@@ -15348,112 +15348,109 @@
       panel.setAttribute("data-scm-contracts-ending-filters-ready", "1");
     }
 
+    function contractsEndingIcon(name) {
+      var paths = {info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',document:'<path d="M7 3h7l4 4v14H7zM14 3v5h4M10 12h5m-5 4h5"/>',bell:'<path d="M6 17h12l-2-3V9a4 4 0 0 0-8 0v5zm4 3h4"/>',clipboard:'<rect x="5" y="5" width="14" height="16" rx="2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/>',calendar:'<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 10h16m-12 4 8 5m0-5-8 5"/>',settings:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="17" r="2"/>',list:'<path d="M8 6h12M8 12h12M8 18h12M3 6h1m-1 6h1m-1 6h1"/>',check:'<path d="m5 12 4 4L19 6"/>',plus:'<path d="M12 4v16M4 12h16"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>'};
+      return '<svg class="scm-ending-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (paths[name] || paths.document) + '</svg>';
+    }
+
     function renderContractsEnding(data) {
-      var panel = root.querySelector("[data-scm-contracts-ending-panel]");
+      var panel = root.querySelector('[data-scm-contracts-ending-panel]');
       if (!panel) return;
+      data = data || {};
       contractsEndingData = data;
-      var importForm = panel.querySelector("[data-scm-contracts-ending-import]");
-      if (importForm) importForm.hidden = !data.can_write || contractsEndingView !== "ending";
-      var help = panel.querySelector("[data-contracts-ending-help]");
-      if (help) help.textContent = {ending:"Contratos con fecha fin en el mes consultado.",renewal:"Registra la probabilidad de renovación. Valor ponderado = canon mensual × probabilidad. Al 100 % no se crea retención ni recibo automático.","no-exit":"Registra reportes de no salida y programa recordatorios internos antes de la fecha fin. Puedes consultar todos los contratos o solo los reportados.",receipt:"Se crea un ticket de recibo 15 días antes de la fecha fin. Requiere responsable activo; se omite renovación al 100 % y no salida reportada."}[contractsEndingView];
-      panel.querySelectorAll("[data-contracts-ending-view]").forEach(function(button) { button.setAttribute("aria-selected", String(button.getAttribute("data-contracts-ending-view") === contractsEndingView)); });
-      var status = panel.querySelector("[data-scm-contracts-ending-status]");
-      var summary = panel.querySelector("[data-scm-contracts-ending-summary]");
-      var list = panel.querySelector("[data-scm-contracts-ending-list]");
-      var groups = Array.isArray(data && data.groups) ? data.groups : [];
-      contractsEndingRowsByPk = {};
-      groups.forEach(function (group) {
-        (Array.isArray(group.items) ? group.items : []).forEach(function (row) {
-          if (row && row.contract_pk) contractsEndingRowsByPk[String(row.contract_pk)] = row;
-        });
+      panel.setAttribute('data-ending-view', contractsEndingView);
+      var nav = panel.querySelector('.scm-ending-tabs');
+      var navParent = panel.querySelector(contractsEndingView === 'no-exit' ? '[data-ending-intro]' : '[data-ending-nav-slot]');
+      if (nav && navParent && nav.parentNode !== navParent) navParent.appendChild(nav);
+      var navSlot = panel.querySelector('[data-ending-nav-slot]');
+      if (navSlot) navSlot.hidden = contractsEndingView === 'no-exit';
+      var importForm = panel.querySelector('[data-scm-contracts-ending-import]');
+      if (importForm) importForm.hidden = !data.can_write || contractsEndingView !== 'ending';
+      var help = panel.querySelector('[data-contracts-ending-help]');
+      if (help) help.innerHTML = {
+        ending:'Contratos con fecha fin en el mes consultado.',
+        renewal:contractsEndingIcon('info') + '<p>Registra la probabilidad de renovación desde Por terminar. <b>Valor ponderado = canon mensual × probabilidad.</b> Al 100 % no se crea retención ni recibo automático.</p>',
+        'no-exit':'Registra reportes de no salida y programa recordatorios internos antes de la fecha fin. Puedes consultar todos los contratos o solo los reportados.',
+        receipt:contractsEndingIcon('info') + '<p><b>Regla operativa:</b> Se crea un ticket de recibo 15 días antes de la fecha fin. Requiere responsable activo; se omite renovación al 100 % y no salida reportada.</p>'
+      }[contractsEndingView];
+      panel.querySelectorAll('[data-contracts-ending-view]').forEach(function(button) {
+        var selected = button.getAttribute('data-contracts-ending-view') === contractsEndingView;
+        button.setAttribute('aria-selected', String(selected)); button.tabIndex = selected ? 0 : -1;
       });
+      var status = panel.querySelector('[data-scm-contracts-ending-status]');
+      var summary = panel.querySelector('[data-scm-contracts-ending-summary]');
+      var list = panel.querySelector('[data-scm-contracts-ending-list]');
+      var groups = Array.isArray(data.groups) ? data.groups : [];
+      contractsEndingRowsByPk = {};
+      groups.forEach(function(group) { (group.items || []).forEach(function(row) { if (row && row.contract_pk) contractsEndingRowsByPk[String(row.contract_pk)] = row; }); });
+      var allRows = Object.values(contractsEndingRowsByPk);
+      var config = data.receipt_automation || {};
+      var scoped = allRows.filter(function(row) { return row.receipt_in_scope === true; });
+      var configId = config.contract_id || (scoped[0] || {}).contract_pk || '';
+      var canConfigure = !!root.querySelector('#scm-internal-notifications-modal');
+      var settingsButton = function(label, primary) { return canConfigure ? '<button type="button" class="scm-ending-button ' + (primary ? 'scm-ending-primary' : contractsEndingView === 'receipt' ? 'scm-ending-settings-link' : 'scm-ending-blue') + '" data-ending-settings>' + contractsEndingIcon('settings') + escHtml(label) + '</button>' : ''; };
+      var historyButton = function(id, label) { return '<button type="button" class="scm-ending-button" data-contracts-ending-history data-contract-pk="' + escHtml(id) + '">' + escHtml(label || 'Historial') + '</button>'; };
+      var money = function(value) { return value == null ? 'Sin dato' : new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(Number(value)); };
       if (status) {
-        status.classList.remove("is-error");
-        status.textContent = "Actualizado " + String((data && data.generated_at) || "") + ".";
+        status.classList.remove('is-error');
+        status.innerHTML = (contractsEndingView === 'renewal' ? '<span class="scm-ending-sync-dot" aria-hidden="true"></span>' : contractsEndingView !== 'ending' ? contractsEndingIcon('clock') : '') + '<span>Actualizado <b>' + escHtml(data.generated_at || '') + '</b>.</span>' + (contractsEndingView === 'no-exit' && data.generated_at ? '<span class="scm-ending-synced">• Sincronizado</span>' : '');
       }
+      var metric = function(label, value, extra, icon, cls) {
+        return '<article class="scm-ending-metric ' + (cls || '') + '"><div class="scm-ending-metric-label"><span>' + escHtml(label) + '</span>' + (icon === 'toggle' ? '<span class="scm-ending-toggle ' + (config.enabled ? 'is-enabled' : '') + '" role="img" aria-label="Automatización ' + (config.enabled ? 'activada' : 'desactivada') + '"><i></i></span>' : icon ? '<span class="scm-ending-metric-icon">' + contractsEndingIcon(icon) + '</span>' : '') + '</div><strong>' + value + '</strong>' + (extra || '') + '</article>';
+      };
       if (summary) {
-        summary.innerHTML =
-          '<div><span>Contratos del mes</span><strong>' + formatDashboardCount(data && data.count || 0) + "</strong></div>" +
-          '<div><span>Mes consultado</span><strong>' + escHtml(groups[0] && groups[0].label || "-") + "</strong></div>" +
-          '<div><span>Gestión</span><strong>' + ({ending:'Retención comercial',renewal:'Renovación',"no-exit":'Recordatorios internos',receipt:'Recibo · 15 días'}[contractsEndingView]) + '</strong></div>';
         if (contractsEndingView === 'renewal') {
-          var allRows = Object.values(contractsEndingRowsByPk);
           var valued = allRows.filter(function(row) { return row.weighted_value != null; });
-          var total = valued.reduce(function(sum,row) { return sum + Number(row.weighted_value); }, 0);
-          summary.innerHTML = '<div><span>Contratos con probabilidad y canon</span><strong>' + valued.length + ' / ' + allRows.length + '</strong></div><div><span>Valor ponderado mensual total</span><strong>' + escHtml(new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(total)) + '</strong></div>';
+          var total = valued.reduce(function(sum,row) { return sum + Number(row.weighted_value); },0);
+          summary.innerHTML = metric('Contratos con probabilidad y canon', valued.length + '<small> / ' + allRows.length + '</small>', '', '', 'scm-ending-accent-top') + metric('Valor ponderado mensual total', escHtml(money(total)), '', '', 'scm-ending-accent-top scm-ending-accent-yellow');
+        } else if (contractsEndingView === 'no-exit') {
+          var reported = allRows.filter(function(row) { return Number((row.renewal || {}).no_exit) === 1; });
+          summary.innerHTML = metric('Reportes de no salida', reported.length, '<p>Contratos registrados bajo esta condición</p>', 'document') + metric('Acción', 'Programar recordatorios', '<div class="scm-ending-metric-foot"><p>Envía alertas a los funcionarios configurados</p>' + settingsButton('Configurar', false) + '</div>', 'bell', 'scm-ending-action-metric');
+        } else if (contractsEndingView === 'receipt') {
+          summary.innerHTML = metric('Contrato configurado · _ID', escHtml(configId || '-'), '<p>Contrato seleccionado en Configuración</p>', 'document', 'scm-ending-accent-side') + metric('Automatización', config.enabled ? 'Activada' : 'Desactivada', '<div class="scm-ending-metric-foot"><span class="scm-ending-cron-state ' + (config.enabled ? 'is-active' : '') + '">• Cron ' + (config.enabled ? 'activo' : 'inactivo') + '</span>' + settingsButton(config.enabled ? 'Configurar' : 'Habilitar', false) + '</div>', 'toggle', 'scm-ending-accent-side scm-ending-accent-yellow') + metric('En el mes consultado', scoped.length + '<small> contratos</small>', '<p>' + escHtml((groups[0] || {}).label || '') + ' · ' + scoped.filter(function(row) { return !!row.receipt_ticket_id; }).length + ' recibos creados</p>', 'calendar', 'scm-ending-accent-side scm-ending-accent-yellow');
+        } else {
+          summary.innerHTML = metric('Contratos del mes', formatDashboardCount(data.count || 0)) + metric('Mes consultado', escHtml((groups[0] || {}).label || '-'), '', '', 'scm-ending-text-metric') + metric('Gestión', 'Retención comercial', '', '', 'scm-ending-text-metric');
         }
-      }
-      if (summary && contractsEndingView === 'no-exit') {
-        var reported = Object.values(contractsEndingRowsByPk).filter(function(row) { return Number((row.renewal || {}).no_exit) === 1; });
-        summary.innerHTML = '<div><span>Reportes de no salida</span><strong>' + reported.length + '</strong></div><div><span>Acción</span><strong>Programar recordatorios</strong></div>';
-      }
-      if (summary && contractsEndingView === 'receipt') {
-        var config = data.receipt_automation || {};
-        var scoped = Object.values(contractsEndingRowsByPk).filter(function(row) { return row.receipt_in_scope === true; });
-        summary.innerHTML = '<div><span>Contrato configurado · _ID</span><strong>' + escHtml(config.contract_id || (scoped[0] || {}).contract_pk || '-') + '</strong></div><div><span>Automatización</span><strong>' + (config.enabled ? 'Activada' : 'Desactivada') + '</strong></div><div><span>En el mes consultado</span><strong>' + scoped.length + '</strong></div>';
       }
       if (!list) return;
-      if (!groups.length) {
-        list.innerHTML = contractsEndingEmpty();
-        return;
-      }
-      list.innerHTML = groups.map(function (group) {
+      list.setAttribute('aria-labelledby', 'scm-ending-tab-' + contractsEndingView);
+      if (!groups.length) { list.innerHTML = '<div class="scm-ending-empty"><h4>Sin contratos para este periodo</h4><p>No se encontraron contratos con fecha fin en el mes consultado.</p></div>'; panel.setAttribute('data-scm-loaded', '1'); return; }
+      list.innerHTML = groups.map(function(group) {
         var items = Array.isArray(group.items) ? group.items : [];
-        if (contractsEndingView === "no-exit" && contractsEndingOnlyNoExit) items = items.filter(function(row) { return Number((row.renewal || {}).no_exit) === 1; });
+        if (contractsEndingView === 'no-exit' && contractsEndingOnlyNoExit) items = items.filter(function(row) { return Number((row.renewal || {}).no_exit) === 1; });
         if (contractsEndingView === 'receipt') items = items.filter(function(row) { return row.receipt_in_scope === true; });
         if (contractsEndingView === 'renewal') {
-          var moneyLabel = function(value) { return value == null ? 'Sin dato' : new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(Number(value)); };
-          return '<section class="scm-contracts-ending-month"><h4>Probabilidad y valor · ' + escHtml(group.label || '') + '</h4><div class="scm-contract-renewal-table-wrap"><table class="scm-contract-renewal-table"><thead><tr><th>Contrato / inmueble</th><th>Probabilidad de renovación</th><th>Canon mensual</th><th>Valor ponderado mensual</th><th>Historial</th></tr></thead><tbody>' + items.map(function(row) {
-            return '<tr><td><b>Contrato #' + escHtml(row.contrato || row.contract_pk) + '</b><small>' + escHtml(row.arrendatario || '') + '</small><small>' + escHtml(row.inmueble || '') + ' · ' + escHtml(row.direccion || '') + '</small></td><td>' + (row.probability == null ? 'Sin registrar' : escHtml(row.probability) + ' %') + (Number(row.probability) === 100 ? '<small>Sin nueva acción</small>' : '') + '</td><td>' + escHtml(moneyLabel(row.canon)) + '</td><td><b>' + escHtml(moneyLabel(row.weighted_value)) + '</b></td><td><button type="button" class="scm-case-work-btn" data-contracts-ending-history data-contract-pk="' + escHtml(row.contract_pk) + '">Historial</button></td></tr>';
+          return '<section class="scm-contracts-ending-month scm-ending-report"><div class="scm-ending-report-title"><b>Probabilidad y valor</b><span>•</span>' + escHtml(group.label || '') + '</div><div class="scm-contract-renewal-table-wrap"><table class="scm-contract-renewal-table"><thead><tr><th scope="col">Contrato / inmueble</th><th scope="col">Probabilidad de renovación</th><th scope="col">Canon mensual</th><th scope="col">Valor ponderado mensual</th><th scope="col">Historial</th></tr></thead><tbody>' + items.map(function(row) {
+            return '<tr><td><b>Contrato #' + escHtml(row.contrato || row.contract_pk) + '</b><small class="scm-ending-tenant">' + escHtml(row.arrendatario || '') + '</small><small>' + escHtml(row.inmueble || '') + ' · ' + escHtml(row.direccion || '') + '</small></td><td><span class="scm-ending-probability-pill">' + (row.probability == null ? 'Sin registrar' : escHtml(row.probability) + ' %') + '</span>' + (Number(row.probability) === 100 ? '<small>Sin nueva acción</small>' : '') + '</td><td>' + escHtml(money(row.canon)) + '</td><td>' + (row.weighted_value == null ? '<em>Sin dato</em>' : '<b>' + escHtml(money(row.weighted_value)) + '</b>') + '</td><td>' + historyButton(row.contract_pk) + '</td></tr>';
           }).join('') + '</tbody></table></div></section>';
         }
-        return '<section class="scm-contracts-ending-month">' +
-          '<div class="scm-contracts-ending-month-head"><div><span>Mes de terminación</span><h4>' + escHtml(group.label || group.key || "Mes") + '</h4></div><strong>' + formatDashboardCount(items.length) + '</strong></div>' +
-          '<div class="scm-contracts-ending-rows">' + (items.length ? items.map(function (row) {
-            row = row || {};
-            var existingTicket = String(row.existing_retention_ticket_id || "");
-            var party = [row.arrendatario ? "Arrendatario: " + row.arrendatario : "", row.propietario ? "Propietario: " + row.propietario : ""].filter(Boolean).join(" · ");
-            var place = [row.inmueble ? "Inmueble " + row.inmueble : "", row.direccion || ""].filter(Boolean).join(" · ");
-            var renewal = row.renewal || {};
-            var canWrite = !!data.can_write;
-            var ticketButton = existingTicket
-              ? '<button type="button" class="scm-case-work-btn" data-contracts-ending-case="retention" data-contract-pk="' + escHtml(row.contract_pk) + '">Ver caso #' + escHtml(existingTicket) + '</button>'
-              : Number(row.probability) === 100
-                ? '<span class="scm-contract-renewal-ok">Renovación 100 % · Sin acción</span>'
-                : canWrite && row.retention_ticket && row.retention_ticket.enabled
-                  ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-contracts-ending-create data-contract-pk="' + escHtml(row.contract_pk) + '">Crear retención</button>'
-                  : '<span>' + (canWrite ? 'Sin responsable disponible para retención' : 'Consulta') + '</span>';
-            var details = '';
-            if (contractsEndingView === 'ending') {
-              details = '<div class="scm-contract-renewal-values"><span>Probabilidad de renovación: <b>' + (row.probability == null ? 'Sin registrar' : escHtml(row.probability) + ' %') + '</b></span><span>' + (Number(renewal.no_exit) ? 'No salida reportada' : 'Sin reporte de no salida') + '</span></div>';
-            } else if (contractsEndingView === 'no-exit') {
-              details = '<div class="scm-contract-renewal-values"><span><b>' + (Number(renewal.no_exit) ? 'No salida reportada' : 'Sin reporte de no salida') + '</b></span>' + (renewal.note ? '<span>' + escHtml(renewal.note) + '</span>' : '') + '<span>Recordatorios: ' + escHtml(renewal.reminder_days || '30,7,0') + ' días antes</span></div>';
-            } else if (contractsEndingView === 'receipt') {
-              details = '<div class="scm-contract-renewal-values"><span>Programado: <b>' + escHtml(row.receipt_due_label || '-') + '</b></span><span>' + (Number(row.probability) === 100 ? 'Omitido: renovación al 100 %' : Number(renewal.no_exit) ? 'Omitido: no salida reportada' : row.receipt_ticket_id ? 'Ticket creado' : row.receipt_in_scope === false ? 'Fuera del contrato configurado para el cron' : row.receipt_automation_enabled === false ? 'Cron desactivado en Configuración' : row.receipt_default_employee_id ? 'Pendiente de ejecución automática' : 'Requiere configurar responsable') + '</span></div>';
-              ticketButton = row.receipt_ticket_id ? '<button type="button" class="scm-case-work-btn" data-contracts-ending-case="receipt" data-contract-pk="' + escHtml(row.contract_pk) + '">Ver recibo #' + escHtml(row.receipt_ticket_id) + '</button>' : '';
-            }
-            if (contractsEndingView === 'no-exit') ticketButton = '';
-            var configure = '';
-            if (canWrite && contractsEndingView === 'ending') configure = '<button type="button" class="scm-case-work-btn" data-contracts-ending-configure="probability" data-contract-pk="' + escHtml(row.contract_pk) + '">' + (row.probability == null ? 'Agregar probabilidad' : 'Editar probabilidad') + '</button><button type="button" class="scm-case-work-btn" data-contracts-ending-configure="no-exit" data-contract-pk="' + escHtml(row.contract_pk) + '">' + (Number(renewal.no_exit) ? 'Editar no salida' : 'Reportar no salida') + '</button>';
-            if (canWrite && contractsEndingView === 'no-exit') configure = '<button type="button" class="scm-case-work-btn" data-contracts-ending-configure="no-exit" data-contract-pk="' + escHtml(row.contract_pk) + '">Registrar / editar reporte</button>';
-            var history = '<button type="button" class="scm-case-work-btn" data-contracts-ending-history data-contract-pk="' + escHtml(row.contract_pk) + '">Historial</button>';
-            var daysLeft = Number(row.days_left || 0);
-            var daysLabel = daysLeft < 0 ? Math.abs(daysLeft) + " días vencido" : daysLeft + " días restantes";
-            return '<article class="scm-contracts-ending-row">' +
-              '<div class="scm-contracts-ending-date"><span>Fin</span><strong>' + escHtml(row.fin_contrato_label || "-") + '</strong><small>' + escHtml(daysLabel) + '</small></div>' +
-              '<div class="scm-contracts-ending-main">' +
-                '<strong>Contrato #' + escHtml(row.contrato || row.contract_pk || "-") + '</strong>' +
-                (party ? '<span>' + escHtml(party) + '</span>' : "") +
-                (place ? '<small>' + escHtml(place) + '</small>' : "") + details +
-              '</div>' +
-              '<div class="scm-contracts-ending-actions">' + ticketButton + configure + history +
-              '</div>' +
-            '</article>';
-          }).join("") : '<div class="scm-contracts-ending-empty-month">' + (contractsEndingView === 'receipt' ? 'El contrato configurado para el cron no termina en este mes. Selecciona su año y mes de terminación para consultar el recibo.' : contractsEndingView === 'no-exit' ? 'No hay reportes de no salida en este mes. Desmarca el filtro para registrar uno.' : 'Sin contratos con fecha fin este mes.') + '</div>') + '</div>' +
-        "</section>";
-      }).join("");
-      if (contractsEndingView === "no-exit") list.insertAdjacentHTML("afterbegin", '<label class="scm-contract-renewal-check"><input type="checkbox" data-contracts-only-no-exit ' + (contractsEndingOnlyNoExit ? "checked" : "") + '>Mostrar solo reportes de no salida</label>');
-      panel.setAttribute("data-scm-loaded", "1");
+        var empty = '';
+        if (!items.length) {
+          var isReceipt = contractsEndingView === 'receipt';
+          var title = isReceipt ? 'Sin contratos configurados para este periodo' : contractsEndingView === 'no-exit' ? 'Sin registros activos' : 'Sin contratos para este periodo';
+          var message = isReceipt ? 'El contrato configurado para el cron no termina en este mes. Selecciona su año y mes de terminación para consultar el recibo.' : contractsEndingView === 'no-exit' ? (contractsEndingOnlyNoExit ? 'No hay reportes de no salida en este mes. Desmarca el filtro para registrar uno.' : 'No hay contratos con fecha fin en este mes. Selecciona otro periodo para registrar un reporte.') : 'No hay contratos con fecha fin en este mes.';
+          var emptyButtons = isReceipt ? settingsButton('Configurar Cron' + (configId ? ' de Contrato ' + configId : ''), true) + (configId ? '<button type="button" class="scm-ending-button" data-ending-receipt-history data-contracts-ending-history data-contract-pk="' + escHtml(configId) + '">' + contractsEndingIcon('list') + 'Ver histórico de recibos</button>' : '') : contractsEndingView === 'no-exit' && contractsEndingOnlyNoExit ? '<button type="button" class="scm-ending-button" data-ending-show-all>' + contractsEndingIcon('close') + 'Desmarcar filtro de visualización</button>' + (data.can_write ? '<button type="button" class="scm-ending-button scm-ending-primary" data-ending-manual-report>' + contractsEndingIcon('plus') + 'Crear reporte manual</button>' : '') : '';
+          empty = '<div class="scm-ending-empty"><span class="scm-ending-empty-icon">' + contractsEndingIcon(isReceipt ? 'calendar' : 'clipboard') + '</span><h4>' + title + '</h4><p>' + message + '</p><div class="scm-ending-empty-actions">' + emptyButtons + '</div></div>';
+        }
+        return '<section class="scm-contracts-ending-month"><div class="scm-contracts-ending-month-head"><div><span>Mes de terminación</span><h4>' + escHtml(group.label || group.key || 'Mes') + '</h4></div><strong>' + formatDashboardCount(items.length) + '</strong></div><div class="scm-contracts-ending-rows">' + (items.length ? items.map(function(row) {
+          var renewal = row.renewal || {}, canWrite = !!data.can_write, existingTicket = String(row.existing_retention_ticket_id || '');
+          var ticketButton = existingTicket ? '<button type="button" class="scm-ending-button" data-contracts-ending-case="retention" data-contract-pk="' + escHtml(row.contract_pk) + '">Ver caso #' + escHtml(existingTicket) + '</button>' : Number(row.probability) === 100 ? '<span class="scm-ending-renewed">Renovación 100 % · Sin acción</span>' : canWrite && row.retention_ticket && row.retention_ticket.enabled ? '<button type="button" class="scm-ending-button scm-ending-primary" data-scm-contracts-ending-create data-contract-pk="' + escHtml(row.contract_pk) + '">Crear retención</button>' : '<span class="scm-ending-muted">' + (canWrite ? 'Sin responsable disponible para retención' : 'Consulta') + '</span>';
+          var details = '';
+          if (contractsEndingView === 'ending') details = '<div class="scm-ending-tags"><span><b>Probabilidad de renovación:</b> ' + (row.probability == null ? 'Sin registrar' : escHtml(row.probability) + ' %') + '</span><span>' + (Number(renewal.no_exit) ? 'No salida reportada' : 'Sin reporte de no salida') + '</span></div>';
+          if (contractsEndingView === 'no-exit') { ticketButton = ''; details = '<div class="scm-ending-tags"><span>' + (Number(renewal.no_exit) ? 'No salida reportada' : 'Sin reporte de no salida') + '</span><span>Recordatorios: ' + escHtml(renewal.reminder_days || '30,7,0') + ' días antes</span></div>' + (renewal.note ? '<p class="scm-ending-report-note">' + escHtml(renewal.note) + '</p>' : ''); }
+          if (contractsEndingView === 'receipt') {
+            details = '<div class="scm-ending-tags"><span>Programado: <b>' + escHtml(row.receipt_due_label || '-') + '</b></span><span>' + (Number(row.probability) === 100 ? 'Omitido: renovación al 100 %' : Number(renewal.no_exit) ? 'Omitido: no salida reportada' : row.receipt_ticket_id ? 'Ticket creado' : row.receipt_automation_enabled === false ? 'Cron desactivado en Configuración' : row.receipt_default_employee_id ? 'Pendiente de ejecución automática' : 'Requiere configurar responsable') + '</span></div>';
+            ticketButton = row.receipt_ticket_id ? '<button type="button" class="scm-ending-button" data-contracts-ending-case="receipt" data-contract-pk="' + escHtml(row.contract_pk) + '">Ver recibo #' + escHtml(row.receipt_ticket_id) + '</button>' : '';
+          }
+          var configure = '';
+          if (canWrite && contractsEndingView === 'ending') configure = '<button type="button" class="scm-ending-button" data-contracts-ending-configure="probability" data-contract-pk="' + escHtml(row.contract_pk) + '">' + (row.probability == null ? 'Agregar probabilidad' : 'Editar probabilidad') + '</button><button type="button" class="scm-ending-button" data-contracts-ending-configure="no-exit" data-contract-pk="' + escHtml(row.contract_pk) + '">' + (Number(renewal.no_exit) ? 'Editar no salida' : 'Reportar no salida') + '</button>';
+          if (canWrite && contractsEndingView === 'no-exit') configure = '<button type="button" class="scm-ending-button" data-contracts-ending-configure="no-exit" data-contract-pk="' + escHtml(row.contract_pk) + '">Registrar / editar reporte</button>';
+          var daysLeft = Number(row.days_left || 0), daysLabel = daysLeft < 0 ? Math.abs(daysLeft) + ' días vencido' : daysLeft + ' días restantes';
+          return '<article class="scm-contracts-ending-row"><div class="scm-contracts-ending-date"><span>Fin</span><strong>' + escHtml(row.fin_contrato_label || '-') + '</strong><small class="' + (daysLeft < 0 ? 'is-expired' : '') + '">' + escHtml(daysLabel) + '</small></div><div class="scm-contracts-ending-main"><strong>Contrato #' + escHtml(row.contrato || row.contract_pk || '-') + '</strong><p>' + (row.arrendatario ? '<b>Arrendatario:</b> ' + escHtml(row.arrendatario) : '') + (row.arrendatario && row.propietario ? ' <span class="scm-ending-party-dot">•</span> ' : '') + (row.propietario ? '<b>Propietario:</b> ' + escHtml(row.propietario) : '') + '</p><small>' + escHtml([row.inmueble ? 'Inmueble ' + row.inmueble : '', row.direccion || ''].filter(Boolean).join(' · ')) + '</small>' + details + '</div><div class="scm-contracts-ending-actions">' + ticketButton + configure + historyButton(row.contract_pk) + '</div></article>';
+        }).join('') : empty) + '</div></section>';
+      }).join('');
+      if (contractsEndingView === 'no-exit') list.insertAdjacentHTML('afterbegin', '<label class="scm-ending-filter"><input type="checkbox" data-contracts-only-no-exit ' + (contractsEndingOnlyNoExit ? 'checked' : '') + '>Mostrar solo reportes de no salida</label>');
+      panel.setAttribute('data-scm-loaded', '1');
     }
 
     function loadContractsEnding(force) {
@@ -15530,9 +15527,9 @@
           '<div><span>Iguales</span><strong>' + escHtml(String(stats.unchanged || 0)) + "</strong></div>" +
           '<div class="is-warning"><span>Sin aplicar</span><strong>' + escHtml(String((stats.unmatched || 0) + (stats.ambiguous || 0) + (stats.invalid || 0))) + "</strong></div>" +
         "</div>" +
-        '<div class="scm-contracts-ending-import-table-wrap"><table><thead><tr><th>Fila</th><th>Excel</th><th>Contrato encontrado</th><th>Fecha actual</th><th>Nueva fecha</th><th>Estado</th></tr></thead><tbody>' + rowHtml + "</tbody></table></div>" +
+        '<div class="scm-contracts-ending-import-table-wrap"><table><thead><tr><th scope="col">Fila</th><th scope="col">Excel</th><th scope="col">Contrato encontrado</th><th scope="col">Fecha actual</th><th scope="col">Nueva fecha</th><th scope="col">Estado</th></tr></thead><tbody>' + rowHtml + "</tbody></table></div>" +
         more +
-        '<p class="scm-contracts-ending-import-note">Al confirmar solo se actualiza <b>fin_contrato</b> de las filas marcadas como Cambiar. La fecha se guarda como Unix en la base de datos.</p>' +
+        '<p class="scm-contracts-ending-import-note">Al confirmar se actualizará la fecha fin únicamente en las filas marcadas como Cambiar.</p>' +
       "</div>";
     }
 
@@ -15547,15 +15544,17 @@
         html: contractsEndingImportPreviewHtml(data || {}),
         didOpen: function(popup) { popup.addEventListener("click", function(event) { var button = event.target.closest("[data-import-page]"); if (button) { popup.querySelector(".swal2-html-container").innerHTML = contractsEndingImportPreviewHtml(data, Number(button.getAttribute("data-import-page"))); } }); },
         width: "min(1040px, 96vw)",
+        showCloseButton: true,
+        closeButtonAriaLabel: "Cerrar previsualización",
         showCancelButton: true,
         showConfirmButton: changes.length > 0,
-        confirmButtonText: "Aplicar " + changes.length + " cambio" + (changes.length === 1 ? "" : "s"),
+        confirmButtonText: contractsEndingIcon("check") + "Aplicar " + changes.length + " cambio" + (changes.length === 1 ? "" : "s"),
         cancelButtonText: changes.length > 0 ? "No aplicar" : "Cerrar",
         buttonsStyling: false,
         customClass: {
-          popup: "scm-calendar-swal-popup scm-contract-termination-swal scm-contracts-ending-import-swal",
-          confirmButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--primary",
-          cancelButton: "scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary",
+          popup: "scm-contracts-ending-import-swal scm-ending-import-swal",
+          confirmButton: "scm-ending-import-button scm-ending-import-primary",
+          cancelButton: "scm-ending-import-button",
         },
       }).then(function (result) {
         if (!result.isConfirmed || !changes.length) return;
@@ -15692,10 +15691,11 @@
       return item.action === 'renewal_saved' ? 'Probabilidad: ' + (before.probability == null ? 'Sin registrar' : before.probability + ' %') + ' → ' + (after.probability == null ? 'Sin registrar' : after.probability + ' %') + '. No salida: ' + (Number(after.no_exit) ? 'Sí' : 'No') + '. ' + (after.note || '') : item.action === 'end_date_imported' ? 'Fecha anterior: ' + new Date(Number(details.before) * 1000).toLocaleDateString('es-CO') + '. Nueva: ' + new Date(Number(details.after) * 1000).toLocaleDateString('es-CO') : 'Ticket #' + (details.ticket_id || '');
     }
 
-    function openContractHistory(contractPk, includeVoided) {
+    function openContractHistory(contractPk, includeVoided, receiptsOnly) {
       return dashboardAction(actions.contracts_ending_history, {contract_pk:contractPk, include_voided:includeVoided ? '1' : ''}).then(function(data) {
         var names = {renewal_saved:'Gestión de renovación actualizada',end_date_imported:'Fecha fin actualizada desde Excel',retention_created:'Retención creada',receipt_created:'Recibo automático creado',reminders_cancelled:'Recordatorios cancelados automáticamente',history_edited:'Descripción del historial corregida',history_voided:'Movimiento anulado'};
         var items = data.items || [];
+        if (receiptsOnly) items = items.filter(function(item) { return item.action === 'receipt_created'; });
         var html = '<p>Registro de cambios y tickets del contrato, con fecha y funcionario. Editar o anular un movimiento no modifica la gestión del contrato ni elimina sus tickets.</p>';
         if (data.can_manage) html += '<label><input type="checkbox" data-history-include-voided ' + (includeVoided ? 'checked' : '') + '>Mostrar anulados y correcciones</label>';
         html += items.map(function(item,index) {
@@ -15703,10 +15703,10 @@
           return '<article class="scm-contract-history-entry"><b>' + (item.voided ? 'Anulado · ' : '') + escHtml(names[item.action] || item.action) + '</b><small>' + escHtml(new Date(Number(item.created_at)*1000).toLocaleString('es-CO')) + ' · Funcionario ' + escHtml(item.actor_name || item.actor || 'Sistema') + '</small><p>' + escHtml(contractHistoryText(item)) + '</p>' + (editable ? '<button type="button" class="scm-case-work-btn" data-history-edit="' + index + '">Editar descripción</button><button type="button" class="scm-case-work-btn" data-history-void="' + index + '">Anular movimiento</button>' : '') + '</article>';
         }).join('');
         if (!items.length) html += '<p>No hay movimientos registrados.</p>';
-        Swal.fire({title:'Historial contractual · últimos 30 movimientos',width:'min(900px,96vw)',html:html,confirmButtonText:'Cerrar',didOpen:function() {
+        Swal.fire({title:receiptsOnly ? 'Historial de recibos · últimos movimientos' : 'Historial contractual · últimos 30 movimientos',width:'min(900px,96vw)',html:html,confirmButtonText:'Cerrar',didOpen:function() {
           var popup = Swal.getPopup();
           var toggle = popup.querySelector('[data-history-include-voided]');
-          if (toggle) toggle.addEventListener('change', function() { openContractHistory(contractPk, toggle.checked); });
+          if (toggle) toggle.addEventListener('change', function() { openContractHistory(contractPk, toggle.checked, receiptsOnly); });
           popup.addEventListener('click', function(event) {
             var button = event.target.closest('[data-history-edit],[data-history-void]');
             if (!button) return;
@@ -15720,13 +15720,38 @@
               return dashboardFormAction(actions.contracts_ending_history_manage, function(fd) {
                 fd.append('contract_pk',contractPk);fd.append('entry_id',item.id);fd.append('revision',item.revision);fd.append('operation',operation);fd.append('reason',form.elements.reason.value.trim());fd.append('text',operation === 'edit' ? form.elements.text.value.trim() : '');fd.append('confirm',operation === 'void' && form.elements.confirm.checked ? '1' : '0');
               }).catch(function(error) { Swal.showValidationMessage(error.message || 'No se pudo corregir el historial.');return false; });
-            }}).then(function(result) { if (result.isConfirmed) showToast('success','Historial actualizado.'); openContractHistory(contractPk,includeVoided); });
+            }}).then(function(result) { if (result.isConfirmed) showToast('success','Historial actualizado.'); openContractHistory(contractPk,includeVoided,receiptsOnly); });
           });
         }});
       }).catch(function(error) { showToast('error',error.message,'No se pudo cargar el historial'); });
     }
 
+    root.addEventListener('keydown', function(event) {
+      var tab = event.target.closest('[data-contracts-ending-view]');
+      if (!tab || !['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+      event.preventDefault();
+      var tabs = Array.from(tab.parentNode.querySelectorAll('[data-contracts-ending-view]'));
+      var index = tabs.indexOf(tab);
+      var next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[next].click(); tabs[next].focus();
+    });
+
     root.addEventListener('click', function(event) {
+      var settings = event.target.closest('[data-ending-settings]');
+      if (settings && root.querySelector('#scm-internal-notifications-modal')) {
+        var trigger = root.querySelector('#scm-open-internal-notifications');
+        if (!trigger) { trigger = document.createElement('button'); trigger.type = 'button'; trigger.id = 'scm-open-internal-notifications'; trigger.hidden = true; trigger.tabIndex = -1; trigger.setAttribute('aria-hidden', 'true'); root.appendChild(trigger); }
+        if (typeof bindInternalNotificationsSettings === 'function') bindInternalNotificationsSettings();
+        trigger.click();
+        return;
+      }
+      var showAll = event.target.closest('[data-ending-show-all],[data-ending-manual-report]');
+      if (showAll) {
+        contractsEndingOnlyNoExit = false; renderContractsEnding(contractsEndingData);
+        var firstReport = root.querySelector('[data-contracts-ending-configure="no-exit"]');
+        if (showAll.hasAttribute('data-ending-manual-report') && firstReport) { firstReport.focus(); firstReport.scrollIntoView({block:'center'}); }
+        return;
+      }
       var onlyNoExit = event.target.closest('[data-contracts-only-no-exit]');
       if (onlyNoExit) { contractsEndingOnlyNoExit = onlyNoExit.checked; if (contractsEndingData) renderContractsEnding(contractsEndingData); return; }
       var tab = event.target.closest('[data-contracts-ending-view]');
@@ -15736,7 +15761,7 @@
       var history = event.target.closest('[data-contracts-ending-history]');
       if (history) {
         history.disabled = true;
-        openContractHistory(history.getAttribute('data-contract-pk'), false).finally(function() { history.disabled = false; });
+        openContractHistory(history.getAttribute('data-contract-pk'), false, history.hasAttribute('data-ending-receipt-history')).finally(function() { history.disabled = false; });
         return;
       }
       var caseButton = event.target.closest('[data-contracts-ending-case]');

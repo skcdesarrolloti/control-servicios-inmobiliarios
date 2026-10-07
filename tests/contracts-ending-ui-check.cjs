@@ -8,8 +8,10 @@ const rootDir = path.join(__dirname, '..');
 const runtime = fs.readFileSync(path.join(rootDir, 'public/assets/js/admin-dashboard-runtime.js'), 'utf8');
 const functions = runtime.slice(runtime.indexOf('    function contractsEndingEmployeeOptions('), runtime.indexOf('    function loadDashboardHome()', runtime.indexOf('    function contractsEndingEmployeeOptions(')));
 const caseFunction = runtime.slice(runtime.indexOf('    function openDashboardDueCaseFromButton('), runtime.indexOf('    function dashboardOpenDueCase('));
+const settingsBinder = runtime.slice(runtime.indexOf('    function bindInternalNotificationsSettings()'), runtime.indexOf('    bindInternalNotificationsSettings();', runtime.indexOf('    function bindInternalNotificationsSettings()')));
+const settingsLoader = runtime.slice(runtime.indexOf('    var settingsModalPromises = {};'), runtime.indexOf('    function ticketAdminDatalist(', runtime.indexOf('    var settingsModalPromises = {};')));
 const render = fs.readFileSync(path.join(rootDir, 'src/App/Concerns/RendersDashboard.php'), 'utf8');
-const start = render.indexOf('<section class="scm-contract-termination-panel scm-contracts-ending-panel"');
+const start = render.indexOf('<section class="scm-contracts-ending-panel scm-ending-workspace"');
 const markup = render.slice(start, render.indexOf('</section>', start) + '</section>'.length);
 
 (async () => {
@@ -20,14 +22,21 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
     const page = await browser.newPage({viewport:{width:1400,height:1100}});
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.setContent('<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="scm-app" class="scm-wrap scm-daisy" data-theme="scm-daisy">' + markup + '</div></body></html>');
+    await page.setContent('<html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="scm-app" class="scm-wrap scm-daisy" data-theme="scm-daisy">' + markup + '<div id="scm-internal-notifications-modal" data-scm-lazy-settings="internal-notifications" aria-hidden="true"></div></div></body></html>');
     for (const file of ['tailwind-admin.css','tailwind-services.css','admin/01-core.css','admin/04-dashboard-pending.css','admin/08-modern-normalize.css','modern-ui.css']) await page.addStyleTag({content:fs.readFileSync(path.join(rootDir,'public/assets/css',file),'utf8')});
+    await page.addStyleTag({url:'https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap'});
+    async function snapshot(name, target = page.locator('[data-scm-contracts-ending-panel]')) {
+      await page.evaluate(async()=>{await document.fonts.ready;await Promise.all(document.getAnimations().map(animation=>animation.finished.catch(()=>{})));});
+      await target.screenshot({path:path.join(qaDir,name)});
+    }
     await page.addScriptTag({url:'https://cdn.jsdelivr.net/npm/sweetalert2@11'});
     await page.addScriptTag({content:`
       var root = document.querySelector('#scm-app'), actions = {contracts_ending_case:'case',contracts_ending_history:'history',contracts_ending_history_manage:'history-manage',contracts_ending_renewal_save:'save'};
       var contractsEndingRowsByPk = {}, contractsEndingData = null, contractsEndingView = 'ending', contractsEndingRequestId = 0, contractsEndingOnlyNoExit = true;
       var ajaxUrl = 'synthetic', actionContractsEndingMonths = 'list', actionContractsEndingCreateRetention='retention', actionContractsEndingImportApply='import';
-      var sent = [], opened = [], messages = [], pendingLists = null;
+      var sent = [], opened = [], messages = [], pendingLists = null, settingsLoads = 0;
+      var nonce='synthetic',actionInternalNotificationsRead='settings-read',actionPublicPqrSettingsRead='pqr-read';
+      window.fetch=function() { settingsLoads++;return new Promise(resolve=>setTimeout(()=>resolve({json:()=>Promise.resolve({success:true,data:{html:'<div id="scm-internal-notifications-modal" class="scm-pqr-settings-modal" aria-hidden="true"><button id="scm-close-internal-notifications">Cerrar</button><form id="scm-internal-notifications-form"></form></div>'}})}),30)); };
       function escHtml(value) { var el = document.createElement('div'); el.textContent = String(value == null ? '' : value); return el.innerHTML.replace(/"/g,'&quot;'); }
       function formatDashboardCount(n) { return String(n); }
       function showToast(kind,text,title) { messages.push({kind,text,title}); }
@@ -46,7 +55,7 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
       var base = {receipt_in_scope:true,receipt_automation_enabled:true,receipt_default_employee_id:'EMP-13',contract_pk:'1',contrato:'193',inmueble:'10200',direccion:'Dirección de prueba',arrendatario:'<img src=x onerror=alert(1)>',propietario:'Propietario de prueba',fin_contrato_label:'20/10/2026',end_ts:1792472400,days_left:15,canon:1000000,probability:80,weighted_value:800000,renewal:{probability:80,no_exit:0,revision:2,reminder_days:'30,7,0'},receipt_due_label:'05/10/2026',receipt_funcionarios:[{id:'EMP-13',name:'Funcionario activo'}],retention_ticket:{enabled:true,default_employee_id:'EMP-13',funcionarios:[{id:'EMP-13',name:'Funcionario activo'}]}};
       var historyFixture={can_manage:false,items:[{id:1,action:'retention_created',actor:'EMP-13',actor_name:'Funcionario de prueba',created_at:1791210875,details_json:JSON.stringify({ticket_id:77}),revision:'synthetic-revision'}]};
       var fixture = {receipt_automation:{enabled:true,contract_id:1},can_write:true,year:2026,month:10,count:3,generated_at:'05/10/2026 14:20',groups:[{label:'Octubre 2026',count:3,items:[base,Object.assign({},base,{receipt_in_scope:false,contract_pk:'2',contrato:'656',probability:100,weighted_value:1000000}),Object.assign({},base,{receipt_in_scope:false,contract_pk:'3',contrato:'888',existing_retention_ticket_id:'77',renewal:{no_exit:1,note:'Reporte confirmado',revision:1}})]}]};
-    ` + caseFunction + functions + '\ninitContractsEndingFilters(root.querySelector("[data-scm-contracts-ending-panel]"));renderContractsEnding(fixture);'});
+    ` + settingsBinder + settingsLoader + caseFunction + functions + '\ninitContractsEndingFilters(root.querySelector("[data-scm-contracts-ending-panel]"));renderContractsEnding(fixture);'});
     assert.equal(await page.locator('[data-scm-contracts-ending-create]').count(),1);
     assert.equal(await page.locator('.scm-contracts-ending-main img').count(),0);
     await page.locator('[data-contracts-ending-case="retention"]').click();
@@ -55,10 +64,10 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
     assert.equal(await page.locator('[data-contracts-ending-configure="probability"]').count(),3);
     assert.equal(await page.locator('[data-contracts-ending-configure="no-exit"]').count(),3);
     assert.match(await page.locator('.scm-contracts-ending-main').first().innerText(),/80 %/);
-    await page.screenshot({path:path.join(qaDir,'ending-desktop.png'),fullPage:true});
+    await snapshot('ending-desktop.png');
     await page.setViewportSize({width:390,height:1000});
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'Main list must not overflow on mobile');
-    await page.screenshot({path:path.join(qaDir,'ending-mobile.png'),fullPage:true});
+    await snapshot('ending-mobile.png');
     await page.setViewportSize({width:1400,height:1100});
     await page.locator('[data-contracts-ending-view="renewal"]').click();
     assert.match(await page.locator('[data-scm-contracts-ending-summary]').innerText(), /2.600.000/);
@@ -67,10 +76,10 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
     assert.equal(await page.locator('[data-contracts-ending-configure]').count(),0,'Probability report has no editing actions');
     assert.equal(await page.locator('[data-scm-contracts-ending-create]').count(),0);
     assert.equal(await page.locator('[data-scm-contracts-ending-import]').isVisible(),false);
-    await page.screenshot({path:path.join(qaDir,'renewal-desktop.png'),fullPage:true});
+    await snapshot('renewal-desktop.png');
     await page.setViewportSize({width:390,height:1000});
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'Renewal table must scroll inside its container on mobile');
-    await page.screenshot({path:path.join(qaDir,'renewal-mobile.png'),fullPage:true});
+    await snapshot('renewal-mobile.png');
     await page.setViewportSize({width:1400,height:1100});
     await page.locator('[data-contracts-ending-view="ending"]').click();
     await page.locator('[data-contracts-ending-configure="probability"][data-contract-pk="3"]').click();
@@ -101,6 +110,24 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
     assert.equal(await page.locator('[data-scm-contracts-ending-create]').count(),0);
     await page.locator('[data-contracts-only-no-exit]').check();
     assert.equal(await page.locator('.scm-contracts-ending-row').count(),1);
+    await snapshot('no-exit-desktop.png');
+    await page.evaluate(()=>{fixture.groups[0].items[2].renewal.no_exit=0;renderContractsEnding(fixture);});
+    await snapshot('no-exit-empty-desktop.png');
+    await page.locator('[data-ending-settings]').click();
+    await page.waitForFunction(()=>document.querySelector('#scm-internal-notifications-modal').classList.contains('open'));
+    assert.equal(await page.evaluate(()=>settingsLoads),1,'Configuration loads in the existing internal popup');
+    await page.locator('#scm-close-internal-notifications').click();
+    await page.locator('[data-ending-settings]').click();
+    assert.equal(await page.locator('#scm-internal-notifications-modal').getAttribute('aria-hidden'),'false','Loaded settings reopen without another request');
+    assert.equal(await page.evaluate(()=>settingsLoads),1);
+    await page.locator('#scm-close-internal-notifications').click();
+    await page.locator('[data-ending-show-all]').click();
+    assert.equal(await page.locator('.scm-contracts-ending-row').count(),3);
+    await page.locator('[data-contracts-only-no-exit]').check();
+    await page.locator('[data-ending-manual-report]').click();
+    assert.equal(await page.locator('.scm-contracts-ending-row').count(),3);
+    assert.equal(await page.locator('[data-contracts-only-no-exit]').isChecked(),false);
+    await page.evaluate(()=>{fixture.groups[0].items[2].renewal.no_exit=1;contractsEndingOnlyNoExit=true;renderContractsEnding(fixture);});
     await page.locator('[data-contracts-ending-configure]').click();
     await popup.locator('[name="no_exit"]').uncheck();
     await popup.locator('.swal2-confirm').click();
@@ -112,12 +139,20 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
     assert.equal(await page.locator('[data-contracts-ending-configure]').count(),0);
     assert.match(await page.locator('[data-scm-contracts-ending-list]').innerText(), /Pendiente/);
     await page.setViewportSize({width:390,height:1000});
-    await page.screenshot({path:path.join(qaDir,'receipt-mobile.png'),fullPage:true});
+    await snapshot('receipt-mobile.png');
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'Mobile must not overflow');
-    await page.evaluate(()=>{fixture.groups[0].items[0].receipt_in_scope=false;renderContractsEnding(fixture);});
+    await page.evaluate(()=>{fixture.groups[0].items[0].receipt_in_scope=false;fixture.receipt_automation.enabled=false;renderContractsEnding(fixture);});
     assert.equal(await page.locator('.scm-contracts-ending-row').count(),0);
     assert.match(await page.locator('[data-scm-contracts-ending-list]').innerText(), /cron no termina en este mes/);
-    await page.evaluate(()=>{fixture.groups[0].items[0].receipt_in_scope=true;renderContractsEnding(fixture);});
+    await page.setViewportSize({width:1400,height:1100});
+    await snapshot('receipt-empty-desktop.png');
+    await page.setViewportSize({width:390,height:1000});
+    await snapshot('receipt-empty-mobile.png');
+    await page.locator('[data-ending-receipt-history]').click();
+    await popup.waitFor();
+    assert.equal(await popup.locator('.scm-contract-history-entry').count(),0,'Receipt history excludes retention movements');
+    await popup.locator('.swal2-confirm').click();
+    await page.evaluate(()=>{fixture.groups[0].items[0].receipt_in_scope=true;fixture.receipt_automation.enabled=true;renderContractsEnding(fixture);});
     await page.locator('[data-contracts-ending-history]').first().click();
     await page.locator('.swal2-popup').waitFor();
     assert.equal(await popup.locator('[data-history-edit]').count(),0,'Read-only viewers cannot edit history');
@@ -144,10 +179,33 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
     // All preview pages must be accessible even though the modal displays 80 at once.
     await page.evaluate(()=>openContractsEndingImportPreview({filename:'synthetic.xlsx',expires:123,token:'test',stats:{total:81,changes:81},changes:Array.from({length:81},(_,i)=>({contract_id:String(i)})),rows:Array.from({length:81},(_,i)=>({line:String(i+1),status:'change',contrato_excel:String(i+1),new_fin_label:'01/12/2026'}))}));
     assert.equal(await popup.locator('tbody tr').count(),80);
+    assert.equal(await popup.locator('.swal2-confirm').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(248, 207, 74)','Excel primary action follows supplied yellow theme');
     await popup.locator('[data-import-page="1"]').click();
     assert.equal(await popup.locator('tbody tr').count(),1);
     assert.equal(await popup.locator('tbody tr td').first().innerText(),'81');
     await popup.locator('.swal2-cancel').click();
+    await page.evaluate(()=>openContractsEndingImportPreview({filename:'arrendatario vigente sept 2026.xls',generated_at:'07/10/2026 15:24',expires:123,token:'test',stats:{total:389,changes:246,unchanged:126,unmatched:17},changes:[{contract_id:'1'}],rows:Array.from({length:8},(_,i)=>({line:String(i+2),status:i===2?'unchanged':i===3?'unmatched':'change',contrato_excel:String(i+620),inmueble_excel:'10010',contrato_db:i===3?'':String(i+620),inmueble_db:i===3?'':'10010',old_fin_label:'06/07/2026',new_fin_label:'06/07/2027',note:i===3?'No se encontró contrato con ese No. Contrato + No. Inm.':i===2?'Ya tiene la misma fecha fin.':''}))}));
+    await page.setViewportSize({width:1400,height:1100});
+    await snapshot('excel-preview-desktop.png',popup);
+    await page.setViewportSize({width:390,height:1000});
+    await snapshot('excel-preview-mobile.png',popup);
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'Preview must scroll within the table');
+    await popup.locator('.swal2-close').click();
+    await page.locator('[data-contracts-ending-view="ending"]').focus();
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await page.locator('[data-contracts-ending-view="renewal"]').getAttribute('aria-selected'),'true');
+    for (const width of [768,1024]) {
+      await page.setViewportSize({width,height:1000});
+      for (const view of ['ending','renewal','no-exit','receipt']) {
+        await page.locator('[data-contracts-ending-view="'+view+'"]').click();
+        assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'No overflow in '+view+' at '+width+'px');
+      }
+    }
+    await page.evaluate(()=>{
+      var modal=document.querySelector('#scm-internal-notifications-modal');modal.remove();renderContractsEnding(fixture);
+      if (root.querySelector('[data-ending-settings]')) throw new Error('Settings shortcuts require configuration permission');
+      root.appendChild(modal);renderContractsEnding(fixture);
+    });
     // A late response from an old month cannot overwrite the newest result.
     await page.evaluate(()=>{pendingLists=[];loadContractsEnding(true);loadContractsEnding(true);pendingLists[1](Object.assign({},fixture,{generated_at:'NEW'}));});
     await page.waitForFunction(()=>document.querySelector('[data-scm-contracts-ending-status]').textContent.includes('NEW'));
@@ -156,6 +214,6 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
     await page.evaluate(async()=>{dashboardAction=()=>Promise.reject(new Error('Consulta no disponible'));await loadContractsEnding(true);});
     assert.equal(await page.evaluate(()=>messages[messages.length-1].title),'No se pudo cargar el listado');
     assert.deepEqual(errors,[]);
-    console.log('PASS: four subtabs, weighted amounts, 100% suppression, existing-case popup, saves and retirement validation, escaping, all Excel preview pages, request ordering and mobile layout. QA: '+qaDir);
+    console.log('PASS: reference layouts, keyboard tabs, configuration popup and permissions, weighted amounts, 100% suppression, existing-case popup, saves and retirement validation, escaping, all Excel preview pages, request ordering and mobile layout. QA: '+qaDir);
   } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exit(1);});

@@ -68,3 +68,221 @@
   .swal2-popup.scm-contract-response-swal .swal2-title { padding-left:16px; font-size:19px; }
   .swal2-popup.scm-contract-response-swal .scm-contract-notifications { grid-template-columns:1fr; }
 }
+/* User-supplied contract ending layouts, compiled with the local Tailwind build. */
+@layer components {
+  #scm-app .scm-ending-workspace.scm-contracts-ending-panel { @apply mx-auto flex w-full max-w-7xl flex-col gap-6 bg-[#f4f6f9] p-4 text-[#061d49] sm:p-6; border:0; border-radius:0; font-family:Poppins,sans-serif; font-size:14px; }
+  #scm-app .scm-ending-workspace[data-ending-view="renewal"] { @apply bg-white; }
+  #scm-app .scm-ending-workspace[data-ending-view="no-exit"], #scm-app .scm-ending-workspace[data-ending-view="receipt"] { @apply bg-slate-50; }
+  #scm-app .scm-ending-workspace .scm-ending-intro { @apply rounded-xl border border-slate-200 bg-white p-6 shadow-sm; }
+  #scm-app .scm-ending-workspace .scm-ending-heading { @apply flex flex-col justify-between gap-6 lg:flex-row lg:items-center; }
+  #scm-app .scm-ending-workspace .scm-ending-title { @apply min-w-0; }
+  #scm-app .scm-ending-workspace .scm-ending-title h3 { @apply m-0 mt-1 text-2xl font-bold tracking-tight text-[#061d49] sm:text-3xl; line-height:1.2; }
+  #scm-app .scm-ending-workspace .scm-ending-title p { @apply mb-0 mt-2 max-w-2xl text-sm font-normal leading-relaxed text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-ending-kicker { @apply inline-flex rounded bg-[#f8cf4a] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-ending-module { @apply hidden text-xs font-medium text-slate-400; }
+  #scm-app .scm-ending-workspace[data-ending-view="no-exit"] .scm-ending-module { @apply inline; }
+  #scm-app .scm-ending-workspace:not([data-ending-view="ending"]) .scm-ending-kicker { @apply rounded-full border border-amber-200 bg-amber-50 text-amber-900; }
+  #scm-app .scm-ending-workspace:is([data-ending-view="renewal"],[data-ending-view="receipt"]) .scm-ending-intro { @apply border-0 bg-transparent p-0 shadow-none; }
+  #scm-app .scm-ending-workspace[data-ending-view="receipt"] .scm-ending-intro { @apply border-b border-slate-200 pb-6; }
+  #scm-app .scm-ending-workspace .scm-ending-tools { @apply flex shrink-0 flex-wrap items-end gap-3; }
+  #scm-app .scm-ending-workspace:not([data-ending-view="ending"]) .scm-ending-tools { @apply rounded-xl border border-slate-200 bg-white p-3 shadow-sm; }
+  #scm-app .scm-ending-workspace[data-ending-view="no-exit"] .scm-ending-tools { @apply bg-slate-50 shadow-none; }
+  #scm-app .scm-ending-workspace .scm-ending-tools label { @apply m-0 grid gap-1; }
+  #scm-app .scm-ending-workspace .scm-ending-tools label > span { @apply text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-ending-tools select { @apply m-0 h-10 min-w-[90px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-ending-tools select[data-scm-contracts-ending-month] { @apply min-w-[130px]; }
+  #scm-app .scm-ending-workspace .scm-ending-button { @apply inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-medium leading-snug text-[#061d49] transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50; cursor:pointer; text-decoration:none; box-shadow:0 1px 2px rgba(6,29,73,.03); }
+  #scm-app .scm-ending-workspace .scm-ending-primary { @apply border-[#f8cf4a] bg-[#f8cf4a] font-semibold text-[#061d49] hover:bg-[#eac444]; }
+  #scm-app .scm-ending-workspace .scm-ending-blue { @apply border-[#1e3c76] bg-[#1e3c76] text-white hover:bg-[#061d49]; }
+  #scm-app .scm-ending-workspace[data-ending-view="ending"] [data-scm-contracts-ending-refresh] { @apply border-slate-300 bg-slate-100 font-medium hover:bg-slate-200; }
+  #scm-app .scm-ending-workspace .scm-ending-refresh-icon { @apply hidden; }
+  #scm-app .scm-ending-workspace:is([data-ending-view="no-exit"],[data-ending-view="receipt"]) .scm-ending-refresh-icon { @apply inline-block; }
+  .scm-ending-icon { @apply inline-block h-4 w-4 shrink-0 align-middle; }
+  #scm-app .scm-ending-workspace .scm-ending-upload { @apply grid gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm; }
+  #scm-app .scm-ending-workspace .scm-ending-upload[hidden] { display:none; }
+  #scm-app .scm-ending-workspace .scm-ending-label { @apply m-0 block text-[11px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-ending-upload p { @apply m-0 mt-1 text-xs font-normal text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-ending-upload-controls { @apply flex flex-col items-stretch gap-4 lg:flex-row lg:items-center; }
+  #scm-app .scm-ending-workspace .scm-ending-upload input { @apply min-w-0 flex-1 rounded-lg border border-slate-300 bg-slate-50/50 p-1.5 text-xs text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-ending-upload input::file-selector-button { @apply mr-3 cursor-pointer rounded border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-ending-upload button { @apply whitespace-nowrap px-6 py-3; }
+  #scm-app .scm-ending-workspace .scm-ending-nav-slot:empty { display:none; }
+  #scm-app .scm-ending-workspace .scm-ending-tabs { @apply flex flex-wrap gap-2; }
+  #scm-app .scm-ending-workspace .scm-ending-tabs button { @apply rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-[#061d49] transition-colors hover:bg-slate-100; min-height:40px; cursor:pointer; }
+  #scm-app .scm-ending-workspace .scm-ending-tabs [aria-selected="true"] { @apply border-[#061d49] bg-[#061d49] font-bold text-white shadow-sm hover:bg-[#1e3c76]; }
+  #scm-app .scm-ending-workspace[data-ending-view="ending"] .scm-ending-tabs button { @apply rounded-full; }
+  #scm-app .scm-ending-workspace[data-ending-view="renewal"] .scm-ending-tabs { @apply border-b border-slate-200 pb-0; }
+  #scm-app .scm-ending-workspace[data-ending-view="renewal"] .scm-ending-tabs button:not([aria-selected="true"]) { @apply border-transparent bg-transparent; }
+  #scm-app .scm-ending-workspace:is([data-ending-view="no-exit"],[data-ending-view="receipt"]) .scm-ending-tabs [aria-selected="true"] { box-shadow:0 2px 0 #f8cf4a; }
+  #scm-app .scm-ending-workspace[data-ending-view="no-exit"] .scm-ending-tabs { @apply mt-8 border-t border-slate-100 pt-4; }
+  #scm-app .scm-ending-workspace .scm-ending-tabs [aria-selected="true"]:not([data-contracts-ending-view="ending"])::after { @apply ml-2 inline-block h-1.5 w-1.5 rounded-full bg-[#f8cf4a]; content:""; }
+  #scm-app .scm-ending-workspace .scm-ending-meta { @apply grid gap-3; }
+  #scm-app .scm-ending-workspace[data-ending-view="ending"] .scm-ending-meta { @apply flex flex-wrap items-center justify-between gap-2; }
+  #scm-app .scm-ending-workspace .scm-ending-help { @apply flex items-center gap-3 text-sm font-normal leading-relaxed text-slate-600; }
+  #scm-app .scm-ending-workspace .scm-ending-help p { @apply m-0; }
+  #scm-app .scm-ending-workspace:is([data-ending-view="renewal"],[data-ending-view="receipt"]) .scm-ending-help { @apply rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-[#1e3c76]; }
+  #scm-app .scm-ending-workspace .scm-ending-status { @apply flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-normal text-slate-500; }
+  #scm-app .scm-ending-workspace[data-ending-view="ending"] .scm-ending-status { @apply border-0 bg-transparent p-0; }
+  #scm-app .scm-ending-workspace[data-ending-view="receipt"] .scm-ending-status { @apply self-start; width:fit-content; }
+  #scm-app .scm-ending-workspace .scm-ending-status b { @apply font-semibold; }
+  #scm-app .scm-ending-workspace .scm-ending-status.is-error { @apply border-red-200 bg-red-50 p-3 text-red-800; }
+  #scm-app .scm-ending-workspace .scm-ending-sync-dot { @apply h-2 w-2 rounded-full bg-emerald-500; }
+  #scm-app .scm-ending-workspace .scm-ending-synced { @apply ml-auto rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700; }
+  #scm-app .scm-ending-workspace .scm-ending-metrics { @apply grid grid-cols-1 gap-4 md:grid-cols-3; }
+  #scm-app .scm-ending-workspace:is([data-ending-view="renewal"],[data-ending-view="no-exit"]) .scm-ending-metrics { @apply md:grid-cols-2; }
+  #scm-app .scm-ending-workspace .scm-ending-metric { @apply relative min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm; }
+  #scm-app .scm-ending-workspace .scm-ending-metric-label { @apply mb-2 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-ending-metric > strong { @apply block text-3xl font-bold tracking-tight text-[#061d49]; line-height:1.3; }
+  #scm-app .scm-ending-workspace .scm-ending-metric > strong small { @apply text-lg font-normal text-slate-400; }
+  #scm-app .scm-ending-workspace .scm-ending-metric p { @apply mb-0 mt-2 text-xs font-normal text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-ending-text-metric > strong { @apply text-2xl; }
+  #scm-app .scm-ending-workspace .scm-ending-metric-icon { @apply flex h-8 w-8 items-center justify-center rounded-lg bg-[#eef3fb] text-[#1e3c76]; }
+  #scm-app .scm-ending-workspace .scm-ending-action-metric .scm-ending-metric-icon { @apply bg-amber-50 text-amber-600; }
+  #scm-app .scm-ending-workspace .scm-ending-action-metric > strong { @apply mt-5 text-xl; }
+  #scm-app .scm-ending-workspace .scm-ending-metric-foot { @apply flex flex-wrap items-center justify-between gap-2; }
+  #scm-app .scm-ending-workspace .scm-ending-metric-foot .scm-ending-button { @apply mt-2 min-h-[32px] px-3 py-1.5 text-[11px]; }
+  #scm-app .scm-ending-workspace .scm-ending-cron-state { @apply mt-3 rounded border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-700; }
+  #scm-app .scm-ending-workspace .scm-ending-cron-state.is-active { @apply border-emerald-200 bg-emerald-50 text-emerald-700; }
+  #scm-app .scm-ending-workspace .scm-ending-accent-top { @apply border-t-4 border-t-[#1e3c76]; }
+  #scm-app .scm-ending-workspace .scm-ending-accent-side { @apply border-l-4 border-l-[#1e3c76]; }
+  #scm-app .scm-ending-workspace .scm-ending-accent-top.scm-ending-accent-yellow { @apply border-t-[#f8cf4a]; }
+  #scm-app .scm-ending-workspace .scm-ending-accent-side.scm-ending-accent-yellow { @apply border-l-[#f8cf4a]; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-list { @apply m-0 grid gap-6; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-month { @apply block overflow-hidden rounded-xl border border-slate-200 bg-white p-0 shadow-sm; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-month-head { @apply flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-4; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-month-head span { @apply block text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-month-head h4 { @apply m-0 mt-1 text-lg font-bold text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-month-head > strong { @apply flex h-8 min-w-[32px] items-center justify-center rounded-full bg-[#eef3fb] p-0 text-xs font-bold text-[#1e3c76]; }
+  #scm-app .scm-ending-workspace[data-ending-view="receipt"] .scm-contracts-ending-month-head > strong { @apply bg-[#061d49] text-[#f8cf4a]; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-rows { @apply grid gap-0 px-6 py-3; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-row { @apply grid items-center gap-5 rounded-none border-0 border-b border-slate-100 bg-white px-0 py-5; grid-template-columns:120px minmax(0,1fr); }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-row:last-child { @apply border-b-0; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-date { @apply grid self-start gap-1 rounded-lg border border-slate-200 bg-slate-50 p-3 text-center; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-date span { @apply text-[10px] font-normal uppercase text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-date strong { @apply text-sm font-bold text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-date small { @apply mx-auto mt-1 rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-[#1e3c76]; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-date small.is-expired { @apply border-rose-100 bg-rose-50 text-rose-600; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-main { @apply grid min-w-0 gap-1.5; overflow-wrap:anywhere; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-main > strong { @apply text-sm font-bold text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-main p { @apply m-0 text-xs font-normal leading-relaxed text-slate-700; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-main small { @apply text-[11px] font-normal text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-main b { @apply font-semibold text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-main .scm-ending-party-dot { @apply mx-1 text-slate-400; }
+  #scm-app .scm-ending-workspace .scm-ending-tags { @apply flex flex-wrap gap-2 pt-1; }
+  #scm-app .scm-ending-workspace .scm-ending-tags span { @apply rounded border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-normal text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-actions { @apply col-span-2 flex max-w-none flex-wrap justify-start gap-2; }
+  #scm-app .scm-ending-workspace .scm-contracts-ending-actions .scm-ending-button { @apply min-w-0; }
+  #scm-app .scm-ending-workspace .scm-ending-renewed { @apply inline-flex items-center rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700; }
+  #scm-app .scm-ending-workspace .scm-ending-muted { @apply text-xs text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-ending-filter { @apply m-0 flex items-center gap-3 text-sm font-semibold text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-ending-filter input { @apply h-5 w-5 rounded border-slate-300; accent-color:#061d49; }
+  #scm-app .scm-ending-workspace .scm-ending-empty { @apply m-5 flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-5 py-14 text-center; }
+  #scm-app .scm-ending-workspace .scm-ending-empty-icon { @apply mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#1e3c76] shadow-sm; }
+  #scm-app .scm-ending-workspace .scm-ending-empty-icon svg { @apply h-8 w-8; }
+  #scm-app .scm-ending-workspace[data-ending-view="receipt"] .scm-ending-empty-icon { @apply h-14 w-14 rounded-full border-0 bg-[#eef3fb] shadow-none; }
+  #scm-app .scm-ending-workspace .scm-ending-empty h4 { @apply m-0 text-base font-bold text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-ending-empty p { @apply mb-0 mt-2 max-w-md text-sm font-normal leading-relaxed text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-ending-empty-actions { @apply mt-6 flex flex-wrap items-center justify-center gap-3; }
+  #scm-app .scm-ending-workspace .scm-ending-empty-actions:empty { display:none; }
+  #scm-app .scm-ending-workspace .scm-ending-report-title { @apply flex items-center gap-2 border-b border-slate-200 bg-slate-50/70 px-6 py-4 text-sm text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-ending-report-title span { @apply text-slate-400; }
+  #scm-app .scm-ending-workspace .scm-contract-renewal-table-wrap { @apply overflow-x-auto; }
+  #scm-app .scm-ending-workspace .scm-contract-renewal-table { @apply w-full border-collapse text-left text-xs; min-width:720px; }
+  #scm-app .scm-ending-workspace .scm-contract-renewal-table th { @apply border-b border-slate-200 bg-slate-100/80 px-6 py-4 text-[10px] font-semibold uppercase tracking-wider text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-contract-renewal-table td { @apply border-b border-slate-200 px-6 py-4 align-top font-normal text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-contract-renewal-table tbody tr:last-child td { @apply border-b-0; }
+  #scm-app .scm-ending-workspace .scm-contract-renewal-table tbody tr:hover { @apply bg-slate-50; }
+  #scm-app .scm-ending-workspace .scm-contract-renewal-table td:first-child { width:36%; }
+  #scm-app .scm-ending-workspace .scm-contract-renewal-table td b { @apply font-semibold; }
+  #scm-app .scm-ending-workspace .scm-contract-renewal-table td:first-child b { @apply text-sm font-bold; }
+  #scm-app .scm-ending-workspace .scm-contract-renewal-table small { @apply mt-1 block text-[10px] font-normal leading-relaxed text-slate-500; }
+  #scm-app .scm-ending-workspace .scm-contract-renewal-table small.scm-ending-tenant { @apply font-medium text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-ending-probability-pill { @apply inline-flex whitespace-nowrap rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[10px] text-[#061d49]; }
+  #scm-app .scm-ending-workspace .scm-contract-renewal-table em { @apply font-normal text-slate-400; }
+  #scm-app .scm-ending-workspace .scm-contract-renewal-table .scm-ending-button { @apply min-h-[32px] whitespace-nowrap px-3 py-1.5 text-[11px]; }
+  #scm-app .scm-ending-workspace :is(button,input,select):focus-visible { outline:2px solid #1e3c76; outline-offset:3px; }
+  @media(min-width:1200px) {
+    #scm-app .scm-ending-workspace .scm-contracts-ending-row { grid-template-columns:120px minmax(0,1fr) auto; }
+    #scm-app .scm-ending-workspace .scm-contracts-ending-actions { @apply col-span-1 flex-nowrap justify-end; }
+    #scm-app .scm-ending-workspace .scm-contracts-ending-actions .scm-ending-button { max-width:140px; }
+  }
+  @media(max-width:640px) {
+    #scm-app .scm-ending-workspace .scm-ending-tools { @apply w-full; }
+    #scm-app .scm-ending-workspace .scm-ending-tools select { @apply min-w-0; }
+    #scm-app .scm-ending-workspace .scm-ending-tabs button { @apply flex-1; min-width:140px; min-height:44px; }
+    #scm-app .scm-ending-workspace .scm-contracts-ending-row { grid-template-columns:1fr; }
+    #scm-app .scm-ending-workspace .scm-contracts-ending-date { @apply justify-self-start; }
+    #scm-app .scm-ending-workspace .scm-contracts-ending-actions { @apply col-span-1 grid w-full grid-cols-2; }
+    #scm-app .scm-ending-workspace .scm-ending-button { min-height:44px; }
+  }
+}
+
+/* Scoped SweetAlert shell for the supplied Excel preview. */
+@layer components {
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal { @apply overflow-hidden rounded-2xl border border-slate-200 bg-white p-0 text-[#061d49] shadow-2xl; font-family:Poppins,sans-serif; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .swal2-title { @apply m-0 bg-[#061d49] px-8 py-6 text-left text-2xl font-bold tracking-tight text-white; padding-right:64px; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .swal2-close { @apply absolute right-4 top-4 h-10 w-10 rounded-lg text-white/70 hover:bg-white/10 hover:text-white; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .swal2-html-container { @apply m-0 p-8 text-left; max-height:calc(90dvh - 160px); overflow-y:auto; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .swal2-actions { @apply m-0 flex w-full flex-row-reverse justify-start gap-3 border-t border-slate-200 bg-slate-50 px-8 py-4; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-preview { @apply grid gap-6 text-[#061d49]; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-head { @apply flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-head span { @apply block text-[11px] font-semibold uppercase tracking-wider text-slate-400; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-head strong { @apply mt-1 block text-lg font-bold text-[#061d49]; overflow-wrap:anywhere; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-head small { @apply mt-1 block text-xs font-normal text-slate-500; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-head em { @apply rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-medium not-italic text-amber-700; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-kpis { @apply grid grid-cols-2 gap-4 md:grid-cols-4; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-kpis > div { @apply rounded-xl border border-slate-200 bg-slate-50/70 p-4; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-kpis span { @apply block text-[11px] font-semibold uppercase tracking-wider text-slate-500; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-kpis strong { @apply mt-2 block text-3xl font-bold text-[#061d49]; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-kpis .is-change { @apply border-emerald-200 bg-emerald-50/50; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-kpis .is-change :is(span,strong) { @apply text-emerald-700; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-kpis .is-warning { @apply border-amber-200 bg-amber-50/40; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-kpis .is-warning :is(span,strong) { @apply text-amber-700; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap { @apply overflow-x-auto rounded-xl border border-slate-200 bg-white; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap table { @apply w-full border-collapse text-xs; min-width:720px; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap :is(th,td) { @apply border-b border-slate-100 px-4 py-3.5 text-left align-top; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap th { @apply bg-slate-50/80 text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap td { @apply font-normal text-slate-600; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap td :is(strong,span) { @apply font-semibold text-[#061d49]; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap td small { @apply mt-0.5 block text-[11px] font-normal text-slate-500; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap tr.is-change td:last-child span { @apply text-emerald-600; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap :is(tr.is-unmatched,tr.is-ambiguous,tr.is-invalid) td:last-child span { @apply text-amber-700; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap tbody tr:hover { @apply bg-slate-50; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-ending-import-button { @apply inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-[#061d49] hover:bg-slate-50 disabled:opacity-50; cursor:pointer; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-ending-import-primary { @apply border-[#f8cf4a] bg-[#f8cf4a] font-semibold hover:bg-[#eac444]; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-note { @apply m-0 text-xs font-normal leading-relaxed text-slate-500; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-more { @apply m-0 text-xs text-slate-500; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-subtabs { @apply m-0 flex gap-3; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-subtabs button { @apply rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-[#061d49] disabled:opacity-50; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal :is(button,input):focus-visible { outline:2px solid #1e3c76; outline-offset:2px; }
+  @media(max-width:640px) {
+    .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .swal2-title { @apply pl-4 text-lg; }
+    .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .swal2-html-container { @apply p-4; }
+    .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .swal2-actions { @apply flex-col px-4; }
+    .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-ending-import-button { @apply w-full; min-height:44px; }
+  }
+}
+
+@layer components {
+  #scm-app .scm-ending-workspace [hidden] { display:none!important; }
+  #scm-app .scm-ending-workspace[data-ending-view="receipt"] .scm-ending-tools { @apply items-center px-3 py-2; }
+  #scm-app .scm-ending-workspace[data-ending-view="receipt"] .scm-ending-tools label { @apply flex items-center gap-2; }
+  #scm-app .scm-ending-workspace[data-ending-view="receipt"] .scm-ending-tools select { @apply h-9 bg-slate-50; }
+  #scm-app .scm-ending-workspace .scm-ending-button.scm-ending-settings-link { @apply min-h-0 border-0 bg-transparent p-0 text-xs font-medium text-[#1e3c76] underline shadow-none; }
+  #scm-app .scm-ending-workspace .scm-ending-settings-link svg { @apply hidden; }
+  #scm-app .scm-ending-workspace .scm-ending-toggle { @apply inline-flex h-6 w-12 items-center rounded-full bg-slate-200 p-1; }
+  #scm-app .scm-ending-workspace .scm-ending-toggle i { @apply h-4 w-4 rounded-full bg-white shadow-sm; }
+  #scm-app .scm-ending-workspace .scm-ending-toggle.is-enabled { @apply justify-end bg-emerald-500; }
+  @media(prefers-reduced-motion:reduce) {
+    #scm-app .scm-ending-workspace *, .swal2-popup.scm-ending-import-swal * { transition:none!important; animation:none!important; }
+  }
+}
+
+@layer components {
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap table { table-layout:fixed; min-width:850px; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap :is(th,td):nth-child(1) { width:6%; white-space:nowrap; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap :is(th,td):nth-child(2) { width:10%; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap :is(th,td):nth-child(3) { width:20%; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap :is(th,td):nth-child(4), .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap :is(th,td):nth-child(5) { width:16%; white-space:nowrap; }
+  .swal2-popup.scm-ending-import-swal.scm-contracts-ending-import-swal .scm-contracts-ending-import-table-wrap :is(th,td):nth-child(6) { width:32%; overflow-wrap:anywhere; }
+}

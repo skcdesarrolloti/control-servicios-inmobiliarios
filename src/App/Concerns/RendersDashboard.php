@@ -868,37 +868,42 @@ trait RendersDashboard
               <button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeContractSection === 'scm-home-calendar-section-contract-non-renewal' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-contract-non-renewal"><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><span>No pr&oacute;rroga de contrato</span></button>
           </div>
             <div class="scm-calendar-section-panel<?php echo $activeContractSection === 'scm-home-calendar-section-contracts-ending' ? ' active' : ''; ?>" id="scm-home-calendar-section-contracts-ending" data-calendar-section-panel>
-              <section class="scm-contract-termination-panel scm-contracts-ending-panel" data-scm-contracts-ending-panel aria-live="polite">
-                <div class="scm-contract-termination-head">
-                  <div>
-                    <span class="scm-calendar-action-kicker">Contratos</span>
-                    <h3>Contratos por terminar</h3>
-                    <p>Escoge un a&ntilde;o y mes para ver qu&eacute; contratos llegan a fecha fin y crear tickets comerciales de retenci&oacute;n cuando aplique.</p>
-                  </div>
-                  <div class="scm-contracts-ending-tools">
-                    <label><span>A&ntilde;o</span><select data-scm-contracts-ending-year></select></label>
-                    <label><span>Mes</span><select data-scm-contracts-ending-month></select></label>
-                    <button type="button" class="scm-case-work-btn" data-scm-contracts-ending-refresh>Actualizar</button>
+              <section class="scm-contracts-ending-panel scm-ending-workspace" data-scm-contracts-ending-panel data-ending-view="ending" aria-label="Contratos por terminar">
+                <div class="scm-ending-intro" data-ending-intro>
+                  <div class="scm-ending-heading">
+                    <div class="scm-ending-title">
+                      <div class="flex flex-wrap items-center gap-2"><span class="scm-ending-kicker">Contratos</span><span class="scm-ending-module">Módulo de Retención &amp; Terminaciones</span></div>
+                      <h3>Contratos por terminar</h3>
+                      <p>Escoge un año y mes para ver qué contratos llegan a fecha fin y crear tickets comerciales de retención cuando aplique.</p>
+                    </div>
+                    <div class="scm-ending-tools">
+                      <label for="scm-ending-year"><span>Año</span><select id="scm-ending-year" data-scm-contracts-ending-year></select></label>
+                      <label for="scm-ending-month"><span>Mes</span><select id="scm-ending-month" data-scm-contracts-ending-month></select></label>
+                      <button type="button" class="scm-ending-button scm-ending-primary" data-scm-contracts-ending-refresh><svg class="scm-ending-icon scm-ending-refresh-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7v5h-5M4 17v-5h5M6 8a7 7 0 0 1 12-3l2 2M4 17l2 2a7 7 0 0 0 12-3"/></svg>Actualizar</button>
+                    </div>
                   </div>
                 </div>
-                <form class="scm-contracts-ending-import" data-scm-contracts-ending-import enctype="multipart/form-data" autocomplete="off">
-                  <label>
-                    <span>Actualizar fecha fin desde Excel</span>
-                    <input type="file" name="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
-                  </label>
-                  <button type="submit" class="scm-case-work-btn scm-primary-action">Previsualizar actualizaci&oacute;n</button>
-                  <small>Se cruzan No. Contrato + No. Inmueble y solo se aplica despu&eacute;s de confirmar los cambios.</small>
+                <form class="scm-ending-upload" data-scm-contracts-ending-import enctype="multipart/form-data" autocomplete="off">
+                  <div><label class="scm-ending-label" for="scm-ending-file">Actualizar fecha fin desde Excel</label><p>Se cruzan No. Contrato + No. Inmueble y solo se aplica después de confirmar los cambios.</p></div>
+                  <div class="scm-ending-upload-controls">
+                    <input id="scm-ending-file" type="file" name="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required aria-label="Seleccionar archivo de fechas fin">
+                    <button type="submit" class="scm-ending-button scm-ending-primary">Previsualizar actualización</button>
+                  </div>
                 </form>
-                <div class="scm-contracts-ending-subtabs" role="tablist" aria-label="Gestión de contratos por terminar">
-                  <button type="button" role="tab" aria-selected="true" data-contracts-ending-view="ending">Por terminar</button>
-                  <button type="button" role="tab" aria-selected="false" data-contracts-ending-view="renewal">Probabilidad y valor</button>
-                  <button type="button" role="tab" aria-selected="false" data-contracts-ending-view="no-exit">No salida del inmueble</button>
-                  <button type="button" role="tab" aria-selected="false" data-contracts-ending-view="receipt">Recibo automático</button>
+                <div class="scm-ending-nav-slot" data-ending-nav-slot>
+                  <div class="scm-ending-tabs" role="tablist" aria-label="Gestión de contratos por terminar">
+                    <button id="scm-ending-tab-ending" type="button" role="tab" aria-controls="scm-ending-content" aria-selected="true" data-contracts-ending-view="ending">Por terminar</button>
+                    <button id="scm-ending-tab-renewal" type="button" role="tab" aria-controls="scm-ending-content" aria-selected="false" tabindex="-1" data-contracts-ending-view="renewal">Probabilidad y valor</button>
+                    <button id="scm-ending-tab-no-exit" type="button" role="tab" aria-controls="scm-ending-content" aria-selected="false" tabindex="-1" data-contracts-ending-view="no-exit">No salida del inmueble</button>
+                    <button id="scm-ending-tab-receipt" type="button" role="tab" aria-controls="scm-ending-content" aria-selected="false" tabindex="-1" data-contracts-ending-view="receipt">Recibo automático</button>
+                  </div>
                 </div>
-                <p class="scm-contracts-ending-view-help" data-contracts-ending-help></p>
-                <div class="scm-contract-termination-status" data-scm-contracts-ending-status>Cargando contratos por terminar...</div>
-                <div class="scm-contract-termination-summary" data-scm-contracts-ending-summary></div>
-                <div class="scm-contracts-ending-list" data-scm-contracts-ending-list></div>
+                <div class="scm-ending-meta">
+                  <div class="scm-ending-help" data-contracts-ending-help></div>
+                  <div class="scm-ending-status" data-scm-contracts-ending-status role="status">Cargando contratos por terminar...</div>
+                </div>
+                <div class="scm-ending-metrics" data-scm-contracts-ending-summary></div>
+                <div class="scm-contracts-ending-list" id="scm-ending-content" role="tabpanel" aria-labelledby="scm-ending-tab-ending" data-scm-contracts-ending-list></div>
               </section>
             </div>
             <?php foreach (['termination' => ['section' => 'contract-termination', 'title' => 'Solicitudes de terminación de contrato'], 'non-renewal' => ['section' => 'contract-non-renewal', 'title' => 'Solicitudes de no prórroga de contrato']] as $requestKind => $requestView): ?>

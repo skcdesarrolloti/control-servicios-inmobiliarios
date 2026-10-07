@@ -1,6 +1,6 @@
 # Contratos por terminar · renovación y recibo
 
-Versión 3.3.361. El panel consulta contratos `Entregado` o `Por recibir` por mes de fecha fin. No cambia el estado administrativo de tickets existentes.
+Versión 3.3.362. El panel consulta contratos `Entregado` o `Por recibir` por mes de fecha fin. No cambia el estado administrativo de tickets existentes.
 
 ## Subpestañas
 
@@ -105,3 +105,12 @@ Editar/anular historial no reinicia probabilidad, no retira reportes de no salid
 En **Por terminar**, cada contrato muestra su porcentaje actual (o Sin registrar), el estado de no salida y botones independientes para agregar/editar probabilidad y reportar/editar no salida. Cada formulario conserva los datos del otro proceso. No salida y Recibo automático siguen siendo listados.
 
 Los nuevos tickets de retención de los tres flujos solicitan conservar al cliente en SKC SuCasa Inmobiliaria y ofrecer inmuebles similares según sus necesidades y presupuesto. La descripción incluye tipo, destinación, canon mensual del contrato, habitaciones, baños, área construida y barrio. Se consulta la ficha del inmueble asociada al contrato; los datos faltantes se muestran como Sin registrar, sin sustituir el canon vigente por el precio publicado del inmueble.
+
+
+## Vistas Tailwind (3.3.362)
+
+Las cuatro subpestañas y la previsualización Excel siguen los HTML de referencia: Poppins, azul #061D49 / #1E3C76, amarillo #F8CF4A, tarjetas con borde tenue, listas blancas, etiquetas de estado y tablas. El diseño se adapta al ancho del panel; en móvil las tablas desplazan su contenido dentro del contenedor y los botones se distribuyen en dos columnas. Las pestañas admiten flechas, Inicio y Fin.
+
+Configurar / Habilitar abre el popup existente de Notificaciones internas cuando el usuario dispone de ese permiso; la activación se guarda desde esa configuración. Crear reporte manual muestra los contratos del periodo para escoger el reporte, sin modificar datos automáticamente. Ver histórico de recibos filtra movimientos de recibo del historial consultado. El popup Excel conserva paginación, token de confirmación y aplicación solo de cambios válidos; cerrar o No aplicar no modifica fechas.
+
+Compilación: `npx --yes tailwindcss@3.4.17 -c tailwind.config.js -i resources/css/tailwind-admin.css -o public/assets/css/tailwind-admin.css --minify`. No se utiliza Tailwind CDN en producción.
