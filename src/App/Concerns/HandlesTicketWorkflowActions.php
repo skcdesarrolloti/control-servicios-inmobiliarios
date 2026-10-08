@@ -876,8 +876,35 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk([
       'items' => $items,
       'count' => count($items),
+      'can_delete' => $this->canUseDashboardAction('case_respond'),
       'generated_at' => date('d/m/Y H:i'),
     ]);
+  }
+
+  public function ajax_handler_contract_request_delete(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessContractTerminationRequests() || !$this->canUseDashboardAction('case_respond')) {
+      $this->jsonFail('No tienes permiso para eliminar solicitudes contractuales.');
+    }
+    if ((string) ($_POST['confirm_delete'] ?? '') !== '1') $this->jsonFail('Confirma la eliminación del caso y su solicitud.');
+    $kind = (string) ($_POST['request_kind'] ?? '');
+    if (!in_array($kind, ['termination', 'non-renewal'], true)) $this->jsonFail('Tipo de solicitud inválido.');
+    try {
+      // Resolve the real employee row, rather than writing the session's CCT _ID.
+      $employee = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_funcionarios') . '` WHERE `_ID` = ?', [Auth::userId()]) ?? [];
+      $result = (new \SCM\Modules\Contracts\ContractRequestDeletionService($this->db))->delete(
+        $kind, (int) ($_POST['ticket_pk'] ?? 0), (int) ($_POST['solicitud_id'] ?? 0),
+        ['employee_id' => trim((string) ($employee['id_empleado'] ?? '')), 'name' => (string) ($employee['nombre'] ?? Auth::user())],
+        fn(array $ticket): bool => $kind === 'termination' ? $this->isContractTerminationTicket($ticket) : $this->isContractNonRenewalTicket($ticket)
+      );
+    } catch (\DomainException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      error_log('[contract_request_delete] ' . $error->getMessage());
+      $this->jsonFail('No se pudo eliminar el caso y su solicitud. No se guardó la eliminación.');
+    }
+    $this->jsonOk($result);
   }
 
   public function ajax_handler_contract_termination_respond(): void
@@ -1000,6 +1027,7 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk([
       'items' => $items,
       'count' => count($items),
+      'can_delete' => $this->canUseDashboardAction('case_respond'),
       'generated_at' => date('d/m/Y H:i'),
     ]);
   }

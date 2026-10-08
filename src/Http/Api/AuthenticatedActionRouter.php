@@ -106,6 +106,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_PROPERTY_HISTORY_PDF => 'ajax_handler_property_history_pdf',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRACT_TERMINATION_REQUESTS => 'ajax_handler_contract_termination_requests',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRACT_TERMINATION_RESPOND => 'ajax_handler_contract_termination_respond',
+      SuCasaControlServiciosInmobiliarios::AJAX_CONTRACT_REQUEST_DELETE => 'ajax_handler_contract_request_delete',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRACT_NON_RENEWAL_REQUESTS => 'ajax_handler_contract_non_renewal_requests',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRACT_NON_RENEWAL_RESPOND => 'ajax_handler_contract_non_renewal_respond',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRACTS_ENDING_MONTHS => 'ajax_handler_contracts_ending_months',

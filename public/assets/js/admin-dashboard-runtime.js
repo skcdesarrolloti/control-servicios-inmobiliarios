@@ -220,6 +220,7 @@
       actions.contract_termination_requests || "";
     var actionContractTerminationRespond =
       actions.contract_termination_respond || "";
+    var actionContractRequestDelete = actions.contract_request_delete || "";
     var actionContractNonRenewalRequests =
       actions.contract_non_renewal_requests || "";
     var actionContractNonRenewalRespond =
@@ -14885,6 +14886,7 @@
         document: '<path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v5h4M9 12h6M9 16h6"/>',
         filter: '<path d="M3 6h18M6 12h12M10 18h4"/>',
         download: '<path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4"/>',
+        trash: '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>',
         location: '<path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 0 1 14 0Z"/><circle cx="12" cy="10" r="2"/>'
       };
       return '<svg class="scm-contract-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + (paths[name] || paths.document) + '</svg>';
@@ -14902,7 +14904,7 @@
       });
     }
 
-    function contractRequestCard(row, kind) {
+    function contractRequestCard(row, kind, canDelete) {
       row = row || {};
       var caseData = row.case || {};
       var sourceHtml = String(caseData.case_source_html || '').trim();
@@ -14918,6 +14920,7 @@
         '</div>' + contractTerminationTermBadge(row, true) + '</div>' +
         '<div class="scm-contract-card-footer"><span class="inline-flex items-center gap-2 text-xs">' + contractUiIcon('document') + 'Solicitud: ' + escHtml(row.estado_solicitud || 'Pendiente') + '</span><div class="flex flex-wrap gap-3">' +
         (sourceHtml ? '<button type="button" class="scm-contract-button" ' + prefix + '-open-case data-scm-due-case-loaded="1" data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + '>' + contractUiIcon('eye') + 'Ver caso</button>' : '<button type="button" class="scm-contract-button" disabled>Sin caso</button>') +
+        (canDelete ? '<button type="button" class="scm-contract-button" data-contract-request-delete="' + kind + '" data-solicitud-id="' + escHtml(row.solicitud_id || '') + '" data-ticket-pk="' + escHtml(row.ticket_pk || '') + '">' + contractUiIcon('trash') + 'Eliminar caso</button>' : '') +
         '<button type="button" class="scm-contract-button scm-contract-button-primary" ' + prefix + '-respond data-solicitud-id="' + escHtml(row.solicitud_id || '') + '" data-ticket-pk="' + escHtml(row.ticket_pk || '') + '">' + contractUiIcon('reply') + 'Responder</button></div></div>' +
         '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + '</div></article>';
     }
@@ -14925,7 +14928,7 @@
     function renderContractRequestList(panel, kind) {
       var rows = contractFilteredRows(panel);
       var list = panel.querySelector('[data-scm-contract-' + kind + '-list]');
-      if (list) list.innerHTML = rows.length ? rows.map(function (row) { return contractRequestCard(row, kind); }).join('') : contractTerminationEmpty('No hay solicitudes para mostrar con estos criterios.');
+      if (list) list.innerHTML = rows.length ? rows.map(function (row) { return contractRequestCard(row, kind, panel.scmContractData.can_delete === true); }).join('') : contractTerminationEmpty('No hay solicitudes para mostrar con estos criterios.');
       var count = panel.querySelector('[data-contract-count]');
       if (count) count.textContent = rows.length + (rows.length === 1 ? ' registro' : ' registros');
     }
@@ -14977,6 +14980,37 @@
       contractTerminationRowsByPk = {};
       (Array.isArray(data && data.items) ? data.items : []).forEach(function (row) { if (row && row.solicitud_id) contractTerminationRowsByPk[String(row.solicitud_id)] = row; });
       renderContractRequests(data, 'termination');
+    }
+
+    function deleteContractRequest(button) {
+      if (!window.Swal || !actionContractRequestDelete || button.disabled) return Promise.resolve();
+      var kind = button.getAttribute('data-contract-request-delete');
+      var requestId = button.getAttribute('data-solicitud-id') || '';
+      var ticketPk = button.getAttribute('data-ticket-pk') || '';
+      var card = button.closest('.scm-contract-card');
+      var label = card && card.querySelector('.scm-contract-tag');
+      return window.Swal.fire({
+        title: '¿Eliminar caso y solicitud?',
+        text: (label ? label.textContent.trim() + '. ' : '') + 'Se eliminarán permanentemente el caso y su solicitud de ' + (kind === 'termination' ? 'terminación' : 'no prórroga') + '. Esta acción no se puede deshacer. Se conservará un registro de auditoría.',
+        icon: 'warning', showCancelButton: true, focusCancel: true,
+        confirmButtonText: 'Sí, eliminar caso y solicitud', cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#b91c1c', showLoaderOnConfirm: true,
+        allowOutsideClick: function () { return !window.Swal.isLoading(); },
+        allowEscapeKey: function () { return !window.Swal.isLoading(); },
+        preConfirm: function () {
+          return dashboardFormAction(actionContractRequestDelete, function (fd) {
+            fd.append('request_kind', kind); fd.append('ticket_pk', ticketPk);
+            fd.append('solicitud_id', requestId); fd.append('confirm_delete', '1');
+          }).catch(function (error) {
+            window.Swal.showValidationMessage(error && error.message || 'No se pudo eliminar la solicitud.');
+            return false;
+          });
+        }
+      }).then(function (result) {
+        if (!result || !result.isConfirmed) return;
+        showToast('success', result.value && result.value.message || 'Caso y solicitud eliminados.');
+        return kind === 'termination' ? loadContractTerminationRequests(true) : loadContractNonRenewalRequests(true);
+      });
     }
 
     function loadContractTerminationRequests(force) {
@@ -22098,6 +22132,14 @@
         var terminationPanel = contractTerminationRefresh.closest("[data-scm-contract-termination-panel]");
         if (terminationPanel) terminationPanel.setAttribute("data-scm-loaded", "0");
         loadContractTerminationRequests(true);
+        return;
+      }
+
+      var contractRequestDelete = event.target.closest('[data-contract-request-delete]');
+      if (contractRequestDelete) {
+        event.preventDefault();
+        event.stopPropagation();
+        deleteContractRequest(contractRequestDelete);
         return;
       }
 

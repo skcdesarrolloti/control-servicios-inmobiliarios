@@ -512,6 +512,7 @@ trait RendersDashboard
         'property_history_pdf' => self::AJAX_PROPERTY_HISTORY_PDF,
         'contract_termination_requests' => self::AJAX_CONTRACT_TERMINATION_REQUESTS,
         'contract_termination_respond' => self::AJAX_CONTRACT_TERMINATION_RESPOND,
+        'contract_request_delete' => self::AJAX_CONTRACT_REQUEST_DELETE,
         'contract_non_renewal_requests' => self::AJAX_CONTRACT_NON_RENEWAL_REQUESTS,
         'contract_non_renewal_respond' => self::AJAX_CONTRACT_NON_RENEWAL_RESPOND,
         'contracts_ending_months' => self::AJAX_CONTRACTS_ENDING_MONTHS,
