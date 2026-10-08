@@ -773,7 +773,7 @@ foreach ($rawNavItems as $k => $item) {
             <input
               id="global-search-input"
               type="text"
-              placeholder="Buscar contratos, propiedades, cédulas o tickets..."
+              placeholder="Buscar contratos, propiedades, cédulas o casos..."
               class="w-full pl-10 pr-14 py-2 rounded-xl bg-slate-100/80 text-slate-900 text-xs sm:text-sm placeholder-slate-400 border border-transparent focus:border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f1e36]/10 transition-all shadow-inner"
               autocomplete="off"
             >

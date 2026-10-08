@@ -15,9 +15,9 @@ final class CompletionPolicy
     'arrendatario' => 'En ejecucion por arrendatario',
     'copropiedad' => 'En ejecucion por copropiedad',
   ];
-  public const CONSENT = 'Confirmo que soy la persona designada para firmar, revisé el acta y recibí a satisfacción las soluciones descritas. Acepto firmarla electrónicamente con mi nombre y cerrar este ticket.';
-  public const DRAWN_CONSENT = 'Confirmo que soy la persona designada, revisé los daños, soluciones y observaciones del acta y los recibo a satisfacción. Acepto firmar electrónicamente con mi trazo, nombre, documento y código de verificación, y autorizar el cierre de este ticket.';
-  public const TYPED_OTP_CONSENT = 'Confirmo que soy la persona designada, revisé el acta y recibí a satisfacción las soluciones descritas. Acepto firmarla electrónicamente con mi nombre y código de verificación, y cerrar este ticket.';
+  public const CONSENT = 'Confirmo que soy la persona designada para firmar, revisé el acta y recibí a satisfacción las soluciones descritas. Acepto firmarla electrónicamente con mi nombre y cerrar este caso.';
+  public const DRAWN_CONSENT = 'Confirmo que soy la persona designada, revisé los daños, soluciones y observaciones del acta y los recibo a satisfacción. Acepto firmar electrónicamente con mi trazo, nombre, documento y código de verificación, y autorizar el cierre de este caso.';
+  public const TYPED_OTP_CONSENT = 'Confirmo que soy la persona designada, revisé el acta y recibí a satisfacción las soluciones descritas. Acepto firmarla electrónicamente con mi nombre y código de verificación, y cerrar este caso.';
 
   public static function phone(string $phone, string $indicator = ''): string
   {

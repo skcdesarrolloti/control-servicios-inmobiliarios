@@ -28,9 +28,9 @@ trait PendingNotificationsAndDatesConcern
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode((string) $ticketId);
     $subject = $mode === 'preventiva'
       ? 'Aviso de revision preventiva del contrato ' . (string) ($ticketPayload['contrato'] ?? '')
-      : 'Ticket administrativo #' . $ticketId . ' creado';
-    $content = '<p style="font-weight:600;margin:0 0 12px;">Se ha creado un ticket administrativo.</p>';
-    $content .= '<p style="margin:4px 0;"><b>Ticket:</b> #' . EmailTemplate::e((string) $ticketId) . '</p>';
+      : 'Caso administrativo #' . $ticketId . ' creado';
+    $content = '<p style="font-weight:600;margin:0 0 12px;">Se ha creado un caso administrativo.</p>';
+    $content .= '<p style="margin:4px 0;"><b>Caso:</b> #' . EmailTemplate::e((string) $ticketId) . '</p>';
     $content .= '<p style="margin:4px 0;"><b>Tema:</b> ' . EmailTemplate::e((string) ($ticketPayload['tema_ayuda'] ?? '')) . '</p>';
     $content .= '<p style="margin:4px 0;"><b>Asunto:</b> ' . EmailTemplate::e((string) ($ticketPayload['asunto'] ?? '')) . '</p>';
     $content .= '<p style="margin:4px 0;"><b>Contrato:</b> ' . EmailTemplate::e((string) ($ticketPayload['contrato'] ?? '')) . '</p>';

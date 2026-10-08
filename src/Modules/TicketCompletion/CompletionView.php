@@ -70,10 +70,10 @@ final class CompletionView
       : '';
     ob_start(); ?>
     <section class="scm-acta">
-      <p class="scm-acta-notice">Documenta la solución y elige el firmante. El ticket conservará el <strong>estado de ejecución seleccionado</strong> mientras el acta queda pendiente. Puedes hacer seguimiento desde <strong>Actividades administrativas → Actas de satisfacción</strong>. Solo la firma registrará el cierre; no se creará reporte administrativo nuevo desde esta acta.</p>
+      <p class="scm-acta-notice">Documenta la solución y elige el firmante. El caso conservará el <strong>estado de ejecución seleccionado</strong> mientras el acta queda pendiente. Puedes hacer seguimiento desde <strong>Actividades administrativas → Actas de satisfacción</strong>. Solo la firma registrará el cierre; no se creará reporte administrativo nuevo desde esta acta.</p>
       <?php if ($sourceNotice !== ''): ?><p class="scm-acta-notice"><?= self::e($sourceNotice) ?></p><?php endif; ?>
       <?php if ($editAct): ?><p class="scm-acta-notice">Estás editando el acta #<?= self::e($editAct['id']) ?>. Al guardar <?= $editAct['status'] === 'signed' ? 'quedará sin firmar y el caso volverá a estar en proceso. La versión firmada anterior se conservará en el historial. Se invalidan la firma, enlaces y códigos anteriores y se solicita una nueva firma.' : 'se invalidan los códigos anteriores y se envía una nueva invitación.' ?></p><?php endif; ?>
-      <div class="scm-acta-meta"><span>Ticket <strong>#<?= self::e($ticket['id_ticket'] ?: $ticket['_ID']) ?></strong></span><span>Contrato <strong><?= self::e($ticket['contrato'] ?? '—') ?></strong> · Inmueble SIMI <strong><?= self::e($ticket['inmueble'] ?? '—') ?></strong></span></div>
+      <div class="scm-acta-meta"><span>Caso <strong>#<?= self::e($ticket['id_ticket'] ?: $ticket['_ID']) ?></strong></span><span>Contrato <strong><?= self::e($ticket['contrato'] ?? '—') ?></strong> · Inmueble SIMI <strong><?= self::e($ticket['inmueble'] ?? '—') ?></strong></span></div>
       <?php if ($showHistory): foreach ($context['acts'] as $act): $payload = $service->payload($act); $canDeleteAct = in_array($act['status'], ['archived', 'cancelled'], true) || $canDeleteAny; ?>
         <article class="scm-acta-record">
           <div class="scm-acta-meta"><h3><?= $act['status'] === 'superseded' ? 'Versión firmada anterior · Registro #' : 'Acta de satisfacción #' ?><?= self::e($act['id']) ?></h3><strong class="scm-acta-status" data-acta-status="<?= self::e($act['status']) ?>"><?= self::e(['pending' => 'Acta sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada', 'superseded' => 'Versión firmada anterior'][$act['status']] ?? $act['status']) ?></strong></div>
@@ -99,7 +99,7 @@ final class CompletionView
           <?php $delivery = json_decode((string) ($act['delivery_json'] ?? ''), true) ?: []; $event = $act['status'] === 'signed' ? 'signed_receipt' : 'signature_invitation'; ?>
           <?php if (!in_array($act['status'], ['archived', 'cancelled', 'superseded'], true)): ?><ul class="scm-acta-help"><?php foreach ($payload['channels'] ?? ['email'] as $channel): ?><li><?= $channel === 'email' ? 'Correo' : 'WhatsApp' ?>: <?= !empty($delivery[$event][$channel]['sent']) ? 'enviado al proveedor' : (!empty($delivery[$event][$channel]['queued']) ? 'pendiente de reintento o confirmación; el acta permanece guardada' : 'no se pudo registrar el envío; reintenta') ?></li><?php endforeach; ?></ul><?php endif; ?>
           <?php if ($act['status'] === 'pending'): ?>
-            <p class="scm-acta-help">El enlace vence el <?= self::e(date('d/m/Y', (int) $act['expires_at'])) ?>. Reenviar no cierra el ticket.</p>
+            <p class="scm-acta-help">El enlace vence el <?= self::e(date('d/m/Y', (int) $act['expires_at'])) ?>. Reenviar no cierra el caso.</p>
             <details><summary>¿Necesitas corregir el acta o cambiar el firmante?</summary>
               <p>Anula esta versión y genera otra. El enlace anterior dejará de funcionar. No se elimina el registro.</p>
               <form data-acta-cancel="<?= self::e($act['id']) ?>"><label>Motivo de anulación <textarea name="reason" required maxlength="1000" rows="2"></textarea></label><button type="submit" class="scm-acta-button scm-acta-danger">Anular acta pendiente</button></form>
@@ -135,7 +135,7 @@ final class CompletionView
       <?php elseif (!$showHistory && $activeAct): ?>
         <p class="scm-acta-notice">Este caso ya tiene un acta <?= self::e($activeAct['status'] === 'pending' ? 'sin firmar' : 'firmada') ?>. Adminístrala desde <strong>Actividades administrativas → Actas de satisfacción</strong>.</p>
         <p><a class="scm-acta-button" href="<?= self::e($service->dashboardUrlForTicket($ticket, $activeAct['status'] === 'signed' ? 'signed' : 'pending')) ?>">Ir a Actas de satisfacción</a></p>
-      <?php elseif (!$active): ?><p>El ticket está cerrado. No se pueden generar nuevas actas.</p><?php endif; ?>
+      <?php elseif (!$active): ?><p>El caso está cerrado. No se pueden generar nuevas actas.</p><?php endif; ?>
       <div data-acta-message role="status" aria-live="polite"></div>
     </section>
     <?php return (string) ob_get_clean();
@@ -195,7 +195,7 @@ final class CompletionView
         <form method="post" autocomplete="off" id="sacta_form">
           <div class="scm-grid scm-actas-filter-grid">
             <div class="scm-field"><label for="sacta_estado">Estado</label><select id="sacta_estado" name="sacta_estado"><option value="pending" <?= $status === 'pending' ? 'selected' : '' ?>>Actas sin firmar</option><option value="signed" <?= $status === 'signed' ? 'selected' : '' ?>>Firmadas</option><option value="archived" <?= $status === 'archived' ? 'selected' : '' ?>>Archivadas</option><option value="cancelled" <?= $status === 'cancelled' ? 'selected' : '' ?>>Anuladas</option><option value="superseded" <?= $status === 'superseded' ? 'selected' : '' ?>>Versiones firmadas anteriores</option><option value="all" <?= $status === 'all' ? 'selected' : '' ?>>Todas</option></select></div>
-            <div class="scm-field"><label for="sacta_caso"># caso</label><input id="sacta_caso" name="sacta_caso" type="text" value="<?= self::e($filters['caso'] ?? '') ?>" placeholder="Ticket"></div>
+            <div class="scm-field"><label for="sacta_caso"># caso</label><input id="sacta_caso" name="sacta_caso" type="text" value="<?= self::e($filters['caso'] ?? '') ?>" placeholder="Caso"></div>
             <div class="scm-field"><label for="sacta_inmueble">Inmueble</label><input id="sacta_inmueble" name="sacta_inmueble" type="text" value="<?= self::e($filters['inmueble'] ?? '') ?>" placeholder="# inmueble"></div>
             <div class="scm-field"><label for="sacta_contrato">Contrato</label><input id="sacta_contrato" name="sacta_contrato" type="text" value="<?= self::e($filters['contrato'] ?? '') ?>" placeholder="# contrato"></div>
             <div class="scm-field"><label for="sacta_firmante">Firmante</label><input id="sacta_firmante" name="sacta_firmante" type="text" value="<?= self::e($filters['firmante'] ?? '') ?>" placeholder="Nombre, correo o celular"></div>
@@ -343,7 +343,7 @@ final class CompletionView
       . '<p class="scm-acta-help">Escribe exactamente: <strong>' . self::e($payload['signer']['name']) . '</strong>. Ese nombre será tu firma electrónica.</p>'
       . '<label>Código de 6 dígitos *<input name="otp_code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></label>'
       . '<label class="scm-acta-check"><input type="checkbox" name="accepted" value="1" required><span>' . self::e(CompletionPolicy::TYPED_OTP_CONSENT) . '</span></label>'
-      . '<button type="submit" class="scm-acta-button">Firmar acta y cerrar ticket</button><p role="alert" aria-live="assertive" data-acta-sign-status></p></form></section>';
+      . '<button type="submit" class="scm-acta-button">Firmar acta y cerrar caso</button><p role="alert" aria-live="assertive" data-acta-sign-status></p></form></section>';
   }
 
   public static function signatureSvg(array $strokes): string

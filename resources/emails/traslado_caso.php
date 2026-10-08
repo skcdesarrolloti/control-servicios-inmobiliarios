@@ -13,7 +13,7 @@
     </tr>
     <tr>
       <td style="padding:24px;text-align:center;color:#061d49;">
-        <h3 style="font-size:18px;margin:0 0 18px;">Traslado del caso &mdash; ticket #{id_ticket}</h3>
+        <h3 style="font-size:18px;margin:0 0 18px;">Traslado del caso #{id_ticket}</h3>
         <p style="font-weight:500;margin:10px 0;">Apreciado/a {destinatario}</p>
         <p style="font-weight:500;margin:10px 0;">{mensaje_principal}</p>
         <table cellpadding="0" cellspacing="0" style="width:100%;margin:18px 0;text-align:left;">

@@ -18,18 +18,18 @@ trait NotificationDeliveryConcern
       return 0;
     }
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
-    $subject = $estado === 'Cerrado' ? 'Ticket #' . $logicalTicket . ' cerrado' : 'Ticket #' . $logicalTicket . ' con nueva respuesta';
+    $subject = $estado === 'Cerrado' ? 'Caso #' . $logicalTicket . ' cerrado' : 'Caso #' . $logicalTicket . ' con nueva respuesta';
     $sent = 0;
     foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets, [], 'respuesta_ticket') as $recipient) {
       $html = EmailTemplate::renderNamed('respuesta_ticket', [
         'asunto_correo' => EmailTemplate::e($subject),
         'destinatario' => EmailTemplate::e($recipient['name'] !== '' ? $recipient['name'] : 'cliente'),
         'mensaje_intro' => $estado === 'Cerrado'
-          ? 'Te informamos que el ticket ha sido cerrado.'
-          : 'Te informamos que el ticket ha tenido una nueva respuesta.',
+          ? 'Te informamos que el caso ha sido cerrado.'
+          : 'Te informamos que el caso ha tenido una nueva respuesta.',
         'respuesta' => wp_kses_post($respuesta),
         'usuario' => EmailTemplate::e($userName),
-        'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver ticket']]),
+        'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver caso']]),
       ]);
       $sent += $this->sendMailToUnique($recipient['email'], $subject, $html);
     }
@@ -136,7 +136,7 @@ trait NotificationDeliveryConcern
     }
     $logicalTicket = $this->firstNonEmpty([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '']);
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
-    $subject = 'Nuevo seguimiento del ticket #' . $logicalTicket;
+    $subject = 'Nuevo seguimiento del caso #' . $logicalTicket;
     $sent = 0;
     foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets, [], 'seguimiento_ticket') as $recipient) {
       $html = EmailTemplate::renderNamed('nuevo_seguimiento', [
@@ -145,7 +145,7 @@ trait NotificationDeliveryConcern
         'observacion' => wp_kses_post($observacion),
         'usuario' => EmailTemplate::e($userName),
         'fecha' => EmailTemplate::e(date('Y-m-d H:i')),
-        'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver ticket']]),
+        'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver caso']]),
       ]);
       $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, [
         'cc' => [],
@@ -164,7 +164,7 @@ trait NotificationDeliveryConcern
     $tenantName = $this->resolveTicketTenantDisplayName($ticket);
     $noticeUrl = trim((string)($notice['url'] ?? ''));
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
-    $subject = 'Acta de revision preventiva del ticket #' . $logicalTicket;
+    $subject = 'Acta de revision preventiva del caso #' . $logicalTicket;
 
     $content = '<p style="font-weight:500;margin:10px 0;">Apreciado(a) ' . EmailTemplate::e($tenantName) . ',</p>'
       . '<p style="line-height:1.65;margin:10px 0;">Se ha generado el acta/comunicación preventiva para dejar constancia de la gestión realizada frente a la revisión preventiva del inmueble.</p>'
@@ -176,7 +176,7 @@ trait NotificationDeliveryConcern
       $html = EmailTemplate::render('Acta de revision preventiva', $content, [
         'buttons' => [
           ['url' => $noticeUrl, 'label' => 'Ver acta preventiva'],
-          ['url' => $ticketUrl, 'label' => 'Ver ticket'],
+          ['url' => $ticketUrl, 'label' => 'Ver caso'],
         ],
       ]);
       $emailSent = $this->sendMailToUnique($tenantEmail, $subject, $html);
@@ -192,7 +192,7 @@ trait NotificationDeliveryConcern
       try {
         $buttonSuffix = $this->whatsappUrlButtonSuffix($noticeUrl);
         $message = "Buen día, {$tenantName}.\n\n";
-        $message .= "Se generó la comunicación preventiva No. {$attempt} del ticket #{$logicalTicket}, relacionada con la revisión preventiva del inmueble.\n\n";
+        $message .= "Se generó la comunicación preventiva No. {$attempt} del caso #{$logicalTicket}, relacionada con la revisión preventiva del inmueble.\n\n";
         $message .= "Puedes consultar el documento en el botón.\n\n";
         $message .= "Atentamente,\n{$userName}";
 
@@ -273,11 +273,11 @@ trait NotificationDeliveryConcern
     ]);
     $noticeUrl = trim((string) ($notice['url'] ?? ''));
     $quoteUrl = $quoteId !== '' ? \SCM\App\SuCasaControlServiciosInmobiliarios::signedMaintenanceQuotePublicUrl((int) $quoteId) : '';
-    $subject = 'Seguimiento de reparaciones - cotizacion #' . ($quoteId !== '' ? $quoteId : '-') . ' del ticket #' . $logicalTicket;
+    $subject = 'Seguimiento de reparaciones - cotizacion #' . ($quoteId !== '' ? $quoteId : '-') . ' del caso #' . $logicalTicket;
 
     $content = '<p style="font-weight:500;margin:10px 0;">Apreciado(a) ' . EmailTemplate::e($recipientName) . ',</p>'
       . '<p style="line-height:1.65;margin:10px 0;">Se ha generado la comunicacion de seguimiento de reparaciones para dejar constancia de que la cotizacion de mantenimiento #' . EmailTemplate::e($quoteId !== '' ? $quoteId : '-') . ' continua sin respuesta.</p>'
-      . '<p style="line-height:1.65;margin:10px 0;">Han transcurrido ' . EmailTemplate::e((string) $elapsedDays) . ' dias calendario desde el envio de la cotizacion. La comunicacion queda anexada al historial del ticket #' . EmailTemplate::e($logicalTicket) . '.</p>'
+      . '<p style="line-height:1.65;margin:10px 0;">Han transcurrido ' . EmailTemplate::e((string) $elapsedDays) . ' dias calendario desde el envio de la cotizacion. La comunicacion queda anexada al historial del caso #' . EmailTemplate::e($logicalTicket) . '.</p>'
       . '<p style="line-height:1.65;margin:10px 0;">Puedes consultarla desde el siguiente boton. No adjuntamos el archivo para evitar bloqueos o marcaciones de spam.</p>'
       . '<p style="line-height:1.65;margin:10px 0;">Cordialmente,<br><b>' . EmailTemplate::e($userName) . '</b><br>SKC SuCasa Inmobiliaria</p>';
 
@@ -307,7 +307,7 @@ trait NotificationDeliveryConcern
       try {
         $buttonSuffix = $this->whatsappUrlButtonSuffix($noticeUrl);
         $message = "Buen dia, {$recipientName}.\n\n";
-        $message .= "Generamos la comunicacion de seguimiento de reparaciones No. {$attempt} porque la cotizacion #{$quoteId} del ticket #{$logicalTicket} sigue sin respuesta despues de {$elapsedDays} dias.\n\n";
+        $message .= "Generamos la comunicacion de seguimiento de reparaciones No. {$attempt} porque la cotizacion #{$quoteId} del caso #{$logicalTicket} sigue sin respuesta despues de {$elapsedDays} dias.\n\n";
         $message .= "Puedes consultar el documento en el boton.\n\n";
         $message .= "Enlace directo: {$noticeUrl}\n\n";
         $message .= "Atentamente,\n{$userName}";

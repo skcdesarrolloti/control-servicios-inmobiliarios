@@ -32,9 +32,9 @@ final class ContractRetentionDescription
     $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $source = trim((string) ($context['source'] ?? 'solicitud contractual'));
     $origin = 'Origen: ' . $source;
-    if (!empty($context['source_ticket'])) $origin .= ' · Ticket #' . (string) $context['source_ticket'];
+    if (!empty($context['source_ticket'])) $origin .= ' · Caso #' . (string) $context['source_ticket'];
     $html = '<p><strong>Gestión comercial de retención</strong></p>';
-    $html .= '<p>Se crea este ticket para retener al cliente en SKC SuCasa Inmobiliaria.</p>';
+    $html .= '<p>Se crea este caso para retener al cliente en SKC SuCasa Inmobiliaria.</p>';
     $html .= '<p>El cliente actualmente ocupa el inmueble con las siguientes características:</p><ul>';
     foreach (['property_type' => 'Tipo de inmueble', 'property_use' => 'Destinación', 'monthly_rent' => 'Canon mensual', 'bedrooms' => 'Habitaciones', 'bathrooms' => 'Baños', 'area' => 'Área construida (m²)', 'neighborhood' => 'Barrio'] as $key => $label) {
       $value = trim((string) ($context[$key] ?? ''));
@@ -50,7 +50,7 @@ final class ContractRetentionDescription
     $url = trim((string) ($context['document_url'] ?? ''));
     if (filter_var($url, FILTER_VALIDATE_URL) && in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['https', 'http'], true)) {
       $title = trim((string) ($context['document_title'] ?? '')) ?: 'Respuesta contractual';
-      $html .= '<p>Respuesta completa: <a href="' . $escape($url) . '">' . $escape($title) . '</a>. El documento también está disponible en los archivos del ticket.</p>';
+      $html .= '<p>Respuesta completa: <a href="' . $escape($url) . '">' . $escape($title) . '</a>. El documento también está disponible en los archivos del caso.</p>';
     } elseif (!empty($context['source_ticket'])) {
       $html .= '<p>Consultar la respuesta completa y sus documentos en el caso de origen.</p>';
     }

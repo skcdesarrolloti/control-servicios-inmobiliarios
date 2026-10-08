@@ -5,7 +5,7 @@
   "components": [
     {
       "type": "BODY",
-      "text": "Buen día, {{1}}.\n\nGeneramos la comunicación de seguimiento de reparaciones No. {{2}} porque la cotización #{{3}} del ticket #{{4}} sigue sin respuesta después de {{5}} días.\n\nPuedes consultar el documento en el botón.\n\nAtentamente,\n{{6}}",
+      "text": "Buen día, {{1}}.\n\nGeneramos la comunicación de seguimiento de reparaciones No. {{2}} porque la cotización #{{3}} del caso #{{4}} sigue sin respuesta después de {{5}} días.\n\nPuedes consultar el documento en el botón.\n\nAtentamente,\n{{6}}",
       "example": {
         "body_text": [
           [

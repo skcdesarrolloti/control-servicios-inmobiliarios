@@ -23,7 +23,7 @@ foreach (['contrato por terminar', 'terminación de contrato', 'no prórroga'] a
     if (!str_contains($html, $expected)) throw new RuntimeException('Missing customer retention detail: ' . $expected);
   }
   if (!str_contains($html, '<ul>') || !str_contains($html, $source) || !str_contains($html, '09/01/2027') || str_contains($html, 'CARTA COMPLETA') || mb_strlen(strip_tags($html)) > 1400) throw new RuntimeException('Commercial handoff must be brief and structured for ' . $source);
-  if ($source !== 'contrato por terminar' && !str_contains($html, 'Ticket #10863')) throw new RuntimeException('Original case must remain referenced.');
+  if ($source !== 'contrato por terminar' && !str_contains($html, 'Caso #10863')) throw new RuntimeException('Original case must remain referenced.');
   $samples[] = '<h2>' . htmlspecialchars($source) . '</h2><article>' . $html . '</article>';
 }
 $unsafe = ContractRetentionDescription::build(['source' => '<script>alert(1)</script>', 'tenant' => '<img src=x onerror=alert(1)>', 'property_type' => '<script>bad</script>', 'document_url' => 'javascript:alert(1)']);

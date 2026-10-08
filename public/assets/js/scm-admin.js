@@ -1891,7 +1891,7 @@
         var tickets = (json.data && json.data.tickets) || [];
         if (!tickets.length) {
           body.innerHTML =
-            '<p class="scm-muted">Este ticket no tiene magnitud calculable para esa revision.</p>';
+            '<p class="scm-muted">Este caso no tiene magnitud calculable para esa revision.</p>';
           prependCaseLocationPanel(body, caseBtn, modal);
           return;
         }
@@ -1926,7 +1926,7 @@
         '<div class="scm-case-magnitude-popup" data-ticket-pk="' +
         escHtml(ticketPk) +
         '">' +
-        '<p class="scm-muted">Esta magnitud es manual y queda guardada en el ticket.</p>' +
+        '<p class="scm-muted">Esta magnitud es manual y queda guardada en el caso.</p>' +
         '<div class="scm-case-magnitude-options">' +
         options
           .map(function (key) {
@@ -3261,7 +3261,7 @@
             window.Swal.fire({
               icon: "warning",
               title: "Archivar acta #" + actId + "?",
-              text: "El acta saldrá de pendientes. No se cerrará el ticket ni se generará cobro.",
+              text: "El acta saldrá de pendientes. No se cerrará el caso ni se generará cobro.",
               input: "textarea",
               inputLabel: "Motivo",
               showCancelButton: true,
@@ -3282,7 +3282,7 @@
             window.confirm(
               "¿Archivar acta #" +
                 actId +
-                "? No se cerrará el ticket ni se generará cobro.",
+                "? No se cerrará el caso ni se generará cobro.",
             )
           ) {
             archiveAct(window.prompt("Motivo para archivar:", "") || "");
@@ -4051,7 +4051,7 @@
         "</select></label>" +
         '<label class="scm-seg-field scm-transfer-field"><span>Respuesta <em>*</em></span><textarea name="respuesta" rows="7" required placeholder="Escribe la respuesta que se enviara al solicitante..."></textarea></label>' +
         (isPreventiva
-          ? '<section class="scm-preventiva-no-access-box" data-scm-preventiva-no-access-box><div><strong>Comunicaci&oacute;n / Acta preventiva por no autorizaci&oacute;n</strong><span>Este ticket lleva <b>' +
+          ? '<section class="scm-preventiva-no-access-box" data-scm-preventiva-no-access-box><div><strong>Comunicaci&oacute;n / Acta preventiva por no autorizaci&oacute;n</strong><span>Este caso lleva <b>' +
             escHtml(String(noAccessCount)) +
             "</b> comunicaci&oacute;n" +
             (noAccessCount === 1 ? "" : "es") +
@@ -4166,7 +4166,7 @@
         '">' +
         '<section class="scm-preventiva-no-access-box"><div><strong>Generar acta/carta de seguimiento</strong><span>Se crear&aacute; la comunicaci&oacute;n con membrete para la cotizaci&oacute;n <b>#' +
         escHtml(cotizacionId || "-") +
-        "</b>, se anexar&aacute; al ticket y se enviar&aacute; por correo y WhatsApp al destinatario de la cotizaci&oacute;n. D&iacute;as calendario sin respuesta: <b>" +
+        "</b>, se anexar&aacute; al caso y se enviar&aacute; por correo y WhatsApp al destinatario de la cotizaci&oacute;n. D&iacute;as calendario sin respuesta: <b>" +
         escHtml(elapsedDays || "-") +
         "</b>.</span></div></section>" +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Generar, guardar y enviar</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
@@ -4309,7 +4309,7 @@
     var contract = cleanCalendarContractLabel(contractLabel);
     if (contract && contract !== "-")
       return "Contrato #" + contract + " - " + categoryName;
-    return "Ticket #" + String(ticketPk || "").trim() + " - " + categoryName;
+    return "Caso #" + String(ticketPk || "").trim() + " - " + categoryName;
   }
 
   function formatCalendarDateForMessage(value) {
@@ -4698,7 +4698,7 @@
           "</strong></div>"
         : "") +
       (ticket
-        ? "<div><small>Ticket</small><strong>#" +
+        ? "<div><small>Caso</small><strong>#" +
           escHtml(ticket) +
           "</strong></div>"
         : "") +
@@ -4748,7 +4748,7 @@
           escHtml(calendarTimePartFromDateTime(row.fecha_fin || row.end)) +
           '"></label>' +
           "</div>" +
-          '<label><span>Motivo del traslado</span><textarea name="observacion" rows="3" required placeholder="Explica por qu&eacute; se traslada este evento..."></textarea><small>Si es una cita relacionada con ticket, tambi&eacute;n se preparar&aacute; el mensaje de reprogramaci&oacute;n.</small></label>' +
+          '<label><span>Motivo del traslado</span><textarea name="observacion" rows="3" required placeholder="Explica por qu&eacute; se traslada este evento..."></textarea><small>Si es una cita relacionada con caso, tambi&eacute;n se preparar&aacute; el mensaje de reprogramaci&oacute;n.</small></label>' +
           '<div><button type="submit" class="scm-case-calendar-complete-save">Guardar traslado</button><button type="button" class="scm-case-calendar-complete-cancel" data-scm-case-calendar-transfer-cancel>Cancelar</button></div>' +
           '<small data-scm-case-calendar-transfer-msg aria-live="polite"></small>' +
           "</form>"
@@ -5254,7 +5254,7 @@
           (category
             ? "<b>Categor&iacute;a:</b> " + escHtml(category) + " "
             : "") +
-          (ticket ? "<b>Ticket:</b> #" + escHtml(ticket) : "") +
+          (ticket ? "<b>Caso:</b> #" + escHtml(ticket) : "") +
           "</p>" +
           '<button type="button" class="scm-case-calendar-complete-btn" data-scm-case-calendar-pending-detail="' +
           index +
@@ -5555,10 +5555,10 @@
         escHtml(employeeId) +
         '">' +
         '<input type="hidden" name="es_cita" value="si">' +
-        '<div class="scm-calendar-case-kicker"><span>Ticket #' +
+        '<div class="scm-calendar-case-kicker"><span>Caso #' +
         escHtml(logicalTicket || ticketPk || "-") +
         "</span><b>M&oacute;dulo de Asignaciones T&eacute;cnicas</b></div>" +
-        '<div class="scm-calendar-case-alert"><span aria-hidden="true">!</span><p>Se crear&aacute; el evento en el calendario t&eacute;cnico y quedar&aacute; sincronizado con el ticket #' +
+        '<div class="scm-calendar-case-alert"><span aria-hidden="true">!</span><p>Se crear&aacute; el evento en el calendario t&eacute;cnico y quedar&aacute; sincronizado con el caso #' +
         escHtml(logicalTicket || ticketPk || "-") +
         " y la agenda del funcionario asignado.</p></div>" +
         '<div class="scm-calendar-case-grid">' +
@@ -6493,7 +6493,7 @@
       '<div class="skc-rp-card"><div class="skc-rp-lbl">\u00c1rea afectada</div><div class="skc-rp-val">' +
       escHtml(String(areaAfect)) +
       " m2</div></div>" +
-      '<div class="skc-rp-card"><div class="skc-rp-lbl">Ticket / Inmueble</div><div class="skc-rp-val">#' +
+      '<div class="skc-rp-card"><div class="skc-rp-lbl">Caso / Inmueble</div><div class="skc-rp-val">#' +
       escHtml(String(idTicket)) +
       "</div>" +
       (codigo
@@ -6511,13 +6511,13 @@
     var diasHtml =
       '<div class="skc-rp-sec">C\u00e1lculo de d\u00edas</div>' +
       '<div class="skc-rp-formula">' +
-      "<strong>Fecha ticket:</strong> " +
+      "<strong>Fecha caso:</strong> " +
       escHtml(String(fechaTicket)) +
       "<br>" +
       "<strong>Fecha cotizaci\u00f3n:</strong> " +
       escHtml(String(fechaCot)) +
       "<br>" +
-      "<strong>D\u00edas desde ticket:</strong> " +
+      "<strong>D\u00edas desde caso:</strong> " +
       escHtml(String(diasTicket)) +
       "<br>" +
       "<strong>Duraci\u00f3n del trabajo:</strong> " +
@@ -6574,7 +6574,7 @@
     var ticketPk = caseBtn.dataset.ticketPk || "";
     var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
     if (title)
-      title.textContent = isPublicPqr ? "Cerrar solicitud" : "Cerrar ticket";
+      title.textContent = isPublicPqr ? "Cerrar solicitud" : "Cerrar caso";
     setCaseSubmodalMeta(sub, caseBtn);
     if (body) {
       body.innerHTML =
@@ -6583,12 +6583,12 @@
         escHtml(ticketPk) +
         '">' +
         '<p class="scm-muted">Esta acci&oacute;n cerrar&aacute; ' +
-        (isPublicPqr ? "la solicitud" : "el ticket") +
+        (isPublicPqr ? "la solicitud" : "el caso") +
         " y marcar&aacute; el estado administrativo como Finalizado.</p>" +
         '<label class="scm-seg-field"><span>Mensaje de cierre</span><textarea name="observacion" rows="6" required placeholder="' +
         (isPublicPqr
           ? "Escribe el mensaje o motivo para cerrar la solicitud..."
-          : "Escribe el mensaje o motivo para cerrar el ticket...") +
+          : "Escribe el mensaje o motivo para cerrar el caso...") +
         '"></textarea></label>' +
         '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Confirmar cierre</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
@@ -6616,7 +6616,7 @@
         '<input type="hidden" name="estado_ticket" value="__keep__">' +
         '<input type="hidden" name="estado_cotizacion" value="__keep__">' +
         '<input type="hidden" name="notify_recipients_present" value="1">' +
-        '<p class="scm-muted">Selecciona el nuevo estado administrativo del ticket #' +
+        '<p class="scm-muted">Selecciona el nuevo estado administrativo del caso #' +
         escHtml(ticketPk) +
         " (estado actual: <strong>" +
         escHtml(currentAdmin || "Sin asignar") +
@@ -9089,7 +9089,7 @@
         if (typeof window.scmNotify === "function")
           window.scmNotify(
             "error",
-            "No se encontró el ticket autorizado para abrir su acta.",
+            "No se encontró el caso autorizado para abrir su acta.",
           );
         return;
       }
@@ -9335,7 +9335,7 @@
     }
     if (skipped > 0) {
       var skippedText =
-        "Evento creado, pero no se encoló WhatsApp. Revisa celular del ticket o funcionario.";
+        "Evento creado, pero no se encoló WhatsApp. Revisa celular del caso o funcionario.";
       if (msg) msg.textContent = skippedText;
       scmNotify("warning", skippedText, "WhatsApp");
     }

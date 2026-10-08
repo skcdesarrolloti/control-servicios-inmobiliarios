@@ -12,7 +12,7 @@
         <h3 style="font-size:18px;margin:0 0 18px;">Respuesta de cotizacion #{id_cotizacion}</h3>
         <p style="font-weight:500;margin:10px 0;">Apreciado/a {destinatario}</p>
         <p style="font-weight:500;margin:10px 0;">La cotizacion fue marcada como <b>{estado}</b>.</p>
-        <p style="font-weight:500;margin:10px 0;"><b>Ticket:</b> #{id_ticket}</p>
+        <p style="font-weight:500;margin:10px 0;"><b>Caso:</b> #{id_ticket}</p>
         <div style="background:#f3f4f6;border-left:4px solid #f59120;padding:14px;margin:18px 0;text-align:left;">
           {observacion}
         </div>

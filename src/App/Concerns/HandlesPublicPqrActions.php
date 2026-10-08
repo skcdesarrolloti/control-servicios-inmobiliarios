@@ -42,7 +42,7 @@ trait HandlesPublicPqrActions
     }
 
     if ($ticketPk <= 0) {
-      throw new \InvalidArgumentException('Ticket invalido.');
+      throw new \InvalidArgumentException('Caso invalido.');
     }
     if ($tipoPqrsRaw === '') {
       throw new \InvalidArgumentException('Debes seleccionar un tipo de PQR/Peticion.');
@@ -67,7 +67,7 @@ trait HandlesPublicPqrActions
       [$ticketPk]
     );
     if (!is_array($ticket)) {
-      throw new \RuntimeException('Ticket no encontrado.');
+      throw new \RuntimeException('Caso no encontrado.');
     }
 
     if ($authorizedEmployeeId !== '' && $accessScope !== 'all') {

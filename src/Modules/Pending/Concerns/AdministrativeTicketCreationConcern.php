@@ -18,7 +18,7 @@ trait AdministrativeTicketCreationConcern
     $schema = new SchemaInspector($db);
     $ticketsTable = $db->table('jet_cct_tickets');
     if (!$schema->tableExists($ticketsTable)) {
-      return ['ok' => '0', 'message' => 'No existe la tabla de tickets.'];
+      return ['ok' => '0', 'message' => 'No existe la tabla de casos.'];
     }
 
     $contractRef = trim((string) ($input['contract_pk'] ?? $input['id_contrato'] ?? ''));
@@ -53,7 +53,7 @@ trait AdministrativeTicketCreationConcern
     ];
 
     if ($mode === 'preventiva' && $descripcion === '') {
-      $descripcion = 'Se crea este ticket para coordinar y documentar la revisión preventiva anual del inmueble conforme a la fecha de inicio del contrato de arrendamiento.';
+      $descripcion = 'Se crea este caso para coordinar y documentar la revisión preventiva anual del inmueble conforme a la fecha de inicio del contrato de arrendamiento.';
     }
     if ($tema === '' || $departamento === '' || $prioridad === '' || $asunto === '' || $descripcion === '') {
       return ['ok' => '0', 'message' => 'Completa responsable, prioridad, departamento, tema, asunto y descripcion.'];
@@ -208,7 +208,7 @@ trait AdministrativeTicketCreationConcern
 
     $insertPayload = $schema->filterTableData($ticketsTable, $ticketPayload);
     if (empty($insertPayload)) {
-      return ['ok' => '0', 'message' => 'No se pudo preparar la informacion del ticket.'];
+      return ['ok' => '0', 'message' => 'No se pudo preparar la informacion del caso.'];
     }
 
     $pdo = $db->pdo();
@@ -225,7 +225,7 @@ trait AdministrativeTicketCreationConcern
       $db->insert($ticketsTable, $insertPayload);
       $ticketId = (int) $db->lastInsertId();
       if ($ticketId <= 0) {
-        throw new \RuntimeException('No se pudo obtener el ID del ticket creado.');
+        throw new \RuntimeException('No se pudo obtener el ID del caso creado.');
       }
 
       if ($schema->columnExists($ticketsTable, 'id_ticket')) {
@@ -260,7 +260,7 @@ trait AdministrativeTicketCreationConcern
       if ($startedTransaction && $pdo->inTransaction()) {
         $pdo->rollBack();
       }
-      return ['ok' => '0', 'message' => 'No se pudo crear el ticket: ' . $e->getMessage()];
+      return ['ok' => '0', 'message' => 'No se pudo crear el caso: ' . $e->getMessage()];
     }
 
     try {
@@ -272,11 +272,11 @@ trait AdministrativeTicketCreationConcern
         throw $exception;
       }
       $queued = 0;
-      $warnings[] = 'Ticket guardado; no se pudieron encolar los avisos.';
+      $warnings[] = 'Caso guardado; no se pudieron encolar los avisos.';
       error_log('[ticket_creation_notifications] ' . $exception->getMessage());
     }
     if ($startedTransaction && $pdo->inTransaction()) $pdo->commit();
-    $message = 'Ticket #' . $ticketId . ' creado correctamente.';
+    $message = 'Caso #' . $ticketId . ' creado correctamente.';
     if (!empty($warnings)) {
       $message .= ' ' . implode(' ', $warnings);
     }
@@ -449,8 +449,8 @@ trait AdministrativeTicketCreationConcern
       'id_ticket' => $ticketId,
       'fecha' => $nowTs,
       'nombre' => $userName,
-      'respuesta' => 'Ticket administrativo creado: ' . (string) ($ticketPayload['asunto'] ?? ''),
-      'observacion' => 'Ticket administrativo creado: ' . (string) ($ticketPayload['asunto'] ?? ''),
+      'respuesta' => 'Caso administrativo creado: ' . (string) ($ticketPayload['asunto'] ?? ''),
+      'observacion' => 'Caso administrativo creado: ' . (string) ($ticketPayload['asunto'] ?? ''),
       'cct_author_id' => $idEmpleado,
       'cct_created' => $nowMysql,
       'cct_modified' => $nowMysql,
@@ -479,8 +479,8 @@ trait AdministrativeTicketCreationConcern
     }
 
     $observacion = $mode === 'preventiva'
-      ? 'Se ha creado un ticket para la realizacion de la revision preventiva del inmueble.'
-      : 'Se ha creado un ticket administrativo.';
+      ? 'Se ha creado un caso para la realizacion de la revision preventiva del inmueble.'
+      : 'Se ha creado un caso administrativo.';
     $payload = [
       'cct_status' => 'publish',
       'id_ticket' => $ticketId,

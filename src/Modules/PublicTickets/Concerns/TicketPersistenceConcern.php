@@ -27,7 +27,7 @@ trait TicketPersistenceConcern
   ): array {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     if (!$this->schema->tableExists($ticketsTable)) {
-      return ['ok' => false, 'message' => 'No existe la tabla de tickets.'];
+      return ['ok' => false, 'message' => 'No existe la tabla de casos.'];
     }
 
     $nowTs = time();
@@ -161,18 +161,18 @@ trait TicketPersistenceConcern
 
     $insertData = $this->schema->filterTableData($ticketsTable, $data);
     if (empty($insertData)) {
-      return ['ok' => false, 'message' => 'No se pudo construir el payload del ticket.'];
+      return ['ok' => false, 'message' => 'No se pudo construir el payload del caso.'];
     }
 
     try {
       $this->db->insert($ticketsTable, $insertData);
       $ticketId = (int) $this->db->lastInsertId();
     } catch (\Throwable $e) {
-      return ['ok' => false, 'message' => 'Error insertando ticket: ' . $e->getMessage()];
+      return ['ok' => false, 'message' => 'Error insertando caso: ' . $e->getMessage()];
     }
 
     if ($ticketId <= 0) {
-      return ['ok' => false, 'message' => 'No se pudo obtener el ID del ticket creado.'];
+      return ['ok' => false, 'message' => 'No se pudo obtener el ID del caso creado.'];
     }
 
     $updateData = $this->schema->filterTableData($ticketsTable, [

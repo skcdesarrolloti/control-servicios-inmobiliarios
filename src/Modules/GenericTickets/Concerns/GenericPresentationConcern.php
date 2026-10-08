@@ -135,7 +135,7 @@ trait GenericPresentationConcern
   {
     $buttons = [];
     if ($ticketUrl !== '') {
-      $buttons[] = ['url' => $ticketUrl, 'label' => 'Ver ticket'];
+      $buttons[] = ['url' => $ticketUrl, 'label' => 'Ver caso'];
     }
     if ($corrUrl !== '') {
       $buttons[] = ['url' => $corrUrl, 'label' => 'Ver revision'];

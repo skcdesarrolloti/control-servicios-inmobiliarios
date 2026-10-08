@@ -10,7 +10,7 @@ final class SeguimientoFormView
       return '<div class="scm-seg-readonly">Inicia sesi&oacute;n para registrar seguimiento desde este panel.</div>';
     }
     if ($ticketPk <= 0) {
-      return '<div class="scm-seg-readonly">No se puede registrar seguimiento: el ticket no tiene identificador interno.</div>';
+      return '<div class="scm-seg-readonly">No se puede registrar seguimiento: el caso no tiene identificador interno.</div>';
     }
 
     $html = '';
@@ -68,7 +68,7 @@ final class SeguimientoFormView
     }
     $html .= '</fieldset>';
     $html .= '<div class="scm-seg-actions">';
-    $html .= '<label class="scm-seg-check"><input type="checkbox" name="cerrar_ticket" value="1"> Cerrar ticket en este seguimiento</label>';
+    $html .= '<label class="scm-seg-check"><input type="checkbox" name="cerrar_ticket" value="1"> Cerrar caso en este seguimiento</label>';
     $html .= '<button type="submit" class="scm-btn-primary">Guardar seguimiento</button>';
     $html .= '<span class="scm-seg-msg" aria-live="polite"></span>';
     $html .= '</div>';

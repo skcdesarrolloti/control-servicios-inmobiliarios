@@ -100,7 +100,7 @@ trait RendersDashboard
     $myTicketsParams['fEmpleado'] = $currentEmployeeId !== '' ? $currentEmployeeId : '__sin_funcionario__';
     $myTicketsParams['_scmStatusBucket'] = 'all';
     $myTicketsParams['_scmExcludeDepartamento'] = 'Servicio al cliente';
-    $myTicketsResult = ['tbody' => $this->render_lazy_tickets_placeholder('Abre esta pestaña para cargar tus tickets.'), 'pagination_html' => ''];
+    $myTicketsResult = ['tbody' => $this->render_lazy_tickets_placeholder('Abre esta pestaña para cargar tus casos.'), 'pagination_html' => ''];
     $myTicketsStats = ['total' => 0];
     $cotizacionesParams = $this->parse_cotizaciones_mantenimiento_params($_GET, 'scmqt_');
     $cotizacionesResult = [
@@ -164,6 +164,7 @@ trait RendersDashboard
       'mis_tickets' => 'scm-panel-mis-tickets',
       'mis-tickets' => 'scm-panel-mis-tickets',
       'mis tickets' => 'scm-panel-mis-tickets',
+      'mis casos' => 'scm-panel-mis-tickets',
       'scm-panel-mis-tickets' => 'scm-panel-mis-tickets',
       'cotizaciones_mantenimiento' => 'scm-panel-cotizaciones-mantenimiento',
       'cotizaciones-mantenimiento' => 'scm-panel-cotizaciones-mantenimiento',
@@ -374,7 +375,7 @@ trait RendersDashboard
     $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];
     $tbodyHtml = $hydrateMaintenanceRows
       ? (string)($result['tbody'] ?? '')
-      : $this->render_lazy_tickets_placeholder('Abre Mantenimiento para cargar los tickets.');
+      : $this->render_lazy_tickets_placeholder('Abre Mantenimiento para cargar los casos.');
     $paginationHtml = $hydrateMaintenanceRows ? (string)($result['pagination_html'] ?? '') : '';
 
     $homeDisplayName = trim((string) Auth::user());
@@ -382,10 +383,10 @@ trait RendersDashboard
     $homeFirstName = (string)($homeNameParts[0] ?? '');
     $homeQuickLinks = [];
     if (in_array('abiertos', $dashboardAllowedTabs, true)) {
-      $homeQuickLinks[] = ['panel' => 'scm-panel-abiertos', 'icon' => 'fa-inbox', 'label' => 'Tickets abiertos'];
+      $homeQuickLinks[] = ['panel' => 'scm-panel-abiertos', 'icon' => 'fa-inbox', 'label' => 'Casos abiertos'];
     }
     if (in_array('mis_tickets', $dashboardAllowedTabs, true)) {
-      $homeQuickLinks[] = ['panel' => 'scm-panel-mis-tickets', 'icon' => 'fa-user-check', 'label' => 'Mis tickets'];
+      $homeQuickLinks[] = ['panel' => 'scm-panel-mis-tickets', 'icon' => 'fa-user-check', 'label' => 'Mis casos'];
     }
     if ($canAccessAdministrativeActivities) {
       $homeQuickLinks[] = ['panel' => 'scm-panel-actividades-administrativas', 'icon' => 'fa-calendar-check', 'label' => 'Actividades administrativas'];
@@ -421,7 +422,7 @@ trait RendersDashboard
       'guide'   => [
         'enabled' => true,
         'title'   => 'Guia de uso',
-        'html'    => '<ul><li>Usa filtros para acotar resultados.</li><li>Atraso desde creacion = dias transcurridos desde que se creo el ticket.</li><li>Sin actualizar desde gestion = dias desde la ultima actualizacion o seguimiento.</li></ul>',
+        'html'    => '<ul><li>Usa filtros para acotar resultados.</li><li>Atraso desde creacion = dias transcurridos desde que se creo el caso.</li><li>Sin actualizar desde gestion = dias desde la ultima actualizacion o seguimiento.</li></ul>',
       ],
       'actions' => [
         'mant'            => self::AJAX_ACTION,
@@ -718,7 +719,7 @@ trait RendersDashboard
             </div>
             <div>
               <h2 class="scm-mesa-title">Mesa Operativa de Casos</h2>
-              <div class="scm-mesa-subtitle">CONTROL DE MANTENIMIENTOS &amp; TICKETS</div>
+              <div class="scm-mesa-subtitle">CONTROL DE MANTENIMIENTOS &amp; CASOS</div>
             </div>
           </div>
           <div class="scm-guide-bar scm-mesa-quick-actions" style="display:none !important;">
@@ -876,7 +877,7 @@ trait RendersDashboard
                     <div class="scm-ending-title">
                       <div class="flex flex-wrap items-center gap-2"><span class="scm-ending-kicker">Contratos</span><span class="scm-ending-module">Módulo de Retención &amp; Terminaciones</span></div>
                       <h3>Contratos por terminar</h3>
-                      <p>Escoge un año y mes para ver qué contratos llegan a fecha fin y crear tickets comerciales de retención cuando aplique.</p>
+                      <p>Escoge un año y mes para ver qué contratos llegan a fecha fin y crear casos comerciales de retención cuando aplique.</p>
                     </div>
                     <div class="scm-ending-tools">
                       <label for="scm-ending-year"><span>Año</span><select id="scm-ending-year" data-scm-contracts-ending-year></select></label>
@@ -915,7 +916,7 @@ trait RendersDashboard
                   <div class="space-y-2">
                     <div class="flex flex-wrap items-center gap-2"><span class="scm-contract-kicker">Contratos</span><span class="inline-flex items-center gap-1.5 text-xs"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>Gestión de arrendamiento</span></div>
                     <h3><?php echo esc_html($requestView['title']); ?></h3>
-                    <p data-contract-description>Responde si la solicitud está dentro o fuera de término, elige destinatarios y cierra el ticket con acta.</p>
+                    <p data-contract-description>Responde si la solicitud está dentro o fuera de término, elige destinatarios y cierra el caso con acta.</p>
                   </div>
                   <div class="flex flex-wrap items-center gap-2 shrink-0">
                     <button type="button" class="scm-contract-button" data-contract-view-toggle aria-pressed="false">Ver contestadas</button>
@@ -933,12 +934,12 @@ trait RendersDashboard
                 </div>
                 <div id="scm-contract-filters-<?php echo $requestKind; ?>" data-contract-filters hidden>
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-xl bg-white p-4">
-                    <label class="grid gap-2 text-xs font-semibold">Buscar caso<input type="search" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" data-contract-search placeholder="Ticket, contrato, inmueble o solicitante"></label>
+                    <label class="grid gap-2 text-xs font-semibold">Buscar caso<input type="search" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" data-contract-search placeholder="Caso, contrato, inmueble o solicitante"></label>
                     <label class="grid gap-2 text-xs font-semibold">Término<select class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" data-contract-term-filter><option value="">Todos</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option><option value="unknown">Sin cálculo de término</option></select></label>
                   </div>
                 </div>
                 <div class="flex flex-col gap-5" data-scm-contract-<?php echo $requestKind; ?>-list></div>
-                <div class="rounded-xl bg-[#f2f3ff] p-4 text-xs leading-relaxed" data-contract-pending-note><strong class="block mb-1">Respuesta contractual</strong>Al responder se generará el acta y se cerrará la solicitud. La creación del ticket comercial de retención es opcional.</div>
+                <div class="rounded-xl bg-[#f2f3ff] p-4 text-xs leading-relaxed" data-contract-pending-note><strong class="block mb-1">Respuesta contractual</strong>Al responder se generará el acta y se cerrará la solicitud. La creación del caso comercial de retención es opcional.</div>
               </section>
             </div>
             <?php endforeach; ?>
@@ -948,7 +949,7 @@ trait RendersDashboard
 
       <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-abiertos' ? ' active' : ''; ?>" id="scm-panel-abiertos" data-permission-tab="abiertos">
         <div class="scm-status-bucket scm-open-bucket" data-open-bucket="abiertos">
-          <div class="scm-status-subtabs scm-open-subtabs flex items-center justify-between" role="tablist" aria-label="Tickets abiertos">
+          <div class="scm-status-subtabs scm-open-subtabs flex items-center justify-between" role="tablist" aria-label="Casos abiertos">
             <div class="flex items-center gap-1.5 flex-wrap">
               <?php foreach ($openTopicDefs as $openTopicKey => $openTopicDef): ?>
                 <button class="scm-status-topic-tab scm-open-topic-tab<?php echo $activeOpenTopic === $openTopicKey ? ' active' : ''; ?>" type="button" data-open-target="<?php echo esc_attr($openTopicKey); ?>"><?php echo esc_html((string)($openTopicDef['label'] ?? $openTopicKey)); ?></button>
@@ -1175,7 +1176,7 @@ trait RendersDashboard
             <?php
               $visibleCasesCount = count((array)($result['rows'] ?? []));
               $totalCasesCount = (int)($stats['total'] ?? $visibleCasesCount);
-              $countBadgeText = $totalCasesCount > 0 ? ('Mostrando ' . ($visibleCasesCount > 0 ? $visibleCasesCount : min(12, $totalCasesCount)) . ' de ' . $totalCasesCount) : 'Sin tickets registrados';
+              $countBadgeText = $totalCasesCount > 0 ? ('Mostrando ' . ($visibleCasesCount > 0 ? $visibleCasesCount : min(12, $totalCasesCount)) . ' de ' . $totalCasesCount) : 'Sin casos registrados';
             ?>
             <span class="scm-cases-count-badge text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200" id="scm-cases-count-badge"><?php echo esc_html($countBadgeText); ?></span>
           </div>
@@ -1436,7 +1437,7 @@ trait RendersDashboard
             </button>
             <button type="button" onclick="window.dispatchEvent(new CustomEvent('scm:open-nuevo-ticket'))" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0f1e36] text-white hover:bg-[#162846] text-xs font-semibold shadow-xs transition-all">
               <span class="material-symbols-outlined text-[18px]">add</span>
-              <span>Nuevo Ticket</span>
+              <span>Nuevo Caso</span>
             </button>
           </div>
         </div>
@@ -1454,10 +1455,10 @@ trait RendersDashboard
         <div class="scm-metrics-pane active" data-scm-metrics-pane="operativas">
         <!-- Tarjetas Ejecutivas de KPIs de Alta Jerarquía -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-scm-metrics-main-kpis>
-          <!-- KPI 1: Tickets Activos -->
+          <!-- KPI 1: Casos Activos -->
           <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col justify-between hover:shadow-elevated transition-shadow">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Tickets Activos</span>
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Casos Activos</span>
               <span class="p-2 rounded-xl bg-blue-50 text-[#0f1e36]">
                 <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
               </span>
@@ -1643,7 +1644,7 @@ trait RendersDashboard
             <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
               <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <span class="material-symbols-outlined text-[18px] text-slate-400">inbox</span>
-                <span>Tickets abiertos por Funcionario</span>
+                <span>Casos abiertos por Funcionario</span>
               </h3>
               <div class="scm-bars" id="scm-chart-abiertos-funcionario"></div>
             </section>
@@ -2022,10 +2023,10 @@ trait RendersDashboard
           <div class="scm-config-info-strip"><strong>Acciones y destinatarios internos:</strong> Selecciona uno o varios funcionarios por acci&oacute;n. Si una acci&oacute;n queda vac&iacute;a, no se env&iacute;an avisos internos para esa actividad.</div>
           <section class="scm-pqr-settings-section" data-receipt-automation>
             <h4>Recibos automáticos de contratos · cron</h4>
-            <p>Genera el ticket y la carta de aviso previo 15 días antes de la fecha fin. Solo procesa el _ID indicado. La carta se envía al arrendatario, al responsable y a los destinatarios del evento Ticket automático de recibo · 15 días.</p>
+            <p>Genera el caso y la carta de aviso previo 15 días antes de la fecha fin. Solo procesa el _ID indicado. La carta se envía al arrendatario, al responsable y a los destinatarios del evento Caso automático de recibo · 15 días.</p>
             <label><input type="checkbox" name="receipt_enabled" <?php echo !empty($receiptConfig['enabled']) ? 'checked' : ''; ?>> Activar recibos automáticos</label>
             <label>Contrato: _ID interno (no número contractual)<input class="input input-bordered" type="number" min="1" max="999999999" required name="receipt_contract_id" value="<?php echo (int) $receiptConfig['contract_id']; ?>"></label>
-            <label>Funcionario al que se asignan los tickets<select class="select select-bordered scm-select" name="receipt_employee_id"><?php echo $receiptOptions((string) $receiptConfig['employee_id']); ?></select></label>
+            <label>Funcionario al que se asignan los casos<select class="select select-bordered scm-select" name="receipt_employee_id"><?php echo $receiptOptions((string) $receiptConfig['employee_id']); ?></select></label>
             <label>Coordinador que aparece en la carta (opcional)<select class="select select-bordered scm-select" name="receipt_coordinator_id"><?php echo $receiptOptions((string) $receiptConfig['coordinator_id']); ?></select></label>
             <p>El registro fotográfico del contrato se incluye como enlace. Las fotos almacenadas en la aplicación se insertan en el PDF. El responsable configurado aquí prevalece sobre la recomendación del inmueble.</p>
           </section>
@@ -2704,7 +2705,7 @@ trait RendersDashboard
     if (empty($temaOptions)) {
       $temaOptions = is_array($filterOptions['tema'] ?? null) ? $filterOptions['tema'] : [];
     }
-    $form = $this->render_generic_filter_form('mis_tickets', 'scm_my_', $params, true, $temaOptions, $filterOptions, 'mis_tickets', 'Mis tickets');
+    $form = $this->render_generic_filter_form('mis_tickets', 'scm_my_', $params, true, $temaOptions, $filterOptions, 'mis_tickets', 'Mis casos');
     $kpis = '<div class="scm-kpis scm-kpis-daisy">'
       . '<div class="scm-kpi"><div class="scm-kpi-label">TOTAL</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-total">' . esc_html((string) ($stats['total'] ?? 0)) . '</div></div>'
       . '<div class="scm-kpi scm-kpi-magnitud scm-kpi-critico"><div class="scm-kpi-label">CR&Iacute;TICOS</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-magnitud-critico">' . esc_html((string) ($stats['magnitud_critico'] ?? 0)) . '</div></div>'
@@ -2713,7 +2714,7 @@ trait RendersDashboard
       . '<div class="scm-kpi scm-kpi-magnitud scm-kpi-bajo"><div class="scm-kpi-label">BAJOS</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-magnitud-bajo">' . esc_html((string) ($stats['magnitud_bajo'] ?? 0)) . '</div></div>'
       . '</div>';
     return '<span id="scm-mis_tickets-count" style="display:none;">' . esc_html((string) ($stats['total'] ?? 0)) . '</span>'
-      . '<div class="scm-status-topic-head"><div><h3>Mis tickets</h3><p>Tickets asignados a tu funcionario, excepto los de Servicio al cliente.</p></div><span class="scm-status-count"><strong>' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> tickets</span></div>'
+      . '<div class="scm-status-topic-head"><div><h3>Mis casos</h3><p>Casos asignados a tu funcionario, excepto los de Servicio al cliente.</p></div><span class="scm-status-count"><strong>' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> casos</span></div>'
       . $kpis
       . $form
       . '<div class="scm-cards-wrap"><div class="scm-ticket-cards" id="scm-cards-mis_tickets">' . $cards . '</div></div>'
@@ -2897,7 +2898,7 @@ trait RendersDashboard
           <form class="scm-calendar-due-type-filter" data-scm-calendar-due-type-filter autocomplete="off">
             <label class="scm-calendar-due-chip scm-calendar-due-chip--no-prorroga-contrato"><input type="checkbox" name="due_type" value="servicios_publicos_critico" checked><span class="material-symbols-outlined" aria-hidden="true">warning</span><strong>Servicios críticos · 72 horas</strong></label>
             <label class="scm-calendar-due-chip scm-calendar-due-chip--preventiva-sin-enviar"><input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><strong>Preventivas sin enviar</strong></label>
-            <label class="scm-calendar-due-chip scm-calendar-due-chip--ticket-preventiva-sin-cita"><input type="checkbox" name="due_type" value="ticket_preventiva_sin_cita" checked><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><strong>Tickets sin cita preventiva</strong></label>
+            <label class="scm-calendar-due-chip scm-calendar-due-chip--ticket-preventiva-sin-cita"><input type="checkbox" name="due_type" value="ticket_preventiva_sin_cita" checked><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><strong>Casos sin cita preventiva</strong></label>
             <label class="scm-calendar-due-chip scm-calendar-due-chip--preventiva-cita-sin-realizar"><input type="checkbox" name="due_type" value="preventiva_cita_sin_realizar" checked><span class="material-symbols-outlined" aria-hidden="true">pending_actions</span><strong>Preventivas con cita sin realizar</strong></label>
             <label class="scm-calendar-due-chip scm-calendar-due-chip--cotizacion-sin-enviar"><input type="checkbox" name="due_type" value="cotizacion_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">receipt_long</span><strong>Cotizaciones sin enviar</strong></label>
             <label class="scm-calendar-due-chip scm-calendar-due-chip--cotizacion-enviada-sin-respuesta"><input type="checkbox" name="due_type" value="cotizacion_enviada_sin_respuesta" checked><span class="material-symbols-outlined" aria-hidden="true">mark_email_unread</span><strong>Cotizaciones sin respuesta</strong></label>
@@ -4789,7 +4790,7 @@ trait RendersDashboard
     $canQuoteActaCreate = $canManageMaintenanceQuote && $this->canUseDashboardAction('quote_acta_create');
     $cotizacionPuedeEnviarse = $id !== '' && $canQuoteSend && $cotizacionEditable && !$enviada && $cotizacionSinResponder;
     $seguimientoReparacionesDisponible = $id !== '' && $ticket !== '' && $canQuoteRepairFollowup && $cotizacionSinResponder && $enviada && $fechaEnvioTs > 0 && $diasCalendarioSinRespuesta > 10;
-    $caseDescription = 'Cotizacion de mantenimiento #' . ($id !== '' ? $id : '-') . ($ticket !== '' ? ' relacionada con el ticket #' . $ticket . '.' : '.');
+    $caseDescription = 'Cotizacion de mantenimiento #' . ($id !== '' ? $id : '-') . ($ticket !== '' ? ' relacionada con el caso #' . $ticket . '.' : '.');
     if ($direccion !== '' && $direccion !== '-') {
       $caseDescription .= ' Direccion: ' . $direccion . '.';
     }
@@ -4842,7 +4843,7 @@ trait RendersDashboard
     }
 
     return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '" data-cot-fecha-envio="' . esc_attr((string) $fechaEnvioTs) . '" data-cot-dias-calendario="' . esc_attr((string) $diasCalendarioSinRespuesta) . '" data-cot-seguimiento-reparaciones-disponible="' . esc_attr($seguimientoReparacionesDisponible ? '1' : '0') . '">'
-      . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Ticket <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : 'Sin estado') . '</span></div></div>'
+      . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Caso <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : 'Sin estado') . '</span></div></div>'
       . '<div class="scm-cotizacion-meta"><div><span>Fecha</span><strong>' . esc_html($fecha) . '</strong></div><div><span>Destinatario</span><strong>' . esc_html($destinatario !== '' ? $destinatario : '-') . '</strong></div><div><span>Contacto</span><strong>' . esc_html($contacto !== '' ? $contacto : '-') . '</strong></div><div><span>Empleado</span><strong>' . esc_html($empleado !== '' ? $empleado : '-') . '</strong></div><div><span>Ordenes</span><strong>' . esc_html($ordenesTotal) . '</strong></div></div>'
       . '<div class="scm-cotizacion-finance-actions"><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="saldos" aria-expanded="false">Ver saldos</button><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="totales" aria-expanded="false">Ver totales</button></div>'
       . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="saldos" hidden><div class="scm-cotizacion-finance-grid"><div><span>Saldo mano de obra</span><strong>' . esc_html($saldoObra) . '</strong></div><div><span>Saldo materiales</span><strong>' . esc_html($saldoMateriales) . '</strong></div><div><span>Saldo equipos</span><strong>' . esc_html($saldoMaquinarias) . '</strong></div><div><span>Saldo otros costos</span><strong>' . esc_html($saldoOtros) . '</strong></div></div></div>'

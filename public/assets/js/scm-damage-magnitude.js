@@ -70,7 +70,7 @@
   }
 
   function setLoading() {
-    state.textContent = 'Cargando tickets...';
+    state.textContent = 'Cargando casos...';
     state.className = 'scm-damage-state';
     grid.innerHTML = '';
     summary.innerHTML = '<div class="scm-skeleton"></div><div class="scm-skeleton"></div><div class="scm-skeleton"></div><div class="scm-skeleton"></div>';
@@ -176,7 +176,7 @@
       '</div>' +
       '<div class="scm-indicators">' + indicators + '</div>' +
       '<div class="scm-damage-actions">' +
-      (ticketUrl ? '<a class="scm-damage-ticket-btn" href="' + escapeHtml(ticketUrl) + '" target="_blank" rel="noopener noreferrer">Ver ticket</a>' : '') +
+      (ticketUrl ? '<a class="scm-damage-ticket-btn" href="' + escapeHtml(ticketUrl) + '" target="_blank" rel="noopener noreferrer">Ver caso</a>' : '') +
       '<button class="scm-damage-ticket-btn scm-damage-detail-btn" type="button" data-damage-index="' + escapeHtml(index) + '">Ver matriz y da&ntilde;os</button>' +
       '</div>' +
       '</article>';
@@ -268,12 +268,12 @@
       const tickets = data.tickets || [];
       currentTickets = tickets;
       if (!tickets.length) {
-        state.textContent = 'No hay tickets con revisión ' + revisionLabel + ' para los filtros seleccionados.';
+        state.textContent = 'No hay casos con revisión ' + revisionLabel + ' para los filtros seleccionados.';
         grid.innerHTML = '';
         return;
       }
 
-      state.textContent = tickets.length + ' ticket(s) encontrados.';
+      state.textContent = tickets.length + ' caso(s) encontrados.';
       grid.innerHTML = tickets.map(renderTicketCard).join('');
     } catch (error) {
       console.error(error);

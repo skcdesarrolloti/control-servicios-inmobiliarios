@@ -341,7 +341,7 @@ trait HandlesPropertyHistoryActions
     return [
       'historial' => ['table' => 'jet_cct_historial_del_inmueble', 'label' => 'Historial del inmueble', 'description' => 'Linea de tiempo general registrada para el inmueble.', 'order' => ['fecha', 'cct_created', '_ID']],
       'gestiones_cobro' => ['table' => 'jet_cct_gestiones_cobro', 'label' => 'Gestiones de cobro', 'description' => 'Mensajes, recordatorios y acciones de cartera.', 'order' => ['fecha', 'cct_created', '_ID']],
-      'tickets' => ['table' => 'jet_cct_tickets', 'label' => 'Tickets', 'description' => 'Casos administrativos y solicitudes relacionadas.', 'contract_columns' => ['contrato', 'id_contrato'], 'order' => ['fecha', 'cct_created', '_ID']],
+      'tickets' => ['table' => 'jet_cct_tickets', 'label' => 'Casos', 'description' => 'Casos administrativos y solicitudes relacionadas.', 'contract_columns' => ['contrato', 'id_contrato'], 'order' => ['fecha', 'cct_created', '_ID']],
       'contratos_arrendamiento' => ['table' => 'jet_cct_contratos_arrendamiento', 'label' => 'Contratos de arrendamiento', 'description' => 'Contratos vinculados al inmueble.', 'contract_columns' => ['contrato', 'id_contrato', '_ID'], 'order' => ['fecha', 'cct_created', '_ID']],
       'contratos_mandato' => ['table' => 'jet_cct_contrato_mandato', 'label' => 'Contratos de administracion', 'description' => 'Mandatos o administracion del inmueble.', 'contract_columns' => ['contrato', 'id_contrato', '_ID'], 'order' => ['fecha', 'cct_created', '_ID']],
       'cierres' => ['table' => 'jet_cct_cierres', 'label' => 'Cierres', 'description' => 'Cierres comerciales o documentales.', 'contract_columns' => ['contrato', 'id_contrato'], 'order' => ['fecha', 'cct_created', '_ID']],
@@ -512,10 +512,11 @@ trait HandlesPropertyHistoryActions
   {
     if ($key === 'tickets') {
       $ticket = $this->property_history_first($row, ['id_ticket', '_ID']);
-      return 'Ticket #' . ($ticket !== '' ? $ticket : $id) . ' - ' . $this->property_history_first($row, ['asunto', 'tema_ayuda', 'categoria']);
+      return 'Caso #' . ($ticket !== '' ? $ticket : $id) . ' - ' . $this->property_history_first($row, ['asunto', 'tema_ayuda', 'categoria']);
     }
     if ($key === 'historial') {
-      return $this->property_history_first($row, ['tipo_reporte', 'tipo', 'titulo']) ?: 'Movimiento de historial #' . $id;
+      $type = $this->property_history_first($row, ['tipo_reporte', 'tipo', 'titulo']);
+      return strcasecmp($type, 'Ticket') === 0 ? 'Caso' : ($type ?: 'Movimiento de historial #' . $id);
     }
     if ($key === 'contratos_arrendamiento' || $key === 'contratos_mandato') {
       return 'Contrato #' . ($this->property_history_first($row, ['contrato', 'id_contrato', '_ID']) ?: $id);
@@ -588,7 +589,7 @@ trait HandlesPropertyHistoryActions
       'Generado: ' . (string) ($payload['generated_at'] ?? date('d/m/Y H:i')) . ' | Inmueble ' . ($propertyLabel !== '' ? $propertyLabel : '-'),
       'Informe consolidado de actividad del inmueble'
     );
-    $pdf->paragraph('Informe consolidado de actividades, reportes, gestiones, tickets, contratos, revisiones, cotizaciones y registros relacionados con el inmueble consultado.', 8);
+    $pdf->paragraph('Informe consolidado de actividades, reportes, gestiones, casos, contratos, revisiones, cotizaciones y registros relacionados con el inmueble consultado.', 8);
     $pdf->heading('Identificacion del inmueble');
     $pdf->detailGrid([
       ['Codigo / inmueble', (string) ($property['codigo'] ?? '-')],

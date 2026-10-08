@@ -9,9 +9,9 @@
     <tr><td style="background:#f59120;height:14px;font-size:0;line-height:0;">&nbsp;</td></tr>
     <tr>
       <td style="padding:24px;text-align:center;color:#061d49;">
-        <h3 style="font-size:18px;margin:0 0 18px;">Nuevo seguimiento del ticket #{id_ticket}</h3>
+        <h3 style="font-size:18px;margin:0 0 18px;">Nuevo seguimiento del caso #{id_ticket}</h3>
         <p style="font-weight:500;margin:10px 0;">Apreciado/a {destinatario}</p>
-        <p style="font-weight:500;margin:10px 0;">Se registro un nuevo seguimiento para el ticket.</p>
+        <p style="font-weight:500;margin:10px 0;">Se registro un nuevo seguimiento para el caso.</p>
         <div style="background:#f3f4f6;border-left:4px solid #f59120;padding:14px;margin:18px 0;text-align:left;">
           {observacion}
         </div>

@@ -348,7 +348,7 @@ trait GenericFiltersAndHistoryConcern
   {
     $author = trim((string) ($row['nombre_empleado'] ?? $row['empleado'] ?? ''));
     if ($author === '') {
-      $author = 'Ticket';
+      $author = 'Caso';
     }
 
     $ts = $this->parse_unix_ts($row['fecha_actualizacion'] ?? $row['fecha'] ?? '');

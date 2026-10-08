@@ -20,6 +20,7 @@ final class SimplePdf
   private array $images = [];
   private string $footerLabel = 'SKC SuCasa Inmobiliaria - Cotización de mantenimiento';
   private string $actaEyebrow = '';
+  private bool $showFooter = true;
 
   public function __construct()
   {
@@ -44,6 +45,11 @@ final class SimplePdf
   public function footerLabel(string $label): void
   {
     $this->footerLabel = trim($label);
+  }
+
+  public function hideFooter(): void
+  {
+    $this->showFooter = false;
   }
 
   public function actaDesign(string $eyebrow): void
@@ -603,7 +609,7 @@ final class SimplePdf
     $this->y += $size + 8;
   }
 
-  public function paragraph(string $text, int $size = 8): void
+  public function paragraph(string $text, int $size = 8, string $font = 'F1', bool $justify = true): void
   {
     if ($this->actaEyebrow !== '') { $size = max(9, $size); }
     $lines = $this->wrap($text, $this->contentWidth, $size);
@@ -611,10 +617,10 @@ final class SimplePdf
     $this->fill(25, 43, 69);
     $lastLineIndex = count($lines) - 1;
     foreach ($lines as $index => $line) {
-      if ($index < $lastLineIndex && $this->canJustify($line, $this->contentWidth, $size)) {
-        $this->textJustified($this->margin, $this->y, $line, $this->contentWidth, $size, 'F1');
+      if ($justify && $index < $lastLineIndex && $this->canJustify($line, $this->contentWidth, $size)) {
+        $this->textJustified($this->margin, $this->y, $line, $this->contentWidth, $size, $font);
       } else {
-        $this->text($this->margin, $this->y, $line, $size, 'F1');
+        $this->text($this->margin, $this->y, $line, $size, $font);
       }
       $this->y += $size + 6;
     }
@@ -775,12 +781,14 @@ final class SimplePdf
     if ($this->content === '') {
       $this->content = "BT /F1 1 Tf 0 0 Td () Tj ET\n";
     }
-    $this->fill(100, 116, 139);
-    if ($this->footerLabel !== '') {
-      $this->text($this->margin, self::PAGE_H - $this->bottomMargin + 24, $this->footerLabel, 7, 'F1');
+    if ($this->showFooter) {
+      $this->fill(100, 116, 139);
+      if ($this->footerLabel !== '') {
+        $this->text($this->margin, self::PAGE_H - $this->bottomMargin + 24, $this->footerLabel, 7, 'F1');
+      }
+      $pageLabel = 'Página ' . (string) (count($this->pages) + 1);
+      $this->textRight($this->margin + $this->contentWidth, self::PAGE_H - $this->bottomMargin + 24, $pageLabel, 7, 'F1');
     }
-    $pageLabel = 'Página ' . (string) (count($this->pages) + 1);
-    $this->textRight($this->margin + $this->contentWidth, self::PAGE_H - $this->bottomMargin + 24, $pageLabel, 7, 'F1');
     $this->pages[] = $this->content;
   }
 

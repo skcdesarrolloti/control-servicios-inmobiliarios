@@ -756,6 +756,7 @@ trait HistoryPresentationConcern
   private function recordDetail(array $item): string
   {
     $type = trim((string) ($item['tipo_reporte'] ?? ''));
+    if (strcasecmp($type, 'Ticket') === 0) $type = 'Caso';
     $detail = trim((string) ($item['observacion'] ?? $item['respuesta'] ?? $item['descripcion'] ?? ''));
     if ($type !== '' && stripos($detail, $type) === false) {
       return '<strong>' . esc_html($type) . ':</strong> ' . esc_html($detail !== '' ? $detail : 'Sin detalle');
@@ -957,7 +958,7 @@ trait HistoryPresentationConcern
   {
     $buttons = [];
     if ($ticketUrl !== '') {
-      $buttons[] = ['url' => $ticketUrl, 'label' => 'Ver ticket'];
+      $buttons[] = ['url' => $ticketUrl, 'label' => 'Ver caso'];
     }
     if ($corrUrl !== '') {
       $buttons[] = ['url' => $corrUrl, 'label' => 'Ver revision'];

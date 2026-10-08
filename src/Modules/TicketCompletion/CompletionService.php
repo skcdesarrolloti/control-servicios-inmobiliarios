@@ -656,7 +656,7 @@ final class CompletionService
     $this->repo->requireSchema();
     $act = $this->repo->transaction($ticketId, function (array $ticket) use ($ticketId, $input, $actor): array {
       if ($this->repo->active($ticketId)) {
-        throw new \DomainException('Este ticket ya tiene un acta activa. Consúltala o anúlala antes de generar otra.');
+        throw new \DomainException('Este caso ya tiene un acta activa. Consúltala o anúlala antes de generar otra.');
       }
       if (in_array(mb_strtolower(trim((string) $ticket['estado'])), ['cerrado', 'finalizado', 'resuelto'], true)) {
         throw new \DomainException('No se puede crear un acta en un caso cerrado.');
@@ -682,7 +682,7 @@ final class CompletionService
       return $this->repo->act($id);
     });
     try { return $this->notify($act); }
-    catch (\Throwable) { return ['act_id' => (int) $act['id'], 'queued' => false, 'message' => 'Acta guardada. No se pudo confirmar el envío; recarga y usa Reenviar invitación. El ticket sigue abierto.']; }
+    catch (\Throwable) { return ['act_id' => (int) $act['id'], 'queued' => false, 'message' => 'Acta guardada. No se pudo confirmar el envío; recarga y usa Reenviar invitación. El caso sigue abierto.']; }
   }
 
   public function update(int $id, int $ticketId, array $input, array $actor): array
@@ -1291,9 +1291,9 @@ final class CompletionService
           'final_trabajo' => '',
         ];
         $this->repo->updateTicket((int) $ticket['_ID'], $ticketUpdate);
-        $this->repo->audit((int) $ticket['_ID'], 'Acta #' . $id . ' eliminada permanentemente por cargo administrativo. El ticket volvió al estado anterior; se retiraron los soportes internos asociados y no queda cobro de esta acta.', $actor['name'], $actor['employee_id']);
+        $this->repo->audit((int) $ticket['_ID'], 'Acta #' . $id . ' eliminada permanentemente por cargo administrativo. El caso volvió al estado anterior; se retiraron los soportes internos asociados y no queda cobro de esta acta.', $actor['name'], $actor['employee_id']);
       } else {
-        $this->repo->audit((int) $ticket['_ID'], 'Acta #' . $id . ' eliminada permanentemente del tablero de actas. No cerró el ticket ni generó cobro.', $actor['name'], $actor['employee_id']);
+        $this->repo->audit((int) $ticket['_ID'], 'Acta #' . $id . ' eliminada permanentemente del tablero de actas. No cerró el caso ni generó cobro.', $actor['name'], $actor['employee_id']);
       }
       $this->repo->unlinkDeletedLegacyAct($legacyId);
     });
@@ -1314,7 +1314,7 @@ final class CompletionService
       $payload = $this->payload($act);
       $this->repo->db->update($this->repo->table(), ['status' => $status, 'active_slot' => null, 'cancelled_at' => time(), 'cancellation_reason' => $reason], ['id' => $id]);
       $this->repo->updateTicket((int) $ticket['_ID'], ['estado' => 'En proceso', 'estado_administrativo' => $payload['previous']['estado_administrativo']]);
-      $this->repo->audit((int) $ticket['_ID'], 'Acta #' . $id . ' ' . $statusLabel . ' sin cerrar el ticket ni generar cobro. Motivo: ' . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8'), $actor['name'], $actor['employee_id']);
+      $this->repo->audit((int) $ticket['_ID'], 'Acta #' . $id . ' ' . $statusLabel . ' sin cerrar el caso ni generar cobro. Motivo: ' . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8'), $actor['name'], $actor['employee_id']);
     });
   }
 

@@ -20,7 +20,7 @@ final class EmailTemplate
 
     $buttons = '';
     if ($ticketUrl !== '') {
-      $buttons .= self::button($ticketUrl, 'Ver ticket');
+      $buttons .= self::button($ticketUrl, 'Ver caso');
     }
     if ($quoteUrl !== '') {
       $buttons .= self::button($quoteUrl, 'Ver cotizacion');

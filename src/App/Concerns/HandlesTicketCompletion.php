@@ -44,7 +44,7 @@ trait HandlesTicketCompletion
       if ((int) ($_POST['act_id'] ?? 0) > 0 && in_array((string) ($_POST['operation'] ?? 'read'), ['read', 'update', 'resend', 'cancel', 'archive', 'delete'], true)) {
         $existingRepo = new CompletionRepository($this->db);
         $existingAct = $existingRepo->act((int) ($_POST['act_id'] ?? 0));
-        if ((int) $existingAct['ticket_pk'] !== $ticketId) throw new \DomainException('El acta no pertenece al ticket seleccionado.');
+        if ((int) $existingAct['ticket_pk'] !== $ticketId) throw new \DomainException('El acta no pertenece al caso seleccionado.');
         $existingService = new CompletionService($existingRepo, SCM_APP_SECRET, SCM_BASE_URL);
         $existingSource = $existingService->payload($existingAct)['source'] ?? [];
         $sourceFlow = ($existingSource['flow'] ?? '') === 'approved_quote' ? $existingSource : [];
@@ -58,7 +58,7 @@ trait HandlesTicketCompletion
       }
       if (!$this->canAccessTicketCompletion($ticketId)) {
         http_response_code(403);
-        $this->jsonFail('No tienes permiso para gestionar el acta de este ticket.');
+        $this->jsonFail('No tienes permiso para gestionar el acta de este caso.');
       }
       $repo = new CompletionRepository($this->db);
       $repo->requireSchema();
@@ -270,19 +270,19 @@ trait HandlesTicketCompletion
       } elseif (in_array($operation, ['resend', 'cancel', 'archive', 'delete'], true)) {
         $id = (int) ($_POST['act_id'] ?? 0);
         if ((int) $repo->act($id)['ticket_pk'] !== $ticketId) {
-          throw new \DomainException('El acta no pertenece al ticket seleccionado.');
+          throw new \DomainException('El acta no pertenece al caso seleccionado.');
         }
         if ($operation === 'resend') {
           $result = $service->resend($id);
         } elseif ($operation === 'cancel') {
           $service->cancel($id, (string) ($_POST['reason'] ?? ''), $actor);
-          $result = ['message' => 'Acta anulada. Puedes generar una nueva versión; el ticket sigue abierto.'];
+          $result = ['message' => 'Acta anulada. Puedes generar una nueva versión; el caso sigue abierto.'];
         } elseif ($operation === 'archive') {
           $service->archive($id, (string) ($_POST['reason'] ?? ''), $actor);
-          $result = ['message' => 'Acta archivada. Salió de pendientes, el ticket sigue abierto y no se generó cobro.'];
+          $result = ['message' => 'Acta archivada. Salió de pendientes, el caso sigue abierto y no se generó cobro.'];
         } else {
           $service->deleteRetired($id, $actor, $this->canDeleteAnyTicketCompletionActs());
-          $result = ['message' => 'Acta eliminada permanentemente. No se cerró el ticket ni se generó cobro.'];
+          $result = ['message' => 'Acta eliminada permanentemente. No se cerró el caso ni se generó cobro.'];
         }
       } elseif ($operation !== 'read') {
         throw new \DomainException('Operación de acta no válida.');
@@ -319,8 +319,8 @@ trait HandlesTicketCompletion
       $data = $service->dashboardList($_POST);
       $view = new CompletionView();
       $message = $operation === 'archive'
-        ? 'Acta archivada. Salió de pendientes, el ticket sigue abierto y no se generó cobro.'
-        : ($operation === 'delete' ? 'Acta eliminada permanentemente. No se cerró el ticket ni se generó cobro.' : '');
+        ? 'Acta archivada. Salió de pendientes, el caso sigue abierto y no se generó cobro.'
+        : ($operation === 'delete' ? 'Acta eliminada permanentemente. No se cerró el caso ni se generó cobro.' : '');
       $this->jsonOk([
         'table_html' => $view->dashboardTable($data['items'], $service, $data['pagination'], $canDeleteAny),
         'kpis_html' => $view->dashboardKpis($data['stats']),

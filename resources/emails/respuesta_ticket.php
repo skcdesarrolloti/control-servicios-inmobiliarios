@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Respuesta de ticket</title>
+  <title>Respuesta de caso</title>
 </head>
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
   <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:760px;border:3px solid #ebecec;background:#fff;margin:20px auto;">

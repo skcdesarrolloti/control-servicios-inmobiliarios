@@ -88,7 +88,7 @@ final class CompletionRepository
   {
     $row = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE _ID = ?' . ($lock ? ' FOR UPDATE' : ''), [$id]);
     if (!$row) {
-      throw new \DomainException('Ticket no encontrado.');
+      throw new \DomainException('Caso no encontrado.');
     }
     return $row;
   }
@@ -377,7 +377,7 @@ final class CompletionRepository
   {
     $key = 'scm-acta-' . substr(hash('sha256', $db->prefix() . ':' . $ticketId), 0, 45);
     if ((int) $db->getVar('SELECT GET_LOCK(?, 10)', [$key]) !== 1) {
-      throw new \DomainException('El ticket está siendo actualizado. Intenta nuevamente.');
+      throw new \DomainException('El caso está siendo actualizado. Intenta nuevamente.');
     }
     try {
       return $callback();
@@ -417,10 +417,10 @@ final class CompletionRepository
     }
     $currentAdminState = (string) ($repo->ticket($ticketId)['estado_administrativo'] ?? '');
     if ($act['status'] === 'pending' && ($close || !in_array($adminState, ['', '__keep__', $currentAdminState], true))) {
-      return 'Este ticket tiene un acta pendiente de firma. Solo se cerrará cuando firme el destinatario. Para cambiar el proceso, anula primero el acta.';
+      return 'Este caso tiene un acta pendiente de firma. Solo se cerrará cuando firme el destinatario. Para cambiar el proceso, anula primero el acta.';
     }
     if (!$allowReopen && $act['status'] === 'signed' && strcasecmp((string) $repo->ticket($ticketId)['estado'], 'Cerrado') === 0) {
-      return 'El ticket ya fue cerrado con un acta firmada. Actívalo expresamente antes de registrar nuevas respuestas.';
+      return 'El caso ya fue cerrado con un acta firmada. Actívalo expresamente antes de registrar nuevas respuestas.';
     }
     return '';
   }

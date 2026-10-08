@@ -574,7 +574,7 @@ trait RendersPublicPqr
     $html .= '</div>';
     $html .= '<div class="scm-status-topic-panel scm-public-pqr-topic-panel active" data-public-pqr-active-topic="' . self::h($currentTopic) . '">';
     $html .= '<div class="scm-status-topic-head"><div><h3>' . self::h($currentTopicLabel) . '</h3><p>Solicitudes Web · ' . self::h((string) ($statusLabels[$currentBucket] ?? 'Abiertos')) . '</p></div>';
-    $html .= '<div class="scm-public-pqr-heading-actions"><span class="scm-status-count"><strong>' . self::h((string) ($topicCounts[$currentTopic] ?? ($pagination['total'] ?? 0))) . '</strong> tickets</span>';
+    $html .= '<div class="scm-public-pqr-heading-actions"><span class="scm-status-count"><strong>' . self::h((string) ($topicCounts[$currentTopic] ?? ($pagination['total'] ?? 0))) . '</strong> casos</span>';
     if ($isAdmin) {
       $html .= '<button type="button" onclick="document.getElementById(\'scm-pqr-settings-modal\').style.display=\'flex\'" class="btn btn-sm scm-public-pqr-settings-btn" aria-label="Configurar solicitudes web">Configuración</button>';
     }
@@ -762,7 +762,7 @@ trait RendersPublicPqr
       $caseSource .= '<div class="scm-public-pqr-description"><span>Descripción</span><p>' . ($descripcionActual !== '' ? nl2br(self::h($descripcionActual)) : 'Sin descripción registrada.') . '</p></div>';
       $caseSource .= $ticketAttachmentsHtml;
       $caseSource .= '<div class="scm-public-pqr-detail-grid">';
-      $caseSource .= '<div><span>Ticket</span><strong>#' . self::h($logicalId !== '' ? $logicalId : (string) $ticketPk) . '</strong></div>';
+      $caseSource .= '<div><span>Caso</span><strong>#' . self::h($logicalId !== '' ? $logicalId : (string) $ticketPk) . '</strong></div>';
       $caseSource .= '<div><span>Tipo</span><strong>' . self::h($tipoActual !== '' ? $tipoActual : 'Solicitud web') . '</strong></div>';
       $caseSource .= '<div><span>Estado</span><strong>' . self::h($estadoActual !== '' ? $estadoActual : '-') . '</strong></div>';
       $caseSource .= '<div><span>Estado administrativo</span><strong>' . self::h($estadoAdminActual !== '' ? $estadoAdminActual : '-') . '</strong></div>';
@@ -783,7 +783,7 @@ trait RendersPublicPqr
       ]);
       $caseSource .= '<div class="scm-case-hidden-sections" style="display:none;">';
       $caseSource .= $this->render_public_pqr_case_section('Solicitud web', [
-        'Ticket' => '#' . ($logicalId !== '' ? $logicalId : (string) $ticketPk),
+        'Caso' => '#' . ($logicalId !== '' ? $logicalId : (string) $ticketPk),
         'Asunto' => $asuntoActual,
         'Tipo de solicitud' => $tipoActual,
         'Departamento' => $deptoActual,

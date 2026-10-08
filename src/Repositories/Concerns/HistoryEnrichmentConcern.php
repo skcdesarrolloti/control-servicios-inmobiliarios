@@ -211,7 +211,7 @@ trait HistoryEnrichmentConcern
   {
     $author = trim((string) ($row['nombre_empleado'] ?? $row['empleado'] ?? ''));
     if ($author === '') {
-      $author = 'Ticket';
+      $author = 'Caso';
     }
 
     $ts = $this->parser->parse($this->firstExistingValue($row, ['fecha_actualizacion', 'fecha']));

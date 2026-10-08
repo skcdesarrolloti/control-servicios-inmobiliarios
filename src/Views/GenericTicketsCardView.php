@@ -357,8 +357,8 @@ final class GenericTicketsCardView
     $historialItems = is_array($row['_scm_historial_items'] ?? null) ? $row['_scm_historial_items'] : [];
     $seguimientosItems = is_array($row['_scm_seguimientos_ticket'] ?? null) ? $row['_scm_seguimientos_ticket'] : [];
     $notasItems = is_array($row['_scm_notas_ticket'] ?? null) ? $row['_scm_notas_ticket'] : [];
-    $seguimientoFields = ['_ID' => 'ID', 'cct_status' => 'Estado', 'id_ticket' => 'Ticket', 'id_coordinador' => 'Coordinador', 'id_empleado' => 'Empleado', 'cct_author_id' => 'Autor ID', 'fecha' => 'Fecha', 'cct_created' => 'Creado', 'cct_modified' => 'Modificado', 'evidencia' => 'Evidencia'];
-    $notasFields = ['_ID' => 'ID', 'cct_status' => 'Estado', 'id_ticket' => 'Ticket', 'id_empleado' => 'Empleado', 'cct_author_id' => 'Autor ID', 'fecha' => 'Fecha', 'cct_created' => 'Creado', 'cct_modified' => 'Modificado'];
+    $seguimientoFields = ['_ID' => 'ID', 'cct_status' => 'Estado', 'id_ticket' => 'Caso', 'id_coordinador' => 'Coordinador', 'id_empleado' => 'Empleado', 'cct_author_id' => 'Autor ID', 'fecha' => 'Fecha', 'cct_created' => 'Creado', 'cct_modified' => 'Modificado', 'evidencia' => 'Evidencia'];
+    $notasFields = ['_ID' => 'ID', 'cct_status' => 'Estado', 'id_ticket' => 'Caso', 'id_empleado' => 'Empleado', 'cct_author_id' => 'Autor ID', 'fecha' => 'Fecha', 'cct_created' => 'Creado', 'cct_modified' => 'Modificado'];
     $historialInmuebleItems = is_array($row['_scm_historial_inmueble'] ?? null) ? $row['_scm_historial_inmueble'] : [];
     $contratoData = is_array($row['_scm_contrato_data'] ?? null) ? $row['_scm_contrato_data'] : [];
     $propertyDataId = trim((string) ($inmuebleData['_ID'] ?? $inmuebleData['id_inmueble_data'] ?? ''));
@@ -382,7 +382,7 @@ final class GenericTicketsCardView
     $caseSource .= '<div class="scm-seg-wrap">' . (string) call_user_func($this->renderSeguimientoForm, $ticketPk, Auth::isLoggedIn(), $cotizacionPendienteRespuesta) . '</div>';
     $caseSource .= (string) call_user_func($this->renderHistorialBlock, $historialItems);
     $caseSource .= (string) call_user_func($this->renderRecordSection, 'Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);
-    $caseSource .= (string) call_user_func($this->renderRecordSection, 'Notas del ticket', $notasItems);
+    $caseSource .= (string) call_user_func($this->renderRecordSection, 'Notas del caso', $notasItems);
     $caseSource .= '<div class="scm-case-action-buttons">';
     if ($ticketDocumentsHtml !== '') {
       $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Adjuntos del caso</button>';
@@ -571,7 +571,7 @@ final class GenericTicketsCardView
 
     $c .= '<div class="scm-ticket-card-footer">';
     if (in_array($effectiveStatusBucket, ['postergados', 'cerrados'], true)) {
-      $c .= '<button class="btn btn-outline btn-sm scm-activate-ticket-btn" type="button" data-scm-activate-ticket>Activar ticket</button>';
+      $c .= '<button class="btn btn-outline btn-sm scm-activate-ticket-btn" type="button" data-scm-activate-ticket>Activar caso</button>';
     }
     $c .= '<button class="scm-btn-case btn btn-primary btn-sm scm-btn-ver-detalle" type="button" onclick="scmOpenCase(this)" ' . $dataAttrs . '><span>Ver Detalle</span><span class="material-symbols-outlined text-[16px]">arrow_forward</span></button>';
     $c .= '</div>';
@@ -722,7 +722,7 @@ final class GenericTicketsCardView
   public function renderGenericCards(array $rows, array $config, string $tabKey, string $statusBucket = ''): string
   {
     if (empty($rows)) {
-      return '<div class="scm-empty"><p>No se encontraron tickets.</p></div>';
+      return '<div class="scm-empty"><p>No se encontraron casos.</p></div>';
     }
     $html = '';
     foreach ($rows as $row) {

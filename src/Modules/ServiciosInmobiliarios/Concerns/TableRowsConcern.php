@@ -15,7 +15,7 @@ trait TableRowsConcern
   public function renderTbody(array $rows, array $config, bool $canSeguimiento, string $statusBucket = ''): string
   {
     if (empty($rows)) {
-      return '<div class="scm-empty scm-empty-cards">No hay tickets con los filtros actuales.</div>';
+      return '<div class="scm-empty scm-empty-cards">No hay casos con los filtros actuales.</div>';
     }
 
     $html = '';
@@ -113,7 +113,7 @@ trait TableRowsConcern
       $propertyGoogleMaps = trim((string) ($inmuebleData['ubicacion_google_maps'] ?? ''));
       $seguimientoFields = [
         'cct_status' => 'Estado',
-        'id_ticket' => 'Ticket',
+        'id_ticket' => 'Caso',
         'id_coordinador' => 'Coordinador',
         'id_empleado' => 'Empleado',
         'cct_author_id' => 'Autor ID',
@@ -125,7 +125,7 @@ trait TableRowsConcern
       ];
       $notasFields = [
         'cct_status' => 'Estado',
-        'id_ticket' => 'Ticket',
+        'id_ticket' => 'Caso',
         'id_empleado' => 'Empleado',
         'cct_author_id' => 'Autor ID',
         'fecha' => 'Fecha',
@@ -168,7 +168,7 @@ trait TableRowsConcern
       $caseSource .= '</div>';
       $caseSource .= $this->renderHistorialBlock($historialItems);
       $caseSource .= $this->renderRecordSection('Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);
-      $caseSource .= $this->renderRecordSection('Notas del ticket', $notasItems);
+      $caseSource .= $this->renderRecordSection('Notas del caso', $notasItems);
       $caseSource .= '<div class="scm-case-action-buttons">';
       if ($ticketDocumentsHtml !== '') {
         $caseSource .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Adjuntos del caso</button>';
@@ -290,7 +290,7 @@ trait TableRowsConcern
 
       $html .= '<div class="scm-ticket-card-footer">';
       if ($statusBucket !== '') {
-        $html .= '<button class="btn btn-outline btn-sm scm-activate-ticket-btn" type="button" data-scm-activate-ticket>Activar ticket</button>';
+        $html .= '<button class="btn btn-outline btn-sm scm-activate-ticket-btn" type="button" data-scm-activate-ticket>Activar caso</button>';
       }
       $html .= '<button class="scm-btn-case btn btn-primary btn-sm scm-btn-ver-detalle"'
         . ' data-ticket="' . esc_attr($idTicket) . '"'

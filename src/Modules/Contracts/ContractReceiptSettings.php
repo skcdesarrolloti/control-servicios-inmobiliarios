@@ -29,7 +29,7 @@ final class ContractReceiptSettings
     $employee = trim((string) ($value['employee_id'] ?? ''));
     $coordinator = trim((string) ($value['coordinator_id'] ?? ''));
     foreach ([$employee, $coordinator] as $person) if ($person !== '' && !in_array($person, $active, true)) throw new \InvalidArgumentException('Selecciona funcionarios activos.');
-    if ($enabled && $employee === '') throw new \InvalidArgumentException('Selecciona el funcionario que recibirá los tickets automáticos.');
+    if ($enabled && $employee === '') throw new \InvalidArgumentException('Selecciona el funcionario que recibirá los casos automáticos.');
     return ['enabled' => $enabled, 'contract_id' => (int) $id, 'employee_id' => $employee, 'coordinator_id' => $coordinator];
   }
 }

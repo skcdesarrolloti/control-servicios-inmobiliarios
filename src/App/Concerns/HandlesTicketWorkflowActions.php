@@ -418,7 +418,7 @@ trait HandlesTicketWorkflowActions
         $automation = json_decode((string) $_POST['receipt_automation'], true, 512, JSON_THROW_ON_ERROR);
         if (!is_array($automation)) throw new \InvalidArgumentException('Configuración de recibos inválida.');
         $automation = \SCM\Modules\Contracts\ContractReceiptSettings::validate($this->db, $automation);
-        if ($automation['enabled'] && empty($settings['contrato_recibo_automatico'])) throw new \InvalidArgumentException('Selecciona destinatarios internos para Ticket automático de recibo · 15 días.');
+        if ($automation['enabled'] && empty($settings['contrato_recibo_automatico'])) throw new \InvalidArgumentException('Selecciona destinatarios internos para Caso automático de recibo · 15 días.');
       } catch (\Throwable $exception) { $this->jsonFail($exception->getMessage()); return; }
     }
     $pdo = $this->db->pdo();
@@ -527,7 +527,7 @@ trait HandlesTicketWorkflowActions
     }
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Caso invalido.');
     }
     if ($observacion === '') {
       $this->jsonFail('La observacion es obligatoria.');
@@ -565,7 +565,7 @@ trait HandlesTicketWorkflowActions
     $observacion = trim(wp_kses_post(stripslashes((string) ($_POST['observacion'] ?? ''))));
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Caso invalido.');
     }
     if ($observacion === '') {
       $this->jsonFail('La nota no puede estar vacia.');
@@ -591,7 +591,7 @@ trait HandlesTicketWorkflowActions
   {
     $this->verifyCsrf();
     if (!$this->canUseDashboardAction('case_postpone')) {
-      $this->jsonFail('No tienes permiso para postergar tickets.');
+      $this->jsonFail('No tienes permiso para postergar casos.');
     }
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
@@ -602,7 +602,7 @@ trait HandlesTicketWorkflowActions
     }
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Caso invalido.');
     }
     if ($observacion === '') {
       $this->jsonFail('El motivo de postergacion es obligatorio.');
@@ -618,7 +618,7 @@ trait HandlesTicketWorkflowActions
     $documentos = $this->handleDocumentUploads('documento', $documentTitles, 10);
     $result = $service->postponeTicket($ticketPk, $observacion, $notifyRecipients, $evidencias, $documentos);
     if (($result['ok'] ?? '0') !== '1') {
-      $this->jsonFail((string) ($result['message'] ?? 'No se pudo postergar el ticket.'));
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo postergar el caso.'));
     }
 
     $this->jsonOk($result);
@@ -631,7 +631,7 @@ trait HandlesTicketWorkflowActions
     $bucketKey = $this->normalize_status_bucket((string) ($_POST['bucket'] ?? ''));
     $topicKey = $this->normalize_status_topic((string) ($_POST['topic'] ?? ''));
     if ($bucketKey === '' || $topicKey === '') {
-      $this->jsonFail('Vista de tickets no reconocida.');
+      $this->jsonFail('Vista de casos no reconocida.');
     }
     if (!$this->canAccessDashboardTab($bucketKey)) {
       $this->jsonFail('No tienes permiso para ver esta pestaña.');
@@ -746,13 +746,13 @@ trait HandlesTicketWorkflowActions
   {
     $this->verifyCsrf();
     if (!$this->canUseDashboardAction('case_activate')) {
-      $this->jsonFail('No tienes permiso para activar tickets.');
+      $this->jsonFail('No tienes permiso para activar casos.');
     }
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $motivo = trim(wp_kses_post(stripslashes((string) ($_POST['motivo'] ?? ($_POST['observacion'] ?? '')))));
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Caso invalido.');
     }
     if ($motivo === '') {
       $this->jsonFail('El motivo de activacion es obligatorio.');
@@ -765,7 +765,7 @@ trait HandlesTicketWorkflowActions
 
     $result = $service->activateTicket($ticketPk, $motivo);
     if (($result['ok'] ?? '0') !== '1') {
-      $this->jsonFail((string) ($result['message'] ?? 'No se pudo activar el ticket.'));
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo activar el caso.'));
     }
     $this->jsonOk($result);
   }
@@ -774,7 +774,7 @@ trait HandlesTicketWorkflowActions
   {
     $this->verifyCsrf();
     if (!$this->canUseDashboardAction('case_respond')) {
-      $this->jsonFail('No tienes permiso para responder tickets.');
+      $this->jsonFail('No tienes permiso para responder casos.');
     }
 
     $solicitudId = isset($_POST['solicitud_id']) ? (int) $_POST['solicitud_id'] : 0;
@@ -794,7 +794,7 @@ trait HandlesTicketWorkflowActions
     }
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Caso invalido.');
     }
     if ($respuesta === '') {
       $this->jsonFail('La respuesta no puede estar vacia.');
@@ -833,7 +833,7 @@ trait HandlesTicketWorkflowActions
     }
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Caso invalido.');
     }
     if (!in_array($estado, ['Aprobada', 'Desaprobada'], true)) {
       $this->jsonFail('Selecciona si la cotizacion fue aprobada o desaprobada.');
@@ -937,7 +937,7 @@ trait HandlesTicketWorkflowActions
   {
     $this->verifyCsrf();
     if (!$this->canUseDashboardAction('case_respond')) {
-      $this->jsonFail('No tienes permiso para responder tickets.');
+      $this->jsonFail('No tienes permiso para responder casos.');
     }
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
@@ -952,7 +952,7 @@ trait HandlesTicketWorkflowActions
     }
 
     if ($solicitudId <= 0 && $ticketPk <= 0) {
-      $this->jsonFail('Solicitud o ticket inválido.');
+      $this->jsonFail('Solicitud o caso inválido.');
     }
     if (!in_array($term, ['dentro', 'fuera'], true)) {
       $this->jsonFail('Selecciona si la solicitud está dentro o fuera de término.');
@@ -1001,11 +1001,11 @@ trait HandlesTicketWorkflowActions
     $retentionTicket = [];
     if ($createRetentionTicket) {
       if ($retentionEmployeeId === '') {
-        $this->jsonFail('Selecciona el funcionario responsable del ticket de retención.');
+        $this->jsonFail('Selecciona el funcionario responsable del caso de retención.');
       }
       $retentionTicket = $this->createContractRetentionTicketFromContractRequest($ticket, $term, $retentionEmployeeId, $responseText, $actaUrl, (string) ($acta['title'] ?? 'Acta de respuesta terminación de contrato'), 'terminación de contrato');
       if (($retentionTicket['ok'] ?? '0') !== '1') {
-        $this->jsonFail((string) ($retentionTicket['message'] ?? 'No se pudo crear el ticket comercial de retención.'));
+        $this->jsonFail((string) ($retentionTicket['message'] ?? 'No se pudo crear el caso comercial de retención.'));
       }
     }
 
@@ -1028,9 +1028,9 @@ trait HandlesTicketWorkflowActions
       $result['retention_ticket_url'] = (string) ($retentionTicket['ticket_url'] ?? '');
       $result['retention_whatsapp_queued'] = (string) ($retentionTicket['whatsapp_queued'] ?? 0);
     }
-    $result['message'] = 'Solicitud respondida, acta generada y ticket cerrado.';
+    $result['message'] = 'Solicitud respondida, acta generada y caso cerrado.';
     if ($retentionTicket !== []) {
-      $result['message'] .= ' Ticket comercial de retención #' . (string) ($retentionTicket['ticket_id'] ?? '') . ' creado.';
+      $result['message'] .= ' Caso comercial de retención #' . (string) ($retentionTicket['ticket_id'] ?? '') . ' creado.';
     }
 
     $this->jsonOk($result);
@@ -1065,7 +1065,7 @@ trait HandlesTicketWorkflowActions
   {
     $this->verifyCsrf();
     if (!$this->canUseDashboardAction('case_respond')) {
-      $this->jsonFail('No tienes permiso para responder tickets.');
+      $this->jsonFail('No tienes permiso para responder casos.');
     }
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
@@ -1079,7 +1079,7 @@ trait HandlesTicketWorkflowActions
     }
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket inválido.');
+      $this->jsonFail('Caso inválido.');
     }
     if (!in_array($term, ['dentro', 'fuera'], true)) {
       $this->jsonFail('Selecciona si la solicitud está dentro o fuera de término.');
@@ -1104,7 +1104,7 @@ trait HandlesTicketWorkflowActions
     $retentionTicket = [];
     if ($createRetentionTicket) {
       if ($retentionEmployeeId === '') {
-        $this->jsonFail('Selecciona el funcionario responsable del ticket de retención.');
+        $this->jsonFail('Selecciona el funcionario responsable del caso de retención.');
       }
     }
 
@@ -1127,7 +1127,7 @@ trait HandlesTicketWorkflowActions
     if ($createRetentionTicket) {
       $retentionTicket = $this->createContractRetentionTicketFromContractRequest($ticket, $term, $retentionEmployeeId, $responseText, $actaUrl, (string) ($acta['title'] ?? 'Acta de respuesta no prórroga de contrato'), 'no prórroga');
       if (($retentionTicket['ok'] ?? '0') !== '1') {
-        $this->jsonFail((string) ($retentionTicket['message'] ?? 'No se pudo crear el ticket comercial de retención.'));
+        $this->jsonFail((string) ($retentionTicket['message'] ?? 'No se pudo crear el caso comercial de retención.'));
       }
     }
 
@@ -1149,9 +1149,9 @@ trait HandlesTicketWorkflowActions
       $result['retention_ticket_url'] = (string) ($retentionTicket['ticket_url'] ?? '');
       $result['retention_whatsapp_queued'] = (string) ($retentionTicket['whatsapp_queued'] ?? 0);
     }
-    $result['message'] = 'Solicitud de no prórroga respondida, acta generada y ticket cerrado.';
+    $result['message'] = 'Solicitud de no prórroga respondida, acta generada y caso cerrado.';
     if ($retentionTicket !== []) {
-      $result['message'] .= ' Ticket comercial de retención #' . (string) ($retentionTicket['ticket_id'] ?? '') . ' creado.';
+      $result['message'] .= ' Caso comercial de retención #' . (string) ($retentionTicket['ticket_id'] ?? '') . ' creado.';
     }
 
     $this->jsonOk($result);
@@ -1219,7 +1219,7 @@ trait HandlesTicketWorkflowActions
   {
     $this->verifyCsrf();
     if (!$this->canUseDashboardAction('case_respond') && !$this->canAccessDashboardTab('contratos_arrendamiento')) {
-      $this->jsonFail('No tienes permiso para crear tickets de retención.');
+      $this->jsonFail('No tienes permiso para crear casos de retención.');
     }
 
     $contractPk = trim(sanitize_text_field(wp_unslash((string) ($_POST['contract_pk'] ?? $_POST['id_contrato'] ?? ''))));
@@ -1228,7 +1228,7 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail('Contrato inválido.');
     }
     if ($employeeId === '') {
-      $this->jsonFail('Selecciona el funcionario responsable del ticket de retención.');
+      $this->jsonFail('Selecciona el funcionario responsable del caso de retención.');
     }
 
     $contract = $this->contractEndingContractByPk($contractPk);
@@ -1237,22 +1237,22 @@ trait HandlesTicketWorkflowActions
     }
     $existingTicket = $this->contractEndingRetentionTicketId($contract);
     if ($existingTicket !== '') {
-      $this->jsonFail('Este contrato ya tiene ticket de retención #' . $existingTicket . '.');
+      $this->jsonFail('Este contrato ya tiene caso de retención #' . $existingTicket . '.');
     }
 
     $contractCode = $this->contractTerminationFirstText([$contract], ['contrato', 'id_contrato', '_ID']);
     $endTs = $this->contractTerminationTimestamp($contract['fin_contrato'] ?? '');
     $endLabel = $endTs > 0 ? date('d/m/Y', $endTs) : 'sin fecha fin registrada';
-    $responseText = 'Ticket creado desde la pestaña Contratos por terminar para gestionar retención comercial. '
+    $responseText = 'Caso creado desde la pestaña Contratos por terminar para gestionar retención comercial. '
       . 'Contrato ' . ($contractCode !== '' ? $contractCode : $contractPk) . ', fecha fin ' . $endLabel . '.';
 
     $result = $this->createContractRetentionTicketFromContractRequest($contract, '', $employeeId, $responseText, '', '', 'contrato por terminar');
     if (($result['ok'] ?? '0') !== '1') {
-      $this->jsonFail((string) ($result['message'] ?? 'No se pudo crear el ticket comercial de retención.'));
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo crear el caso comercial de retención.'));
     }
 
     $this->jsonOk([
-      'message' => 'Ticket comercial de retención #' . (string) ($result['ticket_id'] ?? '') . ' creado.',
+      'message' => 'Caso comercial de retención #' . (string) ($result['ticket_id'] ?? '') . ' creado.',
       'ticket_id' => (string) ($result['ticket_id'] ?? ''),
       'ticket_url' => (string) ($result['ticket_url'] ?? ''),
       'whatsapp_queued' => (string) ($result['whatsapp_queued'] ?? 0),
@@ -1656,7 +1656,7 @@ trait HandlesTicketWorkflowActions
     $observacion = trim(wp_kses_post(stripslashes((string) ($_POST['observacion'] ?? ''))));
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Caso invalido.');
     }
     if ($cotizacionId <= 0) {
       $this->jsonFail('Cotizacion invalida.');
@@ -2012,7 +2012,7 @@ trait HandlesTicketWorkflowActions
           'id' => $config['type'] . '-' . $requestId,
           'type' => $config['type'],
           'group' => $config['group'],
-          'title' => 'Solicitud de ' . strtolower($config['label']) . ' · Ticket #' . ($ticketLabel !== '' ? $ticketLabel : '-'),
+          'title' => 'Solicitud de ' . strtolower($config['label']) . ' · Caso #' . ($ticketLabel !== '' ? $ticketLabel : '-'),
           'description' => 'Plazo operativo de respuesta: ' . $config['days'] . ' día(s) calendario desde la solicitud.',
           'color' => $config['color'],
           'base_ts' => $baseTs,
@@ -2299,9 +2299,9 @@ trait HandlesTicketWorkflowActions
       $items[] = $this->adminDueEvent([
         'id' => 'prev-ticket-sin-cita-' . ($ticketPk !== '' ? $ticketPk : uniqid('', false)),
         'type' => 'ticket_preventiva_sin_cita',
-        'group' => 'Tickets sin cita preventiva',
-        'title' => 'Ticket #' . ($ticketPk !== '' ? $ticketPk : '-') . ' sin cita preventiva',
-        'description' => 'Vence ' . $days . ' día(s) después de crear el ticket preventivo.',
+        'group' => 'Casos sin cita preventiva',
+        'title' => 'Caso #' . ($ticketPk !== '' ? $ticketPk : '-') . ' sin cita preventiva',
+        'description' => 'Vence ' . $days . ' día(s) después de crear el caso preventivo.',
         'color' => '#0f766e',
         'base_ts' => $baseTs,
         'due_ts' => (int) $dueTs,
@@ -2339,7 +2339,7 @@ trait HandlesTicketWorkflowActions
         'type' => 'preventiva_pendiente',
         'group' => 'Preventivas pendientes',
         'title' => 'Preventiva pendiente contrato #' . ($contractCode !== '' ? $contractCode : '-'),
-        'description' => empty($ticket) ? 'Contrato pendiente para crear ticket preventivo.' : 'Contrato con ticket preventivo activo.',
+        'description' => empty($ticket) ? 'Contrato pendiente para crear caso preventivo.' : 'Contrato con caso preventivo activo.',
         'color' => '#14b8a6',
         'base_ts' => (int) ($item['ultima'] ?? 0),
         'due_ts' => $dueTs,
@@ -2593,7 +2593,7 @@ trait HandlesTicketWorkflowActions
       'case_source_html' => $this->adminDueLoadingCaseSourceHtml(
         $type === 'preventiva_cita_sin_realizar'
           ? 'Cargando detalle completo de la cita preventiva pendiente.'
-          : 'Cargando detalle completo del ticket preventivo sin cita.'
+          : 'Cargando detalle completo del caso preventivo sin cita.'
       ),
     ];
   }
@@ -2630,7 +2630,7 @@ trait HandlesTicketWorkflowActions
     return [
       'admin_ticket_create' => '1',
       'ticket_mode' => 'preventiva',
-      'ticket_title' => 'Crear ticket preventivo',
+      'ticket_title' => 'Crear caso preventivo',
       'contract_pk' => $contractPk,
       'contract_code' => $contractCode,
       'contract_state' => (string) ($row['estado'] ?? ''),
@@ -2919,8 +2919,8 @@ trait HandlesTicketWorkflowActions
       $ticketLabel = trim((string) ($ticket['id_ticket'] ?? $ticketPk));
       $case['case_source_html'] = '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">'
         . esc_html($type === 'preventiva_cita_sin_realizar'
-          ? 'Control de vencimiento para cita preventiva pendiente del ticket #' . ($ticketLabel !== '' ? $ticketLabel : '-')
-          : 'Control de vencimiento para ticket preventivo sin cita #' . ($ticketLabel !== '' ? $ticketLabel : '-'))
+          ? 'Control de vencimiento para cita preventiva pendiente del caso #' . ($ticketLabel !== '' ? $ticketLabel : '-')
+          : 'Control de vencimiento para caso preventivo sin cita #' . ($ticketLabel !== '' ? $ticketLabel : '-'))
         . '.</div></div>'
         . ($ticketPk !== '' ? '<div class="scm-seg-wrap">' . $this->render_seguimiento_form((int) $ticketPk, Auth::isLoggedIn(), false) . '</div>' : '')
         . $detailHtml;
@@ -3234,8 +3234,8 @@ trait HandlesTicketWorkflowActions
       : $this->adminDuePreventivaTicketNoAppointmentTiming($ticket);
     $appointmentTs = $this->adminDueFirstTimestamp($appointment, ['fecha_inicio']);
     return '<section class="scm-case-history"><h4>Detalle del vencimiento preventivo</h4><article class="scm-case-history-item"><div class="scm-case-history-detail">'
-      . '<p><strong>Tipo:</strong> ' . esc_html($type === 'preventiva_cita_sin_realizar' ? 'Preventiva con cita sin realizar' : 'Ticket sin cita preventiva') . '</p>'
-      . '<p><strong>Ticket:</strong> #' . esc_html($ticketLabel !== '' ? $ticketLabel : '-') . '</p>'
+      . '<p><strong>Tipo:</strong> ' . esc_html($type === 'preventiva_cita_sin_realizar' ? 'Preventiva con cita sin realizar' : 'Caso sin cita preventiva') . '</p>'
+      . '<p><strong>Caso:</strong> #' . esc_html($ticketLabel !== '' ? $ticketLabel : '-') . '</p>'
       . '<p><strong>Revisión preventiva:</strong> ' . esc_html($revisionId !== '' ? $this->adminDueHashLabel($revisionId) : '-') . '</p>'
       . '<p><strong>Estado:</strong> ' . esc_html($this->adminDueFirstText([$ticket], ['estado']) ?: '-') . '</p>'
       . '<p><strong>Estado administrativo:</strong> ' . esc_html($this->adminDueFirstText([$ticket], ['estado_administrativo']) ?: '-') . '</p>'
@@ -3567,7 +3567,7 @@ trait HandlesTicketWorkflowActions
     $controller = $this->get_pending_controller();
     $result = $controller->createAdministrativeTicket($input, $imagenes, $documentos, $notifyRecipients);
     if (($result['ok'] ?? '0') !== '1') {
-      $this->jsonFail((string) ($result['message'] ?? 'No se pudo crear el ticket.'));
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo crear el caso.'));
     }
 
     $this->jsonOk($result);
@@ -3611,13 +3611,13 @@ trait HandlesTicketWorkflowActions
   {
     $this->verifyCsrf();
     if (!$this->canUseDashboardAction('case_close')) {
-      $this->jsonFail('No tienes permiso para cerrar tickets.');
+      $this->jsonFail('No tienes permiso para cerrar casos.');
     }
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     $observacion = trim(wp_kses_post(stripslashes((string) ($_POST['observacion'] ?? ($_POST['motivo'] ?? '')))));
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Caso invalido.');
     }
     if ($observacion === '') {
       $this->jsonFail('El mensaje de cierre es obligatorio.');
@@ -3626,7 +3626,7 @@ trait HandlesTicketWorkflowActions
     $service = $this->get_seguimiento_service();
     $result = $service->closeTicket($ticketPk, $observacion);
     if (($result['ok'] ?? '0') !== '1') {
-      $this->jsonFail((string) ($result['message'] ?? 'No se pudo cerrar el ticket.'));
+      $this->jsonFail((string) ($result['message'] ?? 'No se pudo cerrar el caso.'));
     }
     $this->jsonOk($result);
   }
@@ -3746,7 +3746,7 @@ trait HandlesTicketWorkflowActions
             $queued++;
           } else {
             $detail = method_exists($smsQueue, 'lastError') ? trim((string) $smsQueue->lastError()) : '';
-            $errors[] = 'No se pudo encolar WhatsApp al funcionario del ticket #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : '.') ;
+            $errors[] = 'No se pudo encolar WhatsApp al funcionario del caso #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : '.') ;
           }
         } else {
           $skipped++;
@@ -3801,7 +3801,7 @@ trait HandlesTicketWorkflowActions
           $queued++;
         } else {
           $detail = method_exists($smsQueue, 'lastError') ? trim((string) $smsQueue->lastError()) : '';
-          $errors[] = 'No se pudo encolar WhatsApp al solicitante del ticket #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : '.') ;
+          $errors[] = 'No se pudo encolar WhatsApp al solicitante del caso #' . $logicalTicket . ($detail !== '' ? ': ' . $detail : '.') ;
         }
       } elseif ($requesterPhone === '') {
         $skipped++;
@@ -4408,7 +4408,7 @@ trait HandlesTicketWorkflowActions
       'solicitud_id' => $ticketPk,
       'ticket_pk' => $ticketPk,
       'id_ticket' => $logicalTicket,
-      'titulo' => 'Ticket #' . ($logicalTicket !== '' ? $logicalTicket : $ticketPk),
+      'titulo' => 'Caso #' . ($logicalTicket !== '' ? $logicalTicket : $ticketPk),
       'asunto' => $subject,
       'estado' => $this->contractTerminationFirstText([$row], ['estado']) ?: '-',
       'estado_solicitud' => \SCM\Modules\Contracts\ContractRequestReopenService::answered($row, true) ? 'Contestada' : 'Pendiente',
@@ -4738,7 +4738,7 @@ trait HandlesTicketWorkflowActions
     try {
       (new ContractRenewalService($this->db))->manageHistory((int) ($_POST['contract_pk'] ?? 0), (int) ($_POST['entry_id'] ?? 0), $operation, (string) ($_POST['text'] ?? ''), (string) ($_POST['reason'] ?? ''), (string) ($_POST['revision'] ?? ''), Auth::employeeId());
     } catch (\Throwable $exception) { $this->jsonFail($exception->getMessage()); }
-    $this->jsonOk(['message' => 'Historial actualizado. Los datos del contrato y sus tickets conservan su gestión actual.']);
+    $this->jsonOk(['message' => 'Historial actualizado. Los datos del contrato y sus casos conservan su gestión actual.']);
   }
 
   public function ajax_handler_contracts_ending_case(): void
@@ -4748,10 +4748,10 @@ trait HandlesTicketWorkflowActions
     $contract = $this->contractEndingContractByPk((string) ($_POST['contract_pk'] ?? ''));
     if (!$contract) $this->jsonFail('Contrato no encontrado.');
     $id = (string) ($_POST['kind'] ?? '') === 'receipt' ? $this->contractEndingReceiptTicketId($contract) : $this->contractEndingRetentionTicketId($contract);
-    if ($id === '') $this->jsonFail('No hay un ticket asociado a este ciclo del contrato.');
+    if ($id === '') $this->jsonFail('No hay un caso asociado a este ciclo del contrato.');
     $table = $this->db->table('jet_cct_tickets');
     $ticket = $this->db->getRow("SELECT * FROM `{$table}` WHERE `id_contrato` = ? AND `id_ticket` = ? LIMIT 1", [(string) $contract['_ID'], $id]);
-    if (!$ticket) $this->jsonFail('No se encontró el ticket asociado.');
+    if (!$ticket) $this->jsonFail('No se encontró el caso asociado.');
     $this->jsonOk(['case' => $this->adminDueNativeTicketCasePayload((int) $ticket['_ID'], $this->adminDueStatusBucket($ticket))]);
   }
 
@@ -4778,7 +4778,7 @@ trait HandlesTicketWorkflowActions
       foreach ($rows as $row) {
         $endTs = $this->contractTerminationTimestamp($row['fin_contrato']);
         $state = $schema->tableExists($service->table()) ? $service->get((int) $row['_ID'], $endTs) : [];
-        $reason = !empty($state['no_exit']) ? 'No salida reportada' : ((isset($state['probability']) && (float) $state['probability'] >= 100) ? 'Renovación al 100 %' : ($this->contractEndingReceiptTicketId($row) !== '' ? 'Ticket existente' : 'Dentro del plazo; validar responsable y destinatarios'));
+        $reason = !empty($state['no_exit']) ? 'No salida reportada' : ((isset($state['probability']) && (float) $state['probability'] >= 100) ? 'Renovación al 100 %' : ($this->contractEndingReceiptTicketId($row) !== '' ? 'Caso existente' : 'Dentro del plazo; validar responsable y destinatarios'));
         $stats['candidates'][] = ['contract_id' => (int) $row['_ID'], 'end_date' => date('Y-m-d', $endTs), 'employee_id' => $config['employee_id'], 'reason' => $reason];
       }
       if (!$rows) {
@@ -4816,7 +4816,7 @@ trait HandlesTicketWorkflowActions
           'ticket_mode' => 'administrativo', 'contract_pk' => (string) $id, 'id_empleado' => $employee,
           'solicitante_tipo' => 'arrendatario', 'prioridad' => 'Prioridad urgente', 'departamento' => 'Servicio al arrendatario',
           'tema_ayuda' => 'Recibo de inmuebles', 'asunto' => 'Recibo automático de contrato #' . (string) ($row['contrato'] ?? $id),
-          'descripcion' => 'Ticket automático para coordinar el recibo 15 días antes de la terminación del contrato. Fecha fin: ' . date('d/m/Y', $endTs),
+          'descripcion' => 'Caso automático para coordinar el recibo 15 días antes de la terminación del contrato. Fecha fin: ' . date('d/m/Y', $endTs),
           'internal_notification_action' => 'contrato_recibo_automatico',
           'require_receipt_letter' => true, 'contractual_employee_id' => (string) $config['coordinator_id'],
         ], [], [], ['empleado', 'solicitante', 'admin']);
@@ -5026,7 +5026,7 @@ trait HandlesTicketWorkflowActions
       if (isset($locked['estado']) && !in_array(mb_strtolower(trim((string) $locked['estado'])), ['entregado', 'por recibir'], true)) throw new \RuntimeException('Solo se genera retención para contratos entregados o por recibir.');
       $state = $service->get($id, $this->contractTerminationTimestamp($locked['fin_contrato'] ?? ''));
       if (isset($state['probability']) && (float) $state['probability'] >= 100) throw new \RuntimeException('Renovación al 100 %: no se genera retención.');
-      if ($this->contractEndingRetentionTicketId($locked) !== '') throw new \RuntimeException('Este contrato ya tiene ticket de retención. Actualiza el listado para abrir el caso.');
+      if ($this->contractEndingRetentionTicketId($locked) !== '') throw new \RuntimeException('Este contrato ya tiene caso de retención. Actualiza el listado para abrir el caso.');
       $result = $this->createContractRetentionTicketUnlocked($ticket, $term, $employeeId, $responseText, $actaUrl, $actaTitle, $sourceLabel, $locked);
       if (($result['ok'] ?? '0') !== '1') throw new \RuntimeException((string) ($result['message'] ?? 'No se pudo crear la retención.'));
       $service->audit($id, 'retention_created', Auth::employeeId(), ['ticket_id' => $result['ticket_id'], 'end_ts' => $locked['fin_contrato'] ?? '']);
@@ -5042,7 +5042,7 @@ trait HandlesTicketWorkflowActions
   {
     $employeeId = trim($employeeId);
     if ($employeeId === '') {
-      return ['ok' => '0', 'message' => 'Selecciona el funcionario responsable del ticket de retención.'];
+      return ['ok' => '0', 'message' => 'Selecciona el funcionario responsable del caso de retención.'];
     }
     $activeIds = [];
     foreach ($this->contractRetentionEligibleFuncionarios() as $funcionario) {
@@ -5058,7 +5058,7 @@ trait HandlesTicketWorkflowActions
     $contract = $resolvedContract ?: $this->contractTerminationContractByContext($ticket);
     $contractPk = $this->contractTerminationFirstText([$contract, $ticket], ['_ID', 'id_contrato', 'contrato']);
     if ($contractPk === '') {
-      return ['ok' => '0', 'message' => 'No se encontró el contrato para crear el ticket de retención.'];
+      return ['ok' => '0', 'message' => 'No se encontró el contrato para crear el caso de retención.'];
     }
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: '-';
     $contractCode = $this->contractTerminationFirstText([$contract, $ticket], ['contrato', 'id_contrato', '_ID']);
@@ -5141,7 +5141,7 @@ trait HandlesTicketWorkflowActions
     $requesterPhone = $this->contractTerminationFirstText([$ticket], ['celular_' . $requesterType]);
 
     if ($requesterPhone !== '') {
-      $ok = $queue->enqueue($requesterPhone, $requesterName, "Se creó el ticket comercial #{$ticketId} para gestionar la retención del contrato.", [
+      $ok = $queue->enqueue($requesterPhone, $requesterName, "Se creó el caso comercial #{$ticketId} para gestionar la retención del contrato.", [
         'source_module' => 'retencion_contrato',
         'campaign_tag' => 'retencion_contrato',
         'categoria_mensaje' => 'informacion',
@@ -5176,7 +5176,7 @@ trait HandlesTicketWorkflowActions
     $employeePhone = trim((string) ($employee['phone'] ?? ''));
     if ($employeePhone !== '') {
       $employeeName = trim((string) ($employee['name'] ?? 'Funcionario')) ?: 'Funcionario';
-      $ok = $queue->enqueue($employeePhone, $employeeName, "Se te asignó el ticket comercial #{$ticketId} de retención de contrato.", [
+      $ok = $queue->enqueue($employeePhone, $employeeName, "Se te asignó el caso comercial #{$ticketId} de retención de contrato.", [
         'source_module' => 'retencion_contrato',
         'campaign_tag' => 'retencion_contrato',
         'categoria_mensaje' => 'informacion',
@@ -5225,7 +5225,7 @@ trait HandlesTicketWorkflowActions
       'solicitud_id' => $solicitudId,
       'ticket_pk' => $ticketPk,
       'id_ticket' => $logicalTicket,
-      'titulo' => 'Ticket #' . ($logicalTicket !== '' ? $logicalTicket : $ticketPk),
+      'titulo' => 'Caso #' . ($logicalTicket !== '' ? $logicalTicket : $ticketPk),
       'asunto' => $subject,
       'estado' => $this->contractTerminationFirstText([$row], ['estado']) ?: '-',
       'estado_solicitud' => $this->contractTerminationFirstText([$row], ['solicitud_estado']) ?: '-',
@@ -5358,44 +5358,19 @@ trait HandlesTicketWorkflowActions
   /** @param array<string,mixed> $ticket @return array{title:string,url:string,path:string} */
   private function generateContractTerminationActa(array $ticket, string $term, string $responseText, string $requestDate, string $endDate, string $creatorName, string $creatorDetails): array
   {
-    if (!defined('SCM_UPLOAD_PATH')) {
-      throw new \RuntimeException('No está configurada la ruta de almacenamiento.');
-    }
     $ticketPk = (int) ($ticket['_ID'] ?? 0);
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
     $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: '-';
-    $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
+    $property = $this->contractTerminationFirstText([$ticket], ['inmueble']) ?: '-';
     $title = $term === 'dentro'
       ? 'Acta de terminación dentro de término'
       : 'Acta de terminación fuera de término';
-    $safeName = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
-    $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . $safeName;
-
-    $pdf = new \SCM\Support\SimplePdf();
-    $pdf->actaDesign('Gestión contractual');
-    $membrete = defined('SCM_RESOURCES_PATH') ? SCM_RESOURCES_PATH . '/assets/membrete-sucasa.jpg' : '';
-    if ($membrete !== '' && is_file($membrete)) {
-      $pdf->backgroundImage($membrete);
-    }
-    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Terminación de contrato');
-    $pdf->actaHeader($title, 'Ticket #' . $logicalTicket . ' · Contrato #' . $contract . ' · Inmueble ' . $property, $term === 'dentro' ? 'Dentro de término' : 'Fuera de término');
-    $pdf->sectionTitle('Respuesta emitida');
-    foreach (preg_split('/\n{2,}/', $responseText) ?: [] as $paragraph) {
-      $paragraph = trim($paragraph);
-      if ($paragraph !== '') {
-        $pdf->paragraph($paragraph, 8);
-      }
-    }
-    $pdf->signatureGroup([
-      ['label' => 'Atentamente', 'name' => $creatorName, 'details' => $creatorDetails !== '' ? $creatorDetails : 'SKC SuCasa Inmobiliaria'],
-    ]);
-    $pdf->save($path);
-
-    return [
-      'title' => $title . ' - Ticket #' . $logicalTicket,
-      'url' => \SCM\Support\StoredFileService::fromRuntime()->urlFor($safeName),
-      'path' => $path,
-    ];
+    $acta = (new \SCM\Modules\Contracts\ContractRequestPdfGenerator())->generate(
+      $title, 'Caso #' . $logicalTicket . ' · Contrato #' . $contract . ' · Inmueble SIMI: ' . $property,
+      $responseText, $creatorName, $creatorDetails
+    );
+    $acta['title'] = $title . ' - Caso #' . $logicalTicket;
+    return $acta;
   }
 
   /** @param array<string,mixed> $ticket */
@@ -5423,44 +5398,19 @@ trait HandlesTicketWorkflowActions
   /** @param array<string,mixed> $ticket @return array{title:string,url:string,path:string} */
   private function generateContractNonRenewalActa(array $ticket, string $term, string $responseText, string $creatorName, string $creatorDetails): array
   {
-    if (!defined('SCM_UPLOAD_PATH')) {
-      throw new \RuntimeException('No está configurada la ruta de almacenamiento.');
-    }
     $ticketPk = (int) ($ticket['_ID'] ?? 0);
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
     $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: '-';
-    $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
+    $property = $this->contractTerminationFirstText([$ticket], ['inmueble']) ?: '-';
     $title = $term === 'dentro'
       ? 'Acta de no prórroga dentro de término'
       : 'Acta de no prórroga fuera de término';
-    $safeName = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
-    $path = rtrim((string) SCM_UPLOAD_PATH, '/\\') . DIRECTORY_SEPARATOR . $safeName;
-
-    $pdf = new \SCM\Support\SimplePdf();
-    $pdf->actaDesign('Gestión contractual');
-    $membrete = defined('SCM_RESOURCES_PATH') ? SCM_RESOURCES_PATH . '/assets/membrete-sucasa.jpg' : '';
-    if ($membrete !== '' && is_file($membrete)) {
-      $pdf->backgroundImage($membrete);
-    }
-    $pdf->footerLabel('SKC SuCasa Inmobiliaria - No prórroga de contrato');
-    $pdf->actaHeader($title, 'Ticket #' . $logicalTicket . ' · Contrato #' . $contract . ' · Inmueble ' . $property, $term === 'dentro' ? 'Dentro de término' : 'Fuera de término');
-    $pdf->sectionTitle('Respuesta emitida');
-    foreach (preg_split('/\n{2,}/', $responseText) ?: [] as $paragraph) {
-      $paragraph = trim($paragraph);
-      if ($paragraph !== '') {
-        $pdf->paragraph($paragraph, 8);
-      }
-    }
-    $pdf->signatureGroup([
-      ['label' => 'Atentamente', 'name' => $creatorName, 'details' => $creatorDetails !== '' ? $creatorDetails : 'SKC SuCasa Inmobiliaria'],
-    ]);
-    $pdf->save($path);
-
-    return [
-      'title' => $title . ' - Ticket #' . $logicalTicket,
-      'url' => \SCM\Support\StoredFileService::fromRuntime()->urlFor($safeName),
-      'path' => $path,
-    ];
+    $acta = (new \SCM\Modules\Contracts\ContractRequestPdfGenerator())->generate(
+      $title, 'Caso #' . $logicalTicket . ' · Contrato #' . $contract . ' · Inmueble SIMI: ' . $property,
+      $responseText, $creatorName, $creatorDetails
+    );
+    $acta['title'] = $title . ' - Caso #' . $logicalTicket;
+    return $acta;
   }
 
   /** @param array<string,mixed> $ticket */
@@ -5607,7 +5557,7 @@ trait HandlesTicketWorkflowActions
       return ['email' => 0, 'whatsapp' => 0];
     }
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: '-';
-    $subject = 'Respuesta solicitud de terminación de contrato - Ticket #' . $logicalTicket;
+    $subject = 'Respuesta solicitud de terminación de contrato - Caso #' . $logicalTicket;
     $status = $term === 'dentro' ? 'dentro de término' : 'fuera de término';
     $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: '-';
     $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
@@ -5631,7 +5581,7 @@ trait HandlesTicketWorkflowActions
         $phone = (string) ($recipient['phone'] ?? '');
         $name = (string) ($recipient['name'] ?? 'cliente');
         $buttonSuffix = $this->contractTerminationWhatsappButtonSuffix($actaUrl);
-        $message = "Buen dia, {$name}.\n\nSKC SuCasa Inmobiliaria emitio respuesta a la solicitud de terminacion del contrato #{$contract}, inmueble {$property}, direccion {$address}, asociada al ticket #{$logicalTicket}.\n\nLa solicitud fue clasificada como {$status}. Puedes consultar el acta en el boton.\n\nAtentamente,\n{$creatorSignature}";
+        $message = "Buen dia, {$name}.\n\nSKC SuCasa Inmobiliaria emitio respuesta a la solicitud de terminacion del contrato #{$contract}, inmueble {$property}, direccion {$address}, asociada al caso #{$logicalTicket}.\n\nLa solicitud fue clasificada como {$status}. Puedes consultar el acta en el boton.\n\nAtentamente,\n{$creatorSignature}";
         $smsQueue = new \SCM\Support\SmsQueue($this->db);
         $ok = $smsQueue->enqueue($phone, $name, $message, [
           'source_module' => 'terminacion_contrato',
@@ -5683,7 +5633,7 @@ trait HandlesTicketWorkflowActions
       return ['email' => 0, 'whatsapp' => 0];
     }
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: '-';
-    $subject = 'Respuesta solicitud de no prórroga de contrato - Ticket #' . $logicalTicket;
+    $subject = 'Respuesta solicitud de no prórroga de contrato - Caso #' . $logicalTicket;
     $status = $term === 'dentro' ? 'dentro de término' : 'fuera de término';
     $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: '-';
     $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
@@ -5706,7 +5656,7 @@ trait HandlesTicketWorkflowActions
       try {
         $phone = (string) ($recipient['phone'] ?? '');
         $name = (string) ($recipient['name'] ?? 'cliente');
-        $summary = "No prórroga contrato #{$contract}, inmueble {$property}, dirección {$address}, ticket #{$logicalTicket}. Clasificación: {$status}. Acta: {$actaUrl}";
+        $summary = "No prórroga contrato #{$contract}, inmueble {$property}, dirección {$address}, caso #{$logicalTicket}. Clasificación: {$status}. Acta: {$actaUrl}";
         $message = "Buen dia, {$name}.\n\nSKC SuCasa Inmobiliaria emitio respuesta sobre la no prorroga del contrato.\n\n{$summary}\n\nAtentamente,\n{$creatorSignature}";
         $smsQueue = new \SCM\Support\SmsQueue($this->db);
         $ok = $smsQueue->enqueue($phone, $name, $message, [
@@ -6004,12 +5954,12 @@ trait HandlesTicketWorkflowActions
 
   private function calendarCitaEmployeeMessage(string $name, string $category, string $ticket, string $date, string $time, string $location): string
   {
-    return "Hola {$name}, se te ha agendado una cita de {$category}.\n\nTicket: #{$ticket}\nFecha: {$date}\nHora: {$time}\nDireccion: " . ($location !== '' ? $location : '-');
+    return "Hola {$name}, se te ha agendado una cita de {$category}.\n\nCaso: #{$ticket}\nFecha: {$date}\nHora: {$time}\nDireccion: " . ($location !== '' ? $location : '-');
   }
 
   private function calendarCitaRequesterMessage(string $name, string $category, string $ticket, string $date, string $time, string $location, string $creatorContact): string
   {
-    return "Hola {$name}, se te ha agendado una cita de {$category}.\n\nTicket: #{$ticket}\nFecha: {$date}\nHora: {$time}\nLugar: " . ($location !== '' ? $location : '-') . "\n\nSi no puedes atenderla, contacta a {$creatorContact}.";
+    return "Hola {$name}, se te ha agendado una cita de {$category}.\n\nCaso: #{$ticket}\nFecha: {$date}\nHora: {$time}\nLugar: " . ($location !== '' ? $location : '-') . "\n\nSi no puedes atenderla, contacta a {$creatorContact}.";
   }
 
   /** @param mixed $raw @return string[] */
@@ -6033,7 +5983,7 @@ trait HandlesTicketWorkflowActions
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Caso invalido.');
     }
 
     $clean = static function (string $key): string {

@@ -17,10 +17,10 @@ trait PersistenceAndContactsConcern
     $notesTable   = $this->db->table('jet_cct_notas_ticket');
 
     if ($ticketPk <= 0) {
-      return ['ok' => '0', 'message' => 'Ticket invalido.'];
+      return ['ok' => '0', 'message' => 'Caso invalido.'];
     }
     if (!$this->schema->tableExists($ticketsTable)) {
-      return ['ok' => '0', 'message' => 'No existe tabla de tickets.'];
+      return ['ok' => '0', 'message' => 'No existe tabla de casos.'];
     }
     if (!$this->schema->tableExists($notesTable)) {
       return ['ok' => '0', 'message' => 'No existe tabla de notas.'];
@@ -31,7 +31,7 @@ trait PersistenceAndContactsConcern
       [$ticketPk]
     );
     if (!is_array($ticket)) {
-      return ['ok' => '0', 'message' => 'Ticket no encontrado.'];
+      return ['ok' => '0', 'message' => 'Caso no encontrado.'];
     }
 
     $nowTs    = time();
@@ -87,12 +87,12 @@ trait PersistenceAndContactsConcern
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     if ($ticketPk <= 0 || !$this->schema->tableExists($ticketsTable)) {
-      return ['ok' => '0', 'message' => 'Ticket invalido.'];
+      return ['ok' => '0', 'message' => 'Caso invalido.'];
     }
 
     $ticket = $this->db->getRow("SELECT * FROM `{$ticketsTable}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]);
     if (!is_array($ticket)) {
-      return ['ok' => '0', 'message' => 'Ticket no encontrado.'];
+      return ['ok' => '0', 'message' => 'Caso no encontrado.'];
     }
 
     $nowMysql = date('Y-m-d H:i:s');

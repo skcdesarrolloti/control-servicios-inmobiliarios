@@ -356,7 +356,7 @@ final class GuideModalView
         'titulo' => 'Nuevo',
         'icono'  => 'star',
         'color'  => 'scm-gc-yellow',
-        'desc'   => 'Estado inicial generado automáticamente cuando se crea un ticket.',
+        'desc'   => 'Estado inicial generado automáticamente cuando se crea un caso.',
       ],
       [
         'titulo' => 'Contactado',
@@ -517,13 +517,13 @@ final class GuideModalView
         'titulo'    => 'Finalizado',
         'icono'     => 'flag',
         'color'     => 'scm-gc-green-dk',
-        'contenido' => '<strong>Definición:</strong> Reparación terminada y acta firmada.<br><br><strong>Política:</strong> Solo cerrar ticket con Acta de Satisfacción firmada. <em>Encuesta se envía con el acta.</em>',
+        'contenido' => '<strong>Definición:</strong> Reparación terminada y acta firmada.<br><br><strong>Política:</strong> Solo cerrar caso con Acta de Satisfacción firmada. <em>Encuesta se envía con el acta.</em>',
       ],
       [
         'titulo'    => 'En espera de firma',
         'icono'     => 'draw',
         'color'     => 'scm-gc-blue',
-        'contenido' => '<strong>Definición:</strong> Acta de solución generada y pendiente de aceptación del firmante seleccionado.<br><br><strong>Política:</strong> Registrar daños, soluciones y observaciones. El ticket permanece abierto; la firma registra el cierre y un único reporte administrativo. Para corregir el documento, anular la versión pendiente y generar otra.',
+        'contenido' => '<strong>Definición:</strong> Acta de solución generada y pendiente de aceptación del firmante seleccionado.<br><br><strong>Política:</strong> Registrar daños, soluciones y observaciones. El caso permanece abierto; la firma registra el cierre y un único reporte administrativo. Para corregir el documento, anular la versión pendiente y generar otra.',
       ],
       [
         'titulo'    => 'Entregado',

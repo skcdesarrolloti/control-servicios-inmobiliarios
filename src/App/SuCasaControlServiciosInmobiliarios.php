@@ -269,7 +269,7 @@ final class SuCasaControlServiciosInmobiliarios
       'abiertos' => 'Abiertos',
       'postergados' => 'Postergados',
       'cerrados' => 'Cerrados',
-      'mis_tickets' => 'Mis tickets',
+      'mis_tickets' => 'Mis casos',
       'cotizaciones_mantenimiento' => 'Cotizaciones de Mantenimiento',
       'actas_satisfaccion' => 'Actas de satisfacción',
       'calendario_actividades' => 'Calendario',
@@ -329,7 +329,7 @@ final class SuCasaControlServiciosInmobiliarios
         'label' => 'Gestión del caso',
         'items' => [
           'respuesta_ticket' => [
-            'label' => 'Responder ticket',
+            'label' => 'Responder caso',
             'description' => 'Cuando un funcionario responde un caso.',
             'channel' => 'Email interno en cola',
           ],
@@ -349,8 +349,8 @@ final class SuCasaControlServiciosInmobiliarios
             'channel' => 'Pendiente de conexión',
           ],
           'postergar_ticket' => [
-            'label' => 'Postergar ticket',
-            'description' => 'Cuando el ticket queda postergado.',
+            'label' => 'Postergar caso',
+            'description' => 'Cuando el caso queda postergado.',
             'channel' => 'Pendiente de conexión',
           ],
           'gestion_caso_admin' => [
@@ -406,8 +406,8 @@ final class SuCasaControlServiciosInmobiliarios
             'channel' => 'Email interno en cola',
           ],
           'retencion_contrato_ticket' => [
-            'label' => 'Ticket comercial de retención de contrato',
-            'description' => 'Cuando una no prórroga crea un ticket comercial para gestionar la retención o búsqueda del inmueble.',
+            'label' => 'Caso comercial de retención de contrato',
+            'description' => 'Cuando una no prórroga crea un caso comercial para gestionar la retención o búsqueda del inmueble.',
             'channel' => 'Email interno en cola',
           ],
           'contrato_no_salida' => [
@@ -416,7 +416,7 @@ final class SuCasaControlServiciosInmobiliarios
             'channel' => 'Email interno en cola',
           ],
           'contrato_recibo_automatico' => [
-            'label' => 'Ticket automático de recibo · 15 días',
+            'label' => 'Caso automático de recibo · 15 días',
             'description' => 'Avisos internos al crear el recibo antes de la fecha fin del contrato.',
             'channel' => 'Email interno en cola',
           ],
@@ -451,8 +451,8 @@ final class SuCasaControlServiciosInmobiliarios
             'channel' => 'Email interno en cola',
           ],
           'ticket_administrativo_creado' => [
-            'label' => 'Ticket administrativo creado',
-            'description' => 'Cuando se crea un ticket administrativo nativo y se marca notificación a administración.',
+            'label' => 'Caso administrativo creado',
+            'description' => 'Cuando se crea un caso administrativo nativo y se marca notificación a administración.',
             'channel' => 'Email interno en cola',
           ],
           'orden_mantenimiento_creada' => [
@@ -481,8 +481,8 @@ final class SuCasaControlServiciosInmobiliarios
         'label' => 'Preventivas',
         'items' => [
           'crear_ticket_preventiva' => [
-            'label' => 'Crear ticket preventivo',
-            'description' => 'Cuando se crea un ticket administrativo de revisión preventiva.',
+            'label' => 'Crear caso preventivo',
+            'description' => 'Cuando se crea un caso administrativo de revisión preventiva.',
             'channel' => 'Email interno en cola',
           ],
           'comunicacion_no_acceso' => [
@@ -619,12 +619,12 @@ final class SuCasaControlServiciosInmobiliarios
           'case_followup' => 'Agregar seguimiento',
           'case_schedule' => 'Agendar cita del caso',
           'case_note' => 'Agregar nota',
-          'case_postpone' => 'Postergar ticket',
-          'case_respond' => 'Responder ticket',
+          'case_postpone' => 'Postergar caso',
+          'case_respond' => 'Responder caso',
           'contract_history_manage' => 'Editar y anular historial contractual',
           'case_transfer' => 'Trasladar caso',
-          'case_activate' => 'Activar ticket',
-          'case_close' => 'Cerrar ticket',
+          'case_activate' => 'Activar caso',
+          'case_close' => 'Cerrar caso',
           'case_edit_magnitude' => 'Editar magnitud del caso',
           'case_completion_act' => 'Acta de solución y firma',
           'corrective_review_manage' => 'Gestionar revisión correctiva',
@@ -1444,7 +1444,7 @@ final class SuCasaControlServiciosInmobiliarios
     return $out;
   }
 
-  private function render_lazy_tickets_placeholder(string $message = 'Selecciona esta vista para cargar tickets.'): string
+  private function render_lazy_tickets_placeholder(string $message = 'Selecciona esta vista para cargar casos.'): string
   {
     return '<div class="scm-empty scm-lazy-empty"><p>' . esc_html($message) . '</p></div>';
   }
@@ -1474,7 +1474,7 @@ final class SuCasaControlServiciosInmobiliarios
         'dom_key' => $this->status_dom_key($bucketKey, $topicKey),
         'prefix' => $this->status_prefix($bucketKey, $topicKey),
         'count' => 0,
-        'cards' => '<div class="scm-empty"><p>No se encontraron tickets.</p></div>',
+        'cards' => '<div class="scm-empty"><p>No se encontraron casos.</p></div>',
         'pagination' => '',
         'form' => '',
         'stats' => ['total' => 0],
@@ -1677,7 +1677,7 @@ final class SuCasaControlServiciosInmobiliarios
     }
 ?>
     <div class="scm-status-bucket" data-status-bucket="<?php echo esc_attr($bucketKey); ?>">
-      <div class="scm-status-subtabs" role="tablist" aria-label="<?php echo esc_attr((string)($bucketDef['label'] ?? 'Tickets')); ?>">
+      <div class="scm-status-subtabs" role="tablist" aria-label="<?php echo esc_attr((string)($bucketDef['label'] ?? 'Casos')); ?>">
         <?php foreach ($topicDefs as $topicKey => $topicDef):
           $domKey = $this->status_dom_key($bucketKey, $topicKey);
           $isActive = $topicKey === $activeTopicKey; ?>
@@ -1694,9 +1694,9 @@ final class SuCasaControlServiciosInmobiliarios
           <div class="scm-status-topic-head">
             <div>
               <h3><?php echo esc_html((string)($topicDef['label'] ?? $topicKey)); ?></h3>
-              <p><?php echo esc_html((string)($bucketDef['label'] ?? 'Tickets')); ?></p>
+              <p><?php echo esc_html((string)($bucketDef['label'] ?? 'Casos')); ?></p>
             </div>
-            <span class="scm-status-count"><strong id="scm-<?php echo esc_attr($domKey); ?>-count"><?php echo esc_html((string)($data['count'] ?? 0)); ?></strong> tickets</span>
+            <span class="scm-status-count"><strong id="scm-<?php echo esc_attr($domKey); ?>-count"><?php echo esc_html((string)($data['count'] ?? 0)); ?></strong> casos</span>
           </div>
           <?php echo (string)($data['form'] ?? ''); ?>
           <div class="scm-cards-wrap">

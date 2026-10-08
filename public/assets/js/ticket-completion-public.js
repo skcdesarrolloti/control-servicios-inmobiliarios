@@ -328,7 +328,7 @@
       busy = false;
       if (button) {
         button.disabled = false;
-        button.textContent = "Firmar acta y cerrar ticket";
+        button.textContent = "Firmar acta y cerrar caso";
       }
       if (codeButton) codeButton.disabled = false;
       form.removeAttribute("aria-busy");

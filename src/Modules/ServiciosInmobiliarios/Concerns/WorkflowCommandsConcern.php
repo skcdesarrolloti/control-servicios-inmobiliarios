@@ -23,10 +23,10 @@ trait WorkflowCommandsConcern
     $histFallbackTable = $this->db->table('jet_cct_historial_del_ticket');
 
     if ($ticketPk <= 0) {
-      return ['ok' => '0', 'message' => 'Ticket invalido.'];
+      return ['ok' => '0', 'message' => 'Caso invalido.'];
     }
     if (!$this->schema->tableExists($ticketsTable)) {
-      return ['ok' => '0', 'message' => 'No existe tabla de tickets.'];
+      return ['ok' => '0', 'message' => 'No existe tabla de casos.'];
     }
 
     $ticket = $this->db->getRow(
@@ -34,7 +34,7 @@ trait WorkflowCommandsConcern
       [$ticketPk]
     );
     if (!is_array($ticket)) {
-      return ['ok' => '0', 'message' => 'Ticket no encontrado.'];
+      return ['ok' => '0', 'message' => 'Caso no encontrado.'];
     }
 
     $nowTs    = time();
@@ -105,7 +105,7 @@ trait WorkflowCommandsConcern
 
     $msg = 'Seguimiento guardado.';
     if ($effectiveEstadoTicket === 'Cerrado') {
-      $msg .= ' Ticket cerrado.';
+      $msg .= ' Caso cerrado.';
     }
     $emailsSent = $this->notifySeguimiento($ticket, $observacion, $userName, $notifyTargets);
     if ($emailsSent > 0) {
@@ -157,7 +157,7 @@ trait WorkflowCommandsConcern
 
     $ticket = $this->db->getRow("SELECT * FROM `{$ticketsTable}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]);
     if (!is_array($ticket)) {
-      return ['ok' => '0', 'message' => 'Ticket no encontrado.'];
+      return ['ok' => '0', 'message' => 'Caso no encontrado.'];
     }
 
     $nowTs = time();
@@ -185,7 +185,7 @@ trait WorkflowCommandsConcern
         return ['ok' => '0', 'message' => 'Para generar esta comunicacion selecciona el estado administrativo "En espera de respuesta".'];
       }
       if (!$this->isPreventivaTicket($ticket)) {
-        return ['ok' => '0', 'message' => 'Esta comunicacion solo aplica para tickets de revision preventiva.'];
+        return ['ok' => '0', 'message' => 'Esta comunicacion solo aplica para casos de revision preventiva.'];
       }
       $attemptNoAccessNotice = $this->nextPreventivaNoAccessAttempt($ticketPk, (string) ($ticket['archivos'] ?? ''));
       $tenantDisplayName = $this->resolveTicketTenantDisplayName($ticket);
@@ -338,7 +338,7 @@ trait WorkflowCommandsConcern
 
     $ticket = $this->db->getRow("SELECT * FROM `{$ticketsTable}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]);
     if (!is_array($ticket)) {
-      return ['ok' => '0', 'message' => 'Ticket no encontrado.'];
+      return ['ok' => '0', 'message' => 'Caso no encontrado.'];
     }
 
     $cotizacion = $this->fetchCotizacion($cotTable, (string) $cotizacionId);
@@ -346,7 +346,7 @@ trait WorkflowCommandsConcern
       return ['ok' => '0', 'message' => 'Cotizacion no encontrada.'];
     }
     if (!$this->cotizacionBelongsToTicket($ticket, $cotizacion, $ticketPk, $cotizacionId)) {
-      return ['ok' => '0', 'message' => 'La cotizacion seleccionada no pertenece a este ticket.'];
+      return ['ok' => '0', 'message' => 'La cotizacion seleccionada no pertenece a este caso.'];
     }
 
     $estadoActual = strtolower(trim((string) ($cotizacion['estado'] ?? $cotizacion['estado_respuesta_cotizacion_mantenimiento'] ?? $cotizacion['estado_respuesta'] ?? '')));
@@ -857,7 +857,7 @@ trait WorkflowCommandsConcern
 
     $ticket = $this->db->getRow("SELECT * FROM `{$ticketsTable}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]);
     if (!is_array($ticket)) {
-      return ['ok' => '0', 'message' => 'Ticket no encontrado.'];
+      return ['ok' => '0', 'message' => 'Caso no encontrado.'];
     }
 
     $nowTs = time();
@@ -866,7 +866,7 @@ trait WorkflowCommandsConcern
     $userName = \SCM\Core\Auth::user() ?: ($userId > 0 ? ('Usuario #' . $userId) : 'Sistema');
     $userInfo = $this->findFuncionario($userId);
     $employeeId = $this->employeeLogicalId($userId, $userInfo);
-    $histObservacion = 'Ticket postergado: ' . $observacion;
+    $histObservacion = 'Caso postergado: ' . $observacion;
 
     $evidencias = is_array($evidencias) ? array_values(array_filter(array_map('strval', $evidencias))) : [trim((string) $evidencias)];
     $evidencias = array_values(array_filter($evidencias, static fn(string $url): bool => $url !== ''));
@@ -928,7 +928,7 @@ trait WorkflowCommandsConcern
     $sent = $this->notifySeguimiento($ticket, $histObservacion, $userName, $notifyTargets);
     return [
       'ok' => '1',
-      'message' => 'Ticket postergado.' . ($sent > 0 ? ' Correos programados en cola: ' . $sent . '.' : ' Sin correos programados.'),
+      'message' => 'Caso postergado.' . ($sent > 0 ? ' Correos programados en cola: ' . $sent . '.' : ' Sin correos programados.'),
       'seg_saved' => $segSaved ? '1' : '0',
       'hist_saved' => '1',
       'emails_sent' => (string)$sent,
@@ -953,7 +953,7 @@ trait WorkflowCommandsConcern
 
     $ticket = $this->db->getRow("SELECT * FROM `{$ticketsTable}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]);
     if (!is_array($ticket)) {
-      return ['ok' => '0', 'message' => 'Ticket no encontrado.'];
+      return ['ok' => '0', 'message' => 'Caso no encontrado.'];
     }
 
     $nowTs = time();
@@ -962,7 +962,7 @@ trait WorkflowCommandsConcern
     $userName = \SCM\Core\Auth::user() ?: ($userId > 0 ? ('Usuario #' . $userId) : 'Sistema');
     $userInfo = $this->findFuncionario($userId);
     $employeeId = $this->employeeLogicalId($userId, $userInfo);
-    $histObservacion = 'Ticket activado: ' . $motivo;
+    $histObservacion = 'Caso activado: ' . $motivo;
 
     $histSaved = $this->insertHistorial(
       $histTable,
@@ -1013,7 +1013,7 @@ trait WorkflowCommandsConcern
 
     return [
       'ok' => '1',
-      'message' => 'Ticket activado.',
+      'message' => 'Caso activado.',
       'seg_saved' => $segSaved ? '1' : '0',
       'hist_saved' => '1',
       'emails_sent' => '0',
@@ -1141,18 +1141,18 @@ trait WorkflowCommandsConcern
     }
     $ticket = $this->db->getRow("SELECT * FROM `{$ticketsTable}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]);
     if (!is_array($ticket)) {
-      return ['ok' => '0', 'message' => 'Ticket no encontrado.'];
+      return ['ok' => '0', 'message' => 'Caso no encontrado.'];
     }
     $cotIds = $this->splitIds((string)($ticket['id_cotizacion_mantenimiento'] ?? ''));
     if (empty($cotIds)) {
-      return ['ok' => '0', 'message' => 'Este ticket no tiene cotizacion asociada.'];
+      return ['ok' => '0', 'message' => 'Este caso no tiene cotizacion asociada.'];
     }
     if ($targetCotizacionId > 0) {
       $target = (string) $targetCotizacionId;
       if (!in_array($target, $cotIds, true)) {
         $targetCotizacion = $this->fetchCotizacion($cotTable, $target);
         if (!is_array($targetCotizacion) || !$this->cotizacionBelongsToTicket($ticket, $targetCotizacion, $ticketPk, $targetCotizacionId)) {
-          return ['ok' => '0', 'message' => 'La cotizacion seleccionada no pertenece a este ticket.'];
+          return ['ok' => '0', 'message' => 'La cotizacion seleccionada no pertenece a este caso.'];
         }
       }
       $cotIds = [$target];
@@ -1244,7 +1244,7 @@ trait WorkflowCommandsConcern
     $seguimientoTable = $this->db->table('jet_cct_seguimiento_ticket');
     $histTable = $this->db->table('jet_cct_historial_del_ticket');
     if ($ticketPk <= 0 || !$this->schema->tableExists($ticketsTable)) {
-      return ['ok' => '0', 'message' => 'No se pudo cerrar el ticket.'];
+      return ['ok' => '0', 'message' => 'No se pudo cerrar el caso.'];
     }
     $motivo = trim($motivo);
     if ($motivo === '') {
@@ -1253,7 +1253,7 @@ trait WorkflowCommandsConcern
 
     $ticket = $this->db->getRow("SELECT * FROM `{$ticketsTable}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]);
     if (!is_array($ticket)) {
-      return ['ok' => '0', 'message' => 'Ticket no encontrado.'];
+      return ['ok' => '0', 'message' => 'Caso no encontrado.'];
     }
 
     $nowTs = time();
@@ -1262,7 +1262,7 @@ trait WorkflowCommandsConcern
     $userName = \SCM\Core\Auth::user() ?: ($userId > 0 ? ('Usuario #' . $userId) : 'Sistema');
     $userInfo = $this->findFuncionario($userId);
     $employeeId = $this->employeeLogicalId($userId, $userInfo);
-    $histObservacion = 'Ticket cerrado: ' . $motivo;
+    $histObservacion = 'Caso cerrado: ' . $motivo;
     $ticketUpdate = [
       'estado' => 'Cerrado',
       'estado_administrativo' => 'Finalizado',
@@ -1277,7 +1277,7 @@ trait WorkflowCommandsConcern
     }
     $ticketUpdate = $this->schema->filterTableData($ticketsTable, $ticketUpdate);
     if (empty($ticketUpdate)) {
-      return ['ok' => '0', 'message' => 'No hay columnas disponibles para cerrar el ticket.'];
+      return ['ok' => '0', 'message' => 'No hay columnas disponibles para cerrar el caso.'];
     }
 
     $histSaved = false;
@@ -1314,7 +1314,7 @@ trait WorkflowCommandsConcern
     );
     return [
       'ok' => '1',
-      'message' => 'Ticket cerrado y mensaje guardado.',
+      'message' => 'Caso cerrado y mensaje guardado.',
       'seg_saved' => $segSaved ? '1' : '0',
       'hist_saved' => '1',
     ];
@@ -1341,10 +1341,10 @@ trait WorkflowCommandsConcern
   ): int {
     $logicalTicket = $this->firstNonEmpty([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '']);
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
-    $subject   = 'Traslado del caso — ticket #' . $logicalTicket;
+    $subject   = 'Traslado del caso #' . $logicalTicket;
     $sent      = 0;
     $fecha     = date('Y-m-d H:i');
-    $botones   = EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver ticket']]);
+    $botones   = EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver caso']]);
 
     $baseVars = [
       'id_ticket'        => EmailTemplate::e($logicalTicket),

@@ -23,7 +23,7 @@ final class ContractRenewalService
     if (!$this->db->pdo()->inTransaction()) (new SharedNotificationsBridge($this->db))->queue();
     $schema = new \SCM\Support\SchemaInspector($this->db);
     if ($schema->tableExists($this->table()) && $schema->tableExists($this->eventsTable()) && $schema->tableExists($this->db->table('scm_contract_receipts'))) return;
-    if ($this->db->pdo()->inTransaction()) throw new \RuntimeException('Prepara el esquema contractual antes de crear tickets.');
+    if ($this->db->pdo()->inTransaction()) throw new \RuntimeException('Prepara el esquema contractual antes de crear casos.');
     $this->db->pdo()->exec("CREATE TABLE IF NOT EXISTS `{$this->table()}` (
       contract_id BIGINT UNSIGNED PRIMARY KEY, end_ts BIGINT NOT NULL,
       probability DECIMAL(5,2) NULL, no_exit TINYINT NOT NULL DEFAULT 0,

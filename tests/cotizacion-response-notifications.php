@@ -100,6 +100,13 @@ namespace {
         'correo_empleado' => 'responsable@example.test',
       ], $quote, $state, $observation);
     }
+    public function notifyCase(string $state): int {
+      $ticket = ['id_ticket' => '10841', 'solicitante' => 'Cliente', 'correo_solicitante' => 'cliente@example.test', 'correo_empleado' => 'responsable@example.test'];
+      return $state === 'followup'
+        ? $this->notifySeguimiento($ticket, 'Seguimiento de prueba', 'Funcionario', ['solicitante'])
+        : $this->notifyTicketResponse($ticket, '10841', 'Respuesta de prueba', 'Funcionario', $state, ['solicitante']);
+    }
+    private function resolveTicketTenantDisplayName(array $ticket): string { return 'Arrendatario de prueba'; }
   }
   function check(bool $condition, string $message): void {
     if (!$condition) throw new \RuntimeException($message);
@@ -120,6 +127,16 @@ namespace {
     'financiacion' => 'No', 'motivo' => '',
   ];
   $probe = new ResponseNotificationProbe();
+  foreach (['En proceso', 'Cerrado', 'followup'] as $state) {
+    $storage->rows = [];
+    check($probe->notifyCase($state) === 1 && count($storage->rows) === 1, 'Case notification must queue exactly once');
+    $row = $storage->rows[0];
+    check(preg_match('/\bticket\b/i', $row['subject'] . ' ' . $row['message_text']) === 0, 'Case notification must not expose the old term');
+    check(str_contains($row['subject'], 'caso #10841') || str_contains($row['subject'], 'Caso #10841'), 'Case number missing from subject');
+    check(str_contains($row['message_html'], '/ticket/?id_ticket=10841') && str_contains($row['message_html'], 'Ver caso'), 'Case link must preserve its compatible URL and new label');
+    check($row['destination'] === 'cliente@example.test' && $row['status'] === 'pending', 'Case terminology must preserve recipients and queue delivery');
+  }
+  $storage->rows = [];
   $counts = $probe->respond($quote);
   check($counts === ['email' => 2, 'whatsapp' => 3], 'Recipients must deduplicate each channel and include phone-only officials');
   $allowed = ['creador@example.test', 'funcionario@example.test', '+573001112233', '+573001112244', '+573001112255'];

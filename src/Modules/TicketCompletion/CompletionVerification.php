@@ -30,7 +30,7 @@ final class CompletionVerification
     return ['queued' => $state['queued'], 'sent' => $state['sent'], 'message' => $state['sent']
       ? 'Código enviado al proveedor. Revisa el contacto seleccionado. Vence en 10 minutos; usa solo el último código.'
       : ($state['queued'] ? 'El envío inmediato no se confirmó. El código quedó pendiente de reintento automático. Si no llega, espera un minuto y solicita otro o elige otro canal.'
-      : 'No se pudo registrar ni enviar el código. El ticket sigue abierto. Espera un minuto y reintenta o elige otro canal disponible.')];
+      : 'No se pudo registrar ni enviar el código. El caso sigue abierto. Espera un minuto y reintenta o elige otro canal disponible.')];
   }
 
   /** Persist failed attempts outside the signing transaction; rollback must not reset the budget. */

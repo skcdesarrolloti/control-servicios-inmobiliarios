@@ -171,7 +171,7 @@
                   window.Swal.fire({
                     icon: 'warning',
                     title: 'Archivar acta #' + actId + '?',
-                    text: 'La acta saldrá de pendientes. No se cerrará el ticket ni se generará cobro.',
+                    text: 'La acta saldrá de pendientes. No se cerrará el caso ni se generará cobro.',
                     input: 'textarea',
                     inputLabel: 'Motivo',
                     showCancelButton: true,
@@ -187,7 +187,7 @@
                   return;
                 }
 
-                if (window.confirm('Archivar acta #' + actId + '? No se cerrará el ticket ni se generará cobro.')) {
+                if (window.confirm('Archivar acta #' + actId + '? No se cerrará el caso ni se generará cobro.')) {
                   archiveAct(window.prompt('Motivo para archivar:', '') || '');
                 }
               });

@@ -500,7 +500,7 @@ final class DamageMagnitudeService
                 'label' => 'Crítico',
                 'class' => 'danger',
                 'color' => '#dc2626',
-                'recommendation' => 'Atención inmediata. Validar riesgo para habitabilidad, seguridad o servicios esenciales antes de cerrar el ticket.',
+                'recommendation' => 'Atención inmediata. Validar riesgo para habitabilidad, seguridad o servicios esenciales antes de cerrar el caso.',
             ],
             'alto' => [
                 'label' => 'Alto',

@@ -145,7 +145,7 @@ final class PendingView
             </div>
             <div class="scm-field">
               <label for="sra_ticket"># caso</label>
-              <input id="sra_ticket" name="sra_ticket" type="text" value="<?php echo esc_attr((string) ($filters['id_ticket'] ?? '')); ?>" placeholder="ID ticket">
+              <input id="sra_ticket" name="sra_ticket" type="text" value="<?php echo esc_attr((string) ($filters['id_ticket'] ?? '')); ?>" placeholder="ID caso">
             </div>
             <div class="scm-field">
               <label for="sra_contrato">Contrato</label>
@@ -318,7 +318,7 @@ final class PendingView
       . '<table class="scm-table scm-table-prev">'
       . '<thead><tr>'
       . '<th>ID</th><th>Fecha</th><th>Categoria</th><th>Descripcion</th>'
-      . '<th>Valor</th><th>Inmueble</th><th>Contrato</th><th>Funcionario</th><th>Arrendatario</th><th>Ticket</th><th>Acciones</th>'
+      . '<th>Valor</th><th>Inmueble</th><th>Contrato</th><th>Funcionario</th><th>Arrendatario</th><th>Caso</th><th>Acciones</th>'
       . '</tr></thead><tbody>';
 
     foreach ($items as $item) {
@@ -342,7 +342,7 @@ final class PendingView
       $html .= '<td>' . esc_html($ticketRef !== '' ? $ticketRef : '-') . '</td>';
       $html .= '<td class="scm-pending-action-cell" style="display:flex;gap:8px;flex-wrap:wrap;">';
       if ($ticketUrl !== '') {
-        $html .= '<button type="button" class="scm-pending-action-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($ticketUrl) . '" data-iframe-title="Ver ticket">Ver ticket</button>';
+        $html .= '<button type="button" class="scm-pending-action-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($ticketUrl) . '" data-iframe-title="Ver caso">Ver caso</button>';
       }
       if ($estado === 'pendiente') {
         $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;" data-sra-action="approve" data-sra-id="' . esc_attr((string) $preId) . '">Aprobar</button>';
@@ -428,20 +428,20 @@ final class PendingView
         $html .= '<button type="button" class="scm-pending-action-btn scm-btn-case"'
           . $this->preventivaTicketCaseAttrs((array) $ticket, $row, (int) ($item['ultima'] ?? 0), (int) ($item['due'] ?? 0))
           . '>'
-          . 'Ver ticket</button>';
+          . 'Ver caso</button>';
       } else {
         $html .= '<button type="button" class="scm-pending-action-btn"'
           . ' data-scm-open-admin-ticket data-ticket-mode="preventiva"'
-          . ' data-ticket-title="Crear ticket preventivo"'
+          . ' data-ticket-title="Crear caso preventivo"'
           . $this->contractTicketAttrs($row)
           . '>'
-          . 'Crear ticket</button>';
+          . 'Crear caso</button>';
       }
       if ($ticketsCount > 0) {
         $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;"'
           . ' data-scm-toggle-preventiva-tickets data-target="' . esc_attr($ticketsListId) . '"'
           . ' data-contract-code="' . esc_attr($contractCode !== '' ? $contractCode : $contractPk) . '">'
-          . 'Ver tickets (' . esc_html((string) $ticketsCount) . ')</button>';
+          . 'Ver casos (' . esc_html((string) $ticketsCount) . ')</button>';
       }
       if ($contractPk !== '' && $estado !== 'recibido') {
         $html .= '<button type="button" class="scm-pending-action-btn"'
@@ -525,9 +525,9 @@ final class PendingView
       }
 
       $html .= '<button type="button" class="px-3 py-1 rounded-lg bg-[#0f1e36] text-white hover:bg-[#162846] font-medium text-xs shadow-2xs transition-all flex items-center gap-1"'
-        . ' data-scm-open-admin-ticket data-ticket-mode="administrativo" data-ticket-title="Crear ticket administrativo"'
+        . ' data-scm-open-admin-ticket data-ticket-mode="administrativo" data-ticket-title="Crear caso administrativo"'
         . $this->contractTicketAttrs($row)
-        . '><span class="material-symbols-outlined text-[14px]">add</span><span>Crear ticket</span></button>';
+        . '><span class="material-symbols-outlined text-[14px]">add</span><span>Crear caso</span></button>';
 
       $html .= '</div>';
       $html .= '</td>';
@@ -604,13 +604,13 @@ final class PendingView
   private function renderPreventivaTicketsList(array $tickets, array $contractRow, int $ultimaTs, int $dueTs): string
   {
     if (empty($tickets)) {
-      return '<div class="scm-case-history-empty">Este contrato no tiene tickets preventivos registrados.</div>';
+      return '<div class="scm-case-history-empty">Este contrato no tiene casos preventivos registrados.</div>';
     }
 
     $html = '<div class="scm-preventiva-ticket-list">'
-      . '<strong>Tickets preventivos del contrato</strong>'
+      . '<strong>Casos preventivos del contrato</strong>'
       . '<div class="scm-table-wrap"><table class="scm-table scm-table-prev">'
-      . '<thead><tr><th>Ticket</th><th>Estado</th><th>Estado administrativo</th><th>Fecha</th><th>Asunto</th><th>Acciones</th></tr></thead><tbody>';
+      . '<thead><tr><th>Caso</th><th>Estado</th><th>Estado administrativo</th><th>Fecha</th><th>Asunto</th><th>Acciones</th></tr></thead><tbody>';
 
     foreach ($tickets as $ticket) {
       $ticket = (array) $ticket;
@@ -628,7 +628,7 @@ final class PendingView
       $html .= '<td>' . esc_html(trim((string) ($ticket['asunto'] ?? 'REVISION PREVENTIVA')) ?: '-') . '</td>';
       $html .= '<td><button type="button" class="scm-pending-action-btn scm-btn-case"'
         . $this->preventivaTicketCaseAttrs($ticket, $contractRow, $ultimaTs, $dueTs)
-        . '>Ver ticket</button></td>';
+        . '>Ver caso</button></td>';
       $html .= '</tr>';
       $html .= '<tr class="scm-tl-row" style="display:none;"><td colspan="6">'
         . $this->renderPreventivaTicketCaseSource($ticket, $contractRow)
@@ -664,7 +664,7 @@ final class PendingView
       $html .= '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">' . wp_kses_post($descripcion) . '</div></div>';
     }
     if ($html === '') {
-      $html = '<div class="scm-case-description"><strong>Detalle del caso:</strong><div class="scm-case-description-content">Ticket preventivo creado desde contratos pendientes.</div></div>';
+      $html = '<div class="scm-case-description"><strong>Detalle del caso:</strong><div class="scm-case-description-content">Caso preventivo creado desde contratos pendientes.</div></div>';
     }
     $seguimientoHtml = '<div class="scm-seg-readonly">No se pudo cargar el formulario de seguimiento en este momento.</div>';
     try {
@@ -675,7 +675,7 @@ final class PendingView
     $html .= '<div class="scm-seg-wrap">' . $seguimientoHtml . '</div>';
     $html .= $this->renderPendingHistorialBlock($historialItems);
     $html .= $this->renderPendingRecordSection('Seguimientos realizados', $seguimientosItems, '', ['evidencia' => 'Evidencia']);
-    $html .= $this->renderPendingRecordSection('Notas del ticket', $notasItems);
+    $html .= $this->renderPendingRecordSection('Notas del caso', $notasItems);
     $html .= '<div class="scm-case-action-buttons">';
     if ($documentsHtml !== '') {
       $html .= '<button type="button" class="btn btn-primary btn-sm" data-scm-open-section="scm-sec-documentos">Adjuntos del caso</button>';
@@ -799,6 +799,7 @@ final class PendingView
       $itemStyle = $page === 1 ? '' : ' style="display:none;"';
       $detail = trim((string) ($item['observacion'] ?? $item['observacion_his'] ?? $item['respuesta'] ?? $item['descripcion'] ?? ''));
       $type = trim((string) ($item['tipo_reporte'] ?? $item['tipo_de_reporte_his'] ?? ''));
+      if (strcasecmp($type, 'Ticket') === 0) $type = 'Caso';
       if ($detail === '') {
         $detail = 'Sin detalle';
       }
@@ -1465,12 +1466,12 @@ final class PendingView
       'cct_created' => 'Creado',
       'cct_modified' => 'Modificado',
       'cct_author_id' => 'Autor',
-      'id_ticket' => 'Ticket',
-      'ticket_id' => 'Ticket',
-      'id_tickets' => 'Ticket',
-      'tickets_id' => 'Ticket',
-      'id_ticket_mantenimiento' => 'Ticket mantenimiento',
-      'ticket_pk' => 'Ticket',
+      'id_ticket' => 'Caso',
+      'ticket_id' => 'Caso',
+      'id_tickets' => 'Caso',
+      'tickets_id' => 'Caso',
+      'id_ticket_mantenimiento' => 'Caso mantenimiento',
+      'ticket_pk' => 'Caso',
       'id_contrato' => 'Contrato',
       'contrato' => 'Contrato',
       'id_inmueble' => 'Inmueble',
@@ -1506,8 +1507,8 @@ final class PendingView
       'id_acta_revision' => 'Acta de revisión',
       'id_acta_revision_notificacion' => 'Notificación acta de revisión',
       'id_acta_recibo' => 'Acta de recibo',
-      'id_ticket_danos_entrega' => 'Ticket daños entrega',
-      'id_ticket_danos_recibo' => 'Ticket daños recibo',
+      'id_ticket_danos_entrega' => 'Caso daños entrega',
+      'id_ticket_danos_recibo' => 'Caso daños recibo',
       'id_hoja_cierre' => 'Hoja de cierre',
       'seguimiento_reparaciones' => 'Seguimiento de reparaciones',
     ];

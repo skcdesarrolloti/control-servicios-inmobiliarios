@@ -158,7 +158,7 @@ trait HandlesMaintenanceActions
     $funcTable = $this->db->table('jet_cct_funcionarios');
 
     if (!$this->table_exists($ticketsTable)) {
-      $this->jsonFail('La tabla de tickets no esta disponible.');
+      $this->jsonFail('La tabla de casos no esta disponible.');
     }
 
     $employees = $this->metrics_execution_employee_map($funcTable);
@@ -403,7 +403,7 @@ trait HandlesMaintenanceActions
       $quoteTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
       $ticketTable = $this->db->table('jet_cct_tickets');
       if (!$schema->tableExists($quoteTable) || !$schema->tableExists($ticketTable)) {
-        throw new \DomainException('No está disponible la tabla de cotizaciones o tickets.');
+        throw new \DomainException('No está disponible la tabla de cotizaciones o casos.');
       }
 
       $ticket = is_array($context['ticket_raw'] ?? null) ? $context['ticket_raw'] : [];
@@ -585,7 +585,7 @@ trait HandlesMaintenanceActions
       try {
         $this->maintenance_quote_update_ticket($schema, $ticket, $quoteIdSaved, $tipoMantenimiento, $now, $nowSql);
       } catch (\Throwable $error) {
-        $warnPostSave('no se pudo actualizar el ticket', $error);
+        $warnPostSave('no se pudo actualizar el caso', $error);
       }
       try {
         $this->maintenance_quote_insert_histories($schema, $quoteIdSaved, $mode, $quoteData, $ticket, $actor, $employeeId, $now, $nowSql);
@@ -669,7 +669,7 @@ trait HandlesMaintenanceActions
     $ticketTable = $this->db->table('jet_cct_tickets');
     $quoteTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
     if (!$schema->tableExists($ticketTable) || !$schema->tableExists($quoteTable)) {
-      throw new \DomainException('No están disponibles las tablas de tickets o cotizaciones.');
+      throw new \DomainException('No están disponibles las tablas de casos o cotizaciones.');
     }
 
     $quote = [];
@@ -701,7 +701,7 @@ trait HandlesMaintenanceActions
         : $this->db->getRow("SELECT * FROM `{$ticketTable}` WHERE TRIM(COALESCE(`id_ticket`, '')) = ? LIMIT 1", [$ticketRef]);
     }
     if (!is_array($ticket)) {
-      throw new \DomainException('Ticket inválido.');
+      throw new \DomainException('Caso inválido.');
     }
 
     [$revision, $tipoMantenimiento, $revisionId] = $this->maintenance_quote_resolve_revision($ticket, $quote);
@@ -2299,7 +2299,7 @@ trait HandlesMaintenanceActions
       (string) ($update['observacion_respuesta'] ?? $observacion)
     );
     $this->jsonOk([
-      'message' => 'Cotizacion marcada como aprobada.' . ($ticketRowsUpdated > 0 ? ' Ticket sincronizado.' : '') . ' Correos en cola: ' . $notifications['email'] . '. WhatsApp en cola: ' . $notifications['whatsapp'] . '.',
+      'message' => 'Cotizacion marcada como aprobada.' . ($ticketRowsUpdated > 0 ? ' Caso sincronizado.' : '') . ' Correos en cola: ' . $notifications['email'] . '. WhatsApp en cola: ' . $notifications['whatsapp'] . '.',
       'id_cotizacion' => (string) $cotizacionId,
       'emails_sent' => (string) $notifications['email'],
       'whatsapp_sent' => (string) $notifications['whatsapp'],
@@ -3146,7 +3146,7 @@ trait HandlesMaintenanceActions
     }
     $ticketPk = (int) ($row['id_ticket'] ?? 0);
     if ($ticketPk <= 0) {
-      return ['ok' => '0', 'message' => 'La cotización no tiene ticket asociado.'];
+      return ['ok' => '0', 'message' => 'La cotización no tiene caso asociado.'];
     }
     return $this->get_seguimiento_service()->saveCotizacionResponse($ticketPk, $estado, $observacion, $motivo, $financiacion, [], $cotizacionId);
   }
@@ -4451,7 +4451,7 @@ trait HandlesMaintenanceActions
 
     $pdf->actaHeader(
       'Orden de mantenimiento #' . ($orderId !== '-' ? $orderId : ''),
-      'Cotización #' . $clean('id_cotizacion') . '  |  Ticket #' . $clean('id_ticket') . '  |  Contrato #' . $clean('contrato', $clean('id_contrato')) . '  |  Inmueble ' . $clean('inmueble', $clean('id_inmueble')) . '  |  Fecha: ' . $date,
+      'Cotización #' . $clean('id_cotizacion') . '  |  Caso #' . $clean('id_ticket') . '  |  Contrato #' . $clean('contrato', $clean('id_contrato')) . '  |  Inmueble ' . $clean('inmueble', $clean('id_inmueble')) . '  |  Fecha: ' . $date,
       'Estado: ' . $state
     );
     $pdf->heading('Resumen para pago');
@@ -4543,7 +4543,7 @@ trait HandlesMaintenanceActions
 
     $table = $this->db->table('jet_cct_tickets');
     if (!$this->ensure_magnitud_caso_column($table)) {
-      $this->jsonFail('No se pudo preparar la columna magnitud_caso en tickets.');
+      $this->jsonFail('No se pudo preparar la columna magnitud_caso en casos.');
     }
 
     $service = new \SCM\Modules\ServiciosInmobiliarios\DamageMagnitudeService($this->db->pdo(), $this->db->prefix());
@@ -4613,7 +4613,7 @@ trait HandlesMaintenanceActions
     $allowed = ['critico', 'alto', 'medio', 'bajo'];
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Caso invalido.');
     }
     if (!in_array($magnitud, $allowed, true)) {
       $this->jsonFail('Magnitud no valida.');
@@ -4621,7 +4621,7 @@ trait HandlesMaintenanceActions
 
     $table = $this->db->table('jet_cct_tickets');
     if (!$this->column_exists($table, 'magnitud_caso')) {
-      $this->jsonFail('No existe la columna magnitud_caso en tickets.');
+      $this->jsonFail('No existe la columna magnitud_caso en casos.');
     }
 
     $this->db->update($table, ['magnitud_caso' => $magnitud], ['_ID' => $ticketPk]);
@@ -4645,7 +4645,7 @@ trait HandlesMaintenanceActions
     $mapsLocation = $this->normalizePropertyLocationInput($mapsLocationRaw);
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Caso invalido.');
     }
     if ($propertyRowId === '' && $propertyCode === '') {
       $this->jsonFail('No se encontro el inmueble asociado al caso.');
@@ -4717,7 +4717,7 @@ trait HandlesMaintenanceActions
     $notifyNewEmp  = !empty($_POST['notify_funcionario']) || !empty($_POST['notify_nuevo']);
 
     if ($ticketPk <= 0) {
-      $this->jsonFail('Ticket invalido.');
+      $this->jsonFail('Caso invalido.');
     }
     if ($newEmpId === '') {
       $this->jsonFail('Debe seleccionar un funcionario.');
@@ -4731,7 +4731,7 @@ trait HandlesMaintenanceActions
       [$ticketPk]
     );
     if (!is_array($ticket)) {
-      $this->jsonFail('Ticket no encontrado.');
+      $this->jsonFail('Caso no encontrado.');
     }
 
     $newEmp = $this->db->getRow(
@@ -4772,7 +4772,7 @@ trait HandlesMaintenanceActions
     ]);
 
     if (empty($update)) {
-      $this->jsonFail('No se pudo actualizar el ticket.');
+      $this->jsonFail('No se pudo actualizar el caso.');
     }
 
     $this->db->update($ticketsTable, $update, ['_ID' => $ticketPk]);

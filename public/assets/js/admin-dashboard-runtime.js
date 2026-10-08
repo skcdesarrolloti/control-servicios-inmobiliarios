@@ -44,7 +44,7 @@
       return;
     }
     if (skipped > 0) {
-      showToast("warning", "No se encoló WhatsApp: revisa si el ticket/funcionario tiene celular.");
+      showToast("warning", "No se encoló WhatsApp: revisa si el caso o funcionario tiene celular.");
     }
   }
   var getLlavesDetailPayload = core.getLlavesDetailPayload;
@@ -515,7 +515,7 @@
     function dashboardDueTypeLabel(type) {
       if (type === "preventiva_sin_enviar") return "Preventivas sin enviar";
       if (type === "preventiva_pendiente") return "Preventivas pendientes";
-      if (type === "ticket_preventiva_sin_cita") return "Tickets sin cita preventiva";
+      if (type === "ticket_preventiva_sin_cita") return "Casos sin cita preventiva";
       if (type === "preventiva_cita_sin_realizar") return "Preventivas con cita sin realizar";
       if (type === "servicios_publicos_critico") return "Servicios críticos · 72 horas";
         if (type === "servicios_publicos_pendientes") return "Servicios públicos pendientes";
@@ -880,7 +880,7 @@
           '<strong>' + escHtml(formatDuePopupDate(row.fecha_vencimiento || "-")) + "</strong>" +
           '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
           '<em>' + escHtml(row.estado || "Pendiente") + (Number(row.dias_vencido || 0) > 0 ? " • " + escHtml(String(row.dias_vencido)) + " día(s)" : "") + "</em>" +
-          (caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Seguimiento · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-create-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Crear ticket</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-services data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" disabled>Sin caso</button>'))) +
+          (caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Seguimiento · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-create-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Crear caso</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-services data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" disabled>Sin caso</button>'))) +
           '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div>" +
           "</div>";
       }).join("");
@@ -923,8 +923,8 @@
       settings = settings || {};
       return '<div class="scm-due-settings-intro"><strong>Los plazos configurados</strong> determinan el cálculo de alertas de vencimiento en las bandejas operativas y recordatorios automáticos.</div>' +
         '<form class="scm-calendar-due-settings-form scm-calendar-due-settings-form--modal" data-scm-calendar-due-settings-modal autocomplete="off">' +
-        '<label class="scm-field"><span>Cotizaciones sin enviar</span><em>Fase emisión</em><small>Días hábiles desde la creación del ticket para emitir la cotización.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "cotizaciones_sin_enviar_dias", 3)) + '"></label>' +
-        '<label class="scm-field"><span>Tickets sin cita preventiva</span><em>Agendamiento</em><small>Días transcurridos desde que se crea el ticket preventivo hasta agendar cita.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="tickets_preventivos_sin_cita_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "tickets_preventivos_sin_cita_dias", 3)) + '"></label>' +
+        '<label class="scm-field"><span>Cotizaciones sin enviar</span><em>Fase emisión</em><small>Días hábiles desde la creación del caso para emitir la cotización.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "cotizaciones_sin_enviar_dias", 3)) + '"></label>' +
+        '<label class="scm-field"><span>Casos sin cita preventiva</span><em>Agendamiento</em><small>Días transcurridos desde que se crea el caso preventivo hasta agendar cita.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="tickets_preventivos_sin_cita_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "tickets_preventivos_sin_cita_dias", 3)) + '"></label>' +
         '<label class="scm-field"><span>Preventivas con cita sin realizar</span><em>Cita agendada</em><small>Días desde la fecha de la cita preventiva hasta marcarla como realizada.</small><input class="input input-bordered input-sm scm-input" type="number" min="0" max="120" name="preventivas_con_cita_sin_realizar_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "preventivas_con_cita_sin_realizar_dias", 0)) + '"></label>' +
         '<label class="scm-field"><span>Preventivas sin enviar</span><em>Revisión</em><small>Días de plazo desde que se realiza la revisión preventiva técnica.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "preventivas_dias", 3)) + '"></label>' +
         '<label class="scm-field"><span>Cotizaciones sin respuesta</span><em>Seguimiento</em><small>Días límite de espera de respuesta del cliente desde el envío inicial.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "cotizaciones_enviadas_sin_respuesta_dias", 10)) + '"></label>' +
@@ -2503,7 +2503,7 @@
           (Number(row.dias_vencido || 0) > 0 ? '<span>' + escHtml(String(row.dias_vencido)) + " dia(s) vencido</span>" : "") +
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
-          (caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Seguimiento · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn" data-scm-open-admin-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Crear ticket</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn" data-scm-open-public-services-review data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>'))) +
+          (caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Seguimiento · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn" data-scm-open-admin-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Crear caso</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn" data-scm-open-public-services-review data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>'))) +
           '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div></div></article>";
       }
 
@@ -2531,7 +2531,7 @@
           '<span>' + escHtml(row.funcionario || row.nombre || "Funcionario") + "</span>" +
           '<span>' + escHtml(kindLabel) + "</span>" +
           '<span>' + escHtml(row.categoria || (categoriesById[getCategoryId(row)] && categoriesById[getCategoryId(row)].nombre) || "Sin categoria") + "</span>" +
-          (ticket ? '<span>Ticket #' + escHtml(ticket) + "</span>" : "") +
+          (ticket ? '<span>Caso #' + escHtml(ticket) + "</span>" : "") +
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
           (id ? (isEventKind
@@ -3385,7 +3385,7 @@
       function dueTypeLabel(type) {
         if (type === "preventiva_sin_enviar") return "Preventivas sin enviar";
         if (type === "preventiva_pendiente") return "Preventivas pendientes";
-        if (type === "ticket_preventiva_sin_cita") return "Tickets sin cita preventiva";
+        if (type === "ticket_preventiva_sin_cita") return "Casos sin cita preventiva";
         if (type === "preventiva_cita_sin_realizar") return "Preventivas con cita sin realizar";
         if (type === "servicios_publicos_critico") return "Servicios críticos · 72 horas";
         if (type === "servicios_publicos_pendientes") return "Servicios públicos pendientes";
@@ -3448,8 +3448,8 @@
         settings = settings || {};
         return '<div class="scm-due-settings-intro"><strong>Los plazos configurados</strong> determinan el cálculo de alertas de vencimiento en las bandejas operativas y recordatorios automáticos.</div>' +
           '<form class="scm-calendar-due-settings-form scm-calendar-due-settings-form--modal" data-scm-calendar-due-settings-modal autocomplete="off">' +
-          '<label class="scm-field"><span>Cotizaciones sin enviar</span><em>Fase emisión</em><small>Días hábiles desde la creación del ticket para emitir la cotización.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_sin_enviar_dias", 3)) + '"></label>' +
-          '<label class="scm-field"><span>Tickets sin cita preventiva</span><em>Agendamiento</em><small>Días transcurridos desde que se crea el ticket preventivo hasta agendar cita.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="tickets_preventivos_sin_cita_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "tickets_preventivos_sin_cita_dias", 3)) + '"></label>' +
+          '<label class="scm-field"><span>Cotizaciones sin enviar</span><em>Fase emisión</em><small>Días hábiles desde la creación del caso para emitir la cotización.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_sin_enviar_dias", 3)) + '"></label>' +
+          '<label class="scm-field"><span>Casos sin cita preventiva</span><em>Agendamiento</em><small>Días transcurridos desde que se crea el caso preventivo hasta agendar cita.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="tickets_preventivos_sin_cita_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "tickets_preventivos_sin_cita_dias", 3)) + '"></label>' +
           '<label class="scm-field"><span>Preventivas con cita sin realizar</span><em>Cita agendada</em><small>Días desde la fecha de la cita preventiva hasta marcarla como realizada.</small><input class="input input-bordered input-sm scm-input" type="number" min="0" max="120" name="preventivas_con_cita_sin_realizar_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "preventivas_con_cita_sin_realizar_dias", 0)) + '"></label>' +
           '<label class="scm-field"><span>Preventivas sin enviar</span><em>Revisión</em><small>Días de plazo desde que se realiza la revisión preventiva técnica.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "preventivas_dias", 3)) + '"></label>' +
           '<label class="scm-field"><span>Cotizaciones sin respuesta</span><em>Seguimiento</em><small>Días límite de espera de respuesta del cliente desde el envío inicial.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_enviadas_sin_respuesta_dias", 10)) + '"></label>' +
@@ -3767,9 +3767,9 @@
         if (!ticket) return "";
         var id = String(ticket._ID || ticket.id_ticket || ticket.id || "").trim();
         if (String(ticket.departamento || "").trim() === "Servicio al cliente") {
-          return "Ticket #" + id + " - Solicitante: " + String(ticket.solicitante || "").trim();
+          return "Caso #" + id + " - Solicitante: " + String(ticket.solicitante || "").trim();
         }
-        return "Ticket #" + id + " - Contrato #" + String(ticket.contrato || "-").trim() + " - Inmueble #" + String(ticket.inmueble || "-").trim();
+        return "Caso #" + id + " - Contrato #" + String(ticket.contrato || "-").trim() + " - Inmueble #" + String(ticket.inmueble || "-").trim();
       }
 
       function loadTicketsForEmployee(employeeId) {
@@ -3812,7 +3812,7 @@
           if (!query) return true;
           return normalizeText(ticketLabel(ticket) + " " + (ticket.direccion || "") + " " + (ticket.solicitante || "")).indexOf(query) !== -1;
         }).slice(0, 500);
-        select.innerHTML = '<option value="">Sin ticket relacionado</option>' + filtered.map(function (ticket) {
+        select.innerHTML = '<option value="">Sin caso relacionado</option>' + filtered.map(function (ticket) {
           var id = String(ticket._ID || ticket.id_ticket || ticket.id || "").trim();
           return id ? '<option value="' + escHtml(id) + '">' + escHtml(ticketLabel(ticket)) + "</option>" : "";
         }).join("");
@@ -3991,7 +3991,7 @@
           var created = eventCreatedValue(row);
           return '<article class="scm-calendar-report-event">' +
             '<div><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>Creado: ' + escHtml(created ? formatDateTime(created) : "Sin fecha") + '</span></div>' +
-            '<p><b>Programado:</b> ' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + ' <b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (ticket ? ' <b>Ticket:</b> #' + escHtml(ticket) : "") + '</p>' +
+            '<p><b>Programado:</b> ' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + ' <b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (ticket ? ' <b>Caso:</b> #' + escHtml(ticket) : "") + '</p>' +
             '</article>';
         }).join("") + '</div></section>';
       }
@@ -4539,7 +4539,7 @@
         return '<div class="scm-calendar-native-detail scm-calendar-ticket-native-detail">' +
           '<div class="scm-case-calendar-event-mini-head"><span>Detalle del caso</span><strong>' + escHtml(ticketTitle) + '</strong></div>' +
           '<div class="scm-case-calendar-event-mini-grid">' +
-          calendarDetailFieldHtml("Ticket", ticketId ? "#" + ticketId : "", false) +
+          calendarDetailFieldHtml("Caso", ticketId ? "#" + ticketId : "", false) +
           calendarDetailFieldHtml("Solicitante", calendarDetailValue(ticket, ["solicitante", "nombre_solicitante", "cliente"]), false) +
           calendarDetailFieldHtml("Contrato", calendarDetailValue(ticket, ["contrato", "id_contrato"]), false) +
           calendarDetailFieldHtml("Inmueble", calendarDetailValue(ticket, ["inmueble", "id_inmueble", "id_inmueble_web"]), false) +
@@ -4794,7 +4794,7 @@
         options = options || {};
         ticketId = String(ticketId || "").trim();
         if (!ticketId) {
-          showToast("warning", "Este evento no tiene ticket relacionado.");
+          showToast("warning", "Este evento no tiene caso relacionado.");
           return true;
         }
         if (openLoadedNativeTicket(ticketId)) return true;
@@ -4846,7 +4846,7 @@
         var location = String(row.ubicacion || row.lugar || row.direccion || "").trim();
         var html = '<form class="scm-calendar-reschedule-modern scm-calendar-reschedule-form" autocomplete="off">' +
           '<header class="scm-calendar-reschedule-head">' +
-          '<div class="scm-calendar-reschedule-title"><span class="scm-calendar-reschedule-icon material-symbols-outlined" aria-hidden="true">update</span><div><h3>Trasladar evento <em>Reprogramaci&oacute;n</em></h3><p>Ajuste de fecha, ventana horaria y sincronizaci&oacute;n con ticket operativo</p></div></div>' +
+          '<div class="scm-calendar-reschedule-title"><span class="scm-calendar-reschedule-icon material-symbols-outlined" aria-hidden="true">update</span><div><h3>Trasladar evento <em>Reprogramaci&oacute;n</em></h3><p>Ajuste de fecha, ventana horaria y sincronizaci&oacute;n con caso operativo</p></div></div>' +
           '<button type="button" class="scm-calendar-modern-close" data-scm-calendar-reschedule-cancel aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>' +
           '</header>' +
           '<section class="scm-calendar-reschedule-body">' +
@@ -4861,8 +4861,8 @@
           '</div>' +
           '<label class="scm-calendar-reschedule-field"><span><i class="material-symbols-outlined" aria-hidden="true">location_away</i>¿Es cita presencial?<small>Impacta agenda del equipo de campo</small></span><select name="es_cita"><option value="si"' + (ticket ? " selected" : "") + '>Si, requiere presencia en el inmueble</option><option value="no"' + (!ticket ? " selected" : "") + '>No, coordinaci&oacute;n remota / tarea interna</option></select></label>' +
           '<label class="scm-calendar-reschedule-field"><span><i class="material-symbols-outlined" aria-hidden="true">edit_note</i>Motivo del traslado<b>Requerido para auditor&iacute;a</b></span><textarea name="observacion" rows="3" required placeholder="Explica claramente por qu&eacute; se traslada este evento..."></textarea></label>' +
-          '<label class="scm-calendar-reschedule-field scm-calendar-reschedule-message-field" data-scm-calendar-message-field><span><i class="material-symbols-outlined" aria-hidden="true">mark_chat_unread</i>Mensaje para el ticket / cliente<button type="button" data-scm-calendar-template-default>Plantilla por defecto</button></span><textarea name="descripcion" rows="4" placeholder="Este texto se enviar&aacute; al proceso del ticket si el evento est&aacute; relacionado."></textarea></label>' +
-          '<p class="scm-calendar-reschedule-note"><span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>Si es una cita vinculada a ticket, este texto se enviar&aacute; autom&aacute;ticamente como actualizaci&oacute;n por correo y WhatsApp institucional.</p>' +
+          '<label class="scm-calendar-reschedule-field scm-calendar-reschedule-message-field" data-scm-calendar-message-field><span><i class="material-symbols-outlined" aria-hidden="true">mark_chat_unread</i>Mensaje para el caso / cliente<button type="button" data-scm-calendar-template-default>Plantilla por defecto</button></span><textarea name="descripcion" rows="4" placeholder="Este texto se enviar&aacute; al proceso del caso si el evento est&aacute; relacionado."></textarea></label>' +
+          '<p class="scm-calendar-reschedule-note"><span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>Si es una cita vinculada a caso, este texto se enviar&aacute; autom&aacute;ticamente como actualizaci&oacute;n por correo y WhatsApp institucional.</p>' +
           '</section>' +
           '<footer class="scm-calendar-reschedule-foot">' +
           '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-reschedule-cancel><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>Cancelar</button>' +
@@ -5019,7 +5019,7 @@
           '</header>' +
           '<section class="scm-calendar-complete-body">' +
           '<article class="scm-calendar-complete-summary">' +
-          '<div><span class="scm-calendar-complete-status"><i></i>En progreso</span>' + (ticket ? '<small>Ticket #' + escHtml(ticket) + '</small>' : "") + '</div>' +
+          '<div><span class="scm-calendar-complete-status"><i></i>En progreso</span>' + (ticket ? '<small>Caso #' + escHtml(ticket) + '</small>' : "") + '</div>' +
           '<h4>' + escHtml(title) + '</h4>' +
           '<p><span class="material-symbols-outlined" aria-hidden="true">calendar_today</span>' + escHtml(formatDateTime(row.fecha_inicio || "")) + '<span class="material-symbols-outlined" aria-hidden="true">person</span>' + escHtml(employeeNameForRow(row)) + '<b>' + escHtml(categoryName) + '</b></p>' +
           '</article>' +
@@ -5095,7 +5095,7 @@
             var legacyTicket = String(row.id_ticket || "").trim();
             return '<article class="scm-calendar-report-event scm-calendar-pending-event-card">' +
               '<div class="scm-calendar-pending-event-head"><strong>' + escHtml(row.titulo || "Evento") + '</strong><span>' + escHtml(formatDateTime(row.fecha_inicio)) + (row.fecha_fin ? " - " + escHtml(formatDateTime(row.fecha_fin)) : "") + '</span></div>' +
-              '<p class="scm-calendar-pending-event-meta"><b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (legacyTicket ? ' <b>Ticket:</b> #' + escHtml(legacyTicket) : "") + '</p>' +
+              '<p class="scm-calendar-pending-event-meta"><b>Categor&iacute;a:</b> ' + escHtml(categoryNameForRow(row)) + ' <b>Funcionario:</b> ' + escHtml(employeeNameForRow(row)) + (legacyTicket ? ' <b>Caso:</b> #' + escHtml(legacyTicket) : "") + '</p>' +
               '<div class="scm-calendar-event-actions scm-calendar-pending-event-actions">' +
               (legacyId ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-event data-event-id="' + escHtml(legacyId) + '">Ver evento</button>' : "") +
               (legacyTicket ? '<button type="button" class="scm-calendar-action-btn scm-calendar-action-btn--ghost" data-scm-calendar-view-ticket data-event-id="' + escHtml(legacyId) + '" data-ticket-id="' + escHtml(legacyTicket) + '">Ver caso</button>' : "") +
@@ -5436,7 +5436,7 @@
               $ticket.select2({
                 width: "100%",
                 dropdownParent: window.jQuery(popup),
-                placeholder: "Buscar ticket por número, contrato, inmueble o solicitante",
+                placeholder: "Buscar caso por número, contrato, inmueble o solicitante",
                 allowClear: true,
               });
             }
@@ -5647,7 +5647,7 @@
               if (mode !== "single") return;
               var selected = selectedEmployees();
               destroyTicketSelect2();
-              if (ticketSelect) ticketSelect.innerHTML = '<option value="">Cargando tickets...</option>';
+              if (ticketSelect) ticketSelect.innerHTML = '<option value="">Cargando casos...</option>';
               loadTicketsForEmployees(selected).then(function (rows) {
                 currentTicketRows = rows || [];
                 renderTicketSelector(ticketSelect, currentTicketRows, "");
@@ -6531,7 +6531,7 @@
       }
       var title = loader.querySelector("strong");
       if (title) {
-        title.textContent = label || "Cargando tickets...";
+        title.textContent = label || "Cargando casos...";
       }
       wrap.classList.toggle("scm-list-is-loading", !!isLoading);
       loader.classList.toggle("active", !!isLoading);
@@ -10461,7 +10461,7 @@
       };
       var html =
         '<div class="scm-cotizacion-response-form scm-actas-guide-modal">' +
-        '<p class="scm-cotizacion-dialog-intro">Enlaces completos para abrir funciones nativas desde WordPress. Todos pueden evitar login agregando el sufijo de autologin. <strong>&lt;ID_INTERNO_CASO&gt;</strong> es el _ID interno del ticket y <strong>&lt;ID_COTIZACION&gt;</strong> es el _ID de la cotizaci&oacute;n.</p>' +
+        '<p class="scm-cotizacion-dialog-intro">Enlaces completos para abrir funciones nativas desde WordPress. Todos pueden evitar login agregando el sufijo de autologin. <strong>&lt;ID_INTERNO_CASO&gt;</strong> es el _ID interno del caso y <strong>&lt;ID_COTIZACION&gt;</strong> es el _ID de la cotizaci&oacute;n.</p>' +
         '<div class="scm-cotizacion-response-grid">' +
         '<div class="scm-cotizacion-dialog-field is-wide"><span>Actas</span><strong>Dos procesos distintos</strong><small>Acta directa: soluci&oacute;n/cierre sin cotizaci&oacute;n aprobada. Acta por cotizaci&oacute;n: satisfacci&oacute;n al terminar el trabajo cotizado y aprobado.</small></div>' +
         linkField("Acta directa del caso", "Abre Complementarias → Acta de solución y firma.", bridgeUrl("accion=acta_satisfaccion&ticket_pk=<ID_INTERNO_CASO>")) +
@@ -10633,7 +10633,7 @@
       modal.innerHTML =
         '<div class="scm-admin-ticket-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-admin-ticket-title">' +
         '<header class="scm-case-submodal-head">' +
-        '<div><h4 class="scm-case-submodal-title" id="scm-admin-ticket-title">Crear ticket</h4><p class="scm-case-submodal-meta">Ticket administrativo desde contrato</p></div>' +
+        '<div><h4 class="scm-case-submodal-title" id="scm-admin-ticket-title">Crear caso</h4><p class="scm-case-submodal-meta">Caso administrativo desde contrato</p></div>' +
         '<button type="button" class="scm-case-submodal-close" data-admin-ticket-close aria-label="Cerrar formulario"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>' +
         "</header>" +
         '<div class="scm-admin-ticket-body"></div>' +
@@ -11359,7 +11359,7 @@
     function openAdminTicketModal(btn) {
       if (!btn) return;
       if (!actionCrearTicketAdministrativo) {
-        showToast("error", "Accion de crear ticket no configurada.");
+        showToast("error", "Accion de crear caso no configurada.");
         return;
       }
       var mode = contractDataset(btn, "ticketMode") || "administrativo";
@@ -11378,7 +11378,7 @@
       var defaultPrioridad = isPreventiva ? "Prioridad urgente" : "";
       var defaultAsunto = isPreventiva ? "REVISION PREVENTIVA" : "";
       var defaultDescripcion = isPreventiva
-        ? "Se crea este ticket para coordinar y documentar la revision preventiva anual del inmueble conforme a la fecha de inicio del contrato de arrendamiento."
+        ? "Se crea este caso para coordinar y documentar la revision preventiva anual del inmueble conforme a la fecha de inicio del contrato de arrendamiento."
         : "";
       var evidenceFields = isPreventiva
         ? ""
@@ -11387,7 +11387,7 @@
           renderTicketDocumentFields();
 
       if (title) {
-        title.textContent = contractDataset(btn, "ticketTitle") || "Crear ticket";
+        title.textContent = contractDataset(btn, "ticketTitle") || "Crear caso";
       }
       if (meta) {
         meta.textContent =
@@ -11530,7 +11530,7 @@
           "</div>" +
           "</section>" +
           renderNotifyTargets(["solicitante"], ["arrendatario", "empleado"]) +
-          '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear ticket</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+          '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear caso</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
           "</form>";
       } else {
       body.innerHTML =
@@ -11574,7 +11574,7 @@
         "</span>" +
         "</div>" +
         '<section class="scm-admin-ticket-section">' +
-        '<h5 class="scm-admin-ticket-section-title">Informacion del ticket</h5>' +
+        '<h5 class="scm-admin-ticket-section-title">Informacion del caso</h5>' +
         '<div class="scm-admin-ticket-grid">' +
         '<label class="scm-seg-field"><span>Responsable</span><select name="id_empleado" required>' +
         adminTicketEmployeeOptions(defaultEmpleado) +
@@ -11650,7 +11650,7 @@
           isPreventiva ? ["solicitante"] : [],
           isPreventiva ? ["arrendatario", "empleado"] : null
         ) +
-        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear ticket</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
+        '<div class="scm-seg-actions"><button type="submit" class="scm-btn-primary">Crear caso</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
       }
 
@@ -11779,7 +11779,7 @@
         closeCaseModal(openModal);
       }
       return refreshActiveTab().then(function () {
-        showToast("success", isPublicPqr ? "Solicitud activada." : "Ticket activado.");
+        showToast("success", isPublicPqr ? "Solicitud activada." : "Caso activado.");
         if (triggerNode && triggerNode.focus) {
           triggerNode.focus();
         }
@@ -11789,7 +11789,7 @@
     function submitActivateTicket(caseBtn, motivo, triggerNode) {
       var ticketPk = String(caseBtn && caseBtn.dataset.ticketPk ? caseBtn.dataset.ticketPk : "").trim();
       if (!ticketPk) {
-        showToast("error", "No se encontro el ticket.");
+        showToast("error", "No se encontro el caso.");
         return Promise.resolve();
       }
       if (!actionActivateTicket) {
@@ -11818,13 +11818,13 @@
           if (!json || !json.success) {
             throw new Error(
               (json && json.data && json.data.message) ||
-                "No se pudo activar el ticket.",
+                "No se pudo activar el caso.",
             );
           }
           return finishActivateTicket(ticketPk, triggerNode, caseBtn);
         })
         .catch(function (err) {
-          showToast("error", err.message || "No se pudo activar el ticket.");
+          showToast("error", err.message || "No se pudo activar el caso.");
         })
         .finally(function () {
           if (triggerNode) {
@@ -11835,18 +11835,18 @@
 
     function openActivateTicketPrompt(caseBtn, triggerNode) {
       if (!caseBtn) {
-        showToast("error", "No se encontro el ticket.");
+        showToast("error", "No se encontro el caso.");
         return;
       }
       var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
       if (window.Swal && typeof window.Swal.fire === "function") {
         window.Swal.fire({
-          title: isPublicPqr ? "Activar solicitud" : "Activar ticket",
+          title: isPublicPqr ? "Activar solicitud" : "Activar caso",
           input: "textarea",
           inputLabel: "Mensaje de activacion",
           inputPlaceholder: isPublicPqr
             ? "Escribe el mensaje o motivo para activar la solicitud"
-            : "Escribe el mensaje o motivo para activar el ticket",
+            : "Escribe el mensaje o motivo para activar el caso",
           inputAttributes: { "aria-label": "Mensaje de activacion" },
           showCancelButton: true,
           allowOutsideClick: false,
@@ -11872,7 +11872,7 @@
         return;
       }
 
-      var motivo = window.prompt("Mensaje para activar el ticket:");
+      var motivo = window.prompt("Mensaje para activar el caso:");
       if (motivo === null) {
         return;
       }
@@ -12642,7 +12642,7 @@
       modal.innerHTML =
         '<div class="scm-standalone-detail-dialog scm-preventiva-tickets-dialog" role="dialog" aria-modal="true" aria-labelledby="scm-preventiva-tickets-title">' +
         '<button type="button" class="scm-standalone-detail-close" data-close-preventiva-tickets aria-label="Cerrar">&times;</button>' +
-        '<div class="scm-standalone-detail-head"><h4 class="scm-standalone-detail-title" id="scm-preventiva-tickets-title">Tickets preventivos</h4></div>' +
+        '<div class="scm-standalone-detail-head"><h4 class="scm-standalone-detail-title" id="scm-preventiva-tickets-title">Casos preventivos</h4></div>' +
         '<div class="scm-standalone-detail-body" data-preventiva-tickets-body></div>' +
         "</div>";
       root.appendChild(modal);
@@ -12681,7 +12681,7 @@
         }
       }
       if (!sourceHtml) {
-        showToast("error", "No se encontraron tickets preventivos.");
+        showToast("error", "No se encontraron casos preventivos.");
         return;
       }
       var modal = ensurePreventivaTicketsModal();
@@ -12690,8 +12690,8 @@
       var contractCode = String(button.getAttribute("data-contract-code") || "").trim();
       if (title) {
         title.textContent = contractCode
-          ? "Tickets preventivos del contrato " + contractCode
-          : "Tickets preventivos del contrato";
+          ? "Casos preventivos del contrato " + contractCode
+          : "Casos preventivos del contrato";
       }
       if (body) {
         body.innerHTML = sourceHtml;
@@ -13238,7 +13238,7 @@
         row = row || {};
         var sourceHtml = String(row.case_source_html || "").trim();
         var meta = [
-          row.ticket ? "Ticket #" + row.ticket : "",
+          row.ticket ? "Caso #" + row.ticket : "",
           row.contrato ? "Contrato #" + row.contrato : "",
           row.inmueble ? "Inmueble " + row.inmueble : "",
           row.destinatario || "",
@@ -14914,7 +14914,7 @@
       var dueType = kind === 'termination' ? 'terminacion_contrato_pendiente' : 'no_prorroga_contrato_pendiente';
       return '<article class="scm-contract-card scm-ticket-card">' +
         '<div class="scm-contract-card-body"><div class="flex flex-col gap-3 min-w-0 flex-1">' +
-        '<div class="flex flex-wrap items-center gap-3 text-xs"><span class="scm-contract-tag font-semibold">' + contractUiIcon('ticket') + escHtml(row.titulo || 'Ticket') + '</span><span class="inline-flex items-center gap-1.5">' + contractUiIcon('clock') + 'Creado: ' + escHtml(row.creado || '-') + '</span><span class="rounded-md bg-amber-50 px-2 py-1 text-amber-900">' + (answered ? 'Contestada' : 'Esperando respuesta') + '</span></div>' +
+        '<div class="flex flex-wrap items-center gap-3 text-xs"><span class="scm-contract-tag font-semibold">' + contractUiIcon('ticket') + escHtml(row.titulo || 'Caso') + '</span><span class="inline-flex items-center gap-1.5">' + contractUiIcon('clock') + 'Creado: ' + escHtml(row.creado || '-') + '</span><span class="rounded-md bg-amber-50 px-2 py-1 text-amber-900">' + (answered ? 'Contestada' : 'Esperando respuesta') + '</span></div>' +
         '<h4 class="!m-0 !text-base sm:!text-lg !font-bold !text-[#001944]">' + escHtml(row.asunto || (kind === 'termination' ? 'Solicitud de terminación de contrato' : 'Solicitud de no prórroga de contrato')) + '</h4>' +
         '<div class="flex flex-wrap items-center gap-2 text-xs"><span>' + escHtml(meta.join(' · ') || 'Sin datos de inmueble') + '</span>' + (row.direccion && row.direccion !== '-' ? '<span class="inline-flex items-start gap-1">' + contractUiIcon('location') + escHtml(row.direccion) + '</span>' : '') + '</div>' +
         '<div class="flex flex-wrap items-center gap-2"><span class="scm-contract-tag font-semibold">' + contractUiIcon('person') + escHtml(row.solicitante || '-') + '</span><span class="scm-contract-tag">Caso: ' + escHtml(row.estado || '-') + ' / ' + escHtml(row.estado_administrativo || '-') + '</span></div>' +
@@ -14944,7 +14944,7 @@
       toggle.textContent = answered ? 'Ver pendientes' : 'Ver contestadas';
       toggle.setAttribute('aria-pressed', String(answered));
       var description = panel.querySelector('[data-contract-description]');
-      description.textContent = answered ? 'Consulta las solicitudes contestadas o ponlas en proceso para responderlas nuevamente.' : 'Responde si la solicitud está dentro o fuera de término, elige destinatarios y cierra el ticket con acta.';
+      description.textContent = answered ? 'Consulta las solicitudes contestadas o ponlas en proceso para responderlas nuevamente.' : 'Responde si la solicitud está dentro o fuera de término, elige destinatarios y cierra el caso con acta.';
       panel.querySelector('[data-contract-pending-note]').hidden = answered;
       var rows = Array.isArray(data && data.items) ? data.items : [];
       var status = panel.querySelector('[data-scm-contract-' + kind + '-status]');
@@ -14969,7 +14969,7 @@
         panel.querySelector('[data-contract-term-filter]').addEventListener('change', function () { renderContractRequestList(panel, kind); });
         panel.querySelector('[data-contract-export]').addEventListener('click', function () {
           var exportRows = contractFilteredRows(panel);
-          var cells = [['Ticket', 'Creado', 'Contrato', 'Inmueble', 'Dirección', 'Solicitante', 'Clasificación', 'Fin contrato', 'Límite']].concat(exportRows.map(function (row) { return [row.id_ticket || row.titulo, row.creado, row.contrato, row.inmueble, row.direccion, row.solicitante, row.term_label, row.fin_contrato_label, row.fecha_limite_label]; }));
+          var cells = [['Caso', 'Creado', 'Contrato', 'Inmueble', 'Dirección', 'Solicitante', 'Clasificación', 'Fin contrato', 'Límite']].concat(exportRows.map(function (row) { return [row.id_ticket || row.titulo, row.creado, row.contrato, row.inmueble, row.direccion, row.solicitante, row.term_label, row.fin_contrato_label, row.fecha_limite_label]; }));
           var csv = '\ufeff' + cells.map(function (row) { return row.map(function (cell) { var value = String(cell == null ? '' : cell); if (/^[=+\-@\t\r]/.test(value)) value = "'" + value; return '"' + value.replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
           var url = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8;' }));
           var link = document.createElement('a'); link.href = url; link.download = 'solicitudes-' + kind + (panel.scmContractView === 'answered' ? '-contestadas' : '') + '.csv'; document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
@@ -14980,7 +14980,7 @@
     function contractResponseFormHtml(row, kind) {
       var meta = [row.contrato ? 'Contrato #' + row.contrato : '', row.inmueble ? 'Inmueble ' + row.inmueble : '', row.direccion || ''].filter(Boolean).join(' · ');
       return '<form class="scm-contract-response-form" data-scm-contract-' + kind + '-form>' +
-        '<div class="rounded-xl bg-[#f2f3ff] p-4 space-y-2"><div class="flex flex-wrap items-center gap-2"><span class="scm-contract-tag !bg-[#dae2ff] font-semibold">' + contractUiIcon('ticket') + escHtml(row.titulo || 'Ticket') + '</span><strong>' + escHtml(row.asunto || 'Solicitud contractual') + '</strong></div><p class="!m-0 text-xs">' + escHtml(meta) + '</p></div>' +
+        '<div class="rounded-xl bg-[#f2f3ff] p-4 space-y-2"><div class="flex flex-wrap items-center gap-2"><span class="scm-contract-tag !bg-[#dae2ff] font-semibold">' + contractUiIcon('ticket') + escHtml(row.titulo || 'Caso') + '</span><strong>' + escHtml(row.asunto || 'Solicitud contractual') + '</strong></div><p class="!m-0 text-xs">' + escHtml(meta) + '</p></div>' +
         contractTerminationTermBadge(row, false) +
         '<div class="grid grid-cols-1 md:grid-cols-3 gap-4"><label class="scm-contract-field"><span>Clasificación <b class="text-red-700">*</b></span><select name="termino" required><option value="" selected disabled>Selecciona clasificación</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label><label class="scm-contract-field"><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || '') + '" readonly aria-readonly="true"></label><label class="scm-contract-field"><span>' + (kind === 'termination' ? 'Fecha terminación / entrega' : 'Fecha fin de contrato') + '</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || '') + '"></label></div>' +
         contractRetentionTicketBlockHtml(row) + '<section><div class="flex items-center justify-between gap-3 mb-3"><strong class="text-[10px] uppercase tracking-wider">Notificar a</strong><span class="text-[10px]">Destinatarios configurados</span></div>' + contractTerminationRecipientChecks(row) + '</section></form>';
@@ -15113,12 +15113,12 @@
 
       return '<section class="scm-retention-ticket-card' + (!retention.enabled ? " is-disabled" : "") + '">' +
         '<div class="scm-retention-ticket-head">' +
-          '<div><span class="scm-retention-ticket-eyebrow">Ticket comercial</span><strong>Retención de contrato</strong></div>' +
+          '<div><span class="scm-retention-ticket-eyebrow">Caso comercial</span><strong>Retención de contrato</strong></div>' +
           '<span class="scm-retention-ticket-pill">Opcional</span>' +
         "</div>" +
         '<label class="scm-retention-ticket-toggle">' +
           '<input type="checkbox" name="crear_ticket_retencion" value="1" ' + (retention.enabled ? "checked" : "disabled") + '>' +
-          '<span><strong>Crear ticket y enviar segundo mensaje</strong><small>Si lo desmarcas, solo se responde y se cierra esta solicitud.</small></span>' +
+          '<span><strong>Crear caso y enviar segundo mensaje</strong><small>Si lo desmarcas, solo se responde y se cierra esta solicitud.</small></span>' +
         "</label>" +
         (helpHtml ? '<div class="scm-retention-ticket-context">' + helpHtml + "</div>" : "") +
         '<label class="scm-retention-ticket-field scm-contract-field"><span>Asignar a consultor de arriendo</span><select name="retencion_id_empleado" ' + (!retention.enabled ? "disabled" : "") + '><option value="">Selecciona responsable</option>' + retentionOptions + '</select></label>' +
@@ -15199,7 +15199,7 @@
           var createRetention = form.querySelector("[name='crear_ticket_retencion']");
           var retentionEmployee = form.querySelector("[name='retencion_id_empleado']");
           if (createRetention && createRetention.checked && (!retentionEmployee || !retentionEmployee.value)) {
-            window.Swal.showValidationMessage("Selecciona el responsable del ticket comercial de retención.");
+            window.Swal.showValidationMessage("Selecciona el responsable del caso comercial de retención.");
             return false;
           }
           return {
@@ -15301,7 +15301,7 @@
           var createRetention = form.querySelector("[name='crear_ticket_retencion']");
           var retentionEmployee = form.querySelector("[name='retencion_id_empleado']");
           if (createRetention && createRetention.checked && (!retentionEmployee || !retentionEmployee.value)) {
-            window.Swal.showValidationMessage("Selecciona el responsable del ticket comercial de retención.");
+            window.Swal.showValidationMessage("Selecciona el responsable del caso comercial de retención.");
             return false;
           }
           return {
@@ -15437,7 +15437,7 @@
         ending:'Contratos con fecha fin en el mes consultado.',
         renewal:contractsEndingIcon('info') + '<p>Registra la probabilidad de renovación desde Por terminar. <b>Valor ponderado = canon mensual × probabilidad.</b> Al 100 % no se crea retención ni recibo automático.</p>',
         'no-exit':'Registra reportes de no salida y programa recordatorios internos antes de la fecha fin. Puedes consultar todos los contratos o solo los reportados.',
-        receipt:contractsEndingIcon('info') + '<p><b>Regla operativa:</b> Se crea un ticket de recibo 15 días antes de la fecha fin. Requiere responsable activo; se omite renovación al 100 % y no salida reportada.</p>'
+        receipt:contractsEndingIcon('info') + '<p><b>Regla operativa:</b> Se crea un caso de recibo 15 días antes de la fecha fin. Requiere responsable activo; se omite renovación al 100 % y no salida reportada.</p>'
       }[contractsEndingView];
       panel.querySelectorAll('[data-contracts-ending-view]').forEach(function(button) {
         var selected = button.getAttribute('data-contracts-ending-view') === contractsEndingView;
@@ -15505,7 +15505,7 @@
           if (contractsEndingView === 'ending') details = '<div class="scm-ending-tags"><span><b>Probabilidad de renovación:</b> ' + (row.probability == null ? 'Sin registrar' : escHtml(row.probability) + ' %') + '</span><span>' + (Number(renewal.no_exit) ? 'No salida reportada' : 'Sin reporte de no salida') + '</span></div>';
           if (contractsEndingView === 'no-exit') { ticketButton = ''; details = '<div class="scm-ending-tags"><span>' + (Number(renewal.no_exit) ? 'No salida reportada' : 'Sin reporte de no salida') + '</span><span>Recordatorios: ' + escHtml(renewal.reminder_days || '30,7,0') + ' días antes</span></div>' + (renewal.note ? '<p class="scm-ending-report-note">' + escHtml(renewal.note) + '</p>' : ''); }
           if (contractsEndingView === 'receipt') {
-            details = '<div class="scm-ending-tags"><span>Programado: <b>' + escHtml(row.receipt_due_label || '-') + '</b></span><span>' + (Number(row.probability) === 100 ? 'Omitido: renovación al 100 %' : Number(renewal.no_exit) ? 'Omitido: no salida reportada' : row.receipt_ticket_id ? 'Ticket creado' : row.receipt_automation_enabled === false ? 'Cron desactivado en Configuración' : row.receipt_default_employee_id ? 'Pendiente de ejecución automática' : 'Requiere configurar responsable') + '</span></div>';
+            details = '<div class="scm-ending-tags"><span>Programado: <b>' + escHtml(row.receipt_due_label || '-') + '</b></span><span>' + (Number(row.probability) === 100 ? 'Omitido: renovación al 100 %' : Number(renewal.no_exit) ? 'Omitido: no salida reportada' : row.receipt_ticket_id ? 'Caso creado' : row.receipt_automation_enabled === false ? 'Cron desactivado en Configuración' : row.receipt_default_employee_id ? 'Pendiente de ejecución automática' : 'Requiere configurar responsable') + '</span></div>';
             ticketButton = row.receipt_ticket_id ? '<button type="button" class="scm-ending-button" data-contracts-ending-case="receipt" data-contract-pk="' + escHtml(row.contract_pk) + '">Ver recibo #' + escHtml(row.receipt_ticket_id) + '</button>' : '';
           }
           var configure = '';
@@ -15692,7 +15692,7 @@
       var suggested = (retention.funcionarios || []).find(function(employee) { return String(employee.id) === String(retention.default_employee_id); });
       var days = Number(row.days_left || 0);
       var html = '<form class="scm-ending-dialog-form" data-scm-contracts-ending-retention-form>' +
-        '<div class="scm-ending-retention-heading"><div><span class="scm-ending-context-label">Ticket comercial</span><strong>Retención de contrato</strong></div><span class="scm-ending-retention-pill">Contratos por terminar</span></div>' +
+        '<div class="scm-ending-retention-heading"><div><span class="scm-ending-context-label">Caso comercial</span><strong>Retención de contrato</strong></div><span class="scm-ending-retention-pill">Contratos por terminar</span></div>' +
         '<div class="scm-ending-context-grid">' +
           contractsEndingContextCard('Contrato','document','<div class="scm-ending-contract-number">#' + escHtml(row.contrato) + (property.destinacion ? '<span>' + escHtml(property.destinacion) + '</span>' : '') + '</div><p class="scm-ending-expiration">' + contractsEndingIcon('clock') + escHtml(days < 0 ? 'Vencido hace ' + Math.abs(days) + ' días' : 'Vencimiento en ' + days + ' días') + '</p>') +
           contractsEndingContextCard('Partes del contrato','person','<p><span>Arrendatario:</span> <b>' + escHtml(row.arrendatario || 'Sin registrar') + '</b></p><p><span>Propietario:</span> <b>' + escHtml(row.propietario || 'Sin registrar') + '</b></p>') +
@@ -15702,13 +15702,13 @@
         '<label><span>Asignar a consultor de arriendo <small>obligatorio</small></span><select name="retencion_id_empleado" ' + (!retention.enabled ? 'disabled' : '') + '><option value="">Selecciona responsable</option>' + contractsEndingEmployeeOptions(row) + '</select></label>' +
         '<div class="scm-ending-dialog-notice">' + contractsEndingIcon('info') + '<p>El consultor asignado gestionará la retención del cliente y buscará inmuebles similares que se ajusten a sus necesidades.</p></div></form>';
       window.Swal.fire({
-        title: "Crear ticket de retención",
+        title: "Crear caso de retención",
         html: html,
         width: "min(760px, 94vw)",
         showCloseButton: true,
-        closeButtonAriaLabel: 'Cerrar creación de ticket',
+        closeButtonAriaLabel: 'Cerrar creación de caso',
         showCancelButton: true,
-        confirmButtonText: contractsEndingIcon('check') + "Crear ticket",
+        confirmButtonText: contractsEndingIcon('check') + "Crear caso",
         cancelButtonText: "Cancelar",
         buttonsStyling: false,
         customClass: contractsEndingDialogClasses('retention'),
@@ -15723,7 +15723,7 @@
           var form = popup ? popup.querySelector("[data-scm-contracts-ending-retention-form]") : null;
           var employee = form ? form.querySelector("[name='retencion_id_empleado']") : null;
           if (!employee || !employee.value) {
-            window.Swal.showValidationMessage("Selecciona el responsable del ticket comercial de retención.");
+            window.Swal.showValidationMessage("Selecciona el responsable del caso comercial de retención.");
             return false;
           }
           return { employee: employee.value };
@@ -15734,10 +15734,10 @@
           fd.append("contract_pk", String(row.contract_pk || ""));
           fd.append("retencion_id_empleado", result.value.employee || "");
         }).then(function (data) {
-          showToast("success", (data && data.message) || "Ticket de retención creado.");
+          showToast("success", (data && data.message) || "Caso de retención creado.");
           loadContractsEnding(true);
         }).catch(function (error) {
-          showToast("error", error && error.message ? error.message : "No se pudo crear el ticket de retención.");
+          showToast("error", error && error.message ? error.message : "No se pudo crear el caso de retención.");
         });
       });
     }
@@ -15791,7 +15791,7 @@
       if (item.action === 'reminders_cancelled') return details.reason || 'Se cancelaron recordatorios pendientes por un cambio del contrato.';
       if (item.action === 'history_edited' || item.action === 'history_voided') return 'Movimiento #' + details.entry_id + '. Motivo: ' + (details.reason || '');
       var before = details.before || {}, after = details.after || {};
-      return item.action === 'renewal_saved' ? 'Probabilidad: ' + (before.probability == null ? 'Sin registrar' : before.probability + ' %') + ' → ' + (after.probability == null ? 'Sin registrar' : after.probability + ' %') + '. No salida: ' + (Number(after.no_exit) ? 'Sí' : 'No') + '. ' + (after.note || '') : item.action === 'end_date_imported' ? 'Fecha anterior: ' + new Date(Number(details.before) * 1000).toLocaleDateString('es-CO') + '. Nueva: ' + new Date(Number(details.after) * 1000).toLocaleDateString('es-CO') : 'Ticket #' + (details.ticket_id || '');
+      return item.action === 'renewal_saved' ? 'Probabilidad: ' + (before.probability == null ? 'Sin registrar' : before.probability + ' %') + ' → ' + (after.probability == null ? 'Sin registrar' : after.probability + ' %') + '. No salida: ' + (Number(after.no_exit) ? 'Sí' : 'No') + '. ' + (after.note || '') : item.action === 'end_date_imported' ? 'Fecha anterior: ' + new Date(Number(details.before) * 1000).toLocaleDateString('es-CO') + '. Nueva: ' + new Date(Number(details.after) * 1000).toLocaleDateString('es-CO') : 'Caso #' + (details.ticket_id || '');
     }
 
     function openContractHistory(contractPk, includeVoided, receiptsOnly) {
@@ -15799,7 +15799,7 @@
         var names = {renewal_saved:'Gestión de renovación actualizada',end_date_imported:'Fecha fin actualizada desde Excel',retention_created:'Retención creada',receipt_created:'Recibo automático creado',reminders_cancelled:'Recordatorios cancelados automáticamente',history_edited:'Descripción del historial corregida',history_voided:'Movimiento anulado'};
         var items = data.items || [];
         if (receiptsOnly) items = items.filter(function(item) { return item.action === 'receipt_created'; });
-        var html = '<p class="scm-ending-history-intro">Registro de cambios y tickets del contrato, con fecha y funcionario. Editar o anular un movimiento no modifica la gestión del contrato ni elimina sus tickets.</p>';
+        var html = '<p class="scm-ending-history-intro">Registro de cambios y casos del contrato, con fecha y funcionario. Editar o anular un movimiento no modifica la gestión del contrato ni elimina sus casos.</p>';
         if (data.can_manage) html += '<label class="scm-ending-history-filter"><input type="checkbox" data-history-include-voided ' + (includeVoided ? 'checked' : '') + '>Mostrar anulados y correcciones</label>';
         html += items.map(function(item,index) {
           var editable = data.can_manage && !item.voided && item.action !== 'history_edited' && item.action !== 'history_voided';
@@ -15815,7 +15815,7 @@
             if (!button) return;
             var operation = button.hasAttribute('data-history-void') ? 'void' : 'edit';
             var item = items[Number(button.getAttribute(operation === 'void' ? 'data-history-void' : 'data-history-edit'))];
-            Swal.fire({title:operation === 'void' ? 'Anular movimiento del historial' : 'Editar descripción del historial',width:'min(576px,94vw)',buttonsStyling:false,customClass:contractsEndingDialogClasses('correction'),html:'<form data-history-correction class="scm-ending-dialog-form">' + (operation === 'edit' ? '<label>Descripción corregida<textarea name="text" rows="5" maxlength="4000">' + escHtml(contractHistoryText(item)) + '</textarea></label>' : '<p>Este movimiento se ocultará de la consulta normal. La corrección quedará registrada. No se eliminan tickets ni se reinicia la probabilidad o los recordatorios.</p><label class="scm-ending-dialog-check"><input type="checkbox" name="confirm"><span>Confirmo anular este movimiento</span></label>') + '<label>Motivo<textarea name="reason" rows="2" maxlength="2000"></textarea></label></form>',showCancelButton:true,confirmButtonText:operation === 'void' ? 'Confirmar anulación' : 'Guardar corrección',cancelButtonText:'Volver',showLoaderOnConfirm:true,allowOutsideClick:function(){return !Swal.isLoading();},preConfirm:function() {
+            Swal.fire({title:operation === 'void' ? 'Anular movimiento del historial' : 'Editar descripción del historial',width:'min(576px,94vw)',buttonsStyling:false,customClass:contractsEndingDialogClasses('correction'),html:'<form data-history-correction class="scm-ending-dialog-form">' + (operation === 'edit' ? '<label>Descripción corregida<textarea name="text" rows="5" maxlength="4000">' + escHtml(contractHistoryText(item)) + '</textarea></label>' : '<p>Este movimiento se ocultará de la consulta normal. La corrección quedará registrada. No se eliminan casos ni se reinicia la probabilidad o los recordatorios.</p><label class="scm-ending-dialog-check"><input type="checkbox" name="confirm"><span>Confirmo anular este movimiento</span></label>') + '<label>Motivo<textarea name="reason" rows="2" maxlength="2000"></textarea></label></form>',showCancelButton:true,confirmButtonText:operation === 'void' ? 'Confirmar anulación' : 'Guardar corrección',cancelButtonText:'Volver',showLoaderOnConfirm:true,allowOutsideClick:function(){return !Swal.isLoading();},preConfirm:function() {
               var form = Swal.getPopup().querySelector('[data-history-correction]');
               if (!form.elements.reason.value.trim()) { Swal.showValidationMessage('Indica el motivo.'); return false; }
               if (operation === 'void' && !form.elements.confirm.checked) { Swal.showValidationMessage('Confirma la anulación.'); return false; }
@@ -16119,7 +16119,7 @@
       if (spinner) {
         spinner.classList.add("active");
       }
-      setListLoading(tbody, true, "Cargando tickets...");
+      setListLoading(tbody, true, "Cargando casos...");
       form.classList.add("scm-loading");
 
       return fetch(ajaxUrl, {
@@ -16485,7 +16485,7 @@
             : null;
         }
         if (!activateCaseBtn) {
-          showToast("error", "No se encontro el ticket.");
+          showToast("error", "No se encontro el caso.");
           return;
         }
         openActivateTicketPrompt(activateCaseBtn, activateTicketBtn);
@@ -16891,7 +16891,7 @@
         if (tabSpinner) {
           tabSpinner.classList.add("active");
         }
-        setListLoading(tabCards, true, "Cargando tickets...");
+        setListLoading(tabCards, true, "Cargando casos...");
         tabForm.classList.add("scm-loading");
 
         return fetch(ajaxUrl, {
@@ -17293,7 +17293,7 @@
             }
           })
           .catch(function (err) {
-            console.error("SCM status tickets error:", err);
+            console.error("SCM status casos error:", err);
             showToast("error", err.message || "No se pudo cargar la vista.");
           })
           .finally(function () {
@@ -18244,8 +18244,8 @@
         dataItem("Canon total", formatCotizacionOrderCurrency(p.canon_total || 0)) +
         dataItem("Área construida", (p.area_construida || 0) + " m²") +
         '</div><div>' +
-        dataItem("Ticket", p.id_ticket || "") +
-        dataItem("Fecha ticket", p.fecha_ticket_texto || "", "No encontrada") +
+        dataItem("Caso", p.id_ticket || "") +
+        dataItem("Fecha caso", p.fecha_ticket_texto || "", "No encontrada") +
         dataItem("Fecha cotización", p.fecha_cot_texto || "", "No encontrada") +
         '</div></div>';
       var conditionsBox = '<div class="scm-maint-quote-conditions-box"><h5 class="scm-maint-quote-perturb-section-title">Condiciones y perturbación</h5><div class="scm-maint-quote-grid">' +
@@ -18265,7 +18265,7 @@
         '<div class="scm-maint-quote-type-grid"><div class="scm-maint-quote-criterion-card"><label class="scm-cotizacion-dialog-field"><span>Tipo de inmueble</span><select name="tipo_inmueble_perturbacion" data-quote-perturb-type-select><option value="">Selecciona tipo de valoración</option><option value="residencial"' + (tipo === "residencial" ? " selected" : "") + '>Residencial</option><option value="comercial"' + (tipo === "comercial" ? " selected" : "") + '>Comercial</option></select><small>Define si los criterios se valoran desde habitabilidad o continuidad operativa.</small></label></div><div class="scm-maint-quote-criterion-card" data-quote-activity-wrap' + (tipo === "comercial" ? "" : " hidden") + '><label class="scm-cotizacion-dialog-field"><span>Actividad comercial</span><select name="actividad_comercial_perturbacion" data-quote-activity><option value="">Selecciona actividad comercial</option><option value="deposito_bodega"' + (savedActivity === "deposito_bodega" ? " selected" : "") + '>Depósito / bodega</option><option value="fabricacion"' + (savedActivity === "fabricacion" ? " selected" : "") + '>Fabricación / taller</option><option value="prestacion_servicios"' + (savedActivity === "prestacion_servicios" ? " selected" : "") + '>Prestación de servicios</option><option value="compra_venta"' + (savedActivity === "compra_venta" ? " selected" : "") + '>Compra y venta</option><option value="oficina"' + (savedActivity === "oficina" ? " selected" : "") + '>Oficina</option><option value="restaurante_alimentos"' + (savedActivity === "restaurante_alimentos" ? " selected" : "") + '>Restaurante / alimentos</option><option value="salud_estetica"' + (savedActivity === "salud_estetica" ? " selected" : "") + '>Salud / estética</option><option value="otro"' + (savedActivity === "otro" ? " selected" : "") + '>Otra</option></select><small>Solo aplica cuando la valoración es comercial.</small></label></div></div>' +
         '<div class="scm-maint-quote-guide-actions"><button type="button" class="scm-maint-quote-guide-btn is-primary" data-quote-guide-key="general">Ver guía de criterios</button><button type="button" class="scm-maint-quote-guide-btn" data-quote-guide-key="responsabilidad">Ver guía de responsabilidad</button></div>' +
         '<div class="scm-maint-quote-guide-panel" data-quote-guide-panel hidden></div>' +
-        '<h5 class="scm-maint-quote-perturb-section-title">1. Días de afectación calculados</h5><div class="scm-maint-quote-days-box"><strong data-quote-days-text>0 días</strong><span data-quote-days-detail>Días desde ticket: ' + escHtml(String(p.dias_desde_ticket || 0)) + ' | Duración trabajo: 0 | Margen seguridad: 1.2</span></div>' +
+        '<h5 class="scm-maint-quote-perturb-section-title">1. Días de afectación calculados</h5><div class="scm-maint-quote-days-box"><strong data-quote-days-text>0 días</strong><span data-quote-days-detail>Días desde caso: ' + escHtml(String(p.dias_desde_ticket || 0)) + ' | Duración trabajo: 0 | Margen seguridad: 1.2</span></div>' +
         '<h5 class="scm-maint-quote-perturb-section-title">2. Criterios de severidad</h5>' +
         '<div class="scm-maint-quote-criteria-grid" data-quote-criteria="residencial"' + (tipo === "residencial" ? "" : " hidden") + '>' + residential + '</div>' +
         '<div class="scm-maint-quote-criteria-grid" data-quote-criteria="comercial"' + (tipo === "comercial" ? "" : " hidden") + '>' + commercial + '</div>' +
@@ -18923,7 +18923,7 @@
       if (bonusEl) bonusEl.textContent = "Bonificación sugerida: " + formatCotizacionOrderCurrency(bonus);
       if (levelEl) levelEl.textContent = "Nivel: " + perturbInfo.nivel;
       if (daysTextEl) daysTextEl.textContent = dias + (dias === 1 ? " día" : " días");
-      if (daysDetailEl) daysDetailEl.textContent = "Días desde ticket: " + diasTicket + " | Duración trabajo: " + duracion + " | Margen seguridad: 1.2";
+      if (daysDetailEl) daysDetailEl.textContent = "Días desde caso: " + diasTicket + " | Duración trabajo: " + duracion + " | Margen seguridad: 1.2";
       if (detailEl) detailEl.innerHTML = escHtml(perturbInfo.texto) + "<br>Área usada: <strong>" + escHtml(String(area)) + " m²</strong> · Días calculados: <strong>" + escHtml(String(dias)) + "</strong>";
     }
 
@@ -19974,7 +19974,7 @@
         });
       }
       if (!ticketRef) {
-        return Promise.reject(new Error("Ticket inválido."));
+        return Promise.reject(new Error("Caso inválido."));
       }
       if (!ajaxUrl || !actionCotizacionesMantenimiento) {
         return Promise.reject(new Error("No se pueden cargar las cotizaciones en este momento."));
@@ -21194,7 +21194,7 @@
           ? cotizacionCard.querySelector(".scm-cotizacion-linked-ticket-source")
           : null;
         if (!cotizacionCard || !sourceTemplate) {
-          showToast("error", "No se encontro el ticket completo de la cotizacion.");
+          showToast("error", "No se encontro el caso completo de la cotizacion.");
           return;
         }
         var holder = cotizacionCard.querySelector(".scm-cotizacion-linked-ticket-dom");
@@ -21208,7 +21208,7 @@
         }
         var caseButton = holder.querySelector(".scm-btn-case");
         if (!caseButton || typeof window.scmOpenCase !== "function") {
-          showToast("error", "No se pudo abrir el popup completo del ticket.");
+          showToast("error", "No se pudo abrir el popup completo del caso.");
           return;
         }
         window.scmOpenCase(caseButton);
@@ -21370,7 +21370,7 @@
         window.Swal.fire({
           title: "Seguimiento de reparaciones",
           html:
-            '<div class="scm-cotizacion-response-form"><p class="scm-cotizacion-dialog-intro">Se generar&aacute; la carta con membrete, se anexar&aacute; al ticket y se enviar&aacute; por correo y WhatsApp al destinatario de la cotizaci&oacute;n.</p><div class="scm-cotizacion-response-grid">' +
+            '<div class="scm-cotizacion-response-form"><p class="scm-cotizacion-dialog-intro">Se generar&aacute; la carta con membrete, se anexar&aacute; al caso y se enviar&aacute; por correo y WhatsApp al destinatario de la cotizaci&oacute;n.</p><div class="scm-cotizacion-response-grid">' +
             '<div class="scm-cotizacion-dialog-field"><span>Cotizaci&oacute;n</span><strong>#' + escHtml(repairCotizacionId) + '</strong></div>' +
             '<div class="scm-cotizacion-dialog-field"><span>D&iacute;as sin respuesta</span><strong>' + escHtml(repairDays || "-") + '</strong></div>' +
             "</div></div>",
@@ -21423,7 +21423,7 @@
         var responseReturnContext = responseBtn._scmCaseCotizacionesReturn || null;
         responseBtn._scmCaseCotizacionesReturn = null;
         if (!ticketPk) {
-          showToast("error", "No se encontro el ticket de la cotizacion.");
+          showToast("error", "No se encontro el caso de la cotizacion.");
           return;
         }
         if (!window.Swal) {
@@ -22085,7 +22085,7 @@
                 return loadOpenTopicPanelIfNeeded(openPanel);
               },
               "Cargando " + (tab.textContent || "casos").trim(),
-              "Estamos consultando los tickets de esta pestaña.",
+              "Estamos consultando los casos de esta pestaña.",
             );
             return;
           }
@@ -22587,7 +22587,7 @@
       var msg = adminForm.querySelector(".scm-seg-msg");
       if (btn) btn.disabled = true;
       if (msg) {
-        msg.textContent = "Creando ticket...";
+        msg.textContent = "Creando caso...";
         msg.classList.remove("error");
       }
 
@@ -22603,11 +22603,11 @@
           if (!json || !json.success) {
             throw new Error(
               (json && json.data && json.data.message) ||
-                "No se pudo crear el ticket.",
+                "No se pudo crear el caso.",
             );
           }
           var data = json.data || {};
-          var okMsg = data.message || "Ticket creado correctamente.";
+          var okMsg = data.message || "Caso creado correctamente.";
           if (msg) {
             msg.textContent = okMsg;
             msg.classList.remove("error");
@@ -22638,12 +22638,12 @@
         .catch(function (err) {
           if (msg) {
             msg.textContent =
-              err && err.message ? err.message : "No se pudo crear el ticket.";
+              err && err.message ? err.message : "No se pudo crear el caso.";
             msg.classList.add("error");
           }
           showToast(
             "error",
-            err && err.message ? err.message : "No se pudo crear el ticket.",
+            err && err.message ? err.message : "No se pudo crear el caso.",
           );
         })
         .finally(function () {
@@ -22677,7 +22677,7 @@
           e,
           "scm-close-ticket-form",
           actionCloseTicket,
-          "Error cerrando ticket.",
+          "Error cerrando caso.",
         )
       ) {
         return;
@@ -22687,7 +22687,7 @@
           e,
           "scm-postpone-ticket-form",
           actionPostponeTicket,
-          "Error postergando ticket.",
+          "Error postergando caso.",
         )
       ) {
         return;
