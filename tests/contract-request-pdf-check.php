@@ -40,11 +40,23 @@ foreach (['terminacion','no-prorroga'] as $kind) foreach (['dentro','fuera'] as 
   check(str_contains($result['title'],'Caso #') && !str_contains($result['title'],'Ticket #'),'Attachment title also uses Caso');
   check(str_contains($bytes,literal('Soluciones Comerciales y Constructivas Sas.')),'Legal corporate name rendered with spaces');
   foreach (['Cartagena de Indias D.T. y C., '.date('d/m/Y'),'Señor(a): ARRENDATARIO DE EJEMPLO','Cordial saludo.'] as $bold) {
-    check(preg_match('/BT \/F2 9 Tf [^\r\n]*\(' . preg_quote(literal($bold),'/') . '\) Tj/', $bytes) === 1,'Bold opening: '.$bold);
+    check(preg_match('/BT \/F2 10 Tf [^\r\n]*\(' . preg_quote(literal($bold),'/') . '\) Tj/', $bytes) === 1,'Bold opening: '.$bold);
   }
   check(substr_count($bytes,literal('Cordial saludo.')) === 1,'Greeting appears once in all four variants');
   check(str_contains($bytes,'(Atentamente)') && str_contains($bytes,'(Funcionario de ejemplo)'),'Signature identity retained');
   check(substr_count($bytes,'/Type /Page ') === 1,'Representative letter fits one page');
+  preg_match_all('/BT \/(F\d) (\d+) Tf [\d.]+ ([\d.]+) Td \((.*)\) Tj ET/', $bytes, $matches, PREG_SET_ORDER);
+  $positions = array_map(static fn(array $m): array => ['font'=>$m[1], 'size'=>(int)$m[2], 'top'=>841.89-(float)$m[3], 'text'=>$m[4]], $matches);
+  $at = static function (string $text) use ($positions): float {
+    foreach ($positions as $position) if ($position['text'] === literal($text)) return $position['top'];
+    throw new RuntimeException('Missing positioned text: ' . $text);
+  };
+  $body = array_values(array_filter($positions, static fn(array $p): bool => $p['font'] === 'F1' && $p['size'] === 10));
+  check($at(preg_replace('/ - Caso #.*$/', '', $result['title'])) >= 150, 'Title clears the institutional logo');
+  check($at('Cartagena de Indias D.T. y C., '.date('d/m/Y')) - $at('Caso #EJEMPLO-10916 · Contrato #2000 · Inmueble SIMI: 204578') >= 36, 'Reference and addressee blocks remain separated');
+  check($body[0]['top'] >= 340 && $body[0]['top'] <= 410 && $body[0]['top'] - $at('Cordial saludo.') >= 30, 'Letter body occupies the middle with space after the greeting');
+  check($at('Atentamente') >= 660 && $at('Atentamente') - $body[count($body)-1]['top'] >= 40, 'Closing stays below the body with a visible gap');
+  check(max(array_column($positions,'top')) <= 735, 'All writing clears the contact details in the letterhead footer');
   rename($result['path'],$directory.'/acta-'.$kind.'-'.$term.'-de-termino.pdf');
 }
 // Missing SIMI must not silently expose the web or internal property ID.
@@ -56,4 +68,4 @@ unlink($result['path']);
 // Opt-in document settings must not remove other modules' default footer.
 $pdf = new \SCM\Support\SimplePdf(); $pdf->paragraph('Documento de otro módulo');
 check(str_contains($pdf->bytes(),literal('Página 1')),'Other documents retain page number');
-echo "PASS: all four letters, removed decorations/footer, legal name, bold openings, SIMI selection, signature, single-page layout and shared defaults. PDFs: {$directory}\n";
+echo "PASS: all four letters, removed decorations/footer, legal name, bold openings, SIMI selection, centred body, separated closing, safe letterhead margins, single-page layout and shared defaults. PDFs: {$directory}\n";

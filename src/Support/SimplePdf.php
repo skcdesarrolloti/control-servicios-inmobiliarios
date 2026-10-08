@@ -665,6 +665,18 @@ final class SimplePdf
     $this->y += $height;
   }
 
+  /** Advance within the page without moving backwards over existing text. */
+  public function spacerTo(float $top): void
+  {
+    $this->y = max($this->y, $top);
+  }
+
+  public function paragraphHeight(string $text, int $size = 8): float
+  {
+    if ($this->actaEyebrow !== '') { $size = max(9, $size); }
+    return count($this->wrap($text, $this->contentWidth, $size)) * ($size + 6) + 8;
+  }
+
   public function pageBreak(): void
   {
     $this->startNewPage();
