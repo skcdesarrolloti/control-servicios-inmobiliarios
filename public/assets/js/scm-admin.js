@@ -2457,7 +2457,11 @@
   }
 
   function caseCanCreateMaintenanceQuote(caseBtn) {
-    if (!caseBtn || !caseBtn.dataset || !isMaintenanceCase(caseBtn))
+    if (
+      !caseBtn ||
+      !caseBtn.dataset ||
+      (!isMaintenanceCase(caseBtn) && !isPreventivaCase(caseBtn))
+    )
       return false;
     if (String(caseBtn.dataset.idRevisionCorrectiva || "").trim()) {
       return true;
