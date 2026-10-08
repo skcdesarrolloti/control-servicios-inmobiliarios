@@ -45,7 +45,7 @@ final class ContractRequestPdfGenerator
     $bodyHeight = array_sum(array_map(fn(string $text): float => $pdf->paragraphHeight($text, 10) + 4, $body));
     $pdf->spacerTo(max(348, 470 - $bodyHeight / 2));
     foreach ($body as $paragraph) {
-      $pdf->paragraph($paragraph, 10, 'F1', false);
+      $pdf->paragraph($paragraph, 10, 'F1', true);
       $pdf->spacer(4);
     }
     $pdf->spacer(32);
