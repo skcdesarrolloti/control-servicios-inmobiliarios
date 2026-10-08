@@ -397,17 +397,17 @@ final class SuCasaControlServiciosInmobiliarios
         'items' => [
           'terminacion_contrato' => [
             'label' => 'Solicitudes de terminación de contrato',
-            'description' => 'Cuando se responde una solicitud de terminación, se genera acta y se cierra el caso.',
-            'channel' => 'Email interno en cola',
+            'description' => 'Al responder se genera el acta y se cierra el caso. Marca Funcionario configurado en la respuesta y elige correo o WhatsApp. Los destinatarios internos se seleccionan aquí.',
+            'channel' => 'Correo; WhatsApp opcional al responder',
           ],
           'no_prorroga_contrato' => [
             'label' => 'Solicitudes de no prórroga de contrato',
-            'description' => 'Cuando se responde una solicitud de no prórroga, se genera acta y se cierra el caso.',
-            'channel' => 'Email interno en cola',
+            'description' => 'Al responder se genera el acta y se cierra el caso. Marca Funcionario configurado en la respuesta y elige correo o WhatsApp. Los destinatarios internos se seleccionan aquí.',
+            'channel' => 'Correo; WhatsApp opcional al responder',
           ],
           'retencion_contrato_ticket' => [
             'label' => 'Caso comercial de retención de contrato',
-            'description' => 'Cuando una no prórroga crea un caso comercial para gestionar la retención o búsqueda del inmueble.',
+            'description' => 'Cuando terminación o no prórroga crea un caso comercial de retención. Sus correos y los WhatsApp al solicitante y consultor son independientes del aviso con acta.',
             'channel' => 'Email interno en cola',
           ],
           'contrato_no_salida' => [

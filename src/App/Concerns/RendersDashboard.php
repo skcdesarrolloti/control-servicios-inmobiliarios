@@ -2017,7 +2017,7 @@ trait RendersDashboard
         <div class="scm-pqr-settings-head scm-tw-head bg-[#0f1e36] text-white px-6 py-5">
           <span class="scm-config-head-badge inline-flex rounded-full text-[10px] font-bold uppercase">Configuraci&oacute;n &amp; despacho</span>
           <h3 id="scm-internal-notifications-title" class="text-2xl font-bold text-white">Notificaciones internas administrativas</h3>
-          <p>Clasifica a qu&eacute; funcionarios se les avisa por cada acci&oacute;n del panel. Gesti&oacute;n de cobro y Cobro prejur&iacute;dico ya encolan Email interno real; las dem&aacute;s acciones quedan listas para conectar al flujo correspondiente.</p>
+          <p>Selecciona los funcionarios que reciben avisos por cada acci&oacute;n del panel. Cada evento indica sus canales; terminaci&oacute;n y no pr&oacute;rroga permiten elegir correo y WhatsApp al responder.</p>
         </div>
         <form id="scm-internal-notifications-form" class="scm-internal-notifications-form" autocomplete="off">
           <div class="scm-config-info-strip"><strong>Acciones y destinatarios internos:</strong> Selecciona uno o varios funcionarios por acci&oacute;n. Si una acci&oacute;n queda vac&iacute;a, no se env&iacute;an avisos internos para esa actividad.</div>

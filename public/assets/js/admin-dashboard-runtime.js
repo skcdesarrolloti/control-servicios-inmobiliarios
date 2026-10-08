@@ -14865,8 +14865,40 @@
       return '<div class="scm-contract-notifications">' + recipients.map(function (recipient) {
         recipient = recipient || {};
         var available = recipient.available === true || recipient.available === '1';
-        return '<label class="' + (available ? '' : 'is-disabled') + '"><input type="checkbox" name="notify_recipients[]" value="' + escHtml(recipient.value || '') + '"' + (available ? ' checked' : ' disabled') + '><span class="min-w-0"><span class="scm-recipient-label">' + escHtml(recipient.label || 'Destinatario') + '</span><strong class="text-xs">' + escHtml(recipient.name || '') + '</strong><small>' + escHtml([recipient.email,recipient.phone].filter(Boolean).join(' · ')) + '</small></span></label>';
-      }).join('') + '<label><input type="checkbox" name="notify_recipients[]" value="none"' + (!recipients.length ? ' checked' : '') + '><span><strong class="text-xs">No notificar a ninguna parte</strong><small>Solo registrar la respuesta y cerrar</small></span></label></div>';
+        var defaults = Array.isArray(recipient.default_channels) ? recipient.default_channels : ['email', 'whatsapp'];
+        var emailAvailable = recipient.email_available == null ? Boolean(recipient.email) : recipient.email_available === true;
+        var whatsappAvailable = recipient.whatsapp_available == null ? Boolean(recipient.phone) : recipient.whatsapp_available === true;
+        var selected = available && ((emailAvailable && defaults.indexOf('email') !== -1) || (whatsappAvailable && defaults.indexOf('whatsapp') !== -1));
+        var choices = [['email', 'Correo', emailAvailable], ['whatsapp', 'WhatsApp', whatsappAvailable]].map(function (channel) {
+          return '<label><input type="checkbox" data-contract-channel="' + channel[0] + '"' + (channel[2] && defaults.indexOf(channel[0]) !== -1 ? ' checked' : '') + (!channel[2] || !selected ? ' disabled' : '') + (channel[2] ? ' data-channel-available="1"' : '') + '>' + channel[1] + (!channel[2] ? ' (sin dato)' : '') + '</label>';
+        }).join('');
+        return '<div class="scm-contract-recipient' + (available ? '' : ' is-disabled') + '"><label><input type="checkbox" name="notify_recipients[]" value="' + escHtml(recipient.value || '') + '"' + (selected ? ' checked' : '') + (!available ? ' disabled' : '') + '><span class="min-w-0"><span class="scm-recipient-label">' + escHtml(recipient.label || 'Destinatario') + '</span><strong class="text-xs">' + escHtml(recipient.name || '') + '</strong><small>' + escHtml([recipient.email,recipient.phone].filter(Boolean).join(' · ')) + '</small></span></label><div class="scm-contract-channel-choices" role="group" aria-label="Canales para ' + escHtml(recipient.label || 'destinatario') + '">' + choices + '</div>' + (recipient.help ? '<small class="scm-contract-recipient-help">' + escHtml(recipient.help) + '</small>' : '') + '</div>';
+      }).join('') + '<label><input type="checkbox" name="notify_recipients[]" value="none"' + (!recipients.some(function (recipient) { return recipient.available; }) ? ' checked' : '') + '><span><strong class="text-xs">No notificar la respuesta</strong><small>Si creas el caso de retención, sus avisos se envían por separado.</small></span></label></div>';
+    }
+
+    function syncContractNotificationChannels(form) {
+      form.querySelectorAll('.scm-contract-recipient').forEach(function (card) {
+        var recipient = card.querySelector('[name="notify_recipients[]"]');
+        card.querySelectorAll('[data-contract-channel]').forEach(function (input) {
+          input.disabled = !recipient.checked || input.dataset.channelAvailable !== '1';
+        });
+      });
+    }
+
+    function contractNotificationChannelSelection(form, checked) {
+      var channels = {};
+      var valid = true;
+      checked.forEach(function (input) {
+        if (input.value === 'none') return;
+        var card = input.closest('.scm-contract-recipient');
+        channels[input.value] = Array.prototype.slice.call(card.querySelectorAll('[data-contract-channel]:checked:not(:disabled)')).map(function (channel) { return channel.dataset.contractChannel; });
+        if (!channels[input.value].length) valid = false;
+      });
+      if (!valid) {
+        window.Swal.showValidationMessage('Selecciona correo o WhatsApp para cada destinatario marcado.');
+        return false;
+      }
+      return channels;
     }
 
     function contractTerminationTermBadge(row, compact) {
@@ -14983,7 +15015,7 @@
         '<div class="rounded-xl bg-[#f2f3ff] p-4 space-y-2"><div class="flex flex-wrap items-center gap-2"><span class="scm-contract-tag !bg-[#dae2ff] font-semibold">' + contractUiIcon('ticket') + escHtml(row.titulo || 'Caso') + '</span><strong>' + escHtml(row.asunto || 'Solicitud contractual') + '</strong></div><p class="!m-0 text-xs">' + escHtml(meta) + '</p></div>' +
         contractTerminationTermBadge(row, false) +
         '<div class="grid grid-cols-1 md:grid-cols-3 gap-4"><label class="scm-contract-field"><span>Clasificación <b class="text-red-700">*</b></span><select name="termino" required><option value="" selected disabled>Selecciona clasificación</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label><label class="scm-contract-field"><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || '') + '" readonly aria-readonly="true"></label><label class="scm-contract-field"><span>' + (kind === 'termination' ? 'Fecha terminación / entrega' : 'Fecha fin de contrato') + '</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || '') + '"></label></div>' +
-        contractRetentionTicketBlockHtml(row) + '<section><div class="flex items-center justify-between gap-3 mb-3"><strong class="text-[10px] uppercase tracking-wider">Notificar a</strong><span class="text-[10px]">Destinatarios configurados</span></div>' + contractTerminationRecipientChecks(row) + '</section></form>';
+        contractRetentionTicketBlockHtml(row) + '<section><div class="flex items-center justify-between gap-3 mb-3"><strong class="text-[10px] uppercase tracking-wider">Notificar a</strong><span class="text-[10px]">Correo y WhatsApp por destinatario</span></div>' + contractTerminationRecipientChecks(row) + '</section></form>';
     }
 
     function renderContractTermination(data) {
@@ -15177,6 +15209,7 @@
                 none.checked = false;
               }
             }
+            syncContractNotificationChannels(form);
             if (event.target && event.target.name === "crear_ticket_retencion") {
               syncContractRetentionTicketState(form);
             }
@@ -15191,6 +15224,8 @@
             window.Swal.showValidationMessage("Selecciona a quién notificar o marca No notificar.");
             return false;
           }
+          var channels = contractNotificationChannelSelection(form, checked);
+          if (channels === false) return false;
           var term = form.querySelector("[name='termino']");
           if (!term || !term.value) {
             window.Swal.showValidationMessage("Selecciona la clasificación de la solicitud.");
@@ -15207,6 +15242,7 @@
             fecha_terminacion: form.querySelector("[name='fecha_terminacion']").value,
             crear_ticket_retencion: createRetention && createRetention.checked ? "1" : "0",
             retencion_id_empleado: retentionEmployee ? retentionEmployee.value : "",
+            channels: channels,
             notify: checked.map(function (input) { return input.value; }),
           };
         },
@@ -15221,11 +15257,12 @@
           fd.append("crear_ticket_retencion", value.crear_ticket_retencion || "0");
           fd.append("retencion_id_empleado", value.retencion_id_empleado || "");
           fd.append("notify_recipients_present", "1");
+          fd.append("notify_channels", JSON.stringify(value.channels || {}));
           (value.notify || []).forEach(function (target) {
             fd.append("notify_recipients[]", target);
           });
         }).then(function (data) {
-          showToast("success", (data && data.message) || "Solicitud respondida.");
+          showToast(data && data.notification_warning ? "warning" : "success", (data && data.message) || "Solicitud respondida.");
           loadContractTerminationRequests(true);
         }).catch(function (error) {
           showToast("error", error && error.message ? error.message : "No se pudo responder la solicitud.");
@@ -15279,6 +15316,7 @@
                 none.checked = false;
               }
             }
+            syncContractNotificationChannels(form);
             if (event.target && event.target.name === "crear_ticket_retencion") {
               syncContractRetentionTicketState(form);
             }
@@ -15293,6 +15331,8 @@
             window.Swal.showValidationMessage("Selecciona a quién notificar o marca No notificar.");
             return false;
           }
+          var channels = contractNotificationChannelSelection(form, checked);
+          if (channels === false) return false;
           var term = form.querySelector("[name='termino']");
           if (!term || !term.value) {
             window.Swal.showValidationMessage("Selecciona la clasificación de la solicitud.");
@@ -15309,6 +15349,7 @@
             fecha_terminacion: form.querySelector("[name='fecha_terminacion']").value,
             crear_ticket_retencion: createRetention && createRetention.checked ? "1" : "0",
             retencion_id_empleado: retentionEmployee ? retentionEmployee.value : "",
+            channels: channels,
             notify: checked.map(function (input) { return input.value; }),
           };
         },
@@ -15323,11 +15364,12 @@
           fd.append("crear_ticket_retencion", value.crear_ticket_retencion || "0");
           fd.append("retencion_id_empleado", value.retencion_id_empleado || "");
           fd.append("notify_recipients_present", "1");
+          fd.append("notify_channels", JSON.stringify(value.channels || {}));
           (value.notify || []).forEach(function (target) {
             fd.append("notify_recipients[]", target);
           });
         }).then(function (data) {
-          showToast("success", (data && data.message) || "Solicitud respondida.");
+          showToast(data && data.notification_warning ? "warning" : "success", (data && data.message) || "Solicitud respondida.");
           loadContractNonRenewalRequests(true);
         }).catch(function (error) {
           showToast("error", error && error.message ? error.message : "No se pudo responder la solicitud.");

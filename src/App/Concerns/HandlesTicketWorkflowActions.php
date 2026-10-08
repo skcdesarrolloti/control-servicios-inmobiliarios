@@ -950,6 +950,11 @@ trait HandlesTicketWorkflowActions
     if (isset($_POST['notify_recipients_present']) && empty($notifyRecipients)) {
       $notifyRecipients = ['none'];
     }
+    try {
+      $notifyChannels = $this->contractRequestSelectedChannels($notifyRecipients, $_POST['notify_channels'] ?? null);
+    } catch (\InvalidArgumentException $exception) {
+      $this->jsonFail($exception->getMessage()); return;
+    }
 
     if ($solicitudId <= 0 && $ticketPk <= 0) {
       $this->jsonFail('Solicitud o caso inválido.');
@@ -968,6 +973,12 @@ trait HandlesTicketWorkflowActions
     $solicitudId = (int) ($ticket['solicitud_id'] ?? $solicitudId);
     if ($ticketPk <= 0) {
       $this->jsonFail('La solicitud no tiene un caso vinculado válido.');
+    }
+
+    try {
+      $this->validateContractRequestNotificationChannels($ticket, $notifyRecipients, $notifyChannels, 'terminacion_contrato');
+    } catch (\InvalidArgumentException $exception) {
+      $this->jsonFail($exception->getMessage()); return;
     }
 
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
@@ -1018,7 +1029,7 @@ trait HandlesTicketWorkflowActions
     $this->contractTerminationInsertPropertyHistory($ticket, $term, $responseText, $actaUrl, $creatorName);
     $this->contractTerminationMarkResponded($solicitudId, $actaUrl, $term);
     $creatorWhatsappSignature = $this->contractTerminationCreatorSignatureInline($creatorName, $creatorDetails);
-    $extraQueued = $this->notifyContractTerminationActa($ticket, $term, $responseText, $actaUrl, $notifyRecipients, $creatorWhatsappSignature);
+    $extraQueued = $this->notifyContractTerminationActa($ticket, $term, $responseText, $actaUrl, $notifyRecipients, $creatorWhatsappSignature, $notifyChannels);
     $result['acta_url'] = $actaUrl;
     $result['acta_title'] = (string) ($acta['title'] ?? '');
     $result['termination_email_queued'] = (string) ($extraQueued['email'] ?? 0);
@@ -1029,6 +1040,9 @@ trait HandlesTicketWorkflowActions
       $result['retention_whatsapp_queued'] = (string) ($retentionTicket['whatsapp_queued'] ?? 0);
     }
     $result['message'] = 'Solicitud respondida, acta generada y caso cerrado.';
+    $result['message'] .= ' Avisos del acta en cola: ' . $extraQueued['email'] . ' por correo y ' . $extraQueued['whatsapp'] . ' por WhatsApp.';
+    $result['notification_warning'] = !empty($extraQueued['failed']);
+    if ($result['notification_warning']) $result['message'] .= ' No se pudieron encolar ' . $extraQueued['failed'] . ' avisos; revisa la cola de notificaciones.';
     if ($retentionTicket !== []) {
       $result['message'] .= ' Caso comercial de retención #' . (string) ($retentionTicket['ticket_id'] ?? '') . ' creado.';
     }
@@ -1077,6 +1091,11 @@ trait HandlesTicketWorkflowActions
     if (isset($_POST['notify_recipients_present']) && empty($notifyRecipients)) {
       $notifyRecipients = ['none'];
     }
+    try {
+      $notifyChannels = $this->contractRequestSelectedChannels($notifyRecipients, $_POST['notify_channels'] ?? null);
+    } catch (\InvalidArgumentException $exception) {
+      $this->jsonFail($exception->getMessage()); return;
+    }
 
     if ($ticketPk <= 0) {
       $this->jsonFail('Caso inválido.');
@@ -1088,6 +1107,12 @@ trait HandlesTicketWorkflowActions
     $ticket = $this->contractTerminationTicketByPk($ticketPk);
     if ($ticket === [] || !$this->isContractNonRenewalTicket($ticket)) {
       $this->jsonFail('No se encontró la solicitud de no prórroga.');
+    }
+
+    try {
+      $this->validateContractRequestNotificationChannels($ticket, $notifyRecipients, $notifyChannels, 'no_prorroga_contrato');
+    } catch (\InvalidArgumentException $exception) {
+      $this->jsonFail($exception->getMessage()); return;
     }
 
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
@@ -1139,7 +1164,7 @@ trait HandlesTicketWorkflowActions
 
     $this->contractNonRenewalInsertPropertyHistory($ticket, $term, $responseText, $actaUrl, $creatorName);
     $creatorWhatsappSignature = $this->contractTerminationCreatorSignatureInline($creatorName, $creatorDetails);
-    $extraQueued = $this->notifyContractNonRenewalActa($ticket, $term, $responseText, $actaUrl, $notifyRecipients, $creatorWhatsappSignature);
+    $extraQueued = $this->notifyContractNonRenewalActa($ticket, $term, $responseText, $actaUrl, $notifyRecipients, $creatorWhatsappSignature, $notifyChannels);
     $result['acta_url'] = $actaUrl;
     $result['acta_title'] = (string) ($acta['title'] ?? '');
     $result['non_renewal_email_queued'] = (string) ($extraQueued['email'] ?? 0);
@@ -1150,6 +1175,9 @@ trait HandlesTicketWorkflowActions
       $result['retention_whatsapp_queued'] = (string) ($retentionTicket['whatsapp_queued'] ?? 0);
     }
     $result['message'] = 'Solicitud de no prórroga respondida, acta generada y caso cerrado.';
+    $result['message'] .= ' Avisos del acta en cola: ' . $extraQueued['email'] . ' por correo y ' . $extraQueued['whatsapp'] . ' por WhatsApp.';
+    $result['notification_warning'] = !empty($extraQueued['failed']);
+    if ($result['notification_warning']) $result['message'] .= ' No se pudieron encolar ' . $extraQueued['failed'] . ' avisos; revisa la cola de notificaciones.';
     if ($retentionTicket !== []) {
       $result['message'] .= ' Caso comercial de retención #' . (string) ($retentionTicket['ticket_id'] ?? '') . ' creado.';
     }
@@ -5250,7 +5278,7 @@ trait HandlesTicketWorkflowActions
     ];
   }
 
-  /** @param array<string,mixed> $ticket @return array<int,array<string,string|bool>> */
+  /** @param array<string,mixed> $ticket @return array<int,array<string,mixed>> */
   private function contractTerminationRecipientOptions(array $ticket, string $internalAction = 'terminacion_contrato'): array
   {
     $options = [];
@@ -5262,24 +5290,33 @@ trait HandlesTicketWorkflowActions
       [$label, $nameCols, $emailCols, $phoneCols] = $config;
       $name = $this->contractTerminationFirstText([$ticket], $nameCols);
       $email = $this->contractTerminationFirstText([$ticket], $emailCols);
-      $phone = $this->contractTerminationFirstText([$ticket], $phoneCols);
+      $phone = $this->contractRequestWhatsappPhone($this->contractTerminationFirstText([$ticket], $phoneCols));
       $options[] = [
         'value' => $value,
         'label' => $label,
         'name' => $name,
         'email' => $email,
         'phone' => $phone,
-        'available' => $email !== '' || $phone !== '',
+        'available' => filter_var($email, FILTER_VALIDATE_EMAIL) !== false || $phone !== '',
+        'email_available' => filter_var($email, FILTER_VALIDATE_EMAIL) !== false,
+        'whatsapp_available' => $phone !== '',
+        'default_channels' => ['email', 'whatsapp'],
       ];
     }
     $adminEmails = \SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, $internalAction);
+    $adminContacts = \SCM\Support\InternalNotificationRecipients::contactsForAction($this->db, $internalAction);
+    $adminPhones = array_values(array_filter(array_map(fn($contact): string => $this->contractRequestWhatsappPhone((string) $contact['phone']), $adminContacts)));
     $options[] = [
       'value' => 'admin',
       'label' => 'Funcionario configurado',
-      'name' => count($adminEmails) . ' destinatario(s) interno(s)',
+      'name' => implode(', ', array_column($adminContacts, 'name')) ?: 'Sin funcionarios configurados',
       'email' => implode(', ', $adminEmails),
-      'phone' => '',
-      'available' => count($adminEmails) > 0,
+      'phone' => implode(', ', $adminPhones),
+      'available' => $adminEmails !== [] || $adminPhones !== [],
+      'email_available' => $adminEmails !== [],
+      'whatsapp_available' => $adminPhones !== [],
+      'default_channels' => ['email'],
+      'help' => 'Destinatarios de Notificaciones internas → Contratos → ' . ($internalAction === 'no_prorroga_contrato' ? 'Solicitudes de no prórroga de contrato.' : 'Solicitudes de terminación de contrato.') . ' Cada canal avisa solo a quienes tengan ese dato registrado.',
     ];
     return $options;
   }
@@ -5549,8 +5586,8 @@ trait HandlesTicketWorkflowActions
     }
   }
 
-  /** @param array<string,mixed> $ticket @param string[] $notifyTargets @return array{email:int,whatsapp:int} */
-  private function notifyContractTerminationActa(array $ticket, string $term, string $responseText, string $actaUrl, array $notifyTargets, string $creatorSignature): array
+  /** @param array<string,mixed> $ticket @param string[] $notifyTargets @return array{email:int,whatsapp:int,failed?:int} */
+  private function notifyContractTerminationActa(array $ticket, string $term, string $responseText, string $actaUrl, array $notifyTargets, string $creatorSignature, ?array $channels = null): array
   {
     $targets = array_values(array_unique($notifyTargets));
     if ($actaUrl === '' || in_array('none', $targets, true) || $targets === []) {
@@ -5562,7 +5599,8 @@ trait HandlesTicketWorkflowActions
     $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: '-';
     $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
     $address = $this->contractTerminationFirstText([$ticket], ['direccion']) ?: 'dirección registrada';
-    $emailRecipients = $this->contractTerminationNotificationEmails($ticket, $targets);
+    $emailRecipients = $this->contractTerminationNotificationEmails($ticket, $targets, 'terminacion_contrato', $channels);
+    $dedupeKey = 'terminacion_contrato:' . $logicalTicket . ':' . $term . ':' . substr(hash('sha256', $actaUrl), 0, 24);
     $html = \SCM\Support\EmailTemplate::render('Respuesta solicitud de terminación de contrato', nl2br(\SCM\Support\EmailTemplate::e($responseText)), [
       'buttons' => [['url' => $actaUrl, 'label' => 'Ver acta generada']],
     ]);
@@ -5570,13 +5608,14 @@ trait HandlesTicketWorkflowActions
       ? (new \SCM\Support\EmailQueue($this->db))->enqueue(array_values($emailRecipients), $subject, $html, [
         'source_module' => 'terminacion_contrato',
         'destination_name' => '',
-        'dedupe_key' => 'terminacion_contrato:' . $logicalTicket . ':' . $term,
-        'meta' => ['id_ticket' => $logicalTicket, 'acta_url' => $actaUrl, 'termino' => $status],
+        'dedupe_key' => $dedupeKey,
+        'meta' => ['id_ticket' => $logicalTicket, 'acta_url' => $actaUrl, 'termino' => $status, 'notify_targets' => $targets, 'notify_channels' => $channels],
       ])
       : 0;
 
+    $phoneRecipients = $this->contractTerminationNotificationPhones($ticket, $targets, 'terminacion_contrato', $channels);
     $whatsappQueued = 0;
-    foreach ($this->contractTerminationNotificationPhones($ticket, $targets) as $recipient) {
+    foreach ($phoneRecipients as $recipient) {
       try {
         $phone = (string) ($recipient['phone'] ?? '');
         $name = (string) ($recipient['name'] ?? 'cliente');
@@ -5590,7 +5629,7 @@ trait HandlesTicketWorkflowActions
           'id_ticket' => $logicalTicket,
           'acta_url' => $actaUrl,
           'button_url_mode' => 'dynamic_suffix',
-          'dedupe_key' => 'terminacion_contrato:' . $logicalTicket . ':' . $term,
+          'dedupe_key' => $dedupeKey,
           'template_name' => 'scm_terminacion_contrato_respuesta_v3',
           'template_language' => 'es_CO',
           'template_components' => [
@@ -5622,11 +5661,11 @@ trait HandlesTicketWorkflowActions
       }
     }
 
-    return ['email' => $emailQueued, 'whatsapp' => $whatsappQueued];
+    return ['email' => $emailQueued, 'whatsapp' => $whatsappQueued, 'failed' => max(0, count($emailRecipients) - $emailQueued) + max(0, count($phoneRecipients) - $whatsappQueued)];
   }
 
-  /** @param array<string,mixed> $ticket @param string[] $notifyTargets @return array{email:int,whatsapp:int} */
-  private function notifyContractNonRenewalActa(array $ticket, string $term, string $responseText, string $actaUrl, array $notifyTargets, string $creatorSignature): array
+  /** @param array<string,mixed> $ticket @param string[] $notifyTargets @return array{email:int,whatsapp:int,failed?:int} */
+  private function notifyContractNonRenewalActa(array $ticket, string $term, string $responseText, string $actaUrl, array $notifyTargets, string $creatorSignature, ?array $channels = null): array
   {
     $targets = array_values(array_unique($notifyTargets));
     if ($actaUrl === '' || in_array('none', $targets, true) || $targets === []) {
@@ -5638,7 +5677,8 @@ trait HandlesTicketWorkflowActions
     $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: '-';
     $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
     $address = $this->contractTerminationFirstText([$ticket], ['direccion']) ?: 'dirección registrada';
-    $emailRecipients = $this->contractTerminationNotificationEmails($ticket, $targets, 'no_prorroga_contrato');
+    $emailRecipients = $this->contractTerminationNotificationEmails($ticket, $targets, 'no_prorroga_contrato', $channels);
+    $dedupeKey = 'no_prorroga_contrato:' . $logicalTicket . ':' . $term . ':' . substr(hash('sha256', $actaUrl), 0, 24);
     $html = \SCM\Support\EmailTemplate::render('Respuesta solicitud de no prórroga de contrato', nl2br(\SCM\Support\EmailTemplate::e($responseText)), [
       'buttons' => [['url' => $actaUrl, 'label' => 'Ver acta generada']],
     ]);
@@ -5646,13 +5686,14 @@ trait HandlesTicketWorkflowActions
       ? (new \SCM\Support\EmailQueue($this->db))->enqueue(array_values($emailRecipients), $subject, $html, [
         'source_module' => 'no_prorroga_contrato',
         'destination_name' => '',
-        'dedupe_key' => 'no_prorroga_contrato:' . $logicalTicket . ':' . $term,
-        'meta' => ['id_ticket' => $logicalTicket, 'acta_url' => $actaUrl, 'termino' => $status],
+        'dedupe_key' => $dedupeKey,
+        'meta' => ['id_ticket' => $logicalTicket, 'acta_url' => $actaUrl, 'termino' => $status, 'notify_targets' => $targets, 'notify_channels' => $channels],
       ])
       : 0;
 
+    $phoneRecipients = $this->contractTerminationNotificationPhones($ticket, $targets, 'no_prorroga_contrato', $channels);
     $whatsappQueued = 0;
-    foreach ($this->contractTerminationNotificationPhones($ticket, $targets) as $recipient) {
+    foreach ($phoneRecipients as $recipient) {
       try {
         $phone = (string) ($recipient['phone'] ?? '');
         $name = (string) ($recipient['name'] ?? 'cliente');
@@ -5665,7 +5706,7 @@ trait HandlesTicketWorkflowActions
           'categoria_mensaje' => 'informacion',
           'id_ticket' => $logicalTicket,
           'acta_url' => $actaUrl,
-          'dedupe_key' => 'no_prorroga_contrato:' . $logicalTicket . ':' . $term,
+          'dedupe_key' => $dedupeKey,
           'template_name' => 'scm_no_prorroga_contrato_respuesta',
           'template_language' => 'es_CO',
           'template_components' => [[
@@ -5685,11 +5726,11 @@ trait HandlesTicketWorkflowActions
       }
     }
 
-    return ['email' => $emailQueued, 'whatsapp' => $whatsappQueued];
+    return ['email' => $emailQueued, 'whatsapp' => $whatsappQueued, 'failed' => max(0, count($emailRecipients) - $emailQueued) + max(0, count($phoneRecipients) - $whatsappQueued)];
   }
 
   /** @param array<string,mixed> $ticket @param string[] $targets @return array<string,string> */
-  private function contractTerminationNotificationEmails(array $ticket, array $targets, string $internalAction = 'terminacion_contrato'): array
+  private function contractTerminationNotificationEmails(array $ticket, array $targets, string $internalAction = 'terminacion_contrato', ?array $channels = null): array
   {
     $emails = [];
     $map = [
@@ -5697,6 +5738,7 @@ trait HandlesTicketWorkflowActions
       'propietario' => ['correo_propietario'],
     ];
     foreach ($targets as $target) {
+      if ($channels !== null && !in_array('email', $channels[$target] ?? [], true)) continue;
       if ($target === 'admin') {
         foreach (\SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, $internalAction) as $email) {
           $emails[strtolower($email)] = $email;
@@ -5714,7 +5756,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $ticket @param string[] $targets @return array<int,array{name:string,phone:string}> */
-  private function contractTerminationNotificationPhones(array $ticket, array $targets): array
+  private function contractTerminationNotificationPhones(array $ticket, array $targets, string $internalAction = 'terminacion_contrato', ?array $channels = null): array
   {
     $out = [];
     $map = [
@@ -5723,6 +5765,16 @@ trait HandlesTicketWorkflowActions
     ];
     $seen = [];
     foreach ($targets as $target) {
+      // Historical clients notify internal staff by email only. WhatsApp is opt-in.
+      if ($channels !== null && !in_array('whatsapp', $channels[$target] ?? [], true)) continue;
+      if ($target === 'admin') {
+        if ($channels !== null) {
+          foreach (\SCM\Support\InternalNotificationRecipients::contactsForAction($this->db, $internalAction) as $contact) {
+            $out[] = ['name' => (string) $contact['name'], 'phone' => (string) $contact['phone']];
+          }
+        }
+        continue;
+      }
       if (!isset($map[$target])) {
         continue;
       }
@@ -5741,7 +5793,50 @@ trait HandlesTicketWorkflowActions
         'phone' => $phone,
       ];
     }
+    $unique = [];
+    foreach ($out as $recipient) {
+      $phone = $this->contractRequestWhatsappPhone($recipient['phone']);
+      if ($phone === '') continue;
+      $unique[$phone] ??= ['name' => $recipient['name'], 'phone' => $phone];
+    }
+    return array_values($unique);
+  }
+
+  /** Null preserves the routing of clients that predate channel selection. */
+  private function contractRequestSelectedChannels(array $targets, $raw): ?array
+  {
+    if ($raw === null) return null;
+    $decoded = is_string($raw) ? json_decode($raw, true) : $raw;
+    if (!is_array($decoded)) throw new \InvalidArgumentException('La selección de canales no es válida.');
+    if (in_array('none', $targets, true)) return [];
+    $out = [];
+    foreach ($targets as $target) {
+      if (!in_array($target, ['arrendatario', 'propietario', 'admin'], true)) throw new \InvalidArgumentException('Destinatario no válido para la respuesta contractual.');
+      $values = is_array($decoded[$target] ?? null) ? $decoded[$target] : [];
+      $out[$target] = array_values(array_filter(['email', 'whatsapp'], static fn($channel): bool => in_array($channel, $values, true)));
+      if ($out[$target] === []) throw new \InvalidArgumentException('Selecciona correo o WhatsApp para cada destinatario marcado.');
+    }
     return $out;
+  }
+
+  private function validateContractRequestNotificationChannels(array $ticket, array $targets, ?array $channels, string $action): void
+  {
+    if ($channels === null || in_array('none', $targets, true)) return;
+    foreach ($this->contractTerminationRecipientOptions($ticket, $action) as $recipient) {
+      if (!in_array($recipient['value'], $targets, true)) continue;
+      foreach ($channels[$recipient['value']] ?? [] as $channel) {
+        if (empty($recipient[$channel === 'email' ? 'email_available' : 'whatsapp_available'])) {
+          throw new \InvalidArgumentException('No hay ' . ($channel === 'email' ? 'correo válido' : 'celular válido para WhatsApp') . ' para ' . $recipient['label'] . '. Revisa los contactos o cambia el canal.');
+        }
+      }
+    }
+  }
+
+  private function contractRequestWhatsappPhone(string $raw): string
+  {
+    $digits = preg_replace('/\D+/', '', $raw) ?: '';
+    if (strlen($digits) === 10 && !str_starts_with(trim($raw), '+')) $digits = '57' . $digits;
+    return preg_match('/^[1-9][0-9]{7,14}$/D', $digits) ? '+' . $digits : '';
   }
 
   private function contractTerminationHumanDate(string $date): string

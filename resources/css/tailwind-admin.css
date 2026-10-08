@@ -57,6 +57,10 @@
 .swal2-popup.scm-contract-response-swal .scm-retention-ticket-field select { background:white; }
 .swal2-popup.scm-contract-response-swal .scm-contract-notifications { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .swal2-popup.scm-contract-response-swal .scm-contract-notifications label { display:flex; gap:10px; align-items:flex-start; padding:14px; border-radius:12px; background:#f2f3ff; cursor:pointer; min-width:0; }
+.swal2-popup.scm-contract-response-swal .scm-contract-recipient { background:#f2f3ff; border-radius:12px; min-width:0; }
+.swal2-popup.scm-contract-response-swal .scm-contract-channel-choices { display:flex; flex-wrap:wrap; gap:12px; padding:0 14px 14px; }
+.swal2-popup.scm-contract-response-swal .scm-contract-channel-choices label { padding:0; align-items:center; font-size:11px; gap:6px; }
+.swal2-popup.scm-contract-response-swal .scm-contract-recipient-help { padding:0 14px 14px; color:#52617b; }
 .swal2-popup.scm-contract-response-swal .scm-contract-notifications small { font-size:10px; overflow-wrap:anywhere; display:block; }
 .swal2-popup.scm-contract-response-swal .scm-contract-notifications .is-disabled { opacity:.55; cursor:default; }
 .swal2-popup.scm-contract-response-swal .scm-contract-notifications .scm-recipient-label { font-size:9px; text-transform:uppercase; letter-spacing:.05em; display:block; margin-bottom:3px; }
