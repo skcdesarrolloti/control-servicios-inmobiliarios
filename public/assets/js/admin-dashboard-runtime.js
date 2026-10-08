@@ -221,6 +221,7 @@
     var actionContractTerminationRespond =
       actions.contract_termination_respond || "";
     var actionContractRequestDelete = actions.contract_request_delete || "";
+    var actionContractRequestReopen = actions.contract_request_reopen || "";
     var actionContractNonRenewalRequests =
       actions.contract_non_renewal_requests || "";
     var actionContractNonRenewalRespond =
@@ -14904,7 +14905,7 @@
       });
     }
 
-    function contractRequestCard(row, kind, canDelete) {
+    function contractRequestCard(row, kind, canDelete, answered, canReopen) {
       row = row || {};
       var caseData = row.case || {};
       var sourceHtml = String(caseData.case_source_html || '').trim();
@@ -14913,22 +14914,22 @@
       var dueType = kind === 'termination' ? 'terminacion_contrato_pendiente' : 'no_prorroga_contrato_pendiente';
       return '<article class="scm-contract-card scm-ticket-card">' +
         '<div class="scm-contract-card-body"><div class="flex flex-col gap-3 min-w-0 flex-1">' +
-        '<div class="flex flex-wrap items-center gap-3 text-xs"><span class="scm-contract-tag font-semibold">' + contractUiIcon('ticket') + escHtml(row.titulo || 'Ticket') + '</span><span class="inline-flex items-center gap-1.5">' + contractUiIcon('clock') + 'Creado: ' + escHtml(row.creado || '-') + '</span><span class="rounded-md bg-amber-50 px-2 py-1 text-amber-900">Esperando respuesta</span></div>' +
+        '<div class="flex flex-wrap items-center gap-3 text-xs"><span class="scm-contract-tag font-semibold">' + contractUiIcon('ticket') + escHtml(row.titulo || 'Ticket') + '</span><span class="inline-flex items-center gap-1.5">' + contractUiIcon('clock') + 'Creado: ' + escHtml(row.creado || '-') + '</span><span class="rounded-md bg-amber-50 px-2 py-1 text-amber-900">' + (answered ? 'Contestada' : 'Esperando respuesta') + '</span></div>' +
         '<h4 class="!m-0 !text-base sm:!text-lg !font-bold !text-[#001944]">' + escHtml(row.asunto || (kind === 'termination' ? 'Solicitud de terminación de contrato' : 'Solicitud de no prórroga de contrato')) + '</h4>' +
         '<div class="flex flex-wrap items-center gap-2 text-xs"><span>' + escHtml(meta.join(' · ') || 'Sin datos de inmueble') + '</span>' + (row.direccion && row.direccion !== '-' ? '<span class="inline-flex items-start gap-1">' + contractUiIcon('location') + escHtml(row.direccion) + '</span>' : '') + '</div>' +
         '<div class="flex flex-wrap items-center gap-2"><span class="scm-contract-tag font-semibold">' + contractUiIcon('person') + escHtml(row.solicitante || '-') + '</span><span class="scm-contract-tag">Caso: ' + escHtml(row.estado || '-') + ' / ' + escHtml(row.estado_administrativo || '-') + '</span></div>' +
         '</div>' + contractTerminationTermBadge(row, true) + '</div>' +
         '<div class="scm-contract-card-footer"><span class="inline-flex items-center gap-2 text-xs">' + contractUiIcon('document') + 'Solicitud: ' + escHtml(row.estado_solicitud || 'Pendiente') + '</span><div class="flex flex-wrap gap-3">' +
         (sourceHtml ? '<button type="button" class="scm-contract-button" ' + prefix + '-open-case data-scm-due-case-loaded="1" data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + '>' + contractUiIcon('eye') + 'Ver caso</button>' : '<button type="button" class="scm-contract-button" disabled>Sin caso</button>') +
-        (canDelete ? '<button type="button" class="scm-contract-button" data-contract-request-delete="' + kind + '" data-solicitud-id="' + escHtml(row.solicitud_id || '') + '" data-ticket-pk="' + escHtml(row.ticket_pk || '') + '">' + contractUiIcon('trash') + 'Eliminar caso</button>' : '') +
-        '<button type="button" class="scm-contract-button scm-contract-button-primary" ' + prefix + '-respond data-solicitud-id="' + escHtml(row.solicitud_id || '') + '" data-ticket-pk="' + escHtml(row.ticket_pk || '') + '">' + contractUiIcon('reply') + 'Responder</button></div></div>' +
+        (!answered && canDelete ? '<button type="button" class="scm-contract-button" data-contract-request-delete="' + kind + '" data-solicitud-id="' + escHtml(row.solicitud_id || '') + '" data-ticket-pk="' + escHtml(row.ticket_pk || '') + '">' + contractUiIcon('trash') + 'Eliminar caso</button>' : '') +
+        (answered ? (canReopen && Number(row.ticket_pk) > 0 ? '<button type="button" class="scm-contract-button scm-contract-button-primary" data-contract-request-reopen="' + kind + '" data-solicitud-id="' + escHtml(row.solicitud_id || '') + '" data-ticket-pk="' + escHtml(row.ticket_pk || '') + '">' + contractUiIcon('refresh') + 'Poner en proceso</button>' : '') : '<button type="button" class="scm-contract-button scm-contract-button-primary" ' + prefix + '-respond data-solicitud-id="' + escHtml(row.solicitud_id || '') + '" data-ticket-pk="' + escHtml(row.ticket_pk || '') + '">' + contractUiIcon('reply') + 'Responder</button>') + '</div></div>' +
         '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + '</div></article>';
     }
 
     function renderContractRequestList(panel, kind) {
       var rows = contractFilteredRows(panel);
       var list = panel.querySelector('[data-scm-contract-' + kind + '-list]');
-      if (list) list.innerHTML = rows.length ? rows.map(function (row) { return contractRequestCard(row, kind, panel.scmContractData.can_delete === true); }).join('') : contractTerminationEmpty('No hay solicitudes para mostrar con estos criterios.');
+      if (list) list.innerHTML = rows.length ? rows.map(function (row) { return contractRequestCard(row, kind, panel.scmContractData.can_delete === true, panel.scmContractData.view === 'answered', panel.scmContractData.can_reopen === true); }).join('') : contractTerminationEmpty('No hay solicitudes para mostrar con estos criterios.');
       var count = panel.querySelector('[data-contract-count]');
       if (count) count.textContent = rows.length + (rows.length === 1 ? ' registro' : ' registros');
     }
@@ -14937,6 +14938,14 @@
       var panel = root.querySelector('[data-scm-contract-' + kind + '-panel]');
       if (!panel) return;
       panel.scmContractData = data || {};
+      panel.scmContractView = data && data.view === 'answered' ? 'answered' : 'pending';
+      var answered = panel.scmContractView === 'answered';
+      var toggle = panel.querySelector('[data-contract-view-toggle]');
+      toggle.textContent = answered ? 'Ver pendientes' : 'Ver contestadas';
+      toggle.setAttribute('aria-pressed', String(answered));
+      var description = panel.querySelector('[data-contract-description]');
+      description.textContent = answered ? 'Consulta las solicitudes contestadas o ponlas en proceso para responderlas nuevamente.' : 'Responde si la solicitud está dentro o fuera de término, elige destinatarios y cierra el ticket con acta.';
+      panel.querySelector('[data-contract-pending-note]').hidden = answered;
       var rows = Array.isArray(data && data.items) ? data.items : [];
       var status = panel.querySelector('[data-scm-contract-' + kind + '-status]');
       if (status) {
@@ -14945,6 +14954,7 @@
       }
       var summary = panel.querySelector('[data-scm-contract-' + kind + '-summary]');
       if (summary) summary.innerHTML = '<div class="scm-contract-metric"><div class="space-y-1"><span class="text-[10px] font-bold uppercase tracking-wider">Pendientes</span><div class="flex items-center gap-2"><strong class="text-3xl font-bold">' + formatDashboardCount(data && data.count != null ? data.count : rows.length) + '</strong><span class="rounded-md bg-emerald-50 px-2 py-1 text-[10px] text-emerald-800">Revisión prioritaria</span></div><p class="!m-0 text-xs">Solicitudes pendientes de respuesta</p></div><span class="rounded-xl bg-[#e9edff] p-3">' + contractUiIcon('document') + '</span></div><div class="scm-contract-metric"><div class="space-y-2"><span class="text-[10px] font-bold uppercase tracking-wider">Acción requerida</span><strong class="block text-2xl font-bold">Responder y cerrar</strong><p class="!m-0 text-xs">Clasificación y generación del acta de respuesta</p></div><span class="rounded-xl bg-[#e9edff] p-3">' + contractUiIcon('reply') + '</span></div>';
+      if (answered && summary) summary.innerHTML = '<div class="scm-contract-metric"><div class="space-y-2"><span class="text-[10px] font-bold uppercase tracking-wider">Contestadas</span><strong class="block text-3xl font-bold">' + formatDashboardCount(data && data.count != null ? data.count : rows.length) + '</strong><p class="!m-0 text-xs">Solicitudes respondidas</p></div>' + contractUiIcon('check') + '</div><div class="scm-contract-metric"><div class="space-y-2"><strong class="block text-2xl font-bold">Poner en proceso</strong><p class="!m-0 text-xs">Devuelve la solicitud a pendientes conservando su historial</p></div>' + contractUiIcon('refresh') + '</div>';
       renderContractRequestList(panel, kind);
       panel.setAttribute('data-scm-loaded', '1');
       if (!panel.scmContractControlsBound) {
@@ -14962,7 +14972,7 @@
           var cells = [['Ticket', 'Creado', 'Contrato', 'Inmueble', 'Dirección', 'Solicitante', 'Clasificación', 'Fin contrato', 'Límite']].concat(exportRows.map(function (row) { return [row.id_ticket || row.titulo, row.creado, row.contrato, row.inmueble, row.direccion, row.solicitante, row.term_label, row.fin_contrato_label, row.fecha_limite_label]; }));
           var csv = '\ufeff' + cells.map(function (row) { return row.map(function (cell) { var value = String(cell == null ? '' : cell); if (/^[=+\-@\t\r]/.test(value)) value = "'" + value; return '"' + value.replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
           var url = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8;' }));
-          var link = document.createElement('a'); link.href = url; link.download = 'solicitudes-' + kind + '.csv'; document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+          var link = document.createElement('a'); link.href = url; link.download = 'solicitudes-' + kind + (panel.scmContractView === 'answered' ? '-contestadas' : '') + '.csv'; document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
         });
       }
     }
@@ -15013,30 +15023,62 @@
       });
     }
 
-    function loadContractTerminationRequests(force) {
-      var panel = root.querySelector("[data-scm-contract-termination-panel]");
-      if (!panel || !ajaxUrl || !actionContractTerminationRequests) {
-        return Promise.resolve();
-      }
-      if (!force && panel.getAttribute("data-scm-loaded") === "1") {
-        return Promise.resolve();
-      }
-      var status = panel.querySelector("[data-scm-contract-termination-status]");
-      if (status) {
-        status.classList.remove("is-error");
-        status.textContent = "Cargando solicitudes de terminación...";
-      }
-      return dashboardAction(actionContractTerminationRequests, {})
-        .then(function (data) {
-          renderContractTermination(data || {});
-        })
-        .catch(function (error) {
-          if (status) {
-            status.classList.add("is-error");
-            status.textContent = error && error.message ? error.message : "No se pudieron cargar las solicitudes.";
-          }
-          showToast("error", error && error.message ? error.message : "No se pudieron cargar las solicitudes.");
-        });
+    function loadContractRequests(kind, force) {
+      var panel = root.querySelector('[data-scm-contract-' + kind + '-panel]');
+      var action = kind === 'termination' ? actionContractTerminationRequests : actionContractNonRenewalRequests;
+      if (!panel || !ajaxUrl || !action || (!force && panel.getAttribute('data-scm-loaded') === '1')) return Promise.resolve();
+      var view = panel.scmContractView === 'answered' ? 'answered' : 'pending';
+      var sequence = panel.scmContractLoadSequence = (panel.scmContractLoadSequence || 0) + 1;
+      var status = panel.querySelector('[data-scm-contract-' + kind + '-status]');
+      var toggle = panel.querySelector('[data-contract-view-toggle]');
+      toggle.textContent = view === 'answered' ? 'Ver pendientes' : 'Ver contestadas';
+      toggle.setAttribute('aria-pressed', String(view === 'answered'));
+      toggle.disabled = true;
+      status.classList.remove('is-error');
+      status.textContent = 'Cargando solicitudes ' + (view === 'answered' ? 'contestadas' : 'pendientes') + '...';
+      panel.scmContractData = {items:[],count:0,view:view};
+      renderContractRequestList(panel, kind);
+      panel.querySelector('[data-scm-contract-' + kind + '-list]').innerHTML = contractTerminationEmpty(status.textContent);
+      panel.setAttribute('data-scm-loaded', '0');
+      return dashboardAction(action, {view:view}).then(function (data) {
+        if (sequence !== panel.scmContractLoadSequence) return;
+        if (kind === 'termination') renderContractTermination(data || {}); else renderContractNonRenewal(data || {});
+      }).catch(function (error) {
+        if (sequence !== panel.scmContractLoadSequence) return;
+        status.classList.add('is-error');
+        status.textContent = error && error.message || 'No se pudieron cargar las solicitudes.';
+        panel.querySelector('[data-scm-contract-' + kind + '-list]').innerHTML = contractTerminationEmpty(status.textContent);
+        showToast('error', status.textContent);
+      }).finally(function () {
+        if (sequence === panel.scmContractLoadSequence) toggle.disabled = false;
+      });
+    }
+
+    function loadContractTerminationRequests(force) { return loadContractRequests('termination', force); }
+
+    function reopenContractRequest(button) {
+      if (!window.Swal || !actionContractRequestReopen || button.disabled) return Promise.resolve();
+      var kind = button.getAttribute('data-contract-request-reopen');
+      var requestId = button.getAttribute('data-solicitud-id') || '';
+      var ticketPk = button.getAttribute('data-ticket-pk') || '';
+      return window.Swal.fire({
+        title: '¿Poner la solicitud en proceso?',
+        text: 'Volverá a pendientes con estado Nuevo y podrás responderla nuevamente. Se conservarán las respuestas y actas anteriores.',
+        icon: 'question', showCancelButton: true, confirmButtonText: 'Poner en proceso', cancelButtonText: 'Cancelar',
+        showLoaderOnConfirm: true,
+        allowOutsideClick: function () { return !window.Swal.isLoading(); },
+        allowEscapeKey: function () { return !window.Swal.isLoading(); },
+        preConfirm: function () {
+          return dashboardFormAction(actionContractRequestReopen, function (fd) {
+            fd.append('request_kind', kind); fd.append('ticket_pk', ticketPk);
+            fd.append('solicitud_id', requestId); fd.append('confirm_reopen', '1');
+          }).catch(function (error) { window.Swal.showValidationMessage(error && error.message || 'No se pudo poner en proceso.'); return false; });
+        }
+      }).then(function (result) {
+        if (!result || !result.isConfirmed) return;
+        showToast('success', result.value && result.value.message || 'Solicitud puesta en proceso.');
+        return loadContractRequests(kind, true);
+      });
     }
 
     function contractRetentionTicketBlockHtml(row) {
@@ -15197,31 +15239,7 @@
       renderContractRequests(data, 'non-renewal');
     }
 
-    function loadContractNonRenewalRequests(force) {
-      var panel = root.querySelector("[data-scm-contract-non-renewal-panel]");
-      if (!panel || !ajaxUrl || !actionContractNonRenewalRequests) {
-        return Promise.resolve();
-      }
-      if (!force && panel.getAttribute("data-scm-loaded") === "1") {
-        return Promise.resolve();
-      }
-      var status = panel.querySelector("[data-scm-contract-non-renewal-status]");
-      if (status) {
-        status.classList.remove("is-error");
-        status.textContent = "Cargando solicitudes de no prórroga...";
-      }
-      return dashboardAction(actionContractNonRenewalRequests, {})
-        .then(function (data) {
-          renderContractNonRenewal(data || {});
-        })
-        .catch(function (error) {
-          if (status) {
-            status.classList.add("is-error");
-            status.textContent = error && error.message ? error.message : "No se pudieron cargar las solicitudes.";
-          }
-          showToast("error", error && error.message ? error.message : "No se pudieron cargar las solicitudes.");
-        });
-    }
+    function loadContractNonRenewalRequests(force) { return loadContractRequests('non-renewal', force); }
 
     function openContractNonRenewalResponse(solicitudId) {
       var row = contractNonRenewalRowsByPk[String(solicitudId || "")];
@@ -22140,6 +22158,24 @@
         event.preventDefault();
         event.stopPropagation();
         deleteContractRequest(contractRequestDelete);
+        return;
+      }
+
+      var contractRequestReopen = event.target.closest('[data-contract-request-reopen]');
+      if (contractRequestReopen) {
+        event.preventDefault();
+        event.stopPropagation();
+        reopenContractRequest(contractRequestReopen);
+        return;
+      }
+
+      var contractViewToggle = event.target.closest('[data-contract-view-toggle]');
+      if (contractViewToggle) {
+        event.preventDefault();
+        var contractPanel = contractViewToggle.closest('.scm-contract-workspace');
+        var contractKind = contractPanel.hasAttribute('data-scm-contract-termination-panel') ? 'termination' : 'non-renewal';
+        contractPanel.scmContractView = contractPanel.scmContractView === 'answered' ? 'pending' : 'answered';
+        loadContractRequests(contractKind, true);
         return;
       }
 

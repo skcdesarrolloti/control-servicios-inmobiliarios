@@ -35,6 +35,7 @@ final class ContractRequestDeletionService
       if ($kind === 'termination') {
         $request = $this->db->getRow("SELECT * FROM `{$requests}` WHERE `_ID` = ? FOR UPDATE", [$requestId]) ?? [];
         if (!$request) throw new \DomainException('La solicitud ya no existe. Actualiza la bandeja.');
+        if (ContractRequestReopenService::answered($request)) throw new \DomainException('Las solicitudes contestadas deben ponerse en proceso antes de eliminarlas.');
         $ref = trim((string) ($request['id_ticket'] ?? ''));
         $linked = $ref === '' ? [] : $this->ticketsForReference($tickets, $ref);
         if (count($linked) > 1) throw new \DomainException('La referencia del caso es ambigua. Revisa la vinculación antes de eliminar.');
@@ -45,11 +46,13 @@ final class ContractRequestDeletionService
       $ticket = $ticketPk > 0 ? ($this->db->getRow("SELECT * FROM `{$tickets}` WHERE `_ID` = ? FOR UPDATE", [$ticketPk]) ?? []) : [];
       if ($ticketPk > 0 && !$ticket) throw new \DomainException('El caso ya no existe. Actualiza la bandeja.');
       if ($ticket && !$matchesKind($ticket)) throw new \DomainException('El caso no corresponde a este tipo de solicitud.');
+      if ($ticket && ContractRequestReopenService::answered($ticket, true)) throw new \DomainException('Las solicitudes contestadas deben ponerse en proceso antes de eliminarlas.');
       $linkedRequests = $request ? [$request] : [];
       if ($kind === 'termination' && $ticket) {
         $refs = array_values(array_unique(array_filter([(string) $ticketPk, trim((string) ($ticket['id_ticket'] ?? ''))])));
         $linkedRequests = $this->db->getResults("SELECT * FROM `{$requests}` WHERE TRIM(`id_ticket`) IN (" . implode(',', array_fill(0, count($refs), '?')) . ') FOR UPDATE', $refs);
         foreach ($linkedRequests as $linkedRequest) {
+          if (ContractRequestReopenService::answered($linkedRequest)) throw new \DomainException('El caso conserva solicitudes contestadas. Deben ponerse en proceso antes de eliminarlo.');
           $matches = $this->ticketsForReference($tickets, trim((string) $linkedRequest['id_ticket']));
           if (count($matches) !== 1 || (int) $matches[0]['_ID'] !== $ticketPk) throw new \DomainException('Hay solicitudes con referencias ambiguas. Revisa la vinculación antes de eliminar.');
         }

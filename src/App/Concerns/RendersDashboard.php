@@ -513,6 +513,7 @@ trait RendersDashboard
         'contract_termination_requests' => self::AJAX_CONTRACT_TERMINATION_REQUESTS,
         'contract_termination_respond' => self::AJAX_CONTRACT_TERMINATION_RESPOND,
         'contract_request_delete' => self::AJAX_CONTRACT_REQUEST_DELETE,
+        'contract_request_reopen' => self::AJAX_CONTRACT_REQUEST_REOPEN,
         'contract_non_renewal_requests' => self::AJAX_CONTRACT_NON_RENEWAL_REQUESTS,
         'contract_non_renewal_respond' => self::AJAX_CONTRACT_NON_RENEWAL_RESPOND,
         'contracts_ending_months' => self::AJAX_CONTRACTS_ENDING_MONTHS,
@@ -914,9 +915,12 @@ trait RendersDashboard
                   <div class="space-y-2">
                     <div class="flex flex-wrap items-center gap-2"><span class="scm-contract-kicker">Contratos</span><span class="inline-flex items-center gap-1.5 text-xs"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>Gestión de arrendamiento</span></div>
                     <h3><?php echo esc_html($requestView['title']); ?></h3>
-                    <p>Responde si la solicitud está dentro o fuera de término, elige destinatarios y cierra el ticket con acta.</p>
+                    <p data-contract-description>Responde si la solicitud está dentro o fuera de término, elige destinatarios y cierra el ticket con acta.</p>
                   </div>
-                  <button type="button" class="scm-contract-button shrink-0" data-scm-contract-<?php echo $requestKind; ?>-refresh><svg class="scm-contract-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 7v5h-5M4 17v-5h5M6 8a7 7 0 0 1 12-3l2 2M4 17l2 2a7 7 0 0 0 12-3"/></svg>Actualizar</button>
+                  <div class="flex flex-wrap items-center gap-2 shrink-0">
+                    <button type="button" class="scm-contract-button" data-contract-view-toggle aria-pressed="false">Ver contestadas</button>
+                    <button type="button" class="scm-contract-button" data-scm-contract-<?php echo $requestKind; ?>-refresh><svg class="scm-contract-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 7v5h-5M4 17v-5h5M6 8a7 7 0 0 1 12-3l2 2M4 17l2 2a7 7 0 0 0 12-3"/></svg>Actualizar</button>
+                  </div>
                 </div>
                 <div class="scm-contract-status" data-scm-contract-<?php echo $requestKind; ?>-status role="status">Cargando solicitudes pendientes...</div>
                 <div class="scm-contract-metrics" data-scm-contract-<?php echo $requestKind; ?>-summary></div>
@@ -934,7 +938,7 @@ trait RendersDashboard
                   </div>
                 </div>
                 <div class="flex flex-col gap-5" data-scm-contract-<?php echo $requestKind; ?>-list></div>
-                <div class="rounded-xl bg-[#f2f3ff] p-4 text-xs leading-relaxed"><strong class="block mb-1">Respuesta contractual</strong>Al responder se generará el acta y se cerrará la solicitud. La creación del ticket comercial de retención es opcional.</div>
+                <div class="rounded-xl bg-[#f2f3ff] p-4 text-xs leading-relaxed" data-contract-pending-note><strong class="block mb-1">Respuesta contractual</strong>Al responder se generará el acta y se cerrará la solicitud. La creación del ticket comercial de retención es opcional.</div>
               </section>
             </div>
             <?php endforeach; ?>

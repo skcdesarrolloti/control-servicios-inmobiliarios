@@ -112,6 +112,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_TERMINATION_REQUESTS = 'scm_solicitudes_terminacion_contrato';
   const AJAX_CONTRACT_TERMINATION_RESPOND = 'scm_responder_terminacion_contrato';
   const AJAX_CONTRACT_REQUEST_DELETE = 'scm_eliminar_solicitud_contractual';
+  const AJAX_CONTRACT_REQUEST_REOPEN = 'scm_reabrir_solicitud_contractual';
   const AJAX_CONTRACT_NON_RENEWAL_REQUESTS = 'scm_solicitudes_no_prorroga_contrato';
   const AJAX_CONTRACT_NON_RENEWAL_RESPOND = 'scm_responder_no_prorroga_contrato';
   const AJAX_CONTRACTS_ENDING_MONTHS = 'scm_contratos_por_terminar';

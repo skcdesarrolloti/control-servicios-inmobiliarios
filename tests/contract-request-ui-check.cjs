@@ -38,13 +38,20 @@ eval('?>' . substr($source, $start, $end - $start));
       var ajaxUrl = 'synthetic', actionContractTerminationRequests = 'termination-list', actionContractNonRenewalRequests = 'non-renewal-list';
       var actionContractTerminationRespond = 'termination-save', actionContractNonRenewalRespond = 'non-renewal-save';
       var actionContractRequestDelete = 'request-delete', nextDeleteError = false;
+      var actionContractRequestReopen = 'request-reopen', nextReopenError = false, answeredFixture = null, listRequests = [];
       var requests = [], messages = [];
       function escHtml(value) { var el = document.createElement('div'); el.textContent = String(value == null ? '' : value); return el.innerHTML.replace(/"/g, '&quot;'); }
       function formatDashboardCount(n) { return String(n); }
       function dashboardDueCaseAttrsHtml() { return ' data-ticket-pk="41"'; }
       function showToast(kind, text) { messages.push({kind,text}); }
-      function dashboardAction() { return Promise.resolve(fixture); }
-      function dashboardFormAction(action, fill) { var fd = new FormData(); fill(fd); requests.push({action,data:Array.from(fd.entries())}); if (nextDeleteError && action === 'request-delete') { nextDeleteError = false; return Promise.reject(new Error('Fallo simulado al eliminar')); } return Promise.resolve({message:'Guardado simulado'}); }
+      function dashboardAction(action, payload) { listRequests.push({action,payload}); return Promise.resolve(payload && payload.view === 'answered' ? answeredFixture : fixture); }
+      function dashboardFormAction(action, fill) {
+        var fd = new FormData(); fill(fd); requests.push({action,data:Array.from(fd.entries())});
+        if (nextDeleteError && action === 'request-delete') { nextDeleteError = false; return Promise.reject(new Error('Fallo simulado al eliminar')); }
+        if (nextReopenError && action === 'request-reopen') { nextReopenError = false; return Promise.reject(new Error('Fallo simulado al reabrir')); }
+        if (action === 'request-reopen') { answeredFixture.items = answeredFixture.items.filter(row => row.solicitud_id !== fd.get('solicitud_id')); answeredFixture.count = answeredFixture.items.length; }
+        return Promise.resolve({message:'Guardado simulado'});
+      }
       var base = {solicitud_id:'41',ticket_pk:'41',id_ticket:'10863',titulo:'Ticket #10863',asunto:'Solicitud de terminación de contrato de arrendamiento',creado:'05/10/2026 08:54',contrato:'2000',inmueble:'204578',direccion:'Urbanización Simón Bolívar manzana 20 lote 7',solicitante:'ARRENDATARIO DE EJEMPLO',estado:'Nuevo',estado_administrativo:'Nuevo',estado_solicitud:'Pendiente',fecha_solicitud:'2026-10-05',fin_contrato:'2027-01-09',fin_contrato_label:'09/01/2027',fecha_limite_label:'09/10/2026',term_status:'dentro',term_label:'Dentro de término',term_hint:'Solicitud recibida antes o el 09/10/2026.',case:{case_source_html:'<p>Detalle del caso</p>'},retention_ticket:{enabled:true,default_employee_id:'13',funcionarios:[{id:'13',name:'Funcionario de Ejemplo',cargo:'Asistente de Desarrollo TI'}],assignment_help:[{label:'Contrato',value:'#2000'},{label:'Contrato de',value:'Arrendatario: CLIENTE / Propietario: PROPIETARIO'},{label:'Inmueble',value:'Inmueble 204578 · Urbanización Simón Bolívar'},{label:'Funcionario relacionado',value:'Funcionario de Ejemplo · Asistente de Desarrollo TI'},{label:'Sugerido para asignar',value:'Funcionario de Ejemplo · Asistente de Desarrollo TI'}]},recipients:[{value:'tenant',label:'Arrendatario',name:'CLIENTE',email:'cliente@example.invalid',available:true},{value:'owner',label:'Propietario',name:'PROPIETARIO',email:'propietario@example.invalid',available:true},{value:'staff',label:'Funcionario configurado',name:'Funcionario',available:false}]};
       var fixture = {generated_at:'05/10/2026 11:03',count:3,items:[base,Object.assign({},base,{solicitud_id:'42',ticket_pk:'42',titulo:'Ticket #10864',id_ticket:'10864',contrato:'2001',term_status:'fuera',term_label:'Fuera de término'}),Object.assign({},base,{solicitud_id:'43',ticket_pk:'43',titulo:'Ticket #10865',id_ticket:'10865',term_status:'unknown',term_label:'Sin cálculo de término',asunto:'<img src=x onerror=alert(1)>',solicitante:'=1+1'})]};
     ` + functions });
@@ -137,6 +144,49 @@ eval('?>' . substr($source, $start, $end - $start));
       assert.equal(payload.request_kind,kind); assert.equal(payload.ticket_pk,'41'); assert.equal(payload.solicitud_id,'41'); assert.equal(payload.confirm_delete,'1');
       assert.equal(await panel.locator('.scm-contract-card').count(),3,'successful delete refreshes from server');
     }
+    for (const kind of ['termination','non-renewal']) {
+      await page.evaluate(kind => {
+        document.querySelectorAll('[data-calendar-section-panel]').forEach(el => el.style.display = el.id.endsWith('contract-'+kind) ? 'block' : 'none');
+        answeredFixture = Object.assign({},fixture,{view:'answered',can_delete:true,can_reopen:true,count:2,items:fixture.items.slice(0,2).map((row,i)=>Object.assign({},row,{solicitud_id:String(91+i),ticket_pk:String(91+i),estado:'Cerrado',estado_administrativo:'Finalizado',estado_solicitud:'Contestada'}))});
+        renderContractRequests(fixture,kind);
+      },kind);
+      const panel = page.locator('[data-scm-contract-'+kind+'-panel]');
+      await panel.locator('[data-contract-view-toggle]').click();
+      await page.waitForFunction(kind => document.querySelector('[data-scm-contract-'+kind+'-panel]').scmContractData.view === 'answered',kind);
+      assert.equal(await panel.locator('[data-contract-view-toggle]').innerText(),'Ver pendientes');
+      assert.equal(await panel.locator('[data-contract-request-delete]').count(),0,'answered never exposes delete even with a stale permission flag');
+      assert.equal(await panel.locator('[data-scm-contract-'+kind+'-respond]').count(),0,'answered does not respond again before reopening');
+      assert.equal(await panel.locator('[data-contract-request-reopen]').count(),2);
+      assert((await panel.locator('[data-scm-contract-'+kind+'-summary]').innerText()).toLocaleLowerCase('es').includes('contestadas'));
+      await page.screenshot({path:path.join(qaDir,kind+'-answered-desktop.png'),fullPage:true});
+      await page.evaluate(kind => loadContractRequests(kind,true),kind);
+      assert.equal(await panel.locator('[data-contract-request-reopen]').count(),2,'refresh stays in answered view');
+      const listPayload = await page.evaluate(() => listRequests[listRequests.length-1]);
+      assert.equal(listPayload.payload.view,'answered');
+      const reopensBefore = await page.evaluate(() => requests.filter(r=>r.action==='request-reopen').length);
+      await panel.locator('[data-contract-request-reopen]').first().click();
+      await page.locator('.swal2-cancel').click();
+      await page.waitForFunction(() => !Swal.isVisible());
+      assert.equal(await page.evaluate(() => requests.filter(r=>r.action==='request-reopen').length),reopensBefore,'cancel does not reopen');
+      await page.evaluate(() => nextReopenError = true);
+      await panel.locator('[data-contract-request-reopen]').first().click();
+      await page.locator('.swal2-confirm').click();
+      await page.waitForFunction(() => document.querySelector('.swal2-validation-message').textContent.includes('Fallo simulado al reabrir'));
+      await page.locator('.swal2-confirm').click();
+      await page.waitForFunction(() => !Swal.isVisible());
+      await page.waitForFunction(kind => document.querySelector('[data-scm-contract-'+kind+'-panel]').scmContractData.count === 1,kind);
+      const reopening = await page.evaluate(() => requests.filter(r=>r.action==='request-reopen').at(-1));
+      const payload = Object.fromEntries(reopening.data);
+      assert.equal(payload.request_kind,kind); assert.equal(payload.ticket_pk,'91'); assert.equal(payload.solicitud_id,'91'); assert.equal(payload.confirm_reopen,'1');
+      assert.equal(await panel.locator('[data-contract-request-reopen]').count(),1,'reopened row leaves answered list');
+      await page.setViewportSize({width:390,height:844});
+      assert(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth),'answered mobile layout fits screen');
+      await page.screenshot({path:path.join(qaDir,kind+'-answered-mobile.png'),fullPage:true});
+      await page.setViewportSize({width:1280,height:1100});
+      await panel.locator('[data-contract-view-toggle]').click();
+      await page.waitForFunction(kind => document.querySelector('[data-scm-contract-'+kind+'-panel]').scmContractView === 'pending',kind);
+      assert.equal(await panel.locator('[data-contract-request-delete]').count(),3,'pending keeps delete');
+    }
     await page.evaluate(() => { document.querySelector('#scm-home-calendar-section-contract-termination').style.display='block'; document.querySelector('#scm-home-calendar-section-contract-non-renewal').style.display='none'; });
     await page.setViewportSize({width:390,height:844});
     await page.evaluate(() => openContractTerminationResponse('41'));
@@ -155,6 +205,6 @@ eval('?>' . substr($source, $start, $end - $start));
     assert.equal(await page.locator('[data-scm-contract-non-renewal-panel]').getAttribute('data-scm-loaded'),'1','empty responses are cached');
     assert((await page.locator('[data-scm-contract-non-renewal-list]').innerText()).includes('No hay solicitudes'));
     assert.deepEqual(errors,[]);
-    console.log('PASS: both panels, escaping, filters, CSV, both modal validations, retention and recipients, delete permission visibility, cancellation, error retry, confirmed payloads, refresh, yellow CTA and mobile layout. QA: '+qaDir);
+    console.log('PASS: both panels, filters, CSV, response modals, deletion, answered toggles, answered refresh, no delete/respond in history, reopen cancellation/error/payload/refresh and mobile layout. QA: '+qaDir);
   } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exitCode=1;});

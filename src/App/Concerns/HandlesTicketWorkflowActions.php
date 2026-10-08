@@ -867,7 +867,8 @@ trait HandlesTicketWorkflowActions
     }
 
     try {
-      $items = $this->contractTerminationRequestItems(150);
+      $answered = (string) ($_POST['view'] ?? '') === 'answered';
+      $items = $this->contractTerminationRequestItems(150, true, $answered);
     } catch (\Throwable $exception) {
       error_log('[contract_termination_requests] ' . $exception->getMessage());
       $this->jsonFail('No se pudieron cargar las solicitudes de terminación.');
@@ -876,7 +877,9 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk([
       'items' => $items,
       'count' => count($items),
-      'can_delete' => $this->canUseDashboardAction('case_respond'),
+      'view' => $answered ? 'answered' : 'pending',
+      'can_delete' => !$answered && $this->canUseDashboardAction('case_respond'),
+      'can_reopen' => $answered && $this->canUseDashboardAction('case_respond'),
       'generated_at' => date('d/m/Y H:i'),
     ]);
   }
@@ -903,6 +906,29 @@ trait HandlesTicketWorkflowActions
     } catch (\Throwable $error) {
       error_log('[contract_request_delete] ' . $error->getMessage());
       $this->jsonFail('No se pudo eliminar el caso y su solicitud. No se guardó la eliminación.');
+    }
+    $this->jsonOk($result);
+  }
+
+  public function ajax_handler_contract_request_reopen(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_respond')) $this->jsonFail('No tienes permiso para poner solicitudes en proceso.');
+    if ((string) ($_POST['confirm_reopen'] ?? '') !== '1') $this->jsonFail('Confirma que deseas poner la solicitud en proceso.');
+    $kind = (string) ($_POST['request_kind'] ?? '');
+    if (!in_array($kind, ['termination', 'non-renewal'], true)) $this->jsonFail('Tipo de solicitud inválido.');
+    try {
+      $employee = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_funcionarios') . '` WHERE `_ID` = ?', [Auth::userId()]) ?? [];
+      $result = (new \SCM\Modules\Contracts\ContractRequestReopenService($this->db))->reopen(
+        $kind, (int) ($_POST['ticket_pk'] ?? 0), (int) ($_POST['solicitud_id'] ?? 0),
+        ['employee_id' => trim((string) ($employee['id_empleado'] ?? '')), 'name' => (string) ($employee['nombre'] ?? Auth::user())],
+        fn(array $ticket): bool => $kind === 'termination' ? $this->isContractTerminationTicket($ticket) : $this->isContractNonRenewalTicket($ticket)
+      );
+    } catch (\DomainException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      error_log('[contract_request_reopen] ' . $error->getMessage());
+      $this->jsonFail('No se pudo poner la solicitud en proceso. No se guardaron cambios.');
     }
     $this->jsonOk($result);
   }
@@ -1018,7 +1044,8 @@ trait HandlesTicketWorkflowActions
     }
 
     try {
-      $items = $this->contractNonRenewalRequestItems(150);
+      $answered = (string) ($_POST['view'] ?? '') === 'answered';
+      $items = $this->contractNonRenewalRequestItems(150, true, $answered);
     } catch (\Throwable $exception) {
       error_log('[contract_non_renewal_requests] ' . $exception->getMessage());
       $this->jsonFail('No se pudieron cargar las solicitudes de no prórroga.');
@@ -1027,7 +1054,9 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk([
       'items' => $items,
       'count' => count($items),
-      'can_delete' => $this->canUseDashboardAction('case_respond'),
+      'view' => $answered ? 'answered' : 'pending',
+      'can_delete' => !$answered && $this->canUseDashboardAction('case_respond'),
+      'can_reopen' => $answered && $this->canUseDashboardAction('case_respond'),
       'generated_at' => date('d/m/Y H:i'),
     ]);
   }
@@ -3875,13 +3904,13 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @return array<int,array<string,mixed>> */
-  private function contractTerminationRequestItems(int $limit = 150, bool $includeCase = true): array
+  private function contractTerminationRequestItems(int $limit = 150, bool $includeCase = true, bool $answered = false): array
   {
     $table = $this->db->table('jet_cct_solicitudes_terminacion_contrato');
     if (!$this->table_exists($table)) {
       return [];
     }
-    [$whereSql, $args] = $this->contractTerminationWhereSql($table, 't');
+    [$whereSql, $args] = $this->contractTerminationWhereSql($table, 't', $answered);
     if ($whereSql === '') {
       return [];
     }
@@ -3895,7 +3924,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @return array<int,array<string,mixed>> */
-  private function contractNonRenewalRequestItems(int $limit = 150, bool $includeCase = true): array
+  private function contractNonRenewalRequestItems(int $limit = 150, bool $includeCase = true, bool $answered = false): array
   {
     $table = $this->db->table('jet_cct_tickets');
     if (!$this->table_exists($table)) {
@@ -3905,7 +3934,7 @@ trait HandlesTicketWorkflowActions
     if ($select === []) {
       return [];
     }
-    $where = $this->contractNonRenewalWhereSql($table, 't');
+    $where = $this->contractNonRenewalWhereSql($table, 't', $answered);
     if ($where === '') {
       return [];
     }
@@ -3936,18 +3965,19 @@ trait HandlesTicketWorkflowActions
     }
   }
 
-  private function contractNonRenewalWhereSql(string $table, string $alias = 't'): string
+  private function contractNonRenewalWhereSql(string $table, string $alias = 't', bool $answered = false): string
   {
     $prefix = $alias !== '' ? $alias . '.' : '';
     if ($this->column_exists($table, 'tema_ayuda')) {
       $where = "LOWER(TRIM(COALESCE({$prefix}`tema_ayuda`, ''))) IN ('no prorroga de contrato', 'no prórroga de contrato')";
+      if ($answered) return $where . ' AND ' . $this->contractAnsweredWhereSql($table, $prefix, true);
       if ($this->column_exists($table, 'estado')) {
         $where .= " AND LOWER(TRIM(COALESCE({$prefix}`estado`, ''))) NOT IN ('cerrado', 'cerrada', 'finalizado', 'finalizada', 'anulado', 'anulada')";
       }
       if ($this->column_exists($table, 'estado_administrativo')) {
         $where .= " AND LOWER(TRIM(COALESCE({$prefix}`estado_administrativo`, ''))) NOT IN ('finalizado', 'finalizada', 'cerrado', 'cerrada')";
       }
-      return $where;
+      return $where . ' AND NOT (' . $this->contractAnsweredWhereSql($table, $prefix, true) . ')';
     }
     $topicCols = array_values(array_filter(
       ['tipo_pqrs', 'tema_ayuda', 'asunto'],
@@ -3964,13 +3994,14 @@ trait HandlesTicketWorkflowActions
     $allHaystack = "LOWER(CONCAT_WS(' ', " . implode(', ', array_map(fn(string $column): string => "COALESCE({$prefix}`{$column}`, '')", $allTextCols)) . '))';
     $where = "({$topicHaystack} LIKE '%no prorroga%' OR {$topicHaystack} LIKE '%no prórroga%' OR {$topicHaystack} LIKE '%no renovacion%' OR {$topicHaystack} LIKE '%no renovación%' OR {$topicHaystack} LIKE '%no prorrogacion%' OR {$topicHaystack} LIKE '%no prorrogación%')";
     $where .= " AND {$allHaystack} NOT LIKE '%terminacion%' AND {$allHaystack} NOT LIKE '%terminación%' AND {$allHaystack} NOT LIKE '%desocupacion%' AND {$allHaystack} NOT LIKE '%desocupación%'";
+    if ($answered) return $where . ' AND ' . $this->contractAnsweredWhereSql($table, $prefix, true);
     if ($this->column_exists($table, 'estado')) {
       $where .= " AND LOWER(TRIM(COALESCE({$prefix}`estado`, ''))) NOT IN ('cerrado', 'cerrada', 'finalizado', 'finalizada', 'anulado', 'anulada')";
     }
     if ($this->column_exists($table, 'estado_administrativo')) {
       $where .= " AND LOWER(TRIM(COALESCE({$prefix}`estado_administrativo`, ''))) NOT IN ('finalizado', 'finalizada', 'cerrado', 'cerrada')";
     }
-    return $where;
+    return $where . ' AND NOT (' . $this->contractAnsweredWhereSql($table, $prefix, true) . ')';
   }
 
   private function contractTerminationPendingCount(): int
@@ -4043,17 +4074,33 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @return array{0:string,1:array<int,mixed>} */
-  private function contractTerminationWhereSql(string $table, string $alias): array
+  private function contractTerminationWhereSql(string $table, string $alias, bool $answered = false): array
   {
     $p = trim($alias) !== '' ? trim($alias) . '.' : '';
     $where = [];
     if ($this->column_exists($table, 'tema_ayuda')) {
       $where[] = "LOWER(TRIM(COALESCE({$p}`tema_ayuda`, ''))) IN ('terminacion de contrato', 'terminación de contrato')";
     }
+    if ($answered) {
+      $where[] = $this->contractAnsweredWhereSql($table, $p);
+      return [implode(' AND ', $where), []];
+    }
     if ($this->column_exists($table, 'estado')) {
       $where[] = "LOWER(TRIM(COALESCE({$p}`estado`, ''))) NOT IN ('respondida', 'respondido', 'dentro de término', 'dentro de termino', 'fuera de término', 'fuera de termino', 'cerrada', 'cerrado', 'finalizada', 'finalizado', 'anulada', 'anulado')";
     }
     return [$where !== [] ? implode(' AND ', $where) : '1 = 1', []];
+  }
+
+  private function contractAnsweredWhereSql(string $table, string $prefix, bool $includeAdmin = false): string
+  {
+    $states = "'" . implode("','", \SCM\Modules\Contracts\ContractRequestReopenService::ANSWERED_STATES) . "'";
+    $where = [];
+    foreach ($includeAdmin ? ['estado', 'estado_administrativo'] : ['estado'] as $column) {
+      if ($this->column_exists($table, $column)) $where[] = "LOWER(TRIM(COALESCE({$prefix}`{$column}`, ''))) IN ({$states})";
+    }
+    $sql = $where ? '(' . implode(' OR ', $where) . ')' : '1 = 0';
+    if ($this->column_exists($table, 'estado')) $sql .= " AND LOWER(TRIM(COALESCE({$prefix}`estado`, ''))) NOT IN ('anulado','anulada')";
+    return $sql;
   }
 
   private function contractTerminationOrderSql(string $table, string $alias): string
@@ -4364,7 +4411,7 @@ trait HandlesTicketWorkflowActions
       'titulo' => 'Ticket #' . ($logicalTicket !== '' ? $logicalTicket : $ticketPk),
       'asunto' => $subject,
       'estado' => $this->contractTerminationFirstText([$row], ['estado']) ?: '-',
-      'estado_solicitud' => 'Pendiente',
+      'estado_solicitud' => \SCM\Modules\Contracts\ContractRequestReopenService::answered($row, true) ? 'Contestada' : 'Pendiente',
       'estado_administrativo' => $this->contractTerminationFirstText([$row], ['estado_administrativo']) ?: '-',
       'contrato' => $this->contractTerminationFirstText([$row], ['contrato', 'id_contrato']) ?: '-',
       'inmueble' => $this->contractTerminationFirstText([$row], ['inmueble', 'id_inmueble']) ?: '-',
