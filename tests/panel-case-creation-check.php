@@ -45,6 +45,8 @@ $check(count($service->searchPanelContracts('QATENANT456', 'arrendatario')) === 
 $check($service->searchPanelContracts("%' OR 1=1 --", 'contrato') === [], 'query is escaped and parameterized');
 $options = $service->panelCaseOptions();
 $check(count($options['employees']) === 4, 'active employees outside panel cargos remain assignable');
+$criticalTheme = SCM\Modules\Pending\PublicServicesCriticalTicket::TOPIC;
+$check(in_array($criticalTheme, $options['themes'], true) && $options['theme_departments'][$criticalTheme] === 'Servicio al arrendatario', 'panel offers canonical critical public service topic and department');
 $input = ['asunto' => 'Revisar fuga <script>texto</script>', 'descripcion' => 'Descripción de prueba', 'tema_ayuda' => 'Reparaciones necesarias', 'departamento' => 'Mantenimiento', 'id_empleado' => '9002', 'contract_id' => 801, 'has_attachments' => 'No'];
 foreach ([['contract_id' => 999999], ['id_empleado' => '9004'], ['id_empleado' => '9005'], ['tema_ayuda' => 'Tema inventado'], ['departamento' => 'Departamento inventado'], ['has_attachments' => 'Si'], ['asunto' => '']] as $invalid) {
   try { $service->createPanelTicket(array_merge($input, $invalid)); $check(false, 'reject invalid input'); }
@@ -101,4 +103,10 @@ $db->pdo()->exec("UPDATE `{$queueTable}` SET scheduled_at = DATE_SUB(UTC_TIMESTA
 $worker->run(10, 'control-servicios-inmobiliarios');
 $check((int) $db->getVar("SELECT COUNT(*) FROM `{$queueTable}` WHERE status = 'sent'") === 2, 'inert provider worker completes shared emails');
 $check((int) $db->getVar("SELECT COUNT(*) FROM `{$attemptsTable}`") === 2, 'worker logs attempts without contacting real recipients');
+
+$criticalResult = $service->createPanelTicket(array_replace($input, ['tema_ayuda' => $criticalTheme, 'departamento' => 'Servicio al arrendatario']));
+$criticalTicket = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_tickets') . '` WHERE `_ID` = ?', [(int) $criticalResult['ticket_id']]);
+$check($criticalTicket['tema_ayuda'] === $criticalTheme && $criticalTicket['departamento'] === 'Servicio al arrendatario', 'critical public service topic persists with canonical value');
+$criticalMail = $db->getRow('SELECT * FROM `' . $queueTable . '` WHERE dedupe_key LIKE ? LIMIT 1', ['nuevo_caso_panel:' . $criticalResult['ticket_id'] . '%']);
+$check($criticalResult['queued'] === 2 && $criticalMail && str_contains($criticalMail['message_html'], $criticalTheme), 'critical topic appears in queued assignment email');
 echo $checks . " checks passed.\n";

@@ -15,7 +15,7 @@ const assert = require('node:assert/strict');
       const field = name => body.match(new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]+)`))?.[1];
       const action = field('action');
       let data;
-      if (action === 'scm_panel_case_options') data = {themes: ['Reparaciones necesarias', 'Solicitud contractual'], departments: ['Mantenimiento', 'Contractual'], theme_departments: {'Reparaciones necesarias': 'Mantenimiento', 'Solicitud contractual': 'Contractual'}, employees: [{employee_id: '9002', name: 'Responsable Ejemplo', cargo: 'Coordinación', email: 'responsable@example.invalid'}], max_file_bytes: 10485760};
+      if (action === 'scm_panel_case_options') data = {themes: ['Reparaciones necesarias', 'Solicitud contractual', 'Servicio publico critico'], departments: ['Mantenimiento', 'Contractual', 'Servicio al arrendatario'], theme_departments: {'Reparaciones necesarias': 'Mantenimiento', 'Solicitud contractual': 'Contractual', 'Servicio publico critico': 'Servicio al arrendatario'}, employees: [{employee_id: '9002', name: 'Responsable Ejemplo', cargo: 'Coordinación', email: 'responsable@example.invalid'}], max_file_bytes: 10485760};
       if (action === 'scm_panel_case_search') data = {contracts: [{_ID: '801', contrato: 'QA801', inmueble: 'SIMI8001', direccion: 'Calle de ejemplo 123', estado: 'Entregado', propietario: 'Propietario Ejemplo', arrendatario: 'Arrendatario Ejemplo'}]};
       if (action === 'scm_panel_case_create') {
         await page.evaluate(payload => { window.submissions.push(payload); }, {id: field('request_id'), contract: field('contract_id'), employee: field('id_empleado'), attachments: body.includes('evidencia.png'), pasted: body.includes('filename="captura-'), imageCount: [...body.matchAll(/name="imagenes\[\]"; filename="[^"]+"/g)].length});
@@ -71,6 +71,8 @@ const assert = require('node:assert/strict');
     await page.locator('[data-results] button').click();
     await page.locator('[name=asunto]').fill('Revisar fuga');
     await page.locator('[name=descripcion]').fill('Se presenta una fuga de agua en cocina.');
+    await page.locator('[name=tema_ayuda]').selectOption('Servicio publico critico');
+    assert.equal(await page.locator('[name=departamento]').inputValue(), 'Servicio al arrendatario', 'critical service theme suggests its existing workflow department');
     await page.locator('[name=tema_ayuda]').selectOption('Reparaciones necesarias');
     assert.equal(await page.locator('[name=departamento]').inputValue(), 'Mantenimiento', 'theme suggests department');
     await page.locator('[name=id_empleado]').selectOption('9002');

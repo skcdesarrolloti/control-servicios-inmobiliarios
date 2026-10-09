@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Modules\PublicTickets\Concerns;
 
 use SCM\Core\Auth;
+use SCM\Modules\Pending\PublicServicesCriticalTicket;
 use SCM\Support\EmailTemplate;
 use SCM\Support\FuncionarioOptions;
 use SCM\Support\InternalNotificationRecipients;
@@ -15,11 +16,11 @@ trait PanelTicketCreationConcern
 {
   public function panelCaseOptions(): array
   {
-    $themes = self::PQR_THEMES;
+    $themes = [...self::PQR_THEMES, PublicServicesCriticalTicket::TOPIC];
     $departments = ['Servicio al propietario', 'Servicio al arrendatario', 'Servicio a la copropiedad', 'Servicio al cliente'];
-    $themeDepartments = [];
+    $themeDepartments = [PublicServicesCriticalTicket::TOPIC => 'Servicio al arrendatario'];
     foreach ($themes as $theme) {
-      $department = self::getDepartmentForTheme($theme);
+      $department = $themeDepartments[$theme] ?? self::getDepartmentForTheme($theme);
       $themeDepartments[$theme] = $department;
       if ($department !== '') $departments[] = $department;
     }

@@ -4,6 +4,8 @@ El botón **Nuevo Caso** en Métricas abre un popup interno con estilos de Tailw
 
 El formulario pide título, descripción, tema, departamento, funcionario responsable y si hay adjuntos. Los temas y departamentos usan las definiciones del servicio compartido con Guardian; el tema sugiere el departamento, que puede cambiarse. Los responsables son funcionarios con `activo = Si`, sin filtro de cargos. El responsable debe tener correo válido.
 
+El panel también permite el tema `Servicio publico critico`, con el mismo valor de los casos de revisión de servicios públicos. Sugiere el departamento `Servicio al arrendatario`, que puede cambiarse antes de guardar.
+
 El caso sigue la persistencia de `PublicTicketsService` utilizada por el bot, con origen `Panel administrativo` y creador `Funcionario`. El autor del CCT y los historiales usan el `id_empleado` real del creador. La asignación usa el `id_empleado` del responsable. Solo se inicializan los estados del caso nuevo según la regla existente; no se alteran otros casos.
 
 Los pasos de descripción, asignación y adjuntos aparecen únicamente después de seleccionar un contrato. Si cambia la búsqueda, se ocultan y deshabilitan hasta seleccionar nuevamente; el botón de crear sigue la misma condición.
