@@ -52,6 +52,7 @@
           <div data-results class="flex flex-col gap-2 max-h-56 overflow-y-auto"></div>
           <div data-selected hidden class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-slate-700"></div>
         </section>
+        <fieldset data-contract-steps hidden disabled class="min-w-0"><div class="flex flex-col gap-6">
         <section class="flex flex-col gap-4"><h3 class="scm-new-case-section"><span>2</span> Describe y asigna el caso</h3>
           <label class="scm-new-case-label">Título<input name="asunto" required maxlength="200" placeholder="Resume la solicitud"></label>
           <label class="scm-new-case-label">Descripción<textarea name="descripcion" rows="4" required maxlength="10000" placeholder="Describe qué ocurre y qué gestión se necesita"></textarea></label>
@@ -69,8 +70,9 @@
             <label class="scm-new-case-label">Documentos PDF<input type="file" name="archivos[]" accept="application/pdf,.pdf" multiple></label>
           </div><p class="text-xs text-slate-500 mt-3">Hasta 10 archivos, ${Math.floor(config.max_file_bytes / 1024 / 1024)} MB por archivo y 25 MB en total. Imágenes JPG, PNG o WebP de máximo 16 megapíxeles.</p><ul data-files class="mt-3 text-xs text-slate-600 flex flex-col gap-1"></ul></div>
         </section>
+        </div></fieldset>
         <p data-error hidden role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"></p>
-        <footer class="border-t border-slate-200 pt-4 flex flex-wrap items-center justify-between gap-3"><p class="text-xs text-slate-500 max-w-sm">Los avisos se encolan al guardar. Las copias se configuran en Notificaciones internas.</p><div class="flex gap-2"><button type="button" data-cancel class="scm-new-case-button">Cancelar</button><button type="submit" class="scm-new-case-primary">Crear caso</button></div></footer>
+        <footer class="border-t border-slate-200 pt-4 flex flex-wrap items-center justify-between gap-3"><p class="text-xs text-slate-500 max-w-sm">Los avisos se encolan al guardar. Las copias se configuran en Notificaciones internas.</p><div class="flex gap-2"><button type="button" data-cancel class="scm-new-case-button">Cancelar</button><span data-create-action hidden><button type="submit" disabled class="scm-new-case-primary">Crear caso</button></span></div></footer>
       </form>`;
       const form = current.querySelector('form');
       const error = current.querySelector('[data-error]');
@@ -80,7 +82,14 @@
       const results = current.querySelector('[data-results]');
       const status = current.querySelector('[data-search-status]');
       const summary = current.querySelector('[data-selected]');
-      const invalidateSelection = () => { sequence++; selected = null; summary.hidden = true; results.replaceChildren(); status.textContent = 'Busca y selecciona el contrato correspondiente.'; };
+      const contractSteps = current.querySelector('[data-contract-steps]');
+      const setContractStepsVisible = visible => {
+        contractSteps.hidden = !visible;
+        contractSteps.disabled = !visible;
+        current.querySelector('[data-create-action]').hidden = !visible;
+        form.querySelector('[type=submit]').disabled = !visible;
+      };
+      const invalidateSelection = () => { sequence++; selected = null; summary.hidden = true; setContractStepsVisible(false); showError(''); results.replaceChildren(); status.textContent = 'Busca y selecciona el contrato correspondiente.'; };
       searchInput.oninput = invalidateSelection;
       searchBy.onchange = invalidateSelection;
       const search = async () => {
@@ -104,6 +113,7 @@
               results.replaceChildren();
               summary.innerHTML = `<strong>Contrato ${escape(contract.contrato)} · SIMI ${escape(contract.inmueble)}</strong><p class="mt-1">${escape(contract.direccion)}</p><p class="text-xs mt-1">Propietario: ${escape(contract.propietario)} · Arrendatario: ${escape(contract.arrendatario)}</p>`;
               summary.hidden = false; status.textContent = 'Contrato seleccionado. Puedes cambiarlo realizando otra búsqueda.';
+              setContractStepsVisible(true);
               form.elements.asunto.focus();
             };
             results.append(button);

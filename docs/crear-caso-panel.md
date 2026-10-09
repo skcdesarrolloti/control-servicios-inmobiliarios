@@ -6,6 +6,8 @@ El formulario pide título, descripción, tema, departamento, funcionario respon
 
 El caso sigue la persistencia de `PublicTicketsService` utilizada por el bot, con origen `Panel administrativo` y creador `Funcionario`. El autor del CCT y los historiales usan el `id_empleado` real del creador. La asignación usa el `id_empleado` del responsable. Solo se inicializan los estados del caso nuevo según la regla existente; no se alteran otros casos.
 
+Los pasos de descripción, asignación y adjuntos aparecen únicamente después de seleccionar un contrato. Si cambia la búsqueda, se ocultan y deshabilitan hasta seleccionar nuevamente; el botón de crear sigue la misma condición.
+
 ## Adjuntos
 
 - Hasta 10 archivos, máximo 10 MB por archivo (o el límite menor configurado) y 25 MB en total.
