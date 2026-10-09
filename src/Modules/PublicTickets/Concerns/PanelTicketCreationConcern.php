@@ -10,6 +10,7 @@ use SCM\Support\EmailTemplate;
 use SCM\Support\FuncionarioOptions;
 use SCM\Support\InternalNotificationRecipients;
 use SCM\Support\PanelCaseAttachments;
+use SCM\Support\PanelCaseNotifications;
 use SCM\Support\SharedNotificationsBridge;
 
 trait PanelTicketCreationConcern
@@ -39,6 +40,7 @@ trait PanelTicketCreationConcern
       'theme_departments' => $themeDepartments,
       'employees' => FuncionarioOptions::panelFuncionarios($this->db, $this->schema, 'employee', null, true),
       'max_file_bytes' => min((int) SCM_UPLOAD_MAX_BYTES, 10 * 1024 * 1024),
+      'whatsapp_enabled' => PanelCaseNotifications::config()['enabled'],
     ];
   }
 
@@ -116,6 +118,8 @@ trait PanelTicketCreationConcern
     }
     $contract = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_contratos_arrendamiento') . '` WHERE `_ID` = ? LIMIT 1', [(int) ($input['contract_id'] ?? 0)]);
     if (!$contract) throw new \InvalidArgumentException('Selecciona un contrato existente.');
+    $notifications = new PanelCaseNotifications($this->db, $this->schema);
+    $notificationPlan = $notifications->prepare($contract, $assignee, $input);
     $attachments = new PanelCaseAttachments();
     $attachments->validate($input);
     $tickets = $this->db->table('jet_cct_tickets');
@@ -157,8 +161,10 @@ trait PanelTicketCreationConcern
         'meta' => ['ticket_id' => $id, 'contract_id' => (int) $contract['_ID'], 'created_by_employee_id' => $creator['employee_id'], 'assigned_employee_id' => $assignee['employee_id']],
       ]);
       if ($queued !== count($recipients)) throw new \RuntimeException('No se pudieron encolar todos los correos. El caso no se guardó; intenta nuevamente.');
+      $extra = $notifications->enqueue($notificationPlan, $id, $contract, $title, $description, $theme, $creator, $recipients);
       $pdo->commit();
-      return ['ticket_id' => $id, 'queued' => $queued, 'message' => 'Caso #' . $id . ' creado. Correos encolados: ' . $queued . '.'];
+      $queued += $extra['email'];
+      return ['ticket_id' => $id, 'queued' => $queued, 'whatsapp_queued' => $extra['whatsapp'], 'message' => 'Caso #' . $id . ' creado. Correos encolados: ' . $queued . '. WhatsApp encolados: ' . $extra['whatsapp'] . '. ' . $extra['warning']];
     } catch (\Throwable $e) {
       if ($pdo->inTransaction()) $pdo->rollBack();
       $attachments->cleanup($stored);

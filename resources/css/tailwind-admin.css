@@ -230,7 +230,8 @@
   .scm-new-case-section { @apply flex items-center gap-2 text-sm font-semibold text-slate-900; }
   .scm-new-case-section > span { @apply flex h-6 w-6 items-center justify-center rounded-full bg-[#0f1e36] text-xs text-white; }
   .scm-new-case-label { @apply flex flex-col gap-2 text-xs font-semibold text-slate-700; }
-  .scm-new-case input, .scm-new-case select, .scm-new-case textarea { @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-[#0f1e36]/10 disabled:opacity-50; }
+  .scm-new-case input:not([type=checkbox]), .scm-new-case select, .scm-new-case textarea { @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-[#0f1e36]/10 disabled:opacity-50; }
+  .scm-new-case input[type=checkbox] { @apply h-4 w-4 shrink-0 rounded border-slate-300; accent-color:#0f1e36; }
   .scm-new-case-button { @apply inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50; }
   .scm-new-case-primary { @apply inline-flex items-center justify-center rounded-xl bg-[#0f1e36] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#162846] disabled:opacity-50; }
   .scm-new-case-result { @apply flex w-full flex-col gap-1 rounded-xl border border-slate-200 bg-white p-3 text-left text-xs text-slate-600 transition-colors hover:bg-slate-50 focus:ring-2 focus:ring-[#0f1e36]/10; }

@@ -10399,6 +10399,13 @@
         fd.append("action", actionInternalNotificationsSave);
         fd.append("nonce", nonce);
         fd.append("settings", JSON.stringify(collectSettings()));
+        var caseScope = form.querySelector('[data-case-notifications]');
+        if (caseScope) fd.append('case_notifications', JSON.stringify({
+          enabled: caseScope.querySelector('[name="case_whatsapp_enabled"]').checked,
+          assigned_template: caseScope.querySelector('[name="case_assigned_template"]').value,
+          external_template: caseScope.querySelector('[name="case_external_template"]').value,
+          language: caseScope.querySelector('[name="case_template_language"]').value
+        }));
         var receiptScope = form.querySelector('[data-receipt-automation]');
         if (receiptScope) fd.append('receipt_automation', JSON.stringify({
           enabled: receiptScope.querySelector('[name="receipt_enabled"]').checked,

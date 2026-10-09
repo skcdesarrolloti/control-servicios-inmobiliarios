@@ -1979,6 +1979,7 @@ trait RendersDashboard
     };
 
     $receiptConfig = \SCM\Modules\Contracts\ContractReceiptSettings::read($this->db);
+    $caseNotificationConfig = \SCM\Support\PanelCaseNotifications::config();
     $receiptEmployees = \SCM\Support\FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db), 'employee', true);
     $receiptOptions = static function (string $selected) use ($receiptEmployees): string {
       $html = '<option value="">Selecciona un funcionario</option>';
@@ -2022,6 +2023,17 @@ trait RendersDashboard
         </div>
         <form id="scm-internal-notifications-form" class="scm-internal-notifications-form" autocomplete="off">
           <div class="scm-config-info-strip"><strong>Acciones y destinatarios internos:</strong> Selecciona uno o varios funcionarios por acci&oacute;n. Si una acci&oacute;n queda vac&iacute;a, no se env&iacute;an avisos internos para esa actividad.</div>
+          <section data-case-notifications class="m-4 rounded-2xl border border-slate-200 bg-slate-50 p-5 flex flex-col gap-4">
+            <h4 class="font-bold text-slate-900">Crear casos · WhatsApp oficial</h4>
+            <p class="text-sm text-slate-600">El consultor asignado recibe siempre correo. Al activar WhatsApp también se avisa al consultor, a las copias del evento Crear caso desde el panel y a los interesados seleccionados al crear el caso.</p>
+            <label class="flex items-center gap-3 text-sm text-slate-700"><input type="checkbox" name="case_whatsapp_enabled" <?php echo $caseNotificationConfig['enabled'] ? 'checked' : ''; ?>> Activar WhatsApp con plantillas aprobadas</label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label class="flex flex-col gap-2 text-sm text-slate-700">Plantilla para consultor y copias internas<input class="rounded-xl border border-slate-200 px-3 py-2" name="case_assigned_template" required pattern="[a-z0-9_]+" value="<?php echo esc_attr($caseNotificationConfig['assigned_template']); ?>"></label>
+              <label class="flex flex-col gap-2 text-sm text-slate-700">Plantilla para propietario, arrendatario y copropiedad<input class="rounded-xl border border-slate-200 px-3 py-2" name="case_external_template" required pattern="[a-z0-9_]+" value="<?php echo esc_attr($caseNotificationConfig['external_template']); ?>"></label>
+            </div>
+            <label class="flex flex-col gap-2 text-sm text-slate-700">Código de idioma de ambas plantillas<input class="rounded-xl border border-slate-200 px-3 py-2" name="case_template_language" required pattern="[a-z]{2}(_[A-Z]{2})?" value="<?php echo esc_attr($caseNotificationConfig['language']); ?>"></label>
+            <p class="text-xs text-slate-500">Ambas llevan seis variables: nombre del destinatario, número del caso, título, tema, contrato y responsable. La plantilla interna incluye un botón Ver caso con URL <?php echo esc_html(rtrim((string) SCM_BASE_URL, '/') . '/?scm_case={{1}}'); ?>. La externa no lleva botones ni encabezado. Activa cuando ambas estén aprobadas en Meta.</p>
+          </section>
           <section class="scm-pqr-settings-section" data-receipt-automation>
             <h4>Recibos automáticos de contratos · cron</h4>
             <p>Genera el caso y la carta de aviso previo 15 días antes de la fecha fin. Solo procesa el _ID indicado. La carta se envía al arrendatario, al responsable y a los destinatarios del evento Caso automático de recibo · 15 días.</p>

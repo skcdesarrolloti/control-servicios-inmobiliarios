@@ -331,8 +331,8 @@ final class SuCasaControlServiciosInmobiliarios
         'items' => [
           'nuevo_caso_panel' => [
             'label' => 'Crear caso desde el panel',
-            'description' => 'Copias del aviso de creación. El responsable asignado siempre recibe su correo.',
-            'channel' => 'Email interno en cola',
+            'description' => 'Copias del aviso de creación. El responsable asignado siempre recibe correo y, al activar las plantillas de Crear casos, WhatsApp.',
+            'channel' => 'Correo y WhatsApp oficial configurable en cola',
           ],
           'respuesta_ticket' => [
             'label' => 'Responder caso',

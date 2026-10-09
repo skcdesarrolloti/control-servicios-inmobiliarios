@@ -10,7 +10,7 @@ $sharedRoot = getenv('SHARED_NOTIFICATIONS_PATH') ?: dirname(__DIR__, 2) . '/sha
 $config = require $sharedRoot . '/config.php';
 $queueTable = $config['queue']['queue_table'];
 $attemptsTable = $config['queue']['attempts_table'];
-$tables = ['jet_cct_tickets', 'jet_cct_contratos_arrendamiento', 'jet_cct_funcionarios', 'jet_cct_historial_del_ticket', 'jet_cct_historial_del_inmueble', 'jet_cct_propietarios', 'jet_cct_arrendatarios'];
+$tables = ['jet_cct_tickets', 'jet_cct_contratos_arrendamiento', 'jet_cct_funcionarios', 'jet_cct_historial_del_ticket', 'jet_cct_historial_del_inmueble', 'jet_cct_propietarios', 'jet_cct_arrendatarios', 'jet_cct_copropiedades'];
 foreach (array_merge(array_map(fn($name) => $db->table($name), $tables), [$queueTable, $attemptsTable]) as $table) {
   if (!preg_match('/^[a-zA-Z0-9_]+$/D', $table)) throw new RuntimeException('Invalid fixture table');
   $definition = $db->getRow('SHOW CREATE TABLE `' . $table . '`');
@@ -97,10 +97,11 @@ $check((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historia
 $db->pdo()->exec("ALTER TABLE `{$queueTable}` DROP CONSTRAINT qa_panel_copy");
 require_once $sharedRoot . '/autoload.php';
 final class PanelCaseTestProvider implements SharedNotifications\Contracts\ProviderInterface {
-  public function code(): string { return 'email_smtp'; }
+  public function __construct(private string $providerCode = 'email_smtp') {}
+  public function code(): string { return $this->providerCode; }
   public function send(array $notification): array { return ['ok' => true, 'http_code' => 200, 'response' => ['simulated' => true]]; }
 }
-$providers = (new SharedNotifications\Providers\ProviderRegistry())->add(new PanelCaseTestProvider());
+$providers = (new SharedNotifications\Providers\ProviderRegistry())->add(new PanelCaseTestProvider())->add(new PanelCaseTestProvider('whatsapp_official'));
 $worker = new SharedNotifications\NotificationWorker(new SharedNotifications\Storage\PdoStorageAdapter($db->pdo()), $providers, new SharedNotifications\Config\QueueConfig($queueTable, $attemptsTable));
 $db->pdo()->exec("UPDATE `{$queueTable}` SET scheduled_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY), next_attempt_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)");
 $worker->run(10, 'control-servicios-inmobiliarios');
@@ -112,4 +113,63 @@ $criticalTicket = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_tickets') 
 $check($criticalTicket['tema_ayuda'] === $criticalTheme && $criticalTicket['departamento'] === 'Servicio al arrendatario', 'critical public service topic persists with canonical value');
 $criticalMail = $db->getRow('SELECT * FROM `' . $queueTable . '` WHERE dedupe_key LIKE ? LIMIT 1', ['nuevo_caso_panel:' . $criticalResult['ticket_id'] . '%']);
 $check($criticalResult['queued'] === 2 && $criticalMail && str_contains($criticalMail['message_html'], $criticalTheme), 'critical topic appears in queued assignment email');
+$check($criticalResult['whatsapp_queued'] === 0 && str_contains($criticalResult['message'], 'WhatsApp pendiente'), 'disabled WhatsApp is explicit without claiming delivery');
+
+$settingsProperty = new ReflectionProperty(SCM\Core\Settings::class, 'data');
+$settingsData = $settingsProperty->getValue(SCM\Core\App::settings());
+$settingsData[SCM\Support\PanelCaseNotifications::SETTINGS_KEY] = ['enabled' => true, 'assigned_template' => 'qa_caso_asignado', 'external_template' => 'qa_caso_externo', 'language' => 'es_CO'];
+$settingsProperty->setValue(SCM\Core\App::settings(), $settingsData);
+$check($service->panelCaseOptions()['whatsapp_enabled'] === true, 'popup reads enabled WhatsApp configuration');
+foreach ([['assigned_template' => 'Invalid name'], ['language' => 'Spanish']] as $invalidConfig) {
+  try { SCM\Support\PanelCaseNotifications::validateConfig($invalidConfig); $check(false, 'invalid template config must fail'); }
+  catch (InvalidArgumentException $e) { $check(true, 'invalid WhatsApp template setting rejected'); }
+}
+$db->update($db->table('jet_cct_funcionarios'), ['celular' => '3001112202'], ['_ID' => 902]);
+$db->update($db->table('jet_cct_funcionarios'), ['celular' => '3001112203'], ['_ID' => 903]);
+foreach ([['notify_roles' => ['invitado']], ['notify_roles' => 'propietario'], ['notify_roles' => [['propietario']]], ['notify_roles' => ['copropiedad']]] as $invalid) {
+  try { $service->createPanelTicket(array_replace($input, $invalid)); $check(false, 'invalid external notification must fail'); }
+  catch (InvalidArgumentException $e) { $check(true, 'invalid or incomplete external recipient rejected'); }
+}
+$db->update($db->table('jet_cct_funcionarios'), ['celular' => '123'], ['_ID' => 902]);
+try { $service->createPanelTicket($input); $check(false, 'invalid assignee phone must fail'); }
+catch (InvalidArgumentException $e) { $check(true, 'enabled WhatsApp requires a valid assignee phone'); }
+$db->update($db->table('jet_cct_funcionarios'), ['celular' => '3001112202'], ['_ID' => 902]);
+// Owner and copropiedad resolve from their linked records; tenant uses the contract snapshot.
+$db->update($db->table('jet_cct_propietarios'), ['nombre' => 'Propietario QA', 'correo' => 'owner@example.invalid', 'celular' => '3001113301', 'indicativo' => '+57'], ['_ID' => 71]);
+$db->insert($db->table('jet_cct_copropiedades'), ['_ID' => 73, 'copropiedad' => 'Copropiedad QA', 'correo' => 'copro@example.invalid', 'contacto' => '3001113303', 'indicativo' => '+57']);
+$db->update($db->table('jet_cct_contratos_arrendamiento'), ['id_copropiedad' => '73', 'correo_arrendatario' => 'tenant@example.invalid', 'celular_arrendatario' => '3001113302', 'indicativo_arrendatario' => '+57'], ['_ID' => 801]);
+$notifyInput = $input + ['notify_roles' => ['propietario', 'arrendatario', 'copropiedad']];
+$notifyResult = $service->createPanelTicket($notifyInput);
+$notifyId = (int) $notifyResult['ticket_id'];
+$jobs = $db->getResults('SELECT * FROM `' . $queueTable . '` WHERE dedupe_key LIKE ? ORDER BY id', ['nuevo_caso_panel:' . $notifyId . ':%']);
+$emails = array_values(array_filter($jobs, fn($r) => $r['channel'] === 'email'));
+$whatsapps = array_values(array_filter($jobs, fn($r) => $r['channel'] === 'whatsapp'));
+$check($notifyResult['queued'] === 5 && $notifyResult['whatsapp_queued'] === 5 && count($emails) === 5 && count($whatsapps) === 5, 'assignee, configured copy and three selected external recipients get both queued channels');
+$check(count(array_filter($jobs, fn($r) => $r['status'] === 'pending')) === 10, 'both channels remain pending for shared worker');
+foreach ($whatsapps as $job) {
+  $payload = json_decode($job['payload_json'], true);
+  $meta = json_decode($job['meta_json'], true);
+  $body = $payload['components'][0]['parameters'];
+  $check($job['provider'] === 'whatsapp_official' && count($body) === 6 && $body[1]['text'] === (string) $notifyId && $body[5]['text'] === 'Responsable comercial', 'official template carries six ordered case variables');
+  $internal = $meta['recipient_role'] === 'funcionario';
+  $check($job['template_name'] === ($internal ? 'qa_caso_asignado' : 'qa_caso_externo') && count($payload['components']) === ($internal ? 2 : 1), 'only internal template receives authenticated case button');
+}
+$externalEmails = array_filter($emails, fn($r) => str_contains($r['dedupe_key'], ':externo:'));
+$check(count($externalEmails) === 3 && !array_filter($externalEmails, fn($r) => str_contains($r['message_html'], 'scm_case=') || str_contains($r['message_html'], '<script>')), 'external emails escape content and exclude internal access links');
+$beforeTickets = (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_tickets') . '`');
+$beforeJobs = (int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '`');
+$db->pdo()->exec("ALTER TABLE `{$queueTable}` ADD CONSTRAINT qa_panel_whatsapp CHECK (channel <> 'whatsapp' OR dedupe_key LIKE 'nuevo_caso_panel:{$notifyId}:%')");
+try { $service->createPanelTicket($notifyInput); $check(false, 'WhatsApp queue failure must fail'); }
+catch (PDOException $e) { $check(true, 'WhatsApp queue failure is surfaced'); }
+$check((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_tickets') . '`') === $beforeTickets && (int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '`') === $beforeJobs, 'WhatsApp failure rolls back case and every email');
+$db->pdo()->exec("ALTER TABLE `{$queueTable}` DROP CONSTRAINT qa_panel_whatsapp");
+$db->update($db->table('jet_cct_contratos_arrendamiento'), ['correo_arrendatario' => 'owner@example.invalid', 'celular_arrendatario' => '3001113301'], ['_ID' => 801]);
+$dedupResult = $service->createPanelTicket($notifyInput);
+$check($dedupResult['queued'] === 4 && $dedupResult['whatsapp_queued'] === 4, 'duplicate external emails and normalized phones enqueue once per channel');
+$internalOnly = $service->createPanelTicket($input);
+$check($internalOnly['queued'] === 2 && $internalOnly['whatsapp_queued'] === 2, 'assigned consultant and configured copy get WhatsApp even with no external recipients selected');
+$db->pdo()->exec("UPDATE `{$queueTable}` SET scheduled_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY), next_attempt_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)");
+$worker->run(100, 'control-servicios-inmobiliarios');
+$check((int) $db->getVar("SELECT COUNT(*) FROM `{$queueTable}` WHERE status <> 'sent'") === 0, 'inert providers process both email and official WhatsApp without real sends');
+$check((int) $db->getVar("SELECT COUNT(*) FROM `{$attemptsTable}`") === (int) $db->getVar("SELECT COUNT(*) FROM `{$queueTable}`"), 'both channels leave shared attempt traces');
 echo $checks . " checks passed.\n";

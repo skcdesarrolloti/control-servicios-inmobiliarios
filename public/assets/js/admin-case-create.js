@@ -61,7 +61,7 @@
             <label class="scm-new-case-label">Departamento<select name="departamento" required>${option('', 'Selecciona el departamento')}${config.departments.map(t => option(t)).join('')}</select></label>
           </div>
           <label class="scm-new-case-label">Asignar a<select name="id_empleado" required>${option('', 'Selecciona un funcionario activo')}${config.employees.map(e => option(e.employee_id, `${e.name} · ${e.cargo}${e.email ? '' : ' · Sin correo'}`)).join('')}</select></label>
-          <p data-assignee class="text-xs text-slate-500">El responsable recibirá un correo con los datos del caso.</p>
+          <p data-assignee class="text-xs text-slate-500">El responsable recibirá correo${config.whatsapp_enabled ? ' y WhatsApp' : '. WhatsApp pendiente de activar en Notificaciones internas'}.</p>
         </section>
         <section class="flex flex-col gap-4"><h3 class="scm-new-case-section"><span>3</span> Adjunta las evidencias</h3>
           <label class="scm-new-case-label">¿El caso tiene adjuntos?<select name="has_attachments" required>${option('', 'Selecciona una opción')}${option('No', 'No, continuar sin adjuntos')}${option('Si', 'Sí, agregar imágenes o documentos')}</select></label>
@@ -69,6 +69,11 @@
             <label class="scm-new-case-label">Imágenes<input type="file" name="imagenes[]" accept="image/jpeg,image/png,image/webp" multiple></label>
             <label class="scm-new-case-label">Documentos PDF<input type="file" name="archivos[]" accept="application/pdf,.pdf" multiple></label>
           </div><div class="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4"><button type="button" data-paste-image class="scm-new-case-button">Pegar captura</button><p data-paste-status role="status" aria-live="polite" class="mt-2 text-xs text-slate-500">Copia una captura y presiona Ctrl+V dentro de este popup, o usa Pegar captura.</p><div data-pasted-images class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3"></div></div><p class="text-xs text-slate-500 mt-3">Hasta 10 archivos, ${Math.floor(config.max_file_bytes / 1024 / 1024)} MB por archivo y 25 MB en total. Imágenes JPG, PNG o WebP de máximo 16 megapíxeles.</p><ul data-files class="mt-3 text-xs text-slate-600 flex flex-col gap-1"></ul></div>
+        </section>
+        <section class="flex flex-col gap-3"><h3 class="scm-new-case-section"><span>4</span> Notifica a los interesados</h3>
+          <p class="text-sm text-slate-500">Opcional. Selecciona a quién avisar por correo y WhatsApp con el título, tema, contrato y responsable. El correo también incluye la descripción.</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">${[['propietario', 'Propietario'], ['arrendatario', 'Arrendatario'], ['copropiedad', 'Copropiedad']].map(([value, label]) => `<label class="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700"><input type="checkbox" name="notify_roles[]" value="${value}" class="h-4 w-4">${label}</label>`).join('')}</div>
+          <p class="text-xs text-slate-500">Se usan los datos del contrato y su ficha. Deben tener correo y celular válidos.${config.whatsapp_enabled ? '' : ' WhatsApp está pendiente de activar; por ahora se encolará solo el correo.'}</p>
         </section>
         </div></fieldset>
         <p data-error hidden role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"></p>
@@ -128,7 +133,7 @@
       };
       form.elements.id_empleado.onchange = () => {
         const employee = config.employees.find(e => e.employee_id === form.elements.id_empleado.value);
-        current.querySelector('[data-assignee]').textContent = employee ? (employee.email ? `Aviso de asignación: ${employee.email}` : 'Este funcionario necesita un correo válido para recibir la asignación.') : 'El responsable recibirá un correo con los datos del caso.';
+        current.querySelector('[data-assignee]').textContent = employee ? (employee.email ? `Correo: ${employee.email}. ${config.whatsapp_enabled ? `WhatsApp: ${employee.phone || 'falta celular válido en su ficha'}.` : 'WhatsApp pendiente de activar en Notificaciones internas.'}` : 'Este funcionario necesita un correo válido para recibir la asignación.') : 'Selecciona un funcionario para consultar los canales de aviso.';
       };
       const fileInputs = [...form.querySelectorAll('input[type=file]')];
       const pastedImages = [];
