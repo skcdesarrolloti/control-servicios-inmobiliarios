@@ -30,11 +30,13 @@ El responsable recibe siempre el correo de asignación y, al activar las plantil
 
 En el paso **Notifica a los interesados** se pueden marcar propietario, arrendatario y/o copropiedad. Ninguno viene marcado. Sus datos se resuelven exclusivamente en el servidor: primero desde el contrato, y los campos vacíos desde la ficha relacionada por `id_propietario`, `id_arrendatario` o `id_copropiedad`. Para copropiedades se admite `contacto` como teléfono de la ficha. No se aceptan direcciones ni teléfonos arbitrarios desde el navegador. Se exige correo y celular válidos de cada interesado seleccionado y, con WhatsApp activo, del responsable.
 
-El correo externo incluye título, tema, contrato, responsable y descripción. WhatsApp incluye los seis datos indicados en las plantillas de abajo. El botón interno exige iniciar sesión; los avisos externos no incluyen enlaces de acceso al panel ni adjuntos internos. Los destinatarios elegidos quedan registrados en los metadatos de la cola. La pantalla final muestra los contadores de correo y WhatsApp **encolados**; la entrega se consulta en la cola y sus intentos.
+El correo externo incluye título, tema, contrato, responsable y descripción. WhatsApp incluye los seis datos indicados en las plantillas de abajo. Ambos canales incluyen **Ver caso**, con enlace firmado válido por 30 días. Los destinatarios elegidos quedan registrados en los metadatos de la cola. La pantalla final muestra los contadores de correo y WhatsApp **encolados**; la entrega se consulta en la cola y sus intentos.
 
 Los mensajes se encolan en `shared-notifications`, con `source_module = nuevo_caso_panel`, deduplicación por caso y destino y metadatos del contrato, creador y responsable. WhatsApp usa `whatsapp_official`. La inicialización de la cola ocurre antes de la transacción para evitar DDL durante el guardado. Caso, historiales, correos y WhatsApp se confirman juntos; una falla al encolar revierte todo.
 
-El enlace `?scm_case=ID` abre el detalle nativo dentro del panel. Exige sesión y permite consultar al responsable, a las copias activas configuradas para casos del panel o a usuarios con permiso de Métricas. El enlace se conserva al pasar por el login. La creación, búsqueda y opciones también exigen sesión, CSRF y permiso de Métricas.
+Los enlaces nuevos usan `?scm_case=ID.VENCIMIENTO.FIRMA`, con HMAC SHA-256 específico para esta vista. Con sesión activa se vuelve a `?scm_case=ID` y se abre el popup nativo, conservando sus permisos: responsable, copias activas configuradas o usuarios con permiso de Métricas. Sin sesión (también si expiró), el enlace firmado abre la vista pública de solo lectura. Cambiar el ID o la firma impide el acceso; el enlace vencido no permite acceso público. Un enlace anterior que solo tenga el número del caso sigue enviando al login y conserva el caso de destino, sin permitir consulta pública por número.
+
+La vista pública muestra título, estado, tema, contrato, SIMI, dirección, fecha, descripción y las evidencias originales del caso. Usa el mismo lenguaje visual Tailwind del popup, permite previsualizar imágenes y PDF dentro de la página y tiene impresión A4 compacta. El responsable aparece en el cierre. No publica sucursal, datos de contacto, estado administrativo, historial privado ni acciones internas. Usa una lista explícita de campos y adjuntos de almacenamiento firmado o medios corporativos públicos; nunca reutiliza el HTML administrativo. No se modifica el caso al consultar. `public/caso.php` también permite abrir directamente la misma referencia firmada. La creación, búsqueda y opciones del panel continúan exigiendo sesión, CSRF y permiso de Métricas.
 
 Cada formulario genera un identificador de solicitud. El servidor guarda el resultado bajo bloqueo en `storage/data/panel-case-receipts`; reintentos de la misma solicitud recuperan el caso creado sin repetir correos. Al guardar se invalidan y actualizan las métricas.
 
@@ -62,11 +64,11 @@ Agrega exactamente un botón **Visitar sitio web**, URL **dinámica**, texto **V
 https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/?scm_case={{1}}
 ```
 
-El parámetro del botón es el número interno del caso; ejemplo de URL completa: `https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/?scm_case=10945`. El destinatario debe iniciar sesión en el panel.
+El parámetro del botón es ahora el token completo `ID.VENCIMIENTO.FIRMA`, **no solamente el número del caso**. El código lo genera y sustituye automáticamente en `{{1}}`, sin cambiar la URL base de la plantilla. Para el ejemplo que pide Meta, copia un enlace firmado de un correo de caso nuevo; los correos ya incluyen ese enlace aunque WhatsApp todavía no esté activo. Con sesión abre el panel; sin sesión, la vista pública. No construyas una firma manual ni uses un enlace con solo el número como ejemplo de acceso público.
 
-### Propietario, arrendatario y copropiedad: `scm_caso_registrado_v1`
+### Propietario, arrendatario y copropiedad: `scm_caso_registrado_v2`
 
-Texto del cuerpo, **sin botones**:
+Texto del cuerpo:
 
 ```text
 Hola {{1}}.
@@ -77,6 +79,8 @@ Contrato: {{5}}.
 Responsable asignado: {{6}}.
 Este aviso corresponde a la gestión de tu contrato con SKC SuCasa Inmobiliaria.
 ```
+
+Agrega el mismo botón **Ver caso**, URL dinámica `https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/?scm_case={{1}}`. La plantilla externa anterior `scm_caso_registrado_v1` no tenía botón: crea esta versión nueva y cambia el nombre en Configuración, o actualiza la anterior con el botón y espera su aprobación antes de usarla. El código ya envía un componente de botón en ambas plantillas; no es compatible con una plantilla externa que siga sin botón.
 
 Las dos plantillas reciben las mismas seis variables y en este orden:
 
@@ -99,9 +103,13 @@ php tests/panel-case-login-check.php
 node tests/panel-case-attachments-check.cjs
 node tests/panel-case-modal-check.cjs
 node tests/panel-case-settings-check.cjs
+php tests/public-case-check.php
+node tests/public-case-ui-check.cjs
 ```
 
 La prueba `tests/panel-case-settings-check.cjs` verifica la sección real de configuración, los valores iniciales, la validación y el envío de nombres/idioma/activación. La prueba del servicio usa tablas temporales y proveedores inertes para comprobar ambos canales, las variables, los destinatarios, la deduplicación y la reversión de fallos sin enviar mensajes reales.
+
+`public-case-check.php` verifica las firmas, el vencimiento y la lista pública de campos/adjuntos. `public-case-ui-check.cjs` levanta un servidor en localhost con registros temporales y secreto de prueba: recorre las rutas reales, el retorno al panel con sesión, los enlaces antiguos al login, los rechazos sin firma, la sesión vencida, las previsualizaciones, móvil y la impresión de un caso representativo en una página A4. Genera capturas y PDF de prueba en `output/public-case`.
 
 La prueba de base de datos usa tablas temporales de la conexión y proveedores de correo y WhatsApp simulados. La prueba de adjuntos levanta un servidor PHP solo en localhost y limpia sus archivos. La prueba de navegador requiere Playwright y Edge; genera capturas de escritorio y móvil en `output/panel-case`.
 

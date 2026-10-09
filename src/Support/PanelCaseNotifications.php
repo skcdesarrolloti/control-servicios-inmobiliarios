@@ -26,7 +26,7 @@ final class PanelCaseNotifications
     $config = [
       'enabled' => filter_var($raw['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN),
       'assigned_template' => trim((string) ($raw['assigned_template'] ?? 'scm_caso_asignado_v1')),
-      'external_template' => trim((string) ($raw['external_template'] ?? 'scm_caso_registrado_v1')),
+      'external_template' => trim((string) ($raw['external_template'] ?? 'scm_caso_registrado_v2')),
       'language' => trim((string) ($raw['language'] ?? 'es_CO')),
     ];
     foreach (['assigned_template', 'external_template'] as $key) {
@@ -103,7 +103,7 @@ final class PanelCaseNotifications
         $content = '<p>Hola ' . EmailTemplate::e($person['name']) . ', se registró el caso <b>#' . $id . '</b> en SKC SuCasa Inmobiliaria.</p>';
         foreach (['Título' => $title, 'Tema' => $theme, 'Contrato' => $contract['contrato'] ?? '', 'Responsable' => $assignee['name']] as $label => $value) $content .= '<p><b>' . $label . ':</b> ' . EmailTemplate::e((string) $value) . '</p>';
         $content .= '<p>' . nl2br(EmailTemplate::e($description)) . '</p>';
-        $count = (new EmailQueue($this->db))->enqueue($email, 'Caso #' . $id . ' registrado: ' . $title, EmailTemplate::render('Caso registrado', $content), [
+        $count = (new EmailQueue($this->db))->enqueue($email, 'Caso #' . $id . ' registrado: ' . $title, EmailTemplate::render('Caso registrado', $content, ['ticket_url' => PublicCaseAccess::url($id)]), [
           'source_module' => 'nuevo_caso_panel', 'dedupe_key' => 'nuevo_caso_panel:' . $id . ':externo', 'meta' => $meta + ['recipient_role' => $person['role']],
         ]);
         if ($count !== 1) throw new \RuntimeException('No se pudo encolar el correo del destinatario. El caso no se guardó.');
@@ -121,7 +121,7 @@ final class PanelCaseNotifications
         $values = [$person['name'], (string) $id, $title, $theme, (string) ($contract['contrato'] ?? 'Sin número'), $assignee['name']];
         $values = array_map(static fn($v, $limit) => mb_substr(preg_replace('/\s+/u', ' ', trim((string) $v)) ?: 'Sin dato', 0, $limit), $values, [80, 20, 200, 100, 50, 80]);
         $components = [['type' => 'body', 'parameters' => array_map(static fn($v) => ['type' => 'text', 'text' => $v], $values)]];
-        if (!$external) $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => (string) $id]]];
+        $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => PublicCaseAccess::reference($id)]]];
         $queuedId = $queue->enqueueWhatsAppOfficialTemplate($phone, $config[$external ? 'external_template' : 'assigned_template'], $components, [
           'project_code' => 'control-servicios-inmobiliarios', 'source_module' => 'nuevo_caso_panel',
           'destination_name' => $person['name'], 'template_language' => $config['language'], 'max_attempts' => 5,

@@ -152,10 +152,12 @@ foreach ($whatsapps as $job) {
   $body = $payload['components'][0]['parameters'];
   $check($job['provider'] === 'whatsapp_official' && count($body) === 6 && $body[1]['text'] === (string) $notifyId && $body[5]['text'] === 'Responsable comercial', 'official template carries six ordered case variables');
   $internal = $meta['recipient_role'] === 'funcionario';
-  $check($job['template_name'] === ($internal ? 'qa_caso_asignado' : 'qa_caso_externo') && count($payload['components']) === ($internal ? 2 : 1), 'only internal template receives authenticated case button');
+  $reference = $payload['components'][1]['parameters'][0]['text'] ?? '';
+  $publicRoute = SCM\Support\PublicCaseAccess::route($reference, false);
+  $check($job['template_name'] === ($internal ? 'qa_caso_asignado' : 'qa_caso_externo') && count($payload['components']) === 2 && $publicRoute === ['mode' => 'public', 'id' => $notifyId], 'internal and external templates receive signed public/panel case button');
 }
 $externalEmails = array_filter($emails, fn($r) => str_contains($r['dedupe_key'], ':externo:'));
-$check(count($externalEmails) === 3 && !array_filter($externalEmails, fn($r) => str_contains($r['message_html'], 'scm_case=') || str_contains($r['message_html'], '<script>')), 'external emails escape content and exclude internal access links');
+$check(count($externalEmails) === 3 && !array_filter($externalEmails, fn($r) => !str_contains($r['message_html'], 'scm_case=' . $notifyId . '.') || str_contains($r['message_html'], '<script>')), 'external emails escape content and include signed case links');
 $beforeTickets = (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_tickets') . '`');
 $beforeJobs = (int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '`');
 $db->pdo()->exec("ALTER TABLE `{$queueTable}` ADD CONSTRAINT qa_panel_whatsapp CHECK (channel <> 'whatsapp' OR dedupe_key LIKE 'nuevo_caso_panel:{$notifyId}:%')");

@@ -26,7 +26,7 @@ const assert = require('node:assert/strict');
     `});
     assert.equal(await page.locator('[name=case_whatsapp_enabled]').isChecked(), false, 'WhatsApp defaults off until templates are approved');
     assert.equal(await page.locator('[name=case_assigned_template]').inputValue(), 'scm_caso_asignado_v1');
-    assert.equal(await page.locator('[name=case_external_template]').inputValue(), 'scm_caso_registrado_v1');
+    assert.equal(await page.locator('[name=case_external_template]').inputValue(), 'scm_caso_registrado_v2');
     await page.locator('[name=case_whatsapp_enabled]').check();
     await page.locator('[name=case_assigned_template]').fill('qa_asignado');
     await page.locator('[name=case_external_template]').fill('qa_externo');

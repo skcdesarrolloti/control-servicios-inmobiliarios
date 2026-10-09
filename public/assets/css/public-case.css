@@ -1,0 +1,21 @@
+.scm-public-case-card section, .scm-public-case-signoff { break-inside:avoid; }
+.scm-public-case-preview { width:min(58rem,calc(100% - 2rem)); max-height:92vh; }
+.scm-public-case-preview::backdrop { background:rgb(15 23 42 / .75); backdrop-filter:blur(4px); }
+.scm-public-case-preview img { width:100%; max-height:72vh; object-fit:contain; }
+.scm-public-case-preview iframe { width:100%; height:72vh; border:0; }
+@media print {
+  @page { size:A4; margin:10mm; }
+  .scm-public-case { background:white; font-size:10pt; }
+  .scm-public-case main { min-height:0; display:block; padding:0; }
+  .scm-public-case-card { max-width:none; border:0; border-radius:0; box-shadow:none; }
+  .scm-public-case-card header, .scm-public-case-card > div { padding:8px; }
+  .scm-public-case-card > div { gap:12px; }
+  .scm-public-case-card section { padding:8px; }
+  .scm-public-case-card dl { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:8px; }
+  .scm-public-case-card p, .scm-public-case-card dd { font-size:9pt; line-height:1.35; }
+  .scm-public-case-card section, .scm-public-case-signoff { break-inside:avoid; page-break-inside:avoid; }
+  .scm-public-case-evidence { grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+  .scm-public-case-evidence img { height:65px; }
+  .scm-public-case-actions, .scm-public-case-preview, [data-preview="pdf"] { display:none !important; }
+  .scm-public-case-signoff { padding-top:8px; }
+}
