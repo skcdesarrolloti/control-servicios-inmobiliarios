@@ -26,6 +26,9 @@ $safeNext = static function (string $raw): string {
       : '';
   }
   if ($path === 'index.php') {
+    if (isset($query['scm_case']) && $digits($query['scm_case'])) {
+      return 'index.php?scm_case=' . rawurlencode((string) $query['scm_case']);
+    }
     $action = trim((string) ($query['scm_bridge_action'] ?? ''));
     $allowedActions = ['revision_correctiva', 'crear_cotizacion', 'editar_cotizacion', 'enviar_cotizacion', 'crear_orden', 'acta_satisfaccion', 'acta_cotizacion'];
     if (!in_array($action, $allowedActions, true)) {

@@ -12,6 +12,7 @@ final class PublicTicketsService
 {
   use \SCM\Modules\PublicTickets\Concerns\PublicPortalQueriesConcern;
   use \SCM\Modules\PublicTickets\Concerns\PublicTicketCreationConcern;
+  use \SCM\Modules\PublicTickets\Concerns\PanelTicketCreationConcern;
   use \SCM\Modules\PublicTickets\Concerns\RequesterLookupConcern;
   use \SCM\Modules\PublicTickets\Concerns\ResponsibleResolutionConcern;
   use \SCM\Modules\PublicTickets\Concerns\TicketPersistenceConcern;

@@ -23,7 +23,8 @@ trait TicketPersistenceConcern
     array $contact,
     array $responsable,
     ?array $contract,
-    ?array $client
+    ?array $client,
+    string $staffAuthorId = ''
   ): array {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     if (!$this->schema->tableExists($ticketsTable)) {
@@ -39,7 +40,7 @@ trait TicketPersistenceConcern
 
     $data = [
       'cct_status' => 'publish',
-      'cct_author_id' => 0,
+      'cct_author_id' => $staffAuthorId !== '' ? $staffAuthorId : 0,
       'cct_created' => $nowMysql,
       'cct_modified' => $nowMysql,
       'id_ticket' => '',

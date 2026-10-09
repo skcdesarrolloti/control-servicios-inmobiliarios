@@ -13,6 +13,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesCorrectiveReviewActions;
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   use \SCM\App\Concerns\HandlesPublicPqrActions;
+  use \SCM\App\Concerns\HandlesPanelCaseCreation;
   use \SCM\App\Concerns\HandlesAdministrativeNotifications;
   use \SCM\App\Concerns\HandlesCollectionManagement;
   use \SCM\App\Concerns\HandlesCanonInsuranceAudits;
@@ -328,6 +329,11 @@ final class SuCasaControlServiciosInmobiliarios
       'gestion_caso' => [
         'label' => 'Gestión del caso',
         'items' => [
+          'nuevo_caso_panel' => [
+            'label' => 'Crear caso desde el panel',
+            'description' => 'Copias del aviso de creación. El responsable asignado siempre recibe su correo.',
+            'channel' => 'Email interno en cola',
+          ],
           'respuesta_ticket' => [
             'label' => 'Responder caso',
             'description' => 'Cuando un funcionario responde un caso.',
@@ -534,7 +540,7 @@ final class SuCasaControlServiciosInmobiliarios
       $selected = [];
       foreach ((array) $ids as $id) {
         $idKey = trim((string) ((int) $id));
-        $allowed = in_array($actionKey, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_no_salida'], true) ? $allActiveIds : $validFuncionarioIds;
+        $allowed = in_array($actionKey, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_no_salida','nuevo_caso_panel'], true) ? $allActiveIds : $validFuncionarioIds;
         if ($idKey !== '' && $idKey !== '0' && isset($allowed[$idKey])) {
           $selected[$idKey] = $idKey;
         }

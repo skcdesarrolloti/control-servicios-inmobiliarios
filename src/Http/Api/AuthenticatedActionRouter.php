@@ -24,6 +24,10 @@ final class AuthenticatedActionRouter
     $this->guideController = new GuideApiController(App::db(), App::csrf());
     $this->routes = [
       SuCasaControlServiciosInmobiliarios::AJAX_ACTION => 'ajax_handler',
+      'scm_panel_case_options' => 'ajax_handler_panel_case_options',
+      'scm_panel_case_search' => 'ajax_handler_panel_case_search',
+      'scm_panel_case_create' => 'ajax_handler_panel_case_create',
+      'scm_panel_case_read' => 'ajax_handler_panel_case_read',
       SuCasaControlServiciosInmobiliarios::AJAX_SEGUIMIENTO => 'ajax_handler_seguimiento',
       SuCasaControlServiciosInmobiliarios::AJAX_NOTA => 'ajax_handler_nota',
       SuCasaControlServiciosInmobiliarios::AJAX_TICKET_RESPONSE => 'ajax_handler_ticket_response',

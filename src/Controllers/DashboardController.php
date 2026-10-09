@@ -16,7 +16,12 @@ final class DashboardController
 
   public function requireAuth(): void
   {
-    Auth::requireLogin(SCM_BASE_URL . '/login.php');
+    $loginUrl = SCM_BASE_URL . '/login.php';
+    $caseId = (string) ($_GET['scm_case'] ?? '');
+    if (preg_match('/^[1-9][0-9]{0,18}$/D', $caseId)) {
+      $loginUrl .= '?next=' . rawurlencode('index.php?scm_case=' . $caseId);
+    }
+    Auth::requireLogin($loginUrl);
   }
 
   public function getPanelHtml(): string

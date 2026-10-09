@@ -1415,6 +1415,7 @@ trait RendersDashboard
       </div>
 
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-dashboard-inline.js?v=' . SCM_VERSION); ?>" defer></script>
+      <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-case-create.js?v=' . SCM_VERSION); ?>" defer></script>
 
       <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas' ? ' active' : ''; ?> flex flex-col gap-6 w-full" id="scm-panel-metricas" data-permission-tab="metricas" data-scm-metrics="<?php echo self::h((string)$metricsJson); ?>" data-scm-loaded="0">
         <!-- Encabezado de Métricas y Acciones -->
@@ -2000,7 +2001,7 @@ trait RendersDashboard
         $groupsHtml .= '<span>' . esc_html((string) ($item['channel'] ?? 'Email interno')) . '</span>';
         $groupsHtml .= '</div>';
         $groupsHtml .= '<p>' . esc_html((string) ($item['description'] ?? '')) . '</p>';
-        $groupsHtml .= '<select name="settings[' . esc_attr($action) . '][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $buildOptions($selectedIds, in_array($action, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_no_salida'], true)) . '</select>';
+        $groupsHtml .= '<select name="settings[' . esc_attr($action) . '][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $buildOptions($selectedIds, in_array($action, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_no_salida','nuevo_caso_panel'], true)) . '</select>';
         $groupsHtml .= '</div>';
       }
       $groupsHtml .= '</section>';

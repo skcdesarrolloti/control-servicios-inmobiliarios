@@ -11979,6 +11979,35 @@
       return Promise.resolve();
     }
 
+    function openPanelCaseById(caseId) {
+      caseId = String(caseId || "");
+      if (!/^\d+$/.test(caseId)) return;
+      dashboardAction("scm_panel_case_read", { case_id: caseId }).then(function (data) {
+        var caseData = data && data.case;
+        if (!caseData || !caseData.case_source_html) throw new Error("No se pudo cargar el caso.");
+        var card = document.createElement("article");
+        card.className = "scm-ticket-card";
+        card.hidden = true;
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "scm-btn-case";
+        var source = document.createElement("div");
+        source.className = "scm-case-source";
+        source.innerHTML = caseData.case_source_html;
+        card.appendChild(button);
+        card.appendChild(source);
+        root.appendChild(card);
+        dashboardApplyDueCaseData(button, caseData);
+        openDashboardDueCaseFromButton(button, caseData.case_source_html);
+        window.setTimeout(function () { card.remove(); }, 1000);
+      }).catch(function (error) { showToast("error", error.message || "No se pudo abrir el caso."); });
+    }
+    root.addEventListener("scm:open-panel-case", function (event) {
+      openPanelCaseById(event.detail && event.detail.ticket_id);
+    });
+    var linkedPanelCase = new URLSearchParams(window.location.search).get("scm_case");
+    if (linkedPanelCase) openPanelCaseById(linkedPanelCase);
+
     root.addEventListener("scm:refresh-active-tab", function () {
       refreshActiveTab();
     });
@@ -15933,6 +15962,13 @@
         panel.removeAttribute("aria-busy");
       });
     }
+
+    root.addEventListener("scm:panel-case-created", function () {
+      var panel = root.querySelector("#scm-panel-metricas");
+      if (panel) panel.setAttribute("data-scm-loaded", "0");
+      dashboardMetricsPromise = null;
+      loadDashboardMetrics();
+    });
 
     function loadDashboardMetrics() {
       var panel = root.querySelector("#scm-panel-metricas");

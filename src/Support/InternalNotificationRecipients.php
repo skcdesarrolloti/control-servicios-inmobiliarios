@@ -57,7 +57,7 @@ final class InternalNotificationRecipients
 
     $selected = array_fill_keys(array_map('strval', $selectedIds), true);
     $contacts = [];
-    foreach (FuncionarioOptions::panelFuncionarios($db, new SchemaInspector($db), 'primary', in_array($action, ['contrato_recibo_automatico', 'contrato_no_salida'], true) ? [] : null) as $funcionario) {
+    foreach (FuncionarioOptions::panelFuncionarios($db, new SchemaInspector($db), 'primary', in_array($action, ['contrato_recibo_automatico', 'contrato_no_salida', 'nuevo_caso_panel'], true) ? [] : null, $action === 'nuevo_caso_panel') as $funcionario) {
       $id = (string) ((int) ($funcionario['id'] ?? 0));
       if ($id === '0' || !isset($selected[$id])) {
         continue;
