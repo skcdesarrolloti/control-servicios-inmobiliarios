@@ -203,9 +203,14 @@ trait PublicServicesReviewConcern
       $result = $this->createLockedServiciosPublicosReview($contractId, $input);
       if (empty($result['ok'])) throw new \DomainException((string) ($result['message'] ?? 'No fue posible guardar la revisión.'));
       $publicResult = $result;
+      $criticalTicketId = (new \SCM\Modules\Pending\PublicServicesCritical($db))->record($result);
+      if ($criticalTicketId) {
+        $result['critical_ticket_id'] = $publicResult['critical_ticket_id'] = $criticalTicketId;
+        $result['_context']['critical_ticket_id']=$criticalTicketId;
+        $result['critical_deadline_at'] = $publicResult['critical_deadline_at'] = (int)$result['_context']['fecha'] + 72 * 3600;
+      }
       unset($publicResult['_context'], $publicResult['_services'], $publicResult['_documents'], $publicResult['_contract'], $publicResult['_employee']);
       $storage->insert($requestKey, $contractId, $result['review_id'], ['context' => $result['_context'], 'services' => $result['_services'], 'result' => $publicResult]);
-      (new \SCM\Modules\Pending\PublicServicesCritical($db))->record($result);
       $pdo->commit();
     } catch (\Throwable $error) {
       if ($pdo->inTransaction()) $pdo->rollBack();
@@ -222,7 +227,7 @@ trait PublicServicesReviewConcern
     unset($result['_context'], $result['_services'], $result['_documents'], $result['_contract'], $result['_employee']);
     $result['notifications_queued'] = $queued;
     $result['message'] = 'Revisión agregada con éxito. Se generaron ' . count($result['documents']) . ' actas y se encolaron ' . $queued . ' correos.';
-    if (!empty($result['critical_deadline_at'])) $result['message'] .= ' Seguimiento crítico creado: pago máximo en 72 horas, hasta ' . date('d/m/Y H:i', $result['critical_deadline_at']) . ' (Colombia). Los avisos y recordatorios se procesarán por cola.';
+    if (!empty($result['critical_deadline_at'])) $result['message'] .= ' Caso #' . $result['critical_ticket_id'] . ' creado con tema Servicio publico critico y registrado en el reporte del inmueble. Vence en 72 horas: ' . date('d/m/Y H:i', $result['critical_deadline_at']) . ' (Colombia). Avisos y recordatorios por cola.';
     return $result;
   }
 

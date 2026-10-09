@@ -69,30 +69,27 @@ final class PublicServicesWorkspace
 
   public function critical(array $input): string
   {
-    $critical = new PublicServicesCritical($this->db);
-    $stats = ['pending'=>0,'reported'=>0,'overdue'=>0,'verified'=>0];
-    if (!$critical->available()) return self::criticalList([], $input, 0, 1, 1, $stats);
-    $table = $critical->table();
-    $now = time();
-    $counts = $this->db->getRow('SELECT SUM(status=\'pending\') pending, SUM(status=\'reported\') reported, SUM(status<>\'verified\' AND deadline_at<?) overdue, SUM(status=\'verified\') verified FROM `'.$table.'`', [$now]);
-    foreach ($stats as $key=>$_) $stats[$key] = (int)($counts[$key]??0);
-    $where = []; $args = [];
-    $status = (string)($input['status']??'open');
-    if (!in_array($status, ['open','pending','reported','verified','overdue','all'], true)) $status = 'open';
-    $input['status'] = $status;
-    if ($status==='open') $where[] = 'c.status<>\'verified\'';
-    elseif ($status==='overdue') { $where[] = 'c.status<>\'verified\' AND c.deadline_at<?'; $args[] = $now; }
-    elseif ($status!=='all') { $where[] = 'c.status=?'; $args[] = $status; }
-    foreach (['contrato','inmueble','arrendatario'] as $field) {
-      $term = trim((string)($input[$field]??''));
-      if ($term!=='') { $where[] = 'r.`'.$field.'` LIKE ?'; $args[] = '%'.$this->db->escapeLike($term).'%'; }
+    $critical=new PublicServicesCritical($this->db);
+    $stats=['pending'=>0,'closed'=>0,'legacy'=>0,'overdue'=>0];$rows=[];$now=time();
+    $status=(string)($input['status']??'open');
+    if(!in_array($status,['open','pending','closed','legacy','overdue','all'],true))$status='open';
+    $input['status']=$status;
+    if($critical->available()){
+      $all=$this->db->getResults('SELECT c.*, t._ID ticket_id, t.estado ticket_state, t.estado_administrativo ticket_admin FROM `'.$critical->table().'` c LEFT JOIN `'.$this->db->table('jet_cct_tickets').'` t ON t._ID=CAST(JSON_UNQUOTE(JSON_EXTRACT(c.payload_json,\'$.ticket_id\')) AS UNSIGNED) ORDER BY c.deadline_at,c.review_id');
+      foreach($all as $row){
+        $row['status']=empty($row['ticket_id'])?'legacy':(PublicServicesCriticalTicket::open(['_ID'=>$row['ticket_id'],'estado'=>$row['ticket_state'],'estado_administrativo'=>$row['ticket_admin']])?'pending':'closed');
+        $late=$row['status']==='pending' && (int)$row['deadline_at']<$now;
+        $stats[$row['status']]++;if($late)$stats['overdue']++;
+        if(($status==='open' || $status==='pending') && $row['status']!=='pending')continue;
+        if($status==='overdue' && !$late)continue;
+        if(in_array($status,['closed','legacy'],true) && $row['status']!==$status)continue;
+        $p=json_decode($row['payload_json'],true,32,JSON_THROW_ON_ERROR);$matches=true;
+        foreach(['contrato','inmueble','arrendatario'] as $field){$term=trim((string)($input[$field]??''));if($term!=='' && mb_stripos((string)($p['contract'][$field]??''),$term)===false)$matches=false;}
+        if($matches)$rows[]=$row;
+      }
     }
-    $join = ' FROM `'.$table.'` c LEFT JOIN `'.$this->db->table('jet_cct_revisiones_servicios').'` r ON r._ID=c.review_id WHERE '.($where?implode(' AND ', $where):'1=1');
-    $total = (int)$this->db->getVar('SELECT COUNT(*)'.$join, $args);
-    $pages = max(1, (int)ceil($total/30));
-    $page = min($pages, max(1, (int)($input['page']??1)));
-    $rows = $this->db->getResults('SELECT c.*'.$join.' ORDER BY c.deadline_at ASC, c.review_id ASC LIMIT 30 OFFSET '.(($page-1)*30), $args);
-    return self::criticalList($rows, $input, $total, $page, $pages, $stats);
+    $total=count($rows);$pages=max(1,(int)ceil($total/30));$page=min($pages,max(1,(int)($input['page']??1)));
+    return self::criticalList(array_slice($rows,($page-1)*30,30),$input,$total,$page,$pages,$stats);
   }
 
   public static function criticalList(array $rows, array $input, int $total, int $page, int $pages, array $stats): string
@@ -127,6 +124,8 @@ final class PublicServicesWorkspace
       $service['cutoff_at'] = self::timestamp($row['fecha_corte_'.$suffix] ?? 0);
     }
     unset($service);
+    $linked=(new PublicServicesCritical($this->db))->case($id);
+    if(!empty($linked['ticket_id'])){$context['critical_ticket_id']=$linked['ticket_id'];$context['fecha_limite_pago']=(int)$linked['deadline_at'];}
     return ['review'=>$row,'context'=>$context,'services'=>$services,'documents'=>self::documents($row)];
   }
 

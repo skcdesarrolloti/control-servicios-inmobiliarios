@@ -88,7 +88,7 @@ final class PublicServicesDocument
   {
     $html = '<article class="scm-acta-receipt scm-services-document">' . self::header('Revisión de servicios públicos #' . $review['_ID'])
       . '<p class="scm-acta-receipt-date">Fecha de revisión: ' . date('d/m/Y H:i', (int) $context['fecha']) . ' (Colombia)</p>'
-      . (!empty($context['fecha_limite_pago']) && array_filter($services, static fn($s)=>($s['status']??'')==='Estado critico') ? '<section class="scm-services-deadline"><strong>Requerimiento crítico · pago máximo en 72 horas</strong><p>Fecha límite: ' . date('d/m/Y H:i',(int)$context['fecha_limite_pago']) . ' (Colombia).</p><a class="scm-services-button" href="' . self::e(PublicServicesCritical::url((int)$review['_ID'],(int)$context['fecha']+180*86400)) . '">Realicé el pago</a></section>' : '')
+      . (!empty($context['critical_ticket_id']) && !empty($context['fecha_limite_pago']) && array_filter($services, static fn($s)=>($s['status']??'')==='Estado critico') ? '<section class="scm-services-deadline"><strong>Caso #'.(int)$context['critical_ticket_id'].' de servicios públicos críticos · atención en 72 horas</strong><p>Fecha límite: ' . date('d/m/Y H:i',(int)$context['fecha_limite_pago']) . ' (Colombia).</p></section>' : '')
       . '<section class="scm-acta-receipt-section"><h2>1. Datos de la revisión</h2>' . self::table([
         'Contrato / Inmueble SIMI' => '#' . ($context['contrato'] ?? '') . ' · ' . ($context['inmueble'] ?? ''),
         'Dirección' => $context['direccion'] ?? '', 'Arrendatario' => $context['arrendatario'] ?? '',

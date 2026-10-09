@@ -26,27 +26,21 @@ foreach ($items as &$qaItem) { $qaItem['can_adjust_schedule']=true; $qaItem['adj
 unset($qaItem);
 $configurationItems=[array_replace($items[0],['needs_service_configuration'=>true,'due'=>0])];
 $historyRows=[['_ID'=>123,'fecha'=>time(),'contrato'=>149,'inmueble'=>10156,'direccion'=>'Altos de Plan Parejo 2 Mz 42 Lt 02','arrendatario'=>'JORGE IVAN ZABALETA RINCON','realizado_por'=>'Funcionario autenticado QA','acta_felicitaciones_luz'=>'https://example.invalid/acta.pdf']];
-$criticalRow = ['review_id'=>123,'created_at'=>time()-73*3600,'deadline_at'=>time()-3600,'status'=>'reported','payload_json'=>json_encode(['contract'=>$historyRows[0],'services'=>['energia'=>['label'=>'Energía eléctrica','account'=>'NIC-QA','amount'=>350000]]])];
+$criticalRow = ['review_id'=>123,'created_at'=>time()-73*3600,'deadline_at'=>time()-3600,'status'=>'pending','ticket_id'=>456,'payload_json'=>json_encode(['contract'=>$historyRows[0],'services'=>['energia'=>['label'=>'Energía eléctrica','account'=>'NIC-QA','amount'=>350000]]])];
 
-$criticalConfig=['whatsapp_template'=>'','response_template'=>'','language'=>'es_CO','whatsapp_enabled'=>false,'button_base'=>'https://example.invalid/'];
+$criticalConfig=['whatsapp_template'=>'','language'=>'es','whatsapp_enabled'=>false,'button_base'=>'https://example.invalid/'];
 $criticalContacts=[['id'=>'11','name'=>'Funcionario QA','employee_id'=>'94011','cargo'=>'Director QA']];
 $criticalConfigHtml=static fn()=>\SCM\Modules\Pending\PublicServicesUi::render('critical-config',['config'=>$criticalConfig,'contacts'=>$criticalContacts,'events'=>[]]);
-$criticalDetailHtml=static function($verified=false)use($criticalContacts){
-  return \SCM\Modules\Pending\PublicServicesUi::render('critical-detail',[
-    'case'=>['review_id'=>123,'created_at'=>time(),'deadline_at'=>time()+72*3600,'status'=>$verified?'verified':'reported'],
-    'payload'=>['contract'=>['contrato'=>149,'direccion'=>'Dirección QA','arrendatario'=>'Arrendatario QA'],'employee'=>['nombre'=>'Funcionario QA']],
-    'payments'=>[['id'=>99,'created_at'=>time(),'note'=>'Comprobante sintético QA']], 'audit'=>[], 'jobs'=>[], 'canVerify'=>true
-  ]);
-};
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   header('Content-Type: application/json');
   $operation = (string) ($_POST['operation'] ?? '');
   if ($operation==='critical') {
-    $visible = !in_array($_POST['status']??'open',['pending','verified'],true);
-    echo json_encode(['success'=>true,'data'=>['html'=>\SCM\Modules\Pending\PublicServicesWorkspace::criticalList($visible?[$criticalRow]:[], $_POST, $visible?31:0, max(1,(int)($_POST['page']??1)), $visible?2:1, ['pending'=>0,'reported'=>31,'overdue'=>31,'verified'=>0])]]); exit;
+    $visible = !in_array($_POST['status']??'open',['closed'],true);
+    echo json_encode(['success'=>true,'data'=>['html'=>\SCM\Modules\Pending\PublicServicesWorkspace::criticalList($visible?[$criticalRow]:[], $_POST, $visible?31:0, max(1,(int)($_POST['page']??1)), $visible?2:1, ['pending'=>31,'closed'=>0,'overdue'=>31,'legacy'=>0])]]); exit;
   }
-  if (in_array($operation,['critical_detail','critical_verify','critical_config'],true)) { echo json_encode(['success'=>true,'data'=>['html'=>$operation==='critical_config'?$criticalConfigHtml():$criticalDetailHtml($operation==='critical_verify'),'message'=>'QA sin escritura: '.$operation]]); exit; }
+  if ($operation==='critical_detail') { echo json_encode(['success'=>true,'data'=>['case'=>['ticket_pk'=>'456','ticket'=>'456','tema'=>'Servicio publico critico','case_source_html'=>'<p>Caso crítico QA #456 · atención en 72 horas</p>']]]);exit; }
+  if (in_array($operation,['critical_config'],true)) { echo json_encode(['success'=>true,'data'=>['html'=>$criticalConfigHtml(),'message'=>'QA sin escritura: '.$operation]]); exit; }
   $type = (string) ($_POST['type'] ?? 'al_dia');
   if (in_array(($_POST['action']??''),['qa-pending','scm_servicios_publicos_pendientes'],true)) { echo json_encode(['success'=>true,'data'=>['table_html'=>$view->renderServiciosPublicosTable($items,$configurationItems),'kpis_html'=>$view->renderServiciosPublicosKpis(count($items),'2026',$items,$configurationItems),'count'=>(string)count($items)]]);exit; }
   if (in_array($operation,['templates','save_template','preview_template','history'],true)) {

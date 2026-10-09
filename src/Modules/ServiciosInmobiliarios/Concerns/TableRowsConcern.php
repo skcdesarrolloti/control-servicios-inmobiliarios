@@ -296,6 +296,8 @@ trait TableRowsConcern
         . ' data-ticket="' . esc_attr($idTicket) . '"'
         . ' data-ticket-pk="' . esc_attr((string) $ticketPk) . '"'
         . ' data-asunto="' . esc_attr($asuntoLabel) . '"'
+        . ' data-tema="' . esc_attr($tema) . '"'
+        . ' data-departamento="' . esc_attr((string)($row['departamento']??'')) . '"'
         . ' data-estado="' . esc_attr($estado !== '' ? $estado : '-') . '"'
         . ' data-admin="' . esc_attr($estadoAdmin !== '' ? $estadoAdmin : '-') . '"'
         . ' data-prioridad="' . esc_attr($prioridad !== '' ? $prioridad : '-') . '"'

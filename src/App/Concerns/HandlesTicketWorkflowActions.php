@@ -1812,6 +1812,11 @@ trait HandlesTicketWorkflowActions
     $ticketRefs = array_values(array_unique(array_filter($ticketRefs, static function ($ref): bool {
       return $ref !== '';
     })));
+    if ($type === 'servicios_publicos_critico') {
+      if (!$this->canAccessDashboardTab('servicios_publicos_pendientes')) $this->jsonFail('No tienes permiso para ver servicios públicos críticos.');
+      $ticket = $this->db->getRow('SELECT * FROM `'.$this->db->table('jet_cct_tickets').'` WHERE _ID=?', [(int)($_POST['ticket_pk']??0)]);
+      if ($ticket && ($ticket['tema_ayuda']??'') === \SCM\Modules\Pending\PublicServicesCriticalTicket::TOPIC) $case=$this->adminDueNativeTicketCasePayload((int)$ticket['_ID'],$this->adminDueStatusBucket($ticket));
+    }
     if ($case === [] && in_array($type, ['calendar_ticket', 'terminacion_contrato_pendiente', 'no_prorroga_contrato_pendiente'], true) && $ticketRefs !== []) {
       $ticket = [];
       foreach ($ticketRefs as $ticketRef) {
@@ -1961,18 +1966,24 @@ trait HandlesTicketWorkflowActions
     if ($this->canAccessDashboardTab('servicios_publicos_pendientes')) {
       $critical = new \SCM\Modules\Pending\PublicServicesCritical($this->db);
       if ($critical->available()) foreach ($this->db->getResults('SELECT * FROM `' . $critical->table() . '` WHERE status <> ? ORDER BY deadline_at', ['verified']) as $row) {
+        $row=$critical->case((int)$row['review_id']);
+        if (empty($row['ticket_id']) || $row['status']==='closed') continue;
         $due = (int)$row['deadline_at'];
         $placement = $this->adminDueCalendarPlacementTimestamp($due, $fromTs, $toTs);
         if (!$placement) continue;
         $p = json_decode($row['payload_json'], true, 32, JSON_THROW_ON_ERROR);
         $item = $this->adminDueEvent([
           'id'=>'services-critical-'.$row['review_id'],'type'=>'servicios_publicos_critico','group'=>'Servicios públicos críticos · 72 horas',
-          'title'=>'Pago crítico · contrato #'.$p['contract']['contrato'].' · revisión #'.$row['review_id'],
-          'description'=>($row['status']==='reported'?'Pago reportado, pendiente de verificación. ':'Pendiente de pago. ').'Máximo 72 horas. Vence '.date('d/m/Y H:i',$due).' (Colombia). '.$critical->summary($p),
+          'title'=>'Caso #'.$row['ticket_id'].' · Servicio publico critico · contrato #'.$p['contract']['contrato'],
+          'description'=>'Caso '.$row['ticket']['estado'].'. Plazo de atención: 72 horas. Vence '.date('d/m/Y H:i',$due).' (Colombia). Revisión #'.$row['review_id'].'. '.$critical->summary($p),
           'color'=>'#be123c','base_ts'=>(int)$row['created_at'],'due_ts'=>$due,'calendar_ts'=>$placement,'days_limit'=>3,
-          'case'=>['critical_review_id'=>(string)$row['review_id']],
+          'case'=>['ticket_pk'=>(string)$row['ticket_id'],'ticket'=>(string)$row['ticket_id'],'case_source_html'=>$this->adminDueLoadingCaseSourceHtml('Cargando caso de servicios públicos críticos.')],
         ]);
         $item['estado'] = $due < time() ? 'Vencido' : 'Pendiente';
+        $item['fecha_vencimiento_hora']=date('H:i',$due);
+        $item['fecha_vencimiento_ts']=$due;
+        $item['fecha_inicio']=date('Y-m-d H:i:s',$placement);
+        $item['fecha_fin']=date('Y-m-d H:i:s',$placement+1800);
         $items[]=$item;
       }
     }
@@ -3367,8 +3378,13 @@ trait HandlesTicketWorkflowActions
       try {
         $critical = new \SCM\Modules\Pending\PublicServicesCritical($this->db);
         $employee = (new \SCM\Modules\Pending\PendingRepository($this->db))->getFuncionarioByUserId(Auth::userId());
-        if ($operation === 'critical_detail') $this->jsonOk(['html'=>$critical->detailHtml((int)($_POST['review_id']??0))]);
-        if (!\SCM\Modules\Pending\PublicServicesCritical::admin($employee ?? [])) $this->jsonFail('Solo los administradores pueden configurar este flujo o verificar el pago.');
+        if ($operation === 'critical_detail') {
+          $linked=$critical->case((int)($_POST['review_id']??0));
+          $native=!empty($linked['ticket_id'])?$this->adminDueNativeTicketCasePayload((int)$linked['ticket_id'],$this->adminDueStatusBucket($linked['ticket'])):[];
+          if(!empty($linked['ticket_id']) && empty($native))$this->jsonFail('No se pudo cargar el caso completo. Intenta desde Servicios inmobiliarios.');
+          $this->jsonOk(['html'=>$critical->detailHtml((int)($_POST['review_id']??0)),'case'=>$native]);
+        }
+        if (!\SCM\Modules\Pending\PublicServicesCritical::admin($employee ?? [])) $this->jsonFail('Solo los administradores pueden configurar este flujo.');
         if ($operation === 'critical_config') {
           $critical->saveConfig($_POST, $employee);
           $this->jsonOk(['html'=>$critical->configHtml(),'message'=>'Configuración guardada. WhatsApp solo se activa con plantillas aprobadas.']);

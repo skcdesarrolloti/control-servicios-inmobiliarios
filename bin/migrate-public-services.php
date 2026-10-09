@@ -12,5 +12,14 @@ if (!(new \SCM\Support\SchemaInspector($db))->columnExists($contracts, 'proxima_
 $storage->requireSchema();
 $critical = new \SCM\Modules\Pending\PublicServicesCritical($db);
 foreach ($critical->schema() as $sql) $db->pdo()->exec($sql);
+// Native critical case + review + histories must commit or roll back together.
+foreach (['jet_cct_tickets','jet_cct_historial_del_ticket','jet_cct_historial_del_inmueble'] as $suffix) {
+  $table=$db->table($suffix);
+  $definition=$db->getRow('SHOW CREATE TABLE `'.$table.'`');
+  if(!preg_match('/\bENGINE=InnoDB\b/i',(string)($definition['Create Table']??''))) {
+    echo 'Preparando transacciones en '.$table."...\n";
+    $db->pdo()->exec('ALTER TABLE `'.$table.'` ENGINE=InnoDB');
+  }
+}
 $critical->requireSchema();
 echo "Esquema de revisiones nativas preparado. Se conservan contratos y revisiones históricas.\n";

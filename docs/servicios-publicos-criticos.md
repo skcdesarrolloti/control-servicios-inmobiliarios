@@ -1,48 +1,58 @@
-# Seguimiento de servicios públicos críticos
+# Servicios públicos críticos: revisión y caso nativo
 
-La versión 3.3.348 crea seguimiento para las nuevas revisiones nativas con resultado `Estado critico`. No envía requerimientos retroactivos ni modifica las actas históricas.
+Desde la versión **3.3.372**, la revisión crítica se atiende mediante un caso de Servicios inmobiliarios con `tema_ayuda = Servicio publico critico`. Sustituye el flujo independiente de reporte y verificación de pagos.
 
-1. El funcionario registra el servicio crítico, la referencia, el medidor y la deuda. La revisión, las actas, el contrato y el seguimiento se guardan juntos. La fecha límite es la hora del registro más **72 horas calendario**, en Colombia; incluye fines de semana. No depende del mes trimestral de revisión.
-2. Se generan las actas PDF y se registra un seguimiento independiente. Las nuevas actas críticas incluyen la fecha límite. El editor conserva las plantillas y admite `{{fecha_limite}}`; la redacción anterior de 48 horas del modelo suministrado pasa a 72 horas para las actas nuevas.
-3. Se preparan avisos al arrendatario, al creador y a los funcionarios seleccionados en `servicios_publicos_critico`. Correo y WhatsApp se encolan en **shared-notifications**; no hay un segundo transportador. Cada acta crítica se adjunta a un WhatsApp con botón dinámico **Realicé el pago**. Los correos incluyen las actas y enlace público.
-4. Desde la versión 3.3.351 el vencimiento se agenda únicamente para los funcionarios activos configurados en Notificaciones internas → Revisión crítica · 72 horas (`servicios_publicos_critico`). La antigua selección `servicios_publicos_critico_calendario` ya no determina destinatarios. Se consulta `calendario_google_accounts` para decidir cuáles de esos seleccionados tienen conexión Google: se exige correo Google y token renovable o acceso aún vigente, sin leer ni trasladar credenciales OAuth a este módulo. La API existente crea un recordatorio a la hora exacta del vencimiento y, si hay conexión, su evento en Google usando el `id_empleado` real. Los seleccionados sin conexión reciben solo el recordatorio interno por correo. Tener Google conectado no añade destinatarios; una lista del aviso crítico vacía no crea recordatorios. Antes de ejecutar una creación pendiente se vuelve a comprobar la selección, incluso para trabajos planificados con la versión anterior. Se recupera el recordatorio existente por referencia en los reintentos. El seguimiento aparece también en el calendario de vencimientos y su popup, sujeto a los permisos/configuración del panel.
-5. El botón abre `pago-servicios-publicos.php` con firma HMAC y vencimiento. El arrendatario ve la revisión y las actas sin nombre del propietario; puede previsualizar y subir un PDF de máximo 10 MB. El servidor valida contenido, tamaño, sesión del formulario, hash e idempotencia; guarda el archivo en almacenamiento privado. Se conserva la hora de recepción, incluso después del vencimiento.
-6. El caso queda en **pago reportado, pendiente de verificación**. Se encolan WhatsApp con PDF y correos al creador, a los responsables del requerimiento y a la lista adicional `servicios_publicos_pago_reportado`. El mismo PDF no duplica el reporte ni los avisos.
-7. En la pestaña **Servicios públicos en estado crítico**, el listado muestra contrato, inmueble, arrendatario, servicios, referencia, deuda, fecha límite y estado. Incluye indicadores, filtros y páginas de 30 registros; por defecto muestra los casos sin cerrar y permite consultar también los verificados. **Abrir seguimiento** conserva el popup donde un administrador consulta soportes y confirma o rechaza, con motivo y confirmación explícita. Confirmar actualiza el listado, cierra el vencimiento y solicita cancelar el recordatorio; rechazar conserva el plazo original. El acceso anterior desde Revisiones realizadas sigue disponible. Ningún archivo cierra automáticamente el caso, cambia el estado del servicio o crea una revisión ficticia. Se conservan actas y auditoría.
+## Flujo
 
-## Configuración y activación
+1. Guardar una revisión con uno o varios servicios en **Estado crítico** genera sus actas y **un único caso por revisión**, inicialmente asignado al creador.
+2. La revisión, el caso, el vínculo y los historiales de caso e inmueble se guardan en la misma transacción. `cct_author_id` e historiales usan el `id_empleado` real.
+3. El plazo del caso es de **72 horas calendario desde el registro de la revisión**, con fecha y hora de Colombia. Es independiente de la próxima revisión trimestral.
+4. Se encolan avisos de revisión con actas para el arrendatario, el creador y la lista `internal_admin_notifications.servicios_publicos_critico`. WhatsApp utiliza un encabezado Documento y botón **Ver revisión** con URL firmada. Se prepara un WhatsApp por acta crítica y destinatario; se deduplican destinos y reintentos.
+5. El caso aparece en vencimientos y en el popup con el grupo **Servicios críticos · 72 horas**. El acceso abre el caso nativo dentro del panel. El estado vencido se calcula a la hora exacta, incluso dentro del mismo día.
+6. Los funcionarios seleccionados en el evento crítico reciben un recordatorio interno; se solicita Google Calendar solo para los que tienen cuenta conectada. El creador y el arrendatario no se agendan por el solo hecho de recibir el aviso.
+7. La atención, respuestas, evidencias y cierre se realizan con el flujo normal del caso. Se consulta su estado real; cerrar/finalizar/anular el caso retira su vencimiento y el procesador solicita cancelar sus recordatorios. Esta integración no modifica `estado_administrativo` de casos existentes.
 
-En **Servicios públicos → Plantillas de actas → Seguimiento crítico**, un administrador configura las dos listas, el nombre de las dos plantillas aprobadas y el idioma. Los eventos también aparecen en **Notificaciones internas**. Estos eventos admiten funcionarios activos de todos los cargos, sin ampliar destinatarios de otros módulos.
+## Cambio del flujo anterior
 
-Las dos plantillas propuestas están documentadas en ese formulario:
+- Se retiran los botones de reportar pago, el formulario público de comprobantes, la configuración de respuestas de pago y la verificación de pagos del módulo.
+- Los enlaces de pago enviados anteriormente solo redirigen a la revisión si su firma sigue vigente. Los POST al endpoint retirado se rechazan con HTTP 405.
+- Los comprobantes históricos y su auditoría se conservan como antecedentes de consulta.
+- El procesador convierte los seguimientos antiguos **abiertos** en casos una sola vez, conservando el vencimiento original. No concede otras 72 horas. Registra la creación también en el historial del inmueble.
+- Los seguimientos históricos ya verificados permanecen como antecedentes, sin crear casos retroactivos.
+- Se cancelan los trabajos pendientes del flujo anterior y sus mensajes todavía pendientes en la cola compartida. Los mensajes ya entregados no pueden retirarse; sus enlaces públicos dejan de permitir cargas.
+- Se requiere configurar y activar una **nueva plantilla de revisión**. La activación anterior no se hereda, para evitar mensajes con el botón de pago retirado.
 
-- `scm_servicios_critico_72h`: encabezado Documento, cinco variables de cuerpo y botón URL **Realicé el pago**.
-- `scm_servicios_pago_reportado`: encabezado Documento, las mismas cinco posiciones y botón URL **Ver revisión**.
+## Configuración de WhatsApp
 
-Variables: nombre del destinatario, contrato, resumen del requerimiento/respuesta, fecha límite y nombre del creador. La base del botón es `SCM_BASE_URL` con barra final y una variable dinámica para la ruta y parámetros firmados. Meta debe aprobar ambas plantillas antes de activar WhatsApp; hasta entonces los trabajos quedan pendientes, con error visible y reintentos. No se sustituyen por un proveedor de texto libre.
+En **Servicios públicos → Plantillas de actas → Seguimiento crítico**, configurar una plantilla aprobada (nombre sugerido `scm_servicios_revision_critica`), su idioma exacto y los funcionarios del evento crítico. El encabezado lleva el acta PDF. Las cinco variables son destinatario, contrato, resumen con número de caso, vencimiento y creador. Botón URL dinámico **Ver revisión**, con base `SCM_BASE_URL` más `/{{1}}`.
 
-Despliegue:
+La guía completa está en [Plantilla y proceso de servicios públicos](guia-plantillas-y-proceso-servicios-publicos.md).
+
+## Despliegue
+
+Ejecutar antes de registrar nuevas revisiones críticas:
 
 ```sh
 php bin/migrate-public-services.php
 ```
 
-Conservar `storage/public-services-payments/` entre despliegues, fuera de la raíz pública. Se incluye `.htaccess` de denegación; PHP sirve PDFs únicamente mediante sesión del panel o firma específica de evidencia. Configurar `upload_max_filesize` y `post_max_size` para aceptar PDF de 10 MB más el formulario.
+Además del esquema de revisiones, la migración prepara `jet_cct_tickets`, `jet_cct_historial_del_ticket` y `jet_cct_historial_del_inmueble` como InnoDB si todavía usan otro motor. **Realizar la conversión en una ventana de mantenimiento, con respaldo de la base de datos**, porque `ALTER TABLE` puede bloquear tablas mientras las reconstruye. No cambia estados ni elimina registros.
 
-El cron existente de `bin/queue-worker.php` procesa las integraciones críticas antes del transporte compartido. Si producción usa únicamente el worker global de shared-notifications, programar **además** cada minuto:
+El cron de `bin/queue-worker.php` procesa las integraciones antes del transporte compartido. Si producción solo ejecuta el worker global de shared-notifications, ejecutar además cada minuto:
 
 ```sh
 php bin/process-public-services-critical.php 10
 ```
 
-Este script procesa efectos de negocio y la API del calendario; no entrega mensajes. Evita solapamientos locales y los trabajos tienen bloqueo temporal. No ejecutar workers de prueba contra destinatarios reales.
+Este procesador convierte seguimientos abiertos anteriores, prepara avisos, sincroniza el cierre del caso y procesa la API del calendario. No envía mensajes directamente. Conservar el almacenamiento de comprobantes antiguos en `storage/public-services-payments/`.
 
-La API usa HTTPS y, si corresponde, `SCM_CALENDAR_API_KEY` como cabecera `X-SKC-Calendar-Key`. `SCM_CALENDAR_API_URL` permite cambiar la base, cuyo valor predeterminado termina en `/calendario-actividades/index.php?action=`. No guardar la clave en el frontend. La integración recupera recordatorios por `origen_app` y `external_ref` antes de crear; si Google queda pendiente, reintenta sobre el registro existente.
+La integración del calendario utiliza `SCM_CALENDAR_API_URL` y, cuando corresponde, `SCM_CALENDAR_API_KEY` como cabecera `X-SKC-Calendar-Key`. Recupera recordatorios por `origen_app` y `external_ref` para evitar duplicados. Si Google queda pendiente, reintenta sobre el mismo registro.
 
-## Trazabilidad y comprobación
+## Verificación
 
-Los estados de trabajos internos representan planificación/encolado o integración con calendario. La entrega efectiva y sus intentos se consultan en la cola compartida. Los contactos faltantes, errores de configuración y sincronización quedan visibles en el seguimiento; la carga del PDF no acredita pago bancario ni garantiza entrega de mensajes.
+- `tests/public-services-review-check.php`: tablas temporales, revisión y caso, historial del inmueble, autor real, idempotencia, cola compartida, vencimiento, cierre, conversión del flujo anterior y rollback. Simula la migración InnoDB solo en sus tablas temporales.
+- `tests/public-services-critical-calendar-check.php`: destinatarios activos, recordatorios, conexión Google, reintento sin duplicados y cierre del caso, con API simulada.
+- `tests/public-services-workspace-check.cjs`: apertura del caso nativo, filtros, plantilla única y regresiones de interfaz en escritorio y móvil.
+- `tests/public-services-critical-upload-check.cjs`: comprueba que el endpoint público retirado rechaza nuevas cargas.
 
-Pruebas: `tests/public-services-review-check.php` usa tablas TEMPORARY e incluye 107 verificaciones del flujo y sus regresiones. `tests/public-services-workspace-check.cjs` verifica interfaz y confirmación. Con el servidor local de pruebas y el PDF sintético generado, `tests/public-services-critical-upload-check.cjs` prueba multipart real, rechazo de PDF falso, deduplicación y avisos de respuesta. No invocan transportadores reales ni Google real.
-
-`tests/public-services-critical-calendar-check.php` verifica la selección de cuentas conectadas, exclusión de inactivos/accesos caducados sin renovación, exclusión de conectados no seleccionados en el aviso crítico (aunque figuren en la antigua lista de calendario o en trabajos pendientes anteriores), lista vacía, vencimiento exacto, recuperación de la API, filtros del listado y cierre de los recordatorios seleccionados. Usa tablas TEMPORARY y una API simulada, sin mensajes ni eventos reales. La prueba de interfaz cubre la pestaña crítica, filtros, páginas, popup y escritorio/móvil.
+No confundir un trabajo encolado con un mensaje entregado. Los intentos de transporte se consultan en shared-notifications. Estas pruebas no llaman proveedores reales ni crean eventos reales de Google.

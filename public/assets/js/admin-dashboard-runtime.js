@@ -877,10 +877,10 @@
         var isCreateTicket = String(caseData.admin_ticket_create || "") === "1";
         var isPublicServices = String(caseData.public_services_review || "") === "1";
         return '<div class="scm-due-entry-row scm-ticket-card">' +
-          '<strong>' + escHtml(formatDuePopupDate(row.fecha_vencimiento || "-")) + "</strong>" +
+          '<strong>' + escHtml(formatDuePopupDate(row.fecha_vencimiento || "-") + (row.fecha_vencimiento_hora ? " · " + row.fecha_vencimiento_hora : "")) + "</strong>" +
           '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
           '<em>' + escHtml(row.estado || "Pendiente") + (Number(row.dias_vencido || 0) > 0 ? " • " + escHtml(String(row.dias_vencido)) + " día(s)" : "") + "</em>" +
-          (caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Seguimiento · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-create-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Crear caso</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-services data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" disabled>Sin caso</button>'))) +
+          (caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Ver caso · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-create-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Crear caso</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-services data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" disabled>Sin caso</button>'))) +
           '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div>" +
           "</div>";
       }).join("");
@@ -2503,7 +2503,7 @@
           (Number(row.dias_vencido || 0) > 0 ? '<span>' + escHtml(String(row.dias_vencido)) + " dia(s) vencido</span>" : "") +
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
-          (caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Seguimiento · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn" data-scm-open-admin-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Crear caso</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn" data-scm-open-public-services-review data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>'))) +
+          (caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Ver caso · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn" data-scm-open-admin-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Crear caso</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn" data-scm-open-public-services-review data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>'))) +
           '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div></div></article>";
       }
 
@@ -10703,6 +10703,14 @@
       var fd = new FormData(); fd.set('review_id', open.dataset.servicesCriticalOpen);
       open.disabled = true;
       servicesWorkspaceRequest('critical_detail', fd).then(function (data) {
+        if (data.case && data.case.case_source_html) {
+          var holder = document.createElement('div'); holder.className = 'scm-ticket-card'; holder.hidden = true;
+          holder.innerHTML = '<button type="button" data-scm-due-case-loaded="1" data-due-type="servicios_publicos_critico"></button><div class="scm-case-source"></div>';
+          root.appendChild(holder); var trigger = holder.querySelector('button');
+          dashboardApplyDueCaseData(trigger, data.case);
+          openDashboardDueCaseFromButton(trigger, data.case.case_source_html);
+          holder.remove(); return;
+        }
         var dialog = servicesCriticalDialog(); dialog._trigger = open;
         dialog.querySelector('[data-critical-content]').innerHTML = data.html;
         if (!dialog.open) dialog.showModal();
@@ -10711,34 +10719,13 @@
     root.addEventListener('submit', function (event) {
       var form = event.target;
       var config = form.matches('[data-services-critical-config-form]');
-      var verify = form.matches('[data-services-critical-verify-form]');
-      if (!config && !verify) return;
+      if (!config) return;
       event.preventDefault();
-      var submittedFields = new FormData(form);
-      var send = function () {
-        var button = form.querySelector('[type="submit"]'); button.disabled = true;
-        servicesWorkspaceRequest(config ? 'critical_config' : 'critical_verify', submittedFields).then(function (data) {
-          if (config) { form.closest('[data-services-critical-config]').outerHTML = data.html; }
-          else { servicesCriticalDialog().querySelector('[data-critical-content]').innerHTML = data.html; }
-          showToast('success', data.message);
-          if (verify) {
-            dashboardDuePopupPromise = null; refreshDashboardDueNavBadge();
-            var listForm = root.querySelector('[data-services-critical-list-form]');
-            if (listForm) loadServicesWorkspace('critical', new FormData(listForm));
-          }
-        }).catch(function (error) { showToast('error', error.message); }).finally(function () { button.disabled = false; });
-      };
-      if (verify) {
-        if (form.querySelector('[data-critical-confirm]')) return;
-        var box = document.createElement('aside'); box.setAttribute('data-critical-confirm',''); box.setAttribute('role','alert');
-        box.className = '!sp-bg-amber-50 !sp-p-4 !sp-rounded !sp-text-xs';
-        box.innerHTML = '<p>Confirma que revisaste el PDF. Confirmar el pago cierra el vencimiento; rechazar conserva el plazo original.</p><button type="button" class="scm-btn-primary" data-critical-confirm-yes>Confirmar resultado</button> <button type="button" class="scm-btn-secondary" data-critical-confirm-no>Cancelar</button>';
-        form.appendChild(box);
-        box.querySelector('[data-critical-confirm-yes]').addEventListener('click', function () { box.remove(); send(); });
-        box.querySelector('[data-critical-confirm-no]').addEventListener('click', function () { box.remove(); });
-        box.querySelector('[data-critical-confirm-yes]').focus();
-      }
-      else send();
+      var button = form.querySelector('[type="submit"]'); button.disabled = true;
+      servicesWorkspaceRequest('critical_config', new FormData(form)).then(function (data) {
+        form.closest('[data-services-critical-config]').outerHTML = data.html;
+        showToast('success', data.message);
+      }).catch(function (error) { showToast('error', error.message); }).finally(function () { button.disabled = false; });
     });
 
     function loadServicesWorkspace(section, fields) {

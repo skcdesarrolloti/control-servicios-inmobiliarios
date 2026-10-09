@@ -1,25 +1,12 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const crypto = require('node:crypto');
+// Retired public route rejects uploads; no business writes and no real sends.
 (async () => {
   const base=process.env.SCM_SERVICES_QA_URL || 'http://127.0.0.1:9015';
-  const bytes=fs.readFileSync(path.join(__dirname,'../tmp/services-qa/critical-72h.pdf'));
-  const fd=new FormData();
-  fd.append('evidence',new Blob([bytes],{type:'application/pdf'}),'comprobante.pdf');
-  fd.append('repeat',new Blob([bytes],{type:'application/pdf'}),'comprobante-repetido.pdf');
-  fd.append('note','<script>qa</script> Pago energía');
-  let response=await fetch(base+'/tests/public-services-critical-upload.php',{method:'POST',headers:{'X-SCM-QA':'critical-upload'},body:fd});
-  const data=await response.json();assert.equal(response.status,200,JSON.stringify(data));assert(data.ok);
-  assert.equal(data.status_after_report,'reported');assert.equal(data.status_after_verification,'verified');
-  assert(data.deadline_unchanged && data.late && data.private_path && data.all_queued_responses);
-  assert.equal(data.jobs,6);assert.equal(data.queue,6);assert.deepEqual(data.channels,{email:3,whatsapp:3});
-  assert(data.repeated_same && data.payment_count===1);
-  assert.equal(data.sha256,crypto.createHash('sha256').update(bytes).digest('hex'));
-  assert(data.escaped_note.includes('&lt;script&gt;'));
-  console.log('PASS: carga PDF real, hash, evidencia privada, reporte tardío, deduplicación y avisos de respuesta al creador y listas configuradas, sin mensajes externos.');
-  const bad=new FormData();bad.append('evidence',new Blob(['<?php invalid'],{type:'application/pdf'}),'falso.pdf');
-  response=await fetch(base+'/tests/public-services-critical-upload.php',{method:'POST',headers:{'X-SCM-QA':'critical-upload'},body:bad});
-  const rejected=await response.json();assert.equal(response.status,422);assert.equal(rejected.ok,false);
-  console.log('PASS: archivo falso rechazado por el servidor.');
+  const fd=new FormData();fd.append('evidence',new Blob(['%PDF-invalid'],{type:'application/pdf'}),'test.pdf');
+  const response=await fetch(base+'/public/pago-servicios-publicos.php?revision=123',{method:'POST',body:fd});
+  assert.equal(response.status,405);assert.equal(response.headers.get('allow'),'GET');
+  assert((await response.text()).includes('retirado'));
+  const invalid=await fetch(base+'/public/pago-servicios-publicos.php?revision=123&expires=1&sig=invalid',{redirect:'manual'});
+  assert.equal(invalid.status,403);
+  console.log('PASS: retired payment route rejects uploads and invalid legacy links; no writes or notifications.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
