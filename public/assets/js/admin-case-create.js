@@ -68,7 +68,7 @@
           <div data-attachments hidden><div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label class="scm-new-case-label">Imágenes<input type="file" name="imagenes[]" accept="image/jpeg,image/png,image/webp" multiple></label>
             <label class="scm-new-case-label">Documentos PDF<input type="file" name="archivos[]" accept="application/pdf,.pdf" multiple></label>
-          </div><p class="text-xs text-slate-500 mt-3">Hasta 10 archivos, ${Math.floor(config.max_file_bytes / 1024 / 1024)} MB por archivo y 25 MB en total. Imágenes JPG, PNG o WebP de máximo 16 megapíxeles.</p><ul data-files class="mt-3 text-xs text-slate-600 flex flex-col gap-1"></ul></div>
+          </div><div class="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4"><button type="button" data-paste-image class="scm-new-case-button">Pegar captura</button><p data-paste-status role="status" aria-live="polite" class="mt-2 text-xs text-slate-500">Copia una captura y presiona Ctrl+V dentro de este popup, o usa Pegar captura.</p><div data-pasted-images class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3"></div></div><p class="text-xs text-slate-500 mt-3">Hasta 10 archivos, ${Math.floor(config.max_file_bytes / 1024 / 1024)} MB por archivo y 25 MB en total. Imágenes JPG, PNG o WebP de máximo 16 megapíxeles.</p><ul data-files class="mt-3 text-xs text-slate-600 flex flex-col gap-1"></ul></div>
         </section>
         </div></fieldset>
         <p data-error hidden role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"></p>
@@ -128,15 +128,77 @@
         current.querySelector('[data-assignee]').textContent = employee ? (employee.email ? `Aviso de asignación: ${employee.email}` : 'Este funcionario necesita un correo válido para recibir la asignación.') : 'El responsable recibirá un correo con los datos del caso.';
       };
       const fileInputs = [...form.querySelectorAll('input[type=file]')];
-      const files = () => fileInputs.flatMap(input => [...input.files]);
-      fileInputs.forEach(input => { input.onchange = () => {
+      const pastedImages = [];
+      const pastedPreview = current.querySelector('[data-pasted-images]');
+      const pasteStatus = current.querySelector('[data-paste-status]');
+      let captureNumber = 0;
+      const files = () => [...fileInputs.flatMap(input => [...input.files]), ...pastedImages.map(image => image.file)];
+      const renderFiles = () => {
         current.querySelector('[data-files]').innerHTML = files().map(file => `<li>${escape(file.name)} · ${(file.size / 1024 / 1024).toFixed(1)} MB</li>`).join('');
-      }; input.disabled = true; });
+        pastedPreview.innerHTML = pastedImages.map((image, index) => `<figure class="min-w-0 rounded-xl border border-slate-200 bg-white p-3"><img src="${image.url}" alt="Vista previa de ${escape(image.file.name)}" class="h-32 w-full rounded-lg object-contain"><figcaption class="mt-2 flex items-center justify-between gap-2"><span class="min-w-0 break-all text-xs text-slate-600">${escape(image.file.name)}</span><button type="button" data-remove-pasted="${index}" class="scm-new-case-button" aria-label="Quitar ${escape(image.file.name)}">Quitar</button></figcaption></figure>`).join('');
+      };
+      const clearPastedImages = () => {
+        pastedImages.forEach(image => URL.revokeObjectURL(image.url));
+        pastedImages.length = 0;
+      };
+      current.addEventListener('close', clearPastedImages);
+      fileInputs.forEach(input => { input.onchange = renderFiles; input.disabled = true; });
       form.elements.has_attachments.onchange = () => {
         const enabled = form.elements.has_attachments.value === 'Si';
         current.querySelector('[data-attachments]').hidden = !enabled;
         fileInputs.forEach(input => { input.disabled = !enabled; if (!enabled) input.value = ''; });
-        current.querySelector('[data-files]').replaceChildren();
+        if (!enabled) clearPastedImages();
+        renderFiles();
+      };
+      const addPastedImages = blobs => {
+        if (busy || !selected || !current.isConnected) return;
+        const allowedTypes = {'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp'};
+        if (blobs.some(blob => !allowedTypes[blob.type])) { showError('Pega imágenes en formato JPG, PNG o WebP.'); return; }
+        const combined = [...files(), ...blobs];
+        if (combined.length > 10 || blobs.some(blob => !blob.size || blob.size > config.max_file_bytes) || combined.reduce((sum, file) => sum + file.size, 0) > 25 * 1024 * 1024) {
+          showError('La captura supera los límites: máximo 10 adjuntos, el límite indicado por archivo y 25 MB en total.'); return;
+        }
+        form.elements.has_attachments.value = 'Si';
+        form.elements.has_attachments.onchange();
+        blobs.forEach(blob => {
+          const file = new File([blob], `captura-${Date.now()}-${++captureNumber}.${allowedTypes[blob.type]}`, {type: blob.type});
+          pastedImages.push({file, url: URL.createObjectURL(file)});
+        });
+        renderFiles();
+        showError('');
+        pasteStatus.textContent = blobs.length === 1 ? 'Captura agregada. Puedes pegar otra o quitarla antes de guardar.' : `${blobs.length} capturas agregadas. Puedes revisarlas antes de guardar.`;
+      };
+      pastedPreview.onclick = event => {
+        const button = event.target.closest('[data-remove-pasted]');
+        if (!button || busy) return;
+        const [removed] = pastedImages.splice(Number(button.dataset.removePasted), 1);
+        if (removed) URL.revokeObjectURL(removed.url);
+        renderFiles();
+        pasteStatus.textContent = 'Captura quitada. Puedes pegar otra con Ctrl+V.';
+      };
+      form.addEventListener('paste', event => {
+        if (busy || !selected) return;
+        const clipboard = event.clipboardData;
+        if (!clipboard) return;
+        let images = [...(clipboard.items || [])].filter(item => item.type.startsWith('image/')).map(item => item.getAsFile()).filter(Boolean);
+        if (!images.length) images = [...(clipboard.files || [])].filter(file => file.type.startsWith('image/'));
+        if (!images.length) return;
+        event.preventDefault();
+        addPastedImages(images);
+      });
+      current.querySelector('[data-paste-image]').onclick = async () => {
+        pasteStatus.textContent = 'Si el navegador pide acceso, permite leer la captura; también puedes presionar Ctrl+V.';
+        if (!navigator.clipboard?.read) { pasteStatus.textContent = 'Copia una captura y presiona Ctrl+V dentro de este popup.'; return; }
+        try {
+          const items = await navigator.clipboard.read();
+          const images = [];
+          for (const item of items) {
+            const type = item.types.find(type => ['image/png', 'image/jpeg', 'image/webp'].includes(type));
+            if (type) images.push(await item.getType(type));
+          }
+          if (images.length) addPastedImages(images);
+          else pasteStatus.textContent = 'No hay una imagen en el portapapeles. Copia una captura y presiona Ctrl+V.';
+        } catch (_) { pasteStatus.textContent = 'No se pudo leer el portapapeles. Presiona Ctrl+V dentro de este popup para pegar la captura.'; }
       };
       current.querySelector('[data-cancel]').onclick = close;
       form.onsubmit = async event => {
@@ -149,6 +211,7 @@
           showError('Revisa los adjuntos: agrega al menos uno si elegiste Sí, máximo 10 archivos y respeta los límites de tamaño.'); return;
         }
         const data = new FormData(form); data.set('contract_id', selected._ID); data.set('request_id', requestId);
+        pastedImages.forEach(image => data.append('imagenes[]', image.file, image.file.name));
         busy = true;
         const submit = form.querySelector('[type=submit]');
         submit.textContent = 'Creando caso…';
@@ -159,6 +222,7 @@
         try {
           const response = await api('scm_panel_case_create', data);
           busy = false;
+          clearPastedImages();
           current.removeAttribute('aria-busy');
           current.querySelector('[data-close]').disabled = false;
           current.querySelector('[data-content]').innerHTML = `<div class="p-6 text-center flex flex-col items-center gap-4"><span class="material-symbols-outlined text-emerald-700 text-4xl">check_circle</span><h3 class="text-xl font-bold text-slate-900">Caso #${escape(response.ticket_id)} creado</h3><p role="status" class="text-sm text-slate-600">${escape(response.message)}</p><button type="button" data-done class="scm-new-case-primary">Volver al panel</button></div>`;

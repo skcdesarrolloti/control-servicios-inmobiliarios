@@ -10,6 +10,8 @@ Los pasos de descripción, asignación y adjuntos aparecen únicamente después 
 
 ## Adjuntos
 
+Las capturas se pueden pegar con **Ctrl+V** dentro del popup después de seleccionar el contrato, o con **Pegar captura** cuando el navegador permita leer el portapapeles. Se muestran miniaturas con botón **Quitar**, se agregan junto a los archivos seleccionados y comparten sus límites y validaciones. Pegar una imagen activa automáticamente la opción de adjuntos. Elegir **No** limpia las capturas y los archivos seleccionados.
+
 - Hasta 10 archivos, máximo 10 MB por archivo (o el límite menor configurado) y 25 MB en total.
 - Imágenes JPG, PNG y WebP de hasta 16 megapíxeles, validadas antes de guardar y comprimidas por `StoredFileService` cuando GD está disponible.
 - Documentos PDF validados por extensión y MIME real.
