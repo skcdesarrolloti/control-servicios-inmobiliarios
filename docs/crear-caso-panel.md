@@ -2,7 +2,11 @@
 
 El botón **Nuevo Caso** en Métricas abre un popup interno con estilos de Tailwind. Permite buscar el contrato por número, inmueble SIMI, propietario o arrendatario (nombre, identificador o documento). Devuelve hasta 30 resultados por búsqueda y guarda el `_ID` del contrato seleccionado, conservando su número y datos del inmueble.
 
-El formulario pide título, descripción, tema, departamento, funcionario responsable y si hay adjuntos. Los temas y departamentos usan las definiciones del servicio compartido con Guardian; el tema sugiere el departamento, que puede cambiarse. Los responsables son funcionarios con `activo = Si`, sin filtro de cargos. El responsable debe tener correo válido.
+El formulario pide título, descripción, tema, departamento, funcionario responsable y si hay adjuntos. Los únicos departamentos disponibles son `Servicio al propietario`, `Servicio al arrendatario` y `Servicio a la copropiedad`. El servidor valida las mismas opciones que muestra el popup.
+
+Los temas permitidos son: `Reparaciones necesarias`, `Reparaciones locativas`, `Mejoras utiles`, `Reparaciones voluntarias`, `Contable y tributaria`, `Certificaciones tributarias`, `Procesos juridicos`, `Solicitud contractual`, `Solicitud de servicios publicos`, `Otros servicios`, `Reparaciones antes de la entrega`, `Reparaciones antes del recibo` y `Servicio publico critico`.
+
+**Asignar a** muestra funcionarios con `activo = Si` de los cargos habilitados en **Configuración → Permisos → Funcionarios visibles por cargo** (`dashboard_funcionario_cargo_ids`). El responsable debe tener correo válido; el servidor también exige que pertenezca a esos cargos al guardar. El creador se resuelve entre todos los funcionarios activos por su `id_empleado`, independientemente de que su cargo aparezca en la lista de asignación.
 
 El panel también permite el tema `Servicio publico critico`, con el mismo valor de los casos de revisión de servicios públicos. Sugiere el departamento `Servicio al arrendatario`, que puede cambiarse antes de guardar.
 

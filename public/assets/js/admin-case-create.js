@@ -122,7 +122,10 @@
       };
       current.querySelector('[data-search-button]').onclick = search;
       searchInput.onkeydown = event => { if (event.key === 'Enter') { event.preventDefault(); search(); } };
-      form.elements.tema_ayuda.onchange = () => { form.elements.departamento.value = config.theme_departments[form.elements.tema_ayuda.value] || ''; };
+      form.elements.tema_ayuda.onchange = () => {
+        const suggested = config.theme_departments[form.elements.tema_ayuda.value];
+        if (config.departments.includes(suggested)) form.elements.departamento.value = suggested;
+      };
       form.elements.id_empleado.onchange = () => {
         const employee = config.employees.find(e => e.employee_id === form.elements.id_empleado.value);
         current.querySelector('[data-assignee]').textContent = employee ? (employee.email ? `Aviso de asignación: ${employee.email}` : 'Este funcionario necesita un correo válido para recibir la asignación.') : 'El responsable recibirá un correo con los datos del caso.';

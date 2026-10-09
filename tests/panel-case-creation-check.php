@@ -24,7 +24,7 @@ foreach (array_merge(array_map(fn($name) => $db->table($name), $tables), [$queue
   'dashboard_tab_permissions' => ['999' => ['mis_tickets']],
 ]);
 foreach ([[901, '9001', 'Creador', 'creator@example.invalid', 'Si'], [902, '9002', 'Responsable comercial', 'assignee@example.invalid', 'Si'], [903, '9003', 'Copia comercial', 'copy@example.invalid', 'Si'], [904, '9004', 'Inactivo', 'inactive@example.invalid', 'No'], [905, '9005', 'Sin correo', '', 'Si']] as [$pk, $employee, $name, $email, $active]) {
-  $db->insert($db->table('jet_cct_funcionarios'), ['_ID' => $pk, 'id_empleado' => $employee, 'nombre' => $name, 'correo' => $email, 'celular' => '3001112201', 'activo' => $active, 'id_cargo' => '999']);
+  $db->insert($db->table('jet_cct_funcionarios'), ['_ID' => $pk, 'id_empleado' => $employee, 'nombre' => $name, 'correo' => $email, 'celular' => '3001112201', 'activo' => $active, 'id_cargo' => in_array($employee, ['9002', '9004', '9005'], true) ? '3' : '999']);
 }
 $db->insert($db->table('jet_cct_propietarios'), ['_ID' => 71, 'id_propietario' => 'P71', 'documento' => 'QAOWNER123']);
 $db->insert($db->table('jet_cct_arrendatarios'), ['_ID' => 72, 'id_arrendatario' => 'A72', 'documento' => 'QATENANT456']);
@@ -44,11 +44,14 @@ $check(count($service->searchPanelContracts('QAOWNER123', 'propietario')) === 1,
 $check(count($service->searchPanelContracts('QATENANT456', 'arrendatario')) === 1, 'tenant document follows contract relation');
 $check($service->searchPanelContracts("%' OR 1=1 --", 'contrato') === [], 'query is escaped and parameterized');
 $options = $service->panelCaseOptions();
-$check(count($options['employees']) === 4, 'active employees outside panel cargos remain assignable');
+$assignableIds = array_column($options['employees'], 'employee_id'); sort($assignableIds);
+$check($assignableIds === ['9002', '9005'], 'only active employees in configured panel cargos are assignable');
 $criticalTheme = SCM\Modules\Pending\PublicServicesCriticalTicket::TOPIC;
 $check(in_array($criticalTheme, $options['themes'], true) && $options['theme_departments'][$criticalTheme] === 'Servicio al arrendatario', 'panel offers canonical critical public service topic and department');
-$input = ['asunto' => 'Revisar fuga <script>texto</script>', 'descripcion' => 'Descripción de prueba', 'tema_ayuda' => 'Reparaciones necesarias', 'departamento' => 'Mantenimiento', 'id_empleado' => '9002', 'contract_id' => 801, 'has_attachments' => 'No'];
-foreach ([['contract_id' => 999999], ['id_empleado' => '9004'], ['id_empleado' => '9005'], ['tema_ayuda' => 'Tema inventado'], ['departamento' => 'Departamento inventado'], ['has_attachments' => 'Si'], ['asunto' => '']] as $invalid) {
+$check($options['themes'] === ['Reparaciones necesarias', 'Reparaciones locativas', 'Mejoras utiles', 'Reparaciones voluntarias', 'Contable y tributaria', 'Certificaciones tributarias', 'Procesos juridicos', 'Solicitud contractual', 'Solicitud de servicios publicos', 'Otros servicios', 'Reparaciones antes de la entrega', 'Reparaciones antes del recibo', $criticalTheme], 'panel exposes only the thirteen requested topics');
+$check($options['departments'] === ['Servicio al propietario', 'Servicio al arrendatario', 'Servicio a la copropiedad'], 'panel exposes only the three requested departments');
+$input = ['asunto' => 'Revisar fuga <script>texto</script>', 'descripcion' => 'Descripción de prueba', 'tema_ayuda' => 'Reparaciones necesarias', 'departamento' => 'Servicio al propietario', 'id_empleado' => '9002', 'contract_id' => 801, 'has_attachments' => 'No'];
+foreach ([['contract_id' => 999999], ['id_empleado' => '9003'], ['id_empleado' => '9004'], ['id_empleado' => '9005'], ['tema_ayuda' => 'Tema inventado'], ['tema_ayuda' => 'Arriendo'], ['departamento' => 'Departamento inventado'], ['departamento' => 'Mantenimiento'], ['departamento' => 'Servicio al cliente'], ['has_attachments' => 'Si'], ['asunto' => '']] as $invalid) {
   try { $service->createPanelTicket(array_merge($input, $invalid)); $check(false, 'reject invalid input'); }
   catch (InvalidArgumentException $e) { $check(true, 'rejects invalid ' . array_key_first($invalid) . ' before writing'); }
 }

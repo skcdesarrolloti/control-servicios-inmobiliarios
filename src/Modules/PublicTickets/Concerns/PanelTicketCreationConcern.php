@@ -16,19 +16,28 @@ trait PanelTicketCreationConcern
 {
   public function panelCaseOptions(): array
   {
-    $themes = [...self::PQR_THEMES, PublicServicesCriticalTicket::TOPIC];
-    $departments = ['Servicio al propietario', 'Servicio al arrendatario', 'Servicio a la copropiedad', 'Servicio al cliente'];
+    $themes = [
+      'Reparaciones necesarias',
+      'Reparaciones locativas',
+      'Mejoras utiles',
+      'Reparaciones voluntarias',
+      'Contable y tributaria',
+      'Certificaciones tributarias',
+      'Procesos juridicos',
+      'Solicitud contractual',
+      'Solicitud de servicios publicos',
+      'Otros servicios',
+      'Reparaciones antes de la entrega',
+      'Reparaciones antes del recibo',
+      PublicServicesCriticalTicket::TOPIC,
+    ];
+    $departments = ['Servicio al propietario', 'Servicio al arrendatario', 'Servicio a la copropiedad'];
     $themeDepartments = [PublicServicesCriticalTicket::TOPIC => 'Servicio al arrendatario'];
-    foreach ($themes as $theme) {
-      $department = $themeDepartments[$theme] ?? self::getDepartmentForTheme($theme);
-      $themeDepartments[$theme] = $department;
-      if ($department !== '') $departments[] = $department;
-    }
     return [
       'themes' => $themes,
-      'departments' => array_values(array_unique($departments)),
+      'departments' => $departments,
       'theme_departments' => $themeDepartments,
-      'employees' => FuncionarioOptions::activeFuncionarios($this->db, $this->schema, 'employee', true),
+      'employees' => FuncionarioOptions::panelFuncionarios($this->db, $this->schema, 'employee', null, true),
       'max_file_bytes' => min((int) SCM_UPLOAD_MAX_BYTES, 10 * 1024 * 1024),
     ];
   }
@@ -97,9 +106,11 @@ trait PanelTicketCreationConcern
       throw new \InvalidArgumentException('Selecciona un tema y un departamento válidos.');
     }
     $employees = array_column($options['employees'], null, 'employee_id');
-    $creator = $employees[(string) Auth::employeeId()] ?? null;
+    $activeEmployees = array_column(FuncionarioOptions::activeFuncionarios($this->db, $this->schema, 'employee', true), null, 'employee_id');
+    $creator = $activeEmployees[(string) Auth::employeeId()] ?? null;
     $assignee = $employees[trim((string) ($input['id_empleado'] ?? ''))] ?? null;
-    if (!$creator || !$assignee) throw new \InvalidArgumentException('El creador y el responsable deben ser funcionarios activos.');
+    if (!$creator) throw new \InvalidArgumentException('El creador debe ser un funcionario activo.');
+    if (!$assignee) throw new \InvalidArgumentException('Selecciona un responsable activo de los cargos habilitados en Configuración.');
     if (!filter_var($assignee['email'], FILTER_VALIDATE_EMAIL)) {
       throw new \InvalidArgumentException('El responsable no tiene un correo válido. Actualiza su ficha antes de asignarlo.');
     }
