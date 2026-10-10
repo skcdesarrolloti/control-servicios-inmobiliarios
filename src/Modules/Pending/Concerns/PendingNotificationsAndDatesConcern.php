@@ -26,6 +26,7 @@ trait PendingNotificationsAndDatesConcern
     }
 
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode((string) $ticketId);
+    $isRetention = in_array(mb_strtolower(trim((string) ($ticketPayload['tema_ayuda'] ?? '')), 'UTF-8'), ['retencion de contrato', 'retención de contrato'], true);
     $subject = $mode === 'preventiva'
       ? 'Aviso de revision preventiva del contrato ' . (string) ($ticketPayload['contrato'] ?? '')
       : 'Caso administrativo #' . $ticketId . ' creado';
@@ -42,6 +43,10 @@ trait PendingNotificationsAndDatesConcern
       $content .= '<p style="margin:0 0 6px;color:#f8fafc;font-weight:700;">Descripcion</p>';
       $content .= '<p style="margin:0;color:#cbd5e1;line-height:1.55;">' . nl2br(EmailTemplate::e($descripcion)) . '</p>';
       $content .= '</div>';
+    }
+    if ($isRetention) {
+      $subject = \SCM\Modules\Contracts\ContractRetentionEmail::subject($ticketId);
+      $content = \SCM\Modules\Contracts\ContractRetentionEmail::content($ticketId, $ticketPayload);
     }
 
     $jobs = [];

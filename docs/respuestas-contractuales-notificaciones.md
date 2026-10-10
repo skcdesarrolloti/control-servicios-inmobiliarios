@@ -16,4 +16,6 @@ Correo y WhatsApp incluyen acceso al acta mediante la cola compartida `shared-no
 
 Al crear un caso de retención, se guarda su descripción comercial y el acta en los archivos del caso, sin agregar la respuesta automática «Caso administrativo creado». La autoría de creación y el historial del inmueble conservan la trazabilidad. Las respuestas que agreguen los funcionarios posteriormente se guardan mediante el flujo habitual.
 
+El correo de creación de retención se presenta como **Tarea comercial: Retención de contrato · Caso #…**. Incluye contrato, inmueble SIMI, dirección, arrendatario, responsable y las acciones comerciales esperadas. La descripción conserva sus párrafos y listas para facilitar la lectura; el botón **Ver caso** permite consultar los documentos y registrar la gestión. Se reutilizan los destinatarios configurados y la cola de creación existente.
+
 Verificación: `php tests/contract-request-notifications-check.php` usa tablas temporales y proveedores simulados para comprobar destinatarios, canales, eventos, cola e intentos sin enviar mensajes externos. `node tests/contract-request-ui-check.cjs` verifica ambos formularios, la selección de canales, validaciones, payload y presentación móvil con datos sintéticos.

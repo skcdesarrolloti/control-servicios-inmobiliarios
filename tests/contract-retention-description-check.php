@@ -3,6 +3,7 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/vendor/autoload.php';
 use SCM\Modules\Contracts\ContractRetentionDescription;
 $samples = [];
+$emailSamples = [];
 $features = ContractRetentionDescription::propertyContext(
   ['valor_canon' => '1.250.000', 'destinacion_inmueble' => 'Vivienda'],
   ['tipo_inmueble' => 'Apartamento', 'destinacion' => 'Comercial', 'precio_arriendo' => '9000000', 'habitaciones' => '3', 'banos' => '2', 'area_construida' => '85', 'barrio' => 'El Recreo']
@@ -25,10 +26,20 @@ foreach (['contrato por terminar', 'terminación de contrato', 'no prórroga'] a
   if (!str_contains($html, '<ul>') || !str_contains($html, $source) || !str_contains($html, '09/01/2027') || str_contains($html, 'CARTA COMPLETA') || mb_strlen(strip_tags($html)) > 1400) throw new RuntimeException('Commercial handoff must be brief and structured for ' . $source);
   if ($source !== 'contrato por terminar' && !str_contains($html, 'Caso #10863')) throw new RuntimeException('Original case must remain referenced.');
   $samples[] = '<h2>' . htmlspecialchars($source) . '</h2><article>' . $html . '</article>';
+  $emailContent=\SCM\Modules\Contracts\ContractRetentionEmail::content(10955,[
+    'contrato'=>'2000','inmueble'=>'204578','id_inmueble'=>'84016','direccion'=>'Urbanización Simón Bolívar manzana 20 lote 7',
+    'arrendatario'=>'Arrendatario de ejemplo','nombre_empleado'=>'Consultor de ejemplo','descripcion'=>$html
+  ]);
+  if (!str_contains($emailContent,'<ul>') || !str_contains($emailContent,'Caso #10863') && $source!=='contrato por terminar' || str_contains($emailContent,'84016')) throw new RuntimeException('Email must preserve structured description and SIMI property identifier.');
+  $emailSamples[]=\SCM\Support\EmailTemplate::render(\SCM\Modules\Contracts\ContractRetentionEmail::subject(10955),$emailContent,['ticket_url'=>'https://example.invalid/caso/10955']);
 }
 $unsafe = ContractRetentionDescription::build(['source' => '<script>alert(1)</script>', 'tenant' => '<img src=x onerror=alert(1)>', 'property_type' => '<script>bad</script>', 'document_url' => 'javascript:alert(1)']);
 if (str_contains($unsafe, '<script>') || str_contains($unsafe, '<img ') || str_contains($unsafe, 'href=')) throw new RuntimeException('Unsafe content must be escaped.');
 if (!str_contains(ContractRetentionDescription::build($missing), 'Sin registrar') || !str_contains(ContractRetentionDescription::build($missing), 'Habitaciones:</strong> 0')) throw new RuntimeException('Missing characteristics must be explicit.');
 $path = sys_get_temp_dir() . '/scm-retention-description-qa.html';
 file_put_contents($path, '<!doctype html><meta charset="utf-8"><style>body{font:16px Arial;color:#0f1e36;background:#f1f5f9;margin:24px}article{background:white;border:1px solid #dbe4f0;border-radius:12px;padding:24px;line-height:1.6}li{margin:4px 0}a{color:#2563eb}</style>' . implode('', $samples));
+$emailPath=sys_get_temp_dir().'/scm-retention-email-qa.html';
+file_put_contents($emailPath,$emailSamples[1]);
+$escaped=\SCM\Modules\Contracts\ContractRetentionEmail::content(1,['arrendatario'=>'<img src=x onerror=alert(1)>','descripcion'=>'<p>Contexto seguro</p><script>alert(1)</script>']);
+if (str_contains($escaped,'<img ') || str_contains($escaped,'<script>') || !str_contains($escaped,'<p>Contexto seguro</p>')) throw new RuntimeException('Retention email must escape summary fields and sanitize rich description.');
 echo "PASS: all three retention sources, short HTML description, original case and document references, escaping. QA: {$path}\n";

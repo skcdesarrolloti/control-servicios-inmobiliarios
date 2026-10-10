@@ -248,6 +248,9 @@ try {
     'prioridad'=>'Prioridad urgente','asunto'=>'Retention test','descripcion'=>'Synthetic only', 'internal_notification_action'=>'retencion_contrato_ticket'
   ],[],[],['admin']);
   check($result['ok']==='1' && $result['emails_queued']==='1','The specific retention event must route to configured recipients: '.json_encode($result));
+  $retentionMail=json_decode($db->getVar('SELECT payload FROM test_jobs WHERE dedupe_key LIKE ?', ['ticket_admin_created_'.$result['ticket_id'].':%']),true);
+  check(str_starts_with($retentionMail['subject'],'Tarea comercial: Retención de contrato') && str_contains($retentionMail['message_html'],'Gestión comercial solicitada') && !str_contains($retentionMail['message_html'],'Se ha creado un caso administrativo.'),'Retention queue uses commercial task subject and actionable content');
+  check($retentionMail['meta']['targets']===['admin'] && str_contains($retentionMail['message_html'],'Ver caso'),'Retention email keeps configured recipients and case access');
   check($db->getVar('SELECT id_contrato FROM wp_jet_cct_tickets WHERE _ID=?',[$result['ticket_id']])==='193','Real ticket creation must select exact PK despite a number collision');
   check($db->getVar('SELECT cct_author_id FROM wp_jet_cct_historial_del_inmueble WHERE id_ticket=?',[$result['ticket_id']])==='EMP-900','Property audit must record creator, not assignee');
   check((int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket WHERE id_ticket=?',[$result['ticket_id']])===0,'Retention creation must not insert an automatic response');
@@ -277,6 +280,7 @@ try {
   check($letterResult['ok']==='1' && (int)$letterResult['emails_queued']===2,'Tenant and configured internal employee must receive the letter, deduplicating recipient');
   check($db->getVar('SELECT cct_author_id FROM wp_jet_cct_historial_del_ticket WHERE id_ticket=?',[$letterResult['ticket_id']])==='EMP-900','Other administrative topics retain their creation history and real actor');
   $letterJob=json_decode($db->getVar("SELECT payload FROM test_jobs WHERE payload LIKE '%signed-letter.pdf%' LIMIT 1"),true);
+  check(str_starts_with($letterJob['subject'],'Caso administrativo #'),'Other administrative topics keep their email titles');
   check(($letterJob['meta']['documents'][0]['url'] ?? '')==='https://example.invalid/signed-letter.pdf','Queued letter must retain signed PDF link');
   check(\SharedNotifications\NotificationQueue::$constructions===1,'All transactions must reuse the prewarmed queue');
   $probe->writable=false;
