@@ -3,8 +3,14 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/bootstrap/app.php';
 $check = static function(bool $ok, string $label): void { if (!$ok) throw new RuntimeException('FAIL: ' . $label); echo 'PASS: ' . $label . PHP_EOL; };
 $reference = SCM\Support\PublicCaseAccess::reference(10945);
-$check(SCM\Support\PublicCaseAccess::route($reference, false) === ['mode' => 'public', 'id' => 10945], 'signed case opens publicly');
-$check(SCM\Support\PublicCaseAccess::route($reference, true) === ['mode' => 'panel', 'id' => 10945], 'same signed case opens in authenticated panel');
+$check(SCM\Support\PublicCaseAccess::route($reference, false) === ['mode' => 'public', 'id' => 10945, 'audience' => 'publico'], 'signed case opens publicly');
+$check(SCM\Support\PublicCaseAccess::route($reference, true) === ['mode' => 'panel', 'id' => 10945, 'audience' => 'publico'], 'same signed case opens in authenticated panel');
+$staffReference = SCM\Support\PublicCaseAccess::reference(10945, null, 'funcionario');
+$check(SCM\Support\PublicCaseAccess::route($staffReference, false)['audience'] === 'funcionario', 'staff audience is signed into the link');
+$check(SCM\Support\PublicCaseAccess::route(str_replace('.funcionario.', '.propietario.', $staffReference), false)['mode'] === 'denied', 'audience cannot be changed without invalidating the signature');
+$expiry = time()+3600;
+$legacy = '10945.' . $expiry . '.' . hash_hmac('sha256', 'public_case_v1|10945|' . $expiry, SCM_APP_SECRET);
+$check(SCM\Support\PublicCaseAccess::route($legacy, false)['audience'] === 'publico', 'legacy signed links remain public without staff controls');
 $check(SCM\Support\PublicCaseAccess::route('10945', true)['mode'] === 'panel', 'legacy numeric internal links remain valid with session');
 foreach (['10945', str_replace('10945.', '10946.', $reference), substr($reference, 0, -1) . (str_ends_with($reference, 'a') ? 'b' : 'a'), SCM\Support\PublicCaseAccess::reference(10945, time() - 1), '1<script>', '0', 'https://evil.invalid', '1.0000000000.' . str_repeat('a', 64)] as $invalid) {
   $check(SCM\Support\PublicCaseAccess::route($invalid, false)['mode'] === 'denied', 'unsigned, changed, expired or malformed case is denied');

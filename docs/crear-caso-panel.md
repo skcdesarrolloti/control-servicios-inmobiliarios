@@ -12,15 +12,15 @@ El panel también permite el tema `Servicio publico critico`, con el mismo valor
 
 El caso sigue la persistencia de `PublicTicketsService` utilizada por el bot, con origen `Panel administrativo` y creador `Funcionario`. El autor del CCT y los historiales usan el `id_empleado` real del creador. La asignación usa el `id_empleado` del responsable. Solo se inicializan los estados del caso nuevo según la regla existente; no se alteran otros casos.
 
-Los pasos de descripción, asignación y adjuntos aparecen únicamente después de seleccionar un contrato. Si cambia la búsqueda, se ocultan y deshabilitan hasta seleccionar nuevamente; el botón de crear sigue la misma condición.
+Después de seleccionar un contrato se pregunta **¿Quieres preparar la información del caso con el asistente?**. **Sí, usar el asistente** muestra sus herramientas y el formulario; **No, completar manualmente** muestra el formulario habitual. Antes de responder, los demás pasos permanecen ocultos y deshabilitados. Si cambia la búsqueda, se requiere seleccionar nuevamente el contrato y responder la pregunta.
 
-## Ayuda de IA después de seleccionar contrato
+## Asistente después de seleccionar contrato
 
-El apartado opcional **Completar con IA** aparece encima de los datos del caso, únicamente después de seleccionar un contrato. Admite texto pegado de correos o WhatsApp y hasta 4 capturas JPG/PNG/WebP (5 MB por imagen, 12 MB en total y 16 megapíxeles). Se pueden subir desde el equipo o pegar con Ctrl+V dentro de esa sección o con **Pegar captura**.
+El apartado opcional **Asistente para preparar el caso** aparece encima de los datos cuando se elige usar el asistente. Admite texto pegado de correos o WhatsApp y hasta 4 capturas JPG/PNG/WebP (5 MB por imagen, 12 MB en total y 16 megapíxeles). Se pueden subir con **Adjuntar captura** o pegar con Ctrl+V dentro de esa sección o con **Pegar (Ctrl+V)**.
 
 **Analizar solicitud** genera una propuesta de título, descripción, tema y departamento. **Completar formulario** la aplica, conservando el responsable, los destinatarios y la selección de adjuntos. **Deshacer autocompletado** restaura los campos anteriores. El funcionario revisa y guarda el caso con el flujo habitual. Los temas y departamentos generados se validan contra las opciones reales del formulario; los valores desconocidos requieren selección manual.
 
-El texto y las imágenes se envían a MiniMax solo al pulsar Analizar. Las capturas de IA son fuentes privadas temporales: se validan y, si GD está disponible, se convierten a JPEG y se reducen a 2400 px de lado mayor antes del envío. No se guardan ni se agregan a los adjuntos públicos del caso. Para conservar una evidencia, agrégala expresamente en **Adjunta las evidencias**. El texto original y las capturas tampoco se incluyen al guardar el caso. Solo se envía al modelo contexto mínimo del contrato (número, SIMI y dirección), no su ficha completa ni contactos. Cambiar el contrato descarta las fuentes, propuestas y solicitudes pendientes de IA.
+El texto y las imágenes se envían a MiniMax solo al pulsar Analizar. Las capturas del asistente son fuentes privadas temporales: se validan y, si GD está disponible, se convierten a JPEG y se reducen a 2400 px de lado mayor antes del envío. No se guardan en el servidor ni se agregan a los adjuntos públicos del caso; sí se conservan temporalmente en el borrador local descrito abajo. Para conservar una evidencia del caso, agrégala expresamente en **Adjunta las evidencias**. El texto original y las capturas tampoco se incluyen al guardar el caso. Solo se envía al modelo contexto mínimo del contrato (número, SIMI y dirección), no su ficha completa ni contactos. Cambiar el contrato descarta las fuentes, propuestas y solicitudes pendientes del asistente.
 
 La integración usa la API compatible con OpenAI de MiniMax, sin necesitar un servidor MCP. Configura en el `.env` privado **del servidor que ejecuta PHP**:
 
@@ -37,13 +37,21 @@ MiniMax documenta imágenes y texto en [la API multimodal compatible con OpenAI]
 
 ## Adjuntos
 
-Las capturas se pueden pegar con **Ctrl+V** dentro del popup después de seleccionar el contrato, o con **Pegar captura** cuando el navegador permita leer el portapapeles. Se muestran miniaturas con botón **Quitar**, se agregan junto a los archivos seleccionados y comparten sus límites y validaciones. Pegar una imagen activa automáticamente la opción de adjuntos. Elegir **No** limpia las capturas y los archivos seleccionados.
+La barra de adjuntos usa botones **Adjuntar imagen**, **Pegar (Ctrl+V)** y **Adjuntar documento**, con los controles nativos de archivos ocultos. Las capturas se pueden pegar con **Ctrl+V** dentro del popup después de seleccionar el contrato y responder cómo completar el caso, o con el botón Pegar cuando el navegador permita leer el portapapeles. Se muestran miniaturas con botón **Quitar**, se agregan junto a los archivos seleccionados y comparten sus límites y validaciones. Pegar una imagen activa automáticamente la opción de adjuntos. Elegir **No** limpia las capturas y los archivos seleccionados.
 
 - Hasta 10 archivos, máximo 10 MB por archivo (o el límite menor configurado) y 25 MB en total.
 - Imágenes JPG, PNG y WebP de hasta 16 megapíxeles, validadas antes de guardar y comprimidas por `StoredFileService` cuando GD está disponible.
 - Documentos PDF validados por extensión y MIME real.
 - URLs firmadas de almacenamiento, imágenes en `imagenes` y documentos serializados en `archivos`, compatibles con las vistas existentes.
 - Un archivo rechazado impide crear el caso; los archivos guardados se eliminan si falla la transacción.
+
+## Protección y recuperación del borrador
+
+El popup no se cierra al pulsar fuera ni con Escape. Los botones explícitos de cerrar y cancelar guardan primero el borrador; si el navegador rechaza el almacenamiento, muestran el error y mantienen el popup abierto. Esto también evita cierres al cancelar el selector de archivos.
+
+El autoguardado usa IndexedDB en este navegador, con una clave opaca por funcionario y caducidad de 24 horas. Conserva contrato, campos, destinatarios, elección del asistente, texto fuente, capturas y documentos. Al reabrir o recargar recupera el borrador y vuelve a consultar el contrato antes de habilitar los pasos siguientes. No se sincroniza con otros equipos y depende de que el navegador permita almacenar datos; cerrar el sistema abruptamente puede perder el último cambio aún pendiente.
+
+**Descartar borrador** pide confirmación dentro del popup. Crear correctamente el caso elimina el borrador. La recuperación conserva el identificador de solicitud para que un reintento después de perder la respuesta no duplique el caso ni sus avisos. El CSRF se obtiene nuevamente del servidor.
 
 ## Correos y consulta
 
@@ -57,7 +65,9 @@ Los mensajes se encolan en `shared-notifications`, con `source_module = nuevo_ca
 
 Al crear el caso, se cierra el formulario y se abre automáticamente su popup nativo dentro del panel. El detalle conserva un resumen de los avisos y un apartado **Detalle de los avisos de WhatsApp** por destinatario. Si dos o más destinatarios comparten celular se envía un solo mensaje a ese número y se explica en el resumen. Las copias internas sin celular válido también se indican. El contador representa destinos únicos encolados, no personas ni confirmaciones de entrega. No se cambia el estado administrativo al abrir el caso.
 
-Los enlaces nuevos usan `?scm_case=ID.VENCIMIENTO.FIRMA`, con HMAC SHA-256 específico para esta vista. Con sesión activa se vuelve a `?scm_case=ID` y se abre el popup nativo, conservando sus permisos: responsable, copias activas configuradas o usuarios con permiso de Métricas. Sin sesión (también si expiró), el enlace firmado abre la vista pública de solo lectura. Cambiar el ID o la firma impide el acceso; el enlace vencido no permite acceso público. Un enlace anterior que solo tenga el número del caso sigue enviando al login y conserva el caso de destino, sin permitir consulta pública por número.
+Los enlaces nuevos usan `?scm_case=ID.VENCIMIENTO.DESTINATARIO.FIRMA`, con HMAC SHA-256 específico que también protege el destinatario (`funcionario`, `propietario`, `arrendatario` o `copropiedad`). Con sesión activa se vuelve a `?scm_case=ID` y se abre el popup nativo, conservando sus permisos: responsable, copias activas configuradas o usuarios con permiso de Métricas. Sin sesión (también si expiró), el enlace firmado abre la vista pública de solo lectura. Cambiar el ID, destinatario o firma impide el acceso; el enlace vencido no permite acceso público. Los enlaces firmados anteriores de tres partes siguen funcionando como consulta pública genérica, sin acceso de funcionarios. Un enlace anterior que solo tenga el número del caso sigue enviando al login y conserva el caso de destino, sin permitir consulta pública por número.
+
+La vista adapta el subtítulo al destinatario y solo muestra **Acceso funcionarios** en enlaces firmados para funcionarios. Propietarios, arrendatarios y copropiedades no reciben ese botón. Usa Poppins y el logo y favicon configurados en la configuración central del sistema mediante `system_image()`.
 
 La vista pública muestra título, estado, tema, contrato, SIMI, dirección, fecha, descripción y las evidencias originales del caso. Usa el mismo lenguaje visual Tailwind del popup, permite previsualizar imágenes y PDF dentro de la página y tiene impresión A4 compacta. El responsable aparece en el cierre. No publica sucursal, datos de contacto, estado administrativo, historial privado ni acciones internas. Usa una lista explícita de campos y adjuntos de almacenamiento firmado o medios corporativos públicos; nunca reutiliza el HTML administrativo. No se modifica el caso al consultar. `public/caso.php` también permite abrir directamente la misma referencia firmada. La creación, búsqueda y opciones del panel continúan exigiendo sesión, CSRF y permiso de Métricas.
 
@@ -87,7 +97,7 @@ Agrega exactamente un botón **Visitar sitio web**, URL **dinámica**, texto **V
 https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/?scm_case={{1}}
 ```
 
-El parámetro del botón es ahora el token completo `ID.VENCIMIENTO.FIRMA`, **no solamente el número del caso**. El código lo genera y sustituye automáticamente en `{{1}}`, sin cambiar la URL base de la plantilla. Para el ejemplo que pide Meta, copia un enlace firmado de un correo de caso nuevo; los correos ya incluyen ese enlace aunque WhatsApp todavía no esté activo. Con sesión abre el panel; sin sesión, la vista pública. No construyas una firma manual ni uses un enlace con solo el número como ejemplo de acceso público.
+El parámetro del botón es ahora el token completo `ID.VENCIMIENTO.DESTINATARIO.FIRMA`, **no solamente el número del caso**. El código lo genera y sustituye automáticamente en `{{1}}`, sin cambiar la URL base ni la estructura de las plantillas ya configuradas. Para el ejemplo que pide Meta, copia un enlace firmado de un correo de caso nuevo; los correos ya incluyen ese enlace aunque WhatsApp todavía no esté activo. Con sesión abre el panel; sin sesión, la vista pública correspondiente. No construyas una firma manual ni uses un enlace con solo el número como ejemplo de acceso público.
 
 ### Propietario, arrendatario y copropiedad: `scm_caso_registrado_v2`
 
@@ -125,6 +135,7 @@ php tests/panel-case-creation-check.php
 php tests/panel-case-login-check.php
 node tests/panel-case-attachments-check.cjs
 node tests/panel-case-modal-check.cjs
+node tests/panel-case-draft-ui-check.cjs
 node tests/panel-case-settings-check.cjs
 php tests/panel-case-ai-check.php
 node tests/panel-case-ai-uploads-check.cjs
@@ -137,7 +148,9 @@ La prueba `tests/panel-case-settings-check.cjs` verifica la sección real de con
 
 Las pruebas de IA verifican el contrato como requisito, fuentes privadas, límites y MIME real, compresión, formato de respuesta, listas de opciones, revisión/aplicación/deshacer, fallos de cuota, descarte al cambiar de contrato, móvil y apertura automática del caso con el detalle de avisos. Usan respuestas simuladas y cargas multipart locales; no consumen cuota de MiniMax ni envían mensajes reales.
 
-`public-case-check.php` verifica las firmas, el vencimiento y la lista pública de campos/adjuntos. `public-case-ui-check.cjs` levanta un servidor en localhost con registros temporales y secreto de prueba: recorre las rutas reales, el retorno al panel con sesión, los enlaces antiguos al login, los rechazos sin firma, la sesión vencida, las previsualizaciones, móvil y la impresión de un caso representativo en una página A4. Genera capturas y PDF de prueba en `output/public-case`.
+`panel-case-draft-ui-check.cjs` comprueba la pregunta del asistente, controles de archivos, protección frente a clic fuera/Escape/cancelar selector, recuperación de archivos al reabrir y recargar, separación por funcionario, limpieza tras crear y confirmación al descartar.
+
+`public-case-check.php` verifica las firmas, destinatarios, compatibilidad anterior, vencimiento y lista pública de campos/adjuntos. `public-case-ui-check.cjs` levanta un servidor en localhost con registros temporales y secreto de prueba: recorre las cuatro vistas por destinatario, logo/Poppins, intentos de cambiar el destinatario, retorno al panel con sesión, enlaces antiguos al login, rechazos sin firma, sesión vencida, previsualizaciones, móvil e impresión de un caso representativo en una página A4. Genera capturas y PDF de prueba en `output/public-case`.
 
 La prueba de base de datos usa tablas temporales de la conexión y proveedores de correo y WhatsApp simulados. La prueba de adjuntos levanta un servidor PHP solo en localhost y limpia sus archivos. La prueba de navegador requiere Playwright y Edge; genera capturas de escritorio y móvil en `output/panel-case`.
 

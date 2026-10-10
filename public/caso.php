@@ -13,7 +13,7 @@ header('Cache-Control: no-store, private');
 header('Referrer-Policy: no-referrer');
 header('X-Content-Type-Options: nosniff');
 header('X-Robots-Tag: noindex, nofollow');
-header("Content-Security-Policy: default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self' https:; script-src 'self'; frame-src 'self' https://sucasainmobiliaria.com.co; base-uri 'none'; form-action 'self'; frame-ancestors 'self'");
+header("Content-Security-Policy: default-src 'none'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https:; script-src 'self'; frame-src 'self' https://sucasainmobiliaria.com.co; base-uri 'none'; form-action 'self'; frame-ancestors 'self'");
 $reference = is_string($_GET['scm_case'] ?? null) ? $_GET['scm_case'] : '';
 $route = PublicCaseAccess::route($reference, Auth::isLoggedIn());
 if ($route['mode'] === 'panel') {
@@ -47,4 +47,4 @@ if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true)) {
   }
 }
 session_write_close();
-(new \SCM\Views\PublicCaseView())->render($case, $error);
+(new \SCM\Views\PublicCaseView())->render($case, $error, $route['audience']);

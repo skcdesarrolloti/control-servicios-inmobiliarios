@@ -154,7 +154,7 @@ foreach ($whatsapps as $job) {
   $internal = $meta['recipient_role'] === 'funcionario';
   $reference = $payload['components'][1]['parameters'][0]['text'] ?? '';
   $publicRoute = SCM\Support\PublicCaseAccess::route($reference, false);
-  $check($job['template_name'] === ($internal ? 'qa_caso_asignado' : 'qa_caso_externo') && count($payload['components']) === 2 && $publicRoute === ['mode' => 'public', 'id' => $notifyId], 'internal and external templates receive signed public/panel case button');
+  $check($job['template_name'] === ($internal ? 'qa_caso_asignado' : 'qa_caso_externo') && count($payload['components']) === 2 && $publicRoute === ['mode' => 'public', 'id' => $notifyId, 'audience' => $meta['recipient_role']], 'internal and external templates receive signed case button bound to recipient audience');
 }
 $externalEmails = array_filter($emails, fn($r) => str_contains($r['dedupe_key'], ':externo:'));
 $check(count($externalEmails) === 3 && !array_filter($externalEmails, fn($r) => !str_contains($r['message_html'], 'scm_case=' . $notifyId . '.') || str_contains($r['message_html'], '<script>')), 'external emails escape content and include signed case links');

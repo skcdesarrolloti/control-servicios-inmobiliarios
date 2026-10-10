@@ -6,20 +6,21 @@ namespace SCM\Views;
 
 final class PublicCaseView
 {
-  public function render(?array $case, string $error = ''): void
+  public function render(?array $case, string $error = '', string $audience = 'publico'): void
   {
     $e = static fn($v): string => htmlspecialchars((string) $v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $base = rtrim((string) SCM_BASE_URL, '/');
+    $audienceLabel = ['propietario' => 'Información para el propietario', 'arrendatario' => 'Información para el arrendatario', 'copropiedad' => 'Información para la copropiedad', 'funcionario' => 'Consulta para funcionarios'][$audience] ?? 'Consulta del caso';
     $login = $base . '/login.php' . ($case ? '?next=' . rawurlencode('index.php?scm_case=' . $case['_ID']) : '');
     ?>
 <!doctype html>
-<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title><?php echo $case ? 'Caso #' . $e($case['_ID']) : 'Caso no disponible'; ?> · SKC SuCasa Inmobiliaria</title><link rel="stylesheet" href="<?php echo $e($base); ?>/assets/css/tailwind-admin.css?v=<?php echo $e(SCM_VERSION); ?>"><link rel="stylesheet" href="<?php echo $e($base); ?>/assets/css/public-case.css?v=<?php echo $e(SCM_VERSION); ?>"><script defer src="<?php echo $e($base); ?>/assets/js/public-case.js?v=<?php echo $e(SCM_VERSION); ?>"></script></head>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title><?php echo $case ? 'Caso #' . $e($case['_ID']) : 'Caso no disponible'; ?> · SKC SuCasa Inmobiliaria</title><link rel="icon" href="<?php echo $e(\system_image('portal_favicon_url')); ?>"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"><link rel="stylesheet" href="<?php echo $e($base); ?>/assets/css/tailwind-admin.css?v=<?php echo $e(SCM_VERSION); ?>"><link rel="stylesheet" href="<?php echo $e($base); ?>/assets/css/public-case.css?v=<?php echo $e(SCM_VERSION); ?>"><script defer src="<?php echo $e($base); ?>/assets/js/public-case.js?v=<?php echo $e(SCM_VERSION); ?>"></script></head>
 <body class="scm-public-case bg-slate-100 font-sans text-slate-900">
 <main class="min-h-screen p-4 sm:p-8 flex items-start justify-center">
   <article class="scm-public-case-card w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
     <header class="border-b border-slate-200 px-6 py-5 flex flex-wrap items-start justify-between gap-4">
-      <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-500">SKC SuCasa Inmobiliaria</p><h1 class="mt-1 text-xl font-bold"><?php echo $case ? 'Caso #' . $e($case['_ID']) : 'Caso no disponible'; ?></h1><p class="mt-1 text-sm text-slate-500">Consulta del caso</p></div>
-      <div class="scm-public-case-actions flex flex-wrap gap-2"><?php if ($case): ?><button type="button" data-print class="scm-new-case-button">Imprimir</button><?php endif; ?><a href="<?php echo $e($login); ?>" class="scm-new-case-button">Acceso funcionarios</a></div>
+      <div class="flex flex-col gap-4"><img data-brand-logo src="<?php echo $e(\system_image('portal_logo_url')); ?>" alt="SKC SuCasa Inmobiliaria" class="scm-public-case-logo"><div><p class="text-xs font-semibold uppercase tracking-wider text-slate-500">SKC SuCasa Inmobiliaria</p><h1 class="mt-1 text-2xl font-bold"><?php echo $case ? 'Caso #' . $e($case['_ID']) : 'Caso no disponible'; ?></h1><p class="mt-1 text-sm text-slate-500"><?php echo $e($audienceLabel); ?></p></div></div>
+      <div class="scm-public-case-actions flex flex-wrap gap-2"><?php if ($case): ?><button type="button" data-print class="scm-new-case-button">Imprimir</button><?php endif; ?><?php if ($case && $audience === 'funcionario'): ?><a data-staff-access href="<?php echo $e($login); ?>" class="scm-new-case-button">Acceso funcionarios</a><?php endif; ?></div>
     </header>
     <div class="p-6 flex flex-col gap-6">
     <?php if (!$case): ?><p role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"><?php echo $e($error); ?></p>

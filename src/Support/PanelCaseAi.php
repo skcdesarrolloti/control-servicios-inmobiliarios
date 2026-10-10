@@ -28,7 +28,7 @@ final class PanelCaseAi
       && in_array($config['model'], ['MiniMax-M3', 'MiniMax-M3.1-Flash-Preview'], true);
     return ['enabled' => $ready, 'max_images' => self::MAX_IMAGES, 'max_image_bytes' => self::MAX_IMAGE_BYTES,
       'max_total_bytes' => self::MAX_TOTAL_BYTES,
-      'message' => $ready ? '' : 'La ayuda de IA está pendiente de activar con la clave de MiniMax en el servidor. Puedes completar el caso manualmente.'];
+      'message' => $ready ? '' : 'El asistente está pendiente de activar con la clave de MiniMax en el servidor. Puedes completar el caso manualmente.'];
   }
 
   /** Reads validated PHP uploads into inline data; source screenshots never become public files. */
@@ -36,7 +36,7 @@ final class PanelCaseAi
   {
     if ($files === []) return [];
     if (!is_array($files['name'] ?? null) || count($files['name']) > self::MAX_IMAGES) {
-      throw new \InvalidArgumentException('La IA admite máximo 4 capturas por análisis.');
+      throw new \InvalidArgumentException('El asistente admite máximo 4 capturas por análisis.');
     }
     $images = [];
     $total = 0;
@@ -138,15 +138,15 @@ final class PanelCaseAi
     $choice = $decoded['choices'][0] ?? [];
     $raw = $choice['message']['content'] ?? '';
     if (!is_string($raw) || ($choice['finish_reason'] ?? '') !== 'stop' || (int) ($decoded['base_resp']['status_code'] ?? 0) !== 0) {
-      throw new \RuntimeException('La IA no devolvió un borrador completo. Intenta con menos contenido o capturas más claras.');
+      throw new \RuntimeException('El asistente no devolvió un borrador completo. Intenta con menos contenido o capturas más claras.');
     }
     $raw = trim(preg_replace('/<think>.*?<\/think>/s', '', $raw) ?? '');
     $raw = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', $raw) ?? '';
     $draft = json_decode($raw, true);
-    if (!is_array($draft) || array_is_list($draft)) throw new \RuntimeException('La respuesta de IA no tiene el formato esperado. Intenta nuevamente.');
+    if (!is_array($draft) || array_is_list($draft)) throw new \RuntimeException('La respuesta del asistente no tiene el formato esperado. Intenta nuevamente.');
     $result = [];
     foreach (['asunto' => 200, 'descripcion' => 10000, 'tema_ayuda' => 100, 'departamento' => 100, 'observaciones' => 1500] as $key => $limit) {
-      if (!is_string($draft[$key] ?? '')) throw new \RuntimeException('La IA devolvió un campo inválido. Intenta nuevamente.');
+      if (!is_string($draft[$key] ?? '')) throw new \RuntimeException('El asistente devolvió un campo inválido. Intenta nuevamente.');
       $result[$key] = mb_substr(trim(strip_tags($draft[$key] ?? '')), 0, $limit);
     }
     if ($result['asunto'] === '' || $result['descripcion'] === '') throw new \RuntimeException('No hay información suficiente para preparar el caso. Agrega más contexto o una captura legible.');

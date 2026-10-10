@@ -42,6 +42,7 @@ trait PanelTicketCreationConcern
       'max_file_bytes' => min((int) SCM_UPLOAD_MAX_BYTES, 10 * 1024 * 1024),
       'whatsapp_enabled' => PanelCaseNotifications::config()['enabled'],
       'ai' => \SCM\Support\PanelCaseAi::availability(),
+      'draft_scope' => hash_hmac('sha256', 'panel-case-draft:' . Auth::employeeId(), (string) SCM_APP_SECRET),
     ];
   }
 
@@ -156,7 +157,7 @@ trait PanelTicketCreationConcern
         $content .= '<p><b>' . EmailTemplate::e($label) . ':</b> ' . EmailTemplate::e((string) $value) . '</p>';
       }
       $content .= '<p>' . nl2br(EmailTemplate::e($description)) . '</p><p>Adjuntos: ' . (count($stored['images']) + count($stored['documents'])) . '.</p>';
-      $url = \SCM\Support\PublicCaseAccess::url($id);
+      $url = \SCM\Support\PublicCaseAccess::url($id, 'funcionario');
       $queued = $this->emailQueue->enqueue($recipients, 'Nuevo caso #' . $id . ': ' . $title, EmailTemplate::render('Nuevo caso asignado', $content, ['ticket_url' => $url]), [
         'source_module' => 'nuevo_caso_panel', 'dedupe_key' => 'nuevo_caso_panel:' . $id,
         'meta' => ['ticket_id' => $id, 'contract_id' => (int) $contract['_ID'], 'created_by_employee_id' => $creator['employee_id'], 'assigned_employee_id' => $assignee['employee_id']],

@@ -13,7 +13,7 @@ const assert = require('node:assert/strict');
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 if (str_starts_with($path, '/assets/')) return false;
 require '${repo}/bootstrap/app.php';
-if ($path === '/fixture') { header('Content-Type: application/json'); echo json_encode(['reference' => SCM\\Support\\PublicCaseAccess::reference(1999999999), 'expired' => SCM\\Support\\PublicCaseAccess::reference(1999999999, time()-1)]); exit; }
+if ($path === '/fixture') { header('Content-Type: application/json'); echo json_encode(['reference' => SCM\\Support\\PublicCaseAccess::reference(1999999999), 'expired' => SCM\\Support\\PublicCaseAccess::reference(1999999999, time()-1), 'audiences' => array_combine(['funcionario','propietario','arrendatario','copropiedad'], array_map(fn($a) => SCM\\Support\\PublicCaseAccess::reference(1999999999, null, $a), ['funcionario','propietario','arrendatario','copropiedad']))]); exit; }
 if ($path === '/file.php') { header('Content-Type: image/png'); echo base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aM1kAAAAASUVORK5CYII='); exit; }
 $db = SCM\\Core\\App::db();
 $db->pdo()->exec('CREATE TEMPORARY TABLE '.chr(96).$db->table('jet_cct_tickets').chr(96).' (_ID BIGINT, asunto TEXT, descripcion TEXT, tema_ayuda TEXT, estado TEXT, contrato TEXT, inmueble TEXT, direccion TEXT, fecha BIGINT, nombre_empleado TEXT, imagenes TEXT, archivos TEXT, sucursal TEXT, correo_propietario TEXT, observacion_interna TEXT)');
@@ -50,6 +50,14 @@ require '${repo}/public/' . ($path === '/caso.php' ? 'caso.php' : 'index.php');
     assert.equal(direct.headers.get('location'), base + '/?scm_case=1999999999');
     assert.equal((await fetch(url + '&logged=expired')).status, 200, 'expired session falls back to signed public view');
     assert.equal((await fetch(url, {method: 'POST'})).status, 405, 'public endpoint is read-only');
+    for (const [audience, reference] of Object.entries(fixture.audiences)) {
+      const response = await fetch(base + '/?scm_case=' + reference);
+      const html = await response.text();
+      assert.equal(response.status, 200);
+      assert.equal(html.includes('data-staff-access'), audience === 'funcionario', 'only signed staff links expose staff access');
+      assert(html.includes('data-brand-logo') && html.includes('family=Poppins'), 'public view loads corporate logo and Poppins');
+    }
+    assert.equal((await fetch(base + '/?scm_case=' + fixture.audiences.propietario.replace('.propietario.', '.funcionario.'))).status, 403, 'recipient audience cannot be forged');
     browser = await chromium.launch({headless: true, executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
     const page = await browser.newPage({viewport: {width: 1280, height: 1000}});
     const errors = [];
@@ -61,6 +69,8 @@ require '${repo}/public/' . ($path === '/caso.php' ? 'caso.php' : 'index.php');
     const text = await page.locator('body').innerText();
     assert(text.includes('Revisar fuga en cocina') && text.includes('Consultor de prueba'));
     assert(!text.includes('SECRET_'), 'public page omits sensitive internal fields');
+    assert(!text.includes('Acceso funcionarios'), 'generic public links omit internal navigation');
+    assert((await page.locator('body').evaluate(node => getComputedStyle(node).fontFamily)).includes('Poppins'));
     assert.equal(await page.locator('[data-preview=image]').count(), 1);
     await page.locator('[data-preview=image]').click();
     assert(await page.locator('dialog').isVisible(), 'image opens inside same page');

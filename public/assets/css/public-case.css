@@ -1,3 +1,5 @@
+.scm-public-case { font-family:Poppins,Arial,sans-serif; }
+.scm-public-case-logo { width:190px; max-width:100%; height:54px; object-fit:contain; object-position:left center; }
 .scm-public-case-card section, .scm-public-case-signoff { break-inside:avoid; }
 .scm-public-case-preview { width:min(58rem,calc(100% - 2rem)); max-height:92vh; }
 .scm-public-case-preview::backdrop { background:rgb(15 23 42 / .75); backdrop-filter:blur(4px); }
@@ -7,6 +9,7 @@
   @page { size:A4; margin:10mm; }
   .scm-public-case { background:white; font-size:10pt; }
   .scm-public-case main { min-height:0; display:block; padding:0; }
+  .scm-public-case-logo { width:130px; height:36px; }
   .scm-public-case-card { max-width:none; border:0; border-radius:0; box-shadow:none; }
   .scm-public-case-card header, .scm-public-case-card > div { padding:8px; }
   .scm-public-case-card > div { gap:12px; }
