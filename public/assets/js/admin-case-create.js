@@ -482,12 +482,18 @@
           clearPastedImages();
           current.removeAttribute('aria-busy');
           current.querySelector('[data-close]').disabled = false;
-          current.querySelector('[data-content]').innerHTML = `<div class="p-6 text-center flex flex-col items-center gap-4"><span class="material-symbols-outlined text-emerald-700 text-4xl">check_circle</span><h3 class="text-xl font-bold text-slate-900">Caso #${escape(response.ticket_id)} creado</h3><p role="status" class="text-sm text-slate-600">${escape(response.message)}</p>${response.notification_details?.length ? `<ul class="text-left text-sm text-slate-600 flex flex-col gap-2">${response.notification_details.map(detail => `<li>${escape(detail)}</li>`).join('')}</ul>` : ''}<button type="button" data-done class="scm-new-case-primary">Abrir caso</button></div>`;
-          const openCreatedCase = async () => { await close(); root.dispatchEvent(new CustomEvent('scm:open-panel-case', {detail: response})); };
+          current.querySelector('[data-content]').innerHTML = `<div class="p-6 text-center flex flex-col items-center gap-4"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" class="text-emerald-700"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><h3 class="text-xl font-bold text-slate-900">Caso #${escape(response.ticket_id)} creado</h3><p role="status" class="text-sm text-slate-600">${escape(response.message)}</p>${response.notification_details?.length ? `<div class="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-left"><h4 class="text-sm font-semibold text-slate-900">Detalle de los avisos de WhatsApp</h4><ul class="mt-3 text-sm text-slate-600 flex flex-col gap-2">${response.notification_details.map(detail => `<li>${escape(detail)}</li>`).join('')}</ul></div>` : ''}<button type="button" data-done class="scm-new-case-primary">Aceptar</button></div>`;
+          let openingCreatedCase = false;
+          const openCreatedCase = async () => {
+            if (openingCreatedCase) return;
+            openingCreatedCase = true;
+            current.querySelector('[data-done]').disabled = true;
+            await close();
+            root.dispatchEvent(new CustomEvent('scm:open-panel-case', {detail: {ticket_id: response.ticket_id}}));
+          };
           current.querySelector('[data-done]').onclick = openCreatedCase;
           current.querySelector('[data-done]').focus();
           root.dispatchEvent(new CustomEvent('scm:panel-case-created', {detail: response}));
-          if (typeof window.scmOpenCase === 'function') openCreatedCase();
         } catch (e) {
           busy = false; current.removeAttribute('aria-busy');
           controls.forEach((control, index) => { control.disabled = states[index]; });
