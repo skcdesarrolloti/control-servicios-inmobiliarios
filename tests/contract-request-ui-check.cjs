@@ -133,7 +133,7 @@ eval('?>' . substr($source, $start, $end - $start));
     for (const kind of ['termination','non-renewal']) {
       await page.evaluate(kind => {
         const rows = kind === 'termination' ? contractTerminationRowsByPk : contractNonRenewalRowsByPk;
-        rows['41'].recipients[2] = {value:'admin',label:'Funcionario configurado',name:'Funcionario Interno',email:'staff@example.invalid',phone:'3001112255',available:true,email_available:true,whatsapp_available:true,default_channels:['email']};
+        rows['41'].recipients[2] = {value:'admin',label:'Funcionario configurado',name:'Funcionario Interno',email:'staff@example.invalid',phone:'3001112255',available:true,email_available:true,whatsapp_available:true,default_channels:['email','whatsapp']};
       },kind);
       await page.evaluate(kind => kind === 'termination' ? openContractTerminationResponse('41') : openContractNonRenewalResponse('41'),kind);
       const popup = page.locator('.scm-contract-response-swal');
@@ -144,7 +144,9 @@ eval('?>' . substr($source, $start, $end - $start));
       const owner = popup.locator('.scm-contract-recipient').filter({has:page.locator('[value="propietario"]')});
       const staff = popup.locator('.scm-contract-recipient').filter({has:page.locator('[value="admin"]')});
       assert(await staff.locator('[data-contract-channel="email"]').isChecked());
-      assert.equal(await staff.locator('[data-contract-channel="whatsapp"]').isChecked(),false,'internal WhatsApp requires explicit selection');
+      assert(await staff.locator('[data-contract-channel="whatsapp"]').isChecked(),'internal WhatsApp defaults to selected when a valid number exists');
+      await staff.locator('[data-contract-channel="whatsapp"]').uncheck();
+      assert.equal(await staff.locator('[data-contract-channel="whatsapp"]').isChecked(),false,'internal WhatsApp can still be deselected');
       await staff.locator('[data-contract-channel="whatsapp"]').check();
       assert(await tenant.locator('[data-contract-channel="whatsapp"]').isChecked());
       assert(await owner.locator('[data-contract-channel="whatsapp"]').isDisabled());
@@ -313,6 +315,6 @@ eval('?>' . substr($source, $start, $end - $start));
     assert.equal(await page.locator('[data-scm-contract-non-renewal-panel]').getAttribute('data-scm-loaded'),'1','empty responses are cached');
     assert((await page.locator('[data-scm-contract-non-renewal-list]').innerText()).includes('No hay solicitudes'));
     assert.deepEqual(errors,[]);
-    console.log('PASS: both panels, recipient channels, internal WhatsApp opt-in, channel validation/payload, filters, CSV, response modals, deletion, answered history, reopen and mobile layout. QA: '+qaDir);
+    console.log('PASS: both panels, recipient channels, internal WhatsApp default and opt-out, channel validation/payload, filters, CSV, response modals, deletion, answered history, reopen and mobile layout. QA: '+qaDir);
   } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exitCode=1;});

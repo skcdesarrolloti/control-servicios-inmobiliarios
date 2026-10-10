@@ -5396,7 +5396,7 @@ trait HandlesTicketWorkflowActions
       'available' => $adminEmails !== [] || $adminPhones !== [],
       'email_available' => $adminEmails !== [],
       'whatsapp_available' => $adminPhones !== [],
-      'default_channels' => ['email'],
+      'default_channels' => ['email', 'whatsapp'],
       'help' => 'Destinatarios de Notificaciones internas → Contratos → ' . ($internalAction === 'no_prorroga_contrato' ? 'Solicitudes de no prórroga de contrato.' : 'Solicitudes de terminación de contrato.') . ' Cada canal avisa solo a quienes tengan ese dato registrado.',
     ];
     return $options;
@@ -5846,7 +5846,7 @@ trait HandlesTicketWorkflowActions
     ];
     $seen = [];
     foreach ($targets as $target) {
-      // Historical clients notify internal staff by email only. WhatsApp is opt-in.
+      // Legacy requests without channel selection preserve internal email-only routing.
       if ($channels !== null && !in_array('whatsapp', $channels[$target] ?? [], true)) continue;
       if ($target === 'admin') {
         if ($channels !== null) {

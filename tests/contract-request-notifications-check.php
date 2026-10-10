@@ -41,11 +41,11 @@ foreach (['notifyContractTerminationActa' => 'terminacion_contrato', 'notifyCont
   $result = $invoke($method, $ticket, 'dentro', 'Respuesta de ejemplo', $url, $targets, 'Funcionario');
   $check($result['email'] === 3 && $result['whatsapp'] === 2, "$action preserves legacy routing: both parties on both channels, internal email only");
   $options = $invoke('contractTerminationRecipientOptions', $ticket, $action);
-  $check($options[2]['name'] === ($action === 'terminacion_contrato' ? 'Terminación' : 'No prórroga') && $options[2]['default_channels'] === ['email'], "$action shows configured active staff and email default");
+  $check($options[2]['name'] === ($action === 'terminacion_contrato' ? 'Terminación' : 'No prórroga') && $options[2]['default_channels'] === ['email', 'whatsapp'], "$action shows configured active staff with email and WhatsApp selected by default");
   $clear();
   $channels = ['arrendatario' => ['whatsapp'], 'propietario' => ['email'], 'admin' => ['email', 'whatsapp']];
   $result = $invoke($method, $ticket, 'dentro', 'Respuesta de ejemplo', $url, $targets, 'Funcionario', $channels);
-  $check($result['email'] === 2 && $result['whatsapp'] === 2, "$action respects separate recipient channels including internal WhatsApp opt-in");
+  $check($result['email'] === 2 && $result['whatsapp'] === 2, "$action respects separate recipient channels including internal WhatsApp selection");
   $destinations = array_column($rows(), 'destination');
   $check(!in_array('tenant@example.invalid', $destinations) && !in_array('+573001112244', $destinations), "$action never queues excluded party channels");
   $check(in_array($action === 'terminacion_contrato' ? '+573001112201' : '+573001112202', $destinations), "$action resolves its own internal event, not the other event");
