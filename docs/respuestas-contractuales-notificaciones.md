@@ -14,4 +14,6 @@ Correo y WhatsApp incluyen acceso al acta mediante la cola compartida `shared-no
 
 **Crear caso y enviar segundo mensaje** es independiente. Si se activa, crea retención, encola los correos de creación al responsable, solicitante y funcionarios configurados para `retencion_contrato_ticket`, y WhatsApp al solicitante y consultor asignado cuando tienen celular. **No notificar la respuesta** desactiva únicamente el aviso con acta; para evitar también los avisos comerciales debe desmarcarse la creación de retención.
 
+Al crear un caso de retención, se guarda su descripción comercial y el acta en los archivos del caso, sin agregar la respuesta automática «Caso administrativo creado». La autoría de creación y el historial del inmueble conservan la trazabilidad. Las respuestas que agreguen los funcionarios posteriormente se guardan mediante el flujo habitual.
+
 Verificación: `php tests/contract-request-notifications-check.php` usa tablas temporales y proveedores simulados para comprobar destinatarios, canales, eventos, cola e intentos sin enviar mensajes externos. `node tests/contract-request-ui-check.cjs` verifica ambos formularios, la selección de canales, validaciones, payload y presentación móvil con datos sintéticos.

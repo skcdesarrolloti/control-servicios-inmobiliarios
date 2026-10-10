@@ -158,6 +158,8 @@ $pdo->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN cct_author_id TEXT');
 $pdo->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN id_empleado TEXT');
 $pdo->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN estado TEXT');
 $pdo->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN estado_administrativo TEXT');
+$pdo->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN descripcion TEXT');
+$pdo->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN archivos TEXT');
 $db->insert('wp_jet_cct_funcionarios', ['_ID'=>13,'id_empleado'=>'EMP-13','nombre'=>'Assigned test','correo'=>'test@example.invalid','id_cargo'=>'13','activo'=>'Si']);
 $db->insert('wp_jet_cct_confi_sistema', ['_ID'=>1,'funcion'=>'control_servicios_config','valor'=>json_encode(['internal_admin_notifications'=>['contrato_no_salida'=>[13],'retencion_contrato_ticket'=>[13],'contrato_recibo_automatico'=>[13]]])]);
 $end = strtotime('today +15 days');
@@ -248,8 +250,17 @@ try {
   check($result['ok']==='1' && $result['emails_queued']==='1','The specific retention event must route to configured recipients: '.json_encode($result));
   check($db->getVar('SELECT id_contrato FROM wp_jet_cct_tickets WHERE _ID=?',[$result['ticket_id']])==='193','Real ticket creation must select exact PK despite a number collision');
   check($db->getVar('SELECT cct_author_id FROM wp_jet_cct_historial_del_inmueble WHERE id_ticket=?',[$result['ticket_id']])==='EMP-900','Property audit must record creator, not assignee');
-  check($db->getVar('SELECT cct_author_id FROM wp_jet_cct_historial_del_ticket WHERE id_ticket=?',[$result['ticket_id']])==='EMP-900','Ticket audit must record creator');
+  check((int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket WHERE id_ticket=?',[$result['ticket_id']])===0,'Retention creation must not insert an automatic response');
+  check($db->getVar('SELECT cct_author_id FROM wp_jet_cct_tickets WHERE _ID=?',[$result['ticket_id']])==='EMP-900','Retention case keeps real creator without adding a response');
+  check($db->getVar('SELECT descripcion FROM wp_jet_cct_tickets WHERE _ID=?',[$result['ticket_id']])==='Synthetic only','Retention description remains on the case');
   check($db->getVar('SELECT id_empleado FROM wp_jet_cct_tickets WHERE _ID=?',[$result['ticket_id']])==='EMP-13','Ticket responsibility must remain the selected employee');
+  $documents=[['nombre_archivo'=>'Acta de terminación','archivo'=>'https://example.invalid/acta.pdf','media_archivo'=>'https://example.invalid/acta.pdf']];
+  $withAct=(new RealTicketCreationProbe($db))->createAdministrativeTicket([
+    'contract_pk'=>'193','id_empleado'=>'EMP-13','tema_ayuda'=>'Retención de contrato','departamento'=>'Servicio al cliente',
+    'prioridad'=>'Prioridad urgente','asunto'=>'Retención con acta','descripcion'=>'Descripción comercial con acta'
+  ],[],$documents,[]);
+  check($withAct['ok']==='1' && (int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket WHERE id_ticket=?',[$withAct['ticket_id']])===0,'Accented retention topic also omits automatic response');
+  check(unserialize($db->getVar('SELECT archivos FROM wp_jet_cct_tickets WHERE _ID=?',[$withAct['ticket_id']]),['allowed_classes'=>false])===$documents,'Act stays attached to retention case without a history response');
   $letterProbe = new RealTicketCreationProbe($db);
   $letterInput = ['contract_pk'=>'801','id_empleado'=>'EMP-13','tema_ayuda'=>'Recibo de inmuebles','departamento'=>'Servicio al arrendatario','prioridad'=>'Prioridad urgente','asunto'=>'Aviso previo','descripcion'=>'Prueba sin envío','solicitante_tipo'=>'arrendatario','internal_notification_action'=>'contrato_recibo_automatico','require_receipt_letter'=>true];
   $before = (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tickets');
@@ -264,6 +275,7 @@ try {
   check((int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tickets')===$before,'Failed delivery enqueue must roll back ticket');
   $pdo->beginTransaction(); $letterResult=$letterProbe->createAdministrativeTicket($letterInput,[],[],['empleado','solicitante','admin']); $pdo->commit();
   check($letterResult['ok']==='1' && (int)$letterResult['emails_queued']===2,'Tenant and configured internal employee must receive the letter, deduplicating recipient');
+  check($db->getVar('SELECT cct_author_id FROM wp_jet_cct_historial_del_ticket WHERE id_ticket=?',[$letterResult['ticket_id']])==='EMP-900','Other administrative topics retain their creation history and real actor');
   $letterJob=json_decode($db->getVar("SELECT payload FROM test_jobs WHERE payload LIKE '%signed-letter.pdf%' LIMIT 1"),true);
   check(($letterJob['meta']['documents'][0]['url'] ?? '')==='https://example.invalid/signed-letter.pdf','Queued letter must retain signed PDF link');
   check(\SharedNotifications\NotificationQueue::$constructions===1,'All transactions must reuse the prewarmed queue');

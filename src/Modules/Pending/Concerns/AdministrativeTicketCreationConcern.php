@@ -438,6 +438,8 @@ trait AdministrativeTicketCreationConcern
   /** @param array<string,mixed> $ticketPayload */
   private function insertTicketHistory(SchemaInspector $schema, int $ticketId, array $ticketPayload, array $imagenes, array $documentos, string $userName, string $idEmpleado, int $nowTs, string $nowMysql): void
   {
+    // Retention opens with its description and case files; creation is not a response.
+    if (in_array(mb_strtolower(trim((string) ($ticketPayload['tema_ayuda'] ?? '')), 'UTF-8'), ['retencion de contrato', 'retención de contrato'], true)) return;
     $db = $this->repo->getDb();
     $histTable = $db->table('jet_cct_historial_del_ticket');
     if (!$schema->tableExists($histTable)) {
