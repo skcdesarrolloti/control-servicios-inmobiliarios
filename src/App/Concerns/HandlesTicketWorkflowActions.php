@@ -4486,6 +4486,18 @@ trait HandlesTicketWorkflowActions
   /** @param array<string,mixed> $ticket @return array<string,mixed> */
   private function contractRetentionTicketUiData(array $ticket): array
   {
+    $contract = $this->contractTerminationContractByContext($ticket);
+    $open = $contract ? $this->contractEndingRetentionTicket($contract) : [];
+    $existing = $open ?: ($contract ? $this->contractEndingRetentionTicket($contract, false) : []);
+    $existingCase = $existing ? [
+      'id' => $this->contractTerminationFirstText([$existing], ['id_ticket', '_ID']),
+      'active' => $open !== [],
+      'status' => $this->contractTerminationFirstText([$existing], ['estado']) ?: 'Sin estado',
+      'administrative_status' => $this->contractTerminationFirstText([$existing], ['estado_administrativo']),
+      'employee' => $this->contractRetentionEmployeeDisplayName((string) ($existing['id_empleado'] ?? ''), 'id_empleado') ?: (string) ($existing['nombre_empleado'] ?? $existing['id_empleado'] ?? ''),
+      'subject' => (string) ($existing['asunto'] ?? 'Retención de contrato'),
+      'description' => html_entity_decode(strip_tags((string) ($existing['descripcion'] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+    ] : [];
     try {
       $funcionarios = $this->contractRetentionEligibleFuncionarios();
     } catch (\Throwable $exception) {
@@ -4495,6 +4507,7 @@ trait HandlesTicketWorkflowActions
         'default_employee_id' => '',
         'funcionarios' => [],
         'assignment_help' => [],
+        'existing_case' => $existingCase,
       ];
     }
     $validIds = [];
@@ -4525,7 +4538,8 @@ trait HandlesTicketWorkflowActions
     }
 
     return [
-      'enabled' => $options !== [],
+      'enabled' => $options !== [] && $open === [],
+      'existing_case' => $existingCase,
       'default_employee_id' => $defaultEmployeeId,
       'funcionarios' => $options,
       'assignment_help' => $this->contractRetentionAssignmentHelp($ticket, $defaultEmployeeId),
@@ -5015,24 +5029,35 @@ trait HandlesTicketWorkflowActions
   /** @param array<string,mixed> $contract */
   private function contractEndingRetentionTicketId(array $contract): string
   {
+    return $this->contractTerminationFirstText([$this->contractEndingRetentionTicket($contract)], ['id_ticket', '_ID']);
+  }
+
+  /** Only an open case blocks a new retention in the same contract cycle. */
+  private function contractEndingRetentionTicket(array $contract, bool $activeOnly = true): array
+  {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     if (!$this->table_exists($ticketsTable) || !$this->column_exists($ticketsTable, 'id_contrato')) {
-      return '';
+      return [];
     }
     $contractRefs = [trim((string) ($contract['_ID'] ?? ''))];
-    if ($contractRefs[0] === '') return '';
+    if ($contractRefs[0] === '') return [];
     $topicSql = $this->column_exists($ticketsTable, 'tema_ayuda')
       ? " AND LOWER(TRIM(COALESCE(`tema_ayuda`, ''))) IN ('retencion de contrato', 'retención de contrato')"
       : '';
-    $select = $this->column_exists($ticketsTable, 'id_ticket') ? '`_ID`, `id_ticket`' : '`_ID`';
+    $statusSql = '';
+    if ($activeOnly) {
+      foreach (['estado', 'estado_administrativo'] as $column) {
+        if ($this->column_exists($ticketsTable, $column)) $statusSql .= " AND LOWER(TRIM(COALESCE(`{$column}`, ''))) NOT IN ('cerrado', 'cerrada', 'resuelto', 'resuelta', 'finalizado', 'finalizada', 'anulado', 'anulada')";
+      }
+    }
     $rows = $this->db->getResults(
-      "SELECT {$select} FROM `{$ticketsTable}` WHERE TRIM(COALESCE(`id_contrato`, '')) IN (" . implode(', ', array_fill(0, count($contractRefs), '?')) . "){$topicSql}" . ($this->column_exists($ticketsTable, 'fecha_terminacion_contrato') ? " AND `fecha_terminacion_contrato` = ?" : '') . " ORDER BY CAST(COALESCE(`_ID`, 0) AS UNSIGNED) DESC LIMIT 1" . ($this->db->pdo()->inTransaction() ? " FOR UPDATE" : ""),
+      "SELECT * FROM `{$ticketsTable}` WHERE TRIM(COALESCE(`id_contrato`, '')) IN (" . implode(', ', array_fill(0, count($contractRefs), '?')) . "){$topicSql}{$statusSql}" . ($this->column_exists($ticketsTable, 'fecha_terminacion_contrato') ? " AND `fecha_terminacion_contrato` = ?" : '') . " ORDER BY CAST(COALESCE(`_ID`, 0) AS UNSIGNED) DESC LIMIT 1" . ($this->db->pdo()->inTransaction() ? " FOR UPDATE" : ""),
       $this->column_exists($ticketsTable, 'fecha_terminacion_contrato') ? array_merge($contractRefs, [(string) ($contract['fin_contrato'] ?? '')]) : $contractRefs
     );
     if (!is_array($rows) || $rows === [] || !is_array($rows[0])) {
-      return '';
+      return [];
     }
-    return $this->contractTerminationFirstText([$rows[0]], ['id_ticket', '_ID']);
+    return $rows[0];
   }
 
   private function contractEndingContractByPk(string $contractPk): array
@@ -5103,7 +5128,8 @@ trait HandlesTicketWorkflowActions
       if (isset($locked['estado']) && !in_array(mb_strtolower(trim((string) $locked['estado'])), ['entregado', 'por recibir'], true)) throw new \RuntimeException('Solo se genera retención para contratos entregados o por recibir.');
       $state = $service->get($id, $this->contractTerminationTimestamp($locked['fin_contrato'] ?? ''));
       if (isset($state['probability']) && (float) $state['probability'] >= 100) throw new \RuntimeException('Renovación al 100 %: no se genera retención.');
-      if ($this->contractEndingRetentionTicketId($locked) !== '') throw new \RuntimeException('Este contrato ya tiene caso de retención. Actualiza el listado para abrir el caso.');
+      $existingId = $this->contractEndingRetentionTicketId($locked);
+      if ($existingId !== '') throw new \RuntimeException('Este contrato ya tiene caso de retención abierto #' . $existingId . '. Puedes responder sin crear otra retención; revisa el caso existente en el formulario.');
       $result = $this->createContractRetentionTicketUnlocked($ticket, $term, $employeeId, $responseText, $actaUrl, $actaTitle, $sourceLabel, $locked);
       if (($result['ok'] ?? '0') !== '1') throw new \RuntimeException((string) ($result['message'] ?? 'No se pudo crear la retención.'));
       $service->audit($id, 'retention_created', Auth::employeeId(), ['ticket_id' => $result['ticket_id'], 'end_ts' => $locked['fin_contrato'] ?? '']);

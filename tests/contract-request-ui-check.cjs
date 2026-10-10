@@ -150,6 +150,43 @@ eval('?>' . substr($source, $start, $end - $start));
       assert.deepEqual(JSON.parse(posted.notify_channels),{arrendatario:['whatsapp'],propietario:['email'],admin:['email','whatsapp']});
     }
     assert.equal(await page.evaluate(() => contractsEndingRefreshes),4,'each successful within-term response refreshes contracts ending with the new probability');
+    for (const kind of ['termination','non-renewal']) {
+      for (const active of [true,false]) {
+        await page.evaluate(({kind,active}) => {
+          const rows = kind === 'termination' ? contractTerminationRowsByPk : contractNonRenewalRowsByPk;
+          rows['41'].retention_ticket = Object.assign({},base.retention_ticket,{existing_case:{id:'10900',active,status:active?'En proceso':'Cerrado',administrative_status:active?'Nuevo':'Finalizado',employee:'Consultor de ejemplo',subject:'Retención <img src=x onerror=alert(1)>',description:'Gestión comercial pendiente.\n'+'detalle'.repeat(60)}});
+        },{kind,active});
+        await page.evaluate(kind => kind === 'termination' ? openContractTerminationResponse('41') : openContractNonRenewalResponse('41'),kind);
+        const popup = page.locator('.scm-contract-response-swal');
+        await popup.waitFor();
+        const existing = popup.locator('[data-contract-retention-existing]');
+        assert((await existing.innerText()).includes('Caso #10900'));
+        assert((await existing.innerText()).includes('Consultor de ejemplo'));
+        assert.equal(await popup.locator('[name="crear_ticket_retencion"]').isDisabled(),active);
+        assert.equal(await popup.locator('[name="crear_ticket_retencion"]').isChecked(),!active);
+        await popup.locator('[name="termino"]').selectOption('dentro');
+        await existing.locator('summary').click();
+        assert.equal(await existing.locator('img').count(),0,'existing case data stays escaped');
+        assert((await existing.innerText()).includes('Gestión comercial pendiente.'));
+        assert.equal(await popup.locator('[name="termino"]').inputValue(),'dentro','viewing existing case preserves response fields');
+        await page.screenshot({path:path.join(qaDir,kind+'-retention-'+(active?'open':'closed')+'.png')});
+        await page.setViewportSize({width:390,height:844});
+        assert(await popup.evaluate(el=>el.scrollWidth<=el.clientWidth),'existing retention details fit mobile');
+        if (active) {
+          await popup.locator('[name="notify_recipients[]"][value="none"]').check();
+          await popup.locator('.swal2-confirm').click();
+          await page.waitForFunction(() => !Swal.isVisible());
+          const posted = await page.evaluate(() => Object.fromEntries(requests.at(-1).data));
+          assert.equal(posted.crear_ticket_retencion,'0','response succeeds without duplicating active retention');
+        } else {
+          assert(await popup.locator('[name="retencion_id_empleado"]').isEnabled(),'closed case allows assignment for new retention');
+          await popup.locator('.swal2-cancel').click();
+          await page.waitForFunction(() => !Swal.isVisible());
+        }
+        await page.setViewportSize({width:1280,height:1100});
+        await page.evaluate(() => { delete base.retention_ticket.existing_case; });
+      }
+    }
     const deleteStart = runtime.indexOf('      var contractRequestDelete = event.target.closest(');
     const deleteEnd = runtime.indexOf('      var contractTerminationRespond = ', deleteStart);
     await page.addScriptTag({content:'root.addEventListener("click", function(event) {' + runtime.slice(deleteStart,deleteEnd) + '});'});

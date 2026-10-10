@@ -84,6 +84,7 @@ final class RenewalProbe {
   public function matches($rows) { return $this->contractsEndingImportContractMatches($rows); }
   public function token($rows, $expires) { return $this->contractsEndingImportToken($rows, $expires); }
   public function retention($row) { return $this->contractEndingRetentionTicketId($row); }
+  public function retentionUi($row) { return $this->contractRetentionTicketUiData($row); }
   public function month($year, $month) { return $this->contractsEndingMonthItems($year, $month); }
   public function defaultEmployee($row,$ids) { return $this->contractRetentionDefaultEmployeeId($row,$ids); }
   public function createRetention($row) { return $this->createContractRetentionTicketFromContractRequest($row,'','EMP-13','test','','','contrato por terminar',(string)$row['_ID']); }
@@ -318,6 +319,21 @@ try {
     check(str_contains($result['input']['descripcion'],'Caso #'.$casePk), $source . ': preserve original case in commercial handoff');
     $repeated = $probe->createRequestRetention($request,$source);
     check($repeated['ok']==='0' && str_contains($repeated['message'],'ya tiene caso de retención'), $source . ': still block duplicate retention for actual contract');
+    check(str_contains($repeated['message'],'#'.$result['ticket_id']), $source . ': duplicate error identifies the open case');
+    $ui = $probe->retentionUi($request);
+    check(!$ui['enabled'] && $ui['existing_case']['active'] && $ui['existing_case']['id']===$result['ticket_id'], $source . ': response form shows existing open retention and disables duplicate creation');
+    // A newer closed case must never conceal an older open case.
+    $newerId=(int)$db->getVar('SELECT MAX(_ID)+1 FROM wp_jet_cct_tickets');
+    $db->insert('wp_jet_cct_tickets', ['_ID'=>$newerId,'id_ticket'=>(string)$newerId,'id_contrato'=>(string)$contractPk,'tema_ayuda'=>'Retencion de contrato','fecha_terminacion_contrato'=>$end,'estado'=>'Cerrado','estado_administrativo'=>'Finalizado']);
+    check($probe->retention($probe->pk((string)$contractPk))===$result['ticket_id'], $source . ': older active retention still blocks despite newer closed record');
+    $db->update('wp_jet_cct_tickets',['estado'=>' Cerrado ','estado_administrativo'=>'Nuevo'],['_ID'=>(int)$result['ticket_id']]);
+    $ui=$probe->retentionUi($request);
+    check($ui['enabled'] && !$ui['existing_case']['active'] && $ui['existing_case']['id']===(string)$newerId, $source . ': closed retention remains visible and enables another case');
+    $replacement=$probe->createRequestRetention($request,$source);
+    check($replacement['ok']==='1' && $replacement['ticket_id']!==$result['ticket_id'], $source . ': allow new retention after closed case in same cycle');
+    $db->update('wp_jet_cct_tickets',['estado'=>'En proceso','estado_administrativo'=>' Finalizado '],['_ID'=>(int)$replacement['ticket_id']]);
+    check($probe->retention($probe->pk((string)$contractPk))==='', $source . ': finalized administrative state also releases retention creation');
+    check((int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tickets WHERE id_contrato=? AND tema_ayuda=?',[(string)$contractPk,'Retencion de contrato'])===3, $source . ': preserve previous closed cases');
   }
   check($probe->requestContract(['_ID'=>805,'fin_contrato'=>(string)$end])===[], 'An unrelated contract sharing the case PK must not be selected without contract/property references');
   $result = $probe->createRetention($probe->pk('805'));
@@ -371,6 +387,17 @@ try {
   $probe->respondRequest($requestFor(812),'dentro','no prórroga');
   check((float)$service->get(812,$end)['probability']===0.0 && (int)$service->get(812,$end)['no_exit']===0, 'New date cycle initializes zero without carrying old no-exit report');
   foreach (json_decode($stale['jobs_json'],true) as $key) check($db->getVar('SELECT status FROM test_jobs WHERE dedupe_key=?',[$key])==='cancelled', 'New date cycle retires stale scheduled jobs');
+  foreach ([813=>'terminación de contrato',814=>'no prórroga'] as $id=>$source) {
+    $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>$id,'contrato'=>(string)($id+100),'inmueble'=>(string)$id,'fin_contrato'=>(string)$end,'estado'=>'Entregado']);
+    $request=$requestFor($id); $existing=$probe->createRequestRetention($request,$source);
+    try { $probe->respondRequest($request,'dentro',$source,true); throw new RuntimeException('Active duplicate accepted'); }
+    catch (RuntimeException $e) { check(str_contains($e->getMessage(),'abierto #'.$existing['ticket_id']), $source . ': stale form cannot create another active retention'); }
+    check($db->getVar('SELECT estado FROM wp_jet_cct_tickets WHERE _ID=?',[$request['_ID']])==='Nuevo' && $service->get($id,$end)===[], $source . ': duplicate rejection leaves response and probability untouched');
+    $db->update('wp_jet_cct_tickets',['estado'=>'Cerrado','estado_administrativo'=>'Finalizado'],['_ID'=>(int)$existing['ticket_id']]);
+    $completed=$probe->respondRequest($request,'dentro',$source,true);
+    check($completed['response']['ok']==='1' && $completed['retention']['ticket_id']!==$existing['ticket_id'] && (float)$service->get($id,$end)['probability']===0.0, $source . ': full response creates new retention after closed case and sets probability zero');
+    check($db->getVar('SELECT estado FROM wp_jet_cct_tickets WHERE _ID=?',[(int)$existing['ticket_id']])==='Cerrado', $source . ': previous retention stays closed');
+  }
   echo "PASS: exact contract, request-to-contract resolution, retention in termination/no renewal, dates, matching, signatures, probabilities, responsibility, reminder scheduling/cancellation, history, atomic imports and idempotent automatic receipts. No messages sent.\n";
 } finally {
   putenv('SHARED_NOTIFICATIONS_PATH'); unlink($temp.'/autoload.php');unlink($temp.'/config.php');rmdir($temp);

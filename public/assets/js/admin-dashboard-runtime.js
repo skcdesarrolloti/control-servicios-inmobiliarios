@@ -15132,6 +15132,14 @@
     function contractRetentionTicketBlockHtml(row) {
       row = row || {};
       var retention = row.retention_ticket || {};
+      var existing = retention.existing_case || {};
+      var hasExisting = Boolean(existing.id);
+      var activeExisting = hasExisting && Boolean(existing.active);
+      var canCreate = Boolean(retention.enabled) && !activeExisting;
+      var existingHtml = hasExisting ? '<div class="scm-retention-ticket-context-item" data-contract-retention-existing><span>' + (activeExisting ? 'Retención abierta' : 'Retención anterior cerrada') + '</span><strong>Caso #' + escHtml(existing.id) + ' · ' + escHtml(existing.status || '') + (existing.administrative_status ? ' / ' + escHtml(existing.administrative_status) : '') + '</strong>' +
+        (existing.employee ? '<p class="!m-0 text-xs">Responsable: ' + escHtml(existing.employee) + '</p>' : '') +
+        '<p class="!m-0 text-xs">' + (activeExisting ? 'Ya existe una retención abierta. Puedes responder y cerrar esta solicitud sin crear otra retención.' : 'Este caso ya está cerrado. Puedes crear una nueva retención al responder.') + '</p>' +
+        '<details><summary class="scm-contract-button">Ver detalles del caso #' + escHtml(existing.id) + '</summary><p class="text-xs"><b>' + escHtml(existing.subject || 'Retención de contrato') + '</b></p><p class="text-xs" style="white-space:pre-line;overflow-wrap:anywhere">' + escHtml(existing.description || 'Sin descripción registrada.') + '</p></details></div>' : '';
       var retentionEmployees = Array.isArray(retention.funcionarios) ? retention.funcionarios : [];
       var defaultRetentionEmployee = String(retention.default_employee_id || "");
       var retentionOptions = retentionEmployees.map(function (func) {
@@ -15159,17 +15167,18 @@
         return '<div class="scm-retention-ticket-context-item' + (label === "Sugerido para asignar" ? " is-suggested" : "") + '"><span>' + escHtml(label === "Contrato de" ? "Partes del contrato" : label) + '</span><strong>' + escHtml(value) + "</strong></div>";
       }).join("");
 
-      return '<section class="scm-retention-ticket-card' + (!retention.enabled ? " is-disabled" : "") + '">' +
+      return '<section class="scm-retention-ticket-card' + (!canCreate ? " is-disabled" : "") + '">' +
         '<div class="scm-retention-ticket-head">' +
           '<div><span class="scm-retention-ticket-eyebrow">Caso comercial</span><strong>Retención de contrato</strong></div>' +
-          '<span class="scm-retention-ticket-pill">Opcional</span>' +
+          '<span class="scm-retention-ticket-pill">' + (activeExisting ? 'Ya existe' : 'Opcional') + '</span>' +
         "</div>" +
+        existingHtml +
         '<label class="scm-retention-ticket-toggle">' +
-          '<input type="checkbox" name="crear_ticket_retencion" value="1" ' + (retention.enabled ? "checked" : "disabled") + '>' +
-          '<span><strong>Crear caso y enviar segundo mensaje</strong><small>Si lo desmarcas, solo se responde y se cierra esta solicitud.</small></span>' +
+          '<input type="checkbox" name="crear_ticket_retencion" value="1" ' + (canCreate ? "checked" : "disabled") + '>' +
+          '<span><strong>' + (activeExisting ? 'Se conserva el caso de retención abierto' : 'Crear caso y enviar segundo mensaje') + '</strong><small>' + (activeExisting ? 'La respuesta se guardará sin duplicar la retención.' : 'Si lo desmarcas, solo se responde y se cierra esta solicitud.') + '</small></span>' +
         "</label>" +
         (helpHtml ? '<div class="scm-retention-ticket-context">' + helpHtml + "</div>" : "") +
-        '<label class="scm-retention-ticket-field scm-contract-field"><span>Asignar a consultor de arriendo</span><select name="retencion_id_empleado" ' + (!retention.enabled ? "disabled" : "") + '><option value="">Selecciona responsable</option>' + retentionOptions + '</select></label>' +
+        (!activeExisting ? '<label class="scm-retention-ticket-field scm-contract-field"><span>Asignar a consultor de arriendo</span><select name="retencion_id_empleado" ' + (!canCreate ? "disabled" : "") + '><option value="">Selecciona responsable</option>' + retentionOptions + '</select></label>' : '') +
       "</section>";
     }
 
