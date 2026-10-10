@@ -15279,6 +15279,7 @@
           });
         }).then(function (data) {
           showToast(data && data.notification_warning ? "warning" : "success", (data && data.message) || "Solicitud respondida.");
+          if (data && data.renewal_probability_updated) loadContractsEnding(true);
           loadContractTerminationRequests(true);
         }).catch(function (error) {
           showToast("error", error && error.message ? error.message : "No se pudo responder la solicitud.");
@@ -15386,6 +15387,7 @@
           });
         }).then(function (data) {
           showToast(data && data.notification_warning ? "warning" : "success", (data && data.message) || "Solicitud respondida.");
+          if (data && data.renewal_probability_updated) loadContractsEnding(true);
           loadContractNonRenewalRequests(true);
         }).catch(function (error) {
           showToast("error", error && error.message ? error.message : "No se pudo responder la solicitud.");
@@ -15849,7 +15851,7 @@
       if (item.action === 'reminders_cancelled') return details.reason || 'Se cancelaron recordatorios pendientes por un cambio del contrato.';
       if (item.action === 'history_edited' || item.action === 'history_voided') return 'Movimiento #' + details.entry_id + '. Motivo: ' + (details.reason || '');
       var before = details.before || {}, after = details.after || {};
-      return item.action === 'renewal_saved' ? 'Probabilidad: ' + (before.probability == null ? 'Sin registrar' : before.probability + ' %') + ' → ' + (after.probability == null ? 'Sin registrar' : after.probability + ' %') + '. No salida: ' + (Number(after.no_exit) ? 'Sí' : 'No') + '. ' + (after.note || '') : item.action === 'end_date_imported' ? 'Fecha anterior: ' + new Date(Number(details.before) * 1000).toLocaleDateString('es-CO') + '. Nueva: ' + new Date(Number(details.after) * 1000).toLocaleDateString('es-CO') : 'Caso #' + (details.ticket_id || '');
+      return item.action === 'renewal_saved' ? 'Probabilidad: ' + (before.probability == null ? 'Sin registrar' : before.probability + ' %') + ' → ' + (after.probability == null ? 'Sin registrar' : after.probability + ' %') + '. No salida: ' + (Number(after.no_exit) ? 'Sí' : 'No') + '. ' + (after.note || '') + (details.reason ? ' ' + details.reason : '') : item.action === 'end_date_imported' ? 'Fecha anterior: ' + new Date(Number(details.before) * 1000).toLocaleDateString('es-CO') + '. Nueva: ' + new Date(Number(details.after) * 1000).toLocaleDateString('es-CO') : 'Caso #' + (details.ticket_id || '');
     }
 
     function openContractHistory(contractPk, includeVoided, receiptsOnly) {

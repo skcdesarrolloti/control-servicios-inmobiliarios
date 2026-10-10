@@ -56,6 +56,10 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
       var historyFixture={can_manage:false,items:[{id:1,action:'retention_created',actor:'EMP-13',actor_name:'Funcionario de prueba',created_at:1791210875,details_json:JSON.stringify({ticket_id:77}),revision:'synthetic-revision'}]};
       var fixture = {receipt_automation:{enabled:true,contract_id:1},can_write:true,year:2026,month:10,count:3,generated_at:'05/10/2026 14:20',groups:[{label:'Octubre 2026',count:3,items:[base,Object.assign({},base,{receipt_in_scope:false,contract_pk:'2',contrato:'656',probability:100,weighted_value:1000000}),Object.assign({},base,{receipt_in_scope:false,contract_pk:'3',contrato:'888',existing_retention_ticket_id:'77',renewal:{no_exit:1,note:'Reporte confirmado',revision:1}})]}]};
     ` + settingsBinder + settingsLoader + caseFunction + functions + '\ninitContractsEndingFilters(root.querySelector("[data-scm-contracts-ending-panel]"));renderContractsEnding(fixture);'});
+    const automaticHistory = await page.evaluate(() => contractHistoryText({action:'renewal_saved',details_json:JSON.stringify({before:{probability:100},after:{probability:0,no_exit:0,note:'Nota existente'},reason:'Probabilidad de renovación ajustada automáticamente a 0 % al responder no prórroga dentro del término. Caso #10916.'})}));
+    assert.match(automaticHistory,/100 % → 0 %/);
+    assert.match(automaticHistory,/Nota existente/);
+    assert.match(automaticHistory,/automáticamente.*no prórroga.*Caso #10916/,'contract history explains the automatic change and links the source case');
     assert.equal(await page.locator('[data-scm-contracts-ending-create]').count(),1);
     assert.equal(await page.locator('.scm-contracts-ending-main img').count(),0);
     await page.locator('[data-contracts-ending-case="retention"]').click();

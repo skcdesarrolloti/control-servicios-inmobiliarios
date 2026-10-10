@@ -1,5 +1,9 @@
 # Avisos de respuesta de terminación y no prórroga
 
+Al guardar una respuesta clasificada **dentro del término**, la probabilidad de renovación del contrato vinculado se ajusta automáticamente a **0 %** para su fecha fin vigente. El historial contractual registra el porcentaje anterior, el caso de origen, el tipo de solicitud y el funcionario real que respondió. Se conservan las observaciones, el reporte de no salida, sus recordatorios vigentes y el responsable de recibo. Una respuesta fuera de término conserva la probabilidad registrada.
+
+La respuesta, el porcentaje y la retención opcional se guardan en una transacción: si falla la respuesta, se revierten también el cambio de probabilidad y la retención creada. Se actualiza el listado de Contratos por terminar al confirmar la respuesta. Esta automatización no genera avisos adicionales.
+
 En ambos formularios, **Notificar a** permite seleccionar arrendatario, propietario y los funcionarios del evento interno correspondiente. Cada destinatario tiene controles separados de **Correo** y **WhatsApp**. Un canal sin datos válidos queda deshabilitado; los contactos se vuelven a validar antes de generar el acta y cerrar el caso.
 
 Los valores iniciales conservan el comportamiento anterior: arrendatario y propietario por los canales disponibles, funcionarios internos solo por correo. WhatsApp interno requiere marcarlo explícitamente al responder. Los funcionarios se resuelven desde **Configuración → Notificaciones internas → Contratos → Solicitudes de terminación de contrato / Solicitudes de no prórroga de contrato**, usando `internal_admin_notifications`. Cada evento tiene su propia selección de funcionarios activos; cada canal utiliza únicamente contactos con ese dato disponible.

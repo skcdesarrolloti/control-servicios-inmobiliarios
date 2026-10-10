@@ -1010,20 +1010,15 @@ trait HandlesTicketWorkflowActions
       ];
     }
     $retentionTicket = [];
-    if ($createRetentionTicket) {
-      if ($retentionEmployeeId === '') {
-        $this->jsonFail('Selecciona el funcionario responsable del caso de retención.');
-      }
-      $retentionTicket = $this->createContractRetentionTicketFromContractRequest($ticket, $term, $retentionEmployeeId, $responseText, $actaUrl, (string) ($acta['title'] ?? 'Acta de respuesta terminación de contrato'), 'terminación de contrato');
-      if (($retentionTicket['ok'] ?? '0') !== '1') {
-        $this->jsonFail((string) ($retentionTicket['message'] ?? 'No se pudo crear el caso comercial de retención.'));
-      }
+    if ($createRetentionTicket && $retentionEmployeeId === '') {
+      $this->jsonFail('Selecciona el funcionario responsable del caso de retención.');
     }
-
-    $service = $this->get_seguimiento_service();
-    $result = $service->saveTicketResponse($ticketPk, $responseText, 'Finalizado', true, ['none'], [], $documentos);
-    if (($result['ok'] ?? '0') !== '1') {
-      $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la respuesta de terminación.'));
+    try {
+      $saved = $this->saveContractRequestResponse($ticketPk, $ticket, $term, $responseText, $documentos, $createRetentionTicket, $retentionEmployeeId, $actaUrl, (string) ($acta['title'] ?? ''), 'terminación de contrato');
+      $result = $saved['response'];
+      $retentionTicket = $saved['retention'];
+    } catch (\Throwable $exception) {
+      $this->jsonFail($exception->getMessage()); return;
     }
 
     $this->contractTerminationInsertPropertyHistory($ticket, $term, $responseText, $actaUrl, $creatorName);
@@ -1040,6 +1035,7 @@ trait HandlesTicketWorkflowActions
       $result['retention_whatsapp_queued'] = (string) ($retentionTicket['whatsapp_queued'] ?? 0);
     }
     $result['message'] = 'Solicitud respondida, acta generada y caso cerrado.';
+    if ($result['renewal_probability_updated']) $result['message'] .= ' Probabilidad de renovación actualizada a 0 %.';
     $result['message'] .= ' Avisos del acta en cola: ' . $extraQueued['email'] . ' por correo y ' . $extraQueued['whatsapp'] . ' por WhatsApp.';
     $result['notification_warning'] = !empty($extraQueued['failed']);
     if ($result['notification_warning']) $result['message'] .= ' No se pudieron encolar ' . $extraQueued['failed'] . ' avisos; revisa la cola de notificaciones.';
@@ -1149,17 +1145,15 @@ trait HandlesTicketWorkflowActions
         'archivo' => $actaUrl,
       ];
     }
-    if ($createRetentionTicket) {
-      $retentionTicket = $this->createContractRetentionTicketFromContractRequest($ticket, $term, $retentionEmployeeId, $responseText, $actaUrl, (string) ($acta['title'] ?? 'Acta de respuesta no prórroga de contrato'), 'no prórroga');
-      if (($retentionTicket['ok'] ?? '0') !== '1') {
-        $this->jsonFail((string) ($retentionTicket['message'] ?? 'No se pudo crear el caso comercial de retención.'));
-      }
+    if ($createRetentionTicket && $retentionEmployeeId === '') {
+      $this->jsonFail('Selecciona el funcionario responsable del caso de retención.');
     }
-
-    $service = $this->get_seguimiento_service();
-    $result = $service->saveTicketResponse($ticketPk, $responseText, 'Finalizado', true, ['none'], [], $documentos);
-    if (($result['ok'] ?? '0') !== '1') {
-      $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la respuesta de no prórroga.'));
+    try {
+      $saved = $this->saveContractRequestResponse($ticketPk, $ticket, $term, $responseText, $documentos, $createRetentionTicket, $retentionEmployeeId, $actaUrl, (string) ($acta['title'] ?? ''), 'no prórroga');
+      $result = $saved['response'];
+      $retentionTicket = $saved['retention'];
+    } catch (\Throwable $exception) {
+      $this->jsonFail($exception->getMessage()); return;
     }
 
     $this->contractNonRenewalInsertPropertyHistory($ticket, $term, $responseText, $actaUrl, $creatorName);
@@ -1175,6 +1169,7 @@ trait HandlesTicketWorkflowActions
       $result['retention_whatsapp_queued'] = (string) ($retentionTicket['whatsapp_queued'] ?? 0);
     }
     $result['message'] = 'Solicitud de no prórroga respondida, acta generada y caso cerrado.';
+    if ($result['renewal_probability_updated']) $result['message'] .= ' Probabilidad de renovación actualizada a 0 %.';
     $result['message'] .= ' Avisos del acta en cola: ' . $extraQueued['email'] . ' por correo y ' . $extraQueued['whatsapp'] . ' por WhatsApp.';
     $result['notification_warning'] = !empty($extraQueued['failed']);
     if ($result['notification_warning']) $result['message'] .= ' No se pudieron encolar ' . $extraQueued['failed'] . ' avisos; revisa la cola de notificaciones.';
@@ -5049,6 +5044,43 @@ trait HandlesTicketWorkflowActions
     if (!ctype_digit($contractPk)) return [];
     $table = $this->db->table('jet_cct_contratos_arrendamiento');
     return $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [(int) $contractPk]) ?? [];
+  }
+
+  /** @param array<string,mixed> $ticket @return array<string,mixed> */
+  private function saveContractRequestResponse(int $ticketPk, array $ticket, string $term, string $responseText, array $documents, bool $createRetention, string $employeeId, string $actaUrl, string $actaTitle, string $source): array
+  {
+    $renewal = new ContractRenewalService($this->db);
+    if ($term === 'dentro' || $createRetention) $renewal->ensureSchema();
+    $seguimiento = $this->get_seguimiento_service();
+    $contract = $term === 'dentro' ? $this->contractTerminationContractByContext($ticket) : [];
+    if ($term === 'dentro' && !$contract) throw new \RuntimeException('No se encontró el contrato para actualizar la probabilidad de renovación.');
+    $pdo = $this->db->pdo();
+    $owns = !$pdo->inTransaction();
+    try {
+      if ($owns) $pdo->beginTransaction();
+      if ($term === 'dentro') {
+        $table = $this->db->table('jet_cct_contratos_arrendamiento');
+        $contract = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? FOR UPDATE", [(int) $contract['_ID']]);
+        if (!$contract) throw new \RuntimeException('El contrato ya no existe.');
+        $endTs = $this->contractTerminationTimestamp($contract['fin_contrato'] ?? '');
+        if ($endTs <= 0) throw new \RuntimeException('El contrato no tiene fecha fin válida para actualizar la probabilidad de renovación.');
+        $caseNumber = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
+        $renewal->recordWithinTermResponse($contract, $endTs, $caseNumber, $source, Auth::employeeId());
+      }
+      $retention = [];
+      if ($createRetention) {
+        $retention = $this->createContractRetentionTicketFromContractRequest($ticket, $term, $employeeId, $responseText, $actaUrl, $actaTitle, $source, (string) ($contract['_ID'] ?? ''));
+        if (($retention['ok'] ?? '0') !== '1') throw new \RuntimeException((string) ($retention['message'] ?? 'No se pudo crear el caso comercial de retención.'));
+      }
+      $result = $seguimiento->saveTicketResponse($ticketPk, $responseText, 'Finalizado', true, ['none'], [], $documents);
+      if (($result['ok'] ?? '0') !== '1') throw new \RuntimeException((string) ($result['message'] ?? 'No se pudo guardar la respuesta.'));
+      $result['renewal_probability_updated'] = $term === 'dentro';
+      if ($owns) $pdo->commit();
+      return ['response' => $result, 'retention' => $retention];
+    } catch (\Throwable $exception) {
+      if ($owns && $pdo->inTransaction()) $pdo->rollBack();
+      throw $exception;
+    }
   }
 
   /** @param array<string,mixed> $ticket @return array<string,mixed> */

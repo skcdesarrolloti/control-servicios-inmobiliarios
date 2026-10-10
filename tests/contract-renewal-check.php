@@ -76,6 +76,7 @@ final class RenewalResult extends RuntimeException { public function __construct
 final class RenewalProbe {
   use \SCM\App\Concerns\HandlesTicketWorkflowActions;
   public bool $writable = true;
+  public bool $failResponse = false;
   public array $spreadsheetRows = [];
   public function __construct(public \SCM\Core\Database $db) {}
   public function parse($value) { return $this->contractsEndingImportDateTimestamp($value); }
@@ -88,6 +89,7 @@ final class RenewalProbe {
   public function createRetention($row) { return $this->createContractRetentionTicketFromContractRequest($row,'','EMP-13','test','','','contrato por terminar',(string)$row['_ID']); }
   public function requestContract($row) { return $this->contractTerminationContractByContext($row); }
   public function createRequestRetention($row, $source) { return $this->createContractRetentionTicketFromContractRequest($row,'dentro','EMP-13','test','','',$source); }
+  public function respondRequest($row, $term, $source, $retention = false) { return $this->saveContractRequestResponse((int)$row['_ID'],$row,$term,'Respuesta de prueba',[],$retention,'EMP-13','','',$source); }
   public function preview($file) { return $this->contractsEndingImportPreview($file); }
   private function contractsEndingImportSpreadsheetRows(string $path, string $name): array { return $this->spreadsheetRows; }
   private function verifyCsrf() {}
@@ -98,6 +100,17 @@ final class RenewalProbe {
   private function table_exists($table) { return (new \SCM\Support\SchemaInspector($this->db))->tableExists($table); }
   private function column_exists($table,$column) { return (new \SCM\Support\SchemaInspector($this->db))->columnExists($table,$column); }
   private function calendarCitaFuncionarioRow($value,$mode) { return []; }
+  private function get_seguimiento_service() {
+    return new class($this->db, $this->failResponse) {
+      public function __construct(private $db, private bool $fail) {}
+      public function saveTicketResponse($pk, $text, $admin, $close, $notify, ...$args): array {
+        if (!$this->db->pdo()->inTransaction() || $notify !== ['none']) throw new RuntimeException('Response and probability must share transaction without duplicate notifications');
+        $this->db->update('wp_jet_cct_tickets', ['estado'=>'Cerrado','estado_administrativo'=>$admin], ['_ID'=>$pk]);
+        $this->db->insert('wp_jet_cct_historial_del_ticket', ['id_ticket'=>$pk,'nombre'=>$text,'id_empleado'=>'EMP-900','cct_author_id'=>'EMP-900']);
+        return $this->fail ? ['ok'=>'0','message'=>'Synthetic response failure'] : ['ok'=>'1'];
+      }
+    };
+  }
   private function get_pending_controller() {
     return new class($this->db) {
       public function __construct(private $db) {}
@@ -140,6 +153,8 @@ $pdo->exec('CREATE TABLE wp_jet_cct_historial_del_ticket(_ID INTEGER PRIMARY KEY
 $pdo->exec('CREATE TABLE wp_jet_cct_historial_del_inmueble(_ID INTEGER PRIMARY KEY,id_ticket TEXT,funcionario TEXT,id_empleado TEXT,cct_author_id TEXT)');
 $pdo->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN cct_author_id TEXT');
 $pdo->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN id_empleado TEXT');
+$pdo->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN estado TEXT');
+$pdo->exec('ALTER TABLE wp_jet_cct_tickets ADD COLUMN estado_administrativo TEXT');
 $db->insert('wp_jet_cct_funcionarios', ['_ID'=>13,'id_empleado'=>'EMP-13','nombre'=>'Assigned test','correo'=>'test@example.invalid','id_cargo'=>'13','activo'=>'Si']);
 $db->insert('wp_jet_cct_confi_sistema', ['_ID'=>1,'funcion'=>'control_servicios_config','valor'=>json_encode(['internal_admin_notifications'=>['contrato_no_salida'=>[13],'retencion_contrato_ticket'=>[13],'contrato_recibo_automatico'=>[13]]])]);
 $end = strtotime('today +15 days');
@@ -307,6 +322,55 @@ try {
   check($probe->requestContract(['_ID'=>805,'fin_contrato'=>(string)$end])===[], 'An unrelated contract sharing the case PK must not be selected without contract/property references');
   $result = $probe->createRetention($probe->pk('805'));
   check($result['ok']==='1' && $result['input']['contract_pk']==='805', 'Contracts ending flow must continue to use its explicitly selected contract PK');
+  // Completing an in-term response and changing probability form one business operation.
+  foreach ([806,807,808,809,810,811,812] as $id) $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>$id,'contrato'=>(string)($id+100),'inmueble'=>(string)$id,'fin_contrato'=>(string)$end,'estado'=>'Entregado']);
+  $requestFor = static function (int $id) use ($db,$end): array {
+    $pk=95000+$id*10;
+    $db->insert('wp_jet_cct_tickets', ['_ID'=>$pk,'id_ticket'=>(string)$pk,'id_contrato'=>(string)$id,'estado'=>'Nuevo','estado_administrativo'=>'Nuevo']);
+    return ['_ID'=>$pk,'id_ticket'=>(string)$pk,'id_contrato'=>(string)$id,'contrato'=>(string)($id+100),'inmueble'=>(string)$id,'fin_contrato'=>(string)$end];
+  };
+  $pdo->beginTransaction(); $service->save($probe->pk('806'),$end,80,true,'7,0','Conservar reporte de no salida','EMP-13','EMP-13'); $pdo->commit();
+  $oldState=$service->get(806,$end); $jobsBefore=(int)$db->getVar('SELECT COUNT(*) FROM test_jobs');
+  $request=$requestFor(806);
+  $result=$probe->respondRequest($request,'dentro','terminación de contrato');
+  $state=$service->get(806,$end);
+  check($result['response']['renewal_probability_updated'] && (float)$state['probability']===0.0, 'Within-term termination response sets current-cycle probability to zero without retention');
+  foreach (['no_exit','reminder_days','note','jobs_json','receipt_employee_id'] as $field) check($state[$field]===$oldState[$field], 'Automatic probability preserves existing '.$field);
+  check((int)$db->getVar('SELECT COUNT(*) FROM test_jobs')===$jobsBefore, 'Automatic probability must not create or requeue no-exit notices');
+  check($state['updated_by']==='EMP-900' && (int)$state['revision']===(int)$oldState['revision']+1, 'Automatic probability records actual employee and invalidates stale edits');
+  $event=$service->history(806)[0]; $detail=json_decode($event['details_json'],true);
+  check($event['action']==='renewal_saved' && $event['actor']==='EMP-900' && $detail['case_number']===$request['id_ticket'] && str_contains($detail['reason'],'terminación de contrato'), 'Contract history links automatic zero to source case and response type');
+  check($db->getVar('SELECT estado FROM wp_jet_cct_tickets WHERE _ID=?',[$request['_ID']])==='Cerrado', 'Successful response closes the actual case');
+  $pdo->beginTransaction(); $service->save($probe->pk('807'),$end,100,false,'30,7,0','Renovación anterior','EMP-13'); $pdo->commit();
+  $request=$requestFor(807);
+  $result=$probe->respondRequest($request,'dentro','no prórroga',true);
+  check((float)$service->get(807,$end)['probability']===0.0 && $result['retention']['ok']==='1', 'Within-term non-renewal replaces 100 percent and still allows optional retention');
+  check($result['retention']['input']['contract_pk']==='807', 'Optional retention targets the same locked contract as probability update');
+  $pdo->beginTransaction(); $service->save($probe->pk('808'),$end,75,false,'30,7,0','Outside-term prior state','EMP-13'); $pdo->commit();
+  $oldState=$service->get(808,$end); $historyBefore=count($service->history(808));
+  $result=$probe->respondRequest($requestFor(808),'fuera','no prórroga');
+  check(!$result['response']['renewal_probability_updated'] && $service->get(808,$end)===$oldState && count($service->history(808))===$historyBefore, 'Outside-term response leaves probability and contract history unchanged');
+  $pdo->beginTransaction(); $service->save($probe->pk('809'),$end,65,false,'30,7,0','Preserve on failure','EMP-13'); $pdo->commit();
+  $request=$requestFor(809); $oldState=$service->get(809,$end); $historyBefore=count($service->history(809));
+  $ticketsBefore=(int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tickets'); $caseHistoryBefore=(int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket');
+  $probe->failResponse=true;
+  try { $probe->respondRequest($request,'dentro','terminación de contrato',true); throw new RuntimeException('Failed response accepted'); }
+  catch (RuntimeException $e) { check($e->getMessage()==='Synthetic response failure','Failed response must propagate original error'); }
+  $probe->failResponse=false;
+  check($service->get(809,$end)===$oldState && count($service->history(809))===$historyBefore, 'Failed response rolls back automatic probability and contract audit');
+  check((int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tickets')===$ticketsBefore && (int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket')===$caseHistoryBefore, 'Failed response rolls back optional retention and partially written case history');
+  check($db->getVar('SELECT estado FROM wp_jet_cct_tickets WHERE _ID=?',[$request['_ID']])==='Nuevo', 'Failed response leaves original case pending');
+  $result=$probe->respondRequest($requestFor(810),'dentro','no prórroga');
+  check((float)$service->get(810,$end)['probability']===0.0 && $result['retention']===[], 'Within-term response creates missing renewal tracking with zero percent');
+  $request=$requestFor(811); $db->update('wp_jet_cct_contratos_arrendamiento',['fin_contrato'=>'invalid'],['_ID'=>811]);
+  try { $probe->respondRequest($request,'dentro','terminación de contrato'); throw new RuntimeException('Invalid end date accepted'); }
+  catch (RuntimeException $e) { check(str_contains($e->getMessage(),'fecha fin válida'),'Invalid contract end date must prevent silent partial completion'); }
+  check($service->get(811,$end)===[] && $db->getVar('SELECT estado FROM wp_jet_cct_tickets WHERE _ID=?',[$request['_ID']])==='Nuevo', 'Invalid contract date never writes probability or closes case');
+  $pdo->beginTransaction(); $service->save($probe->pk('812'),$end-86400,50,true,'7,0','Previous cycle only','EMP-13'); $pdo->commit();
+  $stale=$service->get(812,$end-86400);
+  $probe->respondRequest($requestFor(812),'dentro','no prórroga');
+  check((float)$service->get(812,$end)['probability']===0.0 && (int)$service->get(812,$end)['no_exit']===0, 'New date cycle initializes zero without carrying old no-exit report');
+  foreach (json_decode($stale['jobs_json'],true) as $key) check($db->getVar('SELECT status FROM test_jobs WHERE dedupe_key=?',[$key])==='cancelled', 'New date cycle retires stale scheduled jobs');
   echo "PASS: exact contract, request-to-contract resolution, retention in termination/no renewal, dates, matching, signatures, probabilities, responsibility, reminder scheduling/cancellation, history, atomic imports and idempotent automatic receipts. No messages sent.\n";
 } finally {
   putenv('SHARED_NOTIFICATIONS_PATH'); unlink($temp.'/autoload.php');unlink($temp.'/config.php');rmdir($temp);

@@ -151,6 +151,33 @@ final class ContractRenewalService
     return ['reminders_queued' => $keepSchedule ? 0 : count($jobs), 'revision' => $revision];
   }
 
+  /** Caller holds the contract row lock and saves the case response in the same transaction. */
+  public function recordWithinTermResponse(array $contract, int $endTs, string $caseNumber, string $source, string $actor): void
+  {
+    if (!$this->db->pdo()->inTransaction() || $endTs <= 0) throw new \RuntimeException('No se pudo preparar la actualización de probabilidad.');
+    $id = (int) $contract['_ID'];
+    $old = $this->db->getRow("SELECT * FROM `{$this->table()}` WHERE contract_id = ? FOR UPDATE", [$id]) ?? [];
+    $sameCycle = $old && (int) $old['end_ts'] === $endTs;
+    $payload = ['probability' => 0, 'revision' => (int) ($old['revision'] ?? 0) + 1, 'updated_by' => $actor, 'updated_at' => time()];
+    if (!$sameCycle) {
+      // Retire only schedules from a previous end-date cycle, never current reminders.
+      $jobs = json_decode((string) ($old['jobs_json'] ?? '[]'), true) ?: [];
+      if ($jobs) {
+        $queue = (new SharedNotificationsBridge($this->db))->queue();
+        if (!$queue) throw new \RuntimeException('No se pueden retirar recordatorios del ciclo anterior.');
+        foreach ($jobs as $job) $queue->cancelByDedupeKey((string) $job, 'Respuesta contractual en un nuevo ciclo de fecha fin.');
+      }
+      $payload += ['end_ts' => $endTs, 'no_exit' => 0, 'reminder_days' => '30,7,0', 'note' => '', 'jobs_json' => '[]', 'receipt_employee_id' => ''];
+    }
+    if ($old) $this->db->update($this->table(), $payload, ['contract_id' => $id]);
+    else $this->db->insert($this->table(), ['contract_id' => $id] + $payload);
+    $this->audit($id, 'renewal_saved', $actor, [
+      'before' => $old, 'after' => array_replace($old, $payload),
+      'reason' => 'Probabilidad de renovación ajustada automáticamente a 0 % al responder ' . $source . ' dentro del término. Caso #' . $caseNumber . '.',
+      'source' => $source, 'case_number' => $caseNumber, 'term' => 'dentro',
+    ]);
+  }
+
   public function history(int $id, bool $includeCorrections = false): array
   {
     $rows = $this->db->getResults("SELECT id,action,actor,details_json,created_at FROM `{$this->eventsTable()}` WHERE contract_id = ? ORDER BY id DESC LIMIT 30", [$id]);

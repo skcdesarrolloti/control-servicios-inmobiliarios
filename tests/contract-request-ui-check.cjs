@@ -40,6 +40,8 @@ eval('?>' . substr($source, $start, $end - $start));
       var actionContractRequestDelete = 'request-delete', nextDeleteError = false;
       var actionContractRequestReopen = 'request-reopen', nextReopenError = false, answeredFixture = null, listRequests = [];
       var requests = [], messages = [];
+      var contractsEndingRefreshes = 0;
+      function loadContractsEnding(force) { if (force) contractsEndingRefreshes++; return Promise.resolve(); }
       function escHtml(value) { var el = document.createElement('div'); el.textContent = String(value == null ? '' : value); return el.innerHTML.replace(/"/g, '&quot;'); }
       function formatDashboardCount(n) { return String(n); }
       function dashboardDueCaseAttrsHtml() { return ' data-ticket-pk="41"'; }
@@ -50,7 +52,7 @@ eval('?>' . substr($source, $start, $end - $start));
         if (nextDeleteError && action === 'request-delete') { nextDeleteError = false; return Promise.reject(new Error('Fallo simulado al eliminar')); }
         if (nextReopenError && action === 'request-reopen') { nextReopenError = false; return Promise.reject(new Error('Fallo simulado al reabrir')); }
         if (action === 'request-reopen') { answeredFixture.items = answeredFixture.items.filter(row => row.solicitud_id !== fd.get('solicitud_id')); answeredFixture.count = answeredFixture.items.length; }
-        return Promise.resolve({message:'Guardado simulado'});
+        return Promise.resolve({message:'Guardado simulado',renewal_probability_updated:fd.get('termino') === 'dentro'});
       }
       var base = {solicitud_id:'41',ticket_pk:'41',id_ticket:'10863',titulo:'Caso #10863',asunto:'Solicitud de terminación de contrato de arrendamiento',creado:'05/10/2026 08:54',contrato:'2000',inmueble:'204578',direccion:'Urbanización Simón Bolívar manzana 20 lote 7',solicitante:'ARRENDATARIO DE EJEMPLO',estado:'Nuevo',estado_administrativo:'Nuevo',estado_solicitud:'Pendiente',fecha_solicitud:'2026-10-05',fin_contrato:'2027-01-09',fin_contrato_label:'09/01/2027',fecha_limite_label:'09/10/2026',term_status:'dentro',term_label:'Dentro de término',term_hint:'Solicitud recibida antes o el 09/10/2026.',case:{case_source_html:'<p>Detalle del caso</p>'},retention_ticket:{enabled:true,default_employee_id:'13',funcionarios:[{id:'13',name:'Funcionario de Ejemplo',cargo:'Asistente de Desarrollo TI'}],assignment_help:[{label:'Contrato',value:'#2000'},{label:'Contrato de',value:'Arrendatario: CLIENTE / Propietario: PROPIETARIO'},{label:'Inmueble',value:'Inmueble 204578 · Urbanización Simón Bolívar'},{label:'Funcionario relacionado',value:'Funcionario de Ejemplo · Asistente de Desarrollo TI'},{label:'Sugerido para asignar',value:'Funcionario de Ejemplo · Asistente de Desarrollo TI'}]},recipients:[{value:'arrendatario',label:'Arrendatario',name:'CLIENTE',email:'cliente@example.invalid',phone:'3001112233',available:true},{value:'propietario',label:'Propietario',name:'PROPIETARIO',email:'propietario@example.invalid',available:true},{value:'admin',label:'Funcionario configurado',name:'Funcionario',available:false}]};
       var fixture = {generated_at:'05/10/2026 11:03',count:3,items:[base,Object.assign({},base,{solicitud_id:'42',ticket_pk:'42',titulo:'Caso #10864',id_ticket:'10864',contrato:'2001',term_status:'fuera',term_label:'Fuera de término'}),Object.assign({},base,{solicitud_id:'43',ticket_pk:'43',titulo:'Caso #10865',id_ticket:'10865',term_status:'unknown',term_label:'Sin cálculo de término',asunto:'<img src=x onerror=alert(1)>',solicitante:'=1+1'})]};
@@ -147,6 +149,7 @@ eval('?>' . substr($source, $start, $end - $start));
       const posted = await page.evaluate(() => Object.fromEntries(requests[requests.length-1].data));
       assert.deepEqual(JSON.parse(posted.notify_channels),{arrendatario:['whatsapp'],propietario:['email'],admin:['email','whatsapp']});
     }
+    assert.equal(await page.evaluate(() => contractsEndingRefreshes),4,'each successful within-term response refreshes contracts ending with the new probability');
     const deleteStart = runtime.indexOf('      var contractRequestDelete = event.target.closest(');
     const deleteEnd = runtime.indexOf('      var contractTerminationRespond = ', deleteStart);
     await page.addScriptTag({content:'root.addEventListener("click", function(event) {' + runtime.slice(deleteStart,deleteEnd) + '});'});
