@@ -4076,7 +4076,7 @@ trait HandlesTicketWorkflowActions
       'SELECT ' . implode(', ', $select) . " FROM `{$table}` t WHERE t.`_ID` = ? LIMIT 1",
       [$ticketPk]
     );
-    return is_array($row) ? $row : [];
+    return is_array($row) ? $this->contractRequestWithContractContext($row) : [];
   }
 
   /** @return array<string,mixed> */
@@ -4189,26 +4189,7 @@ trait HandlesTicketWorkflowActions
         $merged[$column] = $value;
       }
     }
-    $contract = $this->contractTerminationContractByContext($merged, $solicitud, $ticket);
-    if ($contract !== []) {
-      foreach ([
-        'fin_contrato', 'inicio_contrato', 'id_contrato_arrendamiento', 'id_inmueble',
-        'id_inmueble_data', 'codigo_inmueble_web', 'inmueble', 'direccion', 'barrio', 'ciudad', 'arrendatario', 'correo_arrendatario',
-        'celular_arrendatario', 'propietario', 'correo_propietario', 'celular_propietario',
-      ] as $column) {
-        $current = trim((string) ($merged[$column] ?? ''));
-        $value = trim((string) ($contract[$column] ?? ''));
-        if ($value !== '' && ($current === '' || in_array($column, ['fin_contrato', 'inicio_contrato'], true))) {
-          $merged[$column] = $value;
-        }
-      }
-      if (trim((string) ($merged['contrato'] ?? '')) === '') {
-        $merged['contrato'] = $this->contractTerminationFirstText([$contract], ['contrato', 'id_contrato', 'id_contrato_arrendamiento', '_ID']);
-      }
-      if (trim((string) ($merged['id_contrato'] ?? '')) === '') {
-        $merged['id_contrato'] = $this->contractTerminationFirstText([$contract], ['_ID', 'id_contrato', 'id_contrato_arrendamiento']);
-      }
-    }
+    $merged = $this->contractRequestWithContractContext($merged, $solicitud, $ticket);
     if (trim((string) ($merged['solicitante'] ?? '')) === '' && trim((string) ($merged['arrendatario'] ?? '')) !== '') {
       $merged['solicitante'] = trim((string) $merged['arrendatario']);
     }
@@ -4219,6 +4200,34 @@ trait HandlesTicketWorkflowActions
       $merged['celular_solicitante'] = trim((string) $merged['celular_arrendatario']);
     }
     return $merged;
+  }
+
+  /** @param array<string,mixed> $row @param array<string,mixed> ...$context @return array<string,mixed> */
+  private function contractRequestWithContractContext(array $row, array ...$context): array
+  {
+    // fin_contrato belongs to the contract CCT, not necessarily to the case.
+    // Reuse the same source for both lists and the server-side response flow.
+    $contract = $this->contractTerminationContractByContext($row, ...$context);
+    if ($contract !== []) {
+      foreach ([
+        'fin_contrato', 'inicio_contrato', 'id_contrato_arrendamiento', 'id_inmueble',
+        'id_inmueble_data', 'codigo_inmueble_web', 'inmueble', 'direccion', 'barrio', 'ciudad', 'arrendatario', 'correo_arrendatario',
+        'celular_arrendatario', 'propietario', 'correo_propietario', 'celular_propietario',
+      ] as $column) {
+        $current = trim((string) ($row[$column] ?? ''));
+        $value = trim((string) ($contract[$column] ?? ''));
+        if ($value !== '' && ($current === '' || in_array($column, ['fin_contrato', 'inicio_contrato'], true))) {
+          $row[$column] = $value;
+        }
+      }
+      if (trim((string) ($row['contrato'] ?? '')) === '') {
+        $row['contrato'] = $this->contractTerminationFirstText([$contract], ['contrato', 'id_contrato', 'id_contrato_arrendamiento', '_ID']);
+      }
+      if (trim((string) ($row['id_contrato'] ?? '')) === '') {
+        $row['id_contrato'] = $this->contractTerminationFirstText([$contract], ['_ID', 'id_contrato', 'id_contrato_arrendamiento']);
+      }
+    }
+    return $row;
   }
 
   /** @param array<string,mixed> ...$rows @return array<string,mixed> */
@@ -4436,6 +4445,7 @@ trait HandlesTicketWorkflowActions
   /** @param array<string,mixed> $row @return array<string,mixed> */
   private function contractNonRenewalListItem(array $row, bool $includeCase = true): array
   {
+    $row = $this->contractRequestWithContractContext($row);
     $createdTs = $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
     $ticketPk = trim((string) ($row['_ID'] ?? ''));
     $logicalTicket = $this->contractTerminationFirstText([$row], ['id_ticket', '_ID']);
