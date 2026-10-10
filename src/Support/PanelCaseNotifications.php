@@ -141,6 +141,6 @@ final class PanelCaseNotifications
         $details[] = $label . ' — WhatsApp encolado.';
       }
     }
-    return ['email' => $emailCount, 'whatsapp' => $whatsappCount, 'details' => $details, 'warning' => $config['enabled'] ? '' : 'WhatsApp pendiente: activa las plantillas aprobadas en Configuración → Notificaciones internas → Crear casos.'];
+    return ['email' => $emailCount, 'whatsapp' => $whatsappCount, 'details' => $details, 'warning' => $config['enabled'] ? '' : 'WhatsApp pendiente de activar en la configuración interna del sistema.'];
   }
 }

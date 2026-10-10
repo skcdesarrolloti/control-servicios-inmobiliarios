@@ -412,14 +412,6 @@ trait HandlesTicketWorkflowActions
     } else {
       $settings = $incomingSettings;
     }
-    $caseNotifications = null;
-    if (array_key_exists('case_notifications', $_POST)) {
-      try {
-        $caseNotifications = json_decode((string) $_POST['case_notifications'], true, 512, JSON_THROW_ON_ERROR);
-        if (!is_array($caseNotifications)) throw new \InvalidArgumentException('Configuración de avisos de casos inválida.');
-        $caseNotifications = \SCM\Support\PanelCaseNotifications::validateConfig($caseNotifications);
-      } catch (\Throwable $exception) { $this->jsonFail($exception->getMessage()); return; }
-    }
     $automation = null;
     if (array_key_exists('receipt_automation', $_POST)) {
       try {
@@ -433,7 +425,6 @@ trait HandlesTicketWorkflowActions
     $pdo->beginTransaction();
     try {
       if ($automation !== null) \SCM\Core\App::settings()->set(\SCM\Modules\Contracts\ContractReceiptSettings::KEY, $automation, (int) Auth::employeeId());
-      if ($caseNotifications !== null) \SCM\Core\App::settings()->set(\SCM\Support\PanelCaseNotifications::SETTINGS_KEY, $caseNotifications, (int) Auth::employeeId());
       \SCM\Core\App::settings()->set('internal_admin_notifications', $settings, (int) Auth::employeeId());
       $pdo->commit();
     } catch (\Throwable $exception) {

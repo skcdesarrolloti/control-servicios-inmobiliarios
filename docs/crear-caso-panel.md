@@ -126,7 +126,7 @@ Las dos plantillas reciben las mismas seis variables y en este orden:
 | `{{5}}` | Número de contrato | 801 |
 | `{{6}}` | Consultor asignado | Carlos López |
 
-Tras aprobar ambas, abre **Configuración → Notificaciones internas → Crear casos · WhatsApp oficial**, confirma los nombres exactos e idioma, marca **Activar WhatsApp con plantillas aprobadas** y guarda. La configuración se almacena en `panel_case_notifications`; por defecto WhatsApp está desactivado y el popup indica que solo encolará correo hasta activarlo. No se consulta ni cambia la cuenta de Meta desde el panel. El proveedor `whatsapp_official` y el worker compartido deben estar activos. Esta activación se aplica a casos nuevos, no reenvía los ya creados.
+La activación, los nombres de plantillas y el idioma se administran internamente en la configuración `panel_case_notifications`, leída por `PanelCaseNotifications::config()`. Los nombres predeterminados son `scm_caso_asignado_v1` y `scm_caso_registrado_v2`, con idioma `es_CO`. El apartado de edición de plantillas se retiró de **Notificaciones internas administrativas**; los valores previamente guardados, incluida la activación, se conservan. Guardar los destinatarios internos no cambia esta configuración. Si no existe configuración previa, WhatsApp sigue desactivado hasta que el administrador técnico establezca `enabled = true` después de aprobar ambas plantillas. En Notificaciones internas permanece el evento **Crear caso desde el panel** para configurar las copias. No se consulta ni cambia la cuenta de Meta desde el panel. El proveedor `whatsapp_official` y el worker compartido deben estar activos. Esta activación se aplica a casos nuevos, no reenvía los ya creados.
 
 ## Verificación
 
@@ -144,7 +144,7 @@ php tests/public-case-check.php
 node tests/public-case-ui-check.cjs
 ```
 
-La prueba `tests/panel-case-settings-check.cjs` verifica la sección real de configuración, los valores iniciales, la validación y el envío de nombres/idioma/activación. La prueba del servicio usa tablas temporales y proveedores inertes para comprobar ambos canales, las variables, los destinatarios, la deduplicación y la reversión de fallos sin enviar mensajes reales.
+La prueba `tests/panel-case-settings-check.cjs` verifica el modal real, la ausencia de controles de plantillas y el guardado de copias y recibos sin enviar cambios a la configuración interna de WhatsApp. La prueba del servicio usa tablas temporales y proveedores inertes para comprobar ambos canales, las variables, los destinatarios, la deduplicación y la reversión de fallos sin enviar mensajes reales.
 
 Las pruebas de IA verifican el contrato como requisito, fuentes privadas, límites y MIME real, compresión, formato de respuesta, listas de opciones, revisión/aplicación/deshacer, fallos de cuota, descarte al cambiar de contrato, móvil y apertura automática del caso con el detalle de avisos. Usan respuestas simuladas y cargas multipart locales; no consumen cuota de MiniMax ni envían mensajes reales.
 

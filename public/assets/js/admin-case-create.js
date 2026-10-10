@@ -116,7 +116,7 @@
             <label class="scm-new-case-label">Departamento<select name="departamento" required>${option('', 'Selecciona el departamento')}${config.departments.map(t => option(t)).join('')}</select></label>
           </div>
           <label class="scm-new-case-label">Asignar a<select name="id_empleado" required>${option('', 'Selecciona un funcionario activo')}${config.employees.map(e => option(e.employee_id, `${e.name} · ${e.cargo}${e.email ? '' : ' · Sin correo'}`)).join('')}</select></label>
-          <p data-assignee class="text-xs text-slate-500">El responsable recibirá correo${config.whatsapp_enabled ? ' y WhatsApp' : '. WhatsApp pendiente de activar en Notificaciones internas'}.</p>
+          <p data-assignee class="text-xs text-slate-500">El responsable recibirá correo${config.whatsapp_enabled ? ' y WhatsApp' : '. WhatsApp pendiente de activar en la configuración interna del sistema'}.</p>
         </section>
         <section class="flex flex-col gap-4"><h3 class="scm-new-case-section"><span>3</span> Adjunta las evidencias</h3>
           <label class="scm-new-case-label">¿El caso tiene adjuntos?<select name="has_attachments" required>${option('', 'Selecciona una opción')}${option('No', 'No, continuar sin adjuntos')}${option('Si', 'Sí, agregar imágenes o documentos')}</select></label>
@@ -191,7 +191,7 @@
       };
       form.elements.id_empleado.onchange = () => {
         const employee = config.employees.find(e => e.employee_id === form.elements.id_empleado.value);
-        current.querySelector('[data-assignee]').textContent = employee ? (employee.email ? `Correo: ${employee.email}. ${config.whatsapp_enabled ? `WhatsApp: ${employee.phone || 'falta celular válido en su ficha'}.` : 'WhatsApp pendiente de activar en Notificaciones internas.'}` : 'Este funcionario necesita un correo válido para recibir la asignación.') : 'Selecciona un funcionario para consultar los canales de aviso.';
+        current.querySelector('[data-assignee]').textContent = employee ? (employee.email ? `Correo: ${employee.email}. ${config.whatsapp_enabled ? `WhatsApp: ${employee.phone || 'falta celular válido en su ficha'}.` : 'WhatsApp pendiente de activar en la configuración interna del sistema.'}` : 'Este funcionario necesita un correo válido para recibir la asignación.') : 'Selecciona un funcionario para consultar los canales de aviso.';
       };
       const aiSection = current.querySelector('[data-ai-section]');
       const aiInputs = current.querySelector('[data-ai-inputs]');
