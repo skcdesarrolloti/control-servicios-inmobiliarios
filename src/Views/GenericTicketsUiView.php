@@ -77,7 +77,7 @@ final class GenericTicketsUiView
     static $historySeq = 0;
     $historySeq++;
     $historyListId = 'scm-history-list-generic-' . $historySeq;
-    $list = is_array($items) ? $items : [];
+    $list = \SCM\Support\TicketHistoryActivity::visible(is_array($items) ? $items : []);
     $html = '<section class="scm-case-history"><h4>Historial del caso</h4>';
     if (empty($list)) {
       return $html . '<p class="scm-case-history-empty">Sin historial registrado.</p></section>';

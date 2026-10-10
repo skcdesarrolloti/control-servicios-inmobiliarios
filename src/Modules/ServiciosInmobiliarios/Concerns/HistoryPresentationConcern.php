@@ -14,6 +14,7 @@ trait HistoryPresentationConcern
 {
   private function renderHistorialBlock(array $items): string
   {
+    $items = \SCM\Support\TicketHistoryActivity::visible($items);
     $this->historySeq++;
     $historyListId = 'scm-history-list-mant-' . $this->historySeq;
     $html = '<section class="scm-case-history">';

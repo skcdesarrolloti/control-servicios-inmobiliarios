@@ -26,7 +26,7 @@ final class PanelCaseNotifications
     $config = [
       'enabled' => filter_var($raw['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN),
       'assigned_template' => trim((string) ($raw['assigned_template'] ?? 'scm_caso_asignado_v1')),
-      'external_template' => trim((string) ($raw['external_template'] ?? 'scm_caso_registrado_v2')),
+      'external_template' => trim((string) ($raw['external_template'] ?? 'scm_caso_registrado_v1')),
       'language' => trim((string) ($raw['language'] ?? 'es_CO')),
     ];
     foreach (['assigned_template', 'external_template'] as $key) {

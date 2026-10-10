@@ -10,7 +10,7 @@ Los temas permitidos son: `Reparaciones necesarias`, `Reparaciones locativas`, `
 
 El panel también permite el tema `Servicio publico critico`, con el mismo valor de los casos de revisión de servicios públicos. Sugiere el departamento `Servicio al arrendatario`, que puede cambiarse antes de guardar.
 
-El caso sigue la persistencia de `PublicTicketsService` utilizada por el bot, con origen `Panel administrativo` y creador `Funcionario`. El autor del CCT y los historiales usan el `id_empleado` real del creador. La asignación usa el `id_empleado` del responsable. Solo se inicializan los estados del caso nuevo según la regla existente; no se alteran otros casos.
+El caso sigue la persistencia de `PublicTicketsService` utilizada por el bot, con origen `Panel administrativo` y creador `Funcionario`. El autor del CCT y el historial del inmueble usan el `id_empleado` real del creador. La creación queda auditada en el inmueble, sin insertar una respuesta automática en `historial_del_ticket`. Las filas antiguas sin contenido, adjuntos ni actividad relacionada se omiten en la presentación del historial, conservando sus datos. La asignación usa el `id_empleado` del responsable. Solo se inicializan los estados del caso nuevo según la regla existente; no se alteran otros casos.
 
 Después de seleccionar un contrato se pregunta **¿Quieres preparar la información del caso con el asistente?**. **Sí, usar el asistente** muestra sus herramientas y el formulario; **No, completar manualmente** muestra el formulario habitual. Antes de responder, los demás pasos permanecen ocultos y deshabilitados. Si cambia la búsqueda, se requiere seleccionar nuevamente el contrato y responder la pregunta.
 
@@ -99,7 +99,7 @@ https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/?scm_ca
 
 El parámetro del botón es ahora el token completo `ID.VENCIMIENTO.DESTINATARIO.FIRMA`, **no solamente el número del caso**. El código lo genera y sustituye automáticamente en `{{1}}`, sin cambiar la URL base ni la estructura de las plantillas ya configuradas. Para el ejemplo que pide Meta, copia un enlace firmado de un correo de caso nuevo; los correos ya incluyen ese enlace aunque WhatsApp todavía no esté activo. Con sesión abre el panel; sin sesión, la vista pública correspondiente. No construyas una firma manual ni uses un enlace con solo el número como ejemplo de acceso público.
 
-### Propietario, arrendatario y copropiedad: `scm_caso_registrado_v2`
+### Propietario, arrendatario y copropiedad: `scm_caso_registrado_v1`
 
 Texto del cuerpo:
 
@@ -113,7 +113,7 @@ Responsable asignado: {{6}}.
 Este aviso corresponde a la gestión de tu contrato con SKC SuCasa Inmobiliaria.
 ```
 
-Agrega el mismo botón **Ver caso**, URL dinámica `https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/?scm_case={{1}}`. La plantilla externa anterior `scm_caso_registrado_v1` no tenía botón: crea esta versión nueva y cambia el nombre en Configuración, o actualiza la anterior con el botón y espera su aprobación antes de usarla. El código ya envía un componente de botón en ambas plantillas; no es compatible con una plantilla externa que siga sin botón.
+Agrega el mismo botón **Ver caso**, URL dinámica `https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/?scm_case={{1}}`. El nombre confirmado en Meta es `scm_caso_registrado_v1`; no se requiere crear una versión v2. Ambas plantillas deben tener seis variables de cuerpo y el botón dinámico, porque el código envía esos componentes. Su estructura e idioma deben coincidir con lo aprobado en Meta.
 
 Las dos plantillas reciben las mismas seis variables y en este orden:
 
@@ -126,12 +126,13 @@ Las dos plantillas reciben las mismas seis variables y en este orden:
 | `{{5}}` | Número de contrato | 801 |
 | `{{6}}` | Consultor asignado | Carlos López |
 
-La activación, los nombres de plantillas y el idioma se administran internamente en la configuración `panel_case_notifications`, leída por `PanelCaseNotifications::config()`. Los nombres predeterminados son `scm_caso_asignado_v1` y `scm_caso_registrado_v2`, con idioma `es_CO`. El apartado de edición de plantillas se retiró de **Notificaciones internas administrativas**; los valores previamente guardados, incluida la activación, se conservan. Guardar los destinatarios internos no cambia esta configuración. Si no existe configuración previa, WhatsApp sigue desactivado hasta que el administrador técnico establezca `enabled = true` después de aprobar ambas plantillas. En Notificaciones internas permanece el evento **Crear caso desde el panel** para configurar las copias. No se consulta ni cambia la cuenta de Meta desde el panel. El proveedor `whatsapp_official` y el worker compartido deben estar activos. Esta activación se aplica a casos nuevos, no reenvía los ya creados.
+La activación, los nombres de plantillas y el idioma se administran internamente en la configuración `panel_case_notifications`, leída por `PanelCaseNotifications::config()`. Los nombres predeterminados son `scm_caso_asignado_v1` y `scm_caso_registrado_v1`, con idioma `es_CO`. El apartado de edición de plantillas se retiró de **Notificaciones internas administrativas**; los valores previamente guardados, incluida la activación, se conservan. Guardar los destinatarios internos no cambia esta configuración. Si no existe configuración previa, WhatsApp sigue desactivado hasta que el administrador técnico establezca `enabled = true` después de aprobar ambas plantillas. En Notificaciones internas permanece el evento **Crear caso desde el panel** para configurar las copias. No se consulta ni cambia la cuenta de Meta desde el panel. El proveedor `whatsapp_official` y el worker compartido deben estar activos. Esta activación se aplica a casos nuevos, no reenvía los ya creados.
 
 ## Verificación
 
 ```powershell
 php tests/panel-case-creation-check.php
+php tests/panel-case-history-check.php
 php tests/panel-case-login-check.php
 node tests/panel-case-attachments-check.cjs
 node tests/panel-case-modal-check.cjs

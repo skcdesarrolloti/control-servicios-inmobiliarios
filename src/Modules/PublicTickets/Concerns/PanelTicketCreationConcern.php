@@ -179,8 +179,8 @@ trait PanelTicketCreationConcern
     $now = time();
     $base = ['cct_status' => 'publish', 'cct_author_id' => $creator['employee_id'], 'id_empleado' => $creator['employee_id'], 'id_ticket' => $id, 'fecha' => $now, 'cct_created' => date('Y-m-d H:i:s', $now), 'cct_modified' => date('Y-m-d H:i:s', $now)];
     $histories = [
-      'jet_cct_historial_del_ticket' => ['nombre' => $creator['name'], 'observacion' => 'Caso creado desde el panel. Asignado a ' . $assignee['name'] . '. ' . $title, 'fue_editada' => 'No'],
-      'jet_cct_historial_del_inmueble' => ['funcionario' => $creator['name'], 'observacion' => $title, 'tipo_reporte' => 'Ticket', 'id_inmueble' => $contract['id_inmueble'] ?? '', 'id_inmueble_data' => $contract['id_inmueble_data'] ?? ''],
+      // Creation is an audit event for the property, not a consultant response.
+      'jet_cct_historial_del_inmueble' => ['funcionario' => $creator['name'], 'observacion' => 'Caso creado desde el panel. Asignado a ' . $assignee['name'] . '. ' . $title, 'tipo_reporte' => 'Ticket', 'id_inmueble' => $contract['id_inmueble'] ?? '', 'id_inmueble_data' => $contract['id_inmueble_data'] ?? ''],
     ];
     foreach ($histories as $name => $fields) {
       $table = $this->db->table($name);

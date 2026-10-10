@@ -62,10 +62,12 @@ $check((string) $ticket['cct_author_id'] === '9001' && $ticket['id_empleado'] ==
 $check($ticket['id_ticket'] === (string) $id && $ticket['contrato'] === 'QA801' && $ticket['inmueble'] === 'SIMI8001', 'canonical ticket ID and contract snapshot');
 $check($ticket['estado'] === 'Nuevo' && $ticket['estado_administrativo'] === 'Nuevo', 'new case follows existing initial-state rule');
 $check($ticket['medio'] === 'Panel administrativo' && ($ticket['creado_por'] ?? $ticket['creador_por'] ?? '') === 'Funcionario', 'panel origin is recorded');
-foreach (['jet_cct_historial_del_ticket', 'jet_cct_historial_del_inmueble'] as $name) {
+foreach (['jet_cct_historial_del_inmueble'] as $name) {
   $history = $db->getRow('SELECT * FROM `' . $db->table($name) . '` WHERE `id_ticket` = ?', [$id]);
   $check($history && (string) $history['cct_author_id'] === '9001' && $history['id_empleado'] === '9001', 'history uses actor employee ID: ' . $name);
 }
+$check((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historial_del_ticket') . '`') === 0, 'new case does not create an automatic consultant response');
+$check(str_contains($history['observacion'], 'Caso creado desde el panel. Asignado a Responsable comercial.'), 'property audit describes creation and assignment');
 $rows = $db->getResults('SELECT * FROM `' . $queueTable . '` ORDER BY id');
 $check(count($rows) === 2 && $result['queued'] === 2, 'assignee and configured copy deduplicate; inactive copy excluded');
 $destinations = array_column($rows, 'destination'); sort($destinations);
@@ -93,7 +95,7 @@ try { $service->createPanelTicket($input); $check(false, 'partial queue failure 
 catch (RuntimeException $e) { $check(true, 'partial queue failure is surfaced'); }
 $check((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_tickets') . '`') === $before, 'queue failure rolls back case');
 $check((int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '`') === 2, 'queue failure rolls back first recipient too');
-$check((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historial_del_ticket') . '`') === 1, 'queue failure rolls back history');
+$check((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historial_del_ticket') . '`') === 0 && (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historial_del_inmueble') . '`') === 1, 'queue failure rolls back creation audit without generating responses');
 $db->pdo()->exec("ALTER TABLE `{$queueTable}` DROP CONSTRAINT qa_panel_copy");
 require_once $sharedRoot . '/autoload.php';
 final class PanelCaseTestProvider implements SharedNotifications\Contracts\ProviderInterface {
