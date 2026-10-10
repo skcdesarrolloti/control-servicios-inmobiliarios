@@ -6,6 +6,9 @@ const os = require('node:os');
 
 const rootDir = path.join(__dirname, '..');
 const runtime = fs.readFileSync(path.join(rootDir, 'public/assets/js/admin-dashboard-runtime.js'), 'utf8');
+const core = fs.readFileSync(path.join(rootDir, 'public/assets/js/scm-admin.js'), 'utf8');
+const escapeFunction = core.slice(core.indexOf('  function escHtml(value)'), core.indexOf('  function scmNotify('));
+assert.match(escapeFunction, /function escHtml\(value\)/, 'Use the production HTML escape helper');
 const functions = runtime.slice(runtime.indexOf('    function contractsEndingEmployeeOptions('), runtime.indexOf('    function loadDashboardHome()', runtime.indexOf('    function contractsEndingEmployeeOptions(')));
 const caseFunction = runtime.slice(runtime.indexOf('    function openDashboardDueCaseFromButton('), runtime.indexOf('    function dashboardOpenDueCase('));
 const settingsBinder = runtime.slice(runtime.indexOf('    function bindInternalNotificationsSettings()'), runtime.indexOf('    bindInternalNotificationsSettings();', runtime.indexOf('    function bindInternalNotificationsSettings()')));
@@ -37,7 +40,7 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
       var sent = [], opened = [], messages = [], pendingLists = null, settingsLoads = 0;
       var nonce='synthetic',actionInternalNotificationsRead='settings-read',actionPublicPqrSettingsRead='pqr-read';
       window.fetch=function() { settingsLoads++;return new Promise(resolve=>setTimeout(()=>resolve({json:()=>Promise.resolve({success:true,data:{html:'<div id="scm-internal-notifications-modal" class="scm-pqr-settings-modal" aria-hidden="true"><button id="scm-close-internal-notifications">Cerrar</button><form id="scm-internal-notifications-form"></form></div>'}})}),30)); };
-      function escHtml(value) { var el = document.createElement('div'); el.textContent = String(value == null ? '' : value); return el.innerHTML.replace(/"/g,'&quot;'); }
+      ${escapeFunction}
       function formatDashboardCount(n) { return String(n); }
       function showToast(kind,text,title) { messages.push({kind,text,title}); }
       function dashboardAction(action,payload) {
@@ -56,6 +59,23 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
       var historyFixture={can_manage:false,items:[{id:1,action:'retention_created',actor:'EMP-13',actor_name:'Funcionario de prueba',created_at:1791210875,details_json:JSON.stringify({ticket_id:77}),revision:'synthetic-revision'}]};
       var fixture = {receipt_automation:{enabled:true,contract_id:1},can_write:true,year:2026,month:10,count:3,generated_at:'05/10/2026 14:20',groups:[{label:'Octubre 2026',count:3,items:[base,Object.assign({},base,{receipt_in_scope:false,contract_pk:'2',contrato:'656',probability:100,weighted_value:1000000}),Object.assign({},base,{receipt_in_scope:false,contract_pk:'3',contrato:'888',existing_retention_ticket_id:'77',renewal:{no_exit:1,note:'Reporte confirmado',revision:1}})]}]};
     ` + settingsBinder + settingsLoader + caseFunction + functions + '\ninitContractsEndingFilters(root.querySelector("[data-scm-contracts-ending-panel]"));renderContractsEnding(fixture);'});
+    // Real API values include numeric zero; a safe test-only escape helper hid this regression.
+    await page.evaluate(() => {
+      var zeroFixture = Object.assign({}, fixture, {count:4,groups:[{label:'Octubre 2026',count:4,items:[0,'0',null,12.5].map((probability,index) => Object.assign({},base,{contract_pk:String(index+10),probability,weighted_value:probability == null ? null : Number(probability)*10000,renewal:{probability,no_exit:0,revision:1}}))}]});
+      renderContractsEnding(zeroFixture);
+    });
+    for (const [index,label] of ['0 %','0 %','Sin registrar','12.5 %'].entries()) {
+      assert.equal(await page.locator('.scm-ending-tags > span:first-child').nth(index).innerText(),'Probabilidad de renovación: '+label);
+    }
+    await snapshot('probability-zero-card.png');
+    await page.locator('[data-contracts-ending-configure="probability"][data-contract-pk="10"]').click();
+    assert.equal(await page.locator('.swal2-popup [name="probability"]').inputValue(),'0','Editing a stored zero must not show an empty field');
+    await snapshot('probability-zero-editor.png',page.locator('.swal2-popup'));
+    await page.locator('.swal2-cancel').click();
+    await page.locator('[data-contracts-ending-view="renewal"]').click();
+    assert.deepEqual(await page.locator('.scm-ending-probability-pill').allTextContents(),['0 %','0 %','Sin registrar','12.5 %']);
+    assert.match(await page.locator('.scm-contract-renewal-table tbody tr').first().locator('td').nth(3).innerText(),/0/,'Zero probability keeps zero weighted value visible');
+    await page.evaluate(() => {contractsEndingView='ending';renderContractsEnding(fixture);});
     const automaticHistory = await page.evaluate(() => contractHistoryText({action:'renewal_saved',details_json:JSON.stringify({before:{probability:100},after:{probability:0,no_exit:0,note:'Nota existente'},reason:'Probabilidad de renovación ajustada automáticamente a 0 % al responder no prórroga dentro del término. Caso #10916.'})}));
     assert.match(automaticHistory,/100 % → 0 %/);
     assert.match(automaticHistory,/Nota existente/);
