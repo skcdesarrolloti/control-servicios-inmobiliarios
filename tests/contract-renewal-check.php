@@ -85,7 +85,9 @@ final class RenewalProbe {
   public function retention($row) { return $this->contractEndingRetentionTicketId($row); }
   public function month($year, $month) { return $this->contractsEndingMonthItems($year, $month); }
   public function defaultEmployee($row,$ids) { return $this->contractRetentionDefaultEmployeeId($row,$ids); }
-  public function createRetention($row) { return $this->createContractRetentionTicketFromContractRequest($row,'','EMP-13','test'); }
+  public function createRetention($row) { return $this->createContractRetentionTicketFromContractRequest($row,'','EMP-13','test','','','contrato por terminar',(string)$row['_ID']); }
+  public function requestContract($row) { return $this->contractTerminationContractByContext($row); }
+  public function createRequestRetention($row, $source) { return $this->createContractRetentionTicketFromContractRequest($row,'dentro','EMP-13','test','','',$source); }
   public function preview($file) { return $this->contractsEndingImportPreview($file); }
   private function contractsEndingImportSpreadsheetRows(string $path, string $name): array { return $this->spreadsheetRows; }
   private function verifyCsrf() {}
@@ -290,7 +292,22 @@ try {
   $db->update('wp_jet_cct_contratos_arrendamiento',['estado'=>'Recibido'],['_ID'=>802]);
   $service->reconcileCycles(802);
   foreach($scheduledJobs as $key) check($db->getVar('SELECT status FROM test_jobs WHERE dedupe_key=?',[$key])==='cancelled','Received contract must cancel pending no-exit notices');
-  echo "PASS: exact contract, dates, matching, signatures, probabilities, responsibility, reminder scheduling/cancellation, history, atomic imports and idempotent automatic receipts. No messages sent.\n";
+  // Requests inherit fin_contrato but their _ID still belongs to the case.
+  foreach ([803=>'903',804=>'904',805=>'905'] as $id=>$code) $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>$id,'contrato'=>$code,'inmueble'=>(string)$id,'fin_contrato'=>(string)$end,'estado'=>'Entregado']);
+  foreach ([['terminación de contrato',803,'903',91001],['no prórroga',804,'904',800]] as [$source,$contractPk,$code,$casePk]) {
+    $request = ['_ID'=>$casePk,'id_ticket'=>(string)$casePk,'id_contrato'=>(string)$contractPk,'contrato'=>$code,'inmueble'=>(string)$contractPk,'fin_contrato'=>(string)$end];
+    check((int)($probe->requestContract($request)['_ID'] ?? 0)===$contractPk, $source . ': inherited end date must not turn case PK into contract PK');
+    $result = $probe->createRequestRetention($request,$source);
+    check($result['ok']==='1', $source . ': retention must create successfully for request with end date: ' . json_encode($result));
+    check((string)$result['input']['contract_pk']===(string)$contractPk, $source . ': retention must belong to referenced contract despite missing/colliding case PK');
+    check(str_contains($result['input']['descripcion'],'Caso #'.$casePk), $source . ': preserve original case in commercial handoff');
+    $repeated = $probe->createRequestRetention($request,$source);
+    check($repeated['ok']==='0' && str_contains($repeated['message'],'ya tiene caso de retención'), $source . ': still block duplicate retention for actual contract');
+  }
+  check($probe->requestContract(['_ID'=>805,'fin_contrato'=>(string)$end])===[], 'An unrelated contract sharing the case PK must not be selected without contract/property references');
+  $result = $probe->createRetention($probe->pk('805'));
+  check($result['ok']==='1' && $result['input']['contract_pk']==='805', 'Contracts ending flow must continue to use its explicitly selected contract PK');
+  echo "PASS: exact contract, request-to-contract resolution, retention in termination/no renewal, dates, matching, signatures, probabilities, responsibility, reminder scheduling/cancellation, history, atomic imports and idempotent automatic receipts. No messages sent.\n";
 } finally {
   putenv('SHARED_NOTIFICATIONS_PATH'); unlink($temp.'/autoload.php');unlink($temp.'/config.php');rmdir($temp);
 }

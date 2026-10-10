@@ -1274,7 +1274,7 @@ trait HandlesTicketWorkflowActions
     $responseText = 'Caso creado desde la pestaña Contratos por terminar para gestionar retención comercial. '
       . 'Contrato ' . ($contractCode !== '' ? $contractCode : $contractPk) . ', fecha fin ' . $endLabel . '.';
 
-    $result = $this->createContractRetentionTicketFromContractRequest($contract, '', $employeeId, $responseText, '', '', 'contrato por terminar');
+    $result = $this->createContractRetentionTicketFromContractRequest($contract, '', $employeeId, $responseText, '', '', 'contrato por terminar', $contractPk);
     if (($result['ok'] ?? '0') !== '1') {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo crear el caso comercial de retención.'));
     }
@@ -4233,9 +4233,8 @@ trait HandlesTicketWorkflowActions
     if (!$this->table_exists($table)) {
       return [];
     }
-    foreach ($rows as $context) {
-      if (array_key_exists('fin_contrato', $context) && isset($context['_ID'])) return $this->contractEndingContractByPk((string) $context['_ID']);
-    }
+    // A request can inherit fin_contrato while _ID remains its case/request ID.
+    // Resolve it from contract/property references, never from that unrelated PK.
     $contractRefs = $this->contractTerminationUniqueRefs($rows, ['contrato', 'id_contrato', 'id_contrato_arrendamiento']);
     $propertyRefs = $this->contractTerminationUniqueRefs($rows, ['id_inmueble', 'inmueble']);
     if ($contractRefs === [] && $propertyRefs === []) {
@@ -5053,11 +5052,13 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $ticket @return array<string,mixed> */
-  private function createContractRetentionTicketFromContractRequest(array $ticket, string $term, string $employeeId, string $responseText, string $actaUrl = '', string $actaTitle = '', string $sourceLabel = 'no prórroga'): array
+  private function createContractRetentionTicketFromContractRequest(array $ticket, string $term, string $employeeId, string $responseText, string $actaUrl = '', string $actaTitle = '', string $sourceLabel = 'no prórroga', string $contractPk = ''): array
   {
     $service = new ContractRenewalService($this->db);
     $service->ensureSchema();
-    $contract = array_key_exists('fin_contrato', $ticket) && isset($ticket['_ID']) ? $this->contractEndingContractByPk((string) $ticket['_ID']) : $this->contractTerminationContractByContext($ticket);
+    $contract = $contractPk !== ''
+      ? $this->contractEndingContractByPk($contractPk)
+      : $this->contractTerminationContractByContext($ticket);
     $id = (int) ($contract['_ID'] ?? 0);
     if (!$id) return ['ok' => '0', 'message' => 'No se encontró el contrato.'];
     $pdo = $this->db->pdo();
