@@ -13,6 +13,8 @@
     let busy = false;
     let selected = null;
     let sequence = 0;
+    let aiSequence = 0;
+    let aiController = null;
     const requestId = crypto.randomUUID();
     dialog = document.createElement('dialog');
     dialog.className = 'scm-new-case';
@@ -28,13 +30,13 @@
       dialog.close();
     };
     dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
-    dialog.addEventListener('close', () => { sequence++; dialog.remove(); dialog = null; opener?.focus(); });
+    dialog.addEventListener('close', () => { sequence++; aiSequence++; aiController?.abort(); dialog.remove(); dialog = null; opener?.focus(); });
     dialog.querySelector('[data-close]').onclick = close;
     const current = dialog;
-    const api = async (action, data = new FormData()) => {
+    const api = async (action, data = new FormData(), signal) => {
       data.set('action', action);
       data.set('nonce', runtime.nonce);
-      const response = await fetch(runtime.ajaxUrl, {method: 'POST', body: data, credentials: 'same-origin'});
+      const response = await fetch(runtime.ajaxUrl, {method: 'POST', body: data, credentials: 'same-origin', signal});
       let json;
       try { json = await response.json(); } catch (_) { throw new Error('El servidor no respondió correctamente. Revisa la conexión e inténtalo nuevamente.'); }
       if (!json.success) throw new Error(json.data?.message || 'No se pudo completar la solicitud.');
@@ -53,6 +55,24 @@
           <div data-selected hidden class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-slate-700"></div>
         </section>
         <fieldset data-contract-steps hidden disabled class="min-w-0"><div class="flex flex-col gap-6">
+        <details data-ai-section class="rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <summary class="cursor-pointer text-sm font-semibold text-slate-900">Completar con IA <span class="ml-2 text-xs font-normal text-slate-500">Opcional</span></summary>
+          <p class="mt-2 text-sm text-slate-600">Pega un correo o una conversación, o agrega capturas. Revisa la propuesta y úsala para completar los datos del caso.</p>
+          ${config.ai?.enabled ? '' : `<p class="mt-3 text-sm text-slate-600">${escape(config.ai?.message || 'La ayuda de IA está pendiente de activar con MiniMax en el servidor. Puedes completar el caso manualmente.')}</p>`}
+          <fieldset data-ai-inputs ${config.ai?.enabled ? '' : 'disabled'} class="mt-4 min-w-0 flex flex-col gap-3">
+            <label class="scm-new-case-label">Contenido del correo o WhatsApp<textarea data-ai-text rows="4" maxlength="20000" placeholder="Pega aquí el mensaje que explica la solicitud. También puedes añadir contexto para interpretar las capturas."></textarea></label>
+            <label class="scm-new-case-label">Capturas para analizar<input data-ai-images type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
+            <div class="flex flex-wrap items-center gap-3"><button data-ai-paste type="button" class="scm-new-case-button">Pegar captura</button><span class="text-xs text-slate-500">También puedes usar Ctrl+V en esta sección. Máximo 4 capturas, 5 MB cada una.</span></div>
+            <div data-ai-previews class="grid grid-cols-2 gap-3"></div>
+            <p class="text-xs text-slate-500">Al analizar, el texto y las capturas se envían a MiniMax. Las capturas de esta sección no se guardan como evidencias del caso.</p>
+            <div><button data-ai-analyze type="button" class="scm-new-case-primary">Analizar solicitud</button></div>
+          </fieldset>
+          <p data-ai-status role="status" aria-live="polite" class="mt-3 text-sm text-slate-600"></p>
+          <div data-ai-result hidden class="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+            <h4 class="text-sm font-semibold text-slate-900">Propuesta para revisar</h4><div data-ai-draft class="mt-3 flex flex-col gap-3 text-sm text-slate-700"></div>
+            <div class="mt-4 flex flex-wrap gap-3"><button data-ai-apply type="button" class="scm-new-case-primary">Completar formulario</button><button data-ai-undo hidden type="button" class="scm-new-case-button">Deshacer autocompletado</button></div>
+          </div>
+        </details>
         <section class="flex flex-col gap-4"><h3 class="scm-new-case-section"><span>2</span> Describe y asigna el caso</h3>
           <label class="scm-new-case-label">Título<input name="asunto" required maxlength="200" placeholder="Resume la solicitud"></label>
           <label class="scm-new-case-label">Descripción<textarea name="descripcion" rows="4" required maxlength="10000" placeholder="Describe qué ocurre y qué gestión se necesita"></textarea></label>
@@ -94,7 +114,7 @@
         current.querySelector('[data-create-action]').hidden = !visible;
         form.querySelector('[type=submit]').disabled = !visible;
       };
-      const invalidateSelection = () => { sequence++; selected = null; summary.hidden = true; setContractStepsVisible(false); showError(''); results.replaceChildren(); status.textContent = 'Busca y selecciona el contrato correspondiente.'; };
+      const invalidateSelection = () => { sequence++; resetAi(); selected = null; summary.hidden = true; setContractStepsVisible(false); showError(''); results.replaceChildren(); status.textContent = 'Busca y selecciona el contrato correspondiente.'; };
       searchInput.oninput = invalidateSelection;
       searchBy.onchange = invalidateSelection;
       const search = async () => {
@@ -135,7 +155,120 @@
         const employee = config.employees.find(e => e.employee_id === form.elements.id_empleado.value);
         current.querySelector('[data-assignee]').textContent = employee ? (employee.email ? `Correo: ${employee.email}. ${config.whatsapp_enabled ? `WhatsApp: ${employee.phone || 'falta celular válido en su ficha'}.` : 'WhatsApp pendiente de activar en Notificaciones internas.'}` : 'Este funcionario necesita un correo válido para recibir la asignación.') : 'Selecciona un funcionario para consultar los canales de aviso.';
       };
-      const fileInputs = [...form.querySelectorAll('input[type=file]')];
+      const aiSection = current.querySelector('[data-ai-section]');
+      const aiInputs = current.querySelector('[data-ai-inputs]');
+      const aiText = current.querySelector('[data-ai-text]');
+      const aiFileInput = current.querySelector('[data-ai-images]');
+      const aiStatus = current.querySelector('[data-ai-status]');
+      const aiResult = current.querySelector('[data-ai-result]');
+      const aiAnalyze = current.querySelector('[data-ai-analyze]');
+      const aiApply = current.querySelector('[data-ai-apply]');
+      const aiUndo = current.querySelector('[data-ai-undo]');
+      const aiSources = [];
+      const aiFields = ['asunto', 'descripcion', 'tema_ayuda', 'departamento'];
+      let aiDraft = null;
+      let aiUndoValues = null;
+      const invalidateAiDraft = () => {
+        aiSequence++; aiController?.abort(); aiController = null;
+        aiInputs.disabled = !config.ai?.enabled;
+        aiAnalyze.textContent = 'Analizar solicitud'; aiSection.removeAttribute('aria-busy');
+        aiDraft = null; aiUndoValues = null; aiResult.hidden = true; aiStatus.textContent = '';
+        aiApply.disabled = false; aiUndo.hidden = true;
+      };
+      const renderAiSources = () => {
+        current.querySelector('[data-ai-previews]').innerHTML = aiSources.map((image, index) => `<figure class="min-w-0 rounded-xl border border-slate-200 bg-white p-2"><img src="${image.url}" alt="Captura para analizar ${index + 1}" class="h-32 w-full rounded-lg object-contain"><figcaption class="mt-2 flex flex-wrap items-center justify-between gap-2"><span class="break-all text-xs text-slate-600">${escape(image.file.name)}</span><button type="button" data-ai-remove="${index}" class="scm-new-case-button" aria-label="Quitar captura ${index + 1}">Quitar</button></figcaption></figure>`).join('');
+      };
+      const clearAiSources = () => { aiSources.forEach(image => URL.revokeObjectURL(image.url)); aiSources.length = 0; };
+      const resetAi = () => { invalidateAiDraft(); clearAiSources(); aiText.value = ''; aiFileInput.value = ''; renderAiSources(); };
+      current.addEventListener('close', clearAiSources);
+      aiText.oninput = invalidateAiDraft;
+      const addAiImages = blobs => {
+        if (busy || aiController || !selected || !config.ai?.enabled || !current.isConnected) return;
+        const types = {'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp'};
+        const combined = [...aiSources.map(image => image.file), ...blobs];
+        if (combined.length > 4 || blobs.some(blob => !types[blob.type] || !blob.size || blob.size > 5 * 1024 * 1024)
+          || combined.reduce((sum, file) => sum + file.size, 0) > 12 * 1024 * 1024) {
+          aiStatus.textContent = 'Usa máximo 4 capturas JPG, PNG o WebP, 5 MB por captura y 12 MB en total.'; return;
+        }
+        invalidateAiDraft();
+        blobs.forEach((blob, index) => {
+          const file = new File([blob], blob.name || `captura-ia-${Date.now()}-${index + 1}.${types[blob.type]}`, {type: blob.type});
+          aiSources.push({file, url: URL.createObjectURL(file)});
+        });
+        renderAiSources(); aiStatus.textContent = 'Capturas listas para analizar. Puedes añadir contexto en el texto.';
+      };
+      aiFileInput.onchange = () => { addAiImages([...aiFileInput.files]); aiFileInput.value = ''; };
+      current.querySelector('[data-ai-previews]').onclick = event => {
+        const button = event.target.closest('[data-ai-remove]');
+        if (!button || busy || aiController) return;
+        invalidateAiDraft();
+        const [removed] = aiSources.splice(Number(button.dataset.aiRemove), 1);
+        if (removed) URL.revokeObjectURL(removed.url);
+        renderAiSources();
+      };
+      aiSection.addEventListener('paste', event => {
+        if (!config.ai?.enabled || !selected || busy || aiController) return;
+        const images = [...(event.clipboardData?.items || [])].filter(item => item.type.startsWith('image/')).map(item => item.getAsFile()).filter(Boolean);
+        if (!images.length) return;
+        event.preventDefault(); event.stopPropagation(); addAiImages(images);
+      });
+      current.querySelector('[data-ai-paste]').onclick = async () => {
+        if (!navigator.clipboard?.read) { aiStatus.textContent = 'Copia la captura y presiona Ctrl+V dentro del contenido de IA.'; aiText.focus(); return; }
+        try {
+          const items = await navigator.clipboard.read();
+          const images = [];
+          for (const item of items) {
+            const type = item.types.find(type => ['image/png', 'image/jpeg', 'image/webp'].includes(type));
+            if (type) images.push(await item.getType(type));
+          }
+          if (images.length) addAiImages(images);
+          else aiStatus.textContent = 'No hay una captura en el portapapeles. Copia una imagen o pega el texto del mensaje.';
+        } catch (_) { aiStatus.textContent = 'No se pudo leer el portapapeles. Usa Ctrl+V dentro del contenido de IA.'; aiText.focus(); }
+      };
+      aiAnalyze.onclick = async () => {
+        if (busy || aiController || !selected || !config.ai?.enabled) return;
+        if (!aiText.value.trim() && !aiSources.length) { aiStatus.textContent = 'Pega el contenido del mensaje o agrega una captura.'; aiText.focus(); return; }
+        invalidateAiDraft();
+        const run = ++aiSequence;
+        const contractId = String(selected._ID);
+        const data = new FormData(); data.set('contract_id', contractId); data.set('source_text', aiText.value);
+        aiSources.forEach(image => data.append('ai_images[]', image.file, image.file.name));
+        aiController = new AbortController();
+        aiInputs.disabled = true; aiAnalyze.textContent = 'Analizando…'; aiSection.setAttribute('aria-busy', 'true');
+        aiStatus.textContent = 'Leyendo la solicitud y preparando una propuesta…';
+        try {
+          const response = await api('scm_panel_case_analyze', data, aiController.signal);
+          if (!current.isConnected || run !== aiSequence || String(selected?._ID) !== contractId || String(response.contract_id) !== contractId) return;
+          aiDraft = response.draft;
+          const labels = {asunto: 'Título', descripcion: 'Descripción', tema_ayuda: 'Tema', departamento: 'Departamento', observaciones: 'Por revisar'};
+          current.querySelector('[data-ai-draft]').innerHTML = Object.entries(labels).map(([key, label]) => `<div><p class="text-xs font-semibold text-slate-500">${label}</p><p class="mt-1 whitespace-pre-wrap break-words">${escape(aiDraft[key] || (key === 'observaciones' ? 'Revisa que el resumen corresponda a la solicitud.' : 'Seleccionar manualmente'))}</p></div>`).join('');
+          aiResult.hidden = false; aiStatus.textContent = 'Propuesta lista. Al aplicarla se reemplazan título y descripción; el responsable y los avisos los eliges tú.';
+        } catch (e) {
+          if (run === aiSequence && current.isConnected && e.name !== 'AbortError') aiStatus.textContent = e.message;
+        } finally {
+          if (run === aiSequence && current.isConnected) {
+            aiController = null; aiInputs.disabled = false; aiAnalyze.textContent = 'Analizar solicitud'; aiSection.removeAttribute('aria-busy');
+          }
+        }
+      };
+      aiApply.onclick = () => {
+        if (!aiDraft || busy || !selected) return;
+        aiUndoValues = Object.fromEntries(aiFields.map(key => [key, form.elements[key].value]));
+        form.elements.asunto.value = aiDraft.asunto;
+        form.elements.descripcion.value = aiDraft.descripcion;
+        if (config.themes.includes(aiDraft.tema_ayuda)) form.elements.tema_ayuda.value = aiDraft.tema_ayuda;
+        if (config.departments.includes(aiDraft.departamento)) form.elements.departamento.value = aiDraft.departamento;
+        aiUndo.hidden = false; aiApply.disabled = true;
+        aiStatus.textContent = 'Datos completados. Revisa los campos, selecciona el responsable y decide los adjuntos y avisos antes de crear el caso.';
+        form.elements.asunto.focus();
+      };
+      aiUndo.onclick = () => {
+        if (!aiUndoValues || busy) return;
+        aiFields.forEach(key => { form.elements[key].value = aiUndoValues[key]; });
+        aiUndoValues = null; aiUndo.hidden = true; aiApply.disabled = false;
+        aiStatus.textContent = 'Se restauraron los datos que tenías antes del autocompletado.';
+      };
+      const fileInputs = [...form.querySelectorAll('[name="imagenes[]"], [name="archivos[]"]')];
       const pastedImages = [];
       const pastedPreview = current.querySelector('[data-pasted-images]');
       const pasteStatus = current.querySelector('[data-paste-status]');
@@ -186,6 +319,7 @@
       };
       form.addEventListener('paste', event => {
         if (busy || !selected) return;
+        if (event.target.closest('[data-ai-section]')) return;
         const clipboard = event.clipboardData;
         if (!clipboard) return;
         let images = [...(clipboard.items || [])].filter(item => item.type.startsWith('image/')).map(item => item.getAsFile()).filter(Boolean);
@@ -211,6 +345,7 @@
       current.querySelector('[data-cancel]').onclick = close;
       form.onsubmit = async event => {
         event.preventDefault();
+        if (aiController) { showError('Espera a que termine el análisis antes de crear el caso.'); return; }
         if (busy || !form.reportValidity()) return;
         showError('');
         if (!selected) { showError('Busca y selecciona un contrato antes de crear el caso.'); searchInput.focus(); return; }
@@ -233,10 +368,12 @@
           clearPastedImages();
           current.removeAttribute('aria-busy');
           current.querySelector('[data-close]').disabled = false;
-          current.querySelector('[data-content]').innerHTML = `<div class="p-6 text-center flex flex-col items-center gap-4"><span class="material-symbols-outlined text-emerald-700 text-4xl">check_circle</span><h3 class="text-xl font-bold text-slate-900">Caso #${escape(response.ticket_id)} creado</h3><p role="status" class="text-sm text-slate-600">${escape(response.message)}</p><button type="button" data-done class="scm-new-case-primary">Volver al panel</button></div>`;
-          current.querySelector('[data-done]').onclick = close;
+          current.querySelector('[data-content]').innerHTML = `<div class="p-6 text-center flex flex-col items-center gap-4"><span class="material-symbols-outlined text-emerald-700 text-4xl">check_circle</span><h3 class="text-xl font-bold text-slate-900">Caso #${escape(response.ticket_id)} creado</h3><p role="status" class="text-sm text-slate-600">${escape(response.message)}</p>${response.notification_details?.length ? `<ul class="text-left text-sm text-slate-600 flex flex-col gap-2">${response.notification_details.map(detail => `<li>${escape(detail)}</li>`).join('')}</ul>` : ''}<button type="button" data-done class="scm-new-case-primary">Abrir caso</button></div>`;
+          const openCreatedCase = () => { close(); root.dispatchEvent(new CustomEvent('scm:open-panel-case', {detail: response})); };
+          current.querySelector('[data-done]').onclick = openCreatedCase;
           current.querySelector('[data-done]').focus();
           root.dispatchEvent(new CustomEvent('scm:panel-case-created', {detail: response}));
+          if (typeof window.scmOpenCase === 'function') openCreatedCase();
         } catch (e) {
           busy = false; current.removeAttribute('aria-busy');
           controls.forEach((control, index) => { control.disabled = states[index]; });

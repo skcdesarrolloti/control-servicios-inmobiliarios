@@ -14,6 +14,27 @@ El caso sigue la persistencia de `PublicTicketsService` utilizada por el bot, co
 
 Los pasos de descripción, asignación y adjuntos aparecen únicamente después de seleccionar un contrato. Si cambia la búsqueda, se ocultan y deshabilitan hasta seleccionar nuevamente; el botón de crear sigue la misma condición.
 
+## Ayuda de IA después de seleccionar contrato
+
+El apartado opcional **Completar con IA** aparece encima de los datos del caso, únicamente después de seleccionar un contrato. Admite texto pegado de correos o WhatsApp y hasta 4 capturas JPG/PNG/WebP (5 MB por imagen, 12 MB en total y 16 megapíxeles). Se pueden subir desde el equipo o pegar con Ctrl+V dentro de esa sección o con **Pegar captura**.
+
+**Analizar solicitud** genera una propuesta de título, descripción, tema y departamento. **Completar formulario** la aplica, conservando el responsable, los destinatarios y la selección de adjuntos. **Deshacer autocompletado** restaura los campos anteriores. El funcionario revisa y guarda el caso con el flujo habitual. Los temas y departamentos generados se validan contra las opciones reales del formulario; los valores desconocidos requieren selección manual.
+
+El texto y las imágenes se envían a MiniMax solo al pulsar Analizar. Las capturas de IA son fuentes privadas temporales: se validan y, si GD está disponible, se convierten a JPEG y se reducen a 2400 px de lado mayor antes del envío. No se guardan ni se agregan a los adjuntos públicos del caso. Para conservar una evidencia, agrégala expresamente en **Adjunta las evidencias**. El texto original y las capturas tampoco se incluyen al guardar el caso. Solo se envía al modelo contexto mínimo del contrato (número, SIMI y dirección), no su ficha completa ni contactos. Cambiar el contrato descarta las fuentes, propuestas y solicitudes pendientes de IA.
+
+La integración usa la API compatible con OpenAI de MiniMax, sin necesitar un servidor MCP. Configura en el `.env` privado **del servidor que ejecuta PHP**:
+
+```dotenv
+PANEL_CASE_AI_ENABLED=true
+MINIMAX_API_KEY="CLAVE_PRIVADA_DE_TU_CUENTA"
+MINIMAX_API_HOST=https://api.minimax.io
+MINIMAX_MODEL=MiniMax-M3
+```
+
+La clave nunca se devuelve al navegador ni se escribe en Git. Usa la clave y región de la misma cuenta; para cuentas de China continental el host permitido es `https://api.minimaxi.com`. También se admite `MiniMax-M3.1-Flash-Preview` si tu cuenta lo tiene habilitado. Los modelos M2.x no se admiten en este flujo de capturas. PHP debe tener cURL, Fileinfo y mbstring; GD permite comprimir las capturas. Si falta configuración o acceso al modelo, el formulario sigue funcionando manualmente y muestra el motivo. El servidor permite 6 análisis por funcionario cada 5 minutos y 60 por hora entre todos los usuarios, con un máximo de 45 segundos por llamada y sin reintentos automáticos de consumo.
+
+MiniMax documenta imágenes y texto en [la API multimodal compatible con OpenAI](https://platform.minimax.io/docs/api-reference/text-openai-api). Consulta [Token Plan](https://platform.minimax.io/subscribe/token-plan) para confirmar los modelos y la cuota de tu cuenta; MiniMax orienta este plan al uso individual interactivo y recomienda pago por uso para producción.
+
 ## Adjuntos
 
 Las capturas se pueden pegar con **Ctrl+V** dentro del popup después de seleccionar el contrato, o con **Pegar captura** cuando el navegador permita leer el portapapeles. Se muestran miniaturas con botón **Quitar**, se agregan junto a los archivos seleccionados y comparten sus límites y validaciones. Pegar una imagen activa automáticamente la opción de adjuntos. Elegir **No** limpia las capturas y los archivos seleccionados.
@@ -33,6 +54,8 @@ En el paso **Notifica a los interesados** se pueden marcar propietario, arrendat
 El correo externo incluye título, tema, contrato, responsable y descripción. WhatsApp incluye los seis datos indicados en las plantillas de abajo. Ambos canales incluyen **Ver caso**, con enlace firmado válido por 30 días. Los destinatarios elegidos quedan registrados en los metadatos de la cola. La pantalla final muestra los contadores de correo y WhatsApp **encolados**; la entrega se consulta en la cola y sus intentos.
 
 Los mensajes se encolan en `shared-notifications`, con `source_module = nuevo_caso_panel`, deduplicación por caso y destino y metadatos del contrato, creador y responsable. WhatsApp usa `whatsapp_official`. La inicialización de la cola ocurre antes de la transacción para evitar DDL durante el guardado. Caso, historiales, correos y WhatsApp se confirman juntos; una falla al encolar revierte todo.
+
+Al crear el caso, se cierra el formulario y se abre automáticamente su popup nativo dentro del panel. El detalle conserva un resumen de los avisos y un apartado **Detalle de los avisos de WhatsApp** por destinatario. Si dos o más destinatarios comparten celular se envía un solo mensaje a ese número y se explica en el resumen. Las copias internas sin celular válido también se indican. El contador representa destinos únicos encolados, no personas ni confirmaciones de entrega. No se cambia el estado administrativo al abrir el caso.
 
 Los enlaces nuevos usan `?scm_case=ID.VENCIMIENTO.FIRMA`, con HMAC SHA-256 específico para esta vista. Con sesión activa se vuelve a `?scm_case=ID` y se abre el popup nativo, conservando sus permisos: responsable, copias activas configuradas o usuarios con permiso de Métricas. Sin sesión (también si expiró), el enlace firmado abre la vista pública de solo lectura. Cambiar el ID o la firma impide el acceso; el enlace vencido no permite acceso público. Un enlace anterior que solo tenga el número del caso sigue enviando al login y conserva el caso de destino, sin permitir consulta pública por número.
 
@@ -103,11 +126,16 @@ php tests/panel-case-login-check.php
 node tests/panel-case-attachments-check.cjs
 node tests/panel-case-modal-check.cjs
 node tests/panel-case-settings-check.cjs
+php tests/panel-case-ai-check.php
+node tests/panel-case-ai-uploads-check.cjs
+node tests/panel-case-ai-ui-check.cjs
 php tests/public-case-check.php
 node tests/public-case-ui-check.cjs
 ```
 
 La prueba `tests/panel-case-settings-check.cjs` verifica la sección real de configuración, los valores iniciales, la validación y el envío de nombres/idioma/activación. La prueba del servicio usa tablas temporales y proveedores inertes para comprobar ambos canales, las variables, los destinatarios, la deduplicación y la reversión de fallos sin enviar mensajes reales.
+
+Las pruebas de IA verifican el contrato como requisito, fuentes privadas, límites y MIME real, compresión, formato de respuesta, listas de opciones, revisión/aplicación/deshacer, fallos de cuota, descarte al cambiar de contrato, móvil y apertura automática del caso con el detalle de avisos. Usan respuestas simuladas y cargas multipart locales; no consumen cuota de MiniMax ni envían mensajes reales.
 
 `public-case-check.php` verifica las firmas, el vencimiento y la lista pública de campos/adjuntos. `public-case-ui-check.cjs` levanta un servidor en localhost con registros temporales y secreto de prueba: recorre las rutas reales, el retorno al panel con sesión, los enlaces antiguos al login, los rechazos sin firma, la sesión vencida, las previsualizaciones, móvil y la impresión de un caso representativo en una página A4. Genera capturas y PDF de prueba en `output/public-case`.
 

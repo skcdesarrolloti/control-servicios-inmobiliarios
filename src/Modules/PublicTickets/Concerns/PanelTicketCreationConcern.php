@@ -41,6 +41,7 @@ trait PanelTicketCreationConcern
       'employees' => FuncionarioOptions::panelFuncionarios($this->db, $this->schema, 'employee', null, true),
       'max_file_bytes' => min((int) SCM_UPLOAD_MAX_BYTES, 10 * 1024 * 1024),
       'whatsapp_enabled' => PanelCaseNotifications::config()['enabled'],
+      'ai' => \SCM\Support\PanelCaseAi::availability(),
     ];
   }
 
@@ -164,7 +165,7 @@ trait PanelTicketCreationConcern
       $extra = $notifications->enqueue($notificationPlan, $id, $contract, $title, $description, $theme, $creator, $recipients);
       $pdo->commit();
       $queued += $extra['email'];
-      return ['ticket_id' => $id, 'queued' => $queued, 'whatsapp_queued' => $extra['whatsapp'], 'message' => 'Caso #' . $id . ' creado. Correos encolados: ' . $queued . '. WhatsApp encolados: ' . $extra['whatsapp'] . '. ' . $extra['warning']];
+      return ['ticket_id' => $id, 'queued' => $queued, 'whatsapp_queued' => $extra['whatsapp'], 'notification_details' => $extra['details'], 'message' => 'Caso #' . $id . ' creado. Correos encolados: ' . $queued . '. WhatsApp encolados: ' . $extra['whatsapp'] . '. ' . $extra['warning']];
     } catch (\Throwable $e) {
       if ($pdo->inTransaction()) $pdo->rollBack();
       $attachments->cleanup($stored);

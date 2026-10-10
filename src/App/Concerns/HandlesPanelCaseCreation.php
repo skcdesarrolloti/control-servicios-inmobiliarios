@@ -57,6 +57,35 @@ trait HandlesPanelCaseCreation
     }
   }
 
+  public function ajax_handler_panel_case_analyze(): void
+  {
+    $service = $this->panelCaseService();
+    try {
+      if (!\SCM\Support\PanelCaseAi::availability()['enabled']) {
+        throw new \InvalidArgumentException(\SCM\Support\PanelCaseAi::availability()['message']);
+      }
+      $id = $_POST['contract_id'] ?? '';
+      $text = $_POST['source_text'] ?? '';
+      if (!is_scalar($id) || !ctype_digit((string) $id) || !is_string($text)) throw new \InvalidArgumentException('Selecciona el contrato y revisa el contenido para analizar.');
+      $contract = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_contratos_arrendamiento') . '` WHERE `_ID` = ? LIMIT 1', [(int) $id]);
+      if (!$contract) throw new \InvalidArgumentException('Selecciona un contrato existente antes de analizar.');
+      $ai = new \SCM\Support\PanelCaseAi();
+      $images = $ai->images(is_array($_FILES['ai_images'] ?? null) ? $_FILES['ai_images'] : []);
+      $options = $service->panelCaseOptions();
+      // Validate before consuming quota or calling the provider. Never accept remote image URLs.
+      $ai->requestPayload($text, $images, $contract, $options);
+      $limiter = new \SCM\Support\FileRateLimiter(SCM_STORAGE_PATH . '/data/rate-limits');
+      if (!$limiter->consume('panel-case-ai:employee:' . Auth::employeeId(), 6, 300)
+        || !$limiter->consume('panel-case-ai:global', 60, 3600)) {
+        throw new \InvalidArgumentException('Se alcanzó el límite de análisis. Espera unos minutos o completa el caso manualmente.');
+      }
+      $draft = $ai->analyze($text, $images, $contract, $options);
+    } catch (\InvalidArgumentException | \RuntimeException $e) {
+      $this->jsonFail($e->getMessage());
+    }
+    $this->jsonOk(['draft' => $draft, 'contract_id' => (string) $contract['_ID']]);
+  }
+
   public function ajax_handler_panel_case_create(): void
   {
     $service = $this->panelCaseService();

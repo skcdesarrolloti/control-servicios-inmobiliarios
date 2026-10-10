@@ -26,6 +26,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_ACTION => 'ajax_handler',
       'scm_panel_case_options' => 'ajax_handler_panel_case_options',
       'scm_panel_case_search' => 'ajax_handler_panel_case_search',
+      'scm_panel_case_analyze' => 'ajax_handler_panel_case_analyze',
       'scm_panel_case_create' => 'ajax_handler_panel_case_create',
       'scm_panel_case_read' => 'ajax_handler_panel_case_read',
       SuCasaControlServiciosInmobiliarios::AJAX_SEGUIMIENTO => 'ajax_handler_seguimiento',

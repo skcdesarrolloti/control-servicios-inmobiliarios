@@ -168,6 +168,7 @@ $db->pdo()->exec("ALTER TABLE `{$queueTable}` DROP CONSTRAINT qa_panel_whatsapp"
 $db->update($db->table('jet_cct_contratos_arrendamiento'), ['correo_arrendatario' => 'owner@example.invalid', 'celular_arrendatario' => '3001113301'], ['_ID' => 801]);
 $dedupResult = $service->createPanelTicket($notifyInput);
 $check($dedupResult['queued'] === 4 && $dedupResult['whatsapp_queued'] === 4, 'duplicate external emails and normalized phones enqueue once per channel');
+$check(count($dedupResult['notification_details']) === 5 && count(array_filter($dedupResult['notification_details'], fn($text) => str_contains($text, 'comparte celular'))) === 1, 'receipt explains every WhatsApp recipient and phone deduplication');
 $internalOnly = $service->createPanelTicket($input);
 $check($internalOnly['queued'] === 2 && $internalOnly['whatsapp_queued'] === 2, 'assigned consultant and configured copy get WhatsApp even with no external recipients selected');
 $db->pdo()->exec("UPDATE `{$queueTable}` SET scheduled_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY), next_attempt_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)");

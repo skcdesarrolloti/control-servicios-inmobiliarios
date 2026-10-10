@@ -92,6 +92,7 @@ final class PanelCaseNotifications
     $assignee = $plan['assignee'];
     $emailCount = 0;
     $whatsappCount = 0;
+    $details = [];
     $meta = ['ticket_id' => $id, 'contract_id' => (int) $contract['_ID'], 'created_by_employee_id' => $creator['employee_id'], 'assigned_employee_id' => $assignee['employee_id'], 'notify_roles' => array_column($plan['external'], 'role')];
     $queue = (new SharedNotificationsBridge($this->db))->queue();
     if (!$queue) throw new \RuntimeException('La cola de notificaciones no está disponible.');
@@ -113,11 +114,16 @@ final class PanelCaseNotifications
     }
     if ($config['enabled']) {
       // Assignee first; configured internal copies come from the existing event only.
-      $staff = array_merge([$assignee], InternalNotificationRecipients::contactsForAction($this->db, 'nuevo_caso_panel'));
-      foreach (array_merge($staff, $plan['external']) as $person) {
+      $staff = [(string) $assignee['employee_id'] => $assignee];
+      foreach (InternalNotificationRecipients::contactsForAction($this->db, 'nuevo_caso_panel') as $copy) {
+        if (!isset($staff[(string) $copy['employee_id']])) $staff[(string) $copy['employee_id']] = $copy;
+      }
+      foreach (array_merge(array_values($staff), $plan['external']) as $person) {
         $external = isset($person['role']);
         $phone = self::phone((string) $person['phone']);
-        if ($phone === '' || isset($phones[$phone])) continue;
+        $label = ($external ? self::ROLES[$person['role']] . ': ' : 'Funcionario: ') . $person['name'];
+        if ($phone === '') { $details[] = $label . ' — sin WhatsApp: falta un celular válido en su ficha.'; continue; }
+        if (isset($phones[$phone])) { $details[] = $label . ' — comparte celular con ' . $phones[$phone] . '; se encoló un solo mensaje para ese número.'; continue; }
         $values = [$person['name'], (string) $id, $title, $theme, (string) ($contract['contrato'] ?? 'Sin número'), $assignee['name']];
         $values = array_map(static fn($v, $limit) => mb_substr(preg_replace('/\s+/u', ' ', trim((string) $v)) ?: 'Sin dato', 0, $limit), $values, [80, 20, 200, 100, 50, 80]);
         $components = [['type' => 'body', 'parameters' => array_map(static fn($v) => ['type' => 'text', 'text' => $v], $values)]];
@@ -130,10 +136,11 @@ final class PanelCaseNotifications
           'meta' => $meta + ['recipient_role' => $person['role'] ?? 'funcionario'], 'created_by' => $creator['employee_id'],
         ]);
         if ($queuedId <= 0) throw new \RuntimeException('No se pudo encolar WhatsApp. El caso no se guardó.');
-        $phones[$phone] = true;
+        $phones[$phone] = $person['name'];
         $whatsappCount++;
+        $details[] = $label . ' — WhatsApp encolado.';
       }
     }
-    return ['email' => $emailCount, 'whatsapp' => $whatsappCount, 'warning' => $config['enabled'] ? '' : 'WhatsApp pendiente: activa las plantillas aprobadas en Configuración → Notificaciones internas → Crear casos.'];
+    return ['email' => $emailCount, 'whatsapp' => $whatsappCount, 'details' => $details, 'warning' => $config['enabled'] ? '' : 'WhatsApp pendiente: activa las plantillas aprobadas en Configuración → Notificaciones internas → Crear casos.'];
   }
 }

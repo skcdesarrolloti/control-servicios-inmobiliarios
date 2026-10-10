@@ -11986,7 +11986,7 @@
       return Promise.resolve();
     }
 
-    function openPanelCaseById(caseId) {
+    function openPanelCaseById(caseId, receipt) {
       caseId = String(caseId || "");
       if (!/^\d+$/.test(caseId)) return;
       dashboardAction("scm_panel_case_read", { case_id: caseId }).then(function (data) {
@@ -12006,11 +12006,37 @@
         root.appendChild(card);
         dashboardApplyDueCaseData(button, caseData);
         openDashboardDueCaseFromButton(button, caseData.case_source_html);
+        if (receipt && receipt.message) {
+          var caseBody = root.querySelector("#scm-case-modal.open #scm-case-body");
+          if (caseBody) {
+            var banner = document.createElement("section");
+            banner.className = "mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-slate-700";
+            banner.setAttribute("role", "status");
+            var message = document.createElement("p");
+            message.textContent = receipt.message;
+            banner.appendChild(message);
+            if (Array.isArray(receipt.notification_details) && receipt.notification_details.length) {
+              var details = document.createElement("details");
+              details.className = "mt-3";
+              var summary = document.createElement("summary");
+              summary.className = "cursor-pointer font-semibold";
+              summary.textContent = "Detalle de los avisos de WhatsApp";
+              details.appendChild(summary);
+              var list = document.createElement("ul");
+              list.className = "mt-2 flex flex-col gap-2";
+              receipt.notification_details.forEach(function (text) {
+                var item = document.createElement("li"); item.textContent = text; list.appendChild(item);
+              });
+              details.appendChild(list); banner.appendChild(details);
+            }
+            caseBody.prepend(banner);
+          }
+        }
         window.setTimeout(function () { card.remove(); }, 1000);
       }).catch(function (error) { showToast("error", error.message || "No se pudo abrir el caso."); });
     }
     root.addEventListener("scm:open-panel-case", function (event) {
-      openPanelCaseById(event.detail && event.detail.ticket_id);
+      openPanelCaseById(event.detail && event.detail.ticket_id, event.detail);
     });
     var linkedPanelCase = new URLSearchParams(window.location.search).get("scm_case");
     if (linkedPanelCase) openPanelCaseById(linkedPanelCase);
