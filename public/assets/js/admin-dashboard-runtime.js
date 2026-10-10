@@ -15139,7 +15139,7 @@
       var existingHtml = hasExisting ? '<div class="scm-retention-ticket-context-item" data-contract-retention-existing><span>' + (activeExisting ? 'Retención abierta' : 'Retención anterior cerrada') + '</span><strong>Caso #' + escHtml(existing.id) + ' · ' + escHtml(existing.status || '') + (existing.administrative_status ? ' / ' + escHtml(existing.administrative_status) : '') + '</strong>' +
         (existing.employee ? '<p class="!m-0 text-xs">Responsable: ' + escHtml(existing.employee) + '</p>' : '') +
         '<p class="!m-0 text-xs">' + (activeExisting ? 'Ya existe una retención abierta. Puedes responder y cerrar esta solicitud sin crear otra retención.' : 'Este caso ya está cerrado. Puedes crear una nueva retención al responder.') + '</p>' +
-        '<details><summary class="scm-contract-button">Ver detalles del caso #' + escHtml(existing.id) + '</summary><p class="text-xs"><b>' + escHtml(existing.subject || 'Retención de contrato') + '</b></p><p class="text-xs" style="white-space:pre-line;overflow-wrap:anywhere">' + escHtml(existing.description || 'Sin descripción registrada.') + '</p></details></div>' : '';
+        '<button type="button" class="scm-contract-button" data-contract-retention-open>Ver caso #' + escHtml(existing.id) + '</button></div>' : '';
       var retentionEmployees = Array.isArray(retention.funcionarios) ? retention.funcionarios : [];
       var defaultRetentionEmployee = String(retention.default_employee_id || "");
       var retentionOptions = retentionEmployees.map(function (func) {
@@ -15196,7 +15196,67 @@
       }
     }
 
-    function openContractTerminationResponse(solicitudId) {
+    function initContractResponseReturn(form, row, kind, draft) {
+      if (draft) {
+        Array.prototype.slice.call(form.elements).forEach(function (input) {
+          var saved = draft.fields.find(function (field) { return field.name === input.name && field.type === input.type && (!/^(checkbox|radio)$/.test(input.type) || field.value === input.value); });
+          if (!saved) return;
+          if (/^(checkbox|radio)$/.test(input.type)) input.checked = saved.checked && !(input.name === 'crear_ticket_retencion' && input.disabled);
+          else input.value = saved.value;
+        });
+        syncContractNotificationChannels(form);
+        var scroller = form.closest('.swal2-html-container');
+        if (scroller) scroller.scrollTop = draft.scrollTop;
+      }
+      form.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-contract-retention-open]');
+        if (!button) return;
+        event.preventDefault();
+        openContractRetentionCase(row, kind, form, button);
+      });
+    }
+
+    function openContractRetentionCase(row, kind, form, button) {
+      if (button.disabled) return;
+      var existing = (row.retention_ticket || {}).existing_case || {};
+      if (!existing.ticket_pk || !existing.contract_pk || typeof window.scmOpenCase !== 'function') {
+        showToast('error', 'No se pudo abrir el caso de retención. Actualiza el listado e inténtalo de nuevo.');
+        return;
+      }
+      button.disabled = true;
+      dashboardAction(actions.contracts_ending_case, {contract_pk:existing.contract_pk, ticket_pk:existing.ticket_pk, kind:'retention'}).then(function (data) {
+        if (!form.isConnected || !window.Swal.isVisible()) return;
+        var caseData = data && data.case;
+        if (!caseData || !caseData.case_source_html) throw new Error('No se encontró el detalle del caso.');
+        var scroller = form.closest('.swal2-html-container');
+        var draft = {scrollTop:scroller ? scroller.scrollTop : 0, fields:Array.prototype.slice.call(form.elements).filter(function (input) { return input.name; }).map(function (input) { return {name:input.name, type:input.type, value:input.value, checked:input.checked}; })};
+        var returned = false;
+        var reopen = function () {
+          if (returned) return;
+          returned = true;
+          root.removeEventListener('scm:case-modal-closed', onClose);
+          if (kind === 'termination') openContractTerminationResponse(row.solicitud_id, draft);
+          else openContractNonRenewalResponse(row.solicitud_id, draft);
+        };
+        var onClose = function () {
+          window.setTimeout(function () { if (!root.querySelector('#scm-case-modal.open')) reopen(); }, 160);
+        };
+        root.addEventListener('scm:case-modal-closed', onClose);
+        dashboardApplyDueCaseData(button, caseData);
+        window.Swal.close();
+        window.setTimeout(function () {
+          try {
+            openDashboardDueCaseFromButton(button, caseData.case_source_html);
+            if (!root.querySelector('#scm-case-modal.open')) throw new Error('No se pudo abrir el popup del caso.');
+          } catch (error) {
+            reopen();
+            showToast('error', error.message || 'No se pudo abrir el caso.');
+          }
+        }, 160);
+      }).catch(function (error) { showToast('error', error.message || 'No se pudo cargar el caso.'); }).finally(function () { button.disabled = false; });
+    }
+
+    function openContractTerminationResponse(solicitudId, draft) {
       var row = contractTerminationRowsByPk[String(solicitudId || "")];
       if (!row || !window.Swal || typeof window.Swal.fire !== "function") {
         showToast("warning", "No se encontró la solicitud seleccionada.");
@@ -15222,6 +15282,7 @@
           var popup = window.Swal.getPopup();
           var form = popup ? popup.querySelector("[data-scm-contract-termination-form]") : null;
           if (!form) return;
+          initContractResponseReturn(form, row, 'termination', draft);
           syncContractRetentionTicketState(form);
           form.addEventListener("change", function (event) {
             if (event.target && event.target.name === "notify_recipients[]") {
@@ -15304,7 +15365,7 @@
 
     function loadContractNonRenewalRequests(force) { return loadContractRequests('non-renewal', force); }
 
-    function openContractNonRenewalResponse(solicitudId) {
+    function openContractNonRenewalResponse(solicitudId, draft) {
       var row = contractNonRenewalRowsByPk[String(solicitudId || "")];
       if (!row || !window.Swal || typeof window.Swal.fire !== "function") {
         showToast("warning", "No se encontró la solicitud seleccionada.");
@@ -15330,6 +15391,7 @@
           var popup = window.Swal.getPopup();
           var form = popup ? popup.querySelector("[data-scm-contract-non-renewal-form]") : null;
           if (!form) return;
+          initContractResponseReturn(form, row, 'non-renewal', draft);
           syncContractRetentionTicketState(form);
           form.addEventListener("change", function (event) {
             if (event.target && event.target.name === "notify_recipients[]") {

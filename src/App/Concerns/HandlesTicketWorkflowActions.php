@@ -4491,12 +4491,12 @@ trait HandlesTicketWorkflowActions
     $existing = $open ?: ($contract ? $this->contractEndingRetentionTicket($contract, false) : []);
     $existingCase = $existing ? [
       'id' => $this->contractTerminationFirstText([$existing], ['id_ticket', '_ID']),
+      'ticket_pk' => (string) $existing['_ID'],
+      'contract_pk' => (string) $contract['_ID'],
       'active' => $open !== [],
       'status' => $this->contractTerminationFirstText([$existing], ['estado']) ?: 'Sin estado',
       'administrative_status' => $this->contractTerminationFirstText([$existing], ['estado_administrativo']),
       'employee' => $this->contractRetentionEmployeeDisplayName((string) ($existing['id_empleado'] ?? ''), 'id_empleado') ?: (string) ($existing['nombre_empleado'] ?? $existing['id_empleado'] ?? ''),
-      'subject' => (string) ($existing['asunto'] ?? 'Retención de contrato'),
-      'description' => html_entity_decode(strip_tags((string) ($existing['descripcion'] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
     ] : [];
     try {
       $funcionarios = $this->contractRetentionEligibleFuncionarios();
@@ -4799,10 +4799,16 @@ trait HandlesTicketWorkflowActions
     if (!$this->canAccessContractsEndingPanel()) $this->jsonFail('No tienes permiso para abrir el caso.');
     $contract = $this->contractEndingContractByPk((string) ($_POST['contract_pk'] ?? ''));
     if (!$contract) $this->jsonFail('Contrato no encontrado.');
-    $id = (string) ($_POST['kind'] ?? '') === 'receipt' ? $this->contractEndingReceiptTicketId($contract) : $this->contractEndingRetentionTicketId($contract);
-    if ($id === '') $this->jsonFail('No hay un caso asociado a este ciclo del contrato.');
-    $table = $this->db->table('jet_cct_tickets');
-    $ticket = $this->db->getRow("SELECT * FROM `{$table}` WHERE `id_contrato` = ? AND `id_ticket` = ? LIMIT 1", [(string) $contract['_ID'], $id]);
+    $ticketPk = (int) ($_POST['ticket_pk'] ?? 0);
+    if ($ticketPk > 0 && (string) ($_POST['kind'] ?? '') === 'retention') {
+      // The response form can open a closed retention, always scoped to this contract cycle.
+      $ticket = $this->contractEndingRetentionTicket($contract, false, $ticketPk);
+    } else {
+      $id = (string) ($_POST['kind'] ?? '') === 'receipt' ? $this->contractEndingReceiptTicketId($contract) : $this->contractEndingRetentionTicketId($contract);
+      if ($id === '') $this->jsonFail('No hay un caso asociado a este ciclo del contrato.');
+      $table = $this->db->table('jet_cct_tickets');
+      $ticket = $this->db->getRow("SELECT * FROM `{$table}` WHERE `id_contrato` = ? AND `id_ticket` = ? LIMIT 1", [(string) $contract['_ID'], $id]);
+    }
     if (!$ticket) $this->jsonFail('No se encontró el caso asociado.');
     $this->jsonOk(['case' => $this->adminDueNativeTicketCasePayload((int) $ticket['_ID'], $this->adminDueStatusBucket($ticket))]);
   }
@@ -5033,7 +5039,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** Only an open case blocks a new retention in the same contract cycle. */
-  private function contractEndingRetentionTicket(array $contract, bool $activeOnly = true): array
+  private function contractEndingRetentionTicket(array $contract, bool $activeOnly = true, int $ticketPk = 0): array
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     if (!$this->table_exists($ticketsTable) || !$this->column_exists($ticketsTable, 'id_contrato')) {
@@ -5051,8 +5057,8 @@ trait HandlesTicketWorkflowActions
       }
     }
     $rows = $this->db->getResults(
-      "SELECT * FROM `{$ticketsTable}` WHERE TRIM(COALESCE(`id_contrato`, '')) IN (" . implode(', ', array_fill(0, count($contractRefs), '?')) . "){$topicSql}{$statusSql}" . ($this->column_exists($ticketsTable, 'fecha_terminacion_contrato') ? " AND `fecha_terminacion_contrato` = ?" : '') . " ORDER BY CAST(COALESCE(`_ID`, 0) AS UNSIGNED) DESC LIMIT 1" . ($this->db->pdo()->inTransaction() ? " FOR UPDATE" : ""),
-      $this->column_exists($ticketsTable, 'fecha_terminacion_contrato') ? array_merge($contractRefs, [(string) ($contract['fin_contrato'] ?? '')]) : $contractRefs
+      "SELECT * FROM `{$ticketsTable}` WHERE TRIM(COALESCE(`id_contrato`, '')) IN (" . implode(', ', array_fill(0, count($contractRefs), '?')) . "){$topicSql}{$statusSql}" . ($this->column_exists($ticketsTable, 'fecha_terminacion_contrato') ? " AND `fecha_terminacion_contrato` = ?" : '') . ($ticketPk > 0 ? ' AND `_ID` = ?' : '') . " ORDER BY CAST(COALESCE(`_ID`, 0) AS UNSIGNED) DESC LIMIT 1" . ($this->db->pdo()->inTransaction() ? " FOR UPDATE" : ""),
+      array_merge($contractRefs, $this->column_exists($ticketsTable, 'fecha_terminacion_contrato') ? [(string) ($contract['fin_contrato'] ?? '')] : [], $ticketPk > 0 ? [$ticketPk] : [])
     );
     if (!is_array($rows) || $rows === [] || !is_array($rows[0])) {
       return [];

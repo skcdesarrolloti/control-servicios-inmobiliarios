@@ -9,6 +9,7 @@ const { execFileSync } = require('node:child_process');
 const rootDir = path.join(__dirname, '..');
 const runtime = fs.readFileSync(path.join(rootDir, 'public/assets/js/admin-dashboard-runtime.js'), 'utf8');
 const functions = runtime.slice(runtime.indexOf('    function contractTerminationEmpty('), runtime.indexOf('    function contractsEndingEmployeeOptions('));
+const caseBridge = runtime.slice(runtime.indexOf('    function dashboardDueCaseAttrMap('), runtime.indexOf('    function openDashboardRelatedTickets(')) + runtime.slice(runtime.indexOf('    function dashboardDueCaseSourceHtml('), runtime.indexOf('    function dashboardOpenDueCase('));
 const markup = execFileSync('php', ['-r', String.raw`
 function esc_html($s) { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 function esc_attr($s) { return esc_html($s); }
@@ -40,13 +41,24 @@ eval('?>' . substr($source, $start, $end - $start));
       var actionContractRequestDelete = 'request-delete', nextDeleteError = false;
       var actionContractRequestReopen = 'request-reopen', nextReopenError = false, answeredFixture = null, listRequests = [];
       var requests = [], messages = [];
+      var actions = {contracts_ending_case:'retention-case'}, nativeCases = [], nextCaseError = false;
+      var nativeModal = document.createElement('div'); nativeModal.id = 'scm-case-modal'; nativeModal.className = 'scm-case-modal'; nativeModal.setAttribute('aria-hidden','true'); root.appendChild(nativeModal);
+      window.scmOpenCase = function(button) { nativeCases.push({pk:button.getAttribute('data-ticket-pk'),id:button.getAttribute('data-ticket'),source:button.closest('.scm-ticket-card').querySelector('.scm-case-source').innerHTML}); nativeModal.classList.add('open'); nativeModal.setAttribute('aria-hidden','false'); };
+      function closeNativeCase() { nativeModal.classList.remove('open'); nativeModal.setAttribute('aria-hidden','true'); nativeModal.dispatchEvent(new CustomEvent('scm:case-modal-closed',{bubbles:true})); }
       var contractsEndingRefreshes = 0;
       function loadContractsEnding(force) { if (force) contractsEndingRefreshes++; return Promise.resolve(); }
       function escHtml(value) { var el = document.createElement('div'); el.textContent = String(value == null ? '' : value); return el.innerHTML.replace(/"/g, '&quot;'); }
       function formatDashboardCount(n) { return String(n); }
       function dashboardDueCaseAttrsHtml() { return ' data-ticket-pk="41"'; }
       function showToast(kind, text) { messages.push({kind,text}); }
-      function dashboardAction(action, payload) { listRequests.push({action,payload}); return Promise.resolve(payload && payload.view === 'answered' ? answeredFixture : fixture); }
+      function dashboardAction(action, payload) {
+        listRequests.push({action,payload});
+        if (action === 'retention-case') {
+          if (nextCaseError) { nextCaseError=false; return Promise.reject(new Error('Fallo simulado al cargar caso')); }
+          return Promise.resolve({case:{ticket_pk:payload.ticket_pk,ticket:'10900',asunto:'Retención de contrato',case_source_html:'<p>Detalle nativo e historial del caso #10900</p>'}});
+        }
+        return Promise.resolve(payload && payload.view === 'answered' ? answeredFixture : fixture);
+      }
       function dashboardFormAction(action, fill) {
         var fd = new FormData(); fill(fd); requests.push({action,data:Array.from(fd.entries())});
         if (nextDeleteError && action === 'request-delete') { nextDeleteError = false; return Promise.reject(new Error('Fallo simulado al eliminar')); }
@@ -56,7 +68,7 @@ eval('?>' . substr($source, $start, $end - $start));
       }
       var base = {solicitud_id:'41',ticket_pk:'41',id_ticket:'10863',titulo:'Caso #10863',asunto:'Solicitud de terminación de contrato de arrendamiento',creado:'05/10/2026 08:54',contrato:'2000',inmueble:'204578',direccion:'Urbanización Simón Bolívar manzana 20 lote 7',solicitante:'ARRENDATARIO DE EJEMPLO',estado:'Nuevo',estado_administrativo:'Nuevo',estado_solicitud:'Pendiente',fecha_solicitud:'2026-10-05',fin_contrato:'2027-01-09',fin_contrato_label:'09/01/2027',fecha_limite_label:'09/10/2026',term_status:'dentro',term_label:'Dentro de término',term_hint:'Solicitud recibida antes o el 09/10/2026.',case:{case_source_html:'<p>Detalle del caso</p>'},retention_ticket:{enabled:true,default_employee_id:'13',funcionarios:[{id:'13',name:'Funcionario de Ejemplo',cargo:'Asistente de Desarrollo TI'}],assignment_help:[{label:'Contrato',value:'#2000'},{label:'Contrato de',value:'Arrendatario: CLIENTE / Propietario: PROPIETARIO'},{label:'Inmueble',value:'Inmueble 204578 · Urbanización Simón Bolívar'},{label:'Funcionario relacionado',value:'Funcionario de Ejemplo · Asistente de Desarrollo TI'},{label:'Sugerido para asignar',value:'Funcionario de Ejemplo · Asistente de Desarrollo TI'}]},recipients:[{value:'arrendatario',label:'Arrendatario',name:'CLIENTE',email:'cliente@example.invalid',phone:'3001112233',available:true},{value:'propietario',label:'Propietario',name:'PROPIETARIO',email:'propietario@example.invalid',available:true},{value:'admin',label:'Funcionario configurado',name:'Funcionario',available:false}]};
       var fixture = {generated_at:'05/10/2026 11:03',count:3,items:[base,Object.assign({},base,{solicitud_id:'42',ticket_pk:'42',titulo:'Caso #10864',id_ticket:'10864',contrato:'2001',term_status:'fuera',term_label:'Fuera de término'}),Object.assign({},base,{solicitud_id:'43',ticket_pk:'43',titulo:'Caso #10865',id_ticket:'10865',term_status:'unknown',term_label:'Sin cálculo de término',asunto:'<img src=x onerror=alert(1)>',solicitante:'=1+1'})]};
-    ` + functions });
+    ` + caseBridge + functions });
     await page.evaluate(() => { fixture.can_delete = true; renderContractTermination(fixture); renderContractNonRenewal(fixture); document.querySelector('#scm-home-calendar-section-contract-non-renewal').style.display='none'; });
     const termination = page.locator('[data-scm-contract-termination-panel]');
     assert.equal(await termination.locator('.scm-contract-card').count(),3);
@@ -154,7 +166,7 @@ eval('?>' . substr($source, $start, $end - $start));
       for (const active of [true,false]) {
         await page.evaluate(({kind,active}) => {
           const rows = kind === 'termination' ? contractTerminationRowsByPk : contractNonRenewalRowsByPk;
-          rows['41'].retention_ticket = Object.assign({},base.retention_ticket,{existing_case:{id:'10900',active,status:active?'En proceso':'Cerrado',administrative_status:active?'Nuevo':'Finalizado',employee:'Consultor de ejemplo',subject:'Retención <img src=x onerror=alert(1)>',description:'Gestión comercial pendiente.\n'+'detalle'.repeat(60)}});
+          rows['41'].retention_ticket = Object.assign({},base.retention_ticket,{existing_case:{id:'10900',ticket_pk:'764',contract_pk:'213',active,status:active?'En proceso':'Cerrado',administrative_status:active?'Nuevo':'Finalizado',employee:'Consultor de ejemplo'}});
         },{kind,active});
         await page.evaluate(kind => kind === 'termination' ? openContractTerminationResponse('41') : openContractNonRenewalResponse('41'),kind);
         const popup = page.locator('.scm-contract-response-swal');
@@ -165,10 +177,31 @@ eval('?>' . substr($source, $start, $end - $start));
         assert.equal(await popup.locator('[name="crear_ticket_retencion"]').isDisabled(),active);
         assert.equal(await popup.locator('[name="crear_ticket_retencion"]').isChecked(),!active);
         await popup.locator('[name="termino"]').selectOption('dentro');
-        await existing.locator('summary').click();
-        assert.equal(await existing.locator('img').count(),0,'existing case data stays escaped');
-        assert((await existing.innerText()).includes('Gestión comercial pendiente.'));
-        assert.equal(await popup.locator('[name="termino"]').inputValue(),'dentro','viewing existing case preserves response fields');
+        await popup.locator('[name="fecha_terminacion"]').fill('2027-02-10');
+        await popup.locator('[name="notify_recipients[]"][value="none"]').check();
+        if (!active) await popup.locator('[name="crear_ticket_retencion"]').uncheck();
+        const formState = await popup.locator('form').evaluate(form=>Array.from(form.elements).filter(el=>el.name).map(el=>({name:el.name,value:el.value,checked:el.checked,disabled:el.disabled})));
+        await page.evaluate(() => nextCaseError=true);
+        await existing.locator('[data-contract-retention-open]').click();
+        await page.waitForFunction(() => messages.at(-1).text.includes('Fallo simulado al cargar caso'));
+        assert(await popup.isVisible(),'case loading failure keeps response popup open');
+        const submitsBefore = await page.evaluate(() => requests.length);
+        await existing.locator('[data-contract-retention-open]').click();
+        await page.waitForSelector('#scm-case-modal.open');
+        assert.equal(await page.evaluate(() => Swal.isVisible()),false,'native case replaces response popup');
+        assert.equal(await page.evaluate(() => requests.length),submitsBefore,'opening a case never submits the response');
+        const opened = await page.evaluate(() => nativeCases.at(-1));
+        assert.equal(opened.pk,'764','popup uses internal PK, not displayed case number');
+        assert.equal(opened.id,'10900');
+        assert(opened.source.includes('historial del caso #10900'),'native bridge receives complete case source');
+        const apiCall = await page.evaluate(() => listRequests.at(-1));
+        assert.deepEqual(apiCall.payload,{contract_pk:'213',ticket_pk:'764',kind:'retention'});
+        await page.evaluate(() => closeNativeCase());
+        await popup.waitFor();
+        const restoredState = await popup.locator('form').evaluate(form=>Array.from(form.elements).filter(el=>el.name).map(el=>({name:el.name,value:el.value,checked:el.checked,disabled:el.disabled})));
+        assert.deepEqual(restoredState,formState,'closing case restores classification, dates, retention and notification selections');
+        assert.equal(await popup.locator('details').count(),0,'case button no longer expands plain text');
+        await page.waitForTimeout(350);
         await page.screenshot({path:path.join(qaDir,kind+'-retention-'+(active?'open':'closed')+'.png')});
         await page.setViewportSize({width:390,height:844});
         assert(await popup.evaluate(el=>el.scrollWidth<=el.clientWidth),'existing retention details fit mobile');
@@ -179,6 +212,7 @@ eval('?>' . substr($source, $start, $end - $start));
           const posted = await page.evaluate(() => Object.fromEntries(requests.at(-1).data));
           assert.equal(posted.crear_ticket_retencion,'0','response succeeds without duplicating active retention');
         } else {
+          await popup.locator('[name="crear_ticket_retencion"]').check();
           assert(await popup.locator('[name="retencion_id_empleado"]').isEnabled(),'closed case allows assignment for new retention');
           await popup.locator('.swal2-cancel').click();
           await page.waitForFunction(() => !Swal.isVisible());

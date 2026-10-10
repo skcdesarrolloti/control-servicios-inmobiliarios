@@ -76,6 +76,7 @@ final class RenewalResult extends RuntimeException { public function __construct
 final class RenewalProbe {
   use \SCM\App\Concerns\HandlesTicketWorkflowActions;
   public bool $writable = true;
+  public bool $readable = true;
   public bool $failResponse = false;
   public array $spreadsheetRows = [];
   public function __construct(public \SCM\Core\Database $db) {}
@@ -94,7 +95,8 @@ final class RenewalProbe {
   public function preview($file) { return $this->contractsEndingImportPreview($file); }
   private function contractsEndingImportSpreadsheetRows(string $path, string $name): array { return $this->spreadsheetRows; }
   private function verifyCsrf() {}
-  private function canAccessDashboardTab($tab) { return $tab === 'contractual' || $this->writable; }
+  private function canAccessDashboardTab($tab) { return $this->readable && ($tab === 'contractual' || $this->writable); }
+  private function adminDueNativeTicketCasePayload(int $pk, string $bucket): array { return ['ticket_pk'=>(string)$pk,'status_bucket'=>$bucket,'case_source_html'=>'<p>Native case fixture</p>']; }
   private function canUseDashboardAction($action) { return $this->writable; }
   private function jsonFail($message) { throw new RenewalResult(false, ['message' => $message]); }
   private function jsonOk($data) { throw new RenewalResult(true, $data); }
@@ -329,6 +331,21 @@ try {
     $db->update('wp_jet_cct_tickets',['estado'=>' Cerrado ','estado_administrativo'=>'Nuevo'],['_ID'=>(int)$result['ticket_id']]);
     $ui=$probe->retentionUi($request);
     check($ui['enabled'] && !$ui['existing_case']['active'] && $ui['existing_case']['id']===(string)$newerId, $source . ': closed retention remains visible and enables another case');
+    check($ui['existing_case']['ticket_pk']===(string)$newerId && $ui['existing_case']['contract_pk']===(string)$contractPk, $source . ': popup carries internal case and contract IDs');
+    $_POST=['contract_pk'=>(string)$contractPk,'kind'=>'retention','ticket_pk'=>$newerId];
+    $popup=callEndpoint(fn()=>$probe->ajax_handler_contracts_ending_case());
+    check($popup->ok && $popup->data['case']['ticket_pk']===(string)$newerId, $source . ': exact closed case opens in native popup');
+    $_POST['contract_pk']='193';
+    check(!callEndpoint(fn()=>$probe->ajax_handler_contracts_ending_case())->ok, $source . ': cannot open a case from another contract');
+    $_POST['contract_pk']=(string)$contractPk;
+    $db->update('wp_jet_cct_tickets',['fecha_terminacion_contrato'=>$end-86400],['_ID'=>$newerId]);
+    check(!callEndpoint(fn()=>$probe->ajax_handler_contracts_ending_case())->ok, $source . ': cannot open a case from another date cycle');
+    $db->update('wp_jet_cct_tickets',['fecha_terminacion_contrato'=>$end,'tema_ayuda'=>'Otro tema'],['_ID'=>$newerId]);
+    check(!callEndpoint(fn()=>$probe->ajax_handler_contracts_ending_case())->ok, $source . ': cannot open an unrelated topic as retention');
+    $db->update('wp_jet_cct_tickets',['tema_ayuda'=>'Retencion de contrato'],['_ID'=>$newerId]);
+    $probe->readable=false; $probe->writable=false;
+    check(!callEndpoint(fn()=>$probe->ajax_handler_contracts_ending_case())->ok, $source . ': case popup requires panel permission');
+    $probe->readable=true; $probe->writable=true;
     $replacement=$probe->createRequestRetention($request,$source);
     check($replacement['ok']==='1' && $replacement['ticket_id']!==$result['ticket_id'], $source . ': allow new retention after closed case in same cycle');
     $db->update('wp_jet_cct_tickets',['estado'=>'En proceso','estado_administrativo'=>' Finalizado '],['_ID'=>(int)$replacement['ticket_id']]);
