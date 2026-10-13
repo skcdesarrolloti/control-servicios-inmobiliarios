@@ -1963,6 +1963,7 @@ trait HandlesMaintenanceActions
       'dedupe_key' => 'cotizacion-mantenimiento-' . $mode . ':' . $quoteId,
       'meta' => [
         'event' => 'cotizacion_mantenimiento_guardada',
+        'notification_actor_email' => trim((string) ($actor['email'] ?? $quoteData['email_creador'] ?? '')),
         'mode' => $mode,
         'id_cotizacion' => $quoteId,
         'id_ticket' => $ticket,
@@ -4332,6 +4333,7 @@ trait HandlesMaintenanceActions
       'dedupe_key' => 'orden-mantenimiento-respuesta:' . $orderId . ':' . strtolower($estado) . ':' . (string) ($order['cct_modified'] ?? ''),
       'meta' => [
         'event' => 'respuesta_orden_mantenimiento',
+        'notification_actor_email' => (string) ($creatorRecipient['email'] ?? ''),
         'id_orden' => $orderId,
         'id_cotizacion' => trim((string) ($order['id_cotizacion'] ?? '')),
         'id_ticket' => $ticket,

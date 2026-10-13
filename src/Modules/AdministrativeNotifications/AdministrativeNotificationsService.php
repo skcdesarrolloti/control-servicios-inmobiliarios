@@ -4778,6 +4778,7 @@ final class AdministrativeNotificationsService
     ];
 
     try {
+      $data = \SCM\Support\NotificationActorCopy::apply($this->db, $data);
       $filtered = $this->schema->filterTableData(self::QUEUE_TABLE, $data);
       return $filtered !== [] && $this->db->insert(self::QUEUE_TABLE, $filtered);
     } catch (\Throwable) {

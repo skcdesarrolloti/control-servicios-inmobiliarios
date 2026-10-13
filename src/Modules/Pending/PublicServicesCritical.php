@@ -340,7 +340,8 @@ final class PublicServicesCritical
     $bridge=$this->notificationBridge;$queue=$bridge?->queue();if(!$queue)throw new \RuntimeException('La cola compartida no está disponible.');
     $existing=$this->db->getVar('SELECT id FROM `'.$bridge->queueTable().'` WHERE project_code=? AND dedupe_key=? LIMIT 1',[$bridge->projectCode(),$job['dedupe_key']]);
     if($existing)return ['queue_id'=>(int)$existing,'replayed'=>true];
-    $options=['project_code'=>$bridge->projectCode(),'source_module'=>'public-services-critical','dedupe_key'=>$job['dedupe_key'],'destination_name'=>$p['destination_name'],'priority'=>1,'max_attempts'=>5,'meta'=>['review_id'=>(int)$job['review_id'],'critical_job_id'=>(int)$job['id'],'workflow'=>self::WORKFLOW,'ticket_id'=>(int)($this->case((int)$job['review_id'])['ticket_id']??0)]];
+    $case=$this->case((int)$job['review_id']);$data=json_decode($case['payload_json'],true);
+    $options=['project_code'=>$bridge->projectCode(),'source_module'=>'public-services-critical','dedupe_key'=>$job['dedupe_key'],'destination_name'=>$p['destination_name'],'priority'=>1,'max_attempts'=>5,'meta'=>['review_id'=>(int)$job['review_id'],'critical_job_id'=>(int)$job['id'],'workflow'=>self::WORKFLOW,'ticket_id'=>(int)($case['ticket_id']??0),'notification_actor_employee_id'=>(string)($data['employee']['id_empleado']??'')]];
     if($job['kind']==='email'){
       $attachments=[];foreach($p['documents'] as $d)if(!empty($d['path']))$attachments[]=['path'=>$d['path'],'name'=>$d['filename']??$d['attachment_name']??basename($d['path'])];
       $options['payload']=['attachments'=>$attachments];
@@ -349,7 +350,6 @@ final class PublicServicesCritical
     }
     $cfg=$this->config();$template=$cfg['whatsapp_template'];
     if(!$cfg['whatsapp_enabled']||!$template)throw new \RuntimeException('WhatsApp pendiente: configura y activa las plantillas aprobadas por Meta en Plantillas de actas.');
-    $case=$this->case((int)$job['review_id']);$data=json_decode($case['payload_json'],true);
     $buttonBase=(string)$cfg['button_base'];
     if(!str_starts_with($p['url'],$buttonBase))throw new \RuntimeException('La base del botón de Meta no coincide con el enlace público.');
     $values=[$p['destination_name'],(string)$data['contract']['contrato'],mb_substr($p['body'],0,900),date('d/m/Y H:i',(int)$case['deadline_at']).' Colombia',$data['employee']['nombre']];

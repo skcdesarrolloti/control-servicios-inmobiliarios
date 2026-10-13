@@ -10399,6 +10399,8 @@
         fd.append("action", actionInternalNotificationsSave);
         fd.append("nonce", nonce);
         fd.append("settings", JSON.stringify(collectSettings()));
+        var actorCopy = form.querySelector('[name="email_actor_cc_enabled"]');
+        if (actorCopy) fd.append('email_actor_cc_enabled', actorCopy.checked ? '1' : '0');
         var receiptScope = form.querySelector('[data-receipt-automation]');
         if (receiptScope) fd.append('receipt_automation', JSON.stringify({
           enabled: receiptScope.querySelector('[name="receipt_enabled"]').checked,

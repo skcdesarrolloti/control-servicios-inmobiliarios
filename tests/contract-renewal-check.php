@@ -2,29 +2,50 @@
 declare(strict_types=1);
 
 // SQLite fixtures plus a transactional queue double: no production DB or transport.
+namespace SharedNotifications\Contracts {
+  require_once (getenv('SHARED_NOTIFICATIONS_PATH') ?: dirname(__DIR__, 2) . '/shared-notifications') . '/src/Contracts/StorageAdapterInterface.php';
+}
 namespace SharedNotifications\Config {
   class QueueConfig { public function __construct(...$args) {} public function queueTable() { return 'test_jobs'; } }
 }
 namespace SharedNotifications\Storage {
-  class PdoStorageAdapter { public function __construct(public \PDO $pdo) {} }
+  class PdoStorageAdapter implements \SharedNotifications\Contracts\StorageAdapterInterface {
+    public function __construct(public \PDO $pdo) {}
+    public function ensureSchema(string $queueTable, string $attemptsTable): void { if ($this->pdo->inTransaction()) throw new \RuntimeException('Queue initialization must not execute DDL inside a business transaction'); }
+    public function insert(string $table, array $data): int {
+      $data['payload'] = json_decode($data['payload_json'] ?? '[]', true);
+      $data['meta'] = json_decode($data['meta_json'] ?? '[]', true);
+      $stmt = $this->pdo->prepare('INSERT INTO test_jobs(dedupe_key,status,payload) VALUES (?, ?, ?)');
+      $stmt->execute([$data['dedupe_key'], 'pending', json_encode($data)]);
+      return (int) $this->pdo->lastInsertId();
+    }
+    public function fetchPending(string $table, int $limit, ?string $projectCode = null): array { return []; }
+    public function fetchPendingFair(string $table, int $limit, ?string $projectCode = null, int $perProjectLimit = 5): array { return []; }
+    public function claim(string $table, int $id, int $attempts, string $workerId, string $now): bool { return false; }
+    public function releaseStaleProcessing(string $table, string $now, int $staleMinutes = 15): int { return 0; }
+    public function cancelByDedupeKey(string $table, string $dedupeKey, string $now, string $reason): int {
+      $stmt = $this->pdo->prepare("UPDATE test_jobs SET status='cancelled' WHERE dedupe_key=? AND status='pending'");
+      $stmt->execute([$dedupeKey]); return $stmt->rowCount();
+    }
+    public function updateById(string $table, int $id, array $data): void {}
+  }
 }
 namespace SharedNotifications {
   class NotificationQueue {
     public static int $constructions = 0;
     public static bool $failEnqueue = false;
     public function __construct(private $storage, $config) {
-      if ($storage->pdo->inTransaction()) throw new \RuntimeException('Queue initialization must not execute DDL inside a business transaction');
+      $storage->ensureSchema('test_jobs', 'test_attempts');
       self::$constructions++;
     }
     public function enqueue(array $job): int {
       if (self::$failEnqueue) throw new \RuntimeException('Synthetic queue failure');
-      $stmt = $this->storage->pdo->prepare('INSERT INTO test_jobs(dedupe_key,status,payload) VALUES (?, ?, ?)');
-      $stmt->execute([$job['dedupe_key'], 'pending', json_encode($job)]);
-      return (int) $this->storage->pdo->lastInsertId();
+      $job['payload_json'] = json_encode($job['payload'] ?? []);
+      $job['meta_json'] = json_encode($job['meta'] ?? []);
+      return $this->storage->insert('test_jobs', $job);
     }
     public function cancelByDedupeKey(string $key, string $reason = ''): int {
-      $stmt = $this->storage->pdo->prepare("UPDATE test_jobs SET status='cancelled' WHERE dedupe_key=? AND status='pending'");
-      $stmt->execute([$key]); return $stmt->rowCount();
+      return $this->storage->cancelByDedupeKey('test_jobs', $key, '', $reason);
     }
   }
 }

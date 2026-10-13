@@ -412,6 +412,10 @@ trait HandlesTicketWorkflowActions
     } else {
       $settings = $incomingSettings;
     }
+    $actorCopy = $_POST['email_actor_cc_enabled'] ?? null;
+    if ($actorCopy !== null && (!is_string($actorCopy) || !in_array($actorCopy, ['0', '1'], true))) {
+      $this->jsonFail('La configuración de copia al funcionario no es válida.'); return;
+    }
     $automation = null;
     if (array_key_exists('receipt_automation', $_POST)) {
       try {
@@ -425,6 +429,7 @@ trait HandlesTicketWorkflowActions
     $pdo->beginTransaction();
     try {
       if ($automation !== null) \SCM\Core\App::settings()->set(\SCM\Modules\Contracts\ContractReceiptSettings::KEY, $automation, (int) Auth::employeeId());
+      if ($actorCopy !== null) \SCM\Core\App::settings()->set(\SCM\Support\NotificationActorCopy::SETTING, $actorCopy === '1', (int) Auth::employeeId());
       \SCM\Core\App::settings()->set('internal_admin_notifications', $settings, (int) Auth::employeeId());
       $pdo->commit();
     } catch (\Throwable $exception) {

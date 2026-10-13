@@ -2021,6 +2021,11 @@ trait RendersDashboard
           <p>Selecciona los funcionarios que reciben avisos por cada acci&oacute;n del panel. Cada evento indica sus canales; terminaci&oacute;n y no pr&oacute;rroga permiten elegir correo y WhatsApp al responder.</p>
         </div>
         <form id="scm-internal-notifications-form" class="scm-internal-notifications-form" autocomplete="off">
+          <section class="scm-pqr-settings-section scm-actor-copy-settings">
+            <h4>Copia al funcionario que realiza la acción</h4>
+            <label><input type="checkbox" name="email_actor_cc_enabled" <?php echo (new \SCM\Support\NotificationActorCopy($this->db))->enabled() ? 'checked' : ''; ?>> Agregar al funcionario en CC de los correos de la aplicación</label>
+            <p>Usa el correo registrado del funcionario activo. Si ya es destinatario del correo, no se repite en CC. Los procesos automáticos usan al funcionario que originó la gestión cuando está identificado. Los códigos de firma se envían exclusivamente al firmante.</p>
+          </section>
           <div class="scm-config-info-strip"><strong>Acciones y destinatarios internos:</strong> Selecciona uno o varios funcionarios por acci&oacute;n. Si una acci&oacute;n queda vac&iacute;a, no se env&iacute;an avisos internos para esa actividad.</div>
           <section class="scm-pqr-settings-section" data-receipt-automation>
             <h4>Recibos automáticos de contratos · cron</h4>

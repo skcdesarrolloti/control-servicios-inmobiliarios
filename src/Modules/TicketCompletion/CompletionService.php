@@ -1131,7 +1131,7 @@ final class CompletionService
               'signer_name' => $payload['signer']['name'], 'contract' => $payload['contract'],
               'property' => $payload['property'] ?? '', 'act_url' => $url,
               'dedupe_key' => 'ticket-acta:' . $act['id'] . ':acta_firmada:' . $act['signed_at'] . ':' . $channel . ':' . $act['token_nonce'],
-              'meta' => ['event' => 'acta_firmada', 'ticket_pk' => (int) $act['ticket_pk'], 'act_id' => (int) $act['id']],
+              'meta' => ['event' => 'acta_firmada', 'ticket_pk' => (int) $act['ticket_pk'], 'act_id' => (int) $act['id'], 'notification_actor_employee_id' => $this->notificationActorId($act, $payload)],
             ]);
             $result = is_array($result) ? $result : ['queued' => $result > 0, 'sent' => false];
           } catch (\Throwable) { $result = ['queued' => false, 'sent' => false]; }
@@ -1215,12 +1215,23 @@ final class CompletionService
         'ticket_number' => $payload['ticket_number'], 'act_url' => $actUrl,
         'priority' => $event === 'signature_otp' ? 200 : 100,
         'dedupe_key' => 'ticket-acta:' . $act['id'] . ':' . $event . ':' . $channel . ':' . $key,
-        'meta' => ['ticket_pk' => (int) $act['ticket_pk'], 'act_id' => (int) $act['id'], 'event' => $event],
+        'meta' => ['ticket_pk' => (int) $act['ticket_pk'], 'act_id' => (int) $act['id'], 'event' => $event, 'notification_actor_employee_id' => $event === 'signature_otp' ? '' : $this->notificationActorId($act, $payload)],
       ]);
       return is_array($result) ? $result : ['queued' => $result > 0, 'sent' => false, 'status' => $result > 0 ? 'pending' : 'unavailable'];
     } catch (\Throwable) {
       error_log('[ticket-completion] No se pudo encolar ' . $event . ' por ' . $channel . ' del acta #' . $act['id']);
       return ['queued' => false, 'sent' => false, 'status' => 'unavailable'];
+    }
+  }
+
+  private function notificationActorId(array $act, array $payload): string
+  {
+    try {
+      if (\SCM\Core\Auth::isLoggedIn()) return \SCM\Core\Auth::employeeId();
+      return (string) ($this->originalCreator($act, $payload)['employee_id'] ?? '');
+    } catch (\Throwable) {
+      error_log('[notification-actor-cc] No se pudo identificar al funcionario del acta #' . (int) ($act['id'] ?? 0));
+      return '';
     }
   }
 

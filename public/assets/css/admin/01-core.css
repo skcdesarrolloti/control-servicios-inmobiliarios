@@ -278,6 +278,24 @@
   padding: 20px 26px 24px;
 }
 
+#scm-app .scm-actor-copy-settings {
+  flex: 0 0 auto;
+}
+
+#scm-app .scm-actor-copy-settings label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #061d49;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+#scm-app .scm-actor-copy-settings input {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
 #scm-app .scm-pqr-settings-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

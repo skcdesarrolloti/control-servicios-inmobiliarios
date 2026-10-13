@@ -134,7 +134,7 @@ final class ContractRenewalService
           'subject' => 'Recordatorio de no salida · Contrato ' . (string) ($contract['contrato'] ?? $id),
           'message_html' => $html, 'message_text' => strip_tags($html),
           'scheduled_at' => date(DATE_ATOM, $scheduled), 'dedupe_key' => $key,
-          'meta' => ['contract_id' => $id, 'end_ts' => $endTs, 'revision' => $revision], 'created_by' => $actor,
+          'meta' => ['contract_id' => $id, 'end_ts' => $endTs, 'revision' => $revision, 'notification_actor_employee_id' => $actor], 'created_by' => $actor,
         ]);
         $jobs[] = $key;
       }

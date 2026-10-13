@@ -54,6 +54,7 @@ trait NotificationDeliveryConcern
     $dedupe = 'cotizacion-respuesta:' . $cotId . ':' . $estado . ':' . (string) ($cotizacion['fecha_respuesta'] ?? '');
     $meta = [
       'event' => 'respuesta_cotizacion_mantenimiento',
+      'notification_actor_email' => trim((string) ($cotizacion['email_creador'] ?? '')),
       'id_cotizacion' => $cotId,
       'id_ticket' => $logicalTicket,
       'estado' => $estado,
