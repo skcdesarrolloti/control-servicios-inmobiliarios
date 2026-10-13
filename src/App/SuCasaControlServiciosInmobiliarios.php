@@ -104,6 +104,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_COLLECTION_PORTFOLIO_PDF = 'scm_collection_portfolio_pdf';
   const AJAX_COLLECTION_PORTFOLIO_TIMELINE = 'scm_collection_portfolio_timeline';
   const AJAX_INTERNAL_NOTIFICATIONS_SAVE = 'scm_internal_notifications_save';
+  const AJAX_INTERNAL_EVENTS_SYNC = 'scm_internal_events_sync';
   const AJAX_PUBLIC_PQR_SETTINGS_READ = 'scm_public_pqr_settings_read';
   const AJAX_INTERNAL_NOTIFICATIONS_READ = 'scm_internal_notifications_read';
   const AJAX_METRICS_EXECUTION = 'scm_metricas_ejecucion_funcionario';
@@ -353,18 +354,18 @@ final class SuCasaControlServiciosInmobiliarios
           ],
           'nota_ticket' => [
             'label' => 'Agregar nota',
-            'description' => 'Cuando se deja una nota interna en el caso.',
-            'channel' => 'Pendiente de conexión',
+            'description' => 'Cuando se guarda una nota. Solo avisa a los funcionarios seleccionados; no se comparte con clientes.',
+            'channel' => 'Email interno en cola',
           ],
           'trasladar_caso' => [
             'label' => 'Trasladar caso',
-            'description' => 'Cuando el caso se traslada a otro responsable o área.',
-            'channel' => 'Pendiente de conexión',
+            'description' => 'Copias del traslado al seleccionar notificar a administración. Usa estos destinatarios y no los avisos generales.',
+            'channel' => 'Email interno en cola',
           ],
           'postergar_ticket' => [
             'label' => 'Postergar caso',
-            'description' => 'Cuando el caso queda postergado.',
-            'channel' => 'Pendiente de conexión',
+            'description' => 'Copias al postergar un caso y seleccionar notificar a administración.',
+            'channel' => 'Email interno en cola',
           ],
           'gestion_caso_admin' => [
             'label' => 'Avisos administrativos generales',
@@ -378,13 +379,13 @@ final class SuCasaControlServiciosInmobiliarios
         'items' => [
           'agendar_cita' => [
             'label' => 'Agendar cita',
-            'description' => 'Cuando se agenda una cita del caso.',
-            'channel' => 'Pendiente de conexión',
+            'description' => 'Aviso interno al guardar una cita vinculada al historial de un caso. Se sincroniza desde el calendario y el cron del panel.',
+            'channel' => 'Email interno en cola',
           ],
           'cita_realizada' => [
             'label' => 'Cita realizada',
-            'description' => 'Cuando una cita queda marcada como realizada.',
-            'channel' => 'Pendiente de conexión',
+            'description' => 'Aviso interno al confirmar como realizada una cita del caso. Se sincroniza desde el calendario y el cron del panel.',
+            'channel' => 'Email interno en cola',
           ],
         ],
       ],
@@ -499,13 +500,13 @@ final class SuCasaControlServiciosInmobiliarios
           ],
           'comunicacion_no_acceso' => [
             'label' => 'Comunicación por no autorización',
-            'description' => 'Cuando se genera comunicación preventiva por falta de autorización o acceso.',
-            'channel' => 'Pendiente de conexión',
+            'description' => 'Recibe CC del correo con la comunicación por no acceso. Si no hay correo del arrendatario, el aviso es solo interno.',
+            'channel' => 'Email interno en cola',
           ],
           'acta_preventiva' => [
             'label' => 'Acta preventiva',
-            'description' => 'Cuando se genera o envía un acta de revisión preventiva.',
-            'channel' => 'Pendiente de conexión',
+            'description' => 'CC de los ofrecimientos al crear el caso y marcar administración; aviso interno al enviar la revisión preventiva realizada. Las revisiones externas se sincronizan por el panel y su cron.',
+            'channel' => 'Email interno en cola',
           ],
         ],
       ],

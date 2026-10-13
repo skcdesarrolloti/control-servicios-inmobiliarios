@@ -133,16 +133,16 @@ trait NotificationDeliveryConcern
     return $queued;
   }
 
-  private function notifySeguimiento(array $ticket, string $observacion, string $userName, array $notifyTargets = []): int
+  private function notifySeguimiento(array $ticket, string $observacion, string $userName, array $notifyTargets = [], string $action = 'seguimiento_ticket'): int
   {
     if (!$this->queue instanceof EmailQueue) {
       return 0;
     }
     $logicalTicket = $this->firstNonEmpty([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '']);
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
-    $subject = 'Nuevo seguimiento del caso #' . $logicalTicket;
+    $subject = ($action === 'postergar_ticket' ? 'Caso postergado #' : 'Nuevo seguimiento del caso #') . $logicalTicket;
     $sent = 0;
-    foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets, [], 'seguimiento_ticket') as $recipient) {
+    foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets, [], $action) as $recipient) {
       $html = EmailTemplate::renderNamed('nuevo_seguimiento', [
         'destinatario' => EmailTemplate::e($recipient['name'] !== '' ? $recipient['name'] : 'cliente'),
         'id_ticket' => EmailTemplate::e($logicalTicket),
@@ -152,7 +152,8 @@ trait NotificationDeliveryConcern
         'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver caso']]),
       ]);
       $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, [
-        'internal_cc' => $recipient['internal_cc']??[],
+        'internal_action' => $action, 'internal_cc' => $recipient['internal_cc']??[],
+        'source_module' => $action, 'meta' => ['event' => $action, 'id_ticket' => $logicalTicket],
       ]);
     }
     return $sent;
@@ -176,14 +177,18 @@ trait NotificationDeliveryConcern
       . '<p style="line-height:1.65;margin:10px 0;">Puedes consultarla desde el siguiente botón. No adjuntamos el archivo para evitar bloqueos o marcaciones de spam.</p>'
       . '<p style="line-height:1.65;margin:10px 0;">Cordialmente,<br><b>' . EmailTemplate::e($userName) . '</b></p>';
 
-    if ($this->queue instanceof EmailQueue && $tenantEmail !== '' && filter_var($tenantEmail, FILTER_VALIDATE_EMAIL)) {
+    if ($this->queue instanceof EmailQueue) {
       $html = EmailTemplate::render('Acta de revision preventiva', $content, [
         'buttons' => [
           ['url' => $noticeUrl, 'label' => 'Ver acta preventiva'],
           ['url' => $ticketUrl, 'label' => 'Ver caso'],
         ],
       ]);
-      $emailSent = $this->sendMailToUnique($tenantEmail, $subject, $html);
+      $emailSent = $this->queue->enqueue($tenantEmail, $subject, $html, [
+        'internal_action' => 'comunicacion_no_acceso', 'source_module' => 'comunicacion_no_acceso',
+        'dedupe_key' => 'preventiva-no-acceso:' . $logicalTicket . ':' . $attempt,
+        'meta' => ['event' => 'comunicacion_no_acceso', 'id_ticket' => $logicalTicket, 'attempt' => $attempt, 'notice_url' => $noticeUrl],
+      ]);
     }
 
     $tenantPhone = $this->firstNonEmpty([
@@ -418,14 +423,14 @@ trait NotificationDeliveryConcern
       $targets = ['solicitante', 'arrendatario', 'propietario', 'empleado', 'admin'];
     }
 
-    $excludeMap = array_fill_keys($exclude, true);
+    $excludeMap = array_fill_keys(array_map(static fn($value): string => strtolower(trim((string) $value)), $exclude), true);
     $recipients = [];
     $add = static function (string $role, string $name, string $email) use (&$recipients, $targets, $excludeMap): void {
       if (!in_array($role, $targets, true) || !empty($excludeMap[$role])) {
         return;
       }
       $email = trim($email);
-      if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      if ($email === '' || isset($excludeMap[strtolower($email)]) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         return;
       }
       $recipients[] = ['email' => $email, 'name' => trim($name), 'role' => $role];

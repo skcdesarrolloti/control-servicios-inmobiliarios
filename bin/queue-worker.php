@@ -29,6 +29,8 @@ if (!$lockFp || !flock($lockFp, LOCK_EX | LOCK_NB)) {
 }
 
 try {
+  try { (new \SCM\Support\InternalAdminExternalEvents($scmDb))->run(); }
+  catch (\Throwable $error) { error_log('[internal-admin-events] ' . $error->getMessage()); }
   // Preserve cancellation of obsolete reminders independently of receipt activation.
   $renewal = new \SCM\Modules\Contracts\ContractRenewalService($scmDb);
   $renewal->ensureSchema();

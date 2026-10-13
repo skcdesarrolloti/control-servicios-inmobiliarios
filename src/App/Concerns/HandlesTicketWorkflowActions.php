@@ -78,6 +78,19 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk(['html' => $this->renderDashboardPublicPqrSettingsModal()]);
   }
 
+  public function ajax_handler_internal_events_sync(): void
+  {
+    $this->verifyCsrf();
+    if (!Auth::isLoggedIn()) { $this->jsonFail('Inicia sesión para sincronizar los avisos internos.'); return; }
+    try {
+      $result = (new \SCM\Support\InternalAdminExternalEvents($this->db))->run();
+    } catch (\Throwable $error) {
+      error_log('[internal-admin-events] ' . $error->getMessage());
+      $this->jsonFail('No se pudieron sincronizar los avisos internos. Se reintentará desde el panel o el cron.'); return;
+    }
+    $this->jsonOk($result);
+  }
+
   public function ajax_handler_internal_notifications_read(): void
   {
     $this->verifyCsrf();

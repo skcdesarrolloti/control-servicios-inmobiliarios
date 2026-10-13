@@ -83,6 +83,9 @@ trait PendingNotificationsAndDatesConcern
         if ($adminAction === '') {
           $adminAction = $mode === 'preventiva' ? 'crear_ticket_preventiva' : 'ticket_administrativo_creado';
         }
+        if ($mode === 'preventiva' && $generatedPdfs !== []) {
+          foreach (InternalNotificationRecipients::emailsForAction($this->repo->getDb(), 'acta_preventiva') as $actEmail) $addJob($jobs, $actEmail, $target, $generatedPdfs);
+        }
         foreach (InternalNotificationRecipients::emailsForAction($this->repo->getDb(), $adminAction) as $adminEmail) {
           $addJob($jobs, $adminEmail, $target, $generatedPdfs);
         }
@@ -94,6 +97,7 @@ trait PendingNotificationsAndDatesConcern
 
     $queue = new EmailQueue($this->repo->getDb());
     $copies = $adminAction !== '' ? InternalNotificationRecipients::emailsForAction($this->repo->getDb(),$adminAction) : [];
+    if ($mode === 'preventiva' && $generatedPdfs !== [] && in_array('admin',$notifyRecipients,true)) $copies = \SCM\Support\InternalEmailCopies::emails(array_merge($copies,InternalNotificationRecipients::emailsForAction($this->repo->getDb(),'acta_preventiva')));
     $primaryEmails = \SCM\Support\InternalEmailCopies::plan(array_column($jobs,'email'),$copies)['to'];
     foreach ($jobs as $job) {
       if (!in_array(strtolower($job['email']),$primaryEmails,true)) continue;
@@ -129,6 +133,7 @@ trait PendingNotificationsAndDatesConcern
         'dedupe_key' => 'ticket_admin_created_' . $ticketId,
         'meta' => [
           'documents' => $documents,
+          'internal_events' => $mode === 'preventiva' && $generatedPdfs !== [] ? [$adminAction, 'acta_preventiva'] : [$adminAction],
           'targets' => array_values(array_unique((array) ($job['targets'] ?? []))),
         ],
       ]);

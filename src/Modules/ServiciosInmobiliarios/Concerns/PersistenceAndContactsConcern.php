@@ -61,6 +61,7 @@ trait PersistenceAndContactsConcern
       return ['ok' => '0', 'message' => 'No se pudo insertar la nota.'];
     }
 
+    $noteId = $this->db->lastInsertId();
     $currentSeg = isset($ticket['seguimientos']) ? (int) $ticket['seguimientos'] : 0;
     $ticketUpdate = [
       'seguimientos' => (string) ($currentSeg + 1),
@@ -72,10 +73,12 @@ trait PersistenceAndContactsConcern
       $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => $ticketPk]);
     }
 
+    $queued = \SCM\Support\InternalAdminEventNotification::enqueue($this->db, 'nota_ticket', $ticket, 'Nueva nota interna', $observacion, 'note:' . $noteId, ['note_id' => $noteId, 'employee_id' => $employeeId]);
     return [
       'ok' => '1',
-      'message' => 'Nota guardada.',
-      'note_id' => $this->db->lastInsertId(),
+      'message' => 'Nota guardada.' . ($queued > 0 ? ' Aviso interno en cola.' : ''),
+      'note_id' => $noteId,
+      'emails_sent' => (string) $queued,
     ];
   }
 

@@ -925,7 +925,7 @@ trait WorkflowCommandsConcern
       $evidenciaUrl
     );
 
-    $sent = $this->notifySeguimiento($ticket, $histObservacion, $userName, $notifyTargets);
+    $sent = $this->notifySeguimiento($ticket, $histObservacion, $userName, $notifyTargets, 'postergar_ticket');
     return [
       'ok' => '1',
       'message' => 'Caso postergado.' . ($sent > 0 ? ' Correos programados en cola: ' . $sent . '.' : ' Sin correos programados.'),
@@ -1345,7 +1345,7 @@ trait WorkflowCommandsConcern
     $sent      = 0;
     $fecha     = date('Y-m-d H:i');
     $targets = $this->normalizeTargets($notifyTargets);
-    $copies = in_array('admin', $targets, true) && !in_array('none', $targets, true) ? $this->adminNotificationEmails() : [];
+    $copies = in_array('admin', $targets, true) && !in_array('none', $targets, true) ? $this->adminNotificationEmails('trasladar_caso') : [];
     $botones   = EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver caso']]);
 
     $baseVars = [
@@ -1363,7 +1363,7 @@ trait WorkflowCommandsConcern
         'destinatario'      => EmailTemplate::e($oldEmpNombre ?: 'funcionario'),
         'mensaje_principal' => 'Te informamos que el caso ha sido trasladado a otro funcionario.',
       ]));
-      $sent += $this->sendMailToUnique($oldEmpCorreo, $subject, $html, ['internal_cc' => $copies]);
+      $sent += $this->sendMailToUnique($oldEmpCorreo, $subject, $html, ['internal_action' => 'trasladar_caso', 'internal_cc' => $copies, 'source_module' => 'trasladar_caso', 'meta' => ['event' => 'trasladar_caso', 'id_ticket' => $logicalTicket]]);
     }
 
     // Notificar empleado nuevo
@@ -1372,7 +1372,7 @@ trait WorkflowCommandsConcern
         'destinatario'      => EmailTemplate::e($newEmpNombre ?: 'funcionario'),
         'mensaje_principal' => 'Se te ha asignado un nuevo caso.',
       ]));
-      $sent += $this->sendMailToUnique($newEmpCorreo, $subject, $html, ['internal_cc' => $copies]);
+      $sent += $this->sendMailToUnique($newEmpCorreo, $subject, $html, ['internal_action' => 'trasladar_caso', 'internal_cc' => $copies, 'source_module' => 'trasladar_caso', 'meta' => ['event' => 'trasladar_caso', 'id_ticket' => $logicalTicket]]);
     }
 
     // Notificar destinatarios adicionales seleccionados
@@ -1384,13 +1384,13 @@ trait WorkflowCommandsConcern
         'nombre_empleado'  => $newEmpNombre,
         'empleado'         => $newEmpNombre,
       ]);
-      foreach ($this->emailRecipientsForTargets($ticketWithNewEmp, $targets, [$oldEmpCorreo, $newEmpCorreo]) as $recipient) {
+      foreach ($this->emailRecipientsForTargets($ticketWithNewEmp, $targets, [$oldEmpCorreo, $newEmpCorreo], 'trasladar_caso') as $recipient) {
         if ($sent > 0 && $recipient['role'] === 'admin') continue;
         $html = EmailTemplate::renderNamed('traslado_caso', array_merge($baseVars, [
           'destinatario'      => EmailTemplate::e($recipient['name'] ?: 'cliente'),
           'mensaje_principal' => 'Te informamos que el caso ha sido trasladado a un nuevo funcionario.',
         ]));
-        $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, ['internal_cc' => $recipient['internal_cc'] ?? []]);
+        $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, ['internal_action' => 'trasladar_caso', 'internal_cc' => $recipient['internal_cc'] ?? [], 'source_module' => 'trasladar_caso', 'meta' => ['event' => 'trasladar_caso', 'id_ticket' => $logicalTicket]]);
       }
     }
 

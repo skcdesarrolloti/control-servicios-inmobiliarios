@@ -505,6 +505,7 @@ trait RendersDashboard
         'collection_portfolio_pdf' => self::AJAX_COLLECTION_PORTFOLIO_PDF,
         'collection_portfolio_timeline' => self::AJAX_COLLECTION_PORTFOLIO_TIMELINE,
         'internal_notifications_save' => self::AJAX_INTERNAL_NOTIFICATIONS_SAVE,
+        'internal_events_sync' => self::AJAX_INTERNAL_EVENTS_SYNC,
         'public_pqr_settings_read' => self::AJAX_PUBLIC_PQR_SETTINGS_READ,
         'internal_notifications_read' => self::AJAX_INTERNAL_NOTIFICATIONS_READ,
         'metrics_execution' => self::AJAX_METRICS_EXECUTION,

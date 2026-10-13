@@ -1161,6 +1161,32 @@
       openIframeModal(buildCalendarUrl(path), title || "Calendario", false);
     }
 
+    var internalEventsSyncPromise = null;
+    function syncInternalAdminEvents() {
+      if (!actions.internal_events_sync) return Promise.resolve({queued:0});
+      if (!internalEventsSyncPromise) internalEventsSyncPromise = dashboardAction(actions.internal_events_sync, {}).catch(function(error) {
+        console.warn('Avisos internos pendientes de sincronizar:',error.message);
+        return {queued:0,warning:true};
+      }).finally(function() { internalEventsSyncPromise = null; });
+      return internalEventsSyncPromise;
+    }
+
+    function calendarMutationWithNotifications(action, send) {
+      if (['crear_evento','crear_eventos','crear_item_calendario','cambiar_estado','finalizar_reporte_comercial'].indexOf(action) === -1) return send();
+      return syncInternalAdminEvents().then(send).then(function(json) {
+        if (!json || !json.success) return json;
+        return syncInternalAdminEvents().then(function(result) { json.internal_notifications = result; return json; });
+      });
+    }
+
+    if (actions.internal_events_sync) {
+      syncInternalAdminEvents();
+      var internalEventsTimer = window.setInterval(function() {
+        if (!root.isConnected) { window.clearInterval(internalEventsTimer); return; }
+        if (!document.hidden) syncInternalAdminEvents();
+      },60000);
+    }
+
     function calendarApiRequest(action, payload, method) {
       var options = {
         method: method || (payload ? "POST" : "GET"),
@@ -1170,8 +1196,10 @@
         options.headers = { "Content-Type": "application/json" };
         options.body = JSON.stringify(payload);
       }
-      return fetch(calendarApiUrl + encodeURIComponent(action), options).then(function (r) {
-        return r.json();
+      return calendarMutationWithNotifications(action, function() {
+        return fetch(calendarApiUrl + encodeURIComponent(action), options).then(function (r) {
+          return r.json();
+        });
       });
     }
 
@@ -1585,7 +1613,7 @@
           options.headers = { "Content-Type": "application/json" };
           options.body = JSON.stringify(payload);
         }
-        return fetch(calendarApiUrl + encodeURIComponent(action), options).then(function (r) {
+        return calendarMutationWithNotifications(action, function() { return fetch(calendarApiUrl + encodeURIComponent(action), options).then(function (r) {
           return r.text().then(function (body) {
             try {
               var json = JSON.parse(body);
@@ -1599,6 +1627,7 @@
               throw responseError;
             }
           });
+        });
         });
       }
 

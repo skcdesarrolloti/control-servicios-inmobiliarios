@@ -17,6 +17,9 @@ $_SESSION['scm_user_rol'] = 'Sistema';
 $_SESSION['scm_user_cargo'] = '14';
 $_POST['nonce'] = \SCM\Core\App::csrf()->token(\SCM\App\SuCasaControlServiciosInmobiliarios::NONCE_KEY);
 
+try { (new \SCM\Support\InternalAdminExternalEvents(\SCM\Core\App::db()))->run(); }
+catch (\Throwable $error) { error_log('[internal-admin-events] ' . $error->getMessage()); }
+
 $application = new \SCM\App\SuCasaControlServiciosInmobiliarios(\SCM\Core\App::db());
 $target = strtolower(trim((string) ($argv[1] ?? 'metrics')));
 ob_start(static fn(string $buffer): string => '');

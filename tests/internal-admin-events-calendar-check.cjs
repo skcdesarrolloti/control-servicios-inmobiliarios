@@ -1,0 +1,23 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../public/assets/js/admin-dashboard-runtime.js'),'utf8');
+const start=source.indexOf('    var internalEventsSyncPromise = null;');
+const end=source.indexOf('    function openCollectionQueueFromLog(',start);
+const inner=source.indexOf('      function calendarApi(action, payload, method)');
+const innerEnd=source.indexOf('      function googleCalendarAuthWindow(',inner);
+const calls=[];
+let failure=false,invalid=false,syncFailure=false;
+const context=vm.createContext({actions:{},root:{isConnected:true},document:{hidden:false},window:{setInterval(){return 1;},clearInterval(){}},console:{warn(){}},calendarApiUrl:'https://example.invalid/?action=',dashboardAction:async(action)=>{calls.push('sync');if(syncFailure)throw new Error('Synthetic sync failure');return {queued:1};},fetch:async(url,options)=>{calls.push('calendar');return {status:200,json:async()=>({success:!failure}),text:async()=>invalid?'bad JSON':JSON.stringify({success:!failure})};}});
+vm.runInContext(source.slice(start,end)+source.slice(inner,innerEnd),context);
+context.actions.internal_events_sync='internal-events';
+(async()=>{
+  let result=await context.calendarApi('crear_evento',{id_ticket:9});
+  assert.deepEqual(calls,['sync','calendar','sync']);assert.equal(result.internal_notifications.queued,1);
+  calls.length=0;await context.calendarApiRequest('filtrar_eventos_admin',{});assert.deepEqual(calls,['calendar'],'reads do not create internal events');
+  calls.length=0;failure=true;result=await context.calendarApi('cambiar_estado',{id_evento:9});assert.equal(result.success,false);assert.deepEqual(calls,['sync','calendar'],'failed actions never trigger a post-save notice');failure=false;
+  calls.length=0;invalid=true;await assert.rejects(context.calendarApi('cambiar_estado',{}),error=>error.calendarResponseInvalid===true);assert.deepEqual(calls,['sync','calendar'],'malformed responses retain existing error policy');invalid=false;
+  calls.length=0;syncFailure=true;result=await context.calendarApi('cambiar_estado',{id_evento:9});assert.equal(result.success,true);assert.equal(result.internal_notifications.warning,true,'notice failure never presents a saved event as failed');syncFailure=false;
+  calls.length=0;result=await context.calendarApiRequest('crear_eventos',{});assert.deepEqual(calls,['sync','calendar','sync']);assert.equal(result.internal_notifications.queued,1,'both calendar request paths connect persisted actions');
+  console.log('PASS: calendar mutations seed and synchronize notices, reads skip them, provider failures and malformed responses preserve business action policy. No network used.');
+})().catch(error=>{console.error(error);process.exitCode=1;});
