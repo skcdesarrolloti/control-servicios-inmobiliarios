@@ -12001,10 +12001,10 @@
       return Promise.resolve();
     }
 
-    function openPanelCaseById(caseId) {
+    function openPanelCaseById(caseId, propagateError) {
       caseId = String(caseId || "");
       if (!/^\d+$/.test(caseId)) return;
-      dashboardAction("scm_panel_case_read", { case_id: caseId }).then(function (data) {
+      return dashboardAction("scm_panel_case_read", { case_id: caseId }).then(function (data) {
         var caseData = data && data.case;
         if (!caseData || !caseData.case_source_html) throw new Error("No se pudo cargar el caso.");
         var card = document.createElement("article");
@@ -12022,7 +12022,12 @@
         dashboardApplyDueCaseData(button, caseData);
         openDashboardDueCaseFromButton(button, caseData.case_source_html);
         window.setTimeout(function () { card.remove(); }, 1000);
-      }).catch(function (error) { showToast("error", error.message || "No se pudo abrir el caso."); });
+        return true;
+      }).catch(function (error) {
+        if (propagateError) throw error;
+        showToast("error", error.message || "No se pudo abrir el caso.");
+        return false;
+      });
     }
     root.addEventListener("scm:open-panel-case", function (event) {
       openPanelCaseById(event.detail && event.detail.ticket_id);
@@ -17112,6 +17117,7 @@
     }
 
     function makeTabFetcher(tabKey, action) {
+      var myTicketsRequestSequence = 0;
       var tabForm = root.querySelector("#scm-form-" + tabKey);
       var tabCards = root.querySelector("#scm-cards-" + tabKey);
       var tabPagination = root.querySelector("#scm-pagination-" + tabKey);
@@ -17135,6 +17141,7 @@
       }
 
       function fetchTab(fd) {
+        var myTicketsRequest = tabKey === "mis_tickets" ? ++myTicketsRequestSequence : 0;
         fd.append("action", action);
         fd.append("nonce", nonce);
         fd.append("config", JSON.stringify(config));
@@ -17154,6 +17161,7 @@
             return r.json();
           })
           .then(function (json) {
+            if (myTicketsRequest && myTicketsRequest !== myTicketsRequestSequence) return;
             if (!json || !json.success) {
               return;
             }
@@ -17164,6 +17172,10 @@
             }
             if (tabCount) {
               tabCount.textContent = d.count || "0";
+            }
+            if (tabKey === "mis_tickets") {
+              var myTotal = root.querySelector('[data-my-tickets-total]');
+              if (myTotal) myTotal.textContent = d.count || "0";
             }
             if (tabPanel) {
               tabPanel.setAttribute("data-scm-loaded", "1");
@@ -17289,6 +17301,7 @@
             console.error("SCM " + tabKey + " error:", err);
           })
           .finally(function () {
+            if (myTicketsRequest && myTicketsRequest !== myTicketsRequestSequence) return;
             if (tabSpinner) {
               tabSpinner.classList.remove("active");
             }
@@ -17400,6 +17413,7 @@
             updateCotizacionStateTabs(tabForm);
             updateCotizacionKpiVisibility(tabForm);
           }
+          if (tabKey === "mis_tickets") selectMyTicketsBucket(tabForm.querySelector('[name="scm_my_bucket"]').value, false);
           applyBinaryFilterKpiVisibility(
             "scm-" + tabKey + "-",
             "",
@@ -21925,6 +21939,46 @@
       }
     });
 
+    function selectMyTicketsBucket(bucket, refresh) {
+      var fetcher = tabFetchers.mis_tickets;
+      if (!fetcher || !fetcher.form) return Promise.resolve();
+      var labels = {active:"Abiertos", postergados:"Postergados", cerrados:"Cerrados"};
+      if (!Object.prototype.hasOwnProperty.call(labels, bucket)) bucket = "active";
+      var input = fetcher.form.querySelector('[name="scm_my_bucket"]');
+      if (!input) return Promise.resolve();
+      var changed = input.value !== bucket;
+      input.value = bucket;
+      var page = fetcher.form.querySelector('[name="scm_my_page"]');
+      if (page) page.value = "1";
+      var view = fetcher.form.querySelector('#scm_my_estado_bloqueado');
+      if (view) view.value = "Mis casos · " + labels[bucket];
+      root.querySelectorAll('[data-my-tickets-status]').forEach(function(button) {
+        var selected = button.getAttribute('data-my-tickets-status') === bucket;
+        button.classList.toggle('active', selected);
+        button.setAttribute('aria-selected', selected ? 'true' : 'false');
+        button.tabIndex = selected ? 0 : -1;
+      });
+      var results = root.querySelector('#scm-my-tickets-results');
+      if (results) results.setAttribute('aria-labelledby', 'scm-my-state-' + bucket);
+      var panel = root.querySelector('#scm-panel-mis-tickets');
+      if (changed && panel) {
+        panel.setAttribute('data-scm-loaded', '0');
+        panel.setAttribute('data-scm-loading', '0');
+      }
+      return refresh ? fetcher.fetchTab(new FormData(fetcher.form)) : Promise.resolve();
+    }
+
+    root.querySelectorAll('[data-my-tickets-status]').forEach(function(button, index, buttons) {
+      button.addEventListener('click', function() { selectMyTicketsBucket(button.getAttribute('data-my-tickets-status'), true); });
+      button.addEventListener('keydown', function(event) {
+        var target = event.key === 'ArrowRight' ? (index + 1) % buttons.length : event.key === 'ArrowLeft' ? (index + buttons.length - 1) % buttons.length : event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : -1;
+        if (target < 0) return;
+        event.preventDefault();
+        buttons[target].focus();
+        buttons[target].click();
+      });
+    });
+
     function cssAttrValue(value) {
       return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     }
@@ -22000,6 +22054,8 @@
       if (openButtonFromNotification(currentBtn)) {
         return Promise.resolve(true);
       }
+      // A personal case may now be in another status tab; open its native popup directly.
+      if (isMine && /^\d+$/.test(ticketPk || logicalId)) return openPanelCaseById(ticketPk || logicalId, true);
 
       var fetchKey = isMine ? "mis_tickets" : subtab;
       var fetchPromise = null;
@@ -22347,6 +22403,7 @@
 
     root.querySelectorAll(".scm-tab[data-tab]").forEach(function (tab) {
       tab.addEventListener("click", function () {
+        if ((tab.getAttribute("data-tab") || "") === "scm-panel-mis-tickets") selectMyTicketsBucket("active", false);
         if ((tab.getAttribute("data-tab") || "") === "scm-panel-inicio") {
           var homeUrl = new URL(window.location.href);
           if (["ini", "mine", "team", "due", "property_history"].indexOf(homeUrl.searchParams.get("tab")) === -1) {

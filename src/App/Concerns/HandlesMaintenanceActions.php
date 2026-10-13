@@ -8,6 +8,12 @@ use SCM\Core\Auth;
 
 trait HandlesMaintenanceActions
 {
+  private function myTicketsStatusBucket($value): string
+  {
+    $bucket = is_string($value) ? strtolower(trim($value)) : '';
+    return in_array($bucket, ['active', 'postergados', 'cerrados'], true) ? $bucket : 'active';
+  }
+
   public function ajax_handler_generic(): void
   {
     $this->verifyCsrf();
@@ -105,7 +111,8 @@ trait HandlesMaintenanceActions
     $params = $this->parse_params_generic($_POST, 'scm_my_');
     $employeeId = $this->current_employee_id();
     $params['fEmpleado'] = $employeeId !== '' ? $employeeId : '__sin_funcionario__';
-    $params['_scmStatusBucket'] = 'all';
+    $params['_scmStatusBucket'] = $this->myTicketsStatusBucket($_POST['scm_my_bucket'] ?? 'active');
+    $params['fEstado'] = $params['fEstadoAdmin'] = '';
     $params['_scmExcludeDepartamento'] = 'Servicio al cliente';
     $result = $this->run_query_generic([], $params, $config);
     $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
@@ -113,7 +120,8 @@ trait HandlesMaintenanceActions
     $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : ['page' => 1, 'total_pages' => 1, 'total' => 0];
 
     $this->jsonOk([
-      'cards' => $this->render_generic_cards($rows, $config, 'mis_tickets', 'all'),
+      'cards' => $this->render_generic_cards($rows, $config, 'mis_tickets', $params['_scmStatusBucket']),
+      'status_bucket' => $params['_scmStatusBucket'],
       'pagination' => $this->get_generic_tickets_module()->render_generic_pagination('mis_tickets', $pagination),
       'count' => (string) ($stats['total'] ?? 0),
       'kpi_total' => (string) ($stats['total'] ?? 0),

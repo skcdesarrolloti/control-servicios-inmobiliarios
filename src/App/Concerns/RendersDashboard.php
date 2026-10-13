@@ -98,7 +98,8 @@ trait RendersDashboard
     $config['calendar_current_employee_id'] = $currentEmployeeId;
     $myTicketsParams = $this->parse_params_generic($_GET, 'scm_my_');
     $myTicketsParams['fEmpleado'] = $currentEmployeeId !== '' ? $currentEmployeeId : '__sin_funcionario__';
-    $myTicketsParams['_scmStatusBucket'] = 'all';
+    $myTicketsParams['_scmStatusBucket'] = 'active';
+    $myTicketsParams['fEstado'] = $myTicketsParams['fEstadoAdmin'] = '';
     $myTicketsParams['_scmExcludeDepartamento'] = 'Servicio al cliente';
     $myTicketsResult = ['tbody' => $this->render_lazy_tickets_placeholder('Abre esta pestaña para cargar tus casos.'), 'pagination_html' => ''];
     $myTicketsStats = ['total' => 0];
@@ -2695,7 +2696,16 @@ trait RendersDashboard
     if (empty($temaOptions)) {
       $temaOptions = is_array($filterOptions['tema'] ?? null) ? $filterOptions['tema'] : [];
     }
-    $form = $this->render_generic_filter_form('mis_tickets', 'scm_my_', $params, true, $temaOptions, $filterOptions, 'mis_tickets', 'Mis casos');
+    $bucket = $this->myTicketsStatusBucket($params['_scmStatusBucket'] ?? 'active');
+    $labels = ['active'=>'Abiertos', 'postergados'=>'Postergados', 'cerrados'=>'Cerrados'];
+    $params['_scmStatusBucket'] = $bucket;
+    $tabs = '<div class="scm-my-ticket-state-tabs" role="tablist" aria-label="Estado de mis casos">';
+    foreach ($labels as $key => $label) {
+      $selected = $key === $bucket;
+      $tabs .= '<button type="button" class="scm-my-ticket-state-tab' . ($selected ? ' active' : '') . '" id="scm-my-state-' . $key . '" role="tab" aria-controls="scm-my-tickets-results" aria-selected="' . ($selected ? 'true' : 'false') . '" tabindex="' . ($selected ? '0' : '-1') . '" data-my-tickets-status="' . $key . '">' . $label . '</button>';
+    }
+    $tabs .= '</div>';
+    $form = $this->render_generic_filter_form('mis_tickets', 'scm_my_', $params, true, $temaOptions, $filterOptions, 'mis_tickets', 'Mis casos · ' . $labels[$bucket]);
     $kpis = '<div class="scm-kpis scm-kpis-daisy">'
       . '<div class="scm-kpi"><div class="scm-kpi-label">TOTAL</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-total">' . esc_html((string) ($stats['total'] ?? 0)) . '</div></div>'
       . '<div class="scm-kpi scm-kpi-magnitud scm-kpi-critico"><div class="scm-kpi-label">CR&Iacute;TICOS</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-magnitud-critico">' . esc_html((string) ($stats['magnitud_critico'] ?? 0)) . '</div></div>'
@@ -2704,11 +2714,13 @@ trait RendersDashboard
       . '<div class="scm-kpi scm-kpi-magnitud scm-kpi-bajo"><div class="scm-kpi-label">BAJOS</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-magnitud-bajo">' . esc_html((string) ($stats['magnitud_bajo'] ?? 0)) . '</div></div>'
       . '</div>';
     return '<span id="scm-mis_tickets-count" style="display:none;">' . esc_html((string) ($stats['total'] ?? 0)) . '</span>'
-      . '<div class="scm-status-topic-head"><div><h3>Mis casos</h3><p>Casos asignados a tu funcionario, excepto los de Servicio al cliente.</p></div><span class="scm-status-count"><strong>' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> casos</span></div>'
+      . '<div class="scm-status-topic-head"><div><h3>Mis casos</h3><p>Casos asignados a tu funcionario, excepto los de Servicio al cliente.</p></div><span class="scm-status-count"><strong data-my-tickets-total>' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> casos</span></div>'
+      . $tabs
+      . '<div id="scm-my-tickets-results" role="tabpanel" aria-labelledby="scm-my-state-' . $bucket . '">'
       . $kpis
       . $form
       . '<div class="scm-cards-wrap"><div class="scm-ticket-cards" id="scm-cards-mis_tickets">' . $cards . '</div></div>'
-      . '<div class="scm-pagination" id="scm-pagination-mis_tickets">' . $pagination . '</div>';
+      . '<div class="scm-pagination" id="scm-pagination-mis_tickets">' . $pagination . '</div></div>';
   }
 
   /** @param array<string,mixed> $config */

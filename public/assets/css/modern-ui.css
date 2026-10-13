@@ -3633,6 +3633,36 @@ body,
   color: #475569 !important;
 }
 
+#scm-app .scm-my-ticket-state-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1.25rem;
+}
+
+#scm-app .scm-my-ticket-state-tab {
+  border: 1px solid #dce4f0;
+  border-radius: 0.65rem;
+  padding: 0.65rem 1rem;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#scm-app .scm-my-ticket-state-tab.active {
+  background: #102039;
+  border-color: #102039;
+  color: #fff;
+}
+
+#scm-app .scm-my-ticket-state-tab:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
 #scm-app .scm-composer-notify-label {
   display: inline-flex !important;
   align-items: center !important;
