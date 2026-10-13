@@ -292,7 +292,7 @@ if (empty($current_page) || $current_page === 'tickets') {
   } elseif (in_array($tabParam, ['contratos', 'contratos-arrendamiento', 'contratos_arrendamiento', 'scm-panel-contratos-arrendamiento'], true)) {
     $current_page = 'contratos';
   } elseif (in_array($tabParam, ['administrativas', 'actividades_administrativas', 'scm-panel-actividades-administrativas'], true)) {
-    $current_page = 'notificaciones';
+    $current_page = 'administrativas';
   } elseif (in_array($tabParam, ['metricas', 'dashboard', 'scm-panel-metricas'], true)) {
     $current_page = 'dashboard';
   } else {
@@ -318,9 +318,10 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 // Orden solicitado:
 // 1. Inicio (Dropdown: Resumen, Mi Calendario, Calendario Equipo, Vencimientos, Historial Inmueble)
 // 2. Gestión de Casos & Tickets (Dropdown: Tickets Abiertos, Mis Tickets, Tickets Postergados, Tickets Cerrados)
-// 3. Actividades Administrativas (Dropdown: Notificaciones, Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
+// 3. Actividades Administrativas (Dropdown: Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
 // 4. Actividades contractuales (Dropdown: Contratos por terminar, Terminación, No prórroga)
-// 5. Métricas y Dashboard
+// 5. Notificaciones
+// 6. Métricas y Dashboard
 $rawNavItems = [
   'inicio' => [
     'type' => 'dropdown',
@@ -421,16 +422,6 @@ $rawNavItems = [
     'label' => 'Actividades Administrativas',
     'icon' => 'folder_shared',
     'children' => [
-      'notificaciones' => [
-        'key' => 'notificaciones',
-        'label' => 'Notificaciones',
-        'panel_id' => 'scm-panel-actividades-administrativas',
-        'admin_sub_target' => 'scm-panel-admin-notificaciones',
-        'admin_activity_key' => 'notificaciones',
-        'url' => $baseUrl . '/index.php?tab=notificaciones',
-        'icon' => 'notifications',
-        'perms' => ['notificaciones'],
-      ],
       'gestiones_cobro' => [
         'key' => 'gestiones_cobro',
         'label' => 'Gestiones de Cobro',
@@ -557,6 +548,15 @@ $rawNavItems = [
         'perms' => ['calendario_actividades', 'abiertos'],
       ],
     ],
+  ],
+  'notificaciones' => [
+    'type' => 'link',
+    'key' => 'notificaciones',
+    'label' => 'Notificaciones',
+    'panel_id' => 'scm-panel-admin-notificaciones',
+    'url' => $baseUrl . '/index.php?tab=notificaciones',
+    'icon' => 'notifications',
+    'perms' => ['notificaciones'],
   ],
   'dashboard' => [
     'type' => 'link',

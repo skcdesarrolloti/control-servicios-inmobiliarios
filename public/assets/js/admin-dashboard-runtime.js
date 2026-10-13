@@ -768,6 +768,14 @@
         openContractNonRenewalTab();
         return;
       }
+      if (key === "notificaciones") {
+        var notificationsTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-admin-notificaciones"]');
+        if (notificationsTab) {
+          notificationsTab.click();
+          notificationsTab.focus({ preventScroll: true });
+        }
+        return;
+      }
       dashboardDuePopupShown.administrative = true;
       var adminTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-actividades-administrativas"]');
       if (adminTab) {
@@ -12051,9 +12059,6 @@
       if (panelId === "scm-panel-calendario-actividades") {
         return "calendario_actividades";
       }
-      if (panelId === "scm-panel-admin-notificaciones") {
-        return "notificaciones";
-      }
       if (panelId === "scm-panel-gestiones-cobro") {
         return "gestiones_cobro";
       }
@@ -22202,6 +22207,9 @@
           loadDashboardFilterOptions(),
         ]).then(function () {});
       }
+      if (activePanel.id === "scm-panel-admin-notificaciones") {
+        return loadAdminNotificationsPanel();
+      }
       if (activePanel.id === "scm-panel-actividades-administrativas") {
         var activeAdministrativePanel = activePanel.querySelector(
           ".scm-admin-activity-panel.active",
@@ -22277,12 +22285,6 @@
             }
           }
           return Promise.resolve();
-        }
-        if (
-          activeAdministrativePanel &&
-          administrativeKey === "notificaciones"
-        ) {
-          return loadAdminNotificationsPanel();
         }
         if (
           activeAdministrativePanel &&

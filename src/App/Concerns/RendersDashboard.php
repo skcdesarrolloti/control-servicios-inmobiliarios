@@ -233,10 +233,6 @@ trait RendersDashboard
       $initialTab = 'scm-panel-actividades-contractuales';
     }
     $administrativeActivityTabs = [
-      'notificaciones' => [
-        'panel' => 'scm-panel-admin-notificaciones',
-        'label' => $dashboardPermissionTabs['notificaciones'] ?? 'Notificaciones',
-      ],
       'gestiones_cobro' => [
         'panel' => 'scm-panel-gestiones-cobro',
         'label' => $dashboardPermissionTabs['gestiones_cobro'] ?? 'Gestiones de cobro',
@@ -332,6 +328,7 @@ trait RendersDashboard
       'scm-panel-actividades-administrativas' => 'actividades_administrativas',
       'scm-panel-actividades-contractuales' => 'calendario_actividades',
       'scm-panel-contratos-arrendamiento' => 'contratos_arrendamiento',
+      'scm-panel-admin-notificaciones' => 'notificaciones',
       'scm-panel-metricas' => 'metricas',
     ];
     if ($initialTab !== '') {
@@ -1356,12 +1353,6 @@ trait RendersDashboard
             <?php endforeach; ?>
           </div>
 
-          <?php if (in_array('notificaciones', $allowedAdministrativeActivityTabs, true)): ?>
-            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'notificaciones' ? ' active' : ''; ?>" id="scm-panel-admin-notificaciones" data-permission-tab="notificaciones" data-admin-activity-panel="notificaciones" data-scm-loaded="0">
-              <?php echo $this->render_admin_notifications_shell(); ?>
-            </div>
-          <?php endif; ?>
-
           <?php if (in_array('gestiones_cobro', $allowedAdministrativeActivityTabs, true)): ?>
             <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'gestiones_cobro' ? ' active' : ''; ?>" id="scm-panel-gestiones-cobro" data-permission-tab="gestiones_cobro" data-admin-activity-panel="gestiones_cobro" data-scm-loaded="0">
               <?php echo $this->render_collection_management_shell(); ?>
@@ -1420,6 +1411,12 @@ trait RendersDashboard
 
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-dashboard-inline.js?v=' . SCM_VERSION); ?>" defer></script>
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-case-create.js?v=' . SCM_VERSION); ?>" defer></script>
+
+      <?php if (in_array('notificaciones', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-admin-notificaciones' ? ' active' : ''; ?>" id="scm-panel-admin-notificaciones" data-permission-tab="notificaciones" data-scm-loaded="0">
+          <?php echo $this->render_admin_notifications_shell(); ?>
+        </div>
+      <?php endif; ?>
 
       <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas' ? ' active' : ''; ?> flex flex-col gap-6 w-full" id="scm-panel-metricas" data-permission-tab="metricas" data-scm-metrics="<?php echo self::h((string)$metricsJson); ?>" data-scm-loaded="0">
         <!-- Encabezado de Métricas y Acciones -->
@@ -2041,7 +2038,6 @@ trait RendersDashboard
   private function renderDashboardPermissionsModal(array $tabs, array $cargos, array $permissions, array $employeeCargoIds, array $adminDuePopupCargoIds, array $actionCatalog = [], array $actionPermissions = []): string
   {
     $activityPermissionKeys = [
-      'notificaciones',
       'gestiones_cobro',
       'cotizaciones_mantenimiento',
       'actas_satisfaccion',
