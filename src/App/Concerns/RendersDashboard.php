@@ -2985,7 +2985,7 @@ trait RendersDashboard
     $emailTemplates = $service->emailTemplates();
     $whatsappTemplates = $service->whatsappTemplates();
     $senderProfile = $service->senderProfile();
-    $configuredEmailCopies = \SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, AdministrativeNotificationsService::MANUAL_EMAIL_COPY_ACTION);
+    $emailCopyContacts = $service->manualEmailCopyContacts();
     $firstType = (string) array_key_first($types);
     $firstEmailTemplate = is_array(reset($emailTemplates)) ? reset($emailTemplates) : [];
     $defaultEmailSubject = (string) ($firstEmailTemplate['subject'] ?? '');
@@ -3268,9 +3268,24 @@ trait RendersDashboard
                 <span><strong>Enviar copia por correo (CC)</strong><small>Opcional para este envío. Se envía una copia de cada correo a las direcciones indicadas.</small></span>
               </label>
               <div class="scm-admin-notif-email-copy-fields" data-admin-notif-email-copy-fields hidden>
-                <p>Funcionarios configurados en <strong>Notificaciones internas · Avisos administrativos generales</strong>:<br>
-                  <?php echo esc_html($configuredEmailCopies !== [] ? implode(', ', $configuredEmailCopies) : 'No hay correos configurados. Puedes agregar correos abajo.'); ?>
+                <p><strong>Copia a quien crea este envío:</strong><br>
+                  <?php echo esc_html($emailCopyContacts['creator'] !== null ? $emailCopyContacts['creator']['name'] . ' · ' . $emailCopyContacts['creator']['email'] : 'Tu usuario no tiene un correo válido registrado. Selecciona otro funcionario o agrega un correo.'); ?>
                 </p>
+                <div class="scm-admin-notif-copy-picker">
+                  <label for="scm-admin-notif-copy-search">Agregar funcionarios en copia</label>
+                  <input id="scm-admin-notif-copy-search" type="search" class="input input-bordered input-sm scm-input" placeholder="Buscar por nombre, cargo o correo" data-admin-notif-copy-search>
+                  <span aria-live="polite"><strong data-admin-notif-copy-count>0</strong> funcionarios adicionales seleccionados</span>
+                  <div class="scm-admin-notif-copy-options" role="group" aria-label="Funcionarios adicionales en copia">
+                    <?php foreach ($emailCopyContacts['employees'] as $copyEmployee): ?>
+                      <?php if ($emailCopyContacts['creator'] !== null && $copyEmployee['employee_id'] === $emailCopyContacts['creator']['employee_id']) continue; ?>
+                      <label class="scm-admin-notif-copy-option" data-admin-notif-copy-option>
+                        <input type="checkbox" name="email_copy_employee_ids[]" value="<?php echo esc_attr((string) $copyEmployee['employee_id']); ?>" data-admin-notif-copy-employee disabled>
+                        <span><strong><?php echo esc_html($copyEmployee['name']); ?></strong><small><?php echo esc_html($copyEmployee['cargo'] . ' · ' . $copyEmployee['email']); ?></small></span>
+                      </label>
+                    <?php endforeach; ?>
+                    <p data-admin-notif-copy-empty hidden>No se encontraron funcionarios con correo válido.</p>
+                  </div>
+                </div>
                 <div class="scm-field">
                   <label for="scm-admin-notif-additional-emails">Otros correos en copia (opcional)</label>
                   <textarea id="scm-admin-notif-additional-emails" name="additional_emails" class="textarea textarea-bordered scm-input" rows="2" maxlength="6000" placeholder="correo@ejemplo.com, otro@ejemplo.com" aria-describedby="scm-admin-notif-email-copy-help" data-admin-notif-additional-emails disabled></textarea>

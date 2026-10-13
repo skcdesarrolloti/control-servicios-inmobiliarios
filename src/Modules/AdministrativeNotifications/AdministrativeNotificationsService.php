@@ -15,7 +15,6 @@ final class AdministrativeNotificationsService
 {
   public const PROJECT_CODE = 'control-servicios-inmobiliarios';
   public const SOURCE_MODULE = 'admin_notifications';
-  public const MANUAL_EMAIL_COPY_ACTION = 'gestion_caso_admin';
   public const QUEUE_TABLE = 'skc_notification_queue';
   private const COLLECTION_QUEUE_SOURCE_MODULE = 'collection-management';
   private const QUEUE_ATTEMPTS_TABLE = 'skc_notification_attempts';
@@ -2517,7 +2516,7 @@ final class AdministrativeNotificationsService
       $channels = array_values(array_filter($channels, static fn(string $channel): bool => $channel !== 'sms'));
     }
     $testOptions = $this->sanitizeTestModeOptions($testOptions, $channels);
-    $manualEmailCopies = $this->manualEmailCopies($emailCopyOptions, $channels, !empty($testOptions['enabled']));
+    $manualEmailCopyPlan = $this->manualEmailCopyPlan($emailCopyOptions, $channels, !empty($testOptions['enabled']));
     $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
     $subject = trim($subject);
     $message = trim($message);
@@ -2590,11 +2589,13 @@ final class AdministrativeNotificationsService
         $queueRecipient = $recipient;
         if ($configuredCopies && $channel === 'email') $queueRecipient['_scm_internal_cc']=$copyPlan['cc'];
         if ($emailCopyOptions !== [] && $channel === 'email') {
-          $queueRecipient['_scm_internal_cc'] = $manualEmailCopies;
+          $queueRecipient['_scm_internal_cc'] = $manualEmailCopyPlan['emails'];
           $queueRecipient['_scm_email_copy_options'] = [
             'requested' => !empty($emailCopyOptions['enabled']),
             'enabled' => !empty($emailCopyOptions['enabled']) && empty($testOptions['enabled']),
-            'action' => self::MANUAL_EMAIL_COPY_ACTION,
+            'mode' => 'creator_and_selected',
+            'creator_employee_id' => $manualEmailCopyPlan['creator_employee_id'],
+            'selected_employee_ids' => $manualEmailCopyPlan['selected_employee_ids'],
           ];
         }
         if (!empty($testOptions['enabled'])) {
@@ -2653,19 +2654,52 @@ final class AdministrativeNotificationsService
     ] : []);
   }
 
-  /** Resolve optional copies before queuing any recipient. Test sends never copy real contacts. */
-  private function manualEmailCopies(array $options, array $channels, bool $testMode): array
+  /** Active employees with valid email, identified by their real id_empleado. */
+  public function manualEmailCopyContacts(): array
   {
+    $employees = [];
+    $creator = null;
+    $creatorId = Auth::employeeId();
+    foreach (\SCM\Support\FuncionarioOptions::activeFuncionarios($this->db, $this->schema, 'employee', true) as $employee) {
+      $email = strtolower(trim((string) ($employee['email'] ?? '')));
+      if (!filter_var($email, FILTER_VALIDATE_EMAIL)) continue;
+      $employee['email'] = $email;
+      $employees[] = $employee;
+      if ((string) $employee['employee_id'] === $creatorId) $creator = $employee;
+    }
+    return ['creator' => $creator, 'employees' => $employees];
+  }
+
+  /** Resolve optional copies before queuing any recipient. Test sends never copy real contacts. */
+  private function manualEmailCopyPlan(array $options, array $channels, bool $testMode): array
+  {
+    $plan = ['emails' => [], 'creator_employee_id' => '', 'selected_employee_ids' => []];
     if (empty($options['enabled']) || $testMode || !in_array('email', $channels, true)) {
-      return [];
+      return $plan;
     }
     $additional = \SCM\Support\AdditionalEmailRecipients::parse($options['additional_emails'] ?? '');
-    $configured = \SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, self::MANUAL_EMAIL_COPY_ACTION);
-    $copies = \SCM\Support\InternalEmailCopies::emails(array_merge($configured, $additional));
-    if ($copies === []) {
-      throw new \InvalidArgumentException('Agrega al menos un correo en copia o configura funcionarios en Notificaciones internas: Avisos administrativos generales.');
+    $rawIds = $options['employee_ids'] ?? [];
+    if (!is_array($rawIds)) throw new \InvalidArgumentException('Selecciona los funcionarios que recibirán copia.');
+    $contacts = $this->manualEmailCopyContacts();
+    $byId = array_column($contacts['employees'], null, 'employee_id');
+    $copies = [];
+    if ($contacts['creator'] !== null) {
+      $copies[] = $contacts['creator']['email'];
+      $plan['creator_employee_id'] = (string) $contacts['creator']['employee_id'];
     }
-    return $copies;
+    foreach ($rawIds as $id) {
+      if (!is_string($id) && !is_int($id)) throw new \InvalidArgumentException('La selección de funcionarios no es válida.');
+      $id = trim((string) $id);
+      if (!isset($byId[$id])) throw new \InvalidArgumentException('Un funcionario seleccionado ya no está activo o no tiene un correo válido. Actualiza la lista.');
+      $plan['selected_employee_ids'][$id] = $id;
+      $copies[] = $byId[$id]['email'];
+    }
+    $plan['selected_employee_ids'] = array_values($plan['selected_employee_ids']);
+    $plan['emails'] = \SCM\Support\InternalEmailCopies::emails(array_merge($copies, $additional));
+    if ($plan['emails'] === []) {
+      throw new \InvalidArgumentException('Tu usuario no tiene un correo válido para recibir copia. Selecciona otro funcionario o agrega un correo.');
+    }
+    return $plan;
   }
 
   /**

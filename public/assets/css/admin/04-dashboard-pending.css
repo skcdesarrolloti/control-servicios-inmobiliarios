@@ -15581,6 +15581,38 @@
   font-size: 12px;
 }
 
+#scm-app .scm-admin-notif-copy-picker {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+#scm-app .scm-admin-notif-copy-options {
+  display: grid;
+  gap: 6px;
+  max-height: 208px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #fff;
+}
+
+#scm-app .scm-admin-notif-copy-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+#scm-app .scm-admin-notif-copy-option span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+#scm-app .scm-admin-notif-copy-option[hidden],
 #scm-app .scm-admin-notif-email-copies[hidden],
 #scm-app .scm-admin-notif-email-copy-fields[hidden] {
   display: none !important;

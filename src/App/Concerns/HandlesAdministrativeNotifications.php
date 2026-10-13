@@ -125,6 +125,7 @@ trait HandlesAdministrativeNotifications
 
       $emailCopyOptions = [
         'enabled' => (string) ($_POST['email_copy_enabled'] ?? '') === '1',
+        'employee_ids' => $_POST['email_copy_employee_ids'] ?? [],
         'additional_emails' => wp_unslash($_POST['additional_emails'] ?? ''),
       ];
       $result = $service->enqueue($type, $ids, $channels, $subject, $message, $whatsappTemplate, $emailTemplate, $importPayload, AdministrativeNotificationsService::SMS_MAX, $testOptions, false, $emailCopyOptions);

@@ -52,14 +52,21 @@ $manual = static function (string $subject, array $copies, array $test = [], arr
   return $admin->enqueue('funcionarios', $ids, ['email'], $subject, 'Mensaje manual QA', '', '', [], $admin::SMS_MAX, $test, false, $copies);
 };
 $manualRow = static fn(string $subject): ?array => $db->getRow('SELECT * FROM `'.$queue.'` WHERE subject=?', [$subject]);
+$db->insert($db->table('jet_cct_funcionarios'), ['_ID'=>905,'id_empleado'=>'97005','nombre'=>'Comercial fuera de cargos del panel','correo'=>'commercial@example.invalid','activo'=>'Si','id_cargo'=>'99']);
+$db->insert($db->table('jet_cct_funcionarios'), ['_ID'=>906,'id_empleado'=>'97006','nombre'=>'Sin correo válido','correo'=>'invalid','activo'=>'Si','id_cargo'=>'3']);
+$contacts = $admin->manualEmailCopyContacts();
+$contactIds = array_column($contacts['employees'], 'employee_id');
+$check($contacts['creator']['employee_id']==='97004' && in_array('97005',$contactIds,true) && !in_array('97002',$contactIds,true) && !in_array('97006',$contactIds,true), 'Copy picker resolves session creator and all active employees with valid email across cargos');
 $manual('Manual CC desactivada', ['enabled'=>false, 'additional_emails'=>'invalid stale input']);
 $check($cc($manualRow('Manual CC desactivada'))===[], 'Manual send without opt-in ignores configured copies and stale input');
-$manual('Manual CC activada', ['enabled'=>true, 'additional_emails'=>'Extra@example.invalid; a@example.invalid; B@example.invalid']);
+$manual('Manual CC activada', ['enabled'=>true, 'employee_ids'=>['97005','97005'], 'additional_emails'=>'Extra@example.invalid; AUTHOR@example.invalid; B@example.invalid']);
 $manualCc = $manualRow('Manual CC activada');
-$check($manualCc['destination']==='b@example.invalid' && $cc($manualCc)===['a@example.invalid','extra@example.invalid'], 'Manual CC combines active configured staff and additional addresses, excluding duplicates and primary');
-$check(json_decode($manualCc['meta_json'],true)['admin_notifications']['email_copy_options']===['requested'=>true,'enabled'=>true,'action'=>'gestion_caso_admin'], 'Manual queue traces explicit choice and configuration event');
-$manual('Manual CC configurada', ['enabled'=>true]);
-$check($cc($manualRow('Manual CC configurada'))===['a@example.invalid'], 'Opt-in uses configured copies without requiring additional addresses');
+$check($manualCc['destination']==='b@example.invalid' && $cc($manualCc)===['author@example.invalid','commercial@example.invalid','extra@example.invalid'], 'Manual CC uses creator, selected employees and additional addresses without duplicates or global configured staff');
+$check(json_decode($manualCc['meta_json'],true)['admin_notifications']['email_copy_options']===['requested'=>true,'enabled'=>true,'mode'=>'creator_and_selected','creator_employee_id'=>'97004','selected_employee_ids'=>['97005']], 'Manual queue traces creator and selected real employee IDs');
+$manual('Manual CC creador', ['enabled'=>true]);
+$check($cc($manualRow('Manual CC creador'))===['author@example.invalid'], 'Opt-in copies only the creator when no additional employees are selected');
+$manual('Manual creador destinatario', ['enabled'=>true,'employee_ids'=>['97005']], [], [904]);
+$check($cc($manualRow('Manual creador destinatario'))===['commercial@example.invalid'], 'Creator is not repeated in CC when already primary recipient');
 $manual('Manual CC prueba', ['enabled'=>true, 'additional_emails'=>'invalid stale input'], ['enabled'=>true,'email'=>'test@example.invalid']);
 $manualTest = $manualRow('Manual CC prueba');
 $check($manualTest['destination']==='test@example.invalid' && $cc($manualTest)===[], 'Test mode ignores all real copies even with opt-in and stale addresses');
@@ -70,19 +77,22 @@ foreach (['invalid', implode(',', array_map(static fn(int $i): string => 'extra'
   catch (InvalidArgumentException $e) { $rejected=true; }
   $check($rejected && (int)$db->getVar('SELECT COUNT(*) FROM `'.$queue.'`')===$beforeInvalid, 'Invalid or excessive CC rejected before any batch recipient is queued');
 }
-$settingsProperty = new ReflectionProperty(\SCM\Core\Settings::class,'data');
-$savedSettings = $settingsProperty->getValue(\SCM\Core\App::settings());
-$withoutCopies = $savedSettings;
-$withoutCopies['internal_admin_notifications']['gestion_caso_admin'] = [];
-$settingsProperty->setValue(\SCM\Core\App::settings(), $withoutCopies);
+foreach ([['97002'], ['97006'], ['901'], ['unknown'], [['nested']], '97005'] as $invalidSelection) {
+  $beforeInvalid = (int)$db->getVar('SELECT COUNT(*) FROM `'.$queue.'`');
+  $rejected=false;
+  try { $manual('Invalid employee CC', ['enabled'=>true,'employee_ids'=>$invalidSelection]); }
+  catch (InvalidArgumentException $e) { $rejected=true; }
+  $check($rejected && (int)$db->getVar('SELECT COUNT(*) FROM `'.$queue.'`')===$beforeInvalid, 'Inactive, invalid, forged or malformed employee selections rejected before queuing');
+}
+$_SESSION['scm_employee_id']='missing-employee';
 $manual('Manual CC externa', ['enabled'=>true,'additional_emails'=>'external@example.invalid']);
-$check($cc($manualRow('Manual CC externa'))===['external@example.invalid'], 'Additional copies work without configured staff');
+$check($cc($manualRow('Manual CC externa'))===['external@example.invalid'], 'Additional copies work when creator has no valid contact');
 $rejected=false;
 try { $manual('Manual CC vacia', ['enabled'=>true]); } catch (InvalidArgumentException $e) { $rejected=true; }
 $check($rejected && !$manualRow('Manual CC vacia'), 'Empty opt-in returns actionable error without sending');
-$settingsProperty->setValue(\SCM\Core\App::settings(), $savedSettings);
-$resolveManual = new ReflectionMethod($admin, 'manualEmailCopies');
-$check($resolveManual->invoke($admin, ['enabled'=>true,'additional_emails'=>'invalid'], ['sms','whatsapp'], false)===[], 'SMS and WhatsApp never resolve or validate email copies');
+$_SESSION['scm_employee_id']='97004';
+$resolveManual = new ReflectionMethod($admin, 'manualEmailCopyPlan');
+$check($resolveManual->invoke($admin, ['enabled'=>true,'additional_emails'=>'invalid'], ['sms','whatsapp'], false)['emails']===[], 'SMS and WhatsApp never resolve or validate email copies');
 $email->enqueue('A@example.invalid','QA','<p>Already primary</p>',['internal_action'=>'qa_alpha','dedupe_key'=>'copies:already']);
 $check($cc($rows('copies:already')[0])===[],'Configured primary is not repeated in CC');
 $_SESSION=[];

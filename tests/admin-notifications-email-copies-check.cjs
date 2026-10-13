@@ -2,6 +2,7 @@ const { chromium } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 
 const root = path.join(__dirname, '..');
 const view = fs.readFileSync(path.join(root, 'src/App/Concerns/RendersDashboard.php'), 'utf8');
@@ -9,8 +10,20 @@ const runtime = fs.readFileSync(path.join(root, 'public/assets/js/admin-dashboar
 const markupStart = view.indexOf('            <fieldset class="scm-admin-notif-email-copies"');
 const markupEnd = view.indexOf('</fieldset>', markupStart) + '</fieldset>'.length;
 assert(markupStart > 0 && markupEnd > markupStart);
-const markup = view.slice(markupStart, markupEnd).replace(/<\?php[\s\S]*?\?>/g, 'admin@example.invalid');
-const functionsStart = runtime.indexOf('      function updateEmailCopyFields()');
+const rendered = spawnSync('php', [], { cwd: root, encoding: 'utf8', input: `<?php
+  require 'src/Core/Helpers.php';
+  $creator = ['employee_id'=>'97004','name'=>'Creador del envío','email'=>'author@example.invalid','cargo'=>'Operaciones'];
+  $emailCopyContacts = ['creator'=>$creator,'employees'=>[$creator,
+    ['employee_id'=>'97005','name'=>'María Gómez','email'=>'commercial@example.invalid','cargo'=>'Comercial'],
+    ['employee_id'=>'97007','name'=>'Luis Ríos','email'=>'operations@example.invalid','cargo'=>'Operaciones']]];
+  $view = file_get_contents('src/App/Concerns/RendersDashboard.php');
+  $start = strpos($view, '            <fieldset class="scm-admin-notif-email-copies"');
+  $end = strpos($view, '</fieldset>', $start) + strlen('</fieldset>');
+  eval('?>'.substr($view, $start, $end-$start));
+` });
+assert.equal(rendered.status, 0, rendered.stderr);
+const markup = rendered.stdout;
+const functionsStart = runtime.indexOf('      function filterEmailCopyEmployees()');
 const functionsEnd = runtime.indexOf('      function renderTestModeRealContacts()', functionsStart);
 const eventsStart = runtime.indexOf('        if (testModeInput) {', functionsEnd);
 const eventsEnd = runtime.indexOf('        [testEmailInput, testPhoneInput]', eventsStart);
@@ -34,6 +47,10 @@ assert(functionsStart > 0 && functionsEnd > functionsStart && eventsEnd > events
       var emailCopyFields = panel.querySelector('[data-admin-notif-email-copy-fields]');
       var additionalEmailsInput = panel.querySelector('[data-admin-notif-additional-emails]');
       var emailCopyTestNote = panel.querySelector('[data-admin-notif-email-copy-test-note]');
+      var emailCopySearch = panel.querySelector('[data-admin-notif-copy-search]');
+      var emailCopyCount = panel.querySelector('[data-admin-notif-copy-count]');
+      var emailCopyEmpty = panel.querySelector('[data-admin-notif-copy-empty]');
+      var emailCopyEmployees = panel.querySelectorAll('[data-admin-notif-copy-employee]');
       function markComposerDirty(){} function renderTestModeRealContacts(){}
       ${runtime.slice(functionsStart, functionsEnd)}
       ${runtime.slice(eventsStart, eventsEnd)}
@@ -49,6 +66,22 @@ assert(functionsStart > 0 && functionsEnd > functionsStart && eventsEnd > events
     assert.equal((await payload()).additional_emails, undefined);
     await copies.check();
     assert.equal(await fields.isVisible(), true);
+    assert.equal(await page.locator('[data-admin-notif-copy-employee]').count(), 2);
+    assert.equal(await page.locator('[data-admin-notif-copy-employee][value="97004"]').count(), 0);
+    const search = page.locator('[data-admin-notif-copy-search]');
+    await search.fill('maria');
+    assert.equal(await page.locator('[data-admin-notif-copy-option]:visible').count(), 1);
+    await page.locator('[data-admin-notif-copy-employee][value="97005"]').check();
+    await search.fill('operaciones');
+    assert.equal(await page.locator('[data-admin-notif-copy-option]:visible').count(), 1);
+    assert.equal(await page.locator('[data-admin-notif-copy-count]').textContent(), '1');
+    await page.locator('[data-admin-notif-copy-employee][value="97007"]').check();
+    assert.deepEqual(await page.evaluate(() => new FormData(document.querySelector('form')).getAll('email_copy_employee_ids[]')), ['97005','97007']);
+    await search.fill('nobody');
+    assert.equal(await page.locator('[data-admin-notif-copy-empty]').isVisible(), true);
+    await search.fill('commercial@example');
+    assert.equal(await page.locator('[data-admin-notif-copy-option]:visible').count(), 1);
+    await search.fill('');
     await extra.fill('external@example.invalid; other@example.invalid');
     assert.equal((await payload()).email_copy_enabled, '1');
     assert.equal((await payload()).additional_emails, 'external@example.invalid; other@example.invalid');
@@ -64,6 +97,7 @@ assert(functionsStart > 0 && functionsEnd > functionsStart && eventsEnd > events
     assert.equal(await fields.isVisible(), false);
     assert.equal((await payload()).email_copy_enabled, undefined);
     assert.equal((await payload()).additional_emails, undefined);
+    assert.deepEqual(await page.evaluate(() => new FormData(document.querySelector('form')).getAll('email_copy_employee_ids[]')), []);
     assert.equal(await page.locator('[data-admin-notif-email-copy-test-note]').isVisible(), true);
     await page.locator('[data-admin-notif-test-mode]').uncheck();
     await page.locator('[data-admin-notif-channel]').uncheck();
@@ -73,7 +107,7 @@ assert(functionsStart > 0 && functionsEnd > functionsStart && eventsEnd > events
     await copies.uncheck();
     assert.equal((await payload()).additional_emails, undefined);
     assert.deepEqual(errors, []);
-    console.log('PASS: optional CC, form payload, test mode isolation, email channel visibility and mobile layout');
+    console.log('PASS: creator CC, employee search by name/cargo/email, retained selections, test mode isolation and mobile layout');
   } finally {
     await browser.close();
   }
