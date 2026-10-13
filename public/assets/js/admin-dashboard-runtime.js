@@ -6685,6 +6685,11 @@
       var sendContractNumber = panel.querySelector("[data-admin-notif-send-contract-number]");
       var sendImportPayload = panel.querySelector("[data-admin-notif-import-payload]");
       var testModeInput = panel.querySelector("[data-admin-notif-test-mode]");
+      var emailCopiesWrap = panel.querySelector("[data-admin-notif-email-copies]");
+      var emailCopyEnabledInput = panel.querySelector("[data-admin-notif-email-copy-enabled]");
+      var emailCopyFields = panel.querySelector("[data-admin-notif-email-copy-fields]");
+      var additionalEmailsInput = panel.querySelector("[data-admin-notif-additional-emails]");
+      var emailCopyTestNote = panel.querySelector("[data-admin-notif-email-copy-test-note]");
       var testFields = panel.querySelector("[data-admin-notif-test-fields]");
       var testEmailInput = panel.querySelector("[data-admin-notif-test-email]");
       var testPhoneInput = panel.querySelector("[data-admin-notif-test-phone]");
@@ -6836,7 +6841,20 @@
         }
       }
 
+      function updateEmailCopyFields() {
+        if (!emailCopiesWrap || !emailCopyEnabledInput) return;
+        var emailSelected = !!panel.querySelector('[data-admin-notif-channel][value="email"]:checked');
+        var testMode = !!(testModeInput && testModeInput.checked);
+        emailCopiesWrap.hidden = !emailSelected;
+        emailCopyEnabledInput.disabled = !emailSelected || testMode;
+        var enabled = emailSelected && !testMode && emailCopyEnabledInput.checked;
+        if (emailCopyFields) emailCopyFields.hidden = !enabled;
+        if (additionalEmailsInput) additionalEmailsInput.disabled = !enabled;
+        if (emailCopyTestNote) emailCopyTestNote.hidden = !testMode;
+      }
+
       function updateTestModeFields() {
+        updateEmailCopyFields();
         if (!testFields || !testModeInput) {
           return;
         }
@@ -9658,6 +9676,13 @@
             updateTestModeFields();
           });
         }
+        if (emailCopyEnabledInput) {
+          emailCopyEnabledInput.addEventListener("change", function () {
+            markComposerDirty();
+            updateEmailCopyFields();
+          });
+        }
+        if (additionalEmailsInput) additionalEmailsInput.addEventListener("input", markComposerDirty);
         [testEmailInput, testPhoneInput].forEach(function (input) {
           if (!input) {
             return;
@@ -9848,6 +9873,9 @@
           fd.set("import_payload", JSON.stringify(importedPayload || {}));
           fd.set("all_filtered", useAll ? "1" : "0");
           fd.set("test_mode", testModeEnabled ? "1" : "0");
+          var emailCopiesEnabled = !!(emailCopyEnabledInput && emailCopyEnabledInput.checked && !emailCopyEnabledInput.disabled && !testModeEnabled);
+          fd.set("email_copy_enabled", emailCopiesEnabled ? "1" : "0");
+          fd.set("additional_emails", emailCopiesEnabled && additionalEmailsInput ? String(additionalEmailsInput.value || "") : "");
           if (testEmailInput) {
             fd.set("test_email", String(testEmailInput.value || ""));
           }
@@ -9890,6 +9918,9 @@
               var queuedCount = Number(data.queued || 0);
               var notifyResult = showToast(queuedCount > 0 ? "success" : "warning", msg);
               if (queuedCount > 0) {
+                if (emailCopyEnabledInput) emailCopyEnabledInput.checked = false;
+                if (additionalEmailsInput) additionalEmailsInput.value = "";
+                updateEmailCopyFields();
                 var closeAfterNotify = function () {
                   closeComposer(true);
                 };

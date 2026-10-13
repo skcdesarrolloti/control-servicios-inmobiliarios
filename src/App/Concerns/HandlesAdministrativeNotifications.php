@@ -123,7 +123,11 @@ trait HandlesAdministrativeNotifications
         }
       }
 
-      $result = $service->enqueue($type, $ids, $channels, $subject, $message, $whatsappTemplate, $emailTemplate, $importPayload, AdministrativeNotificationsService::SMS_MAX, $testOptions);
+      $emailCopyOptions = [
+        'enabled' => (string) ($_POST['email_copy_enabled'] ?? '') === '1',
+        'additional_emails' => wp_unslash($_POST['additional_emails'] ?? ''),
+      ];
+      $result = $service->enqueue($type, $ids, $channels, $subject, $message, $whatsappTemplate, $emailTemplate, $importPayload, AdministrativeNotificationsService::SMS_MAX, $testOptions, false, $emailCopyOptions);
       $queued = (int) ($result['queued'] ?? 0);
       $invalid = (int) ($result['invalid'] ?? 0);
       $failed = (int) ($result['failed'] ?? 0);

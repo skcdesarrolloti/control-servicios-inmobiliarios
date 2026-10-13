@@ -15,6 +15,7 @@ final class AdministrativeNotificationsService
 {
   public const PROJECT_CODE = 'control-servicios-inmobiliarios';
   public const SOURCE_MODULE = 'admin_notifications';
+  public const MANUAL_EMAIL_COPY_ACTION = 'gestion_caso_admin';
   public const QUEUE_TABLE = 'skc_notification_queue';
   private const COLLECTION_QUEUE_SOURCE_MODULE = 'collection-management';
   private const QUEUE_ATTEMPTS_TABLE = 'skc_notification_attempts';
@@ -2505,7 +2506,7 @@ final class AdministrativeNotificationsService
     return $this->enqueue($type,$ids,$channels,$subject,$message,$whatsappTemplate,$emailTemplate,$recipientMetaMap,$smsMax,[],true);
   }
 
-  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = '', array $recipientMetaMap = [], int $smsMax = self::SMS_MAX, array $testOptions = [], bool $configuredCopies = false): array
+  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = '', array $recipientMetaMap = [], int $smsMax = self::SMS_MAX, array $testOptions = [], bool $configuredCopies = false, array $emailCopyOptions = []): array
   {
     $config = $this->typeConfig($type);
     $channels = $this->sanitizeChannels($channels);
@@ -2516,6 +2517,7 @@ final class AdministrativeNotificationsService
       $channels = array_values(array_filter($channels, static fn(string $channel): bool => $channel !== 'sms'));
     }
     $testOptions = $this->sanitizeTestModeOptions($testOptions, $channels);
+    $manualEmailCopies = $this->manualEmailCopies($emailCopyOptions, $channels, !empty($testOptions['enabled']));
     $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
     $subject = trim($subject);
     $message = trim($message);
@@ -2587,6 +2589,14 @@ final class AdministrativeNotificationsService
         }
         $queueRecipient = $recipient;
         if ($configuredCopies && $channel === 'email') $queueRecipient['_scm_internal_cc']=$copyPlan['cc'];
+        if ($emailCopyOptions !== [] && $channel === 'email') {
+          $queueRecipient['_scm_internal_cc'] = $manualEmailCopies;
+          $queueRecipient['_scm_email_copy_options'] = [
+            'requested' => !empty($emailCopyOptions['enabled']),
+            'enabled' => !empty($emailCopyOptions['enabled']) && empty($testOptions['enabled']),
+            'action' => self::MANUAL_EMAIL_COPY_ACTION,
+          ];
+        }
         if (!empty($testOptions['enabled'])) {
           $queueRecipient['_scm_test_mode'] = [
             'enabled' => true,
@@ -2641,6 +2651,21 @@ final class AdministrativeNotificationsService
       'test_email' => (string) ($testOptions['email'] ?? ''),
       'test_phone' => (string) ($testOptions['phone'] ?? ''),
     ] : []);
+  }
+
+  /** Resolve optional copies before queuing any recipient. Test sends never copy real contacts. */
+  private function manualEmailCopies(array $options, array $channels, bool $testMode): array
+  {
+    if (empty($options['enabled']) || $testMode || !in_array('email', $channels, true)) {
+      return [];
+    }
+    $additional = \SCM\Support\AdditionalEmailRecipients::parse($options['additional_emails'] ?? '');
+    $configured = \SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, self::MANUAL_EMAIL_COPY_ACTION);
+    $copies = \SCM\Support\InternalEmailCopies::emails(array_merge($configured, $additional));
+    if ($copies === []) {
+      throw new \InvalidArgumentException('Agrega al menos un correo en copia o configura funcionarios en Notificaciones internas: Avisos administrativos generales.');
+    }
+    return $copies;
   }
 
   /**
@@ -4756,15 +4781,15 @@ final class AdministrativeNotificationsService
         $payload['attachments'] = $attachments;
       }
     }
-    if ($channel === 'email' && isset($recipient['_scm_internal_cc'])) {
+    if ($channel === 'email' && empty($recipient['_scm_test_mode']['enabled']) && isset($recipient['_scm_internal_cc'])) {
       $payload['cc']=array_values(array_diff(\SCM\Support\InternalEmailCopies::emails($recipient['_scm_internal_cc']),[strtolower($destination)]));
-    }
-    if ($channel === 'email' && empty($recipient['_scm_test_mode']['enabled']) && $type !== 'funcionarios' && !empty($recipient['_scm_notification_meta']['collection_management'])) {
+    } elseif ($channel === 'email' && empty($recipient['_scm_test_mode']['enabled']) && $type !== 'funcionarios' && !empty($recipient['_scm_notification_meta']['collection_management'])) {
       $payload['cc']=array_values(array_diff(\SCM\Support\InternalNotificationRecipients::emailsForAction($this->db,'gestion_cobro'),[strtolower($destination)]));
     }
     $meta = [
       'admin_notifications' => [
         'internal_cc'=>$payload['cc']??[],
+        'email_copy_options' => $recipient['_scm_email_copy_options'] ?? [],
         'batch_id' => $batchId,
         'id_actor' => $actorId,
         'tipo_actor' => $type,
