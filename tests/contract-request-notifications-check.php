@@ -39,17 +39,18 @@ $url = 'https://example.invalid/uploads/acta-qa-1.pdf?n=qa&s=firma';
 foreach (['notifyContractTerminationActa' => 'terminacion_contrato', 'notifyContractNonRenewalActa' => 'no_prorroga_contrato'] as $method => $action) {
   $clear();
   $result = $invoke($method, $ticket, 'dentro', 'Respuesta de ejemplo', $url, $targets, 'Funcionario');
-  $check($result['email'] === 3 && $result['whatsapp'] === 2, "$action preserves legacy routing: both parties on both channels, internal email only");
+  $check($result['email'] === 2 && $result['whatsapp'] === 2, "$action sends party emails with configured staff in CC");
+  foreach (array_filter($rows(),static fn($r)=>$r['channel']==='email') as $email) $check(json_decode($email['payload_json'],true)['cc']===[$action==='terminacion_contrato'?'termination@example.invalid':'renewal@example.invalid'],"$action uses only its configured staff in CC");
   $options = $invoke('contractTerminationRecipientOptions', $ticket, $action);
   $check($options[2]['name'] === ($action === 'terminacion_contrato' ? 'Terminación' : 'No prórroga') && $options[2]['default_channels'] === ['email', 'whatsapp'], "$action shows configured active staff with email and WhatsApp selected by default");
   $clear();
   $channels = ['arrendatario' => ['whatsapp'], 'propietario' => ['email'], 'admin' => ['email', 'whatsapp']];
   $result = $invoke($method, $ticket, 'dentro', 'Respuesta de ejemplo', $url, $targets, 'Funcionario', $channels);
-  $check($result['email'] === 2 && $result['whatsapp'] === 2, "$action respects separate recipient channels including internal WhatsApp selection");
+  $check($result['email'] === 1 && $result['whatsapp'] === 2, "$action respects party channels with internal CC and separate WhatsApp");
   $destinations = array_column($rows(), 'destination');
   $check(!in_array('tenant@example.invalid', $destinations) && !in_array('+573001112244', $destinations), "$action never queues excluded party channels");
   $check(in_array($action === 'terminacion_contrato' ? '+573001112201' : '+573001112202', $destinations), "$action resolves its own internal event, not the other event");
-  $check(count(array_filter($rows(), static fn($r) => $r['status'] === 'pending')) === 4, "$action uses real shared pending queue");
+  $check(count(array_filter($rows(), static fn($r) => $r['status'] === 'pending')) === 3, "$action uses one email and two WhatsApp pending jobs");
   foreach (array_filter($rows(), static fn($r) => $r['channel'] === 'whatsapp') as $whatsapp) {
     $payload = json_decode($whatsapp['payload_json'], true, 512, JSON_THROW_ON_ERROR);
     $expected = [$whatsapp['destination_name'], '2000', '204578'];
@@ -60,8 +61,8 @@ foreach (['notifyContractTerminationActa' => 'terminacion_contrato', 'notifyCont
   }
   $originalKeys = array_column($rows(), 'dedupe_key');
   $invoke($method, $ticket, 'dentro', 'Respuesta nueva', str_replace('-1.', '-2.', $url), $targets, 'Funcionario', $channels);
-  $check(count($rows()) === 8, "$action reopened case can notify a new act with same classification");
-  $check(array_intersect($originalKeys, array_column(array_slice($rows(), 4), 'dedupe_key')) === [], "$action distinguishes a new act from its previous response");
+  $check(count($rows()) === 6, "$action reopened case can notify a new act with same classification");
+  $check(array_intersect($originalKeys, array_column(array_slice($rows(), 3), 'dedupe_key')) === [], "$action distinguishes a new act from its previous response");
   $clear();
   $invoke($method, $ticket, 'dentro', 'Respuesta', $url, ['none', 'arrendatario'], 'Funcionario', $channels);
   $check($rows() === [], "$action no-notification selection takes precedence");

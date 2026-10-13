@@ -106,6 +106,7 @@ final class PanelCaseNotifications
         $content .= '<p>' . nl2br(EmailTemplate::e($description)) . '</p>';
         $count = (new EmailQueue($this->db))->enqueue($email, 'Caso #' . $id . ' registrado: ' . $title, EmailTemplate::render('Caso registrado', $content, ['ticket_url' => PublicCaseAccess::url($id, $person['role'])]), [
           'source_module' => 'nuevo_caso_panel', 'dedupe_key' => 'nuevo_caso_panel:' . $id . ':externo', 'meta' => $meta + ['recipient_role' => $person['role']],
+          'internal_action'=>'nuevo_caso_panel',
         ]);
         if ($count !== 1) throw new \RuntimeException('No se pudo encolar el correo del destinatario. El caso no se guardó.');
         $emails[$email] = true;

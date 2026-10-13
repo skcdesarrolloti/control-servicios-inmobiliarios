@@ -65,7 +65,7 @@ $assert = static function (bool $ok, string $label) use (&$checks): void {
 };
 $failStaff = true;
 $service = new CompletionService($repo, $secret, 'https://example.invalid/panel', static function ($to, $subject, $html, $options) use ($db, &$failStaff): int {
-  if ($failStaff && $to === 'staff@example.invalid') { return 0; }
+  if ($failStaff && strtolower($to) === 'creator@example.invalid') { return 0; }
   return CompletionDelivery::enqueue($db, $to, $subject, $html, $options);
 });
 $notify = new ReflectionMethod($service, 'notifySignedStaff');
@@ -76,17 +76,22 @@ $original = (new ReflectionMethod($service, 'originalCreator'))->invoke($service
 $assert($original['employee_id'] === '200' && strtolower($original['email']) === 'creator@example.invalid', 'older edited act recovers original creator from creation audit');
 $act = $repo->act(900001);
 $results = $notify->invoke($service, $act);
-$assert($results === ['creator@example.invalid' => true, 'staff@example.invalid' => false], 'creator and active configured recipients only; email case deduplicated');
+$assert($results === ['creator@example.invalid' => false, 'staff@example.invalid' => false], 'Primary enqueue failure keeps configured CC pending too');
+$rows = $db->getResults('SELECT * FROM `' . $queueTable . '` ORDER BY id');
+$assert(count($rows)===0,'Failed grouped notice does not create separate staff jobs');
+$failStaff = false;
+$notify->invoke($service, $repo->act(900001));
 $rows = $db->getResults('SELECT * FROM `' . $queueTable . '` ORDER BY id');
 $assert(count($rows) === 1 && $rows[0]['destination'] === 'creator@example.invalid', 'original creator receives email independently of WhatsApp invitation');
+$assert(json_decode($rows[0]['payload_json'],true)['cc']===['staff@example.invalid'],'Configured staff receive CC of the signed act notice');
 $assert($rows[0]['status'] === 'pending' && $rows[0]['source_module'] === 'ticket-completion' && json_decode($rows[0]['meta_json'], true)['event'] === 'acta_firmada', 'real shared queue retains pending internal event');
 $assert(str_contains($rows[0]['message_html'], '204578') && str_contains($rows[0]['message_html'], '787') && !str_contains($rows[0]['message_html'], 'token='), 'internal link requires panel login and shows contract next to SIMI');
 $failStaff = false;
 $notify->invoke($service, $repo->act(900001));
 $rows = $db->getResults('SELECT * FROM `' . $queueTable . '` ORDER BY id');
-$assert(count($rows) === 2 && $rows[1]['destination'] === 'staff@example.invalid', 'partial failure retries only missing configured recipient');
+$assert(count($rows) === 1, 'Grouped retry does not create standalone configured emails');
 $notify->invoke($service, $repo->act(900001));
-$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '`') === 2, 'duplicate signature or resend does not duplicate internal notices');
+$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '`') === 1, 'duplicate signature or resend does not duplicate internal notices');
 $delivery = json_decode($repo->act(900001)['delivery_json'], true);
 $assert(count($delivery['internal_signed_receipt']) === 2 && $delivery['internal_signed_receipt']['staff@example.invalid']['queued'], 'delivery trace saved independently per recipient');
 $db->update($repo->table(), ['status' => 'pending'], ['id' => 900001]);
@@ -96,7 +101,7 @@ $db->update($repo->table(), ['status' => 'signed', 'delivery_json' => null], ['i
 $defaultService = new CompletionService($repo, $secret, 'https://example.invalid/panel');
 $defaultResults = $notify->invoke($defaultService, $repo->act(900001));
 $assert($defaultResults === ['creator@example.invalid' => true, 'staff@example.invalid' => true]
-  && (int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '` WHERE status = \'pending\'') === 2,
+  && (int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '` WHERE status = \'pending\'') === 1,
   'default production internal adapter enqueues only without running SMTP');
 
 // Upgrade a signed act that already notified by email: preserve those delivery keys.
@@ -117,7 +122,7 @@ $wsService = new CompletionService($repo, $secret, 'https://example.invalid/pane
 $notify->invoke($wsService, $repo->act(900001));
 $wsRows = $db->getResults('SELECT * FROM `' . $queueTable . '` WHERE channel = \'whatsapp\' ORDER BY id');
 $assert(count($wsRows) === 2 && array_column($wsRows, 'destination') === ['+573001111111', '+573003333333'], 'WhatsApp deduplicates creator/configured phone and includes selected staff without email');
-$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '` WHERE channel = \'email\'') === 2, 'adding WhatsApp preserves already queued emails');
+$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '` WHERE channel = \'email\'') === 1, 'adding WhatsApp preserves already queued emails');
 $template = json_decode(file_get_contents(dirname(__DIR__) . '/docs/whatsapp-acta-internal-signed-template.json'), true, 512, JSON_THROW_ON_ERROR);
 $wsPayload = json_decode($wsRows[0]['payload_json'], true);
 $assert($wsPayload['template_name'] === $template['name'] && $wsPayload['template_language'] === $template['language']
@@ -128,7 +133,7 @@ $failWs = false;
 $notify->invoke($wsService, $repo->act(900001));
 $assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '` WHERE channel = \'whatsapp\'') === 3, 'failed WhatsApp retry queues only missing phone');
 $notify->invoke($wsService, $repo->act(900001));
-$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '`') === 5, 'repeat notification does not duplicate either channel');
+$assert((int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '`') === 4, 'repeat notification does not duplicate either channel');
 $wsDelivery = json_decode($repo->act(900001)['delivery_json'], true);
 $assert($wsDelivery['internal_signed_receipt']['whatsapp:+573002222222']['queued'], 'WhatsApp delivery status tracked independently from email');
 $db->update($db->table('jet_cct_funcionarios'), ['celular' => '3004444444'], ['_ID' => 105]);

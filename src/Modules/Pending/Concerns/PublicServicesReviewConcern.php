@@ -713,6 +713,8 @@ trait PublicServicesReviewConcern
       ];
     }
     $recipients = $this->uniquePublicServicesEmailRecipients($recipients);
+    $copies = array_column($this->repo->getInternalNotificationRecipientsForAction('acta_servicios_publicos'),'email');
+    $recipients = \SCM\Support\InternalEmailCopies::recipients($recipients,$copies);
 
     foreach ($recipients as $recipient) {
       $email = trim($recipient['email']);
@@ -727,6 +729,7 @@ trait PublicServicesReviewConcern
       $html = EmailTemplate::render($subject, $content, ['buttons' => $buttons]);
       $queued += $queue->enqueue($email, $subject, $html, [
         'source_module' => 'revision-servicios-publicos-nativa',
+        'internal_action'=>'acta_servicios_publicos', 'internal_cc'=>$copies,
         'destination_name' => $name,
         'dedupe_key' => 'revision_servicios_publicos_' . $reviewId,
         'payload' => [

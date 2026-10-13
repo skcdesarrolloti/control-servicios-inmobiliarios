@@ -976,6 +976,7 @@ final class CollectionPortfolioService
           'source_module' => AdministrativeNotificationsService::SOURCE_MODULE,
           'destination_name' => (string) ($item['tenant_name'] ?? ''),
           'dedupe_key' => 'collection-letter:' . $portfolioId . ':' . $letterType . ':' . date('YmdHi'),
+          'internal_action'=>'cobro_prejuridico',
           'meta' => array_merge([
             'source_submodule' => 'collection-management',
             'portfolio_id' => $portfolioId,
@@ -1144,6 +1145,7 @@ final class CollectionPortfolioService
       'source_module' => AdministrativeNotificationsService::SOURCE_MODULE,
       'destination_name' => $tenantName,
       'dedupe_key' => 'collection-siniestro-notification:' . $portfolioId . ':' . date('YmdHi'),
+      'internal_action'=>'contrato_siniestro',
       'meta' => array_merge([
         'source_submodule' => 'collection-management',
         'portfolio_id' => $portfolioId,

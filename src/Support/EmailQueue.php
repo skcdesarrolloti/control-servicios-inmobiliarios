@@ -11,7 +11,7 @@ final class EmailQueue
 {
   private SharedNotificationsBridge $bridge;
 
-  public function __construct(Database $db)
+  public function __construct(private Database $db)
   {
     $this->bridge = new SharedNotificationsBridge($db);
   }
@@ -35,6 +35,10 @@ final class EmailQueue
     $destinationName = trim((string) ($options['destination_name'] ?? ''));
     $dedupeKey = trim((string) ($options['dedupe_key'] ?? ''));
     $payload = is_array($options['payload'] ?? null) ? $options['payload'] : [];
+    $action = trim((string) ($options['internal_action'] ?? ''));
+    $copies = is_array($options['internal_cc'] ?? null) ? $options['internal_cc'] : ($action !== '' ? InternalNotificationRecipients::emailsForAction($this->db, $action) : []);
+    $plan = InternalEmailCopies::plan($recipients, $copies);
+    $recipients = $plan['to'];
     $meta = $this->buildMeta($options, [
       'source',
       'source_module',
@@ -45,6 +49,8 @@ final class EmailQueue
       'destination_name',
       'dedupe_key',
       'payload',
+      'internal_cc',
+      'internal_action',
     ]);
     $queued = 0;
 
@@ -55,6 +61,12 @@ final class EmailQueue
       }
 
       try {
+        $envelope = $payload;
+        $cc = InternalEmailCopies::emails(array_merge((array) ($payload['cc'] ?? []), $plan['cc']));
+        $envelope['cc'] = array_values(array_diff($cc, [strtolower($email)]));
+        if (isset($envelope['bcc'])) $envelope['bcc'] = array_values(array_diff(InternalEmailCopies::emails((array)$envelope['bcc']), array_merge($envelope['cc'], [strtolower($email)])));
+        $deliveryMeta = $meta;
+        if ($copies !== []) $deliveryMeta['internal_email_copies'] = ['action'=>$action,'emails'=>$envelope['cc'],'internal_only'=>$plan['internal_only']];
         $queue->enqueue([
           'project_code' => $this->bridge->projectCode(),
           'source_module' => $sourceModule,
@@ -65,8 +77,8 @@ final class EmailQueue
           'subject' => $subject,
           'message_html' => $html,
           'message_text' => trim(html_entity_decode(strip_tags($html), ENT_QUOTES, 'UTF-8')),
-          'payload' => $payload,
-          'meta' => $meta,
+          'payload' => $envelope,
+          'meta' => $deliveryMeta,
           'priority' => $priority,
           'max_attempts' => $maxAttempts,
           'scheduled_at' => $scheduledAt,

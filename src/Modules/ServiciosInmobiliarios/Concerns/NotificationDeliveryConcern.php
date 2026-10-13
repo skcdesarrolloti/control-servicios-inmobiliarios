@@ -31,7 +31,7 @@ trait NotificationDeliveryConcern
         'usuario' => EmailTemplate::e($userName),
         'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver caso']]),
       ]);
-      $sent += $this->sendMailToUnique($recipient['email'], $subject, $html);
+      $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, ['internal_cc'=>$recipient['internal_cc']??[]]);
     }
     return $sent;
   }
@@ -68,12 +68,14 @@ trait NotificationDeliveryConcern
       $details .= ' Financiación: ' . (string) $cotizacion['financiacion'] . '.';
     }
     $seenEmail = [];
+    $copies = InternalNotificationRecipients::emailsForAction($this->db,'respuesta_cotizacion_mantenimiento');
+    $primaryEmails = \SCM\Support\InternalEmailCopies::plan(array_column($recipients,'email'),$copies)['to'];
     $seenPhone = [];
     $text = static fn($value): string => mb_substr(trim(preg_replace('/\s+/u', ' ', wp_strip_all_tags((string) $value)) ?: '') ?: 'No aplica', 0, 600, 'UTF-8');
     foreach ($recipients as $recipient) {
       $name = trim((string) ($recipient['name'] ?? '')) ?: 'Funcionario';
       $email = strtolower(trim((string) ($recipient['email'] ?? '')));
-      if ($this->queue instanceof EmailQueue && filter_var($email, FILTER_VALIDATE_EMAIL) && !isset($seenEmail[$email])) {
+      if ($this->queue instanceof EmailQueue && in_array($email,$primaryEmails,true) && !isset($seenEmail[$email])) {
         $seenEmail[$email] = true;
         $html = EmailTemplate::renderNamed('respuesta_cotizacion', [
           'destinatario' => EmailTemplate::e($name),
@@ -90,6 +92,7 @@ trait NotificationDeliveryConcern
         try {
           $queued['email'] += $this->queue->enqueue($email, $subject, $html, [
             'source_module' => 'respuesta_cotizacion_mantenimiento',
+            'internal_action' => 'respuesta_cotizacion_mantenimiento', 'internal_cc'=>$copies,
             'destination_name' => $name,
             'dedupe_key' => $dedupe . ':email',
             'meta' => $meta,
@@ -149,7 +152,7 @@ trait NotificationDeliveryConcern
         'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver caso']]),
       ]);
       $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, [
-        'cc' => [],
+        'internal_cc' => $recipient['internal_cc']??[],
       ]);
     }
     return $sent;
@@ -449,7 +452,8 @@ trait NotificationDeliveryConcern
       }
     }
 
-    return $this->uniqueEmailRecipients($recipients);
+    $copies = in_array('admin',$targets,true) && empty($excludeMap['admin']) ? $this->adminNotificationEmails($adminAction) : [];
+    return \SCM\Support\InternalEmailCopies::recipients($this->uniqueEmailRecipients($recipients),$copies);
   }
 
   /** @param array<int,array{email:string,name:string,role:string}> $recipients @return array<int,array{email:string,name:string,role:string}> */
@@ -539,9 +543,8 @@ trait NotificationDeliveryConcern
 
     // Modo cola: encolar para procesamiento asíncrono
     if ($this->queue instanceof EmailQueue) {
-      $allEmails = array_merge($to, isset($options['cc']) && is_array($options['cc']) ? $options['cc'] : []);
-      $this->queue->enqueue($allEmails, $subject, $html, $options);
-      return count($allEmails);
+      $options['payload']['cc'] = array_merge((array)($options['payload']['cc']??[]),(array)($options['cc']??[]));
+      return $this->queue->enqueue($to, $subject, $html, $options);
     }
 
     return 0;

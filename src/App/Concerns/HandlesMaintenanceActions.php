@@ -1960,6 +1960,7 @@ trait HandlesMaintenanceActions
 
     return (new \SCM\Support\EmailQueue($this->db))->enqueue(array_column($recipients, 'email'), $subject, $html, [
       'source_module' => 'cotizaciones_mantenimiento',
+      'internal_action' => 'cotizacion_mantenimiento_guardada',
       'dedupe_key' => 'cotizacion-mantenimiento-' . $mode . ':' . $quoteId,
       'meta' => [
         'event' => 'cotizacion_mantenimiento_guardada',
@@ -4200,6 +4201,7 @@ trait HandlesMaintenanceActions
     if ($emailRecipients !== []) {
       $emailQueued = (new \SCM\Support\EmailQueue($this->db))->enqueue(array_column($emailRecipients, 'email'), $subject, $html, [
         'source_module' => 'ordenes_mantenimiento',
+        'internal_action' => 'orden_mantenimiento_creada',
         'dedupe_key' => 'orden-mantenimiento-creada:' . $orderId . ':' . ($order['_notification_revision'] ?? 'inicial'),
         'meta' => [
           'event' => 'orden_mantenimiento_creada',
@@ -4331,6 +4333,7 @@ trait HandlesMaintenanceActions
     return (new \SCM\Support\EmailQueue($this->db))->enqueue($emails, $subject, $html, [
       'source_module' => 'ordenes_mantenimiento',
       'dedupe_key' => 'orden-mantenimiento-respuesta:' . $orderId . ':' . strtolower($estado) . ':' . (string) ($order['cct_modified'] ?? ''),
+      'internal_action' => 'respuesta_orden_mantenimiento',
       'meta' => [
         'event' => 'respuesta_orden_mantenimiento',
         'notification_actor_email' => (string) ($creatorRecipient['email'] ?? ''),

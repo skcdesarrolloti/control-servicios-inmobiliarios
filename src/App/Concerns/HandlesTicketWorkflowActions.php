@@ -412,10 +412,6 @@ trait HandlesTicketWorkflowActions
     } else {
       $settings = $incomingSettings;
     }
-    $actorCopy = $_POST['email_actor_cc_enabled'] ?? null;
-    if ($actorCopy !== null && (!is_string($actorCopy) || !in_array($actorCopy, ['0', '1'], true))) {
-      $this->jsonFail('La configuración de copia al funcionario no es válida.'); return;
-    }
     $automation = null;
     if (array_key_exists('receipt_automation', $_POST)) {
       try {
@@ -429,7 +425,6 @@ trait HandlesTicketWorkflowActions
     $pdo->beginTransaction();
     try {
       if ($automation !== null) \SCM\Core\App::settings()->set(\SCM\Modules\Contracts\ContractReceiptSettings::KEY, $automation, (int) Auth::employeeId());
-      if ($actorCopy !== null) \SCM\Core\App::settings()->set(\SCM\Support\NotificationActorCopy::SETTING, $actorCopy === '1', (int) Auth::employeeId());
       \SCM\Core\App::settings()->set('internal_admin_notifications', $settings, (int) Auth::employeeId());
       $pdo->commit();
     } catch (\Throwable $exception) {
@@ -5696,6 +5691,8 @@ trait HandlesTicketWorkflowActions
     $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
     $address = $this->contractTerminationFirstText([$ticket], ['direccion']) ?: 'dirección registrada';
     $emailRecipients = $this->contractTerminationNotificationEmails($ticket, $targets, 'terminacion_contrato', $channels);
+    $internalCopies = in_array('admin',$targets,true) && ($channels === null || in_array('email',$channels['admin']??[],true)) ? \SCM\Support\InternalNotificationRecipients::emailsForAction($this->db,'terminacion_contrato') : [];
+    $emailRecipients = \SCM\Support\InternalEmailCopies::plan(array_values($emailRecipients),$internalCopies)['to'];
     $dedupeKey = 'terminacion_contrato:' . $logicalTicket . ':' . $term . ':' . substr(hash('sha256', $actaUrl), 0, 24);
     $html = \SCM\Support\EmailTemplate::render('Respuesta solicitud de terminación de contrato', nl2br(\SCM\Support\EmailTemplate::e($responseText)), [
       'buttons' => [['url' => $actaUrl, 'label' => 'Ver acta generada']],
@@ -5703,6 +5700,7 @@ trait HandlesTicketWorkflowActions
     $emailQueued = $emailRecipients !== []
       ? (new \SCM\Support\EmailQueue($this->db))->enqueue(array_values($emailRecipients), $subject, $html, [
         'source_module' => 'terminacion_contrato',
+        'internal_action' => 'terminacion_contrato', 'internal_cc' => $internalCopies,
         'destination_name' => '',
         'dedupe_key' => $dedupeKey,
         'meta' => ['id_ticket' => $logicalTicket, 'acta_url' => $actaUrl, 'termino' => $status, 'notify_targets' => $targets, 'notify_channels' => $channels],
@@ -5774,6 +5772,8 @@ trait HandlesTicketWorkflowActions
     $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
     $address = $this->contractTerminationFirstText([$ticket], ['direccion']) ?: 'dirección registrada';
     $emailRecipients = $this->contractTerminationNotificationEmails($ticket, $targets, 'no_prorroga_contrato', $channels);
+    $internalCopies = in_array('admin',$targets,true) && ($channels === null || in_array('email',$channels['admin']??[],true)) ? \SCM\Support\InternalNotificationRecipients::emailsForAction($this->db,'no_prorroga_contrato') : [];
+    $emailRecipients = \SCM\Support\InternalEmailCopies::plan(array_values($emailRecipients),$internalCopies)['to'];
     $dedupeKey = 'no_prorroga_contrato:' . $logicalTicket . ':' . $term . ':' . substr(hash('sha256', $actaUrl), 0, 24);
     $html = \SCM\Support\EmailTemplate::render('Respuesta solicitud de no prórroga de contrato', nl2br(\SCM\Support\EmailTemplate::e($responseText)), [
       'buttons' => [['url' => $actaUrl, 'label' => 'Ver acta generada']],
@@ -5781,6 +5781,7 @@ trait HandlesTicketWorkflowActions
     $emailQueued = $emailRecipients !== []
       ? (new \SCM\Support\EmailQueue($this->db))->enqueue(array_values($emailRecipients), $subject, $html, [
         'source_module' => 'no_prorroga_contrato',
+        'internal_action' => 'no_prorroga_contrato', 'internal_cc' => $internalCopies,
         'destination_name' => '',
         'dedupe_key' => $dedupeKey,
         'meta' => ['id_ticket' => $logicalTicket, 'acta_url' => $actaUrl, 'termino' => $status, 'notify_targets' => $targets, 'notify_channels' => $channels],

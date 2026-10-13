@@ -50,6 +50,7 @@ trait PendingNotificationsAndDatesConcern
     }
 
     $jobs = [];
+    $adminAction = '';
     $addJob = static function (array &$jobs, string $email, string $target, array $pdfs): void {
       $email = trim($email);
       if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -92,7 +93,10 @@ trait PendingNotificationsAndDatesConcern
     }
 
     $queue = new EmailQueue($this->repo->getDb());
+    $copies = $adminAction !== '' ? InternalNotificationRecipients::emailsForAction($this->repo->getDb(),$adminAction) : [];
+    $primaryEmails = \SCM\Support\InternalEmailCopies::plan(array_column($jobs,'email'),$copies)['to'];
     foreach ($jobs as $job) {
+      if (!in_array(strtolower($job['email']),$primaryEmails,true)) continue;
       $pdfButtons = [];
       $documents = [];
       foreach ((array) ($job['pdfs'] ?? []) as $pdf) {
@@ -121,6 +125,7 @@ trait PendingNotificationsAndDatesConcern
       ]);
       $queuedCount = $queue->enqueue((string) $job['email'], $subject, $html, [
         'source' => 'scm_ticket_administrativo_nativo',
+        'internal_action'=>$adminAction, 'internal_cc'=>$copies,
         'dedupe_key' => 'ticket_admin_created_' . $ticketId,
         'meta' => [
           'documents' => $documents,
@@ -129,7 +134,7 @@ trait PendingNotificationsAndDatesConcern
       ]);
       if (!empty($ticketPayload['require_receipt_letter']) && $queuedCount < 1) throw new \RuntimeException('No se pudo encolar la carta para todos los destinatarios.');
     }
-    return count($jobs);
+    return count($primaryEmails);
   }
 
   /** @param array<int,string> $notifyRecipients @return array<int,string> */

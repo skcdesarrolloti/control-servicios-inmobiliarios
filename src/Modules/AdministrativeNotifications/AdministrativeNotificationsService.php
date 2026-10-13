@@ -2496,7 +2496,16 @@ final class AdministrativeNotificationsService
    * @param string[] $channels
    * @return array{queued:int,failed:int,invalid:int,filtered:int,selected:int,channels:array<int,string>,type:string,test_mode?:bool,test_email?:string,test_phone?:string}
    */
-  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = '', array $recipientMetaMap = [], int $smsMax = self::SMS_MAX, array $testOptions = []): array
+  public function enqueueConfigured(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = '', array $recipientMetaMap = [], int $smsMax = self::SMS_MAX): array
+  {
+    if ($type !== 'funcionarios') throw new \InvalidArgumentException('Las copias internas requieren funcionarios configurados.');
+    $activeIds = array_map('intval', array_column(\SCM\Support\FuncionarioOptions::activeFuncionarios($this->db, $this->schema, 'primary', true), 'id'));
+    $ids = array_values(array_intersect(array_map('intval', $ids), $activeIds));
+    if ($ids === []) return ['queued' => 0, 'email_queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0, 'selected' => 0, 'channels' => $channels, 'type' => $type];
+    return $this->enqueue($type,$ids,$channels,$subject,$message,$whatsappTemplate,$emailTemplate,$recipientMetaMap,$smsMax,[],true);
+  }
+
+  public function enqueue(string $type, array $ids, array $channels, string $subject, string $message, string $whatsappTemplate = '', string $emailTemplate = '', array $recipientMetaMap = [], int $smsMax = self::SMS_MAX, array $testOptions = [], bool $configuredCopies = false): array
   {
     $config = $this->typeConfig($type);
     $channels = $this->sanitizeChannels($channels);
@@ -2549,8 +2558,14 @@ final class AdministrativeNotificationsService
     }
 
     $recipients = $this->recipients($type, $ids, $recipientMetaMap, $notificationMetaMap);
+    $copyEmails = [];
+    if ($configuredCopies) foreach ($recipients as $copy) {
+      if (!$this->isBlockedByPreference($copy,'email',$type)) $copyEmails[]=$this->destination($copy,'email');
+    }
+    $copyPlan = \SCM\Support\InternalEmailCopies::plan($copyEmails,$copyEmails);
     $batchId = bin2hex(random_bytes(8));
     $queued = 0;
+    $emailQueued = 0;
     $failed = 0;
     $invalid = 0;
     $filtered = 0;
@@ -2562,6 +2577,7 @@ final class AdministrativeNotificationsService
           continue;
         }
         $originalDestination = $this->destination($recipient, $channel);
+        if ($configuredCopies && $channel === 'email' && !in_array(strtolower($originalDestination),$copyPlan['to'],true)) continue;
         $destination = !empty($testOptions['enabled'])
           ? $this->testModeDestination($testOptions, $channel)
           : $originalDestination;
@@ -2570,6 +2586,7 @@ final class AdministrativeNotificationsService
           continue;
         }
         $queueRecipient = $recipient;
+        if ($configuredCopies && $channel === 'email') $queueRecipient['_scm_internal_cc']=$copyPlan['cc'];
         if (!empty($testOptions['enabled'])) {
           $queueRecipient['_scm_test_mode'] = [
             'enabled' => true,
@@ -2603,6 +2620,7 @@ final class AdministrativeNotificationsService
         }
         if ($this->insertQueueRow($channel, $destination, $queueRecipient, $resolvedSubject, $resolvedMessage, $batchId, $whatsappTemplateConfig, $emailTemplateConfig)) {
           $queued++;
+          if ($channel === 'email') $emailQueued++;
         } else {
           $failed++;
         }
@@ -2611,6 +2629,7 @@ final class AdministrativeNotificationsService
 
     return [
       'queued' => $queued,
+      'email_queued' => $emailQueued,
       'failed' => $failed,
       'invalid' => $invalid,
       'filtered' => $filtered,
@@ -2656,6 +2675,7 @@ final class AdministrativeNotificationsService
     }
     $result = [
       'queued' => 0,
+      'email_queued' => 0,
       'failed' => 0,
       'invalid' => 0,
       'filtered' => 0,
@@ -2725,6 +2745,7 @@ final class AdministrativeNotificationsService
         }
         if ($this->insertQueueRow($channel, $destination, $recipient, $resolvedSubject, $resolvedMessage, $batchId, $whatsappTemplateConfig, $emailTemplateConfig)) {
           $result['queued']++;
+          if ($channel === 'email') $result['email_queued']++;
         } else {
           $result['failed']++;
         }
@@ -4735,8 +4756,15 @@ final class AdministrativeNotificationsService
         $payload['attachments'] = $attachments;
       }
     }
+    if ($channel === 'email' && isset($recipient['_scm_internal_cc'])) {
+      $payload['cc']=array_values(array_diff(\SCM\Support\InternalEmailCopies::emails($recipient['_scm_internal_cc']),[strtolower($destination)]));
+    }
+    if ($channel === 'email' && empty($recipient['_scm_test_mode']['enabled']) && $type !== 'funcionarios' && !empty($recipient['_scm_notification_meta']['collection_management'])) {
+      $payload['cc']=array_values(array_diff(\SCM\Support\InternalNotificationRecipients::emailsForAction($this->db,'gestion_cobro'),[strtolower($destination)]));
+    }
     $meta = [
       'admin_notifications' => [
+        'internal_cc'=>$payload['cc']??[],
         'batch_id' => $batchId,
         'id_actor' => $actorId,
         'tipo_actor' => $type,
@@ -4778,7 +4806,6 @@ final class AdministrativeNotificationsService
     ];
 
     try {
-      $data = \SCM\Support\NotificationActorCopy::apply($this->db, $data);
       $filtered = $this->schema->filterTableData(self::QUEUE_TABLE, $data);
       return $filtered !== [] && $this->db->insert(self::QUEUE_TABLE, $filtered);
     } catch (\Throwable) {

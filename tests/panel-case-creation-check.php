@@ -69,10 +69,10 @@ foreach (['jet_cct_historial_del_inmueble'] as $name) {
 $check((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historial_del_ticket') . '`') === 0, 'new case does not create an automatic consultant response');
 $check(str_contains($history['observacion'], 'Caso creado desde el panel. Asignado a Responsable comercial.'), 'property audit describes creation and assignment');
 $rows = $db->getResults('SELECT * FROM `' . $queueTable . '` ORDER BY id');
-$check(count($rows) === 2 && $result['queued'] === 2, 'assignee and configured copy deduplicate; inactive copy excluded');
+$check(count($rows) === 1 && $result['queued'] === 1, 'assignee and configured copy deduplicate; inactive copy excluded');
 $destinations = array_column($rows, 'destination'); sort($destinations);
-$check($destinations === ['assignee@example.invalid', 'copy@example.invalid'], 'internal recipients follow configuration across cargos');
-$check(count(array_filter($rows, fn($row) => $row['status'] === 'pending' && $row['channel'] === 'email' && $row['source_module'] === 'nuevo_caso_panel')) === 2, 'real shared queue contains pending email events');
+$check($destinations === ['assignee@example.invalid'] && json_decode($rows[0]['payload_json'], true)['cc'] === ['copy@example.invalid'], 'internal recipients follow configuration across cargos');
+$check(count(array_filter($rows, fn($row) => $row['status'] === 'pending' && $row['channel'] === 'email' && $row['source_module'] === 'nuevo_caso_panel')) === 1, 'real shared queue contains pending email events');
 $check(!str_contains($rows[0]['message_html'], '<script>') && str_contains($rows[0]['message_html'], 'scm_case=' . $id), 'email safely escapes content and links to authenticated case popup');
 $app = new SCM\App\SuCasaControlServiciosInmobiliarios($db);
 $read = static fn() => (new ReflectionMethod($app, 'panelCaseReadPayload'))->invoke($app, $id);
@@ -90,11 +90,11 @@ catch (InvalidArgumentException $e) { $check(true, 'anonymous case read rejected
 $_SESSION['scm_logged_in'] = true;
 $_SESSION['scm_employee_id'] = '9001';
 $before = (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_tickets') . '`');
-$db->pdo()->exec("ALTER TABLE `{$queueTable}` ADD CONSTRAINT qa_panel_copy CHECK (destination <> 'copy@example.invalid' OR subject LIKE 'Nuevo caso #{$id}:%')");
+$db->pdo()->exec("ALTER TABLE `{$queueTable}` ADD CONSTRAINT qa_panel_copy CHECK (channel <> 'email' OR subject LIKE 'Nuevo caso #{$id}:%')");
 try { $service->createPanelTicket($input); $check(false, 'partial queue failure must fail'); }
 catch (RuntimeException $e) { $check(true, 'partial queue failure is surfaced'); }
 $check((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_tickets') . '`') === $before, 'queue failure rolls back case');
-$check((int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '`') === 2, 'queue failure rolls back first recipient too');
+$check((int) $db->getVar('SELECT COUNT(*) FROM `' . $queueTable . '`') === 1, 'queue failure rolls back first recipient too');
 $check((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historial_del_ticket') . '`') === 0 && (int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_historial_del_inmueble') . '`') === 1, 'queue failure rolls back creation audit without generating responses');
 $db->pdo()->exec("ALTER TABLE `{$queueTable}` DROP CONSTRAINT qa_panel_copy");
 require_once $sharedRoot . '/autoload.php';
@@ -107,14 +107,14 @@ $providers = (new SharedNotifications\Providers\ProviderRegistry())->add(new Pan
 $worker = new SharedNotifications\NotificationWorker(new SharedNotifications\Storage\PdoStorageAdapter($db->pdo()), $providers, new SharedNotifications\Config\QueueConfig($queueTable, $attemptsTable));
 $db->pdo()->exec("UPDATE `{$queueTable}` SET scheduled_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY), next_attempt_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)");
 $worker->run(10, 'control-servicios-inmobiliarios');
-$check((int) $db->getVar("SELECT COUNT(*) FROM `{$queueTable}` WHERE status = 'sent'") === 2, 'inert provider worker completes shared emails');
-$check((int) $db->getVar("SELECT COUNT(*) FROM `{$attemptsTable}`") === 2, 'worker logs attempts without contacting real recipients');
+$check((int) $db->getVar("SELECT COUNT(*) FROM `{$queueTable}` WHERE status = 'sent'") === 1, 'inert provider worker completes shared emails');
+$check((int) $db->getVar("SELECT COUNT(*) FROM `{$attemptsTable}`") === 1, 'worker logs attempts without contacting real recipients');
 
 $criticalResult = $service->createPanelTicket(array_replace($input, ['tema_ayuda' => $criticalTheme, 'departamento' => 'Servicio al arrendatario']));
 $criticalTicket = $db->getRow('SELECT * FROM `' . $db->table('jet_cct_tickets') . '` WHERE `_ID` = ?', [(int) $criticalResult['ticket_id']]);
 $check($criticalTicket['tema_ayuda'] === $criticalTheme && $criticalTicket['departamento'] === 'Servicio al arrendatario', 'critical public service topic persists with canonical value');
 $criticalMail = $db->getRow('SELECT * FROM `' . $queueTable . '` WHERE dedupe_key LIKE ? LIMIT 1', ['nuevo_caso_panel:' . $criticalResult['ticket_id'] . '%']);
-$check($criticalResult['queued'] === 2 && $criticalMail && str_contains($criticalMail['message_html'], $criticalTheme), 'critical topic appears in queued assignment email');
+$check($criticalResult['queued'] === 1 && $criticalMail && str_contains($criticalMail['message_html'], $criticalTheme), 'critical topic appears in queued assignment email');
 $check($criticalResult['whatsapp_queued'] === 0 && str_contains($criticalResult['message'], 'WhatsApp pendiente'), 'disabled WhatsApp is explicit without claiming delivery');
 
 $settingsProperty = new ReflectionProperty(SCM\Core\Settings::class, 'data');
@@ -146,8 +146,8 @@ $notifyId = (int) $notifyResult['ticket_id'];
 $jobs = $db->getResults('SELECT * FROM `' . $queueTable . '` WHERE dedupe_key LIKE ? ORDER BY id', ['nuevo_caso_panel:' . $notifyId . ':%']);
 $emails = array_values(array_filter($jobs, fn($r) => $r['channel'] === 'email'));
 $whatsapps = array_values(array_filter($jobs, fn($r) => $r['channel'] === 'whatsapp'));
-$check($notifyResult['queued'] === 5 && $notifyResult['whatsapp_queued'] === 5 && count($emails) === 5 && count($whatsapps) === 5, 'assignee, configured copy and three selected external recipients get both queued channels');
-$check(count(array_filter($jobs, fn($r) => $r['status'] === 'pending')) === 10, 'both channels remain pending for shared worker');
+$check($notifyResult['queued'] === 4 && $notifyResult['whatsapp_queued'] === 5 && count($emails) === 4 && count($whatsapps) === 5, 'assignee, configured copy and three selected external recipients get both queued channels');
+$check(count(array_filter($jobs, fn($r) => $r['status'] === 'pending')) === 9, 'both channels remain pending for shared worker');
 foreach ($whatsapps as $job) {
   $payload = json_decode($job['payload_json'], true);
   $meta = json_decode($job['meta_json'], true);
@@ -169,10 +169,10 @@ $check((int) $db->getVar('SELECT COUNT(*) FROM `' . $db->table('jet_cct_tickets'
 $db->pdo()->exec("ALTER TABLE `{$queueTable}` DROP CONSTRAINT qa_panel_whatsapp");
 $db->update($db->table('jet_cct_contratos_arrendamiento'), ['correo_arrendatario' => 'owner@example.invalid', 'celular_arrendatario' => '3001113301'], ['_ID' => 801]);
 $dedupResult = $service->createPanelTicket($notifyInput);
-$check($dedupResult['queued'] === 4 && $dedupResult['whatsapp_queued'] === 4, 'duplicate external emails and normalized phones enqueue once per channel');
+$check($dedupResult['queued'] === 3 && $dedupResult['whatsapp_queued'] === 4, 'duplicate external emails and normalized phones enqueue once per channel');
 $check(count($dedupResult['notification_details']) === 5 && count(array_filter($dedupResult['notification_details'], fn($text) => str_contains($text, 'comparte celular'))) === 1, 'receipt explains every WhatsApp recipient and phone deduplication');
 $internalOnly = $service->createPanelTicket($input);
-$check($internalOnly['queued'] === 2 && $internalOnly['whatsapp_queued'] === 2, 'assigned consultant and configured copy get WhatsApp even with no external recipients selected');
+$check($internalOnly['queued'] === 1 && $internalOnly['whatsapp_queued'] === 2, 'assigned consultant and configured copy get WhatsApp even with no external recipients selected');
 $db->pdo()->exec("UPDATE `{$queueTable}` SET scheduled_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY), next_attempt_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 DAY)");
 $worker->run(100, 'control-servicios-inmobiliarios');
 $check((int) $db->getVar("SELECT COUNT(*) FROM `{$queueTable}` WHERE status <> 'sent'") === 0, 'inert providers process both email and official WhatsApp without real sends');

@@ -149,9 +149,9 @@ trait PanelTicketCreationConcern
       ]);
       if ($data !== []) $this->db->update($tickets, $data, ['_ID' => $id]);
       $this->insertPanelCaseHistory($id, $title, $creator, $assignee, $contract);
-      $recipients = InternalNotificationRecipients::emailsForAction($this->db, 'nuevo_caso_panel');
-      $recipients[] = $assignee['email'];
+      $recipients = array_merge([$assignee['email']], InternalNotificationRecipients::emailsForAction($this->db, 'nuevo_caso_panel'));
       $recipients = array_values(array_unique(array_map('strtolower', $recipients)));
+      $recipients = \SCM\Support\InternalEmailCopies::plan($recipients,InternalNotificationRecipients::emailsForAction($this->db,'nuevo_caso_panel'))['to'];
       $content = '<p>Se creó el caso <b>#' . $id . '</b> en SKC SuCasa Inmobiliaria.</p>';
       foreach (['Título' => $title, 'Tema' => $theme, 'Departamento' => $department, 'Responsable' => $assignee['name'], 'Contrato' => $contract['contrato'] ?? '', 'Inmueble SIMI' => $contract['inmueble'] ?? '', 'Dirección' => $contract['direccion'] ?? '', 'Creado por' => $creator['name']] as $label => $value) {
         $content .= '<p><b>' . EmailTemplate::e($label) . ':</b> ' . EmailTemplate::e((string) $value) . '</p>';
@@ -160,6 +160,7 @@ trait PanelTicketCreationConcern
       $url = \SCM\Support\PublicCaseAccess::url($id, 'funcionario');
       $queued = $this->emailQueue->enqueue($recipients, 'Nuevo caso #' . $id . ': ' . $title, EmailTemplate::render('Nuevo caso asignado', $content, ['ticket_url' => $url]), [
         'source_module' => 'nuevo_caso_panel', 'dedupe_key' => 'nuevo_caso_panel:' . $id,
+        'internal_action'=>'nuevo_caso_panel',
         'meta' => ['ticket_id' => $id, 'contract_id' => (int) $contract['_ID'], 'created_by_employee_id' => $creator['employee_id'], 'assigned_employee_id' => $assignee['employee_id']],
       ]);
       if ($queued !== count($recipients)) throw new \RuntimeException('No se pudieron encolar todos los correos. El caso no se guardó; intenta nuevamente.');

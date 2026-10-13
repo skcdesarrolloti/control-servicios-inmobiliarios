@@ -298,11 +298,12 @@ try {
   finally { $pdo->rollBack(); \SharedNotifications\NotificationQueue::$failEnqueue=false; }
   check((int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tickets')===$before,'Failed delivery enqueue must roll back ticket');
   $pdo->beginTransaction(); $letterResult=$letterProbe->createAdministrativeTicket($letterInput,[],[],['empleado','solicitante','admin']); $pdo->commit();
-  check($letterResult['ok']==='1' && (int)$letterResult['emails_queued']===2,'Tenant and configured internal employee must receive the letter, deduplicating recipient');
+  check($letterResult['ok']==='1' && (int)$letterResult['emails_queued']===1,'Letter uses one tenant email with configured employee in CC');
   check($db->getVar('SELECT cct_author_id FROM wp_jet_cct_historial_del_ticket WHERE id_ticket=?',[$letterResult['ticket_id']])==='EMP-900','Other administrative topics retain their creation history and real actor');
   $letterJob=json_decode($db->getVar("SELECT payload FROM test_jobs WHERE payload LIKE '%signed-letter.pdf%' LIMIT 1"),true);
   check(str_starts_with($letterJob['subject'],'Caso administrativo #'),'Other administrative topics keep their email titles');
   check(($letterJob['meta']['documents'][0]['url'] ?? '')==='https://example.invalid/signed-letter.pdf','Queued letter must retain signed PDF link');
+  check($letterJob['payload']['cc']===['test@example.invalid'],'Configured internal employee receives CC of the same signed letter');
   check(\SharedNotifications\NotificationQueue::$constructions===1,'All transactions must reuse the prewarmed queue');
   $probe->writable=false;
   check(!callEndpoint(fn()=>$probe->ajax_handler_contracts_ending_import_apply())->ok,'Read-only users cannot import');
@@ -452,6 +453,29 @@ try {
     check($completed['response']['ok']==='1' && $completed['retention']['ticket_id']!==$existing['ticket_id'] && (float)$service->get($id,$end)['probability']===0.0, $source . ': full response creates new retention after closed case and sets probability zero');
     check($db->getVar('SELECT estado FROM wp_jet_cct_tickets WHERE _ID=?',[(int)$existing['ticket_id']])==='Cerrado', $source . ': previous retention stays closed');
   }
+  // A scheduled internal event is one envelope per date, with all selected staff.
+  $db->insert('wp_jet_cct_funcionarios', ['_ID'=>14,'id_empleado'=>'EMP-14','nombre'=>'Second selected','correo'=>'second@example.invalid','id_cargo'=>'13','activo'=>'Si']);
+  $settings=json_decode($db->getVar('SELECT valor FROM wp_jet_cct_confi_sistema WHERE _ID=1'),true);
+  $settings['internal_admin_notifications']['contrato_no_salida']=[13,14];
+  $db->update('wp_jet_cct_confi_sistema',['valor'=>json_encode($settings)],['_ID'=>1]);
+  \SCM\Core\App::settings()->refresh();
+  $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>9901,'contrato'=>'QA9901','inmueble'=>'SIMI9901','estado'=>'Entregado','fin_contrato'=>(string)$end]);
+  $groupContract=$probe->pk('9901');
+  $pdo->beginTransaction();$grouped=$service->save($groupContract,$end,20,true,'7,0','Grouped','EMP-900');$pdo->commit();
+  $groupJobs=$db->getResults("SELECT payload FROM test_jobs WHERE dedupe_key LIKE 'contrato_no_salida:9901:%' AND status='pending'");
+  check($grouped['reminders_queued']===2 && count($groupJobs)===2,'Two dates create two grouped envelopes, not four staff emails');
+  foreach($groupJobs as $groupRow) {
+    $groupJob=json_decode($groupRow['payload'],true);
+    $all=array_merge([$groupJob['destination']],$groupJob['payload']['cc']);sort($all);
+    check($all===['second@example.invalid','test@example.invalid'] && count($groupJob['payload']['cc'])===1,'Scheduled copies include exactly the two configured employees');
+  }
+  $pdo->beginTransaction();$sameGroup=$service->save($groupContract,$end,25,true,'7,0','Grouped','EMP-900');$pdo->commit();
+  check($sameGroup['reminders_queued']===0,'Probability-only edit retains grouped schedules');
+  $settings['internal_admin_notifications']['contrato_no_salida']=[14];
+  $db->update('wp_jet_cct_confi_sistema',['valor'=>json_encode($settings)],['_ID'=>1]);
+  \SCM\Core\App::settings()->refresh();
+  $pdo->beginTransaction();$changedGroup=$service->save($groupContract,$end,25,true,'7,0','Grouped','EMP-900');$pdo->commit();
+  check($changedGroup['reminders_queued']===2 && (int)$db->getVar("SELECT COUNT(*) FROM test_jobs WHERE dedupe_key LIKE 'contrato_no_salida:9901:%' AND status='cancelled'")===2,'Recipient changes retire obsolete copies and schedule the new list');
   echo "PASS: exact contract, request-to-contract resolution, retention in termination/no renewal, dates, matching, signatures, probabilities, responsibility, reminder scheduling/cancellation, history, atomic imports and idempotent automatic receipts. No messages sent.\n";
 } finally {
   putenv('SHARED_NOTIFICATIONS_PATH'); unlink($temp.'/autoload.php');unlink($temp.'/config.php');rmdir($temp);

@@ -40,7 +40,7 @@ final class InternalNotificationRecipients
     foreach (self::contactsForAction($db, $action) as $funcionario) {
       $email = trim((string) ($funcionario['email'] ?? ''));
       if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $emails[strtolower($email)] = $email;
+        $emails[strtolower($email)] = strtolower($email);
       }
     }
 

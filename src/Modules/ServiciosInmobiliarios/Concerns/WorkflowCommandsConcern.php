@@ -1344,6 +1344,8 @@ trait WorkflowCommandsConcern
     $subject   = 'Traslado del caso #' . $logicalTicket;
     $sent      = 0;
     $fecha     = date('Y-m-d H:i');
+    $targets = $this->normalizeTargets($notifyTargets);
+    $copies = in_array('admin', $targets, true) && !in_array('none', $targets, true) ? $this->adminNotificationEmails() : [];
     $botones   = EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver caso']]);
 
     $baseVars = [
@@ -1361,7 +1363,7 @@ trait WorkflowCommandsConcern
         'destinatario'      => EmailTemplate::e($oldEmpNombre ?: 'funcionario'),
         'mensaje_principal' => 'Te informamos que el caso ha sido trasladado a otro funcionario.',
       ]));
-      $sent += $this->sendMailToUnique($oldEmpCorreo, $subject, $html);
+      $sent += $this->sendMailToUnique($oldEmpCorreo, $subject, $html, ['internal_cc' => $copies]);
     }
 
     // Notificar empleado nuevo
@@ -1370,7 +1372,7 @@ trait WorkflowCommandsConcern
         'destinatario'      => EmailTemplate::e($newEmpNombre ?: 'funcionario'),
         'mensaje_principal' => 'Se te ha asignado un nuevo caso.',
       ]));
-      $sent += $this->sendMailToUnique($newEmpCorreo, $subject, $html);
+      $sent += $this->sendMailToUnique($newEmpCorreo, $subject, $html, ['internal_cc' => $copies]);
     }
 
     // Notificar destinatarios adicionales seleccionados
@@ -1383,11 +1385,12 @@ trait WorkflowCommandsConcern
         'empleado'         => $newEmpNombre,
       ]);
       foreach ($this->emailRecipientsForTargets($ticketWithNewEmp, $targets, [$oldEmpCorreo, $newEmpCorreo]) as $recipient) {
+        if ($sent > 0 && $recipient['role'] === 'admin') continue;
         $html = EmailTemplate::renderNamed('traslado_caso', array_merge($baseVars, [
           'destinatario'      => EmailTemplate::e($recipient['name'] ?: 'cliente'),
           'mensaje_principal' => 'Te informamos que el caso ha sido trasladado a un nuevo funcionario.',
         ]));
-        $sent += $this->sendMailToUnique($recipient['email'], $subject, $html);
+        $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, ['internal_cc' => $recipient['internal_cc'] ?? []]);
       }
     }
 

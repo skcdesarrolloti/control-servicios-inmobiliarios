@@ -110,14 +110,14 @@ try {
   $assert((int) $contract['mes_revision_servicios'] === (int) date('n', $expectedDue) && (int) $contract['revisiones_servicios'] === 5 && (int) $contract['ultima_revision_servicios'] > 1700000000, 'review schedules three months from actual date despite stale configured November');
   $assert($contract['id_empleado'] === '94001' && $contract['realizado_por'] === 'Funcionario autenticado QA', 'contract stores authenticated employee');
   $rows = $db->getResults("SELECT * FROM `{$queueTable}` ORDER BY id");
-  $assert(count($rows) === 3 && count(array_filter($rows, static fn(array $r): bool => $r['status'] === 'pending')) === 3, 'emails enqueue owner, tenant and configured internal recipient only');
+  $assert(count($rows) === 2 && count(array_filter($rows, static fn(array $r): bool => $r['status'] === 'pending')) === 2, 'Owner and tenant emails carry configured staff as CC');
   $queuedDestinations = array_map(static fn(array $row): string => strtolower((string) ($row['destination'] ?? '')), $rows);
-  $assert(in_array('admin-config@example.invalid', $queuedDestinations, true) && !in_array('gcorrearivera@gmail.com', $queuedDestinations, true), 'internal review email uses configuration instead of fixed legacy addresses');
+  $assert(!in_array('admin-config@example.invalid', $queuedDestinations, true) && !array_filter($rows, static fn(array $row): bool => (json_decode($row['payload_json'],true)['cc'] ?? []) !== ['admin-config@example.invalid']), 'internal review email uses configuration instead of fixed legacy addresses');
   $payload = json_decode($rows[0]['payload_json'], true);
   $assert($payload['reply_to'] === 'actor@example.invalid' && $payload['attachments'][0]['path'] === $generatedPaths[0], 'reply-to and attachment belong to correct actor/review');
   $assert(str_contains($rows[0]['message_html'], 'revision-servicios-publicos.php?numero=') && str_contains($rows[0]['message_html'], 'expires='), 'email uses native expiring public review URL');
   $replay = $service->createServiciosPublicosReview(90001, $reviewInput);
-  $assert(!empty($replay['ok']) && !empty($replay['replayed']) && $replay['review_id'] === $result['review_id'] && (int)$db->getVar("SELECT COUNT(*) FROM `{$reviewTable}`") === 1 && (int)$db->getVar("SELECT COUNT(*) FROM `{$queueTable}`") === 3, 'same request replays original review without duplicate PDFs rows counts or emails');
+  $assert(!empty($replay['ok']) && !empty($replay['replayed']) && $replay['review_id'] === $result['review_id'] && (int)$db->getVar("SELECT COUNT(*) FROM `{$reviewTable}`") === 1 && (int)$db->getVar("SELECT COUNT(*) FROM `{$queueTable}`") === 2, 'same request replays original review without duplicate PDFs rows counts or emails');
   $staleInput = $reviewInput;
   $staleInput['request_token'] = \SCM\Modules\Pending\PublicServicesReviewStorage::formToken($base, 70001);
   $assert(empty($service->createServiciosPublicosReview(90001, $staleInput)['ok']), 'second form with old review version is rejected after contract row lock');
@@ -149,7 +149,7 @@ try {
   });
   $worker = new \SharedNotifications\NotificationWorker(new \SharedNotifications\Storage\PdoStorageAdapter($db->pdo()), $registry, new \SharedNotifications\Config\QueueConfig($queueTable, $attemptsTable), 'public-services-isolated-qa');
   $stats = $worker->run(6);
-  $assert($stats['sent'] === 3 && (int) $db->getVar("SELECT COUNT(*) FROM `{$attemptsTable}`") === 3, 'inert worker records successful attempts without sending messages');
+  $assert($stats['sent'] === 2 && (int) $db->getVar("SELECT COUNT(*) FROM `{$attemptsTable}`") === 2, 'inert worker records successful attempts without sending messages');
   $saved = $service->saveServiciosPublicosConfiguration(90001, ['configuration_present' => '1', 'servicios_configurados' => []]);
   $context = $service->buildServiciosPublicosReviewContext(90001);
   $assert(!empty($saved['ok']) && !$context['has_services'] && $context['services']['energia']['account'] === 'NIC-QA', 'removing all services excludes pending but preserves historical identifiers');

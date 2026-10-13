@@ -687,6 +687,8 @@ trait HandlesCorrectiveReviewActions
       ];
     }
     $recipients = $this->correctiveReviewUniqueEmailRecipients($recipients);
+    $copies = array_column($this->correctiveReviewInternalEmailRecipients('revision_correctiva_creada'),'email');
+    $recipients = \SCM\Support\InternalEmailCopies::recipients($recipients,$copies);
     if ($recipients === []) {
       return 0;
     }
@@ -712,6 +714,7 @@ trait HandlesCorrectiveReviewActions
 
       $queued += $queue->enqueue((string) $recipient['email'], $subject, $html, [
         'source_module' => 'revision_correctiva',
+        'internal_action'=>'revision_correctiva_creada', 'internal_cc'=>$copies,
         'destination_name' => $name,
         'dedupe_key' => 'revision-correctiva-creada:' . $reviewId . ':' . $role,
         'payload' => [

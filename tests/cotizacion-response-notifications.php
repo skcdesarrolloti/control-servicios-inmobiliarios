@@ -39,6 +39,7 @@ namespace {
   $sharedRoot = getenv('SHARED_NOTIFICATIONS_PATH') ?: dirname($root) . '/shared-notifications';
   require $sharedRoot . '/autoload.php';
   require $root . '/src/Support/InternalNotificationRecipients.php';
+  require $root . '/src/Support/InternalEmailCopies.php';
   require $root . '/src/Support/EmailQueue.php';
   require $root . '/src/Support/SmsQueue.php';
   require $root . '/src/Support/EmailTemplate.php';
@@ -138,7 +139,8 @@ namespace {
   }
   $storage->rows = [];
   $counts = $probe->respond($quote);
-  check($counts === ['email' => 2, 'whatsapp' => 3], 'Recipients must deduplicate each channel and include phone-only officials');
+  check($counts === ['email' => 1, 'whatsapp' => 3], 'Configured staff receive CC while WhatsApp remains individual');
+  check(json_decode($storage->rows[0]['payload_json'],true)['cc']===['funcionario@example.test'],'Quote response copies only configured staff without duplicating creator in To');
   $allowed = ['creador@example.test', 'funcionario@example.test', '+573001112233', '+573001112244', '+573001112255'];
   $template = json_decode(file_get_contents($root . '/docs/whatsapp-cotizacion-mantenimiento-respuesta-template.json'), true, 512, JSON_THROW_ON_ERROR);
   foreach ($storage->rows as $row) {
@@ -154,12 +156,12 @@ namespace {
     check(str_contains($payload['components'][0]['parameters'][7]['text'], 'Financiación: No'), 'Approval financing missing');
   }
   $probe->respond($quote);
-  check(count($storage->rows) === 5, 'Repeated response event must have stable dedupe keys');
+  check(count($storage->rows) === 4, 'Repeated response event must have stable dedupe keys');
   $providers = (new \SharedNotifications\Providers\ProviderRegistry())
     ->add(new LocalTestProvider('email_smtp'))->add(new LocalTestProvider('whatsapp_official'));
   $worker = new \SharedNotifications\NotificationWorker($storage, $providers);
-  check($worker->run(10)['sent'] === 5, 'Shared worker must process both channels');
-  check(count($storage->attempts) === 5, 'Shared worker must retain an attempt per notification');
+  check($worker->run(10)['sent'] === 4, 'Shared worker must process both channels');
+  check(count($storage->attempts) === 4, 'Shared worker must retain an attempt per notification');
   foreach ($storage->rows as $row) check($row['status'] === 'sent', 'Worker must mark isolated test notifications sent');
   $storage->rows = [];
   \SCM\Core\Settings::$values = [];

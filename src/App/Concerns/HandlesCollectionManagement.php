@@ -154,7 +154,7 @@ trait HandlesCollectionManagement
           if ($internalIds !== []) {
             try {
               $adminService = $this->get_admin_notifications_service();
-              $internalNotifyResult = $adminService->enqueue(
+              $internalNotifyResult = $adminService->enqueueConfigured(
                 'funcionarios',
                 $internalIds,
                 ['email'],
@@ -182,10 +182,10 @@ trait HandlesCollectionManagement
         $internalNotifyResult = ['queued' => 0, 'failed' => 0, 'invalid' => 0, 'filtered' => 0];
         $internalNotifyError = '';
         $internalIds = $this->internalNotificationRecipientsForAction('cobro_prejuridico');
-        if ($internalIds !== []) {
+        if ($internalIds !== [] && $emailQueued === 0) {
           try {
             $adminService = $this->get_admin_notifications_service();
-            $internalNotifyResult = $adminService->enqueue(
+            $internalNotifyResult = $adminService->enqueueConfigured(
               'funcionarios',
               $internalIds,
               ['email'],
@@ -478,9 +478,9 @@ trait HandlesCollectionManagement
     }
 
     $internalIds = $this->internalNotificationRecipientsForAction('gestion_cobro');
-    if ($internalIds !== [] && $allManagements !== []) {
+    if ($internalIds !== [] && $allManagements !== [] && empty($summary['notifications']['email_queued'])) {
       try {
-        $internalResult = $adminService->enqueue(
+        $internalResult = $adminService->enqueueConfigured(
           'funcionarios',
           $internalIds,
           ['email'],
@@ -594,9 +594,9 @@ trait HandlesCollectionManagement
         $summary['processed']++;
         $summary['email_queued'] += (int) ($result['email_queued'] ?? ($result['queued'] ?? 0));
         $internalIds = $this->internalNotificationRecipientsForAction('cobro_prejuridico');
-        if ($internalIds !== []) {
+        if ($internalIds !== [] && (int)($result['email_queued']??$result['queued']??0)===0) {
           try {
-            $summary['internal_notifications'] = $this->merge_admin_notification_results((array) $summary['internal_notifications'], $adminService->enqueue(
+            $summary['internal_notifications'] = $this->merge_admin_notification_results((array) $summary['internal_notifications'], $adminService->enqueueConfigured(
               'funcionarios',
               $internalIds,
               ['email'],
@@ -669,7 +669,7 @@ trait HandlesCollectionManagement
         }
         if ($internalIds !== []) {
           try {
-            $summary['internal_notifications'] = $this->merge_admin_notification_results((array) $summary['internal_notifications'], $adminService->enqueue(
+            $summary['internal_notifications'] = $this->merge_admin_notification_results((array) $summary['internal_notifications'], $adminService->enqueueConfigured(
               'funcionarios',
               $internalIds,
               ['email'],

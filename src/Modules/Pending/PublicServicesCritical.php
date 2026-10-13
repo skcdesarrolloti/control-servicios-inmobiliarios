@@ -187,8 +187,12 @@ final class PublicServicesCritical
       $p=json_decode($case['payload_json'],true,32,JSON_THROW_ON_ERROR); $contract=$p['contract'];
       $recipients=$this->internalRecipients($p,self::EVENT);
       $recipients[]=['name'=>$contract['arrendatario'],'email'=>$contract['correo_arrendatario']??'','phone'=>$contract['celular_arrendatario']??$contract['telefono_arrendatario']??''];
+      $copies=array_column($this->contacts(self::EVENT),'email');
+      $primaryEmails=\SCM\Support\InternalEmailCopies::plan(array_column($recipients,'email'),$copies)['to'];
       $details='Caso #'.(int)($p['ticket_id']??0).' · '.$this->summary($p); $deadline=date('d/m/Y H:i',(int)$case['deadline_at']).' (Colombia)'; $link=self::url($id, (int)$case['created_at']+180*86400);
       foreach ($recipients as $r) {
+        $r['email_as_cc']=!in_array(strtolower(trim((string)($r['email']??''))),$primaryEmails,true);
+        $r['internal_cc']=$copies;
         $body='Revisión crítica #'.$id.' · Contrato #'.$contract['contrato'].' · '.$contract['direccion']."\n".$details."\nCaso de servicios públicos críticos con plazo de atención de 72 horas. Vence ".$deadline."\nRealizado por: ".$p['employee']['nombre'];
         $this->notifyJobs($case,$r,$body,$link,$p['documents'],false);
       }
@@ -209,8 +213,8 @@ final class PublicServicesCritical
   {
     $id=(int)$case['review_id']; $base='services-critical:'.$id.':revision-ticket';
     $email=strtolower(trim((string)($r['email']??'')));
-    if (filter_var($email,FILTER_VALIDATE_EMAIL)) $this->job($id,'email',$base.':email:'.hash('sha256',$email),['destination'=>$email,'destination_name'=>$r['name'],'body'=>$body,'url'=>$url,'documents'=>$docs,'response'=>false,'workflow'=>self::WORKFLOW]);
-    else $this->audit($id,'contact_missing','system',['recipient'=>$r['name'],'channel'=>'email']);
+    if (empty($r['email_as_cc']) && filter_var($email,FILTER_VALIDATE_EMAIL)) $this->job($id,'email',$base.':email:'.hash('sha256',$email),['destination'=>$email,'destination_name'=>$r['name'],'body'=>$body,'url'=>$url,'documents'=>$docs,'response'=>false,'workflow'=>self::WORKFLOW,'internal_cc'=>$r['internal_cc']??[]]);
+    elseif (empty($r['email_as_cc'])) $this->audit($id,'contact_missing','system',['recipient'=>$r['name'],'channel'=>'email']);
     $phone=preg_replace('/\D/','',(string)($r['phone']??'')); if(strlen($phone)===10)$phone='57'.$phone;
     if(!preg_match('/^[1-9][0-9]{7,14}$/D',$phone)) { $this->audit($id,'contact_missing','system',['recipient'=>$r['name'],'channel'=>'whatsapp']); return; }
     foreach ($docs as $key=>$doc) {
@@ -344,7 +348,7 @@ final class PublicServicesCritical
     $options=['project_code'=>$bridge->projectCode(),'source_module'=>'public-services-critical','dedupe_key'=>$job['dedupe_key'],'destination_name'=>$p['destination_name'],'priority'=>1,'max_attempts'=>5,'meta'=>['review_id'=>(int)$job['review_id'],'critical_job_id'=>(int)$job['id'],'workflow'=>self::WORKFLOW,'ticket_id'=>(int)($case['ticket_id']??0),'notification_actor_employee_id'=>(string)($data['employee']['id_empleado']??'')]];
     if($job['kind']==='email'){
       $attachments=[];foreach($p['documents'] as $d)if(!empty($d['path']))$attachments[]=['path'=>$d['path'],'name'=>$d['filename']??$d['attachment_name']??basename($d['path'])];
-      $options['payload']=['attachments'=>$attachments];
+      $options['payload']=['attachments'=>$attachments,'cc'=>array_values(array_diff(\SCM\Support\InternalEmailCopies::emails($p['internal_cc']??[]),[strtolower($p['destination'])]))];
       $html='<p>'.nl2br(PublicServicesDocument::e($p['body'])).'</p><p><a href="'.PublicServicesDocument::e($p['url']).'">'.'Ver revisión'.'</a></p>';
       return ['queue_ids'=>$queue->enqueueEmail([$p['destination']],'Revisión de servicios públicos críticos · caso con plazo de 72 horas',$html,$options)];
     }

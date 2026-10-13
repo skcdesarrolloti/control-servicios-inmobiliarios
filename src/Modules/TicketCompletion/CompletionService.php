@@ -1098,13 +1098,17 @@ final class CompletionService
       $payload = $this->payload($act);
       $creator = $this->originalCreator($act, $payload);
       $recipients = [$creator];
+      $copies = [];
       try {
-        $recipients = array_merge($recipients, \SCM\Support\InternalNotificationRecipients::contactsForAction($this->repo->db, 'acta_firmada'));
+        $contacts = \SCM\Support\InternalNotificationRecipients::contactsForAction($this->repo->db, 'acta_firmada');
+        $recipients = array_merge($recipients, $contacts);
+        $copies = \SCM\Support\InternalEmailCopies::emails(array_column($contacts, 'email'));
       } catch (\Throwable $error) {
         // A configuration failure must not prevent the creator's notification.
         error_log('[ticket-completion] No se pudieron resolver los configurados de acta_firmada: ' . $error->getMessage());
       }
       $delivery = json_decode((string) ($act['delivery_json'] ?? ''), true) ?: [];
+      $primaryEmails = \SCM\Support\InternalEmailCopies::plan(array_column($recipients,'email'),$copies)['to'];
       $results = [];
       $subject = 'Acta #' . $act['id'] . ' firmada · Caso #' . $payload['ticket_number'];
       $url = $this->viewUrl((int) $act['id']);
@@ -1116,6 +1120,7 @@ final class CompletionService
           . '<p><a href="' . EmailTemplate::e($url) . '">Consultar acta firmada y descargar PDF</a> (requiere iniciar sesión en el panel).</p>';
         $phone = CompletionPolicy::phone((string) ($recipient['phone'] ?? ''));
         foreach (['email' => $email, 'whatsapp' => $phone] as $channel => $destination) {
+          if ($channel === 'email' && !in_array($destination,$primaryEmails,true)) continue;
           if ($channel === 'email' ? !filter_var($destination, FILTER_VALIDATE_EMAIL) : $destination === '') { continue; }
           // Retain existing email delivery keys when adding WhatsApp to older signed acts.
           $key = $channel === 'email' ? $destination : 'whatsapp:' . $destination;
@@ -1125,6 +1130,7 @@ final class CompletionService
           try {
             $result = ($this->enqueueInternal)($destination, $subject, EmailTemplate::render($subject, $body), [
               'channel' => $channel, 'source_module' => 'ticket-completion',
+              'internal_action'=>'acta_firmada', 'internal_cc'=>$copies,
               'provider' => $channel === 'email' ? 'email_smtp' : 'whatsapp_official',
               'destination_name' => $name, 'priority' => 100, 'message_text' => $text,
               'ticket_number' => $payload['ticket_number'], 'act_id' => (string) $act['id'],
@@ -1137,9 +1143,14 @@ final class CompletionService
           } catch (\Throwable) { $result = ['queued' => false, 'sent' => false]; }
           $results[$key] = !empty($result['queued']);
           $delivery['internal_signed_receipt'][$key] = $result + ['attempted_at' => time()];
+          if ($channel === 'email') foreach (array_diff($copies,[$destination]) as $copy) {
+            $results[$copy] = !empty($result['queued']);
+            $delivery['internal_signed_receipt'][$copy] = $result + ['via'=>'cc','primary_destination'=>$destination,'attempted_at'=>time()];
+          }
           $this->repo->db->update($this->repo->table(), ['delivery_json' => json_encode($delivery, JSON_THROW_ON_ERROR)], ['id' => (int) $act['id']]);
         }
       }
+      foreach ($copies as $copy) if (!isset($results[$copy]) && isset($delivery['internal_signed_receipt'][$copy])) $results[$copy]=!empty($delivery['internal_signed_receipt'][$copy]['queued']);
       return $results;
     });
   }

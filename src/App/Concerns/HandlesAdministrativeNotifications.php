@@ -434,12 +434,12 @@ trait HandlesAdministrativeNotifications
         }
       }
       $internalNotifyError = '';
-      if ($created > 0) {
+      if ($created > 0 && empty($notifyResult['email_queued']) && empty($codeudorNotifyResult['email_queued'])) {
         $internalIds = $this->internalNotificationRecipientsForAction('gestion_cobro');
         if ($internalIds !== []) {
           try {
             $internalMessage = $this->collection_management_internal_notification_message((array) ($result['managements'] ?? []), $payload, $queuedDetail, $created, $skipped);
-            $internalNotifyResult = $service->enqueue(
+            $internalNotifyResult = $service->enqueueConfigured(
               'funcionarios',
               $internalIds,
               ['email'],
@@ -550,7 +550,7 @@ trait HandlesAdministrativeNotifications
   /** @param array<string,mixed> $base @param array<string,mixed> $extra @return array<string,mixed> */
   private function merge_admin_notification_results(array $base, array $extra): array
   {
-    foreach (['queued', 'failed', 'invalid', 'filtered'] as $key) {
+    foreach (['queued', 'failed', 'invalid', 'filtered', 'email_queued'] as $key) {
       $base[$key] = (int) ($base[$key] ?? 0) + (int) ($extra[$key] ?? 0);
     }
     $base['selected'] = max((int) ($base['selected'] ?? 0), (int) ($extra['selected'] ?? 0));

@@ -564,11 +564,13 @@ final class RentIncreaseService
     ]];
     $emailQueue = new EmailQueue($this->db);
     $emailQueued = 0;
+    $internalAction = $type === 'canon' ? 'carta_aumento_canon' : 'carta_aumento_administracion';
+    $copies = InternalNotificationRecipients::emailsForAction($this->db,$internalAction);
     $emailRecipients = [
       ['email' => (string) ($context['correo_arrendatario'] ?? ''), 'name' => (string) ($context['arrendatario'] ?? ''), 'role' => 'arrendatario'],
       ['email' => (string) ($context['correo_propietario'] ?? ''), 'name' => (string) ($context['propietario'] ?? ''), 'role' => 'propietario'],
     ];
-    foreach ($emailRecipients as $recipient) {
+    foreach (\SCM\Support\InternalEmailCopies::recipients($emailRecipients,$copies) as $recipient) {
       if (!filter_var(trim($recipient['email']), FILTER_VALIDATE_EMAIL)) {
         continue;
       }
@@ -577,6 +579,7 @@ final class RentIncreaseService
       ]);
       $emailQueued += $emailQueue->enqueue($recipient['email'], $subject, $html, [
         'source_module' => 'cartas_aumento_arrendamiento',
+        'internal_action'=>$internalAction, 'internal_cc'=>$copies,
         'destination_name' => $recipient['name'],
         'dedupe_key' => 'carta_aumento_' . $type . '_' . $letterId,
         'payload' => ['attachments' => $attachments, 'reply_to' => (string) ($context['correo_contractual'] ?? '')],
@@ -584,19 +587,7 @@ final class RentIncreaseService
       ]);
     }
 
-    $internalQueued = 0;
-    foreach (InternalNotificationRecipients::emailsForAction($this->db, $type === 'canon' ? 'carta_aumento_canon' : 'carta_aumento_administracion') as $email) {
-      $html = EmailTemplate::render($subject, $this->emailBody($type, $context, 'equipo administrativo', 'administracion'), [
-        'buttons' => [['url' => $letterUrl, 'label' => 'Ver carta de aumento']],
-      ]);
-      $internalQueued += $emailQueue->enqueue($email, $subject, $html, [
-        'source_module' => 'cartas_aumento_arrendamiento_interno',
-        'destination_name' => 'Administración',
-        'dedupe_key' => 'carta_aumento_internal_' . $type . '_' . $letterId,
-        'payload' => ['attachments' => $attachments],
-        'meta' => ['letter_id' => $letterId, 'contract_id' => (int) ($context['_ID'] ?? 0), 'recipient_role' => 'interno', 'letter_url' => $letterUrl],
-      ]);
-    }
+    $internalQueued = $emailQueued > 0 ? count($copies) : 0;
 
     $whatsappQueued = 0;
     $sms = new SmsQueue($this->db);

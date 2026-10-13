@@ -107,9 +107,12 @@ final class ContractRenewalService
     foreach ($oldJobs as $key) $previousContacts[] = strtolower((string) substr($key, strrpos($key, ':') + 1));
     $previousContacts = array_values(array_unique($previousContacts)); sort($previousContacts);
     $currentContacts = array_map('strtolower', $contacts); sort($currentContacts);
+    $contactKey=substr(hash('sha256',implode('|',$currentContacts)),0,16);
+    $sameContacts = $previousContacts === $currentContacts && count($currentContacts)<2;
+    if ($oldJobs && preg_match('/:cc_([a-f0-9]{16}):/',(string)$oldJobs[0],$copyKey)) $sameContacts=hash_equals($contactKey,$copyKey[1]);
     $keepSchedule = $noExit && !empty($old['no_exit']) && (int) $old['end_ts'] === $endTs
       && (string) $old['reminder_days'] === implode(',', $parsedDays) && (string) $old['note'] === $note
-      && $previousContacts === $currentContacts;
+      && $sameContacts;
     $queue = !$keepSchedule && ($noExit || $oldJobs) ? $bridge->queue() : null;
     if (!$keepSchedule && ($noExit || $oldJobs) && !$queue) throw new \RuntimeException('La cola compartida no está disponible. No se guardaron cambios.');
     if (!$keepSchedule) foreach ($oldJobs as $job) $queue->cancelByDedupeKey((string) $job, 'Actualización de seguimiento contractual.');
@@ -126,13 +129,14 @@ final class ContractRenewalService
       $label = htmlspecialchars((string) ($contract['contrato'] ?? $id), ENT_QUOTES, 'UTF-8');
       $property = htmlspecialchars((string) ($contract['inmueble'] ?? $contract['id_inmueble'] ?? ''), ENT_QUOTES, 'UTF-8');
       $html = '<p>SKC SuCasa Inmobiliaria</p><p>Se reportó que el arrendatario no realizará la salida del inmueble.</p><p>Contrato: ' . $label . '. Inmueble: ' . $property . '. Fecha fin: ' . date('d/m/Y', $endTs) . '.</p><p>' . nl2br(htmlspecialchars($note, ENT_QUOTES, 'UTF-8')) . '</p>';
-      foreach ($dates as $scheduled) foreach ($contacts as $email) {
-        $key = 'contrato_no_salida:' . $id . ':' . $revision . ':' . $scheduled . ':' . strtolower($email);
+      foreach ($dates as $scheduled) foreach (\SCM\Support\InternalEmailCopies::plan($contacts,$contacts)['to'] as $email) {
+        $key = 'contrato_no_salida:' . $id . ':' . $revision . ':' . $scheduled . ':cc_' . $contactKey . ':' . strtolower($email);
         $queue->enqueue([
           'project_code' => $bridge->projectCode(), 'source_module' => 'contrato_no_salida',
           'channel' => 'email', 'provider' => 'email_smtp', 'destination' => $email,
           'subject' => 'Recordatorio de no salida · Contrato ' . (string) ($contract['contrato'] ?? $id),
           'message_html' => $html, 'message_text' => strip_tags($html),
+          'payload'=>['cc'=>array_values(array_diff($currentContacts,[strtolower($email)]))],
           'scheduled_at' => date(DATE_ATOM, $scheduled), 'dedupe_key' => $key,
           'meta' => ['contract_id' => $id, 'end_ts' => $endTs, 'revision' => $revision, 'notification_actor_employee_id' => $actor], 'created_by' => $actor,
         ]);

@@ -1998,7 +1998,7 @@ trait RendersDashboard
         $groupsHtml .= '<div class="scm-internal-notif-action">';
         $groupsHtml .= '<div class="scm-internal-notif-action-head">';
         $groupsHtml .= '<strong>' . esc_html((string) ($item['label'] ?? $action)) . '</strong>';
-        $groupsHtml .= '<span>' . esc_html((string) ($item['channel'] ?? 'Email interno')) . '</span>';
+        $groupsHtml .= '<span>' . esc_html(str_replace(['Email interno en cola','Email interno'],['CC por correo','CC por correo'],(string) ($item['channel'] ?? 'CC por correo'))) . '</span>';
         $groupsHtml .= '</div>';
         $groupsHtml .= '<p>' . esc_html((string) ($item['description'] ?? '')) . '</p>';
         $groupsHtml .= '<select name="settings[' . esc_attr($action) . '][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $buildOptions($selectedIds, in_array($action, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_no_salida','nuevo_caso_panel'], true)) . '</select>';
@@ -2018,15 +2018,11 @@ trait RendersDashboard
         <div class="scm-pqr-settings-head scm-tw-head bg-[#0f1e36] text-white px-6 py-5">
           <span class="scm-config-head-badge inline-flex rounded-full text-[10px] font-bold uppercase">Configuraci&oacute;n &amp; despacho</span>
           <h3 id="scm-internal-notifications-title" class="text-2xl font-bold text-white">Notificaciones internas administrativas</h3>
-          <p>Selecciona los funcionarios que reciben avisos por cada acci&oacute;n del panel. Cada evento indica sus canales; terminaci&oacute;n y no pr&oacute;rroga permiten elegir correo y WhatsApp al responder.</p>
+          <p>Selecciona los funcionarios que reciben copia en CC de los correos de cada acción. WhatsApp y calendario conservan sus destinatarios individuales.</p>
         </div>
         <form id="scm-internal-notifications-form" class="scm-internal-notifications-form" autocomplete="off">
-          <section class="scm-pqr-settings-section scm-actor-copy-settings">
-            <h4>Copia al funcionario que realiza la acción</h4>
-            <label><input type="checkbox" name="email_actor_cc_enabled" <?php echo (new \SCM\Support\NotificationActorCopy($this->db))->enabled() ? 'checked' : ''; ?>> Agregar al funcionario en CC de los correos de la aplicación</label>
-            <p>Usa el correo registrado del funcionario activo. Si ya es destinatario del correo, no se repite en CC. Los procesos automáticos usan al funcionario que originó la gestión cuando está identificado. Los códigos de firma se envían exclusivamente al firmante.</p>
-          </section>
-          <div class="scm-config-info-strip"><strong>Acciones y destinatarios internos:</strong> Selecciona uno o varios funcionarios por acci&oacute;n. Si una acci&oacute;n queda vac&iacute;a, no se env&iacute;an avisos internos para esa actividad.</div>
+          <div class="scm-internal-notifications-body">
+          <div class="scm-config-info-strip"><strong>Copias por acción:</strong> Los funcionarios seleccionados reciben CC del correo principal. Si el aviso es solo interno, uno queda en Para y los demás en CC. El autor no se agrega automáticamente. Los códigos de firma son exclusivos del firmante.</div>
           <section class="scm-pqr-settings-section" data-receipt-automation>
             <h4>Recibos automáticos de contratos · cron</h4>
             <p>Genera el caso y la carta de aviso previo 15 días antes de la fecha fin. Solo procesa el _ID indicado. La carta se envía al arrendatario, al responsable y a los destinatarios del evento Caso automático de recibo · 15 días.</p>
@@ -2038,9 +2034,10 @@ trait RendersDashboard
           </section>
           <section class="scm-pqr-settings-section">
             <h4>Acciones y destinatarios internos</h4>
-            <p>Selecciona uno o varios funcionarios por acci&oacute;n. Si una acci&oacute;n queda vac&iacute;a, no se env&iacute;an avisos internos para esa actividad.</p>
+            <p>Selecciona uno o varios funcionarios por acción. Sus correos reciben CC; dejar una acción vacía desactiva sus copias internas.</p>
             <div class="scm-internal-notif-grid"><?php echo $groupsHtml; ?></div>
           </section>
+          </div>
           <div class="scm-pqr-config-actions scm-internal-notif-actions">
             <small id="scm-internal-notifications-msg" aria-live="polite"></small>
             <button type="submit" class="scm-btn-primary btn btn-primary btn-sm">Guardar notificaciones internas</button>

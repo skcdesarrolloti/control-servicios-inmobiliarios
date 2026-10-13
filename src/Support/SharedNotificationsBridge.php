@@ -148,8 +148,7 @@ final class SharedNotificationsBridge
         $this->lastError = 'Inicializa shared-notifications antes de comenzar la transacción.';
         return false;
       }
-      $queueStorage = new ActorCopyNotificationStorage($this->storage, $this->db, $this->queueConfig->queueTable());
-      $queues[$key] = new \SharedNotifications\NotificationQueue($queueStorage, $this->queueConfig);
+      $queues[$key] = new \SharedNotifications\NotificationQueue($this->storage, $this->queueConfig);
       self::$connectionQueues[$pdo] = $queues;
     }
     $this->queue = $queues[$key];

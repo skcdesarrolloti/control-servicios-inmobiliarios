@@ -370,6 +370,7 @@ final class PublicServicesLiquidatorService
         $html = EmailTemplate::render($subject, $this->emailBody($context, $calculation, $recipient), ['buttons' => $buttons]);
         $emailQueued += $queue->enqueue((string) $recipient['email'], $subject, $html, [
           'source_module' => 'liquidador_servicios_publicos',
+          'internal_action'=>'liquidador_servicios_publicos',
           'destination_name' => (string) $recipient['name'],
           'dedupe_key' => 'liquidador_servicios_' . (int) ($contract['_ID'] ?? 0) . '_' . $batchKey,
           'payload' => ['attachments' => $attachments, 'reply_to' => (string) ($context['realizado_por_correo'] ?? '')],
