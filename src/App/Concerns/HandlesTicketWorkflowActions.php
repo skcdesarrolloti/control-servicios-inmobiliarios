@@ -974,7 +974,6 @@ trait HandlesTicketWorkflowActions
     if (array_key_exists('fin_contrato', $_POST)) {
       try {
         $ticket = $this->contractRequestEditedEndDate($ticket, (string) $_POST['fin_contrato'], (string) ($_POST['fin_contrato_original'] ?? ''));
-        $term = $ticket['_response_term'];
         $endDate = $ticket['_response_end_date'];
       } catch (\Throwable $exception) { $this->jsonFail($exception->getMessage()); return; }
     }
@@ -1113,7 +1112,6 @@ trait HandlesTicketWorkflowActions
     if (array_key_exists('fin_contrato', $_POST)) {
       try {
         $ticket = $this->contractRequestEditedEndDate($ticket, (string) $_POST['fin_contrato'], (string) ($_POST['fin_contrato_original'] ?? ''));
-        $term = $ticket['_response_term'];
         $endDate = $ticket['_response_end_date'];
       } catch (\Throwable $exception) { $this->jsonFail($exception->getMessage()); return; }
     }
@@ -5130,7 +5128,7 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $ticket @return array<string,mixed> */
-  /** Validate the edit against the linked contract; never trust the browser's classification. */
+  /** Validate the date edit; the response classification remains the employee's decision. */
   private function contractRequestEditedEndDate(array $ticket, string $date, string $original): array
   {
     $date = trim($date);
@@ -5144,10 +5142,9 @@ trait HandlesTicketWorkflowActions
     $ticket['fin_contrato'] = (string) $parsed->getTimestamp();
     $requestTs = $this->adminDueFirstTimestamp($ticket, ['solicitud_fecha', 'fecha', 'solicitud_created', 'cct_created']);
     $info = $this->contractTerminationTermInfo($ticket, $requestTs);
-    if (!in_array($info['term_status'], ['dentro', 'fuera'], true)) throw new \InvalidArgumentException('No se encontró la fecha de solicitud para recalcular el término.');
     $ticket['_response_end_date'] = $date;
     $ticket['_response_original_end_date'] = $oldDate;
-    $ticket['_response_term'] = $info['term_status'];
+    $ticket['_response_calculated_term'] = $info['term_status'];
     return $ticket;
   }
 
@@ -5155,7 +5152,7 @@ trait HandlesTicketWorkflowActions
   {
     $renewal = new ContractRenewalService($this->db);
     $edited = isset($ticket['_response_end_date']);
-    if ($edited) $term = $ticket['_response_term'];
+    if (!in_array($term, ['dentro', 'fuera'], true)) throw new \InvalidArgumentException('Selecciona la clasificación de la respuesta.');
     if ($term === 'dentro' || $createRetention || $edited) $renewal->ensureSchema();
     $seguimiento = $this->get_seguimiento_service();
     $contract = ($term === 'dentro' || $edited) ? $this->contractTerminationContractByContext($ticket) : [];
@@ -5181,7 +5178,7 @@ trait HandlesTicketWorkflowActions
             if ($this->column_exists($table, 'cct_modified')) $payload['cct_modified'] = date('Y-m-d H:i:s');
             if ($this->column_exists($table, 'cct_author_id')) $payload['cct_author_id'] = Auth::employeeId();
             if ($this->db->update($table, $payload, ['_ID' => (int) $contract['_ID']]) !== 1) throw new \RuntimeException('No se pudo guardar la fecha fin del contrato.');
-            $renewal->audit((int) $contract['_ID'], 'end_date_corrected', Auth::employeeId(), ['before' => $endTs, 'after' => $newTs, 'case_number' => $ticket['id_ticket'] ?? $ticketPk, 'source' => $source, 'term' => $term]);
+            $renewal->audit((int) $contract['_ID'], 'end_date_corrected', Auth::employeeId(), ['before' => $endTs, 'after' => $newTs, 'case_number' => $ticket['id_ticket'] ?? $ticketPk, 'source' => $source, 'term' => $term, 'calculated_term' => $ticket['_response_calculated_term'] ?? 'unknown']);
             if ($term !== 'dentro' && ($state = $renewal->get((int) $contract['_ID'], $endTs))) {
               $renewal->save($contract, $newTs, null, false, (string) $state['reminder_days'], '', Auth::employeeId());
             }

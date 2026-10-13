@@ -64,7 +64,7 @@ eval('?>' . substr($source, $start, $end - $start));
         if (nextDeleteError && action === 'request-delete') { nextDeleteError = false; return Promise.reject(new Error('Fallo simulado al eliminar')); }
         if (nextReopenError && action === 'request-reopen') { nextReopenError = false; return Promise.reject(new Error('Fallo simulado al reabrir')); }
         if (action === 'request-reopen') { answeredFixture.items = answeredFixture.items.filter(row => row.solicitud_id !== fd.get('solicitud_id')); answeredFixture.count = answeredFixture.items.length; }
-        return Promise.resolve({message:'Guardado simulado',renewal_probability_updated:fd.get('termino') === 'dentro'});
+        return Promise.resolve({message:'Guardado simulado',renewal_probability_updated:fd.get('termino') === 'dentro',contract_end_date_updated:fd.get('fin_contrato') !== fd.get('fin_contrato_original')});
       }
       var base = {solicitud_id:'41',ticket_pk:'41',id_ticket:'10863',titulo:'Caso #10863',asunto:'Solicitud de terminación de contrato de arrendamiento',creado:'05/10/2026 08:54',contrato:'2000',inmueble:'204578',direccion:'Urbanización Simón Bolívar manzana 20 lote 7',solicitante:'ARRENDATARIO DE EJEMPLO',estado:'Nuevo',estado_administrativo:'Nuevo',estado_solicitud:'Pendiente',fecha_solicitud:'2026-10-05',fin_contrato:'2027-01-09',fin_contrato_label:'09/01/2027',fecha_limite_label:'09/10/2026',term_status:'dentro',term_label:'Dentro de término',term_hint:'Solicitud recibida antes o el 09/10/2026.',case:{case_source_html:'<p>Detalle del caso</p>'},retention_ticket:{enabled:true,default_employee_id:'13',funcionarios:[{id:'13',name:'Funcionario de Ejemplo',cargo:'Asistente de Desarrollo TI'}],assignment_help:[{label:'Contrato',value:'#2000'},{label:'Contrato de',value:'Arrendatario: CLIENTE / Propietario: PROPIETARIO'},{label:'Inmueble',value:'Inmueble 204578 · Urbanización Simón Bolívar'},{label:'Funcionario relacionado',value:'Funcionario de Ejemplo · Asistente de Desarrollo TI'},{label:'Sugerido para asignar',value:'Funcionario de Ejemplo · Asistente de Desarrollo TI'}]},recipients:[{value:'arrendatario',label:'Arrendatario',name:'CLIENTE',email:'cliente@example.invalid',phone:'3001112233',available:true},{value:'propietario',label:'Propietario',name:'PROPIETARIO',email:'propietario@example.invalid',available:true},{value:'admin',label:'Funcionario configurado',name:'Funcionario',available:false}]};
       var fixture = {generated_at:'05/10/2026 11:03',count:3,items:[base,Object.assign({},base,{solicitud_id:'42',ticket_pk:'42',titulo:'Caso #10864',id_ticket:'10864',contrato:'2001',term_status:'fuera',term_label:'Fuera de término'}),Object.assign({},base,{solicitud_id:'43',ticket_pk:'43',titulo:'Caso #10865',id_ticket:'10865',term_status:'unknown',term_label:'Sin cálculo de término',asunto:'<img src=x onerror=alert(1)>',solicitante:'=1+1'})]};
@@ -104,16 +104,24 @@ eval('?>' . substr($source, $start, $end - $start));
       assert.equal(await popup.locator('[name="retencion_id_empleado"]').inputValue(),'13');
       assert.equal(await popup.locator('[name="notify_recipients[]"][value="admin"]').isDisabled(),true);
       assert.equal(await popup.locator('.swal2-confirm').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(248, 207, 74)','global modal rules cannot override reference yellow');
-      assert.equal(await popup.locator('[name="termino"]').inputValue(),'dentro');
-      assert(await popup.locator('[name="termino"]').isDisabled(),'classification is calculated');
+      assert(await popup.locator('[name="termino"]').isEnabled(),'classification is selected manually');
+      assert.equal(await popup.locator('[name="termino"]').inputValue(),'');
+      await popup.locator('.swal2-confirm').click();
+      assert(await popup.locator('[name="termino"]').evaluate(input=>input.validity.valueMissing),'a manual classification is required');
+      await popup.locator('[name="termino"]').selectOption('fuera');
       await popup.locator('[name="fin_contrato"]').fill('2026-12-09');
-      assert.equal(await popup.locator('[name="termino"]').inputValue(),'fuera');
+      assert.match(await popup.locator('[data-contract-response-term]').innerText(),/Fuera de término/);
       assert.match(await popup.locator('[data-contract-response-term]').innerText(),/09\/09\/2026/);
-      await popup.locator('[name="fin_contrato"]').fill('2027-01-05');
-      assert.equal(await popup.locator('[name="termino"]').inputValue(),'dentro','deadline day is inclusive');
+      assert.equal(await popup.locator('[name="termino"]').inputValue(),'fuera');
+      // Native picker/value changes must recalculate even before input/change fires.
+      await popup.locator('[name="fin_contrato"]').evaluate(input=>{input.value='2027-01-05';});
+      await page.waitForFunction(()=>document.querySelector('[data-contract-response-term]').innerText.includes('Dentro de término'));
+      assert.match(await popup.locator('[data-contract-response-term]').innerText(),/05\/10\/2026/);
+      assert.equal(await popup.locator('[name="termino"]').inputValue(),'fuera','live calculation preserves manual classification');
       await popup.locator('[name="fin_contrato"]').fill('2027-02-09');
-      assert.equal(await popup.locator('[name="termino"]').inputValue(),'dentro');
       assert.match(await popup.locator('[data-contract-response-term]').innerText(),/09\/11\/2026/);
+      assert.equal(await popup.locator('[name="termino"]').inputValue(),'fuera');
+      assert.equal(await popup.locator('[name="termino"]').inputValue(),'fuera','manual outside-term selection survives inside-term recommendation');
       assert.equal(await popup.locator('input[type="date"]').count(),2,'Only request date and editable end date are shown');
       assert.equal(await popup.locator('[name="fecha_terminacion"]').inputValue(),'2027-02-09','Act date follows the single editable end date');
       await popup.locator('[name="crear_ticket_retencion"]').uncheck();
@@ -139,7 +147,7 @@ eval('?>' . substr($source, $start, $end - $start));
     }
     const sent = await page.evaluate(() => requests);
     assert.deepEqual(sent.map(r=>r.action),['termination-save','non-renewal-save']);
-    sent.forEach(r => { const data = Object.fromEntries(r.data); assert.equal(data.ticket_pk,'41'); assert.equal(data.retencion_id_empleado,'13'); assert.equal(data['notify_recipients[]'],'none'); assert.equal(data.termino,'dentro'); assert.equal(data.fin_contrato_original,'2027-01-09'); assert.match(data.fin_contrato,/^2027-02-/); });
+    sent.forEach(r => { const data = Object.fromEntries(r.data); assert.equal(data.ticket_pk,'41'); assert.equal(data.retencion_id_empleado,'13'); assert.equal(data['notify_recipients[]'],'none'); assert.equal(data.termino,'fuera'); assert.equal(data.fin_contrato_original,'2027-01-09'); assert.match(data.fin_contrato,/^2027-02-/); });
     for (const kind of ['termination','non-renewal']) {
       await page.evaluate(kind => {
         const rows = kind === 'termination' ? contractTerminationRowsByPk : contractNonRenewalRowsByPk;
@@ -148,7 +156,7 @@ eval('?>' . substr($source, $start, $end - $start));
       await page.evaluate(kind => kind === 'termination' ? openContractTerminationResponse('41') : openContractNonRenewalResponse('41'),kind);
       const popup = page.locator('.scm-contract-response-swal');
       await popup.waitFor();
-      assert.equal(await popup.locator('[name="termino"]').inputValue(),'dentro');
+      await popup.locator('[name="termino"]').selectOption('dentro');
       await popup.locator('[name="crear_ticket_retencion"]').uncheck();
       const tenant = popup.locator('.scm-contract-recipient').filter({has:page.locator('[value="arrendatario"]')});
       const owner = popup.locator('.scm-contract-recipient').filter({has:page.locator('[value="propietario"]')});
@@ -188,7 +196,7 @@ eval('?>' . substr($source, $start, $end - $start));
         assert((await existing.innerText()).includes('Consultor de ejemplo'));
         assert.equal(await popup.locator('[name="crear_ticket_retencion"]').isDisabled(),active);
         assert.equal(await popup.locator('[name="crear_ticket_retencion"]').isChecked(),!active);
-        assert.equal(await popup.locator('[name="termino"]').inputValue(),'dentro');
+        await popup.locator('[name="termino"]').selectOption('dentro');
         await popup.locator('[name="fin_contrato"]').fill('2027-02-10');
         await popup.locator('[name="notify_recipients[]"][value="none"]').check();
         if (!active) await popup.locator('[name="crear_ticket_retencion"]').uncheck();

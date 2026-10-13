@@ -138,7 +138,9 @@ La revisión corrigió la omisión de `destinacion_inmueble` en la consulta mens
 En **Responder terminación** y **Responder no prórroga**, el funcionario puede
 editar **Fecha fin del contrato**. Se recalculan la fecha límite y la clasificación
 con la misma regla del listado: tres meses calendario antes de la fecha fin,
-incluyendo el día límite. La clasificación se verifica también en el servidor.
+incluyendo el día límite. Ese cálculo es orientativo: el funcionario selecciona
+manualmente la clasificación de la respuesta. Cambiar la fecha no reemplaza
+su selección. La respuesta, el acta y la probabilidad usan la clasificación elegida.
 Ambos popups muestran una sola fecha fin editable, usada también en el acta.
 
 La corrección se guarda al responder, junto con la respuesta y la probabilidad

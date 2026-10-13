@@ -467,14 +467,14 @@ try {
       catch(InvalidArgumentException $error) {check(str_contains($error->getMessage(),'fecha fin'),'Invalid corrections are rejected before responding');}
     }
     $edited=$probe->editRequestDate($request,'2027-02-09','2026-12-09');
-    check($edited['_response_term']==='dentro','Edited date recalculates in-term classification for '.$source);
+    check($edited['_response_calculated_term']==='dentro','Edited date recalculates in-term classification for '.$source);
     $probe->failResponse=true;
-    try {$probe->respondRequest($edited,'fuera',$source);throw new RuntimeException('Failed response accepted');}
+    try {$probe->respondRequest($edited,'dentro',$source);throw new RuntimeException('Failed response accepted');}
     catch(RuntimeException $error) {check($error->getMessage()==='Synthetic response failure','Edited response propagates failure');}
     $probe->failResponse=false;
     check((int)$probe->pk((string)$id)['fin_contrato']===$oldEnd && $service->history($id)===[],'Failed response rolls back corrected date and audit');
-    $saved=$probe->respondRequest($edited,'fuera',$source);
-    check($saved['response']['contract_end_date_updated'] && $saved['response']['renewal_probability_updated'],'Server uses recalculated term instead of submitted classification');
+    $saved=$probe->respondRequest($edited,'dentro',$source);
+    check($saved['response']['contract_end_date_updated'] && $saved['response']['renewal_probability_updated'],'Server honors the selected in-term response classification');
     check((int)$probe->pk((string)$id)['fin_contrato']===$newEnd && (float)$service->get($id,$newEnd)['probability']===0.0,'Date and zero probability use same new cycle');
     check((int)$db->getVar('SELECT fecha_terminacion_contrato FROM wp_jet_cct_tickets WHERE _ID=?',[$request['_ID']])===$newEnd,'Case snapshot follows corrected contract end date');
     $dateEvent=array_values(array_filter($service->history($id),fn($event)=>$event['action']==='end_date_corrected'))[0];
@@ -483,9 +483,9 @@ try {
     try {$probe->editRequestDate($request,'2027-03-01','2026-12-09');throw new RuntimeException('Stale date accepted');}
     catch(RuntimeException $error) {check(str_contains($error->getMessage(),'cambió'),'Stale popup cannot overwrite a new contract date');}
     $boundary=$probe->editRequestDate($request,'2027-01-05','2027-02-09');
-    check($boundary['_response_term']==='dentro','Request on three-month deadline is inside term');
+    check($boundary['_response_calculated_term']==='dentro','Request on three-month deadline is inside term');
     $outside=$probe->editRequestDate($request,'2026-12-09','2027-02-09');
-    check($outside['_response_term']==='fuera','Moving the end date earlier recalculates outside term');
+    check($outside['_response_calculated_term']==='fuera','Moving the end date earlier recalculates outside term');
     $db->update('wp_jet_cct_contratos_arrendamiento',['fin_contrato'=>(string)strtotime('2027-04-09')],['_ID'=>$id]);
     try {$probe->respondRequest($outside,'fuera',$source);throw new RuntimeException('Concurrent correction accepted');}
     catch(RuntimeException $error) {check(str_contains($error->getMessage(),'cambió'),'Locked save rejects a date changed after PDF preparation');}
@@ -497,9 +497,17 @@ try {
   $request=$requestFor(817);$request['fecha']=strtotime('2026-10-05');
   $outside=$probe->editRequestDate($request,'2026-12-09','2027-02-09');
   $saved=$probe->respondRequest($outside,'dentro','no prórroga');
-  check($saved['response']['contract_end_date_updated'] && !$saved['response']['renewal_probability_updated'],'Outside-term correction saves the date without forcing zero probability');
-  check((int)$probe->pk('817')['fin_contrato']===$outsideEnd && $service->get(817,$outsideEnd)['probability']===null,'Outside-term date begins a new renewal cycle');
+  check($saved['response']['contract_end_date_updated'] && $saved['response']['renewal_probability_updated'],'Employee-selected in-term response takes precedence over outside-term recommendation');
+  check((int)$probe->pk('817')['fin_contrato']===$outsideEnd && (float)$service->get(817,$outsideEnd)['probability']===0.0,'Manual in-term response updates probability in the corrected date cycle');
   foreach(json_decode($priorState['jobs_json'],true) as $key) check($db->getVar('SELECT status FROM test_jobs WHERE dedupe_key=?',[$key])==='cancelled','Old date reminders retire atomically with correction');
+  $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>820,'contrato'=>'920','inmueble'=>'820','fin_contrato'=>(string)$oldEnd,'estado'=>'Entregado']);
+  $request=$requestFor(820);$request['fecha']=strtotime('2026-10-05');
+  $recommendedInside=$probe->editRequestDate($request,'2027-03-09','2027-02-09');
+  check($recommendedInside['_response_calculated_term']==='dentro','Dates may recommend within term');
+  $saved=$probe->respondRequest($recommendedInside,'fuera','terminación de contrato');
+  check(!$saved['response']['renewal_probability_updated'] && $service->get(820,strtotime('2027-03-09'))===[],'Employee-selected outside-term response never forces automatic zero');
+  $dateAudit=json_decode($service->history(820)[0]['details_json'],true);
+  check($dateAudit['term']==='fuera' && $dateAudit['calculated_term']==='dentro','Audit distinguishes manual decision from date recommendation');
   $sameEnd=strtotime('2027-01-09 13:00:00');
   $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>818,'contrato'=>'918','inmueble'=>'818','fin_contrato'=>(string)$sameEnd,'estado'=>'Entregado']);
   $request=$requestFor(818);$request['fecha']=strtotime('2026-10-05');

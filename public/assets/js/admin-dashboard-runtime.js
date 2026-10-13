@@ -15023,15 +15023,14 @@
       return '<form class="scm-contract-response-form" data-scm-contract-' + kind + '-form>' +
         '<div class="rounded-xl bg-[#f2f3ff] p-4 space-y-2"><div class="flex flex-wrap items-center gap-2"><span class="scm-contract-tag !bg-[#dae2ff] font-semibold">' + contractUiIcon('ticket') + escHtml(row.titulo || 'Caso') + '</span><strong>' + escHtml(row.asunto || 'Solicitud contractual') + '</strong></div><p class="!m-0 text-xs">' + escHtml(meta) + '</p></div>' +
         '<div data-contract-response-term>' + contractTerminationTermBadge(row, false) + '</div>' +
-        '<div class="grid grid-cols-1 md:grid-cols-2 gap-4"><label class="scm-contract-field"><span>Clasificación calculada</span><select name="termino" disabled><option value="">Sin cálculo</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label><label class="scm-contract-field"><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || '') + '" readonly aria-readonly="true"></label>' +
-        '<label class="scm-contract-field"><span>Fecha fin del contrato <b class="text-red-700">*</b></span><input type="date" name="fin_contrato" required value="' + escHtml(row.fin_contrato || '') + '"><small>Se guardará en el contrato al responder y recalculará el término.</small></label>' +
+        '<div class="grid grid-cols-1 md:grid-cols-2 gap-4"><label class="scm-contract-field"><span>Clasificación de la respuesta <b class="text-red-700">*</b></span><select name="termino" required><option value="">Selecciona clasificación</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label><label class="scm-contract-field"><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || '') + '" readonly aria-readonly="true"></label>' +
+        '<label class="scm-contract-field"><span>Fecha fin del contrato <b class="text-red-700">*</b></span><input type="date" name="fin_contrato" required value="' + escHtml(row.fin_contrato || '') + '"><small>El cálculo se actualiza al editar. La fecha se guarda en el contrato al responder.</small></label>' +
         '<input type="hidden" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || '') + '"></div>' +
         contractRetentionTicketBlockHtml(row) + '<section><div class="flex items-center justify-between gap-3 mb-3"><strong class="text-[10px] uppercase tracking-wider">Notificar a</strong><span class="text-[10px]">Correo y WhatsApp por destinatario</span></div>' + contractTerminationRecipientChecks(row) + '</section></form>';
     }
 
     function initContractResponseDates(form, row) {
       var input = form.querySelector('[name="fin_contrato"]');
-      var term = form.querySelector('[name="termino"]');
       var delivery = form.querySelector('[name="fecha_terminacion"]');
       var badge = form.querySelector('[data-contract-response-term]');
       function parse(value) {
@@ -15043,7 +15042,6 @@
       function recalculate() {
         var end = parse(input.value), request = parse(row.fecha_solicitud || '');
         var current = Object.assign({},row,{fin_contrato:input.value,fin_contrato_label:end ? human(end) : '',fecha_limite_label:'',term_status:'unknown',term_label:'Sin cálculo de término',term_hint:'Indica una fecha fin válida para calcular el término.'});
-        term.value = '';
         if (end && request) {
           var limit = new Date(end.getTime());
           limit.setUTCMonth(limit.getUTCMonth()-3);
@@ -15051,13 +15049,18 @@
           current.term_status = request <= limit ? 'dentro' : 'fuera';
           current.term_label = current.term_status === 'dentro' ? 'Dentro de término' : 'Fuera de término';
           current.term_hint = 'Solicitud recibida ' + (current.term_status === 'dentro' ? 'antes o el ' : 'después del ') + current.fecha_limite_label + '.';
-          term.value = current.term_status;
         } else if (end) current.term_hint = 'No se encontró la fecha de solicitud para calcular el término.';
-        if (badge) badge.innerHTML = contractTerminationTermBadge(current,false);
+        if (badge) badge.innerHTML = '<span class="block text-[10px] font-bold uppercase tracking-wider mb-2">Cálculo según fechas</span>' + contractTerminationTermBadge(current,false);
         if (delivery) delivery.value = input.value;
       }
       input.addEventListener('input',recalculate);
       input.addEventListener('change',recalculate);
+      // Some native date pickers update value before emitting change or blur.
+      var lastValue = input.value;
+      var watch = window.setInterval(function() {
+        if (!form.isConnected) { window.clearInterval(watch); return; }
+        if (input.value !== lastValue) { lastValue = input.value; recalculate(); }
+      },150);
       recalculate();
     }
 
@@ -15343,7 +15346,7 @@
           if (channels === false) return false;
           var term = form.querySelector("[name='termino']");
           if (!term || !term.value) {
-            window.Swal.showValidationMessage("No se pudo calcular el término. Revisa la fecha fin y la fecha de solicitud.");
+            window.Swal.showValidationMessage("Selecciona la clasificación de la respuesta.");
             return false;
           }
           var createRetention = form.querySelector("[name='crear_ticket_retencion']");
@@ -15458,7 +15461,7 @@
           if (channels === false) return false;
           var term = form.querySelector("[name='termino']");
           if (!term || !term.value) {
-            window.Swal.showValidationMessage("No se pudo calcular el término. Revisa la fecha fin y la fecha de solicitud.");
+            window.Swal.showValidationMessage("Selecciona la clasificación de la respuesta.");
             return false;
           }
           var createRetention = form.querySelector("[name='crear_ticket_retencion']");
