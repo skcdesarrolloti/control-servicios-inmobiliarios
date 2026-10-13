@@ -96,7 +96,7 @@ eval('?>' . substr($source, $start, $end - $start));
       await page.evaluate(kind => kind === 'termination' ? openContractTerminationResponse('41') : openContractNonRenewalResponse('41'),kind);
       const popup = page.locator('.scm-contract-response-swal');
       await popup.waitFor();
-      assert.equal(await popup.locator('[name="fecha_terminacion"]').getAttribute('type'),kind==='termination'?'date':'hidden');
+      assert.equal(await popup.locator('[name="fecha_terminacion"]').getAttribute('type'),'hidden');
       await page.mouse.move(0,0);
       await page.waitForTimeout(350);
       await page.screenshot({path:path.join(qaDir,kind+'-modal-initial.png')});
@@ -114,11 +114,8 @@ eval('?>' . substr($source, $start, $end - $start));
       await popup.locator('[name="fin_contrato"]').fill('2027-02-09');
       assert.equal(await popup.locator('[name="termino"]').inputValue(),'dentro');
       assert.match(await popup.locator('[data-contract-response-term]').innerText(),/09\/11\/2026/);
-      if(kind==='termination') {
-        await popup.locator('[name="fecha_terminacion"]').fill('2027-03-01');
-        await popup.locator('[name="fin_contrato"]').fill('2027-02-10');
-        assert.equal(await popup.locator('[name="fecha_terminacion"]').inputValue(),'2027-03-01','delivery date is independent of contract end');
-      }
+      assert.equal(await popup.locator('input[type="date"]').count(),2,'Only request date and editable end date are shown');
+      assert.equal(await popup.locator('[name="fecha_terminacion"]').inputValue(),'2027-02-09','Act date follows the single editable end date');
       await popup.locator('[name="crear_ticket_retencion"]').uncheck();
       assert(await popup.locator('[name="retencion_id_empleado"]').isDisabled());
       await popup.locator('[name="crear_ticket_retencion"]').check();

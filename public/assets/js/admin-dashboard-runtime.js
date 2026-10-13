@@ -15025,16 +15025,15 @@
         '<div data-contract-response-term>' + contractTerminationTermBadge(row, false) + '</div>' +
         '<div class="grid grid-cols-1 md:grid-cols-2 gap-4"><label class="scm-contract-field"><span>Clasificación calculada</span><select name="termino" disabled><option value="">Sin cálculo</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label><label class="scm-contract-field"><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || '') + '" readonly aria-readonly="true"></label>' +
         '<label class="scm-contract-field"><span>Fecha fin del contrato <b class="text-red-700">*</b></span><input type="date" name="fin_contrato" required value="' + escHtml(row.fin_contrato || '') + '"><small>Se guardará en el contrato al responder y recalculará el término.</small></label>' +
-        (kind === 'termination' ? '<label class="scm-contract-field"><span>Fecha terminación / entrega</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || '') + '"></label>' : '<input type="hidden" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || '') + '">') + '</div>' +
+        '<input type="hidden" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || '') + '"></div>' +
         contractRetentionTicketBlockHtml(row) + '<section><div class="flex items-center justify-between gap-3 mb-3"><strong class="text-[10px] uppercase tracking-wider">Notificar a</strong><span class="text-[10px]">Correo y WhatsApp por destinatario</span></div>' + contractTerminationRecipientChecks(row) + '</section></form>';
     }
 
-    function initContractResponseDates(form, row, kind) {
+    function initContractResponseDates(form, row) {
       var input = form.querySelector('[name="fin_contrato"]');
       var term = form.querySelector('[name="termino"]');
       var delivery = form.querySelector('[name="fecha_terminacion"]');
       var badge = form.querySelector('[data-contract-response-term]');
-      var previous = input.value;
       function parse(value) {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
         var date = new Date(value + 'T00:00:00Z');
@@ -15055,8 +15054,7 @@
           term.value = current.term_status;
         } else if (end) current.term_hint = 'No se encontró la fecha de solicitud para calcular el término.';
         if (badge) badge.innerHTML = contractTerminationTermBadge(current,false);
-        if (delivery && (kind !== 'termination' || !delivery.value || delivery.value === previous)) delivery.value = input.value;
-        previous = input.value;
+        if (delivery) delivery.value = input.value;
       }
       input.addEventListener('input',recalculate);
       input.addEventListener('change',recalculate);
@@ -15312,7 +15310,7 @@
           var form = popup ? popup.querySelector("[data-scm-contract-termination-form]") : null;
           if (!form) return;
           initContractResponseReturn(form, row, 'termination', draft);
-          initContractResponseDates(form, row, 'termination');
+          initContractResponseDates(form, row);
           syncContractRetentionTicketState(form);
           form.addEventListener("change", function (event) {
             if (event.target && event.target.name === "notify_recipients[]") {
@@ -15427,7 +15425,7 @@
           var form = popup ? popup.querySelector("[data-scm-contract-non-renewal-form]") : null;
           if (!form) return;
           initContractResponseReturn(form, row, 'non-renewal', draft);
-          initContractResponseDates(form, row, 'non-renewal');
+          initContractResponseDates(form, row);
           syncContractRetentionTicketState(form);
           form.addEventListener("change", function (event) {
             if (event.target && event.target.name === "notify_recipients[]") {

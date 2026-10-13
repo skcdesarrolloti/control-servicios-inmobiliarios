@@ -139,7 +139,7 @@ En **Responder terminación** y **Responder no prórroga**, el funcionario puede
 editar **Fecha fin del contrato**. Se recalculan la fecha límite y la clasificación
 con la misma regla del listado: tres meses calendario antes de la fecha fin,
 incluyendo el día límite. La clasificación se verifica también en el servidor.
-En terminación, **Fecha terminación / entrega** es un campo independiente.
+Ambos popups muestran una sola fecha fin editable, usada también en el acta.
 
 La corrección se guarda al responder, junto con la respuesta y la probabilidad
 correspondiente, en una sola transacción. El historial contractual registra fecha

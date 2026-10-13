@@ -975,6 +975,7 @@ trait HandlesTicketWorkflowActions
       try {
         $ticket = $this->contractRequestEditedEndDate($ticket, (string) $_POST['fin_contrato'], (string) ($_POST['fin_contrato_original'] ?? ''));
         $term = $ticket['_response_term'];
+        $endDate = $ticket['_response_end_date'];
       } catch (\Throwable $exception) { $this->jsonFail($exception->getMessage()); return; }
     }
 
