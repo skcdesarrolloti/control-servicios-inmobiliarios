@@ -35,7 +35,7 @@ $ticket = ['id_ticket' => 'QA10916', 'contrato' => '2000', 'inmueble' => '204578
 $targets = ['arrendatario', 'propietario', 'admin'];
 $rows = static fn() => $db->getResults('SELECT * FROM `' . $queueTable . '` ORDER BY id');
 $clear = static fn() => $db->pdo()->exec('DELETE FROM `' . $queueTable . '`');
-$url = 'https://example.invalid/uploads/acta-qa-1.pdf';
+$url = 'https://example.invalid/uploads/acta-qa-1.pdf?n=qa&s=firma';
 foreach (['notifyContractTerminationActa' => 'terminacion_contrato', 'notifyContractNonRenewalActa' => 'no_prorroga_contrato'] as $method => $action) {
   $clear();
   $result = $invoke($method, $ticket, 'dentro', 'Respuesta de ejemplo', $url, $targets, 'Funcionario');
@@ -50,6 +50,14 @@ foreach (['notifyContractTerminationActa' => 'terminacion_contrato', 'notifyCont
   $check(!in_array('tenant@example.invalid', $destinations) && !in_array('+573001112244', $destinations), "$action never queues excluded party channels");
   $check(in_array($action === 'terminacion_contrato' ? '+573001112201' : '+573001112202', $destinations), "$action resolves its own internal event, not the other event");
   $check(count(array_filter($rows(), static fn($r) => $r['status'] === 'pending')) === 4, "$action uses real shared pending queue");
+  foreach (array_filter($rows(), static fn($r) => $r['channel'] === 'whatsapp') as $whatsapp) {
+    $payload = json_decode($whatsapp['payload_json'], true, 512, JSON_THROW_ON_ERROR);
+    $expected = [$whatsapp['destination_name'], '2000', '204578'];
+    if ($action === 'terminacion_contrato') $expected[] = 'Dirección de ejemplo';
+    array_push($expected, 'QA10916', 'dentro de término', 'Funcionario');
+    $check(array_column($payload['components'][0]['parameters'], 'text') === $expected, "$action sends approved body fields in order, including the case and signature");
+    $check($payload['components'][1] === ['type'=>'button','sub_type'=>'url','index'=>'0','parameters'=>[['type'=>'text','text'=>'uploads/acta-qa-1.pdf?n=qa&s=firma']]], "$action supplies dynamic act button at index zero and preserves the signed query");
+  }
   $originalKeys = array_column($rows(), 'dedupe_key');
   $invoke($method, $ticket, 'dentro', 'Respuesta nueva', str_replace('-1.', '-2.', $url), $targets, 'Funcionario', $channels);
   $check(count($rows()) === 8, "$action reopened case can notify a new act with same classification");

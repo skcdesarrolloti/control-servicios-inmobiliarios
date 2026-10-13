@@ -5789,6 +5789,7 @@ trait HandlesTicketWorkflowActions
         $phone = (string) ($recipient['phone'] ?? '');
         $name = (string) ($recipient['name'] ?? 'cliente');
         $summary = "No prórroga contrato #{$contract}, inmueble {$property}, dirección {$address}, caso #{$logicalTicket}. Clasificación: {$status}. Acta: {$actaUrl}";
+        $buttonSuffix = $this->contractTerminationWhatsappButtonSuffix($actaUrl);
         $message = "Buen dia, {$name}.\n\nSKC SuCasa Inmobiliaria emitio respuesta sobre la no prorroga del contrato.\n\n{$summary}\n\nAtentamente,\n{$creatorSignature}";
         $smsQueue = new \SCM\Support\SmsQueue($this->db);
         $ok = $smsQueue->enqueue($phone, $name, $message, [
@@ -5797,6 +5798,7 @@ trait HandlesTicketWorkflowActions
           'categoria_mensaje' => 'informacion',
           'id_ticket' => $logicalTicket,
           'acta_url' => $actaUrl,
+          'button_url_mode' => 'dynamic_suffix',
           'dedupe_key' => $dedupeKey,
           'template_name' => 'scm_no_prorroga_contrato_respuesta',
           'template_language' => 'es_CO',
@@ -5804,9 +5806,17 @@ trait HandlesTicketWorkflowActions
             'type' => 'body',
             'parameters' => [
               ['type' => 'text', 'text' => $name],
-              ['type' => 'text', 'text' => $summary],
+              ['type' => 'text', 'text' => $contract],
+              ['type' => 'text', 'text' => $property],
+              ['type' => 'text', 'text' => $logicalTicket],
+              ['type' => 'text', 'text' => $status],
               ['type' => 'text', 'text' => $creatorSignature],
             ],
+          ], [
+            'type' => 'button',
+            'sub_type' => 'url',
+            'index' => '0',
+            'parameters' => [['type' => 'text', 'text' => $buttonSuffix]],
           ]],
         ]);
         if ($ok) {
