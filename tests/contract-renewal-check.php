@@ -353,6 +353,9 @@ try {
   $service->reconcileCycles(802);
   foreach($scheduledJobs as $key) check($db->getVar('SELECT status FROM test_jobs WHERE dedupe_key=?',[$key])==='cancelled','Received contract must cancel pending no-exit notices');
   // Requests inherit fin_contrato but their _ID still belongs to the case.
+  // Start a fresh response request with the newly eligible cargo, preserving notification fixtures above.
+  $db->update('wp_jet_cct_funcionarios',['id_cargo'=>'1'],['_ID'=>13]);
+  $probe = new RenewalProbe($db);
   foreach ([803=>'903',804=>'904',805=>'905'] as $id=>$code) $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>$id,'contrato'=>$code,'inmueble'=>(string)$id,'fin_contrato'=>(string)$end,'estado'=>'Entregado']);
   foreach ([['terminación de contrato',803,'903',91001],['no prórroga',804,'904',800]] as [$source,$contractPk,$code,$casePk]) {
     $request = ['_ID'=>$casePk,'id_ticket'=>(string)$casePk,'id_contrato'=>(string)$contractPk,'contrato'=>$code,'inmueble'=>(string)$contractPk,'fin_contrato'=>(string)$end];

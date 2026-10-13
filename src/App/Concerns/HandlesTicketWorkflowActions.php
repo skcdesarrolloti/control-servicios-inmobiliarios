@@ -4542,7 +4542,7 @@ trait HandlesTicketWorkflowActions
     return $this->contractRetentionEmployeesCache = array_values(array_filter($funcionarios, static function (array $funcionario): bool {
       $cargo = mb_strtolower(trim((string) ($funcionario['cargo'] ?? '')), 'UTF-8');
       $cargoId = trim((string) ($funcionario['id_cargo'] ?? ''));
-      return $cargo === 'consultor de arriendo' || $cargoId === '13';
+      return $cargo === 'consultor de arriendo' || $cargoId === '1';
     }));
   }
 
@@ -5269,7 +5269,7 @@ trait HandlesTicketWorkflowActions
       }
     }
     if (!isset($activeIds[$employeeId])) {
-      return ['ok' => '0', 'message' => 'El responsable debe tener activo = Si y ser consultor de arriendo o tener el cargo 13.'];
+      return ['ok' => '0', 'message' => 'El responsable debe tener activo = Si y ser consultor de arriendo o tener el cargo 1.'];
     }
 
     $contract = $resolvedContract ?: $this->contractTerminationContractByContext($ticket);
