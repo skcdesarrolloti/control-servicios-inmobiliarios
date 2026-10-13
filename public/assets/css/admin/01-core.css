@@ -338,19 +338,6 @@
   margin: 10px 0 8px;
 }
 
-#scm-app #scm-internal-notifications-modal [data-receipt-automation] input[type="number"],
-#scm-app #scm-internal-notifications-modal [data-receipt-automation] select {
-  display: block;
-  width: 100%;
-  max-width: 520px;
-  margin-top: 6px;
-  min-height: 38px;
-  padding: 8px 10px;
-  border: 1px solid #dbe3ef;
-  border-radius: 8px;
-  background: #fff;
-}
-
 #scm-app #scm-internal-notifications-modal .scm-internal-notif-action-head {
   flex-direction: column;
   align-items: flex-start;

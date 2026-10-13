@@ -10399,13 +10399,6 @@
         fd.append("action", actionInternalNotificationsSave);
         fd.append("nonce", nonce);
         fd.append("settings", JSON.stringify(collectSettings()));
-        var receiptScope = form.querySelector('[data-receipt-automation]');
-        if (receiptScope) fd.append('receipt_automation', JSON.stringify({
-          enabled: receiptScope.querySelector('[name="receipt_enabled"]').checked,
-          contract_id: receiptScope.querySelector('[name="receipt_contract_id"]').value,
-          employee_id: receiptScope.querySelector('[name="receipt_employee_id"]').value,
-          coordinator_id: receiptScope.querySelector('[name="receipt_coordinator_id"]').value
-        }));
         fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
           .then(function (r) {
             return r.json();
@@ -15584,8 +15577,8 @@
       var config = data.receipt_automation || {};
       var scoped = allRows.filter(function(row) { return row.receipt_in_scope === true; });
       var configId = config.contract_id || (scoped[0] || {}).contract_pk || '';
-      var canConfigure = !!root.querySelector('#scm-internal-notifications-modal');
-      var settingsButton = function(label, primary) { return canConfigure ? '<button type="button" class="scm-ending-button ' + (primary ? 'scm-ending-primary' : contractsEndingView === 'receipt' ? 'scm-ending-settings-link' : 'scm-ending-blue') + '" data-ending-settings>' + contractsEndingIcon('settings') + escHtml(label) + '</button>' : ''; };
+      var canConfigure = contractsEndingView === 'receipt' ? data.can_configure_receipts === true : !!root.querySelector('#scm-internal-notifications-modal');
+      var settingsButton = function(label, primary) { return canConfigure ? '<button type="button" class="scm-ending-button ' + (primary ? 'scm-ending-primary' : contractsEndingView === 'receipt' ? 'scm-ending-settings-link' : 'scm-ending-blue') + '" data-ending-settings="' + (contractsEndingView === 'receipt' ? 'receipt' : 'notifications') + '">' + contractsEndingIcon('settings') + escHtml(label) + '</button>' : ''; };
       var historyButton = function(id, label) { return '<button type="button" class="scm-ending-button" data-contracts-ending-history data-contract-pk="' + escHtml(id) + '">' + escHtml(label || 'Historial') + '</button>'; };
       var money = function(value) { return value == null ? 'Sin dato' : new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(Number(value)); };
       if (status) {
@@ -15604,7 +15597,7 @@
           var reported = allRows.filter(function(row) { return Number((row.renewal || {}).no_exit) === 1; });
           summary.innerHTML = metric('Reportes de no salida', reported.length, '<p>Contratos registrados bajo esta condición</p>', 'document') + metric('Acción', 'Programar recordatorios', '<div class="scm-ending-metric-foot"><p>Envía alertas a los funcionarios configurados</p>' + settingsButton('Configurar', false) + '</div>', 'bell', 'scm-ending-action-metric');
         } else if (contractsEndingView === 'receipt') {
-          summary.innerHTML = metric('Contrato configurado · _ID', escHtml(configId || '-'), '<p>Contrato seleccionado en Configuración</p>', 'document', 'scm-ending-accent-side') + metric('Automatización', config.enabled ? 'Activada' : 'Desactivada', '<div class="scm-ending-metric-foot"><span class="scm-ending-cron-state ' + (config.enabled ? 'is-active' : '') + '">• Cron ' + (config.enabled ? 'activo' : 'inactivo') + '</span>' + settingsButton(config.enabled ? 'Configurar' : 'Habilitar', false) + '</div>', 'toggle', 'scm-ending-accent-side scm-ending-accent-yellow') + metric('En el mes consultado', scoped.length + '<small> contratos</small>', '<p>' + escHtml((groups[0] || {}).label || '') + ' · ' + scoped.filter(function(row) { return !!row.receipt_ticket_id; }).length + ' recibos creados</p>', 'calendar', 'scm-ending-accent-side scm-ending-accent-yellow');
+          summary.innerHTML = metric('Contrato configurado · _ID', escHtml(configId || '-'), '<p>Contrato seleccionado para el recibo automático</p>', 'document', 'scm-ending-accent-side') + metric('Automatización', config.enabled ? 'Activada' : 'Desactivada', '<div class="scm-ending-metric-foot"><span class="scm-ending-cron-state ' + (config.enabled ? 'is-active' : '') + '">• Cron ' + (config.enabled ? 'activo' : 'inactivo') + '</span>' + settingsButton('Configurar automatización', false) + '</div>', 'toggle', 'scm-ending-accent-side scm-ending-accent-yellow') + metric('En el mes consultado', scoped.length + '<small> contratos</small>', '<p>' + escHtml((groups[0] || {}).label || '') + ' · ' + scoped.filter(function(row) { return !!row.receipt_ticket_id; }).length + ' recibos creados</p>', 'calendar', 'scm-ending-accent-side scm-ending-accent-yellow');
         } else {
           summary.innerHTML = metric('Contratos del mes', formatDashboardCount(data.count || 0)) + metric('Mes consultado', escHtml((groups[0] || {}).label || '-'), '', '', 'scm-ending-text-metric') + metric('Gestión', 'Retención comercial', '', '', 'scm-ending-text-metric');
         }
@@ -15626,7 +15619,7 @@
           var isReceipt = contractsEndingView === 'receipt';
           var title = isReceipt ? 'Sin contratos configurados para este periodo' : contractsEndingView === 'no-exit' ? 'Sin registros activos' : 'Sin contratos para este periodo';
           var message = isReceipt ? 'El contrato configurado para el cron no termina en este mes. Selecciona su año y mes de terminación para consultar el recibo.' : contractsEndingView === 'no-exit' ? (contractsEndingOnlyNoExit ? 'No hay reportes de no salida en este mes. Desmarca el filtro para registrar uno.' : 'No hay contratos con fecha fin en este mes. Selecciona otro periodo para registrar un reporte.') : 'No hay contratos con fecha fin en este mes.';
-          var emptyButtons = isReceipt ? settingsButton('Configurar Cron' + (configId ? ' de Contrato ' + configId : ''), true) + (configId ? '<button type="button" class="scm-ending-button" data-ending-receipt-history data-contracts-ending-history data-contract-pk="' + escHtml(configId) + '">' + contractsEndingIcon('list') + 'Ver histórico de recibos</button>' : '') : contractsEndingView === 'no-exit' && contractsEndingOnlyNoExit ? '<button type="button" class="scm-ending-button" data-ending-show-all>' + contractsEndingIcon('close') + 'Desmarcar filtro de visualización</button>' + (data.can_write ? '<button type="button" class="scm-ending-button scm-ending-primary" data-ending-manual-report>' + contractsEndingIcon('plus') + 'Crear reporte manual</button>' : '') : '';
+          var emptyButtons = isReceipt ? settingsButton('Configurar automatización', true) + (configId ? '<button type="button" class="scm-ending-button" data-ending-receipt-history data-contracts-ending-history data-contract-pk="' + escHtml(configId) + '">' + contractsEndingIcon('list') + 'Ver histórico de recibos</button>' : '') : contractsEndingView === 'no-exit' && contractsEndingOnlyNoExit ? '<button type="button" class="scm-ending-button" data-ending-show-all>' + contractsEndingIcon('close') + 'Desmarcar filtro de visualización</button>' + (data.can_write ? '<button type="button" class="scm-ending-button scm-ending-primary" data-ending-manual-report>' + contractsEndingIcon('plus') + 'Crear reporte manual</button>' : '') : '';
           empty = '<div class="scm-ending-empty"><span class="scm-ending-empty-icon">' + contractsEndingIcon(isReceipt ? 'calendar' : 'clipboard') + '</span><h4>' + title + '</h4><p>' + message + '</p><div class="scm-ending-empty-actions">' + emptyButtons + '</div></div>';
         }
         return '<section class="scm-contracts-ending-month"><div class="scm-contracts-ending-month-head"><div><span>Mes de terminación</span><h4>' + escHtml(group.label || group.key || 'Mes') + '</h4></div><strong>' + formatDashboardCount(items.length) + '</strong></div><div class="scm-contracts-ending-rows">' + (items.length ? items.map(function(row) {
@@ -15636,7 +15629,7 @@
           if (contractsEndingView === 'ending') details = '<div class="scm-ending-tags"><span><b>Probabilidad de renovación:</b> ' + (row.probability == null ? 'Sin registrar' : escHtml(row.probability) + ' %') + '</span><span>' + (Number(renewal.no_exit) ? 'No salida reportada' : 'Sin reporte de no salida') + '</span></div>';
           if (contractsEndingView === 'no-exit') { ticketButton = ''; details = '<div class="scm-ending-tags"><span>' + (Number(renewal.no_exit) ? 'No salida reportada' : 'Sin reporte de no salida') + '</span><span>Recordatorios: ' + escHtml(renewal.reminder_days || '30,7,0') + ' días antes</span></div>' + (renewal.note ? '<p class="scm-ending-report-note">' + escHtml(renewal.note) + '</p>' : ''); }
           if (contractsEndingView === 'receipt') {
-            details = '<div class="scm-ending-tags"><span>Programado: <b>' + escHtml(row.receipt_due_label || '-') + '</b></span><span>' + (Number(row.probability) === 100 ? 'Omitido: renovación al 100 %' : Number(renewal.no_exit) ? 'Omitido: no salida reportada' : row.receipt_ticket_id ? 'Caso creado' : row.receipt_automation_enabled === false ? 'Cron desactivado en Configuración' : row.receipt_default_employee_id ? 'Pendiente de ejecución automática' : 'Requiere configurar responsable') + '</span></div>';
+            details = '<div class="scm-ending-tags"><span>Programado: <b>' + escHtml(row.receipt_due_label || '-') + '</b></span><span>' + (Number(row.probability) === 100 ? 'Omitido: renovación al 100 %' : Number(renewal.no_exit) ? 'Omitido: no salida reportada' : row.receipt_ticket_id ? 'Caso creado' : row.receipt_automation_enabled === false ? 'Automatización desactivada' : row.receipt_default_employee_id ? 'Pendiente de ejecución automática' : 'Requiere configurar responsable') + '</span></div>';
             ticketButton = row.receipt_ticket_id ? '<button type="button" class="scm-ending-button" data-contracts-ending-case="receipt" data-contract-pk="' + escHtml(row.contract_pk) + '">Ver recibo #' + escHtml(row.receipt_ticket_id) + '</button>' : '';
           }
           var configure = '';
@@ -15873,6 +15866,43 @@
       });
     }
 
+    function openContractReceiptSettings() {
+      if (!window.Swal || !contractsEndingData || !contractsEndingData.can_configure_receipts) return Promise.resolve();
+      return dashboardAction(actions.contract_receipt_settings_read, {}).then(function(data) {
+        var config = data.config || {};
+        var options = function(selected) {
+          return '<option value="">Selecciona un funcionario</option>' + (data.employees || []).map(function(person) {
+            return '<option value="' + escHtml(person.id) + '"' + (String(person.id) === String(selected || '') ? ' selected' : '') + '>' + escHtml(person.name || person.id) + '</option>';
+          }).join('');
+        };
+        return Swal.fire({
+          title: 'Configurar recibos automáticos',
+          customClass: contractsEndingDialogClasses('receipt'), width:'min(560px,94vw)', buttonsStyling:false,
+          html: '<form data-contract-receipt-settings-form class="scm-ending-dialog-form">' +
+            '<p>Genera el caso y la carta de aviso previo 15 días antes de la fecha fin del contrato seleccionado.</p>' +
+            '<label class="scm-ending-dialog-check"><input type="checkbox" name="receipt_enabled" ' + (config.enabled ? 'checked' : '') + '><span>Activar recibos automáticos</span></label>' +
+            '<label>Contrato: código interno<input type="number" min="1" max="999999999" required name="receipt_contract_id" value="' + escHtml(config.contract_id) + '"></label>' +
+            '<label>Funcionario al que se asignan los casos<select name="receipt_employee_id">' + options(config.employee_id) + '</select></label>' +
+            '<label>Coordinador que aparece en la carta (opcional)<select name="receipt_coordinator_id">' + options(config.coordinator_id) + '</select></label>' +
+            '<small>El responsable seleccionado se usará en los casos automáticos. Los destinatarios de los avisos se configuran en Notificaciones internas → Caso automático de recibo · 15 días.</small></form>',
+          showCancelButton:true, confirmButtonText:'Guardar configuración', cancelButtonText:'Cancelar', showLoaderOnConfirm:true,
+          allowOutsideClick:function() { return !Swal.isLoading(); },
+          preConfirm:function() {
+            var form = Swal.getPopup().querySelector('[data-contract-receipt-settings-form]');
+            if (!form.reportValidity()) return false;
+            if (form.elements.receipt_enabled.checked && !form.elements.receipt_employee_id.value) {
+              Swal.showValidationMessage('Selecciona el funcionario que recibirá los casos automáticos.'); return false;
+            }
+            return dashboardFormAction(actions.contract_receipt_settings_save, function(fd) {
+              fd.append('receipt_automation', JSON.stringify({enabled:form.elements.receipt_enabled.checked, contract_id:form.elements.receipt_contract_id.value, employee_id:form.elements.receipt_employee_id.value, coordinator_id:form.elements.receipt_coordinator_id.value}));
+            }).catch(function(error) { Swal.showValidationMessage(error.message || 'No se pudo guardar.'); return false; });
+          }
+        }).then(function(result) {
+          if (result.isConfirmed && result.value) { showToast('success', result.value.message); loadContractsEnding(true); }
+        });
+      }).catch(function(error) { showToast('error', error.message || 'No se pudo cargar la configuración.'); });
+    }
+
     function openContractsEndingManagement(contractPk, mode) {
       var row = contractsEndingRowsByPk[String(contractPk)];
       if (!row || !window.Swal || !contractsEndingData.can_write) return;
@@ -15972,6 +16002,11 @@
 
     root.addEventListener('click', function(event) {
       var settings = event.target.closest('[data-ending-settings]');
+      if (settings && settings.getAttribute('data-ending-settings') === 'receipt') {
+        settings.disabled = true;
+        openContractReceiptSettings().finally(function() { settings.disabled = false; });
+        return;
+      }
       if (settings && root.querySelector('#scm-internal-notifications-modal')) {
         var trigger = root.querySelector('#scm-open-internal-notifications');
         if (!trigger) { trigger = document.createElement('button'); trigger.type = 'button'; trigger.id = 'scm-open-internal-notifications'; trigger.hidden = true; trigger.tabIndex = -1; trigger.setAttribute('aria-hidden', 'true'); root.appendChild(trigger); }

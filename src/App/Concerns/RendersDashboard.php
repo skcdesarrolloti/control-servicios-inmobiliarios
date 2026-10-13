@@ -525,6 +525,8 @@ trait RendersDashboard
         'contracts_ending_history' => self::AJAX_CONTRACTS_ENDING_HISTORY,
         'contracts_ending_history_manage' => self::AJAX_CONTRACTS_ENDING_HISTORY_MANAGE,
         'contracts_ending_case' => self::AJAX_CONTRACTS_ENDING_CASE,
+        'contract_receipt_settings_read' => self::AJAX_CONTRACT_RECEIPT_SETTINGS_READ,
+        'contract_receipt_settings_save' => self::AJAX_CONTRACT_RECEIPT_SETTINGS_SAVE,
         'dashboard_metrics' => self::AJAX_DASHBOARD_METRICS,
         'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
@@ -1978,13 +1980,6 @@ trait RendersDashboard
       return $html;
     };
 
-    $receiptConfig = \SCM\Modules\Contracts\ContractReceiptSettings::read($this->db);
-    $receiptEmployees = \SCM\Support\FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db), 'employee', true);
-    $receiptOptions = static function (string $selected) use ($receiptEmployees): string {
-      $html = '<option value="">Selecciona un funcionario</option>';
-      foreach ($receiptEmployees as $person) $html .= '<option value="' . esc_attr((string) $person['id']) . '"' . ((string) $person['id'] === $selected ? ' selected' : '') . '>' . esc_html((string) ($person['name'] ?? $person['id'])) . '</option>';
-      return $html;
-    };
     $groupsHtml = '';
     foreach ($catalog as $groupKey => $group) {
       $groupsHtml .= '<section class="scm-internal-notif-group" data-internal-notif-group="' . esc_attr((string) $groupKey) . '">';
@@ -2023,15 +2018,6 @@ trait RendersDashboard
         <form id="scm-internal-notifications-form" class="scm-internal-notifications-form" autocomplete="off">
           <div class="scm-internal-notifications-body">
           <div class="scm-config-info-strip"><strong>Copias por acción:</strong> Los funcionarios seleccionados reciben CC del correo principal. Si el aviso es solo interno, uno queda en Para y los demás en CC. El autor no se agrega automáticamente. Los códigos de firma son exclusivos del firmante.</div>
-          <section class="scm-pqr-settings-section" data-receipt-automation>
-            <h4>Recibos automáticos de contratos · cron</h4>
-            <p>Genera el caso y la carta de aviso previo 15 días antes de la fecha fin. Solo procesa el _ID indicado. La carta se envía al arrendatario, al responsable y a los destinatarios del evento Caso automático de recibo · 15 días.</p>
-            <label><input type="checkbox" name="receipt_enabled" <?php echo !empty($receiptConfig['enabled']) ? 'checked' : ''; ?>> Activar recibos automáticos</label>
-            <label>Contrato: _ID interno (no número contractual)<input class="input input-bordered" type="number" min="1" max="999999999" required name="receipt_contract_id" value="<?php echo (int) $receiptConfig['contract_id']; ?>"></label>
-            <label>Funcionario al que se asignan los casos<select class="select select-bordered scm-select" name="receipt_employee_id"><?php echo $receiptOptions((string) $receiptConfig['employee_id']); ?></select></label>
-            <label>Coordinador que aparece en la carta (opcional)<select class="select select-bordered scm-select" name="receipt_coordinator_id"><?php echo $receiptOptions((string) $receiptConfig['coordinator_id']); ?></select></label>
-            <p>El registro fotográfico del contrato se incluye como enlace. Las fotos almacenadas en la aplicación se insertan en el PDF. El responsable configurado aquí prevalece sobre la recomendación del inmueble.</p>
-          </section>
           <section class="scm-pqr-settings-section">
             <h4>Acciones y destinatarios internos</h4>
             <p>Selecciona uno o varios funcionarios por acción. Sus correos reciben CC; dejar una acción vacía desactiva sus copias internas.</p>

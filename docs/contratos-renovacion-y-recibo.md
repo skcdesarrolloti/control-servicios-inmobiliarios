@@ -7,7 +7,7 @@ Versión 3.3.365. El panel consulta contratos `Entregado` o `Por recibir` por me
 - **Por terminar:** gestión comercial y acceso al popup interno del ticket de retención del ciclo actual.
 - **Probabilidad y valor:** informe de consulta de canon, probabilidad y valor ponderado; los cambios se registran desde Por terminar. Registro manual de 0 a 100 %, o sin dato. Valor ponderado mensual = `valor_canon × probabilidad / 100`. Sin probabilidad o canon no se inventa un valor. Al 100 % el servidor impide una nueva retención y omite el recibo automático; los tickets existentes siguen siendo consultables.
 - **No salida del inmueble:** reporte con observación obligatoria, filtro de reportados activo inicialmente (puede desmarcarse para registrar nuevos reportes) y días de aviso configurables. Predeterminado: 30, 7 y 0 días antes de fecha fin, a las 09:00 en la zona horaria de la aplicación. Si todos los plazos pasaron, se programa un aviso inmediato. Retirar el reporte exige confirmación y cancela avisos pendientes. Editar solo la probabilidad o el responsable conserva la programación existente.
-- **Recibo automático:** fecha de creación 15 días antes de fecha fin, responsable global seleccionado en Configuración → Notificaciones → Recibos automáticos y acceso al caso creado. Si una ejecución se perdió, recupera los contratos aún vigentes dentro de esos 15 días. No crea recibos de contratos ya vencidos, recibidos, desistidos, con renovación al 100 % o no salida reportada. La vista solo lista el contrato configurado cuando su fecha fin corresponde al mes consultado; si no corresponde, muestra un mensaje y el _ID configurado. Solo procesa el contrato `_ID` configurado (inicialmente 525); requiere activación explícita y un funcionario activo con correo válido. La recomendación del inmueble sigue disponible para retención, pero no cambia el responsable global del cron.
+- **Recibo automático:** fecha de creación 15 días antes de fecha fin, responsable global seleccionado en Contratos → Contratos por terminar → Recibo automático → Configurar automatización y acceso al caso creado. Si una ejecución se perdió, recupera los contratos aún vigentes dentro de esos 15 días. No crea recibos de contratos ya vencidos, recibidos, desistidos, con renovación al 100 % o no salida reportada. La vista solo lista el contrato configurado cuando su fecha fin corresponde al mes consultado; si no corresponde, muestra un mensaje y el _ID configurado. Solo procesa el contrato `_ID` configurado (inicialmente 525); requiere activación explícita y un funcionario activo con correo válido. La recomendación del inmueble sigue disponible para retención, pero no cambia el responsable global del cron.
 
 La recomendación prioriza `id_funcionario` del inmueble, consultado por `id_inmueble_data` o por código inequívoco; luego usa relaciones del contrato. Muestra propietario y funcionario del inmueble. Retención exige funcionario activo consultor de arriendo o cargo 13; recibo admite responsable activo. No se asigna por una coincidencia de nombre ni se inventa un responsable.
 
@@ -33,12 +33,12 @@ php bin/migrate-contract-renewal.php
 
 Se crean tablas de negocio `wp_scm_contract_renewal`, `wp_scm_contract_renewal_events` y `wp_scm_contract_receipts` (el prefijo depende de la instalación). Conservan valoración por ciclo, observaciones, autor, auditoría y recibos creados. Las tablas CCT existentes no requieren columnas nuevas.
 
-En **Configuración → Notificaciones → Recibos automáticos**:
+En **Contratos → Contratos por terminar → Recibo automático → Configurar automatización**:
 
 1. Dejar `Contrato: _ID interno` en **525**. No usar el número contractual 2000.
-2. Escoger el funcionario al que se asignan los tickets y, opcionalmente, el coordinador que aparece en la carta.
-3. Seleccionar destinatarios internos en **Ticket automático de recibo · 15 días**.
-4. Activar **Recibos automáticos** y guardar. La activación inicial está apagada hasta completar estos datos.
+2. Escoger el funcionario al que se asignan los casos y, opcionalmente, el coordinador que aparece en la carta.
+3. Configurar los destinatarios de los avisos en **Notificaciones internas → Caso automático de recibo · 15 días**.
+4. Activar **Recibos automáticos** y guardar. La activación inicial está apagada hasta completar estos datos. La configuración se guarda desde su popup propio, sin modificar los destinatarios de notificaciones.
 
 El contrato 525 consultado el 05/10/2026 termina el **09/01/2027**. Su fecha de creación prevista es **25/12/2026**, salvo cambios posteriores. Su registro fotográfico actual es una carpeta de Google Drive y se incluirá como enlace.
 

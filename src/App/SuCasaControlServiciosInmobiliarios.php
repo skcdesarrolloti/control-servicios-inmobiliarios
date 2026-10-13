@@ -124,6 +124,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACTS_ENDING_HISTORY = 'scm_contratos_renovacion_historial';
   const AJAX_CONTRACTS_ENDING_HISTORY_MANAGE = 'scm_contratos_historial_gestionar';
   const AJAX_CONTRACTS_ENDING_CASE = 'scm_contratos_caso';
+  const AJAX_CONTRACT_RECEIPT_SETTINGS_READ = 'scm_contratos_recibo_configuracion';
+  const AJAX_CONTRACT_RECEIPT_SETTINGS_SAVE = 'scm_contratos_recibo_configuracion_guardar';
   const AJAX_DASHBOARD_METRICS = 'scm_dashboard_metricas';
   const AJAX_DASHBOARD_FILTER_OPTIONS = 'scm_dashboard_filter_options';
   const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';
@@ -293,6 +295,11 @@ final class SuCasaControlServiciosInmobiliarios
   }
 
   private function canManagePublicPqrSettings(): bool
+  {
+    return in_array(Auth::userCargo(), $this->dashboardPermissionAdminCargos(), true);
+  }
+
+  private function canManageContractReceiptSettings(): bool
   {
     return in_array(Auth::userCargo(), $this->dashboardPermissionAdminCargos(), true);
   }

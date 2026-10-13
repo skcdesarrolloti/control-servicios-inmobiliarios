@@ -97,6 +97,8 @@ final class RenewalResult extends RuntimeException { public function __construct
 final class RenewalProbe {
   use \SCM\App\Concerns\HandlesTicketWorkflowActions;
   public bool $writable = true;
+  public bool $canConfigureReceipts = true;
+  private function canManageContractReceiptSettings(): bool { return $this->canConfigureReceipts; }
   public bool $readable = true;
   public bool $failResponse = false;
   public array $spreadsheetRows = [];
@@ -476,6 +478,30 @@ try {
   \SCM\Core\App::settings()->refresh();
   $pdo->beginTransaction();$changedGroup=$service->save($groupContract,$end,25,true,'7,0','Grouped','EMP-900');$pdo->commit();
   check($changedGroup['reminders_queued']===2 && (int)$db->getVar("SELECT COUNT(*) FROM test_jobs WHERE dedupe_key LIKE 'contrato_no_salida:9901:%' AND status='cancelled'")===2,'Recipient changes retire obsolete copies and schedule the new list');
+  // Contract automation is a separately protected setting; recipient config is untouched.
+  foreach(['cct_author_id','cct_modified','departamento'] as $column) $pdo->exec('ALTER TABLE wp_jet_cct_confi_sistema ADD COLUMN '.$column.' TEXT');
+  $writeSettings=new \SCM\Core\Settings($db);
+  (new ReflectionProperty(\SCM\Core\App::class,'settings'))->setValue(null,$writeSettings);
+  $readConfig=callEndpoint(fn()=>$probe->ajax_handler_contract_receipt_settings_read());
+  check($readConfig->ok && isset($readConfig->data['config'],$readConfig->data['employees']),'Receipt configuration loads separately from notification recipients');
+  $probe->canConfigureReceipts=false;
+  check(!callEndpoint(fn()=>$probe->ajax_handler_contract_receipt_settings_read())->ok,'Receipt configuration read requires admin permission');
+  $_POST=['receipt_automation'=>json_encode(['enabled'=>false,'contract_id'=>9901])];
+  check(!callEndpoint(fn()=>$probe->ajax_handler_contract_receipt_settings_save())->ok,'Receipt configuration writes require admin permission');
+  $probe->canConfigureReceipts=true;
+  $_POST=['receipt_automation'=>'invalid'];
+  check(!callEndpoint(fn()=>$probe->ajax_handler_contract_receipt_settings_save())->ok,'Invalid receipt configuration cannot be saved');
+  $recipientConfig=$writeSettings->get('internal_admin_notifications',[]);
+  $validReceipt=['enabled'=>true,'contract_id'=>9901,'employee_id'=>'EMP-14','coordinator_id'=>'EMP-13'];
+  $_POST=['receipt_automation'=>json_encode($validReceipt)];
+  check(callEndpoint(fn()=>$probe->ajax_handler_contract_receipt_settings_save())->ok,'Valid contract receipt settings save independently');
+  check(\SCM\Modules\Contracts\ContractReceiptSettings::read($db)===$validReceipt,'New endpoint preserves activation, exact contract and employee settings');
+  check($writeSettings->get('internal_admin_notifications')===$recipientConfig,'Receipt settings save never overwrites notification recipients');
+  $missingRecipients=$recipientConfig;$missingRecipients['contrato_recibo_automatico']=[];
+  $writeSettings->set('internal_admin_notifications',$missingRecipients);
+  check(!callEndpoint(fn()=>$probe->ajax_handler_contract_receipt_settings_save())->ok,'Activation still requires configured notification recipients');
+  $validReceipt['enabled']=false;$_POST=['receipt_automation'=>json_encode($validReceipt)];
+  check(callEndpoint(fn()=>$probe->ajax_handler_contract_receipt_settings_save())->ok,'Automation can be disabled independently of its notification recipients');
   echo "PASS: exact contract, request-to-contract resolution, retention in termination/no renewal, dates, matching, signatures, probabilities, responsibility, reminder scheduling/cancellation, history, atomic imports and idempotent automatic receipts. No messages sent.\n";
 } finally {
   putenv('SHARED_NOTIFICATIONS_PATH'); unlink($temp.'/autoload.php');unlink($temp.'/config.php');rmdir($temp);

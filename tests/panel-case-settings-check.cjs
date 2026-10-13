@@ -32,15 +32,14 @@ const assert = require('node:assert/strict');
     assert.equal(await copies.count(), 1, 'case creation event still configures internal copies');
     await copies.evaluate(select => select.add(new Option('Funcionario de prueba', '902')));
     await copies.selectOption('902');
-    await page.locator('[name=receipt_contract_id]').fill('525');
-    await page.locator('[name=receipt_employee_id]').selectOption({index: 0});
+    assert.equal(await page.locator('[data-receipt-automation], [name^=receipt_]').count(),0,'receipt automation is configured in Contracts');
     await page.locator('[type=submit]').click();
     await page.waitForFunction(() => window.saved);
     const saved = await page.evaluate(() => window.saved);
     assert.equal(saved.nonce, 'test-nonce');
     assert.equal(saved.case_notifications, undefined, 'saving recipients does not overwrite internal template settings');
     assert.deepEqual(JSON.parse(saved.settings).nuevo_caso_panel, ['902']);
-    assert(saved.receipt_automation, 'existing receipt automation settings remain supported');
+    assert.equal(saved.receipt_automation,undefined,'saving internal recipients cannot overwrite receipt automation');
     assert.equal(saved.email_actor_cc_enabled, undefined, 'copies are defined only by event recipients');
     for (const width of [390,1440]) {
       await page.setViewportSize({width,height:844});
@@ -59,6 +58,6 @@ const assert = require('node:assert/strict');
     fs.mkdirSync(path.join(__dirname, '../output/panel-case'), {recursive: true});
     await page.screenshot({path: path.join(__dirname, '../output/panel-case/notification-settings.png'), fullPage: true});
     assert.deepEqual(errors, []);
-    console.log('PASS: template controls removed; configured event recipients and receipt automation still serialize without changing internal templates');
+    console.log('PASS: template controls removed; configured event recipients serialize independently; notification modal has one scroll and no receipt automation');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

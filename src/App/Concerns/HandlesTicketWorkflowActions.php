@@ -412,19 +412,9 @@ trait HandlesTicketWorkflowActions
     } else {
       $settings = $incomingSettings;
     }
-    $automation = null;
-    if (array_key_exists('receipt_automation', $_POST)) {
-      try {
-        $automation = json_decode((string) $_POST['receipt_automation'], true, 512, JSON_THROW_ON_ERROR);
-        if (!is_array($automation)) throw new \InvalidArgumentException('Configuración de recibos inválida.');
-        $automation = \SCM\Modules\Contracts\ContractReceiptSettings::validate($this->db, $automation);
-        if ($automation['enabled'] && empty($settings['contrato_recibo_automatico'])) throw new \InvalidArgumentException('Selecciona destinatarios internos para Caso automático de recibo · 15 días.');
-      } catch (\Throwable $exception) { $this->jsonFail($exception->getMessage()); return; }
-    }
     $pdo = $this->db->pdo();
     $pdo->beginTransaction();
     try {
-      if ($automation !== null) \SCM\Core\App::settings()->set(\SCM\Modules\Contracts\ContractReceiptSettings::KEY, $automation, (int) Auth::employeeId());
       \SCM\Core\App::settings()->set('internal_admin_notifications', $settings, (int) Auth::employeeId());
       $pdo->commit();
     } catch (\Throwable $exception) {
@@ -1180,6 +1170,39 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk($result);
   }
 
+  public function ajax_handler_contract_receipt_settings_read(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canManageContractReceiptSettings()) {
+      $this->jsonFail('No tienes permiso para configurar recibos automáticos.'); return;
+    }
+    $this->jsonOk([
+      'config' => \SCM\Modules\Contracts\ContractReceiptSettings::read($this->db),
+      'employees' => \SCM\Support\FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db), 'employee', true),
+    ]);
+  }
+
+  public function ajax_handler_contract_receipt_settings_save(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canManageContractReceiptSettings()) {
+      $this->jsonFail('No tienes permiso para configurar recibos automáticos.'); return;
+    }
+    try {
+      $value = json_decode((string) ($_POST['receipt_automation'] ?? ''), true, 512, JSON_THROW_ON_ERROR);
+      if (!is_array($value)) throw new \InvalidArgumentException('Configuración de recibos inválida.');
+      $config = \SCM\Modules\Contracts\ContractReceiptSettings::validate($this->db, $value);
+      if ($config['enabled'] && !\SCM\Support\InternalNotificationRecipients::emailsForAction($this->db, 'contrato_recibo_automatico')) {
+        throw new \InvalidArgumentException('Configura los destinatarios del aviso Caso automático de recibo · 15 días en Notificaciones internas.');
+      }
+      \SCM\Core\App::settings()->set(\SCM\Modules\Contracts\ContractReceiptSettings::KEY, $config, (int) Auth::employeeId());
+    } catch (\Throwable $exception) {
+      \SCM\Core\App::settings()->refresh();
+      $this->jsonFail($exception->getMessage()); return;
+    }
+    $this->jsonOk(['message' => 'Configuración de recibos automáticos guardada.', 'config' => $config]);
+  }
+
   public function ajax_handler_contracts_ending_months(): void
   {
     $this->verifyCsrf();
@@ -1226,6 +1249,7 @@ trait HandlesTicketWorkflowActions
 
     $receiptConfig = \SCM\Modules\Contracts\ContractReceiptSettings::read($this->db);
     $this->jsonOk([
+      'can_configure_receipts' => $this->canManageContractReceiptSettings(),
       'receipt_automation' => ['enabled' => (bool) $receiptConfig['enabled'], 'contract_id' => (int) $receiptConfig['contract_id']],
       'items' => $items,
       'groups' => array_values($groups),
@@ -4874,7 +4898,7 @@ trait HandlesTicketWorkflowActions
           $pdo->rollBack(); $stats['skipped']++; continue;
         }
         $employee = (string) $config['employee_id'];
-        if ($employee === '' || !in_array($employee, $active, true)) throw new \RuntimeException('Selecciona un responsable activo en Configuración → Notificaciones → Recibos automáticos.');
+        if ($employee === '' || !in_array($employee, $active, true)) throw new \RuntimeException('Selecciona un responsable activo en Contratos → Contratos por terminar → Recibo automático.');
         if ($config['coordinator_id'] !== '' && !in_array((string) $config['coordinator_id'], $active, true)) throw new \RuntimeException('El coordinador configurado ya no está activo.');
         $assigned = array_values(array_filter($receiptEmployees, static fn(array $person): bool => (string) $person['id'] === $employee));
         if (!filter_var((string) ($assigned[0]['email'] ?? ''), FILTER_VALIDATE_EMAIL)) throw new \RuntimeException('El funcionario asignado necesita un correo válido.');

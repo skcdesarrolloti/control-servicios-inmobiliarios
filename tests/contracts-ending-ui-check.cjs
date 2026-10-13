@@ -34,7 +34,7 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
     }
     await page.addScriptTag({url:'https://cdn.jsdelivr.net/npm/sweetalert2@11'});
     await page.addScriptTag({content:`
-      var root = document.querySelector('#scm-app'), actions = {contracts_ending_case:'case',contracts_ending_history:'history',contracts_ending_history_manage:'history-manage',contracts_ending_renewal_save:'save'};
+      var root = document.querySelector('#scm-app'), actions = {contracts_ending_case:'case',contracts_ending_history:'history',contracts_ending_history_manage:'history-manage',contracts_ending_renewal_save:'save',contract_receipt_settings_read:'receipt-read',contract_receipt_settings_save:'receipt-save'};
       var contractsEndingRowsByPk = {}, contractsEndingData = null, contractsEndingView = 'ending', contractsEndingRequestId = 0, contractsEndingOnlyNoExit = true;
       var ajaxUrl = 'synthetic', actionContractsEndingMonths = 'list', actionContractsEndingCreateRetention='retention', actionContractsEndingImportApply='import';
       var sent = [], opened = [], messages = [], pendingLists = null, settingsLoads = 0;
@@ -46,6 +46,7 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
       function dashboardAction(action,payload) {
         sent.push({action,payload});
         if (action === 'case') return Promise.resolve({case:{ticket_pk:'77',ticket:'77',case_source_html:'<p>Detalle del caso #77</p>'}});
+        if (action === 'receipt-read') return Promise.resolve({config:{enabled:true,contract_id:1,employee_id:'EMP-13',coordinator_id:''},employees:[{id:'EMP-13',name:'Funcionario activo'}]});
         if (action === 'history') return Promise.resolve(historyFixture);
         if (pendingLists) return new Promise(resolve => pendingLists.push(resolve));
         return Promise.resolve(fixture);
@@ -57,7 +58,7 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
       window.scmOpenCase = function(button) { opened.push({ticket:button.getAttribute('data-ticket-pk'),html:button.closest('article').querySelector('.scm-case-source').innerHTML}); };
       var base = {receipt_in_scope:true,receipt_automation_enabled:true,receipt_default_employee_id:'EMP-13',contract_pk:'1',contrato:'193',inmueble:'10200',direccion:'Dirección de prueba',arrendatario:'<img src=x onerror=alert(1)>',propietario:'Propietario de prueba',fin_contrato_label:'20/10/2026',end_ts:1792472400,days_left:15,canon:1000000,probability:80,weighted_value:800000,renewal:{probability:80,no_exit:0,revision:2,reminder_days:'30,7,0'},receipt_due_label:'05/10/2026',receipt_funcionarios:[{id:'EMP-13',name:'Funcionario activo'}],retention_ticket:{enabled:true,default_employee_id:'EMP-13',funcionarios:[{id:'EMP-13',name:'Funcionario activo'}]}};
       var historyFixture={can_manage:false,items:[{id:1,action:'retention_created',actor:'EMP-13',actor_name:'Funcionario de prueba',created_at:1791210875,details_json:JSON.stringify({ticket_id:77}),revision:'synthetic-revision'}]};
-      var fixture = {receipt_automation:{enabled:true,contract_id:1},can_write:true,year:2026,month:10,count:3,generated_at:'05/10/2026 14:20',groups:[{label:'Octubre 2026',count:3,items:[base,Object.assign({},base,{receipt_in_scope:false,contract_pk:'2',contrato:'656',probability:100,weighted_value:1000000}),Object.assign({},base,{receipt_in_scope:false,contract_pk:'3',contrato:'888',existing_retention_ticket_id:'77',renewal:{no_exit:1,note:'Reporte confirmado',revision:1}})]}]};
+      var fixture = {can_configure_receipts:true,receipt_automation:{enabled:true,contract_id:1},can_write:true,year:2026,month:10,count:3,generated_at:'05/10/2026 14:20',groups:[{label:'Octubre 2026',count:3,items:[base,Object.assign({},base,{receipt_in_scope:false,contract_pk:'2',contrato:'656',probability:100,weighted_value:1000000}),Object.assign({},base,{receipt_in_scope:false,contract_pk:'3',contrato:'888',existing_retention_ticket_id:'77',renewal:{no_exit:1,note:'Reporte confirmado',revision:1}})]}]};
     ` + settingsBinder + settingsLoader + caseFunction + functions + '\ninitContractsEndingFilters(root.querySelector("[data-scm-contracts-ending-panel]"));renderContractsEnding(fixture);'});
     // Real API values include numeric zero; a safe test-only escape helper hid this regression.
     await page.evaluate(() => {
@@ -203,6 +204,12 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
     assert.equal(await page.locator('[data-scm-contracts-ending-create]').count(),0);
     assert.equal(await page.locator('[data-contracts-ending-configure]').count(),0);
     assert.match(await page.locator('[data-scm-contracts-ending-list]').innerText(), /Pendiente/);
+    await page.locator('[data-ending-settings="receipt"]').click();
+    await page.locator('[data-contract-receipt-settings-form]').waitFor();
+    assert.equal(await page.locator('[name=receipt_employee_id]').inputValue(),'EMP-13');
+    assert.equal(await page.evaluate(()=>settingsLoads),1,'Receipt settings do not load the notification popup');
+    assert.equal(await page.locator('#scm-internal-notifications-modal').getAttribute('aria-hidden'),'true');
+    await page.locator('.swal2-cancel').click();
     await page.setViewportSize({width:390,height:1000});
     await snapshot('receipt-mobile.png');
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'Mobile must not overflow');
@@ -275,9 +282,9 @@ const markup = render.slice(start, render.indexOf('</section>', start) + '</sect
       }
     }
     await page.evaluate(()=>{
-      var modal=document.querySelector('#scm-internal-notifications-modal');modal.remove();renderContractsEnding(fixture);
+      var modal=document.querySelector('#scm-internal-notifications-modal');modal.remove();fixture.can_configure_receipts=false;renderContractsEnding(fixture);
       if (root.querySelector('[data-ending-settings]')) throw new Error('Settings shortcuts require configuration permission');
-      root.appendChild(modal);renderContractsEnding(fixture);
+      root.appendChild(modal);fixture.can_configure_receipts=true;renderContractsEnding(fixture);
     });
     // A late response from an old month cannot overwrite the newest result.
     await page.evaluate(()=>{pendingLists=[];loadContractsEnding(true);loadContractsEnding(true);pendingLists[1](Object.assign({},fixture,{generated_at:'NEW'}));});
