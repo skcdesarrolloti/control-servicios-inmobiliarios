@@ -132,3 +132,18 @@ Para un contrato con fecha fin 09/01/2027, `30,7,0` representa 10/12/2026, 02/01
 Sin no salida y con probabilidad inferior al 100 % (o sin registrar), la creación de recibo está prevista para el 25/12/2026. Si el cron no corrió ese día, puede recuperarlo hasta el día de terminación, mientras el contrato siga en estado permitido. La creación ocurre en la primera ejecución elegible del cron; no usa el horario de las 09:00 de los recordatorios. Deben estar configurados activación, contrato interno específico, responsable activo, destinatarios internos, correos válidos y el worker compartido.
 
 La revisión corrigió la omisión de `destinacion_inmueble` en la consulta mensual, para mostrar la destinación contractual vigente en la ficha. Las pruebas también verifican conservación del reporte vigente y cancelación de avisos cuando otro flujo cambia la fecha fin o el inmueble ya fue recibido. La entrega real y la ejecución del cron en Hostinger requieren revisión en ese servidor; las pruebas locales no certifican el transporte.
+
+### Corrección de fecha al responder solicitudes
+
+En **Responder terminación** y **Responder no prórroga**, el funcionario puede
+editar **Fecha fin del contrato**. Se recalculan la fecha límite y la clasificación
+con la misma regla del listado: tres meses calendario antes de la fecha fin,
+incluyendo el día límite. La clasificación se verifica también en el servidor.
+En terminación, **Fecha terminación / entrega** es un campo independiente.
+
+La corrección se guarda al responder, junto con la respuesta y la probabilidad
+correspondiente, en una sola transacción. El historial contractual registra fecha
+anterior, nueva, caso, tipo de solicitud y funcionario real. Una fecha corregida
+abre un nuevo ciclo de renovación y retira recordatorios del ciclo anterior.
+Si otra persona cambió la fecha desde que se abrió el popup, se solicita actualizar
+el listado antes de responder. Cancelar el popup no cambia el contrato.

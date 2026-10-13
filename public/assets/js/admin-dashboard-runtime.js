@@ -15022,9 +15022,45 @@
       var meta = [row.contrato ? 'Contrato #' + row.contrato : '', row.inmueble ? 'Inmueble ' + row.inmueble : '', row.direccion || ''].filter(Boolean).join(' · ');
       return '<form class="scm-contract-response-form" data-scm-contract-' + kind + '-form>' +
         '<div class="rounded-xl bg-[#f2f3ff] p-4 space-y-2"><div class="flex flex-wrap items-center gap-2"><span class="scm-contract-tag !bg-[#dae2ff] font-semibold">' + contractUiIcon('ticket') + escHtml(row.titulo || 'Caso') + '</span><strong>' + escHtml(row.asunto || 'Solicitud contractual') + '</strong></div><p class="!m-0 text-xs">' + escHtml(meta) + '</p></div>' +
-        contractTerminationTermBadge(row, false) +
-        '<div class="grid grid-cols-1 md:grid-cols-3 gap-4"><label class="scm-contract-field"><span>Clasificación <b class="text-red-700">*</b></span><select name="termino" required><option value="" selected disabled>Selecciona clasificación</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label><label class="scm-contract-field"><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || '') + '" readonly aria-readonly="true"></label><label class="scm-contract-field"><span>' + (kind === 'termination' ? 'Fecha terminación / entrega' : 'Fecha fin de contrato') + '</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || '') + '"></label></div>' +
+        '<div data-contract-response-term>' + contractTerminationTermBadge(row, false) + '</div>' +
+        '<div class="grid grid-cols-1 md:grid-cols-2 gap-4"><label class="scm-contract-field"><span>Clasificación calculada</span><select name="termino" disabled><option value="">Sin cálculo</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label><label class="scm-contract-field"><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || '') + '" readonly aria-readonly="true"></label>' +
+        '<label class="scm-contract-field"><span>Fecha fin del contrato <b class="text-red-700">*</b></span><input type="date" name="fin_contrato" required value="' + escHtml(row.fin_contrato || '') + '"><small>Se guardará en el contrato al responder y recalculará el término.</small></label>' +
+        (kind === 'termination' ? '<label class="scm-contract-field"><span>Fecha terminación / entrega</span><input type="date" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || '') + '"></label>' : '<input type="hidden" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || '') + '">') + '</div>' +
         contractRetentionTicketBlockHtml(row) + '<section><div class="flex items-center justify-between gap-3 mb-3"><strong class="text-[10px] uppercase tracking-wider">Notificar a</strong><span class="text-[10px]">Correo y WhatsApp por destinatario</span></div>' + contractTerminationRecipientChecks(row) + '</section></form>';
+    }
+
+    function initContractResponseDates(form, row, kind) {
+      var input = form.querySelector('[name="fin_contrato"]');
+      var term = form.querySelector('[name="termino"]');
+      var delivery = form.querySelector('[name="fecha_terminacion"]');
+      var badge = form.querySelector('[data-contract-response-term]');
+      var previous = input.value;
+      function parse(value) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+        var date = new Date(value + 'T00:00:00Z');
+        return !isNaN(date.getTime()) && date.toISOString().slice(0,10) === value ? date : null;
+      }
+      function human(date) { return date.toISOString().slice(0,10).split('-').reverse().join('/'); }
+      function recalculate() {
+        var end = parse(input.value), request = parse(row.fecha_solicitud || '');
+        var current = Object.assign({},row,{fin_contrato:input.value,fin_contrato_label:end ? human(end) : '',fecha_limite_label:'',term_status:'unknown',term_label:'Sin cálculo de término',term_hint:'Indica una fecha fin válida para calcular el término.'});
+        term.value = '';
+        if (end && request) {
+          var limit = new Date(end.getTime());
+          limit.setUTCMonth(limit.getUTCMonth()-3);
+          current.fecha_limite_label = human(limit);
+          current.term_status = request <= limit ? 'dentro' : 'fuera';
+          current.term_label = current.term_status === 'dentro' ? 'Dentro de término' : 'Fuera de término';
+          current.term_hint = 'Solicitud recibida ' + (current.term_status === 'dentro' ? 'antes o el ' : 'después del ') + current.fecha_limite_label + '.';
+          term.value = current.term_status;
+        } else if (end) current.term_hint = 'No se encontró la fecha de solicitud para calcular el término.';
+        if (badge) badge.innerHTML = contractTerminationTermBadge(current,false);
+        if (delivery && (kind !== 'termination' || !delivery.value || delivery.value === previous)) delivery.value = input.value;
+        previous = input.value;
+      }
+      input.addEventListener('input',recalculate);
+      input.addEventListener('change',recalculate);
+      recalculate();
     }
 
     function renderContractTermination(data) {
@@ -15276,6 +15312,7 @@
           var form = popup ? popup.querySelector("[data-scm-contract-termination-form]") : null;
           if (!form) return;
           initContractResponseReturn(form, row, 'termination', draft);
+          initContractResponseDates(form, row, 'termination');
           syncContractRetentionTicketState(form);
           form.addEventListener("change", function (event) {
             if (event.target && event.target.name === "notify_recipients[]") {
@@ -15298,6 +15335,7 @@
           var popup = window.Swal.getPopup();
           var form = popup ? popup.querySelector("[data-scm-contract-termination-form]") : null;
           if (!form) return false;
+          if (!form.reportValidity()) return false;
           var checked = Array.prototype.slice.call(form.querySelectorAll('input[name="notify_recipients[]"]:checked'));
           if (!checked.length) {
             window.Swal.showValidationMessage("Selecciona a quién notificar o marca No notificar.");
@@ -15307,7 +15345,7 @@
           if (channels === false) return false;
           var term = form.querySelector("[name='termino']");
           if (!term || !term.value) {
-            window.Swal.showValidationMessage("Selecciona la clasificación de la solicitud.");
+            window.Swal.showValidationMessage("No se pudo calcular el término. Revisa la fecha fin y la fecha de solicitud.");
             return false;
           }
           var createRetention = form.querySelector("[name='crear_ticket_retencion']");
@@ -15318,6 +15356,7 @@
           }
           return {
             termino: term.value,
+            fin_contrato: form.querySelector('[name=fin_contrato]').value,
             fecha_terminacion: form.querySelector("[name='fecha_terminacion']").value,
             crear_ticket_retencion: createRetention && createRetention.checked ? "1" : "0",
             retencion_id_empleado: retentionEmployee ? retentionEmployee.value : "",
@@ -15333,6 +15372,8 @@
           fd.append("solicitud_id", String(row.solicitud_id || ""));
           fd.append("termino", value.termino || "");
           fd.append("fecha_terminacion", value.fecha_terminacion || "");
+          fd.append("fin_contrato", value.fin_contrato || "");
+          fd.append("fin_contrato_original", row.fin_contrato || "");
           fd.append("crear_ticket_retencion", value.crear_ticket_retencion || "0");
           fd.append("retencion_id_empleado", value.retencion_id_empleado || "");
           fd.append("notify_recipients_present", "1");
@@ -15342,7 +15383,8 @@
           });
         }).then(function (data) {
           showToast(data && data.notification_warning ? "warning" : "success", (data && data.message) || "Solicitud respondida.");
-          if (data && data.renewal_probability_updated) loadContractsEnding(true);
+          if (data && (data.renewal_probability_updated || data.contract_end_date_updated)) loadContractsEnding(true);
+          if (data && data.contract_end_date_updated) root.querySelectorAll('[data-scm-contract-termination-panel],[data-scm-contract-non-renewal-panel]').forEach(function(panel) { panel.setAttribute('data-scm-loaded','0'); });
           loadContractTerminationRequests(true);
         }).catch(function (error) {
           showToast("error", error && error.message ? error.message : "No se pudo responder la solicitud.");
@@ -15385,6 +15427,7 @@
           var form = popup ? popup.querySelector("[data-scm-contract-non-renewal-form]") : null;
           if (!form) return;
           initContractResponseReturn(form, row, 'non-renewal', draft);
+          initContractResponseDates(form, row, 'non-renewal');
           syncContractRetentionTicketState(form);
           form.addEventListener("change", function (event) {
             if (event.target && event.target.name === "notify_recipients[]") {
@@ -15407,6 +15450,7 @@
           var popup = window.Swal.getPopup();
           var form = popup ? popup.querySelector("[data-scm-contract-non-renewal-form]") : null;
           if (!form) return false;
+          if (!form.reportValidity()) return false;
           var checked = Array.prototype.slice.call(form.querySelectorAll('input[name="notify_recipients[]"]:checked'));
           if (!checked.length) {
             window.Swal.showValidationMessage("Selecciona a quién notificar o marca No notificar.");
@@ -15416,7 +15460,7 @@
           if (channels === false) return false;
           var term = form.querySelector("[name='termino']");
           if (!term || !term.value) {
-            window.Swal.showValidationMessage("Selecciona la clasificación de la solicitud.");
+            window.Swal.showValidationMessage("No se pudo calcular el término. Revisa la fecha fin y la fecha de solicitud.");
             return false;
           }
           var createRetention = form.querySelector("[name='crear_ticket_retencion']");
@@ -15427,6 +15471,7 @@
           }
           return {
             termino: term.value,
+            fin_contrato: form.querySelector('[name=fin_contrato]').value,
             fecha_terminacion: form.querySelector("[name='fecha_terminacion']").value,
             crear_ticket_retencion: createRetention && createRetention.checked ? "1" : "0",
             retencion_id_empleado: retentionEmployee ? retentionEmployee.value : "",
@@ -15442,6 +15487,8 @@
           fd.append("solicitud_id", String(row.solicitud_id || ""));
           fd.append("termino", value.termino || "");
           fd.append("fecha_terminacion", value.fecha_terminacion || "");
+          fd.append("fin_contrato", value.fin_contrato || "");
+          fd.append("fin_contrato_original", row.fin_contrato || "");
           fd.append("crear_ticket_retencion", value.crear_ticket_retencion || "0");
           fd.append("retencion_id_empleado", value.retencion_id_empleado || "");
           fd.append("notify_recipients_present", "1");
@@ -15451,7 +15498,8 @@
           });
         }).then(function (data) {
           showToast(data && data.notification_warning ? "warning" : "success", (data && data.message) || "Solicitud respondida.");
-          if (data && data.renewal_probability_updated) loadContractsEnding(true);
+          if (data && (data.renewal_probability_updated || data.contract_end_date_updated)) loadContractsEnding(true);
+          if (data && data.contract_end_date_updated) root.querySelectorAll('[data-scm-contract-termination-panel],[data-scm-contract-non-renewal-panel]').forEach(function(panel) { panel.setAttribute('data-scm-loaded','0'); });
           loadContractNonRenewalRequests(true);
         }).catch(function (error) {
           showToast("error", error && error.message ? error.message : "No se pudo responder la solicitud.");
@@ -15952,12 +16000,12 @@
       if (item.action === 'reminders_cancelled') return details.reason || 'Se cancelaron recordatorios pendientes por un cambio del contrato.';
       if (item.action === 'history_edited' || item.action === 'history_voided') return 'Movimiento #' + details.entry_id + '. Motivo: ' + (details.reason || '');
       var before = details.before || {}, after = details.after || {};
-      return item.action === 'renewal_saved' ? 'Probabilidad: ' + (before.probability == null ? 'Sin registrar' : before.probability + ' %') + ' → ' + (after.probability == null ? 'Sin registrar' : after.probability + ' %') + '. No salida: ' + (Number(after.no_exit) ? 'Sí' : 'No') + '. ' + (after.note || '') + (details.reason ? ' ' + details.reason : '') : item.action === 'end_date_imported' ? 'Fecha anterior: ' + new Date(Number(details.before) * 1000).toLocaleDateString('es-CO') + '. Nueva: ' + new Date(Number(details.after) * 1000).toLocaleDateString('es-CO') : 'Caso #' + (details.ticket_id || '');
+      return item.action === 'renewal_saved' ? 'Probabilidad: ' + (before.probability == null ? 'Sin registrar' : before.probability + ' %') + ' → ' + (after.probability == null ? 'Sin registrar' : after.probability + ' %') + '. No salida: ' + (Number(after.no_exit) ? 'Sí' : 'No') + '. ' + (after.note || '') + (details.reason ? ' ' + details.reason : '') : ['end_date_imported','end_date_corrected'].includes(item.action) ? 'Fecha anterior: ' + new Date(Number(details.before) * 1000).toLocaleDateString('es-CO') + '. Nueva: ' + new Date(Number(details.after) * 1000).toLocaleDateString('es-CO') : 'Caso #' + (details.ticket_id || '');
     }
 
     function openContractHistory(contractPk, includeVoided, receiptsOnly) {
       return dashboardAction(actions.contracts_ending_history, {contract_pk:contractPk, include_voided:includeVoided ? '1' : ''}).then(function(data) {
-        var names = {renewal_saved:'Gestión de renovación actualizada',end_date_imported:'Fecha fin actualizada desde Excel',retention_created:'Retención creada',receipt_created:'Recibo automático creado',reminders_cancelled:'Recordatorios cancelados automáticamente',history_edited:'Descripción del historial corregida',history_voided:'Movimiento anulado'};
+        var names = {renewal_saved:'Gestión de renovación actualizada',end_date_imported:'Fecha fin actualizada desde Excel',end_date_corrected:'Fecha fin corregida al responder',retention_created:'Retención creada',receipt_created:'Recibo automático creado',reminders_cancelled:'Recordatorios cancelados automáticamente',history_edited:'Descripción del historial corregida',history_voided:'Movimiento anulado'};
         var items = data.items || [];
         if (receiptsOnly) items = items.filter(function(item) { return item.action === 'receipt_created'; });
         var html = '<p class="scm-ending-history-intro">Registro de cambios y casos del contrato, con fecha y funcionario. Editar o anular un movimiento no modifica la gestión del contrato ni elimina sus casos.</p>';

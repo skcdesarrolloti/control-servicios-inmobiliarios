@@ -103,6 +103,7 @@ final class RenewalProbe {
   public bool $failResponse = false;
   public array $spreadsheetRows = [];
   public function __construct(public \SCM\Core\Database $db) {}
+  public function parse_unix_ts($value) { return $this->contractTerminationTimestamp($value); }
   public function parse($value) { return $this->contractsEndingImportDateTimestamp($value); }
   public function pk($id) { return $this->contractEndingContractByPk($id); }
   public function matches($rows) { return $this->contractsEndingImportContractMatches($rows); }
@@ -114,6 +115,7 @@ final class RenewalProbe {
   public function createRetention($row) { return $this->createContractRetentionTicketFromContractRequest($row,'','EMP-13','test','','','contrato por terminar',(string)$row['_ID']); }
   public function requestContract($row) { return $this->contractTerminationContractByContext($row); }
   public function createRequestRetention($row, $source) { return $this->createContractRetentionTicketFromContractRequest($row,'dentro','EMP-13','test','','',$source); }
+  public function editRequestDate($row, $date, $original) { return $this->contractRequestEditedEndDate($row,$date,$original); }
   public function respondRequest($row, $term, $source, $retention = false) { return $this->saveContractRequestResponse((int)$row['_ID'],$row,$term,'Respuesta de prueba',[],$retention,'EMP-13','','',$source); }
   public function preview($file) { return $this->contractsEndingImportPreview($file); }
   private function contractsEndingImportSpreadsheetRows(string $path, string $name): array { return $this->spreadsheetRows; }
@@ -455,6 +457,60 @@ try {
     check($completed['response']['ok']==='1' && $completed['retention']['ticket_id']!==$existing['ticket_id'] && (float)$service->get($id,$end)['probability']===0.0, $source . ': full response creates new retention after closed case and sets probability zero');
     check($db->getVar('SELECT estado FROM wp_jet_cct_tickets WHERE _ID=?',[(int)$existing['ticket_id']])==='Cerrado', $source . ': previous retention stays closed');
   }
+  // Correcting dates and responding are one operation for both request types.
+  foreach([815=>'terminación de contrato',816=>'no prórroga'] as $id=>$source) {
+    $oldEnd=strtotime('2026-12-09');$newEnd=strtotime('2027-02-09');
+    $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>$id,'contrato'=>(string)($id+100),'inmueble'=>(string)$id,'fin_contrato'=>(string)$oldEnd,'estado'=>'Entregado']);
+    $request=$requestFor($id);$request['fecha']=strtotime('2026-10-05');
+    foreach(['','2027-02-30','wrong'] as $invalidDate) {
+      try { $probe->editRequestDate($request,$invalidDate,'2026-12-09'); throw new RuntimeException('Bad date accepted'); }
+      catch(InvalidArgumentException $error) {check(str_contains($error->getMessage(),'fecha fin'),'Invalid corrections are rejected before responding');}
+    }
+    $edited=$probe->editRequestDate($request,'2027-02-09','2026-12-09');
+    check($edited['_response_term']==='dentro','Edited date recalculates in-term classification for '.$source);
+    $probe->failResponse=true;
+    try {$probe->respondRequest($edited,'fuera',$source);throw new RuntimeException('Failed response accepted');}
+    catch(RuntimeException $error) {check($error->getMessage()==='Synthetic response failure','Edited response propagates failure');}
+    $probe->failResponse=false;
+    check((int)$probe->pk((string)$id)['fin_contrato']===$oldEnd && $service->history($id)===[],'Failed response rolls back corrected date and audit');
+    $saved=$probe->respondRequest($edited,'fuera',$source);
+    check($saved['response']['contract_end_date_updated'] && $saved['response']['renewal_probability_updated'],'Server uses recalculated term instead of submitted classification');
+    check((int)$probe->pk((string)$id)['fin_contrato']===$newEnd && (float)$service->get($id,$newEnd)['probability']===0.0,'Date and zero probability use same new cycle');
+    check((int)$db->getVar('SELECT fecha_terminacion_contrato FROM wp_jet_cct_tickets WHERE _ID=?',[$request['_ID']])===$newEnd,'Case snapshot follows corrected contract end date');
+    $dateEvent=array_values(array_filter($service->history($id),fn($event)=>$event['action']==='end_date_corrected'))[0];
+    $details=json_decode($dateEvent['details_json'],true);
+    check($dateEvent['actor']==='EMP-900' && $details['before']===$oldEnd && $details['after']===$newEnd && $details['case_number']===$request['id_ticket'],'Correction audit retains before/after, source case and real employee');
+    try {$probe->editRequestDate($request,'2027-03-01','2026-12-09');throw new RuntimeException('Stale date accepted');}
+    catch(RuntimeException $error) {check(str_contains($error->getMessage(),'cambió'),'Stale popup cannot overwrite a new contract date');}
+    $boundary=$probe->editRequestDate($request,'2027-01-05','2027-02-09');
+    check($boundary['_response_term']==='dentro','Request on three-month deadline is inside term');
+    $outside=$probe->editRequestDate($request,'2026-12-09','2027-02-09');
+    check($outside['_response_term']==='fuera','Moving the end date earlier recalculates outside term');
+    $db->update('wp_jet_cct_contratos_arrendamiento',['fin_contrato'=>(string)strtotime('2027-04-09')],['_ID'=>$id]);
+    try {$probe->respondRequest($outside,'fuera',$source);throw new RuntimeException('Concurrent correction accepted');}
+    catch(RuntimeException $error) {check(str_contains($error->getMessage(),'cambió'),'Locked save rejects a date changed after PDF preparation');}
+  }
+  $oldEnd=strtotime('2027-02-09');$outsideEnd=strtotime('2026-12-09');
+  $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>817,'contrato'=>'917','inmueble'=>'817','fin_contrato'=>(string)$oldEnd,'estado'=>'Entregado']);
+  $pdo->beginTransaction();$service->save($probe->pk('817'),$oldEnd,70,true,'7,0','Old cycle','EMP-13');$pdo->commit();
+  $priorState=$service->get(817,$oldEnd);
+  $request=$requestFor(817);$request['fecha']=strtotime('2026-10-05');
+  $outside=$probe->editRequestDate($request,'2026-12-09','2027-02-09');
+  $saved=$probe->respondRequest($outside,'dentro','no prórroga');
+  check($saved['response']['contract_end_date_updated'] && !$saved['response']['renewal_probability_updated'],'Outside-term correction saves the date without forcing zero probability');
+  check((int)$probe->pk('817')['fin_contrato']===$outsideEnd && $service->get(817,$outsideEnd)['probability']===null,'Outside-term date begins a new renewal cycle');
+  foreach(json_decode($priorState['jobs_json'],true) as $key) check($db->getVar('SELECT status FROM test_jobs WHERE dedupe_key=?',[$key])==='cancelled','Old date reminders retire atomically with correction');
+  $sameEnd=strtotime('2027-01-09 13:00:00');
+  $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>818,'contrato'=>'918','inmueble'=>'818','fin_contrato'=>(string)$sameEnd,'estado'=>'Entregado']);
+  $request=$requestFor(818);$request['fecha']=strtotime('2026-10-05');
+  $same=$probe->editRequestDate($request,'2027-01-09','2027-01-09');
+  $saved=$probe->respondRequest($same,'dentro','terminación de contrato');
+  check(!$saved['response']['contract_end_date_updated'] && (int)$probe->pk('818')['fin_contrato']===$sameEnd && (float)$service->get(818,$sameEnd)['probability']===0.0,'Unchanged calendar date preserves timestamp and its exact probability cycle');
+  $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID'=>819,'contrato'=>'919','inmueble'=>'819','fin_contrato'=>'','estado'=>'Entregado']);
+  $request=$requestFor(819);$request['fecha']=strtotime('2026-10-05');
+  $missing=$probe->editRequestDate($request,'2027-01-09','');
+  $saved=$probe->respondRequest($missing,'dentro','no prórroga');
+  check($saved['response']['contract_end_date_updated'] && (int)$probe->pk('819')['fin_contrato']===strtotime('2027-01-09'),'A contract without fin_contrato can be corrected before responding');
   // A scheduled internal event is one envelope per date, with all selected staff.
   $db->insert('wp_jet_cct_funcionarios', ['_ID'=>14,'id_empleado'=>'EMP-14','nombre'=>'Second selected','correo'=>'second@example.invalid','id_cargo'=>'13','activo'=>'Si']);
   $settings=json_decode($db->getVar('SELECT valor FROM wp_jet_cct_confi_sistema WHERE _ID=1'),true);

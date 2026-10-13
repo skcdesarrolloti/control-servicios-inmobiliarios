@@ -971,6 +971,13 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail($exception->getMessage()); return;
     }
 
+    if (array_key_exists('fin_contrato', $_POST)) {
+      try {
+        $ticket = $this->contractRequestEditedEndDate($ticket, (string) $_POST['fin_contrato'], (string) ($_POST['fin_contrato_original'] ?? ''));
+        $term = $ticket['_response_term'];
+      } catch (\Throwable $exception) { $this->jsonFail($exception->getMessage()); return; }
+    }
+
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
     $creator = $this->calendarCitaCreatorContact();
     $creatorName = trim((string) ($creator['name'] ?? '')) ?: (Auth::user() ?: 'Funcionario de SKC SuCasa Inmobiliaria');
@@ -1025,6 +1032,7 @@ trait HandlesTicketWorkflowActions
       $result['retention_whatsapp_queued'] = (string) ($retentionTicket['whatsapp_queued'] ?? 0);
     }
     $result['message'] = 'Solicitud respondida, acta generada y caso cerrado.';
+    if (!empty($result['contract_end_date_updated'])) $result['message'] .= ' Fecha fin del contrato actualizada.';
     if ($result['renewal_probability_updated']) $result['message'] .= ' Probabilidad de renovación actualizada a 0 %.';
     $result['message'] .= ' Avisos del acta en cola: ' . $extraQueued['email'] . ' por correo y ' . $extraQueued['whatsapp'] . ' por WhatsApp.';
     $result['notification_warning'] = !empty($extraQueued['failed']);
@@ -1101,6 +1109,14 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail($exception->getMessage()); return;
     }
 
+    if (array_key_exists('fin_contrato', $_POST)) {
+      try {
+        $ticket = $this->contractRequestEditedEndDate($ticket, (string) $_POST['fin_contrato'], (string) ($_POST['fin_contrato_original'] ?? ''));
+        $term = $ticket['_response_term'];
+        $endDate = $ticket['_response_end_date'];
+      } catch (\Throwable $exception) { $this->jsonFail($exception->getMessage()); return; }
+    }
+
     $logicalTicket = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
     $creator = $this->calendarCitaCreatorContact();
     $creatorName = trim((string) ($creator['name'] ?? '')) ?: (Auth::user() ?: 'Funcionario de SKC SuCasa Inmobiliaria');
@@ -1159,6 +1175,7 @@ trait HandlesTicketWorkflowActions
       $result['retention_whatsapp_queued'] = (string) ($retentionTicket['whatsapp_queued'] ?? 0);
     }
     $result['message'] = 'Solicitud de no prórroga respondida, acta generada y caso cerrado.';
+    if (!empty($result['contract_end_date_updated'])) $result['message'] .= ' Fecha fin del contrato actualizada.';
     if ($result['renewal_probability_updated']) $result['message'] .= ' Probabilidad de renovación actualizada a 0 %.';
     $result['message'] .= ' Avisos del acta en cola: ' . $extraQueued['email'] . ' por correo y ' . $extraQueued['whatsapp'] . ' por WhatsApp.';
     $result['notification_warning'] = !empty($extraQueued['failed']);
@@ -5112,25 +5129,67 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,mixed> $ticket @return array<string,mixed> */
+  /** Validate the edit against the linked contract; never trust the browser's classification. */
+  private function contractRequestEditedEndDate(array $ticket, string $date, string $original): array
+  {
+    $date = trim($date);
+    $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+    if (!$parsed || $parsed->format('Y-m-d') !== $date || $parsed->getTimestamp() <= 0) throw new \InvalidArgumentException('Indica una fecha fin de contrato válida.');
+    $contract = $this->contractTerminationContractByContext($ticket);
+    if (!$contract) throw new \InvalidArgumentException('No se encontró el contrato vinculado para corregir su fecha fin.');
+    $oldTs = $this->contractTerminationTimestamp($contract['fin_contrato'] ?? '');
+    $oldDate = $oldTs > 0 ? date('Y-m-d', $oldTs) : '';
+    if ($original !== $oldDate) throw new \RuntimeException('La fecha fin del contrato cambió. Actualiza el listado y vuelve a responder.');
+    $ticket['fin_contrato'] = (string) $parsed->getTimestamp();
+    $requestTs = $this->adminDueFirstTimestamp($ticket, ['solicitud_fecha', 'fecha', 'solicitud_created', 'cct_created']);
+    $info = $this->contractTerminationTermInfo($ticket, $requestTs);
+    if (!in_array($info['term_status'], ['dentro', 'fuera'], true)) throw new \InvalidArgumentException('No se encontró la fecha de solicitud para recalcular el término.');
+    $ticket['_response_end_date'] = $date;
+    $ticket['_response_original_end_date'] = $oldDate;
+    $ticket['_response_term'] = $info['term_status'];
+    return $ticket;
+  }
+
   private function saveContractRequestResponse(int $ticketPk, array $ticket, string $term, string $responseText, array $documents, bool $createRetention, string $employeeId, string $actaUrl, string $actaTitle, string $source): array
   {
     $renewal = new ContractRenewalService($this->db);
-    if ($term === 'dentro' || $createRetention) $renewal->ensureSchema();
+    $edited = isset($ticket['_response_end_date']);
+    if ($edited) $term = $ticket['_response_term'];
+    if ($term === 'dentro' || $createRetention || $edited) $renewal->ensureSchema();
     $seguimiento = $this->get_seguimiento_service();
-    $contract = $term === 'dentro' ? $this->contractTerminationContractByContext($ticket) : [];
-    if ($term === 'dentro' && !$contract) throw new \RuntimeException('No se encontró el contrato para actualizar la probabilidad de renovación.');
+    $contract = ($term === 'dentro' || $edited) ? $this->contractTerminationContractByContext($ticket) : [];
+    if (($term === 'dentro' || $edited) && !$contract) throw new \RuntimeException('No se encontró el contrato para actualizar la probabilidad de renovación.');
     $pdo = $this->db->pdo();
     $owns = !$pdo->inTransaction();
     try {
       if ($owns) $pdo->beginTransaction();
-      if ($term === 'dentro') {
+      $dateUpdated = false;
+      if ($term === 'dentro' || $edited) {
         $table = $this->db->table('jet_cct_contratos_arrendamiento');
         $contract = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? FOR UPDATE", [(int) $contract['_ID']]);
         if (!$contract) throw new \RuntimeException('El contrato ya no existe.');
         $endTs = $this->contractTerminationTimestamp($contract['fin_contrato'] ?? '');
-        if ($endTs <= 0) throw new \RuntimeException('El contrato no tiene fecha fin válida para actualizar la probabilidad de renovación.');
+        if ($endTs <= 0 && !$edited) throw new \RuntimeException('El contrato no tiene fecha fin válida para actualizar la probabilidad de renovación.');
+        if ($edited) {
+          $currentDate = $endTs > 0 ? date('Y-m-d', $endTs) : '';
+          if ($currentDate !== $ticket['_response_original_end_date']) throw new \RuntimeException('La fecha fin del contrato cambió. Actualiza el listado y vuelve a responder.');
+          $dateUpdated = $currentDate !== $ticket['_response_end_date'];
+          $newTs = $dateUpdated ? $this->contractTerminationTimestamp($ticket['fin_contrato']) : $endTs;
+          if ($dateUpdated) {
+            $payload = ['fin_contrato' => (string) $newTs];
+            if ($this->column_exists($table, 'cct_modified')) $payload['cct_modified'] = date('Y-m-d H:i:s');
+            if ($this->column_exists($table, 'cct_author_id')) $payload['cct_author_id'] = Auth::employeeId();
+            if ($this->db->update($table, $payload, ['_ID' => (int) $contract['_ID']]) !== 1) throw new \RuntimeException('No se pudo guardar la fecha fin del contrato.');
+            $renewal->audit((int) $contract['_ID'], 'end_date_corrected', Auth::employeeId(), ['before' => $endTs, 'after' => $newTs, 'case_number' => $ticket['id_ticket'] ?? $ticketPk, 'source' => $source, 'term' => $term]);
+            if ($term !== 'dentro' && ($state = $renewal->get((int) $contract['_ID'], $endTs))) {
+              $renewal->save($contract, $newTs, null, false, (string) $state['reminder_days'], '', Auth::employeeId());
+            }
+            $contract = array_replace($contract, $payload);
+          }
+          $endTs = $newTs;
+        }
         $caseNumber = $this->contractTerminationFirstText([$ticket], ['id_ticket', '_ID']) ?: (string) $ticketPk;
-        $renewal->recordWithinTermResponse($contract, $endTs, $caseNumber, $source, Auth::employeeId());
+        if ($term === 'dentro') $renewal->recordWithinTermResponse($contract, $endTs, $caseNumber, $source, Auth::employeeId());
       }
       $retention = [];
       if ($createRetention) {
@@ -5139,6 +5198,10 @@ trait HandlesTicketWorkflowActions
       }
       $result = $seguimiento->saveTicketResponse($ticketPk, $responseText, 'Finalizado', true, ['none'], [], $documents);
       if (($result['ok'] ?? '0') !== '1') throw new \RuntimeException((string) ($result['message'] ?? 'No se pudo guardar la respuesta.'));
+      if ($edited && $this->column_exists($this->db->table('jet_cct_tickets'), 'fecha_terminacion_contrato')) {
+        $this->db->update($this->db->table('jet_cct_tickets'), ['fecha_terminacion_contrato' => $endTs], ['_ID' => $ticketPk]);
+      }
+      $result['contract_end_date_updated'] = $dateUpdated;
       $result['renewal_probability_updated'] = $term === 'dentro';
       if ($owns) $pdo->commit();
       return ['response' => $result, 'retention' => $retention];
