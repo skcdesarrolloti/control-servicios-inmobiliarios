@@ -12,8 +12,10 @@ use SCM\Support\SchemaInspector;
 
 trait WorkflowCommandsConcern
 {
-  public function save(int $ticketPk, string $observacion, string $estadoTicket, string $estadoCotizacion, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $evidencias = '', array $documentos = [], string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = ''): array
+  public function save(int $ticketPk, string $observacion, string $estadoTicket, string $estadoCotizacion, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $evidencias = '', array $documentos = [], string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = '', array $additionalEmails = []): array
   {
+    try { $additionalEmails = \SCM\Support\AdditionalEmailRecipients::parse($additionalEmails); }
+    catch (\InvalidArgumentException $error) { return ['ok'=>'0','message'=>$error->getMessage()]; }
     $actError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($this->db, $this->schema, $ticketPk, $cerrarTicket, $estadoAdministrativo);
     if ($actError !== '') {
       return ['ok' => '0', 'message' => $actError];
@@ -107,7 +109,7 @@ trait WorkflowCommandsConcern
     if ($effectiveEstadoTicket === 'Cerrado') {
       $msg .= ' Caso cerrado.';
     }
-    $emailsSent = $this->notifySeguimiento($ticket, $observacion, $userName, $notifyTargets);
+    $emailsSent = $this->notifySeguimiento($ticket, $observacion, $userName, $notifyTargets, 'seguimiento_ticket', $additionalEmails);
     if ($emailsSent > 0) {
       $msg .= ' Correos programados en cola: ' . $emailsSent . '.';
     }
@@ -143,8 +145,10 @@ trait WorkflowCommandsConcern
   /**
    * @return array<string,string>
    */
-  public function saveTicketResponse(int $ticketPk, string $respuesta, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $imagenes = '', array $documentos = [], string $estadoCotizacion = '__keep__', string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = '', bool $generarActaNoAccesoPreventiva = false, int $targetCotizacionId = 0): array
+  public function saveTicketResponse(int $ticketPk, string $respuesta, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $imagenes = '', array $documentos = [], string $estadoCotizacion = '__keep__', string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = '', bool $generarActaNoAccesoPreventiva = false, int $targetCotizacionId = 0, array $additionalEmails = []): array
   {
+    try { $additionalEmails = \SCM\Support\AdditionalEmailRecipients::parse($additionalEmails); }
+    catch (\InvalidArgumentException $error) { return ['ok'=>'0','message'=>$error->getMessage()]; }
     $actError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($this->db, $this->schema, $ticketPk, $cerrarTicket, $estadoAdministrativo);
     if ($actError !== '') {
       return ['ok' => '0', 'message' => $actError];
@@ -272,12 +276,12 @@ trait WorkflowCommandsConcern
     }
 
     $sent = $generatedNoAccessNotice === null
-      ? $this->notifyTicketResponse($ticket, $logicalTicket, $respuesta, $userName, $newEstado, $notifyTargets)
+      ? $this->notifyTicketResponse($ticket, $logicalTicket, $respuesta, $userName, $newEstado, $notifyTargets, $additionalEmails)
       : 0;
     $noticeSent = 0;
     $noticeWhatsappSent = 0;
     if ($generatedNoAccessNotice !== null) {
-      $noticeDelivery = $this->notifyPreventivaNoAccessNotice($ticketForNoAccessNotice, $logicalTicket, $generatedNoAccessNotice, $attemptNoAccessNotice, $userName);
+      $noticeDelivery = $this->notifyPreventivaNoAccessNotice($ticketForNoAccessNotice, $logicalTicket, $generatedNoAccessNotice, $attemptNoAccessNotice, $userName, in_array('none', $notifyTargets, true) ? [] : $additionalEmails);
       $noticeSent = (int) ($noticeDelivery['email'] ?? 0);
       $noticeWhatsappSent = (int) ($noticeDelivery['whatsapp'] ?? 0);
     }

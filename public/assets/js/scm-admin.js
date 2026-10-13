@@ -6755,6 +6755,14 @@
     var templateBtn = composer.querySelector("[data-scm-composer-template]");
     var pasteBtn = composer.querySelector("[data-scm-composer-paste]");
     var notifyRow = composer.querySelector("[data-scm-composer-notify-row]");
+    var additionalEmailBox = composer.querySelector("[data-scm-composer-additional-email-box]");
+    var additionalEmailInput = composer.querySelector("[data-scm-composer-additional-emails]");
+
+    function syncAdditionalEmailState() {
+      var none = composer.querySelector('input[name="composer_notify[]"][value="none"]');
+      if (additionalEmailBox) additionalEmailBox.hidden = mode === "note";
+      if (additionalEmailInput) additionalEmailInput.disabled = mode === "note" || !!(none && none.checked);
+    }
     var notifyOptions = composer.querySelector(
       "[data-scm-composer-notify-options]",
     );
@@ -7129,6 +7137,7 @@
           );
           if (noneCb) noneCb.checked = false;
         }
+        syncAdditionalEmailState();
       });
     }
 
@@ -7182,7 +7191,7 @@
         });
         if (adminCb) {
           adminCb.disabled = false;
-          adminCb.checked = false;
+          adminCb.checked = true;
         }
         if (noneCb) {
           noneCb.disabled = false;
@@ -7250,6 +7259,7 @@
         responseOptions.style.display = mode === "reply" ? "" : "none";
       if (prevBox) prevBox.style.display = mode === "reply" ? "" : "none";
       if (cotBox) cotBox.style.display = mode === "reply" ? "" : "none";
+      syncAdditionalEmailState();
     }
 
     var noAccessCheck = composer.querySelector("[data-scm-composer-no-access]");
@@ -7300,6 +7310,7 @@
     if (discardBtn) {
       discardBtn.addEventListener("click", function () {
         if (input) input.value = "";
+        if (additionalEmailInput) additionalEmailInput.value = "";
         composerFiles = [];
         renderFilePreviews();
         clearDocs();
@@ -7382,8 +7393,19 @@
             selectedRecipients.push(cb.value);
           });
         }
+        var additionalEmails = additionalEmailInput && !additionalEmailInput.disabled
+          ? additionalEmailInput.value.trim() : "";
+        if (additionalEmails) {
+          var extraAddresses = additionalEmails.split(/[\s,;]+/).filter(Boolean);
+          var uniqueExtraAddresses = Array.from(new Set(extraAddresses.map(function(email) { return email.toLowerCase(); })));
+          if (uniqueExtraAddresses.length > 20 || extraAddresses.some(function(email) { return !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(email); })) {
+            additionalEmailInput.focus();
+            if (typeof scmNotify === "function") scmNotify("warning", "Revisa los correos adicionales. Ingresa direcciones válidas, máximo 20.");
+            return;
+          }
+        }
         if (!selectedRecipients.length) {
-          selectedRecipients = ["none"];
+          selectedRecipients = additionalEmails ? ["additional"] : ["none"];
         }
         if (mode === "note") {
           selectedRecipients = ["none"];
@@ -7439,6 +7461,7 @@
           selectedRecipients.forEach(function (rec) {
             fd.append("notify_recipients[]", rec);
           });
+          fd.append("additional_emails", additionalEmails);
         }
 
         if (mode !== "note") {
@@ -7543,6 +7566,7 @@
             }
 
             if (input) input.value = "";
+            if (additionalEmailInput) additionalEmailInput.value = "";
             composerFiles = [];
             renderFilePreviews();
             clearDocs();
@@ -8242,7 +8266,7 @@
             ? '<label class="scm-composer-check"><input type="checkbox" name="composer_notify[]" value="solicitante" checked> Solicitante</label>'
             : '<label class="scm-composer-check"><input type="checkbox" name="composer_notify[]" value="arrendatario" checked> Arrendatario</label>' +
               '<label class="scm-composer-check"><input type="checkbox" name="composer_notify[]" value="propietario"> Propietario</label>') +
-          '<label class="scm-composer-check"><input type="checkbox" name="composer_notify[]" value="admin"> Administrativos</label>' +
+          '<label class="scm-composer-check"><input type="checkbox" name="composer_notify[]" value="admin" checked> Administrativos</label>' +
           '<label class="scm-composer-check scm-composer-check-none"><input type="checkbox" name="composer_notify[]" value="none"> Ninguno</label>' +
           "</div>" +
           '<div class="scm-composer-private-notice" data-scm-composer-private-notice style="display:none;">' +
@@ -8250,6 +8274,11 @@
           "<span>Uso interno: Solo visible para funcionarios y administradores.</span>" +
           "</div>" +
           "</div>" +
+          '<div class="scm-composer-extra-box scm-composer-additional-email-box" data-scm-composer-additional-email-box>' +
+          '<label><span>Correos adicionales (CC)</span>' +
+          '<textarea class="scm-composer-textarea" name="additional_emails" rows="2" maxlength="6000" spellcheck="false" autocomplete="off" placeholder="correo@ejemplo.com; otro@ejemplo.com" data-scm-composer-additional-emails></textarea>' +
+          '<small>Solo para este envío. Separa con coma, punto y coma o salto de línea. Máximo 20 correos.</small>' +
+          '</label></div>' +
           '<div class="scm-case-composer-footer">' +
           '<div class="scm-composer-tools">' +
           '<label class="scm-composer-tool-btn scm-composer-attach-btn" title="Adjuntar imagen">' +

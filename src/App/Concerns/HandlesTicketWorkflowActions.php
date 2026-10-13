@@ -541,10 +541,12 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail('Servicio de seguimiento no disponible.');
     }
 
+    try { $additionalEmails = \SCM\Support\AdditionalEmailRecipients::parse($_POST['additional_emails'] ?? ''); }
+    catch (\InvalidArgumentException $error) { $this->jsonFail($error->getMessage()); return; }
     $evidencias = $this->handleImageUploads('evidencia', 10);
     $documentTitles = isset($_POST['documento_nombre']) && is_array($_POST['documento_nombre']) ? $_POST['documento_nombre'] : [];
     $documentos = $this->handleDocumentUploads('documento', $documentTitles, 10);
-    $result = $service->save($ticketPk, $observacion, $estadoTicket, $estadoCotizacion, $estadoAdministrativo, $cerrarTicket, $notifyRecipients, $evidencias, $documentos, $observacionCotizacion, $motivoCotizacion, $financiacionCotizacion);
+    $result = $service->save($ticketPk, $observacion, $estadoTicket, $estadoCotizacion, $estadoAdministrativo, $cerrarTicket, $notifyRecipients, $evidencias, $documentos, $observacionCotizacion, $motivoCotizacion, $financiacionCotizacion, $additionalEmails);
     if (($result['ok'] ?? '0') !== '1') {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar seguimiento.'));
     }
@@ -807,10 +809,12 @@ trait HandlesTicketWorkflowActions
     }
 
     $service = $this->get_seguimiento_service();
+    try { $additionalEmails = \SCM\Support\AdditionalEmailRecipients::parse($_POST['additional_emails'] ?? ''); }
+    catch (\InvalidArgumentException $error) { $this->jsonFail($error->getMessage()); return; }
     $imagenes = $this->handleImageUploads('imagen', 10);
     $documentTitles = isset($_POST['documento_nombre']) && is_array($_POST['documento_nombre']) ? $_POST['documento_nombre'] : [];
     $documentos = $this->handleDocumentUploads('documento', $documentTitles, 10);
-    $result = $service->saveTicketResponse($ticketPk, $respuesta, $estadoAdministrativo, $cerrarTicket, $notifyRecipients, $imagenes, $documentos, $estadoCotizacion, $observacionCotizacion, $motivoCotizacion, $financiacionCotizacion, $generarActaNoAccesoPreventiva, $targetCotizacionId);
+    $result = $service->saveTicketResponse($ticketPk, $respuesta, $estadoAdministrativo, $cerrarTicket, $notifyRecipients, $imagenes, $documentos, $estadoCotizacion, $observacionCotizacion, $motivoCotizacion, $financiacionCotizacion, $generarActaNoAccesoPreventiva, $targetCotizacionId, $additionalEmails);
     if (($result['ok'] ?? '0') !== '1') {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la respuesta.'));
     }
@@ -6266,7 +6270,7 @@ trait HandlesTicketWorkflowActions
   private function parse_notify_recipients($raw): array
   {
     $items = is_array($raw) ? $raw : [$raw];
-    $allowed = ['solicitante', 'arrendatario', 'propietario', 'empleado', 'admin', 'none'];
+    $allowed = ['solicitante', 'arrendatario', 'propietario', 'empleado', 'admin', 'additional', 'none'];
     $out = [];
     foreach ($items as $item) {
       $key = preg_replace('/[^a-z_]/', '', strtolower((string) $item));

@@ -3641,6 +3641,29 @@ body,
   color: #334155 !important;
 }
 
+#scm-app .scm-composer-additional-email-box {
+  margin: 0.75rem 0;
+  font-size: 0.8125rem;
+  color: #334155;
+}
+
+#scm-app .scm-composer-additional-email-box label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+#scm-app .scm-composer-additional-email-box textarea {
+  min-height: 4rem !important;
+  width: 100%;
+}
+
+#scm-app .scm-composer-additional-email-box small {
+  color: #64748b;
+  font-weight: 400;
+}
+
 #scm-app .scm-composer-notify-options {
   display: flex !important;
   align-items: center !important;

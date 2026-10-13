@@ -14,7 +14,7 @@ foreach(array_merge(array_map([$db,'table'],$names),['calendario_actividades',$q
   $db->pdo()->exec(preg_replace('/^CREATE TABLE /','CREATE TEMPORARY TABLE ',$ddl));
 }
 foreach([[901,'97001','Internal A','a@example.invalid','Si'],[902,'97002','Inactive','inactive@example.invalid','No'],[903,'97003','Internal B','b@example.invalid','Si'],[904,'97004','Actor','actor@example.invalid','Si']] as [$pk,$id,$name,$email,$active])$db->insert($db->table('jet_cct_funcionarios'),['_ID'=>$pk,'id_empleado'=>$id,'nombre'=>$name,'correo'=>$email,'activo'=>$active,'id_cargo'=>'3']);
-$actions=['nota_ticket'=>[901,903,902],'trasladar_caso'=>[901],'postergar_ticket'=>[903],'agendar_cita'=>[901],'cita_realizada'=>[903],'comunicacion_no_acceso'=>[901],'acta_preventiva'=>[901,903],'gestion_caso_admin'=>[903],'crear_ticket_preventiva'=>[903]];
+$actions=['nota_ticket'=>[901,903,902],'trasladar_caso'=>[901],'postergar_ticket'=>[903],'agendar_cita'=>[901],'cita_realizada'=>[903],'comunicacion_no_acceso'=>[901],'acta_preventiva'=>[901,903],'gestion_caso_admin'=>[903],'crear_ticket_preventiva'=>[903],'respuesta_ticket'=>[901,903],'seguimiento_ticket'=>[901]];
 $data=['internal_admin_notifications'=>$actions,SCM\Support\FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY=>['3']];
 $db->insert($db->table('jet_cct_confi_sistema'),['funcion'=>SCM\Core\Settings::FUNCTION_KEY,'valor'=>json_encode($data)]);
 SCM\Core\App::settings()->refresh();
@@ -32,6 +32,27 @@ $check(!in_array('tenant@example.invalid',$destinations,true)&&!in_array('actor@
 $storedNote=$db->getRow('SELECT * FROM `'.$db->table('jet_cct_notas_ticket').'` WHERE _ID=?',[$note['note_id']]);
 $check($storedNote['id_empleado']==='97004'&&(string)$storedNote['cct_author_id']==='97004','Note retains real employee audit and stable note ID');
 $check($service->saveNote(999999,'Missing')['ok']==='0'&&count($jobs('nota_ticket'))===1,'Failed note does not emit notification');
+$extra=SCM\Support\AdditionalEmailRecipients::parse("EXTRA@example.invalid; extra@example.invalid, second@example.invalid\n tenant@example.invalid");
+$check($extra===['extra@example.invalid','second@example.invalid','tenant@example.invalid'],'Additional addresses accept common separators and deduplicate case-insensitively');
+foreach (["valid@example.invalid\r\nBcc: injected@example.invalid",array_map(static fn(int $n):string=>'extra'.$n.'@example.invalid',range(1,21))] as $invalid) {
+  try { SCM\Support\AdditionalEmailRecipients::parse($invalid); $check(false,'Invalid additional addresses accepted'); }
+  catch (InvalidArgumentException $expected) { $check(true,'Invalid or excessive additional addresses are rejected'); }
+}
+$response=$service->saveTicketResponse(900001,'Response with copies','__keep__',false,['arrendatario','admin'],[],[],'__keep__','','','',false,0,$extra);
+$rows=$jobs('respuesta_ticket');$copies=$cc($rows[0]);sort($copies);
+$check($response['ok']==='1'&&count($rows)===1&&$rows[0]['destination']==='tenant@example.invalid'&&$copies===['a@example.invalid','b@example.invalid','extra@example.invalid','second@example.invalid'],'Reply merges configured and additional CC without repeating its primary recipient');
+$check($db->getVar('SELECT estado_administrativo FROM `'.$db->table('jet_cct_tickets').'` WHERE _ID=900001')==='Nuevo','Reply with CC preserves administrative state unless explicitly changed');
+$check(json_decode($rows[0]['meta_json'],true)['additional_email_recipients']===$extra,'Additional recipients are traceable in the queued message');
+$service->saveTicketResponse(900001,'Silent response','__keep__',false,['none'],[],[],'__keep__','','','',false,0,$extra);
+$check(count($jobs('respuesta_ticket'))===1,'None suppresses additional and configured response copies');
+$service->saveTicketResponse(900001,'Additional recipients only','__keep__',false,['additional'],[],[],'__keep__','','','',false,0,['only@example.invalid','other@example.invalid']);
+$rows=$jobs('respuesta_ticket');$check(count($rows)===2&&$rows[1]['destination']==='only@example.invalid'&&$cc($rows[1])===['other@example.invalid'],'Only additional recipients retain one To without notifying unselected actors');
+$historyBefore=(int)$db->getVar('SELECT COUNT(*) FROM `'.$db->table('jet_cct_historial_del_ticket').'`');
+$bad=$service->saveTicketResponse(900001,'Must not save','Finalizado',true,['admin'],[],[],'__keep__','','','',false,0,['invalid']);
+$badFollowup=$service->save(900001,'Must not save','__keep__','__keep__','Finalizado',false,['admin'],[],[],'','','',['invalid']);
+$check($bad['ok']==='0'&&$badFollowup['ok']==='0'&&(int)$db->getVar('SELECT COUNT(*) FROM `'.$db->table('jet_cct_historial_del_ticket').'`')===$historyBefore&&$db->getVar('SELECT estado_administrativo FROM `'.$db->table('jet_cct_tickets').'` WHERE _ID=900001')==='Nuevo','Invalid copies reject reply and follow-up before history or status writes');
+$followup=$service->save(900001,'Follow-up with copies','__keep__','__keep__','__keep__',false,['arrendatario','admin'],[],[],'','','',['extra@example.invalid']);
+$rows=$jobs('seguimiento_ticket');$check($followup['ok']==='1'&&count($rows)===1&&$rows[0]['destination']==='tenant@example.invalid'&&$cc($rows[0])===['a@example.invalid','extra@example.invalid'],'Follow-up uses its configured staff plus per-message copies');
 $postpone=$service->postponeTicket(900001,'Awaiting access',['arrendatario','admin']);$rows=$jobs('postergar_ticket');
 $check($postpone['ok']==='1'&&count($rows)===1&&$rows[0]['destination']==='tenant@example.invalid'&&$cc($rows[0])===['b@example.invalid'],'Postponement uses its specific configured CC');
 $check($db->getVar('SELECT estado_administrativo FROM `'.$db->table('jet_cct_tickets').'` WHERE _ID=900001')==='Postergado','Existing postponement state rule is preserved');
@@ -40,8 +61,8 @@ $rows=$jobs('trasladar_caso');$check(count($rows)===2&&!array_filter($rows,fn($r
 $before=count($rows);$service->notifyTrasladoCaso($ticket,'Assigned','assigned@example.invalid','','','Actor QA',['none'],false,false);
 $check(count($jobs('trasladar_caso'))===$before,'No-notify transfer selection is respected');
 $notice=new ReflectionMethod($service,'notifyPreventivaNoAccessNotice');
-$notice->invoke($service,$ticket,'QA900001',['url'=>'https://example.invalid/notice.pdf'],1,'Actor QA');
-$rows=$jobs('comunicacion_no_acceso');$check(count($rows)===1&&$rows[0]['destination']==='tenant@example.invalid'&&$cc($rows[0])===['a@example.invalid'],'No-access document email carries configured staff in CC');
+$notice->invoke($service,$ticket,'QA900001',['url'=>'https://example.invalid/notice.pdf'],1,'Actor QA',['extra@example.invalid']);
+$rows=$jobs('comunicacion_no_acceso');$check(count($rows)===1&&$rows[0]['destination']==='tenant@example.invalid'&&$cc($rows[0])===['a@example.invalid','extra@example.invalid'],'No-access document email carries configured staff and additional recipients in CC');
 $noTenant=$ticket;$noTenant['correo_arrendatario']='';
 $notice->invoke($service,$noTenant,'QA900001',['url'=>'https://example.invalid/notice2.pdf'],2,'Actor QA');
 $rows=$jobs('comunicacion_no_acceso');$check(count($rows)===2&&$rows[1]['destination']==='a@example.invalid','No-access event still reaches internal staff when tenant email is absent');

@@ -12,7 +12,7 @@ use SCM\Support\SchemaInspector;
 
 trait NotificationDeliveryConcern
 {
-  private function notifyTicketResponse(array $ticket, string $logicalTicket, string $respuesta, string $userName, string $estado, array $notifyTargets = []): int
+  private function notifyTicketResponse(array $ticket, string $logicalTicket, string $respuesta, string $userName, string $estado, array $notifyTargets = [], array $additionalEmails = []): int
   {
     if (!$this->queue instanceof EmailQueue) {
       return 0;
@@ -20,7 +20,7 @@ trait NotificationDeliveryConcern
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
     $subject = $estado === 'Cerrado' ? 'Caso #' . $logicalTicket . ' cerrado' : 'Caso #' . $logicalTicket . ' con nueva respuesta';
     $sent = 0;
-    foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets, [], 'respuesta_ticket') as $recipient) {
+    foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets, [], 'respuesta_ticket', $additionalEmails) as $recipient) {
       $html = EmailTemplate::renderNamed('respuesta_ticket', [
         'asunto_correo' => EmailTemplate::e($subject),
         'destinatario' => EmailTemplate::e($recipient['name'] !== '' ? $recipient['name'] : 'cliente'),
@@ -31,7 +31,11 @@ trait NotificationDeliveryConcern
         'usuario' => EmailTemplate::e($userName),
         'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver caso']]),
       ]);
-      $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, ['internal_cc'=>$recipient['internal_cc']??[]]);
+      $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, [
+        'internal_action' => 'respuesta_ticket', 'internal_cc'=>$recipient['internal_cc']??[],
+        'source_module' => 'respuesta_ticket',
+        'meta' => ['event'=>'respuesta_ticket','id_ticket'=>$logicalTicket,'additional_email_recipients'=>$additionalEmails],
+      ]);
     }
     return $sent;
   }
@@ -133,7 +137,7 @@ trait NotificationDeliveryConcern
     return $queued;
   }
 
-  private function notifySeguimiento(array $ticket, string $observacion, string $userName, array $notifyTargets = [], string $action = 'seguimiento_ticket'): int
+  private function notifySeguimiento(array $ticket, string $observacion, string $userName, array $notifyTargets = [], string $action = 'seguimiento_ticket', array $additionalEmails = []): int
   {
     if (!$this->queue instanceof EmailQueue) {
       return 0;
@@ -142,7 +146,7 @@ trait NotificationDeliveryConcern
     $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
     $subject = ($action === 'postergar_ticket' ? 'Caso postergado #' : 'Nuevo seguimiento del caso #') . $logicalTicket;
     $sent = 0;
-    foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets, [], $action) as $recipient) {
+    foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets, [], $action, $additionalEmails) as $recipient) {
       $html = EmailTemplate::renderNamed('nuevo_seguimiento', [
         'destinatario' => EmailTemplate::e($recipient['name'] !== '' ? $recipient['name'] : 'cliente'),
         'id_ticket' => EmailTemplate::e($logicalTicket),
@@ -153,14 +157,14 @@ trait NotificationDeliveryConcern
       ]);
       $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, [
         'internal_action' => $action, 'internal_cc' => $recipient['internal_cc']??[],
-        'source_module' => $action, 'meta' => ['event' => $action, 'id_ticket' => $logicalTicket],
+        'source_module' => $action, 'meta' => ['event' => $action, 'id_ticket' => $logicalTicket, 'additional_email_recipients' => $additionalEmails],
       ]);
     }
     return $sent;
   }
 
   /** @param array<string,mixed> $ticket @param array<string,string> $notice @return array{email:int,whatsapp:int} */
-  private function notifyPreventivaNoAccessNotice(array $ticket, string $logicalTicket, array $notice, int $attempt, string $userName): array
+  private function notifyPreventivaNoAccessNotice(array $ticket, string $logicalTicket, array $notice, int $attempt, string $userName, array $additionalEmails = []): array
   {
     $userName = (new \SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService($this->db))->senderProfile()['signature_line'];
     $emailSent = 0;
@@ -186,8 +190,9 @@ trait NotificationDeliveryConcern
       ]);
       $emailSent = $this->queue->enqueue($tenantEmail, $subject, $html, [
         'internal_action' => 'comunicacion_no_acceso', 'source_module' => 'comunicacion_no_acceso',
+        'internal_cc' => \SCM\Support\InternalEmailCopies::emails(array_merge($this->adminNotificationEmails('comunicacion_no_acceso'), $additionalEmails)),
         'dedupe_key' => 'preventiva-no-acceso:' . $logicalTicket . ':' . $attempt,
-        'meta' => ['event' => 'comunicacion_no_acceso', 'id_ticket' => $logicalTicket, 'attempt' => $attempt, 'notice_url' => $noticeUrl],
+        'meta' => ['event' => 'comunicacion_no_acceso', 'id_ticket' => $logicalTicket, 'attempt' => $attempt, 'notice_url' => $noticeUrl, 'additional_email_recipients' => $additionalEmails],
       ]);
     }
 
@@ -413,7 +418,7 @@ trait NotificationDeliveryConcern
   }
 
   /** @param array<string,mixed> $ticket @param string[] $targets @param string[] $exclude @return array<int,array{email:string,name:string,role:string}> */
-  private function emailRecipientsForTargets(array $ticket, array $targets = [], array $exclude = [], string $adminAction = 'gestion_caso_admin'): array
+  private function emailRecipientsForTargets(array $ticket, array $targets = [], array $exclude = [], string $adminAction = 'gestion_caso_admin', array $additionalEmails = []): array
   {
     $targets = $this->normalizeTargets($targets);
     if (in_array('none', $targets, true)) {
@@ -458,6 +463,10 @@ trait NotificationDeliveryConcern
     }
 
     $copies = in_array('admin',$targets,true) && empty($excludeMap['admin']) ? $this->adminNotificationEmails($adminAction) : [];
+    // Keep selected primary recipients in To; extra addresses are per-message CC.
+    $extraCopies = array_values(array_diff(\SCM\Support\InternalEmailCopies::emails($additionalEmails), \SCM\Support\InternalEmailCopies::emails(array_column($recipients, 'email')), array_keys($excludeMap)));
+    foreach ($extraCopies as $email) $recipients[] = ['email'=>$email,'name'=>'Destinatario adicional','role'=>'additional'];
+    $copies = \SCM\Support\InternalEmailCopies::emails(array_merge($copies, $extraCopies));
     return \SCM\Support\InternalEmailCopies::recipients($this->uniqueEmailRecipients($recipients),$copies);
   }
 
@@ -494,7 +503,7 @@ trait NotificationDeliveryConcern
   /** @param string[] $targets @return string[] */
   private function normalizeTargets(array $targets): array
   {
-    $allowed = ['solicitante', 'arrendatario', 'propietario', 'empleado', 'admin', 'none'];
+    $allowed = ['solicitante', 'arrendatario', 'propietario', 'empleado', 'admin', 'additional', 'none'];
     $out = [];
     foreach ($targets as $target) {
       $target = strtolower(trim((string)$target));
