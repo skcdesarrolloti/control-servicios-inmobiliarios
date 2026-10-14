@@ -15,7 +15,7 @@ use SCM\Support\SmsQueue;
 
 final class CollectionPortfolioService
 {
-  private const IMPORT_VERSION = 'auxiliar-1380-v1';
+  private const IMPORT_VERSION = 'auxiliar-1380-v2';
   private const MONEY_TOLERANCE = 0.005;
 
   private Database $db;
@@ -1282,24 +1282,35 @@ final class CollectionPortfolioService
     $currentProperty = '';
     $currentDocument = '';
     $sourceDate = '';
-    foreach (array_slice($rows, 1) as $row) {
+    foreach (array_slice($rows, 1) as $rowIndex => $row) {
       $row = array_values((array) $row);
       $joined = trim(implode(' ', array_map('strval', array_slice($row, 0, 3))));
+      $isGroup = false;
       if (preg_match('/No\.?\s*Inm\s*:\s*([0-9]+)/i', $joined, $match) === 1) {
         $currentProperty = $this->digits($match[1]);
+        $currentDocument = '';
+        $isGroup = true;
       }
       if (preg_match('/Nit\s*:\s*([0-9.\-]+)/i', $joined, $match) === 1) {
         $currentDocument = $this->digits($match[1]);
+        $isGroup = true;
+      }
+      // Los subtotales y el total general no son movimientos de una cuenta.
+      // En la 1380 no tienen fecha y pueden traer un saldo redondeado o "$".
+      $rawDate = trim((string) ($row[$indices['fecha']] ?? ''));
+      $transaction = isset($indices['notransaccion']) ? trim((string) ($row[$indices['notransaccion']] ?? '')) : '';
+      if ($isGroup || ($rawDate === '' && $transaction === '')) {
+        continue;
       }
       $property = $this->digits($row[$indices['noinm']] ?? '') ?: $currentProperty;
       $document = $this->digits($row[$indices['nit']] ?? '') ?: $currentDocument;
-      $rawBalance = trim((string) ($row[$indices['saldocontable']] ?? ''));
-      $date = $this->spreadsheetDate((string) ($row[$indices['fecha']] ?? ''));
+      $rawBalance = $row[$indices['saldocontable']] ?? '';
+      $date = $this->spreadsheetDate($rawDate);
+      if ($property === '' || $document === '' || $date === '' || preg_match('/\d/', (string) $rawBalance) !== 1) {
+        throw new \RuntimeException('El movimiento de la fila ' . ($rowIndex + 2) . ' no contiene inmueble, NIT, fecha y saldo válidos. Revisa el auxiliar antes de cargarlo.');
+      }
       if ($date !== '' && ($sourceDate === '' || strcmp($date, $sourceDate) > 0)) {
         $sourceDate = $date;
-      }
-      if ($property === '' || $document === '' || $rawBalance === '') {
-        continue;
       }
       $key = $property . '|' . $document;
       $detail = trim((string) ($row[$indices['detalle']] ?? ''));
@@ -1876,6 +1887,10 @@ final class CollectionPortfolioService
 
   private function money(mixed $value): float
   {
+    // Las celdas numéricas XLSX ya tienen separador decimal, sin formato local.
+    if (is_int($value) || is_float($value)) {
+      return (float) $value;
+    }
     $text = trim((string) $value);
     if ($text === '' || preg_match('/\d/', $text) !== 1) {
       return 0.0;
@@ -1893,10 +1908,10 @@ final class CollectionPortfolioService
       }
     } elseif ($lastComma !== false) {
       $decimals = strlen($text) - $lastComma - 1;
-      $text = $decimals === 2 ? str_replace(',', '.', $text) : str_replace(',', '', $text);
+      $text = in_array($decimals, [1, 2], true) ? str_replace(',', '.', $text) : str_replace(',', '', $text);
     } elseif ($lastDot !== false) {
       $decimals = strlen($text) - $lastDot - 1;
-      if ($decimals !== 2) {
+      if (!in_array($decimals, [1, 2], true)) {
         $text = str_replace('.', '', $text);
       }
     }
@@ -1921,9 +1936,9 @@ final class CollectionPortfolioService
     if ($value === '') {
       return '';
     }
-    foreach (['d/m/Y', 'Y-m-d', 'd-m-Y'] as $format) {
+    foreach (['d/m/Y', 'Y-m-d', 'd-m-Y', 'Y-m-d H:i:s'] as $format) {
       $date = \DateTimeImmutable::createFromFormat('!' . $format, $value);
-      if ($date instanceof \DateTimeImmutable) {
+      if ($date instanceof \DateTimeImmutable && \DateTimeImmutable::getLastErrors() === false) {
         return $date->format('Y-m-d');
       }
     }

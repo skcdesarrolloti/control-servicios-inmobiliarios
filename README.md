@@ -83,6 +83,23 @@ Si Chromium o Gotenberg no están disponibles, la aplicación genera un PDF loca
 
    El comando es idempotente. El auxiliar 1380 se carga después desde el panel; no se importa ningún saldo durante el despliegue.
 
+### Lectura del auxiliar 1380
+
+La cartera toma el `Saldo Contable` del último movimiento de cada combinación de inmueble y NIT, respetando el orden del auxiliar. Las agrupaciones, los subtotales de NIT/inmueble y el total general se excluyen: pueden mezclar terceros, redondear valores o representar el cero con `$`. Un saldo positivo indica deuda, cero indica al día y un saldo negativo indica saldo a favor. El cruce posterior con los contratos activos determina qué cuentas quedan vinculadas o pendientes de revisión.
+
+El importador conserva los decimales del archivo y los valores numéricos XLSX. Si un movimiento identificado por fecha o número de transacción tiene datos incompletos, rechaza la carga e informa la fila antes de actualizar la cartera.
+
+Después de desplegar la corrección `auxiliar-1380-v2`, vuelve a subir el auxiliar que produjo saldos incorrectos. Esta versión permite reprocesar una vez el mismo archivo cargado con `v1`; las repeticiones posteriores siguen detectándose como duplicadas. Se conservan los cargues y eventos anteriores para trazabilidad.
+
+Pruebas del importador, sin acceder a producción:
+
+```bash
+php tests/collection-1380-import-check.php
+php tests/collection-1380-import-check.php "/ruta/1380 aviso.xls"
+```
+
+La segunda prueba lee todas las filas, concilia débitos menos créditos contra cada saldo acumulado y el total general, y verifica el cruce, los estados y los duplicados mediante una base SQLite temporal en memoria. Esta conciliación de prueba presupone que el auxiliar completo parte de saldo cero y usa el formato monetario del exportador (`$1,234.56`).
+
 La integración de notificaciones compartidas se localiza mediante `SHARED_NOTIFICATIONS_PATH`. Si está vacía, se intenta usar el proyecto hermano histórico.
 
 ## Estructura
