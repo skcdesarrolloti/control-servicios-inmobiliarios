@@ -6642,29 +6642,54 @@
   color: #9a3412;
 }
 
+/* Fijo al viewport: antes era absolute sobre todo el calendario y quedaba
+   centrado en la mitad del contenido (abajo, fuera de vista). */
 .swal2-popup .scm-case-calendar-event-mini {
   align-items: center;
-  background: rgba(15, 23, 42, 0.44);
-  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(2px);
   display: flex;
   inset: 0;
   justify-content: center;
   padding: 18px !important;
-  position: absolute;
-  z-index: 5;
+  position: fixed;
+  z-index: 2100;
 }
 
 .swal2-popup .scm-case-calendar-event-mini-card {
   background: #fff;
   border: 1px solid #dbe6f2;
   border-radius: 18px;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.3);
   color: #10243d;
-  max-width: 620px;
+  max-height: calc(100vh - 36px);
+  max-width: 640px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 18px !important;
   position: relative;
   text-align: left;
-  width: min(620px, 100%);
+  width: min(640px, 100%);
+}
+
+.swal2-popup .scm-case-calendar-event-mini-back {
+  align-items: center;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #1d4ed8;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 4px;
+  margin-bottom: 10px;
+  min-height: 30px;
+  padding: 4px 12px !important;
+}
+
+.swal2-popup .scm-case-calendar-event-mini-back:hover {
+  background: #dbeafe;
 }
 
 .swal2-popup .scm-case-calendar-event-mini-close {
@@ -6939,34 +6964,97 @@
 }
 
 .swal2-popup .scm-case-calendar-pending-card {
+  display: flex;
+  flex-direction: column;
   max-width: 760px;
+  overflow: hidden;
   width: min(760px, 100%);
+}
+
+.swal2-popup .scm-case-calendar-pending-card .scm-case-calendar-event-mini-head b {
+  color: #c45a00;
 }
 
 .swal2-popup .scm-case-calendar-pending-list {
   display: grid;
-  gap: 10px;
+  flex: 1 1 auto;
+  gap: 8px;
   margin-top: 14px;
-  max-height: 430px;
-  overflow: auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding-right: 4px !important;
 }
 
 .swal2-popup .scm-case-calendar-pending-row {
+  align-items: center;
   background: #fff;
   border: 1px solid #dbe6f2;
   border-left: 4px solid #f59e0b;
   border-radius: 13px;
   display: grid;
-  gap: 8px;
-  padding: 12px 14px !important;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 10px 12px !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.swal2-popup .scm-case-calendar-pending-row > div {
-  align-items: flex-start;
+.swal2-popup .scm-case-calendar-pending-row:hover {
+  border-color: #fdba74;
+  box-shadow: 0 6px 16px rgba(15, 30, 54, 0.07);
+}
+
+.swal2-popup .scm-case-calendar-pending-row.is-done {
+  border-left-color: #10b981;
+}
+
+.swal2-popup .scm-case-calendar-pending-row-main {
   display: grid;
-  gap: 6px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px;
+  min-width: 0;
+}
+
+.swal2-popup .scm-case-calendar-pending-row-main span {
+  justify-self: start;
+}
+
+.swal2-popup .scm-case-calendar-pending-row p em {
+  color: #047857;
+  font-style: normal;
+  font-weight: 950;
+}
+
+.swal2-popup .scm-case-calendar-pending-open {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  color: #c45a00;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 950;
+  min-height: 36px;
+  padding: 7px 14px !important;
+  white-space: nowrap;
+}
+
+.swal2-popup .scm-case-calendar-pending-open:hover {
+  background: #f97316;
+  border-color: #f97316;
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .swal2-popup .scm-case-calendar-pending-row {
+    grid-template-columns: 1fr;
+  }
+
+  .swal2-popup .scm-case-calendar-transfer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .swal2-popup .scm-case-calendar-event-mini-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .swal2-popup .scm-case-calendar-pending-row strong {
@@ -7005,10 +7093,24 @@
 }
 
 .swal2-popup .scm-case-calendar-day-more {
-  color: #64748b;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #475569;
+  cursor: pointer;
+  display: block;
   font-size: 10px;
   font-weight: 950;
   margin-top: 6px;
+  padding: 4px 6px !important;
+  text-align: center;
+  width: 100%;
+}
+
+.swal2-popup .scm-case-calendar-day-more:hover {
+  background: #fff7ed;
+  border-color: #fb923c;
+  color: #c45a00;
 }
 
 .swal2-popup .scm-case-calendar-empty {

@@ -6216,9 +6216,17 @@
               }
               var request;
               if (tipoItem === "evento") {
-                request = selected.length > 1 || eventsToCreate.length > 1
-                  ? calendarApi("crear_eventos", { eventos: eventsToCreate, empleados: selected, sincronizar_google: googleRequested ? "1" : "" })
-                  : calendarApi("crear_evento", Object.assign({}, eventsToCreate[0], { id_empleado: selected[0] }));
+                var sendEvents = function (extra) {
+                  return selected.length > 1 || eventsToCreate.length > 1
+                    ? calendarApi("crear_eventos", Object.assign({ eventos: eventsToCreate, empleados: selected, sincronizar_google: googleRequested ? "1" : "" }, extra))
+                    : calendarApi("crear_evento", Object.assign({}, eventsToCreate[0], { id_empleado: selected[0] }, extra));
+                };
+                request = sendEvents({}).then(function (json) {
+                  var blocked = json && !json.success && ((json.data && json.data.bloqueado_vencidos) || /vencidos sin realizar/i.test(String(json.message || "")));
+                  if (!blocked) return json;
+                  var ok = window.confirm(String(json.message || "El funcionario tiene eventos vencidos sin realizar.") + "\n\n¿Deseas crear el evento de todas formas? Quedará registrado el bloqueo.");
+                  return ok ? sendEvents({ permitir_vencidos: "1" }) : json;
+                });
               } else {
                 var itemPayloads = [];
                 eventsToCreate.forEach(function (eventPayload) {
