@@ -16608,3 +16608,4 @@ body.scm-session-locked {
 .scm-cotizacion-financing label span { font-size:12px; font-weight:700; }
 .scm-cotizacion-financing select { padding:10px 12px; min-height:42px; }
 .scm-cotizacion-financing [role="status"] { align-self:center; font-size:12px; }
+.scm-field[data-scm-financing-filter][hidden] { display:none !important; }

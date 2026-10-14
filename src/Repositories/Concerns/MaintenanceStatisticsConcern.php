@@ -97,7 +97,7 @@ trait MaintenanceStatisticsConcern
     }
 
     $financing = strtolower(trim((string) ($filters['fFinanciacion'] ?? '')));
-    if (in_array($financing, ['si', 'no', 'pending'], true)) {
+    if (($filters['fCotizacion'] ?? '') === 'has' && in_array($financing, ['si', 'no', 'pending'], true)) {
       $quoteTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
       if ($this->schema->tableExists($quoteTable) && $this->schema->columnExists($quoteTable, 'financiacion')) {
         $where[] = \SCM\Support\QuotationFinancingFilter::condition($this->maintenanceCotizacionExistsExpression('t'));

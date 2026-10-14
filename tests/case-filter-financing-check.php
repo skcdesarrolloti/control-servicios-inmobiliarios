@@ -41,9 +41,15 @@ $filters=(new \SCM\Modules\ServiciosInmobiliarios\ServiciosInmobiliariosFilters(
 $assert=static function($ok,$label){if(!$ok)throw new RuntimeException($label);echo "PASS: $label\n";};
 $maintenance->queryMaintenance($filters);
 $assert($maintenance->getLastMaintenanceAdminStatuses()===['En ejecucion por inmobiliaria','Por inspeccionar'],'maintenance options scoped to matching open cases across pages');
-$rows=$maintenance->queryMaintenance(array_replace($filters,['fFinanciacion'=>'Si']));
+$maintenance->queryMaintenance(array_replace($filters,['fFinanciacion'=>'Si']));
+$assert($maintenance->getLastMaintenancePagination()['total']===17,'hidden financing cannot restrict listing without Con cotización');
+$inactive = (new \SCM\Modules\ServiciosInmobiliarios\ServiciosInmobiliariosFilters())->parse(['scm_financiacion'=>'Si']);
+$assert($inactive['fFinanciacion']==='', 'parser drops financing when quote filter is inactive');
+$html = \SCM\Support\CaseFilterFields::financing('scm_', $inactive);
+$assert(str_contains($html,'data-scm-financing-filter hidden')&&str_contains($html,' disabled'), 'financing filter starts hidden and disabled');
+$rows=$maintenance->queryMaintenance(array_replace($filters,['fCotizacion'=>'has','fFinanciacion'=>'Si']));
 $assert(array_column($rows,'_ID')===[2],'financing uses latest quotation instead of old affirmative response');
-$maintenance->queryMaintenance(array_replace($filters,['_scmStatusBucket'=>'postergados','fFinanciacion'=>'pending']));
+$maintenance->queryMaintenance(array_replace($filters,['_scmStatusBucket'=>'postergados','fCotizacion'=>'has','fFinanciacion'=>'pending']));
 $assert($maintenance->getLastMaintenanceAdminStatuses()===['Postergado'],'postponed financing and administrative options are scoped');
 $maintenance->queryMaintenance(array_replace($filters,['_scmStatusBucket'=>'cerrados']));
 $assert($maintenance->getLastMaintenanceAdminStatuses()===['Finalizado'],'closed options exclude open states');
@@ -58,7 +64,7 @@ $generic=new class($db,$tables) {
 $params=$generic->parse_params_generic([],'test_');
 $result=$generic->run_query_generic(['Contabilidad'],$params,[],false);
 $assert($result['admin_status_options']===['Por contabilizar'],'generic tab excludes maintenance states');
-$result=$generic->run_query_generic([],array_replace($params,['_scmStatusBucket'=>'postergados','fEstadoAdmin'=>'Postergado','fFinanciacion'=>'pending']),[],false);
+$result=$generic->run_query_generic([],array_replace($params,['_scmStatusBucket'=>'postergados','fEstadoAdmin'=>'Postergado','fCotizacion'=>'has','fFinanciacion'=>'pending']),[],false);
 $assert($result['stats']['total']===1 && $result['admin_status_options']===['Postergado'],'generic scoped filtering includes postponed cases');
 $service=new \SCM\Support\QuotationFinancingService($db,$schema);
 $service->update(12,'No',['employee_id'=>'99','name'=>'Test']);

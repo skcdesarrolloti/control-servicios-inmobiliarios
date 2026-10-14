@@ -13771,6 +13771,24 @@
       toggleKpiVisibility(prefix + "kpi-magnitud-bajo", showMagnitude);
     }
 
+    function syncCaseFinancingFilter(form) {
+      if (!form) return;
+      var wrap = form.querySelector('[data-scm-financing-filter]');
+      if (!wrap) return;
+      var financing = wrap.querySelector('select');
+      var quote = form.querySelector('[name="' + financing.name.replace(/financiacion$/, 'cotizacion') + '"]');
+      var visible = !!quote && quote.value === 'has';
+      wrap.hidden = !visible;
+      financing.disabled = !visible;
+      if (!visible) financing.value = '';
+    }
+    root.addEventListener('change', function(event) {
+      if (event.target.matches('select[name$="cotizacion"]')) syncCaseFinancingFilter(event.target.closest('form'));
+    });
+    root.addEventListener('reset', function(event) {
+      queueMicrotask(function(){syncCaseFinancingFilter(event.target);});
+    });
+
     function updateAdministrativeStatusOptions(form, values) {
       if (!form || !Array.isArray(values)) return;
       var select = form.querySelector('select[name$="estado_admin"]');

@@ -7,7 +7,8 @@ final class CaseFilterFields
   public static function financing(string $prefix, array $params): string
   {
     $name = htmlspecialchars($prefix . 'financiacion', ENT_QUOTES, 'UTF-8');
-    $html = '<div class="scm-field"><label for="' . $name . '">Financiamiento de cotización</label><select class="select select-bordered select-sm scm-select" id="' . $name . '" name="' . $name . '">';
+    $visible = ($params['fCotizacion'] ?? '') === 'has';
+    $html = '<div class="scm-field" data-scm-financing-filter' . ($visible ? '' : ' hidden') . '><label for="' . $name . '">Financiamiento de cotización</label><select class="select select-bordered select-sm scm-select" id="' . $name . '" name="' . $name . '"' . ($visible ? '' : ' disabled') . '>';
     foreach ([''=>'Todos','Si'=>'Sí','No'=>'No','pending'=>'Sin definir'] as $value=>$label) {
       $html .= '<option value="' . $value . '"' . (($params['fFinanciacion'] ?? '') === $value ? ' selected' : '') . '>' . $label . '</option>';
     }

@@ -33,7 +33,7 @@ trait GenericQueryConcern
 
     return [
       'fEstado' => $clean($input[$prefix . 'estado'] ?? ''),
-      'fFinanciacion' => $clean($input[$prefix . 'financiacion'] ?? ''),
+      'fFinanciacion' => $clean($input[$prefix . 'cotizacion'] ?? '') === 'has' ? $clean($input[$prefix . 'financiacion'] ?? '') : '',
       'fEstadoAdmin' => $clean($input[$prefix . 'estado_admin'] ?? ''),
       'fOrigen' => $clean($input[$prefix . 'origen'] ?? ''),
       'fBusqueda' => $clean($input[$prefix . 'busqueda'] ?? ''),
@@ -520,7 +520,7 @@ trait GenericQueryConcern
       if ($column !== '') { $where[] = "LOWER(TRIM(COALESCE(`{$column}`, ''))) = ?"; $args[] = mb_strtolower(trim($p['fEstadoAdmin']), 'UTF-8'); }
     }
     $financing = strtolower(trim((string) ($p['fFinanciacion'] ?? '')));
-    if (in_array($financing, ['si', 'no', 'pending'], true)) {
+    if (($p['fCotizacion'] ?? '') === 'has' && in_array($financing, ['si', 'no', 'pending'], true)) {
       $quoteTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
       if ($this->table_exists($quoteTable) && $this->column_exists($quoteTable, 'financiacion')) {
         $where[] = \SCM\Support\QuotationFinancingFilter::condition($this->generic_cotizacion_exists_expression($tabla));
