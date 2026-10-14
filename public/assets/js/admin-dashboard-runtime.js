@@ -20381,23 +20381,64 @@
         });
     }
 
-    function saveQuoteFinancing(button) {
+    function saveQuoteFinancing(button, options) {
+      options = options || {};
       var card = button.closest('.scm-cotizacion-card');
-      var select = card && card.querySelector('[data-scm-quote-financing]');
-      var status = card && card.querySelector('[data-scm-quote-financing-status]');
-      if (!select || button.disabled) return Promise.resolve();
-      if (!['Si','No'].includes(select.value)) { if(status) status.textContent='Selecciona Sí o No.'; return Promise.resolve(); }
+      if (!card || !window.Swal) return Promise.resolve();
       var id = card.getAttribute('data-cotizacion-id');
-      var fd = new FormData();
-      fd.set('action','scm_cotizacion_financing');fd.set('nonce',nonce);fd.set('id_cotizacion',id);fd.set('financiacion',select.value);
-      button.disabled=true;select.disabled=true;if(status)status.textContent='Guardando…';
-      return fetch(ajaxUrl,{method:'POST',credentials:'same-origin',body:fd}).then(function(response){return response.json();}).then(function(json){
-        if(!json.success)throw new Error((json.data||{}).message||'No se pudo guardar.');
-        if(status)status.textContent='Financiamiento guardado.';
-        delete cotizacionCardCache[id];
-        root.querySelectorAll('.scm-cotizacion-card').forEach(function(other){if(other.getAttribute('data-cotizacion-id')===id){var field=other.querySelector('[data-scm-quote-financing]');if(field)field.value=select.value;}});
-        root.dispatchEvent(new CustomEvent('scm:refresh-active-tab'));
-      }).catch(function(error){if(status)status.textContent=error.message;}).finally(function(){button.disabled=false;select.disabled=false;});
+      var current = button.getAttribute('data-financiacion') || '';
+      return window.Swal.fire({
+        title: 'Financiamiento de cotización #' + id,
+        html: '<div class="scm-cotizacion-response-form"><label class="scm-cotizacion-dialog-field"><span>¿Requiere financiamiento? <em>*</em></span><select data-scm-quote-financing><option value="">Selecciona una opción</option><option value="Si">Sí</option><option value="No">No</option></select></label></div>',
+        width: 'min(540px, 94vw)',
+        showCloseButton: true,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar financiamiento',
+        cancelButtonText: 'Cancelar',
+        showLoaderOnConfirm: true,
+        allowOutsideClick: false,
+        allowEscapeKey: function(){return !window.Swal.isLoading();},
+        buttonsStyling: false,
+        focusConfirm: false,
+        customClass: {
+          popup: 'scm-cotizacion-dialog scm-cotizacion-response-swal',
+          title: 'scm-cotizacion-dialog-title',
+          htmlContainer: 'scm-cotizacion-dialog-body',
+          actions: 'scm-cotizacion-dialog-actions',
+          confirmButton: 'scm-cotizacion-dialog-confirm',
+          cancelButton: 'scm-cotizacion-dialog-cancel',
+          closeButton: 'scm-swal-close-round scm-cotizacion-dialog-close'
+        },
+        didOpen: function(){
+          var select = window.Swal.getPopup().querySelector('[data-scm-quote-financing]');
+          select.value = current;
+          select.focus();
+        },
+        preConfirm: function(){
+          var value = window.Swal.getPopup().querySelector('[data-scm-quote-financing]').value;
+          if (!['Si','No'].includes(value)) { window.Swal.showValidationMessage('Selecciona Sí o No.'); return false; }
+          var fd = new FormData();
+          fd.set('action','scm_cotizacion_financing');fd.set('nonce',nonce);fd.set('id_cotizacion',id);fd.set('financiacion',value);
+          return fetch(ajaxUrl,{method:'POST',credentials:'same-origin',body:fd}).then(function(response){return response.json();}).then(function(json){
+            if (!json.success) throw new Error((json.data||{}).message||'No se pudo guardar.');
+            return value;
+          }).catch(function(error){window.Swal.showValidationMessage(error.message);return false;});
+        }
+      }).then(function(result){
+        if(result.isConfirmed){
+          delete cotizacionCardCache[id];
+          root.querySelectorAll('.scm-cotizacion-card').forEach(function(other){
+            if(other.getAttribute('data-cotizacion-id')===id){
+              var control=other.querySelector('[data-scm-save-quote-financing]');
+              if(control){control.setAttribute('data-financiacion',result.value);control.textContent='Financiamiento · '+(result.value==='Si'?'Sí':'No');}
+            }
+          });
+          showToast('success','Financiamiento actualizado.');
+          root.dispatchEvent(new CustomEvent('scm:refresh-active-tab'));
+        }
+        if(typeof options.onClose==='function')options.onClose();
+        return result;
+      });
     }
 
     function openCotizacionActaFromCard(target, options) {
@@ -21219,7 +21260,7 @@
               if (!popup) return;
               popup.addEventListener("click", function (event) {
                 var financingButton=event.target.closest('[data-scm-save-quote-financing]');
-                if(financingButton){event.preventDefault();event.stopPropagation();saveQuoteFinancing(financingButton);return;}
+                if(financingButton){event.preventDefault();event.stopPropagation();saveQuoteFinancing(financingButton, {onClose:makeCaseCotizacionesReturn(button)});return;}
 
                 var orderBtn = event.target && event.target.closest
                   ? event.target.closest("[data-scm-add-cotizacion-order]")

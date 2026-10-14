@@ -16603,9 +16603,4 @@ body.scm-session-locked {
   }
 }
 
-.scm-cotizacion-financing { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; padding:14px 0; }
-.scm-cotizacion-financing label { display:grid; gap:6px; min-width:170px; }
-.scm-cotizacion-financing label span { font-size:12px; font-weight:700; }
-.scm-cotizacion-financing select { padding:10px 12px; min-height:42px; }
-.scm-cotizacion-financing [role="status"] { align-self:center; font-size:12px; }
 .scm-field[data-scm-financing-filter][hidden] { display:none !important; }
