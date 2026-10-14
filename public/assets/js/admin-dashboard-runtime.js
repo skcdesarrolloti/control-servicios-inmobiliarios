@@ -1260,7 +1260,8 @@
               html: html,
               width: 980,
               confirmButtonText: "Cerrar",
-              customClass: { confirmButton: "scm-btn-primary" },
+              buttonsStyling: false,
+              customClass: { popup: "scm-gc-swal scm-gc-swal-queue", confirmButton: "scm-gc-swal-confirm" },
             });
             return;
           }
@@ -1288,6 +1289,9 @@
         "scmgc_fecha_desde",
         "scmgc_fecha_hasta",
         "scmgc_tipo",
+        "scmgc_contrato",
+        "scmgc_inmueble",
+        "scmgc_arrendatario",
         "scmgc_page",
         "scmgc_buscar",
         "scmgc_estado",
@@ -1326,6 +1330,9 @@
         "scmgc_fecha_desde",
         "scmgc_fecha_hasta",
         "scmgc_tipo",
+        "scmgc_contrato",
+        "scmgc_inmueble",
+        "scmgc_arrendatario",
         "scmgc_page",
         "scmgc_buscar",
         "scmgc_estado",
@@ -7955,7 +7962,8 @@
                 html: html,
                 width: 980,
                 confirmButtonText: "Cerrar",
-                customClass: { confirmButton: "scm-btn-primary" },
+                buttonsStyling: false,
+                customClass: { popup: "scm-gc-swal scm-gc-swal-queue", confirmButton: "scm-gc-swal-confirm" },
               });
               return;
             }

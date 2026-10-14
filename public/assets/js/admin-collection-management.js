@@ -21,6 +21,7 @@
     var actionPortfolio = actions.collection_portfolio_action || "";
     var actionPdf = actions.collection_portfolio_pdf || "";
     var actionTimeline = actions.collection_portfolio_timeline || "";
+    var actionQueueMessage = actions.collection_queue_message || "";
     var actionPanel = actions.admin_notifications_collection_log || "";
     var actionManagement = actions.admin_notifications_collection || "";
     var actionOptions = actions.admin_notifications_collection_options || "";
@@ -77,7 +78,7 @@
       [
         "scmgc_buscar", "scmgc_estado", "scmgc_etapa", "scmgc_movimiento", "scmgc_cartera_page",
         "scmgc_contratos_buscar", "scmgc_contratos_estado", "scmgc_contratos_etapa", "scmgc_contratos_page",
-        "scmgc_fecha_desde", "scmgc_fecha_hasta", "scmgc_tipo", "scmgc_page",
+        "scmgc_fecha_desde", "scmgc_fecha_hasta", "scmgc_tipo", "scmgc_contrato", "scmgc_inmueble", "scmgc_arrendatario", "scmgc_page",
         "scmgc_queue_fecha_desde", "scmgc_queue_fecha_hasta", "scmgc_queue_estado", "scmgc_queue_canal",
         "scmgc_queue_tipo", "scmgc_queue_plantilla", "scmgc_queue_buscar", "scmgc_queue_page"
       ].forEach(function (name) {
@@ -140,7 +141,7 @@
       };
 
       if (window.Swal && typeof window.Swal.fire === "function") {
-        window.Swal.fire({
+        fireSwal({
           title: isMarkingSiniestro ? "Marcar contrato como siniestro" : (isRemovingSiniestro ? "Quitar siniestro" : (isRemovingPrejuridico ? "Quitar prejurídico" : "Normalizar etapa de cobro")),
           text: isMarkingSiniestro
             ? "Se guardará un reporte en el historial del inmueble, se marcará el contrato como siniestro y se avisará al funcionario configurado."
@@ -257,7 +258,7 @@
       };
 
       if (window.Swal && typeof window.Swal.fire === "function") {
-        window.Swal.fire({
+        fireSwal({
           title: "Aviso previo de siniestro",
           html: '<div class="scm-portfolio-swal-form">'
             + '<p><strong>' + escapeHtml(tenantName) + '</strong>' + (contractNumber ? ' · Contrato ' + escapeHtml(contractNumber) : '') + '</p>'
@@ -278,6 +279,37 @@
       }
 
       if (window.confirm("¿Deseas encolar el aviso previo de siniestro?")) submit();
+    }
+
+    function fireSwal(options) {
+      options = options || {};
+      options.buttonsStyling = false;
+      options.customClass = Object.assign({
+        popup: "scm-gc-swal",
+        confirmButton: "scm-gc-swal-confirm",
+        cancelButton: "scm-gc-swal-cancel",
+        denyButton: "scm-gc-swal-cancel"
+      }, options.customClass || {});
+      delete options.confirmButtonColor;
+      return window.Swal.fire(options);
+    }
+
+    function emptyHtml(title, message, icon) {
+      return '<div class="scm-gc-empty"><span class="material-symbols-outlined scm-gc-icon" aria-hidden="true">' + escapeHtml(icon || "inbox") + '</span><strong>' + escapeHtml(title) + '</strong><span>' + escapeHtml(message) + '</span></div>';
+    }
+
+    function iconHtml(name) {
+      return '<span class="material-symbols-outlined scm-gc-icon" aria-hidden="true">' + escapeHtml(name) + '</span>';
+    }
+
+    function chipTone(kind, value) {
+      var maps = {
+        status: { deuda: "is-danger", al_dia: "is-success", saldo_favor: "is-info", sin_contrato: "is-warning" },
+        stage: { prejuridico: "is-warning", siniestro: "is-danger-solid" },
+        queue: { pending: "is-warning", processing: "is-indigo", sent: "is-success", failed: "is-danger" }
+      };
+      var fallback = kind === "stage" ? "is-neutral" : "is-muted";
+      return (maps[kind] && maps[kind][String(value || "")]) || fallback;
     }
 
     function escapeHtml(value) {
@@ -319,7 +351,7 @@
       };
 
       if (window.Swal && typeof window.Swal.fire === "function") {
-        window.Swal.fire({
+        fireSwal({
           title: "Anexar saldo",
           html: '<div class="scm-portfolio-swal-form">'
             + '<p><strong>' + escapeHtml(tenantName) + '</strong>' + (contractNumber ? ' · Contrato ' + escapeHtml(contractNumber) : '') + '</p>'
@@ -369,7 +401,7 @@
       };
 
       if (window.Swal && typeof window.Swal.fire === "function") {
-        window.Swal.fire({
+        fireSwal({
           title: "Notificación de fecha de pago",
           html: '<div class="scm-portfolio-swal-form">'
             + '<p><strong>' + escapeHtml(tenantName) + '</strong>' + (contractNumber ? ' · Contrato ' + escapeHtml(contractNumber) : '') + '</p>'
@@ -693,7 +725,7 @@
         return runBulkOperation(button, "bulk_due_date", eligible, { due_day: day, notify_channels: channels }, "Registrando y encolando notificaciones en lote...", panel);
       };
       if (window.Swal && typeof window.Swal.fire === "function") {
-        window.Swal.fire({
+        fireSwal({
           title: "Notificar fecha de pago en lote",
           html: '<div class="scm-portfolio-swal-form">'
             + '<p>Se procesarán <strong>' + total + '</strong> contrato(s) ' + (allMode ? 'del filtro guardado que sean elegibles.' : 'seleccionado(s).') + '</p>'
@@ -773,7 +805,7 @@
         return runBulkOperation(button, settings.operation, eligible, action === "mark_siniestro" ? { note: note || "" } : {}, settings.working, panel);
       };
       if (window.Swal && typeof window.Swal.fire === "function") {
-        window.Swal.fire({
+        fireSwal({
           title: settings.title,
           text: settings.text + " Contratos a revisar: " + total + (allMode ? " del filtro guardado. Solo se procesarán los elegibles." : "."),
           input: action === "mark_siniestro" ? "textarea" : undefined,
@@ -818,7 +850,7 @@
       };
 
       if (window.Swal && typeof window.Swal.fire === "function") {
-        window.Swal.fire({
+        fireSwal({
           title: "Limpiar pruebas 1380",
           text: "Se borran únicamente los cargues 1380, la foto actual de cartera y eventos técnicos de esa foto. No toca contratos, gestiones históricas ni notificaciones.",
           input: "text",
@@ -844,7 +876,7 @@
     }
 
     function syncModalBodyState() {
-      var openModal = root.querySelector("[data-scm-portfolio-management-modal]:not([hidden]), [data-scm-portfolio-letter-preview-modal]:not([hidden]), [data-scm-portfolio-report-modal]:not([hidden]), [data-scm-portfolio-timeline-modal]:not([hidden])");
+      var openModal = root.querySelector("[data-scm-portfolio-management-modal]:not([hidden]), [data-scm-portfolio-letter-preview-modal]:not([hidden]), [data-scm-portfolio-report-modal]:not([hidden]), [data-scm-portfolio-timeline-modal]:not([hidden]), [data-scm-collection-queue-message-modal]:not([hidden])");
       document.body.classList.toggle("scm-modal-open", !!openModal);
     }
 
@@ -895,40 +927,40 @@
         count.textContent = rows.length + " de " + (Number(group.count || rows.length)) + " " + reportGroupItemName(group);
       }
       if (!rows.length) {
-        body.innerHTML = '<div class="scm-admin-notif-empty"><strong>Sin registros para mostrar</strong><span>No hay resultados en este grupo con la búsqueda actual.</span></div>';
+        body.innerHTML = emptyHtml("Sin registros para mostrar", "No hay resultados en este grupo con la búsqueda actual.", "search_off");
         return;
       }
       if (String(group.kind || "") === "management") {
-        body.innerHTML = '<table class="scm-collection-log-table scm-portfolio-report-detail-table scm-portfolio-report-detail-table--management">'
+        body.innerHTML = '<table class="scm-gc-table">'
           + '<thead><tr><th>Fecha</th><th>Arrendatario</th><th>Contrato</th><th>Inmueble</th><th>Concepto</th><th>Observación</th><th>Realizado por</th></tr></thead>'
           + '<tbody>' + rows.map(function (row) {
             var property = '<strong>' + escapeHtml(row.property || "-") + '</strong>' + (row.address ? '<small>' + escapeHtml(row.address) + '</small>' : "");
             var officer = '<strong>' + escapeHtml(row.performed_by || "-") + '</strong>' + (row.role ? '<small>' + escapeHtml(row.role) + '</small>' : "");
             return '<tr>'
-              + '<td>' + escapeHtml(row.date || "-") + '</td>'
-              + '<td><strong>' + escapeHtml(row.tenant || "Sin nombre") + '</strong></td>'
-              + '<td><span class="scm-collection-log-pill">' + escapeHtml(row.contract || "-") + '</span></td>'
-              + '<td>' + property + '</td>'
-              + '<td><span class="scm-collection-log-type">' + escapeHtml(row.concept || "-") + '</span></td>'
-              + '<td class="scm-collection-log-note">' + escapeHtml(row.observation || "-") + '</td>'
+              + '<td class="is-nowrap">' + escapeHtml(row.date || "-") + '</td>'
+              + '<td class="is-person"><strong>' + escapeHtml(row.tenant || "Sin nombre") + '</strong></td>'
+              + '<td><span class="scm-gc-code">' + escapeHtml(row.contract || "-") + '</span></td>'
+              + '<td class="is-property">' + property + '</td>'
+              + '<td><span class="scm-gc-chip is-indigo">' + escapeHtml(row.concept || "-") + '</span></td>'
+              + '<td class="is-note">' + escapeHtml(row.observation || "-") + '</td>'
               + '<td>' + officer + '</td>'
               + '</tr>';
           }).join("") + '</tbody></table>';
         return;
       }
-      body.innerHTML = '<table class="scm-collection-log-table scm-portfolio-report-detail-table">'
-        + '<thead><tr><th>Arrendatario</th><th>Contrato</th><th>Inmueble</th><th>Saldo</th><th>Estado</th><th>Etapa</th><th>Última acción</th></tr></thead>'
+      body.innerHTML = '<table class="scm-gc-table">'
+        + '<thead><tr><th>Arrendatario</th><th>Contrato</th><th>Inmueble</th><th class="is-num">Saldo</th><th>Estado</th><th>Etapa</th><th>Última acción</th></tr></thead>'
         + '<tbody>' + rows.map(function (row) {
           var contact = [row.document || "", row.phone || "", row.email || ""].filter(Boolean).join(" · ");
           var property = '<strong>' + escapeHtml(row.property || "-") + '</strong>' + (row.address ? '<small>' + escapeHtml(row.address) + '</small>' : "");
           return '<tr>'
-            + '<td><strong>' + escapeHtml(row.tenant || "Sin nombre") + '</strong><small>' + escapeHtml(contact || "-") + '</small></td>'
-            + '<td><span class="scm-collection-log-pill">' + escapeHtml(row.contract || "-") + '</span></td>'
-            + '<td>' + property + '</td>'
-            + '<td class="scm-portfolio-money">' + escapeHtml(row.balance_label || "-") + '</td>'
-            + '<td><span class="scm-portfolio-status scm-portfolio-status--' + escapeHtml(row.status || "") + '">' + escapeHtml(row.status_label || "-") + '</span></td>'
-            + '<td><span class="scm-portfolio-stage scm-portfolio-stage--' + escapeHtml(row.stage || "") + '">' + escapeHtml(row.stage_label || "-") + '</span></td>'
-            + '<td>' + escapeHtml(row.last_action || "-") + '<small>' + escapeHtml(row.last_action_at || "") + '</small></td>'
+            + '<td class="is-person"><strong>' + escapeHtml(row.tenant || "Sin nombre") + '</strong><small>' + escapeHtml(contact || "-") + '</small></td>'
+            + '<td><span class="scm-gc-code">' + escapeHtml(row.contract || "-") + '</span></td>'
+            + '<td class="is-property">' + property + '</td>'
+            + '<td class="is-num is-money">' + escapeHtml(row.balance_label || "-") + '</td>'
+            + '<td><span class="scm-gc-chip ' + chipTone("status", row.status) + '">' + escapeHtml(row.status_label || "-") + '</span></td>'
+            + '<td><span class="scm-gc-chip ' + chipTone("stage", row.stage) + '">' + escapeHtml(row.stage_label || "-") + '</span></td>'
+            + '<td class="is-last">' + escapeHtml(row.last_action || "-") + '<small>' + escapeHtml(row.last_action_at || "") + '</small></td>'
             + '</tr>';
         }).join("") + '</tbody></table>';
     }
@@ -980,8 +1012,12 @@
       }
     }
 
-    function timelineSummaryCard(label, value, helper) {
-      return '<article><span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(value || "-") + '</strong><small>' + escapeHtml(helper || "") + '</small></article>';
+    function timelineSummaryCard(label, value, helper, icon) {
+      return '<article>' + iconHtml(icon || "info") + '<div><span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(value || "-") + '</strong><small>' + escapeHtml(helper || "") + '</small></div></article>';
+    }
+
+    function timelineSourceIcon(source) {
+      return { snapshot: "account_balance_wallet", event: "bolt", management: "support_agent", property: "home_work" }[String(source || "")] || "radio_button_checked";
     }
 
     function renderTimeline(modal, data) {
@@ -998,15 +1034,15 @@
       }
       if (summary) {
         summary.innerHTML = [
-          timelineSummaryCard("Saldo actual", portfolio.balance_label || "Sin dato", portfolio.status_label || "Sin dato 1380"),
-          timelineSummaryCard("Etapa", portfolio.stage_label || "Cobro normal", "Estado operativo actual"),
-          timelineSummaryCard("Última acción", portfolio.last_action_label || "Sin acciones", formatTimelineDate(portfolio.last_action_at || "")),
-          timelineSummaryCard("Registros", String(counts.total || items.length || 0), "Cartera, gestiones e historial")
+          timelineSummaryCard("Saldo actual", portfolio.balance_label || "Sin dato", portfolio.status_label || "Sin dato 1380", "payments"),
+          timelineSummaryCard("Etapa", portfolio.stage_label || "Cobro normal", "Estado operativo actual", "flag"),
+          timelineSummaryCard("Última acción", portfolio.last_action_label || "Sin acciones", formatTimelineDate(portfolio.last_action_at || ""), "schedule"),
+          timelineSummaryCard("Registros", String(counts.total || items.length || 0), "Cartera, gestiones e historial", "format_list_numbered")
         ].join("");
       }
       if (!body) return;
       if (!items.length) {
-        body.innerHTML = '<div class="scm-admin-notif-empty"><strong>Sin trazabilidad registrada</strong><span>Este contrato todavía no tiene movimientos de cartera, gestiones ni reportes asociados.</span></div>';
+        body.innerHTML = emptyHtml("Sin trazabilidad registrada", "Este contrato todavía no tiene movimientos de cartera, gestiones ni reportes asociados.", "timeline");
         return;
       }
       body.innerHTML = items.map(function (item) {
@@ -1021,14 +1057,14 @@
           current && current !== "Sin dato" ? "Saldo: " + current : ""
         ].filter(Boolean);
         var documentLink = item.document_url
-          ? '<a class="scm-portfolio-timeline-link" href="' + escapeHtml(item.document_url) + '" target="_blank" rel="noopener">Ver documento asociado</a>'
+          ? '<a class="scm-gc-action" href="' + escapeHtml(item.document_url) + '" target="_blank" rel="noopener">' + iconHtml("description") + 'Ver documento asociado</a>'
           : "";
-        return '<article class="scm-portfolio-timeline-item scm-portfolio-timeline-item--' + escapeHtml(item.source || "event") + '">'
-          + '<span class="scm-portfolio-timeline-dot" aria-hidden="true"></span>'
-          + '<div class="scm-portfolio-timeline-content">'
-          + '<div class="scm-portfolio-timeline-item-head"><strong>' + escapeHtml(item.label || "Movimiento de cartera") + '</strong><time>' + escapeHtml(formatTimelineDate(item.date || "")) + '</time></div>'
+        return '<article class="scm-gc-timeline-item is-' + escapeHtml(item.source || "event") + '">'
+          + '<span class="scm-gc-timeline-dot" aria-hidden="true">' + iconHtml(timelineSourceIcon(item.source)) + '</span>'
+          + '<div class="scm-gc-timeline-content">'
+          + '<div class="scm-gc-timeline-head"><strong>' + escapeHtml(item.label || "Movimiento de cartera") + '</strong><time>' + escapeHtml(formatTimelineDate(item.date || "")) + '</time></div>'
           + (note ? '<p>' + escapeHtml(note) + '</p>' : '<p class="is-muted">Sin observación registrada.</p>')
-          + (meta.length ? '<div class="scm-portfolio-timeline-meta">' + meta.map(function (value) { return '<span>' + escapeHtml(value) + '</span>'; }).join("") + '</div>' : "")
+          + (meta.length ? '<div class="scm-gc-timeline-meta">' + meta.map(function (value) { return '<span>' + escapeHtml(value) + '</span>'; }).join("") + '</div>' : "")
           + documentLink
           + '</div>'
           + '</article>';
@@ -1050,7 +1086,7 @@
       if (title) title.textContent = "Trazabilidad contrato " + (contractNumber || contractId || "-");
       if (subtitle) subtitle.textContent = tenantName + " · Consultando movimientos asociados.";
       if (summary) summary.innerHTML = "";
-      if (body) body.innerHTML = '<div class="scm-admin-notif-empty"><strong>Cargando trazabilidad...</strong><span>Estamos cruzando cartera, gestiones y reportes del inmueble.</span></div>';
+      if (body) body.innerHTML = emptyHtml("Cargando trazabilidad...", "Estamos cruzando cartera, gestiones y reportes del inmueble.", "hourglass_top");
       modal.hidden = false;
       syncModalBodyState();
       var close = modal.querySelector("[data-scm-portfolio-timeline-close]");
@@ -1064,13 +1100,87 @@
         renderTimeline(modal, data);
       }).catch(function (error) {
         if (body) {
-          body.innerHTML = '<div class="scm-admin-notif-empty"><strong>No se pudo cargar la trazabilidad</strong><span>' + escapeHtml(error.message) + '</span></div>';
+          body.innerHTML = emptyHtml("No se pudo cargar la trazabilidad", error.message, "error");
         }
         notify("error", error.message, "Cartera");
       }).finally(function () {
         button.disabled = false;
       });
     }
+
+    function closeQueueMessage() {
+      var modal = root.querySelector("[data-scm-collection-queue-message-modal]");
+      if (!modal) return;
+      modal.hidden = true;
+      var body = modal.querySelector("[data-scm-collection-queue-message-body]");
+      if (body) body.innerHTML = "";
+      syncModalBodyState();
+    }
+
+    function formatWhatsappText(value) {
+      return escapeHtml(value)
+        .replace(/\*([^*\n]+)\*/g, "<strong>$1</strong>")
+        .replace(/_([^_\n]+)_/g, "<em>$1</em>")
+        .replace(/\n/g, "<br>");
+    }
+
+    function renderQueueMessage(modal, data) {
+      var title = modal.querySelector("[data-scm-collection-queue-message-title]");
+      var subtitle = modal.querySelector("[data-scm-collection-queue-message-subtitle]");
+      var body = modal.querySelector("[data-scm-collection-queue-message-body]");
+      var channel = String(data.channel || "");
+      if (title) title.textContent = String(data.subject || "Mensaje de cartera") + " · #" + String(data.id || "");
+      if (subtitle) subtitle.textContent = [data.channel_label || channel || "Canal", data.destination_name || "Destinatario", data.destination || "Sin destino"].join(" · ");
+      if (!body) return;
+      var facts = [
+        ["Estado", '<span class="scm-gc-chip ' + chipTone("queue", data.status) + '">' + escapeHtml(data.status_label || data.status || "-") + '</span>'],
+        ["Canal", escapeHtml(data.channel_label || channel || "-") + (data.provider ? '<small>' + escapeHtml(data.provider) + '</small>' : "")],
+        ["Destinatario", escapeHtml(data.destination_name || "-") + '<small>' + escapeHtml([data.destination || "", data.recipient_role_label || ""].filter(Boolean).join(" · ")) + '</small>'],
+        ["Creado", escapeHtml(formatTimelineDate(data.created_at || "")) + (data.sent_at ? '<small>Enviado: ' + escapeHtml(formatTimelineDate(data.sent_at)) + '</small>' : "")],
+        ["Plantilla", '<code class="scm-gc-code">' + escapeHtml(data.template_name || "-") + '</code>'],
+        ["Intentos", escapeHtml(String(Number(data.attempts || 0)) + "/" + String(Number(data.max_attempts || 0)))]
+      ];
+      var preview;
+      if (channel === "email") {
+        preview = '<div class="scm-gc-mail-preview"><div class="scm-gc-mail-bar"><i></i><i></i><i></i><strong>' + escapeHtml(data.subject || "Sin asunto") + '</strong></div>'
+          + '<iframe sandbox title="Vista del correo" data-scm-collection-queue-message-frame></iframe></div>';
+      } else {
+        var text = channel === "whatsapp"
+          ? formatWhatsappText(data.message_text || "")
+          : escapeHtml(data.message_text || "").replace(/\n/g, "<br>");
+        preview = '<div class="scm-gc-chat-preview is-' + escapeHtml(channel || "sms") + '">'
+          + '<div class="scm-gc-chat-head">' + iconHtml(channel === "whatsapp" ? "chat" : "sms") + '<div><strong>' + escapeHtml(data.destination_name || "Destinatario") + '</strong><small>' + escapeHtml(data.destination || "") + '</small></div></div>'
+          + '<div class="scm-gc-chat-body"><div class="scm-gc-bubble">' + (text || '<em>Sin contenido</em>') + '<time>' + escapeHtml(formatTimelineDate(data.sent_at || data.created_at || "")) + '</time></div></div></div>';
+      }
+      body.innerHTML = '<dl class="scm-gc-facts">' + facts.map(function (fact) { return '<div><dt>' + fact[0] + '</dt><dd>' + fact[1] + '</dd></div>'; }).join("") + '</dl>'
+        + (data.last_error ? '<div class="scm-gc-callout is-danger">' + iconHtml("error") + '<div><strong>Último error</strong><span>' + escapeHtml(data.last_error) + '</span></div></div>' : "")
+        + preview;
+      var frame = body.querySelector("[data-scm-collection-queue-message-frame]");
+      if (frame) frame.srcdoc = String(data.message_html || "");
+    }
+
+    function openQueueMessage(button) {
+      var modal = root.querySelector("[data-scm-collection-queue-message-modal]");
+      if (!modal) return;
+      var queueId = String(button.getAttribute("data-scm-collection-queue-message") || "");
+      var body = modal.querySelector("[data-scm-collection-queue-message-body]");
+      if (body) body.innerHTML = emptyHtml("Cargando mensaje...", "Consultando el contenido en la cola de notificaciones.", "hourglass_top");
+      modal.hidden = false;
+      syncModalBodyState();
+      var close = modal.querySelector("[data-scm-collection-queue-message-close]");
+      if (close) close.focus();
+      var fd = new FormData();
+      fd.set("queue_id", queueId);
+      button.disabled = true;
+      postJson(actionQueueMessage, fd).then(function (data) {
+        renderQueueMessage(modal, data);
+      }).catch(function (error) {
+        if (body) body.innerHTML = emptyHtml("No se pudo cargar el mensaje", error.message, "error");
+      }).finally(function () {
+        button.disabled = false;
+      });
+    }
+
 
     function closeLetterPreview() {
       var modal = root.querySelector("[data-scm-portfolio-letter-preview-modal]");
@@ -1156,14 +1266,14 @@
       wrap.hidden = codeudores.length === 0;
       codeudores.forEach(function (codeudor, index) {
         var label = document.createElement("label");
-        label.className = "scm-admin-notif-codeudor-card";
+        label.className = "scm-gc-codeudor";
         var input = document.createElement("input");
         input.type = "checkbox";
         input.name = "notify_codeudor_keys[]";
         input.value = String(codeudor.key || "");
         input.checked = true;
         var info = document.createElement("span");
-        info.className = "scm-admin-notif-codeudor-info";
+        info.className = "scm-gc-codeudor-info";
         var name = document.createElement("strong");
         name.textContent = String(codeudor.nombre || ("Codeudor " + (index + 1)));
         var contact = document.createElement("small");
@@ -1429,6 +1539,18 @@
         }
         return;
       }
+      var queueMessageButton = event.target.closest && event.target.closest("[data-scm-collection-queue-message]");
+      if (queueMessageButton && root.contains(queueMessageButton)) {
+        event.preventDefault();
+        openQueueMessage(queueMessageButton);
+        return;
+      }
+      var queueMessageClose = event.target.closest && event.target.closest("[data-scm-collection-queue-message-close]");
+      if (queueMessageClose && root.contains(queueMessageClose)) {
+        event.preventDefault();
+        closeQueueMessage();
+        return;
+      }
       var timelineButton = event.target.closest && event.target.closest("[data-scm-portfolio-timeline]");
       if (timelineButton && root.contains(timelineButton)) {
         event.preventDefault();
@@ -1542,7 +1664,9 @@
         var preview = root.querySelector("[data-scm-portfolio-letter-preview-modal]:not([hidden])");
         var reportDetail = root.querySelector("[data-scm-portfolio-report-modal]:not([hidden])");
         var timeline = root.querySelector("[data-scm-portfolio-timeline-modal]:not([hidden])");
-        if (preview) closeLetterPreview();
+        var queueMessage = root.querySelector("[data-scm-collection-queue-message-modal]:not([hidden])");
+        if (queueMessage) closeQueueMessage();
+        else if (preview) closeLetterPreview();
         else if (reportDetail) closeReportDrilldown();
         else if (timeline) closeTimelineModal();
         else closeManagementModal();

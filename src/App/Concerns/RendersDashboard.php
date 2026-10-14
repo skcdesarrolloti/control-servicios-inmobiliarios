@@ -502,6 +502,7 @@ trait RendersDashboard
         'collection_portfolio_action' => self::AJAX_COLLECTION_PORTFOLIO_ACTION,
         'collection_portfolio_pdf' => self::AJAX_COLLECTION_PORTFOLIO_PDF,
         'collection_portfolio_timeline' => self::AJAX_COLLECTION_PORTFOLIO_TIMELINE,
+        'collection_queue_message' => self::AJAX_COLLECTION_QUEUE_MESSAGE,
         'internal_notifications_save' => self::AJAX_INTERNAL_NOTIFICATIONS_SAVE,
         'internal_events_sync' => self::AJAX_INTERNAL_EVENTS_SYNC,
         'public_pqr_settings_read' => self::AJAX_PUBLIC_PQR_SETTINGS_READ,
@@ -3454,6 +3455,9 @@ trait RendersDashboard
       'date_from' => trim((string) ($input['scmgc_fecha_desde'] ?? '')),
       'date_to' => trim((string) ($input['scmgc_fecha_hasta'] ?? '')),
       'type' => trim((string) ($input['scmgc_tipo'] ?? '')),
+      'contract' => sanitize_text_field(wp_unslash((string) ($input['scmgc_contrato'] ?? ''))),
+      'property' => sanitize_text_field(wp_unslash((string) ($input['scmgc_inmueble'] ?? ''))),
+      'tenant' => sanitize_text_field(wp_unslash((string) ($input['scmgc_arrendatario'] ?? ''))),
     ];
     $page = max(1, (int) ($input['scmgc_page'] ?? 1));
     $service = new AdministrativeNotificationsService($this->db);
@@ -3491,6 +3495,9 @@ trait RendersDashboard
     $dateFrom = (string) ($applied['date_from'] ?? '');
     $dateTo = (string) ($applied['date_to'] ?? '');
     $currentType = (string) ($applied['type'] ?? '');
+    $currentContract = (string) ($applied['contract'] ?? '');
+    $currentProperty = (string) ($applied['property'] ?? '');
+    $currentTenant = (string) ($applied['tenant'] ?? '');
     $queueFilters = [
       'date_from' => trim((string) ($input['scmgc_queue_fecha_desde'] ?? '')),
       'date_to' => trim((string) ($input['scmgc_queue_fecha_hasta'] ?? '')),
@@ -3823,13 +3830,16 @@ trait RendersDashboard
 
       <section id="scm-portfolio-panel-historial" class="scm-gc-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-historial" data-scm-portfolio-panel="historial"<?php echo $activeView === 'historial' ? '' : ' hidden'; ?>>
         <section class="scm-gc-card scm-gc-table-card">
-          <div class="scm-gc-section-head"><div><span class="scm-gc-kicker">Trazabilidad</span><h4>Historial de gestiones de cobro</h4><p>Todos los registros operativos y sus notificaciones, ya centralizados en este m&oacute;dulo.</p></div><span class="scm-gc-count"><strong><?php echo esc_html((string) ((int) ($stats['total'] ?? 0))); ?></strong> gestiones</span></div>
+          <div class="scm-gc-section-head"><div><span class="scm-gc-kicker">Trazabilidad</span><h4>Historial de gestiones de cobro</h4><p>Todos los registros operativos y sus notificaciones, ya centralizados en este m&oacute;dulo.</p></div><span class="scm-gc-count"><strong><?php echo esc_html((string) ((int) ($pagination['total'] ?? 0))); ?></strong> gestiones</span></div>
           <form method="get" autocomplete="off" data-scm-collection-log-form class="scm-gc-filters is-history">
             <input type="hidden" name="scm_tab" value="gestiones_cobro"><input type="hidden" name="scmgc_view" value="historial"><input type="hidden" name="scmgc_page" value="1">
             <label class="scm-gc-field"><span>Fecha desde</span><input id="scmgc_fecha_desde" name="scmgc_fecha_desde" type="date" value="<?php echo esc_attr($dateFrom); ?>"></label>
             <label class="scm-gc-field"><span>Fecha hasta</span><input id="scmgc_fecha_hasta" name="scmgc_fecha_hasta" type="date" value="<?php echo esc_attr($dateTo); ?>"></label>
             <label class="scm-gc-field"><span>Concepto</span><select id="scmgc_tipo" name="scmgc_tipo"><option value="">Todos</option><?php foreach ($types as $typeOption): ?><option value="<?php echo esc_attr($typeOption); ?>" <?php selected($currentType, $typeOption); ?>><?php echo esc_html($this->collection_management_type_label($typeOption)); ?></option><?php endforeach; ?></select></label>
-            <div class="scm-gc-filter-actions"><button type="submit" class="scm-gc-btn is-navy"><?php echo $this->collection_gc_icon('filter_alt'); ?>Filtrar historial</button></div>
+            <label class="scm-gc-field"><span>Contrato</span><input id="scmgc_contrato" name="scmgc_contrato" type="search" value="<?php echo esc_attr($currentContract); ?>" placeholder="N&uacute;mero de contrato"></label>
+            <label class="scm-gc-field"><span>Inmueble SIMI</span><input id="scmgc_inmueble" name="scmgc_inmueble" type="search" value="<?php echo esc_attr($currentProperty); ?>" placeholder="C&oacute;digo SIMI o direcci&oacute;n"></label>
+            <label class="scm-gc-field"><span>Arrendatario</span><input id="scmgc_arrendatario" name="scmgc_arrendatario" type="search" value="<?php echo esc_attr($currentTenant); ?>" placeholder="Nombre del arrendatario"></label>
+            <div class="scm-gc-filter-actions"><button type="submit" class="scm-gc-btn is-navy"><?php echo $this->collection_gc_icon('filter_alt'); ?>Filtrar historial</button><a class="scm-gc-btn" href="?scm_tab=gestiones_cobro&amp;scmgc_view=historial&amp;scmgc_fecha_desde=&amp;scmgc_fecha_hasta=&amp;scmgc_tipo=&amp;scmgc_contrato=&amp;scmgc_inmueble=&amp;scmgc_arrendatario=&amp;scmgc_page=1" data-scm-collection-log-clear>Limpiar</a></div>
           </form>
           <?php if ($rows === []): ?>
             <?php echo $this->render_collection_gc_empty('Sin gestiones registradas', 'No hay registros con los filtros actuales.'); ?>
@@ -3879,7 +3889,7 @@ trait RendersDashboard
           <?php else: ?>
             <div class="scm-gc-table-wrap">
               <table class="scm-gc-table">
-                <thead><tr><th>ID</th><th>Fecha</th><th>Estado</th><th>Canal</th><th>Destinatario</th><th>Plantilla</th><th>Lote</th><th class="is-num">Intentos</th><th>Detalle</th></tr></thead>
+                <thead><tr><th>ID</th><th>Fecha</th><th>Estado</th><th>Canal</th><th>Destinatario</th><th>Plantilla</th><th>Lote</th><th class="is-num">Intentos</th><th>Detalle</th><th>Mensaje</th></tr></thead>
                 <tbody>
                   <?php foreach ($queueRows as $queueRow): ?>
                     <?php
@@ -3896,7 +3906,8 @@ trait RendersDashboard
                       <td><code class="scm-gc-code"><?php echo esc_html((string) (($queueRow['template_name'] ?? '') ?: '-')); ?></code><small><?php echo esc_html((string) (($queueRow['type_label'] ?? '') ?: 'Cartera')); ?></small></td>
                       <td><code class="scm-gc-code"><?php echo esc_html((string) (($queueRow['batch_id'] ?? '') ?: '-')); ?></code></td>
                       <td class="is-num"><?php echo esc_html((string) ((int) ($queueRow['attempts'] ?? 0))); ?>/<?php echo esc_html((string) ((int) ($queueRow['max_attempts'] ?? 0))); ?></td>
-                      <td class="is-note"><strong><?php echo esc_html((string) (($queueRow['subject'] ?? '') ?: 'Mensaje de cartera')); ?></strong><small><?php echo esc_html(mb_substr(trim((string) (($queueRow['last_error'] ?? '') ?: ($queueRow['message_text'] ?? ''))), 0, 260, 'UTF-8')); ?></small></td>
+                      <td class="is-note"><strong><?php echo esc_html((string) (($queueRow['subject'] ?? '') ?: 'Mensaje de cartera')); ?></strong><small><?php echo esc_html(mb_substr(trim((string) (($queueRow['last_error'] ?? '') ?: ($queueRow['message_text'] ?? ''))), 0, 160, 'UTF-8')); ?></small></td>
+                      <td><button type="button" class="scm-gc-action is-primary" data-scm-collection-queue-message="<?php echo esc_attr((string) ((int) ($queueRow['id'] ?? 0))); ?>" title="Ver el mensaje tal como se envía al destinatario"><?php echo $this->collection_gc_icon('visibility'); ?>Ver mensaje</button></td>
                     </tr>
                   <?php endforeach; ?>
                 </tbody>
@@ -3911,6 +3922,7 @@ trait RendersDashboard
       <?php echo $this->render_collection_letter_preview_modal(); ?>
       <?php echo $this->render_collection_report_drilldown_modal(); ?>
       <?php echo $this->render_collection_portfolio_timeline_modal(); ?>
+      <?php echo $this->render_collection_queue_message_modal(); ?>
     </div>
 <?php
     return (string) ob_get_clean();
@@ -3929,29 +3941,35 @@ trait RendersDashboard
   {
     ob_start();
 ?>
-    <div class="scm-admin-notif-modal scm-portfolio-management-modal" data-scm-portfolio-management-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-portfolio-management-title">
+    <div class="scm-admin-notif-modal scm-gc-modal" data-scm-portfolio-management-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-portfolio-management-title">
       <div class="scm-admin-notif-modal-backdrop" data-scm-portfolio-management-close aria-hidden="true"></div>
-      <section class="scm-admin-notif-card scm-admin-notif-composer scm-admin-notif-modal-panel">
-        <div class="scm-admin-notif-modal-head">
-          <div class="scm-admin-notif-modal-titleblock"><span class="scm-calendar-action-kicker">Cobranza</span><h4 id="scm-portfolio-management-title">Registrar gesti&oacute;n de cobro</h4><p data-scm-portfolio-management-context>Selecciona un contrato de la cartera.</p></div>
-          <button type="button" class="scm-modal-close" data-scm-portfolio-management-close aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
-        </div>
-        <form data-scm-portfolio-management-form autocomplete="off">
+      <section class="scm-gc-modal-panel is-md">
+        <header class="scm-gc-modal-head">
+          <span class="scm-gc-modal-icon"><?php echo $this->collection_gc_icon('support_agent'); ?></span>
+          <div><span class="scm-gc-kicker">Cobranza</span><h4 id="scm-portfolio-management-title">Registrar gesti&oacute;n de cobro</h4><p data-scm-portfolio-management-context>Selecciona un contrato de la cartera.</p></div>
+          <button type="button" class="scm-gc-modal-close" data-scm-portfolio-management-close aria-label="Cerrar"><?php echo $this->collection_gc_icon('close'); ?></button>
+        </header>
+        <form class="scm-gc-modal-body scm-gc-modal-form" data-scm-portfolio-management-form autocomplete="off">
           <input type="hidden" name="type" value="arrendatarios_activos">
           <input type="hidden" name="portfolio_id" value="">
           <input type="hidden" name="ids[]" value="">
           <input type="hidden" name="contract_ids[]" value="">
-          <div class="scm-portfolio-management-grid">
-            <div class="scm-field"><label for="scm-portfolio-management-type">Concepto</label><select id="scm-portfolio-management-type" name="tipo_gestion_cobro" class="select select-bordered select-sm scm-select"><option value="Canon">Canon</option><option value="Administracion">Administraci&oacute;n</option><option value="Servicios publicos">Servicios p&uacute;blicos</option></select></div>
+          <label class="scm-gc-field"><span>Concepto</span><select id="scm-portfolio-management-type" name="tipo_gestion_cobro"><option value="Canon">Canon</option><option value="Administracion">Administraci&oacute;n</option><option value="Servicios publicos">Servicios p&uacute;blicos</option></select></label>
+          <label class="scm-gc-field"><span>Observaci&oacute;n <b aria-hidden="true">*</b></span><textarea id="scm-portfolio-management-observation" name="observacion" rows="5" maxlength="2000" required aria-describedby="scm-portfolio-management-observation-help" placeholder="Ejemplo: Se llam&oacute; al arrendatario. Se comprometi&oacute; a pagar el 30/08 y enviar el soporte por WhatsApp."></textarea><small id="scm-portfolio-management-observation-help">Describe el contacto, el compromiso y el siguiente paso. Esta nota quedar&aacute; en el historial.</small></label>
+          <div class="scm-gc-notify-box">
+            <div><strong><?php echo $this->collection_gc_icon('notifications_active'); ?>Notificar al guardar</strong><span>Opcional. Usa la plantilla de gesti&oacute;n de cobro para el arrendatario y los codeudores seleccionados.</span></div>
+            <div class="scm-gc-channel-group" role="group" aria-label="Canales de notificaci&oacute;n">
+              <label class="scm-gc-channel"><input type="checkbox" name="notify_channels[]" value="whatsapp" checked><span>WhatsApp</span></label>
+              <label class="scm-gc-channel"><input type="checkbox" name="notify_channels[]" value="email"><span>Email</span></label>
+              <label class="scm-gc-channel"><input type="checkbox" name="notify_channels[]" value="sms"><span>SMS</span></label>
+            </div>
           </div>
-          <div class="scm-field scm-portfolio-management-observation"><label for="scm-portfolio-management-observation">Observaci&oacute;n <span aria-hidden="true">*</span></label><textarea id="scm-portfolio-management-observation" name="observacion" class="textarea textarea-bordered scm-textarea" rows="5" maxlength="2000" required aria-describedby="scm-portfolio-management-observation-help" placeholder="Ejemplo: Se llam&oacute; al arrendatario. Se comprometi&oacute; a pagar el 30/08 y enviar el soporte por WhatsApp."></textarea><small id="scm-portfolio-management-observation-help">Describe el contacto, el compromiso y el siguiente paso. Esta nota quedar&aacute; en el historial.</small></div>
-          <div class="scm-portfolio-management-notify">
-            <div><strong>Notificar al guardar</strong><span>Opcional. Usa la plantilla de gesti&oacute;n de cobro para el arrendatario y los codeudores seleccionados.</span></div>
-            <div class="scm-admin-notif-collection-channels" role="group" aria-label="Canales de notificaci&oacute;n"><label class="scm-admin-notif-mini-channel"><input type="checkbox" name="notify_channels[]" value="whatsapp" checked><span>WhatsApp</span></label><label class="scm-admin-notif-mini-channel"><input type="checkbox" name="notify_channels[]" value="email"><span>Email</span></label><label class="scm-admin-notif-mini-channel"><input type="checkbox" name="notify_channels[]" value="sms"><span>SMS</span></label></div>
-          </div>
-          <div class="scm-admin-notif-codeudores" data-scm-portfolio-codeudores hidden><div class="scm-admin-notif-codeudores-head"><div><strong>Codeudores</strong><span>Selecciona qui&eacute;nes tambi&eacute;n recibir&aacute;n la notificaci&oacute;n.</span></div></div><div class="scm-admin-notif-codeudores-list" data-scm-portfolio-codeudores-list></div></div>
-          <div class="scm-admin-notif-submit-row"><span class="scm-spinner" data-scm-portfolio-management-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span><button type="submit" class="scm-btn-primary btn btn-primary">Guardar gesti&oacute;n</button></div>
-          <p class="scm-admin-notif-result" data-scm-portfolio-management-result aria-live="polite"></p>
+          <div class="scm-gc-codeudores" data-scm-portfolio-codeudores hidden><div><strong>Codeudores</strong><span>Selecciona qui&eacute;nes tambi&eacute;n recibir&aacute;n la notificaci&oacute;n.</span></div><div class="scm-gc-codeudores-list" data-scm-portfolio-codeudores-list></div></div>
+          <p class="scm-gc-result" data-scm-portfolio-management-result aria-live="polite"></p>
+          <footer class="scm-gc-modal-foot">
+            <button type="button" class="scm-gc-btn" data-scm-portfolio-management-close>Cancelar</button>
+            <button type="submit" class="scm-gc-btn is-navy"><span class="scm-gc-spinner" aria-hidden="true"></span><?php echo $this->collection_gc_icon('save'); ?>Guardar gesti&oacute;n</button>
+          </footer>
         </form>
       </section>
     </div>
@@ -3963,20 +3981,23 @@ trait RendersDashboard
   {
     ob_start();
 ?>
-    <div class="scm-admin-notif-modal scm-portfolio-letter-preview-modal" data-scm-portfolio-letter-preview-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-portfolio-letter-preview-title">
+    <div class="scm-admin-notif-modal scm-gc-modal" data-scm-portfolio-letter-preview-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-portfolio-letter-preview-title">
       <div class="scm-admin-notif-modal-backdrop" data-scm-portfolio-letter-preview-close aria-hidden="true"></div>
-      <section class="scm-admin-notif-card scm-admin-notif-modal-panel scm-portfolio-letter-preview-panel">
-        <div class="scm-admin-notif-modal-head">
-          <div class="scm-admin-notif-modal-titleblock"><span class="scm-calendar-action-kicker">Vista previa</span><h4 id="scm-portfolio-letter-preview-title" data-scm-portfolio-letter-preview-title>Carta prejur&iacute;dica</h4><p data-scm-portfolio-letter-preview-context>Revisa el documento antes de registrarlo o enviarlo.</p></div>
-          <button type="button" class="scm-modal-close" data-scm-portfolio-letter-preview-close aria-label="Cerrar vista previa"><span aria-hidden="true">&times;</span></button>
+      <section class="scm-gc-modal-panel is-lg">
+        <header class="scm-gc-modal-head">
+          <span class="scm-gc-modal-icon"><?php echo $this->collection_gc_icon('gavel'); ?></span>
+          <div><span class="scm-gc-kicker">Vista previa</span><h4 id="scm-portfolio-letter-preview-title" data-scm-portfolio-letter-preview-title>Carta prejur&iacute;dica</h4><p data-scm-portfolio-letter-preview-context>Revisa el documento antes de registrarlo o enviarlo.</p></div>
+          <button type="button" class="scm-gc-modal-close" data-scm-portfolio-letter-preview-close aria-label="Cerrar vista previa"><?php echo $this->collection_gc_icon('close'); ?></button>
+        </header>
+        <div class="scm-gc-modal-body">
+          <div class="scm-gc-callout"><?php echo $this->collection_gc_icon('info'); ?><div><strong>La vista previa no cambia la etapa ni env&iacute;a mensajes.</strong><span>Al descargar se registra la carta prejur&iacute;dica y su etapa. Al enviar tambi&eacute;n se encola el correo para el arrendatario.</span></div></div>
+          <div class="scm-gc-pdf-frame"><iframe src="about:blank" title="Vista previa de la carta en PDF" data-scm-portfolio-letter-preview-frame></iframe></div>
         </div>
-        <div class="scm-portfolio-letter-preview-help"><strong>La vista previa no cambia la etapa ni env&iacute;a mensajes.</strong><span>Al descargar se registra la carta prejur&iacute;dica y su etapa. Al enviar tambi&eacute;n se encola el correo para el arrendatario.</span></div>
-        <div class="scm-portfolio-letter-preview-frame"><iframe src="about:blank" title="Vista previa de la carta en PDF" data-scm-portfolio-letter-preview-frame></iframe></div>
-        <div class="scm-portfolio-letter-preview-actions">
-          <button type="button" class="scm-btn-secondary btn btn-outline" data-scm-portfolio-letter-preview-close>Cerrar</button>
-          <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter-preview-download>Descargar y registrar</button>
-          <button type="button" class="scm-btn-primary btn btn-primary" data-scm-portfolio-letter-preview-send>Enviar y registrar</button>
-        </div>
+        <footer class="scm-gc-modal-foot">
+          <button type="button" class="scm-gc-btn" data-scm-portfolio-letter-preview-close>Cerrar</button>
+          <button type="button" class="scm-gc-btn" data-scm-portfolio-letter-preview-download><?php echo $this->collection_gc_icon('download'); ?>Descargar y registrar</button>
+          <button type="button" class="scm-gc-btn is-primary" data-scm-portfolio-letter-preview-send><?php echo $this->collection_gc_icon('send'); ?>Enviar y registrar</button>
+        </footer>
       </section>
     </div>
 <?php
@@ -3987,19 +4008,22 @@ trait RendersDashboard
   {
     ob_start();
 ?>
-    <div class="scm-admin-notif-modal scm-portfolio-report-detail-modal" data-scm-portfolio-report-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-portfolio-report-detail-title">
+    <div class="scm-admin-notif-modal scm-gc-modal" data-scm-portfolio-report-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-portfolio-report-detail-title">
       <div class="scm-admin-notif-modal-backdrop" data-scm-portfolio-report-close aria-hidden="true"></div>
-      <section class="scm-admin-notif-card scm-admin-notif-modal-panel scm-portfolio-report-detail-panel">
-        <div class="scm-admin-notif-modal-head">
-          <div class="scm-admin-notif-modal-titleblock"><span class="scm-calendar-action-kicker">Detalle del informe</span><h4 id="scm-portfolio-report-detail-title" data-scm-portfolio-report-title>Grupo de cartera</h4><p data-scm-portfolio-report-subtitle>Contratos incluidos en este indicador.</p></div>
-          <button type="button" class="scm-modal-close" data-scm-portfolio-report-close aria-label="Cerrar detalle"><span aria-hidden="true">&times;</span></button>
+      <section class="scm-gc-modal-panel is-xl">
+        <header class="scm-gc-modal-head">
+          <span class="scm-gc-modal-icon"><?php echo $this->collection_gc_icon('monitoring'); ?></span>
+          <div><span class="scm-gc-kicker">Detalle del informe</span><h4 id="scm-portfolio-report-detail-title" data-scm-portfolio-report-title>Grupo de cartera</h4><p data-scm-portfolio-report-subtitle>Contratos incluidos en este indicador.</p></div>
+          <button type="button" class="scm-gc-modal-close" data-scm-portfolio-report-close aria-label="Cerrar detalle"><?php echo $this->collection_gc_icon('close'); ?></button>
+        </header>
+        <div class="scm-gc-modal-toolbar">
+          <span class="scm-gc-count" data-scm-portfolio-report-count>0 contratos</span>
+          <label class="scm-gc-field is-inline"><span class="sr-only">Buscar</span><input type="search" data-scm-portfolio-report-search placeholder="Nombre, contrato, inmueble o saldo"></label>
+          <button type="button" class="scm-gc-btn" data-scm-portfolio-report-search-clear>Limpiar</button>
         </div>
-        <div class="scm-portfolio-report-detail-toolbar">
-          <div class="scm-portfolio-report-detail-count"><span data-scm-portfolio-report-count>0 contratos</span><small>Filtra el detalle sin salir del informe.</small></div>
-          <label class="scm-portfolio-report-search"><span>Buscar</span><input type="search" class="input input-bordered input-sm scm-input" data-scm-portfolio-report-search placeholder="Nombre, contrato, inmueble o saldo"></label>
-          <button type="button" class="scm-btn-secondary btn btn-outline" data-scm-portfolio-report-search-clear>Limpiar</button>
+        <div class="scm-gc-modal-body">
+          <div class="scm-gc-table-wrap" data-scm-portfolio-report-body></div>
         </div>
-        <div class="scm-portfolio-report-detail-table-wrap" data-scm-portfolio-report-body></div>
       </section>
     </div>
 <?php
@@ -4010,17 +4034,39 @@ trait RendersDashboard
   {
     ob_start();
 ?>
-    <div class="scm-admin-notif-modal scm-portfolio-timeline-modal" data-scm-portfolio-timeline-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-portfolio-timeline-title">
+    <div class="scm-admin-notif-modal scm-gc-modal" data-scm-portfolio-timeline-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-portfolio-timeline-title">
       <div class="scm-admin-notif-modal-backdrop" data-scm-portfolio-timeline-close aria-hidden="true"></div>
-      <section class="scm-admin-notif-card scm-admin-notif-modal-panel scm-portfolio-timeline-panel">
-        <div class="scm-admin-notif-modal-head">
-          <div class="scm-admin-notif-modal-titleblock"><span class="scm-calendar-action-kicker">Trazabilidad</span><h4 id="scm-portfolio-timeline-title" data-scm-portfolio-timeline-title>Contrato de arrendamiento</h4><p data-scm-portfolio-timeline-subtitle>Movimientos de cartera, gestiones registradas y reportes del inmueble asociados.</p></div>
-          <button type="button" class="scm-modal-close" data-scm-portfolio-timeline-close aria-label="Cerrar trazabilidad"><span aria-hidden="true">&times;</span></button>
+      <section class="scm-gc-modal-panel is-lg">
+        <header class="scm-gc-modal-head">
+          <span class="scm-gc-modal-icon"><?php echo $this->collection_gc_icon('timeline'); ?></span>
+          <div><span class="scm-gc-kicker">Trazabilidad</span><h4 id="scm-portfolio-timeline-title" data-scm-portfolio-timeline-title>Contrato de arrendamiento</h4><p data-scm-portfolio-timeline-subtitle>Movimientos de cartera, gestiones registradas y reportes del inmueble asociados.</p></div>
+          <button type="button" class="scm-gc-modal-close" data-scm-portfolio-timeline-close aria-label="Cerrar trazabilidad"><?php echo $this->collection_gc_icon('close'); ?></button>
+        </header>
+        <div class="scm-gc-modal-body">
+          <div class="scm-gc-timeline-summary" data-scm-portfolio-timeline-summary aria-live="polite"></div>
+          <div class="scm-gc-timeline" data-scm-portfolio-timeline-body aria-live="polite">
+            <?php echo $this->render_collection_gc_empty('Selecciona un contrato', 'Aquí verás la trazabilidad de cartera.'); ?>
+          </div>
         </div>
-        <div class="scm-portfolio-timeline-summary" data-scm-portfolio-timeline-summary aria-live="polite"></div>
-        <div class="scm-portfolio-timeline-list" data-scm-portfolio-timeline-body aria-live="polite">
-          <div class="scm-admin-notif-empty"><strong>Selecciona un contrato</strong><span>Aqu&iacute; ver&aacute;s la trazabilidad de cartera.</span></div>
-        </div>
+      </section>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  private function render_collection_queue_message_modal(): string
+  {
+    ob_start();
+?>
+    <div class="scm-admin-notif-modal scm-gc-modal" data-scm-collection-queue-message-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-collection-queue-message-title">
+      <div class="scm-admin-notif-modal-backdrop" data-scm-collection-queue-message-close aria-hidden="true"></div>
+      <section class="scm-gc-modal-panel is-lg">
+        <header class="scm-gc-modal-head">
+          <span class="scm-gc-modal-icon"><?php echo $this->collection_gc_icon('mail'); ?></span>
+          <div><span class="scm-gc-kicker">Cola de notificaciones</span><h4 id="scm-collection-queue-message-title" data-scm-collection-queue-message-title>Mensaje de cartera</h4><p data-scm-collection-queue-message-subtitle>Vista del mensaje tal como lo recibe el destinatario.</p></div>
+          <button type="button" class="scm-gc-modal-close" data-scm-collection-queue-message-close aria-label="Cerrar mensaje"><?php echo $this->collection_gc_icon('close'); ?></button>
+        </header>
+        <div class="scm-gc-modal-body" data-scm-collection-queue-message-body aria-live="polite"></div>
       </section>
     </div>
 <?php
@@ -4354,6 +4400,9 @@ trait RendersDashboard
       'scmgc_fecha_desde' => (string) ($filters['date_from'] ?? ''),
       'scmgc_fecha_hasta' => (string) ($filters['date_to'] ?? ''),
       'scmgc_tipo' => (string) ($filters['type'] ?? ''),
+      'scmgc_contrato' => (string) ($filters['contract'] ?? ''),
+      'scmgc_inmueble' => (string) ($filters['property'] ?? ''),
+      'scmgc_arrendatario' => (string) ($filters['tenant'] ?? ''),
     ], 'scmgc_page');
   }
 

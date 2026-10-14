@@ -815,6 +815,19 @@ trait HandlesCollectionManagement
     }
   }
 
+  public function ajax_handler_collection_queue_message(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('gestiones_cobro')) {
+      $this->jsonFail('No tienes permiso para ver los mensajes de cartera.');
+    }
+    try {
+      $this->jsonOk($this->get_admin_notifications_service()->queueMessageDetail(max(0, (int) ($_POST['queue_id'] ?? 0))));
+    } catch (\Throwable $exception) {
+      $this->jsonFail($exception->getMessage());
+    }
+  }
+
   private function get_collection_portfolio_service(): CollectionPortfolioService
   {
     return new CollectionPortfolioService($this->db);

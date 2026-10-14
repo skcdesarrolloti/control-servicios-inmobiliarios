@@ -103,6 +103,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_COLLECTION_PORTFOLIO_ACTION = 'scm_collection_portfolio_action';
   const AJAX_COLLECTION_PORTFOLIO_PDF = 'scm_collection_portfolio_pdf';
   const AJAX_COLLECTION_PORTFOLIO_TIMELINE = 'scm_collection_portfolio_timeline';
+  const AJAX_COLLECTION_QUEUE_MESSAGE = 'scm_collection_queue_message';
   const AJAX_INTERNAL_NOTIFICATIONS_SAVE = 'scm_internal_notifications_save';
   const AJAX_INTERNAL_EVENTS_SYNC = 'scm_internal_events_sync';
   const AJAX_PUBLIC_PQR_SETTINGS_READ = 'scm_public_pqr_settings_read';

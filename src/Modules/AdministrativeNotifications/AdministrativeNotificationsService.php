@@ -621,7 +621,7 @@ final class AdministrativeNotificationsService
         'stats' => ['total' => 0, 'by_type' => []],
         'types' => [],
         'pagination' => ['page' => 1, 'per_page' => $perPage, 'total' => 0, 'total_pages' => 1],
-        'filters' => ['date_from' => '', 'date_to' => '', 'type' => ''],
+        'filters' => ['date_from' => '', 'date_to' => '', 'type' => '', 'contract' => '', 'property' => '', 'tenant' => ''],
       ];
     }
 
@@ -631,10 +631,14 @@ final class AdministrativeNotificationsService
       [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
     }
     $type = trim((string) ($filters['type'] ?? ''));
+    $textFilters = [];
+    foreach (['contract', 'property', 'tenant'] as $textKey) {
+      $textFilters[$textKey] = mb_substr(trim((string) ($filters[$textKey] ?? '')), 0, 120, 'UTF-8');
+    }
     $page = max(1, $page);
     $perPage = max(10, min(100, $perPage));
 
-    [$whereSql, $args] = $this->collectionManagementWhere($table, $dateFrom, $dateTo, $type, true);
+    [$whereSql, $args] = $this->collectionManagementWhere($table, $dateFrom, $dateTo, $type, true, $textFilters);
     [$statsWhereSql, $statsArgs] = $this->collectionManagementWhere($table, $dateFrom, $dateTo, '', false);
     $total = (int) ($this->db->getVar("SELECT COUNT(*) FROM `{$table}` WHERE {$whereSql}", $args) ?? 0);
     $totalPages = max(1, (int) ceil($total / $perPage));
@@ -693,7 +697,7 @@ final class AdministrativeNotificationsService
       'stats' => ['total' => $statsTotal, 'by_type' => $byType],
       'types' => array_values($types),
       'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
-      'filters' => ['date_from' => $dateFrom, 'date_to' => $dateTo, 'type' => $type],
+      'filters' => ['date_from' => $dateFrom, 'date_to' => $dateTo, 'type' => $type] + $textFilters,
     ];
   }
 
@@ -1014,6 +1018,55 @@ final class AdministrativeNotificationsService
     ];
   }
 
+  /** @return array<string,mixed> */
+  public function queueMessageDetail(int $id): array
+  {
+    if ($id <= 0) {
+      throw new \RuntimeException('Mensaje de cola invalido.');
+    }
+    if (!$this->schema->tableExists(self::QUEUE_TABLE)) {
+      throw new \RuntimeException('La tabla skc_notification_queue no esta disponible.');
+    }
+    $htmlSelect = $this->schema->columnExists(self::QUEUE_TABLE, 'message_html') ? '`message_html`' : "'' AS `message_html`";
+    $row = $this->db->getRow(
+      'SELECT `id`, `channel`, `provider`, `destination`, `destination_name`, `subject`, `template_name`, `status`, `attempts`, `max_attempts`, `created_at`, `sent_at`, `meta_json`, `message_text`, ' . $htmlSelect . ', `last_error`
+        FROM `' . self::QUEUE_TABLE . '`
+        WHERE `id` = ? AND `project_code` = ? AND `source_module` IN (?, ?)
+        LIMIT 1',
+      [$id, self::PROJECT_CODE, self::SOURCE_MODULE, self::COLLECTION_QUEUE_SOURCE_MODULE]
+    );
+    if (!is_array($row)) {
+      throw new \RuntimeException('No se encontro el mensaje en la cola de cartera.');
+    }
+    $channel = strtolower(trim((string) ($row['channel'] ?? '')));
+    $status = strtolower(trim((string) ($row['status'] ?? '')));
+    $messageText = (string) ($row['message_text'] ?? '');
+    $messageHtml = (string) ($row['message_html'] ?? '');
+    if ($channel === 'email' && trim($messageHtml) === '') {
+      $messageHtml = $this->queueEmailHtml((string) ($row['subject'] ?? ''), $messageText);
+    }
+    return [
+      'id' => (int) ($row['id'] ?? 0),
+      'channel' => $channel,
+      'channel_label' => $this->queueChannelLabel($channel),
+      'provider' => (string) ($row['provider'] ?? ''),
+      'status' => $status,
+      'status_label' => $this->queueStatusLabel($status),
+      'destination' => (string) ($row['destination'] ?? ''),
+      'destination_name' => (string) ($row['destination_name'] ?? ''),
+      'recipient_role_label' => $this->queueRecipientRoleLabel((string) ($row['meta_json'] ?? '')),
+      'subject' => (string) ($row['subject'] ?? ''),
+      'template_name' => (string) ($row['template_name'] ?? ''),
+      'attempts' => (int) ($row['attempts'] ?? 0),
+      'max_attempts' => (int) ($row['max_attempts'] ?? 0),
+      'created_at' => (string) ($row['created_at'] ?? ''),
+      'sent_at' => (string) ($row['sent_at'] ?? ''),
+      'message_text' => $messageText,
+      'message_html' => $channel === 'email' ? $messageHtml : '',
+      'last_error' => (string) ($row['last_error'] ?? ''),
+    ];
+  }
+
   private function normalizeQueueDate(string $value): string
   {
     $value = trim($value);
@@ -1166,7 +1219,8 @@ final class AdministrativeNotificationsService
   }
 
   /** @return array{0:string,1:array<int,mixed>} */
-  private function collectionManagementWhere(string $table, string $dateFrom, string $dateTo, string $type, bool $includeType): array
+  /** @param array<string,string> $textFilters contract, property and tenant partial matches */
+  private function collectionManagementWhere(string $table, string $dateFrom, string $dateTo, string $type, bool $includeType, array $textFilters = []): array
   {
     $where = ['1=1'];
     $args = [];
@@ -1193,6 +1247,22 @@ final class AdministrativeNotificationsService
     if ($includeType && $typeColumn !== '' && trim($type) !== '') {
       $where[] = 'LOWER(' . $this->collatedTextSql("TRIM(COALESCE(`{$typeColumn}`, ''))") . ') = LOWER(CONVERT(TRIM(?) USING utf8mb4) COLLATE utf8mb4_unicode_ci)';
       $args[] = $this->collectionTypeLabel($type);
+    }
+
+    $textColumns = [
+      'contract' => ['contrato', 'id_contrato', 'contrato_arrendamiento'],
+      'property' => ['inmueble', 'id_inmueble', 'id_inmueble_data', 'direccion', 'direccion_inmueble'],
+      'tenant' => ['arrendatario', 'nombre_arrendatario'],
+    ];
+    foreach ($textColumns as $key => $candidates) {
+      $value = trim((string) ($textFilters[$key] ?? ''));
+      $columns = array_values(array_filter($candidates, fn(string $column): bool => $this->schema->columnExists($table, $column)));
+      if ($value === '' || $columns === []) {
+        continue;
+      }
+      $needle = '%' . $this->db->escapeLike($value) . '%';
+      $where[] = '(' . implode(' OR ', array_map(fn(string $column): string => $this->collatedTextSql("COALESCE(`{$column}`, '')") . ' LIKE ?', $columns)) . ')';
+      array_push($args, ...array_fill(0, count($columns), $needle));
     }
 
     return [implode(' AND ', $where), $args];
