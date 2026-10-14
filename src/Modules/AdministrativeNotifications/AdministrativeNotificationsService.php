@@ -217,9 +217,9 @@ final class AdministrativeNotificationsService
         'name' => 'scm_arrendatario_fecha_pago_v1',
         'label' => 'Notificación fecha de pago',
         'language' => 'es_CO',
-        'description' => 'Notificación informativa para arrendatarios en las fechas de pago 12, 22, 26 y 31.',
+        'description' => 'Notificación informativa para arrendatarios en su fecha de pago (12, 22, 26, 31 u otro día del contrato).',
         'body' => "Buen día, *{{1}}.*\n\nLe recordamos que hoy, día *{{2}}*, corresponde su *{{3}}* fecha de pago del mes. 📅\n\n💰 Recuerde que el valor correspondiente a pagar se encuentra indicado en su cupón de pago\n\nAgradecemos realizar su pago oportunamente y por el valor establecido en el cupón. 🙏\n\nAtentamente,\n*{{4}}*\n\n🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro *Bot Guardián* desde el botón de abajo.\n🌐 Recuerda que puedes ingresar a tu *menú personal en nuestra página web* para consultar información y gestionar tus servicios.",
-        'variables' => ['Nombre del arrendatario', 'Día de pago: 12, 22, 26 o 31', 'Fecha ordinal: primera, segunda, tercera o última', 'Firma del funcionario: Nombre - Cargo - Celular'],
+        'variables' => ['Nombre del arrendatario', 'Día de pago del 1 al 31', 'Fecha ordinal: primera, segunda, tercera o última', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($arrendatarios, $funcionarios),
         'email_template' => 'scm_email_arrendatario_fecha_pago_v1',
         'parameter_mode' => 'collection_due_date',
@@ -557,21 +557,22 @@ final class AdministrativeNotificationsService
     return 'Buen día, {{nombre}}. ' . $this->collectionNotificationMessage($payload);
   }
 
+  /** Standard dates are 12, 22, 26 and 31; other contract days take the ordinal of the window they fall in. */
   public function collectionDueDateOrdinal(int $day): string
   {
-    return match ($day) {
-      22 => 'segunda',
-      26 => 'tercera',
-      31 => 'última',
-      default => 'primera',
+    return match (true) {
+      $day <= 12 => 'primera',
+      $day <= 22 => 'segunda',
+      $day <= 26 => 'tercera',
+      default => 'última',
     };
   }
 
   public function normalizeCollectionDueDateDay(int|string $day): int
   {
     $day = (int) preg_replace('/\D+/', '', (string) $day);
-    if (!in_array($day, [12, 22, 26, 31], true)) {
-      throw new \RuntimeException('Selecciona una fecha de pago válida: 12, 22, 26 o 31.');
+    if ($day < 1 || $day > 31) {
+      throw new \RuntimeException('Selecciona un día de pago válido entre 1 y 31.');
     }
     return $day;
   }
@@ -3992,7 +3993,7 @@ final class AdministrativeNotificationsService
       }
       $dueDate = is_array($notificationMeta['collection_due_date'] ?? null) ? $notificationMeta['collection_due_date'] : [];
       $dueDay = (int) ($dueDate['day'] ?? 0);
-      if (in_array($dueDay, [12, 22, 26, 31], true)) {
+      if ($dueDay >= 1 && $dueDay <= 31) {
         $cleanMeta['collection_due_date'] = [
           'day' => $dueDay,
           'ordinal' => $this->collectionDueDateOrdinal($dueDay),
@@ -5246,7 +5247,7 @@ final class AdministrativeNotificationsService
       $meta = is_array($recipient['_scm_notification_meta'] ?? null) ? $recipient['_scm_notification_meta'] : [];
       $due = is_array($meta['collection_due_date'] ?? null) ? $meta['collection_due_date'] : [];
       $day = (int) ($due['day'] ?? 12);
-      if (!in_array($day, [12, 22, 26, 31], true)) {
+      if ($day < 1 || $day > 31) {
         $day = 12;
       }
       $ordinal = trim((string) ($due['ordinal'] ?? ''));

@@ -4189,6 +4189,7 @@ trait RendersDashboard
       <div class="scm-gc-bulkbar-actions" role="group" aria-label="Acciones en lote de cartera">
         <button type="button" class="scm-gc-action" data-scm-portfolio-bulk-all><?php echo $this->collection_gc_icon('select_all'); ?>Usar todos los filtrados</button>
         <button type="button" class="scm-gc-action" data-scm-portfolio-bulk-clear hidden><?php echo $this->collection_gc_icon('deselect'); ?>Volver a selecci&oacute;n visible</button>
+        <button type="button" class="scm-gc-action is-reset" data-scm-portfolio-bulk-none hidden><?php echo $this->collection_gc_icon('close'); ?>Quitar selecci&oacute;n</button>
         <button type="button" class="scm-gc-action is-primary" data-scm-portfolio-bulk-action="management" disabled><?php echo $this->collection_gc_icon('support_agent'); ?>Hacer gesti&oacute;n</button>
         <button type="button" class="scm-gc-action" data-scm-portfolio-bulk-action="due_date" disabled><?php echo $this->collection_gc_icon('event_available'); ?>Notificar pago</button>
         <button type="button" class="scm-gc-action is-warning" data-scm-portfolio-bulk-action="prejuridico" disabled><?php echo $this->collection_gc_icon('gavel'); ?>Prejur&iacute;dico</button>

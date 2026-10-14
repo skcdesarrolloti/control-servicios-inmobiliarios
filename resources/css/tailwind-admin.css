@@ -853,6 +853,21 @@
     .swal2-popup.scm-gc-swal :is(.scm-gc-swal-confirm,.scm-gc-swal-cancel) { @apply flex-1; }
   }
 
+  /* Due date picker */
+  .swal2-popup.scm-gc-swal .scm-gc-day-picker { @apply grid grid-cols-2 gap-2 sm:grid-cols-5; }
+  .swal2-popup.scm-gc-swal .scm-gc-day-picker label { @apply m-0 cursor-pointer normal-case tracking-normal; }
+  .swal2-popup.scm-gc-swal .scm-gc-day-picker input { @apply sr-only; }
+  .swal2-popup.scm-gc-swal .scm-gc-day-picker span { @apply flex h-full flex-col rounded-xl border border-slate-200 bg-[#f8f9ff] px-3 py-2 text-left transition-colors hover:border-[#1e3c76]; }
+  .swal2-popup.scm-gc-swal .scm-gc-day-picker b { @apply text-[13px] font-bold text-[#061d49]; }
+  .swal2-popup.scm-gc-swal .scm-gc-day-picker small { @apply text-[10px] font-medium text-slate-500; }
+  .swal2-popup.scm-gc-swal .scm-gc-day-picker input:checked + span { @apply border-[#061d49] bg-[#061d49]; }
+  .swal2-popup.scm-gc-swal .scm-gc-day-picker input:checked + span :is(b,small) { @apply text-white; }
+  .swal2-popup.scm-gc-swal .scm-gc-day-picker input:focus-visible + span { @apply outline outline-2 outline-offset-2 outline-[#1e3c76]; }
+  .swal2-popup.scm-gc-swal .scm-gc-day-custom { @apply grid gap-1.5; }
+  .swal2-popup.scm-gc-swal .scm-gc-day-custom[hidden] { display:none; }
+  .swal2-popup.scm-gc-swal .scm-portfolio-swal-preview > small { @apply text-[11px] text-slate-500; }
+  .swal2-popup.scm-gc-swal .scm-portfolio-swal-preview [data-scm-due-preview] { @apply min-h-[60px]; }
+
   /* Money input for manual balances */
   .swal2-popup.scm-gc-swal .scm-gc-money-input { @apply relative; }
   .swal2-popup.scm-gc-swal .scm-gc-money-input .swal2-input { @apply h-12 pr-14 text-right text-lg font-bold tabular-nums; }

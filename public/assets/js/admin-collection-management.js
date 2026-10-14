@@ -343,8 +343,108 @@
     }
 
     function defaultDueDay() {
-      var day = String(new Date().getDate());
-      return ["12", "22", "26", "31"].indexOf(day) !== -1 ? day : "12";
+      return String(new Date().getDate());
+    }
+
+    var DUE_DAY_PRESETS = ["12", "22", "26", "31"];
+
+    // Mirrors AdministrativeNotificationsService::collectionDueDateOrdinal.
+    function dueDateOrdinal(day) {
+      day = Number(day);
+      if (day <= 12) return "primera";
+      if (day <= 22) return "segunda";
+      if (day <= 26) return "tercera";
+      return "última";
+    }
+
+    // Body of the approved WhatsApp template scm_arrendatario_fecha_pago_v1.
+    function dueDateMessage(name, day, signature) {
+      return "Buen día, *" + name + ".*\n\n"
+        + "Le recordamos que hoy, día *" + day + "*, corresponde su *" + dueDateOrdinal(day) + "* fecha de pago del mes. 📅\n\n"
+        + "💰 Recuerde que el valor correspondiente a pagar se encuentra indicado en su cupón de pago\n\n"
+        + "Agradecemos realizar su pago oportunamente y por el valor establecido en el cupón. 🙏\n\n"
+        + "Atentamente,\n*" + signature + "*\n\n"
+        + "🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro *Bot Guardián* desde el botón de abajo.\n"
+        + "🌐 Recuerda que puedes ingresar a tu *menú personal en nuestra página web* para consultar información y gestionar tus servicios.";
+    }
+
+    function dueDateDialogHtml(contextHtml) {
+      return '<div class="scm-portfolio-swal-form">'
+        + contextHtml
+        + '<label>Día de pago</label>'
+        + '<div class="scm-gc-day-picker" role="radiogroup" aria-label="Día de pago">'
+        + DUE_DAY_PRESETS.map(function (day) {
+          return '<label><input type="radio" name="scm-due-preset" value="' + day + '"><span><b>Día ' + day + '</b><small>' + dueDateOrdinal(day) + ' fecha</small></span></label>';
+        }).join("")
+        + '<label><input type="radio" name="scm-due-preset" value="custom"><span><b>Otro día</b><small>según contrato</small></span></label>'
+        + '</div>'
+        + '<div class="scm-gc-day-custom" data-scm-due-custom hidden><label for="scm-due-custom-day">Día del mes (1 a 31)</label>'
+        + '<input id="scm-due-custom-day" class="swal2-input" type="number" min="1" max="31" step="1" inputmode="numeric" placeholder="Ej: 19"></div>'
+        + '<label>Canales</label>'
+        + '<div class="scm-portfolio-swal-checks">'
+        + '<label><input type="checkbox" value="whatsapp" checked> WhatsApp</label>'
+        + '<label><input type="checkbox" value="email"> Email</label>'
+        + '</div>'
+        + '<div class="scm-portfolio-swal-preview" role="region" aria-label="Vista previa del mensaje">'
+        + '<span>Vista previa del mensaje</span>'
+        + '<div data-scm-due-preview></div>'
+        + '<small>El email lleva este mismo texto con el formato de correo.</small>'
+        + '</div>'
+        + '</div>';
+    }
+
+    function readDueDay(popup) {
+      var preset = popup.querySelector("input[name='scm-due-preset']:checked");
+      if (!preset) return "";
+      if (preset.value !== "custom") return preset.value;
+      var custom = popup.querySelector("#scm-due-custom-day");
+      var day = parseInt(custom ? custom.value : "", 10);
+      return day >= 1 && day <= 31 ? String(day) : "";
+    }
+
+    function bindDueDateDialog(popup, recipientName, signature) {
+      var customWrap = popup.querySelector("[data-scm-due-custom]");
+      var customInput = popup.querySelector("#scm-due-custom-day");
+      var preview = popup.querySelector("[data-scm-due-preview]");
+      var today = defaultDueDay();
+      var initial = popup.querySelector("input[name='scm-due-preset'][value='" + (DUE_DAY_PRESETS.indexOf(today) !== -1 ? today : "custom") + "']");
+      if (initial) initial.checked = true;
+      if (customInput && DUE_DAY_PRESETS.indexOf(today) === -1) customInput.value = today;
+      var sync = function () {
+        var preset = popup.querySelector("input[name='scm-due-preset']:checked");
+        var isCustom = !!preset && preset.value === "custom";
+        if (customWrap) customWrap.hidden = !isCustom;
+        var day = readDueDay(popup);
+        if (preview) {
+          preview.innerHTML = day
+            ? formatWhatsappText(dueDateMessage(recipientName, day, signature))
+            : '<em>Escribe un día entre 1 y 31 para ver el mensaje.</em>';
+        }
+      };
+      popup.querySelectorAll("input[name='scm-due-preset']").forEach(function (input) {
+        input.addEventListener("change", function () {
+          sync();
+          if (input.value === "custom" && customInput) customInput.focus();
+        });
+      });
+      if (customInput) customInput.addEventListener("input", sync);
+      sync();
+    }
+
+    function readDueDateDialog(popup) {
+      var day = readDueDay(popup);
+      if (!day) {
+        window.Swal.showValidationMessage("Indica un día de pago entre 1 y 31.");
+        return false;
+      }
+      var channels = Array.prototype.slice.call(popup.querySelectorAll(".scm-portfolio-swal-checks input:checked")).map(function (input) {
+        return String(input.value || "");
+      });
+      if (channels.length === 0) {
+        window.Swal.showValidationMessage("Selecciona al menos un canal.");
+        return false;
+      }
+      return { day: day, channels: channels };
     }
 
     function runPortfolioOperation(button, payload, workingMessage, successType) {
@@ -445,40 +545,16 @@
       if (window.Swal && typeof window.Swal.fire === "function") {
         fireSwal({
           title: "Notificación de fecha de pago",
-          html: '<div class="scm-portfolio-swal-form">'
-            + '<p><strong>' + escapeHtml(tenantName) + '</strong>' + (contractNumber ? ' · Contrato ' + escapeHtml(contractNumber) : '') + '</p>'
-            + '<label for="scm-due-day">Fecha de pago</label>'
-            + '<select id="scm-due-day" class="swal2-select">'
-            + '<option value="12">Día 12 · primera fecha</option>'
-            + '<option value="22">Día 22 · segunda fecha</option>'
-            + '<option value="26">Día 26 · tercera fecha</option>'
-            + '<option value="31">Día 31 · última fecha</option>'
-            + '</select>'
-            + '<label>Canales</label>'
-            + '<div class="scm-portfolio-swal-checks">'
-            + '<label><input type="checkbox" value="whatsapp" checked> WhatsApp</label>'
-            + '<label><input type="checkbox" value="email"> Email</label>'
-            + '</div>'
-            + '</div>',
-          didOpen: function () {
-            var select = document.getElementById("scm-due-day");
-            if (select) select.value = defaultDueDay();
+          width: 640,
+          html: dueDateDialogHtml('<p><strong>' + escapeHtml(tenantName) + '</strong>' + (contractNumber ? ' · Contrato ' + escapeHtml(contractNumber) : '') + '</p>'),
+          didOpen: function (popup) {
+            bindDueDateDialog(popup, tenantName, siniestroSenderSignature(button));
           },
           showCancelButton: true,
           confirmButtonText: "Enviar notificación",
           cancelButtonText: "Cancelar",
-          confirmButtonColor: "#1e3a5f",
           preConfirm: function () {
-            var popup = window.Swal.getPopup();
-            var select = document.getElementById("scm-due-day");
-            var channels = Array.prototype.slice.call(popup.querySelectorAll(".scm-portfolio-swal-checks input:checked")).map(function (input) {
-              return String(input.value || "");
-            });
-            if (channels.length === 0) {
-              window.Swal.showValidationMessage("Selecciona al menos un canal.");
-              return false;
-            }
-            return { day: select ? String(select.value || "12") : "12", channels: channels };
+            return readDueDateDialog(window.Swal.getPopup());
           }
         }).then(function (result) {
           if (result.isConfirmed && result.value) submit(result.value.day, result.value.channels);
@@ -486,8 +562,8 @@
         return;
       }
 
-      var day = window.prompt("Día de pago: 12, 22, 26 o 31", defaultDueDay());
-      if (["12", "22", "26", "31"].indexOf(String(day || "")) === -1) return;
+      var day = parseInt(window.prompt("Día de pago (1 a 31)", defaultDueDay()) || "", 10);
+      if (!(day >= 1 && day <= 31)) return;
       submit(String(day), ["whatsapp"]);
     }
 
@@ -679,8 +755,10 @@
         if (note) note.hidden = !allMode;
         var allButton = bar.querySelector("[data-scm-portfolio-bulk-all]");
         var clearButton = bar.querySelector("[data-scm-portfolio-bulk-clear]");
+        var noneButton = bar.querySelector("[data-scm-portfolio-bulk-none]");
         if (allButton) allButton.hidden = !!allMode;
         if (clearButton) clearButton.hidden = !allMode;
+        if (noneButton) noneButton.hidden = !allMode && rows.length === 0;
         bar.querySelectorAll("[data-scm-portfolio-bulk-action]").forEach(function (button) {
           var action = String(button.getAttribute("data-scm-portfolio-bulk-action") || "");
           button.disabled = allMode ? selectedTotal <= 0 : bulkEligible(rows, action).length === 0;
@@ -769,48 +847,24 @@
       if (window.Swal && typeof window.Swal.fire === "function") {
         fireSwal({
           title: "Notificar fecha de pago en lote",
-          html: '<div class="scm-portfolio-swal-form">'
-            + '<p>Se procesarán <strong>' + total + '</strong> contrato(s) ' + (allMode ? 'del filtro guardado que sean elegibles.' : 'seleccionado(s).') + '</p>'
-            + '<label for="scm-bulk-due-day">Fecha de pago</label>'
-            + '<select id="scm-bulk-due-day" class="swal2-select">'
-            + '<option value="12">Día 12 · primera fecha</option>'
-            + '<option value="22">Día 22 · segunda fecha</option>'
-            + '<option value="26">Día 26 · tercera fecha</option>'
-            + '<option value="31">Día 31 · última fecha</option>'
-            + '</select>'
-            + '<label>Canales</label>'
-            + '<div class="scm-portfolio-swal-checks">'
-            + '<label><input type="checkbox" value="whatsapp" checked> WhatsApp</label>'
-            + '<label><input type="checkbox" value="email"> Email</label>'
-            + '</div>'
-            + '</div>',
-          didOpen: function () {
-            var select = document.getElementById("scm-bulk-due-day");
-            if (select) select.value = defaultDueDay();
+          width: 640,
+          html: dueDateDialogHtml('<p>Se procesarán <strong>' + total + '</strong> contrato(s) ' + (allMode ? 'del filtro guardado que sean elegibles.' : 'seleccionado(s).') + ' Todos recibirán el mismo día de pago.</p>'),
+          didOpen: function (popup) {
+            bindDueDateDialog(popup, "Nombre del arrendatario", siniestroSenderSignature(button));
           },
           showCancelButton: true,
           confirmButtonText: "Enviar notificaciones",
           cancelButtonText: "Cancelar",
-          confirmButtonColor: "#1e3a5f",
           preConfirm: function () {
-            var popup = window.Swal.getPopup();
-            var select = document.getElementById("scm-bulk-due-day");
-            var channels = Array.prototype.slice.call(popup.querySelectorAll(".scm-portfolio-swal-checks input:checked")).map(function (input) {
-              return String(input.value || "");
-            });
-            if (channels.length === 0) {
-              window.Swal.showValidationMessage("Selecciona al menos un canal.");
-              return false;
-            }
-            return { day: select ? String(select.value || "12") : "12", channels: channels };
+            return readDueDateDialog(window.Swal.getPopup());
           }
         }).then(function (result) {
           if (result.isConfirmed && result.value) submit(result.value.day, result.value.channels);
         });
         return;
       }
-      var day = window.prompt("Día de pago: 12, 22, 26 o 31", defaultDueDay());
-      if (["12", "22", "26", "31"].indexOf(String(day || "")) !== -1) submit(String(day), ["whatsapp"]);
+      var day = parseInt(window.prompt("Día de pago (1 a 31)", defaultDueDay()) || "", 10);
+      if (day >= 1 && day <= 31) submit(String(day), ["whatsapp"]);
     }
 
     function confirmBulkSimple(button, rows, action) {
@@ -1556,6 +1610,27 @@
           bulkState(clearPanel).total = 0;
           syncBulkSelectionFromPanel(clearPanel);
           updateBulkBars(clearPanel);
+        }
+        return;
+      }
+      var bulkNoneButton = event.target.closest && event.target.closest("[data-scm-portfolio-bulk-none]");
+      if (bulkNoneButton && root.contains(bulkNoneButton)) {
+        event.preventDefault();
+        var nonePanel = bulkNoneButton.closest("[data-scm-portfolio-panel]");
+        if (nonePanel) {
+          nonePanel.removeAttribute("data-scm-bulk-all-filtered");
+          var noneState = bulkState(nonePanel);
+          noneState.all = false;
+          noneState.selected = {};
+          noneState.excluded = {};
+          noneState.filterSignature = "";
+          noneState.filterValues = {};
+          noneState.total = 0;
+          nonePanel.querySelectorAll("[data-scm-portfolio-bulk-check], [data-scm-portfolio-bulk-check-all]").forEach(function (input) {
+            input.checked = false;
+            input.indeterminate = false;
+          });
+          updateBulkBars(nonePanel);
         }
         return;
       }
