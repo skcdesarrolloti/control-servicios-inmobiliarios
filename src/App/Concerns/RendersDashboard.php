@@ -3960,9 +3960,14 @@ trait RendersDashboard
             <div><strong><?php echo $this->collection_gc_icon('notifications_active'); ?>Notificar al guardar</strong><span>Opcional. Usa la plantilla de gesti&oacute;n de cobro para el arrendatario y los codeudores seleccionados.</span></div>
             <div class="scm-gc-channel-group" role="group" aria-label="Canales de notificaci&oacute;n">
               <label class="scm-gc-channel"><input type="checkbox" name="notify_channels[]" value="whatsapp" checked><span>WhatsApp</span></label>
-              <label class="scm-gc-channel"><input type="checkbox" name="notify_channels[]" value="email"><span>Email</span></label>
+              <label class="scm-gc-channel"><input type="checkbox" name="notify_channels[]" value="email" checked><span>Email</span></label>
               <label class="scm-gc-channel"><input type="checkbox" name="notify_channels[]" value="sms"><span>SMS</span></label>
             </div>
+          </div>
+          <div class="scm-gc-msg-preview" role="region" aria-label="Vista previa del mensaje">
+            <span>Vista previa del mensaje</span>
+            <div class="scm-gc-bubble" data-scm-management-preview></div>
+            <small data-scm-management-preview-note>El email lleva este mismo texto con el formato de correo.</small>
           </div>
           <div class="scm-gc-codeudores" data-scm-portfolio-codeudores hidden><div><strong>Codeudores</strong><span>Selecciona qui&eacute;nes tambi&eacute;n recibir&aacute;n la notificaci&oacute;n.</span></div><div class="scm-gc-codeudores-list" data-scm-portfolio-codeudores-list></div></div>
           <p class="scm-gc-result" data-scm-portfolio-management-result aria-live="polite"></p>

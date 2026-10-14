@@ -383,7 +383,7 @@
         + '<label>Canales</label>'
         + '<div class="scm-portfolio-swal-checks">'
         + '<label><input type="checkbox" value="whatsapp" checked> WhatsApp</label>'
-        + '<label><input type="checkbox" value="email"> Email</label>'
+        + '<label><input type="checkbox" value="email" checked> Email</label>'
         + '</div>'
         + '<div class="scm-portfolio-swal-preview" role="region" aria-label="Vista previa del mensaje">'
         + '<span>Vista previa del mensaje</span>'
@@ -391,6 +391,44 @@
         + '<small>El email lleva este mismo texto con el formato de correo.</small>'
         + '</div>'
         + '</div>';
+    }
+
+    function collectionConceptText(concept) {
+      return { Canon: "canon", Administracion: "administración", "Servicios publicos": "servicios públicos" }[concept] || String(concept || "canon").toLowerCase();
+    }
+
+    // Body of the approved WhatsApp template scm_arrendatario_gestion_cobro_v1.
+    function managementMessage(name, concept, observation, signature) {
+      var note = String(observation || "").trim().replace(/\.+$/, "");
+      var detail = "Cobro por deuda de " + collectionConceptText(concept) + "." + (note ? " Observación: " + note + "." : "");
+      return "Buen dia, *" + name + ".*\n\n"
+        + "Le informamos que se registro una gestion de cobro relacionada con su contrato de arrendamiento.\n\n"
+        + "*Detalle de la gestion:*\n" + detail + "\n\n"
+        + "*Si ya realizo el pago o tiene alguna novedad, por favor comuniquese con nosotros.*\n\n"
+        + "Atentamente,\n*" + signature + "*\n\n"
+        + "🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro *Bot Guardián* desde el botón de abajo.\n"
+        + "🌐 Recuerda que puedes ingresar a tu *menú personal en nuestra página web* para consultar información y gestionar tus servicios.";
+    }
+
+    function syncManagementPreview(form) {
+      if (!form) return;
+      var preview = form.querySelector("[data-scm-management-preview]");
+      var note = form.querySelector("[data-scm-management-preview-note]");
+      if (!preview) return;
+      var concept = form.querySelector("[name='tipo_gestion_cobro']");
+      var observation = form.querySelector("[name='observacion']");
+      var channels = Array.prototype.slice.call(form.querySelectorAll("[name='notify_channels[]']:checked")).map(function (input) { return input.value; });
+      preview.innerHTML = formatWhatsappText(managementMessage(
+        form.getAttribute("data-preview-name") || "Nombre del arrendatario",
+        concept ? concept.value : "Canon",
+        observation ? observation.value : "",
+        siniestroSenderSignature(form)
+      ));
+      if (note) {
+        note.textContent = channels.length === 0
+          ? "Sin canales seleccionados: solo se registrará la gestión, no se enviará mensaje."
+          : (channels.indexOf("sms") !== -1 ? "El email lleva este mismo texto; el SMS envía una versión corta." : "El email lleva este mismo texto con el formato de correo.");
+      }
     }
 
     function readDueDay(popup) {
@@ -808,6 +846,8 @@
       var form = modal.querySelector("[data-scm-portfolio-management-form]");
       if (!form) return;
       form.reset();
+      form.setAttribute("data-preview-name", "Nombre del arrendatario");
+      syncManagementPreview(form);
       form.setAttribute("data-scm-bulk-mode", "1");
       form.dataset.bulkRows = JSON.stringify(eligible);
       form.dataset.bulkAll = allMode ? "1" : "0";
@@ -1411,6 +1451,8 @@
         form.querySelector("[name='portfolio_id']").value = portfolioId;
         form.querySelector("[name='ids[]']").value = tenantId;
         form.querySelector("[name='contract_ids[]']").value = contractId;
+        form.setAttribute("data-preview-name", tenantName);
+        syncManagementPreview(form);
         modal.querySelector("[data-scm-portfolio-management-context]").textContent = tenantName + " · Contrato " + (contractNumber || contract.contrato || contractId);
         renderCodeudores(modal, contract);
         var result = modal.querySelector("[data-scm-portfolio-management-result]");
@@ -1759,6 +1801,13 @@
         closeLetterPreview();
         sendLetter(sendPortfolioId, sendType, previewSend);
       }
+    });
+
+    ["input", "change"].forEach(function (type) {
+      root.addEventListener(type, function (event) {
+        var form = event.target.closest && event.target.closest("[data-scm-portfolio-management-form]");
+        if (form && root.contains(form)) syncManagementPreview(form);
+      });
     });
 
     root.addEventListener("scm:collection-log-replaced", function (event) {

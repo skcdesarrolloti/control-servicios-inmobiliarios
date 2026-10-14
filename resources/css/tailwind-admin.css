@@ -712,6 +712,11 @@
   #scm-app .scm-gc .scm-gc-pdf-frame { @apply overflow-hidden rounded-xl border border-slate-200 bg-slate-200 p-2; }
   #scm-app .scm-gc .scm-gc-pdf-frame iframe { @apply block w-full rounded-lg border-0 bg-white; height:min(68vh,780px); min-height:360px; }
 
+  #scm-app .scm-gc .scm-gc-msg-preview { @apply grid gap-2 rounded-xl bg-[#efeae2] p-4; }
+  #scm-app .scm-gc .scm-gc-msg-preview > span { @apply text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app .scm-gc .scm-gc-msg-preview > small { @apply text-[11px] text-slate-500; }
+  #scm-app .scm-gc .scm-gc-msg-preview .scm-gc-bubble { @apply max-w-[95%] text-[12px]; }
+
   /* Timeline */
   #scm-app .scm-gc .scm-gc-timeline-summary { @apply grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4; }
   #scm-app .scm-gc .scm-gc-timeline-summary:empty { display:none; }
@@ -813,9 +818,9 @@
   .swal2-popup.scm-gc-swal .scm-portfolio-swal-checks { @apply flex flex-wrap gap-2; }
   .swal2-popup.scm-gc-swal .scm-portfolio-swal-checks label { @apply mt-0 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-[#f8f9ff] px-3 py-2 text-xs font-semibold normal-case tracking-normal text-[#1e3c76] has-[:checked]:border-[#061d49] has-[:checked]:bg-[#061d49] has-[:checked]:text-white; }
   .swal2-popup.scm-gc-swal .scm-portfolio-swal-checks input { @apply m-0 h-4 w-4; accent-color:#f8cf4a; }
-  .swal2-popup.scm-gc-swal .scm-portfolio-swal-preview { @apply grid gap-2 rounded-xl bg-[#efeae2] p-4; }
+  .swal2-popup.scm-gc-swal .scm-portfolio-swal-preview { @apply grid gap-2 overflow-visible rounded-xl border-0 bg-[#efeae2] p-4; max-height:none; }
   .swal2-popup.scm-gc-swal .scm-portfolio-swal-preview > span { @apply text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
-  .swal2-popup.scm-gc-swal .scm-portfolio-swal-preview > div { @apply ml-auto max-w-[95%] rounded-xl rounded-tr-sm bg-[#d9fdd3] px-3.5 py-2.5 text-[12px] leading-relaxed text-slate-800 shadow-sm; }
+  .swal2-popup.scm-gc-swal .scm-portfolio-swal-preview > div { @apply ml-auto max-w-[95%] rounded-xl rounded-tr-sm border-0 bg-[#d9fdd3] px-3.5 py-2.5 text-[12px] leading-relaxed text-slate-800 shadow-sm; overflow-wrap:anywhere; }
 
   /* Historial > Ver: messages linked to one management */
   .swal2-popup.scm-gc-swal-queue .scm-collection-queue-modal { @apply grid gap-4; }
