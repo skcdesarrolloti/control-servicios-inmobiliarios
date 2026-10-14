@@ -294,6 +294,28 @@
       return window.Swal.fire(options);
     }
 
+    // Colombian peso input: "." groups thousands and "," separates up to two decimals.
+    function splitCopInput(raw) {
+      var text = String(raw || "");
+      var commaIndex = text.indexOf(",");
+      var intPart = (commaIndex === -1 ? text : text.slice(0, commaIndex)).replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+      var decimals = commaIndex === -1 ? "" : text.slice(commaIndex + 1).replace(/\D/g, "").slice(0, 2);
+      return { negative: text.indexOf("-") !== -1, intPart: intPart, decimals: decimals, hasComma: commaIndex !== -1 };
+    }
+
+    function formatCopInput(raw) {
+      var parts = splitCopInput(raw);
+      if (!parts.intPart && !parts.hasComma) return parts.negative ? "$ -" : "";
+      var grouped = (parts.intPart || "0").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      return "$ " + (parts.negative ? "-" : "") + grouped + (parts.hasComma ? "," + parts.decimals : "");
+    }
+
+    function parseCopInput(raw) {
+      var parts = splitCopInput(raw);
+      if (!parts.intPart && !parts.decimals) return "";
+      return (parts.negative ? "-" : "") + (parts.intPart || "0") + (parts.decimals ? "." + parts.decimals : "");
+    }
+
     function emptyHtml(title, message, icon) {
       return '<div class="scm-gc-empty"><span class="material-symbols-outlined scm-gc-icon" aria-hidden="true">' + escapeHtml(icon || "inbox") + '</span><strong>' + escapeHtml(title) + '</strong><span>' + escapeHtml(message) + '</span></div>';
     }
@@ -356,19 +378,37 @@
           html: '<div class="scm-portfolio-swal-form">'
             + '<p><strong>' + escapeHtml(tenantName) + '</strong>' + (contractNumber ? ' · Contrato ' + escapeHtml(contractNumber) : '') + '</p>'
             + '<label for="scm-manual-balance">Saldo actual</label>'
-            + '<input id="scm-manual-balance" class="swal2-input" inputmode="decimal" placeholder="Ej: 450000 o 0" value="' + escapeHtml(currentBalance) + '">'
+            + '<div class="scm-gc-money-input"><input id="scm-manual-balance" class="swal2-input" inputmode="decimal" autocomplete="off" placeholder="$ 0" value="' + escapeHtml(formatCopInput(currentBalance === "" ? "" : String(currentBalance).replace(".", ","))) + '"><span>COP</span></div>'
+            + '<p class="scm-gc-money-status" data-scm-money-status></p>'
             + '<label for="scm-manual-note">Observación</label>'
             + '<textarea id="scm-manual-note" class="swal2-textarea" placeholder="Motivo del saldo manual, prueba o ajuste"></textarea>'
             + '</div>',
           showCancelButton: true,
           confirmButtonText: "Guardar saldo",
           cancelButtonText: "Cancelar",
-          confirmButtonColor: "#1e3a5f",
+          didOpen: function (popup) {
+            var input = popup.querySelector("#scm-manual-balance");
+            var status = popup.querySelector("[data-scm-money-status]");
+            var sync = function () {
+              var value = parseCopInput(input.value);
+              var number = value === "" ? null : Number(value);
+              status.className = "scm-gc-money-status " + (number === null ? "is-muted" : (number > 0 ? "is-danger" : (number < 0 ? "is-info" : "is-success")));
+              status.textContent = number === null ? "Escribe el saldo en pesos" : (number > 0 ? "Quedará con deuda" : (number < 0 ? "Quedará con saldo a favor" : "Quedará al día"));
+            };
+            input.addEventListener("input", function () {
+              var fromEnd = input.value.length - (input.selectionEnd || input.value.length);
+              input.value = formatCopInput(input.value);
+              var caret = Math.max(0, input.value.length - fromEnd);
+              input.setSelectionRange(caret, caret);
+              sync();
+            });
+            sync();
+          },
           preConfirm: function () {
             var balance = document.getElementById("scm-manual-balance");
             var note = document.getElementById("scm-manual-note");
-            var value = balance ? String(balance.value || "").trim() : "";
-            if (!value || !/\d/.test(value)) {
+            var value = balance ? parseCopInput(balance.value) : "";
+            if (value === "" || !/\d/.test(value)) {
               window.Swal.showValidationMessage("Indica un saldo válido.");
               return false;
             }

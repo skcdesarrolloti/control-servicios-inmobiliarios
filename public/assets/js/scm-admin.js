@@ -159,23 +159,55 @@
       .replace(/'/g, "&#39;");
   }
 
+  var SCM_TOAST_ICONS = {
+    success: '<path d="M20 6 9 17l-5-5"/>',
+    warning: '<path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+    error: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6m0-6 6 6"/>',
+  };
+
+  // Non-blocking notifications: a modal SweetAlert here used to cover (and close)
+  // the dialog the user was working in, even for "Consultando..." progress notes.
   function scmNotify(type, message, title) {
-    var icon = type === "error" ? "error" : "success";
-    if (window.Swal && typeof window.Swal.fire === "function") {
-      return window.Swal.fire({
-        icon: icon,
-        title: title || (type === "error" ? "No se pudo guardar" : "Guardado"),
-        text: message || "",
-        timer: type === "error" ? undefined : 2200,
-        timerProgressBar: type !== "error",
-        confirmButtonColor: "#1f4f99",
-      });
-      return;
+    var kind = ["success", "info", "warning", "error"].indexOf(type) !== -1 ? type : "success";
+    if (!document.body) {
+      if (kind === "error") alert(message || "No se pudo completar la operación.");
+      return Promise.resolve();
     }
-    if (type === "error") {
-      alert(message || "No se pudo guardar.");
+    var stack = document.getElementById("scm-toast-stack");
+    if (!stack) {
+      stack = document.createElement("div");
+      stack.id = "scm-toast-stack";
+      stack.className = "scm-toast-stack";
+      document.body.appendChild(stack);
     }
-    return Promise.resolve();
+    // Progress notes are superseded by whatever comes next.
+    stack.querySelectorAll(".scm-toast.is-info").forEach(function (node) {
+      if (typeof node._scmDismiss === "function") node._scmDismiss(); else node.remove();
+    });
+    var defaults = { success: "Listo", info: "Procesando", warning: "Atención", error: "No se pudo completar" };
+    var icon = kind === "info"
+      ? '<span class="scm-toast-spinner" aria-hidden="true"></span>'
+      : '<svg class="scm-toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + SCM_TOAST_ICONS[kind] + "</svg>";
+    var toast = document.createElement("div");
+    toast.className = "scm-toast is-" + kind;
+    toast.setAttribute("role", kind === "error" ? "alert" : "status");
+    toast.innerHTML = icon
+      + '<div class="scm-toast-copy"><strong>' + escHtml(title || defaults[kind]) + "</strong>"
+      + (message ? "<span>" + escHtml(message) + "</span>" : "") + "</div>"
+      + '<button type="button" class="scm-toast-close" aria-label="Cerrar notificación">&times;</button>';
+    stack.appendChild(toast);
+    return new Promise(function (resolve) {
+      var done = false;
+      var dismiss = function () {
+        if (done) return;
+        done = true;
+        toast.classList.add("is-leaving");
+        window.setTimeout(function () { toast.remove(); resolve(); }, 180);
+      };
+      toast._scmDismiss = dismiss;
+      toast.querySelector(".scm-toast-close").addEventListener("click", dismiss);
+      window.setTimeout(dismiss, { success: 3200, info: 6000, warning: 5500, error: 8000 }[kind]);
+    });
   }
 
   var imageLightboxState = {

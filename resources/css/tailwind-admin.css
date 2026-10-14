@@ -852,4 +852,38 @@
     .swal2-popup.scm-gc-swal .swal2-actions { @apply px-5; }
     .swal2-popup.scm-gc-swal :is(.scm-gc-swal-confirm,.scm-gc-swal-cancel) { @apply flex-1; }
   }
+
+  /* Money input for manual balances */
+  .swal2-popup.scm-gc-swal .scm-gc-money-input { @apply relative; }
+  .swal2-popup.scm-gc-swal .scm-gc-money-input .swal2-input { @apply h-12 pr-14 text-right text-lg font-bold tabular-nums; }
+  .swal2-popup.scm-gc-swal .scm-gc-money-input > span { @apply pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-slate-400; }
+  .swal2-popup.scm-gc-swal .scm-gc-money-status { @apply m-0 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset; }
+  .swal2-popup.scm-gc-swal .scm-gc-money-status.is-danger { @apply bg-red-50 text-red-700 ring-red-200; }
+  .swal2-popup.scm-gc-swal .scm-gc-money-status.is-success { @apply bg-emerald-50 text-emerald-700 ring-emerald-200; }
+  .swal2-popup.scm-gc-swal .scm-gc-money-status.is-info { @apply bg-sky-50 text-sky-700 ring-sky-200; }
+  .swal2-popup.scm-gc-swal .scm-gc-money-status.is-muted { @apply bg-slate-100 text-slate-500 ring-slate-200; }
+}
+
+/* Global non-blocking notifications (scmNotify). Lives above panel modals and SweetAlert. */
+@layer components {
+  .scm-toast-stack { @apply pointer-events-none fixed bottom-4 left-4 right-4 flex flex-col items-stretch gap-2 sm:bottom-6 sm:left-auto sm:right-6 sm:w-[380px]; z-index:2147483000; font-family:Poppins,sans-serif; }
+  .scm-toast { @apply pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-xl border border-slate-200 bg-white py-3 pl-4 pr-10 text-[#061d49] shadow-popover; border-left-width:4px; animation:scm-toast-in 180ms ease-out both; }
+  .scm-toast.is-success { border-left-color:#059669; }
+  .scm-toast.is-info { border-left-color:#1e3c76; }
+  .scm-toast.is-warning { border-left-color:#f8cf4a; }
+  .scm-toast.is-error { border-left-color:#dc2626; }
+  .scm-toast.is-leaving { animation:scm-toast-out 180ms ease-in both; }
+  .scm-toast-icon { @apply mt-0.5 h-5 w-5 shrink-0; }
+  .scm-toast.is-success .scm-toast-icon { @apply text-emerald-600; }
+  .scm-toast.is-warning .scm-toast-icon { @apply text-amber-500; }
+  .scm-toast.is-error .scm-toast-icon { @apply text-red-600; }
+  .scm-toast-spinner { @apply mt-0.5 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-indigo-100 border-t-[#1e3c76]; }
+  .scm-toast-copy { @apply flex min-w-0 flex-col gap-0.5; }
+  .scm-toast-copy strong { @apply text-[13px] font-semibold leading-snug text-[#061d49]; }
+  .scm-toast-copy span { @apply text-xs leading-relaxed text-slate-600; overflow-wrap:anywhere; }
+  .scm-toast-close { @apply absolute right-2 top-2 m-0 flex h-7 w-7 items-center justify-center rounded-full border-0 bg-transparent p-0 text-lg leading-none text-slate-400 shadow-none transition-colors hover:bg-slate-100 hover:text-slate-700; cursor:pointer; }
+  .scm-toast-close:focus-visible { @apply outline outline-2 outline-offset-1 outline-[#1e3c76]; }
+  @keyframes scm-toast-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+  @keyframes scm-toast-out { to { opacity:0; transform:translateY(4px); } }
+  @media(prefers-reduced-motion:reduce) { .scm-toast, .scm-toast.is-leaving, .scm-toast-spinner { animation:none; } }
 }
