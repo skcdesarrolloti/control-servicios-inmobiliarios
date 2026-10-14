@@ -13771,6 +13771,16 @@
       toggleKpiVisibility(prefix + "kpi-magnitud-bajo", showMagnitude);
     }
 
+    function updateAdministrativeStatusOptions(form, values) {
+      if (!form || !Array.isArray(values)) return;
+      var select = form.querySelector('select[name$="estado_admin"]');
+      if (!select) return;
+      var previous = select.value;
+      select.replaceChildren(new Option('Todos', ''));
+      values.forEach(function(value){ select.add(new Option(String(value), String(value))); });
+      select.value = values.includes(previous) ? previous : '';
+    }
+
     function applyBinaryFilterKpiVisibility(prefix, filterValue, conSuffix, sinSuffix) {
       var normalized = String(filterValue || "").trim().toLowerCase();
       var showCon = true;
@@ -14485,7 +14495,6 @@
       var mappings = [
         ["select[name$='id_empleado'], select[name$='_empleado'], select[name='empleado'], [data-scm-execution-form] select[name='funcionario'], [data-scm-metric-case-filters] select[name='funcionario']", funcionarioOptions, "id", "label"],
         ["select[name$='barrio']", options.barrios || [], "value", "label"],
-        ["select[name$='estado_admin']", options.estado_admin || [], "value", "label"],
         ["select[name$='prioridad']", options.prioridad || [], "value", "label"],
         ["select[name$='cotizacion_estado']", options.cotizacion_estado || [], "value", "label"],
         ["select[name$='revision_estado']", options.revision_estado || [], "value", "label"],
@@ -16459,6 +16468,7 @@
           }
           var d = json.data || {};
           tbody.innerHTML = d.tbody || "";
+          updateAdministrativeStatusOptions(form, d.admin_status_options);
           if (pagination) {
             pagination.innerHTML = d.pagination || "";
           }
@@ -17234,6 +17244,7 @@
             }
             var d = json.data || {};
             tabCards.innerHTML = d.cards || "";
+            updateAdministrativeStatusOptions(tabForm, d.admin_status_options);
             if (tabPagination) {
               tabPagination.innerHTML = d.pagination || "";
             }
@@ -20352,6 +20363,25 @@
         });
     }
 
+    function saveQuoteFinancing(button) {
+      var card = button.closest('.scm-cotizacion-card');
+      var select = card && card.querySelector('[data-scm-quote-financing]');
+      var status = card && card.querySelector('[data-scm-quote-financing-status]');
+      if (!select || button.disabled) return Promise.resolve();
+      if (!['Si','No'].includes(select.value)) { if(status) status.textContent='Selecciona Sí o No.'; return Promise.resolve(); }
+      var id = card.getAttribute('data-cotizacion-id');
+      var fd = new FormData();
+      fd.set('action','scm_cotizacion_financing');fd.set('nonce',nonce);fd.set('id_cotizacion',id);fd.set('financiacion',select.value);
+      button.disabled=true;select.disabled=true;if(status)status.textContent='Guardando…';
+      return fetch(ajaxUrl,{method:'POST',credentials:'same-origin',body:fd}).then(function(response){return response.json();}).then(function(json){
+        if(!json.success)throw new Error((json.data||{}).message||'No se pudo guardar.');
+        if(status)status.textContent='Financiamiento guardado.';
+        delete cotizacionCardCache[id];
+        root.querySelectorAll('.scm-cotizacion-card').forEach(function(other){if(other.getAttribute('data-cotizacion-id')===id){var field=other.querySelector('[data-scm-quote-financing]');if(field)field.value=select.value;}});
+        root.dispatchEvent(new CustomEvent('scm:refresh-active-tab'));
+      }).catch(function(error){if(status)status.textContent=error.message;}).finally(function(){button.disabled=false;select.disabled=false;});
+    }
+
     function openCotizacionActaFromCard(target, options) {
       options = options || {};
       var card = target && target.matches && target.matches(".scm-cotizacion-card")
@@ -21170,6 +21200,9 @@
               var popup = window.Swal.getPopup();
               if (!popup) return;
               popup.addEventListener("click", function (event) {
+                var financingButton=event.target.closest('[data-scm-save-quote-financing]');
+                if(financingButton){event.preventDefault();event.stopPropagation();saveQuoteFinancing(financingButton);return;}
+
                 var orderBtn = event.target && event.target.closest
                   ? event.target.closest("[data-scm-add-cotizacion-order]")
                   : null;
@@ -21456,6 +21489,9 @@
     }
 
     root.addEventListener("click", function (e) {
+      var financingButton=e.target.closest('[data-scm-save-quote-financing]');
+      if(financingButton){e.preventDefault();saveQuoteFinancing(financingButton);return;}
+
       var maintenanceMetricCaseBtn =
         e.target && e.target.closest
           ? e.target.closest("[data-scm-maintenance-quote-open-case]")

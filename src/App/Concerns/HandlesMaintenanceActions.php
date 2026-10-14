@@ -8,6 +8,20 @@ use SCM\Core\Auth;
 
 trait HandlesMaintenanceActions
 {
+  public function ajax_handler_cotizacion_financing(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('quote_edit') || (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('abiertos') && !$this->canAccessDashboardTab('postergados') && !$this->canAccessDashboardTab('mis_tickets'))) {
+      $this->jsonFail('No tienes permiso para editar cotizaciones.');
+      return;
+    }
+    try {
+      (new \SCM\Support\QuotationFinancingService($this->db, new \SCM\Support\SchemaInspector($this->db)))->update((int) ($_POST['id_cotizacion'] ?? 0), trim((string) ($_POST['financiacion'] ?? '')), $this->ticketCompletionActor());
+      $this->jsonOk(['message'=>'Financiamiento actualizado.','financiacion'=>trim((string) $_POST['financiacion'])]);
+    } catch (\DomainException $error) { $this->jsonFail($error->getMessage()); }
+    catch (\Throwable $error) { error_log('[cotizacion_financing] ' . $error->getMessage()); $this->jsonFail('No se pudo actualizar el financiamiento.'); }
+  }
+
   private function myTicketsStatusBucket($value): string
   {
     $bucket = is_string($value) ? strtolower(trim($value)) : '';
@@ -62,6 +76,7 @@ trait HandlesMaintenanceActions
 
     $paginationHtml = $this->get_generic_tickets_module()->render_generic_pagination($tabKey, $pagination);
     $this->jsonOk([
+      'admin_status_options' => $result['admin_status_options'] ?? [],
       'cards'      => $cardsHtml,
       'count'      => (string)($stats['total'] ?? 0),
       'kpi_total' => (string)($stats['total'] ?? 0),
@@ -112,7 +127,7 @@ trait HandlesMaintenanceActions
     $employeeId = $this->current_employee_id();
     $params['fEmpleado'] = $employeeId !== '' ? $employeeId : '__sin_funcionario__';
     $params['_scmStatusBucket'] = $this->myTicketsStatusBucket($_POST['scm_my_bucket'] ?? 'active');
-    $params['fEstado'] = $params['fEstadoAdmin'] = '';
+    $params['fEstado'] = '';
     $params['_scmExcludeDepartamento'] = 'Servicio al cliente';
     $result = $this->run_query_generic([], $params, $config);
     $rows = is_array($result['rows'] ?? null) ? $result['rows'] : [];
@@ -120,6 +135,7 @@ trait HandlesMaintenanceActions
     $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : ['page' => 1, 'total_pages' => 1, 'total' => 0];
 
     $this->jsonOk([
+      'admin_status_options' => $result['admin_status_options'] ?? [],
       'cards' => $this->render_generic_cards($rows, $config, 'mis_tickets', $params['_scmStatusBucket']),
       'status_bucket' => $params['_scmStatusBucket'],
       'pagination' => $this->get_generic_tickets_module()->render_generic_pagination('mis_tickets', $pagination),

@@ -118,6 +118,7 @@ final class ServiciosInmobiliariosModule
     return [
       'rows' => $rows,
       'stats' => $stats,
+      'admin_status_options' => $this->ticketsRepository->getLastMaintenanceAdminStatuses(),
       'tbody' => $this->presenter->renderTbody($rows, $config, Auth::isLoggedIn(), $statusBucket),
       'pagination' => $pagination,
       'pagination_html' => $this->presenter->renderPagination($pagination, count($rows)),

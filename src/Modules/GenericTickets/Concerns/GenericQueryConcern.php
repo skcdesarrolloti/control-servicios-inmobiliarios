@@ -33,6 +33,7 @@ trait GenericQueryConcern
 
     return [
       'fEstado' => $clean($input[$prefix . 'estado'] ?? ''),
+      'fFinanciacion' => $clean($input[$prefix . 'financiacion'] ?? ''),
       'fEstadoAdmin' => $clean($input[$prefix . 'estado_admin'] ?? ''),
       'fOrigen' => $clean($input[$prefix . 'origen'] ?? ''),
       'fBusqueda' => $clean($input[$prefix . 'busqueda'] ?? ''),
@@ -514,7 +515,24 @@ trait GenericQueryConcern
       }
     }
 
+    if (in_array($statusBucket, ['postergados', 'cerrados'], true) && !empty($p['fEstadoAdmin'])) {
+      $column = $this->detect_first_existing_column($tabla, ['estado_admin_ticket', 'estado_administrativo', 'estado_admin']);
+      if ($column !== '') { $where[] = "LOWER(TRIM(COALESCE(`{$column}`, ''))) = ?"; $args[] = mb_strtolower(trim($p['fEstadoAdmin']), 'UTF-8'); }
+    }
+    $financing = strtolower(trim((string) ($p['fFinanciacion'] ?? '')));
+    if (in_array($financing, ['si', 'no', 'pending'], true)) {
+      $quoteTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
+      if ($this->table_exists($quoteTable) && $this->column_exists($quoteTable, 'financiacion')) {
+        $where[] = \SCM\Support\QuotationFinancingFilter::condition($this->generic_cotizacion_exists_expression($tabla));
+        $args[] = $financing === 'pending' ? '' : $financing;
+      } else { $where[] = '0 = 1'; }
+    }
     $whereStr = !empty($where) ? implode(' AND ', $where) : '1 = 1';
+    $adminOptions = [];
+    $adminColumn = $this->detect_first_existing_column($tabla, ['estado_admin_ticket', 'estado_administrativo', 'estado_admin']);
+    if ($adminColumn !== '') {
+      $adminOptions = $this->db->getCol("SELECT DISTINCT TRIM(`{$adminColumn}`) FROM `{$tabla}` WHERE {$whereStr} AND TRIM(COALESCE(`{$adminColumn}`, '')) <> '' ORDER BY 1", $args);
+    }
     $countSql = "SELECT COUNT(*) FROM `{$tabla}` WHERE {$whereStr}";
     $total = (int) $this->db->getVar($countSql, $args);
 
@@ -630,6 +648,7 @@ trait GenericQueryConcern
 
     return [
       'rows' => $rows,
+      'admin_status_options' => $adminOptions,
       'stats' => [
         'total' => $total,
         'abiertos' => $abiertos,

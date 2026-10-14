@@ -477,6 +477,7 @@ trait HandlesTicketWorkflowActions
       $stats  = is_array($result['stats'] ?? null) ? $result['stats'] : [];
 
       $payload = [
+        'admin_status_options' => $result['admin_status_options'] ?? [],
         'tbody'           => (string)($result['tbody'] ?? ''),
         'pagination'      => (string)($result['pagination_html'] ?? ''),
         'kpi_total'       => (string)($stats['total'] ?? 0),

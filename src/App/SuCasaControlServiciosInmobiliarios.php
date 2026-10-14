@@ -1518,6 +1518,7 @@ final class SuCasaControlServiciosInmobiliarios
       }
       $result = $module->run($params, $config, $bucketKey);
       $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];
+      $maintenanceFilterOptions['estado_admin'] = $result['admin_status_options'] ?? [];
       return [
         'dom_key' => $domKey,
         'prefix' => $prefix,
@@ -1553,6 +1554,7 @@ final class SuCasaControlServiciosInmobiliarios
     $stats = is_array($result['stats'] ?? null) ? $result['stats'] : [];
     $pagination = is_array($result['pagination'] ?? null) ? $result['pagination'] : ['page' => 1, 'total_pages' => 1, 'total' => 0];
     $filterOptions = $this->get_generic_tickets_module()->get_generic_filter_options($temas);
+    $filterOptions['estado_admin'] = $result['admin_status_options'] ?? [];
 
     return [
       'dom_key' => $domKey,
@@ -1576,6 +1578,8 @@ final class SuCasaControlServiciosInmobiliarios
       <form id="scm-form-<?php echo esc_attr($domKey); ?>" autocomplete="off">
         <input type="hidden" id="<?php echo esc_attr($prefix); ?>page" name="<?php echo esc_attr($prefix); ?>page" value="<?php echo esc_attr((string)($p['fPage'] ?? 1)); ?>">
         <div class="scm-grid">
+          <?= \SCM\Support\CaseFilterFields::administrativeStatus($prefix, $p, $filterOptions['estado_admin'] ?? []) ?>
+          <?= \SCM\Support\CaseFilterFields::financing($prefix, $p) ?>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>estado_bloqueado">Vista</label><input id="<?php echo esc_attr($prefix); ?>estado_bloqueado" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr($lockedStatusLabel); ?>" readonly></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>sort">Ordenar por</label><select id="<?php echo esc_attr($prefix); ?>sort" name="<?php echo esc_attr($prefix); ?>sort" class="select select-bordered select-sm scm-select scm-sort-select">
               <option value="created_desc" <?php selected((string) ($p['fSort'] ?? 'created_desc'), 'created_desc'); ?>>Fecha de creaci&oacute;n reciente</option>

@@ -851,10 +851,9 @@ final class GenericTicketsUiView
             <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>estado">Estado</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>estado" name="<?php echo esc_attr($prefix); ?>estado">
                 <option value="">Todos</option><?php foreach (['Nuevo', 'En proceso'] as $estOpt): ?><option value="<?php echo esc_attr($estOpt); ?>" <?php selected(strtolower((string) ($p['fEstado'] ?? '')), strtolower($estOpt)); ?>><?php echo esc_html($estOpt); ?></option><?php endforeach; ?>
               </select></div>
-            <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>estado_admin">Estado administrativo</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>estado_admin" name="<?php echo esc_attr($prefix); ?>estado_admin">
-                <option value="">Todos</option><?php foreach (($filterOptions['estado_admin'] ?? []) as $opt): ?><option value="<?php echo esc_attr((string) $opt); ?>" <?php selected((string) ($p['fEstadoAdmin'] ?? ''), (string) $opt); ?>><?php echo esc_html((string) $opt); ?></option><?php endforeach; ?>
-              </select></div>
           <?php endif; ?>
+          <?= \SCM\Support\CaseFilterFields::administrativeStatus($prefix, $p, $filterOptions['estado_admin'] ?? []) ?>
+          <?= \SCM\Support\CaseFilterFields::financing($prefix, $p) ?>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>origen">Origen</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>origen" name="<?php echo esc_attr($prefix); ?>origen">
               <option value="">Todos</option>
               <option value="web" <?php selected((string) ($p['fOrigen'] ?? ''), 'web'); ?>>Guardian</option>

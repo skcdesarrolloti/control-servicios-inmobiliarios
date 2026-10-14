@@ -28,6 +28,10 @@ trait MaintenanceQueriesConcern
   }
 
   /** @return array<string,mixed> */
+  private array $lastMaintenanceAdminStatuses = [];
+
+  public function getLastMaintenanceAdminStatuses(): array { return $this->lastMaintenanceAdminStatuses; }
+
   public function getMaintenanceFilterOptions(): array
   {
     $table = $this->ticketsTable();
@@ -50,6 +54,7 @@ trait MaintenanceQueriesConcern
    */
   public function queryMaintenance(array $filters): array
   {
+    $this->lastMaintenanceAdminStatuses = [];
     $table = $this->ticketsTable();
     if (!$this->schema->tableExists($table)) {
       $this->lastMaintenanceTotal = 0;
@@ -138,7 +143,7 @@ trait MaintenanceQueriesConcern
       }
     }
 
-    if ($statusBucket === 'active' && ($filters['fEstadoAdmin'] ?? '') !== '') {
+    if (($filters['fEstadoAdmin'] ?? '') !== '') {
       $where[] = "LOWER(TRIM(COALESCE(t.estado_administrativo, ''))) = %s";
       $args[] = strtolower(trim((string) $filters['fEstadoAdmin']));
     }
@@ -390,6 +395,18 @@ trait MaintenanceQueriesConcern
 
     if (empty($where)) {
       $where[] = '1=1';
+    }
+
+    $financing = strtolower(trim((string) ($filters['fFinanciacion'] ?? '')));
+    if (in_array($financing, ['si', 'no', 'pending'], true)) {
+      $quoteTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
+      if ($this->schema->tableExists($quoteTable) && $this->schema->columnExists($quoteTable, 'financiacion')) {
+        $where[] = \SCM\Support\QuotationFinancingFilter::condition($this->maintenanceCotizacionExistsExpression('t'));
+        $args[] = $financing === 'pending' ? '' : $financing;
+      } else { $where[] = '0 = 1'; }
+    }
+    if ($this->schema->columnExists($table, 'estado_administrativo')) {
+      $this->lastMaintenanceAdminStatuses = $this->db->getCol($this->convertSql("SELECT DISTINCT TRIM(t.estado_administrativo) FROM `{$table}` t WHERE " . implode(' AND ', $where) . " AND TRIM(COALESCE(t.estado_administrativo, '')) <> '' ORDER BY 1"), $args);
     }
 
     $countSql  = "SELECT COUNT(1) FROM `{$table}` t WHERE " . implode(' AND ', $where);

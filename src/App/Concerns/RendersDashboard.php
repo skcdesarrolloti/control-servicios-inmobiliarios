@@ -99,7 +99,7 @@ trait RendersDashboard
     $myTicketsParams = $this->parse_params_generic($_GET, 'scm_my_');
     $myTicketsParams['fEmpleado'] = $currentEmployeeId !== '' ? $currentEmployeeId : '__sin_funcionario__';
     $myTicketsParams['_scmStatusBucket'] = 'active';
-    $myTicketsParams['fEstado'] = $myTicketsParams['fEstadoAdmin'] = '';
+    $myTicketsParams['fEstado'] = '';
     $myTicketsParams['_scmExcludeDepartamento'] = 'Servicio al cliente';
     $myTicketsResult = ['tbody' => $this->render_lazy_tickets_placeholder('Abre esta pestaña para cargar tus casos.'), 'pagination_html' => ''];
     $myTicketsStats = ['total' => 0];
@@ -1058,7 +1058,7 @@ trait RendersDashboard
             <div class="flex items-center gap-2.5">
               <span class="material-symbols-outlined text-[20px] text-slate-700">tune</span>
               <h3 class="text-sm font-bold text-slate-800 m-0">Filtros Avanzados de Casos</h3>
-              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">16 Criterios</span>
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">17 Criterios</span>
             </div>
             <button type="button" class="scm-filter-collapse-btn flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 font-medium" id="scm-filter-collapse-toggle">
               <span id="scm-filter-collapse-label">Colapsar panel</span>
@@ -1074,6 +1074,7 @@ trait RendersDashboard
               <div class="scm-field"><label for="scm_estado_admin">ESTADO ADMINISTRATIVO</label><select id="scm_estado_admin" name="scm_estado_admin" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions["estado_admin"] ?? []) as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected(($params["fEstadoAdmin"] ?? ""), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?>
                 </select></div>
+                <?= \SCM\Support\CaseFilterFields::financing('scm_', $params) ?>
               <div class="scm-field"><label for="scm_origen">ORIGEN DE SOLICITUD</label><select id="scm_origen" name="scm_origen" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option>
                   <option value="web" <?php selected(($params['fOrigen'] ?? ''), 'web'); ?>>Guardian</option>
@@ -4875,9 +4876,17 @@ trait RendersDashboard
       }
     }
 
+    $financing = trim((string) ($row['financiacion'] ?? ''));
+    $financingHtml = '<div class="scm-cotizacion-financing"><label><span>Financiamiento</span><select class="scm-select" data-scm-quote-financing' . ($canQuoteEdit ? '' : ' disabled') . '>';
+    foreach ([''=>'Sin definir','Si'=>'Sí','No'=>'No'] as $value=>$label) {
+      $financingHtml .= '<option value="' . esc_attr($value) . '"' . ($financing === $value ? ' selected' : '') . '>' . esc_html($label) . '</option>';
+    }
+    $financingHtml .= '</select></label>' . ($canQuoteEdit ? '<button type="button" class="scm-case-work-btn" data-scm-save-quote-financing>Guardar financiamiento</button>' : '') . '<span role="status" data-scm-quote-financing-status></span></div>';
+
     return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '" data-cot-fecha-envio="' . esc_attr((string) $fechaEnvioTs) . '" data-cot-dias-calendario="' . esc_attr((string) $diasCalendarioSinRespuesta) . '" data-cot-seguimiento-reparaciones-disponible="' . esc_attr($seguimientoReparacionesDisponible ? '1' : '0') . '">'
       . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Caso <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : 'Sin estado') . '</span></div></div>'
       . '<div class="scm-cotizacion-meta"><div><span>Fecha</span><strong>' . esc_html($fecha) . '</strong></div><div><span>Destinatario</span><strong>' . esc_html($destinatario !== '' ? $destinatario : '-') . '</strong></div><div><span>Contacto</span><strong>' . esc_html($contacto !== '' ? $contacto : '-') . '</strong></div><div><span>Empleado</span><strong>' . esc_html($empleado !== '' ? $empleado : '-') . '</strong></div><div><span>Ordenes</span><strong>' . esc_html($ordenesTotal) . '</strong></div></div>'
+      . $financingHtml
       . '<div class="scm-cotizacion-finance-actions"><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="saldos" aria-expanded="false">Ver saldos</button><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="totales" aria-expanded="false">Ver totales</button></div>'
       . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="saldos" hidden><div class="scm-cotizacion-finance-grid"><div><span>Saldo mano de obra</span><strong>' . esc_html($saldoObra) . '</strong></div><div><span>Saldo materiales</span><strong>' . esc_html($saldoMateriales) . '</strong></div><div><span>Saldo equipos</span><strong>' . esc_html($saldoMaquinarias) . '</strong></div><div><span>Saldo otros costos</span><strong>' . esc_html($saldoOtros) . '</strong></div></div></div>'
       . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="totales" hidden><div class="scm-cotizacion-finance-grid"><div><span>Total mano de obra</span><strong>' . esc_html($totalObra) . '</strong></div><div><span>Total materiales</span><strong>' . esc_html($totalMateriales) . '</strong></div><div><span>Total equipos</span><strong>' . esc_html($totalMaquinarias) . '</strong></div><div><span>Total otros costos</span><strong>' . esc_html($totalOtros) . '</strong></div><div><span>Administraci&oacute;n' . ($porcentajeAdmon !== '' ? ' ' . esc_html($porcentajeAdmon) . '%' : '') . '</span><strong>' . esc_html($totalAdmon) . '</strong></div><div><span>IVA admon' . ($ivaAdmonPct !== '' ? ' ' . esc_html($ivaAdmonPct) . '%' : '') . '</span><strong>' . esc_html($ivaAdmon) . '</strong></div><div><span>Total admon + IVA</span><strong>' . esc_html($totalAdmonMasIva) . '</strong></div><div class="scm-cotizacion-finance-total"><span>Total cotizaci&oacute;n</span><strong>' . esc_html($totalCotizacion) . '</strong></div></div></div>'
