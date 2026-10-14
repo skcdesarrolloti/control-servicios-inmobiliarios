@@ -2060,6 +2060,206 @@
     });
   }
 
+  function postCaseDataEdit(root, payload) {
+    var runtime = parseRuntime(root) || {};
+    var fd = new FormData();
+    fd.set(
+      "action",
+      (runtime.actions && runtime.actions.edit_case_data) ||
+        "scm_editar_datos_caso",
+    );
+    fd.set("nonce", runtime.nonce || "");
+    Object.keys(payload).forEach(function (key) {
+      fd.set(key, payload[key]);
+    });
+    return fetch(runtime.ajaxUrl || "api.php", {
+      method: "POST",
+      body: fd,
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (json) {
+        if (!json || !json.success) {
+          throw new Error(
+            (json && json.data && json.data.message) ||
+              "No se pudo procesar la edición del caso.",
+          );
+        }
+        return json.data || {};
+      });
+  }
+
+  function refreshCaseHeaderData(modal, caseBtn) {
+    var ticketNum = caseBtn.dataset.ticket || caseBtn.dataset.ticketPk || "-";
+    var title = modal.querySelector("#scm-case-title");
+    if (title) {
+      title.innerHTML =
+        '<span class="scm-case-title-num">Caso #' +
+        escHtml(ticketNum) +
+        "</span>: " +
+        escHtml(caseBtn.dataset.asunto || "Caso de servicios inmobiliarios");
+    }
+    var breadcrumbDept = modal.querySelector("#scm-case-breadcrumb-dept");
+    if (breadcrumbDept && caseBtn.dataset.departamento) {
+      breadcrumbDept.textContent = caseBtn.dataset.departamento;
+    }
+    var prioridadChip = null;
+    modal
+      .querySelectorAll("#scm-case-meta .scm-chip-warning")
+      .forEach(function (chip) {
+        if (/prioridad/i.test(chip.textContent || "")) prioridadChip = chip;
+      });
+    var prioridad = String(caseBtn.dataset.prioridad || "").trim();
+    if (prioridadChip && prioridad) {
+      prioridadChip.innerHTML =
+        '<span class="material-symbols-outlined text-[14px]">bolt</span> Prioridad ' +
+        escHtml(prioridad.replace(/^prioridad\s+/i, ""));
+    }
+  }
+
+  function openCaseDataEditor(modal, root, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var ticketPk = caseBtn.dataset.ticketPk || "";
+    if (title) {
+      title.textContent = "Editar datos del caso";
+    }
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) {
+      body.innerHTML = '<p class="scm-muted">Cargando datos del caso...</p>';
+    }
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+    if (!body || !ticketPk) return;
+
+    function selectHtml(name, label, values, current) {
+      var list = (values || []).slice();
+      if (current && list.indexOf(current) < 0) list.unshift(current);
+      return (
+        '<label class="scm-seg-field"><span>' +
+        escHtml(label) +
+        '</span><select name="' +
+        escHtml(name) +
+        '" required>' +
+        (current ? "" : '<option value="">Selecciona...</option>') +
+        list
+          .map(function (value) {
+            return (
+              '<option value="' +
+              escHtml(value) +
+              '"' +
+              (value === current ? " selected" : "") +
+              ">" +
+              escHtml(value) +
+              "</option>"
+            );
+          })
+          .join("") +
+        "</select></label>"
+      );
+    }
+
+    postCaseDataEdit(root, { ticket_pk: ticketPk, op: "load" })
+      .then(function (data) {
+        var values = data.values || {};
+        var options = data.options || {};
+        var fields = "";
+        if ("asunto" in values) {
+          fields +=
+            '<label class="scm-seg-field"><span>Asunto</span><input type="text" name="asunto" maxlength="200" required value="' +
+            escHtml(values.asunto || "") +
+            '"></label>';
+        }
+        if ("tema_ayuda" in values) {
+          fields += selectHtml("tema_ayuda", "Tema de ayuda", options.tema_ayuda, values.tema_ayuda || "");
+        }
+        if ("prioridad" in values) {
+          fields += selectHtml("prioridad", "Prioridad", options.prioridad, values.prioridad || "");
+        }
+        if ("departamento" in values) {
+          fields += selectHtml("departamento", "Departamento", options.departamento, values.departamento || "");
+        }
+        body.innerHTML =
+          '<form class="scm-case-data-edit-form" data-scm-case-data-form style="display:flex;flex-direction:column;gap:12px;">' +
+          '<p class="scm-muted">Los cambios quedan registrados como nota interna del caso.</p>' +
+          fields +
+          '<div style="display:flex;justify-content:flex-end;gap:8px;align-items:center;">' +
+          '<small class="scm-case-data-edit-msg"></small>' +
+          '<button type="button" class="btn btn-outline btn-sm" data-scm-case-data-cancel>Cancelar</button>' +
+          '<button type="submit" class="btn btn-primary btn-sm">Guardar cambios</button>' +
+          "</div></form>";
+
+        var form = body.querySelector("[data-scm-case-data-form]");
+        var msg = body.querySelector(".scm-case-data-edit-msg");
+        var cancelBtn = body.querySelector("[data-scm-case-data-cancel]");
+        if (cancelBtn) {
+          cancelBtn.addEventListener("click", function () {
+            sub.classList.remove("open");
+            sub.setAttribute("aria-hidden", "true");
+          });
+        }
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var payload = { ticket_pk: ticketPk, op: "save" };
+          Array.prototype.forEach.call(form.elements, function (el) {
+            if (el.name) payload[el.name] = el.value;
+          });
+          if ("asunto" in payload && !String(payload.asunto).trim()) {
+            if (msg) msg.textContent = "El asunto es obligatorio.";
+            return;
+          }
+          var submitBtn = form.querySelector('button[type="submit"]');
+          if (submitBtn) submitBtn.disabled = true;
+          if (msg) msg.textContent = "Guardando...";
+          postCaseDataEdit(root, payload)
+            .then(function (result) {
+              var saved = result.values || {};
+              if (saved.asunto) caseBtn.dataset.asunto = saved.asunto;
+              if (saved.tema_ayuda) caseBtn.dataset.tema = saved.tema_ayuda;
+              if (saved.prioridad) caseBtn.dataset.prioridad = saved.prioridad;
+              if (saved.departamento) caseBtn.dataset.departamento = saved.departamento;
+              refreshCaseHeaderData(modal, caseBtn);
+              scmNotify(
+                "success",
+                result.message || "Datos del caso actualizados.",
+                "Caso actualizado",
+              );
+              if (
+                result.changes &&
+                result.changes.length &&
+                root &&
+                typeof window.CustomEvent === "function"
+              ) {
+                root.dispatchEvent(
+                  new CustomEvent("scm:case-action-saved", {
+                    detail: { ticketPk: ticketPk, fromNode: sub },
+                  }),
+                );
+              }
+              sub.classList.remove("open");
+              sub.setAttribute("aria-hidden", "true");
+            })
+            .catch(function (err) {
+              if (submitBtn) submitBtn.disabled = false;
+              var text = err && err.message ? err.message : "No se pudo guardar.";
+              if (msg) msg.textContent = text;
+              scmNotify("error", text);
+            });
+        });
+      })
+      .catch(function (err) {
+        body.innerHTML =
+          '<p class="scm-error">No se pudieron cargar los datos: ' +
+          escHtml(err && err.message ? err.message : "error") +
+          "</p>";
+      });
+  }
+
   function openTrasladarCasoEditor(modal, caseBtn, runtime) {
     var sub = ensureCaseSubmodal(modal);
     if (!sub || !caseBtn) return;
@@ -8597,6 +8797,14 @@
               "</button>",
           );
         }
+        if (!isPublicPqr && canUseDashboardAction("case_edit_data")) {
+          sidebarStateButtons.push(
+            '<button type="button" class="scm-case-work-btn w-full" data-scm-edit-case-data>' +
+              '<span class="material-symbols-outlined scm-btn-icon">edit_note</span>' +
+              '<div class="scm-btn-text"><span class="scm-btn-label">Editar datos del caso</span><span class="scm-btn-sub">Asunto, tema, prioridad y departamento</span></div>' +
+              "</button>",
+          );
+        }
         var canPostpone = isPublicPqr
           ? statusBucket !== "cerrados" && statusBucket !== "postergados"
           : statusBucket !== "cerrados" &&
@@ -8941,6 +9149,14 @@
         .forEach(function (editBtn) {
           editBtn.addEventListener("click", function () {
             openCaseMagnitudeEditor(modal, root, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-edit-case-data]")
+        .forEach(function (editBtn) {
+          editBtn.addEventListener("click", function () {
+            openCaseDataEditor(modal, root, btn);
           });
         });
 

@@ -76,6 +76,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_DAMAGE_MAGNITUDE => 'ajax_handler_damage_magnitude',
       SuCasaControlServiciosInmobiliarios::AJAX_CLASSIFY_MAGNITUDE => 'ajax_handler_classify_magnitude',
       SuCasaControlServiciosInmobiliarios::AJAX_SAVE_CASE_MAGNITUDE => 'ajax_handler_save_case_magnitude',
+      SuCasaControlServiciosInmobiliarios::AJAX_EDIT_CASE_DATA => 'ajax_handler_edit_case_data',
       SuCasaControlServiciosInmobiliarios::AJAX_SAVE_PROPERTY_LOCATION => 'ajax_handler_save_property_location',
       SuCasaControlServiciosInmobiliarios::AJAX_TRASLADAR_CASO => 'ajax_handler_trasladar_caso',
       SuCasaControlServiciosInmobiliarios::AJAX_ASIGNAR_PQR_PUBLICO => 'ajax_handler_asignar_pqr_publico',

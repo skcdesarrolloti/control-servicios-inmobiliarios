@@ -4663,6 +4663,154 @@ trait HandlesMaintenanceActions
     ]);
   }
 
+  /** @return array<string,array<int,string>> */
+  private function caseDataEditOptions(string $table): array
+  {
+    $base = [
+      'tema_ayuda' => [
+        'Reparaciones necesarias',
+        'Reparaciones locativas',
+        'Mejoras utiles',
+        'Reparaciones voluntarias',
+        'Reparaciones antes de la entrega',
+        'Reparaciones antes del recibo',
+        'Mantenimiento',
+        'Revision preventiva',
+        'Entrega de inmuebles',
+        'Recibo de inmuebles',
+        'Contable y tributaria',
+        'Certificaciones tributarias',
+        'Procesos juridicos',
+        'Solicitud contractual',
+        'Solicitud de servicios publicos',
+        \SCM\Modules\Pending\PublicServicesCriticalTicket::TOPIC,
+        'No prorroga de contrato',
+        'Terminacion de contrato',
+        'Retencion de contrato',
+        'Otros servicios',
+      ],
+      'prioridad' => ['Prioridad urgente', 'Prioridad alta', 'Prioridad media', 'Prioridad baja'],
+      'departamento' => ['Servicio al cliente', 'Servicio al propietario', 'Servicio al arrendatario', 'Servicio a la copropiedad'],
+    ];
+    $options = [];
+    foreach ($base as $column => $values) {
+      if (!$this->column_exists($table, $column)) {
+        continue;
+      }
+      $rows = $this->db->getResults(
+        "SELECT DISTINCT TRIM(`{$column}`) AS v FROM `{$table}` WHERE TRIM(COALESCE(`{$column}`, '')) NOT IN ('', '-') LIMIT 200"
+      );
+      foreach ($rows as $row) {
+        $values[] = (string) ($row['v'] ?? '');
+      }
+      $seen = [];
+      $options[$column] = [];
+      foreach ($values as $value) {
+        $value = trim($value);
+        $key = mb_strtolower($value);
+        if ($value === '' || isset($seen[$key])) {
+          continue;
+        }
+        $seen[$key] = true;
+        $options[$column][] = $value;
+      }
+    }
+    return $options;
+  }
+
+  public function ajax_handler_edit_case_data(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_edit_data')) {
+      $this->jsonFail('No tienes permiso para editar los datos del caso.');
+    }
+
+    $ticketPk = (int) ($_POST['ticket_pk'] ?? 0);
+    if ($ticketPk <= 0) {
+      $this->jsonFail('Caso invalido.');
+    }
+    $table = $this->db->table('jet_cct_tickets');
+    $ticket = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]);
+    if (!is_array($ticket)) {
+      $this->jsonFail('Caso no encontrado.');
+    }
+
+    $options = $this->caseDataEditOptions($table);
+    $fields = ['asunto' => 'Asunto', 'tema_ayuda' => 'Tema', 'prioridad' => 'Prioridad', 'departamento' => 'Departamento'];
+    $current = [];
+    foreach ($fields as $column => $_label) {
+      if ($this->column_exists($table, $column)) {
+        $current[$column] = trim((string) ($ticket[$column] ?? ''));
+      }
+    }
+
+    $op = (string) ($_POST['op'] ?? 'load');
+    if ($op !== 'save') {
+      $this->jsonOk(['ticket_pk' => (string) $ticketPk, 'values' => $current, 'options' => $options]);
+    }
+
+    $update = [];
+    $changes = [];
+    foreach ($current as $column => $before) {
+      if (!array_key_exists($column, $_POST)) {
+        continue;
+      }
+      $value = trim(sanitize_text_field(wp_unslash((string) $_POST[$column])));
+      if ($column === 'asunto') {
+        if ($value === '' || mb_strlen($value) > 200) {
+          $this->jsonFail('El asunto es obligatorio y debe tener máximo 200 caracteres.');
+        }
+      } elseif (!in_array($value, $options[$column] ?? [], true)) {
+        $this->jsonFail($fields[$column] . ' no válido.');
+      }
+      if ($value !== $before) {
+        $update[$column] = $value;
+        $changes[] = $fields[$column] . ': "' . ($before !== '' ? $before : '-') . '" → "' . $value . '"';
+      }
+    }
+
+    if ($update === []) {
+      $this->jsonOk(['message' => 'No hubo cambios en los datos del caso.', 'ticket_pk' => (string) $ticketPk, 'values' => $current]);
+    }
+
+    $now = time();
+    $nowSql = date('Y-m-d H:i:s', $now);
+    $ticketUpdate = $update;
+    if ($this->column_exists($table, 'cct_modified')) {
+      $ticketUpdate['cct_modified'] = $nowSql;
+    }
+    $this->db->update($table, $ticketUpdate, ['_ID' => $ticketPk]);
+
+    // Trazabilidad: la edición queda como nota interna (no visible para el cliente).
+    $notesTable = $this->db->table('jet_cct_notas_ticket');
+    if ($this->table_exists($notesTable)) {
+      $actor = $this->ticketCompletionActor();
+      $actorEmployeeId = trim((string) ($actor['employee_id'] ?? ''));
+      $note = [
+        'cct_status' => 'publish',
+        'id_ticket' => $ticketPk,
+        'id_empleado' => $actorEmployeeId,
+        'cct_author_id' => $actorEmployeeId,
+        'fecha' => $now,
+        'nombre' => (string) ($actor['name'] ?? Auth::user()),
+        'observacion' => "Datos del caso editados:\n" . implode("\n", $changes),
+        'cct_created' => $nowSql,
+        'cct_modified' => $nowSql,
+      ];
+      $note = array_filter($note, fn($column) => $this->column_exists($notesTable, (string) $column), ARRAY_FILTER_USE_KEY);
+      if ($note !== []) {
+        $this->db->insert($notesTable, $note);
+      }
+    }
+
+    $this->jsonOk([
+      'message' => 'Datos del caso actualizados.',
+      'ticket_pk' => (string) $ticketPk,
+      'values' => array_merge($current, $update),
+      'changes' => $changes,
+    ]);
+  }
+
   public function ajax_handler_save_property_location(): void
   {
     $this->verifyCsrf();

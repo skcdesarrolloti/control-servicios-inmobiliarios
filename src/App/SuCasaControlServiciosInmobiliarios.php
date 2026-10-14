@@ -76,6 +76,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_DAMAGE_MAGNITUDE = 'damage_magnitude_tickets';
   const AJAX_CLASSIFY_MAGNITUDE = 'scm_clasificar_magnitud';
   const AJAX_SAVE_CASE_MAGNITUDE = 'scm_guardar_magnitud_caso';
+  const AJAX_EDIT_CASE_DATA = 'scm_editar_datos_caso';
   const AJAX_SAVE_PROPERTY_LOCATION = 'scm_guardar_ubicacion_inmueble';
   const AJAX_TRASLADAR_CASO = 'scm_trasladar_caso';
   const AJAX_ASIGNAR_PQR_PUBLICO = 'scm_asignar_pqr_publico';
@@ -640,6 +641,7 @@ final class SuCasaControlServiciosInmobiliarios
           'case_activate' => 'Activar caso',
           'case_close' => 'Cerrar caso',
           'case_edit_magnitude' => 'Editar magnitud del caso',
+          'case_edit_data' => 'Editar datos del caso (asunto, tema, prioridad, departamento)',
           'case_completion_act' => 'Acta de solución y firma',
           'corrective_review_manage' => 'Gestionar revisión correctiva',
         ],

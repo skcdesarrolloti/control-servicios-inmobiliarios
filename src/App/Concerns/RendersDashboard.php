@@ -475,6 +475,7 @@ trait RendersDashboard
         'damage_magnitude' => self::AJAX_DAMAGE_MAGNITUDE,
         'classify_magnitude' => self::AJAX_CLASSIFY_MAGNITUDE,
         'save_case_magnitude' => self::AJAX_SAVE_CASE_MAGNITUDE,
+        'edit_case_data' => self::AJAX_EDIT_CASE_DATA,
         'save_property_location' => self::AJAX_SAVE_PROPERTY_LOCATION,
         'trasladar_caso' => self::AJAX_TRASLADAR_CASO,
         'asignar_pqr_publico' => self::AJAX_ASIGNAR_PQR_PUBLICO,
