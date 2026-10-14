@@ -1028,7 +1028,10 @@
   .scm-cal-search > .material-symbols-outlined { @apply pointer-events-none absolute left-8 text-slate-400; font-size: 18px; }
   .scm-cal-search .scm-cal-input { @apply pl-9; }
   .scm-cal-list { @apply grid content-start gap-2; }
-  .scm-cal-row { @apply flex w-full cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-2.5 text-left transition hover:border-amber-300 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500; }
+  .scm-cal-row { @apply flex w-full flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 transition hover:border-amber-300 hover:shadow-md sm:flex-nowrap; }
+  .scm-cal-row-hit { @apply flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg border-0 bg-transparent p-0.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500; }
+  .scm-cal-row-hit > .scm-cal-status { @apply hidden shrink-0 sm:inline-flex; }
+  .scm-cal-row-actions { @apply ml-auto flex shrink-0 items-center gap-1.5; }
   .scm-cal-row-date { @apply grid h-12 w-12 shrink-0 place-content-center rounded-lg bg-amber-50 text-center leading-none text-amber-700; }
   .scm-cal-row.is-overdue .scm-cal-row-date { @apply bg-rose-50 text-rose-700; }
   .scm-cal-row.is-done .scm-cal-row-date { @apply bg-emerald-50 text-emerald-700; }
@@ -1037,10 +1040,20 @@
   .scm-cal-row-main { @apply grid min-w-0 flex-1 gap-0.5; }
   .scm-cal-row-main strong { @apply truncate text-sm font-semibold text-slate-900; }
   .scm-cal-row-meta { @apply truncate text-xs text-slate-500; }
-  .scm-cal-row-side { @apply hidden shrink-0 flex-col items-end gap-1 sm:flex; }
-  .scm-cal-row-cta { @apply inline-flex items-center text-xs font-medium text-slate-400 transition-colors; }
-  .scm-cal-row-cta .material-symbols-outlined { font-size: 16px; }
-  .scm-cal-row:hover .scm-cal-row-cta { @apply text-amber-700; }
+  .scm-cal-btn--lead { @apply sm:mr-auto; }
+  .scm-cal-foot-note { @apply mr-auto text-xs text-slate-500; }
+  .scm-cal-sheet-foot.is-stacked { @apply block; }
+  .scm-cal-bulk-row { @apply flex flex-wrap items-center justify-end gap-2; }
+  .scm-cal-bulk-row b { @apply rounded-full bg-white/25 px-1.5 py-0.5 text-[11px] font-semibold leading-none; }
+  .scm-cal-bulk-row b:empty { display: none; }
+  .scm-cal-bulk-form { @apply grid gap-2; }
+  .scm-cal-status.is-info { @apply bg-sky-50 text-sky-700 ring-sky-200; }
+  .scm-cal-history { @apply mt-3 grid gap-2; }
+  .scm-cal-history-item { @apply rounded-xl border border-slate-200 px-3 py-2.5; }
+  .scm-cal-history-item > div { @apply flex flex-wrap items-baseline justify-between gap-2; }
+  .scm-cal-history-item strong { @apply text-[13px] font-semibold text-slate-800; }
+  .scm-cal-history-item span { @apply text-[11px] text-slate-400; }
+  .scm-cal-history-item p { @apply m-0 mt-1 whitespace-pre-line text-[13px] leading-relaxed text-slate-600; }
   .scm-cal-empty { @apply grid place-items-center gap-2 rounded-xl border border-dashed border-slate-200 px-4 py-12 text-center text-sm text-slate-500; }
   .scm-cal-empty p { @apply m-0; }
   .scm-cal-empty .material-symbols-outlined { @apply text-emerald-500; font-size: 32px; }
