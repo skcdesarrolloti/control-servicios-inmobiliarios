@@ -167,6 +167,15 @@
 
   // Non-blocking notifications: a modal SweetAlert here used to cover (and close)
   // the dialog the user was working in, even for "Consultando..." progress notes.
+  // Closes "Procesando" toasts once the request they describe has finished.
+  function scmNotifyDone() {
+    var stack = document.getElementById("scm-toast-stack");
+    if (!stack) return;
+    stack.querySelectorAll(".scm-toast.is-info").forEach(function (node) {
+      if (typeof node._scmDismiss === "function") node._scmDismiss(); else node.remove();
+    });
+  }
+
   function scmNotify(type, message, title) {
     var kind = ["success", "info", "warning", "error"].indexOf(type) !== -1 ? type : "success";
     if (!document.body) {
@@ -181,9 +190,7 @@
       document.body.appendChild(stack);
     }
     // Progress notes are superseded by whatever comes next.
-    stack.querySelectorAll(".scm-toast.is-info").forEach(function (node) {
-      if (typeof node._scmDismiss === "function") node._scmDismiss(); else node.remove();
-    });
+    scmNotifyDone();
     var defaults = { success: "Listo", info: "Procesando", warning: "Atención", error: "No se pudo completar" };
     var icon = kind === "info"
       ? '<span class="scm-toast-spinner" aria-hidden="true"></span>'
@@ -206,7 +213,7 @@
       };
       toast._scmDismiss = dismiss;
       toast.querySelector(".scm-toast-close").addEventListener("click", dismiss);
-      window.setTimeout(dismiss, { success: 3200, info: 6000, warning: 5500, error: 8000 }[kind]);
+      window.setTimeout(dismiss, { success: 3200, info: 4000, warning: 5500, error: 8000 }[kind]);
     });
   }
 
@@ -9413,6 +9420,7 @@
     persistRuntime: persistRuntime,
     escHtml: escHtml,
     scmNotify: scmNotify,
+    scmNotifyDone: scmNotifyDone,
     openImageLightbox: openImageLightbox,
     bindGlobalImageLightbox: bindGlobalImageLightbox,
     bindTabs: bindTabs,

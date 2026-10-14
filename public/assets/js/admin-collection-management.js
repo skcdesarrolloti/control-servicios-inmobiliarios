@@ -17,6 +17,7 @@
     var notify = typeof core.scmNotify === "function"
       ? core.scmNotify
       : function (type, message) { window.alert(message); };
+    var notifyDone = typeof core.scmNotifyDone === "function" ? core.scmNotifyDone : function () {};
     var actionImport = actions.collection_portfolio_import || "";
     var actionPortfolio = actions.collection_portfolio_action || "";
     var actionPdf = actions.collection_portfolio_pdf || "";
@@ -60,7 +61,8 @@
             throw new Error(errorMessage(json));
           }
           return json.data || {};
-        });
+        })
+        .finally(notifyDone);
     }
 
     function setBusy(form, busy) {
@@ -197,7 +199,7 @@
         .catch(function (error) {
           notify("error", error.message, "Cartera");
         })
-        .finally(function () { button.disabled = false; });
+        .finally(function () { notifyDone(); button.disabled = false; });
     }
 
     function sendLetter(portfolioId, type, button) {
@@ -1281,7 +1283,7 @@
         .catch(function (error) {
           notify("error", error.message, "Cartera");
         })
-        .finally(function () { button.disabled = false; });
+        .finally(function () { notifyDone(); button.disabled = false; });
     }
 
     function chooseLetterAction(button) {

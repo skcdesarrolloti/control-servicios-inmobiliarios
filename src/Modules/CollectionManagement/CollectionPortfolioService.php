@@ -1110,22 +1110,47 @@ final class CollectionPortfolioService
    */
   private function enqueueSiniestroEmails(array $item, array $sender, int $portfolioId, array $managementIds = []): int
   {
-    $recipients = [
-      trim((string) ($item['tenant_email'] ?? '')),
-    ];
+    // One email per person: a shared envelope labelled every codeudor with the tenant's name.
+    $recipients = [];
+    $addRecipient = static function (string $email, string $name, string $role, string $fallback) use (&$recipients): void {
+      $email = trim($email);
+      $key = strtolower($email);
+      if ($email === '' || isset($recipients[$key]) || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        return;
+      }
+      $recipients[$key] = ['email' => $email, 'name' => trim($name) !== '' ? trim($name) : $fallback, 'role' => $role];
+    };
+    $addRecipient((string) ($item['tenant_email'] ?? ''), (string) ($item['tenant_name'] ?? ''), 'Arrendatario', 'Arrendatario');
     foreach ((array) ($item['codeudores'] ?? []) as $codeudor) {
       if (is_array($codeudor)) {
-        $recipients[] = trim((string) ($codeudor['correo'] ?? ''));
+        $addRecipient((string) ($codeudor['correo'] ?? ''), (string) ($codeudor['nombre'] ?? ''), 'Codeudor', 'Codeudor');
       }
     }
-    $recipients = array_values(array_unique(array_filter($recipients, static fn(string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false)));
     if ($recipients === []) {
       return 0;
     }
 
     $signature = trim((string) ($sender['signature_line'] ?? '')) ?: Auth::user();
-    $tenantName = trim((string) ($item['tenant_name'] ?? 'arrendatario')) ?: 'arrendatario';
-    $html = '<p><strong>Estimado(a) ' . htmlspecialchars($tenantName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong>, reciba un cordial saludo.</p>'
+    $queued = 0;
+    foreach ($recipients as $recipient) {
+      $queued += $this->enqueueSiniestroEmail($recipient, $item, $signature, $portfolioId, $managementIds);
+    }
+    return $queued;
+  }
+
+  /**
+   * @param array{email:string,name:string,role:string} $recipient
+   * @param array<string,mixed> $item
+   * @param int[] $managementIds
+   */
+  private function enqueueSiniestroEmail(array $recipient, array $item, string $signature, int $portfolioId, array $managementIds): int
+  {
+    $isCodeudor = $recipient['role'] === 'Codeudor';
+    $contractLine = $isCodeudor
+      ? '<p>Le escribimos en calidad de <strong>codeudor(a)</strong> del contrato de arrendamiento <strong>' . htmlspecialchars((string) ($item['contract_number'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong>, cuyo arrendatario es <strong>' . htmlspecialchars((string) ($item['tenant_name'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong>.</p>'
+      : '';
+    $html = '<p><strong>Estimado(a) ' . htmlspecialchars($recipient['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</strong>, reciba un cordial saludo.</p>'
+      . $contractLine
       . '<p>Le recordamos que el incumplimiento en el pago del canon de arrendamiento dentro del plazo establecido constituye una falta a las obligaciones contractuales y puede dar lugar al reporte ante la aseguradora, conforme al contrato de arrendamiento vigente.</p>'
       . '<p>Una vez activado el proceso con la aseguradora, se puede generar un recargo adicional del <strong>50%</strong> sobre el valor del canon adeudado, además de los costos y gestiones asociados al trámite.</p>'
       . '<p><strong>Para evitar mayores consecuencias económicas y administrativas, le solicitamos realizar el pago de manera inmediata.</strong></p>'
@@ -1141,16 +1166,18 @@ final class CollectionPortfolioService
       ],
     ]);
 
-    return (new EmailQueue($this->db))->enqueue($recipients, 'Aviso de siniestro por mora en contrato de arrendamiento', $html, [
+    return (new EmailQueue($this->db))->enqueue([$recipient['email']], 'Aviso de siniestro por mora en contrato de arrendamiento', $html, [
       'source_module' => AdministrativeNotificationsService::SOURCE_MODULE,
-      'destination_name' => $tenantName,
+      'destination_name' => $recipient['name'],
       'dedupe_key' => 'collection-siniestro-notification:' . $portfolioId . ':' . date('YmdHi'),
-      'internal_action'=>'contrato_siniestro',
+      'internal_action' => 'contrato_siniestro',
       'meta' => array_merge([
         'source_submodule' => 'collection-management',
         'portfolio_id' => $portfolioId,
         'letter_type' => 'siniestro',
+        'recipient_role' => strtolower($recipient['role']),
         'template_name' => 'scm_email_aviso_siniestro_v1',
+        'admin_notifications' => ['rol_persona' => $recipient['role']],
       ], $this->collectionManagementQueueMeta($managementIds)),
     ]);
   }
@@ -1222,6 +1249,7 @@ final class CollectionPortfolioService
           'letter_type' => 'siniestro',
           'document_url' => $documentUrl,
           'recipient_role' => (string) $recipient['role'],
+          'admin_notifications' => ['rol_persona' => ucfirst((string) $recipient['role'])],
           'dedupe_key' => 'collection-letter-whatsapp:' . $portfolioId . ':siniestro:' . date('YmdHi'),
           'template_name' => 'scm_aviso_siniestro_v2',
           'template_language' => 'es_CO',

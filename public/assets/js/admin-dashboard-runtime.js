@@ -1237,6 +1237,7 @@
                 "No se pudieron consultar las notificaciones.",
             );
           }
+          if (typeof core.scmNotifyDone === "function") core.scmNotifyDone();
           var data = json.data || {};
           var stats = data.stats || {};
           var total = Number(stats.total || 0);
@@ -7939,6 +7940,7 @@
                   "No se pudieron consultar las notificaciones.",
               );
             }
+            if (typeof core.scmNotifyDone === "function") core.scmNotifyDone();
             var data = json.data || {};
             var stats = data.stats || {};
             var total = Number(stats.total || 0);
