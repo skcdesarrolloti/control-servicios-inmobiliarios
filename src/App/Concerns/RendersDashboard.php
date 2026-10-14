@@ -1074,7 +1074,6 @@ trait RendersDashboard
               <div class="scm-field"><label for="scm_estado_admin">ESTADO ADMINISTRATIVO</label><select id="scm_estado_admin" name="scm_estado_admin" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions["estado_admin"] ?? []) as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected(($params["fEstadoAdmin"] ?? ""), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?>
                 </select></div>
-                <?= \SCM\Support\CaseFilterFields::financing('scm_', $params) ?>
               <div class="scm-field"><label for="scm_origen">ORIGEN DE SOLICITUD</label><select id="scm_origen" name="scm_origen" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option>
                   <option value="web" <?php selected(($params['fOrigen'] ?? ''), 'web'); ?>>Guardian</option>
@@ -1110,6 +1109,7 @@ trait RendersDashboard
                   <option value="si" <?php selected(($params['fCotizacionEnviada'] ?? ''), 'si'); ?>>S&iacute;</option>
                   <option value="no" <?php selected(($params['fCotizacionEnviada'] ?? ''), 'no'); ?>>No</option>
                 </select></div>
+                <?= \SCM\Support\CaseFilterFields::financing('scm_', $params) ?>
               <div class="scm-field"><label for="scm_perturbacion">PERTURBACIÓN</label><select id="scm_perturbacion" name="scm_perturbacion" class="select select-bordered select-sm scm-select">
                   <option value="">Todas</option>
                   <option value="has" <?php selected(strtolower((string) ($params['fPerturbacion'] ?? '')), 'has'); ?>>Con perturbaci&oacute;n</option>

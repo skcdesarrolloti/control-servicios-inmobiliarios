@@ -1579,7 +1579,6 @@ final class SuCasaControlServiciosInmobiliarios
         <input type="hidden" id="<?php echo esc_attr($prefix); ?>page" name="<?php echo esc_attr($prefix); ?>page" value="<?php echo esc_attr((string)($p['fPage'] ?? 1)); ?>">
         <div class="scm-grid">
           <?= \SCM\Support\CaseFilterFields::administrativeStatus($prefix, $p, $filterOptions['estado_admin'] ?? []) ?>
-          <?= \SCM\Support\CaseFilterFields::financing($prefix, $p) ?>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>estado_bloqueado">Vista</label><input id="<?php echo esc_attr($prefix); ?>estado_bloqueado" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr($lockedStatusLabel); ?>" readonly></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>sort">Ordenar por</label><select id="<?php echo esc_attr($prefix); ?>sort" name="<?php echo esc_attr($prefix); ?>sort" class="select select-bordered select-sm scm-select scm-sort-select">
               <option value="created_desc" <?php selected((string) ($p['fSort'] ?? 'created_desc'), 'created_desc'); ?>>Fecha de creaci&oacute;n reciente</option>
@@ -1623,6 +1622,7 @@ final class SuCasaControlServiciosInmobiliarios
               <option value="si" <?php selected(($p['fCotizacionEnviada'] ?? ''), 'si'); ?>>S&iacute;</option>
               <option value="no" <?php selected(($p['fCotizacionEnviada'] ?? ''), 'no'); ?>>No</option>
             </select></div>
+          <?= \SCM\Support\CaseFilterFields::financing($prefix, $p) ?>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>perturbacion">Perturbaci&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>perturbacion" name="<?php echo esc_attr($prefix); ?>perturbacion" class="select select-bordered select-sm scm-select">
               <option value="">Todas</option>
               <option value="has" <?php selected(strtolower((string) ($p['fPerturbacion'] ?? '')), 'has'); ?>>Con perturbaci&oacute;n</option>

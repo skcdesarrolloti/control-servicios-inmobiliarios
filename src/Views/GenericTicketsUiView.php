@@ -853,7 +853,6 @@ final class GenericTicketsUiView
               </select></div>
           <?php endif; ?>
           <?= \SCM\Support\CaseFilterFields::administrativeStatus($prefix, $p, $filterOptions['estado_admin'] ?? []) ?>
-          <?= \SCM\Support\CaseFilterFields::financing($prefix, $p) ?>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>origen">Origen</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>origen" name="<?php echo esc_attr($prefix); ?>origen">
               <option value="">Todos</option>
               <option value="web" <?php selected((string) ($p['fOrigen'] ?? ''), 'web'); ?>>Guardian</option>
@@ -896,6 +895,7 @@ final class GenericTicketsUiView
                 <option value="si" <?php selected((string) ($p['fCotizacionEnviada'] ?? ''), 'si'); ?>>Si</option>
                 <option value="no" <?php selected((string) ($p['fCotizacionEnviada'] ?? ''), 'no'); ?>>No</option>
               </select></div>
+          <?= \SCM\Support\CaseFilterFields::financing($prefix, $p) ?>
             <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>perturbacion">Perturbacion</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>perturbacion" name="<?php echo esc_attr($prefix); ?>perturbacion">
                 <option value="">Todas</option>
                 <option value="has" <?php selected(strtolower((string) ($p['fPerturbacion'] ?? '')), 'has'); ?>>Con perturbacion</option>
