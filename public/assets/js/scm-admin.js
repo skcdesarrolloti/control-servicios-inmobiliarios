@@ -5106,20 +5106,32 @@
     return "";
   }
 
-  // Extrae descripción e historial del HTML fuente del caso como texto plano.
-  function caseCalendarCaseSourceSummary(sourceHtml) {
+  // Lee el HTML fuente del caso (el mismo que usa el popup completo) y
+  // devuelve descripción e historial del caso con sus adjuntos y botones.
+  function caseCalendarCaseSourceSummary(sourceHtml, caseData) {
     var summary = { description: "", history: [] };
     if (!sourceHtml || typeof window.DOMParser !== "function") return summary;
     var doc = new window.DOMParser().parseFromString(
       "<div>" + sourceHtml + "</div>",
       "text/html",
     );
+    // Contrato, inmueble y su historial viven en secciones ocultas: no son
+    // historial del caso.
+    doc
+      .querySelectorAll(".scm-case-hidden-sections, .scm-seg-wrap")
+      .forEach(function (node) {
+        node.remove();
+      });
     doc.querySelectorAll("br").forEach(function (br) {
       br.replaceWith("\n");
     });
+    doc.querySelectorAll("p, li, div").forEach(function (node) {
+      node.appendChild(doc.createTextNode("\n"));
+    });
     var text = function (node) {
       return node
-        ? String(node.innerText || node.textContent || "")
+        ? String(node.textContent || "")
+            .replace(/[ \t]+\n/g, "\n")
             .replace(/\n{3,}/g, "\n\n")
             .trim()
         : "";
@@ -5127,17 +5139,102 @@
     summary.description = text(
       doc.querySelector(".scm-case-description-content"),
     );
-    doc
-      .querySelectorAll(".scm-case-history-item")
-      .forEach(function (item) {
+    var quoteUrl = String((caseData && caseData.cotizacion_url) || "").trim();
+    doc.querySelectorAll(".scm-case-history").forEach(function (section) {
+      var heading = text(section.querySelector("h4"));
+      var kind = /seguimiento/i.test(heading)
+        ? "Seguimiento"
+        : /nota/i.test(heading)
+          ? "Nota"
+          : "";
+      section.querySelectorAll(".scm-case-history-item").forEach(function (item) {
         var meta = item.querySelector(".scm-case-history-meta");
+        var images = [];
+        item.querySelectorAll("img").forEach(function (img) {
+          var src = String(img.getAttribute("src") || "").trim();
+          if (src && images.indexOf(src) === -1) images.push(src);
+        });
+        var links = [];
+        item
+          .querySelectorAll(".scm-case-history-docs [data-iframe-url], .scm-case-actions [data-iframe-url], .scm-case-actions [data-scm-view-cotizacion-native]")
+          .forEach(function (btn) {
+            var url = String(btn.getAttribute("data-iframe-url") || "").trim();
+            if (!url && btn.hasAttribute("data-scm-view-cotizacion-native")) {
+              url = quoteUrl;
+            }
+            if (!url) return;
+            links.push({
+              url: url,
+              label: text(btn) || btn.getAttribute("data-iframe-title") || "Ver",
+              isDoc: !!(btn.closest && btn.closest(".scm-case-history-docs")),
+            });
+          });
+        var detailNode = item.querySelector(".scm-case-history-detail");
+        var author = text(
+          (meta && meta.querySelector("strong")) ||
+            item.querySelector(".scm-case-record-title strong"),
+        );
         summary.history.push({
-          author: text(meta && meta.querySelector("strong")),
-          date: text(meta && meta.querySelector("span")),
-          detail: text(item.querySelector(".scm-case-history-detail")),
+          kind: kind,
+          author: !author || /^sin autor$/i.test(author) ? "Sistema" : author,
+          date: text(
+            (meta && meta.querySelector("span")) ||
+              item.querySelector(".scm-case-record-date strong"),
+          ),
+          timestamp: Number(item.getAttribute("data-timestamp") || 0),
+          detail: text(detailNode),
+          images: images,
+          links: links,
         });
       });
+    });
+    summary.history.sort(function (a, b) {
+      return b.timestamp - a.timestamp;
+    });
     return summary;
+  }
+
+  // Verifica si el caso ya tiene la revisión que corresponde al evento.
+  function caseCalendarRevisionCheck(caseData, row) {
+    var source = [
+      row && (row.categoria || row.nombre_categoria),
+      row && row.titulo,
+      caseData.tema,
+      caseData.asunto,
+      caseData.tab_key,
+    ].join(" ");
+    var kind = /correctiva/i.test(source)
+      ? "correctiva"
+      : /preventiva/i.test(source)
+        ? "preventiva"
+        : "";
+    if (!kind) return null;
+    var id = String(
+      (kind === "preventiva"
+        ? caseData.id_revision_preventiva
+        : caseData.id_revision_correctiva) || "",
+    ).trim();
+    var url = "";
+    if (id) {
+      url =
+        kind === "preventiva"
+          ? "https://sucasainmobiliaria.com.co/revision-preventiva/?numero=" +
+            encodeURIComponent(id)
+          : "revision-correctiva.php?numero=" + encodeURIComponent(id);
+    }
+    var damages = String(caseData.prev_encontro_danos || "").trim();
+    return {
+      kind: kind,
+      label: kind === "preventiva" ? "Revisión preventiva" : "Revisión correctiva",
+      id: id,
+      url: url,
+      damages:
+        kind === "preventiva" && id && damages
+          ? scmIsYesLike(damages)
+            ? "Se encontraron daños"
+            : "Sin daños reportados"
+          : "",
+    };
   }
 
   function openCaseCalendarFullCase(root, shell, caseData, ticket) {
@@ -5172,14 +5269,68 @@
     window.scmOpenCase(button);
   }
 
-  function openCaseCalendarCaseMini(root, shell, ticket) {
+  // Visor interno para imágenes, documentos y actas (sin abrir pestañas).
+  function openCaseCalendarViewer(shell, kind, url, title) {
+    if (!shell || !url) return;
+    var current = shell.querySelector("[data-scm-case-calendar-viewer]");
+    if (current) current.remove();
+    var isImage = kind === "image";
+    var html =
+      '<div class="scm-cal-layer scm-cal-layer--viewer" data-scm-case-calendar-layer data-scm-case-calendar-viewer>' +
+      '<div class="scm-cal-sheet ' +
+      (isImage ? "scm-cal-sheet--image" : "scm-cal-sheet--frame") +
+      '" role="dialog" aria-modal="true" aria-label="' +
+      escHtml(title || "Vista previa") +
+      '">' +
+      '<header class="scm-cal-viewer-head"><strong>' +
+      escHtml(title || (isImage ? "Imagen adjunta" : "Documento")) +
+      "</strong>" +
+      '<a class="scm-cal-btn scm-cal-btn--ghost scm-cal-btn--sm" href="' +
+      escHtml(url) +
+      '" target="_blank" rel="noopener noreferrer">' +
+      caseCalendarIcon("open_in_new") +
+      "<span>Pesta&ntilde;a</span></a>" +
+      '<button type="button" class="scm-cal-icon-btn" data-scm-case-calendar-viewer-close aria-label="Cerrar vista previa">' +
+      caseCalendarIcon("close") +
+      "</button></header>" +
+      (isImage
+        ? '<div class="scm-cal-viewer-image"><img src="' +
+          escHtml(url) +
+          '" alt="' +
+          escHtml(title || "Imagen adjunta") +
+          '"></div>'
+        : '<iframe class="scm-cal-viewer-frame" src="' +
+          escHtml(url) +
+          '" title="' +
+          escHtml(title || "Documento") +
+          '" loading="lazy"></iframe>') +
+      "</div></div>";
+    shell.insertAdjacentHTML("beforeend", html);
+    var viewer = shell.querySelector("[data-scm-case-calendar-viewer]");
+    if (!viewer) return;
+    viewer.addEventListener("click", function (event) {
+      var target = event.target;
+      if (
+        target === viewer ||
+        (target.closest &&
+          target.closest("[data-scm-case-calendar-viewer-close]"))
+      ) {
+        dismissCaseCalendarLayer(shell, viewer);
+      }
+    });
+  }
+
+  // options: { row, onEventDone }
+  function openCaseCalendarCaseMini(root, shell, ticket, options) {
     ticket = String(ticket || "").trim();
     if (!shell || !ticket) return;
+    options = options || {};
+    var row = options.row || null;
     var current = shell.querySelector("[data-scm-case-calendar-case-mini]");
     if (current) current.remove();
     var html =
       '<div class="scm-cal-layer" data-scm-case-calendar-layer data-scm-case-calendar-case-mini>' +
-      '<div class="scm-cal-sheet scm-cal-sheet--detail" role="dialog" aria-modal="true" aria-label="Caso #' +
+      '<div class="scm-cal-sheet scm-cal-sheet--case" role="dialog" aria-modal="true" aria-label="Caso #' +
       escHtml(ticket) +
       '">' +
       '<header class="scm-cal-sheet-head"><div class="scm-cal-sheet-heading">' +
@@ -5189,39 +5340,255 @@
       escHtml(ticket) +
       ' <span data-scm-case-calendar-case-status></span></p>' +
       '<h3 class="scm-cal-sheet-title" data-scm-case-calendar-case-title>Cargando caso...</h3></div>' +
+      '<div class="scm-cal-head-actions">' +
+      '<button type="button" class="scm-cal-icon-btn" data-scm-case-calendar-case-expand aria-label="Ampliar" title="Ampliar">' +
+      caseCalendarIcon("open_in_full") +
+      "</button>" +
       '<button type="button" class="scm-cal-icon-btn" data-scm-case-calendar-case-close aria-label="Cerrar caso">' +
       caseCalendarIcon("close") +
-      "</button></header>" +
+      "</button></div></header>" +
       '<div class="scm-cal-sheet-body" data-scm-case-calendar-case-body><div class="scm-cal-empty is-loading"><p>Cargando informaci&oacute;n del caso...</p></div></div>' +
       '<footer class="scm-cal-sheet-foot" data-scm-case-calendar-case-foot hidden>' +
-      '<span class="scm-cal-foot-note">Abre el caso completo en lugar del caso actual.</span>' +
-      '<button type="button" class="scm-cal-btn scm-cal-btn--primary" data-scm-case-calendar-case-full>' +
-      caseCalendarIcon("open_in_full") +
-      "Abrir caso completo</button></footer>" +
+      '<span class="scm-cal-foot-note">Todo se revisa aqu&iacute; sin salir del caso actual.</span>' +
+      '<button type="button" class="scm-cal-btn scm-cal-btn--ghost" data-scm-case-calendar-case-full title="Reemplaza el caso abierto por este">' +
+      caseCalendarIcon("swap_horiz") +
+      "Ir a este caso</button></footer>" +
       "</div></div>";
     shell.insertAdjacentHTML("beforeend", html);
     var mini = shell.querySelector("[data-scm-case-calendar-case-mini]");
     if (!mini) return;
+    var sheet = mini.querySelector(".scm-cal-sheet");
     var body = mini.querySelector("[data-scm-case-calendar-case-body]");
     var foot = mini.querySelector("[data-scm-case-calendar-case-foot]");
     var loaded = null;
+    var summary = null;
+    var historyShown = 10;
+
+    var renderHistory = function () {
+      var wrap = body.querySelector("[data-scm-case-calendar-case-history]");
+      if (!wrap || !summary) return;
+      var items = summary.history.slice(0, historyShown);
+      wrap.innerHTML =
+        (items.length
+          ? items
+              .map(function (entry, index) {
+                return (
+                  '<article class="scm-cal-history-item">' +
+                  "<div><strong>" +
+                  escHtml(entry.author) +
+                  (entry.kind
+                    ? ' <em class="scm-cal-status is-info">' +
+                      escHtml(entry.kind) +
+                      "</em>"
+                    : "") +
+                  "</strong><span>" +
+                  escHtml(entry.date) +
+                  "</span></div>" +
+                  (entry.detail && entry.detail !== "Sin detalle"
+                    ? "<p>" + escHtml(entry.detail) + "</p>"
+                    : "") +
+                  (entry.images.length
+                    ? '<div class="scm-cal-history-images">' +
+                      entry.images
+                        .map(function (src, imageIndex) {
+                          return (
+                            '<button type="button" data-scm-case-calendar-history-image="' +
+                            index +
+                            ":" +
+                            imageIndex +
+                            '" aria-label="Ver imagen"><img src="' +
+                            escHtml(src) +
+                            '" alt="" loading="lazy"></button>'
+                          );
+                        })
+                        .join("") +
+                      "</div>"
+                    : "") +
+                  (entry.links.length
+                    ? '<div class="scm-cal-history-links">' +
+                      entry.links
+                        .map(function (link, linkIndex) {
+                          return (
+                            '<button type="button" class="scm-cal-chip" data-scm-case-calendar-history-link="' +
+                            index +
+                            ":" +
+                            linkIndex +
+                            '">' +
+                            caseCalendarIcon(link.isDoc ? "description" : "open_in_new") +
+                            "<span>" +
+                            escHtml(link.label) +
+                            "</span></button>"
+                          );
+                        })
+                        .join("") +
+                      "</div>"
+                    : "") +
+                  "</article>"
+                );
+              })
+              .join("")
+          : '<p class="scm-cal-hint">Sin historial registrado.</p>') +
+        (summary.history.length > historyShown
+          ? '<button type="button" class="scm-cal-btn scm-cal-btn--ghost scm-cal-btn--block" data-scm-case-calendar-history-more>Ver ' +
+            Math.min(10, summary.history.length - historyShown) +
+            " m&aacute;s de " +
+            (summary.history.length - historyShown) +
+            "</button>"
+          : "");
+    };
+
+    var revisionHtml = function (check) {
+      if (!check) return "";
+      var eventId = row ? caseCalendarEventId(row) : "";
+      var eventDone = row ? isCaseCalendarEventDone(row) : false;
+      return (
+        '<div class="scm-cal-check ' +
+        (check.id ? "is-ok" : "is-missing") +
+        '" data-scm-case-calendar-check>' +
+        '<span class="scm-cal-check-icon">' +
+        caseCalendarIcon(check.id ? "verified" : "report") +
+        "</span>" +
+        '<div class="scm-cal-check-text"><strong>' +
+        (check.id
+          ? escHtml(check.label) + " registrada · Acta #" + escHtml(check.id)
+          : "A&uacute;n no hay " + escHtml(check.label.toLowerCase()) + " registrada") +
+        "</strong><span>" +
+        (check.id
+          ? escHtml(
+              check.damages
+                ? check.damages + "."
+                : "El funcionario ya montó la revisión en el caso.",
+            ) +
+            (eventId && !eventDone ? " Puedes cerrar el evento del calendario." : "")
+          : "El evento no debería marcarse como realizado hasta que se registre.") +
+        "</span></div>" +
+        '<div class="scm-cal-check-actions">' +
+        (check.url
+          ? '<button type="button" class="scm-cal-btn scm-cal-btn--ghost scm-cal-btn--sm" data-scm-case-calendar-open-revision>' +
+            caseCalendarIcon("visibility") +
+            "Ver revisi&oacute;n</button>"
+          : "") +
+        (check.id && eventId && !eventDone
+          ? '<button type="button" class="scm-cal-btn scm-cal-btn--success scm-cal-btn--sm" data-scm-case-calendar-check-done>' +
+            caseCalendarIcon("task_alt") +
+            "Marcar evento realizado</button>"
+          : "") +
+        (eventDone
+          ? '<span class="scm-cal-status is-done">Evento realizado</span>'
+          : "") +
+        "</div></div>"
+      );
+    };
+
     mini.addEventListener("click", function (event) {
       var target = event.target;
-      if (
-        target === mini ||
-        (target.closest && target.closest("[data-scm-case-calendar-case-close]"))
-      ) {
+      var closest = function (selector) {
+        return target && target.closest ? target.closest(selector) : null;
+      };
+      if (target === mini || closest("[data-scm-case-calendar-case-close]")) {
         dismissCaseCalendarLayer(shell, mini);
         return;
       }
-      if (
-        loaded &&
-        target.closest &&
-        target.closest("[data-scm-case-calendar-case-full]")
-      ) {
+      if (closest("[data-scm-case-calendar-case-expand]")) {
+        var expanded = sheet.classList.toggle("is-expanded");
+        var expandBtn = closest("[data-scm-case-calendar-case-expand]");
+        expandBtn.innerHTML = caseCalendarIcon(
+          expanded ? "close_fullscreen" : "open_in_full",
+        );
+        expandBtn.setAttribute("title", expanded ? "Reducir" : "Ampliar");
+        return;
+      }
+      if (!loaded) return;
+      if (closest("[data-scm-case-calendar-case-full]")) {
         openCaseCalendarFullCase(root, shell, loaded, ticket);
+        return;
+      }
+      if (closest("[data-scm-case-calendar-history-more]")) {
+        historyShown += 10;
+        renderHistory();
+        return;
+      }
+      var imageBtn = closest("[data-scm-case-calendar-history-image]");
+      if (imageBtn) {
+        var imageRef = imageBtn
+          .getAttribute("data-scm-case-calendar-history-image")
+          .split(":");
+        var imageEntry = summary.history[Number(imageRef[0])];
+        if (imageEntry) {
+          openCaseCalendarViewer(
+            shell,
+            "image",
+            imageEntry.images[Number(imageRef[1])],
+            "Imagen adjunta",
+          );
+        }
+        return;
+      }
+      var linkBtn = closest("[data-scm-case-calendar-history-link]");
+      if (linkBtn) {
+        var linkRef = linkBtn
+          .getAttribute("data-scm-case-calendar-history-link")
+          .split(":");
+        var linkEntry = summary.history[Number(linkRef[0])];
+        var link = linkEntry && linkEntry.links[Number(linkRef[1])];
+        if (link) {
+          openCaseCalendarViewer(
+            shell,
+            /\.(png|jpe?g|gif|webp)(\?|$)/i.test(link.url) ? "image" : "frame",
+            link.url,
+            link.label,
+          );
+        }
+        return;
+      }
+      var check = caseCalendarRevisionCheck(loaded, row);
+      if (closest("[data-scm-case-calendar-open-revision]") && check && check.url) {
+        openCaseCalendarViewer(
+          shell,
+          "frame",
+          check.url,
+          check.label + " #" + check.id,
+        );
+        return;
+      }
+      var doneBtn = closest("[data-scm-case-calendar-check-done]");
+      if (doneBtn && check && row) {
+        doneBtn.disabled = true;
+        calendarApiRequest(root, "cambiar_estado", {
+          id_evento: caseCalendarEventId(row),
+          observacion:
+            "Realizado. " + check.label + " registrada en el caso (Acta #" + check.id + ").",
+        })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error(
+                (json && json.message) ||
+                  "No se pudo marcar el evento como realizado.",
+              );
+            }
+            row.estado = "Si";
+            scmNotify(
+              "success",
+              json.message || "Evento marcado como realizado.",
+              "Calendario",
+            );
+            var box = body.querySelector("[data-scm-case-calendar-check]");
+            if (box) box.outerHTML = revisionHtml(check);
+            refreshCaseCalendarHost(shell);
+            if (typeof options.onEventDone === "function") {
+              options.onEventDone(row);
+            }
+          })
+          .catch(function (error) {
+            doneBtn.disabled = false;
+            scmNotify(
+              "error",
+              error.message || "No se pudo marcar el evento como realizado.",
+            );
+          });
       }
     });
+
     loadCaseCalendarTicketCase(root, ticket)
       .then(function (caseData) {
         if (!mini.isConnected) return;
@@ -5242,7 +5609,10 @@
           statusNode.className = "scm-cal-status is-info";
           statusNode.textContent = estado;
         }
-        var summary = caseCalendarCaseSourceSummary(caseData.case_source_html);
+        summary = caseCalendarCaseSourceSummary(
+          caseData.case_source_html,
+          caseData,
+        );
         var item = function (icon, label, value, extra) {
           return value
             ? '<div class="' +
@@ -5262,6 +5632,9 @@
           .filter(Boolean)
           .join(" · ");
         body.innerHTML =
+          revisionHtml(caseCalendarRevisionCheck(caseData, row)) +
+          '<div class="scm-cal-case-grid">' +
+          '<div class="scm-cal-case-main">' +
           '<dl class="scm-cal-meta">' +
           item("pending_actions", "Estado administrativo", field(["admin"])) +
           item("flag", "Prioridad", field(["prioridad"])) +
@@ -5281,39 +5654,26 @@
             [tenant, tenantPhone].filter(Boolean).join(" · "),
             "is-wide",
           ) +
-          item("real_estate_agent", "Propietario", field(["propietario"]), "is-wide") +
+          item(
+            "real_estate_agent",
+            "Propietario",
+            field(["propietario"]),
+            "is-wide",
+          ) +
           "</dl>" +
           (summary.description
             ? '<div class="scm-cal-desc"><p class="scm-cal-desc-label">Descripci&oacute;n del caso</p><div class="scm-cal-desc-text">' +
               escHtml(summary.description) +
               "</div></div>"
             : "") +
-          '<div class="scm-cal-history"><p class="scm-cal-desc-label">Historial reciente' +
+          "</div>" +
+          '<div class="scm-cal-case-side"><p class="scm-cal-section-title">Historial del caso' +
           (summary.history.length
-            ? " (" + summary.history.length + ")"
+            ? ' <b class="scm-cal-count">' + summary.history.length + "</b>"
             : "") +
-          "</p>" +
-          (summary.history.length
-            ? summary.history
-                .slice(0, 8)
-                .map(function (entry) {
-                  return (
-                    '<article class="scm-cal-history-item"><div><strong>' +
-                    escHtml(entry.author || "Sin autor") +
-                    "</strong><span>" +
-                    escHtml(entry.date) +
-                    "</span></div><p>" +
-                    escHtml(
-                      entry.detail.length > 420
-                        ? entry.detail.slice(0, 420) + "…"
-                        : entry.detail,
-                    ) +
-                    "</p></article>"
-                  );
-                })
-                .join("")
-            : '<p class="scm-cal-hint">Sin historial registrado.</p>') +
+          '</p><div class="scm-cal-history" data-scm-case-calendar-case-history></div></div>' +
           "</div>";
+        renderHistory();
         if (foot) foot.hidden = typeof window.scmOpenCase !== "function";
       })
       .catch(function (error) {
@@ -5520,6 +5880,23 @@
           root,
           shell,
           viewCaseBtn.getAttribute("data-scm-case-calendar-view-case"),
+          {
+            row: row,
+            onEventDone: function () {
+              var stateBadge = mini.querySelector(
+                "[data-scm-case-calendar-event-state]",
+              );
+              if (stateBadge) {
+                stateBadge.textContent = "Realizado";
+                stateBadge.className = "scm-cal-status is-done";
+              }
+              var doneBtn = mini.querySelector(
+                "[data-scm-case-calendar-complete-open]",
+              );
+              if (doneBtn) doneBtn.remove();
+              if (form) form.hidden = true;
+            },
+          },
         );
         return;
       }
@@ -6096,10 +6473,29 @@
         ? target.closest("[data-scm-case-calendar-view-case]")
         : null;
       if (viewCaseBtn) {
+        var rowNode = viewCaseBtn.closest("[data-scm-case-calendar-row]");
+        var listRow = rowNode
+          ? (shell._scmCaseCalendarPendingRows || [])[
+              parseInt(rowNode.getAttribute("data-scm-case-calendar-row"), 10)
+            ]
+          : null;
         openCaseCalendarCaseMini(
           root,
           shell,
           viewCaseBtn.getAttribute("data-scm-case-calendar-view-case"),
+          {
+            row: listRow,
+            onEventDone: function () {
+              if (!rowNode) return;
+              rowNode.className = "scm-cal-row is-done";
+              var badge = rowNode.querySelector(".scm-cal-status");
+              if (badge) {
+                badge.className = "scm-cal-status is-done";
+                badge.textContent = "Realizado";
+              }
+              updateBulkCount();
+            },
+          },
         );
         return;
       }

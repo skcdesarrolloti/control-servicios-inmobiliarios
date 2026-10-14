@@ -1048,12 +1048,48 @@
   .scm-cal-bulk-row b:empty { display: none; }
   .scm-cal-bulk-form { @apply grid gap-2; }
   .scm-cal-status.is-info { @apply bg-sky-50 text-sky-700 ring-sky-200; }
-  .scm-cal-history { @apply mt-3 grid gap-2; }
-  .scm-cal-history-item { @apply rounded-xl border border-slate-200 px-3 py-2.5; }
-  .scm-cal-history-item > div { @apply flex flex-wrap items-baseline justify-between gap-2; }
-  .scm-cal-history-item strong { @apply text-[13px] font-semibold text-slate-800; }
-  .scm-cal-history-item span { @apply text-[11px] text-slate-400; }
-  .scm-cal-history-item p { @apply m-0 mt-1 whitespace-pre-line text-[13px] leading-relaxed text-slate-600; }
+  .scm-cal-history { @apply grid content-start gap-2; }
+  .scm-cal-history-item { @apply min-w-0 rounded-xl border border-slate-200 px-3 py-2.5; }
+  .scm-cal-history-item > div:first-child { @apply flex flex-wrap items-center justify-between gap-2; }
+  .scm-cal-history-item > div:first-child > strong { @apply inline-flex items-center gap-2 text-[13px] font-semibold text-slate-800; }
+  .scm-cal-history-item > div:first-child > span { @apply text-[11px] text-slate-400; }
+  .scm-cal-history-item p { @apply m-0 mt-1 whitespace-pre-line text-[13px] leading-relaxed text-slate-600; overflow-wrap: anywhere; }
+  .scm-cal-history-images { @apply mt-2 flex flex-wrap gap-2; }
+  .scm-cal-history-images button { @apply h-20 w-20 cursor-zoom-in overflow-hidden rounded-lg border border-slate-200 bg-slate-100 p-0 transition hover:ring-2 hover:ring-amber-400; }
+  .scm-cal-history-images img { @apply h-full w-full object-cover; }
+  .scm-cal-history-links { @apply mt-2 flex flex-wrap gap-1.5; }
+  .scm-cal-chip { @apply inline-flex max-w-full cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800; }
+  .scm-cal-chip span { @apply truncate; }
+  .scm-cal-chip .material-symbols-outlined { font-size: 16px; }
+  .scm-cal-btn--block { @apply w-full; }
+  .scm-cal-section-title { @apply m-0 mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500; }
+
+  .scm-cal-sheet--case { @apply sm:max-w-5xl; transition: max-width .2s ease; }
+  .scm-cal-sheet--case.is-expanded { @apply sm:h-[calc(100vh-3rem)] sm:max-w-[1400px]; }
+  .scm-cal-case-grid { @apply grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]; }
+  .scm-cal-case-main { @apply min-w-0; }
+  .scm-cal-case-side { @apply min-w-0; }
+
+  .scm-cal-check { @apply mb-4 flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3; }
+  .scm-cal-check.is-ok { @apply border-emerald-200 bg-emerald-50; }
+  .scm-cal-check.is-missing { @apply border-amber-200 bg-amber-50; }
+  .scm-cal-check-icon { @apply grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white; }
+  .scm-cal-check.is-ok .scm-cal-check-icon { @apply text-emerald-600; }
+  .scm-cal-check.is-missing .scm-cal-check-icon { @apply text-amber-600; }
+  .scm-cal-check-text { @apply grid min-w-0 flex-1 gap-0.5; }
+  .scm-cal-check-text strong { @apply text-sm font-semibold text-slate-900; }
+  .scm-cal-check-text span { @apply text-xs text-slate-600; }
+  .scm-cal-check-actions { @apply flex flex-wrap items-center gap-2; }
+
+  .scm-cal-layer--viewer { @apply bg-slate-950/70; }
+  .scm-cal-sheet--image, .scm-cal-sheet--frame { @apply sm:max-w-5xl; }
+  .scm-cal-sheet--frame { @apply h-[92vh] sm:h-[calc(100vh-3rem)]; }
+  .scm-cal-viewer-head { @apply flex items-center gap-2 border-b border-slate-100 px-4 py-3; }
+  .scm-cal-viewer-head strong { @apply mr-auto min-w-0 truncate text-sm font-semibold text-slate-900; }
+  .scm-cal-viewer-head a { @apply no-underline; }
+  .scm-cal-viewer-image { @apply grid min-h-0 flex-1 place-items-center overflow-auto bg-slate-900 p-3; }
+  .scm-cal-viewer-image img { @apply max-h-[calc(100vh-10rem)] max-w-full rounded-lg object-contain; }
+  .scm-cal-viewer-frame { @apply min-h-0 w-full flex-1 border-0 bg-white; }
   .scm-cal-empty { @apply grid place-items-center gap-2 rounded-xl border border-dashed border-slate-200 px-4 py-12 text-center text-sm text-slate-500; }
   .scm-cal-empty p { @apply m-0; }
   .scm-cal-empty .material-symbols-outlined { @apply text-emerald-500; font-size: 32px; }
