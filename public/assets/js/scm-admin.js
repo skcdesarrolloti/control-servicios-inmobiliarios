@@ -5195,25 +5195,29 @@
   }
 
   // Verifica si el caso ya tiene la revisión que corresponde al evento.
+  // El tipo sale del caso (tema/asunto), no del título del evento: las citas
+  // suelen crearse con el título por defecto "Revisión preventiva" aunque el
+  // caso sea de reparaciones y lo que se monta es la correctiva.
   function caseCalendarRevisionCheck(caseData, row) {
-    var source = [
-      row && (row.categoria || row.nombre_categoria),
-      row && row.titulo,
-      caseData.tema,
-      caseData.asunto,
-      caseData.tab_key,
-    ].join(" ");
-    var kind = /correctiva/i.test(source)
-      ? "correctiva"
-      : /preventiva/i.test(source)
-        ? "preventiva"
-        : "";
+    var prevId = String(caseData.id_revision_preventiva || "").trim();
+    var corrId = String(caseData.id_revision_correctiva || "").trim();
+    var caseText = [caseData.tema, caseData.asunto].join(" ");
+    var eventText = row
+      ? [row.categoria || row.nombre_categoria, row.titulo].join(" ")
+      : "";
+    var isMaintenance =
+      String(caseData.tab_key || "").toLowerCase() === "mantenimiento" ||
+      /repar|correctiv|mantenimiento|da[ñn]o/i.test(caseText);
+    var kind = "";
+    if (/preventiva/i.test(caseText)) kind = "preventiva";
+    else if (isMaintenance || /correctiva/i.test(caseText)) kind = "correctiva";
+    else if (corrId) kind = "correctiva";
+    else if (prevId || /preventiva/i.test(eventText)) kind = "preventiva";
     if (!kind) return null;
-    var id = String(
-      (kind === "preventiva"
-        ? caseData.id_revision_preventiva
-        : caseData.id_revision_correctiva) || "",
-    ).trim();
+    // Si la esperada no existe pero sí la otra, la cita igual se cumplió.
+    if (kind === "preventiva" && !prevId && corrId) kind = "correctiva";
+    else if (kind === "correctiva" && !corrId && prevId) kind = "preventiva";
+    var id = kind === "preventiva" ? prevId : corrId;
     var url = "";
     if (id) {
       url =
