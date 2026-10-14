@@ -823,14 +823,14 @@ trait HandlesAdministrativeNotifications
       }
       $html .= '</span>';
       $html .= '<span class="scm-admin-notif-contact">';
-      $html .= '<span class="' . ($email !== '' ? 'is-ready' : 'is-missing') . '">Email: ' . esc_html($email !== '' ? $email : 'Sin correo') . '</span>';
-      $html .= '<span class="' . ($phone !== '' ? 'is-ready' : 'is-missing') . '">Celular: ' . esc_html($phone !== '' ? $phone : ($rawPhone !== '' ? $rawPhone : 'Sin numero')) . '</span>';
+      $html .= '<span class="' . ($email !== '' ? 'is-ready' : 'is-missing') . '"><span class="material-symbols-outlined" aria-hidden="true">mail</span><span class="sr-only">Email: </span>' . esc_html($email !== '' ? $email : 'Sin correo') . '</span>';
+      $html .= '<span class="' . ($phone !== '' ? 'is-ready' : 'is-missing') . '"><span class="material-symbols-outlined" aria-hidden="true">smartphone</span><span class="sr-only">Celular: </span>' . esc_html($phone !== '' ? $phone : ($rawPhone !== '' ? $rawPhone : 'Sin numero')) . '</span>';
       $html .= '</span>';
       $html .= '<span class="scm-admin-notif-row-actions" aria-label="Acciones rapidas de contacto">';
-      $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--email" data-admin-notif-single-channel="email" data-admin-notif-single-id="' . esc_attr((string) $id) . '">Email</button>';
-      $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--sms" data-admin-notif-single-channel="sms" data-admin-notif-single-id="' . esc_attr((string) $id) . '">SMS</button>';
-      $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--whatsapp" data-admin-notif-single-channel="whatsapp" data-admin-notif-single-id="' . esc_attr((string) $id) . '">WhatsApp</button>';
-      $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--all" data-admin-notif-single-all-channels data-admin-notif-single-id="' . esc_attr((string) $id) . '">Todos los canales</button>';
+      $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--email" data-admin-notif-single-channel="email" data-admin-notif-single-id="' . esc_attr((string) $id) . '" title="Enviar Email a ' . esc_attr($name) . '"><span class="material-symbols-outlined" aria-hidden="true">mail</span>Email</button>';
+      $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--sms" data-admin-notif-single-channel="sms" data-admin-notif-single-id="' . esc_attr((string) $id) . '" title="Enviar SMS a ' . esc_attr($name) . '"><span class="material-symbols-outlined" aria-hidden="true">sms</span>SMS</button>';
+      $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--whatsapp" data-admin-notif-single-channel="whatsapp" data-admin-notif-single-id="' . esc_attr((string) $id) . '" title="Enviar WhatsApp a ' . esc_attr($name) . '"><span class="material-symbols-outlined" aria-hidden="true">chat</span>WhatsApp</button>';
+      $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--all" data-admin-notif-single-all-channels data-admin-notif-single-id="' . esc_attr((string) $id) . '" title="Enviar por todos los canales a ' . esc_attr($name) . '"><span class="material-symbols-outlined" aria-hidden="true">send</span>Todos</button>';
       $html .= '</span>';
       $html .= '</div>';
     }

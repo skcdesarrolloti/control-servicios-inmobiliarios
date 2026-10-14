@@ -6740,7 +6740,6 @@
       var composerDescription = panel.querySelector("[data-admin-notif-modal-description]");
       var composerKicker = panel.querySelector("[data-admin-notif-modal-kicker]");
       var channelGroup = panel.querySelector(".scm-admin-notif-channel-group");
-      var closeComposerBtn = panel.querySelector("[data-admin-notif-close-composer]");
       var closeConfirmModal = panel.querySelector("[data-admin-notif-confirm]");
       var closeConfirmAcceptBtn = panel.querySelector("[data-admin-notif-confirm-accept]");
       var closeConfirmCancelBtn = panel.querySelector("[data-admin-notif-confirm-cancel]");
@@ -8615,6 +8614,16 @@
         return input ? String(input.value || "").trim() : "";
       }
 
+      // Full class names so the Tailwind build keeps each status color.
+      var queueStatusBadgeClasses = {
+        pending: "scm-admin-notif-queue-status--pending",
+        processing: "scm-admin-notif-queue-status--processing",
+        sent: "scm-admin-notif-queue-status--sent",
+        failed: "scm-admin-notif-queue-status--failed",
+        cancelled: "scm-admin-notif-queue-status--cancelled",
+        other: "scm-admin-notif-queue-status--other",
+      };
+
       function queueStatusClass(status) {
         var value = String(status || "").toLowerCase();
         return ["pending", "processing", "sent", "failed", "cancelled"].indexOf(value) >= 0
@@ -8629,14 +8638,14 @@
         var info = stats || {};
         var page = pagination || {};
         var chips = [
-          ["Total", info.total || 0],
-          ["Pendientes", info.pending || 0],
-          ["Procesando", info.processing || 0],
-          ["Enviadas", info.sent || 0],
-          ["Fallidas", info.failed || 0],
+          ["Total", info.total || 0, ""],
+          ["Pendientes", info.pending || 0, "is-warning"],
+          ["Procesando", info.processing || 0, "is-indigo"],
+          ["Enviadas", info.sent || 0, "is-success"],
+          ["Fallidas", info.failed || 0, "is-danger"],
         ];
         queueSummaryEl.innerHTML = chips.map(function (chip) {
-          return "<article><span>" + escHtml(chip[0]) + "</span><strong>" + escHtml(String(chip[1])) + "</strong></article>";
+          return '<article class="' + chip[2] + '"><span>' + escHtml(chip[0]) + "</span><strong>" + escHtml(String(chip[1])) + "</strong></article>";
         }).join("") +
           '<small>Pagina ' + escHtml(String(page.page || 1)) + ' de ' + escHtml(String(page.total_pages || 1)) + '</small>';
       }
@@ -8686,7 +8695,7 @@
               '<td class="scm-admin-notif-queue-check-col">' + checkHtml + "</td>" +
               "<td><strong>#" + escHtml(row.id || "") + "</strong></td>" +
               "<td><span>" + escHtml(row.created_at || "") + "</span><small>" + escHtml(row.sent_at ? "Enviada: " + row.sent_at : "") + "</small></td>" +
-              '<td><span class="scm-admin-notif-queue-status scm-admin-notif-queue-status--' + escAttr(statusKey) + '">' + escHtml(row.status_label || row.status || "") + "</span></td>" +
+              '<td><span class="scm-admin-notif-queue-status ' + queueStatusBadgeClasses[statusKey] + '">' + escHtml(row.status_label || row.status || "") + "</span></td>" +
               "<td>" + escHtml(row.channel_label || row.channel || "") + "</td>" +
               "<td><strong>" + escHtml(recipientBits[0] || "") + "</strong><small>" + escHtml(recipientBits.slice(1).join(" · ")) + "</small></td>" +
               "<td><span>" + escHtml(row.template_name || "-") + "</span></td>" +
@@ -9190,11 +9199,11 @@
             singleRecipient: false,
           });
         });
-        if (closeComposerBtn) {
-          closeComposerBtn.addEventListener("click", function () {
+        panel.querySelectorAll("[data-admin-notif-close-composer]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
             closeComposer(false);
           });
-        }
+        });
         if (closeConfirmAcceptBtn) {
           closeConfirmAcceptBtn.addEventListener("click", function () {
             performCloseComposer();

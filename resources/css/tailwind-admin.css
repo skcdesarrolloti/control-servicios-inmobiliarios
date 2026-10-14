@@ -1094,3 +1094,395 @@
   .scm-cal-empty p { @apply m-0; }
   .scm-cal-empty .material-symbols-outlined { @apply text-emerald-500; font-size: 32px; }
 }
+
+/* Notificaciones: recipients, queue and composer on the navy/yellow Poppins system.
+   Two ids outrank the legacy #scm-app .scm-admin-notif-* rules (still shared by Gestiones de cobro modals). */
+@layer components {
+  #scm-app #scm-panel-admin-notificaciones .scm-an { @apply flex flex-col gap-5 text-[#061d49]; font-family:Poppins,sans-serif; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an :is(h3,h4,h5) { @apply m-0 text-[#061d49]; letter-spacing:normal; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an p { @apply m-0; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an .scm-an-icon { @apply shrink-0 leading-none; font-size:18px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an .scm-an-kicker { @apply inline-flex w-fit items-center rounded-full bg-[#fff1c2] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#574500]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an.is-loading .scm-admin-notif-card { @apply opacity-100; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an.is-loading [data-admin-notif-recipients] { @apply pointer-events-none opacity-50 transition-opacity; }
+
+  /* Hero */
+  #scm-app #scm-panel-admin-notificaciones .scm-an-hero { @apply relative flex flex-col gap-5 overflow-hidden rounded-2xl bg-[#061d49] p-6 text-white shadow-elevated sm:p-7 md:flex-row md:items-end md:justify-between; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-hero::after { @apply pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-[#f8cf4a]/10; content:""; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-hero-copy { @apply relative z-[1] flex min-w-0 max-w-3xl flex-col gap-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-hero .scm-an-kicker { @apply bg-[#f8cf4a] text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-hero h3 { @apply text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-hero p { @apply text-sm leading-relaxed text-blue-100/80; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-hero-stat { @apply relative z-[1] flex shrink-0 items-center gap-3 rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/10; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-hero-stat > .scm-an-icon { @apply flex h-10 w-10 items-center justify-center rounded-lg bg-[#f8cf4a] text-[#061d49]; font-size:22px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-hero-stat > span { @apply flex flex-col; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-hero-stat strong { @apply text-2xl font-bold leading-none tabular-nums text-white; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-hero-stat small { @apply mt-1 text-[11px] text-blue-100/70; }
+
+  /* View tabs */
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-tabs { @apply grid w-full grid-cols-1 gap-1.5 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-subtle sm:grid-cols-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-tabs button { @apply m-0 flex min-h-[56px] items-center gap-3 rounded-xl border-0 bg-transparent px-3.5 py-2.5 text-left text-slate-500 shadow-none transition-colors hover:bg-[#f2f3ff] hover:text-[#061d49]; cursor:pointer; font-family:inherit; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-tabs button > .scm-an-icon { @apply flex h-9 w-9 items-center justify-center rounded-lg bg-[#f2f3ff] text-[#1e3c76]; font-size:20px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-tabs button > span:last-child { @apply flex min-w-0 flex-col; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-tabs strong { @apply truncate text-[13px] font-semibold text-inherit; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-tabs small { @apply truncate text-[11px] font-normal text-slate-400; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-tabs button.active { @apply bg-[#061d49] text-white shadow-elevated hover:bg-[#061d49] hover:text-white; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-tabs button.active > .scm-an-icon { @apply bg-[#f8cf4a] text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-tabs button.active small { @apply text-blue-100/70; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-view-panel { @apply flex flex-col gap-5; animation:scm-an-in 160ms ease-out both; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-view-panel[hidden] { display:none!important; }
+  @keyframes scm-an-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+  /* Buttons */
+  #scm-app #scm-panel-admin-notificaciones .scm-an-btn { @apply m-0 inline-flex min-h-[40px] items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-solid border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-[#061d49] no-underline shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50; cursor:pointer; font-family:inherit; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-btn.is-primary { @apply border-[#f8cf4a] bg-[#f8cf4a] hover:bg-[#eac444]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-btn.is-navy { @apply border-[#061d49] bg-[#061d49] text-white hover:bg-[#1e3c76]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-btn.is-danger { @apply border-red-700 bg-red-700 text-white hover:bg-red-800; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-btn.is-ghost, #scm-app #scm-panel-admin-notificaciones .scm-an-btn.is-danger-ghost { @apply border-transparent bg-transparent shadow-none hover:bg-[#f2f3ff]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-btn.is-danger-ghost { @apply text-red-700 hover:bg-red-50; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-btn[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an :is(.scm-an-btn,.scm-admin-notif-tabs button,.scm-admin-notif-stat,.scm-admin-notif-channel-launch,.scm-admin-notif-row-action,.scm-admin-notif-page-number,.scm-admin-notif-page-nav,.scm-admin-notif-page-actions button,.scm-admin-notif-message-toolbar button,.scm-admin-notif-queue-delete,.scm-admin-notif-import-examples a):focus-visible { @apply outline outline-2 outline-offset-2 outline-[#1e3c76]; }
+
+  /* Type shortcuts */
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stats { @apply grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat { @apply m-0 flex min-h-0 items-start gap-3 rounded-2xl border border-solid border-slate-200 bg-white p-4 text-left text-[#061d49] shadow-subtle outline-0 transition-colors hover:border-[#1e3c76]/40 hover:bg-[#f8f9ff]; cursor:pointer; font-family:inherit; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat > .scm-an-icon { @apply flex h-10 w-10 items-center justify-center rounded-xl bg-[#f2f3ff] text-[#1e3c76]; font-size:21px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat.is-inactive > .scm-an-icon { @apply bg-slate-100 text-slate-400; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat .scm-an-stat-copy { @apply flex min-w-0 flex-col text-[13px] font-normal normal-case tracking-normal text-inherit; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat .scm-an-stat-copy > span { @apply truncate text-[11px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat strong { @apply m-0 mt-1 block text-2xl font-bold leading-none tabular-nums text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat small { @apply mt-1 block text-[11px] font-normal text-slate-400; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat.active { @apply border-[#061d49] bg-[#061d49] text-white shadow-elevated; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat.active > .scm-an-icon { @apply bg-[#f8cf4a] text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat.active :is(strong,.scm-an-stat-copy > span) { @apply text-white; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat.active small { @apply text-blue-100/70; }
+
+  /* Cards + section heads */
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-card { @apply m-0 rounded-2xl border border-solid border-slate-200 bg-white p-5 shadow-subtle sm:p-6; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-layout { @apply flex flex-col gap-5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-section-head { @apply mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-section-head > div:first-child { @apply flex min-w-0 flex-col gap-1.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-section-head h4 { @apply m-0 text-lg font-bold leading-snug sm:text-xl; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-section-head p { @apply text-[13px] leading-relaxed text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-section-actions { @apply flex flex-wrap items-center gap-2 lg:justify-end; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-launch-group { @apply inline-flex overflow-hidden rounded-xl border border-solid border-slate-200 bg-white shadow-sm; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-launch { @apply m-0 inline-flex min-h-[40px] items-center justify-center gap-1.5 whitespace-nowrap rounded-none border-0 bg-white px-3.5 py-2 text-xs font-semibold text-[#061d49] shadow-none outline-0 transition-colors; transform:none; cursor:pointer; font-family:inherit; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-launch-group .scm-admin-notif-channel-launch + .scm-admin-notif-channel-launch { @apply border-0 border-l border-solid border-slate-200; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-launch:hover { @apply bg-[#f2f3ff]; transform:none; box-shadow:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-launch--email .scm-an-icon { @apply text-sky-600; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-launch--sms .scm-an-icon { @apply text-indigo-600; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-launch--whatsapp .scm-an-icon { @apply text-emerald-600; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-launch--all { @apply rounded-xl bg-[#f8cf4a] px-4 text-[#061d49] shadow-sm; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-launch--all:hover { @apply bg-[#eac444]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-launch[hidden], #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-launch.is-hidden { display:none!important; }
+
+  /* Import */
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-card { @apply mt-0; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-card[hidden], #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-card.is-hidden { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-card form { @apply m-0 grid grid-cols-1 items-center gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,400px)]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-card .scm-admin-notif-receipts-import { @apply mt-5 border-0 border-t border-solid border-slate-200 pt-5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-card .scm-admin-notif-receipts-import[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-copy { @apply flex min-w-0 gap-4; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-copy > div { @apply flex min-w-0 flex-col gap-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-tile-icon { @apply hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#fff1c2] text-[#061d49] sm:flex; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-tile-icon .scm-an-icon { font-size:24px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-copy h4 { @apply m-0 text-lg font-bold; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-copy p { @apply text-[13px] leading-relaxed text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-copy p strong { @apply font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-copy .scm-admin-notif-import-scope { @apply inline-flex w-fit items-center gap-1.5 rounded-full border-0 bg-[#f2f3ff] px-2.5 py-1 font-semibold; color:#1e3c76!important; font-size:11px!important; margin-top:0!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-copy .scm-admin-notif-import-examples { @apply flex flex-wrap gap-2; margin-top:0!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-examples a { @apply inline-flex min-h-[30px] items-center gap-1 rounded-lg border border-solid border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#1e3c76] no-underline outline-0 transition-colors hover:bg-[#f2f3ff]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-examples .scm-an-icon { font-size:15px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-controls { @apply grid gap-3 rounded-xl bg-[#f2f3ff] p-4; justify-content:stretch; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-file { @apply m-0 grid gap-1.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-file > span { @apply text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-controls input[type="file"] { @apply m-0 min-h-0 w-full min-w-0 max-w-none cursor-pointer rounded-xl border border-dashed border-slate-300 bg-white p-1.5 text-xs font-normal text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-controls input[type="file"]::file-selector-button { @apply mr-3 cursor-pointer rounded-lg border-0 bg-[#e1e8ff] px-3.5 py-2 text-xs font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-file-actions { @apply flex flex-wrap gap-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-file-actions .scm-an-btn.is-navy { @apply flex-1; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-result { @apply col-span-full m-0 flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-result:empty { display:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-result.is-success { @apply rounded-lg bg-emerald-50 px-3 py-2 text-emerald-800; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-result.is-error { @apply rounded-lg bg-red-50 px-3 py-2 text-red-700; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-result button { @apply m-0 inline-flex min-h-[30px] items-center rounded-lg border border-solid border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#1e3c76]; cursor:pointer; }
+
+  /* Fields shared by filters and composer */
+  #scm-app #scm-panel-admin-notificaciones .scm-an .scm-field { @apply m-0 grid min-w-0 gap-1.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an .scm-field > label { @apply m-0 text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an :is(input.scm-input,select.scm-select) { @apply m-0 h-10 w-full min-w-0 max-w-none rounded-xl border border-solid border-slate-200 bg-white px-3 text-[13px] font-medium text-[#061d49] shadow-none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an textarea:is(.scm-input,.scm-textarea) { @apply m-0 min-h-[96px] w-full rounded-xl border border-solid border-slate-200 bg-white p-3 text-[13px] font-normal leading-relaxed text-[#061d49] shadow-none; resize:vertical; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an :is(.scm-input,.scm-select,.scm-textarea)::placeholder { @apply font-normal text-slate-400; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an :is(.scm-input,.scm-select,.scm-textarea):focus { @apply border-[#1e3c76] outline-none ring-2 ring-[#1e3c76]/15; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an :is(.scm-input,.scm-textarea):disabled { @apply cursor-not-allowed bg-slate-50 text-slate-400; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an .scm-field small { @apply text-[11px] font-normal leading-relaxed text-slate-500; }
+  /* 03-public-pqr.css forces grey .scm-field controls with !important. */
+  #scm-app #scm-panel-admin-notificaciones .scm-an .scm-field :is(input,select,textarea) { background:#fff!important; border:1px solid #e2e8f0!important; color:#061d49!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an .scm-field :is(input,select,textarea):focus { border-color:#1e3c76!important; box-shadow:0 0 0 3px rgba(30,60,118,.15)!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an .scm-field :is(input,textarea):disabled { background:#f8fafc!important; color:#94a3b8!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an .scm-admin-notif-message-field textarea { background:#f8f9ff!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-filter-card { @apply p-4 sm:p-4; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-filter-grid { @apply grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-filter-grid:has(.scm-admin-notif-contract-extra:not([hidden])) { @apply xl:grid-cols-6; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-contract-extra[hidden], #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-contract-extra.is-hidden { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-filter-actions { @apply col-span-full flex flex-wrap justify-end gap-2; }
+
+  /* Recipients */
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-recipients { @apply grid min-h-[200px] content-start gap-2 overflow-auto p-0 pr-1; max-height:620px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-recipient { @apply relative grid items-center gap-x-3 gap-y-2 rounded-xl border border-solid border-slate-200 bg-white px-3.5 py-3 shadow-none transition-colors hover:border-[#1e3c76]/30 hover:bg-[#f8f9ff]; grid-template-columns:18px 38px minmax(0,1fr); cursor:pointer; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-recipient:has(input[data-admin-notif-recipient]:checked) { @apply border-[#f8cf4a] bg-[#fffbeb]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-recipient input[type="checkbox"] { @apply m-0 h-[18px] w-[18px] cursor-pointer; accent-color:#061d49; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-avatar { @apply flex h-[38px] w-[38px] items-center justify-center rounded-xl bg-[#f2f3ff] text-sm font-bold text-[#1e3c76]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-recipient:has(input[data-admin-notif-recipient]:checked) .scm-admin-notif-avatar { @apply bg-[#061d49] text-[#f8cf4a]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-person { @apply flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-person strong { @apply w-full truncate text-[13px] font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-person small { @apply text-[11px] font-normal text-slate-400; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-contract-badge { @apply m-0 inline-flex min-h-0 w-fit items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 ring-1 ring-inset ring-slate-200; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-contract-badge.is-active-contract { @apply bg-emerald-50 text-emerald-700 ring-emerald-200; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-contract-badge.is-inactive-contract { @apply bg-amber-50 text-amber-800 ring-amber-200; }
+  #scm-app #scm-panel-admin-notificaciones :is(.scm-admin-notif-contract-summary,.scm-admin-notif-import-summary) { @apply m-0 block w-full truncate rounded-none border-0 bg-transparent p-0 text-[11px] font-normal text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-summary { @apply text-[#1e3c76]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-contact { @apply col-start-3 flex min-w-0 flex-wrap gap-x-4 gap-y-1; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-contact > span { @apply inline-flex min-w-0 items-center gap-1.5 text-xs font-medium text-slate-600; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-contact .material-symbols-outlined { @apply text-slate-400; font-size:16px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-contact > .is-missing { @apply italic text-slate-400; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-contact > .is-missing .material-symbols-outlined { @apply text-red-300; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-row-actions { @apply col-start-3 m-0 flex flex-wrap justify-start gap-1.5 border-0 p-0; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-row-action { @apply m-0 inline-flex min-h-[30px] items-center gap-1 rounded-lg border border-solid border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold leading-none text-[#1e3c76] shadow-none outline-0 transition-colors hover:border-slate-300 hover:bg-[#f2f3ff]; transform:none; cursor:pointer; font-family:inherit; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-row-action:hover { transform:none; box-shadow:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-row-action .material-symbols-outlined { font-size:15px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-row-action--email .material-symbols-outlined { @apply text-sky-600; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-row-action--sms .material-symbols-outlined { @apply text-indigo-600; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-row-action--whatsapp .material-symbols-outlined { @apply text-emerald-600; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-row-action--all { @apply border-[#061d49] bg-[#061d49] text-white; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-row-action--all:hover { @apply border-[#1e3c76] bg-[#1e3c76]; }
+  @media (min-width:1024px) {
+    #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-recipient { grid-template-columns:18px 38px minmax(0,1.1fr) minmax(0,1fr) auto; }
+    #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-contact { @apply col-start-auto flex-col gap-1; }
+    #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-row-actions { @apply col-start-auto flex-nowrap justify-end; }
+  }
+
+  /* Empty, result and pagination */
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-empty { @apply m-0 flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-6 py-10 text-center text-xs text-slate-500 shadow-none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-empty strong { @apply text-sm font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-empty.is-error { @apply border-red-200 bg-red-50 text-red-700; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-empty.is-error strong { @apply text-red-800; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-empty .scm-btn-primary { @apply mt-2 inline-flex min-h-[36px] items-center rounded-xl border border-solid border-[#061d49] bg-[#061d49] px-4 text-xs font-semibold text-white; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-pagination { @apply mt-4 flex flex-col items-center justify-between gap-3 border-0 bg-transparent p-0 sm:flex-row; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-card > .scm-admin-notif-pagination { @apply mt-0; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-pagination:empty { display:none; }
+  #scm-app #scm-panel-admin-notificaciones :is(.scm-admin-notif-page-info,.scm-admin-notif-pagination-summary) { @apply m-0 flex items-baseline gap-2 text-xs font-normal text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-pagination-summary strong { @apply text-xs font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-pagination-summary span { @apply text-xs font-normal text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones :is(.scm-admin-notif-page-actions,.scm-admin-notif-pagination-actions,.scm-admin-notif-page-numbers) { @apply flex flex-wrap items-center gap-1; }
+  #scm-app #scm-panel-admin-notificaciones :is(.scm-admin-notif-page-actions button,.scm-admin-notif-page-nav,.scm-admin-notif-page-number) { @apply m-0 inline-flex h-9 min-h-0 min-w-[36px] items-center justify-center rounded-lg border border-solid border-slate-200 bg-white px-2.5 text-xs font-semibold text-[#1e3c76] shadow-none transition-colors hover:bg-[#f2f3ff] disabled:pointer-events-none disabled:opacity-40; cursor:pointer; font-family:inherit; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-page-number.is-active { @apply border-[#061d49] bg-[#061d49] text-white; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-page-gap { @apply px-1 text-xs text-slate-400; }
+
+  /* Queue */
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-card { @apply flex flex-col gap-5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-card > .scm-admin-notif-section-head { @apply mb-0; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-filters { @apply m-0 grid grid-cols-1 items-end gap-3 rounded-xl bg-[#f8f9ff] p-3 ring-1 ring-inset ring-slate-100 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-search { @apply sm:col-span-2 lg:col-span-2 xl:col-span-4; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-actions { @apply flex flex-wrap gap-2 sm:col-span-2 lg:col-span-1 xl:col-span-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-actions .scm-an-btn { @apply flex-1; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-summary { @apply m-0 grid grid-cols-2 items-stretch gap-2 sm:grid-cols-5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-summary:empty { display:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-summary article { @apply m-0 flex min-h-0 flex-col gap-0.5 rounded-xl border-0 bg-[#f8f9ff] px-4 py-3 shadow-none ring-1 ring-inset ring-slate-100; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-summary article span { @apply text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-summary article strong { @apply m-0 text-xl font-bold tabular-nums text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-summary article.is-warning strong { @apply text-amber-700; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-summary article.is-indigo strong { @apply text-[#1e3c76]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-summary article.is-success strong { @apply text-emerald-700; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-summary article.is-danger strong { @apply text-red-700; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-summary > small { @apply col-span-full -mt-1 text-right text-[11px] font-normal normal-case tracking-normal text-slate-400; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-results { @apply flex flex-col gap-3; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-bulk { @apply m-0 flex flex-col gap-3 rounded-xl border border-solid border-red-100 bg-red-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-bulk > div { @apply flex flex-col; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-bulk strong { @apply text-[13px] font-semibold text-red-800; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-bulk span { @apply text-xs font-normal text-red-700; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table-wrap { @apply m-0 overflow-x-auto rounded-xl border border-solid border-slate-200 bg-white shadow-none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table { @apply m-0 w-full border-collapse bg-white text-left text-xs; min-width:1080px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table th { @apply whitespace-nowrap border-0 border-b border-solid border-slate-200 bg-slate-50 px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td { @apply border-0 border-b border-solid border-slate-100 bg-transparent px-3 py-3 align-top text-xs font-normal text-slate-600; word-break:normal; overflow-wrap:normal; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td:is(:nth-child(2),:nth-child(3),:nth-child(9)) { @apply whitespace-nowrap; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table tbody tr { @apply bg-white transition-colors; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table tbody tr:hover { @apply bg-[#f8f9ff]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table tbody tr:last-child td { @apply border-b-0; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table tbody tr:has(input:checked) { @apply bg-red-50/60; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td strong { @apply block font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td small { @apply mt-0.5 block text-[11px] font-normal normal-case leading-relaxed tracking-normal text-slate-400; white-space:normal; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td:nth-child(10) { min-width:260px; max-width:420px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td:nth-child(10) small { @apply mt-0 text-slate-500; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table code { @apply whitespace-nowrap inline-flex rounded-md border-0 bg-[#f2f3ff] px-2 py-0.5 font-mono text-[10px] font-semibold text-[#1e3c76]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-check-col { @apply w-10 pr-0 text-center; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-check-col input { @apply m-0 h-4 w-4 cursor-pointer; accent-color:#b91c1c; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-status { @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border-0 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-status::before { @apply h-1.5 w-1.5 rounded-full bg-current; content:""; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-status--processing { @apply bg-indigo-50 text-[#1e3c76] ring-indigo-200; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-status--sent { @apply bg-emerald-50 text-emerald-700 ring-emerald-200; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-status--failed { @apply bg-red-50 text-red-700 ring-red-200; }
+  #scm-app #scm-panel-admin-notificaciones :is(.scm-admin-notif-queue-status--cancelled,.scm-admin-notif-queue-status--other) { @apply bg-slate-100 text-slate-600 ring-slate-200; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-delete { @apply m-0 inline-flex min-h-[30px] items-center rounded-lg border border-solid border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 shadow-none transition-colors hover:bg-red-100 disabled:pointer-events-none disabled:opacity-40; cursor:pointer; font-family:inherit; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-delete--bulk { @apply min-h-[38px] border-red-700 bg-red-700 px-4 text-xs text-white hover:bg-red-800; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-action-muted { @apply text-slate-300; }
+
+  /* Modals */
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal { @apply fixed inset-0 grid place-items-center p-3 sm:p-6; z-index:99999; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal-backdrop { @apply absolute inset-0 bg-slate-950/60; backdrop-filter:blur(2px); }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal-panel { @apply relative z-[1] flex w-full flex-col overflow-hidden rounded-2xl border-0 bg-white p-0 text-[#061d49] shadow-2xl; max-width:960px; max-height:calc(100dvh - 32px); animation:scm-an-pop 160ms ease-out both; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-modal .scm-admin-notif-modal-panel { max-width:720px; }
+  @keyframes scm-an-pop { from { opacity:0; transform:translateY(8px) scale(.98); } to { opacity:1; transform:none; } }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal-head { @apply m-0 flex shrink-0 items-start gap-4 overflow-visible rounded-none bg-[#061d49] px-5 py-5 text-white sm:px-7; background-image:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal-titleblock { @apply flex min-w-0 flex-1 flex-col gap-1.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal-head .scm-an-kicker { @apply bg-[#f8cf4a] text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal-head h4 { @apply m-0 text-lg font-bold leading-snug text-white sm:text-xl; letter-spacing:normal; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal-head p { @apply max-w-none text-xs font-normal leading-relaxed text-blue-100/80; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-modal-icon { @apply hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#f8cf4a] sm:flex; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-modal-icon .scm-an-icon { font-size:22px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal-head .scm-modal-close { @apply m-0 flex h-9 w-9 min-w-0 shrink-0 items-center justify-center rounded-full border-0 bg-white/10 p-0 text-white shadow-none transition-colors hover:bg-white/20; cursor:pointer; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal-head .scm-modal-close:focus-visible { @apply outline outline-2 outline-offset-2 outline-[#f8cf4a]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal-panel > form { @apply m-0 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto bg-[#f8f9ff] p-5 pb-0 sm:p-7 sm:pb-0; }
+
+  /* Composer */
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-head { @apply mb-0 rounded-xl border border-solid border-indigo-100 bg-white px-4 py-3 lg:items-center; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-head h4 { @apply text-base sm:text-base; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-head h4 strong { @apply text-[#1e3c76]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-head p { @apply text-xs; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal.is-channel-specific .scm-admin-notif-channel-group { display:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-group { @apply m-0 grid grid-cols-1 gap-2 sm:grid-cols-3; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-pill { @apply relative m-0 flex min-h-0 items-center gap-3 rounded-xl border border-solid border-slate-200 bg-white p-3 text-[#061d49] shadow-none transition-colors hover:border-[#1e3c76]/40; background-image:none; transform:none; cursor:pointer; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-pill:hover { transform:none; box-shadow:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-pill:has(input:focus-visible) { @apply outline outline-2 outline-offset-2 outline-[#1e3c76]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-pill:has(input:checked) { @apply border-[#061d49] bg-[#061d49] text-white shadow-elevated; background-image:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-pill:has(input:checked)::after { @apply right-3 top-1/2 -translate-y-1/2 rounded-none bg-transparent p-0 text-[#f8cf4a]; content:"check_circle"; font-family:"Material Symbols Outlined"; font-size:20px; font-weight:400; letter-spacing:normal; text-transform:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-pill.is-disabled { @apply cursor-not-allowed opacity-50; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-pill.is-hidden { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-icon { @apply static flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#f2f3ff] p-0 text-[#1e3c76] shadow-none; background-image:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-icon .material-symbols-outlined { font-size:20px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-pill--email .scm-admin-notif-channel-icon { @apply bg-sky-50 text-sky-600; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-pill--sms .scm-admin-notif-channel-icon { @apply bg-indigo-50 text-indigo-600; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-pill--whatsapp .scm-admin-notif-channel-icon { @apply bg-emerald-50 text-emerald-600; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-pill:has(input:checked) .scm-admin-notif-channel-icon { @apply bg-white/10 text-[#f8cf4a]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-copy { @apply flex min-w-0 flex-col pr-6; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-copy strong { @apply text-[13px] font-semibold text-inherit; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-copy small { @apply text-[11px] font-normal text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-pill:has(input:checked) .scm-admin-notif-channel-copy small { @apply text-blue-100/70; }
+  #scm-app #scm-panel-admin-notificaciones :is(.scm-admin-notif-all,.scm-admin-notif-test-toggle) { @apply m-0 flex cursor-pointer items-start gap-3 rounded-xl border border-solid border-slate-200 bg-white p-3.5 text-[13px] font-semibold text-[#061d49] shadow-none transition-colors has-[:checked]:border-[#1e3c76]/40 has-[:checked]:bg-indigo-50/60; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-all.is-hidden, #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-all[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones :is(.scm-admin-notif-all,.scm-admin-notif-test-toggle) input { @apply m-0 mt-0.5 h-4 w-4 shrink-0 cursor-pointer; accent-color:#061d49; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-toggle > span { @apply flex min-w-0 flex-col gap-0.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-toggle strong { @apply text-[13px] font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-toggle small { @apply text-[11px] font-normal leading-relaxed text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-mode { @apply m-0 grid gap-3 rounded-none border-0 bg-transparent p-0 shadow-none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-mode[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-mode:has([data-admin-notif-test-mode]:checked) .scm-admin-notif-test-toggle { @apply border-amber-300 bg-amber-50; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-fields { @apply m-0 grid grid-cols-1 gap-3 rounded-xl border border-solid border-amber-200 bg-white p-4 sm:grid-cols-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-fields[hidden], #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-fields.is-hidden { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-real-contacts { @apply col-span-full m-0 grid gap-2 rounded-lg border-0 bg-[#f8f9ff] p-3 text-xs text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-real-contacts:empty { display:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-real-contacts > strong { @apply text-[11px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-real-contacts > div { @apply grid max-h-48 gap-2 overflow-auto sm:grid-cols-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-real-contact { @apply m-0 flex flex-col rounded-lg border border-solid border-slate-200 bg-white px-3 py-2 shadow-none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-real-contact strong { @apply text-xs font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-test-real-contact :is(span,small) { @apply text-[11px] text-slate-500; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-email-copies { @apply m-0 grid min-w-0 gap-3 rounded-xl border border-solid border-slate-200 bg-white p-4 shadow-none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-email-copies[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-email-copies legend { @apply m-0 px-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-email-copies .scm-admin-notif-test-toggle { @apply border-0 bg-[#f8f9ff] p-3; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-email-copies > p { @apply text-[11px] italic text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-email-copies > p[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-email-copy-fields { @apply m-0 grid gap-3 border-0 p-0; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-email-copy-fields[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-email-copy-fields > p { @apply rounded-lg bg-[#f2f3ff] px-3 py-2 text-xs leading-relaxed text-[#1e3c76]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-email-copy-fields > p strong { @apply font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-copy-picker { @apply m-0 grid gap-2 border-0 bg-transparent p-0; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-copy-picker > label { @apply m-0 text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-copy-picker > span { @apply text-[11px] text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-copy-picker > span strong { @apply text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-copy-options { @apply m-0 grid max-h-56 gap-1.5 overflow-auto rounded-xl border border-solid border-slate-200 bg-[#f8f9ff] p-2 sm:grid-cols-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-copy-options > p { @apply col-span-full p-2 text-xs text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-copy-options > p[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-copy-option { @apply m-0 flex cursor-pointer items-start gap-2.5 rounded-lg border border-solid border-transparent bg-white p-2.5 transition-colors has-[:checked]:border-[#1e3c76]/40 has-[:checked]:bg-indigo-50; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-copy-option[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-copy-option input { @apply m-0 mt-0.5 h-4 w-4 shrink-0; accent-color:#061d49; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-copy-option span { @apply flex min-w-0 flex-col; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-copy-option strong { @apply text-xs font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-copy-option small { @apply text-[11px] text-slate-500; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-template-card { @apply m-0 grid gap-3 rounded-none border-0 bg-transparent p-0 shadow-none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-template-card[hidden], #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-template-card.is-hidden { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-message-field { @apply relative m-0 grid gap-1.5 rounded-xl border border-solid border-slate-200 bg-white p-4; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-message-field[hidden], #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-message-field.is-hidden { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-message-toolbar { @apply m-0 flex flex-wrap gap-1.5 border-0 bg-transparent p-0 sm:absolute sm:right-4 sm:top-3; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-message-toolbar button { @apply m-0 inline-flex min-h-[28px] items-center rounded-md border-0 bg-[#f2f3ff] px-2.5 py-1 text-[11px] font-semibold text-[#1e3c76] shadow-none outline-0 transition-colors hover:bg-[#e1e8ff]; cursor:pointer; font-family:inherit; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-message-field .scm-textarea { @apply min-h-[180px] bg-[#f8f9ff]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-message-field .scm-admin-notif-sms-counter { @apply m-0 block text-right text-[11px] font-medium text-slate-400; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-message-field .scm-admin-notif-sms-counter.is-over { @apply font-semibold text-red-700; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-no-message-note { @apply m-0 flex flex-col gap-0.5 rounded-xl border border-solid border-indigo-100 bg-white p-4 text-xs; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-no-message-note[hidden], #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-no-message-note.is-hidden { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-no-message-note strong { @apply text-[13px] font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-no-message-note span { @apply text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview { @apply m-0 grid gap-3 rounded-xl border-0 bg-transparent p-0 text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview[hidden], #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview:empty { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview > strong { @apply m-0 text-[13px]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview > div { @apply m-0 grid gap-3; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview-card { @apply m-0 flex flex-col gap-0 overflow-hidden rounded-xl border border-solid border-slate-200 bg-white p-0 shadow-subtle; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview-card h5 { @apply m-0 flex items-center gap-2 border-0 border-b border-solid border-slate-200 bg-slate-50 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview-card h5::before { @apply h-2 w-2 shrink-0 rounded-full bg-sky-500; content:""; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview-card.is-sms h5::before { @apply bg-indigo-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview-card.is-whatsapp h5::before { @apply bg-emerald-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-email-frame { @apply m-0 block w-full rounded-none border-0 bg-white shadow-none; min-height:460px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview-card.is-whatsapp { @apply bg-[#efeae2]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview-card.is-sms { @apply bg-slate-100; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview-card :is(.scm-admin-notif-preview-text,p) { @apply mx-4 my-4 ml-auto max-w-[90%] rounded-xl rounded-tr-sm bg-[#d9fdd3] px-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-slate-800 shadow-sm; white-space:pre-wrap; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview-card.is-sms :is(.scm-admin-notif-preview-text,p) { @apply bg-white; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview-card small { @apply mx-4 -mt-2 mb-3 block text-right text-[11px] font-medium text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview-card.is-over { @apply ring-2 ring-red-300; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-preview-card.is-over small { @apply font-semibold text-red-700; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-submit-row { @apply sticky bottom-0 z-[2] -mx-5 mt-auto flex flex-wrap items-center justify-end gap-2 border-0 border-t border-solid border-slate-200 bg-white px-5 py-4 sm:-mx-7 sm:px-7; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-submit-row .scm-spinner { @apply mr-auto; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-result { @apply m-0 text-xs font-medium text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-result:empty { display:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-result.is-error { @apply rounded-lg bg-red-50 px-3 py-2 text-red-700; }
+
+  /* Selected recipients modal */
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-tools { @apply m-0 flex shrink-0 justify-end border-0 border-b border-solid border-slate-200 bg-white px-5 py-2.5 sm:px-7; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-list { @apply m-0 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto bg-[#f8f9ff] p-5 sm:p-7; max-height:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-item { @apply m-0 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-solid border-slate-200 bg-white px-4 py-3 shadow-none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-info { @apply flex min-w-0 flex-col gap-0.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-info strong { @apply truncate text-[13px] font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-info small { @apply text-[11px] text-slate-400; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-info span { @apply text-xs text-slate-600; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-info em { @apply truncate text-[11px] not-italic text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-selected-item button { @apply m-0 inline-flex min-h-[30px] items-center rounded-lg border border-solid border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 shadow-none transition-colors hover:bg-red-100; cursor:pointer; font-family:inherit; }
+
+  /* Close confirmation */
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-confirm { @apply fixed inset-0 grid place-items-center p-4; z-index:100000; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-confirm[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-confirm-backdrop { @apply absolute inset-0 bg-slate-950/50; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-confirm-panel { @apply relative z-[1] flex w-full max-w-sm flex-col items-center gap-2 rounded-2xl border-0 bg-white p-6 text-center shadow-2xl; animation:scm-an-pop 160ms ease-out both; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-confirm-icon { @apply mb-1 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-confirm-icon .scm-an-icon { font-size:26px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-confirm-panel h5 { @apply m-0 text-base font-bold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-confirm-panel p { @apply text-[13px] leading-relaxed text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-confirm-actions { @apply mt-3 grid w-full grid-cols-2 gap-2; }
+
+  @media (max-width:640px) {
+    #scm-app #scm-panel-admin-notificaciones .scm-an-hero { @apply p-5; }
+    #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-card { @apply rounded-xl p-4; }
+    #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal { @apply p-0; }
+    #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal-panel { @apply rounded-none; max-height:100dvh; height:100dvh; }
+    #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-section-actions > * { @apply flex-auto; }
+    #scm-app #scm-panel-admin-notificaciones .scm-an-launch-group { @apply basis-full; }
+    #scm-app #scm-panel-admin-notificaciones .scm-an-launch-group > * { @apply min-w-0 flex-1 px-2; }
+    #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-submit-row .scm-an-btn { @apply flex-1; }
+    #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-row-action { @apply min-h-[36px]; }
+    #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat { @apply rounded-xl p-3; }
+    #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat > .scm-an-icon { @apply hidden; }
+    #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat .scm-an-stat-copy > span { @apply whitespace-normal text-[10px] leading-snug; }
+    #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-stat strong { @apply text-xl; }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    #scm-app #scm-panel-admin-notificaciones .scm-an, #scm-app #scm-panel-admin-notificaciones .scm-an * { animation:none!important; transition:none!important; }
+  }
+}

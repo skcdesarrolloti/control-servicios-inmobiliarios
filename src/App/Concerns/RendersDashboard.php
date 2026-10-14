@@ -2995,10 +2995,19 @@ trait RendersDashboard
     $emailBannerUrl = function_exists('system_image')
       ? system_image('banner_sitio_web', 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png')
       : 'https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/banner-sitio-web.png';
+    $icon = static fn(string $name): string => '<span class="material-symbols-outlined scm-an-icon" aria-hidden="true">' . esc_html($name) . '</span>';
+    $typeIcon = static fn(string $typeKey): string => match (true) {
+      str_starts_with($typeKey, 'propietarios') => 'person',
+      str_starts_with($typeKey, 'arrendatarios') => 'key',
+      str_starts_with($typeKey, 'copropiedades') => 'apartment',
+      str_starts_with($typeKey, 'proveedores') => 'handyman',
+      str_starts_with($typeKey, 'funcionarios') => 'badge',
+      default => 'contacts',
+    };
 
     ob_start();
 ?>
-    <div class="scm-admin-notifications"
+    <div class="scm-admin-notifications scm-an"
       data-scm-admin-notifications
       data-admin-notif-sms-prefix="<?php echo esc_attr(\SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService::SMS_PREFIX); ?>"
       data-admin-notif-sender-name="<?php echo esc_attr((string) ($senderProfile['name'] ?? '')); ?>"
@@ -3006,26 +3015,39 @@ trait RendersDashboard
       data-admin-notif-sender-phone="<?php echo esc_attr((string) ($senderProfile['phone'] ?? '')); ?>"
       data-admin-notif-sender-signature="<?php echo esc_attr((string) ($senderProfile['signature'] ?? '')); ?>"
       data-admin-notif-email-banner="<?php echo esc_attr((string) $emailBannerUrl); ?>">
-      <div class="scm-status-topic-head scm-admin-notif-head">
-        <div>
+      <header class="scm-an-hero">
+        <div class="scm-an-hero-copy">
+          <span class="scm-an-kicker">Comunicaciones</span>
           <h3>Notificaciones</h3>
           <p>Busca destinatarios y encola mensajes por Email, SMS o WhatsApp sin crear campa&ntilde;as.</p>
         </div>
-        <span class="scm-status-count"><strong data-admin-notif-total>0</strong> destinatarios</span>
-      </div>
+        <div class="scm-an-hero-stat">
+          <?php echo $icon('group'); ?>
+          <span><strong data-admin-notif-total>0</strong><small>destinatarios en la pesta&ntilde;a activa</small></span>
+        </div>
+      </header>
 
       <div class="scm-admin-notif-tabs" role="tablist" aria-label="Vistas de notificaciones">
-        <button type="button" class="active" role="tab" aria-selected="true" data-admin-notif-view-tab="recipients">Destinatarios</button>
-        <button type="button" role="tab" aria-selected="false" data-admin-notif-view-tab="queue">Cola de notificaciones</button>
+        <button type="button" class="active" role="tab" aria-selected="true" data-admin-notif-view-tab="recipients">
+          <?php echo $icon('contacts'); ?>
+          <span><strong>Destinatarios</strong><small>Buscar, seleccionar y enviar</small></span>
+        </button>
+        <button type="button" role="tab" aria-selected="false" data-admin-notif-view-tab="queue">
+          <?php echo $icon('outgoing_mail'); ?>
+          <span><strong>Cola de notificaciones</strong><small>Estado de cada env&iacute;o</small></span>
+        </button>
       </div>
 
       <div class="scm-admin-notif-view-panel active" data-admin-notif-view-panel="recipients">
       <div class="scm-admin-notif-stats" aria-label="Resumen de destinatarios">
         <?php foreach ($types as $typeKey => $typeDef): $typeStats = $stats[$typeKey] ?? ['total' => 0, 'email' => 0, 'phone' => 0]; ?>
-          <button type="button" class="scm-admin-notif-stat<?php echo $typeKey === $firstType ? ' active' : ''; ?>" data-admin-notif-type-shortcut="<?php echo esc_attr((string) $typeKey); ?>">
-            <span><?php echo esc_html((string) ($typeDef['label'] ?? $typeKey)); ?></span>
-            <strong data-admin-notif-stat-total>-</strong>
-            <small data-admin-notif-stat-contact>Clic para consultar</small>
+          <button type="button" class="scm-admin-notif-stat<?php echo $typeKey === $firstType ? ' active' : ''; ?><?php echo preg_match('/_no_activ/', (string) $typeKey) ? ' is-inactive' : ''; ?>" data-admin-notif-type-shortcut="<?php echo esc_attr((string) $typeKey); ?>">
+            <?php echo $icon($typeIcon((string) $typeKey)); ?>
+            <span class="scm-an-stat-copy">
+              <span><?php echo esc_html((string) ($typeDef['label'] ?? $typeKey)); ?></span>
+              <strong data-admin-notif-stat-total>-</strong>
+              <small data-admin-notif-stat-contact>Clic para consultar</small>
+            </span>
           </button>
         <?php endforeach; ?>
       </div>
@@ -3033,32 +3055,48 @@ trait RendersDashboard
       <section class="scm-admin-notif-card scm-admin-notif-import-card" data-admin-notif-import-wrap>
         <form data-admin-notif-import enctype="multipart/form-data">
           <div class="scm-admin-notif-import-copy">
-            <span class="scm-calendar-action-kicker">Cruce por Excel SIMI</span>
-            <h4>Importar y seleccionar destinatarios</h4>
-            <p>Sube un .xls, .xlsx o .csv con columnas como <strong>contrato</strong>, <strong>inmueble_simi</strong>, <strong>NoInm</strong>, <strong>cedula</strong> y <strong>canon</strong>. El sistema cruza el archivo solo con la pesta&ntilde;a activa.</p>
-            <p class="scm-admin-notif-import-scope" data-admin-notif-import-scope>Se cruzar&aacute; solo en la pesta&ntilde;a activa.</p>
-            <p class="scm-admin-notif-import-examples">
-              <a href="assets/examples/notificaciones-importacion-simi.xlsx" download>Descargar ejemplo XLSX</a>
-              <a href="assets/examples/notificaciones-importacion-simi.csv" download>Descargar ejemplo CSV</a>
-            </p>
+            <span class="scm-an-tile-icon"><?php echo $icon('upload_file'); ?></span>
+            <div>
+              <span class="scm-an-kicker">Cruce por Excel SIMI</span>
+              <h4>Importar y seleccionar destinatarios</h4>
+              <p>Sube un .xls, .xlsx o .csv con columnas como <strong>contrato</strong>, <strong>inmueble_simi</strong>, <strong>NoInm</strong>, <strong>cedula</strong> y <strong>canon</strong>. El sistema cruza el archivo solo con la pesta&ntilde;a activa.</p>
+              <p class="scm-admin-notif-import-scope" data-admin-notif-import-scope>Se cruzar&aacute; solo en la pesta&ntilde;a activa.</p>
+              <p class="scm-admin-notif-import-examples">
+                <a href="assets/examples/notificaciones-importacion-simi.xlsx" download><?php echo $icon('download'); ?>Ejemplo XLSX</a>
+                <a href="assets/examples/notificaciones-importacion-simi.csv" download><?php echo $icon('download'); ?>Ejemplo CSV</a>
+              </p>
+            </div>
           </div>
           <div class="scm-admin-notif-import-controls">
-            <input type="file" name="file" accept=".xls,.xlsx,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-admin-notif-import-file>
-            <button type="submit" class="scm-btn-primary btn btn-primary">Importar Excel</button>
-            <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-import-report hidden>Descargar cruce</button>
-            <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-import-clear>Quitar importaci&oacute;n</button>
+            <label class="scm-an-file">
+              <span>Archivo de cruce</span>
+              <input type="file" name="file" accept=".xls,.xlsx,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-admin-notif-import-file>
+            </label>
+            <div class="scm-an-file-actions">
+              <button type="submit" class="scm-an-btn is-navy"><?php echo $icon('upload'); ?>Importar Excel</button>
+              <button type="button" class="scm-an-btn" data-admin-notif-import-report hidden><?php echo $icon('download'); ?>Descargar cruce</button>
+              <button type="button" class="scm-an-btn is-ghost" data-admin-notif-import-clear>Quitar importaci&oacute;n</button>
+            </div>
           </div>
           <p class="scm-admin-notif-import-result" data-admin-notif-import-result aria-live="polite"></p>
         </form>
         <form class="scm-admin-notif-receipts-import is-hidden" data-admin-notif-payment-receipts-import enctype="multipart/form-data" hidden style="display:none;">
           <div class="scm-admin-notif-import-copy">
-            <span class="scm-calendar-action-kicker">Comprobantes copropiedades</span>
-            <h4>Importar soportes PDF por NIT</h4>
-            <p>Sube los comprobantes de pago en PDF. El nombre debe iniciar o contener el NIT de la copropiedad; si incluye apartamento o torre, el sistema lo agrega al detalle del mensaje.</p>
+            <span class="scm-an-tile-icon"><?php echo $icon('picture_as_pdf'); ?></span>
+            <div>
+              <span class="scm-an-kicker">Comprobantes copropiedades</span>
+              <h4>Importar soportes PDF por NIT</h4>
+              <p>Sube los comprobantes de pago en PDF. El nombre debe iniciar o contener el NIT de la copropiedad; si incluye apartamento o torre, el sistema lo agrega al detalle del mensaje.</p>
+            </div>
           </div>
           <div class="scm-admin-notif-import-controls">
-            <input type="file" name="receipts[]" accept="application/pdf,.pdf" multiple data-admin-notif-payment-receipts-file>
-            <button type="submit" class="scm-btn-primary btn btn-primary">Importar comprobantes</button>
+            <label class="scm-an-file">
+              <span>Comprobantes PDF</span>
+              <input type="file" name="receipts[]" accept="application/pdf,.pdf" multiple data-admin-notif-payment-receipts-file>
+            </label>
+            <div class="scm-an-file-actions">
+              <button type="submit" class="scm-an-btn is-navy"><?php echo $icon('upload'); ?>Importar comprobantes</button>
+            </div>
           </div>
         </form>
       </section>
@@ -3070,31 +3108,31 @@ trait RendersDashboard
           <div class="scm-admin-notif-filter-grid">
             <div class="scm-field scm-admin-notif-search-field">
               <label for="scm-admin-notif-name">Nombre</label>
-              <input id="scm-admin-notif-name" name="nombre" type="search" class="input input-bordered input-sm scm-input" placeholder="Nombre o raz&oacute;n social" data-admin-notif-name>
+              <input id="scm-admin-notif-name" name="nombre" type="search" class="scm-input" placeholder="Nombre o raz&oacute;n social" data-admin-notif-name>
             </div>
             <div class="scm-field scm-admin-notif-search-field">
               <label for="scm-admin-notif-email">Correo</label>
-              <input id="scm-admin-notif-email" name="correo" type="search" class="input input-bordered input-sm scm-input" placeholder="correo@ejemplo.com" data-admin-notif-email>
+              <input id="scm-admin-notif-email" name="correo" type="search" class="scm-input" placeholder="correo@ejemplo.com" data-admin-notif-email>
             </div>
             <div class="scm-field scm-admin-notif-search-field">
               <label for="scm-admin-notif-phone">Celular</label>
-              <input id="scm-admin-notif-phone" name="celular" type="search" inputmode="tel" class="input input-bordered input-sm scm-input" placeholder="3001234567" data-admin-notif-phone>
+              <input id="scm-admin-notif-phone" name="celular" type="search" inputmode="tel" class="scm-input" placeholder="3001234567" data-admin-notif-phone>
             </div>
             <div class="scm-field scm-admin-notif-search-field">
               <label for="scm-admin-notif-document">Documento</label>
-              <input id="scm-admin-notif-document" name="documento" type="search" class="input input-bordered input-sm scm-input" placeholder="C&eacute;dula, NIT o documento" data-admin-notif-document>
+              <input id="scm-admin-notif-document" name="documento" type="search" class="scm-input" placeholder="C&eacute;dula, NIT o documento" data-admin-notif-document>
             </div>
             <div class="scm-field scm-admin-notif-contract-extra" data-admin-notif-contract-extra-wrap>
               <label for="scm-admin-notif-inmueble-simi">Inmueble SIMI</label>
-              <input id="scm-admin-notif-inmueble-simi" name="inmueble_simi" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: 10628" data-admin-notif-inmueble-simi>
+              <input id="scm-admin-notif-inmueble-simi" name="inmueble_simi" type="text" class="scm-input" placeholder="Ej: 10628" data-admin-notif-inmueble-simi>
             </div>
             <div class="scm-field scm-admin-notif-contract-extra" data-admin-notif-contract-extra-wrap>
               <label for="scm-admin-notif-contract-number">Contrato</label>
-              <input id="scm-admin-notif-contract-number" name="contract_number" type="text" class="input input-bordered input-sm scm-input" placeholder="N&uacute;mero de contrato" data-admin-notif-contract-number>
+              <input id="scm-admin-notif-contract-number" name="contract_number" type="text" class="scm-input" placeholder="N&uacute;mero de contrato" data-admin-notif-contract-number>
             </div>
             <div class="scm-admin-notif-filter-actions">
-              <button type="submit" class="scm-btn-primary btn btn-primary">Buscar</button>
-              <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-clear>Limpiar</button>
+              <button type="submit" class="scm-an-btn is-navy"><?php echo $icon('search'); ?>Buscar</button>
+              <button type="button" class="scm-an-btn" data-admin-notif-clear>Limpiar</button>
             </div>
           </div>
         </form>
@@ -3104,16 +3142,18 @@ trait RendersDashboard
         <section class="scm-admin-notif-card">
           <div class="scm-admin-notif-section-head">
             <div>
-              <span class="scm-calendar-action-kicker">Lista de contactos</span>
+              <span class="scm-an-kicker">Lista de contactos</span>
               <h4 data-admin-notif-list-title>Propietarios</h4>
               <p>Selecciona registros visibles o marca el env&iacute;o a todos los resultados filtrados.</p>
             </div>
             <div class="scm-admin-notif-section-actions">
-              <button type="button" class="scm-case-work-btn" data-admin-notif-select-visible>Seleccionar visibles</button>
-              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--email" data-admin-notif-open-channel="email">Notificaci&oacute;n Email</button>
-              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--sms" data-admin-notif-open-channel="sms">Notificaci&oacute;n SMS</button>
-              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--whatsapp" data-admin-notif-open-channel="whatsapp">Notificaci&oacute;n WhatsApp</button>
-              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--all" data-admin-notif-open-all-channels>Todos los canales</button>
+              <button type="button" class="scm-an-btn" data-admin-notif-select-visible><?php echo $icon('select_check_box'); ?>Seleccionar visibles</button>
+              <span class="scm-an-launch-group" role="group" aria-label="Enviar notificaci&oacute;n a los seleccionados">
+                <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--email" data-admin-notif-open-channel="email"><?php echo $icon('mail'); ?>Email</button>
+                <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--sms" data-admin-notif-open-channel="sms"><?php echo $icon('sms'); ?>SMS</button>
+                <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--whatsapp" data-admin-notif-open-channel="whatsapp"><?php echo $icon('chat'); ?>WhatsApp</button>
+              </span>
+              <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--all" data-admin-notif-open-all-channels><?php echo $icon('send'); ?>Todos los canales</button>
             </div>
           </div>
           <div class="scm-admin-notif-recipients" data-admin-notif-recipients>
@@ -3127,24 +3167,24 @@ trait RendersDashboard
       <section class="scm-admin-notif-card scm-admin-notif-queue-card scm-admin-notif-view-panel" data-admin-notif-view-panel="queue" data-admin-notif-queue-card hidden>
           <div class="scm-admin-notif-section-head">
             <div>
-              <span class="scm-calendar-action-kicker">Trazabilidad</span>
+              <span class="scm-an-kicker">Trazabilidad</span>
               <h4>Cola de notificaciones</h4>
               <p>Muestra todo el historial por defecto; usa los filtros para revisar fecha, canal, pesta&ntilde;a, plantilla o estado.</p>
             </div>
-            <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-queue-refresh>Actualizar cola</button>
+            <button type="button" class="scm-an-btn" data-admin-notif-queue-refresh><?php echo $icon('refresh'); ?>Actualizar cola</button>
           </div>
           <form class="scm-admin-notif-queue-filters" data-admin-notif-queue-form autocomplete="off">
             <div class="scm-field">
               <label for="scm-admin-notif-queue-date-from">Desde</label>
-              <input id="scm-admin-notif-queue-date-from" name="date_from" type="date" class="input input-bordered input-sm scm-input" data-admin-notif-queue-date-from>
+              <input id="scm-admin-notif-queue-date-from" name="date_from" type="date" class="scm-input" data-admin-notif-queue-date-from>
             </div>
             <div class="scm-field">
               <label for="scm-admin-notif-queue-date-to">Hasta</label>
-              <input id="scm-admin-notif-queue-date-to" name="date_to" type="date" class="input input-bordered input-sm scm-input" data-admin-notif-queue-date-to>
+              <input id="scm-admin-notif-queue-date-to" name="date_to" type="date" class="scm-input" data-admin-notif-queue-date-to>
             </div>
             <div class="scm-field">
               <label for="scm-admin-notif-queue-status">Estado</label>
-              <select id="scm-admin-notif-queue-status" name="status" class="select select-bordered select-sm scm-select" data-admin-notif-queue-status>
+              <select id="scm-admin-notif-queue-status" name="status" class="scm-select" data-admin-notif-queue-status>
                 <option value="">Todos</option>
                 <option value="pending">Pendiente</option>
                 <option value="processing">Procesando</option>
@@ -3155,7 +3195,7 @@ trait RendersDashboard
             </div>
             <div class="scm-field">
               <label for="scm-admin-notif-queue-channel">Canal</label>
-              <select id="scm-admin-notif-queue-channel" name="channel" class="select select-bordered select-sm scm-select" data-admin-notif-queue-channel>
+              <select id="scm-admin-notif-queue-channel" name="channel" class="scm-select" data-admin-notif-queue-channel>
                 <option value="">Todos</option>
                 <option value="email">Email</option>
                 <option value="whatsapp">WhatsApp</option>
@@ -3164,7 +3204,7 @@ trait RendersDashboard
             </div>
             <div class="scm-field">
               <label for="scm-admin-notif-queue-type">Pesta&ntilde;a</label>
-              <select id="scm-admin-notif-queue-type" name="type" class="select select-bordered select-sm scm-select" data-admin-notif-queue-type>
+              <select id="scm-admin-notif-queue-type" name="type" class="scm-select" data-admin-notif-queue-type>
                 <option value="">Todas</option>
                 <?php foreach ($types as $typeKey => $typeDef): ?>
                   <option value="<?php echo esc_attr((string) $typeKey); ?>"><?php echo esc_html((string) ($typeDef['label'] ?? $typeKey)); ?></option>
@@ -3173,15 +3213,15 @@ trait RendersDashboard
             </div>
             <div class="scm-field">
               <label for="scm-admin-notif-queue-template">Plantilla</label>
-              <input id="scm-admin-notif-queue-template" name="template" type="search" class="input input-bordered input-sm scm-input" placeholder="Nombre t&eacute;cnico" data-admin-notif-queue-template>
+              <input id="scm-admin-notif-queue-template" name="template" type="search" class="scm-input" placeholder="Nombre t&eacute;cnico" data-admin-notif-queue-template>
             </div>
             <div class="scm-field scm-admin-notif-queue-search">
               <label for="scm-admin-notif-queue-q">Buscar</label>
-              <input id="scm-admin-notif-queue-q" name="q" type="search" class="input input-bordered input-sm scm-input" placeholder="Nombre, destino, asunto, error o lote" data-admin-notif-queue-q>
+              <input id="scm-admin-notif-queue-q" name="q" type="search" class="scm-input" placeholder="Nombre, destino, asunto, error o lote" data-admin-notif-queue-q>
             </div>
             <div class="scm-admin-notif-queue-actions">
-              <button type="submit" class="scm-btn-primary btn btn-primary">Consultar cola</button>
-              <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-queue-clear>Limpiar</button>
+              <button type="submit" class="scm-an-btn is-navy"><?php echo $icon('search'); ?>Consultar cola</button>
+              <button type="button" class="scm-an-btn" data-admin-notif-queue-clear>Limpiar</button>
             </div>
           </form>
           <div class="scm-admin-notif-queue-summary" data-admin-notif-queue-summary></div>
@@ -3195,12 +3235,13 @@ trait RendersDashboard
         <div class="scm-admin-notif-modal-backdrop" aria-hidden="true"></div>
         <section class="scm-admin-notif-card scm-admin-notif-composer scm-admin-notif-modal-panel">
           <div class="scm-admin-notif-modal-head">
+            <span class="scm-an-modal-icon"><?php echo $icon('campaign'); ?></span>
             <div class="scm-admin-notif-modal-titleblock">
-              <span class="scm-calendar-action-kicker" data-admin-notif-modal-kicker>Mensaje</span>
+              <span class="scm-an-kicker" data-admin-notif-modal-kicker>Mensaje</span>
               <h4 id="scm-admin-notif-modal-title">Enviar notificaci&oacute;n</h4>
               <p data-admin-notif-modal-description>Prepara el mensaje, elige canales y revisa la vista previa antes de encolar. Si hay texto escrito, el cierre pide confirmaci&oacute;n.</p>
             </div>
-            <button type="button" class="scm-modal-close" data-admin-notif-close-composer aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
+            <button type="button" class="scm-modal-close" data-admin-notif-close-composer aria-label="Cerrar"><?php echo $icon('close'); ?></button>
           </div>
           <form data-admin-notif-send autocomplete="off">
             <input type="hidden" name="type" value="<?php echo esc_attr($firstType); ?>" data-admin-notif-send-type>
@@ -3216,27 +3257,27 @@ trait RendersDashboard
 
             <div class="scm-admin-notif-section-head scm-admin-notif-selected-head">
               <div>
-                <span class="scm-calendar-action-kicker">Destinatarios</span>
+                <span class="scm-an-kicker">Destinatarios</span>
                 <h4><strong data-admin-notif-selected-count>0</strong> seleccionados</h4>
                 <p>Escoge canales, plantilla y revisa la vista previa antes de encolar.</p>
               </div>
-              <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-open-selected>Ver seleccionados</button>
+              <button type="button" class="scm-an-btn" data-admin-notif-open-selected><?php echo $icon('group'); ?>Ver seleccionados</button>
             </div>
 
             <div class="scm-admin-notif-channel-group" role="group" aria-label="Canales">
               <label class="scm-admin-notif-channel-pill scm-admin-notif-channel-pill--email">
                 <input type="checkbox" name="channels[]" value="email" data-admin-notif-channel checked>
-                <span class="scm-admin-notif-channel-icon" aria-hidden="true">E</span>
+                <span class="scm-admin-notif-channel-icon" aria-hidden="true"><span class="material-symbols-outlined">mail</span></span>
                 <span class="scm-admin-notif-channel-copy"><strong>Email</strong><small>HTML con banner y firma</small></span>
               </label>
               <label class="scm-admin-notif-channel-pill scm-admin-notif-channel-pill--sms">
                 <input type="checkbox" name="channels[]" value="sms" data-admin-notif-channel>
-                <span class="scm-admin-notif-channel-icon" aria-hidden="true">S</span>
+                <span class="scm-admin-notif-channel-icon" aria-hidden="true"><span class="material-symbols-outlined">sms</span></span>
                 <span class="scm-admin-notif-channel-copy"><strong>SMS</strong><small>Texto corto con marca</small></span>
               </label>
               <label class="scm-admin-notif-channel-pill scm-admin-notif-channel-pill--whatsapp">
                 <input type="checkbox" name="channels[]" value="whatsapp" data-admin-notif-channel>
-                <span class="scm-admin-notif-channel-icon" aria-hidden="true">W</span>
+                <span class="scm-admin-notif-channel-icon" aria-hidden="true"><span class="material-symbols-outlined">chat</span></span>
                 <span class="scm-admin-notif-channel-copy"><strong>WhatsApp</strong><small>Plantilla oficial Meta</small></span>
               </label>
             </div>
@@ -3254,11 +3295,11 @@ trait RendersDashboard
               <div class="scm-admin-notif-test-fields" data-admin-notif-test-fields hidden>
                 <div class="scm-field">
                   <label for="scm-admin-notif-test-email">Correo de prueba</label>
-                  <input id="scm-admin-notif-test-email" name="test_email" type="email" class="input input-bordered input-sm scm-input" value="roycreativos@gmail.com" data-admin-notif-test-email>
+                  <input id="scm-admin-notif-test-email" name="test_email" type="email" class="scm-input" value="roycreativos@gmail.com" data-admin-notif-test-email>
                 </div>
                 <div class="scm-field">
                   <label for="scm-admin-notif-test-phone">Celular de prueba</label>
-                  <input id="scm-admin-notif-test-phone" name="test_phone" type="tel" class="input input-bordered input-sm scm-input" value="3006838984" data-admin-notif-test-phone>
+                  <input id="scm-admin-notif-test-phone" name="test_phone" type="tel" class="scm-input" value="3006838984" data-admin-notif-test-phone>
                 </div>
                 <div class="scm-admin-notif-test-real-contacts" data-admin-notif-test-real-contacts></div>
               </div>
@@ -3276,7 +3317,7 @@ trait RendersDashboard
                 </p>
                 <div class="scm-admin-notif-copy-picker">
                   <label for="scm-admin-notif-copy-search">Agregar funcionarios en copia</label>
-                  <input id="scm-admin-notif-copy-search" type="search" class="input input-bordered input-sm scm-input" placeholder="Buscar por nombre, cargo o correo" data-admin-notif-copy-search>
+                  <input id="scm-admin-notif-copy-search" type="search" class="scm-input" placeholder="Buscar por nombre, cargo o correo" data-admin-notif-copy-search>
                   <span aria-live="polite"><strong data-admin-notif-copy-count>0</strong> funcionarios adicionales seleccionados</span>
                   <div class="scm-admin-notif-copy-options" role="group" aria-label="Funcionarios adicionales en copia">
                     <?php foreach ($emailCopyContacts['employees'] as $copyEmployee): ?>
@@ -3291,7 +3332,7 @@ trait RendersDashboard
                 </div>
                 <div class="scm-field">
                   <label for="scm-admin-notif-additional-emails">Otros correos en copia (opcional)</label>
-                  <textarea id="scm-admin-notif-additional-emails" name="additional_emails" class="textarea textarea-bordered scm-input" rows="2" maxlength="6000" placeholder="correo@ejemplo.com, otro@ejemplo.com" aria-describedby="scm-admin-notif-email-copy-help" data-admin-notif-additional-emails disabled></textarea>
+                  <textarea id="scm-admin-notif-additional-emails" name="additional_emails" class="scm-input" rows="2" maxlength="6000" placeholder="correo@ejemplo.com, otro@ejemplo.com" aria-describedby="scm-admin-notif-email-copy-help" data-admin-notif-additional-emails disabled></textarea>
                   <small id="scm-admin-notif-email-copy-help">Hasta 20 correos adicionales separados por comas, punto y coma o saltos de línea. Los destinatarios podrán ver las direcciones en CC.</small>
                 </div>
               </div>
@@ -3314,7 +3355,7 @@ trait RendersDashboard
             <div class="scm-admin-notif-template-card" data-admin-notif-whatsapp-template-wrap>
               <div class="scm-field">
                 <label for="scm-admin-notif-whatsapp-template">Tipo de mensaje</label>
-                <select id="scm-admin-notif-whatsapp-template" name="whatsapp_template" class="select select-bordered select-sm scm-select" data-admin-notif-whatsapp-template>
+                <select id="scm-admin-notif-whatsapp-template" name="whatsapp_template" class="scm-select" data-admin-notif-whatsapp-template>
                   <?php foreach ($whatsappTemplates as $templateKey => $template):
                     $linkedEmailTemplateName = (string) ($template['email_template'] ?? \SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService::DEFAULT_EMAIL_TEMPLATE);
                     $linkedEmailTemplate = is_array($emailTemplates[$linkedEmailTemplateName] ?? null)
@@ -3346,7 +3387,7 @@ trait RendersDashboard
 
             <div class="scm-field" data-admin-notif-subject-wrap>
               <label for="scm-admin-notif-subject">Asunto para Email</label>
-              <input id="scm-admin-notif-subject" name="subject" type="text" class="input input-bordered input-sm scm-input" placeholder="Ej: Informaci&oacute;n importante" value="<?php echo esc_attr($defaultEmailSubject); ?>" data-admin-notif-subject>
+              <input id="scm-admin-notif-subject" name="subject" type="text" class="scm-input" placeholder="Ej: Informaci&oacute;n importante" value="<?php echo esc_attr($defaultEmailSubject); ?>" data-admin-notif-subject>
             </div>
 
             <div class="scm-field scm-admin-notif-message-field" data-admin-notif-message-field>
@@ -3356,7 +3397,7 @@ trait RendersDashboard
                 <button type="button" data-admin-notif-copy-message>Copiar</button>
                 <button type="button" data-admin-notif-clear-message>Limpiar</button>
               </div>
-              <textarea id="scm-admin-notif-message" name="message" class="textarea textarea-bordered scm-textarea" rows="8" placeholder="Escribe el mensaje..." data-admin-notif-message></textarea>
+              <textarea id="scm-admin-notif-message" name="message" class="scm-textarea" rows="8" placeholder="Escribe el mensaje..." data-admin-notif-message></textarea>
               <small class="scm-admin-notif-sms-counter" data-admin-notif-sms-counter>0/160 SMS</small>
             </div>
 
@@ -3367,22 +3408,23 @@ trait RendersDashboard
 
             <div class="scm-admin-notif-preview" data-admin-notif-preview></div>
 
+            <p class="scm-admin-notif-result" data-admin-notif-result aria-live="polite"></p>
             <div class="scm-admin-notif-submit-row">
               <span class="scm-spinner" data-admin-notif-spinner><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
-              <button type="submit" class="scm-btn-primary btn btn-primary" data-admin-notif-submit>Encolar notificaci&oacute;n</button>
+              <button type="button" class="scm-an-btn" data-admin-notif-close-composer>Cancelar</button>
+              <button type="submit" class="scm-an-btn is-primary" data-admin-notif-submit><?php echo $icon('send'); ?>Encolar notificaci&oacute;n</button>
             </div>
-            <p class="scm-admin-notif-result" data-admin-notif-result aria-live="polite"></p>
           </form>
         </section>
         <div class="scm-admin-notif-confirm" data-admin-notif-confirm hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-confirm-title">
           <div class="scm-admin-notif-confirm-backdrop" aria-hidden="true"></div>
           <section class="scm-admin-notif-confirm-panel">
-            <span class="scm-calendar-action-kicker">Confirmaci&oacute;n</span>
+            <span class="scm-an-confirm-icon"><?php echo $icon('warning'); ?></span>
             <h5 id="scm-admin-notif-confirm-title">Cerrar notificaci&oacute;n</h5>
             <p>Tienes una notificaci&oacute;n en edici&oacute;n. &iquest;Quieres cerrar sin enviarla?</p>
             <div class="scm-admin-notif-confirm-actions">
-              <button type="button" class="scm-case-work-btn" data-admin-notif-confirm-cancel>Seguir editando</button>
-              <button type="button" class="scm-btn-primary btn btn-primary" data-admin-notif-confirm-accept>Cerrar sin enviar</button>
+              <button type="button" class="scm-an-btn" data-admin-notif-confirm-cancel>Seguir editando</button>
+              <button type="button" class="scm-an-btn is-danger" data-admin-notif-confirm-accept>Cerrar sin enviar</button>
             </div>
           </section>
         </div>
@@ -3392,15 +3434,16 @@ trait RendersDashboard
         <div class="scm-admin-notif-modal-backdrop" aria-hidden="true"></div>
         <section class="scm-admin-notif-card scm-admin-notif-modal-panel">
           <div class="scm-admin-notif-modal-head">
+            <span class="scm-an-modal-icon"><?php echo $icon('group'); ?></span>
             <div class="scm-admin-notif-modal-titleblock">
-              <span class="scm-calendar-action-kicker">Destinatarios</span>
+              <span class="scm-an-kicker">Destinatarios</span>
               <h4 id="scm-admin-notif-selected-modal-title">Seleccionados para enviar</h4>
               <p data-admin-notif-selected-modal-summary>Revisa los destinatarios marcados y quita los que no deban recibir la notificaci&oacute;n.</p>
             </div>
-            <button type="button" class="scm-modal-close" data-admin-notif-close-selected aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
+            <button type="button" class="scm-modal-close" data-admin-notif-close-selected aria-label="Cerrar"><?php echo $icon('close'); ?></button>
           </div>
           <div class="scm-admin-notif-selected-tools">
-            <button type="button" class="scm-btn-secondary btn btn-outline" data-admin-notif-selected-clear>Deseleccionar todos</button>
+            <button type="button" class="scm-an-btn is-danger-ghost" data-admin-notif-selected-clear><?php echo $icon('deselect'); ?>Deseleccionar todos</button>
           </div>
           <div class="scm-admin-notif-selected-list" data-admin-notif-selected-list></div>
         </section>
