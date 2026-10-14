@@ -907,3 +907,141 @@
   @keyframes scm-toast-out { to { opacity:0; transform:translateY(4px); } }
   @media(prefers-reduced-motion:reduce) { .scm-toast, .scm-toast.is-leaving, .scm-toast-spinner { animation:none; } }
 }
+
+/* Calendario del funcionario en el caso: modal propio montado en <body>. */
+@layer components {
+  .scm-cal-root { font-family: Poppins, sans-serif; @apply text-slate-800 antialiased; }
+  .scm-cal-root *, .scm-cal-root *::before, .scm-cal-root *::after { box-sizing: border-box; }
+  .scm-cal-root button, .scm-cal-root input, .scm-cal-root textarea { font-family: inherit; letter-spacing: normal; text-transform: none; }
+  .scm-cal-root [hidden] { display: none !important; }
+  .scm-cal-root .material-symbols-outlined { font-size: 20px; line-height: 1; }
+
+  .scm-cal-overlay { @apply fixed inset-0 flex items-stretch justify-center bg-slate-900/50 backdrop-blur-sm sm:items-center sm:p-6; z-index: 100000; }
+  .scm-cal-dialog { @apply flex h-full w-full max-w-[1180px] flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-slate-900/5 sm:h-auto sm:max-h-[calc(100vh-3rem)] sm:rounded-2xl; }
+  .scm-cal-head { @apply flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6; }
+  .scm-cal-who { @apply flex min-w-0 items-center gap-3; }
+  .scm-cal-avatar { @apply grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#0f1e36] text-sm font-semibold text-white; }
+  .scm-cal-eyebrow { @apply m-0 hidden text-[11px] font-medium uppercase tracking-wider text-slate-400 sm:block; }
+  .scm-cal-name { @apply m-0 truncate text-lg font-semibold leading-tight text-[#0f1e36]; }
+  .scm-cal-head-actions { @apply flex shrink-0 items-center gap-2; }
+
+  .scm-cal-icon-btn { @apply inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white p-0 text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500; }
+  .scm-cal-chip-btn { @apply inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 text-[13px] font-medium text-rose-700 transition-colors hover:border-rose-600 hover:bg-rose-600 hover:text-white; }
+  .scm-cal-chip-btn .material-symbols-outlined { font-size: 18px; }
+  .scm-cal-chip-btn b { @apply min-w-[22px] rounded-full bg-rose-600 px-1.5 py-1 text-center text-[11px] font-semibold leading-none text-white; }
+  .scm-cal-chip-btn b:empty { display: none; }
+  .scm-cal-chip-btn:hover b { @apply bg-white text-rose-600; }
+
+  .scm-cal-toolbar { @apply flex flex-wrap items-center justify-between gap-3 px-5 pt-4 sm:px-6; }
+  .scm-cal-nav { @apply flex items-center gap-2; }
+  .scm-cal-month { @apply m-0 min-w-[170px] text-center text-lg font-semibold text-[#0f1e36] first-letter:uppercase; }
+  .scm-cal-stats { @apply flex flex-wrap items-center gap-2; }
+  .scm-cal-stat { @apply inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-3 py-1 text-xs text-slate-500 ring-1 ring-inset ring-slate-200; }
+  .scm-cal-stat b { @apply font-semibold text-slate-900; }
+  .scm-cal-dot { @apply inline-block h-2 w-2 shrink-0 rounded-full; }
+  .scm-cal-dot.is-pending { @apply bg-amber-500; }
+  .scm-cal-dot.is-overdue { @apply bg-rose-500; }
+  .scm-cal-dot.is-done { @apply bg-emerald-500; }
+  .scm-cal-dot.is-holiday { @apply bg-amber-200; }
+
+  .scm-cal-body { @apply min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-4 sm:px-6; }
+  .scm-cal-weekdays { @apply grid grid-cols-7 pb-2 text-center text-[11px] font-medium uppercase tracking-wider text-slate-400; }
+  .scm-cal-grid { @apply grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200; }
+  .scm-cal-grid[aria-busy="true"] { @apply opacity-60 transition-opacity; }
+  .scm-cal-grid-empty { @apply col-span-7 bg-white px-4 py-20 text-center text-sm text-slate-500; }
+  .scm-cal-day { @apply flex min-h-[76px] min-w-0 flex-col gap-1 bg-white p-1 sm:min-h-[112px] sm:p-1.5; }
+  .scm-cal-day.is-weekend { @apply bg-[#fbfcfe]; }
+  .scm-cal-day.is-holiday { @apply bg-amber-50; }
+  .scm-cal-day.is-muted { @apply bg-slate-50; }
+  .scm-cal-day.is-muted .scm-cal-day-num { @apply text-slate-300; }
+  .scm-cal-day.is-muted .scm-cal-event { @apply opacity-60; }
+  .scm-cal-day-head { @apply flex min-w-0 items-center gap-1; }
+  .scm-cal-day-num { @apply grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-medium text-slate-600 sm:h-7 sm:w-7; }
+  .scm-cal-day.is-today .scm-cal-day-num { @apply bg-amber-500 font-semibold text-white shadow-sm; }
+  .scm-cal-day-holiday { @apply hidden truncate text-[10px] font-medium text-amber-700 sm:block; }
+  .scm-cal-event { @apply flex w-full min-w-0 cursor-pointer items-center gap-1 rounded-md py-[3px] pl-1.5 pr-1 text-left text-[11px] leading-tight transition-colors; border: 0; border-left: 3px solid; }
+  .scm-cal-event.is-pending { @apply border-amber-500 bg-amber-50 text-amber-900 hover:bg-amber-100; }
+  .scm-cal-event.is-overdue { @apply border-rose-500 bg-rose-50 text-rose-900 hover:bg-rose-100; }
+  .scm-cal-event.is-done { @apply border-emerald-500 bg-emerald-50 text-emerald-900 hover:bg-emerald-100; }
+  .scm-cal-event:focus-visible { @apply outline outline-2 outline-offset-1 outline-amber-500; }
+  .scm-cal-event-time { @apply shrink-0 font-semibold tabular-nums; }
+  .scm-cal-event-title { @apply hidden min-w-0 truncate sm:block; }
+  .scm-cal-more { @apply w-full cursor-pointer rounded-md border-0 bg-transparent px-1.5 py-0.5 text-left text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900; }
+  .scm-cal-foot { @apply flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-3 text-xs text-slate-500 sm:px-6; }
+  .scm-cal-legend { @apply flex flex-wrap items-center gap-4; }
+  .scm-cal-legend span { @apply inline-flex items-center gap-1.5; }
+
+  .scm-cal-layer { @apply fixed inset-0 flex items-end justify-center bg-slate-900/40 backdrop-blur-[2px] sm:items-center sm:p-6; z-index: 100010; }
+  .scm-cal-sheet { @apply flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl ring-1 ring-slate-900/5 sm:max-h-[calc(100vh-3rem)] sm:rounded-2xl; }
+  .scm-cal-sheet--detail { @apply sm:max-w-xl; }
+  .scm-cal-sheet--list { @apply sm:max-w-2xl; }
+  .scm-cal-sheet-head { @apply flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4; }
+  .scm-cal-sheet-heading { @apply min-w-0; }
+  .scm-cal-sheet-kicker { @apply m-0 flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500; }
+  .scm-cal-sheet-title { @apply m-0 mt-1.5 text-lg font-semibold leading-snug text-[#0f1e36]; }
+  .scm-cal-sheet-body { @apply min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4; }
+  .scm-cal-sheet-foot { @apply flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/70 px-5 py-3; }
+  .scm-cal-back { @apply mb-2 inline-flex cursor-pointer items-center gap-1 rounded-md border-0 bg-transparent p-0 text-xs font-medium text-slate-500 transition-colors hover:text-slate-900; }
+  .scm-cal-back .material-symbols-outlined { font-size: 16px; }
+  .scm-cal-kicker-icon { @apply grid h-7 w-7 place-items-center rounded-lg; }
+  .scm-cal-kicker-icon .material-symbols-outlined { font-size: 17px; }
+  .scm-cal-kicker-icon.is-danger { @apply bg-rose-50 text-rose-600; }
+  .scm-cal-kicker-icon.is-info { @apply bg-sky-50 text-sky-600; }
+  .scm-cal-count { @apply rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700; }
+  .scm-cal-count:empty { display: none; }
+
+  .scm-cal-status { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium not-italic ring-1 ring-inset; }
+  .scm-cal-status.is-pending { @apply bg-amber-50 text-amber-700 ring-amber-200; }
+  .scm-cal-status.is-overdue { @apply bg-rose-50 text-rose-700 ring-rose-200; }
+  .scm-cal-status.is-done { @apply bg-emerald-50 text-emerald-700 ring-emerald-200; }
+
+  .scm-cal-meta { @apply m-0 grid grid-cols-1 gap-2 sm:grid-cols-2; }
+  .scm-cal-meta > div { @apply flex min-w-0 items-start gap-3 rounded-xl bg-slate-50 px-3 py-2.5; }
+  .scm-cal-meta > div > .material-symbols-outlined { @apply mt-0.5 text-slate-400; }
+  .scm-cal-meta > .is-wide { @apply sm:col-span-2; }
+  .scm-cal-meta dt { @apply m-0 text-[11px] text-slate-400; }
+  .scm-cal-meta dd { @apply m-0 break-words text-sm font-medium text-slate-900; }
+  .scm-cal-desc { @apply mt-3 rounded-xl border border-slate-200 px-3 py-2.5; }
+  .scm-cal-desc-label { @apply m-0 text-[11px] text-slate-400; }
+  .scm-cal-desc-text { @apply mt-1 max-h-44 overflow-y-auto whitespace-pre-line text-[13px] leading-relaxed text-slate-600; }
+
+  .scm-cal-form { @apply mt-4 grid gap-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4; }
+  .scm-cal-form.is-success { @apply border-emerald-200 bg-emerald-50/50; }
+  .scm-cal-form-title { @apply m-0 text-sm font-semibold text-slate-900; }
+  .scm-cal-hint { @apply m-0 mt-0.5 text-xs text-slate-500; }
+  .scm-cal-form-grid { @apply grid grid-cols-1 gap-3 sm:grid-cols-3; }
+  .scm-cal-field { @apply grid gap-1 text-xs font-medium text-slate-600; }
+  .scm-cal-input { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20; min-height: 40px; }
+  textarea.scm-cal-input { @apply min-h-[84px] resize-y; }
+  .scm-cal-form-actions { @apply flex flex-wrap items-center justify-end gap-2; }
+  .scm-cal-form-msg { @apply mr-auto text-xs text-slate-500; }
+  .scm-cal-form-msg.is-error { @apply text-rose-600; }
+
+  .scm-cal-btn { @apply inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-transparent px-4 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60; }
+  .scm-cal-btn .material-symbols-outlined { font-size: 18px; }
+  .scm-cal-btn--primary { @apply bg-amber-500 text-white shadow-sm hover:bg-amber-600; }
+  .scm-cal-btn--success { @apply bg-emerald-600 text-white shadow-sm hover:bg-emerald-700; }
+  .scm-cal-btn--ghost { @apply border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900; }
+  .scm-cal-btn--sm { @apply h-8 px-3 text-xs; }
+
+  .scm-cal-search { @apply relative flex items-center border-b border-slate-100 px-5 py-3; }
+  .scm-cal-search > .material-symbols-outlined { @apply pointer-events-none absolute left-8 text-slate-400; font-size: 18px; }
+  .scm-cal-search .scm-cal-input { @apply pl-9; }
+  .scm-cal-list { @apply grid content-start gap-2; }
+  .scm-cal-row { @apply flex w-full cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white p-2.5 text-left transition hover:border-amber-300 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500; }
+  .scm-cal-row-date { @apply grid h-12 w-12 shrink-0 place-content-center rounded-lg bg-amber-50 text-center leading-none text-amber-700; }
+  .scm-cal-row.is-overdue .scm-cal-row-date { @apply bg-rose-50 text-rose-700; }
+  .scm-cal-row.is-done .scm-cal-row-date { @apply bg-emerald-50 text-emerald-700; }
+  .scm-cal-row-date b { @apply text-lg font-semibold; }
+  .scm-cal-row-date small { @apply mt-0.5 text-[10px] uppercase opacity-80; }
+  .scm-cal-row-main { @apply grid min-w-0 flex-1 gap-0.5; }
+  .scm-cal-row-main strong { @apply truncate text-sm font-semibold text-slate-900; }
+  .scm-cal-row-meta { @apply truncate text-xs text-slate-500; }
+  .scm-cal-row-side { @apply hidden shrink-0 flex-col items-end gap-1 sm:flex; }
+  .scm-cal-row-cta { @apply inline-flex items-center text-xs font-medium text-slate-400 transition-colors; }
+  .scm-cal-row-cta .material-symbols-outlined { font-size: 16px; }
+  .scm-cal-row:hover .scm-cal-row-cta { @apply text-amber-700; }
+  .scm-cal-empty { @apply grid place-items-center gap-2 rounded-xl border border-dashed border-slate-200 px-4 py-12 text-center text-sm text-slate-500; }
+  .scm-cal-empty p { @apply m-0; }
+  .scm-cal-empty .material-symbols-outlined { @apply text-emerald-500; font-size: 32px; }
+}

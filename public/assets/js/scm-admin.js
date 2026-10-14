@@ -4902,6 +4902,138 @@
     return normalizeCalendarText((row && row.estado) || "") === "si";
   }
 
+  // Calendario del funcionario dentro del caso. Usa un modal propio montado en
+  // <body> (no SweetAlert) para que el detalle y las listas floten sobre todo
+  // sin quedar tapados por la barra de acciones del popup.
+  var CASE_CALENDAR_MONTHS_SHORT = [
+    "ene",
+    "feb",
+    "mar",
+    "abr",
+    "may",
+    "jun",
+    "jul",
+    "ago",
+    "sep",
+    "oct",
+    "nov",
+    "dic",
+  ];
+
+  function caseCalendarParseDate(value) {
+    var match = String(value || "")
+      .replace("T", " ")
+      .match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
+    if (!match) return null;
+    return new Date(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3]),
+      Number(match[4] || 0),
+      Number(match[5] || 0),
+    );
+  }
+
+  function caseCalendarStatus(row) {
+    if (isCaseCalendarEventDone(row)) {
+      return { key: "done", label: "Realizado" };
+    }
+    var end = caseCalendarParseDate(
+      (row && (row.fecha_fin || row.end || row.fecha_inicio)) || "",
+    );
+    if (end && end.getTime() < Date.now()) {
+      return { key: "overdue", label: "Vencido" };
+    }
+    return { key: "pending", label: "Pendiente" };
+  }
+
+  function caseCalendarTimeRange(row) {
+    var start = calendarTimePartFromDateTime(
+      row.fecha_inicio || row.fecha || row.start,
+    );
+    var end = calendarTimePartFromDateTime(row.fecha_fin || row.end);
+    return start ? start + (end ? " – " + end : "") : "";
+  }
+
+  function caseCalendarDateLabel(value) {
+    return formatCalendarDateTime(value).split(" ")[0];
+  }
+
+  function caseCalendarTicket(row) {
+    var ticket = caseCalendarEventDetailValue(row, ["id_ticket", "ticket"]);
+    return ticket && ticket !== "0" ? ticket : "";
+  }
+
+  function caseCalendarInitials(name) {
+    var parts = String(name || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!parts.length) return "?";
+    return (
+      parts[0].charAt(0) + (parts.length > 1 ? parts[1].charAt(0) : "")
+    ).toUpperCase();
+  }
+
+  function caseCalendarIcon(name) {
+    return (
+      '<span class="material-symbols-outlined" aria-hidden="true">' +
+      name +
+      "</span>"
+    );
+  }
+
+  function createCaseCalendarHost(standalone) {
+    var host = document.createElement("div");
+    host.className = "scm-cal-root";
+    host.setAttribute("data-scm-case-calendar-host", "");
+    host._scmCaseCalendarStandalone = !!standalone;
+    document.body.appendChild(host);
+    var onKey = function (event) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      var layers = host.querySelectorAll("[data-scm-case-calendar-layer]");
+      if (layers.length) {
+        dismissCaseCalendarLayer(host, layers[layers.length - 1]);
+        return;
+      }
+      closeCaseCalendarHost(host);
+    };
+    document.addEventListener("keydown", onKey, true);
+    host._scmCaseCalendarOnKey = onKey;
+    return host;
+  }
+
+  function closeCaseCalendarHost(host) {
+    if (!host || !host.isConnected) return;
+    if (host._scmCaseCalendarOnKey) {
+      document.removeEventListener("keydown", host._scmCaseCalendarOnKey, true);
+    }
+    host.remove();
+    if (typeof host._scmCaseCalendarOnClose === "function") {
+      host._scmCaseCalendarOnClose();
+    }
+  }
+
+  // Cierre pedido por el usuario (X, fondo, Escape). Si el detalle vino de una
+  // lista vuelve a ella; en modo solo-lista, cerrar la última capa cierra todo.
+  function dismissCaseCalendarLayer(host, layer) {
+    if (!host || !layer) return;
+    var onBack = layer._scmOnBack;
+    layer.remove();
+    if (typeof onBack === "function") {
+      onBack();
+      return;
+    }
+    if (
+      host._scmCaseCalendarStandalone &&
+      !host.querySelector("[data-scm-case-calendar-layer]")
+    ) {
+      closeCaseCalendarHost(host);
+    }
+  }
+
   function closeCaseCalendarEventMini(shell) {
     var current = shell
       ? shell.querySelector("[data-scm-case-calendar-event-mini]")
@@ -4916,13 +5048,20 @@
     if (current) current.remove();
   }
 
+  function refreshCaseCalendarHost(shell) {
+    if (shell && typeof shell._scmCaseCalendarRender === "function") {
+      shell._scmCaseCalendarRender();
+    }
+  }
+
   function openCaseCalendarEventMini(root, shell, row, options) {
     if (!shell || !row) return;
     options = options || {};
     closeCaseCalendarEventMini(shell);
     closeCaseCalendarPendingMini(shell);
     var eventId = caseCalendarEventId(row);
-    var isDone = isCaseCalendarEventDone(row);
+    var status = caseCalendarStatus(row);
+    var isDone = status.key === "done";
     var title =
       caseCalendarEventDetailValue(row, ["titulo", "title"]) || "Evento";
     var category = caseCalendarEventDetailValue(row, [
@@ -4935,7 +5074,7 @@
       "empleado",
       "nombre",
     ]);
-    var ticket = caseCalendarEventDetailValue(row, ["id_ticket", "ticket"]);
+    var ticket = caseCalendarTicket(row);
     var location = caseCalendarEventDetailValue(row, [
       "ubicacion",
       "lugar",
@@ -4946,186 +5085,168 @@
       "observacion",
       "detalle",
     ]);
+    var startValue = row.fecha_inicio || row.fecha || row.start;
+    var metaItem = function (icon, label, value, extra) {
+      return (
+        '<div class="' +
+        (extra || "") +
+        '">' +
+        caseCalendarIcon(icon) +
+        "<div><dt>" +
+        label +
+        "</dt><dd" +
+        value +
+        "</dd></div></div>"
+      );
+    };
     var html =
-      '<div class="scm-case-calendar-event-mini" data-scm-case-calendar-event-mini>' +
-      '<div class="scm-case-calendar-event-mini-card" role="dialog" aria-modal="true" aria-label="Detalle del evento">' +
-      '<button type="button" class="scm-case-calendar-event-mini-close" data-scm-case-calendar-event-mini-close aria-label="Cerrar detalle">&times;</button>' +
+      '<div class="scm-cal-layer" data-scm-case-calendar-layer data-scm-case-calendar-event-mini>' +
+      '<div class="scm-cal-sheet scm-cal-sheet--detail" role="dialog" aria-modal="true" aria-label="Detalle del evento">' +
+      '<header class="scm-cal-sheet-head"><div class="scm-cal-sheet-heading">' +
       (typeof options.onBack === "function"
-        ? '<button type="button" class="scm-case-calendar-event-mini-back" data-scm-case-calendar-event-mini-back>&lsaquo; ' +
+        ? '<button type="button" class="scm-cal-back" data-scm-case-calendar-event-mini-back>' +
+          caseCalendarIcon("arrow_back") +
           escHtml(options.backLabel || "Volver") +
           "</button>"
         : "") +
-      '<div class="scm-case-calendar-event-mini-head"><span>Ver caso del calendario</span><strong>' +
+      '<p class="scm-cal-sheet-kicker"><span class="scm-cal-status is-' +
+      status.key +
+      '" data-scm-case-calendar-event-state>' +
+      status.label +
+      "</span>" +
+      (category ? "<span>" + escHtml(category) + "</span>" : "") +
+      "</p>" +
+      '<h3 class="scm-cal-sheet-title">' +
       escHtml(title) +
-      "</strong></div>" +
-      '<div class="scm-case-calendar-event-mini-grid">' +
-      "<div><small>Inicio</small><strong>" +
-      escHtml(
-        formatCalendarDateTime(row.fecha_inicio || row.fecha || row.start),
+      "</h3></div>" +
+      '<button type="button" class="scm-cal-icon-btn" data-scm-case-calendar-event-mini-close aria-label="Cerrar detalle">' +
+      caseCalendarIcon("close") +
+      "</button></header>" +
+      '<div class="scm-cal-sheet-body">' +
+      '<dl class="scm-cal-meta">' +
+      metaItem(
+        "event",
+        "Fecha",
+        " data-scm-case-calendar-detail-date>" +
+          escHtml(caseCalendarDateLabel(startValue)),
       ) +
-      "</strong></div>" +
-      "<div><small>Fin</small><strong>" +
-      escHtml(formatCalendarDateTime(row.fecha_fin || row.end)) +
-      "</strong></div>" +
-      (category
-        ? "<div><small>Categor&iacute;a</small><strong>" +
-          escHtml(category) +
-          "</strong></div>"
+      metaItem(
+        "schedule",
+        "Horario",
+        " data-scm-case-calendar-detail-time>" +
+          escHtml(caseCalendarTimeRange(row) || "-"),
+      ) +
+      (ticket
+        ? metaItem("confirmation_number", "Caso", ">#" + escHtml(ticket))
         : "") +
       (employee
-        ? "<div><small>Funcionario</small><strong>" +
-          escHtml(employee) +
-          "</strong></div>"
-        : "") +
-      (ticket
-        ? "<div><small>Caso</small><strong>#" +
-          escHtml(ticket) +
-          "</strong></div>"
+        ? metaItem("person", "Funcionario", ">" + escHtml(employee))
         : "") +
       (location
-        ? '<div class="is-wide"><small>Ubicaci&oacute;n</small><strong>' +
-          escHtml(location) +
-          "</strong></div>"
+        ? metaItem(
+            "location_on",
+            "Ubicaci&oacute;n",
+            ">" + escHtml(location),
+            "is-wide",
+          )
         : "") +
-      "</div>" +
+      "</dl>" +
       (description
-        ? '<div class="scm-case-calendar-event-mini-description"><small>Descripci&oacute;n</small><p>' +
-          escHtml(description).replace(/\n/g, "<br>") +
-          "</p></div>"
+        ? '<div class="scm-cal-desc"><p class="scm-cal-desc-label">Descripci&oacute;n</p><div class="scm-cal-desc-text">' +
+          escHtml(description) +
+          "</div></div>"
         : "") +
-      '<div class="scm-case-calendar-event-mini-actions" data-scm-case-calendar-mini-actions>' +
-      '<span class="scm-case-calendar-event-state-badge' +
-      (isDone ? " is-done" : "") +
-      '" data-scm-case-calendar-event-state>' +
-      (isDone ? "Realizado" : "Pendiente") +
-      "</span>" +
       (eventId
-        ? '<button type="button" class="scm-case-calendar-transfer-btn" data-scm-case-calendar-transfer-open>Trasladar / Reprogramar</button>'
-        : "") +
-      (eventId && !isDone
-        ? '<button type="button" class="scm-case-calendar-complete-btn" data-scm-case-calendar-complete-open>Marcar realizado</button>'
-        : "") +
-      "</div>" +
-      (eventId
-        ? '<form class="scm-case-calendar-complete-panel scm-case-calendar-transfer-panel" data-scm-case-calendar-transfer-panel hidden autocomplete="off">' +
-          '<div class="scm-case-calendar-transfer-title"><strong>Trasladar / Reprogramar</strong><span>Define una nueva franja para emitir el alcance formal.</span></div>' +
-          '<div class="scm-case-calendar-transfer-grid">' +
-          '<label><span>Nueva fecha</span><input type="date" name="fecha" required value="' +
-          escHtml(
-            calendarDatePartFromDateTime(
-              row.fecha_inicio || row.fecha || row.start,
-            ),
-          ) +
+        ? '<form class="scm-cal-form" data-scm-case-calendar-transfer-panel hidden autocomplete="off">' +
+          '<div><p class="scm-cal-form-title">Trasladar / reprogramar</p><p class="scm-cal-hint">Define la nueva franja. Si es una cita de caso tambi&eacute;n se enviar&aacute; el aviso de reprogramaci&oacute;n.</p></div>' +
+          '<div class="scm-cal-form-grid">' +
+          '<label class="scm-cal-field">Nueva fecha<input class="scm-cal-input" type="date" name="fecha" required value="' +
+          escHtml(calendarDatePartFromDateTime(startValue)) +
           '"></label>' +
-          '<label><span>Hora inicio</span><input type="time" name="hora_inicio" required value="' +
-          escHtml(
-            calendarTimePartFromDateTime(
-              row.fecha_inicio || row.fecha || row.start,
-            ),
-          ) +
+          '<label class="scm-cal-field">Hora inicio<input class="scm-cal-input" type="time" name="hora_inicio" required value="' +
+          escHtml(calendarTimePartFromDateTime(startValue)) +
           '"></label>' +
-          '<label><span>Hora fin</span><input type="time" name="hora_fin" required value="' +
+          '<label class="scm-cal-field">Hora fin<input class="scm-cal-input" type="time" name="hora_fin" required value="' +
           escHtml(calendarTimePartFromDateTime(row.fecha_fin || row.end)) +
           '"></label>' +
           "</div>" +
-          '<label><span>Motivo del traslado</span><textarea name="observacion" rows="3" required placeholder="Explica por qu&eacute; se traslada este evento..."></textarea><small>Si es una cita relacionada con caso, tambi&eacute;n se preparar&aacute; el mensaje de reprogramaci&oacute;n.</small></label>' +
-          '<div><button type="submit" class="scm-case-calendar-complete-save">Guardar traslado</button><button type="button" class="scm-case-calendar-complete-cancel" data-scm-case-calendar-transfer-cancel>Cancelar</button></div>' +
-          '<small data-scm-case-calendar-transfer-msg aria-live="polite"></small>' +
+          '<label class="scm-cal-field">Motivo del traslado<textarea class="scm-cal-input" name="observacion" rows="3" required placeholder="Explica por qu&eacute; se traslada este evento..."></textarea></label>' +
+          '<div class="scm-cal-form-actions"><small class="scm-cal-form-msg" data-scm-case-calendar-transfer-msg aria-live="polite"></small>' +
+          '<button type="button" class="scm-cal-btn scm-cal-btn--ghost" data-scm-case-calendar-transfer-cancel>Cancelar</button>' +
+          '<button type="submit" class="scm-cal-btn scm-cal-btn--primary">Guardar traslado</button></div>' +
           "</form>"
         : "") +
       (eventId && !isDone
-        ? '<form class="scm-case-calendar-complete-panel" data-scm-case-calendar-complete-panel hidden autocomplete="off">' +
-          '<label><span>Observaci&oacute;n de realizaci&oacute;n</span><textarea name="observacion" rows="3" required>Realizado</textarea><small>Este texto se guardar&aacute; por defecto. Si tienes informaci&oacute;n adicional, puedes ampliarlo antes de guardar.</small></label>' +
-          '<div><button type="submit" class="scm-case-calendar-complete-save">Guardar realizado</button><button type="button" class="scm-case-calendar-complete-cancel" data-scm-case-calendar-complete-cancel>Cancelar</button></div>' +
-          '<small data-scm-case-calendar-complete-msg aria-live="polite"></small>' +
+        ? '<form class="scm-cal-form is-success" data-scm-case-calendar-complete-panel hidden autocomplete="off">' +
+          '<div><p class="scm-cal-form-title">Marcar como realizado</p><p class="scm-cal-hint">Se guarda &laquo;Realizado&raquo; por defecto; ampl&iacute;alo si tienes m&aacute;s informaci&oacute;n.</p></div>' +
+          '<label class="scm-cal-field">Observaci&oacute;n<textarea class="scm-cal-input" name="observacion" rows="3" required>Realizado</textarea></label>' +
+          '<div class="scm-cal-form-actions"><small class="scm-cal-form-msg" data-scm-case-calendar-complete-msg aria-live="polite"></small>' +
+          '<button type="button" class="scm-cal-btn scm-cal-btn--ghost" data-scm-case-calendar-complete-cancel>Cancelar</button>' +
+          '<button type="submit" class="scm-cal-btn scm-cal-btn--success">Guardar realizado</button></div>' +
           "</form>"
+        : "") +
+      "</div>" +
+      (eventId
+        ? '<footer class="scm-cal-sheet-foot" data-scm-case-calendar-mini-actions>' +
+          '<button type="button" class="scm-cal-btn scm-cal-btn--ghost" data-scm-case-calendar-transfer-open>' +
+          caseCalendarIcon("event_repeat") +
+          "Trasladar / reprogramar</button>" +
+          (!isDone
+            ? '<button type="button" class="scm-cal-btn scm-cal-btn--success" data-scm-case-calendar-complete-open>' +
+              caseCalendarIcon("task_alt") +
+              "Marcar realizado</button>"
+            : "") +
+          "</footer>"
         : "") +
       "</div>" +
       "</div>";
     shell.insertAdjacentHTML("beforeend", html);
     var mini = shell.querySelector("[data-scm-case-calendar-event-mini]");
     if (!mini) return;
-    mini.addEventListener("click", function (event) {
-      if (
-        event.target === mini ||
-        (event.target &&
-          event.target.closest &&
-          event.target.closest("[data-scm-case-calendar-event-mini-close]"))
-      ) {
-        closeCaseCalendarEventMini(shell);
-        return;
-      }
-      if (
-        event.target &&
-        event.target.closest &&
-        event.target.closest("[data-scm-case-calendar-event-mini-back]")
-      ) {
-        closeCaseCalendarEventMini(shell);
-        options.onBack();
-        return;
-      }
-      var transferBtn =
-        event.target && event.target.closest
-          ? event.target.closest("[data-scm-case-calendar-transfer-open]")
-          : null;
-      if (transferBtn) {
-        var transferPanel = mini.querySelector(
-          "[data-scm-case-calendar-transfer-panel]",
-        );
-        var completePanel = mini.querySelector(
-          "[data-scm-case-calendar-complete-panel]",
-        );
-        if (completePanel) completePanel.hidden = true;
-        if (transferPanel) {
-          transferPanel.hidden = false;
-          var firstField = transferPanel.querySelector("input, textarea");
-          if (firstField) firstField.focus();
-        }
-        return;
-      }
-      var openBtn =
-        event.target && event.target.closest
-          ? event.target.closest("[data-scm-case-calendar-complete-open]")
-          : null;
-      if (openBtn) {
-        var panel = mini.querySelector(
-          "[data-scm-case-calendar-complete-panel]",
-        );
-        var openTransferPanel = mini.querySelector(
-          "[data-scm-case-calendar-transfer-panel]",
-        );
-        if (openTransferPanel) openTransferPanel.hidden = true;
-        if (panel) {
-          panel.hidden = false;
-          var textarea = panel.querySelector("textarea");
-          if (textarea) textarea.focus();
-        }
-        return;
-      }
-      if (
-        event.target &&
-        event.target.closest &&
-        event.target.closest("[data-scm-case-calendar-complete-cancel]")
-      ) {
-        var cancelPanel = mini.querySelector(
-          "[data-scm-case-calendar-complete-panel]",
-        );
-        if (cancelPanel) cancelPanel.hidden = true;
-      }
-      if (
-        event.target &&
-        event.target.closest &&
-        event.target.closest("[data-scm-case-calendar-transfer-cancel]")
-      ) {
-        var cancelTransferPanel = mini.querySelector(
-          "[data-scm-case-calendar-transfer-panel]",
-        );
-        if (cancelTransferPanel) cancelTransferPanel.hidden = true;
-      }
-    });
+    if (typeof options.onBack === "function") mini._scmOnBack = options.onBack;
+    var footer = mini.querySelector("[data-scm-case-calendar-mini-actions]");
     var transferForm = mini.querySelector(
       "[data-scm-case-calendar-transfer-panel]",
     );
+    var form = mini.querySelector("[data-scm-case-calendar-complete-panel]");
+    var showPanel = function (panel) {
+      if (transferForm) transferForm.hidden = panel !== transferForm;
+      if (form) form.hidden = panel !== form;
+      if (footer) footer.hidden = !!panel;
+      if (panel) {
+        panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        var field = panel.querySelector("textarea, input");
+        if (field) field.focus();
+      }
+    };
+    mini.addEventListener("click", function (event) {
+      var target = event.target;
+      var closest = function (selector) {
+        return target && target.closest ? target.closest(selector) : null;
+      };
+      if (
+        target === mini ||
+        closest("[data-scm-case-calendar-event-mini-close]") ||
+        closest("[data-scm-case-calendar-event-mini-back]")
+      ) {
+        dismissCaseCalendarLayer(shell, mini);
+        return;
+      }
+      if (closest("[data-scm-case-calendar-transfer-open]")) {
+        showPanel(transferForm);
+        return;
+      }
+      if (closest("[data-scm-case-calendar-complete-open]")) {
+        showPanel(form);
+        return;
+      }
+      if (
+        closest("[data-scm-case-calendar-complete-cancel]") ||
+        closest("[data-scm-case-calendar-transfer-cancel]")
+      ) {
+        showPanel(null);
+      }
+    });
     if (transferForm && eventId) {
       transferForm.addEventListener("submit", function (event) {
         event.preventDefault();
@@ -5181,36 +5302,17 @@
             row.fecha_inicio = payload.fecha_inicio;
             row.fecha_fin = payload.fecha_fin;
             if (payload.descripcion) row.descripcion = payload.descripcion;
-            var cells = mini.querySelectorAll(
-              ".scm-case-calendar-event-mini-grid > div strong",
-            );
-            if (cells[0])
-              cells[0].textContent = formatCalendarDateTime(
-                payload.fecha_inicio,
-              );
-            if (cells[1])
-              cells[1].textContent = formatCalendarDateTime(payload.fecha_fin);
-            if (msg) msg.textContent = json.message || "Evento trasladado.";
             scmNotify(
               "success",
               json.message || "Evento trasladado.",
               "Calendario",
             );
-            if (typeof shell._scmCaseCalendarRender === "function") {
-              shell._scmCaseCalendarRender();
-            }
-            closeCaseCalendarEventMini(shell);
-            if (
-              typeof options.onBack === "function" &&
-              !shell._scmCaseCalendarCloseOnTransferred
-            ) {
-              options.onBack();
-            }
+            refreshCaseCalendarHost(shell);
+            var closeAll = !!shell._scmCaseCalendarCloseOnTransferred;
+            mini._scmOnBack = closeAll ? null : options.onBack;
+            dismissCaseCalendarLayer(shell, mini);
             dispatchCaseActionSaved(root, ticket, shell);
-            if (
-              shell &&
-              typeof shell._scmCaseCalendarEventTransferred === "function"
-            ) {
+            if (typeof shell._scmCaseCalendarEventTransferred === "function") {
               shell._scmCaseCalendarEventTransferred({
                 eventId: eventId,
                 payload: payload,
@@ -5218,14 +5320,9 @@
                 row: row,
               });
             }
-            if (
-              shell &&
-              shell._scmCaseCalendarCloseOnTransferred &&
-              window.Swal &&
-              typeof window.Swal.close === "function"
-            ) {
+            if (closeAll) {
               window.setTimeout(function () {
-                window.Swal.close();
+                closeCaseCalendarHost(shell);
               }, 250);
             }
             if (ticket) {
@@ -5279,7 +5376,6 @@
           });
       });
     }
-    var form = mini.querySelector("[data-scm-case-calendar-complete-panel]");
     if (form && eventId) {
       form.addEventListener("submit", function (event) {
         event.preventDefault();
@@ -5312,36 +5408,28 @@
               );
             }
             row.estado = "Si";
-            var status = mini.querySelector(
+            var badge = mini.querySelector(
               "[data-scm-case-calendar-event-state]",
             );
-            if (status) {
-              status.textContent = "Realizado";
-              status.classList.add("is-done");
+            if (badge) {
+              badge.textContent = "Realizado";
+              badge.className = "scm-cal-status is-done";
             }
-            var actions = mini.querySelector(
-              "[data-scm-case-calendar-mini-actions]",
+            var completeBtn = mini.querySelector(
+              "[data-scm-case-calendar-complete-open]",
             );
-            if (actions) {
-              actions.innerHTML =
-                '<span class="scm-case-calendar-event-state-badge is-done">Realizado</span>';
-            }
-            form.hidden = true;
+            if (completeBtn) completeBtn.remove();
+            showPanel(null);
             scmNotify(
               "success",
               json.message || "Evento marcado como realizado.",
               "Calendario",
             );
-            if (typeof shell._scmCaseCalendarRender === "function") {
-              shell._scmCaseCalendarRender();
-            }
+            refreshCaseCalendarHost(shell);
             if (typeof options.onBack === "function") {
               window.setTimeout(function () {
-                if (mini.isConnected) {
-                  closeCaseCalendarEventMini(shell);
-                  options.onBack();
-                }
-              }, 700);
+                if (mini.isConnected) dismissCaseCalendarLayer(shell, mini);
+              }, 600);
             }
           })
           .catch(function (error) {
@@ -5371,18 +5459,21 @@
       : null;
     if (title) title.textContent = caseCalendarMonthTitle(monthDate);
     if (!grid) return Promise.resolve();
+    var emptyGrid = function (text) {
+      grid.innerHTML = '<div class="scm-cal-grid-empty">' + text + "</div>";
+    };
     if (!employeeId) {
-      grid.innerHTML =
-        '<div class="scm-case-calendar-empty">Este caso no tiene funcionario asignado.</div>';
+      emptyGrid("Este caso no tiene funcionario asignado.");
       return Promise.resolve();
     }
     if (!isCalendarEmployeeAllowed(root, employeeId)) {
-      grid.innerHTML =
-        '<div class="scm-case-calendar-empty">El funcionario asignado no pertenece a los cargos visibles del calendario.</div>';
+      emptyGrid(
+        "El funcionario asignado no pertenece a los cargos visibles del calendario.",
+      );
       return Promise.resolve();
     }
-    grid.innerHTML =
-      '<div class="scm-case-calendar-empty">Cargando calendario...</div>';
+    grid.setAttribute("aria-busy", "true");
+    if (!grid.querySelector(".scm-cal-day")) emptyGrid("Cargando calendario...");
     var range = caseCalendarMonthRange(monthDate);
     return calendarApiRequest(root, "filtrar_eventos_admin", {
       id_empleado: employeeId,
@@ -5398,10 +5489,9 @@
           );
         }
         var rowsByDay = {};
-        var allRows = extractCalendarRows(json.data || []);
         var doneCount = 0;
         var pendingCount = 0;
-        allRows.forEach(function (row) {
+        extractCalendarRows(json.data || []).forEach(function (row) {
           if (isCaseCalendarEventDone(row)) {
             doneCount += 1;
           } else {
@@ -5412,12 +5502,12 @@
           if (!rowsByDay[key]) rowsByDay[key] = [];
           rowsByDay[key].push(row);
         });
-        var doneCountNode = shell
-          ? shell.querySelector("[data-scm-case-calendar-done-count]")
-          : null;
-        var pendingCountNode = shell
-          ? shell.querySelector("[data-scm-case-calendar-pending-count]")
-          : null;
+        var doneCountNode = shell.querySelector(
+          "[data-scm-case-calendar-done-count]",
+        );
+        var pendingCountNode = shell.querySelector(
+          "[data-scm-case-calendar-pending-count]",
+        );
         if (doneCountNode) doneCountNode.textContent = String(doneCount);
         if (pendingCountNode) pendingCountNode.textContent = String(pendingCount);
         Object.keys(rowsByDay).forEach(function (key) {
@@ -5429,40 +5519,41 @@
         });
 
         var first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+        var daysInMonth = new Date(
+          monthDate.getFullYear(),
+          monthDate.getMonth() + 1,
+          0,
+        ).getDate();
         var startOffset = (first.getDay() + 6) % 7;
+        var totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
         var cursor = addCalendarDays(first, -startOffset);
         var todayKey = calendarDateKey(new Date());
         var cells = [];
         var eventDetails = [];
-        for (var i = 0; i < 42; i += 1) {
+        for (var i = 0; i < totalCells; i += 1) {
           var current = addCalendarDays(cursor, i);
           var key = calendarDateKey(current);
           var rows = rowsByDay[key] || [];
           var holiday = caseCalendarHolidayLabel(current);
-          var classes = ["scm-case-calendar-day"];
+          var classes = ["scm-cal-day"];
           if (current.getMonth() !== monthDate.getMonth())
             classes.push("is-muted");
           if (key === todayKey) classes.push("is-today");
           if (holiday) classes.push("is-holiday");
-          if (rows.length) classes.push("has-events");
-          if (!rows.length && current.getMonth() === monthDate.getMonth())
-            classes.push("is-free");
+          if (current.getDay() === 0 || current.getDay() === 6)
+            classes.push("is-weekend");
           cells.push(
             '<div class="' +
               classes.join(" ") +
               '">' +
-              '<div class="scm-case-calendar-day-head"><span class="scm-case-calendar-day-number">' +
+              '<div class="scm-cal-day-head"><span class="scm-cal-day-num">' +
               current.getDate() +
               "</span>" +
               (holiday
-                ? '<span class="scm-case-calendar-day-holiday">' +
-                   escHtml(holiday) +
-                   "</span>"
-                 : "") +
-              (rows.length
-                ? '<span class="scm-case-calendar-day-events-count">' +
-                  rows.length +
-                  (rows.length === 1 ? " evento" : " citas") +
+                ? '<span class="scm-cal-day-holiday" title="' +
+                  escHtml(holiday) +
+                  '">' +
+                  escHtml(holiday) +
                   "</span>"
                 : "") +
               "</div>" +
@@ -5470,55 +5561,56 @@
                 .slice(0, 3)
                 .map(function (row) {
                   var detailIndex = eventDetails.push(row) - 1;
-                  var done = isCaseCalendarEventDone(row);
+                  var status = caseCalendarStatus(row);
+                  var label = row.titulo || "Evento";
                   return (
-                    '<div class="scm-case-calendar-day-pill' +
-                    (done ? " is-done" : "") +
-                    '"><div><strong>' +
-                    escHtml(formatCalendarDateTime(row.fecha_inicio)) +
-                    "</strong><span>" +
-                    escHtml(row.titulo || "Evento") +
-                    '</span><em class="scm-case-calendar-day-status' +
-                    (done ? " is-done" : "") +
-                    '">' +
-                    (done ? "Realizado" : "Pendiente") +
-                    '</em></div><button type="button" class="scm-case-calendar-event-detail-btn" data-scm-case-calendar-event-detail="' +
+                    '<button type="button" class="scm-cal-event is-' +
+                    status.key +
+                    '" data-scm-case-calendar-event-detail="' +
                     detailIndex +
-                    '" aria-label="Ver detalle de ' +
-                    escHtml(row.titulo || "evento") +
-                    '">Ver</button></div>'
+                    '" title="' +
+                    escHtml(
+                      caseCalendarTimeRange(row) +
+                        " · " +
+                        label +
+                        " (" +
+                        status.label +
+                        ")",
+                    ) +
+                    '"><span class="scm-cal-event-time">' +
+                    escHtml(
+                      calendarTimePartFromDateTime(row.fecha_inicio) || "",
+                    ) +
+                    '</span><span class="scm-cal-event-title">' +
+                    escHtml(label) +
+                    "</span></button>"
                   );
                 })
                 .join("") +
               (rows.length > 3
-                ? '<button type="button" class="scm-case-calendar-day-more" data-scm-case-calendar-day-list="' +
+                ? '<button type="button" class="scm-cal-more" data-scm-case-calendar-day-list="' +
                   escHtml(key) +
                   '">+' +
                   (rows.length - 3) +
-                  " más &middot; ver todas</button>"
-                : "") +
-              (!rows.length
-                ? '<div class="scm-case-calendar-day-free">' +
-                  (current.getMonth() === monthDate.getMonth()
-                    ? "Disponible"
-                    : "Sin citas") +
-                  "</div>"
+                  " m&aacute;s</button>"
                 : "") +
               "</div>",
           );
         }
         grid.innerHTML = cells.join("");
+        grid.removeAttribute("aria-busy");
         shell._scmCaseCalendarEventDetails = eventDetails;
         grid
           .querySelectorAll("[data-scm-case-calendar-day-list]")
           .forEach(function (btn) {
             btn.addEventListener("click", function (event) {
               event.preventDefault();
-              event.stopPropagation();
               var dayKey = btn.getAttribute("data-scm-case-calendar-day-list");
               openCaseCalendarRowsMini(root, shell, {
                 label: "Eventos del día",
-                title: formatCalendarDateTime(dayKey + " 00:00:00").split(" ")[0],
+                icon: "calendar_today",
+                tone: "info",
+                title: caseCalendarDateLabel(dayKey + " 00:00"),
                 emptyText: "No hay eventos en este día.",
                 rows: rowsByDay[dayKey] || [],
               });
@@ -5529,7 +5621,6 @@
           .forEach(function (btn) {
             btn.addEventListener("click", function (event) {
               event.preventDefault();
-              event.stopPropagation();
               var index = parseInt(
                 btn.getAttribute("data-scm-case-calendar-event-detail") || "-1",
                 10,
@@ -5543,8 +5634,8 @@
           });
       })
       .catch(function (error) {
-        grid.innerHTML =
-          '<div class="scm-case-calendar-empty">No se pudo cargar el calendario.</div>';
+        grid.removeAttribute("aria-busy");
+        emptyGrid("No se pudo cargar el calendario.");
         scmNotify("error", error.message || "No se pudo cargar el calendario.");
       });
   }
@@ -5553,70 +5644,105 @@
     rows = Array.isArray(rows) ? rows : [];
     if (!rows.length) {
       return (
-        '<div class="scm-case-calendar-pending-empty">' +
+        '<div class="scm-cal-empty">' +
+        caseCalendarIcon("task_alt") +
+        "<p>" +
         escHtml(
           emptyText || "No hay eventos pendientes vencidos para este funcionario.",
         ) +
-        "</div>"
+        "</p></div>"
       );
     }
+    var now = Date.now();
     return rows
       .map(function (row, index) {
-        var ticket = caseCalendarEventDetailValue(row, ["id_ticket", "ticket"]);
+        var ticket = caseCalendarTicket(row);
         var category = caseCalendarEventDetailValue(row, [
           "categoria",
           "nombre_categoria",
         ]);
-        var done = isCaseCalendarEventDone(row);
+        var status = caseCalendarStatus(row);
+        var start = caseCalendarParseDate(
+          row.fecha_inicio || row.fecha || row.start,
+        );
+        var end = caseCalendarParseDate(row.fecha_fin || row.end) || start;
+        var overdueDays =
+          status.key === "overdue" && end
+            ? Math.floor((now - end.getTime()) / 86400000)
+            : 0;
+        var meta = [caseCalendarTimeRange(row), category]
+          .concat(ticket ? ["Caso #" + ticket] : [])
+          .filter(Boolean);
+        var search = [row.titulo, category, ticket, row.ubicacion]
+          .join(" ")
+          .toLowerCase();
         return (
-          '<article class="scm-case-calendar-pending-row' +
-          (done ? " is-done" : "") +
-          '">' +
-          '<div class="scm-case-calendar-pending-row-main"><strong>' +
-          escHtml(row.titulo || "Evento") +
-          "</strong><span>" +
-          escHtml(
-            formatCalendarDateTime(row.fecha_inicio || row.fecha || row.start),
-          ) +
-          (row.fecha_fin
-            ? " - " + escHtml(formatCalendarDateTime(row.fecha_fin))
-            : "") +
-          "</span>" +
-          "<p>" +
-          (category
-            ? "<b>Categor&iacute;a:</b> " + escHtml(category) + " "
-            : "") +
-          (ticket ? "<b>Caso:</b> #" + escHtml(ticket) : "") +
-          (done ? " <em>Realizado</em>" : "") +
-          "</p></div>" +
-          '<button type="button" class="scm-case-calendar-pending-open" data-scm-case-calendar-pending-detail="' +
+          '<button type="button" class="scm-cal-row is-' +
+          status.key +
+          '" data-scm-case-calendar-pending-detail="' +
           index +
-          '">Gestionar</button>' +
-          "</article>"
+          '" data-search="' +
+          escHtml(search) +
+          '">' +
+          '<span class="scm-cal-row-date"><b>' +
+          (start ? start.getDate() : "–") +
+          "</b><small>" +
+          (start
+            ? CASE_CALENDAR_MONTHS_SHORT[start.getMonth()] +
+              " " +
+              String(start.getFullYear()).slice(2)
+            : "") +
+          "</small></span>" +
+          '<span class="scm-cal-row-main"><strong>' +
+          escHtml(row.titulo || "Evento") +
+          '</strong><span class="scm-cal-row-meta">' +
+          escHtml(meta.join(" · ")) +
+          "</span></span>" +
+          '<span class="scm-cal-row-side"><em class="scm-cal-status is-' +
+          status.key +
+          '">' +
+          (overdueDays > 0
+            ? "Hace " + overdueDays + (overdueDays === 1 ? " día" : " días")
+            : status.label) +
+          '</em><span class="scm-cal-row-cta">Gestionar' +
+          caseCalendarIcon("chevron_right") +
+          "</span></span>" +
+          "</button>"
         );
       })
       .join("");
   }
 
   // Lista flotante de eventos (pendientes vencidos o eventos de un día).
-  // options: { label, title, emptyText, rows | load: () => Promise<rows> }
+  // options: { label, title, icon, tone, emptyText, rows | load: () => Promise<rows> }
   function openCaseCalendarRowsMini(root, shell, options) {
     if (!shell) return;
     options = options || {};
     closeCaseCalendarEventMini(shell);
     closeCaseCalendarPendingMini(shell);
     var html =
-      '<div class="scm-case-calendar-event-mini scm-case-calendar-pending-mini" data-scm-case-calendar-pending-mini>' +
-      '<div class="scm-case-calendar-event-mini-card scm-case-calendar-pending-card" role="dialog" aria-modal="true" aria-label="' +
+      '<div class="scm-cal-layer" data-scm-case-calendar-layer data-scm-case-calendar-pending-mini>' +
+      '<div class="scm-cal-sheet scm-cal-sheet--list" role="dialog" aria-modal="true" aria-label="' +
       escHtml(options.label || "Eventos") +
       '">' +
-      '<button type="button" class="scm-case-calendar-event-mini-close" data-scm-case-calendar-pending-close aria-label="Cerrar lista">&times;</button>' +
-      '<div class="scm-case-calendar-event-mini-head"><span>' +
+      '<header class="scm-cal-sheet-head"><div class="scm-cal-sheet-heading">' +
+      '<p class="scm-cal-sheet-kicker"><span class="scm-cal-kicker-icon is-' +
+      escHtml(options.tone || "danger") +
+      '">' +
+      caseCalendarIcon(options.icon || "pending_actions") +
+      "</span>" +
       escHtml(options.label || "Eventos") +
-      " <b data-scm-case-calendar-pending-total></b></span><strong>" +
+      ' <b class="scm-cal-count" data-scm-case-calendar-pending-total></b></p>' +
+      '<h3 class="scm-cal-sheet-title">' +
       escHtml(options.title || "Funcionario asignado") +
-      "</strong></div>" +
-      '<div class="scm-case-calendar-pending-list" data-scm-case-calendar-pending-list><div class="scm-case-calendar-pending-empty">Cargando eventos...</div></div>' +
+      "</h3></div>" +
+      '<button type="button" class="scm-cal-icon-btn" data-scm-case-calendar-pending-close aria-label="Cerrar lista">' +
+      caseCalendarIcon("close") +
+      "</button></header>" +
+      '<div class="scm-cal-search" data-scm-case-calendar-list-tools hidden>' +
+      caseCalendarIcon("search") +
+      '<input type="search" class="scm-cal-input" placeholder="Buscar por t&iacute;tulo, caso o categor&iacute;a" data-scm-case-calendar-list-search aria-label="Buscar eventos"></div>' +
+      '<div class="scm-cal-sheet-body"><div class="scm-cal-list" data-scm-case-calendar-pending-list><div class="scm-cal-empty is-loading"><p>Cargando eventos...</p></div></div></div>' +
       "</div>" +
       "</div>";
     shell.insertAdjacentHTML("beforeend", html);
@@ -5627,24 +5753,29 @@
     var total = mini
       ? mini.querySelector("[data-scm-case-calendar-pending-total]")
       : null;
+    var tools = mini
+      ? mini.querySelector("[data-scm-case-calendar-list-tools]")
+      : null;
+    var search = mini
+      ? mini.querySelector("[data-scm-case-calendar-list-search]")
+      : null;
     if (!mini || !list) return;
     var reopen = function () {
       openCaseCalendarRowsMini(root, shell, options);
     };
     mini.addEventListener("click", function (event) {
+      var target = event.target;
       if (
-        event.target === mini ||
-        (event.target &&
-          event.target.closest &&
-          event.target.closest("[data-scm-case-calendar-pending-close]"))
+        target === mini ||
+        (target.closest &&
+          target.closest("[data-scm-case-calendar-pending-close]"))
       ) {
-        closeCaseCalendarPendingMini(shell);
+        dismissCaseCalendarLayer(shell, mini);
         return;
       }
-      var detailBtn =
-        event.target && event.target.closest
-          ? event.target.closest("[data-scm-case-calendar-pending-detail]")
-          : null;
+      var detailBtn = target.closest
+        ? target.closest("[data-scm-case-calendar-pending-detail]")
+        : null;
       if (detailBtn) {
         event.preventDefault();
         var index = parseInt(
@@ -5655,17 +5786,30 @@
         var row =
           shell._scmCaseCalendarPendingRows &&
           shell._scmCaseCalendarPendingRows[index];
-        closeCaseCalendarPendingMini(shell);
         openCaseCalendarEventMini(root, shell, row, {
           backLabel: "Volver a la lista",
           onBack: reopen,
         });
       }
     });
+    if (search) {
+      search.addEventListener("input", function () {
+        var term = search.value.trim().toLowerCase();
+        list
+          .querySelectorAll("[data-scm-case-calendar-pending-detail]")
+          .forEach(function (item) {
+            item.hidden =
+              !!term &&
+              String(item.getAttribute("data-search") || "").indexOf(term) ===
+                -1;
+          });
+      });
+    }
     var show = function (rows) {
       rows = Array.isArray(rows) ? rows : [];
       shell._scmCaseCalendarPendingRows = rows;
-      if (total) total.textContent = rows.length ? "(" + rows.length + ")" : "";
+      if (total) total.textContent = rows.length ? String(rows.length) : "";
+      if (tools) tools.hidden = rows.length <= 5;
       list.innerHTML = renderCaseCalendarPendingRows(rows, options.emptyText);
     };
     if (typeof options.load !== "function") {
@@ -5677,7 +5821,7 @@
       .then(show)
       .catch(function (error) {
         list.innerHTML =
-          '<div class="scm-case-calendar-pending-empty">No se pudieron cargar los eventos.</div>';
+          '<div class="scm-cal-empty"><p>No se pudieron cargar los eventos.</p></div>';
         scmNotify("error", error.message || "No se pudieron cargar los eventos.");
       });
   }
@@ -5706,12 +5850,23 @@
 
   function openCaseCalendarPendingMini(root, shell, employeeId, employeeName) {
     openCaseCalendarRowsMini(root, shell, {
-      label: "Eventos pendientes vencidos",
+      label: "Pendientes vencidos",
+      icon: "pending_actions",
+      tone: "danger",
       title: employeeName || "Funcionario asignado",
       load: function () {
         return loadCaseCalendarOverdueRows(root, employeeId);
       },
     });
+  }
+
+  // Solo la lista de vencidos (sin abrir el calendario mensual).
+  function openCaseCalendarOverduePopup(root, employeeId, employeeName, options) {
+    options = options || {};
+    var host = createCaseCalendarHost(true);
+    host._scmCaseCalendarOnClose =
+      typeof options.onClose === "function" ? options.onClose : null;
+    openCaseCalendarPendingMini(root, host, employeeId, employeeName);
   }
 
   function openCalendarCaseMonthPopup(
@@ -5721,100 +5876,103 @@
     selectedDate,
     options,
   ) {
-    if (!window.Swal || typeof window.Swal.fire !== "function") {
-      scmNotify("error", "No se pudo abrir el calendario.");
-      return;
-    }
     options = options || {};
     var currentMonth = caseCalendarMonthDate(selectedDate);
-    window.Swal.fire({
-      title: "",
-      html:
-        '<div class="scm-case-calendar-month-shell" data-scm-case-calendar-popup>' +
-        '<div class="scm-case-calendar-modal-head"><span class="scm-case-calendar-modal-icon" aria-hidden="true"></span><div><h3>Calendario del funcionario</h3><p>Funcionario asignado: <strong>' +
-        escHtml(employeeName || "Funcionario asignado") +
-        '</strong></p></div><span class="scm-case-calendar-modal-badge">Vista Operativa Mensual</span></div>' +
-        '<div class="scm-case-calendar-toolbar">' +
-        '<button type="button" class="scm-case-calendar-nav" data-scm-case-calendar-prev aria-label="Mes anterior">&lsaquo;</button>' +
-        '<div class="scm-case-calendar-heading"><span>' +
-        escHtml(employeeName || "Funcionario asignado") +
-        "</span><strong data-scm-case-calendar-title>" +
-        escHtml(caseCalendarMonthTitle(currentMonth)) +
-        "</strong><small>Eventos y festivos de Colombia</small></div>" +
-        '<button type="button" class="scm-case-calendar-nav" data-scm-case-calendar-next aria-label="Mes siguiente">&rsaquo;</button>' +
-        '<div class="scm-case-calendar-top-actions"><span class="scm-case-calendar-stat is-done"><b data-scm-case-calendar-done-count>0</b> Realizados</span><span class="scm-case-calendar-stat is-pending"><b data-scm-case-calendar-pending-count>0</b> Pendientes</span><button type="button" class="scm-case-calendar-pending-btn" data-scm-case-calendar-pending>Eventos pendientes</button></div>' +
-        "</div>" +
-        '<div class="scm-case-calendar-weekdays"><span>Lu</span><span>Ma</span><span>Mi</span><span>Ju</span><span>Vi</span><span>Sa</span><span>Do</span></div>' +
-        '<div class="scm-case-calendar-grid" data-scm-case-calendar-grid><div class="scm-case-calendar-empty">Cargando calendario...</div></div>' +
-        '<div class="scm-case-calendar-foot"><span>Revisi&oacute;n preventiva: 45 min por visita</span></div>' +
-        "</div>",
-      width: 1180,
-      showConfirmButton: true,
-      showCancelButton: true,
-      confirmButtonText: "OK",
-      cancelButtonText: "Cerrar calendario",
-      confirmButtonColor: "#f59e0b",
-      cancelButtonColor: "#e2e8f0",
-      allowOutsideClick: false,
-      allowEscapeKey: false,
-      customClass: { popup: "scm-calendar-swal-popup scm-case-calendar-swal" },
-      didOpen: function () {
-        var popup = window.Swal.getPopup();
-        var shell = popup
-          ? popup.querySelector("[data-scm-case-calendar-popup]")
-          : null;
-        var render = function () {
-          renderCaseCalendarMonth(root, shell, employeeId, currentMonth);
-        };
-        if (shell) {
-          shell._scmCaseCalendarRender = render;
-          shell._scmCaseCalendarEventTransferred =
-            typeof options.onEventTransferred === "function"
-              ? options.onEventTransferred
-              : null;
-          shell._scmCaseCalendarCloseOnTransferred =
-            options.closeOnEventTransferred === true;
-        }
-        var prev = popup
-          ? popup.querySelector("[data-scm-case-calendar-prev]")
-          : null;
-        var next = popup
-          ? popup.querySelector("[data-scm-case-calendar-next]")
-          : null;
-        var pending = popup
-          ? popup.querySelector("[data-scm-case-calendar-pending]")
-          : null;
-        if (prev) {
-          prev.addEventListener("click", function () {
-            currentMonth = new Date(
-              currentMonth.getFullYear(),
-              currentMonth.getMonth() - 1,
-              1,
-            );
-            render();
-          });
-        }
-        if (next) {
-          next.addEventListener("click", function () {
-            currentMonth = new Date(
-              currentMonth.getFullYear(),
-              currentMonth.getMonth() + 1,
-              1,
-            );
-            render();
-          });
-        }
-        if (pending) {
-          pending.addEventListener("click", function () {
-            openCaseCalendarPendingMini(root, shell, employeeId, employeeName);
-          });
-        }
-        render();
-        if (options.openPending) {
-          openCaseCalendarPendingMini(root, shell, employeeId, employeeName);
-        }
-      },
+    var name = employeeName || "Funcionario asignado";
+    var shell = createCaseCalendarHost(false);
+    shell.innerHTML =
+      '<div class="scm-cal-overlay" data-scm-case-calendar-popup>' +
+      '<section class="scm-cal-dialog" role="dialog" aria-modal="true" aria-label="Calendario del funcionario">' +
+      '<header class="scm-cal-head">' +
+      '<div class="scm-cal-who"><span class="scm-cal-avatar" aria-hidden="true">' +
+      escHtml(caseCalendarInitials(name)) +
+      '</span><div class="min-w-0"><p class="scm-cal-eyebrow">Agenda del funcionario</p><h2 class="scm-cal-name">' +
+      escHtml(name) +
+      "</h2></div></div>" +
+      '<div class="scm-cal-head-actions">' +
+      '<button type="button" class="scm-cal-chip-btn" data-scm-case-calendar-pending>' +
+      caseCalendarIcon("pending_actions") +
+      '<span>Vencidos</span><b data-scm-case-calendar-overdue-count></b></button>' +
+      '<button type="button" class="scm-cal-icon-btn" data-scm-case-calendar-close aria-label="Cerrar calendario">' +
+      caseCalendarIcon("close") +
+      "</button></div></header>" +
+      '<div class="scm-cal-toolbar">' +
+      '<div class="scm-cal-nav">' +
+      '<button type="button" class="scm-cal-icon-btn" data-scm-case-calendar-prev aria-label="Mes anterior">' +
+      caseCalendarIcon("chevron_left") +
+      "</button>" +
+      '<h3 class="scm-cal-month" data-scm-case-calendar-title>' +
+      escHtml(caseCalendarMonthTitle(currentMonth)) +
+      "</h3>" +
+      '<button type="button" class="scm-cal-icon-btn" data-scm-case-calendar-next aria-label="Mes siguiente">' +
+      caseCalendarIcon("chevron_right") +
+      "</button>" +
+      '<button type="button" class="scm-cal-btn scm-cal-btn--ghost scm-cal-btn--sm" data-scm-case-calendar-today>Hoy</button>' +
+      "</div>" +
+      '<div class="scm-cal-stats">' +
+      '<span class="scm-cal-stat"><i class="scm-cal-dot is-done"></i><b data-scm-case-calendar-done-count>0</b> realizados</span>' +
+      '<span class="scm-cal-stat"><i class="scm-cal-dot is-pending"></i><b data-scm-case-calendar-pending-count>0</b> pendientes</span>' +
+      "</div></div>" +
+      '<div class="scm-cal-body">' +
+      '<div class="scm-cal-weekdays"><span>Lun</span><span>Mar</span><span>Mi&eacute;</span><span>Jue</span><span>Vie</span><span>S&aacute;b</span><span>Dom</span></div>' +
+      '<div class="scm-cal-grid" data-scm-case-calendar-grid><div class="scm-cal-grid-empty">Cargando calendario...</div></div>' +
+      "</div>" +
+      '<footer class="scm-cal-foot"><div class="scm-cal-legend">' +
+      '<span><i class="scm-cal-dot is-pending"></i>Pendiente</span>' +
+      '<span><i class="scm-cal-dot is-overdue"></i>Vencido</span>' +
+      '<span><i class="scm-cal-dot is-done"></i>Realizado</span>' +
+      '<span><i class="scm-cal-dot is-holiday"></i>Festivo</span>' +
+      "</div><span>Revisi&oacute;n preventiva: 45 min por visita</span></footer>" +
+      "</section></div>";
+    var overdueCount = shell.querySelector(
+      "[data-scm-case-calendar-overdue-count]",
+    );
+    var refreshOverdue = function () {
+      if (!employeeId || !overdueCount) return;
+      loadCaseCalendarOverdueRows(root, employeeId)
+        .then(function (rows) {
+          overdueCount.textContent = rows.length ? String(rows.length) : "";
+        })
+        .catch(function () {});
+    };
+    var render = function () {
+      renderCaseCalendarMonth(root, shell, employeeId, currentMonth);
+      refreshOverdue();
+    };
+    var goToMonth = function (date) {
+      currentMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+      render();
+    };
+    shell._scmCaseCalendarRender = render;
+    shell._scmCaseCalendarEventTransferred =
+      typeof options.onEventTransferred === "function"
+        ? options.onEventTransferred
+        : null;
+    shell._scmCaseCalendarCloseOnTransferred =
+      options.closeOnEventTransferred === true;
+    shell.addEventListener("click", function (event) {
+      var target = event.target;
+      if (!target || !target.closest) return;
+      if (target.closest("[data-scm-case-calendar-layer]")) return;
+      if (target.closest("[data-scm-case-calendar-close]")) {
+        closeCaseCalendarHost(shell);
+      } else if (target.closest("[data-scm-case-calendar-prev]")) {
+        goToMonth(
+          new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1),
+        );
+      } else if (target.closest("[data-scm-case-calendar-next]")) {
+        goToMonth(
+          new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1),
+        );
+      } else if (target.closest("[data-scm-case-calendar-today]")) {
+        goToMonth(new Date());
+      } else if (target.closest("[data-scm-case-calendar-pending]")) {
+        openCaseCalendarPendingMini(root, shell, employeeId, employeeName);
+      }
     });
+    render();
+    var closeBtn = shell.querySelector("[data-scm-case-calendar-close]");
+    if (closeBtn) closeBtn.focus();
   }
 
   function renderCalendarCaseEmployeeAgenda(root, body, employeeId) {
@@ -9390,15 +9548,16 @@
           var badge = pendingBtn.querySelector(
             "[data-scm-calendar-pending-badge]",
           );
-          if (pendingEmployeeId && badge) {
+          var refreshBadge = function () {
+            if (!pendingEmployeeId || !badge) return;
             loadCaseCalendarOverdueRows(pendingRoot, pendingEmployeeId)
               .then(function (rows) {
-                if (!rows.length) return;
-                badge.textContent = String(rows.length);
-                badge.hidden = false;
+                badge.textContent = rows.length ? String(rows.length) : "";
+                badge.hidden = !rows.length;
               })
               .catch(function () {});
-          }
+          };
+          refreshBadge();
           pendingBtn.addEventListener("click", function () {
             if (!pendingEmployeeId) {
               scmNotify(
@@ -9407,12 +9566,11 @@
               );
               return;
             }
-            openCalendarCaseMonthPopup(
+            openCaseCalendarOverduePopup(
               pendingRoot,
               pendingEmployeeId,
               btn.dataset.empleado || btn.dataset.asignado || "",
-              "",
-              { openPending: true },
+              { onClose: refreshBadge },
             );
           });
         });
