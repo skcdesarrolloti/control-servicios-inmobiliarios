@@ -3536,46 +3536,56 @@ trait RendersDashboard
 
     ob_start();
 ?>
-    <div class="scm-collection-log scm-portfolio" data-scm-collection-log data-scm-collection-log-loaded="1" data-scm-portfolio data-scm-portfolio-sender-signature="<?php echo esc_attr((string) ($senderProfile['signature_line'] ?? $senderProfile['signature'] ?? 'Control Servicios Inmobiliarios')); ?>">
-      <div class="scm-status-topic-head scm-collection-log-head">
-        <div>
-          <span class="scm-calendar-action-kicker">Cartera y cobranza</span>
+    <div class="scm-collection-log scm-portfolio scm-gc" data-scm-collection-log data-scm-collection-log-loaded="1" data-scm-portfolio data-scm-portfolio-sender-signature="<?php echo esc_attr((string) ($senderProfile['signature_line'] ?? $senderProfile['signature'] ?? 'Control Servicios Inmobiliarios')); ?>">
+      <header class="scm-gc-hero">
+        <div class="scm-gc-hero-copy">
+          <span class="scm-gc-kicker">Cartera y cobranza</span>
           <h3>Control de cartera y gestiones de cobro</h3>
           <p>Actualiza saldos con el auxiliar 1380, identifica pagos, registra gestiones, prepara cartas prejur&iacute;dicas y env&iacute;a avisos previos de siniestro desde un solo lugar.</p>
         </div>
-        <span class="scm-status-count"><strong><?php echo esc_html((string) $currentTotal); ?></strong> cuentas visibles</span>
-      </div>
+        <dl class="scm-gc-hero-stats">
+          <div><dt>Cuentas visibles</dt><dd><?php echo esc_html((string) $currentTotal); ?></dd></div>
+          <div class="is-danger"><dt>Con deuda</dt><dd><?php echo esc_html((string) $debtorAccounts); ?></dd></div>
+          <div class="is-wide"><dt>Cartera pendiente</dt><dd><?php echo esc_html($this->collection_money($portfolioBalance)); ?></dd></div>
+          <div><dt>Corte 1380</dt><dd class="is-small"><?php echo esc_html($reportCutoff); ?></dd></div>
+        </dl>
+      </header>
 
-      <div class="scm-portfolio-tabs" role="tablist" aria-label="Vistas de control de cartera">
-        <?php foreach (['principal' => ['Cartera principal', 'Operación diaria'], 'contratos' => ['Todos los contratos', 'Auditoría completa'], 'informe' => ['Informe gerencial', 'Resumen para dirección'], 'historial' => ['Historial', 'Trazabilidad completa'], 'cola' => ['Cola de notificaciones', 'Envíos de cartera']] as $viewKey => $viewMeta): ?>
-          <button type="button" id="scm-portfolio-tab-<?php echo esc_attr($viewKey); ?>" class="scm-portfolio-tab<?php echo $activeView === $viewKey ? ' is-active' : ''; ?>" role="tab" aria-selected="<?php echo $activeView === $viewKey ? 'true' : 'false'; ?>" aria-controls="scm-portfolio-panel-<?php echo esc_attr($viewKey); ?>" tabindex="<?php echo $activeView === $viewKey ? '0' : '-1'; ?>" data-scm-portfolio-tab="<?php echo esc_attr($viewKey); ?>">
-            <strong><?php echo esc_html($viewMeta[0]); ?></strong><span><?php echo esc_html($viewMeta[1]); ?></span>
+      <div class="scm-gc-tabs" role="tablist" aria-label="Vistas de control de cartera">
+        <?php foreach (['principal' => ['Cartera principal', 'Operación diaria', 'account_balance_wallet'], 'contratos' => ['Todos los contratos', 'Auditoría completa', 'description'], 'informe' => ['Informe gerencial', 'Resumen para dirección', 'monitoring'], 'historial' => ['Historial', 'Trazabilidad completa', 'history'], 'cola' => ['Cola de notificaciones', 'Envíos de cartera', 'outgoing_mail']] as $viewKey => $viewMeta): ?>
+          <button type="button" id="scm-portfolio-tab-<?php echo esc_attr($viewKey); ?>" class="scm-gc-tab<?php echo $activeView === $viewKey ? ' is-active' : ''; ?>" role="tab" aria-selected="<?php echo $activeView === $viewKey ? 'true' : 'false'; ?>" aria-controls="scm-portfolio-panel-<?php echo esc_attr($viewKey); ?>" tabindex="<?php echo $activeView === $viewKey ? '0' : '-1'; ?>" data-scm-portfolio-tab="<?php echo esc_attr($viewKey); ?>">
+            <?php echo $this->collection_gc_icon($viewMeta[2]); ?>
+            <span><strong><?php echo esc_html($viewMeta[0]); ?></strong><small><?php echo esc_html($viewMeta[1]); ?></small></span>
           </button>
         <?php endforeach; ?>
       </div>
 
-      <section id="scm-portfolio-panel-informe" class="scm-portfolio-view scm-portfolio-report" role="tabpanel" aria-labelledby="scm-portfolio-tab-informe" data-scm-portfolio-panel="informe"<?php echo $activeView === 'informe' ? '' : ' hidden'; ?>>
+      <section id="scm-portfolio-panel-informe" class="scm-gc-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-informe" data-scm-portfolio-panel="informe"<?php echo $activeView === 'informe' ? '' : ' hidden'; ?>>
         <script type="application/json" data-scm-portfolio-report-details><?php echo $reportDrilldownsJson; ?></script>
-        <div class="scm-portfolio-report-head">
-          <div><span class="scm-calendar-action-kicker">Informe para gerencia administrativa</span><h4>Estado ejecutivo de la cartera</h4><p>Cifras consolidadas del &uacute;ltimo auxiliar y de las gestiones registradas. Corte contable: <strong><?php echo esc_html($reportCutoff); ?></strong>.</p></div>
-          <button type="button" class="scm-btn-secondary btn btn-outline" data-scm-portfolio-report-print>Imprimir / guardar PDF</button>
+        <div class="scm-gc-card scm-gc-section-head">
+          <div><span class="scm-gc-kicker">Informe para gerencia administrativa</span><h4>Estado ejecutivo de la cartera</h4><p>Cifras consolidadas del &uacute;ltimo auxiliar y de las gestiones registradas. Corte contable: <strong><?php echo esc_html($reportCutoff); ?></strong>.</p></div>
+          <button type="button" class="scm-gc-btn" data-scm-portfolio-report-print><?php echo $this->collection_gc_icon('print'); ?>Imprimir / guardar PDF</button>
         </div>
 
-      <div class="scm-portfolio-kpis" aria-label="Resumen ejecutivo de cartera">
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--money"><span>Cartera pendiente</span><strong><?php echo esc_html($this->collection_money($portfolioSummary['balance'] ?? 0)); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['debtors'] ?? 0))); ?> contratos con saldo</small><?php echo $this->render_collection_report_drilldown_button('cartera_pendiente', 'Ver contratos'); ?></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--danger"><span>Contratos no al d&iacute;a</span><strong><?php echo esc_html((string) $notUpToDateAccounts); ?></strong><small>Saldo positivo pendiente</small><?php echo $this->render_collection_report_drilldown_button('no_al_dia', 'Ver pendientes'); ?></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--success"><span>Contratos al d&iacute;a</span><strong><?php echo esc_html((string) $upToDateAccounts); ?></strong><small>Saldo exacto en 0</small><?php echo $this->render_collection_report_drilldown_button('al_dia', 'Ver al día'); ?></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--credit"><span>Saldo a favor</span><strong><?php echo esc_html((string) $creditAccounts); ?></strong><small>No registran deuda</small><?php echo $this->render_collection_report_drilldown_button('saldo_favor', 'Ver saldos'); ?></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--paid"><span>Pagaron en el &uacute;ltimo cargue</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['paid'] ?? 0))); ?></strong><small>Dejaron de tener saldo positivo</small><?php echo $this->render_collection_report_drilldown_button('pagaron_ultimo_cargue', 'Ver pagos'); ?></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--warning"><span>Sin cruce</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['without_data'] ?? 0) + (int) ($portfolioSummary['unmatched'] ?? 0))); ?></strong><small>Requieren verificaci&oacute;n</small><?php echo $this->render_collection_report_drilldown_button('sin_cruce', 'Ver pendientes'); ?></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--notice"><span>Aviso prejur&iacute;dico</span><strong><?php echo esc_html((string) $prelegalNoticeAccounts); ?></strong><small>Cartas enviadas</small><?php echo $this->render_collection_report_drilldown_button('aviso_prejuridico', 'Ver avisos'); ?></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--notice"><span>Aviso siniestro</span><strong><?php echo esc_html((string) $claimNoticeAccounts); ?></strong><small>Notificaci&oacute;n preventiva</small><?php echo $this->render_collection_report_drilldown_button('aviso_siniestro', 'Ver avisos'); ?></article>
-        <article class="scm-portfolio-kpi scm-portfolio-kpi--claim"><span>Siniestrados</span><strong><?php echo esc_html((string) ((int) ($portfolioSummary['claims'] ?? 0))); ?></strong><small><?php echo esc_html((string) ((int) ($portfolioSummary['prejuridical'] ?? 0))); ?> en prejur&iacute;dico</small><?php echo $this->render_collection_report_drilldown_button('etapa_siniestro', 'Ver siniestros'); ?></article>
-      </div>
+        <div class="scm-gc-kpis" aria-label="Resumen ejecutivo de cartera">
+          <?php foreach ([
+            ['is-navy', 'Cartera pendiente', $this->collection_money($portfolioSummary['balance'] ?? 0), ((int) ($portfolioSummary['debtors'] ?? 0)) . ' contratos con saldo', 'cartera_pendiente', 'Ver contratos'],
+            ['is-danger', 'Contratos no al día', (string) $notUpToDateAccounts, 'Saldo positivo pendiente', 'no_al_dia', 'Ver pendientes'],
+            ['is-success', 'Contratos al día', (string) $upToDateAccounts, 'Saldo exacto en 0', 'al_dia', 'Ver al día'],
+            ['is-info', 'Saldo a favor', (string) $creditAccounts, 'No registran deuda', 'saldo_favor', 'Ver saldos'],
+            ['is-success', 'Pagaron en el último cargue', (string) ((int) ($portfolioSummary['paid'] ?? 0)), 'Dejaron de tener saldo positivo', 'pagaron_ultimo_cargue', 'Ver pagos'],
+            ['is-warning', 'Sin cruce', (string) $reviewAccounts, 'Requieren verificación', 'sin_cruce', 'Ver pendientes'],
+            ['is-indigo', 'Aviso prejurídico', (string) $prelegalNoticeAccounts, 'Cartas enviadas', 'aviso_prejuridico', 'Ver avisos'],
+            ['is-indigo', 'Aviso siniestro', (string) $claimNoticeAccounts, 'Notificación preventiva', 'aviso_siniestro', 'Ver avisos'],
+            ['is-danger', 'Siniestrados', (string) $claimAccounts, $prelegalAccounts . ' en prejurídico', 'etapa_siniestro', 'Ver siniestros'],
+          ] as $kpi): ?>
+            <article class="scm-gc-kpi <?php echo esc_attr($kpi[0]); ?>"><span><?php echo esc_html($kpi[1]); ?></span><strong><?php echo esc_html($kpi[2]); ?></strong><small><?php echo esc_html($kpi[3]); ?></small><?php echo $this->render_collection_report_drilldown_button($kpi[4], $kpi[5]); ?></article>
+          <?php endforeach; ?>
+        </div>
 
-        <div class="scm-portfolio-report-grid">
-          <article class="scm-portfolio-report-card scm-portfolio-report-card--summary">
-            <span class="scm-calendar-action-kicker">Lectura ejecutiva</span>
+        <div class="scm-gc-report-grid">
+          <article class="scm-gc-card scm-gc-report-card is-summary">
+            <span class="scm-gc-kicker">Lectura ejecutiva</span>
             <h5>Resumen del corte</h5>
             <p>La cartera pendiente es de <strong><?php echo esc_html($this->collection_money($portfolioBalance)); ?></strong>, distribuida en <strong><?php echo esc_html((string) $debtorAccounts); ?> contratos</strong>. El saldo promedio por contrato moroso es de <strong><?php echo esc_html($this->collection_money($averageDebt)); ?></strong>.</p>
             <ul>
@@ -3586,398 +3596,311 @@ trait RendersDashboard
               <li>Se han registrado <strong><?php echo esc_html((string) ((int) ($stats['total'] ?? 0))); ?></strong> gestiones de cobro en el historial.</li>
             </ul>
           </article>
-          <article class="scm-portfolio-report-card">
-            <span class="scm-calendar-action-kicker">Indicadores de control</span>
+          <article class="scm-gc-card scm-gc-report-card">
+            <span class="scm-gc-kicker">Indicadores de control</span>
             <h5>Calidad y exposici&oacute;n</h5>
-            <div class="scm-portfolio-report-metric"><span>Contratos no al d&iacute;a</span><strong><?php echo esc_html((string) $notUpToDateAccounts); ?></strong><small><?php echo esc_html((string) $debtRate); ?>% de la cartera vigente</small><?php echo $this->render_collection_report_drilldown_button('no_al_dia', 'Ver'); ?></div>
-            <div class="scm-portfolio-report-metric"><span>Contratos al d&iacute;a</span><strong><?php echo esc_html((string) $upToDateAccounts); ?></strong><small>Saldo exacto en 0</small><?php echo $this->render_collection_report_drilldown_button('al_dia', 'Ver'); ?></div>
-            <div class="scm-portfolio-report-metric"><span>Cuentas cruzadas</span><strong><?php echo esc_html((string) $matchedRate); ?>%</strong><small><?php echo esc_html((string) max(0, $totalAccounts - $reviewAccounts)); ?> cuentas identificadas</small><?php echo $this->render_collection_report_drilldown_button('cuentas_cruzadas', 'Ver'); ?></div>
-            <div class="scm-portfolio-report-metric"><span>Al d&iacute;a o a favor</span><strong><?php echo esc_html((string) ($currentAccounts + $creditAccounts)); ?></strong><small><?php echo esc_html((string) $creditAccounts); ?> presentan saldo a favor</small><?php echo $this->render_collection_report_drilldown_button('al_dia_o_favor', 'Ver'); ?></div>
-          </article>
-        </div>
-
-        <div class="scm-portfolio-report-grid scm-portfolio-report-grid--lower">
-          <article class="scm-portfolio-report-card">
-            <span class="scm-calendar-action-kicker">Etapas de cobro</span>
-            <h5>Distribuci&oacute;n de contratos con deuda</h5>
-            <?php foreach ([['Cobro normal', $normalDebtAccounts, $normalStageRate, 'normal', 'etapa_normal'], ['Prejurídico', $prelegalAccounts, $prelegalStageRate, 'prelegal', 'etapa_prejuridico'], ['Siniestro', $claimAccounts, $claimStageRate, 'claim', 'etapa_siniestro']] as $stageMetric): ?>
-              <div class="scm-portfolio-report-bar-row"><div><span><?php echo esc_html($stageMetric[0]); ?></span><strong><?php echo esc_html((string) $stageMetric[1]); ?></strong><?php echo $this->render_collection_report_drilldown_button((string) $stageMetric[4], 'Ver grupo'); ?></div><div class="scm-portfolio-report-bar" role="img" aria-label="<?php echo esc_attr($stageMetric[0] . ': ' . $stageMetric[1] . ' contratos'); ?>"><i class="scm-portfolio-report-bar-fill scm-portfolio-report-bar-fill--<?php echo esc_attr($stageMetric[3]); ?>" style="--scm-portfolio-bar: <?php echo esc_attr((string) max(0, min(100, (int) $stageMetric[2]))); ?>%"></i></div></div>
+            <?php foreach ([
+              ['Contratos no al día', (string) $notUpToDateAccounts, $debtRate . '% de la cartera vigente', 'no_al_dia'],
+              ['Contratos al día', (string) $upToDateAccounts, 'Saldo exacto en 0', 'al_dia'],
+              ['Cuentas cruzadas', $matchedRate . '%', max(0, $totalAccounts - $reviewAccounts) . ' cuentas identificadas', 'cuentas_cruzadas'],
+              ['Al día o a favor', (string) ($currentAccounts + $creditAccounts), $creditAccounts . ' presentan saldo a favor', 'al_dia_o_favor'],
+            ] as $metric): ?>
+              <div class="scm-gc-metric"><div><span><?php echo esc_html($metric[0]); ?></span><small><?php echo esc_html($metric[2]); ?></small></div><strong><?php echo esc_html($metric[1]); ?></strong><?php echo $this->render_collection_report_drilldown_button($metric[3], 'Ver'); ?></div>
             <?php endforeach; ?>
           </article>
-          <article class="scm-portfolio-report-card">
-            <span class="scm-calendar-action-kicker">Actividad del equipo</span>
+        </div>
+
+        <div class="scm-gc-report-grid is-even">
+          <article class="scm-gc-card scm-gc-report-card">
+            <span class="scm-gc-kicker">Etapas de cobro</span>
+            <h5>Distribuci&oacute;n de contratos con deuda</h5>
+            <?php foreach ([['Cobro normal', $normalDebtAccounts, $normalStageRate, 'is-navy', 'etapa_normal'], ['Prejurídico', $prelegalAccounts, $prelegalStageRate, 'is-warning', 'etapa_prejuridico'], ['Siniestro', $claimAccounts, $claimStageRate, 'is-danger', 'etapa_siniestro']] as $stageMetric): ?>
+              <div class="scm-gc-bar-row">
+                <div><span><?php echo esc_html($stageMetric[0]); ?></span><strong><?php echo esc_html((string) $stageMetric[1]); ?> <small><?php echo esc_html((string) $stageMetric[2]); ?>%</small></strong><?php echo $this->render_collection_report_drilldown_button((string) $stageMetric[4], 'Ver grupo'); ?></div>
+                <div class="scm-gc-bar" role="img" aria-label="<?php echo esc_attr($stageMetric[0] . ': ' . $stageMetric[1] . ' contratos'); ?>"><i class="<?php echo esc_attr($stageMetric[3]); ?>" style="width: <?php echo esc_attr((string) max(0, min(100, (int) $stageMetric[2]))); ?>%"></i></div>
+              </div>
+            <?php endforeach; ?>
+          </article>
+          <article class="scm-gc-card scm-gc-report-card">
+            <span class="scm-gc-kicker">Actividad del equipo</span>
             <h5>Gestiones por concepto</h5>
-            <?php if ($byType === []): ?><p class="scm-portfolio-report-empty">A&uacute;n no hay gestiones clasificadas para resumir.</p><?php else: ?>
-              <dl class="scm-portfolio-report-types"><?php foreach ($byType as $typeLabel => $typeTotal): $typeName = (string) $typeLabel; ?><div><dt><?php echo esc_html($typeName); ?></dt><dd><?php echo esc_html((string) ((int) $typeTotal)); ?></dd><?php echo $this->render_collection_report_drilldown_button((string) ($byTypeDrilldownKeys[$typeName] ?? $this->collection_report_concept_group_key($typeName)), 'Ver'); ?></div><?php endforeach; ?></dl>
+            <?php if ($byType === []): ?><p class="scm-gc-muted-note">A&uacute;n no hay gestiones clasificadas para resumir.</p><?php else: ?>
+              <dl class="scm-gc-types"><?php foreach ($byType as $typeLabel => $typeTotal): $typeName = (string) $typeLabel; ?><div><dt><?php echo esc_html($this->collection_management_type_label($typeName)); ?></dt><dd><?php echo esc_html((string) ((int) $typeTotal)); ?></dd><?php echo $this->render_collection_report_drilldown_button((string) ($byTypeDrilldownKeys[$typeName] ?? $this->collection_report_concept_group_key($typeName)), 'Ver'); ?></div><?php endforeach; ?></dl>
             <?php endif; ?>
           </article>
         </div>
       </section>
 
-      <section id="scm-portfolio-panel-principal" class="scm-portfolio-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-principal" data-scm-portfolio-panel="principal"<?php echo $activeView === 'principal' ? '' : ' hidden'; ?>>
-        <div class="scm-portfolio-workflow" aria-label="Guía de acciones de cartera">
-          <article><span>1</span><div><strong>Hacer gesti&oacute;n</strong><p>Registra llamada, acuerdo o compromiso; puede programar seguimiento y enviar mensajes. No cambia la etapa de cobro.</p></div></article>
-          <article><span>2</span><div><strong>Preparar carta prejur&iacute;dica</strong><p>Abre una vista previa. Descargar o enviar registra la etapa prejur&iacute;dica.</p></div></article>
-          <article><span>3</span><div><strong>Notificar siniestro</strong><p>Muestra la vista previa y encola el aviso previo por WhatsApp y email. No cambia la etapa del contrato.</p></div></article>
-          <article><span>4</span><div><strong>Marcar/Quitar siniestro</strong><p>Marca la etapa administrativa, registra historial del inmueble y avisa al funcionario configurado. Se puede devolver con Quitar siniestro.</p></div></article>
-        </div>
+      <section id="scm-portfolio-panel-principal" class="scm-gc-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-principal" data-scm-portfolio-panel="principal"<?php echo $activeView === 'principal' ? '' : ' hidden'; ?>>
+        <ol class="scm-gc-steps" aria-label="Guía de acciones de cartera">
+          <li><span>1</span><div><strong>Hacer gesti&oacute;n</strong><p>Registra llamada, acuerdo o compromiso; puede programar seguimiento y enviar mensajes. No cambia la etapa de cobro.</p></div></li>
+          <li><span>2</span><div><strong>Preparar carta prejur&iacute;dica</strong><p>Abre una vista previa. Descargar o enviar registra la etapa prejur&iacute;dica.</p></div></li>
+          <li><span>3</span><div><strong>Notificar siniestro</strong><p>Muestra la vista previa y encola el aviso previo por WhatsApp y email. No cambia la etapa del contrato.</p></div></li>
+          <li><span>4</span><div><strong>Marcar/Quitar siniestro</strong><p>Marca la etapa administrativa, registra historial del inmueble y avisa al funcionario configurado. Se puede devolver con Quitar siniestro.</p></div></li>
+        </ol>
 
-      <section class="scm-admin-notif-card scm-portfolio-import-card">
-        <form data-scm-portfolio-import enctype="multipart/form-data">
-          <div>
-            <span class="scm-calendar-action-kicker">Fuente de saldos</span>
-            <h4>Actualizar con auxiliar 1380</h4>
-            <p>El saldo final de cada inmueble y NIT define el estado: <strong>positivo = con deuda</strong>, <strong>0 = al d&iacute;a</strong> y <strong>negativo = saldo a favor</strong>. Cada cargue reemplaza la foto vigente y conserva el historial.</p>
-            <?php if (is_array($latestImport)): ?>
-              <small>&Uacute;ltimo cargue: <?php echo esc_html((string) ($latestImport['source_filename'] ?? '')); ?> &middot; corte <?php echo esc_html($this->collection_date((string) ($latestImport['source_date'] ?? ''))); ?> &middot; <?php echo esc_html($this->format_collection_management_date($latestImport['uploaded_at'] ?? '')); ?> por <?php echo esc_html((string) ($latestImport['uploaded_by_name'] ?? '')); ?></small>
-            <?php else: ?>
-              <small>A&uacute;n no se ha cargado un auxiliar de cartera.</small>
-            <?php endif; ?>
-          </div>
-          <div class="scm-portfolio-import-actions">
-            <label class="scm-portfolio-file"><span>Archivo .xls o .xlsx</span><input type="file" name="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></label>
-            <button type="submit" class="scm-btn-primary btn btn-primary">Procesar cartera</button>
-            <button type="button" class="scm-btn-secondary btn btn-outline scm-portfolio-reset-btn" data-scm-portfolio-reset>Limpiar pruebas 1380</button>
-          </div>
-          <p data-scm-portfolio-import-result class="scm-admin-notif-result" aria-live="polite"></p>
-        </form>
-      </section>
+        <section class="scm-gc-card scm-gc-import">
+          <form data-scm-portfolio-import enctype="multipart/form-data">
+            <div class="scm-gc-import-copy">
+              <span class="scm-gc-import-icon"><?php echo $this->collection_gc_icon('upload_file'); ?></span>
+              <div>
+                <span class="scm-gc-kicker">Fuente de saldos</span>
+                <h4>Actualizar con auxiliar 1380</h4>
+                <p>El saldo final de cada inmueble y NIT define el estado. Cada cargue reemplaza la foto vigente y conserva el historial.</p>
+                <ul class="scm-gc-legend" aria-label="Interpretación del saldo">
+                  <li class="is-danger"><b>Positivo</b> con deuda</li>
+                  <li class="is-success"><b>0</b> al d&iacute;a</li>
+                  <li class="is-info"><b>Negativo</b> saldo a favor</li>
+                </ul>
+                <?php if (is_array($latestImport)): ?>
+                  <small class="scm-gc-import-meta"><?php echo $this->collection_gc_icon('history'); ?>&Uacute;ltimo cargue: <b><?php echo esc_html((string) ($latestImport['source_filename'] ?? '')); ?></b> &middot; corte <?php echo esc_html($this->collection_date((string) ($latestImport['source_date'] ?? ''))); ?> &middot; <?php echo esc_html($this->format_collection_management_date($latestImport['uploaded_at'] ?? '')); ?> por <?php echo esc_html((string) ($latestImport['uploaded_by_name'] ?? '')); ?></small>
+                <?php else: ?>
+                  <small class="scm-gc-import-meta"><?php echo $this->collection_gc_icon('info'); ?>A&uacute;n no se ha cargado un auxiliar de cartera.</small>
+                <?php endif; ?>
+              </div>
+            </div>
+            <div class="scm-gc-import-actions">
+              <label class="scm-gc-file"><span>Archivo .xls o .xlsx</span><input type="file" name="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></label>
+              <button type="submit" class="scm-gc-btn is-primary"><?php echo $this->collection_gc_icon('sync'); ?>Procesar cartera</button>
+              <button type="button" class="scm-gc-btn is-danger-ghost" data-scm-portfolio-reset><?php echo $this->collection_gc_icon('delete_sweep'); ?>Limpiar pruebas 1380</button>
+              <p data-scm-portfolio-import-result class="scm-gc-result" aria-live="polite"></p>
+            </div>
+          </form>
+        </section>
 
-      <section class="scm-admin-notif-card scm-portfolio-control">
-        <div class="scm-portfolio-section-head">
-          <div><span class="scm-calendar-action-kicker">Cartera actual</span><h4>Contratos, saldos y etapa de cobranza</h4><p>Busca, filtra y ejecuta la siguiente acci&oacute;n sin salir del m&oacute;dulo.</p></div>
-        </div>
-        <form method="get" autocomplete="off" data-scm-collection-log-form class="scm-portfolio-filter-form">
-          <input type="hidden" name="scm_tab" value="gestiones_cobro">
-          <input type="hidden" name="scmgc_view" value="principal">
-          <input type="hidden" name="scmgc_cartera_page" value="1">
-          <div class="scm-portfolio-filter-grid">
-            <div class="scm-field">
-              <label for="scmgc_buscar">Buscar</label>
-              <input id="scmgc_buscar" name="scmgc_buscar" type="search" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr((string) ($portfolioApplied['search'] ?? '')); ?>" placeholder="Arrendatario, documento, contrato o inmueble">
-            </div>
-            <div class="scm-field">
-              <label for="scmgc_estado">Estado de saldo</label>
-              <select id="scmgc_estado" name="scmgc_estado" class="select select-bordered select-sm scm-select">
-                <?php foreach (['' => 'Todos', 'deuda' => 'Con deuda', 'al_dia' => 'Al día', 'saldo_favor' => 'Saldo a favor', 'sin_dato' => 'Contrato sin dato', 'sin_contrato' => 'Cuenta sin contrato'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($portfolioApplied['status'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
-              </select>
-            </div>
-            <div class="scm-field">
-              <label for="scmgc_etapa">Etapa</label>
-              <select id="scmgc_etapa" name="scmgc_etapa" class="select select-bordered select-sm scm-select">
-                <?php foreach (['' => 'Todas', 'normal' => 'Cobro normal', 'prejuridico' => 'Prejurídico', 'siniestro' => 'Siniestro'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($portfolioApplied['stage'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
-              </select>
-            </div>
-            <div class="scm-field">
-              <label for="scmgc_movimiento">Movimiento</label>
-              <select id="scmgc_movimiento" name="scmgc_movimiento" class="select select-bordered select-sm scm-select">
-                <option value="">Todos</option>
-                <option value="paid_latest" <?php selected((string) ($portfolioApplied['movement'] ?? ''), 'paid_latest'); ?>>Pagaron en el &uacute;ltimo cargue</option>
-              </select>
-            </div>
-            <div class="scm-collection-log-actions">
-              <button type="submit" class="scm-btn-primary btn btn-primary">Filtrar</button>
-              <a class="scm-btn-secondary btn btn-outline" href="?scm_tab=gestiones_cobro" data-scm-collection-log-clear>Limpiar</a>
-            </div>
+        <section class="scm-gc-card scm-gc-table-card">
+          <div class="scm-gc-section-head">
+            <div><span class="scm-gc-kicker">Cartera actual</span><h4>Contratos, saldos y etapa de cobranza</h4><p>Busca, filtra y ejecuta la siguiente acci&oacute;n sin salir del m&oacute;dulo.</p></div>
+            <span class="scm-gc-count"><strong><?php echo esc_html((string) ((int) ($portfolioPagination['total'] ?? 0))); ?></strong> registros</span>
           </div>
-        </form>
-      </section>
+          <form method="get" autocomplete="off" data-scm-collection-log-form class="scm-gc-filters">
+            <input type="hidden" name="scm_tab" value="gestiones_cobro">
+            <input type="hidden" name="scmgc_view" value="principal">
+            <input type="hidden" name="scmgc_cartera_page" value="1">
+            <label class="scm-gc-field is-search"><span>Buscar</span><input id="scmgc_buscar" name="scmgc_buscar" type="search" value="<?php echo esc_attr((string) ($portfolioApplied['search'] ?? '')); ?>" placeholder="Arrendatario, documento, contrato o inmueble"></label>
+            <label class="scm-gc-field"><span>Estado de saldo</span><select id="scmgc_estado" name="scmgc_estado">
+              <?php foreach (['' => 'Todos', 'deuda' => 'Con deuda', 'al_dia' => 'Al día', 'saldo_favor' => 'Saldo a favor', 'sin_dato' => 'Contrato sin dato', 'sin_contrato' => 'Cuenta sin contrato'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($portfolioApplied['status'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+            </select></label>
+            <label class="scm-gc-field"><span>Etapa</span><select id="scmgc_etapa" name="scmgc_etapa">
+              <?php foreach (['' => 'Todas', 'normal' => 'Cobro normal', 'prejuridico' => 'Prejurídico', 'siniestro' => 'Siniestro'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($portfolioApplied['stage'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+            </select></label>
+            <label class="scm-gc-field"><span>Movimiento</span><select id="scmgc_movimiento" name="scmgc_movimiento">
+              <option value="">Todos</option>
+              <option value="paid_latest" <?php selected((string) ($portfolioApplied['movement'] ?? ''), 'paid_latest'); ?>>Pagaron en el &uacute;ltimo cargue</option>
+            </select></label>
+            <div class="scm-gc-filter-actions">
+              <button type="submit" class="scm-gc-btn is-navy"><?php echo $this->collection_gc_icon('filter_alt'); ?>Filtrar</button>
+              <a class="scm-gc-btn" href="?scm_tab=gestiones_cobro" data-scm-collection-log-clear>Limpiar</a>
+            </div>
+          </form>
 
-      <section class="scm-admin-notif-card scm-collection-log-table-card scm-portfolio-table-card">
-        <?php if ($portfolioRows === []): ?>
-          <div class="scm-admin-notif-empty">
-            <strong>Sin registros de cartera</strong>
-            <span>Carga el auxiliar 1380 o cambia los filtros actuales.</span>
-          </div>
-        <?php else: ?>
-          <?php echo $this->render_collection_portfolio_bulk_toolbar('principal', (int) ($portfolioPagination['total'] ?? 0)); ?>
-          <div class="scm-collection-log-table-wrap scm-portfolio-table-wrap">
-            <table class="scm-collection-log-table scm-portfolio-table">
-              <thead>
-                <tr>
-                  <th class="scm-portfolio-select-col"><input type="checkbox" data-scm-portfolio-bulk-check-all aria-label="Seleccionar registros visibles de cartera principal"></th>
-                  <th>Estado</th>
-                  <th>Arrendatario</th>
-                  <th>Contrato</th>
-                  <th>Inmueble</th>
-                  <th>Saldo actual</th>
-                  <th>Variaci&oacute;n</th>
-                  <th>Etapa</th>
-                  <th>&Uacute;ltima acci&oacute;n</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php foreach ($portfolioRows as $row):
-                  $rowStatus = (string) ($row['status'] ?? 'sin_dato');
-                  $rowStage = (string) ($row['collection_stage'] ?? 'normal');
-                  $balance = $row['balance'] !== null ? (float) $row['balance'] : null;
-                  $previous = $row['previous_balance'] !== null ? (float) $row['previous_balance'] : null;
-                  $variation = $balance !== null && $previous !== null ? $balance - $previous : null;
-                  $rowPortfolioId = (int) ($row['id'] ?? 0);
-                  $rowTenantId = (int) ($row['tenant_id'] ?? 0);
-                  $rowContractId = (int) ($row['contract_id'] ?? 0);
-                  $canManage = (int) ($row['contract_id'] ?? 0) > 0;
-                  $canCollect = $canManage && $rowStatus === 'deuda';
-                ?>
+          <?php if ($portfolioRows === []): ?>
+            <?php echo $this->render_collection_gc_empty('Sin registros de cartera', 'Carga el auxiliar 1380 o cambia los filtros actuales.'); ?>
+          <?php else: ?>
+            <?php echo $this->render_collection_portfolio_bulk_toolbar('principal', (int) ($portfolioPagination['total'] ?? 0)); ?>
+            <div class="scm-gc-table-wrap">
+              <table class="scm-gc-table">
+                <thead>
                   <tr>
-                    <td class="scm-portfolio-select-col"><input type="checkbox" data-scm-portfolio-bulk-check data-portfolio-id="<?php echo esc_attr((string) $rowPortfolioId); ?>" data-tenant-id="<?php echo esc_attr((string) $rowTenantId); ?>" data-contract-id="<?php echo esc_attr((string) $rowContractId); ?>" data-can-manage="<?php echo $canManage ? '1' : '0'; ?>" data-can-collect="<?php echo $canCollect ? '1' : '0'; ?>" aria-label="Seleccionar contrato <?php echo esc_attr((string) (($row['contract_number'] ?? '') ?: $rowContractId)); ?>"<?php echo $canManage ? '' : ' disabled'; ?>></td>
-                    <td><span class="scm-portfolio-status scm-portfolio-status--<?php echo esc_attr($rowStatus); ?>"><?php echo esc_html($this->collection_portfolio_status_label($rowStatus)); ?></span></td>
-                    <td><strong><?php echo esc_html((string) (($row['tenant_name'] ?? '') ?: 'Sin nombre en plataforma')); ?></strong><small><?php echo esc_html((string) (($row['tenant_document'] ?? '') ?: '-')); ?></small></td>
-                    <td><span class="scm-collection-log-pill"><?php echo esc_html((string) (($row['contract_number'] ?? '') ?: '-')); ?></span></td>
-                    <td><strong><?php echo esc_html((string) (($row['property_code'] ?? '') ?: '-')); ?></strong><small><?php echo esc_html((string) (($row['property_address'] ?? '') ?: 'Sin dirección')); ?></small></td>
-                    <td class="scm-portfolio-money"><?php echo $balance === null ? '&mdash;' : esc_html($this->collection_money($balance)); ?></td>
-                    <td class="scm-portfolio-variation<?php echo $variation !== null && $variation < 0 ? ' is-down' : ($variation !== null && $variation > 0 ? ' is-up' : ''); ?>"><?php echo $variation === null ? '&mdash;' : esc_html(($variation > 0 ? '+' : '') . $this->collection_money($variation)); ?></td>
-                    <td><span class="scm-portfolio-stage scm-portfolio-stage--<?php echo esc_attr($rowStage); ?>"><?php echo esc_html($this->collection_portfolio_stage_label($rowStage)); ?></span></td>
-                    <td><?php echo esc_html($this->collection_portfolio_action_label((string) ($row['last_action_type'] ?? ''))); ?><small><?php echo esc_html($this->format_collection_management_date($row['last_action_at'] ?? '')); ?></small></td>
-                    <td>
-                      <?php if ($canManage): ?>
-                        <div class="scm-portfolio-actions">
-                          <button type="button" class="scm-case-work-btn scm-portfolio-timeline-btn" data-scm-portfolio-timeline data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-property-code="<?php echo esc_attr((string) ($row['property_code'] ?? '')); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Ver movimientos, gestiones y reportes de cartera de este contrato">Ver trazabilidad</button>
-                          <button type="button" class="scm-case-work-btn scm-portfolio-balance-btn" data-scm-portfolio-balance data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-current-balance="<?php echo esc_attr($balance === null ? '' : (string) $balance); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Anexar o corregir saldo manual para pruebas o ajustes de cartera">Anexar saldo</button>
-                          <button type="button" class="scm-case-work-btn scm-portfolio-due-btn" data-scm-portfolio-due-date data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar gestión Canon y enviar notificación informativa de fecha de pago">Notificar pago</button>
-                          <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar contacto, acuerdo, compromiso o seguimiento sin cambiar la etapa">Hacer gesti&oacute;n</button>
-                          <?php if ($canCollect): ?>
-                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="prejuridico" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="Revisar la carta antes de descargarla o enviarla">Preparar prejur&iacute;dico</button>
-                            <button type="button" class="scm-case-work-btn" data-scm-portfolio-siniestro data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Muestra vista previa y encola aviso previo por WhatsApp y email, sin marcar siniestro">Notificar siniestro</button>
-                          <?php endif; ?>
-                          <?php if ($canCollect && $rowStage !== 'siniestro'): ?>
-                            <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="siniestro" data-scm-portfolio-current-stage="<?php echo esc_attr($rowStage); ?>" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="Marca la etapa siniestro, registra historial del inmueble y avisa al funcionario configurado">Marcar siniestro</button>
-                          <?php endif; ?>
-                          <?php if ($rowStage === 'siniestro'): ?>
-                            <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="normal" data-scm-portfolio-current-stage="siniestro" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="Quita la marca de siniestro y devuelve el contrato a cobro normal">Quitar siniestro</button>
-                          <?php elseif ($rowStage === 'prejuridico'): ?>
-                            <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="normal" data-scm-portfolio-current-stage="prejuridico" data-portfolio-id="<?php echo esc_attr((string) ((int) $row['id'])); ?>" title="Quita la etapa prejurídica y devuelve el contrato a cobro normal">Quitar prejur&iacute;dico</button>
-                          <?php elseif (!$canCollect): ?><span class="scm-portfolio-no-action">Sin saldo para escalar</span><?php endif; ?>
-                        </div>
-                      <?php else: ?><span class="scm-portfolio-no-action">Cruce pendiente</span><?php endif; ?>
-                    </td>
+                    <th class="is-check"><input type="checkbox" data-scm-portfolio-bulk-check-all aria-label="Seleccionar registros visibles de cartera principal"></th>
+                    <th>Estado</th>
+                    <th>Arrendatario</th>
+                    <th>Contrato</th>
+                    <th>Inmueble</th>
+                    <th class="is-num">Saldo actual</th>
+                    <th class="is-num">Variaci&oacute;n</th>
+                    <th>Etapa</th>
+                    <th>&Uacute;ltima acci&oacute;n</th>
+                    <th>Acciones</th>
                   </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
-          </div>
-          <?php echo $this->render_collection_portfolio_pagination($portfolioPagination, $portfolioApplied); ?>
-        <?php endif; ?>
+                </thead>
+                <tbody>
+                  <?php foreach ($portfolioRows as $row):
+                    $rowStatus = (string) ($row['status'] ?? 'sin_dato');
+                    $rowStage = (string) ($row['collection_stage'] ?? 'normal');
+                    $balance = $row['balance'] !== null ? (float) $row['balance'] : null;
+                    $previous = $row['previous_balance'] !== null ? (float) $row['previous_balance'] : null;
+                    $variation = $balance !== null && $previous !== null ? $balance - $previous : null;
+                    $rowPortfolioId = (int) ($row['id'] ?? 0);
+                    $rowTenantId = (int) ($row['tenant_id'] ?? 0);
+                    $rowContractId = (int) ($row['contract_id'] ?? 0);
+                    $canManage = $rowContractId > 0;
+                    $canCollect = $canManage && $rowStatus === 'deuda';
+                  ?>
+                    <tr>
+                      <td class="is-check"><input type="checkbox" data-scm-portfolio-bulk-check data-portfolio-id="<?php echo esc_attr((string) $rowPortfolioId); ?>" data-tenant-id="<?php echo esc_attr((string) $rowTenantId); ?>" data-contract-id="<?php echo esc_attr((string) $rowContractId); ?>" data-can-manage="<?php echo $canManage ? '1' : '0'; ?>" data-can-collect="<?php echo $canCollect ? '1' : '0'; ?>" aria-label="Seleccionar contrato <?php echo esc_attr((string) (($row['contract_number'] ?? '') ?: $rowContractId)); ?>"<?php echo $canManage ? '' : ' disabled'; ?>></td>
+                      <td><?php echo $this->collection_gc_status_chip($rowStatus); ?></td>
+                      <td class="is-person"><strong><?php echo esc_html((string) (($row['tenant_name'] ?? '') ?: 'Sin nombre en plataforma')); ?></strong><small><?php echo esc_html((string) (($row['tenant_document'] ?? '') ?: '-')); ?></small></td>
+                      <td><span class="scm-gc-code"><?php echo esc_html((string) (($row['contract_number'] ?? '') ?: '-')); ?></span></td>
+                      <td class="is-property"><strong><?php echo esc_html((string) (($row['property_code'] ?? '') ?: '-')); ?></strong><small><?php echo esc_html((string) (($row['property_address'] ?? '') ?: 'Sin dirección')); ?></small></td>
+                      <td class="is-num is-money"><?php echo $balance === null ? '&mdash;' : esc_html($this->collection_money($balance)); ?></td>
+                      <td class="is-num"><?php echo $this->collection_gc_variation($variation); ?></td>
+                      <td><?php echo $this->collection_gc_stage_chip($rowStage); ?></td>
+                      <td class="is-last"><?php echo esc_html($this->collection_portfolio_action_label((string) ($row['last_action_type'] ?? ''))); ?><small><?php echo esc_html($this->format_collection_management_date($row['last_action_at'] ?? '')); ?></small></td>
+                      <td class="is-actions"><?php echo $this->render_collection_portfolio_row_actions($row, $rowPortfolioId, $canCollect, $rowStage, false); ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+            <?php echo $this->render_collection_portfolio_pagination($portfolioPagination, $portfolioApplied); ?>
+          <?php endif; ?>
+        </section>
       </section>
 
-      </section>
-
-      <section id="scm-portfolio-panel-contratos" class="scm-portfolio-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-contratos" data-scm-portfolio-panel="contratos"<?php echo $activeView === 'contratos' ? '' : ' hidden'; ?>>
-      <section class="scm-admin-notif-card scm-portfolio-control">
-        <div class="scm-portfolio-section-head">
-          <div><span class="scm-calendar-action-kicker">Contratos activos</span><h4>Todos los contratos de arrendamiento</h4><p>Audita todos los contratos activos y valida si ya tienen saldo cruzado con la &uacute;ltima 1380.</p></div>
-          <span class="scm-status-count"><strong><?php echo esc_html((string) ((int) ($contractPagination['total'] ?? 0))); ?></strong> contratos</span>
-        </div>
-        <form method="get" autocomplete="off" data-scm-collection-log-form class="scm-portfolio-filter-form">
-          <input type="hidden" name="scm_tab" value="gestiones_cobro">
-          <input type="hidden" name="scmgc_view" value="contratos">
-          <input type="hidden" name="scmgc_contratos_page" value="1">
-          <div class="scm-portfolio-filter-grid scm-portfolio-filter-grid--contracts">
-            <div class="scm-field">
-              <label for="scmgc_contratos_buscar">Buscar contrato</label>
-              <input id="scmgc_contratos_buscar" name="scmgc_contratos_buscar" type="search" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr((string) ($contractApplied['search'] ?? '')); ?>" placeholder="Arrendatario, documento, contrato, inmueble, celular o propietario">
-            </div>
-            <div class="scm-field">
-              <label for="scmgc_contratos_estado">Estado de saldo</label>
-              <select id="scmgc_contratos_estado" name="scmgc_contratos_estado" class="select select-bordered select-sm scm-select">
-                <?php foreach (['' => 'Todos', 'deuda' => 'Con deuda', 'al_dia' => 'Al día', 'saldo_favor' => 'Saldo a favor', 'sin_dato' => 'Sin dato 1380'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($contractApplied['status'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
-              </select>
-            </div>
-            <div class="scm-field">
-              <label for="scmgc_contratos_etapa">Etapa</label>
-              <select id="scmgc_contratos_etapa" name="scmgc_contratos_etapa" class="select select-bordered select-sm scm-select">
-                <?php foreach (['' => 'Todas', 'normal' => 'Cobro normal', 'prejuridico' => 'Prejurídico', 'siniestro' => 'Siniestro'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($contractApplied['stage'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
-              </select>
-            </div>
-            <div class="scm-collection-log-actions">
-              <button type="submit" class="scm-btn-primary btn btn-primary">Filtrar contratos</button>
-              <a class="scm-btn-secondary btn btn-outline" href="?scm_tab=gestiones_cobro&amp;scmgc_view=contratos&amp;scmgc_contratos_buscar=&amp;scmgc_contratos_estado=&amp;scmgc_contratos_etapa=&amp;scmgc_contratos_page=1" data-scm-collection-log-clear>Limpiar</a>
-            </div>
+      <section id="scm-portfolio-panel-contratos" class="scm-gc-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-contratos" data-scm-portfolio-panel="contratos"<?php echo $activeView === 'contratos' ? '' : ' hidden'; ?>>
+        <section class="scm-gc-card scm-gc-table-card">
+          <div class="scm-gc-section-head">
+            <div><span class="scm-gc-kicker">Contratos activos</span><h4>Todos los contratos de arrendamiento</h4><p>Audita todos los contratos activos y valida si ya tienen saldo cruzado con la &uacute;ltima 1380.</p></div>
+            <span class="scm-gc-count"><strong><?php echo esc_html((string) ((int) ($contractPagination['total'] ?? 0))); ?></strong> contratos</span>
           </div>
-        </form>
-      </section>
+          <form method="get" autocomplete="off" data-scm-collection-log-form class="scm-gc-filters is-contracts">
+            <input type="hidden" name="scm_tab" value="gestiones_cobro">
+            <input type="hidden" name="scmgc_view" value="contratos">
+            <input type="hidden" name="scmgc_contratos_page" value="1">
+            <label class="scm-gc-field is-search"><span>Buscar contrato</span><input id="scmgc_contratos_buscar" name="scmgc_contratos_buscar" type="search" value="<?php echo esc_attr((string) ($contractApplied['search'] ?? '')); ?>" placeholder="Arrendatario, documento, contrato, inmueble, celular o propietario"></label>
+            <label class="scm-gc-field"><span>Estado de saldo</span><select id="scmgc_contratos_estado" name="scmgc_contratos_estado">
+              <?php foreach (['' => 'Todos', 'deuda' => 'Con deuda', 'al_dia' => 'Al día', 'saldo_favor' => 'Saldo a favor', 'sin_dato' => 'Sin dato 1380'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($contractApplied['status'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+            </select></label>
+            <label class="scm-gc-field"><span>Etapa</span><select id="scmgc_contratos_etapa" name="scmgc_contratos_etapa">
+              <?php foreach (['' => 'Todas', 'normal' => 'Cobro normal', 'prejuridico' => 'Prejurídico', 'siniestro' => 'Siniestro'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($contractApplied['stage'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+            </select></label>
+            <div class="scm-gc-filter-actions">
+              <button type="submit" class="scm-gc-btn is-navy"><?php echo $this->collection_gc_icon('filter_alt'); ?>Filtrar contratos</button>
+              <a class="scm-gc-btn" href="?scm_tab=gestiones_cobro&amp;scmgc_view=contratos&amp;scmgc_contratos_buscar=&amp;scmgc_contratos_estado=&amp;scmgc_contratos_etapa=&amp;scmgc_contratos_page=1" data-scm-collection-log-clear>Limpiar</a>
+            </div>
+          </form>
 
-      <section class="scm-admin-notif-card scm-collection-log-table-card scm-portfolio-table-card">
-        <?php if ($contractRows === []): ?>
-          <div class="scm-admin-notif-empty">
-            <strong>Sin contratos para mostrar</strong>
-            <span>No hay contratos activos con los filtros actuales.</span>
-          </div>
-        <?php else: ?>
-          <?php echo $this->render_collection_portfolio_bulk_toolbar('contratos', (int) ($contractPagination['total'] ?? 0)); ?>
-          <div class="scm-collection-log-table-wrap scm-portfolio-table-wrap">
-            <table class="scm-collection-log-table scm-portfolio-table">
-              <thead>
-                <tr>
-                  <th class="scm-portfolio-select-col"><input type="checkbox" data-scm-portfolio-bulk-check-all aria-label="Seleccionar contratos visibles"></th>
-                  <th>Estado</th>
-                  <th>Arrendatario</th>
-                  <th>Contrato</th>
-                  <th>Inmueble</th>
-                  <th>Saldo 1380</th>
-                  <th>Etapa</th>
-                  <th>&Uacute;ltima acci&oacute;n</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php foreach ($contractRows as $row):
-                  $rowStatus = (string) ($row['status'] ?? 'sin_dato');
-                  $rowStage = (string) ($row['collection_stage'] ?? 'normal');
-                  $balance = $row['balance'] !== null ? (float) $row['balance'] : null;
-                  $portfolioId = (int) ($row['id'] ?? 0);
-                  $contractTenantId = (int) ($row['tenant_id'] ?? 0);
-                  $contractId = (int) ($row['contract_id'] ?? 0);
-                  $canManageContract = $contractId > 0;
-                  $canCollect = $portfolioId > 0 && $rowStatus === 'deuda';
-                ?>
+          <?php if ($contractRows === []): ?>
+            <?php echo $this->render_collection_gc_empty('Sin contratos para mostrar', 'No hay contratos activos con los filtros actuales.'); ?>
+          <?php else: ?>
+            <?php echo $this->render_collection_portfolio_bulk_toolbar('contratos', (int) ($contractPagination['total'] ?? 0)); ?>
+            <div class="scm-gc-table-wrap">
+              <table class="scm-gc-table">
+                <thead>
                   <tr>
-                    <td class="scm-portfolio-select-col"><input type="checkbox" data-scm-portfolio-bulk-check data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-id="<?php echo esc_attr((string) $contractTenantId); ?>" data-contract-id="<?php echo esc_attr((string) $contractId); ?>" data-can-manage="<?php echo $canManageContract ? '1' : '0'; ?>" data-can-collect="<?php echo $canCollect ? '1' : '0'; ?>" aria-label="Seleccionar contrato <?php echo esc_attr((string) (($row['contract_number'] ?? '') ?: $contractId)); ?>"<?php echo $canManageContract ? '' : ' disabled'; ?>></td>
-                    <td><span class="scm-portfolio-status scm-portfolio-status--<?php echo esc_attr($rowStatus); ?>"><?php echo esc_html($this->collection_portfolio_status_label($rowStatus)); ?></span></td>
-                    <td><strong><?php echo esc_html((string) (($row['tenant_name'] ?? '') ?: 'Sin nombre en plataforma')); ?></strong><small><?php echo esc_html((string) (($row['tenant_document'] ?? '') ?: '-')); ?> &middot; <?php echo esc_html((string) (($row['tenant_phone'] ?? '') ?: 'Sin celular')); ?></small></td>
-                    <td><span class="scm-collection-log-pill"><?php echo esc_html((string) (($row['contract_number'] ?? '') ?: '-')); ?></span></td>
-                    <td><strong><?php echo esc_html((string) (($row['property_code'] ?? '') ?: '-')); ?></strong><small><?php echo esc_html((string) (($row['property_address'] ?? '') ?: 'Sin dirección')); ?></small></td>
-                    <td class="scm-portfolio-money"><?php echo $balance === null ? '<span class="scm-portfolio-no-action">Sin cruce</span>' : esc_html($this->collection_money($balance)); ?></td>
-                    <td><span class="scm-portfolio-stage scm-portfolio-stage--<?php echo esc_attr($rowStage); ?>"><?php echo esc_html($this->collection_portfolio_stage_label($rowStage)); ?></span></td>
-                    <td><?php echo esc_html($this->collection_portfolio_action_label((string) ($row['last_action_type'] ?? ''))); ?><small><?php echo esc_html($this->format_collection_management_date($row['last_action_at'] ?? '')); ?></small></td>
-                    <td>
-                      <?php if ($canManageContract): ?>
-                        <div class="scm-portfolio-actions">
-                          <button type="button" class="scm-case-work-btn scm-portfolio-timeline-btn" data-scm-portfolio-timeline data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-property-code="<?php echo esc_attr((string) ($row['property_code'] ?? '')); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Ver movimientos, gestiones y reportes de cartera de este contrato">Ver trazabilidad</button>
-                          <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-management data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-id="<?php echo esc_attr((string) ((int) ($row['tenant_id'] ?? 0))); ?>" data-contract-id="<?php echo esc_attr((string) ((int) ($row['contract_id'] ?? 0))); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar gestión de cobro e historial del inmueble aunque no exista foto 1380">Hacer gesti&oacute;n</button>
-                          <?php if ($portfolioId > 0): ?>
-                            <button type="button" class="scm-case-work-btn scm-portfolio-balance-btn" data-scm-portfolio-balance data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-current-balance="<?php echo esc_attr($balance === null ? '' : (string) $balance); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Anexar o corregir saldo manual para pruebas o ajustes de cartera">Anexar saldo</button>
-                            <button type="button" class="scm-case-work-btn scm-portfolio-due-btn" data-scm-portfolio-due-date data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Registrar gestión Canon y enviar notificación informativa de fecha de pago">Notificar pago</button>
-                            <?php if ($canCollect): ?>
-                              <button type="button" class="scm-case-work-btn" data-scm-portfolio-letter="prejuridico" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="Revisar la carta antes de descargarla o enviarla">Preparar prejur&iacute;dico</button>
-                              <button type="button" class="scm-case-work-btn" data-scm-portfolio-siniestro data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-name="<?php echo esc_attr((string) ($row['tenant_name'] ?? '')); ?>" data-contract-number="<?php echo esc_attr((string) ($row['contract_number'] ?? '')); ?>" title="Muestra vista previa y encola aviso previo por WhatsApp y email, sin marcar siniestro">Notificar siniestro</button>
-                            <?php endif; ?>
-                            <?php if ($canCollect && $rowStage !== 'siniestro'): ?>
-                              <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="siniestro" data-scm-portfolio-current-stage="<?php echo esc_attr($rowStage); ?>" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="Marca la etapa siniestro, registra historial del inmueble y avisa al funcionario configurado">Marcar siniestro</button>
-                            <?php endif; ?>
-                            <?php if ($rowStage === 'siniestro'): ?>
-                              <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="normal" data-scm-portfolio-current-stage="siniestro" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="Quita la marca de siniestro y devuelve el contrato a cobro normal">Quitar siniestro</button>
-                            <?php elseif ($rowStage === 'prejuridico'): ?>
-                              <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-stage="normal" data-scm-portfolio-current-stage="prejuridico" data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" title="Quita la etapa prejurídica y devuelve el contrato a cobro normal">Quitar prejur&iacute;dico</button>
-                            <?php elseif (!$canCollect): ?><span class="scm-portfolio-no-action">Sin saldo para escalar</span><?php endif; ?>
-                          <?php else: ?><span class="scm-portfolio-no-action">Sin foto de cartera</span><?php endif; ?>
-                        </div>
-                      <?php else: ?><span class="scm-portfolio-no-action">Sin foto de cartera</span><?php endif; ?>
-                    </td>
+                    <th class="is-check"><input type="checkbox" data-scm-portfolio-bulk-check-all aria-label="Seleccionar contratos visibles"></th>
+                    <th>Estado</th>
+                    <th>Arrendatario</th>
+                    <th>Contrato</th>
+                    <th>Inmueble</th>
+                    <th class="is-num">Saldo 1380</th>
+                    <th>Etapa</th>
+                    <th>&Uacute;ltima acci&oacute;n</th>
+                    <th>Acciones</th>
                   </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
-          </div>
-          <?php echo $this->render_collection_contracts_pagination($contractPagination, $contractApplied); ?>
-        <?php endif; ?>
+                </thead>
+                <tbody>
+                  <?php foreach ($contractRows as $row):
+                    $rowStatus = (string) ($row['status'] ?? 'sin_dato');
+                    $rowStage = (string) ($row['collection_stage'] ?? 'normal');
+                    $balance = $row['balance'] !== null ? (float) $row['balance'] : null;
+                    $portfolioId = (int) ($row['id'] ?? 0);
+                    $contractTenantId = (int) ($row['tenant_id'] ?? 0);
+                    $contractId = (int) ($row['contract_id'] ?? 0);
+                    $canManageContract = $contractId > 0;
+                    $canCollect = $portfolioId > 0 && $rowStatus === 'deuda';
+                  ?>
+                    <tr>
+                      <td class="is-check"><input type="checkbox" data-scm-portfolio-bulk-check data-portfolio-id="<?php echo esc_attr((string) $portfolioId); ?>" data-tenant-id="<?php echo esc_attr((string) $contractTenantId); ?>" data-contract-id="<?php echo esc_attr((string) $contractId); ?>" data-can-manage="<?php echo $canManageContract ? '1' : '0'; ?>" data-can-collect="<?php echo $canCollect ? '1' : '0'; ?>" aria-label="Seleccionar contrato <?php echo esc_attr((string) (($row['contract_number'] ?? '') ?: $contractId)); ?>"<?php echo $canManageContract ? '' : ' disabled'; ?>></td>
+                      <td><?php echo $this->collection_gc_status_chip($rowStatus); ?></td>
+                      <td class="is-person"><strong><?php echo esc_html((string) (($row['tenant_name'] ?? '') ?: 'Sin nombre en plataforma')); ?></strong><small><?php echo esc_html((string) (($row['tenant_document'] ?? '') ?: '-')); ?> &middot; <?php echo esc_html((string) (($row['tenant_phone'] ?? '') ?: 'Sin celular')); ?></small></td>
+                      <td><span class="scm-gc-code"><?php echo esc_html((string) (($row['contract_number'] ?? '') ?: '-')); ?></span></td>
+                      <td class="is-property"><strong><?php echo esc_html((string) (($row['property_code'] ?? '') ?: '-')); ?></strong><small><?php echo esc_html((string) (($row['property_address'] ?? '') ?: 'Sin dirección')); ?></small></td>
+                      <td class="is-num is-money"><?php echo $balance === null ? '<span class="scm-gc-muted-note">Sin cruce</span>' : esc_html($this->collection_money($balance)); ?></td>
+                      <td><?php echo $this->collection_gc_stage_chip($rowStage); ?></td>
+                      <td class="is-last"><?php echo esc_html($this->collection_portfolio_action_label((string) ($row['last_action_type'] ?? ''))); ?><small><?php echo esc_html($this->format_collection_management_date($row['last_action_at'] ?? '')); ?></small></td>
+                      <td class="is-actions"><?php echo $this->render_collection_portfolio_row_actions($row, $portfolioId, $canCollect, $rowStage, true); ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+            <?php echo $this->render_collection_contracts_pagination($contractPagination, $contractApplied); ?>
+          <?php endif; ?>
+        </section>
       </section>
 
+      <section id="scm-portfolio-panel-historial" class="scm-gc-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-historial" data-scm-portfolio-panel="historial"<?php echo $activeView === 'historial' ? '' : ' hidden'; ?>>
+        <section class="scm-gc-card scm-gc-table-card">
+          <div class="scm-gc-section-head"><div><span class="scm-gc-kicker">Trazabilidad</span><h4>Historial de gestiones de cobro</h4><p>Todos los registros operativos y sus notificaciones, ya centralizados en este m&oacute;dulo.</p></div><span class="scm-gc-count"><strong><?php echo esc_html((string) ((int) ($stats['total'] ?? 0))); ?></strong> gestiones</span></div>
+          <form method="get" autocomplete="off" data-scm-collection-log-form class="scm-gc-filters is-history">
+            <input type="hidden" name="scm_tab" value="gestiones_cobro"><input type="hidden" name="scmgc_view" value="historial"><input type="hidden" name="scmgc_page" value="1">
+            <label class="scm-gc-field"><span>Fecha desde</span><input id="scmgc_fecha_desde" name="scmgc_fecha_desde" type="date" value="<?php echo esc_attr($dateFrom); ?>"></label>
+            <label class="scm-gc-field"><span>Fecha hasta</span><input id="scmgc_fecha_hasta" name="scmgc_fecha_hasta" type="date" value="<?php echo esc_attr($dateTo); ?>"></label>
+            <label class="scm-gc-field"><span>Concepto</span><select id="scmgc_tipo" name="scmgc_tipo"><option value="">Todos</option><?php foreach ($types as $typeOption): ?><option value="<?php echo esc_attr($typeOption); ?>" <?php selected($currentType, $typeOption); ?>><?php echo esc_html($this->collection_management_type_label($typeOption)); ?></option><?php endforeach; ?></select></label>
+            <div class="scm-gc-filter-actions"><button type="submit" class="scm-gc-btn is-navy"><?php echo $this->collection_gc_icon('filter_alt'); ?>Filtrar historial</button></div>
+          </form>
+          <?php if ($rows === []): ?>
+            <?php echo $this->render_collection_gc_empty('Sin gestiones registradas', 'No hay registros con los filtros actuales.'); ?>
+          <?php else: ?>
+            <div class="scm-gc-table-wrap"><table class="scm-gc-table"><thead><tr><th>Fecha</th><th>Contrato</th><th>Inmueble</th><th>Arrendatario</th><th>Concepto</th><th>Realizado por</th><th>Observaci&oacute;n</th><th>Mensajes</th></tr></thead><tbody>
+            <?php foreach ($rows as $row): ?><tr><td class="is-nowrap"><?php echo esc_html($this->format_collection_management_date($row['fecha_raw'] ?? '')); ?></td><td><span class="scm-gc-code"><?php echo esc_html((string) (($row['contrato'] ?? '') ?: '-')); ?></span></td><td><?php echo esc_html((string) (($row['inmueble'] ?? '') ?: '-')); ?></td><td class="is-person"><strong><?php echo esc_html((string) (($row['arrendatario'] ?? '') ?: '-')); ?></strong></td><td><span class="scm-gc-chip is-indigo"><?php echo esc_html($this->collection_management_type_label((string) ($row['tipo_gestion'] ?? ''))); ?></span></td><td><?php echo esc_html((string) (($row['realizado_por'] ?? '') ?: '-')); ?></td><td class="is-note"><?php echo esc_html((string) (($row['observacion'] ?? '') ?: '-')); ?></td><td><button type="button" class="scm-gc-action" data-scm-collection-queue="<?php echo esc_attr((string) ((int) ($row['id'] ?? 0))); ?>"><?php echo $this->collection_gc_icon('forum'); ?>Ver</button></td></tr><?php endforeach; ?>
+            </tbody></table></div><?php echo $this->render_collection_management_pagination($pagination, $applied); ?>
+          <?php endif; ?>
+        </section>
       </section>
 
-      <section id="scm-portfolio-panel-historial" class="scm-portfolio-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-historial" data-scm-portfolio-panel="historial"<?php echo $activeView === 'historial' ? '' : ' hidden'; ?>>
-      <section class="scm-admin-notif-card scm-collection-history-card">
-        <div class="scm-portfolio-section-head"><div><span class="scm-calendar-action-kicker">Trazabilidad</span><h4>Historial de gestiones de cobro</h4><p>Todos los registros operativos y sus notificaciones, ya centralizados en este m&oacute;dulo.</p></div><span class="scm-status-count"><strong><?php echo esc_html((string) ((int) ($stats['total'] ?? 0))); ?></strong> gestiones</span></div>
-        <form method="get" autocomplete="off" data-scm-collection-log-form class="scm-collection-log-filters">
-          <input type="hidden" name="scm_tab" value="gestiones_cobro"><input type="hidden" name="scmgc_view" value="historial"><input type="hidden" name="scmgc_page" value="1">
-          <div class="scm-collection-log-filter-grid">
-            <div class="scm-field"><label for="scmgc_fecha_desde">Fecha desde</label><input id="scmgc_fecha_desde" name="scmgc_fecha_desde" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr($dateFrom); ?>"></div>
-            <div class="scm-field"><label for="scmgc_fecha_hasta">Fecha hasta</label><input id="scmgc_fecha_hasta" name="scmgc_fecha_hasta" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr($dateTo); ?>"></div>
-            <div class="scm-field"><label for="scmgc_tipo">Concepto</label><select id="scmgc_tipo" name="scmgc_tipo" class="select select-bordered select-sm scm-select"><option value="">Todos</option><?php foreach ($types as $typeOption): ?><option value="<?php echo esc_attr($typeOption); ?>" <?php selected($currentType, $typeOption); ?>><?php echo esc_html($this->collection_management_type_label($typeOption)); ?></option><?php endforeach; ?></select></div>
-            <div class="scm-collection-log-actions"><button type="submit" class="scm-btn-primary btn btn-primary">Filtrar historial</button></div>
+      <section id="scm-portfolio-panel-cola" class="scm-gc-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-cola" data-scm-portfolio-panel="cola"<?php echo $activeView === 'cola' ? '' : ' hidden'; ?>>
+        <section class="scm-gc-card scm-gc-table-card">
+          <div class="scm-gc-section-head">
+            <div><span class="scm-gc-kicker">Trazabilidad</span><h4>Cola de notificaciones de cartera</h4><p>Revisa los correos, WhatsApp y SMS generados desde Gestiones de cobro sin salir del m&oacute;dulo.</p></div>
+            <a class="scm-gc-btn" href="?scm_tab=gestiones_cobro&amp;scmgc_view=cola"><?php echo $this->collection_gc_icon('refresh'); ?>Actualizar cola</a>
           </div>
-        </form>
-        <?php if ($rows === []): ?><div class="scm-admin-notif-empty"><strong>Sin gestiones registradas</strong><span>No hay registros con los filtros actuales.</span></div><?php else: ?>
-          <div class="scm-collection-log-table-wrap"><table class="scm-collection-log-table"><thead><tr><th>Fecha</th><th>Contrato</th><th>Inmueble</th><th>Arrendatario</th><th>Concepto</th><th>Realizado por</th><th>Observaci&oacute;n</th><th>Mensajes</th></tr></thead><tbody>
-          <?php foreach ($rows as $row): ?><tr><td><?php echo esc_html($this->format_collection_management_date($row['fecha_raw'] ?? '')); ?></td><td><span class="scm-collection-log-pill"><?php echo esc_html((string) (($row['contrato'] ?? '') ?: '-')); ?></span></td><td><?php echo esc_html((string) (($row['inmueble'] ?? '') ?: '-')); ?></td><td><?php echo esc_html((string) (($row['arrendatario'] ?? '') ?: '-')); ?></td><td><span class="scm-collection-log-type"><?php echo esc_html($this->collection_management_type_label((string) ($row['tipo_gestion'] ?? ''))); ?></span></td><td><?php echo esc_html((string) (($row['realizado_por'] ?? '') ?: '-')); ?></td><td class="scm-collection-log-note"><?php echo esc_html((string) (($row['observacion'] ?? '') ?: '-')); ?></td><td><button type="button" class="scm-case-work-btn scm-collection-log-notify-btn" data-scm-collection-queue="<?php echo esc_attr((string) ((int) ($row['id'] ?? 0))); ?>">Ver</button></td></tr><?php endforeach; ?>
-          </tbody></table></div><?php echo $this->render_collection_management_pagination($pagination, $applied); ?>
-        <?php endif; ?>
-      </section>
-      </section>
-
-      <section id="scm-portfolio-panel-cola" class="scm-portfolio-view" role="tabpanel" aria-labelledby="scm-portfolio-tab-cola" data-scm-portfolio-panel="cola"<?php echo $activeView === 'cola' ? '' : ' hidden'; ?>>
-        <section class="scm-admin-notif-card scm-admin-notif-queue-card scm-collection-queue-card">
-          <div class="scm-portfolio-section-head">
-            <div><span class="scm-calendar-action-kicker">Trazabilidad</span><h4>Cola de notificaciones de cartera</h4><p>Revisa los correos, WhatsApp y SMS generados desde Gestiones de cobro sin salir del m&oacute;dulo.</p></div>
-            <a class="scm-btn-secondary btn btn-outline" href="?scm_tab=gestiones_cobro&amp;scmgc_view=cola">Actualizar cola</a>
+          <div class="scm-gc-queue-stats">
+            <?php foreach ([['Total', 'total', 'is-navy'], ['Pendientes', 'pending', 'is-warning'], ['Procesando', 'processing', 'is-indigo'], ['Enviadas', 'sent', 'is-success'], ['Fallidas', 'failed', 'is-danger']] as $metric): ?>
+              <article class="<?php echo esc_attr($metric[2]); ?>"><span><?php echo esc_html($metric[0]); ?></span><strong><?php echo esc_html((string) ((int) ($queueStats[$metric[1]] ?? 0))); ?></strong></article>
+            <?php endforeach; ?>
           </div>
-          <form method="get" autocomplete="off" class="scm-admin-notif-queue-filters scm-collection-queue-filters">
+          <form method="get" autocomplete="off" class="scm-gc-filters is-queue">
             <input type="hidden" name="scm_tab" value="gestiones_cobro">
             <input type="hidden" name="scmgc_view" value="cola">
             <input type="hidden" name="scmgc_queue_page" value="1">
-            <div class="scm-field">
-              <label for="scmgc_queue_fecha_desde">Desde</label>
-              <input id="scmgc_queue_fecha_desde" name="scmgc_queue_fecha_desde" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr((string) ($queueApplied['date_from'] ?? '')); ?>">
-            </div>
-            <div class="scm-field">
-              <label for="scmgc_queue_fecha_hasta">Hasta</label>
-              <input id="scmgc_queue_fecha_hasta" name="scmgc_queue_fecha_hasta" type="date" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr((string) ($queueApplied['date_to'] ?? '')); ?>">
-            </div>
-            <div class="scm-field">
-              <label for="scmgc_queue_estado">Estado</label>
-              <select id="scmgc_queue_estado" name="scmgc_queue_estado" class="select select-bordered select-sm scm-select">
-                <?php foreach (['' => 'Todos', 'pending' => 'Pendiente', 'processing' => 'Procesando', 'sent' => 'Enviada', 'failed' => 'Fallida', 'cancelled' => 'Cancelada'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($queueApplied['status'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
-              </select>
-            </div>
-            <div class="scm-field">
-              <label for="scmgc_queue_canal">Canal</label>
-              <select id="scmgc_queue_canal" name="scmgc_queue_canal" class="select select-bordered select-sm scm-select">
-                <?php foreach (['' => 'Todos', 'email' => 'Email', 'whatsapp' => 'WhatsApp', 'sms' => 'SMS'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($queueApplied['channel'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
-              </select>
-            </div>
-            <div class="scm-field">
-              <label for="scmgc_queue_tipo">Destinatario</label>
-              <select id="scmgc_queue_tipo" name="scmgc_queue_tipo" class="select select-bordered select-sm scm-select">
-                <?php foreach (['' => 'Todos', 'arrendatarios_activos' => 'Arrendatarios', 'codeudores' => 'Codeudores', 'funcionarios' => 'Funcionarios'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($queueApplied['type'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
-              </select>
-            </div>
-            <div class="scm-field">
-              <label for="scmgc_queue_plantilla">Plantilla</label>
-              <input id="scmgc_queue_plantilla" name="scmgc_queue_plantilla" type="search" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr((string) ($queueApplied['template'] ?? '')); ?>" placeholder="Nombre técnico">
-            </div>
-            <div class="scm-field scm-admin-notif-queue-search">
-              <label for="scmgc_queue_buscar">Buscar</label>
-              <input id="scmgc_queue_buscar" name="scmgc_queue_buscar" type="search" class="input input-bordered input-sm scm-input" value="<?php echo esc_attr((string) ($queueApplied['q'] ?? '')); ?>" placeholder="Nombre, destino, asunto, error o lote">
-            </div>
-            <div class="scm-admin-notif-queue-actions">
-              <button type="submit" class="scm-btn-primary btn btn-primary">Consultar cola</button>
-              <a class="scm-btn-secondary btn btn-outline" href="?scm_tab=gestiones_cobro&amp;scmgc_view=cola">Limpiar</a>
+            <label class="scm-gc-field"><span>Desde</span><input id="scmgc_queue_fecha_desde" name="scmgc_queue_fecha_desde" type="date" value="<?php echo esc_attr((string) ($queueApplied['date_from'] ?? '')); ?>"></label>
+            <label class="scm-gc-field"><span>Hasta</span><input id="scmgc_queue_fecha_hasta" name="scmgc_queue_fecha_hasta" type="date" value="<?php echo esc_attr((string) ($queueApplied['date_to'] ?? '')); ?>"></label>
+            <label class="scm-gc-field"><span>Estado</span><select id="scmgc_queue_estado" name="scmgc_queue_estado">
+              <?php foreach (['' => 'Todos', 'pending' => 'Pendiente', 'processing' => 'Procesando', 'sent' => 'Enviada', 'failed' => 'Fallida', 'cancelled' => 'Cancelada'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($queueApplied['status'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+            </select></label>
+            <label class="scm-gc-field"><span>Canal</span><select id="scmgc_queue_canal" name="scmgc_queue_canal">
+              <?php foreach (['' => 'Todos', 'email' => 'Email', 'whatsapp' => 'WhatsApp', 'sms' => 'SMS'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($queueApplied['channel'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+            </select></label>
+            <label class="scm-gc-field"><span>Destinatario</span><select id="scmgc_queue_tipo" name="scmgc_queue_tipo">
+              <?php foreach (['' => 'Todos', 'arrendatarios_activos' => 'Arrendatarios', 'codeudores' => 'Codeudores', 'funcionarios' => 'Funcionarios'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($queueApplied['type'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
+            </select></label>
+            <label class="scm-gc-field"><span>Plantilla</span><input id="scmgc_queue_plantilla" name="scmgc_queue_plantilla" type="search" value="<?php echo esc_attr((string) ($queueApplied['template'] ?? '')); ?>" placeholder="Nombre técnico"></label>
+            <label class="scm-gc-field is-search"><span>Buscar</span><input id="scmgc_queue_buscar" name="scmgc_queue_buscar" type="search" value="<?php echo esc_attr((string) ($queueApplied['q'] ?? '')); ?>" placeholder="Nombre, destino, asunto, error o lote"></label>
+            <div class="scm-gc-filter-actions">
+              <button type="submit" class="scm-gc-btn is-navy"><?php echo $this->collection_gc_icon('search'); ?>Consultar cola</button>
+              <a class="scm-gc-btn" href="?scm_tab=gestiones_cobro&amp;scmgc_view=cola">Limpiar</a>
             </div>
           </form>
-          <div class="scm-admin-notif-queue-summary">
-            <?php foreach ([['Total', 'total'], ['Pendientes', 'pending'], ['Procesando', 'processing'], ['Enviadas', 'sent'], ['Fallidas', 'failed']] as $metric): ?>
-              <article><span><?php echo esc_html($metric[0]); ?></span><strong><?php echo esc_html((string) ((int) ($queueStats[$metric[1]] ?? 0))); ?></strong></article>
-            <?php endforeach; ?>
-          </div>
           <?php if ($queueRows === []): ?>
-            <div class="scm-admin-notif-empty"><strong>Sin notificaciones de cartera</strong><span>No hay mensajes con los filtros actuales.</span></div>
+            <?php echo $this->render_collection_gc_empty('Sin notificaciones de cartera', 'No hay mensajes con los filtros actuales.'); ?>
           <?php else: ?>
-            <div class="scm-admin-notif-queue-results">
-              <div class="scm-admin-notif-queue-table-wrap">
-                <table class="scm-admin-notif-queue-table">
-                  <thead><tr><th>ID</th><th>Fecha</th><th>Estado</th><th>Canal</th><th>Destinatario</th><th>Plantilla</th><th>Lote</th><th>Intentos</th><th>Detalle</th></tr></thead>
-                  <tbody>
-                    <?php foreach ($queueRows as $queueRow): ?>
-                      <?php
-                        $queueStatusKey = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($queueRow['status_key'] ?? $queueRow['status'] ?? 'other'));
-                        $queueStatusKey = is_string($queueStatusKey) && $queueStatusKey !== '' ? $queueStatusKey : 'other';
-                      ?>
-                      <tr>
-                        <td><strong>#<?php echo esc_html((string) ((int) ($queueRow['id'] ?? 0))); ?></strong></td>
-                        <td><?php echo esc_html($this->format_collection_management_date($queueRow['created_at'] ?? '')); ?><small><?php echo trim((string) ($queueRow['sent_at'] ?? '')) !== '' ? 'Enviada: ' . esc_html($this->format_collection_management_date($queueRow['sent_at'] ?? '')) : ''; ?></small></td>
-                        <td><span class="scm-admin-notif-queue-status scm-admin-notif-queue-status--<?php echo esc_attr($queueStatusKey); ?>"><?php echo esc_html((string) ($queueRow['status_label'] ?? $queueRow['status'] ?? '-')); ?></span></td>
-                        <td><?php echo esc_html((string) ($queueRow['channel_label'] ?? $queueRow['channel'] ?? '-')); ?><small><?php echo esc_html((string) ($queueRow['provider'] ?? '')); ?></small></td>
-                        <td><strong><?php echo esc_html((string) (($queueRow['destination_name'] ?? '') ?: '-')); ?></strong><small><?php echo esc_html((string) (($queueRow['destination'] ?? '') ?: '-')); ?><?php echo trim((string) ($queueRow['recipient_role_label'] ?? '')) !== '' ? ' · ' . esc_html((string) ($queueRow['recipient_role_label'] ?? '')) : ''; ?></small></td>
-                        <td><code><?php echo esc_html((string) (($queueRow['template_name'] ?? '') ?: '-')); ?></code><small><?php echo esc_html((string) (($queueRow['type_label'] ?? '') ?: 'Cartera')); ?></small></td>
-                        <td><code><?php echo esc_html((string) (($queueRow['batch_id'] ?? '') ?: '-')); ?></code></td>
-                        <td><?php echo esc_html((string) ((int) ($queueRow['attempts'] ?? 0))); ?>/<?php echo esc_html((string) ((int) ($queueRow['max_attempts'] ?? 0))); ?></td>
-                        <td><strong><?php echo esc_html((string) (($queueRow['subject'] ?? '') ?: 'Mensaje de cartera')); ?></strong><small><?php echo esc_html(mb_substr(trim((string) (($queueRow['last_error'] ?? '') ?: ($queueRow['message_text'] ?? ''))), 0, 260, 'UTF-8')); ?></small></td>
-                      </tr>
-                    <?php endforeach; ?>
-                  </tbody>
-                </table>
-              </div>
+            <div class="scm-gc-table-wrap">
+              <table class="scm-gc-table">
+                <thead><tr><th>ID</th><th>Fecha</th><th>Estado</th><th>Canal</th><th>Destinatario</th><th>Plantilla</th><th>Lote</th><th class="is-num">Intentos</th><th>Detalle</th></tr></thead>
+                <tbody>
+                  <?php foreach ($queueRows as $queueRow): ?>
+                    <?php
+                      $queueStatusKey = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($queueRow['status_key'] ?? $queueRow['status'] ?? 'other'));
+                      $queueStatusKey = is_string($queueStatusKey) && $queueStatusKey !== '' ? $queueStatusKey : 'other';
+                      $queueStatusTone = ['pending' => 'is-warning', 'processing' => 'is-indigo', 'sent' => 'is-success', 'failed' => 'is-danger'][$queueStatusKey] ?? 'is-muted';
+                    ?>
+                    <tr>
+                      <td><strong>#<?php echo esc_html((string) ((int) ($queueRow['id'] ?? 0))); ?></strong></td>
+                      <td class="is-nowrap"><?php echo esc_html($this->format_collection_management_date($queueRow['created_at'] ?? '')); ?><small><?php echo trim((string) ($queueRow['sent_at'] ?? '')) !== '' ? 'Enviada: ' . esc_html($this->format_collection_management_date($queueRow['sent_at'] ?? '')) : ''; ?></small></td>
+                      <td><span class="scm-gc-chip <?php echo esc_attr($queueStatusTone); ?>"><?php echo esc_html((string) ($queueRow['status_label'] ?? $queueRow['status'] ?? '-')); ?></span></td>
+                      <td><?php echo esc_html((string) ($queueRow['channel_label'] ?? $queueRow['channel'] ?? '-')); ?><small><?php echo esc_html((string) ($queueRow['provider'] ?? '')); ?></small></td>
+                      <td class="is-person"><strong><?php echo esc_html((string) (($queueRow['destination_name'] ?? '') ?: '-')); ?></strong><small><?php echo esc_html((string) (($queueRow['destination'] ?? '') ?: '-')); ?><?php echo trim((string) ($queueRow['recipient_role_label'] ?? '')) !== '' ? ' · ' . esc_html((string) ($queueRow['recipient_role_label'] ?? '')) : ''; ?></small></td>
+                      <td><code class="scm-gc-code"><?php echo esc_html((string) (($queueRow['template_name'] ?? '') ?: '-')); ?></code><small><?php echo esc_html((string) (($queueRow['type_label'] ?? '') ?: 'Cartera')); ?></small></td>
+                      <td><code class="scm-gc-code"><?php echo esc_html((string) (($queueRow['batch_id'] ?? '') ?: '-')); ?></code></td>
+                      <td class="is-num"><?php echo esc_html((string) ((int) ($queueRow['attempts'] ?? 0))); ?>/<?php echo esc_html((string) ((int) ($queueRow['max_attempts'] ?? 0))); ?></td>
+                      <td class="is-note"><strong><?php echo esc_html((string) (($queueRow['subject'] ?? '') ?: 'Mensaje de cartera')); ?></strong><small><?php echo esc_html(mb_substr(trim((string) (($queueRow['last_error'] ?? '') ?: ($queueRow['message_text'] ?? ''))), 0, 260, 'UTF-8')); ?></small></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
             </div>
             <?php echo $this->render_collection_queue_pagination($queuePagination, $queueApplied); ?>
           <?php endif; ?>
@@ -4177,7 +4100,7 @@ trait RendersDashboard
 
   private function render_collection_report_drilldown_button(string $group, string $label): string
   {
-    return '<button type="button" class="scm-portfolio-report-detail-btn" data-scm-portfolio-report-group="' . esc_attr($group) . '">' . esc_html($label) . '</button>';
+    return '<button type="button" class="scm-gc-detail-btn" data-scm-portfolio-report-group="' . esc_attr($group) . '">' . esc_html($label) . '</button>';
   }
 
   private function collection_report_concept_group_key(string $typeLabel): string
@@ -4211,24 +4134,121 @@ trait RendersDashboard
     $scopeLabel = $scope === 'contratos' ? 'contratos visibles' : 'registros visibles';
     ob_start();
 ?>
-    <div class="scm-portfolio-bulkbar" data-scm-portfolio-bulkbar data-scm-bulk-scope="<?php echo esc_attr($scope); ?>" data-scm-bulk-total="<?php echo esc_attr((string) max(0, $total)); ?>">
-      <div class="scm-portfolio-bulkbar-info">
-        <strong>Acciones en lote</strong>
+    <div class="scm-gc-bulkbar" data-scm-portfolio-bulkbar data-scm-bulk-scope="<?php echo esc_attr($scope); ?>" data-scm-bulk-total="<?php echo esc_attr((string) max(0, $total)); ?>">
+      <div class="scm-gc-bulkbar-info">
+        <strong><?php echo $this->collection_gc_icon('checklist'); ?>Acciones en lote</strong>
         <span data-scm-portfolio-bulk-count>0 <?php echo esc_html($scopeLabel); ?> seleccionados</span>
         <small data-scm-portfolio-bulk-all-note hidden>Se usar&aacute;n los resultados del filtro guardado; puedes buscar o paginar para desmarcar excepciones.</small>
       </div>
-      <div class="scm-portfolio-bulkbar-actions" role="group" aria-label="Acciones en lote de cartera">
-        <button type="button" class="scm-btn-secondary btn btn-outline" data-scm-portfolio-bulk-all>Usar todos los filtrados</button>
-        <button type="button" class="scm-btn-secondary btn btn-outline" data-scm-portfolio-bulk-clear hidden>Volver a selecci&oacute;n visible</button>
-        <button type="button" class="scm-case-work-btn scm-portfolio-management-btn" data-scm-portfolio-bulk-action="management" disabled>Hacer gesti&oacute;n</button>
-        <button type="button" class="scm-case-work-btn scm-portfolio-due-btn" data-scm-portfolio-bulk-action="due_date" disabled>Notificar pago</button>
-        <button type="button" class="scm-case-work-btn" data-scm-portfolio-bulk-action="prejuridico" disabled>Prejur&iacute;dico</button>
-        <button type="button" class="scm-case-work-btn" data-scm-portfolio-bulk-action="siniestro" disabled>Notificar siniestro</button>
-        <button type="button" class="scm-case-work-btn scm-portfolio-stage-btn" data-scm-portfolio-bulk-action="mark_siniestro" disabled>Marcar siniestro</button>
+      <div class="scm-gc-bulkbar-actions" role="group" aria-label="Acciones en lote de cartera">
+        <button type="button" class="scm-gc-action" data-scm-portfolio-bulk-all><?php echo $this->collection_gc_icon('select_all'); ?>Usar todos los filtrados</button>
+        <button type="button" class="scm-gc-action" data-scm-portfolio-bulk-clear hidden><?php echo $this->collection_gc_icon('deselect'); ?>Volver a selecci&oacute;n visible</button>
+        <button type="button" class="scm-gc-action is-primary" data-scm-portfolio-bulk-action="management" disabled><?php echo $this->collection_gc_icon('support_agent'); ?>Hacer gesti&oacute;n</button>
+        <button type="button" class="scm-gc-action" data-scm-portfolio-bulk-action="due_date" disabled><?php echo $this->collection_gc_icon('event_available'); ?>Notificar pago</button>
+        <button type="button" class="scm-gc-action is-warning" data-scm-portfolio-bulk-action="prejuridico" disabled><?php echo $this->collection_gc_icon('gavel'); ?>Prejur&iacute;dico</button>
+        <button type="button" class="scm-gc-action is-warning" data-scm-portfolio-bulk-action="siniestro" disabled><?php echo $this->collection_gc_icon('campaign'); ?>Notificar siniestro</button>
+        <button type="button" class="scm-gc-action is-danger" data-scm-portfolio-bulk-action="mark_siniestro" disabled><?php echo $this->collection_gc_icon('report'); ?>Marcar siniestro</button>
       </div>
     </div>
 <?php
     return (string) ob_get_clean();
+  }
+
+  private function collection_gc_icon(string $name): string
+  {
+    return '<span class="material-symbols-outlined scm-gc-icon" aria-hidden="true">' . esc_html($name) . '</span>';
+  }
+
+  private function collection_gc_status_chip(string $status): string
+  {
+    $tone = ['deuda' => 'is-danger', 'al_dia' => 'is-success', 'saldo_favor' => 'is-info', 'sin_contrato' => 'is-warning'][$status] ?? 'is-muted';
+    return '<span class="scm-gc-chip ' . $tone . '">' . esc_html($this->collection_portfolio_status_label($status)) . '</span>';
+  }
+
+  private function collection_gc_stage_chip(string $stage): string
+  {
+    $tone = ['prejuridico' => 'is-warning', 'siniestro' => 'is-danger-solid'][$stage] ?? 'is-neutral';
+    return '<span class="scm-gc-chip ' . $tone . '">' . esc_html($this->collection_portfolio_stage_label($stage)) . '</span>';
+  }
+
+  private function collection_gc_variation(?float $variation): string
+  {
+    if ($variation === null) {
+      return '<span class="scm-gc-variation">&mdash;</span>';
+    }
+    if ($variation == 0.0) {
+      return '<span class="scm-gc-variation">' . esc_html($this->collection_money(0)) . '</span>';
+    }
+    $isUp = $variation > 0;
+    return '<span class="scm-gc-variation ' . ($isUp ? 'is-up' : 'is-down') . '">'
+      . $this->collection_gc_icon($isUp ? 'trending_up' : 'trending_down')
+      . esc_html(($isUp ? '+' : '') . $this->collection_money($variation)) . '</span>';
+  }
+
+  private function render_collection_gc_empty(string $title, string $message): string
+  {
+    return '<div class="scm-gc-empty">' . $this->collection_gc_icon('inbox') . '<strong>' . esc_html($title) . '</strong><span>' . esc_html($message) . '</span></div>';
+  }
+
+  /** @param array<string,mixed> $row */
+  private function render_collection_portfolio_row_actions(array $row, int $portfolioId, bool $canCollect, string $stage, bool $isContractsView): string
+  {
+    $contractId = (int) ($row['contract_id'] ?? 0);
+    if ($contractId <= 0) {
+      return '<span class="scm-gc-muted-note">' . ($isContractsView ? 'Sin foto de cartera' : 'Cruce pendiente') . '</span>';
+    }
+    $tenantName = esc_attr((string) ($row['tenant_name'] ?? ''));
+    $contractNumber = esc_attr((string) ($row['contract_number'] ?? ''));
+    $ids = 'data-portfolio-id="' . esc_attr((string) $portfolioId) . '"';
+    $names = 'data-tenant-name="' . $tenantName . '" data-contract-number="' . $contractNumber . '"';
+    $button = fn(string $tone, string $icon, string $label, string $attrs, string $title): string => '<button type="button" class="scm-gc-action' . ($tone !== '' ? ' ' . $tone : '') . '" ' . $attrs . ' title="' . esc_attr($title) . '">' . $this->collection_gc_icon($icon) . $label . '</button>';
+
+    $main = $button('is-primary', 'support_agent', 'Hacer gesti&oacute;n', 'data-scm-portfolio-management ' . $ids . ' data-tenant-id="' . esc_attr((string) ((int) ($row['tenant_id'] ?? 0))) . '" data-contract-id="' . esc_attr((string) $contractId) . '" ' . $names, $isContractsView ? 'Registrar gestión de cobro e historial del inmueble aunque no exista foto 1380' : 'Registrar contacto, acuerdo, compromiso o seguimiento sin cambiar la etapa')
+      . $button('', 'timeline', 'Trazabilidad', 'data-scm-portfolio-timeline ' . $ids . ' data-contract-id="' . esc_attr((string) $contractId) . '" data-property-code="' . esc_attr((string) ($row['property_code'] ?? '')) . '" ' . $names, 'Ver movimientos, gestiones y reportes de cartera de este contrato');
+
+    if ($portfolioId <= 0) {
+      return '<div class="scm-gc-actions"><div>' . $main . '</div><span class="scm-gc-muted-note">Sin foto de cartera</span></div>';
+    }
+
+    $balance = $row['balance'] ?? null;
+    $more = $button('', 'add_card', 'Anexar saldo', 'data-scm-portfolio-balance ' . $ids . ' data-current-balance="' . esc_attr($balance === null ? '' : (string) ((float) $balance)) . '" ' . $names, 'Anexar o corregir saldo manual para pruebas o ajustes de cartera')
+      . $button('', 'event_available', 'Notificar pago', 'data-scm-portfolio-due-date ' . $ids . ' ' . $names, 'Registrar gestión Canon y enviar notificación informativa de fecha de pago');
+    if ($canCollect) {
+      $more .= $button('is-warning', 'gavel', 'Preparar prejur&iacute;dico', 'data-scm-portfolio-letter="prejuridico" ' . $ids, 'Revisar la carta antes de descargarla o enviarla')
+        . $button('is-warning', 'campaign', 'Notificar siniestro', 'data-scm-portfolio-siniestro ' . $ids . ' ' . $names, 'Muestra vista previa y encola aviso previo por WhatsApp y email, sin marcar siniestro');
+      if ($stage !== 'siniestro') {
+        $more .= $button('is-danger', 'report', 'Marcar siniestro', 'data-scm-portfolio-stage="siniestro" data-scm-portfolio-current-stage="' . esc_attr($stage) . '" ' . $ids, 'Marca la etapa siniestro, registra historial del inmueble y avisa al funcionario configurado');
+      }
+    }
+    if ($stage === 'siniestro') {
+      $more .= $button('is-reset', 'undo', 'Quitar siniestro', 'data-scm-portfolio-stage="normal" data-scm-portfolio-current-stage="siniestro" ' . $ids, 'Quita la marca de siniestro y devuelve el contrato a cobro normal');
+    } elseif ($stage === 'prejuridico') {
+      $more .= $button('is-reset', 'undo', 'Quitar prejur&iacute;dico', 'data-scm-portfolio-stage="normal" data-scm-portfolio-current-stage="prejuridico" ' . $ids, 'Quita la etapa prejurídica y devuelve el contrato a cobro normal');
+    } elseif (!$canCollect) {
+      $more .= '<span class="scm-gc-muted-note">Sin saldo para escalar</span>';
+    }
+
+    return '<div class="scm-gc-actions"><div>' . $main . '</div><div>' . $more . '</div></div>';
+  }
+
+  /** @param array<string,string> $base */
+  private function render_collection_gc_pagination(array $pagination, array $base, string $pageKey): string
+  {
+    $page = max(1, (int) ($pagination['page'] ?? 1));
+    $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
+    $total = max(0, (int) ($pagination['total'] ?? 0));
+    if ($total <= 0 || $totalPages <= 1) {
+      return '';
+    }
+    $link = static fn(int $target): string => '?' . http_build_query($base + [$pageKey => $target]);
+    $navLink = static fn(int $target, string $label, bool $disabled, string $aria): string => '<a class="scm-gc-page' . ($disabled ? ' is-disabled' : '') . '" href="' . esc_url($link($target)) . '" aria-label="' . esc_attr($aria) . '"' . ($disabled ? ' aria-disabled="true" tabindex="-1"' : '') . '>' . $label . '</a>';
+    $html = '<nav class="scm-gc-pagination scm-collection-log-pagination" aria-label="Paginación"><span>P&aacute;gina <strong>' . esc_html((string) $page) . '</strong> de ' . esc_html((string) $totalPages) . ' &middot; ' . esc_html((string) $total) . ' registros</span><div>';
+    $html .= $navLink(1, '&laquo;', $page <= 1, 'Primera página') . $navLink(max(1, $page - 1), '&lsaquo;', $page <= 1, 'Página anterior');
+    for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++) {
+      $html .= '<a class="scm-gc-page' . ($i === $page ? ' is-active' : '') . '" href="' . esc_url($link($i)) . '"' . ($i === $page ? ' aria-current="page"' : '') . '>' . esc_html((string) $i) . '</a>';
+    }
+    $html .= $navLink(min($totalPages, $page + 1), '&rsaquo;', $page >= $totalPages, 'Página siguiente') . $navLink($totalPages, '&raquo;', $page >= $totalPages, 'Última página');
+    return $html . '</div></nav>';
   }
 
   private function collection_portfolio_status_label(string $status): string
@@ -4276,61 +4296,25 @@ trait RendersDashboard
 
   private function render_collection_portfolio_pagination(array $pagination, array $filters): string
   {
-    $page = max(1, (int) ($pagination['page'] ?? 1));
-    $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
-    $total = max(0, (int) ($pagination['total'] ?? 0));
-    if ($total <= 0 || $totalPages <= 1) {
-      return '';
-    }
-    $base = [
+    return $this->render_collection_gc_pagination($pagination, [
       'scm_tab' => 'gestiones_cobro',
       'scmgc_view' => 'principal',
       'scmgc_buscar' => (string) ($filters['search'] ?? ''),
       'scmgc_estado' => (string) ($filters['status'] ?? ''),
       'scmgc_etapa' => (string) ($filters['stage'] ?? ''),
       'scmgc_movimiento' => (string) ($filters['movement'] ?? ''),
-    ];
-    $link = static fn(int $target): string => '?' . http_build_query($base + ['scmgc_cartera_page' => $target]);
-    $html = '<div class="scm-pagination-card card scm-collection-log-pagination"><div class="scm-pagination-summary">Página ' . esc_html((string) $page) . ' de ' . esc_html((string) $totalPages) . ' | Total: ' . esc_html((string) $total) . '</div><div class="scm-pagination-controls">';
-    foreach ([[1, '&laquo;'], [max(1, $page - 1), '&lsaquo;']] as [$target, $label]) {
-      $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page <= 1 ? ' disabled' : '') . '" href="' . esc_url($link((int) $target)) . '">' . $label . '</a>';
-    }
-    for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++) {
-      $html .= '<a class="scm-page-btn btn btn-sm ' . ($i === $page ? 'btn-primary is-active' : 'btn-outline') . '" href="' . esc_url($link($i)) . '">' . esc_html((string) $i) . '</a>';
-    }
-    foreach ([[min($totalPages, $page + 1), '&rsaquo;'], [$totalPages, '&raquo;']] as [$target, $label]) {
-      $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page >= $totalPages ? ' disabled' : '') . '" href="' . esc_url($link((int) $target)) . '">' . $label . '</a>';
-    }
-    return $html . '</div></div>';
+    ], 'scmgc_cartera_page');
   }
 
   private function render_collection_contracts_pagination(array $pagination, array $filters): string
   {
-    $page = max(1, (int) ($pagination['page'] ?? 1));
-    $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
-    $total = max(0, (int) ($pagination['total'] ?? 0));
-    if ($total <= 0 || $totalPages <= 1) {
-      return '';
-    }
-    $base = [
+    return $this->render_collection_gc_pagination($pagination, [
       'scm_tab' => 'gestiones_cobro',
       'scmgc_view' => 'contratos',
       'scmgc_contratos_buscar' => (string) ($filters['search'] ?? ''),
       'scmgc_contratos_estado' => (string) ($filters['status'] ?? ''),
       'scmgc_contratos_etapa' => (string) ($filters['stage'] ?? ''),
-    ];
-    $link = static fn(int $target): string => '?' . http_build_query($base + ['scmgc_contratos_page' => $target]);
-    $html = '<div class="scm-pagination-card card scm-collection-log-pagination"><div class="scm-pagination-summary">Página ' . esc_html((string) $page) . ' de ' . esc_html((string) $totalPages) . ' | Total: ' . esc_html((string) $total) . '</div><div class="scm-pagination-controls">';
-    foreach ([[1, '&laquo;'], [max(1, $page - 1), '&lsaquo;']] as [$target, $label]) {
-      $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page <= 1 ? ' disabled' : '') . '" href="' . esc_url($link((int) $target)) . '">' . $label . '</a>';
-    }
-    for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++) {
-      $html .= '<a class="scm-page-btn btn btn-sm ' . ($i === $page ? 'btn-primary is-active' : 'btn-outline') . '" href="' . esc_url($link($i)) . '">' . esc_html((string) $i) . '</a>';
-    }
-    foreach ([[min($totalPages, $page + 1), '&rsaquo;'], [$totalPages, '&raquo;']] as [$target, $label]) {
-      $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page >= $totalPages ? ' disabled' : '') . '" href="' . esc_url($link((int) $target)) . '">' . $label . '</a>';
-    }
-    return $html . '</div></div>';
+    ], 'scmgc_contratos_page');
   }
 
   private function collection_management_type_label(string $type): string
@@ -4364,44 +4348,18 @@ trait RendersDashboard
 
   private function render_collection_management_pagination(array $pagination, array $filters): string
   {
-    $page = max(1, (int) ($pagination['page'] ?? 1));
-    $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
-    $total = max(0, (int) ($pagination['total'] ?? 0));
-    if ($total <= 0 || $totalPages <= 1) {
-      return '';
-    }
-    $base = [
+    return $this->render_collection_gc_pagination($pagination, [
       'scm_tab' => 'gestiones_cobro',
       'scmgc_view' => 'historial',
       'scmgc_fecha_desde' => (string) ($filters['date_from'] ?? ''),
       'scmgc_fecha_hasta' => (string) ($filters['date_to'] ?? ''),
       'scmgc_tipo' => (string) ($filters['type'] ?? ''),
-    ];
-    $link = static function (int $targetPage) use ($base): string {
-      return '?' . http_build_query($base + ['scmgc_page' => $targetPage]);
-    };
-    $html = '<div class="scm-pagination-card card scm-collection-log-pagination"><div class="scm-pagination-summary">P&aacute;gina ' . esc_html((string) $page) . ' de ' . esc_html((string) $totalPages) . ' | Total: ' . esc_html((string) $total) . '</div><div class="scm-pagination-controls">';
-    $prev = max(1, $page - 1);
-    $next = min($totalPages, $page + 1);
-    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page <= 1 ? ' disabled' : '') . '" href="' . esc_url($link(1)) . '">&laquo;</a>';
-    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page <= 1 ? ' disabled' : '') . '" href="' . esc_url($link($prev)) . '">&lsaquo;</a>';
-    for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++) {
-      $html .= '<a class="scm-page-btn btn btn-sm ' . ($i === $page ? 'btn-primary is-active' : 'btn-outline') . '" href="' . esc_url($link($i)) . '">' . esc_html((string) $i) . '</a>';
-    }
-    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page >= $totalPages ? ' disabled' : '') . '" href="' . esc_url($link($next)) . '">&rsaquo;</a>';
-    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page >= $totalPages ? ' disabled' : '') . '" href="' . esc_url($link($totalPages)) . '">&raquo;</a>';
-    return $html . '</div></div>';
+    ], 'scmgc_page');
   }
 
   private function render_collection_queue_pagination(array $pagination, array $filters): string
   {
-    $page = max(1, (int) ($pagination['page'] ?? 1));
-    $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
-    $total = max(0, (int) ($pagination['total'] ?? 0));
-    if ($total <= 0 || $totalPages <= 1) {
-      return '';
-    }
-    $base = [
+    return $this->render_collection_gc_pagination($pagination, [
       'scm_tab' => 'gestiones_cobro',
       'scmgc_view' => 'cola',
       'scmgc_queue_fecha_desde' => (string) ($filters['date_from'] ?? ''),
@@ -4411,21 +4369,7 @@ trait RendersDashboard
       'scmgc_queue_tipo' => (string) ($filters['type'] ?? ''),
       'scmgc_queue_plantilla' => (string) ($filters['template'] ?? ''),
       'scmgc_queue_buscar' => (string) ($filters['q'] ?? ''),
-    ];
-    $link = static function (int $targetPage) use ($base): string {
-      return '?' . http_build_query($base + ['scmgc_queue_page' => $targetPage]);
-    };
-    $html = '<div class="scm-pagination-card card scm-collection-log-pagination"><div class="scm-pagination-summary">P&aacute;gina ' . esc_html((string) $page) . ' de ' . esc_html((string) $totalPages) . ' | Total: ' . esc_html((string) $total) . '</div><div class="scm-pagination-controls">';
-    $prev = max(1, $page - 1);
-    $next = min($totalPages, $page + 1);
-    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page <= 1 ? ' disabled' : '') . '" href="' . esc_url($link(1)) . '">&laquo;</a>';
-    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page <= 1 ? ' disabled' : '') . '" href="' . esc_url($link($prev)) . '">&lsaquo;</a>';
-    for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++) {
-      $html .= '<a class="scm-page-btn btn btn-sm ' . ($i === $page ? 'btn-primary is-active' : 'btn-outline') . '" href="' . esc_url($link($i)) . '">' . esc_html((string) $i) . '</a>';
-    }
-    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page >= $totalPages ? ' disabled' : '') . '" href="' . esc_url($link($next)) . '">&rsaquo;</a>';
-    $html .= '<a class="scm-page-btn btn btn-sm btn-outline' . ($page >= $totalPages ? ' disabled' : '') . '" href="' . esc_url($link($totalPages)) . '">&raquo;</a>';
-    return $html . '</div></div>';
+    ], 'scmgc_queue_page');
   }
 
   /** @return array<string,array{label:string,items:array<int,array{title:string,text:string}>}> */
