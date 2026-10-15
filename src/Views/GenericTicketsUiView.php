@@ -105,6 +105,7 @@ final class GenericTicketsUiView
         $detail = 'Sin detalle';
       }
       $detailHtml = (string) call_user_func($this->formatDetailHtml, $detail);
+      $itemButtons = (array) call_user_func($this->buildHistoryItemButtons, $item);
       $itemType = 'reply';
       if (stripos($detail, 'nota interna') !== false || stripos($detail, 'nota privada') !== false) {
         $itemType = 'note';
@@ -171,6 +172,7 @@ final class GenericTicketsUiView
       if ($detail === '') {
         $detail = 'Sin detalle';
       }
+      $itemButtons = $showButtons ? (array) call_user_func($this->buildHistoryItemButtons, $item) : [];
       $secType = 'reply';
       if (stripos($title, 'nota') !== false) {
         $secType = 'note';

@@ -176,6 +176,51 @@ final class PreventiveReviewChecklist
     ];
   }
 
+  /**
+   * Preguntas del formulario JetForm "Enviar revisión preventiva": se responden al enviar
+   * el informe al propietario y al arrendatario, no al crear la revisión.
+   *
+   * @return array{key:string,title:string,description:string,step:string,blocks:array<int,array{key:string,label:string,questions:array<int,array{label:string,alert:string,type?:string}>,observations?:string}>}
+   */
+  public static function sendGroup(): array
+  {
+    return [
+      'key' => 'contrato_envio',
+      'step' => 'envio',
+      'title' => 'Pagos, uso y renovación del contrato',
+      'description' => 'Pagos de renta, uso del inmueble según el contrato y posibilidad de renovación.',
+      'blocks' => [
+        ['key' => 'finanzas', 'label' => 'Pagos y finanzas', 'questions' => [
+          ['label' => '¿Todos los pagos de renta se han realizado puntualmente?', 'alert' => 'No'],
+          ['label' => '¿Existen deudas pendientes o pagos retrasados?', 'alert' => 'Si'],
+        ]],
+        ['key' => 'uso', 'label' => 'Condiciones del uso', 'questions' => [
+          ['label' => '¿El inquilino está utilizando el inmueble de acuerdo con los fines establecidos?', 'alert' => 'No'],
+        ]],
+        ['key' => 'renovacion_contrato', 'label' => 'Renovación del contrato', 'questions' => [
+          ['label' => '¿El contrato está próximo a vencer?', 'alert' => ''],
+          ['label' => '¿Se ha discutido la renovación?', 'alert' => ''],
+          ['label' => '¿Hay condiciones adicionales que se deban considerar para la renovación?', 'alert' => ''],
+        ]],
+      ],
+    ];
+  }
+
+  /** @return array<string,array{key:string,label:string,questions:array<int,array<string,string>>,observations?:string}> */
+  public static function sendBlocks(): array
+  {
+    $out = [];
+    foreach (self::sendGroup()['blocks'] as $block) {
+      $out[$block['key']] = $block;
+    }
+    return $out;
+  }
+
+  public static function wasSent(array $review): bool
+  {
+    return strcasecmp(trim((string) ($review['se_envio'] ?? '')), 'Si') === 0;
+  }
+
   /** @return array<string,array{key:string,label:string,questions:array<int,array<string,string>>,observations?:string}> */
   public static function blocks(): array
   {
@@ -238,7 +283,7 @@ final class PreventiveReviewChecklist
   public static function findingsCount(array $review): int
   {
     $count = 0;
-    foreach (self::blocks() as $key => $block) {
+    foreach (self::blocks() + self::sendBlocks() as $key => $block) {
       $row = self::storedRow($review[$key] ?? '');
       foreach ($block['questions'] as $index => $question) {
         $alert = (string) ($question['alert'] ?? '');

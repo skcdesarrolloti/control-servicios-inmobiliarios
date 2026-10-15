@@ -146,6 +146,36 @@ $assert(\SCM\App\SuCasaControlServiciosInmobiliarios::preventiveReviewPublicSign
 $assert(!\SCM\App\SuCasaControlServiciosInmobiliarios::preventiveReviewPublicSignatureValid($reviewId + 1, (int) $q['expires'], (string) $q['sig']), 'La firma pública no debe servir para otro número.');
 $assert(!\SCM\App\SuCasaControlServiciosInmobiliarios::correctiveReviewPublicSignatureValid($reviewId, (int) $q['expires'], (string) $q['sig']), 'La firma de la preventiva no debe abrir la correctiva.');
 
+// Enviar (formulario JetForm "Enviar revisión preventiva").
+$panel = $call('renderPreventiveReviewPanel', $call('preventiveReviewContext', 10883), 0);
+$assert(str_contains($panel, 'data-preventive-send-review="' . $reviewId . '"') && str_contains($panel, 'Pendiente de envío'), 'El panel debe ofrecer enviar la revisión pendiente.');
+$sendForm = $call('renderPreventiveReviewSendForm', $call('preventiveReviewContext', 10883), $call('preventiveReviewSendTarget', $call('preventiveReviewContext', 10883), 0));
+$assert(str_contains($sendForm, 'checklist[finanzas][pregunta_1_finanzas]') && str_contains($sendForm, 'name="cerrar_ticket"'), 'El formulario de envío no tiene los campos de JetForm.');
+$_POST = ['review_id' => (string) $reviewId, 'checklist' => ['finanzas' => ['pregunta_1_finanzas' => 'No']]];
+try { $call('preventiveReviewSend', 10883, $reviewId); $assert(false, 'Debió exigir la respuesta de cerrar caso.'); } catch (DomainException $e) { $assert(str_contains($e->getMessage(), 'cierra el caso'), $e->getMessage()); }
+$_POST = ['review_id' => (string) $reviewId, 'cerrar_ticket' => 'No', 'notify' => ['propietario', 'arrendatario'], 'recomendaciones' => 'Pintar fachada', 'checklist' => ['finanzas' => ['pregunta_1_finanzas' => 'No', 'pregunta_2_finanzas' => 'Si', 'observaciones_finanzas' => 'Debe un mes'], 'uso' => ['pregunta_1_uso' => 'Si'], 'renovacion_contrato' => ['pregunta_1_renovacion_contrato' => 'No']]];
+$historyBefore = (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket WHERE id_revision_preventiva = ?', [(string) $reviewId]);
+$call('preventiveReviewSend', 10883, $reviewId);
+$review = $db->getRow('SELECT * FROM wp_jet_cct_revision_preventiva WHERE _ID = ?', [$reviewId]);
+$ticket = $db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID = 10883');
+$assert($review['se_envio'] === 'Si' && (int) $review['fecha_envio'] > 0 && $review['recomendaciones'] === 'Pintar fachada' && $review['coordinador'] === 'Funcionario QA', 'El envío no marcó la revisión.');
+$assert(unserialize($review['finanzas'])[0]['observaciones_finanzas'] === 'Debe un mes' && unserialize($review['uso'])[0]['pregunta_1_uso'] === 'Si', 'El envío no guardó pagos/uso con el formato de JetForm.');
+$assert(unserialize($review['suelos'])[0]['pregunta_2_suelos'] === 'Si', 'El envío no debe borrar la checklist de la revisión.');
+$assert($ticket['estado'] !== 'Cerrado' && $ticket['estado_administrativo'] === 'Inspeccionado', 'Sin cerrar, el envío no debe cambiar el estado del caso.');
+$assert((int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket WHERE id_revision_preventiva = ?', [(string) $reviewId]) === $historyBefore + 1, 'El envío debe dejar historial con el botón de la revisión.');
+try { $call('preventiveReviewSend', 10883, $reviewId); $assert(false, 'No debe reenviar una revisión ya enviada.'); } catch (DomainException $e) { $assert(str_contains($e->getMessage(), 'ya fue enviada'), $e->getMessage()); }
+$panel = $call('renderPreventiveReviewPanel', $call('preventiveReviewContext', 10883), 0);
+$assert(!str_contains($panel, 'data-preventive-send-review') && str_contains($panel, 'Enviada al propietario'), 'Una revisión enviada no debe ofrecer enviar de nuevo.');
+$public = (new \SCM\Modules\PreventiveReview\PreventiveReviewPublicView($db))->render($reviewId);
+$assert(str_contains($public['content'], 'Pagos y finanzas') && str_contains($public['content'], 'Debe un mes'), 'El informe público debe mostrar lo diligenciado al enviar.');
+// Cerrar con el envío, como el JetForm.
+$db->update('wp_jet_cct_revision_preventiva', ['se_envio' => 'No'], ['_ID' => $reviewId]);
+$_POST = ['review_id' => (string) $reviewId, 'cerrar_ticket' => 'Si', 'checklist' => []];
+$call('preventiveReviewSend', 10883, 0);
+$ticket = $db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID = 10883');
+$assert($ticket['estado'] === 'Cerrado' && $ticket['estado_administrativo'] === 'Finalizado', 'Cerrar con el envío no cerró el caso.');
+$db->update('wp_jet_cct_tickets', ['estado' => 'En proceso', 'estado_administrativo' => 'Inspeccionado'], ['_ID' => 10883]);
+
 // Eliminar bloqueado si el cobro ya fue exportado.
 $db->update('wp_jet_cct_reportes_administrativos', ['exportado' => 'Si'], ['_ID' => (int) $report['_ID']]);
 try { $call('preventiveReviewDelete', 10883, $reviewId); $assert(false, 'No debe eliminar con cobro exportado.'); } catch (DomainException $e) { $assert(str_contains($e->getMessage(), 'exportado'), $e->getMessage()); }
@@ -165,4 +195,4 @@ $settingsData->setValue(\SCM\Core\App::settings(), ['contract_history_permission
 $perms = $call('dashboardActionPermissionsConfig');
 $assert(!in_array('preventive_review_manage', $perms['3'], true) && $perms['5'] === ['preventive_review_manage'], 'Una vez configurados, los permisos deben ser independientes.');
 
-echo "PASS: preventive review create/edit/delete, JetForm storage format, admin charge, contract/property counters, history, native public view, signed links and separate permission.\n";
+echo "PASS: preventive review create/edit/delete, JetForm storage format, admin charge, contract/property counters, history, native public view, signed links, send to owner/tenant and separate permission.\n";

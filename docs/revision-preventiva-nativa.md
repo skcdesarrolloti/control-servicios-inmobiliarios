@@ -30,3 +30,20 @@ Reemplaza el formulario JetForm "Añadir revisión preventiva" y la página púb
 Permiso propio: *Gestionar revisión preventiva* (`preventive_review_manage`), separado de *Gestionar revisión correctiva*.
 El botón de la correctiva solo aparece en casos de mantenimiento y el de la preventiva solo en casos preventivos.
 Hasta que se guarde la configuración de permisos por primera vez, los cargos con la correctiva heredan la preventiva.
+
+## Envío al propietario y arrendatario
+
+Reemplaza el formulario JetForm "Enviar revisión preventiva".
+
+- Botón *Complementarias → Enviar revisión preventiva* (y "Enviar" en la lista de la revisión). Solo aparece si la
+  revisión no se ha enviado (`se_envio` distinto de `Si`) y el cargo tiene el permiso **Enviar revisión preventiva**
+  (`preventive_review_send`), que no se hereda: hay que asignarlo a los cargos que pueden enviar.
+- Pide pagos y finanzas, condiciones del uso, renovación del contrato (repeaters `finanzas`, `uso`,
+  `renovacion_contrato`, glosario 175), recomendaciones y "¿Cerrar el caso?".
+- Guarda `se_envio = Si`, `fecha_envio` y el coordinador que envía. Con "Cerrar" deja el caso en `Cerrado` /
+  `Finalizado` con los mismos estados que el JetForm (respeta las actas pendientes de firma).
+- Historial del caso con `id_revision_preventiva` (botón "Ver revision preventiva") e historial del inmueble.
+- Correos en cola al propietario y al arrendatario elegidos (enlace firmado), al creador y a los funcionarios de
+  **Notificaciones internas → Revisión preventiva enviada** (reemplaza los correos fijos del formulario).
+
+Cuando el caso ya tiene revisión preventiva se ocultan el contador y las opciones de constancias por no autorización.

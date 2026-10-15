@@ -160,7 +160,7 @@ trait TableRowsConcern
       if ($descripcionRaw !== '') {
         $caseSource .= '<div class="scm-case-description"><strong>Descripci&oacute;n del caso:</strong><div class="scm-case-description-content">' . $descripcionRaw . '</div></div>';
       }
-      if ($isPreventivaTicket) {
+      if ($isPreventivaTicket && !$tienePrev) {
         $caseSource .= $this->renderPreventivaNoAccessSummary($preventivaNoAccessCount);
       }
       $caseSource .= '<div class="scm-seg-wrap">';
@@ -337,6 +337,7 @@ trait TableRowsConcern
         . ' data-cot-seguimiento-reparaciones-disponible="' . esc_attr($cotSeguimientoReparacionesDisponible ? '1' : '0') . '"'
         . ' data-id-revision-correctiva="' . esc_attr($idCorrUrl) . '"'
         . ' data-id-revision-preventiva="' . esc_attr($idPrevUrl) . '"'
+        . ' data-prev-se-envio="' . esc_attr((string) ($row['_scm_prev_se_envio'] ?? '')) . '"'
         . ' data-prev-encontro-danos="' . esc_attr((string) ($row['_scm_prev_encontro_danos'] ?? $row['se_encontraron_danos'] ?? '')) . '"'
         . ' data-preventiva-no-access-count="' . esc_attr((string) $preventivaNoAccessCount) . '"'
         . ' data-tab-key="mantenimiento"'

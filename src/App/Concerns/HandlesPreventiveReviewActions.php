@@ -23,8 +23,11 @@ trait HandlesPreventiveReviewActions
   public function ajax_handler_preventive_review(): void
   {
     $this->verifyCsrf();
-    if (!$this->canUseDashboardAction('preventive_review_manage')) {
-      $this->jsonFail('No tienes permiso para gestionar revisiones preventivas.');
+    $operation = trim((string) ($_POST['operation'] ?? 'read'));
+    $isSendOperation = in_array($operation, ['send_form', 'send'], true);
+    // Enviar el informe es un permiso aparte: no todos los cargos que hacen la revisión pueden enviarla.
+    if (!$this->canUseDashboardAction($isSendOperation ? 'preventive_review_send' : 'preventive_review_manage')) {
+      $this->jsonFail($isSendOperation ? 'No tienes permiso para enviar revisiones preventivas.' : 'No tienes permiso para gestionar revisiones preventivas.');
     }
     $ticketId = (int) ($_POST['ticket_pk'] ?? 0);
     try {
@@ -32,11 +35,19 @@ trait HandlesPreventiveReviewActions
         http_response_code(403);
         $this->jsonFail('No tienes permiso para gestionar la revisión preventiva de este caso.');
       }
-      $operation = trim((string) ($_POST['operation'] ?? 'read'));
       $reviewId = (int) ($_POST['review_id'] ?? 0);
       $result = [];
       $editId = 0;
-      if ($operation === 'create') {
+      if ($operation === 'send_form') {
+        $context = $this->preventiveReviewContext($ticketId);
+        $this->jsonOk(['html' => $this->renderPreventiveReviewSendForm($context, $this->preventiveReviewSendTarget($context, $reviewId))]);
+      }
+      if ($operation === 'send') {
+        $result = $this->preventiveReviewSend($ticketId, $reviewId);
+        if (!$this->canUseDashboardAction('preventive_review_manage')) {
+          $this->jsonOk($result + ['html' => $this->renderPreventiveReviewSentNotice((int) $result['review_id'])]);
+        }
+      } elseif ($operation === 'create') {
         $result = $this->preventiveReviewCreate($ticketId);
       } elseif ($operation === 'edit') {
         $this->preventiveReviewTargetRow($this->preventiveReviewContext($ticketId), $reviewId);
@@ -116,10 +127,23 @@ trait HandlesPreventiveReviewActions
    */
   private function preventiveReviewInputChecklist(): array
   {
+    $out = $this->preventiveReviewParseChecklist(PreventiveReviewChecklist::blocks());
+    if (trim((string) (PreventiveReviewChecklist::storedRow($out['cumplimiento'] ?? '')['observaciones_cumplimiento'] ?? '')) === '') {
+      throw new \DomainException('Describe el uso principal que actualmente se desarrolla en el inmueble.');
+    }
+    return $out;
+  }
+
+  /**
+   * @param array<string,array<string,mixed>> $blocks
+   * @return array<string,string> columna => valor serializado
+   */
+  private function preventiveReviewParseChecklist(array $blocks): array
+  {
     $raw = is_array($_POST['checklist'] ?? null) ? $_POST['checklist'] : [];
     $allowed = array_keys(PreventiveReviewChecklist::answerOptions());
     $out = [];
-    foreach (PreventiveReviewChecklist::blocks() as $key => $block) {
+    foreach ($blocks as $key => $block) {
       $input = is_array($raw[$key] ?? null) ? $raw[$key] : [];
       $row = [];
       foreach ($block['questions'] as $index => $question) {
@@ -135,9 +159,6 @@ trait HandlesPreventiveReviewActions
       $observationField = PreventiveReviewChecklist::observationField($key);
       $row[$observationField] = mb_substr($this->preventiveReviewMultiline($input[$observationField] ?? ''), 0, 3000);
       $out[$key] = serialize([0 => $row]);
-    }
-    if (trim((string) (PreventiveReviewChecklist::storedRow($out['cumplimiento'] ?? '')['observaciones_cumplimiento'] ?? '')) === '') {
-      throw new \DomainException('Describe el uso principal que actualmente se desarrolla en el inmueble.');
     }
     return $out;
   }
@@ -678,6 +699,303 @@ trait HandlesPreventiveReviewActions
     return $queued;
   }
 
+  /**
+   * Revisión a enviar: la indicada o, si no se indica, la más reciente pendiente de envío.
+   *
+   * @param array<string,mixed> $context @return array<string,mixed>
+   */
+  private function preventiveReviewSendTarget(array $context, int $reviewId): array
+  {
+    if ($reviewId <= 0) {
+      foreach ((array) ($context['reviews'] ?? []) as $review) {
+        if (!PreventiveReviewChecklist::wasSent($review)) {
+          $reviewId = (int) ($review['_ID'] ?? 0);
+          break;
+        }
+      }
+      if ($reviewId <= 0) {
+        throw new \DomainException(!empty($context['reviews']) ? 'La revisión preventiva de este caso ya fue enviada.' : 'Este caso aún no tiene revisión preventiva para enviar.');
+      }
+    }
+    $review = $this->preventiveReviewTargetRow($context, $reviewId);
+    if (PreventiveReviewChecklist::wasSent($review)) {
+      throw new \DomainException('La revisión preventiva #' . $reviewId . ' ya fue enviada.');
+    }
+    return $review;
+  }
+
+  /**
+   * Replica el formulario JetForm "Enviar revisión preventiva": completa pagos, uso y renovación,
+   * marca la revisión como enviada, cierra el caso si se pide y notifica a propietario y arrendatario.
+   *
+   * @return array<string,mixed>
+   */
+  private function preventiveReviewSend(int $ticketId, int $reviewId): array
+  {
+    $schema = new SchemaInspector($this->db);
+    $reviewTable = $this->db->table('jet_cct_revision_preventiva');
+    $ticketTable = $this->db->table('jet_cct_tickets');
+    $context = $this->preventiveReviewContext($ticketId);
+    $review = $this->preventiveReviewSendTarget($context, $reviewId);
+    $reviewId = (int) $review['_ID'];
+    $ticket = $context['ticket'];
+
+    $checklist = $this->preventiveReviewParseChecklist(PreventiveReviewChecklist::sendBlocks());
+    $close = $this->correctiveReviewText($_POST['cerrar_ticket'] ?? '');
+    if (!in_array($close, ['Si', 'No'], true)) {
+      throw new \DomainException('Indica si se cierra el caso con el envío de la revisión.');
+    }
+    if ($close === 'Si') {
+      $closeError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($this->db, $schema, $ticketId, true);
+      if ($closeError !== '') {
+        throw new \DomainException($closeError);
+      }
+    }
+    $targets = array_values(array_intersect(['propietario', 'arrendatario'], array_map('strval', (array) ($_POST['notify'] ?? []))));
+
+    $actor = $this->ticketCompletionActor();
+    $actorEmployeeId = $this->correctiveReviewFirstText([$actor['employee_id'] ?? '', Auth::userId()]);
+    $now = time();
+    $nowSql = date('Y-m-d H:i:s', $now);
+    $update = $schema->filterTableData($reviewTable, [
+      'recomendaciones' => mb_substr($this->preventiveReviewMultiline($_POST['recomendaciones'] ?? ''), 0, 3000),
+      'coordinador' => $actor['name'] ?? Auth::user(),
+      'email_coordinador' => $actor['email'] ?? '',
+      'celular_coordinador' => $actor['phone'] ?? '',
+      'cargo_coordinador' => $actor['cargo'] ?? '',
+      'fecha_envio' => $now,
+      'se_envio' => 'Si',
+      'num_rev' => (string) $reviewId,
+      'resultado' => 'Requiere intervencion',
+      'estado_nuevo' => 'Inspeccionado',
+      'estado_administrativo' => 'Inspeccionado',
+      'cct_modified' => $nowSql,
+    ] + $checklist);
+    if (!$update || $this->db->update($reviewTable, $update, ['_ID' => $reviewId]) < 0) {
+      throw new \DomainException('No fue posible marcar la revisión preventiva como enviada.');
+    }
+
+    $ticketUpdate = ['fecha_actualizacion' => $now, 'cct_modified' => $nowSql];
+    if ($close === 'Si') {
+      // Mismos estados que dejaba el formulario de WordPress al cerrar con el envío.
+      $ticketUpdate += [
+        'estado' => 'Cerrado',
+        'estado_administrativo' => 'Finalizado',
+        'estado_rev_entrega' => 'Si',
+        'estado_inventario' => 'Si',
+        'estado_acta_entrega' => 'Si',
+        'estado_respuesta_cotizacion_mantenimiento' => '',
+        'estado_rev_correctiva' => 'Si',
+        'estado_rev_preventiva' => 'Si',
+        'estado_cotizacion_mantenimiento' => 'Si',
+        'estado_acta_satisfaccion' => 'Si',
+      ];
+    }
+    $ticketUpdate = $schema->filterTableData($ticketTable, $ticketUpdate);
+    if ($ticketUpdate) {
+      $this->db->update($ticketTable, $ticketUpdate, ['_ID' => $ticketId]);
+    }
+
+    $this->preventiveReviewHistory(
+      $schema,
+      $ticketId,
+      $reviewId,
+      $actor,
+      $actorEmployeeId,
+      $close === 'Si'
+        ? 'Te informamos que se procede a cerrar el caso porque se realizó y se envió correctamente la revisión preventiva y no se encontraron daños.'
+        : 'Se ha enviado la revisión preventiva realizada en su inmueble.',
+      (string) ($review['id_inmueble'] ?? ''),
+      'Se envió la revisión preventiva #' . $reviewId . ' al propietario y al arrendatario.'
+    );
+
+    try {
+      $queued = $this->preventiveReviewEnqueueSentNotifications(array_merge($review, $update), $ticket, $actor, $reviewId, $targets);
+    } catch (\Throwable $notifyError) {
+      $queued = 0;
+      error_log('[revision-preventiva] envio #' . $reviewId . ': ' . $notifyError->getMessage());
+    }
+
+    return [
+      'message' => 'Revisión preventiva #' . $reviewId . ' enviada.'
+        . ($close === 'Si' ? ' Caso cerrado.' : '')
+        . ($queued > 0 ? ' Correos en cola: ' . $queued . '.' : ' No se programaron correos.'),
+      'review_id' => (string) $reviewId,
+      'review_url' => self::preventiveReviewPublicUrl($reviewId),
+    ];
+  }
+
+  /**
+   * @param array<string,mixed> $review @param array<string,mixed> $ticket @param array<string,mixed> $actor
+   * @param array<int,string> $targets contactos del caso elegidos al enviar (propietario/arrendatario)
+   */
+  private function preventiveReviewEnqueueSentNotifications(array $review, array $ticket, array $actor, int $reviewId, array $targets): int
+  {
+    $recipients = [];
+    if (in_array('propietario', $targets, true)) {
+      $recipients[] = ['name' => trim((string) ($review['propietario'] ?? '')), 'email' => trim((string) ($review['email_propietario'] ?? '')), 'role' => 'propietario'];
+    }
+    if (in_array('arrendatario', $targets, true)) {
+      $recipients[] = ['name' => trim((string) ($review['arrendatario'] ?? '')), 'email' => trim((string) ($review['email_arrendatario'] ?? '')), 'role' => 'arrendatario'];
+    }
+    $recipients[] = ['name' => trim((string) ($review['creador'] ?? '')), 'email' => trim((string) ($review['email_creador'] ?? '')), 'role' => 'creador'];
+    $configured = $this->correctiveReviewInternalEmailRecipients('revision_preventiva_enviada');
+    foreach ($configured as $recipient) {
+      $recipients[] = ['name' => $recipient['name'], 'email' => $recipient['email'], 'role' => 'funcionario_configurado'];
+    }
+    $recipients = $this->correctiveReviewUniqueEmailRecipients($recipients);
+    if ($recipients === []) {
+      return 0;
+    }
+    $copies = array_column($configured, 'email');
+    $reviewUrl = self::signedPreventiveReviewPublicUrl($reviewId);
+    $ticketLabel = trim((string) ($ticket['id_ticket'] ?? '')) ?: (string) ($ticket['_ID'] ?? '');
+    $contract = trim((string) ($review['contrato'] ?? ''));
+    $property = trim((string) ($review['inmueble'] ?? ''));
+    $address = trim((string) ($review['direccion'] ?? ''));
+    $sender = trim((string) ($actor['name'] ?? ''));
+    $e = static fn(string $value): string => \SCM\Support\EmailTemplate::e($value);
+    $place = ($contract !== '' ? ' identificado con el contrato <b>#' . $e($contract) . '</b>' : '') . ($address !== '' ? ', ubicado en <b>' . $e($address) . '</b>' : '');
+    $phone = trim((string) ($actor['phone'] ?? ''));
+    $cargo = trim((string) ($actor['cargo'] ?? ''));
+    $signature = '<p style="margin:16px 0 0;line-height:1.65;">Cordialmente: <b>' . $e($sender) . '</b>'
+      . ($phone !== '' ? ' | <b>' . $e($phone) . '</b>' : '')
+      . ($cargo !== '' ? ' - ' . $e($cargo) : '') . '.</p>';
+    $queue = new \SCM\Support\EmailQueue($this->db);
+    $queued = 0;
+    foreach ($recipients as $recipient) {
+      $name = trim((string) ($recipient['name'] ?? '')) ?: 'Usuario';
+      $role = (string) ($recipient['role'] ?? 'destinatario');
+      $isCaseContact = in_array($role, ['propietario', 'arrendatario'], true);
+      $subject = $isCaseContact
+        ? 'Revisión preventiva del inmueble' . ($property !== '' ? ' #' . $property : '') . ($contract !== '' ? ' con contrato #' . $contract : '')
+        : 'Revisión preventiva enviada' . ($contract !== '' ? ' del contrato #' . $contract : '') . ($ticketLabel !== '' ? ' - caso #' . $ticketLabel : '');
+      $content = '<p style="margin:0 0 16px;font-weight:600;">Apreciado(a) ' . $e($name) . ':</p>'
+        . ($isCaseContact
+          ? '<p style="margin:0 0 14px;line-height:1.65;">Le informamos que en el inmueble' . $place . ' se llevó a cabo la revisión preventiva correspondiente. Esta revisión se realiza periódicamente conforme a la fecha de inicio del contrato. A continuación encontrará el informe detallado del proceso.</p>' . $signature
+          : '<p style="margin:0 0 14px;line-height:1.65;">El funcionario <b>' . $e($sender) . '</b> envió la revisión preventiva #' . $reviewId . ' del inmueble' . $place . '.</p>'
+            . '<p style="margin:0;line-height:1.65;"><b>Daños encontrados:</b> ' . $e((string) ($review['encontro_danos'] ?? '-')) . '.</p>');
+      $html = \SCM\Support\EmailTemplate::render($subject, $content, ['buttons' => [['url' => $reviewUrl, 'label' => $isCaseContact ? 'Consultar informe de revisión preventiva' : 'Ver revisión preventiva']]]);
+      $queued += $queue->enqueue((string) $recipient['email'], $subject, $html, [
+        'source_module' => 'revision_preventiva',
+        'internal_action' => 'revision_preventiva_enviada',
+        'internal_cc' => $isCaseContact ? [] : $copies,
+        'destination_name' => $name,
+        'dedupe_key' => 'revision-preventiva-enviada:' . $reviewId . ':' . $role . ':' . strtolower((string) $recipient['email']),
+        'payload' => ['review_url' => $reviewUrl, 'reply_to' => (string) ($actor['email'] ?? '')],
+        'meta' => [
+          'event' => 'revision_preventiva_enviada',
+          'role' => $role,
+          'id_revision_preventiva' => $reviewId,
+          'id_ticket' => $ticketLabel,
+          'contrato' => $contract,
+          'actor' => $sender,
+        ],
+      ]);
+    }
+    return $queued;
+  }
+
+  /** Respuesta para quien solo puede enviar (sin permiso para editar la revisión). */
+  private function renderPreventiveReviewSentNotice(int $reviewId): string
+  {
+    $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    return '<div class="scm-acta scm-corrective-review scm-preventive-review"><section class="scm-corrective-existing"><h3>Revisión preventiva enviada</h3>'
+      . '<article><div class="scm-corrective-existing-info"><strong>Revisión #' . $h((string) $reviewId) . '</strong><span>El informe quedó enviado y registrado en el historial del caso.</span></div>'
+      . '<div class="scm-corrective-existing-actions"><button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-url="' . $h(self::preventiveReviewPublicUrl($reviewId)) . '" data-iframe-title="Revisión preventiva #' . $h((string) $reviewId) . '">Ver informe</button></div></article>'
+      . '<span data-corrective-review-message aria-live="polite"></span></section></div>';
+  }
+
+  /** @param array<string,mixed> $context @param array<string,mixed> $review */
+  private function renderPreventiveReviewSendForm(array $context, array $review): string
+  {
+    $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    $ticket = (array) ($context['ticket'] ?? []);
+    $contract = (array) ($context['contract'] ?? []);
+    $reviewId = (int) ($review['_ID'] ?? 0);
+    $group = PreventiveReviewChecklist::sendGroup();
+    $damagesFound = strcasecmp(trim((string) ($review['encontro_danos'] ?? '')), 'Si') === 0;
+    $contacts = [
+      'propietario' => ['label' => 'Propietario', 'name' => $this->correctiveReviewFirstText([$review['propietario'] ?? '', $contract['propietario'] ?? '']), 'email' => trim((string) ($review['email_propietario'] ?? ''))],
+      'arrendatario' => ['label' => 'Arrendatario', 'name' => $this->correctiveReviewFirstText([$review['arrendatario'] ?? '', $contract['arrendatario'] ?? '']), 'email' => trim((string) ($review['email_arrendatario'] ?? ''))],
+    ];
+    $summary = [
+      'Caso' => '#' . (trim((string) ($ticket['id_ticket'] ?? '')) ?: (string) ($ticket['_ID'] ?? '')),
+      'Contrato' => ltrim($this->correctiveReviewFirstText([$review['contrato'] ?? '', $contract['contrato'] ?? '']), '#') ?: '-',
+      'Daños encontrados' => trim((string) ($review['encontro_danos'] ?? '')) ?: '-',
+      'Hallazgos en checklist' => (string) PreventiveReviewChecklist::findingsCount($review),
+    ];
+    ob_start();
+    ?>
+    <div class="scm-acta scm-corrective-review scm-preventive-review">
+      <form class="scm-prev-wizard scm-prev-send" data-preventive-send-form data-review-id="<?= $h((string) $reviewId) ?>" autocomplete="off" novalidate>
+        <input type="hidden" name="review_id" value="<?= $h((string) $reviewId) ?>">
+        <section class="scm-prev-step">
+          <header><h3>Enviar revisión preventiva #<?= $h((string) $reviewId) ?></h3><p>Completa la información del contrato y elige a quién notificar. Se enviará el enlace al informe y quedará registrado en el historial del caso.</p></header>
+          <div class="scm-prev-summary">
+            <?php foreach ($summary as $label => $value): ?><div><span><?= $h($label) ?></span><strong><?= $h($value) ?></strong></div><?php endforeach; ?>
+          </div>
+          <div class="scm-prev-links">
+            <button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-url="<?= $h(self::preventiveReviewPublicUrl($reviewId)) ?>" data-iframe-title="Revisión preventiva #<?= $h((string) $reviewId) ?>">Ver informe antes de enviar</button>
+          </div>
+          <div class="scm-prev-group">
+            <header><div><h3><?= $h($group['title']) ?></h3><p><?= $h($group['description']) ?></p></div></header>
+            <?php foreach ($group['blocks'] as $block): $row = PreventiveReviewChecklist::storedRow($review[$block['key']] ?? ''); $obsField = PreventiveReviewChecklist::observationField($block['key']); ?>
+              <fieldset class="scm-prev-block">
+                <legend><?= $h($block['label']) ?></legend>
+                <?php foreach ($block['questions'] as $index => $question): $field = PreventiveReviewChecklist::questionField($block['key'], $index); $value = $row[$field] ?? ''; $name = 'checklist[' . $block['key'] . '][' . $field . ']'; ?>
+                  <div class="scm-prev-question" data-prev-alert="<?= $h($question['alert']) ?>">
+                    <span><?= $h($question['label']) ?></span>
+                    <div class="scm-prev-choice" role="radiogroup" aria-label="<?= $h($question['label']) ?>">
+                      <?php foreach (PreventiveReviewChecklist::answerOptions() as $optValue => $optLabel): ?>
+                        <label><input type="radio" name="<?= $h($name) ?>" value="<?= $h($optValue) ?>"<?= $value === $optValue ? ' checked' : '' ?>><span><?= $h($optLabel) ?></span></label>
+                      <?php endforeach; ?>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+                <label class="scm-prev-observation"><span>Observaciones</span>
+                  <textarea name="checklist[<?= $h($block['key']) ?>][<?= $h($obsField) ?>]" rows="2" placeholder="Opcional"><?= $h($row[$obsField] ?? '') ?></textarea>
+                </label>
+              </fieldset>
+            <?php endforeach; ?>
+          </div>
+          <label class="scm-prev-observation"><span>Recomendaciones y/o sugerencias</span><textarea name="recomendaciones" rows="4" placeholder="Observaciones, sugerencias o conclusiones de la revisión realizada"><?= $h((string) ($review['recomendaciones'] ?? '')) ?></textarea></label>
+          <fieldset class="scm-prev-block">
+            <legend>¿Cerrar el caso? *</legend>
+            <p class="scm-prev-muted">Cierra el caso si no se encontró ningún daño; de lo contrario déjalo activo para gestionar la cotización.</p>
+            <?php if ($damagesFound): ?><p class="scm-prev-warning">Esta revisión registró daños. Lo normal es dejar el caso activo.</p><?php endif; ?>
+            <div class="scm-prev-choice scm-prev-choice--lg" role="radiogroup" aria-label="¿Cerrar el caso?">
+              <label><input type="radio" name="cerrar_ticket" value="Si" required><span>Sí, cerrar el caso</span></label>
+              <label><input type="radio" name="cerrar_ticket" value="No" required<?= $damagesFound ? ' checked' : '' ?>><span>No, dejarlo activo</span></label>
+            </div>
+          </fieldset>
+          <fieldset class="scm-prev-block">
+            <legend>Notificar por correo</legend>
+            <?php foreach ($contacts as $key => $contact): $valid = filter_var($contact['email'], FILTER_VALIDATE_EMAIL) !== false; ?>
+              <label class="scm-prev-notify"><input type="checkbox" name="notify[]" value="<?= $h($key) ?>"<?= $valid ? ' checked' : ' disabled' ?>> <span><b><?= $h($contact['label']) ?>:</b> <?= $h($contact['name'] ?: '-') ?> · <?= $valid ? $h($contact['email']) : 'sin correo registrado' ?></span></label>
+            <?php endforeach; ?>
+            <p class="scm-prev-muted">También se avisa al creador de la revisión y a los funcionarios de Notificaciones internas → Revisión preventiva enviada.</p>
+          </fieldset>
+        </section>
+        <footer class="scm-prev-nav">
+          <?php if ($this->canUseDashboardAction('preventive_review_manage')): ?><button type="button" class="scm-acta-button scm-acta-secondary" data-preventive-send-cancel>Volver</button><?php endif; ?>
+          <span data-corrective-review-message aria-live="polite"></span>
+          <button type="submit" class="scm-acta-button">Enviar revisión preventiva</button>
+        </footer>
+      </form>
+    </div>
+    <?php
+    return (string) ob_get_clean();
+  }
+
+  /** @param array<string,mixed> $review */
+  private function preventiveReviewSentLabel(array $review): string
+  {
+    $raw = $review['fecha_envio'] ?? '';
+    $ts = is_numeric($raw) ? (int) $raw : (strtotime((string) $raw) ?: 0);
+    return $ts > 0 ? date('d/m/Y', $ts) : '';
+  }
+
   /** @param array<string,mixed> $context */
   private function renderPreventiveReviewPanel(array $context, int $editReviewId = 0): string
   {
@@ -703,10 +1021,12 @@ trait HandlesPreventiveReviewActions
                 <strong>Revisión #<?= $h((string) $id) ?></strong>
                 <span><?= $h($this->correctiveReviewDateLabel($this->correctiveReviewDisplayDateRaw($review))) ?> · <?= $h((string) ($review['creador'] ?? '')) ?></span>
                 <span>Daños: <?= $h((string) ($review['encontro_danos'] ?? '-')) ?> · Hallazgos en checklist: <?= $h((string) PreventiveReviewChecklist::findingsCount($review)) ?></span>
+                <span><?= PreventiveReviewChecklist::wasSent($review) ? 'Enviada al propietario y arrendatario' . ($this->preventiveReviewSentLabel($review) !== '' ? ' el ' . $h($this->preventiveReviewSentLabel($review)) : '') : 'Pendiente de envío al propietario y arrendatario' ?></span>
                 <span><?= $report ? 'Cobro #' . $h((string) $report['_ID']) . ': $' . $h(number_format((int) ($report['valor'] ?? 0), 0, ',', '.')) . ($this->preventiveReviewReportLocked($report) ? ' (exportado/pagado)' : ' (pendiente)') : 'Sin cobro administrativo registrado' ?></span>
               </div>
               <div class="scm-corrective-existing-actions">
                 <button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-url="<?= $h(self::preventiveReviewPublicUrl($id)) ?>" data-iframe-title="Revisión preventiva #<?= $h((string) $id) ?>">Ver informe</button>
+                <?php if (!PreventiveReviewChecklist::wasSent($review) && $this->canUseDashboardAction('preventive_review_send')): ?><button type="button" class="scm-acta-button" data-preventive-send-review="<?= $h((string) $id) ?>">Enviar</button><?php endif; ?>
                 <button type="button" class="scm-acta-button scm-acta-secondary" data-preventive-edit-review="<?= $h((string) $id) ?>">Editar</button>
                 <button type="button" class="scm-acta-button scm-acta-danger" data-preventive-delete-review="<?= $h((string) $id) ?>">Eliminar</button>
               </div>

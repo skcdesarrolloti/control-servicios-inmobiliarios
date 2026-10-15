@@ -2702,6 +2702,14 @@
     return /preventiva/i.test(values);
   }
 
+  // Las constancias por no autorización solo aplican mientras no exista la revisión preventiva.
+  function caseNeedsPreventivaNoAccessNotice(caseBtn) {
+    return (
+      isPreventivaCase(caseBtn) &&
+      !String((caseBtn.dataset && caseBtn.dataset.idRevisionPreventiva) || "").trim()
+    );
+  }
+
   function isMaintenanceCase(caseBtn) {
     if (!caseBtn || !caseBtn.dataset) return false;
     var tabKey = String(caseBtn.dataset.tabKey || "")
@@ -3866,7 +3874,14 @@
     openDamageReviewEditor(modal, caseBtn, "preventiva");
   }
 
-  function openDamageReviewEditor(modal, caseBtn, kind) {
+  function openPreventiveReviewSender(modal, caseBtn) {
+    openDamageReviewEditor(modal, caseBtn, "preventiva", {
+      operation: "send_form",
+      reviewId: (caseBtn.dataset.idRevisionPreventiva || "").trim(),
+    });
+  }
+
+  function openDamageReviewEditor(modal, caseBtn, kind, initial) {
     var cfg = DAMAGE_REVIEW_KINDS[kind] || DAMAGE_REVIEW_KINDS.correctiva;
     var sub = ensureCaseSubmodal(modal);
     var root = findRootFromNode(caseBtn);
@@ -3906,8 +3921,10 @@
       });
       if (operation === "delete") {
         message("Eliminando " + cfg.lower + "…", false);
-      } else if (operation === "edit") {
-        message("Cargando edición…", false);
+      } else if (operation === "edit" || operation === "send_form") {
+        message("Cargando…", false);
+      } else if (operation === "send") {
+        message("Enviando " + cfg.lower + "…", false);
       } else if (operation !== "read") {
         message("Guardando " + cfg.lower + "…", false);
       }
@@ -3944,7 +3961,8 @@
           if (
             operation === "create" ||
             operation === "update" ||
-            operation === "delete"
+            operation === "delete" ||
+            operation === "send"
           ) {
             dispatchCaseActionSaved(root, caseBtn.dataset.ticketPk || "", sub);
           }
@@ -3999,6 +4017,23 @@
           var editData = new FormData();
           editData.set("review_id", editBtn.getAttribute(cfg.editAttr) || "");
           request("edit", editData);
+          return;
+        }
+        var sendBtn = event.target.closest("[data-preventive-send-review]");
+        if (sendBtn && body.contains(sendBtn)) {
+          event.preventDefault();
+          var sendFormData = new FormData();
+          sendFormData.set(
+            "review_id",
+            sendBtn.getAttribute("data-preventive-send-review") || "",
+          );
+          request("send_form", sendFormData);
+          return;
+        }
+        var sendCancel = event.target.closest("[data-preventive-send-cancel]");
+        if (sendCancel && body.contains(sendCancel)) {
+          event.preventDefault();
+          request("read");
           return;
         }
         var cancelEdit = event.target.closest("[" + cfg.cancelAttr + "]");
@@ -4059,6 +4094,10 @@
         }
       };
       body.addEventListener("click", body._scmCorrectiveClickHandler);
+
+      body
+        .querySelectorAll("[data-preventive-send-form]")
+        .forEach(bindPreventiveSendForm);
 
       Array.from(body.querySelectorAll(cfg.formSelector)).forEach(function (form) {
         if (form._scmCorrectiveBound) return;
@@ -4542,7 +4581,87 @@
         });
       });
     }
-    request("read");
+
+    // Envío del informe al propietario y arrendatario (formulario "Enviar revisión preventiva").
+    function bindPreventiveSendForm(form) {
+      if (form._scmSendBound) return;
+      form._scmSendBound = true;
+      function syncQuestion(question) {
+        var checked = question.querySelector("input:checked");
+        var alert = question.getAttribute("data-prev-alert") || "";
+        question.classList.toggle(
+          "is-alert",
+          !!checked && alert !== "" && checked.value === alert,
+        );
+        question.classList.toggle(
+          "is-ok",
+          !!checked && alert !== "" && checked.value !== alert,
+        );
+      }
+      form
+        .querySelectorAll(".scm-prev-question[data-prev-alert]")
+        .forEach(syncQuestion);
+      form.addEventListener("change", function (event) {
+        var question = event.target.closest(
+          ".scm-prev-question[data-prev-alert]",
+        );
+        if (question) syncQuestion(question);
+      });
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var close = form.querySelector('input[name="cerrar_ticket"]:checked');
+        if (!close) {
+          var first = form.querySelector('input[name="cerrar_ticket"]');
+          if (first) {
+            first.scrollIntoView({ block: "center", behavior: "smooth" });
+            first.focus({ preventScroll: true });
+          }
+          message("Indica si se cierra el caso con el envío.", true);
+          return;
+        }
+        var reviewId = form.getAttribute("data-review-id") || "";
+        var notified = Array.from(
+          form.querySelectorAll('input[name="notify[]"]:checked'),
+        ).map(function (input) {
+          return input.value;
+        });
+        var text =
+          (notified.length
+            ? "Se enviará el informe a: " + notified.join(" y ") + "."
+            : "No se enviará correo al propietario ni al arrendatario.") +
+          (close.value === "Si" ? " El caso quedará cerrado." : "");
+        function send() {
+          request("send", new FormData(form));
+        }
+        if (window.Swal && typeof window.Swal.fire === "function") {
+          window.Swal.fire({
+            icon: "question",
+            title: "¿Enviar la revisión preventiva #" + reviewId + "?",
+            text: text,
+            showCancelButton: true,
+            confirmButtonText: "Enviar",
+            cancelButtonText: "Cancelar",
+          }).then(function (result) {
+            if (result && result.isConfirmed) send();
+          });
+          return;
+        }
+        if (
+          window.confirm(
+            "¿Enviar la revisión preventiva #" + reviewId + "? " + text,
+          )
+        )
+          send();
+      });
+    }
+
+    if (initial && initial.operation) {
+      var initialData = new FormData();
+      if (initial.reviewId) initialData.set("review_id", initial.reviewId);
+      request(initial.operation, initialData);
+    } else {
+      request("read");
+    }
   }
 
   function openTicketResponseEditor(modal, caseBtn) {
@@ -4552,7 +4671,7 @@
     var body = sub.querySelector(".scm-case-submodal-body");
     var ticketPk = caseBtn.dataset.ticketPk || "";
     var isPublicPqr = (caseBtn.dataset.caseKind || "") === "public-pqr";
-    var isPreventiva = !isPublicPqr && isPreventivaCase(caseBtn);
+    var isPreventiva = !isPublicPqr && caseNeedsPreventivaNoAccessNotice(caseBtn);
     var noAccessCount = Math.max(
       0,
       parseInt(caseBtn.dataset.preventivaNoAccessCount || "0", 10) || 0,
@@ -9764,6 +9883,16 @@
                   "</span></div></button>",
               );
             }
+            if (
+              prevIdVal &&
+              statusBucket !== "cerrados" &&
+              !scmIsYesLike(btn.dataset.prevSeEnvio) &&
+              canUseDashboardAction("preventive_review_send")
+            ) {
+              complementaryActionButtons.push(
+                '<button type="button" class="scm-case-work-btn" data-scm-send-preventive-review><span class="material-symbols-outlined scm-btn-icon">forward_to_inbox</span><div class="scm-btn-text"><span class="scm-btn-label">Enviar revisi&oacute;n preventiva</span><span class="scm-btn-sub">Informe al propietario y arrendatario</span></div></button>',
+              );
+            }
           }
         }
         if (!isPublicPqr && (cotizacionUrl || cotizacionId)) {
@@ -9904,7 +10033,9 @@
           '<textarea class="scm-composer-textarea" rows="3" placeholder="Escriba una respuesta o actualización sobre el caso..." data-scm-composer-input></textarea>' +
           '<div class="scm-composer-file-preview" data-scm-composer-preview style="display:none;"></div>' +
           '<div class="scm-composer-docs-list" data-scm-composer-docs style="display:none;"></div>' +
-          (isPreventivaCase(btn)
+          (!isPublicPqr &&
+          isPreventivaCase(btn) &&
+          !String(btn.dataset.idRevisionPreventiva || "").trim()
             ? '<div class="scm-composer-extra-box scm-composer-preventiva-box" data-scm-composer-preventiva-box style="padding:10px 14px;margin-top:8px;background:#fffbeb;border:1px solid #fef08a;border-radius:8px;font-size:13px;">' +
               '<label class="scm-composer-check" style="font-weight:600;display:flex;align-items:flex-start;gap:8px;cursor:pointer;">' +
               '<input type="checkbox" name="composer_generar_acta_no_acceso_preventiva" value="1" style="margin-top:2px;" data-scm-composer-no-access>' +
@@ -10772,6 +10903,14 @@
         .forEach(function (reviewBtn) {
           reviewBtn.addEventListener("click", function () {
             openPreventiveReviewEditor(modal, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-send-preventive-review]")
+        .forEach(function (sendBtn) {
+          sendBtn.addEventListener("click", function () {
+            openPreventiveReviewSender(modal, btn);
           });
         });
 

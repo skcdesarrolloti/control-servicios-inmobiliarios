@@ -481,6 +481,11 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Cuando se registra una revisión preventiva desde el panel (reemplaza los correos fijos del formulario de WordPress).',
             'channel' => 'Email interno en cola',
           ],
+          'revision_preventiva_enviada' => [
+            'label' => 'Revisión preventiva enviada',
+            'description' => 'Cuando se envía el informe de la revisión preventiva al propietario y al arrendatario (reemplaza los correos fijos del formulario "Enviar revisión preventiva").',
+            'channel' => 'Email interno en cola',
+          ],
           'ticket_administrativo_creado' => [
             'label' => 'Caso administrativo creado',
             'description' => 'Cuando se crea un caso administrativo nativo y se marca notificación a administración.',
@@ -661,6 +666,7 @@ final class SuCasaControlServiciosInmobiliarios
           'case_completion_act' => 'Acta de solución y firma',
           'corrective_review_manage' => 'Gestionar revisión correctiva (casos de mantenimiento)',
           'preventive_review_manage' => 'Gestionar revisión preventiva (casos preventivos)',
+          'preventive_review_send' => 'Enviar revisión preventiva al propietario y arrendatario',
         ],
       ],
       'cotizaciones' => [

@@ -53,6 +53,7 @@ final class PreventiveReviewPublicView
       'Daños encontrados' => $this->first([$review['encontro_danos'] ?? '']) ?: '-',
       'Hallazgos en la inspección' => (string) $findings,
       'Coordinador contractual' => $this->first([$review['coordinador'] ?? '']) ?: '-',
+      'Envío del informe' => PreventiveReviewChecklist::wasSent($review) ? ($this->sentDate($review) ?: 'Enviado') : 'Pendiente',
     ];
 
     $content = '<article class="scm-corrective-public-card scm-corrective-public-hero">'
@@ -62,12 +63,21 @@ final class PreventiveReviewPublicView
       . '<section class="scm-corrective-public-card"><h2>Datos de la revisión</h2><div class="scm-corrective-public-grid">' . $this->grid($meta) . '</div></section>'
       . '<section class="scm-corrective-public-card"><h2>Resumen</h2><div class="scm-corrective-public-grid scm-corrective-public-grid--summary">' . $this->grid($summary) . '</div>'
       . '<p class="scm-prev-public-legend"><span class="is-alert">Requiere atención</span><span class="is-ok">Sin novedad</span></p></section>';
-    foreach (PreventiveReviewChecklist::groups() as $group) {
-      $content .= '<section class="scm-corrective-public-card scm-prev-public-group"><h2>' . $this->h($group['title']) . '</h2>';
+    $groups = PreventiveReviewChecklist::groups();
+    $groups[] = PreventiveReviewChecklist::sendGroup();
+    foreach ($groups as $group) {
+      $blocksHtml = '';
       foreach ($group['blocks'] as $block) {
-        $content .= $this->renderBlock($block, PreventiveReviewChecklist::storedRow($review[$block['key']] ?? ''));
+        $row = PreventiveReviewChecklist::storedRow($review[$block['key']] ?? '');
+        // La sección del envío solo aparece cuando se diligenció al enviar el informe.
+        if ($group['key'] === 'contrato_envio' && implode('', $row) === '') {
+          continue;
+        }
+        $blocksHtml .= $this->renderBlock($block, $row);
       }
-      $content .= '</section>';
+      if ($blocksHtml !== '') {
+        $content .= '<section class="scm-corrective-public-card scm-prev-public-group"><h2>' . $this->h($group['title']) . '</h2>' . $blocksHtml . '</section>';
+      }
     }
     if ($damagesHtml !== '') {
       $content .= '<section class="scm-corrective-public-card"><h2>Daños encontrados</h2><div class="scm-corrective-public-items">' . $damagesHtml . '</div></section>';
@@ -122,6 +132,14 @@ final class PreventiveReviewPublicView
       }
     }
     return '-';
+  }
+
+  /** @param array<string,mixed> $review */
+  private function sentDate(array $review): string
+  {
+    $raw = $review['fecha_envio'] ?? '';
+    $ts = is_numeric($raw) ? (int) $raw : (strtotime((string) $raw) ?: 0);
+    return $ts > 0 ? date('d/m/Y H:i', $ts) : '';
   }
 
   /** @param array<int,mixed> $values */

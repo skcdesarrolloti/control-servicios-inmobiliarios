@@ -755,6 +755,7 @@ final class PendingView
       . ' data-celular-arrendatario="' . esc_attr((string) ($contractRow['celular_arrendatario'] ?? $ticket['celular_arrendatario'] ?? '')) . '"'
       . ' data-indicativo-arrendatario="' . esc_attr((string) ($contractRow['indicativo_arrendatario'] ?? $ticket['indicativo_arrendatario'] ?? '')) . '"'
       . ' data-id-revision-preventiva="' . esc_attr((string) ($ticket['id_revision_preventiva'] ?? '')) . '"'
+      . ' data-prev-se-envio="' . esc_attr((string) ($ticket['_scm_prev_se_envio'] ?? '')) . '"'
       . ' data-id-revision-correctiva="' . esc_attr((string) ($ticket['id_revision_correctiva'] ?? '')) . '"'
       . ' data-prev-encontro-danos="' . esc_attr((string) ($ticket['_scm_prev_encontro_danos'] ?? $ticket['se_encontraron_danos'] ?? $ticket['encontro_danos'] ?? '')) . '"'
       . ' data-cotizacion-id="' . esc_attr($cotizacionId) . '"'
