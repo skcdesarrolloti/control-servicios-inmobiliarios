@@ -103,6 +103,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_CONTRACTS => 'ajax_handler_admin_notifications_community_contracts',
       SuCasaControlServiciosInmobiliarios::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_LINK => 'ajax_handler_admin_notifications_community_link',
       SuCasaControlServiciosInmobiliarios::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_CATALOG_ADD => 'ajax_handler_admin_notifications_community_catalog_add',
+      SuCasaControlServiciosInmobiliarios::AJAX_ADMIN_NOTIFICATIONS_PAYMENT_RECEIPTS_CONFIRM => 'ajax_handler_admin_notifications_payment_receipts_confirm',
       SuCasaControlServiciosInmobiliarios::AJAX_ADMIN_NOTIFICATIONS_COLLECTION => 'ajax_handler_admin_notifications_collection',
       SuCasaControlServiciosInmobiliarios::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS => 'ajax_handler_admin_notifications_collection_options',
       SuCasaControlServiciosInmobiliarios::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE => 'ajax_handler_admin_notifications_collection_queue',

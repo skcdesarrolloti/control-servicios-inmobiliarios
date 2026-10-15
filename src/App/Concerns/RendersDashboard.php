@@ -502,6 +502,7 @@ trait RendersDashboard
         'admin_notifications_community_contracts' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_CONTRACTS,
         'admin_notifications_community_link' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_LINK,
         'admin_notifications_community_catalog_add' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_CATALOG_ADD,
+        'admin_notifications_payment_receipts_confirm' => self::AJAX_ADMIN_NOTIFICATIONS_PAYMENT_RECEIPTS_CONFIRM,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_options' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
@@ -3265,6 +3266,38 @@ trait RendersDashboard
             <button type="button" class="scm-modal-close" data-admin-notif-queue-message-close aria-label="Cerrar mensaje"><?php echo $icon('close'); ?></button>
           </div>
           <div class="scm-an-queue-message-body" data-admin-notif-queue-message-body aria-live="polite"></div>
+        </section>
+      </div>
+
+      <div class="scm-admin-notif-modal scm-an-receipts-review-modal" data-admin-notif-receipts-review hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-receipts-review-title">
+        <div class="scm-admin-notif-modal-backdrop" aria-hidden="true"></div>
+        <section class="scm-admin-notif-modal-panel">
+          <div class="scm-admin-notif-modal-head">
+            <span class="scm-an-modal-icon"><?php echo $icon('fact_check'); ?></span>
+            <div class="scm-admin-notif-modal-titleblock">
+              <span class="scm-an-kicker">Comprobantes copropiedades</span>
+              <h4 id="scm-admin-notif-receipts-review-title">Revisar soportes antes de confirmar</h4>
+              <p data-admin-notif-receipts-review-summary>Corrige NIT, periodo o inmuebles y elige la copropiedad de cada PDF.</p>
+            </div>
+            <button type="button" class="scm-modal-close" data-admin-notif-receipts-review-close aria-label="Cerrar"><?php echo $icon('close'); ?></button>
+          </div>
+          <div class="scm-an-receipts-review-body">
+            <div class="scm-an-receipts-review-wrap">
+              <table class="scm-an-receipts-review-table">
+                <thead><tr><th>Incluir</th><th>Archivo</th><th>NIT</th><th>Periodo</th><th>Inmueble(s)</th><th>Copropiedad</th><th>Estado</th></tr></thead>
+                <tbody data-admin-notif-receipts-review-rows></tbody>
+              </table>
+            </div>
+            <div class="scm-an-receipts-pdf" data-admin-notif-receipts-pdf hidden>
+              <div class="scm-an-receipts-pdf-head"><strong data-admin-notif-receipts-pdf-title>PDF</strong><button type="button" class="scm-an-btn" data-admin-notif-receipts-pdf-close>Cerrar vista</button></div>
+              <iframe title="Vista previa del comprobante" src="about:blank"></iframe>
+            </div>
+          </div>
+          <div class="scm-an-community-foot">
+            <span class="scm-an-receipts-review-count" data-admin-notif-receipts-review-count></span>
+            <button type="button" class="scm-an-btn" data-admin-notif-receipts-review-close>Cancelar</button>
+            <button type="button" class="scm-an-btn is-navy" data-admin-notif-receipts-review-confirm><?php echo $icon('check'); ?>Confirmar soportes</button>
+          </div>
         </section>
       </div>
 

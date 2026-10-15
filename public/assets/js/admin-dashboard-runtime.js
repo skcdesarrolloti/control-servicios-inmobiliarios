@@ -195,6 +195,8 @@
       actions.admin_notifications_import || "";
     var actionAdminNotificationsPaymentReceiptsImport =
       actions.admin_notifications_payment_receipts_import || "";
+    var actionAdminNotificationsPaymentReceiptsConfirm =
+      actions.admin_notifications_payment_receipts_confirm || "";
     var actionAdminNotificationsQueue =
       actions.admin_notifications_queue || "";
     var actionAdminNotificationsQueueDelete =
@@ -6673,6 +6675,8 @@
       var importWrap = panel.querySelector("[data-admin-notif-import-wrap]");
       var importFileInput = panel.querySelector("[data-admin-notif-import-file]");
       var paymentReceiptsFileInput = panel.querySelector("[data-admin-notif-payment-receipts-file]");
+      var receiptsReviewModal = panel.querySelector("[data-admin-notif-receipts-review]");
+      var receiptsReviewState = { rows: [], communities: [], type: "" };
       var importClearBtn = panel.querySelector("[data-admin-notif-import-clear]");
       var importReportBtn = panel.querySelector("[data-admin-notif-import-report]");
       var importResultEl = panel.querySelector("[data-admin-notif-import-result]");
@@ -9756,57 +9760,24 @@
         filterMessageTemplateOptions();
         selectMessageTemplate("scm_copropiedad_soportes_pago_v1");
         setLoading(true);
-        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
-          .then(function (response) {
-            return response.json();
-          })
-          .then(function (json) {
-            if (!json || !json.success) {
-              throw new Error(
-                (json && json.data && json.data.message) ||
-                  "No se pudieron importar los comprobantes.",
-              );
-            }
-            var data = json.data || {};
-            importedPayload = data.payload || {};
-            importReportRows = Array.isArray(data.report_rows) ? data.report_rows : [];
-            selected.clear();
-            Object.keys(importedPayload).forEach(function (id) {
-              selected.add(String(id));
-            });
-            recipientsEl.innerHTML = data.html || "";
-            cacheVisibleRecipientDetails();
-            if (importReportBtn) {
-              importReportBtn.hidden = importReportRows.length === 0;
-            }
-            if (paginationEl) {
-              paginationEl.innerHTML =
-                '<span class="scm-admin-notif-page-info">Copropiedades marcadas: ' +
-                String(data.matched || 0) +
-                "</span>";
-            }
-            if (totalEl) {
-              totalEl.textContent = String(data.matched || 0);
-            }
-            if (listTitle) {
-              listTitle.textContent = (data.type_label || "Copropiedades") + " con comprobantes";
-            }
+        postAdminNotifications(actionAdminNotificationsPaymentReceiptsImport, fd)
+          .then(function (data) {
+            receiptsReviewState = {
+              rows: Array.isArray(data.rows) ? data.rows : [],
+              communities: Array.isArray(data.communities) ? data.communities : [],
+              type: String(data.type || currentType()),
+            };
+            recipientsEl.innerHTML =
+              '<div class="scm-admin-notif-empty"><strong>Revisa los soportes</strong><span>Confirma en la ventana de revisión para marcar las copropiedades.</span></div>';
             if (importResultEl) {
-              importResultEl.textContent = data.message || "Comprobantes importados.";
-              importResultEl.classList.add((data.matched || 0) > 0 ? "is-success" : "is-error");
+              importResultEl.textContent = data.message || "PDF analizados.";
+              importResultEl.classList.add("is-success");
             }
-            updateVisibleChecks();
-            filterMessageTemplateOptions();
-            selectMessageTemplate("scm_copropiedad_soportes_pago_v1");
-            syncContext();
-            showToast((data.matched || 0) > 0 ? "success" : "warning", data.message || "Comprobantes importados.");
+            openReceiptsReview(data.message || "");
           })
           .catch(function (err) {
             importedPayload = {};
             importReportRows = [];
-            if (importReportBtn) {
-              importReportBtn.hidden = true;
-            }
             recipientsEl.innerHTML =
               '<div class="scm-admin-notif-empty is-error"><strong>No se pudo importar.</strong><span>' +
               escHtml(err.message || "Error desconocido") +
@@ -9821,6 +9792,241 @@
           .finally(function () {
             setLoading(false);
           });
+      }
+
+      function receiptNitDigits(value) {
+        return String(value || "").split("-")[0].replace(/\D+/g, "");
+      }
+
+      // Copropiedades whose NIT equals the typed one, with or without check digit.
+      function receiptCommunitiesForNit(nit) {
+        var digits = receiptNitDigits(nit);
+        if (digits.length < 5) {
+          return [];
+        }
+        var withoutCheck = digits.length > 8 ? digits.slice(0, -1) : "";
+        return receiptsReviewState.communities.filter(function (community) {
+          var communityNit = String(community.nit || "");
+          return communityNit !== "" && (communityNit === digits || (withoutCheck && communityNit === withoutCheck));
+        });
+      }
+
+      function receiptCommunityOptionsHtml(row, selectedId) {
+        var candidateIds = {};
+        var candidates = (row.candidates || []).map(function (candidate) {
+          candidateIds[String(candidate.id)] = true;
+          return '<option value="' + escAttr(candidate.id) + '">' + escHtml(candidate.name + (candidate.nit ? " · NIT " + candidate.nit : "")) + "</option>";
+        }).join("");
+        var others = receiptsReviewState.communities.filter(function (community) {
+          return !candidateIds[String(community.id)];
+        }).map(function (community) {
+          return '<option value="' + escAttr(community.id) + '">' + escHtml(community.name + (community.nit ? " · NIT " + community.nit : "")) + "</option>";
+        }).join("");
+        var html = '<option value="">Elige la copropiedad…</option>' +
+          (candidates ? '<optgroup label="Coinciden por NIT">' + candidates + "</optgroup>" : "") +
+          (others ? '<optgroup label="Todas las copropiedades">' + others + "</optgroup>" : "");
+        return html.replace('value="' + escAttr(selectedId) + '"', 'value="' + escAttr(selectedId) + '" selected');
+      }
+
+      function receiptStatusClass(status) {
+        var value = String(status || "").toLowerCase();
+        if (value.indexOf("encontrado") === 0 || value.indexOf("elegid") === 0) {
+          return "is-ok";
+        }
+        if (value.indexOf("duplicado") === 0 || value.indexOf("excluido") === 0) {
+          return "is-muted";
+        }
+        return "is-warn";
+      }
+
+      function renderReceiptsReview() {
+        var tbody = receiptsReviewModal ? receiptsReviewModal.querySelector("[data-admin-notif-receipts-review-rows]") : null;
+        if (!tbody) {
+          return;
+        }
+        tbody.innerHTML = receiptsReviewState.rows.map(function (row, index) {
+          var isDuplicate = row.status === "Duplicado";
+          return (
+            '<tr data-receipt-index="' + index + '" class="' + (row.include ? "" : "is-excluded") + '">' +
+            '<td><input type="checkbox" data-receipt-field="include" aria-label="Incluir ' + escAttr(row.archivo) + '"' + (row.include ? " checked" : "") + (isDuplicate ? " disabled" : "") + "></td>" +
+            '<td class="is-file"><strong>' + escHtml(row.archivo || "") + "</strong>" +
+            (row.url ? '<a href="' + escAttr(row.url) + '" data-receipt-preview>Ver PDF</a>' : "") + "</td>" +
+            '<td><input type="text" class="scm-input" inputmode="numeric" data-receipt-field="nit" value="' + escAttr(row.nit || "") + '"' + (isDuplicate ? " disabled" : "") + "></td>" +
+            '<td><input type="text" class="scm-input" data-receipt-field="periodo" value="' + escAttr(row.periodo || "") + '"' + (isDuplicate ? " disabled" : "") + "></td>" +
+            '<td><input type="text" class="scm-input" data-receipt-field="inmuebles" value="' + escAttr(row.inmuebles || "") + '"' + (isDuplicate ? " disabled" : "") + "></td>" +
+            '<td><select class="scm-select" data-receipt-field="recipient_id"' + (isDuplicate ? " disabled" : "") + ">" + receiptCommunityOptionsHtml(row, String(row.recipient_id || "")) + "</select></td>" +
+            '<td><span class="scm-an-receipt-status ' + receiptStatusClass(row.status) + '" data-receipt-status>' + escHtml(row.status || "") + "</span>" +
+            (row.note ? '<small data-receipt-note>' + escHtml(row.note) + "</small>" : '<small data-receipt-note></small>') + "</td>" +
+            "</tr>"
+          );
+        }).join("");
+        updateReceiptsReviewCount();
+      }
+
+      function updateReceiptsReviewCount() {
+        var countEl = receiptsReviewModal ? receiptsReviewModal.querySelector("[data-admin-notif-receipts-review-count]") : null;
+        if (!countEl) {
+          return;
+        }
+        var included = receiptsReviewState.rows.filter(function (row) { return row.include; }).length;
+        countEl.textContent = included + " de " + receiptsReviewState.rows.length + " PDF se incluirán";
+      }
+
+      function openReceiptsReview(summary) {
+        if (!receiptsReviewModal) {
+          return;
+        }
+        var summaryEl = receiptsReviewModal.querySelector("[data-admin-notif-receipts-review-summary]");
+        if (summaryEl) {
+          summaryEl.textContent = summary || "Corrige NIT, periodo o inmuebles y elige la copropiedad de cada PDF.";
+        }
+        renderReceiptsReview();
+        receiptsReviewModal.hidden = false;
+        document.body.classList.add("scm-admin-notif-modal-open");
+      }
+
+      function closeReceiptsReview() {
+        if (!receiptsReviewModal || receiptsReviewModal.hidden) {
+          return;
+        }
+        receiptsReviewModal.hidden = true;
+        if (!composerModal || composerModal.hidden) {
+          document.body.classList.remove("scm-admin-notif-modal-open");
+        }
+      }
+
+      function onReceiptsReviewInput(event) {
+        var field = event.target && event.target.getAttribute ? event.target.getAttribute("data-receipt-field") : "";
+        var tr = event.target && event.target.closest ? event.target.closest("[data-receipt-index]") : null;
+        if (!field || !tr) {
+          return;
+        }
+        var row = receiptsReviewState.rows[Number(tr.getAttribute("data-receipt-index"))];
+        if (!row) {
+          return;
+        }
+        var statusEl = tr.querySelector("[data-receipt-status]");
+        var noteEl = tr.querySelector("[data-receipt-note]");
+        var setStatus = function (status, note) {
+          row.status = status;
+          if (statusEl) {
+            statusEl.textContent = status;
+            statusEl.className = "scm-an-receipt-status " + receiptStatusClass(status);
+          }
+          if (noteEl) {
+            noteEl.textContent = note || "";
+          }
+        };
+        if (field === "include") {
+          row.include = !!event.target.checked;
+          tr.classList.toggle("is-excluded", !row.include);
+          updateReceiptsReviewCount();
+          return;
+        }
+        if (field === "nit") {
+          row.nit = receiptNitDigits(event.target.value);
+          var matches = receiptCommunitiesForNit(row.nit);
+          var select = tr.querySelector('[data-receipt-field="recipient_id"]');
+          if (matches.length === 1 && select) {
+            select.value = String(matches[0].id);
+            row.recipient_id = String(matches[0].id);
+            setStatus("Encontrado", "");
+          } else if (matches.length > 1) {
+            setStatus("Coincidencia múltiple", "Varias copropiedades tienen ese NIT; elige la correcta.");
+          }
+          return;
+        }
+        if (field === "recipient_id") {
+          row.recipient_id = String(event.target.value || "");
+          if (row.recipient_id) {
+            setStatus(row.status === "Encontrado" ? "Encontrado" : "Elegido manualmente", row.already_sent ? "Este PDF ya se envió el " + row.already_sent + "." : "");
+          } else {
+            setStatus("Sin coincidencia", "Elige la copropiedad.");
+          }
+          return;
+        }
+        row[field] = String(event.target.value || "");
+      }
+
+      function confirmReceiptsReview(button) {
+        var missing = receiptsReviewState.rows.filter(function (row) {
+          return row.include && !row.recipient_id;
+        });
+        if (missing.length) {
+          showToast("warning", "Elige la copropiedad de " + missing.length + " PDF incluido(s) o desmárcalo(s).");
+          return;
+        }
+        if (!receiptsReviewState.rows.some(function (row) { return row.include; })) {
+          showToast("warning", "No hay PDF incluidos para confirmar.");
+          return;
+        }
+        var fd = new FormData();
+        fd.set("type", receiptsReviewState.type || currentType());
+        fd.set("rows", JSON.stringify(receiptsReviewState.rows.map(function (row) {
+          return {
+            archivo: row.archivo,
+            stored_name: row.stored_name,
+            sha1: row.sha1,
+            nit: row.nit,
+            periodo: row.periodo,
+            inmuebles: row.inmuebles,
+            pdf_texto_leido: row.pdf_texto_leido,
+            pagos_pdf: row.pagos_pdf,
+            pagos_pdf_detalle: row.pagos_pdf_detalle,
+            recipient_id: row.recipient_id,
+            include: !!row.include,
+          };
+        })));
+        button.disabled = true;
+        setLoading(true);
+        postAdminNotifications(actionAdminNotificationsPaymentReceiptsConfirm, fd)
+          .then(function (data) {
+            closeReceiptsReview();
+            applyConfirmedReceipts(data);
+          })
+          .catch(function (err) {
+            showToast("error", err.message || "No se pudieron confirmar los comprobantes.");
+          })
+          .finally(function () {
+            button.disabled = false;
+            setLoading(false);
+          });
+      }
+
+      function applyConfirmedReceipts(data) {
+        importedPayload = data.payload || {};
+        importReportRows = Array.isArray(data.report_rows) ? data.report_rows : [];
+        selected.clear();
+        Object.keys(importedPayload).forEach(function (id) {
+          selected.add(String(id));
+        });
+        recipientsEl.innerHTML = data.html || "";
+        cacheVisibleRecipientDetails();
+        if (importReportBtn) {
+          importReportBtn.hidden = importReportRows.length === 0;
+        }
+        if (paginationEl) {
+          paginationEl.innerHTML =
+            '<span class="scm-admin-notif-page-info">Copropiedades marcadas: ' +
+            String(data.matched || 0) +
+            "</span>";
+        }
+        if (totalEl) {
+          totalEl.textContent = String(data.matched || 0);
+        }
+        if (listTitle) {
+          listTitle.textContent = (data.type_label || "Copropiedades") + " con comprobantes";
+        }
+        if (importResultEl) {
+          importResultEl.textContent = data.message || "Comprobantes importados.";
+          importResultEl.classList.remove("is-error", "is-success");
+          importResultEl.classList.add((data.matched || 0) > 0 ? "is-success" : "is-error");
+        }
+        updateVisibleChecks();
+        filterMessageTemplateOptions();
+        selectMessageTemplate("scm_copropiedad_soportes_pago_v1");
+        syncContext();
+        showToast((data.matched || 0) > 0 ? "success" : "warning", data.message || "Comprobantes importados.");
       }
 
       if (!panel.dataset.scmAdminNotificationsEvents) {
@@ -10168,6 +10374,48 @@
           paymentReceiptsImportForm.addEventListener("submit", function (event) {
             event.preventDefault();
             importPaymentReceiptsFromFiles();
+          });
+        }
+        if (receiptsReviewModal) {
+          receiptsReviewModal.addEventListener("input", onReceiptsReviewInput);
+          receiptsReviewModal.addEventListener("change", onReceiptsReviewInput);
+          receiptsReviewModal.addEventListener("click", function (event) {
+            var target = event.target && event.target.closest ? event.target : null;
+            if (!target) {
+              return;
+            }
+            if (target.closest("[data-admin-notif-receipts-review-close]")) {
+              event.preventDefault();
+              closeReceiptsReview();
+              return;
+            }
+            var confirmBtn = target.closest("[data-admin-notif-receipts-review-confirm]");
+            if (confirmBtn && !confirmBtn.disabled) {
+              event.preventDefault();
+              confirmReceiptsReview(confirmBtn);
+              return;
+            }
+            var previewLink = target.closest("[data-receipt-preview]");
+            if (previewLink) {
+              // Preview inside the review modal instead of a new tab.
+              event.preventDefault();
+              var pdfBox = receiptsReviewModal.querySelector("[data-admin-notif-receipts-pdf]");
+              if (pdfBox) {
+                pdfBox.querySelector("[data-admin-notif-receipts-pdf-title]").textContent = previewLink.closest("tr").querySelector("strong").textContent;
+                pdfBox.querySelector("iframe").src = previewLink.getAttribute("href");
+                pdfBox.hidden = false;
+                pdfBox.scrollIntoView({ block: "nearest" });
+              }
+              return;
+            }
+            if (target.closest("[data-admin-notif-receipts-pdf-close]")) {
+              event.preventDefault();
+              var box = receiptsReviewModal.querySelector("[data-admin-notif-receipts-pdf]");
+              if (box) {
+                box.hidden = true;
+                box.querySelector("iframe").src = "about:blank";
+              }
+            }
           });
         }
         if (importClearBtn) {

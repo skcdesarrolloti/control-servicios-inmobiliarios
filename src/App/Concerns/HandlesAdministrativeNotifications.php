@@ -355,15 +355,41 @@ trait HandlesAdministrativeNotifications
     $files = is_array($_FILES['receipts'] ?? null) ? $_FILES['receipts'] : [];
 
     try {
-      $result = $this->get_admin_notifications_service()->importCopropiedadPaymentReceipts($type, $files);
+      $result = $this->get_admin_notifications_service()->analyzeCopropiedadPaymentReceipts($type, $files);
+      $parts = [];
+      foreach (['found' => 'con copropiedad', 'ambiguous' => 'con varias opciones', 'unmatched' => 'sin coincidencia', 'duplicates' => 'repetidos', 'already_sent' => 'ya enviados antes'] as $key => $label) {
+        if ((int) ($result[$key] ?? 0) > 0) {
+          $parts[] = (int) $result[$key] . ' ' . $label;
+        }
+      }
+      $result['message'] = sprintf('%d PDF analizados: %s. Revisa y confirma.', (int) ($result['total'] ?? 0), $parts !== [] ? implode(', ', $parts) : 'sin datos');
+      $this->jsonOk($result);
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
+  public function ajax_handler_admin_notifications_payment_receipts_confirm(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para usar Notificaciones.');
+    }
+
+    $type = $this->sanitize_admin_notification_type((string) ($_POST['type'] ?? 'copropiedades_activas'));
+    $rows = json_decode((string) wp_unslash((string) ($_POST['rows'] ?? '')), true);
+    if (!is_array($rows) || $rows === []) {
+      $this->jsonFail('No hay comprobantes para confirmar.');
+    }
+
+    try {
+      $result = $this->get_admin_notifications_service()->confirmCopropiedadPaymentReceipts($type, array_slice($rows, 0, 200));
       $matched = (int) ($result['matched'] ?? 0);
       $filesMatched = (int) ($result['files_matched'] ?? 0);
-      $usable = (int) ($result['usable_rows'] ?? 0);
-      $unmatched = (int) ($result['unmatched'] ?? 0);
-      $ambiguous = (int) ($result['ambiguous'] ?? 0);
+      $skipped = (int) ($result['unmatched'] ?? 0);
       $message = $matched > 0
-        ? sprintf('Comprobantes importados: %d copropiedad(es) marcadas con %d PDF de %d archivo(s).%s%s', $matched, $filesMatched, $usable, $unmatched > 0 ? " {$unmatched} sin coincidencia." : '', $ambiguous > 0 ? " {$ambiguous} con coincidencia multiple." : '')
-        : 'No se encontraron copropiedades activas para esos comprobantes. Revisa el NIT en el nombre del PDF.';
+        ? sprintf('Comprobantes listos: %d copropiedad(es) marcadas con %d PDF.%s', $matched, $filesMatched, $skipped > 0 ? " {$skipped} PDF no se incluyeron." : '')
+        : 'Ningún PDF quedó asociado a una copropiedad. Revisa la tabla de revisión.';
 
       $this->jsonOk([
         'html' => $this->render_admin_notification_recipient_rows((array) ($result['rows'] ?? [])),
@@ -371,10 +397,7 @@ trait HandlesAdministrativeNotifications
         'report_rows' => (array) ($result['report_rows'] ?? []),
         'matched' => $matched,
         'files_matched' => $filesMatched,
-        'unmatched' => $unmatched,
-        'ambiguous' => $ambiguous,
-        'duplicates' => (int) ($result['duplicates'] ?? 0),
-        'usable_rows' => $usable,
+        'unmatched' => $skipped,
         'type_label' => (string) ($result['type_label'] ?? ''),
         'message' => $message,
       ]);

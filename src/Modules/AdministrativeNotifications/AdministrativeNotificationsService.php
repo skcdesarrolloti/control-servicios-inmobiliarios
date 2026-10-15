@@ -2089,106 +2089,235 @@ final class AdministrativeNotificationsService
   }
 
   /**
+   * Step 1 of the payment-support import: store every PDF, read NIT, period
+   * and properties from its name, and propose the copropiedad. Nothing is
+   * selected yet; the panel shows these rows for review.
+   *
+   * Matches by the NIT copied into lease contracts and by the copropiedad's
+   * own NIT. Flags files repeated in the same upload and files already sent
+   * (same SHA-1) so a support is not sent twice.
+   *
    * @param array<string,mixed> $files
-   * @return array{rows:array<int,array<string,mixed>>,payload:array<string,array<string,mixed>>,report_rows:array<int,array<string,string>>,total_rows:int,usable_rows:int,matched:int,files_matched:int,unmatched:int,ambiguous:int,duplicates:int,type:string,type_label:string}
+   * @return array{rows:array<int,array<string,mixed>>,communities:array<int,array{id:string,name:string,nit:string}>,total:int,found:int,ambiguous:int,unmatched:int,duplicates:int,already_sent:int,type:string,type_label:string}
    */
-  public function importCopropiedadPaymentReceipts(string $type, array $files): array
+  public function analyzeCopropiedadPaymentReceipts(string $type, array $files): array
   {
     $config = $this->typeConfig($type);
     if (!str_starts_with($type, 'copropiedades_')) {
       throw new \RuntimeException('Los comprobantes PDF solo se cruzan en copropiedades.');
     }
-
     $uploads = $this->normalizeReceiptUploadFiles($files);
     if ($uploads === []) {
       throw new \RuntimeException('Selecciona al menos un comprobante PDF.');
     }
+    $contractStatus = $this->effectiveContractStatus($config, '');
+    $typeLabel = (string) ($config['label'] ?? 'Copropiedades');
+
+    $rows = [];
+    $seen = [];
+    $counts = ['found' => 0, 'ambiguous' => 0, 'unmatched' => 0, 'duplicates' => 0, 'already_sent' => 0];
+    foreach ($uploads as $index => $file) {
+      $meta = $this->paymentReceiptMetaFromUpload($file);
+      $hash = (string) (sha1_file((string) ($file['tmp_name'] ?? '')) ?: '');
+      $row = [
+        'key' => (string) $index,
+        'archivo' => (string) ($meta['archivo_pdf'] ?? ''),
+        'sha1' => $hash,
+        'nit' => (string) ($meta['documento_excel'] ?? ''),
+        'periodo' => (string) ($meta['mes_excel'] ?? ''),
+        // Without a NIT the file name is not a reliable property reference.
+        'inmuebles' => ($meta['documento_excel'] ?? '') !== '' ? (string) ($meta['inmueble_simi_excel'] ?? '') : '',
+        'pdf_texto_leido' => (string) ($meta['pdf_texto_leido'] ?? ''),
+        'pagos_pdf' => (string) ($meta['pagos_pdf'] ?? ''),
+        'pagos_pdf_detalle' => (string) ($meta['pagos_pdf_detalle'] ?? ''),
+        'stored_name' => '',
+        'url' => '',
+        'recipient_id' => '',
+        'candidates' => [],
+        'status' => '',
+        'note' => '',
+        'include' => true,
+        'already_sent' => '',
+      ];
+      if ($hash !== '' && isset($seen[$hash])) {
+        $counts['duplicates']++;
+        $row['status'] = 'Duplicado';
+        $row['note'] = 'Es el mismo archivo que "' . $seen[$hash] . '" en esta carga; no se enviará dos veces.';
+        $row['include'] = false;
+        $rows[] = $row;
+        continue;
+      }
+      $seen[$hash] = $row['archivo'];
+
+      $stored = $this->storePaymentReceiptUpload($file, $row['nit']);
+      $row['stored_name'] = (string) ($stored['stored_name'] ?? '');
+      $row['url'] = (string) ($stored['url'] ?? '');
+
+      $candidates = $this->paymentReceiptCandidates($row['nit'], $contractStatus, $type, $typeLabel);
+      $row['candidates'] = $candidates;
+      if (count($candidates) === 1) {
+        $counts['found']++;
+        $row['recipient_id'] = $candidates[0]['id'];
+        $row['status'] = 'Encontrado';
+      } elseif (count($candidates) > 1) {
+        $counts['ambiguous']++;
+        $row['status'] = 'Coincidencia múltiple';
+        $row['note'] = 'Varias copropiedades tienen ese NIT; elige la correcta.';
+      } else {
+        $counts['unmatched']++;
+        $row['status'] = 'Sin coincidencia';
+        $row['note'] = $row['nit'] === ''
+          ? 'No se encontró NIT en el nombre del PDF. Escríbelo o elige la copropiedad.'
+          : 'Ninguna copropiedad tiene ese NIT. Corrígelo o elige la copropiedad.';
+      }
+
+      $sentAt = $this->paymentReceiptAlreadySent($hash);
+      if ($sentAt !== '') {
+        $counts['already_sent']++;
+        $row['already_sent'] = $sentAt;
+        $row['include'] = false;
+        $row['note'] = trim($row['note'] . ' Este PDF ya se envió el ' . $sentAt . '; márcalo solo si quieres reenviarlo.');
+      }
+      $rows[] = $row;
+    }
+
+    return [
+      'rows' => $rows,
+      'communities' => $this->paymentReceiptCommunityOptions(),
+      'total' => count($uploads),
+      'found' => $counts['found'],
+      'ambiguous' => $counts['ambiguous'],
+      'unmatched' => $counts['unmatched'],
+      'duplicates' => $counts['duplicates'],
+      'already_sent' => $counts['already_sent'],
+      'type' => $type,
+      'type_label' => $typeLabel,
+    ];
+  }
+
+  /**
+   * Step 2: builds the recipients and payload from the reviewed rows (the
+   * NIT, period, properties and copropiedad may have been corrected).
+   *
+   * @param array<int,mixed> $reviewRows
+   * @return array<string,mixed>
+   */
+  public function confirmCopropiedadPaymentReceipts(string $type, array $reviewRows): array
+  {
+    $config = $this->typeConfig($type);
+    if (!str_starts_with($type, 'copropiedades_')) {
+      throw new \RuntimeException('Los comprobantes PDF solo se cruzan en copropiedades.');
+    }
+    $contractStatus = $this->effectiveContractStatus($config, '');
+    $typeLabel = (string) ($config['label'] ?? 'Copropiedades');
+    $communityTable = $this->db->table('jet_cct_copropiedades');
+    $uploadDir = rtrim($this->paymentReceiptUploadDir(), '/\\');
+    $clean = static fn($value, int $max = 255): string => trim(mb_substr(trim(preg_replace('/\s+/u', ' ', (string) $value) ?? ''), 0, $max, 'UTF-8'));
 
     $payload = [];
     $contractsByRecipient = [];
     $reportRows = [];
-    $unmatched = 0;
-    $ambiguous = 0;
     $filesMatched = 0;
-
-    foreach ($uploads as $index => $file) {
-      $meta = $this->paymentReceiptMetaFromUpload($file);
-      $nit = (string) ($meta['documento_excel'] ?? '');
+    $skipped = 0;
+    foreach (array_values($reviewRows) as $index => $input) {
+      if (!is_array($input)) {
+        continue;
+      }
+      $fileName = $clean($input['archivo'] ?? '', 200) ?: 'comprobante.pdf';
+      $nit = $this->normalizeImportDocument($clean($input['nit'] ?? '', 40));
+      $meta = [
+        'contrato_excel' => '',
+        'inmueble_simi_excel' => $clean($input['inmuebles'] ?? '', 300),
+        'documento_excel' => $nit,
+        'canon_excel' => '',
+        'canon_excel_raw' => '',
+        'mes_excel' => mb_strtoupper($clean($input['periodo'] ?? '', 60), 'UTF-8'),
+        'direccion_excel' => '',
+        'archivo_pdf' => $fileName,
+        'pdf_texto_leido' => ($input['pdf_texto_leido'] ?? '') === 'Si' ? 'Si' : 'No',
+        'pagos_pdf' => (string) max(0, (int) ($input['pagos_pdf'] ?? 0)),
+        'pagos_pdf_detalle' => trim(mb_substr((string) ($input['pagos_pdf_detalle'] ?? ''), 0, 2000, 'UTF-8')),
+        'detalle_excel' => '',
+      ];
+      if ($meta['pagos_pdf'] === '0') {
+        $meta['pagos_pdf'] = '';
+      }
+      if (empty($input['include'])) {
+        $skipped++;
+        $reportRows[] = $this->importReportRow($index, $meta, null, 'Excluido', 'No', 'Excluido en la revisión.');
+        continue;
+      }
+      $storedName = (string) ($input['stored_name'] ?? '');
+      $path = $uploadDir . DIRECTORY_SEPARATOR . $storedName;
+      if (preg_match('/^[a-f0-9]{24}_\d+\.pdf$/', $storedName) !== 1 || !is_readable($path)) {
+        $skipped++;
+        $reportRows[] = $this->importReportRow($index, $meta, null, 'Sin archivo', 'No', 'El PDF ya no está disponible; vuelve a importarlo.');
+        continue;
+      }
+      $recipientId = (int) ($input['recipient_id'] ?? 0);
+      $community = $recipientId > 0 && $this->schema->tableExists($communityTable)
+        ? $this->db->getRow("SELECT `_ID`, `copropiedad`, `nit` FROM `{$communityTable}` WHERE `_ID` = ? LIMIT 1", [$recipientId])
+        : null;
+      if (!is_array($community)) {
+        $skipped++;
+        $reportRows[] = $this->importReportRow($index, $meta, null, 'Sin copropiedad', 'No', 'No se eligió una copropiedad válida.');
+        continue;
+      }
       if ($nit === '') {
-        $unmatched++;
-        $reportRows[] = $this->importReportRow($index, $meta, null, 'Sin coincidencia', 'No', 'No se encontro NIT en el nombre del PDF.');
-        continue;
+        $meta['documento_excel'] = $this->normalizeImportDocument((string) ($community['nit'] ?? ''));
       }
-
-      $matches = $this->paymentReceiptCopropiedadMatches($nit, $this->effectiveContractStatus($config, ''), $type, (string) ($config['label'] ?? 'Copropiedades'));
-      if ($matches === []) {
-        $unmatched++;
-        $reportRows[] = $this->importReportRow($index, $meta, null, 'Sin coincidencia', 'No', 'No se encontro copropiedad activa para el NIT del PDF.');
-        continue;
+      $hash = (string) ($input['sha1'] ?? '');
+      if (preg_match('/^[a-f0-9]{40}$/', $hash) !== 1) {
+        $hash = (string) (sha1_file($path) ?: '');
       }
-      if (count($matches) > 1) {
-        $ambiguous++;
-        foreach ($matches as $match) {
-          $reportRows[] = $this->importReportRow($index, $meta, $match['recipient'], 'Coincidencia multiple', 'No', 'El NIT coincide con varias copropiedades; no se marco automaticamente.');
-        }
-        continue;
-      }
-
-      $match = reset($matches);
-      if (!is_array($match) || !is_array($match['recipient'] ?? null)) {
-        $unmatched++;
-        $reportRows[] = $this->importReportRow($index, $meta, null, 'Sin coincidencia', 'No', 'No se pudo construir el destinatario de copropiedad.');
-        continue;
-      }
-
-      $stored = $this->storePaymentReceiptUpload($file, $nit);
-      $recipient = $match['recipient'];
-      $recipientId = (string) ((int) ($recipient['_ID'] ?? 0));
-      if ($recipientId === '0') {
-        $unmatched++;
-        $reportRows[] = $this->importReportRow($index, $meta, null, 'Sin coincidencia', 'No', 'El contrato tiene copropiedad, pero no tiene ID de destinatario valido.');
-        continue;
+      $url = '';
+      try {
+        $url = StoredFileService::fromRuntime()->urlFor($storedName);
+      } catch (\Throwable) {
+        $url = '';
       }
 
       $contracts = $this->filterPaymentReceiptContracts(
-        array_values((array) ($match['contracts'] ?? [])),
-        (string) ($meta['inmueble_simi_excel'] ?? ''),
-        (string) ($meta['pagos_pdf_detalle'] ?? '')
+        $this->paymentReceiptCommunityContracts($recipientId, $meta['documento_excel'], $contractStatus),
+        $meta['inmueble_simi_excel'],
+        $meta['pagos_pdf_detalle']
       );
       $receiptMeta = $meta;
-      $receiptMeta['archivo_pdf'] = (string) ($stored['name'] ?? '');
-      $receiptMeta['ruta_pdf'] = (string) ($stored['path'] ?? '');
-      $receiptMeta['url_pdf'] = (string) ($stored['url'] ?? '');
-      $receiptMeta['archivo_pdf_guardado'] = (string) ($stored['stored_name'] ?? '');
+      $receiptMeta['ruta_pdf'] = $path;
+      $receiptMeta['url_pdf'] = $url;
+      $receiptMeta['archivo_pdf_guardado'] = $storedName;
       $receiptMeta['comprobantes_pago'] = [[
-        'path' => (string) ($stored['path'] ?? ''),
-        'name' => (string) ($stored['name'] ?? ''),
-        'stored_name' => (string) ($stored['stored_name'] ?? ''),
-        'url' => (string) ($stored['url'] ?? ''),
-        'nit' => $nit,
-        'periodo' => (string) ($meta['mes_excel'] ?? ''),
-        'inmuebles' => (string) ($meta['inmueble_simi_excel'] ?? ''),
-        'pagos_pdf' => (string) ($meta['pagos_pdf'] ?? ''),
-        'pagos_pdf_detalle' => (string) ($meta['pagos_pdf_detalle'] ?? ''),
+        'path' => $path,
+        'name' => $fileName,
+        'stored_name' => $storedName,
+        'url' => $url,
+        'nit' => $meta['documento_excel'],
+        'periodo' => $meta['mes_excel'],
+        'inmuebles' => $meta['inmueble_simi_excel'],
+        'pagos_pdf' => $meta['pagos_pdf'],
+        'pagos_pdf_detalle' => $meta['pagos_pdf_detalle'],
+        'sha1' => $hash,
       ]];
       $receiptMeta['contratos_sistema'] = implode(' | ', $this->paymentReceiptContractLabels($contracts));
       $receiptMeta['detalle_excel'] = $this->paymentReceiptDetail($receiptMeta, $contracts);
       $receiptMeta['detalle_whatsapp'] = $this->paymentReceiptWhatsappSummary($receiptMeta, false);
 
+      $key = (string) $recipientId;
       $allContracts = [];
-      foreach (array_merge($contractsByRecipient[$recipientId] ?? [], $contracts) as $contractRow) {
+      foreach (array_merge($contractsByRecipient[$key] ?? [], $contracts) as $contractRow) {
         $allContracts[(string) ($contractRow['_ID'] ?? count($allContracts))] = $contractRow;
       }
-      $contractsByRecipient[$recipientId] = array_values($allContracts);
-      if (!isset($payload[$recipientId])) {
-        $payload[$recipientId] = $receiptMeta;
-      } else {
-        $payload[$recipientId] = $this->mergePaymentReceiptMeta($payload[$recipientId], $receiptMeta, $contractsByRecipient[$recipientId]);
-      }
+      $contractsByRecipient[$key] = array_values($allContracts);
+      $payload[$key] = isset($payload[$key])
+        ? $this->mergePaymentReceiptMeta($payload[$key], $receiptMeta, $contractsByRecipient[$key])
+        : $receiptMeta;
       $filesMatched++;
-
-      $recipient['_scm_import_meta'] = $receiptMeta;
-      $reportRows[] = $this->importReportRow($index, $receiptMeta, $recipient, 'Encontrado', 'Si', 'Comprobante asociado y PDF guardado para adjuntar por email.');
+      $reportRows[] = $this->importReportRow($index, $receiptMeta, [
+        '_ID' => $recipientId,
+        'nombre' => (string) ($community['copropiedad'] ?? ''),
+        'tipo_label' => $typeLabel,
+        'documento' => (string) ($community['nit'] ?? ''),
+      ], 'Encontrado', 'Si', 'Comprobante asociado y PDF guardado para adjuntar.');
     }
 
     $ids = array_map('intval', array_keys($payload));
@@ -2205,16 +2334,145 @@ final class AdministrativeNotificationsService
       'rows' => $rows,
       'payload' => $payload,
       'report_rows' => $reportRows,
-      'total_rows' => count($uploads),
-      'usable_rows' => count($uploads),
+      'total_rows' => count($reviewRows),
+      'usable_rows' => count($reviewRows),
       'matched' => count($rows),
       'files_matched' => $filesMatched,
-      'unmatched' => $unmatched,
-      'ambiguous' => $ambiguous,
+      'unmatched' => $skipped,
+      'ambiguous' => 0,
       'duplicates' => 0,
       'type' => $type,
-      'type_label' => (string) ($config['label'] ?? $type),
+      'type_label' => $typeLabel,
     ];
+  }
+
+  /**
+   * Copropiedades whose NIT matches: through the NIT copied into lease
+   * contracts and through the copropiedad's own NIT.
+   *
+   * @return array<int,array{id:string,name:string,nit:string,source:string}>
+   */
+  private function paymentReceiptCandidates(string $nit, string $contractStatus, string $type, string $typeLabel): array
+  {
+    $nit = $this->normalizeImportDocument($nit);
+    if ($nit === '') {
+      return [];
+    }
+    $found = [];
+    foreach ($this->paymentReceiptCopropiedadMatches($nit, $contractStatus, $type, $typeLabel) as $id => $match) {
+      $found[(string) $id] = 'contrato';
+    }
+    $table = $this->db->table('jet_cct_copropiedades');
+    if ($this->schema->tableExists($table)) {
+      $nitCandidates = array_values($this->paymentReceiptNitCandidates($nit));
+      $placeholders = implode(',', array_fill(0, count($nitCandidates), '?'));
+      foreach ($this->db->getCol(
+        "SELECT `_ID` FROM `{$table}` WHERE {$this->normalizedDocumentSql("COALESCE(`nit`, '')")} IN ({$placeholders})",
+        $nitCandidates
+      ) as $id) {
+        $key = (string) (int) $id;
+        $found[$key] = isset($found[$key]) ? 'contrato y copropiedad' : 'copropiedad';
+      }
+    }
+    if ($found === []) {
+      return [];
+    }
+    $ids = array_map('intval', array_keys($found));
+    $names = [];
+    if ($this->schema->tableExists($table)) {
+      foreach ($this->db->getResults(
+        "SELECT `_ID`, `copropiedad`, `nit` FROM `{$table}` WHERE `_ID` IN (" . implode(',', array_fill(0, count($ids), '?')) . ')',
+        $ids
+      ) as $row) {
+        $names[(string) (int) $row['_ID']] = ['name' => trim((string) $row['copropiedad']), 'nit' => trim((string) $row['nit'])];
+      }
+    }
+    $out = [];
+    foreach ($found as $id => $source) {
+      $out[] = [
+        'id' => $id,
+        'name' => $names[$id]['name'] ?? ('Copropiedad ' . $id),
+        'nit' => $names[$id]['nit'] ?? '',
+        'source' => $source,
+      ];
+    }
+    return $out;
+  }
+
+  /** @return array<int,array{id:string,name:string,nit:string}> */
+  private function paymentReceiptCommunityOptions(): array
+  {
+    $table = $this->db->table('jet_cct_copropiedades');
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+    $rows = $this->db->getResults(
+      "SELECT `_ID`, `copropiedad`, `nit` FROM `{$table}`
+        WHERE (`cct_status` = 'publish' OR `cct_status` IS NULL OR `cct_status` = '')
+          AND TRIM(COALESCE(`copropiedad`, '')) <> ''
+        ORDER BY `copropiedad` ASC"
+    );
+    return array_map(static fn(array $row): array => [
+      'id' => (string) (int) $row['_ID'],
+      'name' => trim((string) $row['copropiedad']),
+      'nit' => preg_replace('/\D+/', '', (string) $row['nit']) ?? '',
+    ], $rows);
+  }
+
+  /**
+   * Lease contracts of a copropiedad: linked by id_copropiedad or carrying its
+   * NIT, filtered by the contract state of the current tab.
+   *
+   * @return array<int,array<string,mixed>>
+   */
+  private function paymentReceiptCommunityContracts(int $communityId, string $nit, string $contractStatus): array
+  {
+    $contracts = [];
+    if ($nit !== '') {
+      $matches = $this->paymentReceiptCopropiedadMatches($nit, $contractStatus, 'copropiedades_activas', '');
+      foreach ((array) ($matches[$communityId]['contracts'] ?? []) as $row) {
+        $contracts[(string) ($row['_ID'] ?? '')] = $row;
+      }
+    }
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    if ($this->schema->tableExists($table) && $this->schema->columnExists($table, 'id_copropiedad')) {
+      $args = [$communityId];
+      $statusSql = '';
+      if ($contractStatus !== '') {
+        $statusSql = " AND LOWER(TRIM(COALESCE(`estado`, ''))) = ?";
+        $args[] = $contractStatus === 'activos' ? 'entregado' : 'recibido';
+      }
+      foreach ($this->db->getResults(
+        "SELECT `_ID`, `estado`, `contrato`, `contrato_arrendamiento`, `inmueble`, `id_inmueble`, `id_inmueble_data`, `direccion`
+           FROM `{$table}` WHERE CAST(`id_copropiedad` AS UNSIGNED) = ?{$statusSql} ORDER BY `_ID`",
+        $args
+      ) as $row) {
+        $contracts[(string) ($row['_ID'] ?? '')] = $row;
+      }
+    }
+    return array_values($contracts);
+  }
+
+  /** Date of the last queued/sent message that carried this exact PDF, or ''. */
+  private function paymentReceiptAlreadySent(string $hash): string
+  {
+    if (preg_match('/^[a-f0-9]{40}$/', $hash) !== 1 || !$this->schema->tableExists(self::QUEUE_TABLE)) {
+      return '';
+    }
+    return (string) ($this->db->getVar(
+      'SELECT MAX(`created_at`) FROM `' . self::QUEUE_TABLE . '`
+        WHERE `project_code` = ? AND `source_module` IN (?, ?)
+          AND `status` IN (\'sent\', \'pending\', \'processing\')
+          AND `meta_json` LIKE ?',
+      [self::PROJECT_CODE, self::SOURCE_MODULE, self::COLLECTION_QUEUE_SOURCE_MODULE, '%"sha1":"' . $hash . '"%']
+    ) ?? '');
+  }
+
+  private function paymentReceiptUploadDir(): string
+  {
+    return defined('SCM_UPLOAD_PATH')
+      ? (string) SCM_UPLOAD_PATH
+      : dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'uploads';
   }
 
   /** @param array<string,string> $meta @param array<string,mixed>|null $recipient @return array<string,string> */
@@ -3353,9 +3611,7 @@ final class AdministrativeNotificationsService
   /** @param array{name:string,tmp_name:string,error:int,size:int,type:string} $file @return array{path:string,name:string,stored_name:string,url:string} */
   private function storePaymentReceiptUpload(array $file, string $nit): array
   {
-    $dir = defined('SCM_UPLOAD_PATH')
-      ? (string) SCM_UPLOAD_PATH
-      : dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'uploads';
+    $dir = $this->paymentReceiptUploadDir();
     if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
       throw new \RuntimeException('No se pudo crear la carpeta para comprobantes.');
     }
@@ -3551,7 +3807,8 @@ final class AdministrativeNotificationsService
     if ($payments > 0) {
       $lines[] = 'Pagos en los soportes: ' . $payments;
     }
-    if (preg_match_all('/#\s*([A-Za-z0-9\-]+)/u', (string) ($meta['contratos_sistema'] ?? ''), $numbers) > 0) {
+    // Only the number that starts each label: addresses also contain "#".
+    if (preg_match_all('/(?:^|[|,])\s*#\s*([A-Za-z0-9\-]+)/u', (string) ($meta['contratos_sistema'] ?? ''), $numbers) > 0) {
       $unique = array_values(array_unique($numbers[1]));
       $lines[] = 'Contrato(s): #' . implode(', #', $unique);
     }
@@ -4092,6 +4349,7 @@ final class AdministrativeNotificationsService
           'inmuebles' => trim((string) ($receipt['inmuebles'] ?? '')),
           'pagos_pdf' => trim((string) ($receipt['pagos_pdf'] ?? '')),
           'pagos_pdf_detalle' => trim((string) ($receipt['pagos_pdf_detalle'] ?? '')),
+          'sha1' => preg_match('/^[a-f0-9]{40}$/', (string) ($receipt['sha1'] ?? '')) === 1 ? (string) $receipt['sha1'] : '',
         ];
         if (count($cleanReceipts) >= 20) {
           break;

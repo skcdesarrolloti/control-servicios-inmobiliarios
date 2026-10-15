@@ -103,6 +103,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_CONTRACTS = 'scm_admin_notifications_community_contracts';
   const AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_LINK = 'scm_admin_notifications_community_link';
   const AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_CATALOG_ADD = 'scm_admin_notifications_community_catalog_add';
+  const AJAX_ADMIN_NOTIFICATIONS_PAYMENT_RECEIPTS_CONFIRM = 'scm_admin_notifications_payment_receipts_confirm';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION = 'scm_admin_notifications_collection';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS = 'scm_admin_notifications_collection_options';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE = 'scm_admin_notifications_collection_queue';
