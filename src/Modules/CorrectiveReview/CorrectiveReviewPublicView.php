@@ -105,6 +105,43 @@ final class CorrectiveReviewPublicView
     ];
   }
 
+  /** Daños con evidencias, reutilizado por la vista de la revisión preventiva. */
+  public function damageItemsHtml(mixed $raw): string
+  {
+    $html = '';
+    foreach ($this->items($raw) as $index => $item) {
+      $html .= $this->renderItem($item, $index + 1);
+    }
+    return $html;
+  }
+
+  /** @param array<string,mixed> $review @return array{0:array<string,mixed>,1:array<string,mixed>,2:array<string,mixed>} */
+  public function relatedRecords(array $review): array
+  {
+    $ticket = $this->ticket($review);
+    $contract = $this->contract($review, $ticket);
+    return [$ticket, $contract, $this->property($review, $ticket, $contract)];
+  }
+
+  /** @param array<string,mixed> $review */
+  public function signatureHtml(array $review, string $closing): string
+  {
+    $employee = $this->employeeProfile($review);
+    $performedBy = $this->first([$employee['name'] ?? '', $review['creador'] ?? '', $review['funcionario'] ?? '']);
+    if ($performedBy === '') {
+      return '';
+    }
+    $cargo = $this->first([$employee['cargo'] ?? '', $review['cargo_creador'] ?? '']);
+    $contact = implode(' · ', array_filter([$this->first([$employee['email'] ?? '', $review['email_creador'] ?? '']), $this->first([$employee['phone'] ?? '', $review['celular_creador'] ?? ''])]));
+    return '<section class="scm-corrective-public-card scm-corrective-public-signature">'
+      . '<div class="scm-corrective-public-signature-label">Realizado por</div>'
+      . '<div class="scm-corrective-public-signature-name">' . $this->h($performedBy) . '</div>'
+      . ($cargo !== '' ? '<div class="scm-corrective-public-signature-role">' . $this->h($cargo) . '</div>' : '')
+      . '<p>' . $this->h($closing) . '</p>'
+      . ($contact !== '' ? '<div class="scm-corrective-public-signature-contact">' . $this->h($contact) . '</div>' : '')
+      . '</section>';
+  }
+
   /** @return array<string,mixed> */
   private function review(int $reviewId): array
   {

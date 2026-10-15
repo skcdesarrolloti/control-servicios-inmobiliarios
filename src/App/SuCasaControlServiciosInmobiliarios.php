@@ -11,6 +11,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesTicketWorkflowActions;
   use \SCM\App\Concerns\HandlesTicketCompletion;
   use \SCM\App\Concerns\HandlesCorrectiveReviewActions;
+  use \SCM\App\Concerns\HandlesPreventiveReviewActions;
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   use \SCM\App\Concerns\HandlesPublicPqrActions;
   use \SCM\App\Concerns\HandlesPanelCaseCreation;
@@ -50,6 +51,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_TICKET_COMPLETION = 'scm_ticket_acta';
   const AJAX_TICKET_COMPLETION_LIST = 'scm_ticket_actas_satisfaccion';
   const AJAX_CORRECTIVE_REVIEW = 'scm_revision_correctiva';
+  const AJAX_PREVENTIVE_REVIEW = 'scm_revision_preventiva';
   const AJAX_CONTACTS_UPDATE = 'scm_actualizar_contactos';
   const AJAX_ENTREGA         = 'scm_entrega';
   const AJAX_PREVENTIVA      = 'scm_preventiva';
@@ -172,7 +174,7 @@ final class SuCasaControlServiciosInmobiliarios
   const NONCE_KEY            = 'scm_nonce';
 
   const DEFAULT_TICKET_URL = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=';
-  const DEFAULT_PREVENTIVA_URL = 'https://sucasainmobiliaria.com.co/revision-preventiva/?numero=';
+  const DEFAULT_PREVENTIVA_URL = 'revision-preventiva.php?numero=';
   const DEFAULT_CORRECTIVA_URL = 'revision-correctiva.php?numero=';
   const DEFAULT_COTIZACION_URL = 'cotizacion-mantenimiento.php?numero=';
   const DEFAULT_ACTA_URL = 'https://sucasainmobiliaria.com.co/acta-de-satisfaccion/?numero=';
@@ -474,6 +476,11 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Cuando se registra una revisión correctiva desde el panel.',
             'channel' => 'Email interno en cola',
           ],
+          'revision_preventiva_creada' => [
+            'label' => 'Revisión preventiva creada',
+            'description' => 'Cuando se registra una revisión preventiva desde el panel (reemplaza los correos fijos del formulario de WordPress).',
+            'channel' => 'Email interno en cola',
+          ],
           'ticket_administrativo_creado' => [
             'label' => 'Caso administrativo creado',
             'description' => 'Cuando se crea un caso administrativo nativo y se marca notificación a administración.',
@@ -652,7 +659,7 @@ final class SuCasaControlServiciosInmobiliarios
           'case_edit_magnitude' => 'Editar magnitud del caso',
           'case_edit_data' => 'Editar datos del caso (asunto, tema, prioridad, departamento)',
           'case_completion_act' => 'Acta de solución y firma',
-          'corrective_review_manage' => 'Gestionar revisión correctiva',
+          'corrective_review_manage' => 'Gestionar revisión correctiva y preventiva',
         ],
       ],
       'cotizaciones' => [
@@ -930,6 +937,38 @@ final class SuCasaControlServiciosInmobiliarios
   private static function sanitizeUrl(string $url): string
   {
     return filter_var($url, FILTER_SANITIZE_URL) ?: $url;
+  }
+
+  public static function defaultPreventiveReviewUrl(): string
+  {
+    $base = defined('SCM_BASE_URL') ? rtrim((string) SCM_BASE_URL, '/') : '';
+    return ($base !== '' ? $base . '/' : '') . self::DEFAULT_PREVENTIVA_URL;
+  }
+
+  public static function preventiveReviewPublicUrl(int $reviewId): string
+  {
+    return self::defaultPreventiveReviewUrl() . rawurlencode((string) $reviewId);
+  }
+
+  public static function signedPreventiveReviewPublicUrl(int $reviewId, ?int $expires = null): string
+  {
+    $expires = $expires && $expires > time() ? $expires : (time() + 180 * 86400);
+    return self::preventiveReviewPublicUrl($reviewId)
+      . '&expires=' . rawurlencode((string) $expires)
+      . '&sig=' . rawurlencode(self::preventiveReviewPublicSignature($reviewId, $expires));
+  }
+
+  public static function preventiveReviewPublicSignature(int $reviewId, int $expires): string
+  {
+    return hash_hmac('sha256', 'revision-preventiva|' . $reviewId . '|' . $expires, (string) SCM_APP_SECRET);
+  }
+
+  public static function preventiveReviewPublicSignatureValid(int $reviewId, int $expires, string $signature): bool
+  {
+    if ($reviewId <= 0 || $expires <= time() || trim($signature) === '') {
+      return false;
+    }
+    return hash_equals(self::preventiveReviewPublicSignature($reviewId, $expires), trim($signature));
   }
 
   public static function defaultCorrectiveReviewUrl(): string

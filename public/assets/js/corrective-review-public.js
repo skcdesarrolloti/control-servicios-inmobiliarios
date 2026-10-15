@@ -76,6 +76,13 @@
       return;
     }
 
+    var printButton = target && target.closest ? target.closest("[data-scm-print]") : null;
+    if (printButton) {
+      event.preventDefault();
+      window.print();
+      return;
+    }
+
     var closeButton = target && target.closest ? target.closest("[data-corrective-photo-close]") : null;
     if (closeButton) {
       event.preventDefault();

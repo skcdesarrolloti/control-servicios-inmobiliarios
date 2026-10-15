@@ -22940,26 +22940,37 @@
         var caseBtn = findVisibleCaseButtonByTicket(ticketPk);
         if (!caseBtn && attempts < 40) return;
         window.clearInterval(timer);
-        if (!caseBtn || typeof window.scmOpenCase !== "function") {
+        if (typeof window.scmOpenCase !== "function") {
           showStandaloneFunctionFailure("No se encontró el caso autorizado para abrir esta acción.");
           return;
         }
-        window.scmOpenCase(caseBtn);
-        window.setTimeout(function () {
-          var actionBtn = document.querySelector("#scm-app #scm-case-modal.open " + selector);
-          if (actionBtn) {
-            markStandaloneFunctionReady();
-            actionBtn.click();
-            window.setTimeout(function () {
-              if (funcionarioBridgeMode && !standaloneCaseSubmodalOpened()) {
-                showStandaloneFunctionFailure(missingMessage || "La acción no abrió el formulario esperado para este caso.");
-              }
-            }, 700);
-          } else {
-            showStandaloneFunctionFailure(missingMessage || "La acción no está disponible para este caso.");
-          }
-        }, 120);
+        // El caso puede no estar en la pestaña visible (otro filtro o estado): se carga directo.
+        var opened = caseBtn
+          ? Promise.resolve(window.scmOpenCase(caseBtn))
+          : openPanelCaseById(ticketPk, true, true);
+        opened.then(function () {
+          clickBridgeCaseAction(selector, missingMessage);
+        }).catch(function () {
+          showStandaloneFunctionFailure("No se encontró el caso autorizado para abrir esta acción.");
+        });
       }, 250);
+    }
+
+    function clickBridgeCaseAction(selector, missingMessage) {
+      window.setTimeout(function () {
+        var actionBtn = document.querySelector("#scm-app #scm-case-modal.open " + selector);
+        if (actionBtn) {
+          markStandaloneFunctionReady();
+          actionBtn.click();
+          window.setTimeout(function () {
+            if (funcionarioBridgeMode && !standaloneCaseSubmodalOpened()) {
+              showStandaloneFunctionFailure(missingMessage || "La acción no abrió el formulario esperado para este caso.");
+            }
+          }, 700);
+        } else {
+          showStandaloneFunctionFailure(missingMessage || "La acción no está disponible para este caso.");
+        }
+      }, 120);
     }
 
     function quoteActionButtonFromCard(card, selector, message) {
@@ -23050,6 +23061,11 @@
 
       if (action === "revision_correctiva") {
         openCaseButtonActionFromBridge(ticketPk, "[data-scm-open-corrective-review]", "La revisión correctiva no está disponible para este caso.");
+        return;
+      }
+
+      if (action === "revision_preventiva") {
+        openCaseButtonActionFromBridge(ticketPk, "[data-scm-open-preventive-review]", "La revisión preventiva no está disponible para este caso.");
         return;
       }
 

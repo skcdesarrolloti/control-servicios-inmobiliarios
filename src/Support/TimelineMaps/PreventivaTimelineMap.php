@@ -45,7 +45,7 @@ final class PreventivaTimelineMap
         'done_field' => 'prev_fecha_registro',
         'elapsed_from_fields' => ['cita_fecha_inicio', 'ticket_cct_created'],
         'elapsed_from_label' => 'Cita agendada',
-        'link_url' => 'https://sucasainmobiliaria.com.co/revision-preventiva/?numero={id_revision_preventiva}',
+        'link_url' => \SCM\App\SuCasaControlServiciosInmobiliarios::defaultPreventiveReviewUrl() . '{id_revision_preventiva}',
         'empty_text' => 'Sin revision preventiva',
       ],
       [
@@ -60,7 +60,7 @@ final class PreventivaTimelineMap
         'done_values' => ['Si', 'SI', 'si'],
         'elapsed_from_fields' => ['prev_fecha_registro'],
         'elapsed_from_label' => 'Revision preventiva registrada',
-        'link_url' => 'https://sucasainmobiliaria.com.co/revision-preventiva/?numero={id_revision_preventiva}',
+        'link_url' => \SCM\App\SuCasaControlServiciosInmobiliarios::defaultPreventiveReviewUrl() . '{id_revision_preventiva}',
         'empty_text' => 'Sin envio de preventiva',
       ],
       [

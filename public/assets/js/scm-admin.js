@@ -2686,6 +2686,10 @@
       });
   }
 
+  function previewPreventiveReviewUrl(id) {
+    return "revision-preventiva.php?numero=" + encodeURIComponent(String(id || ""));
+  }
+
   function isPreventivaCase(caseBtn) {
     if (!caseBtn || !caseBtn.dataset) return false;
     var values = [
@@ -3620,7 +3624,250 @@
     request("read");
   }
 
+  var DAMAGE_REVIEW_KINDS = {
+    correctiva: {
+      label: "Revisión correctiva",
+      lower: "revisión correctiva",
+      actionKey: "revision_correctiva",
+      action: "scm_revision_correctiva",
+      formSelector: "[data-corrective-review-create], [data-corrective-review-edit]",
+      editAttr: "data-corrective-edit-review",
+      deleteAttr: "data-corrective-delete-review",
+      cancelAttr: "data-corrective-cancel-edit",
+      editFormAttr: "data-corrective-review-edit",
+      versionAttr: "data-corrective-review-version",
+      draftPrefix: "revision-correctiva-draft",
+    },
+    preventiva: {
+      label: "Revisión preventiva",
+      lower: "revisión preventiva",
+      actionKey: "revision_preventiva",
+      action: "scm_revision_preventiva",
+      formSelector: "[data-preventive-review-form]",
+      editAttr: "data-preventive-edit-review",
+      deleteAttr: "data-preventive-delete-review",
+      cancelAttr: "data-preventive-cancel-edit",
+      editFormAttr: "data-preventive-review-edit",
+      versionAttr: "data-preventive-review-version",
+      draftPrefix: "revision-preventiva-draft",
+      wizard: true,
+    },
+  };
+
+  // Asistente paso a paso de la revisión preventiva (checklist, daños y cobro).
+  function bindPreventiveWizard(form, helpers) {
+    var steps = Array.from(form.querySelectorAll("[data-prev-step]"));
+    var stepButtons = Array.from(form.querySelectorAll("[data-prev-goto]"));
+    var back = form.querySelector("[data-prev-back]");
+    var next = form.querySelector("[data-prev-next]");
+    var submit = form.querySelector("[data-prev-submit]");
+    var progress = form.querySelector("[data-prev-progress]");
+    var current = 0;
+    var visited = {};
+
+    function money(value) {
+      return "$" + Math.round(Number(value) || 0).toLocaleString("es-CO");
+    }
+    function stepIndex(key) {
+      for (var i = 0; i < steps.length; i++) {
+        if (steps[i].getAttribute("data-prev-step") === key) return i;
+      }
+      return -1;
+    }
+    function scrollTop() {
+      var scroller = form.closest(".scm-case-submodal-body") || form.parentElement;
+      if (scroller && typeof scroller.scrollTo === "function") scroller.scrollTo({ top: 0, behavior: "smooth" });
+      else form.scrollIntoView({ block: "start" });
+    }
+    function show(index, focus) {
+      current = Math.max(0, Math.min(steps.length - 1, index));
+      visited[current] = true;
+      steps.forEach(function (step, i) {
+        step.hidden = i !== current;
+      });
+      stepButtons.forEach(function (button, i) {
+        if (i === current) button.setAttribute("aria-current", "step");
+        else button.removeAttribute("aria-current");
+        button.classList.toggle("is-done", !!visited[i] && i !== current && !firstInvalid(steps[i]));
+      });
+      if (back) back.hidden = current === 0;
+      if (next) next.hidden = current === steps.length - 1;
+      if (submit) submit.hidden = current !== steps.length - 1;
+      if (progress) progress.style.width = Math.round(((current + 1) / steps.length) * 100) + "%";
+      if (steps[current].getAttribute("data-prev-step") === "cobro") renderReview();
+      if (focus) {
+        scrollTop();
+        var heading = steps[current].querySelector("h3");
+        if (heading) {
+          heading.setAttribute("tabindex", "-1");
+          heading.focus({ preventScroll: true });
+        }
+      }
+    }
+    function radioGroupMissing(field) {
+      if (field.type !== "radio" || !field.required) return false;
+      return !form.querySelector('input[type="radio"][name="' + CSS.escape(field.name) + '"]:checked');
+    }
+    function firstInvalid(step) {
+      var fields = step.querySelectorAll("input, select, textarea");
+      for (var i = 0; i < fields.length; i++) {
+        var field = fields[i];
+        if (field.disabled || field.type === "hidden" || field.type === "file") continue;
+        if (field.closest("[hidden]") && field.closest("[hidden]") !== step) continue;
+        if (field.type === "radio" ? radioGroupMissing(field) : !field.checkValidity()) return field;
+      }
+      return null;
+    }
+    function reportInvalid(field) {
+      var step = field.closest("[data-prev-step]");
+      var index = steps.indexOf(step);
+      if (index !== current) show(index, false);
+      stepButtons.forEach(function (button, i) {
+        button.classList.toggle("has-error", i === index);
+      });
+      window.setTimeout(function () {
+        field.scrollIntoView({ block: "center", behavior: "smooth" });
+        if (field.type === "radio") {
+          field.focus();
+          helpers.message("Responde: " + (field.closest(".scm-prev-choice") ? field.closest(".scm-prev-choice").getAttribute("aria-label") : "la pregunta obligatoria") + ".", true);
+        } else if (typeof field.reportValidity === "function") {
+          field.reportValidity();
+        }
+      }, 60);
+    }
+    function validateStep(index) {
+      var invalid = firstInvalid(steps[index]);
+      if (invalid) {
+        reportInvalid(invalid);
+        return false;
+      }
+      stepButtons[index] && stepButtons[index].classList.remove("has-error");
+      return true;
+    }
+    form._scmPrevValidateAll = function () {
+      for (var i = 0; i < steps.length; i++) {
+        var invalid = firstInvalid(steps[i]);
+        if (invalid) {
+          reportInvalid(invalid);
+          return false;
+        }
+      }
+      return true;
+    };
+
+    function syncQuestion(question) {
+      var checked = question.querySelector("input:checked");
+      var alert = question.getAttribute("data-prev-alert") || "";
+      question.classList.toggle("is-alert", !!checked && alert !== "" && checked.value === alert);
+      question.classList.toggle("is-ok", !!checked && alert !== "" && checked.value !== alert);
+    }
+    function syncDamages() {
+      var found = form.querySelector("[data-prev-found]:checked");
+      var box = form.querySelector("[data-prev-damages]");
+      if (!box) return;
+      var active = !!found && found.value === "Si";
+      box.hidden = !active;
+      box.querySelectorAll("input, select, textarea, button").forEach(function (field) {
+        field.disabled = !active;
+      });
+      if (active) box.querySelectorAll("[data-corrective-item]").forEach(helpers.syncAreas);
+    }
+    function syncTotal() {
+      var feeNode = form.querySelector("[data-prev-fee]");
+      var transport = form.querySelector("[data-prev-transport]");
+      var total = form.querySelector("[data-prev-total]");
+      if (!feeNode || !total) return;
+      total.textContent = money(Number(feeNode.getAttribute("data-prev-fee") || 0) + Number(transport ? transport.value : 0));
+    }
+    function renderReview() {
+      var box = form.querySelector("[data-prev-review]");
+      if (!box) return;
+      var questions = Array.from(form.querySelectorAll(".scm-prev-question[data-prev-alert]"));
+      var unanswered = questions.filter(function (question) {
+        return !question.querySelector("input:checked");
+      }).length;
+      var alerts = questions.filter(function (question) {
+        return question.classList.contains("is-alert");
+      }).map(function (question) {
+        return question.querySelector("span").textContent;
+      });
+      var found = form.querySelector("[data-prev-found]:checked");
+      var damages = found && found.value === "Si" ? form.querySelectorAll("[data-corrective-item]").length : 0;
+      var html = "<strong>Resumen antes de guardar</strong><ul>" +
+        "<li>Preguntas respondidas: " + (questions.length - unanswered) + " de " + questions.length + (unanswered ? " (" + unanswered + " sin responder)" : "") + "</li>" +
+        "<li>Hallazgos que requieren atención: " + alerts.length + "</li>" +
+        "<li>Daños registrados: " + (found ? (found.value === "Si" ? damages : "No se encontraron daños") : "Falta responder") + "</li></ul>";
+      if (alerts.length) {
+        html += "<ul>" + alerts.slice(0, 8).map(function (text) {
+          return "<li>" + escHtml(text) + "</li>";
+        }).join("") + (alerts.length > 8 ? "<li>…y " + (alerts.length - 8) + " más</li>" : "") + "</ul>";
+      }
+      box.innerHTML = html;
+    }
+
+    form.addEventListener("click", function (event) {
+      var goto = event.target.closest("[data-prev-goto]");
+      if (goto) {
+        event.preventDefault();
+        var target = stepIndex(goto.getAttribute("data-prev-goto"));
+        if (target > current && !validateStep(current)) return;
+        show(target, true);
+        return;
+      }
+      if (event.target.closest("[data-prev-next]")) {
+        event.preventDefault();
+        if (validateStep(current)) show(current + 1, true);
+        return;
+      }
+      if (event.target.closest("[data-prev-back]")) {
+        event.preventDefault();
+        show(current - 1, true);
+        return;
+      }
+      var allOk = event.target.closest("[data-prev-all-ok]");
+      if (allOk) {
+        event.preventDefault();
+        var group = allOk.closest(".scm-prev-group");
+        group.querySelectorAll(".scm-prev-question[data-prev-alert]").forEach(function (question) {
+          var alert = question.getAttribute("data-prev-alert") || "";
+          if (!alert) return;
+          var good = question.querySelector('input[type="radio"]:not([value="' + alert + '"])');
+          if (good && !question.querySelector("input:checked")) {
+            good.checked = true;
+            syncQuestion(question);
+          }
+        });
+        helpers.message("Marqué como sin novedad las preguntas pendientes de esta sección. Ajusta las que tengan hallazgos.", false);
+        helpers.scheduleSave();
+      }
+    });
+    form.addEventListener("change", function (event) {
+      var question = event.target.closest(".scm-prev-question[data-prev-alert]");
+      if (question) syncQuestion(question);
+      if (event.target.matches("[data-prev-found]")) syncDamages();
+      if (event.target.matches("[data-prev-transport]")) syncTotal();
+    });
+    form._scmAfterDraftRestore = function () {
+      form.querySelectorAll(".scm-prev-question[data-prev-alert]").forEach(syncQuestion);
+      syncDamages();
+      syncTotal();
+    };
+    form.querySelectorAll(".scm-prev-question[data-prev-alert]").forEach(syncQuestion);
+    syncDamages();
+    syncTotal();
+    show(0, false);
+  }
+
   function openCorrectiveReviewEditor(modal, caseBtn) {
+    openDamageReviewEditor(modal, caseBtn, "correctiva");
+  }
+
+  function openPreventiveReviewEditor(modal, caseBtn) {
+    openDamageReviewEditor(modal, caseBtn, "preventiva");
+  }
+
+  function openDamageReviewEditor(modal, caseBtn, kind) {
+    var cfg = DAMAGE_REVIEW_KINDS[kind] || DAMAGE_REVIEW_KINDS.correctiva;
     var sub = ensureCaseSubmodal(modal);
     var root = findRootFromNode(caseBtn);
     if (!sub || !root || !caseBtn) return;
@@ -3628,8 +3875,7 @@
     var title = sub.querySelector(".scm-case-submodal-title");
     var body = sub.querySelector(".scm-case-submodal-body");
     var busy = false;
-    var sequence = 1;
-    if (title) title.textContent = "Revisión correctiva";
+    if (title) title.textContent = cfg.label;
     setCaseSubmodalMeta(sub, caseBtn);
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
@@ -3650,8 +3896,7 @@
       data = data || new FormData();
       data.set(
         "action",
-        (runtime.actions && runtime.actions.revision_correctiva) ||
-          "scm_revision_correctiva",
+        (runtime.actions && runtime.actions[cfg.actionKey]) || cfg.action,
       );
       data.set("nonce", runtime.nonce || "");
       data.set("ticket_pk", caseBtn.dataset.ticketPk || "");
@@ -3660,11 +3905,11 @@
         button.disabled = true;
       });
       if (operation === "delete") {
-        message("Eliminando revisión correctiva…", false);
+        message("Eliminando " + cfg.lower + "…", false);
       } else if (operation === "edit") {
         message("Cargando edición…", false);
       } else if (operation !== "read") {
-        message("Guardando revisión correctiva…", false);
+        message("Guardando " + cfg.lower + "…", false);
       }
       return fetch(runtime.ajaxUrl || "api.php", {
         method: "POST",
@@ -3682,9 +3927,7 @@
                 "No se pudo completar la operación.",
             );
           if (operation === "create" || operation === "update") {
-            var savedCorrectiveForm = body.querySelector(
-              "[data-corrective-review-create], [data-corrective-review-edit]",
-            );
+            var savedCorrectiveForm = body.querySelector(cfg.formSelector);
             if (
               savedCorrectiveForm &&
               typeof savedCorrectiveForm._scmCorrectiveClearDraft === "function"
@@ -3696,7 +3939,7 @@
           bind();
           if (json.data.message) {
             message(json.data.message, false);
-            scmNotify("success", json.data.message, "Revisión correctiva");
+            scmNotify("success", json.data.message, cfg.label);
           }
           if (
             operation === "create" ||
@@ -3708,9 +3951,7 @@
         })
         .catch(function (error) {
           if (operation === "create" || operation === "update") {
-            var activeCorrectiveForm = body.querySelector(
-              "[data-corrective-review-create], [data-corrective-review-edit]",
-            );
+            var activeCorrectiveForm = body.querySelector(cfg.formSelector);
             if (
               activeCorrectiveForm &&
               typeof activeCorrectiveForm._scmCorrectiveSaveDraft === "function"
@@ -3728,13 +3969,13 @@
               });
           }
           message(
-            error.message || "No se pudo guardar la revisión correctiva.",
+            error.message || "No se pudo guardar la " + cfg.lower + ".",
             true,
           );
           scmNotify(
             "error",
-            error.message || "No se pudo guardar la revisión correctiva.",
-            "Revisión correctiva",
+            error.message || "No se pudo guardar la " + cfg.lower + ".",
+            cfg.label,
           );
         })
         .finally(function () {
@@ -3752,24 +3993,24 @@
         body.removeEventListener("click", body._scmCorrectiveClickHandler);
       }
       body._scmCorrectiveClickHandler = function (event) {
-        var editBtn = event.target.closest("[data-corrective-edit-review]");
+        var editBtn = event.target.closest("[" + cfg.editAttr + "]");
         if (editBtn && body.contains(editBtn)) {
           event.preventDefault();
           var editData = new FormData();
-          editData.set("review_id", editBtn.dataset.correctiveEditReview || "");
+          editData.set("review_id", editBtn.getAttribute(cfg.editAttr) || "");
           request("edit", editData);
           return;
         }
-        var cancelEdit = event.target.closest("[data-corrective-cancel-edit]");
+        var cancelEdit = event.target.closest("[" + cfg.cancelAttr + "]");
         if (cancelEdit && body.contains(cancelEdit)) {
           event.preventDefault();
           request("read");
           return;
         }
-        var deleteBtn = event.target.closest("[data-corrective-delete-review]");
+        var deleteBtn = event.target.closest("[" + cfg.deleteAttr + "]");
         if (deleteBtn && body.contains(deleteBtn)) {
           event.preventDefault();
-          var reviewId = deleteBtn.dataset.correctiveDeleteReview || "";
+          var reviewId = deleteBtn.getAttribute(cfg.deleteAttr) || "";
           function deleteReview() {
             var deleteData = new FormData();
             deleteData.set("review_id", reviewId);
@@ -3779,7 +4020,13 @@
             window.Swal.fire({
               icon: "warning",
               title: "Eliminar revisión #" + reviewId + "?",
-              text: "Esta acción borra el registro de la revisión correctiva del caso.",
+              text:
+                "Esta acción borra el registro de la " +
+                cfg.lower +
+                " del caso" +
+                (kind === "preventiva"
+                  ? " y su cobro administrativo pendiente."
+                  : "."),
               input: "text",
               inputLabel: "Escribe ELIMINAR para confirmar",
               showCancelButton: true,
@@ -3813,11 +4060,7 @@
       };
       body.addEventListener("click", body._scmCorrectiveClickHandler);
 
-      Array.from(
-        body.querySelectorAll(
-          "[data-corrective-review-create], [data-corrective-review-edit]",
-        ),
-      ).forEach(function (form) {
+      Array.from(body.querySelectorAll(cfg.formSelector)).forEach(function (form) {
         if (form._scmCorrectiveBound) return;
         form._scmCorrectiveBound = true;
 
@@ -4088,10 +4331,10 @@
           var reviewField = form.querySelector("[name='review_id']");
           return [
             "scm",
-            "revision-correctiva-draft",
+            cfg.draftPrefix,
             window.ScmPanelDrafts.user(),
             caseBtn.dataset.ticketPk || "ticket",
-            form.hasAttribute("data-corrective-review-edit")
+            form.hasAttribute(cfg.editFormAttr)
               ? "edit"
               : "create",
             reviewField ? reviewField.value || "new" : "new",
@@ -4126,8 +4369,19 @@
         var correctiveDraftState;
         function saveCorrectiveDraft() { return correctiveDraftState ? correctiveDraftState.save() : Promise.resolve(); }
         function clearCorrectiveDraft() { window.clearTimeout(correctiveDraftTimer); return correctiveDraftState.clear(); }
+        function outsideDraftFieldElements() {
+          return Array.from(
+            form.querySelectorAll("input[name], select[name], textarea[name]"),
+          ).filter(function (field) {
+            return (
+              field.type !== "file" &&
+              field.type !== "hidden" &&
+              !field.closest("[data-corrective-item]")
+            );
+          });
+        }
         function correctiveDraftPayload() {
-          return {items:Array.from(form.querySelectorAll('[data-corrective-item]')).map(function(item){
+          return {outside:outsideDraftFieldElements().map(function(field){return {name:field.name,value:field.value||"",checked:field.type==="checkbox"||field.type==="radio"?!!field.checked:undefined};}), items:Array.from(form.querySelectorAll('[data-corrective-item]')).map(function(item){
             var input=item.querySelector('[data-corrective-photos]');
             return {fields:correctiveDraftFields(item), photos:window.ScmPanelDrafts.pack(filesOf(input)), kept:Array.from(item.querySelectorAll('[data-corrective-existing-photo] input')).map(function(field){return field.value;})};
           })};
@@ -4141,6 +4395,11 @@
           }
         }
         function restoreCorrectiveDraft(payload) {
+          var outsideEntries = Array.isArray(payload.outside) ? payload.outside : [];
+          outsideDraftFieldElements().forEach(function (field, fieldIndex) {
+            var entry = outsideEntries[fieldIndex];
+            if (entry && entry.name === field.name) setCorrectiveDraftField(field, entry);
+          });
           var list = form.querySelector("[data-corrective-review-items]");
           if (list) {
             while (
@@ -4171,9 +4430,10 @@
             },
           );
           message(
-            "Restauré el borrador de este caso, incluidas las fotos de la revisión correctiva.",
+            "Restauré el borrador de este caso, incluidas las fotos de la " + cfg.lower + ".",
             false,
           );
+          if (typeof form._scmAfterDraftRestore === "function") form._scmAfterDraftRestore();
         }
         var correctiveDraftTimer = null;
         function scheduleCorrectiveDraftSave() {
@@ -4244,14 +4504,23 @@
         form
           .querySelectorAll("[data-corrective-item]")
           .forEach(syncCorrectiveAreaFields);
+        if (cfg.wizard) bindPreventiveWizard(form, {
+          message: message,
+          syncAreas: syncCorrectiveAreaFields,
+          scheduleSave: scheduleCorrectiveDraftSave,
+        });
         correctiveDraftState=window.ScmPanelDrafts.bind(form,correctiveDraftKey(),{
-          revision:form.dataset.correctiveReviewVersion||'',snapshot:correctiveDraftPayload,restore:restoreCorrectiveDraft
+          revision:form.getAttribute(cfg.versionAttr)||'',snapshot:correctiveDraftPayload,restore:restoreCorrectiveDraft
         });
         form.addEventListener("submit", function (event) {
           event.preventDefault();
+          if (cfg.wizard && typeof form._scmPrevValidateAll === "function" && !form._scmPrevValidateAll()) {
+            saveCorrectiveDraft();
+            return;
+          }
           saveCorrectiveDraft();
           message("Comprimiendo fotos antes de guardar…", false);
-          var operation = form.hasAttribute("data-corrective-review-edit")
+          var operation = form.hasAttribute(cfg.editFormAttr)
             ? "update"
             : "create";
           compressedFormData()
@@ -5244,7 +5513,7 @@
     if (id) {
       url =
         kind === "preventiva"
-          ? "https://sucasainmobiliaria.com.co/revision-preventiva/?numero=" +
+          ? previewPreventiveReviewUrl("") +
             encodeURIComponent(id)
           : "revision-correctiva.php?numero=" + encodeURIComponent(id);
     }
@@ -9474,13 +9743,25 @@
           }
           if (isPreventivaCase(btn)) {
             var prevIdVal = (btn.dataset.idRevisionPreventiva || "").trim();
-            if (prevIdVal) {
+            if (statusBucket !== "cerrados" && canUseDashboardAction("corrective_review_manage")) {
               complementaryActionButtons.push(
-                '<a href="https://sucasainmobiliaria.com.co/revision-preventiva/?numero=' +
-                  encodeURIComponent(prevIdVal) +
-                  '" class="scm-case-work-btn" target="_blank" rel="noopener"><span class="material-symbols-outlined scm-btn-icon">verified_user</span><div class="scm-btn-text"><span class="scm-btn-label">Revisión preventiva</span><span class="scm-btn-sub">Acta #' +
+                '<button type="button" class="scm-case-work-btn" data-scm-open-preventive-review><span class="material-symbols-outlined scm-btn-icon">verified_user</span><div class="scm-btn-text"><span class="scm-btn-label">' +
+                  (prevIdVal
+                    ? "Gestionar revisi&oacute;n preventiva"
+                    : "Crear revisi&oacute;n preventiva") +
+                  '</span><span class="scm-btn-sub">' +
+                  (prevIdVal ? "Revisi&oacute;n #" + escHtml(prevIdVal) : "Checklist, da&ntilde;os y cobro") +
+                  "</span></div></button>",
+              );
+            } else if (prevIdVal) {
+              complementaryActionButtons.push(
+                '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-title="Revisi&oacute;n preventiva #' +
                   escHtml(prevIdVal) +
-                  "</span></div></a>",
+                  '" data-iframe-url="' +
+                  escHtml(previewPreventiveReviewUrl(prevIdVal)) +
+                  '"><span class="material-symbols-outlined scm-btn-icon">verified_user</span><div class="scm-btn-text"><span class="scm-btn-label">Revisi&oacute;n preventiva</span><span class="scm-btn-sub">Informe #' +
+                  escHtml(prevIdVal) +
+                  "</span></div></button>",
               );
             }
           }
@@ -10184,7 +10465,7 @@
           }
           if ((btn.dataset.idRevisionPreventiva || "").trim()) {
             headActions.innerHTML +=
-              '<button type="button" class="scm-case-side-link" data-scm-open-iframe data-iframe-title="Revisión preventiva" data-iframe-url="https://sucasainmobiliaria.com.co/revision-preventiva/?numero=' +
+              '<button type="button" class="scm-case-side-link" data-scm-open-iframe data-iframe-title="Revisión preventiva" data-iframe-url="' + escHtml(previewPreventiveReviewUrl("")) +
               encodeURIComponent(
                 (btn.dataset.idRevisionPreventiva || "").trim(),
               ) +
@@ -10483,6 +10764,14 @@
         .forEach(function (actaBtn) {
           actaBtn.addEventListener("click", function () {
             openTicketCompletionEditor(modal, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-preventive-review]")
+        .forEach(function (reviewBtn) {
+          reviewBtn.addEventListener("click", function () {
+            openPreventiveReviewEditor(modal, btn);
           });
         });
 

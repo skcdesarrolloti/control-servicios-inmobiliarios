@@ -15,7 +15,7 @@ trait RendersDashboard
   {
     $config = array_merge([
       'ticket_url'     => self::DEFAULT_TICKET_URL,
-      'preventiva_url' => self::DEFAULT_PREVENTIVA_URL,
+      'preventiva_url' => self::defaultPreventiveReviewUrl(),
       'correctiva_url' => self::defaultCorrectiveReviewUrl(),
       'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
       'acta_url'       => self::DEFAULT_ACTA_URL,
@@ -434,6 +434,7 @@ trait RendersDashboard
         'cotizaciones_mantenimiento' => self::AJAX_COTIZACIONES_MANTENIMIENTO,
         'actas_satisfaccion' => self::AJAX_TICKET_COMPLETION_LIST,
         'revision_correctiva' => self::AJAX_CORRECTIVE_REVIEW,
+        'revision_preventiva' => self::AJAX_PREVENTIVE_REVIEW,
         'delete_cotizacion' => self::AJAX_DELETE_COTIZACION,
         'approve_cotizacion' => self::AJAX_APPROVE_COTIZACION,
         'cotizacion_form_context' => self::AJAX_COTIZACION_FORM_CONTEXT,
@@ -700,6 +701,7 @@ trait RendersDashboard
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" media="all">
     <link rel="stylesheet" href="<?php echo $cssUrl; ?>" media="all">
     <link rel="stylesheet" href="<?php echo $damageCssUrl; ?>" media="all">
+    <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/preventive-review.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/preventive-review.css'))); ?>" media="all">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
@@ -5239,7 +5241,7 @@ trait RendersDashboard
         $primaryKeys,
         [
           'ticket_url' => self::DEFAULT_TICKET_URL,
-          'preventiva_url' => self::DEFAULT_PREVENTIVA_URL,
+          'preventiva_url' => self::defaultPreventiveReviewUrl(),
           'correctiva_url' => self::defaultCorrectiveReviewUrl(),
           'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
           'acta_url' => self::DEFAULT_ACTA_URL,

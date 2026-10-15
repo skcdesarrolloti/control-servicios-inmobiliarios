@@ -26,7 +26,7 @@ final class HistoryLinkMap
       'id_ticket_danos_recibo' => ['label' => 'Ver acta de revision de desocupacion', 'base' => 'https://sucasainmobiliaria.com.co/acta-de-revision-de-desocupacion/?numero='],
 
       // Revisiones
-      'id_revision_preventiva' => ['label' => 'Ver revision preventiva', 'base' => 'https://sucasainmobiliaria.com.co/revision-preventiva/?numero='],
+      'id_revision_preventiva' => ['label' => 'Ver revision preventiva', 'base' => $baseUrl . 'revision-preventiva.php?numero='],
       'id_revision_correctiva' => ['label' => 'Ver revision correctiva', 'base' => $correctiveReviewUrl],
       'id_revision_entrega' => ['label' => 'Ver revision de entrega', 'base' => 'https://sucasainmobiliaria.com.co/revision-de-entrega/?numero='],
       'id_revision_recibo' => ['label' => 'Ver revision de recibo', 'base' => 'https://sucasainmobiliaria.com.co/revision-de-recibo/?numero='],

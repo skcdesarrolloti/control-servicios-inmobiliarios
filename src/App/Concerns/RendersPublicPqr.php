@@ -673,7 +673,7 @@ trait RendersPublicPqr
       if (!empty($ticketIds)) {
         $caseCardConfig = [
           'ticket_url' => $ticketUrl !== '' ? $ticketUrl : self::DEFAULT_TICKET_URL,
-          'preventiva_url' => self::DEFAULT_PREVENTIVA_URL,
+          'preventiva_url' => self::defaultPreventiveReviewUrl(),
           'correctiva_url' => self::defaultCorrectiveReviewUrl(),
           'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
           'acta_url' => self::DEFAULT_ACTA_URL,

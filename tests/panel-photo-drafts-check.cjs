@@ -15,6 +15,7 @@ function fixture(kind,user='1',ticket='10841',record='9',revision='v1'){
  const markup=kind==='corrective'?`<form data-corrective-review-edit data-corrective-review-version="${revision}"><input name="review_id" value="${record}"><div data-corrective-review-items>${row(0)}${row(1)}</div></form>`:`<form><input name="destinatario"><input name="materiales_oferta_image"><input type="file" name="mejor_oferta[]" multiple><input type="file" name="otras_oferta[]" multiple><input data-material-support-provider><div data-quote-repeater="materiales" data-rows="[]"><div class="scm-maint-quote-rows"></div></div><div data-quote-repeater="materiales_soporte" data-rows="[]"><div class="scm-maint-quote-rows"></div></div></form>`;
  const setup=kind==='corrective'?`
  const caseBtn={dataset:{ticketPk:'${ticket}'}};
+ const cfg={draftPrefix:'revision-correctiva-draft',editFormAttr:'data-corrective-review-edit',lower:'revisión correctiva'};
  function filesOf(i){return i._scmFiles||Array.from(i.files);}
  function syncInput(i,files){const dt=new DataTransfer();files.forEach(f=>dt.items.add(f));i.files=dt.files;i._scmFiles=files;}
  function preview(i){i.dataset.previewCount=i.files.length;}

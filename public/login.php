@@ -30,7 +30,7 @@ $safeNext = static function (string $raw): string {
       return 'index.php?scm_case=' . rawurlencode((string) $query['scm_case']);
     }
     $action = trim((string) ($query['scm_bridge_action'] ?? ''));
-    $allowedActions = ['revision_correctiva', 'crear_cotizacion', 'editar_cotizacion', 'enviar_cotizacion', 'crear_orden', 'acta_satisfaccion', 'acta_cotizacion'];
+    $allowedActions = ['revision_correctiva', 'revision_preventiva', 'crear_cotizacion', 'editar_cotizacion', 'enviar_cotizacion', 'crear_orden', 'acta_satisfaccion', 'acta_cotizacion'];
     if (!in_array($action, $allowedActions, true)) {
       return '';
     }
