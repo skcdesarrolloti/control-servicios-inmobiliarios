@@ -832,7 +832,7 @@ trait HandlesAdministrativeNotifications
       $html .= '<span class="scm-admin-notif-avatar" aria-hidden="true">' . esc_html(mb_strtoupper(mb_substr($name, 0, 1, 'UTF-8'), 'UTF-8')) . '</span>';
       $html .= '<span class="scm-admin-notif-person">';
       $html .= '<strong>' . esc_html($name) . '</strong>';
-      $html .= '<small>' . esc_html($typeLabel) . ' · ID ' . esc_html((string) $id) . '</small>';
+      $html .= '<small>' . esc_html($typeLabel) . ' · ID ' . esc_html((string) $id) . ' · ' . esc_html($document !== '' ? 'Doc/NIT: ' . $document : 'Sin documento') . '</small>';
       if ($contractLabel !== '') {
         $html .= '<span class="scm-admin-notif-contract-badge ' . esc_attr($contractClass) . '">' . esc_html($contractLabel) . '</span>';
       }
