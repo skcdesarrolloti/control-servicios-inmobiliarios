@@ -3925,14 +3925,14 @@ trait RendersDashboard
         <section class="scm-gc-card scm-gc-table-card">
           <div class="scm-gc-section-head">
             <div><span class="scm-gc-kicker">Trazabilidad</span><h4>Cola de notificaciones de cartera</h4><p>Revisa los correos, WhatsApp y SMS generados desde Gestiones de cobro sin salir del m&oacute;dulo.</p></div>
-            <a class="scm-gc-btn" href="?scm_tab=gestiones_cobro&amp;scmgc_view=cola"><?php echo $this->collection_gc_icon('refresh'); ?>Actualizar cola</a>
+            <button type="submit" class="scm-gc-btn" form="scmgc-queue-filters"><?php echo $this->collection_gc_icon('refresh'); ?>Actualizar cola</button>
           </div>
           <div class="scm-gc-queue-stats">
             <?php foreach ([['Total', 'total', 'is-navy'], ['Pendientes', 'pending', 'is-warning'], ['Procesando', 'processing', 'is-indigo'], ['Enviadas', 'sent', 'is-success'], ['Fallidas', 'failed', 'is-danger']] as $metric): ?>
               <article class="<?php echo esc_attr($metric[2]); ?>"><span><?php echo esc_html($metric[0]); ?></span><strong><?php echo esc_html((string) ((int) ($queueStats[$metric[1]] ?? 0))); ?></strong></article>
             <?php endforeach; ?>
           </div>
-          <form method="get" autocomplete="off" class="scm-gc-filters is-queue">
+          <form method="get" autocomplete="off" id="scmgc-queue-filters" data-scm-collection-log-form class="scm-gc-filters is-queue">
             <input type="hidden" name="scm_tab" value="gestiones_cobro">
             <input type="hidden" name="scmgc_view" value="cola">
             <input type="hidden" name="scmgc_queue_page" value="1">
@@ -3951,7 +3951,7 @@ trait RendersDashboard
             <label class="scm-gc-field is-search"><span>Buscar</span><input id="scmgc_queue_buscar" name="scmgc_queue_buscar" type="search" value="<?php echo esc_attr((string) ($queueApplied['q'] ?? '')); ?>" placeholder="Nombre, destino, asunto, error o lote"></label>
             <div class="scm-gc-filter-actions">
               <button type="submit" class="scm-gc-btn is-navy"><?php echo $this->collection_gc_icon('search'); ?>Consultar cola</button>
-              <a class="scm-gc-btn" href="?scm_tab=gestiones_cobro&amp;scmgc_view=cola">Limpiar</a>
+              <a class="scm-gc-btn" href="?scm_tab=gestiones_cobro&amp;scmgc_view=cola&amp;scmgc_queue_page=1" data-scm-collection-log-clear>Limpiar</a>
             </div>
           </form>
           <?php if ($queueRows === []): ?>
