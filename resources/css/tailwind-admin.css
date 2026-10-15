@@ -1276,6 +1276,21 @@
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-linked[hidden] { display:none!important; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-linked strong { @apply font-semibold text-amber-900; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-linked span { @apply text-amber-800; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview { @apply mt-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview > summary { @apply cursor-pointer text-xs font-semibold text-[#1e3c76] underline-offset-2 hover:underline; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview > div { @apply mt-3 flex max-h-[360px] flex-col gap-3 overflow-y-auto pr-1; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview section { @apply flex flex-col gap-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview-item { @apply flex flex-col gap-2 rounded-lg border border-solid border-slate-200 bg-white px-3 py-2.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview-item.has-changes { @apply border-amber-300; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview-item > div { @apply flex flex-col gap-0.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview-item strong { @apply text-xs font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview-item small { @apply text-[11px] text-slate-500; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview-item ul { @apply m-0 flex list-none flex-col gap-1 p-0; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview-item li { @apply grid grid-cols-1 gap-x-2 text-[11px] sm:grid-cols-[120px_1fr_1fr]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview-item li > span { @apply font-semibold text-slate-600; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview-item del { @apply rounded bg-red-50 px-1.5 text-red-700; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview-item ins { @apply rounded bg-emerald-50 px-1.5 text-emerald-800 no-underline; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-preview-same { @apply m-0 text-[11px] text-slate-400; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-new { @apply flex flex-col gap-3 rounded-xl border border-dashed border-[#c7d2fe] bg-[#f8f9ff] p-3 sm:col-span-2; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-new[hidden] { display:none!important; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-new > strong { @apply text-xs font-semibold text-[#061d49]; }

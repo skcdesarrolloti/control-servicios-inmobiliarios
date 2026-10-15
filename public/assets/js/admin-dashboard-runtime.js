@@ -8957,6 +8957,7 @@
               input.value = input.defaultValue;
             });
             toggleCommunityNewPanel(catalogKey, false);
+            renderCommunityLinkedPreview();
             showToast(data.created ? "success" : "info", data.message || "Catálogo actualizado.");
           })
           .catch(function (err) {
@@ -8965,6 +8966,74 @@
           .finally(function () {
             button.disabled = false;
           });
+      }
+
+      var communityLinkedRecords = [];
+      var COMMUNITY_FIELD_LABELS = {
+        copropiedad: "Copropiedad",
+        nit: "NIT",
+        administrador: "Administrador",
+        contacto: "Contacto",
+        correo: "Correo",
+        direccion: "Dirección",
+        tipo_cuenta: "Tipo de cuenta",
+        numero_cuenta: "Número de cuenta",
+        banco: "Banco",
+      };
+
+      // Mirrors the server cleanup so the preview matches what will be saved.
+      function communityFormValue(name) {
+        var input = communityForm ? communityForm.elements[name] : null;
+        if (!input) {
+          return null;
+        }
+        var value = String(input.value || "").replace(/\s+/g, " ").trim();
+        if (value === COMMUNITY_NEW_OPTION) {
+          return null;
+        }
+        return name === "correo" ? value.toLowerCase() : value;
+      }
+
+      function renderCommunityLinkedPreview() {
+        var list = communityModal ? communityModal.querySelector("[data-admin-notif-community-preview-list]") : null;
+        if (!list) {
+          return;
+        }
+        var totalChanged = 0;
+        var html = communityLinkedRecords.map(function (group) {
+          var items = (group.items || []).map(function (item) {
+            var changes = Object.keys(item.fields || {}).map(function (field) {
+              var before = String(item.fields[field] || "");
+              var after = communityFormValue(field);
+              if (after === null || after === before) {
+                return "";
+              }
+              return (
+                "<li><span>" + escHtml(COMMUNITY_FIELD_LABELS[field] || field) + "</span>" +
+                "<del>" + escHtml(before || "(vacío)") + "</del>" +
+                "<ins>" + escHtml(after || "(vacío)") + "</ins></li>"
+              );
+            }).filter(Boolean);
+            if (changes.length) {
+              totalChanged += 1;
+            }
+            return (
+              '<article class="scm-an-community-preview-item' + (changes.length ? " has-changes" : "") + '">' +
+              "<div><strong>" + escHtml(item.title || "") + "</strong>" +
+              (item.subtitle ? "<small>" + escHtml(item.subtitle) + "</small>" : "") + "</div>" +
+              (changes.length
+                ? "<ul>" + changes.join("") + "</ul>"
+                : '<p class="scm-an-community-preview-same">Sin cambios: ya coincide con la copropiedad.</p>') +
+              "</article>"
+            );
+          }).join("");
+          return '<section><p class="scm-an-community-contracts-title">' + escHtml(group.label || "") + "</p>" + items + "</section>";
+        }).join("");
+        list.innerHTML = html;
+        var summary = communityModal.querySelector("[data-admin-notif-community-preview-summary]");
+        if (summary) {
+          summary.textContent = "Ver registros y cambios (" + totalChanged + " con cambios)";
+        }
       }
 
       function communityCurrentId() {
@@ -9129,6 +9198,7 @@
         var linkedEl = communityModal.querySelector("[data-admin-notif-community-linked]");
         linkedEl.hidden = true;
         linkedEl.innerHTML = "";
+        communityLinkedRecords = [];
         if (communityProperties) {
           communityProperties.hidden = !isEdit || !actionAdminNotificationsCommunityContracts;
         }
@@ -9169,11 +9239,14 @@
             var parts = Object.keys(linked).filter(function (key) { return Number(linked[key]) > 0; }).map(function (key) {
               return linked[key] + " " + key;
             });
+            communityLinkedRecords = Array.isArray(record.linked_records) ? record.linked_records : [];
             if (isEdit) {
               linkedEl.hidden = false;
               linkedEl.innerHTML = parts.length
-                ? "<strong>Registros vinculados que se actualizarán</strong><span>" + escHtml(parts.join(" · ")) + "</span>"
+                ? "<strong>Registros vinculados que se actualizarán</strong><span>" + escHtml(parts.join(" · ")) + "</span>" +
+                  '<details class="scm-an-community-preview"><summary data-admin-notif-community-preview-summary>Ver registros y cambios</summary><div data-admin-notif-community-preview-list></div></details>'
                 : "<strong>Sin registros vinculados</strong><span>Solo se actualizará la copropiedad.</span>";
+              renderCommunityLinkedPreview();
             }
             submitBtn.disabled = false;
             var first = communityForm.elements.copropiedad;
@@ -10145,6 +10218,8 @@
             event.preventDefault();
             submitCommunityForm();
           });
+          communityForm.addEventListener("input", renderCommunityLinkedPreview);
+          communityForm.addEventListener("change", renderCommunityLinkedPreview);
           communityForm.addEventListener("change", function (event) {
             var select = event.target && event.target.matches && event.target.matches('[data-admin-notif-community-select="barrios"], [data-admin-notif-community-select="bancos"]')
               ? event.target

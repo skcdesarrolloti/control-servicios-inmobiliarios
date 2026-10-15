@@ -101,6 +101,7 @@ final class CommunityRecordsService
       }
     }
     $out['linked'] = $this->linkedCounts($id);
+    $out['linked_records'] = $this->linkedRecords($id);
     return $out;
   }
 
@@ -519,6 +520,86 @@ final class CommunityRecordsService
       );
     }
     return $counts;
+  }
+
+  /** Columns used to identify each linked record in the preview. */
+  private const LINKED_IDENTITY = [
+    'jet_cct_contratos_arrendamiento' => ['contrato', 'estado', 'inmueble', 'arrendatario'],
+    'jet_cct_contrato_mandato' => ['estado', 'codigo_inmueble', 'id_inmueble', 'direccion'],
+    'jet_cct_cierres' => ['estado', 'id_inmueble', 'direccion', 'arrendatario'],
+    'jet_cct_inmuebles' => ['codigo', 'estado', 'direccion'],
+  ];
+
+  /**
+   * Linked records with the current value of every copropiedad field they
+   * mirror, so the panel can show what an edit will change.
+   *
+   * @return array<int,array{table:string,label:string,items:array<int,array{id:string,title:string,subtitle:string,fields:array<string,string>}>}>
+   */
+  public function linkedRecords(int $id): array
+  {
+    $groups = [];
+    foreach (self::LINKED_FIELDS as $tableKey => $map) {
+      $table = $this->db->table($tableKey);
+      if (!$this->schema->tableExists($table) || !$this->schema->columnExists($table, 'id_copropiedad')) {
+        continue;
+      }
+      $columns = ['_ID'];
+      foreach (array_merge(self::LINKED_IDENTITY[$tableKey] ?? [], array_values($map)) as $column) {
+        if ($this->schema->columnExists($table, $column)) {
+          $columns[] = $column;
+        }
+      }
+      $rows = $this->db->getResults(
+        'SELECT `' . implode('`, `', array_unique($columns)) . "` FROM `{$table}` WHERE TRIM(COALESCE(`id_copropiedad`, '')) = ? ORDER BY `_ID` DESC LIMIT 100",
+        [(string) $id]
+      );
+      if ($rows === []) {
+        continue;
+      }
+      $items = [];
+      foreach ($rows as $row) {
+        $fields = [];
+        foreach ($map as $source => $target) {
+          if (array_key_exists($target, $row)) {
+            $fields[$source] = trim((string) $row[$target]);
+          }
+        }
+        [$title, $subtitle] = $this->linkedRecordIdentity($tableKey, $row);
+        $items[] = ['id' => (string) (int) $row['_ID'], 'title' => $title, 'subtitle' => $subtitle, 'fields' => $fields];
+      }
+      $groups[] = ['table' => $tableKey, 'label' => ucfirst(self::LINKED_LABELS[$tableKey]), 'items' => $items];
+    }
+    return $groups;
+  }
+
+  /** @param array<string,mixed> $row @return array{0:string,1:string} */
+  private function linkedRecordIdentity(string $tableKey, array $row): array
+  {
+    $value = static function (string $key) use ($row): string {
+      $text = trim((string) ($row[$key] ?? ''));
+      return strcasecmp($text, 'No asignado') === 0 ? '' : $text;
+    };
+    $id = (string) (int) $row['_ID'];
+    $join = static fn(array $parts): string => implode(' · ', array_values(array_filter($parts, static fn(string $part): bool => $part !== '')));
+    return match ($tableKey) {
+      'jet_cct_contratos_arrendamiento' => [
+        $value('contrato') !== '' ? 'Contrato #' . $value('contrato') : 'Contrato ID ' . $id,
+        $join([$value('estado'), $value('inmueble') !== '' ? 'SIMI ' . $value('inmueble') : '', $value('arrendatario')]),
+      ],
+      'jet_cct_contrato_mandato' => [
+        'Mandato ID ' . $id,
+        $join([$value('estado'), ($value('codigo_inmueble') ?: $value('id_inmueble')) !== '' ? 'Inmueble ' . ($value('codigo_inmueble') ?: $value('id_inmueble')) : '', $value('direccion')]),
+      ],
+      'jet_cct_cierres' => [
+        'Hoja de cierre ID ' . $id,
+        $join([$value('estado'), $value('arrendatario'), $value('direccion')]),
+      ],
+      default => [
+        'Inmueble web ' . ($value('codigo') ?: '#' . $id),
+        $join([$value('estado'), $value('direccion')]),
+      ],
+    };
   }
 
   private function communityTable(): string
