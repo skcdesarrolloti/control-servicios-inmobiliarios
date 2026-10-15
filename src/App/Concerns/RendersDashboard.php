@@ -3527,7 +3527,7 @@ trait RendersDashboard
                   <small id="scm-admin-notif-email-copy-help">Hasta 20 correos adicionales separados por comas, punto y coma o saltos de línea. Los destinatarios podrán ver las direcciones en CC.</small>
                 </div>
               </div>
-              <p data-admin-notif-email-copy-test-note hidden>Las copias están desactivadas en modo prueba.</p>
+              <p data-admin-notif-email-copy-test-note hidden>Modo prueba: el correo va a tu dirección de prueba y la copia llega a los correos que elijas aquí.</p>
             </fieldset>
 
             <input type="hidden"

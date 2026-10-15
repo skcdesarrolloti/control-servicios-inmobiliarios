@@ -3224,7 +3224,7 @@ final class AdministrativeNotificationsService
           $queueRecipient['_scm_internal_cc'] = $manualEmailCopyPlan['emails'];
           $queueRecipient['_scm_email_copy_options'] = [
             'requested' => !empty($emailCopyOptions['enabled']),
-            'enabled' => !empty($emailCopyOptions['enabled']) && empty($testOptions['enabled']),
+            'enabled' => !empty($emailCopyOptions['enabled']),
             'mode' => 'creator_and_selected',
             'creator_employee_id' => $manualEmailCopyPlan['creator_employee_id'],
             'selected_employee_ids' => $manualEmailCopyPlan['selected_employee_ids'],
@@ -3306,7 +3306,7 @@ final class AdministrativeNotificationsService
   private function manualEmailCopyPlan(array $options, array $channels, bool $testMode): array
   {
     $plan = ['emails' => [], 'creator_employee_id' => '', 'selected_employee_ids' => []];
-    if (empty($options['enabled']) || $testMode || !in_array('email', $channels, true)) {
+    if (empty($options['enabled']) || !in_array('email', $channels, true)) {
       return $plan;
     }
     $additional = \SCM\Support\AdditionalEmailRecipients::parse($options['additional_emails'] ?? '');
@@ -5490,7 +5490,8 @@ final class AdministrativeNotificationsService
         $payload['attachments'] = $attachments;
       }
     }
-    if ($channel === 'email' && empty($recipient['_scm_test_mode']['enabled']) && isset($recipient['_scm_internal_cc'])) {
+    $manualCopiesInTest = !empty($recipient['_scm_test_mode']['enabled']) && !empty($recipient['_scm_email_copy_options']['enabled']);
+    if ($channel === 'email' && (empty($recipient['_scm_test_mode']['enabled']) || $manualCopiesInTest) && isset($recipient['_scm_internal_cc'])) {
       $payload['cc']=array_values(array_diff(\SCM\Support\InternalEmailCopies::emails($recipient['_scm_internal_cc']),[strtolower($destination)]));
     } elseif ($channel === 'email' && empty($recipient['_scm_test_mode']['enabled']) && $type !== 'funcionarios' && !empty($recipient['_scm_notification_meta']['collection_management'])) {
       $payload['cc']=array_values(array_diff(\SCM\Support\InternalNotificationRecipients::emailsForAction($this->db,'gestion_cobro'),[strtolower($destination)]));

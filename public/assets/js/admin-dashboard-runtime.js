@@ -6921,13 +6921,13 @@
         var emailSelected = !!panel.querySelector('[data-admin-notif-channel][value="email"]:checked');
         var testMode = !!(testModeInput && testModeInput.checked);
         emailCopiesWrap.hidden = !emailSelected;
-        emailCopyEnabledInput.disabled = !emailSelected || testMode;
-        var enabled = emailSelected && !testMode && emailCopyEnabledInput.checked;
+        emailCopyEnabledInput.disabled = !emailSelected;
+        var enabled = emailSelected && emailCopyEnabledInput.checked;
         if (emailCopyFields) emailCopyFields.hidden = !enabled;
         if (additionalEmailsInput) additionalEmailsInput.disabled = !enabled;
         if (emailCopySearch) emailCopySearch.disabled = !enabled;
         emailCopyEmployees.forEach(function (input) { input.disabled = !enabled; });
-        if (emailCopyTestNote) emailCopyTestNote.hidden = !testMode;
+        if (emailCopyTestNote) emailCopyTestNote.hidden = !(testMode && enabled);
         filterEmailCopyEmployees();
       }
 
@@ -11274,7 +11274,7 @@
           fd.set("import_payload", JSON.stringify(importedPayload || {}));
           fd.set("all_filtered", "0");
           fd.set("test_mode", testModeEnabled ? "1" : "0");
-          var emailCopiesEnabled = !!(emailCopyEnabledInput && emailCopyEnabledInput.checked && !emailCopyEnabledInput.disabled && !testModeEnabled);
+          var emailCopiesEnabled = !!(emailCopyEnabledInput && emailCopyEnabledInput.checked && !emailCopyEnabledInput.disabled);
           fd.set("email_copy_enabled", emailCopiesEnabled ? "1" : "0");
           fd.set("additional_emails", emailCopiesEnabled && additionalEmailsInput ? String(additionalEmailsInput.value || "") : "");
           if (testEmailInput) {
