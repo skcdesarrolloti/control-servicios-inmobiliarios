@@ -463,15 +463,20 @@
           if (/^<!doctype|^<html[\s>]/i.test(trimmed)) {
             var looksLikeLogin =
               response.status === 401 ||
-              response.status === 403 ||
-              /iniciar sesi[oó]n|tu sesi[oó]n termin[oó]|seguridad de la cuenta|login/i.test(trimmed);
+              /iniciar sesi[oó]n|tu sesi[oó]n termin[oó]|seguridad de la cuenta|name=["']?(?:password|pwd)["'\s>]/i.test(trimmed);
             if (looksLikeLogin && window.SCMSessionGuard && typeof window.SCMSessionGuard.expire === "function") {
               window.SCMSessionGuard.expire(
                 response.status === 401 || response.status === 403 ? "expired" : "csrf",
               );
               throw new Error("Tu sesion vencio. Inicia sesion nuevamente y repite la accion.");
             }
-            throw new Error("El servidor devolvio una pagina HTML en vez de JSON. Recarga la pagina e intenta nuevamente.");
+            if (response.status === 413) {
+              throw new Error("El archivo es demasiado grande para el servidor. Reduce su tamaño e intenta de nuevo.");
+            }
+            if (response.status === 403 || response.status === 406) {
+              throw new Error("El servidor bloqueó este envío por seguridad (código " + response.status + "). Revisa el archivo o intenta con otro.");
+            }
+            throw new Error("El servidor devolvio una pagina HTML en vez de JSON (código " + response.status + "). Recarga la pagina e intenta nuevamente.");
           }
           throw new Error("El servidor devolvio una respuesta no valida. Revisa la sesion e intenta nuevamente.");
         }
@@ -9862,12 +9867,16 @@
           }
           resetImportState(false);
         }
-        var fd = new FormData(paymentReceiptsImportForm);
-        fd.set("action", actionAdminNotificationsPaymentReceiptsImport);
-        fd.set("nonce", nonce);
-        fd.set("type", currentType().indexOf("copropiedades") === 0 ? currentType() : "copropiedades_activas");
-        recipientsEl.innerHTML =
-          '<div class="scm-admin-notif-empty"><strong>Importando comprobantes...</strong><span>Estamos cruzando los PDF por NIT de copropiedad.</span></div>';
+        var type = currentType().indexOf("copropiedades") === 0 ? currentType() : "copropiedades_activas";
+        var files = Array.prototype.slice.call(paymentReceiptsFileInput.files);
+        var setProgress = function (text) {
+          recipientsEl.innerHTML =
+            '<div class="scm-admin-notif-empty"><strong>' + escHtml(text) + '</strong><span>Estamos cruzando los PDF por NIT de copropiedad.</span></div>';
+          if (importResultEl) {
+            importResultEl.textContent = text;
+          }
+        };
+        setProgress("Importando comprobantes...");
         if (paginationEl) {
           paginationEl.innerHTML = "";
         }
@@ -9875,26 +9884,111 @@
           importReportBtn.hidden = true;
         }
         if (importResultEl) {
-          importResultEl.textContent = "Importando comprobantes PDF por NIT...";
           importResultEl.classList.remove("is-error", "is-success");
         }
         filterMessageTemplateOptions();
         selectMessageTemplate("scm_copropiedad_soportes_pago_v1");
         setLoading(true);
-        postAdminNotifications(actionAdminNotificationsPaymentReceiptsImport, fd)
-          .then(function (data) {
-            receiptsReviewState = {
-              rows: Array.isArray(data.rows) ? data.rows : [],
-              communities: Array.isArray(data.communities) ? data.communities : [],
-              type: String(data.type || currentType()),
-            };
+
+        // One request per PDF: a file the server rejects (size, hosting
+        // firewall) is reported by name and the rest still get analysed.
+        var rows = [];
+        var communities = [];
+        var failed = [];
+        var chain = Promise.resolve();
+        files.forEach(function (file, index) {
+          chain = chain.then(function () {
+            setProgress("Analizando PDF " + (index + 1) + " de " + files.length + "...");
+            var fd = new FormData();
+            fd.set("type", type);
+            fd.append("receipts[]", file, file.name);
+            return postAdminNotifications(actionAdminNotificationsPaymentReceiptsImport, fd)
+              .then(function (data) {
+                if (!communities.length && Array.isArray(data.communities)) {
+                  communities = data.communities;
+                }
+                (Array.isArray(data.rows) ? data.rows : []).forEach(function (row) {
+                  rows.push(row);
+                });
+              })
+              .catch(function (err) {
+                failed.push(file.name);
+                rows.push({
+                  archivo: file.name,
+                  sha1: "",
+                  nit: "",
+                  periodo: "",
+                  inmuebles: "",
+                  stored_name: "",
+                  url: "",
+                  recipient_id: "",
+                  candidates: [],
+                  status: "No se pudo subir",
+                  note: err.message || "El servidor rechazó este archivo.",
+                  include: false,
+                  upload_failed: true,
+                });
+              });
+          });
+        });
+
+        chain
+          .then(function () {
+            // The same PDF uploaded twice in this batch is sent only once.
+            var seen = {};
+            rows.forEach(function (row) {
+              if (!row.sha1 || row.upload_failed) {
+                return;
+              }
+              if (seen[row.sha1] && row.status !== "Duplicado") {
+                row.status = "Duplicado";
+                row.note = 'Es el mismo archivo que "' + seen[row.sha1] + '" en esta carga; no se enviará dos veces.';
+                row.include = false;
+              } else if (!seen[row.sha1]) {
+                seen[row.sha1] = row.archivo;
+              }
+            });
+            if (failed.length === files.length) {
+              throw new Error(failed.length === 1
+                ? rows[0].note
+                : "Ningún PDF se pudo subir. " + (rows[0] ? rows[0].note : ""));
+            }
+            receiptsReviewState = { rows: rows, communities: communities, type: type };
+            var counts = { found: 0, ambiguous: 0, unmatched: 0, duplicates: 0, already: 0 };
+            rows.forEach(function (row) {
+              if (row.upload_failed) {
+                return;
+              }
+              if (row.status === "Duplicado") {
+                counts.duplicates++;
+              } else if (row.status === "Encontrado") {
+                counts.found++;
+              } else if (row.status === "Coincidencia múltiple") {
+                counts.ambiguous++;
+              } else {
+                counts.unmatched++;
+              }
+              if (row.already_sent) {
+                counts.already++;
+              }
+            });
+            var parts = [];
+            [["found", "con copropiedad"], ["ambiguous", "con varias opciones"], ["unmatched", "sin coincidencia"], ["duplicates", "repetidos"], ["already", "ya enviados antes"]].forEach(function (pair) {
+              if (counts[pair[0]] > 0) {
+                parts.push(counts[pair[0]] + " " + pair[1]);
+              }
+            });
+            if (failed.length) {
+              parts.push(failed.length + " no se pudieron subir");
+            }
+            var message = files.length + " PDF analizados: " + (parts.length ? parts.join(", ") : "sin datos") + ". Revisa y confirma.";
             recipientsEl.innerHTML =
               '<div class="scm-admin-notif-empty"><strong>Revisa los soportes</strong><span>Confirma en la ventana de revisión para marcar las copropiedades.</span></div>';
             if (importResultEl) {
-              importResultEl.textContent = data.message || "PDF analizados.";
-              importResultEl.classList.add("is-success");
+              importResultEl.textContent = message;
+              importResultEl.classList.add(failed.length ? "is-error" : "is-success");
             }
-            openReceiptsReview(data.message || "");
+            openReceiptsReview(message);
           })
           .catch(function (err) {
             importedPayload = {};
@@ -9966,7 +10060,7 @@
           return;
         }
         tbody.innerHTML = receiptsReviewState.rows.map(function (row, index) {
-          var isDuplicate = row.status === "Duplicado";
+          var isDuplicate = row.status === "Duplicado" || !!row.upload_failed;
           return (
             '<tr data-receipt-index="' + index + '" class="' + (row.include ? "" : "is-excluded") + '">' +
             '<td><input type="checkbox" data-receipt-field="include" aria-label="Incluir ' + escAttr(row.archivo) + '"' + (row.include ? " checked" : "") + (isDuplicate ? " disabled" : "") + "></td>" +
