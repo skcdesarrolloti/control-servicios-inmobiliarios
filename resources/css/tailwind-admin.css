@@ -1165,6 +1165,10 @@
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-section-head h4 { @apply m-0 text-lg font-bold leading-snug sm:text-xl; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-section-head p { @apply text-[13px] leading-relaxed text-slate-500; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-section-actions { @apply flex flex-wrap items-center gap-2 lg:justify-end; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-selection-count { @apply inline-flex min-h-[40px] items-center whitespace-nowrap rounded-xl bg-slate-100 px-3.5 text-xs font-semibold tabular-nums text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-selection-count.is-active { @apply bg-[#fff1c2] text-[#574500]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-btn.is-active { @apply border-red-200 bg-red-50 text-red-700 hover:bg-red-100; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-btn:disabled { @apply cursor-wait opacity-60; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-launch-group { @apply inline-flex overflow-hidden rounded-xl border border-solid border-slate-200 bg-white shadow-sm; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-channel-launch { @apply m-0 inline-flex min-h-[40px] items-center justify-center gap-1.5 whitespace-nowrap rounded-none border-0 bg-white px-3.5 py-2 text-xs font-semibold text-[#061d49] shadow-none outline-0 transition-colors; transform:none; cursor:pointer; font-family:inherit; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-launch-group .scm-admin-notif-channel-launch + .scm-admin-notif-channel-launch { @apply border-0 border-l border-solid border-slate-200; }

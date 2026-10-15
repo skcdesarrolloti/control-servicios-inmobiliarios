@@ -201,6 +201,8 @@
       actions.admin_notifications_queue_delete || "";
     var actionAdminNotificationsQueueMessage =
       actions.admin_notifications_queue_message || "";
+    var actionAdminNotificationsFilteredIds =
+      actions.admin_notifications_filtered_ids || "";
     var actionAdminNotificationsCollection =
       actions.admin_notifications_collection || "";
     var actionAdminNotificationsCollectionOptions =
@@ -6724,8 +6726,9 @@
       var listTitle = panel.querySelector("[data-admin-notif-list-title]");
       var selectedCountEl = panel.querySelector("[data-admin-notif-selected-count]");
       var selectVisibleBtn = panel.querySelector("[data-admin-notif-select-visible]");
-      var allFiltered = panel.querySelector("[data-admin-notif-all-filtered]");
-      var allFilteredWrap = allFiltered ? allFiltered.closest(".scm-admin-notif-all") : null;
+      var selectFilteredBtn = panel.querySelector("[data-admin-notif-select-filtered]");
+      var selectFilteredLabel = panel.querySelector("[data-admin-notif-select-filtered-label]");
+      var selectionCountEl = panel.querySelector("[data-admin-notif-selection-count]");
       var subjectWrap = panel.querySelector("[data-admin-notif-subject-wrap]");
       var subjectInput = panel.querySelector("[data-admin-notif-subject]");
       var messageFieldWrap = panel.querySelector("[data-admin-notif-message-field]");
@@ -6782,6 +6785,7 @@
       panel.dataset.scmAdminNotificationsInit = "1";
 
       var selected = new Set();
+      var filteredSelectionActive = false;
       var currentPage = 1;
       var recipientsRequestId = 0;
       var queuePage = 1;
@@ -6913,11 +6917,6 @@
           testRealContactsEl.innerHTML = "";
           return;
         }
-        if (allFiltered && allFiltered.checked) {
-          testRealContactsEl.innerHTML =
-            '<strong>Contactos reales</strong><span>Estas usando todos los resultados filtrados. Desactiva esa opcion para ver la lista individual de seleccionados antes de enviar.</span>';
-          return;
-        }
         if (selected.size === 0) {
           testRealContactsEl.innerHTML =
             '<strong>Contactos reales</strong><span>No hay destinatarios seleccionados todavia.</span>';
@@ -7013,19 +7012,11 @@
         if (!selectedListEl) {
           return;
         }
-        var usingAllFiltered = !!(allFiltered && allFiltered.checked);
         if (selectedModalSummary) {
-          selectedModalSummary.textContent = usingAllFiltered
-            ? "Estas usando todos los resultados filtrados. Desactiva esa opcion para quitar destinatarios puntuales."
-            : "Revisa los destinatarios marcados y quita los que no deban recibir la notificacion.";
+          selectedModalSummary.textContent = "Revisa los destinatarios marcados y quita los que no deban recibir la notificacion.";
         }
         if (selectedClearBtn) {
-          selectedClearBtn.hidden = usingAllFiltered || selected.size === 0;
-        }
-        if (usingAllFiltered) {
-          selectedListEl.innerHTML =
-            '<div class="scm-admin-notif-empty"><strong>Todos los filtrados activos</strong><span>No hay una lista individual porque el envio tomara todos los resultados del filtro actual.</span></div>';
-          return;
+          selectedClearBtn.hidden = selected.size === 0;
         }
         if (selected.size === 0) {
           selectedListEl.innerHTML =
@@ -7090,9 +7081,6 @@
             input.checked = false;
           }
         });
-        if (allFiltered) {
-          allFiltered.checked = false;
-        }
         syncContext();
         renderSelectedModal();
       }
@@ -7462,10 +7450,6 @@
         if (channelGroup) {
           channelGroup.hidden = isChannelMode;
         }
-        if (allFilteredWrap) {
-          allFilteredWrap.hidden = composerSingleRecipient;
-          allFilteredWrap.classList.toggle("is-hidden", composerSingleRecipient);
-        }
         if (composerKicker) {
           composerKicker.textContent = selectedTemplateIsPaymentSupport()
             ? "Comprobantes copropiedades"
@@ -7576,9 +7560,6 @@
           }
           input.checked = shouldCheck;
         });
-        if (allFiltered) {
-          allFiltered.checked = false;
-        }
         if (changed) {
           markComposerDirty();
         }
@@ -7597,9 +7578,6 @@
           }
           input.checked = true;
         });
-        if (allFiltered) {
-          allFiltered.checked = false;
-        }
         if (changed) {
           markComposerDirty();
         }
@@ -8065,9 +8043,6 @@
         });
         selected.clear();
         selected.add(value);
-        if (allFiltered) {
-          allFiltered.checked = false;
-        }
         syncCollectionContracts([]);
         updateVisibleChecks();
         syncContext();
@@ -8152,16 +8127,27 @@
           sendImportPayload.value = JSON.stringify(importedPayload || {});
         }
         if (selectedCountEl) {
-          selectedCountEl.textContent =
-            allFiltered && allFiltered.checked
-              ? String(totalEl ? totalEl.textContent || "todos" : "todos")
-              : String(selected.size);
+          selectedCountEl.textContent = String(selected.size);
+        }
+        if (selected.size === 0) {
+          filteredSelectionActive = false;
+        }
+        if (selectionCountEl) {
+          selectionCountEl.textContent = selected.size + (selected.size === 1 ? " seleccionado" : " seleccionados");
+          selectionCountEl.classList.toggle("is-active", selected.size > 0);
+        }
+        if (selectFilteredBtn) {
+          selectFilteredBtn.classList.toggle("is-active", filteredSelectionActive);
+          selectFilteredBtn.setAttribute("aria-pressed", filteredSelectionActive ? "true" : "false");
+        }
+        if (selectFilteredLabel) {
+          selectFilteredLabel.textContent = filteredSelectionActive ? "Deseleccionar todos" : "Seleccionar todos los filtrados";
         }
         if (collectionSelectedCountEl) {
           collectionSelectedCountEl.textContent = String(selected.size);
         }
         if (openSelectedBtn) {
-          openSelectedBtn.disabled = selected.size === 0 && !(allFiltered && allFiltered.checked);
+          openSelectedBtn.disabled = selected.size === 0;
         }
         if (selectedModal && !selectedModal.hidden) {
           renderSelectedModal();
@@ -9145,9 +9131,6 @@
             Object.keys(importedPayload).forEach(function (id) {
               selected.add(String(id));
             });
-            if (allFiltered) {
-              allFiltered.checked = false;
-            }
             recipientsEl.innerHTML = data.html || "";
             cacheVisibleRecipientDetails();
             if (importReportBtn) {
@@ -9257,9 +9240,6 @@
             Object.keys(importedPayload).forEach(function (id) {
               selected.add(String(id));
             });
-            if (allFiltered) {
-              allFiltered.checked = false;
-            }
             recipientsEl.innerHTML = data.html || "";
             cacheVisibleRecipientDetails();
             if (importReportBtn) {
@@ -9372,9 +9352,6 @@
         if (selectedClearBtn) {
           selectedClearBtn.addEventListener("click", function () {
             selected.clear();
-            if (allFiltered) {
-              allFiltered.checked = false;
-            }
             updateVisibleChecks();
             syncContext();
             renderSelectedModal();
@@ -9399,10 +9376,6 @@
         searchForm.addEventListener("submit", function (event) {
           event.preventDefault();
           resetImportState(false);
-          selected.clear();
-          if (allFiltered) {
-            allFiltered.checked = false;
-          }
           syncContext();
           loadRecipients(1);
         });
@@ -9426,10 +9399,6 @@
           if (contractNumberInput) {
             contractNumberInput.value = "";
           }
-          selected.clear();
-          if (allFiltered) {
-            allFiltered.checked = false;
-          }
           syncContext();
           loadRecipients(1);
         });
@@ -9437,9 +9406,6 @@
         typeSelect.addEventListener("change", function () {
           resetImportState(true);
           selected.clear();
-          if (allFiltered) {
-            allFiltered.checked = false;
-          }
           syncContext();
           loadRecipients(1);
         });
@@ -9447,10 +9413,6 @@
         if (contractStatusSelect) {
           contractStatusSelect.addEventListener("change", function () {
             resetImportState(false);
-            selected.clear();
-            if (allFiltered) {
-              allFiltered.checked = false;
-            }
             syncContext();
             loadRecipients(1);
           });
@@ -9472,9 +9434,6 @@
             }
             typeSelect.value = nextType;
             selected.clear();
-            if (allFiltered) {
-              allFiltered.checked = false;
-            }
             syncContext();
             loadRecipients(1);
           });
@@ -9564,9 +9523,6 @@
           } else {
             selected.delete(value);
           }
-          if (allFiltered && selected.size > 0) {
-            allFiltered.checked = false;
-          }
           syncContext();
           renderTestModeRealContacts();
         });
@@ -9590,10 +9546,81 @@
                 selected.delete(value);
               }
             });
-            if (allFiltered && selected.size > 0) {
-              allFiltered.checked = false;
-            }
             syncContext();
+          });
+        }
+
+        if (selectFilteredBtn) {
+          selectFilteredBtn.addEventListener("click", function () {
+            if (filteredSelectionActive) {
+              selected.clear();
+              filteredSelectionActive = false;
+              updateVisibleChecks();
+              syncContext();
+              renderTestModeRealContacts();
+              return;
+            }
+            if (!actionAdminNotificationsFilteredIds) {
+              return;
+            }
+            var fd = new FormData();
+            fd.set("action", actionAdminNotificationsFilteredIds);
+            fd.set("nonce", nonce);
+            fd.set("type", currentType());
+            fd.set("q", currentQuery());
+            fd.set("nombre", currentNameFilter());
+            fd.set("correo", currentEmailFilter());
+            fd.set("celular", currentPhoneFilter());
+            fd.set("documento", currentDocumentFilter());
+            fd.set("contract_status", currentContractStatus());
+            fd.set("inmueble_simi", currentInmuebleSimi());
+            fd.set("contract_number", currentContractNumber());
+            selectFilteredBtn.disabled = true;
+            fetchWithTimeout(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+              .then(function (response) {
+                return responseJson(response);
+              })
+              .then(function (json) {
+                if (!json || !json.success) {
+                  throw new Error((json && json.data && json.data.message) || "No se pudieron seleccionar los filtrados.");
+                }
+                var data = json.data || {};
+                var rows = Array.isArray(data.rows) ? data.rows : [];
+                rows.forEach(function (row) {
+                  var id = String(row.id || "").trim();
+                  if (!id) {
+                    return;
+                  }
+                  if (!selectedDetails.has(id)) {
+                    selectedDetails.set(id, {
+                      id: id,
+                      name: String(row.name || "Destinatario " + id),
+                      type: String(row.type || ""),
+                      document: String(row.document || ""),
+                      email: String(row.email || ""),
+                      phone: String(row.phone || ""),
+                      contract: "",
+                    });
+                  }
+                  selected.add(id);
+                });
+                filteredSelectionActive = selected.size > 0;
+                updateVisibleChecks();
+                syncContext();
+                renderTestModeRealContacts();
+                var total = Number(data.total || 0);
+                if (total > rows.length) {
+                  showToast("warning", "Se seleccionaron " + rows.length + " de " + total + " resultados (límite por envío).");
+                } else {
+                  showToast("success", rows.length + (rows.length === 1 ? " destinatario seleccionado." : " destinatarios seleccionados."));
+                }
+              })
+              .catch(function (err) {
+                showToast("error", err.message || "No se pudieron seleccionar los filtrados.");
+              })
+              .finally(function () {
+                selectFilteredBtn.disabled = false;
+              });
           });
         }
 
@@ -9613,9 +9640,6 @@
           importClearBtn.addEventListener("click", function () {
             resetImportState(true);
             selected.clear();
-            if (allFiltered) {
-              allFiltered.checked = false;
-            }
             syncContext();
             loadRecipients(1);
           });
@@ -9634,9 +9658,6 @@
             event.preventDefault();
             typeSelect.value = btn.getAttribute("data-admin-notif-import-suggest-type") || typeSelect.value;
             selected.clear();
-            if (allFiltered) {
-              allFiltered.checked = false;
-            }
             syncContext();
             importRecipientsFromFile();
           });
@@ -9855,16 +9876,6 @@
             updatePreview();
           });
         }
-        if (allFiltered) {
-          allFiltered.addEventListener("change", function () {
-            if (allFiltered.checked) {
-              selected.clear();
-              updateVisibleChecks();
-            }
-            markComposerDirty();
-            syncContext();
-          });
-        }
         if (testModeInput) {
           testModeInput.addEventListener("change", function () {
             markComposerDirty();
@@ -10042,9 +10053,8 @@
         sendForm.addEventListener("submit", function (event) {
           event.preventDefault();
           syncContext();
-          var useAll = !!(allFiltered && allFiltered.checked);
-          if (!useAll && selected.size === 0) {
-            showToast("error", "Selecciona destinatarios o activa todos los filtrados.");
+          if (selected.size === 0) {
+            showToast("error", "Selecciona destinatarios o usa Seleccionar todos los filtrados.");
             return;
           }
           var fd = new FormData(sendForm);
@@ -10073,7 +10083,7 @@
           fd.set("inmueble_simi", currentInmuebleSimi());
           fd.set("contract_number", currentContractNumber());
           fd.set("import_payload", JSON.stringify(importedPayload || {}));
-          fd.set("all_filtered", useAll ? "1" : "0");
+          fd.set("all_filtered", "0");
           fd.set("test_mode", testModeEnabled ? "1" : "0");
           var emailCopiesEnabled = !!(emailCopyEnabledInput && emailCopyEnabledInput.checked && !emailCopyEnabledInput.disabled && !testModeEnabled);
           fd.set("email_copy_enabled", emailCopiesEnabled ? "1" : "0");
@@ -10084,11 +10094,9 @@
           if (testPhoneInput) {
             fd.set("test_phone", String(testPhoneInput.value || ""));
           }
-          if (!useAll) {
-            selected.forEach(function (id) {
-              fd.append("ids[]", id);
-            });
-          }
+          selected.forEach(function (id) {
+            fd.append("ids[]", id);
+          });
           setLoading(true);
           if (resultEl) {
             resultEl.textContent = "Encolando notificaciones...";

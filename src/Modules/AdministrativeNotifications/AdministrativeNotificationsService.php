@@ -1839,6 +1839,69 @@ final class AdministrativeNotificationsService
   /** @return int[] */
   public function idsForFilter(string $type, string $query, int $limit = 5000, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = '', array $fieldFilters = []): array
   {
+    $parts = $this->filterQueryParts($type, $query, $contractStatus, $inmuebleSimi, $contractNumber, $fieldFilters);
+    if ($parts === null) {
+      return [];
+    }
+    [, $table, $where, $args] = $parts;
+    $rows = $this->db->getResults("SELECT `_ID` FROM `{$table}` WHERE {$where} ORDER BY `_ID` DESC LIMIT ?", array_merge($args, [max(1, $limit)]));
+    return array_values(array_map(static fn(array $row): int => (int) ($row['_ID'] ?? 0), $rows));
+  }
+
+  /**
+   * Light contact data for every recipient that matches the filter, used to
+   * select all filtered recipients in the panel without loading each page.
+   *
+   * @param array<string,string> $fieldFilters
+   * @return array{rows:array<int,array{id:string,name:string,type:string,document:string,email:string,phone:string}>,total:int,limit:int}
+   */
+  public function recipientSummariesForFilter(string $type, string $query, int $limit = 5000, string $contractStatus = '', string $inmuebleSimi = '', string $contractNumber = '', array $fieldFilters = []): array
+  {
+    $parts = $this->filterQueryParts($type, $query, $contractStatus, $inmuebleSimi, $contractNumber, $fieldFilters);
+    if ($parts === null) {
+      return ['rows' => [], 'total' => 0, 'limit' => $limit];
+    }
+    [$config, $table, $where, $args] = $parts;
+    $columns = $this->resolveColumns($config);
+    $select = [
+      '`_ID`',
+      $columns['name'] !== '' ? "`{$columns['name']}` AS nombre" : "CAST(`_ID` AS CHAR) AS nombre",
+      $columns['email'] !== '' ? "`{$columns['email']}` AS correo" : "'' AS correo",
+      $columns['phone'] !== '' ? "`{$columns['phone']}` AS celular" : "'' AS celular",
+      $columns['document'] !== '' ? "`{$columns['document']}` AS documento" : "'' AS documento",
+      $columns['indicator'] !== '' ? "`{$columns['indicator']}` AS indicativo" : "'' AS indicativo",
+    ];
+    $total = (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` WHERE {$where}", $args);
+    $rows = $this->db->getResults(
+      'SELECT ' . implode(', ', $select) . " FROM `{$table}` WHERE {$where} ORDER BY `_ID` DESC LIMIT ?",
+      array_merge($args, [max(1, $limit)])
+    );
+    $out = [];
+    foreach ($rows as $row) {
+      $id = (int) ($row['_ID'] ?? 0);
+      if ($id <= 0) {
+        continue;
+      }
+      $rawPhone = trim((string) ($row['celular'] ?? ''));
+      $phone = $this->normalizePhone($rawPhone, (string) ($row['indicativo'] ?? ''), true);
+      $out[] = [
+        'id' => (string) $id,
+        'name' => trim((string) ($row['nombre'] ?? '')) ?: 'Destinatario ' . $id,
+        'type' => (string) $config['label'],
+        'document' => trim((string) ($row['documento'] ?? '')),
+        'email' => trim((string) ($row['correo'] ?? '')),
+        'phone' => $phone !== '' ? $phone : $rawPhone,
+      ];
+    }
+    return ['rows' => $out, 'total' => $total, 'limit' => $limit];
+  }
+
+  /**
+   * @param array<string,string> $fieldFilters
+   * @return array{0:array<string,mixed>,1:string,2:string,3:array<int,mixed>}|null
+   */
+  private function filterQueryParts(string $type, string $query, string $contractStatus, string $inmuebleSimi, string $contractNumber, array $fieldFilters): ?array
+  {
     $config = $this->typeConfig($type);
     $contractStatus = $this->effectiveContractStatus($config, $contractStatus);
     $inmuebleSimi = trim($inmuebleSimi);
@@ -1846,7 +1909,7 @@ final class AdministrativeNotificationsService
     $fieldFilters = $this->normalizeFieldFilters($fieldFilters);
     $table = (string) $config['table'];
     if (!$this->schema->tableExists($table)) {
-      return [];
+      return null;
     }
     $where = $this->baseWhere($config);
     $args = [];
@@ -1864,8 +1927,7 @@ final class AdministrativeNotificationsService
     }
     $this->applyFieldTextFilters($where, $args, $table, $config, $fieldFilters);
     $this->applyContractFilters($where, $args, $type, $config, $contractStatus, $inmuebleSimi, $contractNumber);
-    $rows = $this->db->getResults("SELECT `_ID` FROM `{$table}` WHERE {$where} ORDER BY `_ID` DESC LIMIT ?", array_merge($args, [max(1, $limit)]));
-    return array_values(array_map(static fn(array $row): int => (int) ($row['_ID'] ?? 0), $rows));
+    return [$config, $table, $where, $args];
   }
 
   /**

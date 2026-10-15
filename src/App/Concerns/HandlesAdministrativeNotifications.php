@@ -58,6 +58,27 @@ trait HandlesAdministrativeNotifications
     }
   }
 
+  public function ajax_handler_admin_notifications_filtered_ids(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para usar Notificaciones.');
+    }
+
+    $type = $this->sanitize_admin_notification_type((string) ($_POST['type'] ?? 'propietarios'));
+    $query = trim(sanitize_text_field(wp_unslash((string) ($_POST['q'] ?? ''))));
+    $fieldFilters = $this->admin_notification_field_filters($_POST);
+    $contractStatus = $this->sanitize_admin_notification_contract_status((string) ($_POST['contract_status'] ?? ''));
+    $inmuebleSimi = trim(sanitize_text_field(wp_unslash((string) ($_POST['inmueble_simi'] ?? ''))));
+    $contractNumber = trim(sanitize_text_field(wp_unslash((string) ($_POST['contract_number'] ?? ''))));
+
+    try {
+      $this->jsonOk($this->get_admin_notifications_service()->recipientSummariesForFilter($type, $query, 5000, $contractStatus, $inmuebleSimi, $contractNumber, $fieldFilters));
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
   public function ajax_handler_admin_notifications_stats(): void
   {
     $this->verifyCsrf();

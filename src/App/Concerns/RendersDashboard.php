@@ -496,6 +496,7 @@ trait RendersDashboard
         'admin_notifications_queue' => self::AJAX_ADMIN_NOTIFICATIONS_QUEUE,
         'admin_notifications_queue_delete' => self::AJAX_ADMIN_NOTIFICATIONS_QUEUE_DELETE,
         'admin_notifications_queue_message' => self::AJAX_ADMIN_NOTIFICATIONS_QUEUE_MESSAGE,
+        'admin_notifications_filtered_ids' => self::AJAX_ADMIN_NOTIFICATIONS_FILTERED_IDS,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_options' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
@@ -3146,10 +3147,12 @@ trait RendersDashboard
             <div>
               <span class="scm-an-kicker">Lista de contactos</span>
               <h4 data-admin-notif-list-title>Propietarios</h4>
-              <p>Selecciona registros visibles o marca el env&iacute;o a todos los resultados filtrados.</p>
+              <p>Selecciona registros visibles o todos los filtrados; la selecci&oacute;n se conserva al buscar o cambiar de p&aacute;gina.</p>
             </div>
             <div class="scm-admin-notif-section-actions">
+              <span class="scm-an-selection-count" data-admin-notif-selection-count aria-live="polite">0 seleccionados</span>
               <button type="button" class="scm-an-btn" data-admin-notif-select-visible><?php echo $icon('select_check_box'); ?>Seleccionar visibles</button>
+              <button type="button" class="scm-an-btn" data-admin-notif-select-filtered><?php echo $icon('select_all'); ?><span data-admin-notif-select-filtered-label>Seleccionar todos los filtrados</span></button>
               <span class="scm-an-launch-group" role="group" aria-label="Enviar notificaci&oacute;n a los seleccionados">
                 <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--email" data-admin-notif-open-channel="email"><?php echo $icon('mail'); ?>Email</button>
                 <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--sms" data-admin-notif-open-channel="sms"><?php echo $icon('sms'); ?>SMS</button>
@@ -3309,11 +3312,6 @@ trait RendersDashboard
                 <span class="scm-admin-notif-channel-copy"><strong>WhatsApp</strong><small>Plantilla oficial Meta</small></span>
               </label>
             </div>
-
-            <label class="scm-admin-notif-all">
-              <input type="checkbox" name="all_filtered" value="1" data-admin-notif-all-filtered>
-              <span>Usar todos los resultados filtrados al encolar</span>
-            </label>
 
             <div class="scm-admin-notif-test-mode" data-admin-notif-test-mode-wrap>
               <label class="scm-admin-notif-test-toggle">
