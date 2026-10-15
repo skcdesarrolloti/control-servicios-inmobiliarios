@@ -9056,6 +9056,12 @@
           ? "Los cambios también se copian al contrato de arrendamiento, contrato de mandato y hoja de cierre vinculados."
           : "Completa los datos de la copropiedad.";
         communityModal.querySelector("[data-admin-notif-community-submit-label]").textContent = isEdit ? "Guardar cambios" : "Crear copropiedad";
+        communityForm.querySelectorAll("[data-admin-notif-community-edit-only]").forEach(function (field) {
+          field.hidden = !isEdit;
+          field.querySelectorAll("input, select").forEach(function (input) {
+            input.disabled = !isEdit;
+          });
+        });
         var linkedEl = communityModal.querySelector("[data-admin-notif-community-linked]");
         linkedEl.hidden = true;
         linkedEl.innerHTML = "";

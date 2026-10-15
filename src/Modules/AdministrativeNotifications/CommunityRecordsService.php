@@ -120,6 +120,8 @@ final class CommunityRecordsService
         $linked = $this->propagate($id, $data, $now);
         $created = false;
       } else {
+        // The creation form does not ask for id_inmueble.
+        $data['id_inmueble'] = '';
         $employeeId = trim(Auth::employeeId());
         if ($employeeId === '') {
           throw new \DomainException('No se pudo identificar al funcionario que crea la copropiedad.');
