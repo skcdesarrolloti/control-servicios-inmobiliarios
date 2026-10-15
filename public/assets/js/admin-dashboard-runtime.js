@@ -8978,7 +8978,7 @@
       }
 
       function confirmCommunityReassign(otherName) {
-        var text = "Este contrato está vinculado a " + otherName + ". Se reasignará a esta copropiedad junto con su contrato de mandato y hoja de cierre.";
+        var text = "Este contrato está vinculado a " + otherName + ". El contrato de arrendamiento se reasignará a esta copropiedad.";
         if (window.Swal && typeof window.Swal.fire === "function") {
           return window.Swal.fire({
             icon: "warning",

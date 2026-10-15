@@ -189,72 +189,30 @@ final class CommunityRecordsService
   }
 
   /**
-   * Links a lease contract (and its mandate contract and closing sheet) to the
-   * copropiedad and copies the copropiedad data into them.
+   * Links a lease contract to the copropiedad and copies the copropiedad
+   * data into it. Mandate contracts and closing sheets are not touched.
    *
-   * @return array{linked:array<string,int>,message:string}
+   * @return array{message:string}
    */
   public function linkContract(int $id, int $contractId): array
   {
     $community = $this->find($id);
     $contractTable = $this->contractTable();
     $contract = $this->db->getRow(
-      "SELECT `_ID`, `contrato`, `inmueble`, `id_inmueble`, `id_contrato_mandato`, `id_cierre` FROM `{$contractTable}` WHERE `_ID` = ? LIMIT 1",
+      "SELECT `_ID`, `contrato` FROM `{$contractTable}` WHERE `_ID` = ? LIMIT 1",
       [$contractId]
     );
     if (!is_array($contract)) {
       throw new \DomainException('No se encontró el contrato de arrendamiento.');
     }
 
-    $data = array_intersect_key($community, array_flip(['copropiedad', 'nit', 'administrador', 'contacto', 'correo', 'direccion', 'tipo_cuenta', 'numero_cuenta', 'banco']));
-    $mandateIds = array_filter([(int) ($contract['id_contrato_mandato'] ?? 0)]);
-    $propertyId = trim((string) ($contract['id_inmueble'] ?? ''));
-    $mandateTable = $this->db->table('jet_cct_contrato_mandato');
-    if ($mandateIds === [] && $propertyId !== '' && $this->schema->tableExists($mandateTable)) {
-      $mandateIds = array_map('intval', $this->db->getCol(
-        "SELECT `_ID` FROM `{$mandateTable}` WHERE TRIM(COALESCE(`id_inmueble`, '')) = ?",
-        [$propertyId]
-      ));
-    }
-    $closingTable = $this->db->table('jet_cct_cierres');
-    $closingIds = array_filter([(int) ($contract['id_cierre'] ?? 0)]);
-    if ($this->schema->tableExists($closingTable) && $this->schema->columnExists($closingTable, 'id_contrato_arrendamiento')) {
-      $closingIds = array_merge($closingIds, array_map('intval', $this->db->getCol(
-        "SELECT `_ID` FROM `{$closingTable}` WHERE TRIM(COALESCE(`id_contrato_arrendamiento`, '')) = ?",
-        [(string) $contractId]
-      )));
-    }
+    $data = array_intersect_key($community, array_flip(['copropiedad', 'nit', 'administrador', 'contacto', 'correo']));
+    $this->linkRows('jet_cct_contratos_arrendamiento', [$contractId], $id, $data, date('Y-m-d H:i:s'));
 
-    $now = date('Y-m-d H:i:s');
-    $pdo = $this->db->pdo();
-    $pdo->beginTransaction();
-    try {
-      $linked = [
-        'jet_cct_contratos_arrendamiento' => $this->linkRows('jet_cct_contratos_arrendamiento', [$contractId], $id, $data, $now),
-        'jet_cct_contrato_mandato' => $this->linkRows('jet_cct_contrato_mandato', $mandateIds, $id, $data, $now),
-        'jet_cct_cierres' => $this->linkRows('jet_cct_cierres', array_values(array_unique($closingIds)), $id, $data, $now),
-      ];
-      $pdo->commit();
-    } catch (\Throwable $error) {
-      if ($pdo->inTransaction()) {
-        $pdo->rollBack();
-      }
-      throw $error;
-    }
-
-    $parts = [];
-    foreach ($linked as $tableKey => $count) {
-      if ($count > 0) {
-        $parts[] = $count . ' ' . self::LINKED_LABELS[$tableKey];
-      }
-    }
     $label = trim((string) ($contract['contrato'] ?? '')) !== '' && strcasecmp(trim((string) $contract['contrato']), 'No asignado') !== 0
       ? 'Contrato #' . trim((string) $contract['contrato'])
       : 'Contrato ID ' . $contractId;
-    return [
-      'linked' => $linked,
-      'message' => $label . ' vinculado a ' . $community['copropiedad'] . ($parts !== [] ? ' (' . implode(', ', $parts) . ').' : '.'),
-    ];
+    return ['message' => $label . ' vinculado a ' . $community['copropiedad'] . '.'];
   }
 
   /** @param array<int,int> $ids @param array<string,string> $data */

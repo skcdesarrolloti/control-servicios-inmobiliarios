@@ -3306,7 +3306,7 @@ trait RendersDashboard
             <section class="scm-an-community-group scm-an-community-properties" data-admin-notif-community-properties hidden>
               <div class="scm-an-community-properties-head">
                 <strong>Inmuebles vinculados</strong>
-                <span>Anexa inmuebles buscando el n&uacute;mero de contrato o el c&oacute;digo de inmueble SIMI. Se vincula el contrato de arrendamiento, su contrato de mandato y su hoja de cierre.</span>
+                <span>Anexa inmuebles buscando el n&uacute;mero de contrato o el c&oacute;digo de inmueble SIMI. Se vincula solo el contrato de arrendamiento.</span>
               </div>
               <div class="scm-an-community-search">
                 <input type="search" class="scm-input" placeholder="Contrato (ej. 853) o inmueble SIMI (ej. 10668)" aria-label="Buscar contrato o inmueble SIMI" data-admin-notif-community-search>
