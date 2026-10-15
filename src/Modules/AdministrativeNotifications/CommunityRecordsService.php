@@ -201,6 +201,139 @@ final class CommunityRecordsService
    *
    * @return array{message:string}
    */
+  /**
+   * Adds a bank to jet_cct_bancos unless an equivalent name already exists
+   * (case, accents and spacing are ignored).
+   *
+   * @param array<string,string> $input
+   * @return array{value:string,created:bool,options:array<int,string>,message:string}
+   */
+  public function addBank(array $input): array
+  {
+    $name = $this->cleanText((string) ($input['banco'] ?? ''));
+    $country = $this->cleanText((string) ($input['pais'] ?? '')) ?: 'Colombia';
+    if ($name === '' || mb_strlen($name, 'UTF-8') > 160) {
+      throw new \DomainException('Escribe el nombre del banco (máximo 160 caracteres).');
+    }
+    $result = $this->addCatalogEntry('jet_cct_bancos', 'banco', $name, [
+      'banco' => $name,
+      'pais' => $country,
+    ]);
+    return $result + ['options' => $this->catalog('jet_cct_bancos', 'banco')];
+  }
+
+  /**
+   * Adds a barrio with the same data the JetForm "Agregar barrio" asks for,
+   * unless an equivalent barrio already exists in the same city.
+   *
+   * @param array<string,string> $input
+   * @return array{value:string,created:bool,options:array<int,string>,message:string}
+   */
+  public function addNeighborhood(array $input): array
+  {
+    $name = $this->cleanText((string) ($input['barrio'] ?? ''));
+    $city = $this->cleanText((string) ($input['ciudad'] ?? '')) ?: 'Cartagena';
+    $state = $this->cleanText((string) ($input['departamento'] ?? '')) ?: 'Bolívar';
+    $country = $this->cleanText((string) ($input['pais'] ?? '')) ?: 'Colombia';
+    $lat = str_replace(',', '.', trim((string) ($input['latitud'] ?? '')));
+    $lng = str_replace(',', '.', trim((string) ($input['longitud'] ?? '')));
+    $postal = trim((string) ($input['codigo_postal'] ?? ''));
+    if ($name === '' || mb_strlen($name, 'UTF-8') > 160) {
+      throw new \DomainException('Escribe el nombre del barrio (máximo 160 caracteres).');
+    }
+    if (!is_numeric($lat) || (float) $lat < -90 || (float) $lat > 90) {
+      throw new \DomainException('La latitud debe ser un número entre -90 y 90 (ej. 10.3910).');
+    }
+    if (!is_numeric($lng) || (float) $lng < -180 || (float) $lng > 180) {
+      throw new \DomainException('La longitud debe ser un número entre -180 y 180 (ej. -75.4794).');
+    }
+    if (preg_match('/^\d{5,6}$/', $postal) !== 1) {
+      throw new \DomainException('El código postal debe tener 5 o 6 dígitos.');
+    }
+    foreach (['ciudad' => $city, 'departamento' => $state, 'país' => $country] as $label => $value) {
+      if (mb_strlen($value, 'UTF-8') > 80) {
+        throw new \DomainException('El campo ' . $label . ' supera los 80 caracteres.');
+      }
+    }
+    $result = $this->addCatalogEntry('jet_cct_barrios', 'barrio', $name, [
+      'barrio' => $name,
+      'ciudad' => $city,
+      'departamento' => $state,
+      'pais' => $country,
+      'latitud' => $lat,
+      'longitud' => $lng,
+      'codigo_postal' => $postal,
+    ], $city);
+    return $result + ['options' => $this->catalog('jet_cct_barrios', 'barrio')];
+  }
+
+  /**
+   * @param array<string,string> $row
+   * @return array{value:string,created:bool,message:string}
+   */
+  private function addCatalogEntry(string $tableKey, string $column, string $name, array $row, string $city = ''): array
+  {
+    $table = $this->db->table($tableKey);
+    if (!$this->schema->tableExists($table)) {
+      throw new \RuntimeException('El catálogo ' . $tableKey . ' no está disponible.');
+    }
+    $employeeId = trim(Auth::employeeId());
+    if ($employeeId === '') {
+      throw new \DomainException('No se pudo identificar al funcionario que agrega el registro.');
+    }
+    $label = $column === 'barrio' ? 'barrio' : 'banco';
+    $key = $this->catalogKey($name);
+    // Serialize catalog writes so two people cannot create the same entry at once.
+    $lock = 'scm:catalog:' . sha1($table);
+    if ((int) $this->db->getVar('SELECT GET_LOCK(?, 5)', [$lock]) !== 1) {
+      throw new \DomainException('El catálogo está ocupado. Intenta nuevamente.');
+    }
+    try {
+      $hasCity = $city !== '' && $this->schema->columnExists($table, 'ciudad');
+      $rows = $this->db->getResults(
+        "SELECT `_ID`, `{$column}` AS nombre, `cct_status`" . ($hasCity ? ', `ciudad`' : '') . " FROM `{$table}` WHERE TRIM(COALESCE(`{$column}`, '')) <> ''"
+      );
+      foreach ($rows as $existing) {
+        if ($this->catalogKey((string) $existing['nombre']) !== $key) {
+          continue;
+        }
+        $existingCity = $hasCity ? $this->catalogKey((string) ($existing['ciudad'] ?? '')) : '';
+        if ($hasCity && $existingCity !== '' && $existingCity !== $this->catalogKey($city)) {
+          continue;
+        }
+        if (!in_array(strtolower(trim((string) ($existing['cct_status'] ?? ''))), ['', 'publish'], true)) {
+          throw new \DomainException('Ese ' . $label . ' ya existe pero no está activo en el catálogo. Solicita su revisión.');
+        }
+        $value = trim((string) $existing['nombre']);
+        return ['value' => $value, 'created' => false, 'message' => 'El ' . $label . ' "' . $value . '" ya existía; se seleccionó.'];
+      }
+      $now = date('Y-m-d H:i:s');
+      if (!$this->db->insert($table, $row + [
+        'cct_status' => 'publish',
+        'cct_author_id' => $employeeId,
+        'cct_created' => $now,
+        'cct_modified' => $now,
+      ])) {
+        throw new \RuntimeException('No se pudo agregar el ' . $label . '.');
+      }
+      return ['value' => $name, 'created' => true, 'message' => ucfirst($label) . ' "' . $name . '" agregado.'];
+    } finally {
+      $this->db->getVar('SELECT RELEASE_LOCK(?)', [$lock]);
+    }
+  }
+
+  /** Comparison key: lowercase, no accents, single spaces. */
+  private function catalogKey(string $value): string
+  {
+    $value = mb_strtolower($this->cleanText($value), 'UTF-8');
+    return strtr($value, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n', '.' => '', ',' => '']);
+  }
+
+  private function cleanText(string $value): string
+  {
+    return trim(preg_replace('/\s+/u', ' ', $value) ?? '');
+  }
+
   /** @return array<int,array<string,string>> */
   public function linkedWebProperties(int $id): array
   {

@@ -501,6 +501,7 @@ trait RendersDashboard
         'admin_notifications_community_save' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_SAVE,
         'admin_notifications_community_contracts' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_CONTRACTS,
         'admin_notifications_community_link' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_LINK,
+        'admin_notifications_community_catalog_add' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_CATALOG_ADD,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_options' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
@@ -3287,6 +3288,22 @@ trait RendersDashboard
               <div class="scm-field is-wide"><label for="scm-an-community-copropiedad">Copropiedad *</label><input id="scm-an-community-copropiedad" name="copropiedad" type="text" class="scm-input" maxlength="255" required></div>
               <div class="scm-field"><label for="scm-an-community-nit">NIT *</label><input id="scm-an-community-nit" name="nit" type="text" class="scm-input" inputmode="numeric" pattern="\d{5,15}" maxlength="15" placeholder="Solo números, sin dígito de verificación" required data-admin-notif-community-nit><small class="scm-an-field-hint">Ej.: 900901454 (sin puntos ni -DV)</small></div>
               <div class="scm-field"><label for="scm-an-community-barrio">Barrio *</label><select id="scm-an-community-barrio" name="barrio" class="scm-select" required data-admin-notif-community-select="barrios"></select></div>
+              <div class="scm-an-community-new" data-admin-notif-community-new-panel="barrios" hidden>
+                <strong>Agregar barrio nuevo</strong>
+                <div class="scm-an-community-new-grid">
+                  <div class="scm-field is-wide"><label>Nombre del barrio *</label><input type="text" class="scm-input" maxlength="160" data-catalog-field="barrio"></div>
+                  <div class="scm-field"><label>Ciudad</label><input type="text" class="scm-input" maxlength="80" value="Cartagena" data-catalog-field="ciudad"></div>
+                  <div class="scm-field"><label>Departamento</label><input type="text" class="scm-input" maxlength="80" value="Bol&iacute;var" data-catalog-field="departamento"></div>
+                  <div class="scm-field"><label>Latitud *</label><input type="text" class="scm-input" inputmode="decimal" placeholder="10.3910" data-catalog-field="latitud"></div>
+                  <div class="scm-field"><label>Longitud *</label><input type="text" class="scm-input" inputmode="decimal" placeholder="-75.4794" data-catalog-field="longitud"></div>
+                  <div class="scm-field"><label>C&oacute;digo postal *</label><input type="text" class="scm-input" inputmode="numeric" maxlength="6" placeholder="130001" data-catalog-field="codigo_postal"></div>
+                  <input type="hidden" value="Colombia" data-catalog-field="pais">
+                </div>
+                <div class="scm-an-community-new-actions">
+                  <button type="button" class="scm-an-btn" data-admin-notif-community-new-cancel="barrios">Cancelar</button>
+                  <button type="button" class="scm-an-btn is-navy" data-admin-notif-community-new-save="barrios">Agregar barrio</button>
+                </div>
+              </div>
               <div class="scm-field"><label for="scm-an-community-direccion">Direcci&oacute;n</label><input id="scm-an-community-direccion" name="direccion" type="text" class="scm-input" maxlength="255"></div>
             </fieldset>
             <fieldset class="scm-an-community-group">
@@ -3301,6 +3318,17 @@ trait RendersDashboard
               <div class="scm-field"><label for="scm-an-community-tipo-cuenta">Tipo de cuenta</label><select id="scm-an-community-tipo-cuenta" name="tipo_cuenta" class="scm-select" data-admin-notif-community-select="tipos_cuenta"></select></div>
               <div class="scm-field"><label for="scm-an-community-numero-cuenta">N&uacute;mero de cuenta</label><input id="scm-an-community-numero-cuenta" name="numero_cuenta" type="text" class="scm-input" maxlength="255"></div>
               <div class="scm-field is-wide"><label for="scm-an-community-banco">Banco</label><select id="scm-an-community-banco" name="banco" class="scm-select" data-admin-notif-community-select="bancos"></select></div>
+              <div class="scm-an-community-new" data-admin-notif-community-new-panel="bancos" hidden>
+                <strong>Agregar banco nuevo</strong>
+                <div class="scm-an-community-new-grid">
+                  <div class="scm-field is-wide"><label>Nombre del banco *</label><input type="text" class="scm-input" maxlength="160" data-catalog-field="banco"></div>
+                  <input type="hidden" value="Colombia" data-catalog-field="pais">
+                </div>
+                <div class="scm-an-community-new-actions">
+                  <button type="button" class="scm-an-btn" data-admin-notif-community-new-cancel="bancos">Cancelar</button>
+                  <button type="button" class="scm-an-btn is-navy" data-admin-notif-community-new-save="bancos">Agregar banco</button>
+                </div>
+              </div>
             </fieldset>
             <section class="scm-an-community-group scm-an-community-properties" data-admin-notif-community-properties hidden>
               <div class="scm-an-community-properties-head">

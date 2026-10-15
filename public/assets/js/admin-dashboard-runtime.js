@@ -211,6 +211,8 @@
       actions.admin_notifications_community_contracts || "";
     var actionAdminNotificationsCommunityLink =
       actions.admin_notifications_community_link || "";
+    var actionAdminNotificationsCommunityCatalogAdd =
+      actions.admin_notifications_community_catalog_add || "";
     var actionAdminNotificationsCollection =
       actions.admin_notifications_collection || "";
     var actionAdminNotificationsCollectionOptions =
@@ -8890,11 +8892,79 @@
         if (value && !options.some(function (option) { return option.value === value; })) {
           options.unshift({ value: value, label: value + " (actual)" });
         }
-        var isIndicative = select.getAttribute("data-admin-notif-community-select") === "indicativos";
+        var catalogKey = select.getAttribute("data-admin-notif-community-select");
+        var isIndicative = catalogKey === "indicativos";
+        var canAdd = (catalogKey === "barrios" || catalogKey === "bancos") && !!actionAdminNotificationsCommunityCatalogAdd;
         select.innerHTML = (isIndicative ? "" : '<option value="">Selecciona…</option>') + options.map(function (option) {
           return '<option value="' + escAttr(option.value) + '">' + escHtml(option.label) + "</option>";
-        }).join("");
+        }).join("") + (canAdd ? '<option value="' + COMMUNITY_NEW_OPTION + '">Otro (agregar nuevo)…</option>' : "");
         select.value = value || (isIndicative ? "+57" : "");
+        select.setAttribute("data-previous-value", select.value);
+      }
+
+      var COMMUNITY_NEW_OPTION = "__scm_new__";
+
+      function communityNewPanel(catalogKey) {
+        return communityForm ? communityForm.querySelector('[data-admin-notif-community-new-panel="' + catalogKey + '"]') : null;
+      }
+
+      function communityCatalogSelect(catalogKey) {
+        return communityForm ? communityForm.querySelector('[data-admin-notif-community-select="' + catalogKey + '"]') : null;
+      }
+
+      function toggleCommunityNewPanel(catalogKey, show) {
+        var panelEl = communityNewPanel(catalogKey);
+        if (!panelEl) {
+          return;
+        }
+        panelEl.hidden = !show;
+        if (show) {
+          var first = panelEl.querySelector('input[type="text"]');
+          if (first) {
+            first.focus();
+          }
+        }
+      }
+
+      function cancelCommunityNew(catalogKey) {
+        var select = communityCatalogSelect(catalogKey);
+        if (select) {
+          select.value = select.getAttribute("data-previous-value") || "";
+        }
+        toggleCommunityNewPanel(catalogKey, false);
+      }
+
+      function saveCommunityNew(catalogKey, button) {
+        var panelEl = communityNewPanel(catalogKey);
+        var select = communityCatalogSelect(catalogKey);
+        if (!panelEl || !select || !actionAdminNotificationsCommunityCatalogAdd) {
+          return;
+        }
+        var fields = { catalog: catalogKey };
+        panelEl.querySelectorAll("[data-catalog-field]").forEach(function (input) {
+          fields[input.getAttribute("data-catalog-field")] = String(input.value || "").trim();
+        });
+        var nameKey = catalogKey === "barrios" ? "barrio" : "banco";
+        if (!fields[nameKey]) {
+          showToast("warning", "Escribe el nombre del " + nameKey + ".");
+          return;
+        }
+        button.disabled = true;
+        postAdminNotifications(actionAdminNotificationsCommunityCatalogAdd, fields)
+          .then(function (data) {
+            fillCommunitySelect(select, Array.isArray(data.options) ? data.options : [], String(data.value || ""));
+            panelEl.querySelectorAll('input[type="text"]').forEach(function (input) {
+              input.value = input.defaultValue;
+            });
+            toggleCommunityNewPanel(catalogKey, false);
+            showToast(data.created ? "success" : "info", data.message || "Catálogo actualizado.");
+          })
+          .catch(function (err) {
+            showToast("error", err.message || "No se pudo agregar al catálogo.");
+          })
+          .finally(function () {
+            button.disabled = false;
+          });
       }
 
       function communityCurrentId() {
@@ -9070,6 +9140,8 @@
         if (communityProperties) {
           communityProperties.hidden = !isEdit || !actionAdminNotificationsCommunityContracts;
         }
+        toggleCommunityNewPanel("barrios", false);
+        toggleCommunityNewPanel("bancos", false);
         if (communityResultsEl) {
           communityResultsEl.innerHTML = "";
         }
@@ -9133,6 +9205,19 @@
         if (missing.length) {
           missing[0].focus();
           showToast("warning", "Completa los campos obligatorios marcados con *.");
+          return;
+        }
+        var pendingNew = ["barrios", "bancos"].filter(function (catalogKey) {
+          var select = communityCatalogSelect(catalogKey);
+          return select && select.value === COMMUNITY_NEW_OPTION;
+        });
+        if (pendingNew.length) {
+          showToast("warning", "Termina de agregar el " + (pendingNew[0] === "barrios" ? "barrio" : "banco") + " nuevo o elige uno de la lista.");
+          var pendingPanel = communityNewPanel(pendingNew[0]);
+          var pendingInput = pendingPanel ? pendingPanel.querySelector('input[type="text"]') : null;
+          if (pendingInput) {
+            pendingInput.focus();
+          }
           return;
         }
         var nitInput = communityForm.elements.nit;
@@ -10068,9 +10153,47 @@
             event.preventDefault();
             submitCommunityForm();
           });
+          communityForm.addEventListener("change", function (event) {
+            var select = event.target && event.target.matches && event.target.matches('[data-admin-notif-community-select="barrios"], [data-admin-notif-community-select="bancos"]')
+              ? event.target
+              : null;
+            if (!select) {
+              return;
+            }
+            var catalogKey = select.getAttribute("data-admin-notif-community-select");
+            if (select.value === COMMUNITY_NEW_OPTION) {
+              toggleCommunityNewPanel(catalogKey, true);
+              return;
+            }
+            select.setAttribute("data-previous-value", select.value);
+            toggleCommunityNewPanel(catalogKey, false);
+          });
+          communityForm.addEventListener("keydown", function (event) {
+            var panelEl = event.key === "Enter" && event.target && event.target.closest
+              ? event.target.closest("[data-admin-notif-community-new-panel]")
+              : null;
+            if (!panelEl) {
+              return;
+            }
+            event.preventDefault();
+            var catalogKey = panelEl.getAttribute("data-admin-notif-community-new-panel");
+            saveCommunityNew(catalogKey, panelEl.querySelector("[data-admin-notif-community-new-save]"));
+          });
           communityForm.addEventListener("click", function (event) {
             var target = event.target && event.target.closest ? event.target : null;
             if (!target) {
+              return;
+            }
+            var newSave = target.closest("[data-admin-notif-community-new-save]");
+            if (newSave && !newSave.disabled) {
+              event.preventDefault();
+              saveCommunityNew(newSave.getAttribute("data-admin-notif-community-new-save"), newSave);
+              return;
+            }
+            var newCancel = target.closest("[data-admin-notif-community-new-cancel]");
+            if (newCancel) {
+              event.preventDefault();
+              cancelCommunityNew(newCancel.getAttribute("data-admin-notif-community-new-cancel"));
               return;
             }
             var linkBtn = target.closest("[data-admin-notif-community-link]");

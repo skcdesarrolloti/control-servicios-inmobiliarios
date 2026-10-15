@@ -1276,6 +1276,12 @@
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-linked[hidden] { display:none!important; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-linked strong { @apply font-semibold text-amber-900; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-linked span { @apply text-amber-800; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-new { @apply flex flex-col gap-3 rounded-xl border border-dashed border-[#c7d2fe] bg-[#f8f9ff] p-3 sm:col-span-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-new[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-new > strong { @apply text-xs font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-new-grid { @apply grid grid-cols-1 gap-3 sm:grid-cols-3; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-new-grid .scm-field.is-wide { @apply sm:col-span-3; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-new-actions { @apply flex justify-end gap-2; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-properties[hidden] { display:none!important; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-properties > * { @apply sm:col-span-2; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-properties-head { @apply flex flex-col gap-0.5; }

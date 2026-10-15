@@ -148,6 +148,35 @@ trait HandlesAdministrativeNotifications
     }
   }
 
+  public function ajax_handler_admin_notifications_community_catalog_add(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para gestionar copropiedades.');
+    }
+
+    $catalog = sanitize_key((string) ($_POST['catalog'] ?? ''));
+    $input = [];
+    foreach (['banco', 'barrio', 'ciudad', 'departamento', 'pais', 'latitud', 'longitud', 'codigo_postal'] as $field) {
+      $input[$field] = sanitize_text_field(wp_unslash((string) ($_POST[$field] ?? '')));
+    }
+    try {
+      $service = new CommunityRecordsService($this->db);
+      if ($catalog === 'bancos') {
+        $this->jsonOk($service->addBank($input));
+      } elseif ($catalog === 'barrios') {
+        $this->jsonOk($service->addNeighborhood($input));
+      } else {
+        $this->jsonFail('Catálogo no válido.');
+      }
+    } catch (\DomainException $e) {
+      $this->jsonFail($e->getMessage());
+    } catch (\Throwable $e) {
+      error_log('[copropiedades] ' . $e->getMessage());
+      $this->jsonFail('No se pudo agregar al catálogo. Inténtalo nuevamente.');
+    }
+  }
+
   public function ajax_handler_admin_notifications_community_link(): void
   {
     $this->verifyCsrf();
