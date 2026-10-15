@@ -1400,6 +1400,7 @@
   #scm-app #scm-panel-admin-notificaciones .scm-an-queue-error { @apply flex flex-col gap-0.5 rounded-xl border border-solid border-red-200 bg-red-50 p-4 text-xs; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-queue-error strong { @apply font-semibold text-red-800; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-queue-error span { @apply leading-relaxed text-red-700; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-error small { @apply mt-1 text-[11px] text-red-500/80; overflow-wrap:anywhere; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-queue-mail { @apply overflow-hidden rounded-xl border border-solid border-slate-200 bg-white shadow-subtle; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-queue-mail-bar { @apply flex items-center gap-1.5 border-0 border-b border-solid border-slate-200 bg-slate-50 px-4 py-2.5; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-queue-mail-bar i { @apply h-2.5 w-2.5 rounded-full bg-slate-300; }

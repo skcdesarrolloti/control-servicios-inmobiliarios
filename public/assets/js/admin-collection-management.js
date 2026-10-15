@@ -1289,7 +1289,7 @@
           + '<div class="scm-gc-chat-body"><div class="scm-gc-bubble">' + (text || '<em>Sin contenido</em>') + '<time>' + escapeHtml(formatTimelineDate(data.sent_at || data.created_at || "")) + '</time></div></div></div>';
       }
       body.innerHTML = '<dl class="scm-gc-facts">' + facts.map(function (fact) { return '<div><dt>' + fact[0] + '</dt><dd>' + fact[1] + '</dd></div>'; }).join("") + '</dl>'
-        + (data.last_error ? '<div class="scm-gc-callout is-danger">' + iconHtml("error") + '<div><strong>Último error</strong><span>' + escapeHtml(data.last_error) + '</span></div></div>' : "")
+        + (data.last_error ? '<div class="scm-gc-callout is-danger">' + iconHtml("error") + '<div><strong>Último error</strong>' + (data.last_error_hint ? '<span>' + escapeHtml(data.last_error_hint) + '</span><span>Detalle técnico: ' + escapeHtml(data.last_error) + '</span>' : '<span>' + escapeHtml(data.last_error) + '</span>') + '</div></div>' : "")
         + preview;
       var frame = body.querySelector("[data-scm-collection-queue-message-frame]");
       if (frame) frame.srcdoc = String(data.message_html || "");

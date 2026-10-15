@@ -1018,6 +1018,7 @@ final class AdministrativeNotificationsService
       $row['batch_id'] = trim((string) ($admin['batch_id'] ?? ''));
       $row['employee_name'] = trim((string) ($admin['nombre_funcionario'] ?? ''));
       $row['test_mode'] = is_array($admin['test_mode'] ?? null) && $admin['test_mode'] !== [];
+      $row['last_error_hint'] = self::queueErrorHint((string) ($row['last_error'] ?? ''));
       unset($row['meta_json']);
     }
     unset($row);
@@ -1077,6 +1078,7 @@ final class AdministrativeNotificationsService
       'message_text' => $messageText,
       'message_html' => $channel === 'email' ? $messageHtml : '',
       'last_error' => (string) ($row['last_error'] ?? ''),
+      'last_error_hint' => self::queueErrorHint((string) ($row['last_error'] ?? '')),
     ];
   }
 
@@ -1085,6 +1087,54 @@ final class AdministrativeNotificationsService
     $meta = json_decode($metaJson, true);
     $admin = is_array($meta['admin_notifications'] ?? null) ? $meta['admin_notifications'] : [];
     return trim((string) ($admin['nombre_funcionario'] ?? ''));
+  }
+
+  /**
+   * Plain-language explanation for provider errors stored in the queue
+   * (Meta WhatsApp codes, SMTP and local validation messages).
+   */
+  public static function queueErrorHint(string $error): string
+  {
+    $error = trim($error);
+    if ($error === '') {
+      return '';
+    }
+    $metaCodes = [
+      '132005' => 'El mensaje es demasiado largo para WhatsApp: la plantilla completa no puede pasar de 1024 caracteres. Reduce el detalle o el mensaje y vuelve a encolar.',
+      '132012' => 'El formato de los datos no coincide con la plantilla aprobada en Meta (por ejemplo, se envió texto donde la plantilla espera un documento o un número). Revisa la plantilla en Meta.',
+      '132000' => 'La cantidad de datos enviados no coincide con los espacios ({{1}}, {{2}}…) de la plantilla aprobada en Meta.',
+      '132001' => 'La plantilla no existe en Meta o no está aprobada en ese idioma.',
+      '132018' => 'Alguno de los datos del mensaje tiene un formato que WhatsApp no acepta (saltos de línea, tabulaciones o demasiados espacios seguidos).',
+      '131009' => 'Uno de los datos enviados no es válido para WhatsApp (por ejemplo, un número o enlace mal formado).',
+      '131026' => 'El número no tiene WhatsApp o no puede recibir mensajes.',
+      '131047' => 'Pasaron más de 24 horas desde la última respuesta del cliente; solo se pueden enviar plantillas aprobadas.',
+      '131049' => 'Meta limitó el envío para no saturar al destinatario. Intenta más tarde.',
+      '131053' => 'WhatsApp no pudo descargar o procesar el archivo adjunto (PDF o imagen).',
+      '131056' => 'Se enviaron demasiados mensajes seguidos al mismo número. Intenta más tarde.',
+      '130429' => 'Se superó el límite de envíos por segundo de WhatsApp. Se puede reintentar.',
+    ];
+    if (preg_match('/\(#(\d+)\)/', $error, $match) === 1 && isset($metaCodes[$match[1]])) {
+      return $metaCodes[$match[1]];
+    }
+    $lower = mb_strtolower($error, 'UTF-8');
+    $patterns = [
+      'disabled by user from hpanel' => 'La cuenta de correo que envía está deshabilitada en el hosting (hPanel). Hay que reactivarla para que salgan los correos.',
+      'message file too big' => 'El correo pesa demasiado (adjuntos muy grandes). Reduce o comprime los PDF.',
+      'temporary lookup failure' => 'No se pudo encontrar el servidor de correo del destinatario. Verifica que el correo esté bien escrito.',
+      'recipients failed' => 'El servidor rechazó la dirección de correo del destinatario. Verifica que esté bien escrita.',
+      'categoría no disponible' => 'El destinatario no acepta esta categoría de mensajes según sus preferencias de notificación.',
+      'categoria no disponible' => 'El destinatario no acepta esta categoría de mensajes según sus preferencias de notificación.',
+      'numero de teléfono invalido' => 'El celular del destinatario no es válido. Corrígelo en su ficha.',
+      'numero de telefono invalido' => 'El celular del destinatario no es válido. Corrígelo en su ficha.',
+      'proveedor no registrado' => 'El canal de envío configurado no está disponible en el sistema de notificaciones.',
+      'supera 160 caracteres' => 'El SMS supera 160 caracteres. Acorta el mensaje.',
+    ];
+    foreach ($patterns as $needle => $hint) {
+      if (str_contains($lower, $needle)) {
+        return $hint;
+      }
+    }
+    return '';
   }
 
   private function normalizeQueueDate(string $value): string
@@ -2121,15 +2171,19 @@ final class AdministrativeNotificationsService
         'pagos_pdf' => (string) ($meta['pagos_pdf'] ?? ''),
         'pagos_pdf_detalle' => (string) ($meta['pagos_pdf_detalle'] ?? ''),
       ]];
-      $receiptMeta['contratos_sistema'] = implode(', ', $this->paymentReceiptContractLabels($contracts));
+      $receiptMeta['contratos_sistema'] = implode(' | ', $this->paymentReceiptContractLabels($contracts));
       $receiptMeta['detalle_excel'] = $this->paymentReceiptDetail($receiptMeta, $contracts);
 
+      $allContracts = [];
+      foreach (array_merge($contractsByRecipient[$recipientId] ?? [], $contracts) as $contractRow) {
+        $allContracts[(string) ($contractRow['_ID'] ?? count($allContracts))] = $contractRow;
+      }
+      $contractsByRecipient[$recipientId] = array_values($allContracts);
       if (!isset($payload[$recipientId])) {
         $payload[$recipientId] = $receiptMeta;
       } else {
-        $payload[$recipientId] = $this->mergePaymentReceiptMeta($payload[$recipientId], $receiptMeta, $contracts);
+        $payload[$recipientId] = $this->mergePaymentReceiptMeta($payload[$recipientId], $receiptMeta, $contractsByRecipient[$recipientId]);
       }
-      $contractsByRecipient[$recipientId] = array_merge($contractsByRecipient[$recipientId] ?? [], $contracts);
       $filesMatched++;
 
       $recipient['_scm_import_meta'] = $receiptMeta;
@@ -3430,19 +3484,15 @@ final class AdministrativeNotificationsService
     }
     $properties = trim((string) ($meta['inmueble_simi_excel'] ?? ''));
     if ($properties !== '') {
-      $lines[] = 'Inmueble(s) indicados en el nombre del PDF: ' . $properties;
+      $lines[] = 'Inmueble(s): ' . $properties;
     }
-    $pdfTextRead = trim((string) ($meta['pdf_texto_leido'] ?? ''));
     $pdfPayments = (int) ($meta['pagos_pdf'] ?? 0);
-    if ($pdfTextRead !== '') {
-      $lines[] = 'PDF leido: ' . $pdfTextRead;
-    }
     if ($pdfPayments > 0) {
-      $lines[] = 'Pagos detectados en PDF: ' . $pdfPayments;
+      $lines[] = 'Pagos en los soportes: ' . $pdfPayments;
     }
     $pdfDetail = trim((string) ($meta['pagos_pdf_detalle'] ?? ''));
     if ($pdfDetail !== '') {
-      $lines[] = 'Detalle leído del PDF:';
+      $lines[] = 'Detalle de los pagos:';
       foreach (preg_split('/\R+/', $pdfDetail) ?: [] as $line) {
         $line = trim((string) $line);
         if ($line !== '') {
@@ -3451,12 +3501,12 @@ final class AdministrativeNotificationsService
       }
     }
     $contractLabels = $this->paymentReceiptContractLabels($contracts);
-    foreach (array_filter(array_map('trim', explode(',', (string) ($meta['contratos_sistema'] ?? '')))) as $label) {
-      $contractLabels[] = $label;
+    if ($contractLabels === []) {
+      $contractLabels = array_values(array_filter(array_map('trim', explode('|', (string) ($meta['contratos_sistema'] ?? '')))));
     }
     $contractLabels = array_values(array_unique($contractLabels));
     if ($contractLabels !== []) {
-      $lines[] = 'Contrato(s) relacionados:';
+      $lines[] = 'Contrato(s):';
       foreach ($contractLabels as $label) {
         $lines[] = '- ' . $label;
       }
@@ -3484,18 +3534,55 @@ final class AdministrativeNotificationsService
     return implode("\n", $lines);
   }
 
+  /**
+   * Short payment-support summary for WhatsApp: the template body is limited,
+   * so it lists contract numbers only (addresses stay in the email).
+   *
+   * @param array<string,mixed> $meta
+   */
+  private function paymentReceiptWhatsappSummary(array $meta, bool $includeLinks): string
+  {
+    $receipts = is_array($meta['comprobantes_pago'] ?? null) ? $meta['comprobantes_pago'] : [];
+    $lines = ['Soportes adjuntos: ' . max(1, count($receipts))];
+    foreach (['documento_excel' => 'NIT', 'mes_excel' => 'Periodo', 'inmueble_simi_excel' => 'Inmueble(s)'] as $key => $label) {
+      $value = trim((string) ($meta[$key] ?? ''));
+      if ($value !== '') {
+        $lines[] = $label . ': ' . $value;
+      }
+    }
+    $payments = (int) ($meta['pagos_pdf'] ?? 0);
+    if ($payments > 0) {
+      $lines[] = 'Pagos en los soportes: ' . $payments;
+    }
+    if (preg_match_all('/#\s*([A-Za-z0-9\-]+)/u', (string) ($meta['contratos_sistema'] ?? ''), $numbers) > 0) {
+      $unique = array_values(array_unique($numbers[1]));
+      $lines[] = 'Contrato(s): #' . implode(', #', $unique);
+    }
+    if ($includeLinks) {
+      $url = trim((string) ($meta['url_pdf'] ?? ''));
+      if ($url !== '') {
+        $lines[] = 'Soporte: ' . trim(explode(',', $url)[0]);
+      }
+    } elseif (count($receipts) > 1) {
+      // A WhatsApp template carries a single document header.
+      $lines[] = 'Por WhatsApp va el primer soporte; todos los soportes van adjuntos en el correo.';
+    }
+    return implode("\n", $lines);
+  }
+
   /** @param array<string,mixed> $base @param array<string,mixed> $extra @param array<int,array<string,mixed>> $contracts @return array<string,mixed> */
   private function mergePaymentReceiptMeta(array $base, array $extra, array $contracts): array
   {
     $baseReceipts = is_array($base['comprobantes_pago'] ?? null) ? $base['comprobantes_pago'] : [];
     $extraReceipts = is_array($extra['comprobantes_pago'] ?? null) ? $extra['comprobantes_pago'] : [];
     $base['comprobantes_pago'] = array_merge($baseReceipts, $extraReceipts);
-    foreach (['inmueble_simi_excel', 'mes_excel', 'contratos_sistema', 'url_pdf'] as $key) {
+    foreach (['inmueble_simi_excel', 'mes_excel', 'url_pdf'] as $key) {
       $values = array_filter(array_map('trim', explode(',', (string) ($base[$key] ?? ''))));
       $extraValues = array_filter(array_map('trim', explode(',', (string) ($extra[$key] ?? ''))));
       $merged = array_values(array_unique(array_merge($values, $extraValues)));
       $base[$key] = implode(', ', $merged);
     }
+    $base['contratos_sistema'] = implode(' | ', $this->paymentReceiptContractLabels($contracts));
     foreach (['pagos_pdf_detalle'] as $key) {
       $values = array_filter(array_map('trim', preg_split('/\R+/', (string) ($base[$key] ?? '')) ?: []));
       $extraValues = array_filter(array_map('trim', preg_split('/\R+/', (string) ($extra[$key] ?? '')) ?: []));
@@ -5279,6 +5366,12 @@ final class AdministrativeNotificationsService
     if ($detail === '') {
       $detail = $this->importCanonSummary($cleanMeta);
     }
+    if ($channel === 'whatsapp' && $this->isCopropiedadPaymentSupportTemplate($whatsappTemplateConfig, $emailTemplateConfig)) {
+      $hasDocumentHeader = strtolower(trim((string) ($whatsappTemplateConfig['header_type'] ?? ''))) === 'document'
+        && $this->whatsappTemplateDocumentHeaderFromRecipient($whatsappTemplateConfig, $recipient) !== [];
+      $summary = $this->paymentReceiptWhatsappSummary($cleanMeta, !$hasDocumentHeader);
+      return $summary !== '' ? $summary : $message;
+    }
     if ($channel === 'whatsapp'
       && strtolower(trim((string) ($whatsappTemplateConfig['header_type'] ?? ''))) === 'document'
       && $this->whatsappTemplateDocumentHeaderFromRecipient($whatsappTemplateConfig, $recipient) !== []
@@ -5336,7 +5429,7 @@ final class AdministrativeNotificationsService
       }
       return [
         $this->whatsappTextParameter($name),
-        $this->whatsappTextParameter($messageWithSignature),
+        $this->whatsappTextParameter($messageWithSignature, $this->whatsappMessageBudget($templateConfig, [$name])),
       ];
     }
     if ($mode === 'collection_due_date') {
@@ -5359,15 +5452,35 @@ final class AdministrativeNotificationsService
     }
     return [
       $this->whatsappTextParameter($name),
-      $this->whatsappTextParameter($message),
+      $this->whatsappTextParameter($message, $this->whatsappMessageBudget($templateConfig, [$name, $signature])),
       $this->whatsappTextParameter($signature),
     ];
   }
 
-  /** @return array{type:string,text:string} */
-  private function whatsappTextParameter(string $text): array
+  /**
+   * Room left for the free-text parameter: Meta rejects templates whose
+   * rendered body exceeds 1024 characters (error #132005).
+   *
+   * @param array<string,mixed> $templateConfig @param array<int,string> $otherParameters
+   */
+  private function whatsappMessageBudget(array $templateConfig, array $otherParameters): int
   {
-    return ['type' => 'text', 'text' => $this->sanitizeWhatsAppTemplateParameterText($text)];
+    $fixed = mb_strlen((string) preg_replace('/\{\{\d+\}\}/', '', (string) ($templateConfig['body'] ?? '')), 'UTF-8');
+    foreach ($otherParameters as $parameter) {
+      $fixed += mb_strlen($this->sanitizeWhatsAppTemplateParameterText($parameter), 'UTF-8');
+    }
+    // Margin for the template text stored in Meta differing slightly from ours.
+    return max(120, 1024 - $fixed - 40);
+  }
+
+  /** @return array{type:string,text:string} */
+  private function whatsappTextParameter(string $text, int $maxLength = 1024): array
+  {
+    $clean = $this->sanitizeWhatsAppTemplateParameterText($text);
+    if (mb_strlen($clean, 'UTF-8') > $maxLength) {
+      $clean = rtrim(mb_substr($clean, 0, $maxLength - 1, 'UTF-8'), " |,") . '…';
+    }
+    return ['type' => 'text', 'text' => $clean];
   }
 
   private function sanitizeWhatsAppTemplateParameterText(string $text): string

@@ -8687,7 +8687,7 @@
             var detailBits = [];
             if (row.subject) detailBits.push("Asunto: " + row.subject);
             if (row.message_text) detailBits.push("Mensaje: " + row.message_text);
-            if (row.last_error) detailBits.push("Error: " + row.last_error);
+            if (row.last_error) detailBits.push("Error: " + (row.last_error_hint || row.last_error));
             var recipientBits = [
               row.destination_name || "Sin nombre",
               row.destination || "",
@@ -9411,7 +9411,9 @@
             return "<div><dt>" + fact[0] + "</dt><dd>" + fact[1] + "</dd></div>";
           }).join("") + "</dl>" +
           (data.last_error
-            ? '<div class="scm-an-queue-error"><strong>Último error</strong><span>' + escHtml(data.last_error) + "</span></div>"
+            ? '<div class="scm-an-queue-error"><strong>Último error</strong>' +
+              (data.last_error_hint ? "<span>" + escHtml(data.last_error_hint) + "</span><small>Detalle técnico: " + escHtml(data.last_error) + "</small>" : "<span>" + escHtml(data.last_error) + "</span>") +
+              "</div>"
             : "") +
           preview;
         var frame = body.querySelector("[data-admin-notif-queue-message-frame]");
