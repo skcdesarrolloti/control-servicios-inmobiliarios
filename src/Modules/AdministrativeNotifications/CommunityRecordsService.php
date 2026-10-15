@@ -331,6 +331,45 @@ final class CommunityRecordsService
     return trim(preg_replace('/\s+/u', ' ', $value) ?? '');
   }
 
+  /**
+   * Removes a lease contract from the copropiedad: clears id_copropiedad and
+   * the copropiedad data copied into the contract. propiedad_horizontal is
+   * left as is because the property may still belong to a building.
+   *
+   * @return array{message:string}
+   */
+  public function unlinkContract(int $id, int $contractId): array
+  {
+    $community = $this->find($id);
+    $table = $this->contractTable();
+    $contract = $this->db->getRow(
+      "SELECT `_ID`, `contrato`, `id_copropiedad` FROM `{$table}` WHERE `_ID` = ? LIMIT 1",
+      [$contractId]
+    );
+    if (!is_array($contract)) {
+      throw new \DomainException('No se encontró el contrato de arrendamiento.');
+    }
+    if (trim((string) ($contract['id_copropiedad'] ?? '')) !== (string) $id) {
+      throw new \DomainException('Ese contrato ya no está vinculado a esta copropiedad.');
+    }
+    $data = ['id_copropiedad' => ''];
+    foreach (self::LINKED_FIELDS['jet_cct_contratos_arrendamiento'] as $target) {
+      if ($this->schema->columnExists($table, $target)) {
+        $data[$target] = '';
+      }
+    }
+    if ($this->schema->columnExists($table, 'cct_modified')) {
+      $data['cct_modified'] = date('Y-m-d H:i:s');
+    }
+    $this->db->update($table, $data, ['_ID' => $contractId]);
+    error_log(sprintf('[copropiedades] Contrato %d desvinculado de la copropiedad %d por el funcionario %s', $contractId, $id, Auth::employeeId()));
+
+    $label = trim((string) ($contract['contrato'] ?? '')) !== '' && strcasecmp(trim((string) $contract['contrato']), 'No asignado') !== 0
+      ? 'Contrato #' . trim((string) $contract['contrato'])
+      : 'Contrato ID ' . $contractId;
+    return ['message' => $label . ' desvinculado de ' . $community['copropiedad'] . '.'];
+  }
+
   public function linkContract(int $id, int $contractId): array
   {
     $community = $this->find($id);
@@ -408,7 +447,8 @@ final class CommunityRecordsService
       'estado' => trim((string) ($row['estado'] ?? '')),
       'direccion' => trim((string) ($row['direccion'] ?? '')),
       'arrendatario' => trim((string) ($row['arrendatario'] ?? '')),
-      'id_copropiedad' => trim((string) ($row['id_copropiedad'] ?? '')),
+      // Some legacy contracts store "0" for "no copropiedad".
+      'id_copropiedad' => (int) trim((string) ($row['id_copropiedad'] ?? '')) > 0 ? trim((string) $row['id_copropiedad']) : '',
       'copropiedad_actual' => trim((string) ($row['copropiedad_actual'] ?? '')),
     ], $rows);
   }

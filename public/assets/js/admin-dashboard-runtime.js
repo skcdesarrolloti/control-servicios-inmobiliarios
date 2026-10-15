@@ -9054,7 +9054,9 @@
           ? '<em>Vinculado a ' + escHtml(row.copropiedad_actual || "copropiedad #" + row.id_copropiedad) + "</em>"
           : "";
         var action = "";
-        if (withAction) {
+        if (!withAction && isHere) {
+          action = '<button type="button" class="scm-an-btn is-danger-ghost" data-admin-notif-community-unlink="' + escAttr(row.id) + '" data-contract-label="' + escAttr(contractLabel) + '">Desvincular</button>';
+        } else if (withAction) {
           action = isHere
             ? '<span class="scm-an-community-linked-badge">Ya vinculado</span>'
             : '<button type="button" class="scm-an-btn is-navy" data-admin-notif-community-link="' + escAttr(row.id) + '" data-other-community="' + escAttr(row.id_copropiedad && !isHere ? (row.copropiedad_actual || row.id_copropiedad) : "") + '">' + (other ? "Reasignar" : "Vincular") + "</button>";
@@ -9132,6 +9134,50 @@
           });
         }
         return Promise.resolve(window.confirm(text));
+      }
+
+      function unlinkCommunityContract(button) {
+        var id = communityCurrentId();
+        var contractId = String(button.getAttribute("data-admin-notif-community-unlink") || "");
+        var label = String(button.getAttribute("data-contract-label") || "este contrato");
+        if (!id || !contractId || !actionAdminNotificationsCommunityLink) {
+          return;
+        }
+        var nameInput = communityForm ? communityForm.elements.copropiedad : null;
+        var communityName = nameInput && nameInput.value ? nameInput.value : "esta copropiedad";
+        var text = "Se quitará " + label + " de " + communityName + " y se borrarán del contrato los datos de la copropiedad (nombre, NIT, administrador, correo y celular). Si es el único contrato entregado, la copropiedad pasará a no activa.";
+        var confirmPromise = window.Swal && typeof window.Swal.fire === "function"
+          ? window.Swal.fire({
+            icon: "warning",
+            title: "¿Desvincular " + label + "?",
+            text: text,
+            showCancelButton: true,
+            confirmButtonText: "Sí, desvincular",
+            cancelButtonText: "Cancelar",
+            confirmButtonColor: "#b91c1c",
+            reverseButtons: true,
+          }).then(function (result) { return !!(result && result.isConfirmed); })
+          : Promise.resolve(window.confirm(text));
+        confirmPromise.then(function (confirmed) {
+          if (!confirmed) {
+            return;
+          }
+          button.disabled = true;
+          postAdminNotifications(actionAdminNotificationsCommunityLink, { id: id, contract_id: contractId, mode: "unlink" })
+            .then(function (data) {
+              showToast("success", data.message || "Contrato desvinculado.");
+              communityRecipientsStale = true;
+              renderCommunityLinked(Array.isArray(data.linked_contracts) ? data.linked_contracts : []);
+              var query = communitySearchInput ? String(communitySearchInput.value || "").trim() : "";
+              if (query) {
+                loadCommunityContracts(query);
+              }
+            })
+            .catch(function (err) {
+              button.disabled = false;
+              showToast("error", err.message || "No se pudo desvincular el contrato.");
+            });
+        });
       }
 
       function linkCommunityContract(button) {
@@ -10261,6 +10307,12 @@
             if (newCancel) {
               event.preventDefault();
               cancelCommunityNew(newCancel.getAttribute("data-admin-notif-community-new-cancel"));
+              return;
+            }
+            var unlinkBtn = target.closest("[data-admin-notif-community-unlink]");
+            if (unlinkBtn && !unlinkBtn.disabled) {
+              event.preventDefault();
+              unlinkCommunityContract(unlinkBtn);
               return;
             }
             var linkBtn = target.closest("[data-admin-notif-community-link]");
