@@ -156,4 +156,13 @@ $contract = $db->getRow('SELECT * FROM wp_jet_cct_contratos_arrendamiento WHERE 
 $assert(!$db->getRow('SELECT * FROM wp_jet_cct_revision_preventiva WHERE _ID = ?', [$reviewId]) && !$db->getRow('SELECT * FROM wp_jet_cct_reportes_administrativos WHERE _ID = ?', [(int) $report['_ID']]), 'No se eliminó la revisión o su cobro.');
 $assert($ticket['id_revision_preventiva'] === '' && $ticket['estado_rev_preventiva'] === 'No' && $ticket['reportes'] === '0' && $contract['revisiones_preventivas'] === '2' && $contract['id_revision_preventiva'] === '', 'Eliminar no revirtió caso y contrato.');
 
-echo "PASS: preventive review create/edit/delete, JetForm storage format, admin charge, contract/property counters, history, native public view and signed links.\n";
+// Permiso propio: hereda la correctiva solo hasta que se guarden los permisos con la nueva opción.
+$settingsData = new ReflectionProperty(\SCM\Core\Settings::class, 'data');
+$settingsData->setValue(\SCM\Core\App::settings(), ['contract_history_permissions_configured' => true, 'dashboard_action_permissions' => ['3' => ['corrective_review_manage'], '4' => ['case_note']]]);
+$perms = $call('dashboardActionPermissionsConfig');
+$assert(in_array('preventive_review_manage', $perms['3'], true) && !in_array('preventive_review_manage', $perms['4'], true), 'La preventiva debe heredar la correctiva antes de configurarse.');
+$settingsData->setValue(\SCM\Core\App::settings(), ['contract_history_permissions_configured' => true, 'preventive_review_permissions_configured' => true, 'dashboard_action_permissions' => ['3' => ['corrective_review_manage'], '5' => ['preventive_review_manage']]]);
+$perms = $call('dashboardActionPermissionsConfig');
+$assert(!in_array('preventive_review_manage', $perms['3'], true) && $perms['5'] === ['preventive_review_manage'], 'Una vez configurados, los permisos deben ser independientes.');
+
+echo "PASS: preventive review create/edit/delete, JetForm storage format, admin charge, contract/property counters, history, native public view, signed links and separate permission.\n";

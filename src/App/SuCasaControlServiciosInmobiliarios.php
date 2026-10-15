@@ -659,7 +659,8 @@ final class SuCasaControlServiciosInmobiliarios
           'case_edit_magnitude' => 'Editar magnitud del caso',
           'case_edit_data' => 'Editar datos del caso (asunto, tema, prioridad, departamento)',
           'case_completion_act' => 'Acta de solución y firma',
-          'corrective_review_manage' => 'Gestionar revisión correctiva y preventiva',
+          'corrective_review_manage' => 'Gestionar revisión correctiva (casos de mantenimiento)',
+          'preventive_review_manage' => 'Gestionar revisión preventiva (casos preventivos)',
         ],
       ],
       'cotizaciones' => [
@@ -701,6 +702,15 @@ final class SuCasaControlServiciosInmobiliarios
     $permissions = $this->sanitizeDashboardActionPermissions(is_array($raw) ? $raw : []);
     if (!\SCM\Core\App::settings()->get('contract_history_permissions_configured', false)) {
       $permissions['11'] = array_values(array_unique(array_merge($permissions['11'] ?? $this->dashboardActionPermissionKeys(), ['contract_history_manage'])));
+    }
+    // Mientras no se guarden los permisos con la nueva opción, la preventiva hereda la correctiva
+    // para no ocultar el botón a cargos que ya la gestionaban con el formulario de WordPress.
+    if (!\SCM\Core\App::settings()->get('preventive_review_permissions_configured', false)) {
+      foreach ($permissions as $cargo => $actions) {
+        if (in_array('corrective_review_manage', $actions, true) && !in_array('preventive_review_manage', $actions, true)) {
+          $permissions[$cargo][] = 'preventive_review_manage';
+        }
+      }
     }
     return $permissions;
   }

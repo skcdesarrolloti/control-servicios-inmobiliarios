@@ -9743,7 +9743,7 @@
           }
           if (isPreventivaCase(btn)) {
             var prevIdVal = (btn.dataset.idRevisionPreventiva || "").trim();
-            if (statusBucket !== "cerrados" && canUseDashboardAction("corrective_review_manage")) {
+            if (statusBucket !== "cerrados" && canUseDashboardAction("preventive_review_manage")) {
               complementaryActionButtons.push(
                 '<button type="button" class="scm-case-work-btn" data-scm-open-preventive-review><span class="material-symbols-outlined scm-btn-icon">verified_user</span><div class="scm-btn-text"><span class="scm-btn-label">' +
                   (prevIdVal

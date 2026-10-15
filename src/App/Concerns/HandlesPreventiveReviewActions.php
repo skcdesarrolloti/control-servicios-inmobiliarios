@@ -23,7 +23,7 @@ trait HandlesPreventiveReviewActions
   public function ajax_handler_preventive_review(): void
   {
     $this->verifyCsrf();
-    if (!$this->canUseDashboardAction('corrective_review_manage')) {
+    if (!$this->canUseDashboardAction('preventive_review_manage')) {
       $this->jsonFail('No tienes permiso para gestionar revisiones preventivas.');
     }
     $ticketId = (int) ($_POST['ticket_pk'] ?? 0);

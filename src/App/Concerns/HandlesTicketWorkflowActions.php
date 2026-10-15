@@ -375,7 +375,10 @@ trait HandlesTicketWorkflowActions
 
     \SCM\Core\App::settings()->set('dashboard_tab_permissions', $permissions, Auth::userId());
     \SCM\Core\App::settings()->set('dashboard_action_permissions', $actionPermissions, Auth::userId());
-    if (array_key_exists('action_permissions', $_POST)) \SCM\Core\App::settings()->set('contract_history_permissions_configured', true, (int) Auth::employeeId());
+    if (array_key_exists('action_permissions', $_POST)) {
+      \SCM\Core\App::settings()->set('contract_history_permissions_configured', true, (int) Auth::employeeId());
+      \SCM\Core\App::settings()->set('preventive_review_permissions_configured', true, (int) Auth::employeeId());
+    }
     \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
     \SCM\Core\App::settings()->set('admin_due_popup_cargo_ids', $adminDuePopupCargoIds, Auth::userId());
     \SCM\Core\App::settings()->refresh();

@@ -27,4 +27,6 @@ Reemplaza el formulario JetForm "Añadir revisión preventiva" y la página púb
 - Correo al creador y a los funcionarios del evento **Notificaciones internas → Revisión preventiva creada**
   (reemplaza los correos fijos del formulario de WordPress).
 
-Permiso: *Gestionar revisión correctiva y preventiva* (`corrective_review_manage`).
+Permiso propio: *Gestionar revisión preventiva* (`preventive_review_manage`), separado de *Gestionar revisión correctiva*.
+El botón de la correctiva solo aparece en casos de mantenimiento y el de la preventiva solo en casos preventivos.
+Hasta que se guarde la configuración de permisos por primera vez, los cargos con la correctiva heredan la preventiva.
