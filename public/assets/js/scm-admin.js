@@ -674,7 +674,13 @@
     if (!node || !node.closest) {
       return null;
     }
-    return node.closest("#scm-app.scm-wrap[data-scm-runtime]");
+    var root = node.closest("#scm-app.scm-wrap[data-scm-runtime]");
+    if (!root && !node.isConnected) {
+      // El botón del caso puede quedar desconectado (tarjeta refrescada o proxy temporal)
+      // mientras el popup sigue abierto; sus acciones deben seguir funcionando.
+      root = document.querySelector("#scm-app.scm-wrap[data-scm-runtime]");
+    }
+    return root;
   }
 
   function getCaseModal(root) {
@@ -685,7 +691,7 @@
   }
 
   function openIframeModal(url, title, compact) {
-    if (!url) {
+    if (!url || /^\s*(javascript|data|vbscript):/i.test(String(url))) {
       return;
     }
     document
@@ -763,9 +769,15 @@
     }
 
     var sub = modal.querySelector(".scm-case-submodal");
+    var dirtyTicket = "";
     if (sub) {
+      dirtyTicket = sub._scmCaseDirtyTicket || "";
+      sub._scmCaseDirtyTicket = "";
       sub.classList.remove("open");
+      sub.setAttribute("aria-hidden", "true");
       sub._scmReturnView = null;
+      var subBody = sub.querySelector(".scm-case-submodal-body");
+      if (subBody) subBody.innerHTML = "";
     }
 
     modal.classList.remove("open");
@@ -785,6 +797,10 @@
       bubbles: true,
       detail: { reason: "close" },
     }));
+    if (dirtyTicket) {
+      var dirtyRoot = findRootFromNode(modal);
+      if (dirtyRoot) dirtyRoot.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+    }
   }
 
   function ensureCaseSubmodal(modal) {
@@ -860,6 +876,12 @@
     }
     sub.classList.remove("open");
     sub.setAttribute("aria-hidden", "true");
+    // Acciones que guardan sin cerrar el subpopup (p. ej. el acta) refrescan el caso al salir.
+    var dirtyTicket = sub._scmCaseDirtyTicket || "";
+    if (dirtyTicket) {
+      sub._scmCaseDirtyTicket = "";
+      dispatchCaseActionSaved(findRootFromNode(sub), dirtyTicket === "-" ? "" : dirtyTicket, sub);
+    }
   }
 
   function closeCaseSubmodal(modal) {
@@ -2961,7 +2983,7 @@
             });
           }
           if (operation !== "read")
-            root.dispatchEvent(new CustomEvent("scm:refresh-active-tab"));
+            sub._scmCaseDirtyTicket = String(caseBtn.dataset.ticketPk || "").trim() || "-";
           if (operation === "read") {
             var first = body.querySelector("select, a, button");
             if (first) first.focus();
@@ -9077,6 +9099,11 @@
       return;
     }
     modal._scmCurrentCaseButton = btn;
+    var staleSub = modal.querySelector(".scm-case-submodal");
+    if (staleSub && !staleSub.classList.contains("open")) {
+      var staleSubBody = staleSub.querySelector(".scm-case-submodal-body");
+      if (staleSubBody) staleSubBody.innerHTML = "";
+    }
 
     try {
       var sourceHtml = "";
@@ -9253,8 +9280,9 @@
           );
         }
         if (adminVal && adminVal !== "-") {
+          // Se rotula para no confundirlo con el estado operativo cuando ambos coinciden (p. ej. "Nuevo").
           metaChips.push(
-            '<span class="scm-chip scm-chip-secondary">' +
+            '<span class="scm-chip scm-chip-secondary" title="Estado administrativo">Administrativo: ' +
               escHtml(adminVal) +
               "</span>",
           );
@@ -9887,7 +9915,7 @@
         // Card 1: Estado & Cumplimiento
         sidebarHtml += '<div class="scm-sidebar-card">';
         sidebarHtml +=
-          '<div class="scm-sidebar-card-head"><span class="scm-sidebar-card-title">Estado &amp; Cumplimiento</span><span class="material-symbols-outlined text-[20px]">donut_large</span></div>';
+          '<div class="scm-sidebar-card-head"><span class="scm-sidebar-card-title">Estado &amp; Cumplimiento</span><button type="button" class="scm-case-refresh-btn" data-scm-case-refresh title="Actualizar caso" aria-label="Actualizar caso"><span class="material-symbols-outlined text-[20px]">refresh</span></button></div>';
         sidebarHtml +=
           '<div class="scm-status-box"><div class="scm-status-info"><span class="scm-status-sub">Estado Operativo</span><strong class="scm-status-main">' +
           escHtml(estadoVal) +
@@ -10156,11 +10184,11 @@
           }
           if ((btn.dataset.idRevisionPreventiva || "").trim()) {
             headActions.innerHTML +=
-              '<a href="https://sucasainmobiliaria.com.co/revision-preventiva/?numero=' +
+              '<button type="button" class="scm-case-side-link" data-scm-open-iframe data-iframe-title="Revisión preventiva" data-iframe-url="https://sucasainmobiliaria.com.co/revision-preventiva/?numero=' +
               encodeURIComponent(
                 (btn.dataset.idRevisionPreventiva || "").trim(),
               ) +
-              '" class="scm-case-side-link" target="_blank" rel="noopener"><span class="material-symbols-outlined text-[16px]">verified_user</span> Ver revisión preventiva</a>';
+              '"><span class="material-symbols-outlined text-[16px]">verified_user</span> Ver revisión preventiva</button>';
             headActions.innerHTML +=
               '<button type="button" class="scm-case-side-link" data-scm-open-damage="preventiva"><span class="material-symbols-outlined text-[16px]">shield</span> Magnitud preventiva</button>';
           }
@@ -10197,15 +10225,15 @@
           var contactoLlavesHead = (btn.dataset.contactoLlaves || "").trim();
           if (tabKeyHead === "entrega" && idEstudioHead) {
             headActions.innerHTML +=
-              '<a href="https://sucasainmobiliaria.com.co/estudio-aseguradora/?id_estudio=' +
+              '<button type="button" class="scm-case-side-link" data-scm-open-iframe data-iframe-title="Estudio asegurable" data-iframe-url="https://sucasainmobiliaria.com.co/estudio-aseguradora/?id_estudio=' +
               encodeURIComponent(idEstudioHead) +
-              '" class="scm-case-side-link" target="_blank" rel="noopener"><span class="material-symbols-outlined text-[16px]">verified</span> Ver asegurable</a>';
+              '"><span class="material-symbols-outlined text-[16px]">verified</span> Ver asegurable</button>';
           }
           if (tabKeyHead === "entrega" && anexosHead) {
             headActions.innerHTML +=
-              '<a href="' +
+              '<button type="button" class="scm-case-side-link" data-scm-open-iframe data-iframe-title="Documentos de entrega" data-iframe-url="' +
               escHtml(anexosHead) +
-              '" class="scm-case-side-link" target="_blank" rel="noopener"><span class="material-symbols-outlined text-[16px]">folder</span> Ver documentos</a>';
+              '"><span class="material-symbols-outlined text-[16px]">folder</span> Ver documentos</button>';
           }
           if (
             tabKeyHead === "entrega" &&
@@ -10291,6 +10319,16 @@
               return;
             }
             target.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-case-refresh]")
+        .forEach(function (refreshBtn) {
+          refreshBtn.addEventListener("click", function () {
+            refreshBtn.disabled = true;
+            refreshBtn.classList.add("is-loading");
+            dispatchCaseActionSaved(root, btn.dataset.ticketPk || "", refreshBtn);
           });
         });
 

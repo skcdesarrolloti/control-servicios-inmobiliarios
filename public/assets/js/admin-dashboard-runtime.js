@@ -655,10 +655,12 @@
     function dashboardApplyDueCaseData(button, caseData) {
       caseData = caseData || {};
       var map = dashboardDueCaseAttrMap();
-      Object.keys(map).forEach(function (key) {
-        if (Object.prototype.hasOwnProperty.call(caseData, key)) {
-          button.setAttribute("data-" + map[key], String(caseData[key] || ""));
-        }
+      Object.keys(caseData).forEach(function (key) {
+        var value = caseData[key];
+        if (key === "case_source_html" || value === null || typeof value === "object") return;
+        // El servidor devuelve todos los data-* de la tarjeta real (etapa, tiempos, solicitante...).
+        var attr = Object.prototype.hasOwnProperty.call(map, key) ? map[key] : key.replace(/_/g, "-");
+        button.setAttribute("data-" + attr, String(value));
       });
       var sourceHtml = String(caseData.case_source_html || "").trim();
       if (sourceHtml) {
@@ -714,7 +716,7 @@
       }
     }
 
-    function openDashboardDueCaseFromButton(button, sourceHtml) {
+    function openDashboardDueCaseFromButton(button, sourceHtml, keepLayer) {
       if (!button || typeof window.scmOpenCase !== "function") return;
       sourceHtml = String(sourceHtml || dashboardDueCaseSourceHtml(button)).trim();
       if (!sourceHtml) {
@@ -739,7 +741,7 @@
       proxyCard.appendChild(proxySource);
       root.appendChild(proxyCard);
       window.scmOpenCase(proxyButton);
-      window.setTimeout(elevateDashboardDueCaseModal, 30);
+      if (!keepLayer) window.setTimeout(elevateDashboardDueCaseModal, 30);
       window.setTimeout(function () {
         proxyCard.remove();
       }, 500);
@@ -13181,12 +13183,33 @@
       if (!modal) {
         return false;
       }
-      var scope = activeCaseSearchScope();
-      var btn = scope.querySelector(
-        '.scm-btn-case[data-ticket-pk="' + cssAttrValue(ticketPk) + '"]',
+      // Los casos abiertos desde inicio, calendario o vencimientos usan una tarjeta proxy oculta.
+      var current = modal._scmCurrentCaseButton;
+      var openedFromList = !(
+        current &&
+        current.closest &&
+        current.closest(".scm-ticket-card[hidden], [data-scm-case-calendar-proxy-card]")
       );
+      var scope = activeCaseSearchScope();
+      var btn = openedFromList
+        ? scope.querySelector(
+            '.scm-btn-case[data-ticket-pk="' + cssAttrValue(ticketPk) + '"]',
+          )
+        : null;
       if (btn) {
         window.scmOpenCase(btn);
+        return true;
+      }
+      // Abierto desde inicio, calendario, vencimientos o enlace directo (o salió del filtro):
+      // se consulta el caso actualizado para no dejar el popup con datos viejos.
+      if (/^\d+$/.test(ticketPk)) {
+        openPanelCaseById(ticketPk, true, true).catch(function () {
+          closeCaseModal(modal);
+          showToast(
+            "success",
+            "Cambios guardados. El caso ya no aparece en el filtro actual.",
+          );
+        });
         return true;
       }
       closeCaseModal(modal);
@@ -13441,7 +13464,7 @@
       return Promise.resolve();
     }
 
-    function openPanelCaseById(caseId, propagateError) {
+    function openPanelCaseById(caseId, propagateError, keepLayer) {
       caseId = String(caseId || "");
       if (!/^\d+$/.test(caseId)) return;
       return dashboardAction("scm_panel_case_read", { case_id: caseId }).then(function (data) {
@@ -13460,7 +13483,7 @@
         card.appendChild(source);
         root.appendChild(card);
         dashboardApplyDueCaseData(button, caseData);
-        openDashboardDueCaseFromButton(button, caseData.case_source_html);
+        openDashboardDueCaseFromButton(button, caseData.case_source_html, keepLayer);
         window.setTimeout(function () { card.remove(); }, 1000);
         return true;
       }).catch(function (error) {
@@ -15120,7 +15143,8 @@
       if (!el || !el.parentElement) {
         return;
       }
-      el.parentElement.style.display = visible ? "" : "none";
+      var card = (el.closest && el.closest(".scm-kpi")) || el.parentElement;
+      card.style.display = visible ? "" : "none";
     }
 
     function applyRevisionKpiVisibility(
@@ -17804,6 +17828,130 @@
       "sin-cotz",
     );
 
+    // KPIs como botones: cada tarjeta alimenta el filtro equivalente del formulario de su pestaña.
+    var KPI_FILTERS = {
+      "con-cotz": ["_cotizacion", "has"],
+      "sin-cotz": ["_cotizacion", "none"],
+      "con-prev": ["_revision", "has"],
+      "sin-prev": ["_revision", "none"],
+      "danos-si": ["_danos", "has"],
+      "danos-no": ["_danos", "none"],
+      critico: ["_magnitud_caso", "critico"],
+      alto: ["_magnitud_caso", "alto"],
+      medio: ["_magnitud_caso", "medio"],
+      bajo: ["_magnitud_caso", "bajo"],
+    };
+
+    function kpiKey(card) {
+      var key = card.getAttribute("data-kpi") || "";
+      if (!key) {
+        var valueEl = card.querySelector(".scm-kpi-value[id]");
+        var match = valueEl ? /-kpi-(.+)$/.exec(valueEl.id) : null;
+        key = match ? match[1] : "";
+      }
+      return key.replace(/^magnitud-/, "");
+    }
+
+    function kpiForm(card) {
+      var panel = card.closest(".scm-open-topic-panel");
+      if (!panel) return null;
+      var topic = panel.getAttribute("data-open-topic") || "";
+      return root.querySelector(topic === "mant" ? "#scm-form" : "#scm-form-" + topic);
+    }
+
+    function kpiField(form, suffix) {
+      return form ? form.querySelector('select[name$="' + suffix + '"]') : null;
+    }
+
+    function syncKpiActiveState(form) {
+      if (!form) return;
+      var panel = form.closest(".scm-open-topic-panel");
+      if (!panel) return;
+      var anyActive = false;
+      panel.querySelectorAll(".scm-kpi-clickable").forEach(function (card) {
+        var key = kpiKey(card);
+        var def = KPI_FILTERS[key];
+        var field = def ? kpiField(form, def[0]) : null;
+        var active = !!(field && field.value === def[1]);
+        anyActive = anyActive || active;
+        card.classList.toggle("scm-kpi-active", active);
+        card.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+      var totalCard = panel.querySelector('.scm-kpi-clickable[data-scm-kpi-key="total"]');
+      if (totalCard) {
+        totalCard.classList.toggle("scm-kpi-active", !anyActive);
+        totalCard.setAttribute("aria-pressed", anyActive ? "false" : "true");
+      }
+    }
+
+    function applyKpiFilter(card) {
+      var form = kpiForm(card);
+      if (!form) return;
+      var key = kpiKey(card);
+      var changed = null;
+      if (key === "total") {
+        Object.keys(KPI_FILTERS).forEach(function (k) {
+          var field = kpiField(form, KPI_FILTERS[k][0]);
+          if (field && field.value !== "") {
+            field.value = "";
+            changed = field;
+          }
+        });
+      } else {
+        var def = KPI_FILTERS[key];
+        var field = def ? kpiField(form, def[0]) : null;
+        if (!field) return;
+        // Un segundo clic sobre el KPI activo quita el filtro.
+        field.value = field.value === def[1] ? "" : def[1];
+        changed = field;
+      }
+      if (changed) {
+        if (window.jQuery && window.jQuery(changed).data("select2")) {
+          window.jQuery(changed).trigger("change.select2");
+        }
+        changed.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      syncKpiActiveState(form);
+    }
+
+    root.querySelectorAll(".scm-open-topic-panel .scm-kpi").forEach(function (card) {
+      var key = kpiKey(card);
+      var form = kpiForm(card);
+      var def = KPI_FILTERS[key];
+      if (!form || (key !== "total" && !(def && kpiField(form, def[0])))) return;
+      card.classList.add("scm-kpi-clickable");
+      card.setAttribute("data-scm-kpi-key", key);
+      card.setAttribute("role", "button");
+      card.setAttribute("tabindex", "0");
+      card.setAttribute("title", key === "total" ? "Ver todos los casos" : "Filtrar por este indicador");
+      card.addEventListener("click", function () {
+        applyKpiFilter(card);
+      });
+      card.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          applyKpiFilter(card);
+        }
+      });
+    });
+    root.addEventListener("click", function (e) {
+      if (!e.target.closest || !e.target.closest('[id^="scm-clear"]')) return;
+      setTimeout(function () {
+        root.querySelectorAll(".scm-open-topic-panel form").forEach(syncKpiActiveState);
+      }, 0);
+    });
+    root.querySelectorAll(".scm-open-topic-panel form").forEach(function (f) {
+      syncKpiActiveState(f);
+      f.addEventListener("change", function () {
+        syncKpiActiveState(f);
+      });
+      f.addEventListener("reset", function () {
+        setTimeout(function () {
+          syncKpiActiveState(f);
+        }, 0);
+      });
+    });
+
     var form = root.querySelector("#scm-form");
     var tbody = root.querySelector("#scm-tbody");
     var pagination = root.querySelector("#scm-pagination");
@@ -19674,6 +19822,15 @@
             (json.data && json.data.message) || "Accion realizada.";
           showToast("success", message);
           return refreshActiveTab()
+            .then(function () {
+              // Si el popup del caso está abierto debajo, se actualiza con el nuevo estado de la cotización.
+              var caseModal = root.querySelector("#scm-case-modal.open");
+              var caseBtn = caseModal ? caseModal._scmCurrentCaseButton : null;
+              var casePk = caseBtn && caseBtn.dataset ? String(caseBtn.dataset.ticketPk || "").trim() : "";
+              if (casePk && caseModal.dataset.caseKind !== "public-pqr") {
+                reopenCaseFromUpdatedCard(casePk);
+              }
+            })
             .catch(function (refreshError) {
               if (window.console && console.warn) {
                 console.warn("[cotizacion] Guardada, pero no se pudo refrescar el panel.", refreshError);

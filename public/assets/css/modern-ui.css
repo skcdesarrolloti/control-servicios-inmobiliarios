@@ -5758,3 +5758,42 @@ body,
   background: #f0f7ff !important;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
 }
+
+/* KPIs clicables: funcionan como filtro rápido de su pestaña */
+#scm-app .scm-kpi.scm-kpi-clickable {
+  cursor: pointer !important;
+  user-select: none;
+}
+#scm-app .scm-kpi.scm-kpi-clickable:focus-visible {
+  outline: 2px solid #2563eb !important;
+  outline-offset: 2px !important;
+}
+#scm-app .scm-kpi.scm-kpi-clickable.scm-kpi-active {
+  background: #f1f5ff !important;
+  border-color: #93c5fd !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18) !important;
+}
+
+/* Botón para recargar el popup del caso sin refrescar la página */
+#scm-app .scm-case-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+}
+#scm-app .scm-case-refresh-btn:hover {
+  background: #eef2ff;
+  color: #1d4ed8;
+}
+#scm-app .scm-case-refresh-btn.is-loading .material-symbols-outlined {
+  animation: scm-case-refresh-spin 0.8s linear infinite;
+}
+@keyframes scm-case-refresh-spin {
+  to { transform: rotate(360deg); }
+}
