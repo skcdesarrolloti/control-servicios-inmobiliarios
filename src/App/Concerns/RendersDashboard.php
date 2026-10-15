@@ -3333,10 +3333,10 @@ trait RendersDashboard
             <section class="scm-an-community-group scm-an-community-properties" data-admin-notif-community-properties hidden>
               <div class="scm-an-community-properties-head">
                 <strong>Inmuebles vinculados</strong>
-                <span>Busca por n&uacute;mero de contrato, c&oacute;digo SIMI o c&oacute;digo de inmueble web. Un contrato de arrendamiento entregado activa la copropiedad; un inmueble web solo queda asociado.</span>
+                <span>Vincula contratos de arrendamiento por su n&uacute;mero. Un contrato entregado activa la copropiedad.</span>
               </div>
               <div class="scm-an-community-search">
-                <input type="search" class="scm-input" placeholder="Contrato (853), SIMI (10668) o inmueble web (150207)" aria-label="Buscar contrato, inmueble SIMI o inmueble web" data-admin-notif-community-search>
+                <input type="search" class="scm-input" inputmode="numeric" placeholder="N&uacute;mero de contrato (ej. 853)" aria-label="Buscar n&uacute;mero de contrato" data-admin-notif-community-search>
                 <button type="button" class="scm-an-btn" data-admin-notif-community-search-btn><?php echo $icon('search'); ?>Buscar</button>
               </div>
               <div class="scm-an-community-contracts" data-admin-notif-community-results></div>

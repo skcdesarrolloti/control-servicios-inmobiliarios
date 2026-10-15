@@ -8974,17 +8974,12 @@
 
       function communityContractHtml(row, withAction) {
         var communityId = communityCurrentId();
-        var isWeb = row.kind === "inmueble";
-        var contractLabel = isWeb
-          ? "Inmueble web " + (row.codigo || "#" + row.id)
-          : (row.contrato && row.contrato.toLowerCase() !== "no asignado" ? "Contrato #" + row.contrato : "Contrato ID " + row.id);
-        var meta = (isWeb
-          ? [row.tipo_negocio || "", row.estado || "", row.barrio || "", "No activa la copropiedad"]
-          : [
-            row.inmueble && row.inmueble.toLowerCase() !== "no asignado" ? "Inmueble SIMI " + row.inmueble : "",
-            row.estado || "",
-            row.arrendatario && row.arrendatario.toLowerCase() !== "no asignado" ? row.arrendatario : "",
-          ]).filter(Boolean).join(" · ");
+        var contractLabel = row.contrato && row.contrato.toLowerCase() !== "no asignado" ? "Contrato #" + row.contrato : "Contrato ID " + row.id;
+        var meta = [
+          row.inmueble && row.inmueble.toLowerCase() !== "no asignado" ? "Inmueble SIMI " + row.inmueble : "",
+          row.estado || "",
+          row.arrendatario && row.arrendatario.toLowerCase() !== "no asignado" ? row.arrendatario : "",
+        ].filter(Boolean).join(" · ");
         var isHere = row.id_copropiedad === communityId;
         var other = row.id_copropiedad && !isHere
           ? '<em>Vinculado a ' + escHtml(row.copropiedad_actual || "copropiedad #" + row.id_copropiedad) + "</em>"
@@ -8993,10 +8988,10 @@
         if (withAction) {
           action = isHere
             ? '<span class="scm-an-community-linked-badge">Ya vinculado</span>'
-            : '<button type="button" class="scm-an-btn is-navy" data-admin-notif-community-link="' + escAttr(row.id) + '" data-kind="' + (isWeb ? "inmueble" : "contrato") + '" data-other-community="' + escAttr(row.id_copropiedad && !isHere ? (row.copropiedad_actual || row.id_copropiedad) : "") + '">' + (other ? "Reasignar" : "Vincular") + "</button>";
+            : '<button type="button" class="scm-an-btn is-navy" data-admin-notif-community-link="' + escAttr(row.id) + '" data-other-community="' + escAttr(row.id_copropiedad && !isHere ? (row.copropiedad_actual || row.id_copropiedad) : "") + '">' + (other ? "Reasignar" : "Vincular") + "</button>";
         }
         return (
-          '<article class="scm-an-community-contract' + (isWeb ? " is-web" : "") + '">' +
+          '<article class="scm-an-community-contract">' +
           "<div><strong>" + escHtml(contractLabel) + "</strong><small>" + escHtml(meta) + "</small>" +
           (row.direccion ? "<span>" + escHtml(row.direccion) + "</span>" : "") + other + "</div>" +
           action +
@@ -9012,7 +9007,7 @@
           '<p class="scm-an-community-contracts-title">Vinculados (' + rows.length + ")</p>" +
           (rows.length
             ? rows.map(function (row) { return communityContractHtml(row, false); }).join("")
-            : '<div class="scm-admin-notif-empty"><strong>Sin inmuebles vinculados</strong><span>Busca un contrato, inmueble SIMI o inmueble web para anexarlo.</span></div>');
+            : '<div class="scm-admin-notif-empty"><strong>Sin inmuebles vinculados</strong><span>Busca un número de contrato para vincularlo.</span></div>');
       }
 
       function loadCommunityContracts(query) {
@@ -9032,7 +9027,7 @@
                 '<p class="scm-an-community-contracts-title">Resultados para "' + escHtml(query) + '"</p>' +
                 (results.length
                   ? results.map(function (row) { return communityContractHtml(row, true); }).join("")
-                  : '<div class="scm-admin-notif-empty"><strong>Sin coincidencias</strong><span>Revisa el número de contrato, el código SIMI o el código de inmueble web exacto.</span></div>');
+                  : '<div class="scm-admin-notif-empty"><strong>Sin coincidencias</strong><span>Revisa el número de contrato exacto.</span></div>');
             }
           })
           .catch(function (err) {
@@ -9046,16 +9041,14 @@
       function searchCommunityContracts() {
         var query = communitySearchInput ? String(communitySearchInput.value || "").trim() : "";
         if (!query) {
-          showToast("warning", "Escribe un número de contrato, un código SIMI o un código de inmueble web.");
+          showToast("warning", "Escribe el número de contrato.");
           return;
         }
         loadCommunityContracts(query);
       }
 
-      function confirmCommunityReassign(otherName, kind) {
-        var text = kind === "inmueble"
-          ? "Este inmueble web está vinculado a " + otherName + ". Se reasignará a esta copropiedad."
-          : "Este contrato está vinculado a " + otherName + ". El contrato de arrendamiento se reasignará a esta copropiedad.";
+      function confirmCommunityReassign(otherName) {
+        var text = "Este contrato está vinculado a " + otherName + ". El contrato de arrendamiento se reasignará a esta copropiedad.";
         if (window.Swal && typeof window.Swal.fire === "function") {
           return window.Swal.fire({
             icon: "warning",
@@ -9076,16 +9069,15 @@
         var id = communityCurrentId();
         var contractId = String(button.getAttribute("data-admin-notif-community-link") || "");
         var otherName = String(button.getAttribute("data-other-community") || "");
-        var kind = String(button.getAttribute("data-kind") || "contrato");
         if (!id || !contractId || !actionAdminNotificationsCommunityLink) {
           return;
         }
-        (otherName ? confirmCommunityReassign(otherName, kind) : Promise.resolve(true)).then(function (confirmed) {
+        (otherName ? confirmCommunityReassign(otherName) : Promise.resolve(true)).then(function (confirmed) {
           if (!confirmed) {
             return;
           }
           button.disabled = true;
-          postAdminNotifications(actionAdminNotificationsCommunityLink, { id: id, contract_id: contractId, kind: kind })
+          postAdminNotifications(actionAdminNotificationsCommunityLink, { id: id, contract_id: contractId })
             .then(function (data) {
               showToast("success", data.message || "Inmueble vinculado.");
               communityRecipientsStale = true;

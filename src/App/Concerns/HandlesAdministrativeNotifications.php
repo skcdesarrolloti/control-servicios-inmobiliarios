@@ -137,8 +137,8 @@ trait HandlesAdministrativeNotifications
     try {
       $service = new CommunityRecordsService($this->db);
       $this->jsonOk([
-        'linked' => $id > 0 ? array_merge($service->linkedContracts($id), $service->linkedWebProperties($id)) : [],
-        'results' => $query !== '' ? array_merge($service->searchContracts($query), $service->searchWebProperties($query)) : [],
+        'linked' => $id > 0 ? $service->linkedContracts($id) : [],
+        'results' => $query !== '' ? $service->searchContracts($query) : [],
       ]);
     } catch (\DomainException $e) {
       $this->jsonFail($e->getMessage());
@@ -186,16 +186,13 @@ trait HandlesAdministrativeNotifications
 
     $id = max(0, (int) ($_POST['id'] ?? 0));
     $contractId = max(0, (int) ($_POST['contract_id'] ?? 0));
-    $kind = sanitize_key((string) ($_POST['kind'] ?? 'contrato'));
     if ($id <= 0 || $contractId <= 0) {
-      $this->jsonFail('Selecciona la copropiedad y el inmueble a vincular.');
+      $this->jsonFail('Selecciona la copropiedad y el contrato a vincular.');
     }
     try {
       $service = new CommunityRecordsService($this->db);
-      $result = $kind === 'inmueble'
-        ? $service->linkWebProperty($id, $contractId)
-        : $service->linkContract($id, $contractId);
-      $this->jsonOk($result + ['linked_contracts' => array_merge($service->linkedContracts($id), $service->linkedWebProperties($id))]);
+      $result = $service->linkContract($id, $contractId);
+      $this->jsonOk($result + ['linked_contracts' => $service->linkedContracts($id)]);
     } catch (\DomainException $e) {
       $this->jsonFail($e->getMessage());
     } catch (\Throwable $e) {

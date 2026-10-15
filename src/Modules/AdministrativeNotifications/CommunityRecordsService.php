@@ -55,9 +55,6 @@ final class CommunityRecordsService
     ],
   ];
 
-  /** JetEngine checkbox value used by the property form for "pertenece a copropiedad". */
-  private const BELONGS_TO_COMMUNITY = 'a:1:{i:0;s:2:"Si";}';
-
   private const LINKED_LABELS = [
     'jet_cct_contratos_arrendamiento' => 'contratos de arrendamiento',
     'jet_cct_contrato_mandato' => 'contratos de mandato',
@@ -176,7 +173,7 @@ final class CommunityRecordsService
   }
 
   /**
-   * Lease contracts matching a contract number or inmueble SIMI code.
+   * Lease contracts matching the exact contract number.
    *
    * @return array<int,array<string,string>>
    */
@@ -184,13 +181,12 @@ final class CommunityRecordsService
   {
     $query = trim(ltrim(trim($query), '#'));
     if ($query === '' || mb_strlen($query, 'UTF-8') > 60) {
-      throw new \DomainException('Escribe un número de contrato o un código de inmueble SIMI.');
+      throw new \DomainException('Escribe el número de contrato.');
     }
     $table = $this->contractTable();
     $rows = $this->db->getResults(
-      $this->contractSelectSql($table) . " WHERE TRIM(COALESCE(ca.`contrato`, '')) = ? OR TRIM(COALESCE(ca.`inmueble`, '')) = ? OR TRIM(COALESCE(ca.`id_inmueble`, '')) = ?
-        ORDER BY ca.`_ID` DESC LIMIT 30",
-      [$query, $query, $query]
+      $this->contractSelectSql($table) . " WHERE TRIM(COALESCE(ca.`contrato`, '')) = ? ORDER BY ca.`_ID` DESC LIMIT 30",
+      [$query]
     );
     return $this->contractRows($rows);
   }
@@ -334,99 +330,6 @@ final class CommunityRecordsService
     return trim(preg_replace('/\s+/u', ' ', $value) ?? '');
   }
 
-  /** @return array<int,array<string,string>> */
-  public function linkedWebProperties(int $id): array
-  {
-    $table = $this->webPropertyTable();
-    if ($table === '') {
-      return [];
-    }
-    return $this->webPropertyRows($this->db->getResults(
-      $this->webPropertySelectSql($table) . " WHERE TRIM(COALESCE(i.`id_copropiedad`, '')) = ? ORDER BY i.`_ID` DESC LIMIT 200",
-      [(string) $id]
-    ));
-  }
-
-  /**
-   * Web properties (jet_cct_inmuebles) matching the exact property code.
-   *
-   * @return array<int,array<string,string>>
-   */
-  public function searchWebProperties(string $query): array
-  {
-    $query = trim(ltrim(trim($query), '#'));
-    $table = $this->webPropertyTable();
-    if ($query === '' || $table === '') {
-      return [];
-    }
-    return $this->webPropertyRows($this->db->getResults(
-      $this->webPropertySelectSql($table) . " WHERE TRIM(COALESCE(i.`codigo`, '')) = ? ORDER BY i.`_ID` DESC LIMIT 30",
-      [$query]
-    ));
-  }
-
-  /**
-   * Links a web property to the copropiedad. It does not create or change any
-   * lease contract, so it does not make the copropiedad active.
-   *
-   * @return array{message:string}
-   */
-  public function linkWebProperty(int $id, int $propertyId): array
-  {
-    $community = $this->find($id);
-    $table = $this->webPropertyTable();
-    if ($table === '') {
-      throw new \RuntimeException('La tabla de inmuebles no está disponible.');
-    }
-    $property = $this->db->getRow("SELECT `_ID`, `codigo` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$propertyId]);
-    if (!is_array($property)) {
-      throw new \DomainException('No se encontró el inmueble web.');
-    }
-    $data = [
-      'id_copropiedad' => (string) $id,
-      'copropiedad' => $community['copropiedad'],
-    ];
-    if ($this->schema->columnExists($table, 'pertenece_copropiedad')) {
-      $data['pertenece_copropiedad'] = self::BELONGS_TO_COMMUNITY;
-    }
-    if ($this->schema->columnExists($table, 'cct_modified')) {
-      $data['cct_modified'] = date('Y-m-d H:i:s');
-    }
-    $this->db->update($table, $data, ['_ID' => $propertyId]);
-    $code = trim((string) ($property['codigo'] ?? ''));
-    return ['message' => 'Inmueble web ' . ($code !== '' ? $code : '#' . $propertyId) . ' vinculado a ' . $community['copropiedad'] . '.'];
-  }
-
-  private function webPropertyTable(): string
-  {
-    $table = $this->db->table('jet_cct_inmuebles');
-    return $this->schema->tableExists($table) && $this->schema->columnExists($table, 'id_copropiedad') ? $table : '';
-  }
-
-  private function webPropertySelectSql(string $table): string
-  {
-    $communityTable = $this->db->table('jet_cct_copropiedades');
-    return "SELECT i.`_ID`, i.`codigo`, i.`estado`, i.`tipo_negocio`, i.`direccion`, i.`barrio`, i.`id_copropiedad`, cp.`copropiedad` AS copropiedad_actual
-      FROM `{$table}` i
-      LEFT JOIN `{$communityTable}` cp ON CAST(cp.`_ID` AS CHAR) = TRIM(COALESCE(i.`id_copropiedad`, ''))";
-  }
-
-  /** @param array<int,array<string,mixed>> $rows @return array<int,array<string,string>> */
-  private function webPropertyRows(array $rows): array
-  {
-    return array_map(static fn(array $row): array => [
-      'kind' => 'inmueble',
-      'id' => (string) (int) ($row['_ID'] ?? 0),
-      'codigo' => trim((string) ($row['codigo'] ?? '')),
-      'estado' => trim((string) ($row['estado'] ?? '')),
-      'tipo_negocio' => trim((string) ($row['tipo_negocio'] ?? '')),
-      'direccion' => trim((string) ($row['direccion'] ?? '')),
-      'barrio' => trim((string) ($row['barrio'] ?? '')),
-      'id_copropiedad' => trim((string) ($row['id_copropiedad'] ?? '')),
-      'copropiedad_actual' => trim((string) ($row['copropiedad_actual'] ?? '')),
-    ], $rows);
-  }
-
   public function linkContract(int $id, int $contractId): array
   {
     $community = $this->find($id);
@@ -498,7 +401,6 @@ final class CommunityRecordsService
   private function contractRows(array $rows): array
   {
     return array_map(static fn(array $row): array => [
-      'kind' => 'contrato',
       'id' => (string) (int) ($row['_ID'] ?? 0),
       'contrato' => trim((string) ($row['contrato'] ?? '')),
       'inmueble' => trim((string) ($row['inmueble'] ?? '')),

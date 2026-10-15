@@ -1298,7 +1298,6 @@
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-contract :is(small,span) { @apply text-[11px] text-slate-500; overflow-wrap:anywhere; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-contract em { @apply text-[11px] not-italic font-semibold text-amber-700; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-contract .scm-an-btn { @apply min-h-[34px] shrink-0 px-3; }
-  #scm-app #scm-panel-admin-notificaciones .scm-an-community-contract.is-web { @apply border-dashed bg-white; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-linked-badge { @apply shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-foot { @apply sticky bottom-0 -mx-5 mt-auto flex justify-end gap-2 border-0 border-t border-solid border-slate-200 bg-white px-5 py-4 sm:-mx-7 sm:px-7; }
   @media (min-width:1024px) {
