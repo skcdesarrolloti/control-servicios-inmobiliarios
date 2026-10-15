@@ -199,6 +199,8 @@
       actions.admin_notifications_payment_receipts_confirm || "";
     var actionAdminNotificationsQueue =
       actions.admin_notifications_queue || "";
+    var actionAdminNotificationsQueueExport =
+      actions.admin_notifications_queue_export || "";
     var actionAdminNotificationsQueueDelete =
       actions.admin_notifications_queue_delete || "";
     var actionAdminNotificationsQueueMessage =
@@ -6692,6 +6694,9 @@
       var queueTemplate = panel.querySelector("[data-admin-notif-queue-template]");
       var queueEmployee = panel.querySelector("[data-admin-notif-queue-employee]");
       var queueMessageModal = panel.querySelector("[data-admin-notif-queue-message-modal]");
+      var queueExportBtn = panel.querySelector("[data-admin-notif-queue-export]");
+      var queueViewButtons = Array.prototype.slice.call(panel.querySelectorAll("[data-admin-notif-queue-mode]"));
+      var queueView = "messages";
       var queueSearch = panel.querySelector("[data-admin-notif-queue-q]");
       var queueClearBtn = panel.querySelector("[data-admin-notif-queue-clear]");
       var queueRefreshBtn = panel.querySelector("[data-admin-notif-queue-refresh]");
@@ -7188,40 +7193,7 @@
             }),
           },
         ];
-        var workbook =
-          '<?xml version="1.0" encoding="UTF-8"?>' +
-          '<?mso-application progid="Excel.Sheet"?>' +
-          '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ' +
-          'xmlns:o="urn:schemas-microsoft-com:office:office" ' +
-          'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
-          'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" ' +
-          'xmlns:html="http://www.w3.org/TR/REC-html40">' +
-          '<Styles><Style ss:ID="Header"><Font ss:Bold="1"/><Interior ss:Color="#EAF2FF" ss:Pattern="Solid"/></Style></Styles>' +
-          sheets.map(function (sheet) {
-            var header = "<Row>" + columns.map(function (column) {
-              return '<Cell ss:StyleID="Header"><Data ss:Type="String">' + excelXml(column[1]) + "</Data></Cell>";
-            }).join("") + "</Row>";
-            var body = sheet.rows.length
-              ? sheet.rows.map(function (row) {
-                  return "<Row>" + columns.map(function (column) {
-                    return '<Cell><Data ss:Type="String">' + excelXml(row[column[0]]) + "</Data></Cell>";
-                  }).join("") + "</Row>";
-                }).join("")
-              : '<Row><Cell><Data ss:Type="String">Sin registros</Data></Cell></Row>';
-            return '<Worksheet ss:Name="' + excelXml(sheet.name) + '"><Table>' + header + body + "</Table></Worksheet>";
-          }).join("") +
-          "</Workbook>";
-        var blob = new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8" });
-        var url = URL.createObjectURL(blob);
-        var link = document.createElement("a");
-        link.href = url;
-        link.download = importReportFileName();
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        setTimeout(function () {
-          URL.revokeObjectURL(url);
-        }, 1000);
+        downloadExcelWorkbook(importReportFileName(), columns, sheets);
       }
 
       function currentContractStatus() {
@@ -9486,17 +9458,8 @@
           });
       }
 
-      function loadNotificationQueue(page) {
-        if (!queueForm || !queueResultsEl || !actionAdminNotificationsQueue) {
-          return Promise.resolve();
-        }
-        queuePage = page || 1;
-        queueLoaded = true;
-        queueRequestId += 1;
-        var requestId = queueRequestId;
+      function queueFilterFormData() {
         var fd = new FormData();
-        fd.set("action", actionAdminNotificationsQueue);
-        fd.set("nonce", nonce);
         fd.set("date_from", queueFieldValue(queueDateFrom));
         fd.set("date_to", queueFieldValue(queueDateTo));
         fd.set("status", queueFieldValue(queueStatus));
@@ -9505,6 +9468,159 @@
         fd.set("template", queueFieldValue(queueTemplate));
         fd.set("employee", queueFieldValue(queueEmployee));
         fd.set("q", queueFieldValue(queueSearch));
+        return fd;
+      }
+
+      function setQueueView(view) {
+        queueView = view === "batches" ? "batches" : "messages";
+        queueViewButtons.forEach(function (btn) {
+          var active = btn.getAttribute("data-admin-notif-queue-mode") === queueView;
+          btn.classList.toggle("is-active", active);
+          btn.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+      }
+
+      function renderQueueBatches(batches) {
+        if (!queueResultsEl) {
+          return;
+        }
+        queueSelectedFailed.clear();
+        if (!Array.isArray(batches) || batches.length === 0) {
+          queueResultsEl.innerHTML =
+            '<div class="scm-admin-notif-empty"><strong>Sin lotes</strong><span>No hay envíos masivos para esos filtros.</span></div>';
+          return;
+        }
+        queueResultsEl.innerHTML =
+          '<div class="scm-admin-notif-queue-table-wrap"><table class="scm-admin-notif-queue-table scm-an-batches-table">' +
+          "<thead><tr><th>Lote</th><th>Fecha</th><th>Funcionario</th><th>Pestaña / plantilla</th><th>Resultado</th><th>Motivo principal de fallo</th><th>Acción</th></tr></thead><tbody>" +
+          batches.map(function (batch) {
+            var total = Number(batch.total || 0);
+            var sent = Number(batch.sent || 0);
+            var failed = Number(batch.failed || 0);
+            var pending = Number(batch.pending || 0);
+            var pct = function (value) { return total > 0 ? Math.round((value / total) * 100) : 0; };
+            var reason = batch.top_error
+              ? "<span>" + escHtml(batch.top_error_hint || batch.top_error) + "</span><small>" + escHtml(String(batch.top_error_count || 0)) + " de " + escHtml(String(failed)) + " fallidos</small>"
+              : '<span class="scm-admin-notif-queue-action-muted">Sin fallos</span>';
+            return (
+              "<tr>" +
+              "<td><code>" + escHtml(batch.batch_id || "") + "</code><small>" + escHtml(batch.channels || "") + "</small></td>" +
+              "<td><span>" + escHtml(batch.first_at || "") + "</span>" + (batch.last_at && batch.last_at !== batch.first_at ? "<small>hasta " + escHtml(batch.last_at) + "</small>" : "") + "</td>" +
+              "<td>" + (batch.employee_name ? "<span>" + escHtml(batch.employee_name) + "</span>" : "<small>Automático</small>") + "</td>" +
+              "<td><span>" + escHtml(batch.type_label || "-") + "</span><small>" + escHtml(batch.templates || "") + "</small></td>" +
+              '<td><div class="scm-an-batch-result"><strong>' + total + ' mensaje(s)</strong>' +
+              '<div class="scm-an-batch-bar" aria-hidden="true"><i class="is-sent" style="width:' + pct(sent) + '%"></i><i class="is-failed" style="width:' + pct(failed) + '%"></i><i class="is-pending" style="width:' + pct(pending) + '%"></i></div>' +
+              '<small><b class="is-sent">' + sent + " enviadas</b> · <b class=\"is-failed\">" + failed + " fallidas</b>" + (pending ? " · " + pending + " pendientes" : "") + "</small></div></td>" +
+              '<td class="scm-an-batch-reason">' + reason + "</td>" +
+              '<td><button type="button" class="scm-admin-notif-queue-view" data-admin-notif-queue-batch="' + escAttr(batch.batch_id || "") + '">Ver mensajes</button></td>' +
+              "</tr>"
+            );
+          }).join("") +
+          "</tbody></table></div>";
+      }
+
+      function downloadExcelWorkbook(fileName, columns, sheets) {
+        var workbook =
+          '<?xml version="1.0" encoding="UTF-8"?>' +
+          '<?mso-application progid="Excel.Sheet"?>' +
+          '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ' +
+          'xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+          'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
+          'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" ' +
+          'xmlns:html="http://www.w3.org/TR/REC-html40">' +
+          '<Styles><Style ss:ID="Header"><Font ss:Bold="1"/><Interior ss:Color="#EAF2FF" ss:Pattern="Solid"/></Style></Styles>' +
+          sheets.map(function (sheet) {
+            var header = "<Row>" + columns.map(function (column) {
+              return '<Cell ss:StyleID="Header"><Data ss:Type="String">' + excelXml(column[1]) + "</Data></Cell>";
+            }).join("") + "</Row>";
+            var body = sheet.rows.length
+              ? sheet.rows.map(function (row) {
+                  return "<Row>" + columns.map(function (column) {
+                    return '<Cell><Data ss:Type="String">' + excelXml(row[column[0]]) + "</Data></Cell>";
+                  }).join("") + "</Row>";
+                }).join("")
+              : '<Row><Cell><Data ss:Type="String">Sin registros</Data></Cell></Row>';
+            return '<Worksheet ss:Name="' + excelXml(sheet.name) + '"><Table>' + header + body + "</Table></Worksheet>";
+          }).join("") +
+          "</Workbook>";
+        var blob = new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(function () {
+          URL.revokeObjectURL(url);
+        }, 1000);
+      }
+
+      function exportNotificationQueue(button) {
+        if (!actionAdminNotificationsQueueExport) {
+          return;
+        }
+        var fd = queueFilterFormData();
+        button.disabled = true;
+        showToast("info", "Preparando el Excel de la cola...");
+        postAdminNotifications(actionAdminNotificationsQueueExport, fd)
+          .then(function (data) {
+            var rows = (Array.isArray(data.rows) ? data.rows : []).map(function (row) {
+              return Object.assign({}, row, {
+                employee_name: row.employee_name || "Automático",
+                attempts_label: (row.attempts || 0) + "/" + (row.max_attempts || 0),
+                last_error_hint: row.last_error_hint || "",
+              });
+            });
+            var columns = [
+              ["id", "ID"],
+              ["created_at", "Creado"],
+              ["sent_at", "Enviado"],
+              ["status_label", "Estado"],
+              ["channel_label", "Canal"],
+              ["destination_name", "Destinatario"],
+              ["destination", "Destino"],
+              ["type_label", "Pestaña"],
+              ["employee_name", "Funcionario"],
+              ["template_name", "Plantilla"],
+              ["batch_id", "Lote"],
+              ["attempts_label", "Intentos"],
+              ["subject", "Asunto"],
+              ["message_text", "Mensaje"],
+              ["last_error_hint", "Motivo del fallo"],
+              ["last_error", "Error técnico"],
+            ];
+            var now = new Date();
+            var stamp = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("");
+            downloadExcelWorkbook("cola-notificaciones-" + stamp + ".xls", columns, [
+              { name: "Cola", rows: rows },
+              { name: "Fallidas", rows: rows.filter(function (row) { return row.status_key === "failed"; }) },
+            ]);
+            var total = Number(data.total || rows.length);
+            showToast(total > rows.length ? "warning" : "success", total > rows.length
+              ? "Se exportaron " + rows.length + " de " + total + " registros (límite por archivo). Ajusta los filtros para el resto."
+              : rows.length + " registro(s) exportado(s).");
+          })
+          .catch(function (err) {
+            showToast("error", err.message || "No se pudo exportar la cola.");
+          })
+          .finally(function () {
+            button.disabled = false;
+          });
+      }
+
+      function loadNotificationQueue(page) {
+        if (!queueForm || !queueResultsEl || !actionAdminNotificationsQueue) {
+          return Promise.resolve();
+        }
+        queuePage = page || 1;
+        queueLoaded = true;
+        queueRequestId += 1;
+        var requestId = queueRequestId;
+        var fd = queueFilterFormData();
+        fd.set("action", actionAdminNotificationsQueue);
+        fd.set("nonce", nonce);
+        fd.set("view", queueView);
         fd.set("page", String(queuePage));
         fd.set("per_page", "25");
         queueResultsEl.innerHTML =
@@ -9530,7 +9646,11 @@
             }
             var data = json.data || {};
             renderQueueSummary(data.stats || {}, data.pagination || {});
-            renderQueueRows(data.rows || []);
+            if (queueView === "batches") {
+              renderQueueBatches(data.batches || []);
+            } else {
+              renderQueueRows(data.rows || []);
+            }
             renderQueuePagination(data.pagination || {});
           })
           .catch(function (err) {
@@ -10474,6 +10594,19 @@
             loadNotificationQueue(queuePage || 1);
           });
         }
+        queueViewButtons.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            setQueueView(btn.getAttribute("data-admin-notif-queue-mode"));
+            loadNotificationQueue(1);
+          });
+        });
+        if (queueExportBtn) {
+          queueExportBtn.addEventListener("click", function () {
+            if (!queueExportBtn.disabled) {
+              exportNotificationQueue(queueExportBtn);
+            }
+          });
+        }
         if (queueClearBtn) {
           queueClearBtn.addEventListener("click", function () {
             [queueDateFrom, queueDateTo, queueStatus, queueChannel, queueType, queueTemplate, queueEmployee, queueSearch].forEach(function (input) {
@@ -10622,6 +10755,21 @@
         }
         if (queueResultsEl) {
           queueResultsEl.addEventListener("click", function (event) {
+            var batchBtn = event.target && event.target.closest
+              ? event.target.closest("[data-admin-notif-queue-batch]")
+              : null;
+            if (batchBtn && queueResultsEl.contains(batchBtn)) {
+              event.preventDefault();
+              if (queueSearch) {
+                queueSearch.value = batchBtn.getAttribute("data-admin-notif-queue-batch") || "";
+              }
+              if (queueStatus) {
+                queueStatus.value = "";
+              }
+              setQueueView("messages");
+              loadNotificationQueue(1);
+              return;
+            }
             var viewBtn = event.target && event.target.closest
               ? event.target.closest("[data-admin-notif-queue-view]")
               : null;

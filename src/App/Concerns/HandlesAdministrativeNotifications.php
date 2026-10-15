@@ -413,7 +413,35 @@ trait HandlesAdministrativeNotifications
       $this->jsonFail('No tienes permiso para consultar la cola de Notificaciones.');
     }
 
-    $filters = [
+    try {
+      $service = $this->get_admin_notifications_service();
+      $filters = $this->admin_notification_queue_filters();
+      $this->jsonOk((string) ($_POST['view'] ?? '') === 'batches'
+        ? $service->notificationQueueBatches($filters)
+        : $service->notificationQueue($filters));
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
+  public function ajax_handler_admin_notifications_queue_export(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para exportar la cola de Notificaciones.');
+    }
+
+    try {
+      $this->jsonOk($this->get_admin_notifications_service()->notificationQueueExport($this->admin_notification_queue_filters(), 5000));
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
+  /** @return array<string,mixed> */
+  private function admin_notification_queue_filters(): array
+  {
+    return [
       'date_from' => trim(sanitize_text_field(wp_unslash((string) ($_POST['date_from'] ?? '')))),
       'date_to' => trim(sanitize_text_field(wp_unslash((string) ($_POST['date_to'] ?? '')))),
       'status' => sanitize_key((string) ($_POST['status'] ?? '')),
@@ -425,12 +453,6 @@ trait HandlesAdministrativeNotifications
       'page' => max(1, (int) ($_POST['page'] ?? 1)),
       'per_page' => max(10, min(100, (int) ($_POST['per_page'] ?? 25))),
     ];
-
-    try {
-      $this->jsonOk($this->get_admin_notifications_service()->notificationQueue($filters));
-    } catch (\Throwable $e) {
-      $this->jsonFail($e->getMessage());
-    }
   }
 
   public function ajax_handler_admin_notifications_queue_message(): void

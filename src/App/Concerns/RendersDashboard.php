@@ -503,6 +503,7 @@ trait RendersDashboard
         'admin_notifications_community_link' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_LINK,
         'admin_notifications_community_catalog_add' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_CATALOG_ADD,
         'admin_notifications_payment_receipts_confirm' => self::AJAX_ADMIN_NOTIFICATIONS_PAYMENT_RECEIPTS_CONFIRM,
+        'admin_notifications_queue_export' => self::AJAX_ADMIN_NOTIFICATIONS_QUEUE_EXPORT,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_options' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
@@ -3183,7 +3184,14 @@ trait RendersDashboard
               <h4>Cola de notificaciones</h4>
               <p>Muestra todo el historial por defecto; usa los filtros para revisar fecha, canal, pesta&ntilde;a, plantilla, funcionario o estado.</p>
             </div>
-            <button type="button" class="scm-an-btn" data-admin-notif-queue-refresh><?php echo $icon('refresh'); ?>Actualizar cola</button>
+            <div class="scm-an-queue-head-actions">
+              <span class="scm-an-segmented" role="group" aria-label="Ver la cola por">
+                <button type="button" class="is-active" aria-pressed="true" data-admin-notif-queue-mode="messages"><?php echo $icon('list'); ?>Mensajes</button>
+                <button type="button" aria-pressed="false" data-admin-notif-queue-mode="batches"><?php echo $icon('stacks'); ?>Lotes</button>
+              </span>
+              <button type="button" class="scm-an-btn" data-admin-notif-queue-export><?php echo $icon('download'); ?>Exportar Excel</button>
+              <button type="button" class="scm-an-btn" data-admin-notif-queue-refresh><?php echo $icon('refresh'); ?>Actualizar cola</button>
+            </div>
           </div>
           <form class="scm-admin-notif-queue-filters" data-admin-notif-queue-form autocomplete="off">
             <div class="scm-field">

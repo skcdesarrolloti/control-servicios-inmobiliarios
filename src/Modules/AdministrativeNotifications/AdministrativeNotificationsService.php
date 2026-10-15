@@ -889,7 +889,180 @@ final class AdministrativeNotificationsService
       $perPage = 25;
     }
     $offset = ($page - 1) * $perPage;
+    [$whereSql, $args, $applied] = $this->queueWhere($filters);
 
+    $total = (int) ($this->db->getVar('SELECT COUNT(1) FROM `' . self::QUEUE_TABLE . '` WHERE ' . $whereSql, $args) ?? 0);
+    $totalPages = max(1, (int) ceil($total / $perPage));
+    if ($page > $totalPages) {
+      $page = $totalPages;
+      $offset = ($page - 1) * $perPage;
+    }
+
+    $rows = $this->db->getResults(
+      'SELECT `id`, `channel`, `provider`, `destination`, `destination_name`, `subject`, `template_name`, `status`, `attempts`, `max_attempts`, `created_at`, `updated_at`, `sent_at`, `meta_json`, LEFT(COALESCE(`message_text`, \'\'), 900) AS `message_text`, LEFT(COALESCE(`last_error`, \'\'), 700) AS `last_error`
+        FROM `' . self::QUEUE_TABLE . '`
+        WHERE ' . $whereSql . '
+        ORDER BY `id` DESC
+        LIMIT ' . $perPage . ' OFFSET ' . $offset,
+      $args
+    );
+
+    return [
+      'rows' => $this->decorateQueueRows($rows),
+      'stats' => $this->queueStats($whereSql, $args, $total),
+      'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
+      'filters' => $applied,
+    ];
+  }
+
+  /**
+   * Queue rows grouped by batch (one bulk send), with sent/failed counts and
+   * the most frequent failure reason of each batch.
+   *
+   * @param array<string,mixed> $filters
+   * @return array{batches:array<int,array<string,mixed>>,stats:array<string,int>,pagination:array<string,int>,filters:array<string,string>}
+   */
+  public function notificationQueueBatches(array $filters = []): array
+  {
+    if (!$this->schema->tableExists(self::QUEUE_TABLE)) {
+      throw new \RuntimeException('La tabla skc_notification_queue no esta disponible.');
+    }
+    $page = max(1, (int) ($filters['page'] ?? 1));
+    $perPage = 20;
+    [$whereSql, $args, $applied] = $this->queueWhere($filters);
+    $messages = (int) ($this->db->getVar('SELECT COUNT(1) FROM `' . self::QUEUE_TABLE . '` WHERE ' . $whereSql, $args) ?? 0);
+    $stats = $this->queueStats($whereSql, $args, $messages);
+
+    // The status filter chooses which batches appear (those with at least one
+    // message in that status); the counts always cover the whole batch.
+    $status = (string) ($applied['status'] ?? '');
+    [$batchWhere, $batchArgs] = $this->queueWhere(['status' => ''] + $filters);
+    $batchSql = $this->jsonTextSql('batch_id');
+    $batchWhere .= " AND `meta_json` LIKE '%\"batch_id\":\"%'";
+    $having = $status !== '' ? ' HAVING SUM(`status` = ?) > 0' : '';
+    $havingArgs = $status !== '' ? [$status] : [];
+    $total = (int) ($this->db->getVar(
+      'SELECT COUNT(1) FROM (SELECT ' . $batchSql . ' AS b FROM `' . self::QUEUE_TABLE . '` WHERE ' . $batchWhere . ' GROUP BY ' . $batchSql . $having . ') t',
+      array_merge($batchArgs, $havingArgs)
+    ) ?? 0);
+    $totalPages = max(1, (int) ceil($total / $perPage));
+    $page = min($page, $totalPages);
+    $offset = ($page - 1) * $perPage;
+
+    $rows = $this->db->getResults(
+      'SELECT ' . $batchSql . ' AS batch_id,
+              COUNT(1) AS total,
+              SUM(`status` = \'sent\') AS sent,
+              SUM(`status` = \'failed\') AS failed,
+              SUM(`status` IN (\'pending\', \'processing\')) AS pending,
+              SUM(`status` = \'cancelled\') AS cancelled,
+              MIN(`created_at`) AS first_at,
+              MAX(`created_at`) AS last_at,
+              GROUP_CONCAT(DISTINCT `channel` ORDER BY `channel` SEPARATOR \',\') AS channels,
+              GROUP_CONCAT(DISTINCT `template_name` ORDER BY `template_name` SEPARATOR \', \') AS templates,
+              MAX(' . $this->jsonTextSql('nombre_funcionario') . ') AS employee_name,
+              MAX(' . $this->jsonTextSql('tipo_actor') . ') AS type_key
+         FROM `' . self::QUEUE_TABLE . '`
+        WHERE ' . $batchWhere . '
+        GROUP BY ' . $batchSql . $having . '
+        ORDER BY MAX(`id`) DESC
+        LIMIT ' . $perPage . ' OFFSET ' . $offset,
+      array_merge($batchArgs, $havingArgs)
+    );
+
+    $reasons = [];
+    $batchIds = array_values(array_filter(array_map(static fn(array $row): string => (string) $row['batch_id'], $rows), static fn(string $id): bool => preg_match('/^[A-Za-z0-9_-]{1,64}$/', $id) === 1));
+    if ($batchIds !== []) {
+      $likes = implode(' OR ', array_fill(0, count($batchIds), '`meta_json` LIKE ?'));
+      $likeArgs = array_map(static fn(string $id): string => '%"batch_id":"' . $id . '"%', $batchIds);
+      foreach ($this->db->getResults(
+        'SELECT ' . $batchSql . ' AS batch_id, LEFT(COALESCE(`last_error`, \'\'), 300) AS error, COUNT(1) AS total
+           FROM `' . self::QUEUE_TABLE . '`
+          WHERE `status` = \'failed\' AND (' . $likes . ')
+          GROUP BY ' . $batchSql . ', LEFT(COALESCE(`last_error`, \'\'), 300)
+          ORDER BY total DESC',
+        $likeArgs
+      ) as $reason) {
+        $key = (string) $reason['batch_id'];
+        if (!isset($reasons[$key])) {
+          $reasons[$key] = $reason;
+        }
+      }
+    }
+
+    $types = $this->types();
+    $channelLabels = fn(string $value): string => implode(', ', array_map(fn(string $channel): string => $this->queueChannelLabel($channel), array_filter(explode(',', $value))));
+    $batches = [];
+    foreach ($rows as $row) {
+      $id = (string) $row['batch_id'];
+      $typeKey = (string) ($row['type_key'] ?? '');
+      $reason = $reasons[$id] ?? null;
+      $batches[] = [
+        'batch_id' => $id,
+        'total' => (int) $row['total'],
+        'sent' => (int) $row['sent'],
+        'failed' => (int) $row['failed'],
+        'pending' => (int) $row['pending'],
+        'cancelled' => (int) $row['cancelled'],
+        'first_at' => (string) $row['first_at'],
+        'last_at' => (string) $row['last_at'],
+        'channels' => $channelLabels((string) ($row['channels'] ?? '')),
+        'templates' => (string) ($row['templates'] ?? ''),
+        'employee_name' => (string) ($row['employee_name'] ?? ''),
+        'type_label' => $typeKey === 'codeudores' ? 'Codeudores' : (string) ($types[$typeKey]['label'] ?? ''),
+        'top_error' => $reason !== null ? (string) $reason['error'] : '',
+        'top_error_count' => $reason !== null ? (int) $reason['total'] : 0,
+        'top_error_hint' => $reason !== null ? self::queueErrorHint((string) $reason['error']) : '',
+      ];
+    }
+
+    return [
+      'batches' => $batches,
+      'stats' => $stats,
+      'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
+      'filters' => $applied,
+    ];
+  }
+
+  /**
+   * Queue rows for an Excel export, using the same filters as the panel.
+   *
+   * @param array<string,mixed> $filters
+   * @return array{rows:array<int,array<string,mixed>>,total:int,limit:int}
+   */
+  public function notificationQueueExport(array $filters = [], int $limit = 5000): array
+  {
+    if (!$this->schema->tableExists(self::QUEUE_TABLE)) {
+      throw new \RuntimeException('La tabla skc_notification_queue no esta disponible.');
+    }
+    [$whereSql, $args] = $this->queueWhere($filters);
+    $total = (int) ($this->db->getVar('SELECT COUNT(1) FROM `' . self::QUEUE_TABLE . '` WHERE ' . $whereSql, $args) ?? 0);
+    $rows = $this->db->getResults(
+      'SELECT `id`, `channel`, `provider`, `destination`, `destination_name`, `subject`, `template_name`, `status`, `attempts`, `max_attempts`, `created_at`, `updated_at`, `sent_at`, `meta_json`, LEFT(COALESCE(`message_text`, \'\'), 1500) AS `message_text`, LEFT(COALESCE(`last_error`, \'\'), 700) AS `last_error`
+        FROM `' . self::QUEUE_TABLE . '`
+        WHERE ' . $whereSql . '
+        ORDER BY `id` DESC
+        LIMIT ' . max(1, $limit),
+      $args
+    );
+    return ['rows' => $this->decorateQueueRows($rows), 'total' => $total, 'limit' => $limit];
+  }
+
+  /** SQL that reads a "key":"value" string out of meta_json ('' when missing). */
+  private function jsonTextSql(string $key): string
+  {
+    $needle = '"' . $key . '":"';
+    return "(CASE WHEN `meta_json` LIKE '%" . $needle . "%' THEN SUBSTRING_INDEX(SUBSTRING_INDEX(`meta_json`, '" . $needle . "', -1), '\"', 1) ELSE '' END)";
+  }
+
+  /**
+   * WHERE clause shared by the queue list, batches and export.
+   *
+   * @param array<string,mixed> $filters
+   * @return array{0:string,1:array<int,mixed>,2:array<string,string>}
+   */
+  private function queueWhere(array $filters): array
+  {
     $status = strtolower(trim((string) ($filters['status'] ?? '')));
     $channel = strtolower(trim((string) ($filters['channel'] ?? '')));
     $type = trim((string) ($filters['type'] ?? ''));
@@ -967,23 +1140,17 @@ final class AdministrativeNotificationsService
       array_push($args, $needle, $needle, $needle, $needle, $needle, $needle, $needle);
     }
 
-    $whereSql = implode(' AND ', $where);
-    $total = (int) ($this->db->getVar('SELECT COUNT(1) FROM `' . self::QUEUE_TABLE . '` WHERE ' . $whereSql, $args) ?? 0);
-    $totalPages = max(1, (int) ceil($total / $perPage));
-    if ($page > $totalPages) {
-      $page = $totalPages;
-      $offset = ($page - 1) * $perPage;
-    }
 
-    $rows = $this->db->getResults(
-      'SELECT `id`, `channel`, `provider`, `destination`, `destination_name`, `subject`, `template_name`, `status`, `attempts`, `max_attempts`, `created_at`, `updated_at`, `sent_at`, `meta_json`, LEFT(COALESCE(`message_text`, \'\'), 900) AS `message_text`, LEFT(COALESCE(`last_error`, \'\'), 700) AS `last_error`
-        FROM `' . self::QUEUE_TABLE . '`
-        WHERE ' . $whereSql . '
-        ORDER BY `id` DESC
-        LIMIT ' . $perPage . ' OFFSET ' . $offset,
-      $args
-    );
+    return [
+      implode(' AND ', $where),
+      $args,
+      ['date_from' => $dateFrom, 'date_to' => $dateTo, 'status' => $status, 'channel' => $channel, 'type' => $type, 'template' => $template, 'q' => $query, 'scope' => $scope, 'employee' => $employee],
+    ];
+  }
 
+  /** @param array<int,mixed> $args @return array<string,int> */
+  private function queueStats(string $whereSql, array $args, int $total): array
+  {
     $statsRows = $this->db->getResults(
       'SELECT LOWER(TRIM(COALESCE(`status`, \'\'))) AS status_key, COUNT(1) AS total
         FROM `' . self::QUEUE_TABLE . '`
@@ -1001,7 +1168,13 @@ final class AdministrativeNotificationsService
         $stats['other'] += $count;
       }
     }
+    return $stats;
+  }
 
+  /** @param array<int,array<string,mixed>> $rows @return array<int,array<string,mixed>> */
+  private function decorateQueueRows(array $rows): array
+  {
+    $types = $this->types();
     foreach ($rows as &$row) {
       $meta = json_decode((string) ($row['meta_json'] ?? ''), true);
       $admin = is_array($meta['admin_notifications'] ?? null) ? $meta['admin_notifications'] : [];
@@ -1022,13 +1195,7 @@ final class AdministrativeNotificationsService
       unset($row['meta_json']);
     }
     unset($row);
-
-    return [
-      'rows' => $rows,
-      'stats' => $stats,
-      'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
-      'filters' => ['date_from' => $dateFrom, 'date_to' => $dateTo, 'status' => $status, 'channel' => $channel, 'type' => $type, 'template' => $template, 'q' => $query, 'scope' => $scope, 'employee' => $employee],
-    ];
+    return $rows;
   }
 
   /** @return array<string,mixed> */
