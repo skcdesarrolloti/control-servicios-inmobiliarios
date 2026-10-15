@@ -3099,25 +3099,7 @@ trait RendersDashboard
               <p>Sube los comprobantes de pago en PDF. El nombre debe iniciar o contener el NIT de la copropiedad; si incluye apartamento o torre, el sistema lo agrega al detalle del mensaje.</p>
             </div>
           </div>
-          <details class="scm-an-filename-guide">
-            <summary><?php echo $icon('help'); ?>&iquest;C&oacute;mo nombrar el PDF?</summary>
-            <div class="scm-an-filename-guide-body">
-              <p class="scm-an-filename-format"><code>NIT</code> <code>MES</code> <code>A&Ntilde;O</code> <code>APTO n&uacute;mero</code> <code>TORRE n&uacute;mero</code> <span>.pdf</span></p>
-              <ul>
-                <li><strong>NIT al inicio:</strong> con o sin puntos y d&iacute;gito de verificaci&oacute;n. No pongas otros n&uacute;meros antes (celulares, cuentas o valores), porque se mezclan con el NIT.</li>
-                <li><strong>Mes en letras y despu&eacute;s el a&ntilde;o:</strong> el a&ntilde;o pegado al NIT (<code>900135868 2026 OCTUBRE</code>) se lee como parte del NIT.</li>
-                <li><strong>Apartamento y torre (opcional):</strong> escribe <code>APTO 302</code> y <code>TORRE 10</code> completos; as&iacute; se identifican los contratos. Abreviaturas como <code>T10</code> solo se muestran como texto.</li>
-                <li>Un PDF por soporte. Si subes varios PDF del mismo NIT, se env&iacute;an juntos en un solo mensaje.</li>
-              </ul>
-              <p class="scm-an-filename-examples-title">Ejemplos correctos</p>
-              <ul class="scm-an-filename-examples">
-                <li><code>901133921 SEPTIEMBRE 2026 APTO 302 TORRE 10.pdf</code></li>
-                <li><code>900.135.868-4 OCTUBRE 2026 APTO 102.pdf</code></li>
-                <li><code>901692013 OCTUBRE 2026.pdf</code> <span>(sin inmueble)</span></li>
-              </ul>
-              <p class="scm-an-filename-note">Antes de confirmar podr&aacute;s revisar y corregir NIT, periodo, inmuebles y copropiedad de cada PDF.</p>
-            </div>
-          </details>
+          <button type="button" class="scm-an-filename-guide-btn" data-admin-notif-filename-guide-open aria-haspopup="dialog"><?php echo $icon('help'); ?>&iquest;C&oacute;mo nombrar el PDF?</button>
           <div class="scm-admin-notif-import-controls">
             <label class="scm-an-file">
               <span>Comprobantes PDF</span>
@@ -3279,6 +3261,40 @@ trait RendersDashboard
           </div>
           <div class="scm-admin-notif-pagination" data-admin-notif-queue-pagination></div>
       </section>
+
+      <div class="scm-admin-notif-modal scm-an-filename-guide-modal" data-admin-notif-filename-guide hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-filename-guide-title">
+        <div class="scm-admin-notif-modal-backdrop" data-admin-notif-filename-guide-close aria-hidden="true"></div>
+        <section class="scm-admin-notif-modal-panel">
+          <div class="scm-admin-notif-modal-head">
+            <span class="scm-an-modal-icon"><?php echo $icon('help'); ?></span>
+            <div class="scm-admin-notif-modal-titleblock">
+              <span class="scm-an-kicker">Soportes de pago</span>
+              <h4 id="scm-admin-notif-filename-guide-title">&iquest;C&oacute;mo nombrar el PDF?</h4>
+              <p>As&iacute; el sistema reconoce la copropiedad, el periodo y el inmueble de cada comprobante.</p>
+            </div>
+            <button type="button" class="scm-modal-close" data-admin-notif-filename-guide-close aria-label="Cerrar gu&iacute;a"><?php echo $icon('close'); ?></button>
+          </div>
+                <div class="scm-an-filename-guide-body scm-an-filename-guide" data-admin-notif-filename-guide-body>
+                  <p class="scm-an-filename-format"><code>NIT</code> <code>MES</code> <code>A&Ntilde;O</code> <code>APTO n&uacute;mero</code> <code>TORRE n&uacute;mero</code> <span>.pdf</span></p>
+                  <ul>
+                    <li><strong>NIT al inicio:</strong> con o sin puntos y d&iacute;gito de verificaci&oacute;n. No pongas otros n&uacute;meros antes (celulares, cuentas o valores), porque se mezclan con el NIT.</li>
+                    <li><strong>Mes en letras y despu&eacute;s el a&ntilde;o:</strong> el a&ntilde;o pegado al NIT (<code>900135868 2026 OCTUBRE</code>) se lee como parte del NIT.</li>
+                    <li><strong>Apartamento y torre (opcional):</strong> escribe <code>APTO 302</code> y <code>TORRE 10</code> completos; as&iacute; se identifican los contratos. Abreviaturas como <code>T10</code> solo se muestran como texto.</li>
+                    <li>Un PDF por soporte. Si subes varios PDF del mismo NIT, se env&iacute;an juntos en un solo mensaje.</li>
+                  </ul>
+                  <p class="scm-an-filename-examples-title">Ejemplos correctos</p>
+                  <ul class="scm-an-filename-examples">
+                    <li><code>901133921 SEPTIEMBRE 2026 APTO 302 TORRE 10.pdf</code></li>
+                    <li><code>900.135.868-4 OCTUBRE 2026 APTO 102.pdf</code></li>
+                    <li><code>901692013 OCTUBRE 2026.pdf</code> <span>(sin inmueble)</span></li>
+                  </ul>
+                  <p class="scm-an-filename-note">Antes de confirmar podr&aacute;s revisar y corregir NIT, periodo, inmuebles y copropiedad de cada PDF.</p>
+                </div>
+          <div class="scm-an-community-foot">
+            <button type="button" class="scm-an-btn is-navy" data-admin-notif-filename-guide-close>Entendido</button>
+          </div>
+        </section>
+      </div>
 
       <div class="scm-admin-notif-modal scm-an-queue-message-modal" data-admin-notif-queue-message-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-queue-message-title">
         <div class="scm-admin-notif-modal-backdrop" data-admin-notif-queue-message-close aria-hidden="true"></div>

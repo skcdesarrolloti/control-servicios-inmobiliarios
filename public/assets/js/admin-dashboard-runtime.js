@@ -6694,6 +6694,7 @@
       var queueTemplate = panel.querySelector("[data-admin-notif-queue-template]");
       var queueEmployee = panel.querySelector("[data-admin-notif-queue-employee]");
       var queueMessageModal = panel.querySelector("[data-admin-notif-queue-message-modal]");
+      var filenameGuideModal = panel.querySelector("[data-admin-notif-filename-guide]");
       var queueExportBtn = panel.querySelector("[data-admin-notif-queue-export]");
       var queueViewButtons = Array.prototype.slice.call(panel.querySelectorAll("[data-admin-notif-queue-mode]"));
       var queueView = "messages";
@@ -10494,6 +10495,42 @@
           paymentReceiptsImportForm.addEventListener("submit", function (event) {
             event.preventDefault();
             importPaymentReceiptsFromFiles();
+          });
+        }
+        if (filenameGuideModal) {
+          var closeFilenameGuide = function () {
+            if (filenameGuideModal.hidden) {
+              return;
+            }
+            filenameGuideModal.hidden = true;
+            if (!composerModal || composerModal.hidden) {
+              document.body.classList.remove("scm-admin-notif-modal-open");
+            }
+          };
+          panel.addEventListener("click", function (event) {
+            var target = event.target && event.target.closest ? event.target : null;
+            if (!target) {
+              return;
+            }
+            if (target.closest("[data-admin-notif-filename-guide-open]")) {
+              event.preventDefault();
+              filenameGuideModal.hidden = false;
+              document.body.classList.add("scm-admin-notif-modal-open");
+              var closeBtn = filenameGuideModal.querySelector(".scm-modal-close");
+              if (closeBtn) {
+                closeBtn.focus();
+              }
+              return;
+            }
+            if (target.closest("[data-admin-notif-filename-guide-close]")) {
+              event.preventDefault();
+              closeFilenameGuide();
+            }
+          });
+          document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+              closeFilenameGuide();
+            }
           });
         }
         if (receiptsReviewModal) {
