@@ -203,6 +203,10 @@
       actions.admin_notifications_queue_message || "";
     var actionAdminNotificationsFilteredIds =
       actions.admin_notifications_filtered_ids || "";
+    var actionAdminNotificationsCommunityGet =
+      actions.admin_notifications_community_get || "";
+    var actionAdminNotificationsCommunitySave =
+      actions.admin_notifications_community_save || "";
     var actionAdminNotificationsCollection =
       actions.admin_notifications_collection || "";
     var actionAdminNotificationsCollectionOptions =
@@ -6729,6 +6733,9 @@
       var selectFilteredBtn = panel.querySelector("[data-admin-notif-select-filtered]");
       var selectFilteredLabel = panel.querySelector("[data-admin-notif-select-filtered-label]");
       var selectionCountEl = panel.querySelector("[data-admin-notif-selection-count]");
+      var communityNewBtn = panel.querySelector("[data-admin-notif-community-new]");
+      var communityModal = panel.querySelector("[data-admin-notif-community-modal]");
+      var communityForm = communityModal ? communityModal.querySelector("[data-admin-notif-community-form]") : null;
       var subjectWrap = panel.querySelector("[data-admin-notif-subject-wrap]");
       var subjectInput = panel.querySelector("[data-admin-notif-subject]");
       var messageFieldWrap = panel.querySelector("[data-admin-notif-message-field]");
@@ -8143,6 +8150,9 @@
         if (selectFilteredLabel) {
           selectFilteredLabel.textContent = filteredSelectionActive ? "Deseleccionar todos" : "Seleccionar todos los filtrados";
         }
+        if (communityNewBtn) {
+          communityNewBtn.hidden = currentType().indexOf("copropiedades_") !== 0 || !actionAdminNotificationsCommunitySave;
+        }
         if (collectionSelectedCountEl) {
           collectionSelectedCountEl.textContent = String(selected.size);
         }
@@ -8833,6 +8843,147 @@
 
       function deleteQueueRecord(id) {
         deleteQueueRecords([id]);
+      }
+
+      function postAdminNotifications(action, fields) {
+        var fd = fields instanceof FormData ? fields : new FormData();
+        if (!(fields instanceof FormData)) {
+          Object.keys(fields || {}).forEach(function (key) {
+            fd.set(key, String(fields[key] == null ? "" : fields[key]));
+          });
+        }
+        fd.set("action", action);
+        fd.set("nonce", nonce);
+        return fetchWithTimeout(ajaxUrl, {
+          method: "POST",
+          body: fd,
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        })
+          .then(function (response) {
+            return responseJson(response);
+          })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error((json && json.data && json.data.message) || "No se pudo completar la acción.");
+            }
+            return json.data || {};
+          });
+      }
+
+      function fillCommunitySelect(select, items, current) {
+        var value = String(current || "");
+        var options = (items || []).map(function (item) {
+          return typeof item === "object"
+            ? { value: String(item.codigo || ""), label: String(item.codigo || "") + (item.pais ? " " + item.pais : "") }
+            : { value: String(item), label: String(item) };
+        });
+        if (value && !options.some(function (option) { return option.value === value; })) {
+          options.unshift({ value: value, label: value + " (actual)" });
+        }
+        var isIndicative = select.getAttribute("data-admin-notif-community-select") === "indicativos";
+        select.innerHTML = (isIndicative ? "" : '<option value="">Selecciona…</option>') + options.map(function (option) {
+          return '<option value="' + escAttr(option.value) + '">' + escHtml(option.label) + "</option>";
+        }).join("");
+        select.value = value || (isIndicative ? "+57" : "");
+      }
+
+      function closeCommunityModal() {
+        if (!communityModal || communityModal.hidden) {
+          return;
+        }
+        communityModal.hidden = true;
+        if (!composerModal || composerModal.hidden) {
+          document.body.classList.remove("scm-admin-notif-modal-open");
+        }
+      }
+
+      function openCommunityModal(id) {
+        if (!communityModal || !communityForm || !actionAdminNotificationsCommunityGet) {
+          return;
+        }
+        var recordId = String(id || "").trim();
+        var isEdit = recordId !== "";
+        communityForm.reset();
+        communityForm.querySelector("[data-admin-notif-community-id]").value = recordId;
+        communityModal.querySelector("[data-admin-notif-community-title]").textContent = isEdit ? "Editar copropiedad" : "Nueva copropiedad";
+        communityModal.querySelector("[data-admin-notif-community-subtitle]").textContent = isEdit
+          ? "Los cambios también se copian al contrato de arrendamiento, contrato de mandato y hoja de cierre vinculados."
+          : "Completa los datos de la copropiedad.";
+        communityModal.querySelector("[data-admin-notif-community-submit-label]").textContent = isEdit ? "Guardar cambios" : "Crear copropiedad";
+        var linkedEl = communityModal.querySelector("[data-admin-notif-community-linked]");
+        linkedEl.hidden = true;
+        linkedEl.innerHTML = "";
+        var submitBtn = communityForm.querySelector("[data-admin-notif-community-submit]");
+        submitBtn.disabled = true;
+        communityModal.hidden = false;
+        document.body.classList.add("scm-admin-notif-modal-open");
+        postAdminNotifications(actionAdminNotificationsCommunityGet, { id: recordId })
+          .then(function (data) {
+            var record = data.record || {};
+            var options = data.options || {};
+            communityForm.querySelectorAll("[data-admin-notif-community-select]").forEach(function (select) {
+              var key = select.getAttribute("data-admin-notif-community-select");
+              var current = record[select.name] || "";
+              if (key === "indicativos" && current && current.charAt(0) !== "+") {
+                current = "+" + current;
+              }
+              fillCommunitySelect(select, options[key] || [], current);
+            });
+            ["copropiedad", "nit", "id_inmueble", "direccion", "administrador", "contacto", "correo", "numero_cuenta"].forEach(function (name) {
+              var input = communityForm.elements[name];
+              if (input) {
+                input.value = record[name] || "";
+              }
+            });
+            var linked = record.linked || {};
+            var parts = Object.keys(linked).filter(function (key) { return Number(linked[key]) > 0; }).map(function (key) {
+              return linked[key] + " " + key;
+            });
+            if (isEdit) {
+              linkedEl.hidden = false;
+              linkedEl.innerHTML = parts.length
+                ? "<strong>Registros vinculados que se actualizarán</strong><span>" + escHtml(parts.join(" · ")) + "</span>"
+                : "<strong>Sin registros vinculados</strong><span>Solo se actualizará la copropiedad.</span>";
+            }
+            submitBtn.disabled = false;
+            var first = communityForm.elements.copropiedad;
+            if (first) {
+              first.focus();
+            }
+          })
+          .catch(function (err) {
+            closeCommunityModal();
+            showToast("error", err.message || "No se pudo cargar la copropiedad.");
+          });
+      }
+
+      function submitCommunityForm() {
+        if (!communityForm || !actionAdminNotificationsCommunitySave) {
+          return;
+        }
+        var missing = Array.prototype.filter.call(communityForm.querySelectorAll("[required]"), function (field) {
+          return !String(field.value || "").trim();
+        });
+        if (missing.length) {
+          missing[0].focus();
+          showToast("warning", "Completa los campos obligatorios marcados con *.");
+          return;
+        }
+        var submitBtn = communityForm.querySelector("[data-admin-notif-community-submit]");
+        submitBtn.disabled = true;
+        postAdminNotifications(actionAdminNotificationsCommunitySave, new FormData(communityForm))
+          .then(function (data) {
+            showToast("success", data.message || "Copropiedad guardada.");
+            closeCommunityModal();
+            loadRecipients(currentPage);
+          })
+          .catch(function (err) {
+            showToast("error", err.message || "No se pudo guardar la copropiedad.");
+          })
+          .finally(function () {
+            submitBtn.disabled = false;
+          });
       }
 
       function queueMessageWhatsappText(value) {
@@ -9712,6 +9863,38 @@
             }
             event.preventDefault();
             loadNotificationQueue(parseInt(btn.getAttribute("data-admin-notif-queue-page") || "1", 10));
+          });
+        }
+        if (communityNewBtn) {
+          communityNewBtn.addEventListener("click", function () {
+            openCommunityModal("");
+          });
+        }
+        recipientsEl.addEventListener("click", function (event) {
+          var editBtn = event.target && event.target.closest
+            ? event.target.closest("[data-admin-notif-community-edit]")
+            : null;
+          if (!editBtn || !recipientsEl.contains(editBtn)) {
+            return;
+          }
+          event.preventDefault();
+          openCommunityModal(editBtn.getAttribute("data-admin-notif-community-edit") || "");
+        });
+        if (communityModal && communityForm) {
+          communityModal.addEventListener("click", function (event) {
+            if (event.target && event.target.closest && event.target.closest("[data-admin-notif-community-close]")) {
+              event.preventDefault();
+              closeCommunityModal();
+            }
+          });
+          communityForm.addEventListener("submit", function (event) {
+            event.preventDefault();
+            submitCommunityForm();
+          });
+          document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape" && !communityModal.hidden) {
+              closeCommunityModal();
+            }
           });
         }
         if (queueMessageModal) {

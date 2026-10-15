@@ -98,6 +98,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_ADMIN_NOTIFICATIONS_QUEUE_DELETE = 'scm_admin_notifications_queue_delete';
   const AJAX_ADMIN_NOTIFICATIONS_QUEUE_MESSAGE = 'scm_admin_notifications_queue_message';
   const AJAX_ADMIN_NOTIFICATIONS_FILTERED_IDS = 'scm_admin_notifications_filtered_ids';
+  const AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_GET = 'scm_admin_notifications_community_get';
+  const AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_SAVE = 'scm_admin_notifications_community_save';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION = 'scm_admin_notifications_collection';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS = 'scm_admin_notifications_collection_options';
   const AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE = 'scm_admin_notifications_collection_queue';

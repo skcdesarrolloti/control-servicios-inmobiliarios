@@ -6,6 +6,7 @@ namespace SCM\App\Concerns;
 
 use SCM\Core\Auth;
 use SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService;
+use SCM\Modules\AdministrativeNotifications\CommunityRecordsService;
 
 trait HandlesAdministrativeNotifications
 {
@@ -76,6 +77,51 @@ trait HandlesAdministrativeNotifications
       $this->jsonOk($this->get_admin_notifications_service()->recipientSummariesForFilter($type, $query, 5000, $contractStatus, $inmuebleSimi, $contractNumber, $fieldFilters));
     } catch (\Throwable $e) {
       $this->jsonFail($e->getMessage());
+    }
+  }
+
+  public function ajax_handler_admin_notifications_community_get(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para gestionar copropiedades.');
+    }
+
+    try {
+      $service = new CommunityRecordsService($this->db);
+      $id = max(0, (int) ($_POST['id'] ?? 0));
+      $this->jsonOk([
+        'record' => $id > 0 ? $service->find($id) : null,
+        'options' => $service->options(),
+      ]);
+    } catch (\DomainException $e) {
+      $this->jsonFail($e->getMessage());
+    } catch (\Throwable $e) {
+      error_log('[copropiedades] ' . $e->getMessage());
+      $this->jsonFail('No se pudo cargar la copropiedad.');
+    }
+  }
+
+  public function ajax_handler_admin_notifications_community_save(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para gestionar copropiedades.');
+    }
+
+    $fields = ['copropiedad', 'nit', 'administrador', 'contacto', 'indicativo', 'correo', 'barrio', 'direccion', 'tipo_cuenta', 'numero_cuenta', 'banco', 'id_inmueble'];
+    $input = [];
+    foreach ($fields as $field) {
+      $input[$field] = sanitize_text_field(wp_unslash((string) ($_POST[$field] ?? '')));
+    }
+
+    try {
+      $this->jsonOk((new CommunityRecordsService($this->db))->save($input, max(0, (int) ($_POST['id'] ?? 0))));
+    } catch (\DomainException $e) {
+      $this->jsonFail($e->getMessage());
+    } catch (\Throwable $e) {
+      error_log('[copropiedades] ' . $e->getMessage());
+      $this->jsonFail('No se pudo guardar la copropiedad. Inténtalo nuevamente.');
     }
   }
 
@@ -862,6 +908,9 @@ trait HandlesAdministrativeNotifications
       $html .= '<span class="' . ($phone !== '' ? 'is-ready' : 'is-missing') . '"><span class="material-symbols-outlined" aria-hidden="true">smartphone</span><span class="sr-only">Celular: </span>' . esc_html($phone !== '' ? $phone : ($rawPhone !== '' ? $rawPhone : 'Sin numero')) . '</span>';
       $html .= '</span>';
       $html .= '<span class="scm-admin-notif-row-actions" aria-label="Acciones rapidas de contacto">';
+      if (str_starts_with($actorType, 'copropiedades_')) {
+        $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--edit" data-admin-notif-community-edit="' . esc_attr((string) $id) . '" title="Editar ' . esc_attr($name) . '"><span class="material-symbols-outlined" aria-hidden="true">edit</span>Editar</button>';
+      }
       $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--email" data-admin-notif-single-channel="email" data-admin-notif-single-id="' . esc_attr((string) $id) . '" title="Enviar Email a ' . esc_attr($name) . '"><span class="material-symbols-outlined" aria-hidden="true">mail</span>Email</button>';
       $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--sms" data-admin-notif-single-channel="sms" data-admin-notif-single-id="' . esc_attr((string) $id) . '" title="Enviar SMS a ' . esc_attr($name) . '"><span class="material-symbols-outlined" aria-hidden="true">sms</span>SMS</button>';
       $html .= '<button type="button" class="scm-admin-notif-row-action scm-admin-notif-row-action--whatsapp" data-admin-notif-single-channel="whatsapp" data-admin-notif-single-id="' . esc_attr((string) $id) . '" title="Enviar WhatsApp a ' . esc_attr($name) . '"><span class="material-symbols-outlined" aria-hidden="true">chat</span>WhatsApp</button>';

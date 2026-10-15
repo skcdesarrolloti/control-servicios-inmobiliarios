@@ -497,6 +497,8 @@ trait RendersDashboard
         'admin_notifications_queue_delete' => self::AJAX_ADMIN_NOTIFICATIONS_QUEUE_DELETE,
         'admin_notifications_queue_message' => self::AJAX_ADMIN_NOTIFICATIONS_QUEUE_MESSAGE,
         'admin_notifications_filtered_ids' => self::AJAX_ADMIN_NOTIFICATIONS_FILTERED_IDS,
+        'admin_notifications_community_get' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_GET,
+        'admin_notifications_community_save' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_SAVE,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_options' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
@@ -3153,6 +3155,7 @@ trait RendersDashboard
               <span class="scm-an-selection-count" data-admin-notif-selection-count aria-live="polite">0 seleccionados</span>
               <button type="button" class="scm-an-btn" data-admin-notif-select-visible><?php echo $icon('select_check_box'); ?>Seleccionar visibles</button>
               <button type="button" class="scm-an-btn" data-admin-notif-select-filtered><?php echo $icon('select_all'); ?><span data-admin-notif-select-filtered-label>Seleccionar todos los filtrados</span></button>
+              <button type="button" class="scm-an-btn is-navy" data-admin-notif-community-new hidden><?php echo $icon('add_business'); ?>Nueva copropiedad</button>
               <span class="scm-an-launch-group" role="group" aria-label="Enviar notificaci&oacute;n a los seleccionados">
                 <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--email" data-admin-notif-open-channel="email"><?php echo $icon('mail'); ?>Email</button>
                 <button type="button" class="scm-admin-notif-channel-launch scm-admin-notif-channel-launch--sms" data-admin-notif-open-channel="sms"><?php echo $icon('sms'); ?>SMS</button>
@@ -3259,6 +3262,50 @@ trait RendersDashboard
             <button type="button" class="scm-modal-close" data-admin-notif-queue-message-close aria-label="Cerrar mensaje"><?php echo $icon('close'); ?></button>
           </div>
           <div class="scm-an-queue-message-body" data-admin-notif-queue-message-body aria-live="polite"></div>
+        </section>
+      </div>
+
+      <div class="scm-admin-notif-modal scm-an-community-modal" data-admin-notif-community-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-community-title">
+        <div class="scm-admin-notif-modal-backdrop" aria-hidden="true"></div>
+        <section class="scm-admin-notif-modal-panel">
+          <div class="scm-admin-notif-modal-head">
+            <span class="scm-an-modal-icon"><?php echo $icon('apartment'); ?></span>
+            <div class="scm-admin-notif-modal-titleblock">
+              <span class="scm-an-kicker">Copropiedades</span>
+              <h4 id="scm-admin-notif-community-title" data-admin-notif-community-title>Nueva copropiedad</h4>
+              <p data-admin-notif-community-subtitle>Completa los datos de la copropiedad.</p>
+            </div>
+            <button type="button" class="scm-modal-close" data-admin-notif-community-close aria-label="Cerrar"><?php echo $icon('close'); ?></button>
+          </div>
+          <form class="scm-an-community-form" data-admin-notif-community-form autocomplete="off" novalidate>
+            <input type="hidden" name="id" value="" data-admin-notif-community-id>
+            <div class="scm-an-community-linked" data-admin-notif-community-linked hidden></div>
+            <fieldset class="scm-an-community-group">
+              <legend>Datos de la copropiedad</legend>
+              <div class="scm-field is-wide"><label for="scm-an-community-copropiedad">Copropiedad *</label><input id="scm-an-community-copropiedad" name="copropiedad" type="text" class="scm-input" maxlength="255" required></div>
+              <div class="scm-field"><label for="scm-an-community-nit">NIT *</label><input id="scm-an-community-nit" name="nit" type="text" class="scm-input" maxlength="255" required></div>
+              <div class="scm-field"><label for="scm-an-community-id-inmueble">ID inmueble</label><input id="scm-an-community-id-inmueble" name="id_inmueble" type="text" class="scm-input" maxlength="255"></div>
+              <div class="scm-field"><label for="scm-an-community-barrio">Barrio *</label><select id="scm-an-community-barrio" name="barrio" class="scm-select" required data-admin-notif-community-select="barrios"></select></div>
+              <div class="scm-field"><label for="scm-an-community-direccion">Direcci&oacute;n</label><input id="scm-an-community-direccion" name="direccion" type="text" class="scm-input" maxlength="255"></div>
+            </fieldset>
+            <fieldset class="scm-an-community-group">
+              <legend>Contacto</legend>
+              <div class="scm-field is-wide"><label for="scm-an-community-administrador">Administrador *</label><input id="scm-an-community-administrador" name="administrador" type="text" class="scm-input" maxlength="255" required></div>
+              <div class="scm-field"><label for="scm-an-community-indicativo">Indicativo</label><select id="scm-an-community-indicativo" name="indicativo" class="scm-select" data-admin-notif-community-select="indicativos"></select></div>
+              <div class="scm-field"><label for="scm-an-community-contacto">Contacto (celular) *</label><input id="scm-an-community-contacto" name="contacto" type="text" class="scm-input" maxlength="255" required></div>
+              <div class="scm-field is-wide"><label for="scm-an-community-correo">Correo *</label><input id="scm-an-community-correo" name="correo" type="email" class="scm-input" maxlength="255" required></div>
+            </fieldset>
+            <fieldset class="scm-an-community-group">
+              <legend>Cuenta bancaria</legend>
+              <div class="scm-field"><label for="scm-an-community-tipo-cuenta">Tipo de cuenta</label><select id="scm-an-community-tipo-cuenta" name="tipo_cuenta" class="scm-select" data-admin-notif-community-select="tipos_cuenta"></select></div>
+              <div class="scm-field"><label for="scm-an-community-numero-cuenta">N&uacute;mero de cuenta</label><input id="scm-an-community-numero-cuenta" name="numero_cuenta" type="text" class="scm-input" maxlength="255"></div>
+              <div class="scm-field is-wide"><label for="scm-an-community-banco">Banco</label><select id="scm-an-community-banco" name="banco" class="scm-select" data-admin-notif-community-select="bancos"></select></div>
+            </fieldset>
+            <div class="scm-an-community-foot">
+              <button type="button" class="scm-an-btn" data-admin-notif-community-close>Cancelar</button>
+              <button type="submit" class="scm-an-btn is-navy" data-admin-notif-community-submit><?php echo $icon('save'); ?><span data-admin-notif-community-submit-label>Crear copropiedad</span></button>
+            </div>
+          </form>
         </section>
       </div>
 
