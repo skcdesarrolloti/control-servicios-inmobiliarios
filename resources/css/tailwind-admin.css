@@ -1282,7 +1282,7 @@
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-card { @apply flex flex-col gap-5; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-card > .scm-admin-notif-section-head { @apply mb-0; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-filters { @apply m-0 grid grid-cols-1 items-end gap-3 rounded-xl bg-[#f8f9ff] p-3 ring-1 ring-inset ring-slate-100 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6; }
-  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-search { @apply sm:col-span-2 lg:col-span-2 xl:col-span-4; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-search { @apply sm:col-span-1 lg:col-span-2 xl:col-span-3; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-actions { @apply flex flex-wrap gap-2 sm:col-span-2 lg:col-span-1 xl:col-span-2; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-actions .scm-an-btn { @apply flex-1; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-summary { @apply m-0 grid grid-cols-2 items-stretch gap-2 sm:grid-cols-5; }
@@ -1301,18 +1301,18 @@
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-bulk strong { @apply text-[13px] font-semibold text-red-800; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-bulk span { @apply text-xs font-normal text-red-700; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table-wrap { @apply m-0 overflow-x-auto rounded-xl border border-solid border-slate-200 bg-white shadow-none; }
-  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table { @apply m-0 w-full border-collapse bg-white text-left text-xs; min-width:1080px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table { @apply m-0 w-full border-collapse bg-white text-left text-xs; min-width:1200px; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table th { @apply whitespace-nowrap border-0 border-b border-solid border-slate-200 bg-slate-50 px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td { @apply border-0 border-b border-solid border-slate-100 bg-transparent px-3 py-3 align-top text-xs font-normal text-slate-600; word-break:normal; overflow-wrap:normal; }
-  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td:is(:nth-child(2),:nth-child(3),:nth-child(9)) { @apply whitespace-nowrap; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td:is(:nth-child(2),:nth-child(3),:nth-child(10)) { @apply whitespace-nowrap; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table tbody tr { @apply bg-white transition-colors; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table tbody tr:hover { @apply bg-[#f8f9ff]; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table tbody tr:last-child td { @apply border-b-0; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table tbody tr:has(input:checked) { @apply bg-red-50/60; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td strong { @apply block font-semibold text-[#061d49]; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td small { @apply mt-0.5 block text-[11px] font-normal normal-case leading-relaxed tracking-normal text-slate-400; white-space:normal; overflow-wrap:anywhere; }
-  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td:nth-child(10) { min-width:260px; max-width:420px; }
-  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td:nth-child(10) small { @apply mt-0 text-slate-500; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td:nth-child(11) { min-width:260px; max-width:420px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table td:nth-child(11) small { @apply mt-0 text-slate-500; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-table code { @apply whitespace-nowrap inline-flex rounded-md border-0 bg-[#f2f3ff] px-2 py-0.5 font-mono text-[10px] font-semibold text-[#1e3c76]; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-check-col { @apply w-10 pr-0 text-center; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-check-col input { @apply m-0 h-4 w-4 cursor-pointer; accent-color:#b91c1c; }
@@ -1325,6 +1325,39 @@
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-delete { @apply m-0 inline-flex min-h-[30px] items-center rounded-lg border border-solid border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700 shadow-none transition-colors hover:bg-red-100 disabled:pointer-events-none disabled:opacity-40; cursor:pointer; font-family:inherit; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-delete--bulk { @apply min-h-[38px] border-red-700 bg-red-700 px-4 text-xs text-white hover:bg-red-800; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-action-muted { @apply text-slate-300; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-row-actions { @apply flex flex-nowrap items-center gap-1.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-queue-view { @apply m-0 inline-flex min-h-[30px] items-center rounded-lg border border-solid border-[#c7d2fe] bg-[#f2f3ff] px-2.5 py-1 text-[11px] font-semibold text-[#1e3c76] shadow-none transition-colors hover:bg-[#e2e7ff] disabled:pointer-events-none disabled:opacity-60; cursor:pointer; }
+
+  /* Queue message viewer */
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-message-body { @apply flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto bg-[#f8f9ff] p-5 sm:p-7; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-facts { @apply m-0 grid grid-cols-2 gap-2 lg:grid-cols-3; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-facts > div { @apply flex min-w-0 flex-col gap-1 rounded-xl border border-solid border-slate-200 bg-white px-3.5 py-2.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-facts dt { @apply text-[10px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-facts dd { @apply m-0 text-xs font-semibold text-[#061d49]; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-facts dd small { @apply block text-[11px] font-normal text-slate-400; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-facts code { @apply inline-flex rounded-md bg-[#f2f3ff] px-2 py-0.5 font-mono text-[10px] font-semibold text-[#1e3c76]; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-error { @apply flex flex-col gap-0.5 rounded-xl border border-solid border-red-200 bg-red-50 p-4 text-xs; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-error strong { @apply font-semibold text-red-800; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-error span { @apply leading-relaxed text-red-700; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-mail { @apply overflow-hidden rounded-xl border border-solid border-slate-200 bg-white shadow-subtle; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-mail-bar { @apply flex items-center gap-1.5 border-0 border-b border-solid border-slate-200 bg-slate-50 px-4 py-2.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-mail-bar i { @apply h-2.5 w-2.5 rounded-full bg-slate-300; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-mail-bar strong { @apply ml-2 truncate text-xs font-semibold; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-mail iframe { @apply block w-full border-0 bg-white; height:min(62vh,720px); min-height:380px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-chat { @apply mx-auto w-full max-w-md overflow-hidden rounded-2xl border border-solid border-slate-200 shadow-subtle; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-chat-head { @apply flex items-center gap-3 bg-[#075e54] px-4 py-3 text-white; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-chat.is-sms .scm-an-queue-chat-head { @apply bg-[#1e3c76]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-chat-head > div { @apply flex min-w-0 flex-col; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-chat-head strong { @apply truncate text-[13px] font-semibold text-white; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-chat-head small { @apply text-[11px] text-white/70; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-chat-body { @apply flex min-h-[220px] flex-col justify-end bg-[#efeae2] p-4; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-chat.is-sms .scm-an-queue-chat-body { @apply bg-slate-100; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-bubble { @apply relative ml-auto max-w-[90%] rounded-xl rounded-tr-sm bg-[#d9fdd3] px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-800 shadow-sm; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-chat.is-sms .scm-an-queue-bubble { @apply bg-white; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-queue-bubble time { @apply mt-1 block text-right text-[10px] text-slate-500; }
+  @media (max-width:640px) {
+    #scm-app #scm-panel-admin-notificaciones .scm-an-queue-facts { @apply grid-cols-1; }
+  }
 
   /* Modals */
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-modal { @apply fixed inset-0 grid place-items-center p-3 sm:p-6; z-index:99999; }

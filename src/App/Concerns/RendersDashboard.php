@@ -495,6 +495,7 @@ trait RendersDashboard
         'admin_notifications_payment_receipts_import' => self::AJAX_ADMIN_NOTIFICATIONS_PAYMENT_RECEIPTS_IMPORT,
         'admin_notifications_queue' => self::AJAX_ADMIN_NOTIFICATIONS_QUEUE,
         'admin_notifications_queue_delete' => self::AJAX_ADMIN_NOTIFICATIONS_QUEUE_DELETE,
+        'admin_notifications_queue_message' => self::AJAX_ADMIN_NOTIFICATIONS_QUEUE_MESSAGE,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_options' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
@@ -2989,6 +2990,7 @@ trait RendersDashboard
     $whatsappTemplates = $service->whatsappTemplates();
     $senderProfile = $service->senderProfile();
     $emailCopyContacts = $service->manualEmailCopyContacts();
+    $queueEmployees = \SCM\Support\FuncionarioOptions::activeFuncionarios($this->db, new \SCM\Support\SchemaInspector($this->db), 'primary');
     $firstType = (string) array_key_first($types);
     $firstEmailTemplate = is_array(reset($emailTemplates)) ? reset($emailTemplates) : [];
     $defaultEmailSubject = (string) ($firstEmailTemplate['subject'] ?? '');
@@ -3169,7 +3171,7 @@ trait RendersDashboard
             <div>
               <span class="scm-an-kicker">Trazabilidad</span>
               <h4>Cola de notificaciones</h4>
-              <p>Muestra todo el historial por defecto; usa los filtros para revisar fecha, canal, pesta&ntilde;a, plantilla o estado.</p>
+              <p>Muestra todo el historial por defecto; usa los filtros para revisar fecha, canal, pesta&ntilde;a, plantilla, funcionario o estado.</p>
             </div>
             <button type="button" class="scm-an-btn" data-admin-notif-queue-refresh><?php echo $icon('refresh'); ?>Actualizar cola</button>
           </div>
@@ -3215,6 +3217,16 @@ trait RendersDashboard
               <label for="scm-admin-notif-queue-template">Plantilla</label>
               <input id="scm-admin-notif-queue-template" name="template" type="search" class="scm-input" placeholder="Nombre t&eacute;cnico" data-admin-notif-queue-template>
             </div>
+            <div class="scm-field">
+              <label for="scm-admin-notif-queue-employee">Funcionario</label>
+              <select id="scm-admin-notif-queue-employee" name="employee" class="scm-select" data-admin-notif-queue-employee>
+                <option value="">Todos</option>
+                <option value="system">Autom&aacute;ticos / sin funcionario</option>
+                <?php foreach ($queueEmployees as $queueEmployee): ?>
+                  <option value="<?php echo esc_attr((string) $queueEmployee['id']); ?>"><?php echo esc_html((string) $queueEmployee['name']); ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
             <div class="scm-field scm-admin-notif-queue-search">
               <label for="scm-admin-notif-queue-q">Buscar</label>
               <input id="scm-admin-notif-queue-q" name="q" type="search" class="scm-input" placeholder="Nombre, destino, asunto, error o lote" data-admin-notif-queue-q>
@@ -3230,6 +3242,22 @@ trait RendersDashboard
           </div>
           <div class="scm-admin-notif-pagination" data-admin-notif-queue-pagination></div>
       </section>
+
+      <div class="scm-admin-notif-modal scm-an-queue-message-modal" data-admin-notif-queue-message-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-queue-message-title">
+        <div class="scm-admin-notif-modal-backdrop" data-admin-notif-queue-message-close aria-hidden="true"></div>
+        <section class="scm-admin-notif-modal-panel">
+          <div class="scm-admin-notif-modal-head">
+            <span class="scm-an-modal-icon"><?php echo $icon('mail'); ?></span>
+            <div class="scm-admin-notif-modal-titleblock">
+              <span class="scm-an-kicker">Cola de notificaciones</span>
+              <h4 id="scm-admin-notif-queue-message-title" data-admin-notif-queue-message-title>Mensaje</h4>
+              <p data-admin-notif-queue-message-subtitle>Vista del mensaje tal como lo recibe el destinatario.</p>
+            </div>
+            <button type="button" class="scm-modal-close" data-admin-notif-queue-message-close aria-label="Cerrar mensaje"><?php echo $icon('close'); ?></button>
+          </div>
+          <div class="scm-an-queue-message-body" data-admin-notif-queue-message-body aria-live="polite"></div>
+        </section>
+      </div>
 
       <div class="scm-admin-notif-modal" data-admin-notif-modal hidden role="dialog" aria-modal="true" aria-labelledby="scm-admin-notif-modal-title">
         <div class="scm-admin-notif-modal-backdrop" aria-hidden="true"></div>

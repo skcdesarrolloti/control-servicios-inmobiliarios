@@ -252,12 +252,26 @@ trait HandlesAdministrativeNotifications
       'type' => sanitize_key((string) ($_POST['type'] ?? '')),
       'template' => trim(sanitize_text_field(wp_unslash((string) ($_POST['template'] ?? '')))),
       'q' => trim(sanitize_text_field(wp_unslash((string) ($_POST['q'] ?? '')))),
+      'employee' => sanitize_key((string) ($_POST['employee'] ?? '')),
       'page' => max(1, (int) ($_POST['page'] ?? 1)),
       'per_page' => max(10, min(100, (int) ($_POST['per_page'] ?? 25))),
     ];
 
     try {
       $this->jsonOk($this->get_admin_notifications_service()->notificationQueue($filters));
+    } catch (\Throwable $e) {
+      $this->jsonFail($e->getMessage());
+    }
+  }
+
+  public function ajax_handler_admin_notifications_queue_message(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para ver los mensajes de la cola de Notificaciones.');
+    }
+    try {
+      $this->jsonOk($this->get_admin_notifications_service()->queueMessageDetail(max(0, (int) ($_POST['queue_id'] ?? 0))));
     } catch (\Throwable $e) {
       $this->jsonFail($e->getMessage());
     }

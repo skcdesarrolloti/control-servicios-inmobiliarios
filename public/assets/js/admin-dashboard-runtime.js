@@ -199,6 +199,8 @@
       actions.admin_notifications_queue || "";
     var actionAdminNotificationsQueueDelete =
       actions.admin_notifications_queue_delete || "";
+    var actionAdminNotificationsQueueMessage =
+      actions.admin_notifications_queue_message || "";
     var actionAdminNotificationsCollection =
       actions.admin_notifications_collection || "";
     var actionAdminNotificationsCollectionOptions =
@@ -6672,6 +6674,8 @@
       var queueChannel = panel.querySelector("[data-admin-notif-queue-channel]");
       var queueType = panel.querySelector("[data-admin-notif-queue-type]");
       var queueTemplate = panel.querySelector("[data-admin-notif-queue-template]");
+      var queueEmployee = panel.querySelector("[data-admin-notif-queue-employee]");
+      var queueMessageModal = panel.querySelector("[data-admin-notif-queue-message-modal]");
       var queueSearch = panel.querySelector("[data-admin-notif-queue-q]");
       var queueClearBtn = panel.querySelector("[data-admin-notif-queue-clear]");
       var queueRefreshBtn = panel.querySelector("[data-admin-notif-queue-refresh]");
@@ -8670,7 +8674,7 @@
         queueResultsEl.innerHTML =
           bulkHtml +
           '<div class="scm-admin-notif-queue-table-wrap"><table class="scm-admin-notif-queue-table">' +
-          '<thead><tr><th class="scm-admin-notif-queue-check-col">' + (failedRows.length > 0 ? '<input type="checkbox" aria-label="Seleccionar fallidas visibles" data-admin-notif-queue-select-all-failed>' : '') + '</th><th>ID</th><th>Fecha</th><th>Estado</th><th>Canal</th><th>Destinatario</th><th>Plantilla</th><th>Lote</th><th>Intentos</th><th>Detalle</th><th>Acción</th></tr></thead><tbody>' +
+          '<thead><tr><th class="scm-admin-notif-queue-check-col">' + (failedRows.length > 0 ? '<input type="checkbox" aria-label="Seleccionar fallidas visibles" data-admin-notif-queue-select-all-failed>' : '') + '</th><th>ID</th><th>Fecha</th><th>Estado</th><th>Canal</th><th>Destinatario</th><th>Funcionario</th><th>Plantilla</th><th>Lote</th><th>Intentos</th><th>Detalle</th><th>Acción</th></tr></thead><tbody>' +
           rows.map(function (row) {
             var statusKey = queueStatusClass(row.status_key || row.status);
             var detailBits = [];
@@ -8687,9 +8691,13 @@
             var checkHtml = canDelete
               ? '<input type="checkbox" aria-label="Seleccionar registro fallido #' + escAttr(row.id || "") + '" data-admin-notif-queue-select-failed="' + escAttr(row.id || "") + '">'
               : "";
-            var actionHtml = canDelete
-              ? '<button type="button" class="scm-admin-notif-queue-delete" data-admin-notif-queue-delete="' + escAttr(row.id || "") + '">Eliminar</button>'
-              : '<span class="scm-admin-notif-queue-action-muted">-</span>';
+            var actionHtml =
+              '<div class="scm-admin-notif-queue-row-actions">' +
+              '<button type="button" class="scm-admin-notif-queue-view" data-admin-notif-queue-view="' + escAttr(row.id || "") + '">Ver</button>' +
+              (canDelete
+                ? '<button type="button" class="scm-admin-notif-queue-delete" data-admin-notif-queue-delete="' + escAttr(row.id || "") + '">Eliminar</button>'
+                : "") +
+              "</div>";
             return (
               "<tr>" +
               '<td class="scm-admin-notif-queue-check-col">' + checkHtml + "</td>" +
@@ -8698,6 +8706,9 @@
               '<td><span class="scm-admin-notif-queue-status ' + queueStatusBadgeClasses[statusKey] + '">' + escHtml(row.status_label || row.status || "") + "</span></td>" +
               "<td>" + escHtml(row.channel_label || row.channel || "") + "</td>" +
               "<td><strong>" + escHtml(recipientBits[0] || "") + "</strong><small>" + escHtml(recipientBits.slice(1).join(" · ")) + "</small></td>" +
+              "<td>" + (row.employee_name
+                ? "<span>" + escHtml(row.employee_name) + "</span>"
+                : "<small>Automático</small>") + "</td>" +
               "<td><span>" + escHtml(row.template_name || "-") + "</span></td>" +
               "<td><code>" + escHtml(row.batch_id || "-") + "</code></td>" +
               "<td>" + escHtml((row.attempts || 0) + "/" + (row.max_attempts || 0)) + "</td>" +
@@ -8838,6 +8849,119 @@
         deleteQueueRecords([id]);
       }
 
+      function queueMessageWhatsappText(value) {
+        return escHtml(value)
+          .replace(/\*([^*\n]+)\*/g, "<strong>$1</strong>")
+          .replace(/_([^_\n]+)_/g, "<em>$1</em>")
+          .replace(/\n/g, "<br>");
+      }
+
+      function renderQueueMessage(data) {
+        if (!queueMessageModal) {
+          return;
+        }
+        var title = queueMessageModal.querySelector("[data-admin-notif-queue-message-title]");
+        var subtitle = queueMessageModal.querySelector("[data-admin-notif-queue-message-subtitle]");
+        var body = queueMessageModal.querySelector("[data-admin-notif-queue-message-body]");
+        var channel = String(data.channel || "");
+        var statusKey = queueStatusClass(data.status);
+        if (title) title.textContent = String(data.subject || data.template_name || "Mensaje") + " · #" + String(data.id || "");
+        if (subtitle) subtitle.textContent = [data.channel_label || channel || "Canal", data.destination_name || "Destinatario", data.destination || "Sin destino"].join(" · ");
+        if (!body) {
+          return;
+        }
+        var facts = [
+          ["Estado", '<span class="scm-admin-notif-queue-status ' + queueStatusBadgeClasses[statusKey] + '">' + escHtml(data.status_label || data.status || "-") + "</span>"],
+          ["Canal", escHtml(data.channel_label || channel || "-") + (data.provider ? "<small>" + escHtml(data.provider) + "</small>" : "")],
+          ["Destinatario", escHtml(data.destination_name || "-") + "<small>" + escHtml([data.destination || "", data.recipient_role_label || ""].filter(Boolean).join(" · ")) + "</small>"],
+          ["Enviado por", escHtml(data.employee_name || "Automático / sin funcionario")],
+          ["Creado", escHtml(data.created_at || "-") + (data.sent_at ? "<small>Enviado: " + escHtml(data.sent_at) + "</small>" : "")],
+          ["Plantilla", "<code>" + escHtml(data.template_name || "-") + "</code><small>Intentos: " + escHtml(String(Number(data.attempts || 0)) + "/" + String(Number(data.max_attempts || 0))) + "</small>"],
+        ];
+        var preview;
+        if (channel === "email") {
+          preview = '<div class="scm-an-queue-mail"><div class="scm-an-queue-mail-bar"><i></i><i></i><i></i><strong>' + escHtml(data.subject || "Sin asunto") + "</strong></div>" +
+            '<iframe sandbox title="Vista del correo" data-admin-notif-queue-message-frame></iframe></div>';
+        } else {
+          var text = channel === "whatsapp"
+            ? queueMessageWhatsappText(data.message_text || "")
+            : escHtml(data.message_text || "").replace(/\n/g, "<br>");
+          preview = '<div class="scm-an-queue-chat is-' + escAttr(channel || "sms") + '">' +
+            '<div class="scm-an-queue-chat-head"><div><strong>' + escHtml(data.destination_name || "Destinatario") + "</strong><small>" + escHtml(data.destination || "") + "</small></div></div>" +
+            '<div class="scm-an-queue-chat-body"><div class="scm-an-queue-bubble">' + (text || "<em>Sin contenido</em>") + "<time>" + escHtml(data.sent_at || data.created_at || "") + "</time></div></div></div>";
+        }
+        body.innerHTML =
+          '<dl class="scm-an-queue-facts">' + facts.map(function (fact) {
+            return "<div><dt>" + fact[0] + "</dt><dd>" + fact[1] + "</dd></div>";
+          }).join("") + "</dl>" +
+          (data.last_error
+            ? '<div class="scm-an-queue-error"><strong>Último error</strong><span>' + escHtml(data.last_error) + "</span></div>"
+            : "") +
+          preview;
+        var frame = body.querySelector("[data-admin-notif-queue-message-frame]");
+        if (frame) {
+          frame.srcdoc = String(data.message_html || "");
+        }
+      }
+
+      function closeQueueMessage() {
+        if (!queueMessageModal || queueMessageModal.hidden) {
+          return;
+        }
+        queueMessageModal.hidden = true;
+        var body = queueMessageModal.querySelector("[data-admin-notif-queue-message-body]");
+        if (body) {
+          body.innerHTML = "";
+        }
+        if (!composerModal || composerModal.hidden) {
+          document.body.classList.remove("scm-admin-notif-modal-open");
+        }
+      }
+
+      function openQueueMessage(button) {
+        if (!queueMessageModal || !actionAdminNotificationsQueueMessage) {
+          return;
+        }
+        var body = queueMessageModal.querySelector("[data-admin-notif-queue-message-body]");
+        if (body) {
+          body.innerHTML = '<div class="scm-admin-notif-empty"><strong>Cargando mensaje...</strong><span>Consultando el contenido en la cola de notificaciones.</span></div>';
+        }
+        queueMessageModal.hidden = false;
+        document.body.classList.add("scm-admin-notif-modal-open");
+        var close = queueMessageModal.querySelector(".scm-modal-close[data-admin-notif-queue-message-close]");
+        if (close) {
+          close.focus();
+        }
+        var fd = new FormData();
+        fd.set("action", actionAdminNotificationsQueueMessage);
+        fd.set("nonce", nonce);
+        fd.set("queue_id", String(button.getAttribute("data-admin-notif-queue-view") || ""));
+        button.disabled = true;
+        fetchWithTimeout(ajaxUrl, {
+          method: "POST",
+          body: fd,
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        })
+          .then(function (response) {
+            return responseJson(response);
+          })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error((json && json.data && json.data.message) || "No se pudo cargar el mensaje.");
+            }
+            renderQueueMessage(json.data || {});
+          })
+          .catch(function (err) {
+            if (body) {
+              body.innerHTML = '<div class="scm-admin-notif-empty is-error"><strong>No se pudo cargar el mensaje.</strong><span>' + escHtml(err.message || "Error desconocido") + "</span></div>";
+            }
+          })
+          .finally(function () {
+            button.disabled = false;
+          });
+      }
+
       function loadNotificationQueue(page) {
         if (!queueForm || !queueResultsEl || !actionAdminNotificationsQueue) {
           return Promise.resolve();
@@ -8855,6 +8979,7 @@
         fd.set("channel", queueFieldValue(queueChannel));
         fd.set("type", queueFieldValue(queueType));
         fd.set("template", queueFieldValue(queueTemplate));
+        fd.set("employee", queueFieldValue(queueEmployee));
         fd.set("q", queueFieldValue(queueSearch));
         fd.set("page", String(queuePage));
         fd.set("per_page", "25");
@@ -9548,7 +9673,7 @@
         }
         if (queueClearBtn) {
           queueClearBtn.addEventListener("click", function () {
-            [queueDateFrom, queueDateTo, queueStatus, queueChannel, queueType, queueTemplate, queueSearch].forEach(function (input) {
+            [queueDateFrom, queueDateTo, queueStatus, queueChannel, queueType, queueTemplate, queueEmployee, queueSearch].forEach(function (input) {
               if (input) {
                 input.value = "";
               }
@@ -9568,8 +9693,29 @@
             loadNotificationQueue(parseInt(btn.getAttribute("data-admin-notif-queue-page") || "1", 10));
           });
         }
+        if (queueMessageModal) {
+          queueMessageModal.addEventListener("click", function (event) {
+            if (event.target && event.target.closest && event.target.closest("[data-admin-notif-queue-message-close]")) {
+              event.preventDefault();
+              closeQueueMessage();
+            }
+          });
+          document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape" && !queueMessageModal.hidden) {
+              closeQueueMessage();
+            }
+          });
+        }
         if (queueResultsEl) {
           queueResultsEl.addEventListener("click", function (event) {
+            var viewBtn = event.target && event.target.closest
+              ? event.target.closest("[data-admin-notif-queue-view]")
+              : null;
+            if (viewBtn && queueResultsEl.contains(viewBtn) && !viewBtn.disabled) {
+              event.preventDefault();
+              openQueueMessage(viewBtn);
+              return;
+            }
             var btn = event.target && event.target.closest
               ? event.target.closest("[data-admin-notif-queue-delete]")
               : null;

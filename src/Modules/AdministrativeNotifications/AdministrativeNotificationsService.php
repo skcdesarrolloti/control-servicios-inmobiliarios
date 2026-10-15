@@ -896,6 +896,7 @@ final class AdministrativeNotificationsService
     $template = mb_substr(trim((string) ($filters['template'] ?? '')), 0, 120, 'UTF-8');
     $query = mb_substr(trim((string) ($filters['q'] ?? '')), 0, 160, 'UTF-8');
     $scope = sanitize_key((string) ($filters['scope'] ?? ''));
+    $employee = strtolower(trim((string) ($filters['employee'] ?? '')));
     $dateFrom = $this->normalizeQueueDate((string) ($filters['date_from'] ?? ''));
     $dateTo = $this->normalizeQueueDate((string) ($filters['date_to'] ?? ''));
 
@@ -945,6 +946,16 @@ final class AdministrativeNotificationsService
       $args[] = '%"tipo_actor":"' . $this->db->escapeLike($type) . '"%';
     } else {
       $type = '';
+    }
+    if ($employee === 'system') {
+      $where[] = '(`meta_json` IS NULL OR `meta_json` NOT LIKE ? OR `meta_json` LIKE ?)';
+      array_push($args, '%"id_funcionario":%', '%"id_funcionario":0,%');
+    } elseif (preg_match('/^\d+$/', $employee) === 1 && (int) $employee > 0) {
+      $employee = (string) (int) $employee;
+      $where[] = '`meta_json` LIKE ?';
+      $args[] = '%"id_funcionario":' . $employee . ',%';
+    } else {
+      $employee = '';
     }
     if ($template !== '') {
       $where[] = '`template_name` LIKE ?';
@@ -1015,7 +1026,7 @@ final class AdministrativeNotificationsService
       'rows' => $rows,
       'stats' => $stats,
       'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
-      'filters' => ['date_from' => $dateFrom, 'date_to' => $dateTo, 'status' => $status, 'channel' => $channel, 'type' => $type, 'template' => $template, 'q' => $query, 'scope' => $scope],
+      'filters' => ['date_from' => $dateFrom, 'date_to' => $dateTo, 'status' => $status, 'channel' => $channel, 'type' => $type, 'template' => $template, 'q' => $query, 'scope' => $scope, 'employee' => $employee],
     ];
   }
 
@@ -1056,6 +1067,7 @@ final class AdministrativeNotificationsService
       'destination' => (string) ($row['destination'] ?? ''),
       'destination_name' => (string) ($row['destination_name'] ?? ''),
       'recipient_role_label' => $this->queueRecipientRoleLabel((string) ($row['meta_json'] ?? '')),
+      'employee_name' => $this->queueEmployeeName((string) ($row['meta_json'] ?? '')),
       'subject' => (string) ($row['subject'] ?? ''),
       'template_name' => (string) ($row['template_name'] ?? ''),
       'attempts' => (int) ($row['attempts'] ?? 0),
@@ -1066,6 +1078,13 @@ final class AdministrativeNotificationsService
       'message_html' => $channel === 'email' ? $messageHtml : '',
       'last_error' => (string) ($row['last_error'] ?? ''),
     ];
+  }
+
+  private function queueEmployeeName(string $metaJson): string
+  {
+    $meta = json_decode($metaJson, true);
+    $admin = is_array($meta['admin_notifications'] ?? null) ? $meta['admin_notifications'] : [];
+    return trim((string) ($admin['nombre_funcionario'] ?? ''));
   }
 
   private function normalizeQueueDate(string $value): string
