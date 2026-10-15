@@ -1186,6 +1186,19 @@
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-card form { @apply m-0 grid grid-cols-1 items-center gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,400px)]; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-card .scm-admin-notif-receipts-import { @apply mt-5 border-0 border-t border-solid border-slate-200 pt-5; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-card .scm-admin-notif-receipts-import[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-filename-guide { @apply my-4 rounded-xl border border-solid border-[#c7d2fe] bg-[#f8f9ff] px-4 py-3 text-xs text-slate-600; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-filename-guide > summary { @apply flex cursor-pointer items-center gap-2 text-xs font-semibold text-[#1e3c76]; list-style:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-filename-guide > summary::-webkit-details-marker { display:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-filename-guide > summary .scm-an-icon { font-size:18px; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-filename-guide-body { @apply mt-3 flex flex-col gap-2.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-filename-guide code { @apply rounded-md bg-white px-1.5 py-0.5 font-mono text-[11px] font-semibold text-[#061d49] ring-1 ring-inset ring-slate-200; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-filename-format { @apply m-0 flex flex-wrap items-center gap-1.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-filename-format code { @apply bg-[#061d49] text-white ring-0; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-filename-guide ul { @apply m-0 flex list-disc flex-col gap-1.5 pl-5 leading-relaxed; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-filename-guide ul.scm-an-filename-examples { @apply list-none pl-0; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-filename-examples span { @apply text-[11px] text-slate-400; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-filename-examples-title { @apply m-0 text-[11px] font-semibold uppercase tracking-wider text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-filename-note { @apply m-0 text-[11px] text-slate-500; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-copy { @apply flex min-w-0 gap-4; }
   #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-import-copy > div { @apply flex min-w-0 flex-col gap-2; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-tile-icon { @apply hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#fff1c2] text-[#061d49] sm:flex; }
