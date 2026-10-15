@@ -1010,10 +1010,44 @@ trait HandlesAdministrativeNotifications
       return '<span class="scm-admin-notif-page-info">Total: ' . esc_html((string) $total) . '</span>';
     }
 
-    $html = '<span class="scm-admin-notif-page-info">Pagina ' . esc_html((string) $page) . ' de ' . esc_html((string) $pages) . ' · Total: ' . esc_html((string) $total) . '</span>';
-    $html .= '<div class="scm-admin-notif-page-actions">';
-    $html .= '<button type="button" data-admin-notif-page="' . esc_attr((string) max(1, $page - 1)) . '"' . ($page <= 1 ? ' disabled' : '') . '>Anterior</button>';
-    $html .= '<button type="button" data-admin-notif-page="' . esc_attr((string) min($pages, $page + 1)) . '"' . ($page >= $pages ? ' disabled' : '') . '>Siguiente</button>';
+    $nav = static fn(int $target, string $label, bool $disabled): string => '<button type="button" class="scm-admin-notif-page-nav" data-admin-notif-page="' . esc_attr((string) $target) . '"' . ($disabled ? ' disabled' : '') . '>' . esc_html($label) . '</button>';
+
+    // Current page with two neighbours on each side, plus first/last and gaps.
+    $start = max(1, $page - 2);
+    $end = min($pages, $page + 2);
+    $items = [];
+    if ($start > 1) {
+      $items[] = 1;
+      if ($start > 2) {
+        $items[] = 'gap';
+      }
+    }
+    for ($i = $start; $i <= $end; $i++) {
+      $items[] = $i;
+    }
+    if ($end < $pages) {
+      if ($end < $pages - 1) {
+        $items[] = 'gap';
+      }
+      $items[] = $pages;
+    }
+    $numbers = '';
+    foreach ($items as $item) {
+      if ($item === 'gap') {
+        $numbers .= '<span class="scm-admin-notif-page-gap">...</span>';
+        continue;
+      }
+      $isActive = $item === $page;
+      $numbers .= '<button type="button" class="scm-admin-notif-page-number' . ($isActive ? ' is-active' : '') . '" data-admin-notif-page="' . esc_attr((string) $item) . '"' . ($isActive ? ' aria-current="page"' : '') . '>' . esc_html((string) $item) . '</button>';
+    }
+
+    $html = '<div class="scm-admin-notif-pagination-summary"><strong>P&aacute;gina ' . esc_html((string) $page) . ' de ' . esc_html((string) $pages) . '</strong><span>' . esc_html((string) $total) . ' registro(s)</span></div>';
+    $html .= '<div class="scm-admin-notif-pagination-actions">';
+    $html .= $nav(1, 'Primera', $page <= 1);
+    $html .= $nav(max(1, $page - 1), 'Anterior', $page <= 1);
+    $html .= '<div class="scm-admin-notif-page-numbers">' . $numbers . '</div>';
+    $html .= $nav(min($pages, $page + 1), 'Siguiente', $page >= $pages);
+    $html .= $nav($pages, 'Última', $page >= $pages);
     $html .= '</div>';
     return $html;
   }
