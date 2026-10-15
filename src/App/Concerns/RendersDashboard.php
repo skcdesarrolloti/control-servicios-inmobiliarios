@@ -499,6 +499,8 @@ trait RendersDashboard
         'admin_notifications_filtered_ids' => self::AJAX_ADMIN_NOTIFICATIONS_FILTERED_IDS,
         'admin_notifications_community_get' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_GET,
         'admin_notifications_community_save' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_SAVE,
+        'admin_notifications_community_contracts' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_CONTRACTS,
+        'admin_notifications_community_link' => self::AJAX_ADMIN_NOTIFICATIONS_COMMUNITY_LINK,
         'admin_notifications_collection' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION,
         'admin_notifications_collection_options' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_OPTIONS,
         'admin_notifications_collection_queue' => self::AJAX_ADMIN_NOTIFICATIONS_COLLECTION_QUEUE,
@@ -3301,6 +3303,18 @@ trait RendersDashboard
               <div class="scm-field"><label for="scm-an-community-numero-cuenta">N&uacute;mero de cuenta</label><input id="scm-an-community-numero-cuenta" name="numero_cuenta" type="text" class="scm-input" maxlength="255"></div>
               <div class="scm-field is-wide"><label for="scm-an-community-banco">Banco</label><select id="scm-an-community-banco" name="banco" class="scm-select" data-admin-notif-community-select="bancos"></select></div>
             </fieldset>
+            <section class="scm-an-community-group scm-an-community-properties" data-admin-notif-community-properties hidden>
+              <div class="scm-an-community-properties-head">
+                <strong>Inmuebles vinculados</strong>
+                <span>Anexa inmuebles buscando el n&uacute;mero de contrato o el c&oacute;digo de inmueble SIMI. Se vincula el contrato de arrendamiento, su contrato de mandato y su hoja de cierre.</span>
+              </div>
+              <div class="scm-an-community-search">
+                <input type="search" class="scm-input" placeholder="Contrato (ej. 853) o inmueble SIMI (ej. 10668)" aria-label="Buscar contrato o inmueble SIMI" data-admin-notif-community-search>
+                <button type="button" class="scm-an-btn" data-admin-notif-community-search-btn><?php echo $icon('search'); ?>Buscar</button>
+              </div>
+              <div class="scm-an-community-contracts" data-admin-notif-community-results></div>
+              <div class="scm-an-community-contracts" data-admin-notif-community-linked-list></div>
+            </section>
             <div class="scm-an-community-foot">
               <button type="button" class="scm-an-btn" data-admin-notif-community-close>Cancelar</button>
               <button type="submit" class="scm-an-btn is-navy" data-admin-notif-community-submit><?php echo $icon('save'); ?><span data-admin-notif-community-submit-label>Crear copropiedad</span></button>

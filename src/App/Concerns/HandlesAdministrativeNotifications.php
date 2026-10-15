@@ -125,6 +125,53 @@ trait HandlesAdministrativeNotifications
     }
   }
 
+  public function ajax_handler_admin_notifications_community_contracts(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para gestionar copropiedades.');
+    }
+
+    $id = max(0, (int) ($_POST['id'] ?? 0));
+    $query = trim(sanitize_text_field(wp_unslash((string) ($_POST['q'] ?? ''))));
+    try {
+      $service = new CommunityRecordsService($this->db);
+      $this->jsonOk([
+        'linked' => $id > 0 ? $service->linkedContracts($id) : [],
+        'results' => $query !== '' ? $service->searchContracts($query) : [],
+      ]);
+    } catch (\DomainException $e) {
+      $this->jsonFail($e->getMessage());
+    } catch (\Throwable $e) {
+      error_log('[copropiedades] ' . $e->getMessage());
+      $this->jsonFail('No se pudieron consultar los contratos.');
+    }
+  }
+
+  public function ajax_handler_admin_notifications_community_link(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('notificaciones')) {
+      $this->jsonFail('No tienes permiso para gestionar copropiedades.');
+    }
+
+    $id = max(0, (int) ($_POST['id'] ?? 0));
+    $contractId = max(0, (int) ($_POST['contract_id'] ?? 0));
+    if ($id <= 0 || $contractId <= 0) {
+      $this->jsonFail('Selecciona la copropiedad y el contrato a vincular.');
+    }
+    try {
+      $service = new CommunityRecordsService($this->db);
+      $result = $service->linkContract($id, $contractId);
+      $this->jsonOk($result + ['linked_contracts' => $service->linkedContracts($id)]);
+    } catch (\DomainException $e) {
+      $this->jsonFail($e->getMessage());
+    } catch (\Throwable $e) {
+      error_log('[copropiedades] ' . $e->getMessage());
+      $this->jsonFail('No se pudo vincular el inmueble. Inténtalo nuevamente.');
+    }
+  }
+
   public function ajax_handler_admin_notifications_stats(): void
   {
     $this->verifyCsrf();

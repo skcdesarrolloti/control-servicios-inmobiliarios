@@ -1274,6 +1274,23 @@
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-linked[hidden] { display:none!important; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-linked strong { @apply font-semibold text-amber-900; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-linked span { @apply text-amber-800; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-properties[hidden] { display:none!important; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-properties > * { @apply sm:col-span-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-properties-head { @apply flex flex-col gap-0.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-properties-head strong { @apply text-[11px] font-bold uppercase tracking-wider text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-properties-head span { @apply text-xs leading-relaxed text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-search { @apply flex gap-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-search .scm-input { @apply min-w-0 flex-1; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-contracts { @apply flex flex-col gap-2; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-contracts:empty { display:none; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-contracts-title { @apply m-0 text-[11px] font-semibold text-slate-500; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-contract { @apply flex items-center justify-between gap-3 rounded-lg border border-solid border-slate-200 bg-[#f8f9ff] px-3 py-2.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-contract > div { @apply flex min-w-0 flex-col gap-0.5; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-contract strong { @apply text-xs font-semibold text-[#061d49]; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-contract :is(small,span) { @apply text-[11px] text-slate-500; overflow-wrap:anywhere; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-contract em { @apply text-[11px] not-italic font-semibold text-amber-700; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-contract .scm-an-btn { @apply min-h-[34px] shrink-0 px-3; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-linked-badge { @apply shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-foot { @apply sticky bottom-0 -mx-5 mt-auto flex justify-end gap-2 border-0 border-t border-solid border-slate-200 bg-white px-5 py-4 sm:-mx-7 sm:px-7; }
   @media (min-width:1024px) {
     #scm-app #scm-panel-admin-notificaciones .scm-admin-notif-recipient { grid-template-columns:18px 38px minmax(0,1.1fr) minmax(0,1fr) auto; }

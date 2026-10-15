@@ -207,6 +207,10 @@
       actions.admin_notifications_community_get || "";
     var actionAdminNotificationsCommunitySave =
       actions.admin_notifications_community_save || "";
+    var actionAdminNotificationsCommunityContracts =
+      actions.admin_notifications_community_contracts || "";
+    var actionAdminNotificationsCommunityLink =
+      actions.admin_notifications_community_link || "";
     var actionAdminNotificationsCollection =
       actions.admin_notifications_collection || "";
     var actionAdminNotificationsCollectionOptions =
@@ -6736,6 +6740,11 @@
       var communityNewBtn = panel.querySelector("[data-admin-notif-community-new]");
       var communityModal = panel.querySelector("[data-admin-notif-community-modal]");
       var communityForm = communityModal ? communityModal.querySelector("[data-admin-notif-community-form]") : null;
+      var communityProperties = communityModal ? communityModal.querySelector("[data-admin-notif-community-properties]") : null;
+      var communitySearchInput = communityModal ? communityModal.querySelector("[data-admin-notif-community-search]") : null;
+      var communityResultsEl = communityModal ? communityModal.querySelector("[data-admin-notif-community-results]") : null;
+      var communityLinkedListEl = communityModal ? communityModal.querySelector("[data-admin-notif-community-linked-list]") : null;
+      var communityRecipientsStale = false;
       var subjectWrap = panel.querySelector("[data-admin-notif-subject-wrap]");
       var subjectInput = panel.querySelector("[data-admin-notif-subject]");
       var messageFieldWrap = panel.querySelector("[data-admin-notif-message-field]");
@@ -8888,11 +8897,142 @@
         select.value = value || (isIndicative ? "+57" : "");
       }
 
+      function communityCurrentId() {
+        var input = communityForm ? communityForm.querySelector("[data-admin-notif-community-id]") : null;
+        return input ? String(input.value || "").trim() : "";
+      }
+
+      function communityContractHtml(row, withAction) {
+        var communityId = communityCurrentId();
+        var contractLabel = row.contrato && row.contrato.toLowerCase() !== "no asignado" ? "Contrato #" + row.contrato : "Contrato ID " + row.id;
+        var meta = [
+          row.inmueble && row.inmueble.toLowerCase() !== "no asignado" ? "Inmueble SIMI " + row.inmueble : "",
+          row.estado || "",
+          row.arrendatario && row.arrendatario.toLowerCase() !== "no asignado" ? row.arrendatario : "",
+        ].filter(Boolean).join(" · ");
+        var isHere = row.id_copropiedad === communityId;
+        var other = row.id_copropiedad && !isHere
+          ? '<em>Vinculado a ' + escHtml(row.copropiedad_actual || "copropiedad #" + row.id_copropiedad) + "</em>"
+          : "";
+        var action = "";
+        if (withAction) {
+          action = isHere
+            ? '<span class="scm-an-community-linked-badge">Ya vinculado</span>'
+            : '<button type="button" class="scm-an-btn is-navy" data-admin-notif-community-link="' + escAttr(row.id) + '" data-other-community="' + escAttr(row.id_copropiedad && !isHere ? (row.copropiedad_actual || row.id_copropiedad) : "") + '">' + (other ? "Reasignar" : "Vincular") + "</button>";
+        }
+        return (
+          '<article class="scm-an-community-contract">' +
+          "<div><strong>" + escHtml(contractLabel) + "</strong><small>" + escHtml(meta) + "</small>" +
+          (row.direccion ? "<span>" + escHtml(row.direccion) + "</span>" : "") + other + "</div>" +
+          action +
+          "</article>"
+        );
+      }
+
+      function renderCommunityLinked(rows) {
+        if (!communityLinkedListEl) {
+          return;
+        }
+        communityLinkedListEl.innerHTML =
+          '<p class="scm-an-community-contracts-title">Vinculados (' + rows.length + ")</p>" +
+          (rows.length
+            ? rows.map(function (row) { return communityContractHtml(row, false); }).join("")
+            : '<div class="scm-admin-notif-empty"><strong>Sin inmuebles vinculados</strong><span>Busca un contrato o inmueble SIMI para anexarlo.</span></div>');
+      }
+
+      function loadCommunityContracts(query) {
+        var id = communityCurrentId();
+        if (!id || !actionAdminNotificationsCommunityContracts) {
+          return Promise.resolve();
+        }
+        if (query && communityResultsEl) {
+          communityResultsEl.innerHTML = '<div class="scm-admin-notif-empty"><strong>Buscando...</strong></div>';
+        }
+        return postAdminNotifications(actionAdminNotificationsCommunityContracts, { id: id, q: query || "" })
+          .then(function (data) {
+            renderCommunityLinked(Array.isArray(data.linked) ? data.linked : []);
+            if (query && communityResultsEl) {
+              var results = Array.isArray(data.results) ? data.results : [];
+              communityResultsEl.innerHTML =
+                '<p class="scm-an-community-contracts-title">Resultados para "' + escHtml(query) + '"</p>' +
+                (results.length
+                  ? results.map(function (row) { return communityContractHtml(row, true); }).join("")
+                  : '<div class="scm-admin-notif-empty"><strong>Sin coincidencias</strong><span>Revisa el número de contrato o el código SIMI exacto.</span></div>');
+            }
+          })
+          .catch(function (err) {
+            if (query && communityResultsEl) {
+              communityResultsEl.innerHTML = "";
+            }
+            showToast("error", err.message || "No se pudieron consultar los contratos.");
+          });
+      }
+
+      function searchCommunityContracts() {
+        var query = communitySearchInput ? String(communitySearchInput.value || "").trim() : "";
+        if (!query) {
+          showToast("warning", "Escribe un número de contrato o un código de inmueble SIMI.");
+          return;
+        }
+        loadCommunityContracts(query);
+      }
+
+      function confirmCommunityReassign(otherName) {
+        var text = "Este contrato está vinculado a " + otherName + ". Se reasignará a esta copropiedad junto con su contrato de mandato y hoja de cierre.";
+        if (window.Swal && typeof window.Swal.fire === "function") {
+          return window.Swal.fire({
+            icon: "warning",
+            title: "¿Reasignar el inmueble?",
+            text: text,
+            showCancelButton: true,
+            confirmButtonText: "Sí, reasignar",
+            cancelButtonText: "Cancelar",
+            reverseButtons: true,
+          }).then(function (result) {
+            return !!(result && result.isConfirmed);
+          });
+        }
+        return Promise.resolve(window.confirm(text));
+      }
+
+      function linkCommunityContract(button) {
+        var id = communityCurrentId();
+        var contractId = String(button.getAttribute("data-admin-notif-community-link") || "");
+        var otherName = String(button.getAttribute("data-other-community") || "");
+        if (!id || !contractId || !actionAdminNotificationsCommunityLink) {
+          return;
+        }
+        (otherName ? confirmCommunityReassign(otherName) : Promise.resolve(true)).then(function (confirmed) {
+          if (!confirmed) {
+            return;
+          }
+          button.disabled = true;
+          postAdminNotifications(actionAdminNotificationsCommunityLink, { id: id, contract_id: contractId })
+            .then(function (data) {
+              showToast("success", data.message || "Inmueble vinculado.");
+              communityRecipientsStale = true;
+              renderCommunityLinked(Array.isArray(data.linked_contracts) ? data.linked_contracts : []);
+              var query = communitySearchInput ? String(communitySearchInput.value || "").trim() : "";
+              if (query) {
+                loadCommunityContracts(query);
+              }
+            })
+            .catch(function (err) {
+              button.disabled = false;
+              showToast("error", err.message || "No se pudo vincular el inmueble.");
+            });
+        });
+      }
+
       function closeCommunityModal() {
         if (!communityModal || communityModal.hidden) {
           return;
         }
         communityModal.hidden = true;
+        if (communityRecipientsStale) {
+          communityRecipientsStale = false;
+          loadRecipients(currentPage);
+        }
         if (!composerModal || composerModal.hidden) {
           document.body.classList.remove("scm-admin-notif-modal-open");
         }
@@ -8914,6 +9054,18 @@
         var linkedEl = communityModal.querySelector("[data-admin-notif-community-linked]");
         linkedEl.hidden = true;
         linkedEl.innerHTML = "";
+        if (communityProperties) {
+          communityProperties.hidden = !isEdit || !actionAdminNotificationsCommunityContracts;
+        }
+        if (communityResultsEl) {
+          communityResultsEl.innerHTML = "";
+        }
+        if (communityLinkedListEl) {
+          communityLinkedListEl.innerHTML = "";
+        }
+        if (isEdit) {
+          loadCommunityContracts("");
+        }
         var submitBtn = communityForm.querySelector("[data-admin-notif-community-submit]");
         submitBtn.disabled = true;
         communityModal.hidden = false;
@@ -8974,9 +9126,15 @@
         submitBtn.disabled = true;
         postAdminNotifications(actionAdminNotificationsCommunitySave, new FormData(communityForm))
           .then(function (data) {
+            if (data.created && data.id) {
+              showToast("success", "Copropiedad creada. Ahora puedes anexar sus inmuebles.");
+              communityRecipientsStale = true;
+              openCommunityModal(String(data.id));
+              return;
+            }
             showToast("success", data.message || "Copropiedad guardada.");
+            communityRecipientsStale = true;
             closeCommunityModal();
-            loadRecipients(currentPage);
           })
           .catch(function (err) {
             showToast("error", err.message || "No se pudo guardar la copropiedad.");
@@ -9891,6 +10049,30 @@
             event.preventDefault();
             submitCommunityForm();
           });
+          communityForm.addEventListener("click", function (event) {
+            var target = event.target && event.target.closest ? event.target : null;
+            if (!target) {
+              return;
+            }
+            var linkBtn = target.closest("[data-admin-notif-community-link]");
+            if (linkBtn && !linkBtn.disabled) {
+              event.preventDefault();
+              linkCommunityContract(linkBtn);
+              return;
+            }
+            if (target.closest("[data-admin-notif-community-search-btn]")) {
+              event.preventDefault();
+              searchCommunityContracts();
+            }
+          });
+          if (communitySearchInput) {
+            communitySearchInput.addEventListener("keydown", function (event) {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                searchCommunityContracts();
+              }
+            });
+          }
           document.addEventListener("keydown", function (event) {
             if (event.key === "Escape" && !communityModal.hidden) {
               closeCommunityModal();
