@@ -310,6 +310,10 @@ final class CommunityRecordsService
         throw new \DomainException('El campo ' . $key . ' supera los 255 caracteres.');
       }
     }
+    // NIT sin puntos ni dígito de verificación: el ingreso de usuarios usa solo los números base.
+    if (preg_match('/^\d{5,15}$/', $data['nit']) !== 1) {
+      throw new \DomainException('El NIT debe tener solo números (5 a 15 dígitos), sin puntos, guiones ni dígito de verificación.');
+    }
     if (filter_var($data['correo'], FILTER_VALIDATE_EMAIL) === false) {
       throw new \DomainException('Escribe un correo válido para la copropiedad.');
     }

@@ -3285,7 +3285,7 @@ trait RendersDashboard
             <fieldset class="scm-an-community-group">
               <legend>Datos de la copropiedad</legend>
               <div class="scm-field is-wide"><label for="scm-an-community-copropiedad">Copropiedad *</label><input id="scm-an-community-copropiedad" name="copropiedad" type="text" class="scm-input" maxlength="255" required></div>
-              <div class="scm-field"><label for="scm-an-community-nit">NIT *</label><input id="scm-an-community-nit" name="nit" type="text" class="scm-input" maxlength="255" required></div>
+              <div class="scm-field"><label for="scm-an-community-nit">NIT *</label><input id="scm-an-community-nit" name="nit" type="text" class="scm-input" inputmode="numeric" pattern="\d{5,15}" maxlength="15" placeholder="Solo números, sin dígito de verificación" required data-admin-notif-community-nit><small class="scm-an-field-hint">Ej.: 900901454 (sin puntos ni -DV)</small></div>
               <div class="scm-field"><label for="scm-an-community-id-inmueble">ID inmueble</label><input id="scm-an-community-id-inmueble" name="id_inmueble" type="text" class="scm-input" maxlength="255"></div>
               <div class="scm-field"><label for="scm-an-community-barrio">Barrio *</label><select id="scm-an-community-barrio" name="barrio" class="scm-select" required data-admin-notif-community-select="barrios"></select></div>
               <div class="scm-field"><label for="scm-an-community-direccion">Direcci&oacute;n</label><input id="scm-an-community-direccion" name="direccion" type="text" class="scm-input" maxlength="255"></div>

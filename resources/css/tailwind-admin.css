@@ -1269,6 +1269,7 @@
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-group .scm-field { @apply m-0 flex min-w-0 flex-col gap-1; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-group .scm-field.is-wide { @apply sm:col-span-2; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-group label { @apply text-[11px] font-semibold text-slate-600; }
+  #scm-app #scm-panel-admin-notificaciones .scm-an-community-group .scm-an-field-hint { @apply text-[10px] text-slate-400; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-group :is(.scm-input,.scm-select) { @apply w-full min-w-0; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-linked { @apply flex flex-col gap-0.5 rounded-xl border border-solid border-amber-200 bg-amber-50 px-4 py-3 text-xs; }
   #scm-app #scm-panel-admin-notificaciones .scm-an-community-linked[hidden] { display:none!important; }

@@ -9024,6 +9024,11 @@
         });
       }
 
+      // NIT base only: drops the check digit after "-" and any dot, space or letter.
+      function cleanCommunityNit(value) {
+        return String(value || "").split("-")[0].replace(/\D+/g, "").slice(0, 15);
+      }
+
       function closeCommunityModal() {
         if (!communityModal || communityModal.hidden) {
           return;
@@ -9085,7 +9090,7 @@
             ["copropiedad", "nit", "id_inmueble", "direccion", "administrador", "contacto", "correo", "numero_cuenta"].forEach(function (name) {
               var input = communityForm.elements[name];
               if (input) {
-                input.value = record[name] || "";
+                input.value = name === "nit" ? cleanCommunityNit(record[name]) : (record[name] || "");
               }
             });
             var linked = record.linked || {};
@@ -9120,6 +9125,12 @@
         if (missing.length) {
           missing[0].focus();
           showToast("warning", "Completa los campos obligatorios marcados con *.");
+          return;
+        }
+        var nitInput = communityForm.elements.nit;
+        if (nitInput && !/^\d{5,15}$/.test(String(nitInput.value || ""))) {
+          nitInput.focus();
+          showToast("warning", "El NIT debe tener solo números (5 a 15 dígitos), sin puntos ni dígito de verificación.");
           return;
         }
         var submitBtn = communityForm.querySelector("[data-admin-notif-community-submit]");
@@ -10065,6 +10076,15 @@
               searchCommunityContracts();
             }
           });
+          var communityNitInput = communityForm.querySelector("[data-admin-notif-community-nit]");
+          if (communityNitInput) {
+            communityNitInput.addEventListener("input", function () {
+              var clean = cleanCommunityNit(communityNitInput.value);
+              if (clean !== communityNitInput.value) {
+                communityNitInput.value = clean;
+              }
+            });
+          }
           if (communitySearchInput) {
             communitySearchInput.addEventListener("keydown", function (event) {
               if (event.key === "Enter") {
