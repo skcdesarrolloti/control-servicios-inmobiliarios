@@ -9901,7 +9901,7 @@
             setProgress("Analizando PDF " + (index + 1) + " de " + files.length + "...");
             var fd = new FormData();
             fd.set("type", type);
-            fd.append("receipts[]", file, file.name);
+            fd.append("receipts[]", file, safeReceiptFileName(file.name));
             return postAdminNotifications(actionAdminNotificationsPaymentReceiptsImport, fd)
               .then(function (data) {
                 if (!communities.length && Array.isArray(data.communities)) {
@@ -9914,7 +9914,7 @@
               .catch(function (err) {
                 failed.push(file.name);
                 rows.push({
-                  archivo: file.name,
+                  archivo: safeReceiptFileName(file.name),
                   sha1: "",
                   nit: "",
                   periodo: "",
@@ -9924,7 +9924,9 @@
                   recipient_id: "",
                   candidates: [],
                   status: "No se pudo subir",
-                  note: err.message || "El servidor rechazó este archivo.",
+                  note: /403|406/.test(String(err.message || ""))
+                    ? "El servidor de hosting bloqueó este PDF por seguridad. Renómbralo solo con letras, números, guiones y comas, o vuelve a guardarlo como PDF (Imprimir > Guardar como PDF) e intenta de nuevo."
+                    : (err.message || "El servidor rechazó este archivo."),
                   include: false,
                   upload_failed: true,
                 });
@@ -10007,6 +10009,21 @@
           .finally(function () {
             setLoading(false);
           });
+      }
+
+      // The hosting firewall rejects uploads whose file name looks like a
+      // shell command (";", "&", "|", "$"...). Separators become commas.
+      function safeReceiptFileName(name) {
+        var value = String(name || "comprobante.pdf");
+        var ext = /\.pdf$/i.test(value) ? value.slice(-4) : ".pdf";
+        var base = value.replace(/\.pdf$/i, "")
+          .replace(/[;|&]+/g, ",")
+          .replace(/[$<>`"'{}\[\]\\^~*?!=+%@]+/g, " ")
+          .replace(/\s*,\s*/g, ", ")
+          .replace(/(,\s*)+/g, ", ")
+          .replace(/\s+/g, " ")
+          .replace(/^[\s,]+|[\s,]+$/g, "");
+        return (base || "comprobante") + ext;
       }
 
       function receiptNitDigits(value) {

@@ -3280,7 +3280,8 @@ trait RendersDashboard
                     <li><strong>NIT al inicio:</strong> con o sin puntos y d&iacute;gito de verificaci&oacute;n. No pongas otros n&uacute;meros antes (celulares, cuentas o valores), porque se mezclan con el NIT.</li>
                     <li><strong>Mes en letras y despu&eacute;s el a&ntilde;o:</strong> el a&ntilde;o pegado al NIT (<code>900135868 2026 OCTUBRE</code>) se lee como parte del NIT.</li>
                     <li><strong>Apartamento y torre (opcional):</strong> escribe <code>APTO 302</code> y <code>TORRE 10</code> completos; as&iacute; se identifican los contratos. Abreviaturas como <code>T10</code> solo se muestran como texto.</li>
-                    <li>Un PDF por soporte. Si subes varios PDF del mismo NIT, se env&iacute;an juntos en un solo mensaje.</li>
+                    <li><strong>Varios apartamentos:</strong> sep&aacute;ralos con coma (<code>APTO 1702, APTO 1701 T7</code>). No uses <code>;</code> <code>&amp;</code> <code>$</code> ni comillas: el servidor bloquea esos archivos por seguridad (el sistema cambia <code>;</code> por coma autom&aacute;ticamente).</li>
+                <li>Un PDF por soporte. Si subes varios PDF del mismo NIT, se env&iacute;an juntos en un solo mensaje.</li>
                   </ul>
                   <p class="scm-an-filename-examples-title">Ejemplos correctos</p>
                   <ul class="scm-an-filename-examples">
