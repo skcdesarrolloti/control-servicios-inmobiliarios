@@ -2173,6 +2173,7 @@ final class AdministrativeNotificationsService
       ]];
       $receiptMeta['contratos_sistema'] = implode(' | ', $this->paymentReceiptContractLabels($contracts));
       $receiptMeta['detalle_excel'] = $this->paymentReceiptDetail($receiptMeta, $contracts);
+      $receiptMeta['detalle_whatsapp'] = $this->paymentReceiptWhatsappSummary($receiptMeta, false);
 
       $allContracts = [];
       foreach (array_merge($contractsByRecipient[$recipientId] ?? [], $contracts) as $contractRow) {
@@ -3474,10 +3475,6 @@ final class AdministrativeNotificationsService
     $lines = [];
     $receipts = is_array($meta['comprobantes_pago'] ?? null) ? $meta['comprobantes_pago'] : [];
     $lines[] = 'Soportes adjuntos: ' . max(1, count($receipts));
-    $nit = trim((string) ($meta['documento_excel'] ?? ''));
-    if ($nit !== '') {
-      $lines[] = 'NIT: ' . $nit;
-    }
     $period = trim((string) ($meta['mes_excel'] ?? ''));
     if ($period !== '') {
       $lines[] = 'Periodo: ' . $period;
@@ -3544,7 +3541,7 @@ final class AdministrativeNotificationsService
   {
     $receipts = is_array($meta['comprobantes_pago'] ?? null) ? $meta['comprobantes_pago'] : [];
     $lines = ['Soportes adjuntos: ' . max(1, count($receipts))];
-    foreach (['documento_excel' => 'NIT', 'mes_excel' => 'Periodo', 'inmueble_simi_excel' => 'Inmueble(s)'] as $key => $label) {
+    foreach (['mes_excel' => 'Periodo', 'inmueble_simi_excel' => 'Inmueble(s)'] as $key => $label) {
       $value = trim((string) ($meta[$key] ?? ''));
       if ($value !== '') {
         $lines[] = $label . ': ' . $value;
@@ -3563,9 +3560,6 @@ final class AdministrativeNotificationsService
       if ($url !== '') {
         $lines[] = 'Soporte: ' . trim(explode(',', $url)[0]);
       }
-    } elseif (count($receipts) > 1) {
-      // A WhatsApp template carries a single document header.
-      $lines[] = 'Por WhatsApp va el primer soporte; todos los soportes van adjuntos en el correo.';
     }
     return implode("\n", $lines);
   }
@@ -3592,6 +3586,7 @@ final class AdministrativeNotificationsService
     $base['pagos_pdf'] = (string) ((int) ($base['pagos_pdf'] ?? 0) + (int) ($extra['pagos_pdf'] ?? 0));
     $base['pdf_texto_leido'] = (($base['pdf_texto_leido'] ?? '') === 'Si' || ($extra['pdf_texto_leido'] ?? '') === 'Si') ? 'Si' : 'No';
     $base['detalle_excel'] = $this->paymentReceiptDetail($base, $contracts);
+    $base['detalle_whatsapp'] = $this->paymentReceiptWhatsappSummary($base, false);
     return $base;
   }
 
@@ -4066,12 +4061,13 @@ final class AdministrativeNotificationsService
       $clean = [];
       $limits = [
         'detalle_excel' => 3000,
+        'detalle_whatsapp' => 900,
         'contratos_sistema' => 2000,
         'pagos_pdf_detalle' => 2000,
         'url_pdf' => 900,
         'ruta_pdf' => 900,
       ];
-      foreach (['contrato_excel', 'inmueble_simi_excel', 'documento_excel', 'canon_excel', 'canon_excel_raw', 'mes_excel', 'direccion_excel', 'detalle_excel', 'archivo_pdf', 'archivo_pdf_guardado', 'ruta_pdf', 'url_pdf', 'contratos_sistema', 'pdf_texto_leido', 'pagos_pdf', 'pagos_pdf_detalle'] as $key) {
+      foreach (['contrato_excel', 'inmueble_simi_excel', 'documento_excel', 'canon_excel', 'canon_excel_raw', 'mes_excel', 'direccion_excel', 'detalle_excel', 'detalle_whatsapp', 'archivo_pdf', 'archivo_pdf_guardado', 'ruta_pdf', 'url_pdf', 'contratos_sistema', 'pdf_texto_leido', 'pagos_pdf', 'pagos_pdf_detalle'] as $key) {
         $limit = (int) ($limits[$key] ?? 500);
         $clean[$key] = trim(mb_substr((string) ($meta[$key] ?? ''), 0, $limit, 'UTF-8'));
       }

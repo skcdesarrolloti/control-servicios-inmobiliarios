@@ -8426,18 +8426,20 @@
         ].indexOf(String(option.value || "")) !== -1;
       }
 
-      function importedDetailPreview() {
+      // forWhatsapp: payment supports send WhatsApp a shorter summary than the email.
+      function importedDetailPreview(forWhatsapp) {
         if (importedPayload && typeof importedPayload === "object") {
           var firstKey = Object.keys(importedPayload)[0];
-          var detail = firstKey && importedPayload[firstKey]
-            ? String(importedPayload[firstKey].detalle_excel || "")
+          var first = firstKey ? importedPayload[firstKey] : null;
+          var detail = first
+            ? String((forWhatsapp && first.detalle_whatsapp) || first.detalle_excel || "")
             : "";
           if (detail) {
             return detail;
           }
         }
         return selectedTemplateIsPaymentSupport()
-          ? "Soportes adjuntos: 1\nNIT: 901133921\nPeriodo: SEPTIEMBRE 2026\nInmueble(s) indicados en el nombre del PDF: APTO 302 T10"
+          ? "Soportes adjuntos: 1\nPeriodo: SEPTIEMBRE 2026\nInmueble(s): APTO 302 T10" + (forWhatsapp ? "\nContrato(s): #700" : "")
           : "Canon: $1.850.000\nContrato: #700\nInmueble SIMI: 10578\nPeriodo: Agosto 2026";
       }
 
@@ -8500,7 +8502,7 @@
           return template;
         }
         var messagePreview = selectedTemplateUsesImportedDetail()
-          ? importedDetailPreview()
+          ? importedDetailPreview(true)
           : previewMessage(rawMessage || "Mensaje escrito por el funcionario.");
         return template
           .replace(/\{\{1\}\}/g, variableValue(1, name))
