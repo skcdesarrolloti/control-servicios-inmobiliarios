@@ -138,6 +138,7 @@ trait HandlesAdministrativeNotifications
       $service = new CommunityRecordsService($this->db);
       $this->jsonOk([
         'linked' => $id > 0 ? $service->linkedContracts($id) : [],
+        'detected' => $id > 0 ? $service->detectedContracts($id) : [],
         'results' => $query !== '' ? $service->searchContracts($query) : [],
       ]);
     } catch (\DomainException $e) {
@@ -194,7 +195,7 @@ trait HandlesAdministrativeNotifications
       $result = (string) ($_POST['mode'] ?? '') === 'unlink'
         ? $service->unlinkContract($id, $contractId)
         : $service->linkContract($id, $contractId);
-      $this->jsonOk($result + ['linked_contracts' => $service->linkedContracts($id)]);
+      $this->jsonOk($result + ['linked_contracts' => $service->linkedContracts($id), 'detected_contracts' => $service->detectedContracts($id)]);
     } catch (\DomainException $e) {
       $this->jsonFail($e->getMessage());
     } catch (\Throwable $e) {

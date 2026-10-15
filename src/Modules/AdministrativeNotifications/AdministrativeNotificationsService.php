@@ -4419,6 +4419,9 @@ final class AdministrativeNotificationsService
         $parts[] = "CAST(`{$contractColumn}` AS UNSIGNED) = ?";
         $args[] = $numeric;
       } else {
+        if (self::isPlaceholderValue($value)) {
+          continue;
+        }
         $parts[] = "LOWER(" . $this->collatedTextSql("TRIM(COALESCE(`{$contractColumn}`, ''))") . ") = LOWER(CONVERT(TRIM(?) USING utf8mb4) COLLATE utf8mb4_unicode_ci)";
         $args[] = $value;
       }
@@ -4457,11 +4460,15 @@ final class AdministrativeNotificationsService
   /** @param array<string,mixed> $config */
   private function contractActorComparisonSql(string $actorTable, string $contractActorColumn, array $config = []): string
   {
+    // Empty, "0" or placeholder values ("NA", "NO APLICA"...) must never pair an
+    // actor with a contract: CAST('' AS UNSIGNED) is 0 and placeholders repeat.
+    $idMatch = static fn(string $contractExpr, string $actorExpr): string => "(CAST({$contractExpr} AS UNSIGNED) > 0 AND CAST({$contractExpr} AS UNSIGNED) = CAST({$actorExpr} AS UNSIGNED))";
+    $placeholders = "('" . implode("','", self::PLACEHOLDER_VALUES) . "')";
     $parts = [
-      "CAST(ca.`{$contractActorColumn}` AS UNSIGNED) = CAST(`{$actorTable}`.`_ID` AS UNSIGNED)",
+      $idMatch("ca.`{$contractActorColumn}`", "`{$actorTable}`.`_ID`"),
     ];
     if ($this->schema->columnExists($actorTable, $contractActorColumn)) {
-      $parts[] = "CAST(ca.`{$contractActorColumn}` AS UNSIGNED) = CAST(`{$actorTable}`.`{$contractActorColumn}` AS UNSIGNED)";
+      $parts[] = $idMatch("ca.`{$contractActorColumn}`", "`{$actorTable}`.`{$contractActorColumn}`");
     }
     foreach ((array) ($config['contract_match_columns'] ?? []) as $actorColumn => $contractColumn) {
       $actorColumn = trim((string) $actorColumn);
@@ -4475,14 +4482,22 @@ final class AdministrativeNotificationsService
         continue;
       }
       if (preg_match('/^id_/', $actorColumn) === 1 || preg_match('/^id_/', $contractColumn) === 1) {
-        $parts[] = "CAST(ca.`{$contractColumn}` AS UNSIGNED) = CAST(`{$actorTable}`.`{$actorColumn}` AS UNSIGNED)";
+        $parts[] = $idMatch("ca.`{$contractColumn}`", "`{$actorTable}`.`{$actorColumn}`");
       } else {
         $caExpr = $this->collatedTextSql("TRIM(COALESCE(ca.`{$contractColumn}`, ''))");
         $actorExpr = $this->collatedTextSql("TRIM(COALESCE(`{$actorTable}`.`{$actorColumn}`, ''))");
-        $parts[] = "TRIM(COALESCE(ca.`{$contractColumn}`, '')) <> '' AND TRIM(COALESCE(`{$actorTable}`.`{$actorColumn}`, '')) <> '' AND LOWER({$caExpr}) = LOWER({$actorExpr})";
+        $parts[] = "(TRIM(COALESCE(ca.`{$contractColumn}`, '')) <> '' AND TRIM(COALESCE(`{$actorTable}`.`{$actorColumn}`, '')) <> '' AND UPPER({$actorExpr}) NOT IN {$placeholders} AND LOWER({$caExpr}) = LOWER({$actorExpr}))";
       }
     }
     return '(' . implode(' OR ', $parts) . ')';
+  }
+
+  /** Filler values seen in NIT/name fields that must not pair records. */
+  public const PLACEHOLDER_VALUES = ['NA', 'N/A', 'N.A', 'N.A.', 'NO APLICA', 'NOAPLICA', 'NINGUNO', 'NINGUNA', 'NO', 'NO TIENE', 'SIN', 'SIN NIT', '0', '-', '.'];
+
+  public static function isPlaceholderValue(string $value): bool
+  {
+    return in_array(mb_strtoupper(trim($value), 'UTF-8'), self::PLACEHOLDER_VALUES, true);
   }
 
   private function collatedTextSql(string $expression): string

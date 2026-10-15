@@ -9070,15 +9070,21 @@
         );
       }
 
-      function renderCommunityLinked(rows) {
+      function renderCommunityLinked(rows, detected) {
         if (!communityLinkedListEl) {
           return;
         }
+        detected = Array.isArray(detected) ? detected : [];
         communityLinkedListEl.innerHTML =
           '<p class="scm-an-community-contracts-title">Vinculados (' + rows.length + ")</p>" +
           (rows.length
             ? rows.map(function (row) { return communityContractHtml(row, false); }).join("")
-            : '<div class="scm-admin-notif-empty"><strong>Sin inmuebles vinculados</strong><span>Busca un número de contrato para vincularlo.</span></div>');
+            : '<div class="scm-admin-notif-empty"><strong>Sin inmuebles vinculados</strong><span>Busca un número de contrato para vincularlo.</span></div>') +
+          (detected.length
+            ? '<p class="scm-an-community-contracts-title">Detectados sin vincular (' + detected.length + ")</p>" +
+              '<p class="scm-an-community-detected-help">Coinciden por inmueble, NIT o nombre y por eso aparecen en el listado, pero no están vinculados. Vincúlalos si pertenecen a esta copropiedad.</p>' +
+              detected.map(function (row) { return communityContractHtml(row, true); }).join("")
+            : "");
       }
 
       function loadCommunityContracts(query) {
@@ -9091,7 +9097,7 @@
         }
         return postAdminNotifications(actionAdminNotificationsCommunityContracts, { id: id, q: query || "" })
           .then(function (data) {
-            renderCommunityLinked(Array.isArray(data.linked) ? data.linked : []);
+            renderCommunityLinked(Array.isArray(data.linked) ? data.linked : [], data.detected);
             if (query && communityResultsEl) {
               var results = Array.isArray(data.results) ? data.results : [];
               communityResultsEl.innerHTML =
@@ -9167,7 +9173,7 @@
             .then(function (data) {
               showToast("success", data.message || "Contrato desvinculado.");
               communityRecipientsStale = true;
-              renderCommunityLinked(Array.isArray(data.linked_contracts) ? data.linked_contracts : []);
+              renderCommunityLinked(Array.isArray(data.linked_contracts) ? data.linked_contracts : [], data.detected_contracts);
               var query = communitySearchInput ? String(communitySearchInput.value || "").trim() : "";
               if (query) {
                 loadCommunityContracts(query);
@@ -9196,7 +9202,7 @@
             .then(function (data) {
               showToast("success", data.message || "Inmueble vinculado.");
               communityRecipientsStale = true;
-              renderCommunityLinked(Array.isArray(data.linked_contracts) ? data.linked_contracts : []);
+              renderCommunityLinked(Array.isArray(data.linked_contracts) ? data.linked_contracts : [], data.detected_contracts);
               var query = communitySearchInput ? String(communitySearchInput.value || "").trim() : "";
               if (query) {
                 loadCommunityContracts(query);

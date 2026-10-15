@@ -174,6 +174,50 @@ final class CommunityRecordsService
   }
 
   /**
+   * Lease contracts the recipient list associates with the copropiedad (same
+   * property id, NIT or name) but that are not formally linked by
+   * id_copropiedad. Shown so they can be linked with one click.
+   *
+   * @return array<int,array<string,string>>
+   */
+  public function detectedContracts(int $id): array
+  {
+    $community = $this->db->getRow(
+      "SELECT `copropiedad`, `nit`, `id_inmueble` FROM `{$this->communityTable()}` WHERE `_ID` = ? LIMIT 1",
+      [$id]
+    );
+    if (!is_array($community)) {
+      return [];
+    }
+    $collate = static fn(string $expr): string => "LOWER(CONVERT(TRIM(COALESCE({$expr}, '')) USING utf8mb4) COLLATE utf8mb4_unicode_ci)";
+    $parts = [];
+    $args = [];
+    $propertyId = (int) preg_replace('/\D+/', '', (string) ($community['id_inmueble'] ?? ''));
+    if ($propertyId > 0) {
+      $parts[] = 'CAST(ca.`id_inmueble` AS UNSIGNED) = ?';
+      $args[] = $propertyId;
+    }
+    foreach (['nit' => 'nit_copropiedad', 'copropiedad' => 'copropiedad'] as $source => $target) {
+      $value = trim((string) ($community[$source] ?? ''));
+      if ($value === '' || AdministrativeNotificationsService::isPlaceholderValue($value)) {
+        continue;
+      }
+      $parts[] = $collate("ca.`{$target}`") . ' = ' . $collate('?');
+      $args[] = $value;
+    }
+    if ($parts === []) {
+      return [];
+    }
+    $table = $this->contractTable();
+    $args[] = (string) $id;
+    $rows = $this->db->getResults(
+      $this->contractSelectSql($table) . ' WHERE (' . implode(' OR ', $parts) . ") AND TRIM(COALESCE(ca.`id_copropiedad`, '')) <> ? ORDER BY ca.`_ID` DESC LIMIT 50",
+      $args
+    );
+    return $this->contractRows($rows);
+  }
+
+  /**
    * Lease contracts matching the exact contract number.
    *
    * @return array<int,array<string,string>>
