@@ -109,7 +109,7 @@ trait HandlesAdministrativeNotifications
       $this->jsonFail('No tienes permiso para gestionar copropiedades.');
     }
 
-    $fields = ['copropiedad', 'nit', 'administrador', 'contacto', 'indicativo', 'correo', 'barrio', 'direccion', 'tipo_cuenta', 'numero_cuenta', 'banco', 'id_inmueble'];
+    $fields = ['copropiedad', 'nit', 'administrador', 'contacto', 'indicativo', 'correo', 'barrio', 'direccion', 'tipo_cuenta', 'numero_cuenta', 'banco'];
     $input = [];
     foreach ($fields as $field) {
       $input[$field] = sanitize_text_field(wp_unslash((string) ($_POST[$field] ?? '')));
@@ -137,8 +137,8 @@ trait HandlesAdministrativeNotifications
     try {
       $service = new CommunityRecordsService($this->db);
       $this->jsonOk([
-        'linked' => $id > 0 ? $service->linkedContracts($id) : [],
-        'results' => $query !== '' ? $service->searchContracts($query) : [],
+        'linked' => $id > 0 ? array_merge($service->linkedContracts($id), $service->linkedWebProperties($id)) : [],
+        'results' => $query !== '' ? array_merge($service->searchContracts($query), $service->searchWebProperties($query)) : [],
       ]);
     } catch (\DomainException $e) {
       $this->jsonFail($e->getMessage());
@@ -157,13 +157,16 @@ trait HandlesAdministrativeNotifications
 
     $id = max(0, (int) ($_POST['id'] ?? 0));
     $contractId = max(0, (int) ($_POST['contract_id'] ?? 0));
+    $kind = sanitize_key((string) ($_POST['kind'] ?? 'contrato'));
     if ($id <= 0 || $contractId <= 0) {
-      $this->jsonFail('Selecciona la copropiedad y el contrato a vincular.');
+      $this->jsonFail('Selecciona la copropiedad y el inmueble a vincular.');
     }
     try {
       $service = new CommunityRecordsService($this->db);
-      $result = $service->linkContract($id, $contractId);
-      $this->jsonOk($result + ['linked_contracts' => $service->linkedContracts($id)]);
+      $result = $kind === 'inmueble'
+        ? $service->linkWebProperty($id, $contractId)
+        : $service->linkContract($id, $contractId);
+      $this->jsonOk($result + ['linked_contracts' => array_merge($service->linkedContracts($id), $service->linkedWebProperties($id))]);
     } catch (\DomainException $e) {
       $this->jsonFail($e->getMessage());
     } catch (\Throwable $e) {

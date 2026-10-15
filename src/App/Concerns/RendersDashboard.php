@@ -3286,7 +3286,6 @@ trait RendersDashboard
               <legend>Datos de la copropiedad</legend>
               <div class="scm-field is-wide"><label for="scm-an-community-copropiedad">Copropiedad *</label><input id="scm-an-community-copropiedad" name="copropiedad" type="text" class="scm-input" maxlength="255" required></div>
               <div class="scm-field"><label for="scm-an-community-nit">NIT *</label><input id="scm-an-community-nit" name="nit" type="text" class="scm-input" inputmode="numeric" pattern="\d{5,15}" maxlength="15" placeholder="Solo números, sin dígito de verificación" required data-admin-notif-community-nit><small class="scm-an-field-hint">Ej.: 900901454 (sin puntos ni -DV)</small></div>
-              <div class="scm-field" data-admin-notif-community-edit-only><label for="scm-an-community-id-inmueble">ID inmueble</label><input id="scm-an-community-id-inmueble" name="id_inmueble" type="text" class="scm-input" maxlength="255"></div>
               <div class="scm-field"><label for="scm-an-community-barrio">Barrio *</label><select id="scm-an-community-barrio" name="barrio" class="scm-select" required data-admin-notif-community-select="barrios"></select></div>
               <div class="scm-field"><label for="scm-an-community-direccion">Direcci&oacute;n</label><input id="scm-an-community-direccion" name="direccion" type="text" class="scm-input" maxlength="255"></div>
             </fieldset>
@@ -3306,10 +3305,10 @@ trait RendersDashboard
             <section class="scm-an-community-group scm-an-community-properties" data-admin-notif-community-properties hidden>
               <div class="scm-an-community-properties-head">
                 <strong>Inmuebles vinculados</strong>
-                <span>Anexa inmuebles buscando el n&uacute;mero de contrato o el c&oacute;digo de inmueble SIMI. Se vincula solo el contrato de arrendamiento.</span>
+                <span>Busca por n&uacute;mero de contrato, c&oacute;digo SIMI o c&oacute;digo de inmueble web. Un contrato de arrendamiento entregado activa la copropiedad; un inmueble web solo queda asociado.</span>
               </div>
               <div class="scm-an-community-search">
-                <input type="search" class="scm-input" placeholder="Contrato (ej. 853) o inmueble SIMI (ej. 10668)" aria-label="Buscar contrato o inmueble SIMI" data-admin-notif-community-search>
+                <input type="search" class="scm-input" placeholder="Contrato (853), SIMI (10668) o inmueble web (150207)" aria-label="Buscar contrato, inmueble SIMI o inmueble web" data-admin-notif-community-search>
                 <button type="button" class="scm-an-btn" data-admin-notif-community-search-btn><?php echo $icon('search'); ?>Buscar</button>
               </div>
               <div class="scm-an-community-contracts" data-admin-notif-community-results></div>
