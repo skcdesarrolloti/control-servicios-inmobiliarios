@@ -34,9 +34,8 @@
     var last = new Date(year, index, 0).getDate();
     return { from: month + "-01", to: month + "-" + String(last).padStart(2, "0") };
   }
-  function currentMonth() {
-    var now = new Date();
-    return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+  function monthLabel(month) {
+    return MONTHS_LONG[Number(month.slice(5, 7)) - 1] + " " + month.slice(0, 4);
   }
 
   function readCache() {
@@ -72,7 +71,8 @@
     module.querySelectorAll("[data-scm-case-filter]").forEach(function (input) {
       inputs[input.getAttribute("data-scm-case-filter")] = input;
     });
-    var state = { data: null, pending: null, byEmployee: [] };
+    var currentMonth = module.getAttribute("data-current-month");
+    var state = { data: null, pending: null, byEmployee: [], mode: "actual" };
     var tooltip = document.createElement("div");
     tooltip.className = "scm-cc-tooltip";
     tooltip.setAttribute("role", "tooltip");
@@ -141,6 +141,14 @@
           };
         }),
       };
+      var years = {};
+      years[currentMonth.slice(0, 4)] = true;
+      state.data.rows.forEach(function (row) { if (row.fecha) years[row.fecha.slice(0, 4)] = true; });
+      var currentYear = inputs.year.value;
+      inputs.year.innerHTML = Object.keys(years).sort().reverse().map(function (year) {
+        return '<option value="' + esc(year) + '">' + esc(year) + "</option>";
+      }).join("");
+      inputs.year.value = currentYear || currentMonth.slice(0, 4);
       fillSelect(inputs.tema, dict.tema, "Todos");
       fillSelect(inputs.departamento, dict.departamento, "Todos");
       var employees = {};
@@ -172,18 +180,35 @@
       return employee.name + (employee.active ? "" : " (retirado)");
     }
 
-    // El rango de fechas manda sobre el mes; sin ninguno se muestra todo el histórico.
+    // Periodo: mes actual, un mes, un año (del año en curso hasta el mes actual) o acumulado de un mes a otro.
     function period() {
-      var from = inputs.from.value;
-      var to = inputs.to.value;
-      if (from || to) {
-        return { from: from || "0000-01-01", to: to || "9999-12-31", label: (from ? formatDay(from) : "el inicio") + " a " + (to ? formatDay(to) : "hoy") };
+      var valid = /^\d{4}-\d{2}$/;
+      if (state.mode === "anual") {
+        var year = inputs.year.value || currentMonth.slice(0, 4);
+        var last = year === currentMonth.slice(0, 4) ? currentMonth : year + "-12";
+        return { from: year + "-01-01", to: monthBounds(last).to, label: "todo " + year };
       }
-      if (inputs.month.value) {
-        var bounds = monthBounds(inputs.month.value);
-        return { from: bounds.from, to: bounds.to, label: MONTHS_LONG[Number(inputs.month.value.slice(5, 7)) - 1] + " " + inputs.month.value.slice(0, 4) };
+      if (state.mode === "acumulado") {
+        var from = valid.test(inputs.from.value) ? inputs.from.value : currentMonth.slice(0, 4) + "-01";
+        var to = valid.test(inputs.to.value) ? inputs.to.value : currentMonth;
+        if (from > to) { var swap = from; from = to; to = swap; }
+        return { from: from + "-01", to: monthBounds(to).to, label: from === to ? monthLabel(from) : monthLabel(from) + " a " + monthLabel(to) };
       }
-      return { from: "0000-01-01", to: "9999-12-31", label: "todo el histórico" };
+      var month = state.mode === "mes" && valid.test(inputs.month.value) ? inputs.month.value : currentMonth;
+      var bounds = monthBounds(month);
+      return { from: bounds.from, to: bounds.to, label: monthLabel(month) + (month === currentMonth ? " (mes actual)" : "") };
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      module.querySelectorAll("[data-scm-case-mode]").forEach(function (button) {
+        var active = button.getAttribute("data-scm-case-mode") === mode;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-checked", active ? "true" : "false");
+      });
+      module.querySelectorAll("[data-scm-case-mode-field]").forEach(function (field) {
+        field.hidden = field.getAttribute("data-scm-case-mode-field") !== mode;
+      });
     }
 
     function filteredRows() {
@@ -221,8 +246,8 @@
     function timelineChart(rows, range) {
       var dates = rows.map(function (row) { return row.fecha; }).sort();
       if (!dates.length) return '<div class="scm-cm-empty">No hay casos en el periodo.</div>';
-      var from = range.from === "0000-01-01" ? dates[0] : range.from;
-      var to = range.to === "9999-12-31" ? dates[dates.length - 1] : range.to;
+      var from = range.from;
+      var to = range.to;
       var days = Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
       var daily = days <= 62;
       var buckets = [];
@@ -423,24 +448,25 @@
     module.addEventListener("change", function (event) {
       var key = event.target.getAttribute && event.target.getAttribute("data-scm-case-filter");
       if (!key || !state.data) return;
-      if (key === "month" && inputs.month.value) {
-        inputs.from.value = "";
-        inputs.to.value = "";
-      }
-      if ((key === "from" || key === "to") && (inputs.from.value || inputs.to.value)) {
-        inputs.month.value = "";
-      }
       render();
     });
 
     module.addEventListener("click", function (event) {
       if (event.target.closest("[data-scm-case-refresh]")) { load(true); return; }
+      var mode = event.target.closest("[data-scm-case-mode]");
+      if (mode) {
+        setMode(mode.getAttribute("data-scm-case-mode"));
+        if (state.data) render();
+        return;
+      }
       if (!state.data) return;
       if (event.target.closest("[data-scm-case-export]")) { exportCsv(); return; }
       if (event.target.closest("[data-scm-case-clear]")) {
-        inputs.month.value = currentMonth();
-        inputs.from.value = "";
-        inputs.to.value = "";
+        setMode("actual");
+        inputs.month.value = currentMonth;
+        inputs.year.value = currentMonth.slice(0, 4);
+        inputs.from.value = currentMonth.slice(0, 4) + "-01";
+        inputs.to.value = currentMonth;
         inputs.tema.value = "";
         inputs.departamento.value = "";
         inputs.funcionario.value = "";

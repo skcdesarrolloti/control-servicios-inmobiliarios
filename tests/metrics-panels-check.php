@@ -41,6 +41,10 @@ $cases = $view->renderCasesShell();
 foreach (['month', 'from', 'to', 'tema', 'departamento', 'funcionario'] as $filter) {
   $check(str_contains($cases, 'data-scm-case-filter="' . $filter . '"'), 'Métricas de casos debe filtrar por ' . $filter . '.');
 }
+foreach (['actual', 'mes', 'anual', 'acumulado'] as $mode) {
+  $check(str_contains($cases, 'data-scm-case-mode="' . $mode . '"'), 'Casos ofrece el periodo ' . $mode . '.');
+}
+$check(str_contains($cases, 'data-scm-case-filter="year"'), 'Casos permite elegir el año.');
 $quotes = $view->renderQuotesShell();
 foreach (['year', 'month', 'from', 'to', 'categoria'] as $filter) {
   $check(str_contains($quotes, 'data-scm-quote-filter="' . $filter . '"'), 'Cotizaciones debe filtrar por ' . $filter . '.');

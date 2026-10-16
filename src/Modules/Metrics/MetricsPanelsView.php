@@ -10,12 +10,15 @@ namespace SCM\Modules\Metrics;
  */
 final class MetricsPanelsView
 {
+  /** Periodos comunes a Casos y Cotizaciones. */
+  private const PERIOD_MODES = ['actual' => 'Mes actual', 'mes' => 'Por mes', 'anual' => 'Anual', 'acumulado' => 'Acumulado'];
+
   public function renderCasesShell(): string
   {
-    $month = date('Y-m');
+    $month = (new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota')))->format('Y-m');
     ob_start();
 ?>
-    <section class="scm-cm scm-case-metrics" data-scm-case-metrics aria-labelledby="scm-case-metrics-title">
+    <section class="scm-cm scm-case-metrics" data-scm-case-metrics data-current-month="<?php echo htmlspecialchars($month, ENT_QUOTES, 'UTF-8'); ?>" aria-labelledby="scm-case-metrics-title">
       <header class="scm-cm-head">
         <div class="scm-cm-head-copy">
           <p class="scm-cm-kicker">Métricas</p>
@@ -33,18 +36,30 @@ final class MetricsPanelsView
         </div>
       </header>
 
-      <form class="scm-cm-filters" onsubmit="return false;">
-        <label class="scm-cm-field">
+      <form class="scm-cm-filters scm-qm-filters" onsubmit="return false;">
+        <div class="scm-cm-field scm-qm-period">
+          <span>Periodo</span>
+          <div class="scm-qm-views" role="radiogroup" aria-label="Periodo">
+            <?php foreach (self::PERIOD_MODES as $mode => $label): ?>
+              <button type="button" role="radio" class="scm-qm-view<?php echo $mode === 'actual' ? ' is-active' : ''; ?>" aria-checked="<?php echo $mode === 'actual' ? 'true' : 'false'; ?>" data-scm-case-mode="<?php echo $mode; ?>"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></button>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <label class="scm-cm-field" data-scm-case-mode-field="mes" hidden>
           <span>Mes</span>
-          <input type="month" data-scm-case-filter="month" value="<?php echo htmlspecialchars($month, ENT_QUOTES, 'UTF-8'); ?>">
+          <input type="month" data-scm-case-filter="month" value="<?php echo htmlspecialchars($month, ENT_QUOTES, 'UTF-8'); ?>" max="<?php echo htmlspecialchars($month, ENT_QUOTES, 'UTF-8'); ?>">
         </label>
-        <label class="scm-cm-field">
+        <label class="scm-cm-field" data-scm-case-mode-field="anual" hidden>
+          <span>Año</span>
+          <select data-scm-case-filter="year"><option value="<?php echo substr($month, 0, 4); ?>"><?php echo substr($month, 0, 4); ?></option></select>
+        </label>
+        <label class="scm-cm-field" data-scm-case-mode-field="acumulado" hidden>
           <span>Desde</span>
-          <input type="date" data-scm-case-filter="from">
+          <input type="month" data-scm-case-filter="from" value="<?php echo substr($month, 0, 4); ?>-01" max="<?php echo htmlspecialchars($month, ENT_QUOTES, 'UTF-8'); ?>">
         </label>
-        <label class="scm-cm-field">
+        <label class="scm-cm-field" data-scm-case-mode-field="acumulado" hidden>
           <span>Hasta</span>
-          <input type="date" data-scm-case-filter="to">
+          <input type="month" data-scm-case-filter="to" value="<?php echo htmlspecialchars($month, ENT_QUOTES, 'UTF-8'); ?>" max="<?php echo htmlspecialchars($month, ENT_QUOTES, 'UTF-8'); ?>">
         </label>
         <label class="scm-cm-field">
           <span>Tema</span>
@@ -73,7 +88,7 @@ final class MetricsPanelsView
     $now = new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota'));
     $year = $now->format('Y');
     $currentMonth = $now->format('Y-m');
-    $modes = ['actual' => 'Mes actual', 'mes' => 'Por mes', 'anual' => 'Anual', 'acumulado' => 'Acumulado'];
+    $modes = self::PERIOD_MODES;
     ob_start();
 ?>
     <section class="scm-cm scm-quote-metrics" data-scm-quote-metrics data-default-year="<?php echo $year; ?>" data-current-month="<?php echo $currentMonth; ?>" aria-labelledby="scm-quote-metrics-title">
