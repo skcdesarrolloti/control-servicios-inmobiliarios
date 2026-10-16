@@ -84,7 +84,8 @@ $check(substr_count($casesJs, 'fetch(') === 1 && str_contains($casesJs, 'session
 $qualityJs = (string) file_get_contents($root . '/public/assets/js/admin-quote-quality.js');
 $check(substr_count($quotesJs, 'fetch(') === 1 && str_contains($quotesJs, 'state.data && !force') && str_contains($quotesJs, 'scm:quote-data'), 'Cotizaciones consulta una sola vez y comparte sus filas.');
 $check(substr_count($qualityJs, 'fetch(') === 1 && str_contains($qualityJs, 'scm:quote-data') && str_contains($qualityJs, 'scm:quote-rows-changed'), 'La conciliación reutiliza las filas y avisa al informe tras corregir.');
-$check(str_contains($qualityJs, 'quotesOf(property)') && str_contains($qualityJs, 'row.inmueble_caso') && str_contains($qualityJs, 'quote_ledger_update'), 'La conciliación lista todas las cotizaciones de cada inmueble del auxiliar y permite editarlas.');
+$check(str_contains($qualityJs, 'function pairGroup(') && str_contains($qualityJs, 'sinceYear') && str_contains($qualityJs, 'row.inmueble_caso') && str_contains($qualityJs, 'quote_ledger_update'),
+  'La conciliación lista las cotizaciones de cada inmueble del auxiliar (desde el año anterior), empareja cada movimiento con su cotización y permite editarlas.');
 $check(str_contains($qualityJs, 'scm:quote-rows-changed') && str_contains($quotesJs, 'scm:quote-rows-changed'), 'Lo corregido en la conciliación recalcula el informe sin recargar.');
 $check(str_contains($quotesJs, 'data-scm-maintenance-quote-open-case') && str_contains($quotesJs, 'scm-maintenance-quote-row'), 'Cotizaciones conserva "Ver caso" con el popup del panel.');
 

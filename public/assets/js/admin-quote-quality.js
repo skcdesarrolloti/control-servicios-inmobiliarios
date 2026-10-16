@@ -63,33 +63,92 @@
         });
     }
 
-    // ---- Datos: agrupación por inmueble -------------------------------------------------------
+    // ---- Datos: agrupación y emparejamiento por inmueble ----------------------------------------
 
-    // Periodo del auxiliar en meses: la administración del sistema se compara con las aprobadas
-    // cuya fecha de respuesta cae en esos meses.
+    // Periodo del auxiliar en meses y ventana de cotizaciones a comparar: desde enero del año
+    // anterior al inicio del auxiliar (auxiliar de 2026 → cotizaciones de 2025 y 2026).
     function ledgerRange() {
       var summary = (state.ledger && state.ledger.resumen) || {};
-      return { from: String(summary.desde || "").slice(0, 7), to: String(summary.hasta || "").slice(0, 7) };
+      var from = String(summary.desde || "").slice(0, 7);
+      return { from: from, to: String(summary.hasta || "").slice(0, 7), sinceYear: from ? Number(from.slice(0, 4)) - 1 : 0 };
     }
     function inRange(row, range) {
       if (!row.approved || !row.respuesta) return false;
       var ym = row.respuesta.slice(0, 7);
       return ym >= range.from && ym <= range.to;
     }
-    function quotesOf(property) {
-      return state.rows.filter(function (row) { return String(row.inmueble) === property || String(row.inmueble_caso || "") === property; })
-        .sort(function (a, b) { return (b.fecha || "") < (a.fecha || "") ? -1 : (b.fecha || "") > (a.fecha || "") ? 1 : b.id - a.id; });
+    function inWindow(row, range) {
+      var date = row.fecha || row.respuesta || "";
+      return !!date && Number(date.slice(0, 4)) >= range.sinceYear;
+    }
+    function quotesOf(property, range) {
+      return state.rows.filter(function (row) {
+        return (String(row.inmueble) === property || String(row.inmueble_caso || "") === property) && inWindow(row, range);
+      }).sort(function (a, b) { return (b.fecha || "") < (a.fecha || "") ? -1 : (b.fecha || "") > (a.fecha || "") ? 1 : b.id - a.id; });
+    }
+    function distance(row, move) {
+      return Math.abs(Date.parse(row.respuesta || row.fecha || move.fecha) - Date.parse(move.fecha));
+    }
+
+    // Empareja cada movimiento del auxiliar con una cotización aprobada del inmueble:
+    // 1. mismo valor de administración (la de fecha más cercana);  2. varios movimientos que suman
+    // la administración de una cotización (cuotas);  3. mismo valor que una cotización ya emparejada
+    // (posible cobro repetido);  4. la aprobada libre de fecha más cercana (diferencia de valor);
+    // 5. sin cotización.
+    function pairGroup(moves, quotes) {
+      var candidates = quotes.filter(function (row) { return row.approved; });
+      var used = {};
+      var link = moves.map(function () { return null; });
+      function free(fn) { return candidates.filter(function (row) { return !used[row.id] && fn(row); }); }
+      function nearest(list, move) { return list.sort(function (a, b) { return distance(a, move) - distance(b, move); })[0] || null; }
+      moves.forEach(function (move, index) {
+        var quote = nearest(free(function (row) { return (row.admin || 0) === move.valor; }), move);
+        if (quote) { used[quote.id] = true; link[index] = { kind: "exacto", quote: quote }; }
+      });
+      var left = function () { return moves.map(function (move, index) { return index; }).filter(function (index) { return !link[index]; }); };
+      var pending = left();
+      var sets = pending.length > 1 ? [pending] : [];
+      for (var i = 0; i < pending.length; i++) for (var j = i + 1; j < pending.length; j++) if (pending.length > 2) sets.push([pending[i], pending[j]]);
+      sets.some(function (set) {
+        var sum = set.reduce(function (total, index) { return total + moves[index].valor; }, 0);
+        var quote = nearest(free(function (row) { return (row.admin || 0) === sum; }), moves[set[0]]);
+        if (!quote) return false;
+        used[quote.id] = true;
+        set.forEach(function (index) { link[index] = { kind: "cuotas", quote: quote }; });
+        return true;
+      });
+      left().forEach(function (index) {
+        var twin = candidates.filter(function (row) { return used[row.id] && (row.admin || 0) === moves[index].valor; })[0];
+        if (twin) link[index] = { kind: "repetido", quote: twin };
+      });
+      left().forEach(function (index) {
+        var quote = nearest(free(function () { return true; }), moves[index]);
+        if (quote) { used[quote.id] = true; link[index] = { kind: "diferencia", quote: quote }; }
+      });
+      left().forEach(function (index) { link[index] = { kind: "sin_cotizacion", quote: null }; });
+      return link;
     }
 
     function buildGroup(property, moves) {
       var range = ledgerRange();
-      var quotes = quotesOf(property);
+      var quotes = quotesOf(property, range);
+      var link = pairGroup(moves, quotes);
+      var byQuote = {};
+      moves.forEach(function (move, index) {
+        var pair = link[index];
+        if (pair.quote && pair.kind !== "repetido") (byQuote[pair.quote.id] = byQuote[pair.quote.id] || []).push(move);
+      });
       var ledgerSum = moves.reduce(function (sum, move) { return sum + move.valor; }, 0);
-      var systemSum = quotes.filter(function (row) { return inRange(row, range); }).reduce(function (sum, row) { return sum + (row.admin || 0); }, 0);
-      var status = !quotes.length ? "none" : ledgerSum === systemSum ? "ok" : "diff";
+      // Sistema: administración de las cotizaciones emparejadas y de las aprobadas del periodo que no están en el auxiliar.
+      var systemSum = quotes.filter(function (row) { return byQuote[row.id] || inRange(row, range); }).reduce(function (sum, row) { return sum + (row.admin || 0); }, 0);
+      var clean = link.every(function (pair) { return pair.kind === "exacto" || pair.kind === "cuotas"; }) &&
+        quotes.every(function (row) { return byQuote[row.id] || !inRange(row, range); });
       var address = "";
       quotes.some(function (row) { address = row.direccion || ""; return !!address; });
-      return { key: property, moves: moves, quotes: quotes, ledgerSum: ledgerSum, systemSum: systemSum, status: status, address: address };
+      return {
+        key: property, moves: moves, link: link, byQuote: byQuote, quotes: quotes, ledgerSum: ledgerSum, systemSum: systemSum,
+        status: !quotes.length ? "none" : clean ? "ok" : "diff", address: address,
+      };
     }
 
     function groups() {
@@ -100,8 +159,9 @@
         if (!byProperty[key]) { byProperty[key] = []; order.push(key); }
         byProperty[key].push(move);
       });
-      return order.map(function (key) { return buildGroup(key, byProperty[key]); })
-        .sort(function (a, b) { return Math.abs(b.ledgerSum - b.systemSum) - Math.abs(a.ledgerSum - a.systemSum) || a.key.localeCompare(b.key); });
+      return order.map(function (key) {
+        return buildGroup(key, byProperty[key].slice().sort(function (a, b) { return a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0; }));
+      }).sort(function (a, b) { return Math.abs(b.ledgerSum - b.systemSum) - Math.abs(a.ledgerSum - a.systemSum) || a.key.localeCompare(b.key); });
     }
 
     // Aprobadas en el periodo del auxiliar cuyo inmueble no aparece en el auxiliar.
@@ -114,19 +174,26 @@
       }).sort(function (a, b) { return (b.respuesta || "") < (a.respuesta || "") ? -1 : 1; });
     }
 
-    function matchedIds() {
-      var ids = {};
-      ((state.ledger && state.ledger.filas) || []).forEach(function (move) {
-        if (move.cotizacion && String(move.estado || "").indexOf("coincide") === 0) ids[move.cotizacion] = true;
-      });
-      return ids;
+    // Resultado de una cotización dentro de su inmueble.
+    function quoteResult(row, group, range) {
+      var moves = (group && group.byQuote[row.id]) || [];
+      if (moves.length) {
+        var sum = moves.reduce(function (total, move) { return total + move.valor; }, 0);
+        var diff = sum - (row.admin || 0);
+        if (!diff) return { text: moves.length > 1 ? "Cuadra en " + moves.length + " cuotas" : "Cuadra", tone: "is-entregado" };
+        return { text: "Diferencia " + (diff > 0 ? "+" : "−") + money(Math.abs(diff)), tone: "is-recibido", hint: "El auxiliar registró " + money(sum) };
+      }
+      if (inRange(row, range)) return { text: "No está en el auxiliar", tone: "is-recibido", hint: "Aprobada en el periodo sin movimiento contable" };
+      if (!row.approved) return { text: "No cuenta", tone: "is-muted", hint: row.estado };
+      if (!row.respuesta) return { text: "Sin fecha de respuesta", tone: "is-por_recibir" };
+      return { text: "No cuenta", tone: "is-muted", hint: "Respuesta fuera del periodo del auxiliar" };
     }
 
     // ---- Vista ---------------------------------------------------------------------------------
 
     function renderLedgerShell() {
       ledgerEl.innerHTML = '<section class="scm-cm-card is-wide"><header><h2>Conciliar con el auxiliar contable</h2>' +
-        '<p class="scm-cm-hint">Sube el auxiliar de administración (AUI) en .xls o .xlsx: por cada número de inmueble verás todas sus cotizaciones para corregir fecha, total y administración.</p></header>' +
+        '<p class="scm-cm-hint">Sube el auxiliar de administración (AUI) en .xls o .xlsx: por cada número de inmueble verás qué movimiento corresponde a cada cotización y podrás corregir fecha, total y administración.</p></header>' +
         '<form class="scm-qq-upload" data-scm-qq-ledger-form><label class="scm-qq-file"><input type="file" accept=".xls,.xlsx" data-scm-qq-ledger-file aria-label="Auxiliar contable">' +
         '<span class="material-symbols-outlined" aria-hidden="true">upload_file</span><span class="scm-qq-file-text"><strong data-scm-qq-ledger-name>Elegir auxiliar contable</strong>' +
         '<small>Archivo .xls o .xlsx exportado de contabilidad</small></span><span class="scm-qq-file-cta">Buscar archivo</span></label>' +
@@ -148,9 +215,9 @@
       var orphanAdmin = orphans.reduce(function (sum, row) { return sum + (row.admin || 0); }, 0);
       return kpi("Inmuebles en el auxiliar", num(list.length), num(summary.movimientos) + " movimientos · " + day(summary.desde) + " a " + day(summary.hasta), "stock") +
         kpi("Total auxiliar", money(ledgerTotal), "Administración registrada en contabilidad") +
-        kpi("Administración en el sistema", money(systemTotal), "Aprobadas de esos inmuebles con respuesta en el periodo", ledgerTotal === systemTotal ? "good" : "") +
-        kpi("Cuadran", num(count.ok), "Auxiliar igual al sistema", "good") +
-        kpi("Con diferencia", num(count.diff), count.none ? num(count.none) + " sin cotizaciones en el sistema" : "Revisa fecha, total o administración", count.diff || count.none ? "bad" : "") +
+        kpi("Administración en el sistema", money(systemTotal), "Cotizaciones emparejadas y aprobadas del periodo", ledgerTotal === systemTotal ? "good" : "") +
+        kpi("Cuadran", num(count.ok), "Cada movimiento tiene su cotización", "good") +
+        kpi("Por revisar", num(count.diff + count.none), count.none ? num(count.none) + " sin cotizaciones en el sistema" : "Diferencias, repetidos o faltantes", count.diff || count.none ? "bad" : "") +
         kpi("Aprobadas fuera del auxiliar", num(orphans.length), orphans.length ? money(orphanAdmin) + " de inmuebles que no están en el auxiliar" : "Todas están en el auxiliar", orphans.length ? "bad" : "");
     }
 
@@ -158,6 +225,7 @@
       var holder = ledgerEl.querySelector("[data-scm-qq-ledger-result]");
       if (!holder) return;
       if (!state.ledger) { holder.innerHTML = ""; return; }
+      var range = ledgerRange();
       var list = groups();
       var pending = list.filter(function (group) { return group.status !== "ok"; });
       var query = normalize(state.search.trim());
@@ -172,7 +240,8 @@
         }).join("") +
         '<label class="scm-cm-search"><span class="material-symbols-outlined" aria-hidden="true">search</span><input type="search" data-scm-qq-ledger-search placeholder="Inmueble, cotización, caso o dirección" value="' + esc(state.search) + '"></label>' +
         '<button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-qq-ledger-export>Exportar conciliación</button></div>';
-      html += '<p class="scm-cm-hint scm-ql-help">Se comparan los movimientos del auxiliar con la administración (sin IVA) de las cotizaciones <strong>aprobadas</strong> con respuesta entre ' +
+      html += '<p class="scm-cm-hint scm-ql-help">Se comparan las cotizaciones de ' + esc(range.sinceYear) + " en adelante. Cada fila muestra el movimiento del auxiliar que le corresponde " +
+        "(mismo valor de administración, o cuotas que lo suman). Cuenta en el periodo la administración sin IVA de las <strong>aprobadas</strong> con respuesta entre " +
         esc(day((state.ledger.resumen || {}).desde)) + " y " + esc(day((state.ledger.resumen || {}).hasta)) + ". Al cambiar la administración se recalcula su IVA y, si no cambias el total, el total se ajusta solo.</p>";
       html += '<div class="scm-ql-list" data-scm-qq-ledger-list>' +
         (shown.length ? shown.slice(0, state.limit).map(groupHtml).join("") : '<div class="scm-cm-empty">' + (state.filter === "revisar" && !query ? "Todos los inmuebles cuadran." : "No hay inmuebles con ese filtro.") + "</div>") +
@@ -184,7 +253,7 @@
       if (orphans.length) {
         html += '<section class="scm-ql-prop is-diff" data-scm-qq-orphans><header><div><strong>Aprobadas en el periodo cuyo inmueble no está en el auxiliar</strong>' +
           "<small>Puede que contabilidad no las haya causado, que tengan otro inmueble o que su fecha de respuesta esté fuera del periodo.</small></div></header>" +
-          quotesTable(orphans, true) + "</section>";
+          quotesTable(null, orphans, true) + "</section>";
       }
       holder.innerHTML = html;
     }
@@ -192,30 +261,42 @@
     function groupHtml(group) {
       var status = STATUS[group.status];
       var diff = group.ledgerSum - group.systemSum;
-      var movesHtml = group.moves.map(function (move) {
-        return '<span class="scm-ql-move"><b>' + esc(money(move.valor)) + "</b> " + esc(day(move.fecha)) + (move.transaccion ? ' <small>Tx ' + esc(move.transaccion) + "</small>" : "") + "</span>";
-      }).join("");
       return '<article class="scm-ql-prop is-' + group.status + '" data-scm-qq-prop="' + esc(group.key) + '"><header><div><strong>Inmueble ' + esc(group.key) + "</strong>" +
         (group.address ? "<small>" + esc(group.address) + "</small>" : "") + '</div><dl class="scm-ql-sums"><div><dt>Auxiliar</dt><dd>' + esc(money(group.ledgerSum)) + "</dd></div>" +
         "<div><dt>Sistema</dt><dd>" + esc(money(group.systemSum)) + "</dd></div>" +
         '<div><dt>Diferencia</dt><dd class="' + (diff ? "is-bad" : "is-good") + '">' + (diff ? (diff > 0 ? "+" : "−") + esc(money(Math.abs(diff))) : "—") + "</dd></div></dl>" +
         '<span class="scm-cm-badge ' + status[1] + '">' + esc(status[0]) + "</span></header>" +
-        '<div class="scm-ql-moves"><span class="scm-ql-label">Movimientos del auxiliar</span>' + movesHtml + "</div>" +
-        (group.quotes.length ? quotesTable(group.quotes, false)
-          : '<p class="scm-cm-muted scm-ql-empty">No hay cotizaciones con este inmueble en el sistema (ni en la cotización ni en su caso). Búscala en el caso o confírmalo con contabilidad.</p>') +
-        "</article>";
+        quotesTable(group, group.quotes, false) + "</article>";
     }
 
-    function quotesTable(rows, showProperty) {
+    function moveChip(move, extra) {
+      return '<span class="scm-ql-move"><b>' + esc(money(move.valor)) + "</b> " + esc(day(move.fecha)) + (move.transaccion ? " <small>Tx " + esc(move.transaccion) + "</small>" : "") + (extra || "") + "</span>";
+    }
+
+    // Una sola tabla por inmueble: cada cotización con su(s) movimiento(s) del auxiliar al lado, y al final
+    // los movimientos que no se pudieron emparejar con ninguna cotización.
+    function quotesTable(group, rows, showProperty) {
       var range = ledgerRange();
-      var matched = matchedIds();
+      var unpaired = group ? group.moves.map(function (move, index) { return { move: move, pair: group.link[index] }; })
+        .filter(function (item) { return item.pair.kind === "repetido" || item.pair.kind === "sin_cotizacion"; }) : [];
+      var columns = showProperty ? 9 : 8;
+      var body = rows.map(function (row) { return quoteRow(row, group, range, showProperty); }).join("");
+      body += unpaired.map(function (item) {
+        var repeated = item.pair.kind === "repetido";
+        return '<tr class="scm-ql-orphan-move"><td colspan="' + (columns - 3) + '"><span class="scm-cm-muted">Movimiento del auxiliar sin cotización</span></td><td>' + moveChip(item.move) + "</td>" +
+          '<td><span class="scm-cm-badge ' + (repeated ? "is-por_recibir" : "is-recibido") + '">' + (repeated ? "Repite el valor de #" + esc(item.pair.quote.id) : "Sin cotización") + "</span>" +
+          '<small class="scm-cm-source">' + (repeated ? "¿Cobro repetido o cuota? Confírmalo con contabilidad" : "No hay cotización con ese valor; búscala en el caso") + "</small></td><td></td></tr>";
+      }).join("");
+      if (!rows.length && !unpaired.length) body = '<tr><td colspan="' + columns + '" class="scm-cm-muted">Sin cotizaciones.</td></tr>';
+      if (!rows.length && group) body = '<tr><td colspan="' + columns + '" class="scm-cm-muted">No hay cotizaciones de ' + esc(range.sinceYear) + " en adelante con este inmueble (ni en la cotización ni en su caso).</td></tr>" + body;
       return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-qq-table scm-ql-quotes"><thead><tr><th>Cotización</th>' + (showProperty ? "<th>Inmueble</th>" : "") +
-        '<th>Estado</th><th>Creada</th><th>Fecha de respuesta</th><th class="is-num">Valor total</th><th class="is-num">Administración</th><th></th></tr></thead><tbody>' +
-        rows.map(function (row) { return quoteRow(row, range, matched, showProperty); }).join("") + "</tbody></table></div>";
+        '<th>Creada</th><th>Fecha de respuesta</th><th class="is-num">Valor total</th><th class="is-num">Administración</th><th>Auxiliar contable</th><th>Resultado</th><th></th></tr></thead><tbody>' +
+        body + "</tbody></table></div>";
     }
 
-    function quoteRow(row, range, matched, showProperty) {
-      var counts = inRange(row, range);
+    function quoteRow(row, group, range, showProperty) {
+      var result = quoteResult(row, group, range);
+      var moves = (group && group.byQuote[row.id]) || [];
       var tone = row.estado === "Aprobada" ? "is-entregado" : row.estado === "Desaprobada" ? "is-recibido" : "is-por_recibir";
       var dateCell = row.approved && state.canEditResponse
         ? '<input type="date" class="scm-qm-date" data-ql-field="fecha" value="' + esc(row.respuesta || "") + '" data-original="' + esc(row.respuesta || "") + '" max="' + todayIso() + '"' +
@@ -226,18 +307,16 @@
           ? '<input type="text" inputmode="numeric" class="scm-qm-date scm-ql-money" data-ql-field="' + field + '" value="' + esc(num(value)) + '" data-original="' + esc(value || 0) + '" aria-label="' + esc(label) + '">'
           : esc(money(value));
       };
-      var notes = [];
-      if (row.approved && !row.respuesta) notes.push('<small class="scm-cm-source is-bad">Sin fecha de respuesta</small>');
-      else if (row.approved && !counts) notes.push('<small class="scm-cm-source">Fuera del periodo del auxiliar</small>');
-      if (matched[row.id]) notes.push('<small class="scm-cm-source is-good">En el auxiliar</small>');
-      if (row.respuesta_fuente === "caso") notes.push('<small class="scm-cm-source">Fecha tomada del caso</small>');
-      return '<tr class="scm-maintenance-quote-row' + (counts ? "" : " is-muted") + '" data-ql-quote="' + esc(row.id) + '" data-cotizacion-id="' + esc(row.id) + '" data-ticket="' + esc(row.ticket) + '">' +
-        "<td><strong>#" + esc(row.id) + "</strong><small class=\"scm-cm-source\">" + (row.ticket ? "Caso #" + esc(row.ticket) : "Sin caso") + "</small></td>" +
+      return '<tr class="scm-maintenance-quote-row' + (result.tone === "is-muted" ? " is-muted" : "") + '" data-ql-quote="' + esc(row.id) + '" data-cotizacion-id="' + esc(row.id) + '" data-ticket="' + esc(row.ticket) + '">' +
+        "<td><strong>#" + esc(row.id) + '</strong> <span class="scm-cm-badge ' + tone + '">' + esc(row.estado) + '</span><small class="scm-cm-source">' + (row.ticket ? "Caso #" + esc(row.ticket) : "Sin caso") + "</small></td>" +
         (showProperty ? "<td>" + esc(row.inmueble || "—") + "</td>" : "") +
-        '<td><span class="scm-cm-badge ' + tone + '">' + esc(row.estado) + "</span></td><td>" + esc(day(row.fecha)) + "</td>" +
-        "<td>" + dateCell + notes.join("") + "</td>" +
+        "<td>" + esc(day(row.fecha)) + "</td>" +
+        "<td>" + dateCell + (row.respuesta_fuente === "caso" ? '<small class="scm-cm-source">Fecha tomada del caso</small>' : "") + "</td>" +
         '<td class="is-num">' + moneyInput("total", row.total, "Valor total de la cotización " + row.id) + "</td>" +
-        '<td class="is-num">' + moneyInput("administracion", row.admin, "Administración de la cotización " + row.id) + '<small class="scm-qm-row-msg" aria-live="polite"></small></td>' +
+        '<td class="is-num">' + moneyInput("administracion", row.admin, "Administración de la cotización " + row.id) + "</td>" +
+        "<td>" + (moves.length ? moves.map(function (move) { return moveChip(move); }).join("") : '<span class="scm-cm-muted">—</span>') + "</td>" +
+        '<td><span class="scm-cm-badge ' + result.tone + '">' + esc(result.text) + "</span>" + (result.hint ? '<small class="scm-cm-source">' + esc(result.hint) + "</small>" : "") +
+        '<small class="scm-qm-row-msg" aria-live="polite"></small></td>' +
         '<td class="is-actions">' + (state.canEditQuote || (row.approved && state.canEditResponse)
           ? '<button type="button" class="scm-cm-btn scm-qq-primary" data-ql-save disabled>Guardar</button> ' : "") +
         '<button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-maintenance-quote-open-case data-cotizacion-id="' + esc(row.id) +
@@ -263,7 +342,8 @@
     function refreshGroup(property) {
       var card = ledgerEl.querySelector('[data-scm-qq-prop="' + (window.CSS && CSS.escape ? CSS.escape(property) : property) + '"]');
       if (card) {
-        var moves = ((state.ledger && state.ledger.filas) || []).filter(function (move) { return String(move.inmueble) === property; });
+        var moves = ((state.ledger && state.ledger.filas) || []).filter(function (move) { return String(move.inmueble) === property; })
+          .sort(function (a, b) { return a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0; });
         card.outerHTML = groupHtml(buildGroup(property, moves));
       }
       var kpis = ledgerEl.querySelector("[data-scm-qq-kpis]");
@@ -309,19 +389,29 @@
         .then(function () { state.saving = false; });
     }
 
+    // Una línea por cotización con su(s) movimiento(s) emparejado(s) y una por cada movimiento sin cotización.
     function exportLedger() {
       var range = ledgerRange();
-      var lines = [["Inmueble", "Total auxiliar", "Administracion sistema (periodo)", "Diferencia", "Resultado", "Cotizacion", "Caso", "Estado cotizacion", "Creada", "Fecha respuesta", "En el periodo", "Valor total", "Administracion"]];
+      var lines = [["Inmueble", "Total auxiliar inmueble", "Administracion sistema inmueble", "Cotizacion", "Caso", "Estado cotizacion", "Creada", "Fecha respuesta",
+        "Valor total", "Administracion", "Movimientos auxiliar", "Valor auxiliar emparejado", "Resultado"]];
       var list = groups();
       list.forEach(function (group) {
-        var base = [group.key, group.ledgerSum, group.systemSum, group.ledgerSum - group.systemSum, STATUS[group.status][0]];
-        if (!group.quotes.length) { lines.push(base); return; }
+        var base = [group.key, group.ledgerSum, group.systemSum];
         group.quotes.forEach(function (row) {
-          lines.push(base.concat([row.id, row.ticket, row.estado, row.fecha || "", row.respuesta || "", inRange(row, range) ? "Si" : "No", row.total, row.admin]));
+          var moves = group.byQuote[row.id] || [];
+          lines.push(base.concat([row.id, row.ticket, row.estado, row.fecha || "", row.respuesta || "", row.total, row.admin,
+            moves.map(function (move) { return move.fecha + " " + move.valor + (move.transaccion ? " Tx " + move.transaccion : ""); }).join(" | "),
+            moves.length ? moves.reduce(function (sum, move) { return sum + move.valor; }, 0) : "", quoteResult(row, group, range).text]));
+        });
+        group.moves.forEach(function (move, index) {
+          var pair = group.link[index];
+          if (pair.kind !== "repetido" && pair.kind !== "sin_cotizacion") return;
+          lines.push(base.concat(["", "", "", "", "", "", "", move.fecha + " " + move.valor + (move.transaccion ? " Tx " + move.transaccion : ""), move.valor,
+            pair.kind === "repetido" ? "Repite el valor de #" + pair.quote.id : "Sin cotizacion"]));
         });
       });
       orphanQuotes(list).forEach(function (row) {
-        lines.push([row.inmueble, "", "", "", "Aprobada sin inmueble en el auxiliar", row.id, row.ticket, row.estado, row.fecha || "", row.respuesta || "", "Si", row.total, row.admin]);
+        lines.push([row.inmueble, "", "", row.id, row.ticket, row.estado, row.fecha || "", row.respuesta || "", row.total, row.admin, "", "", "Aprobada sin inmueble en el auxiliar"]);
       });
       var csv = "﻿" + lines.map(function (line) {
         return line.map(function (cell) {

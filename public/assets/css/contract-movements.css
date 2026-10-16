@@ -204,8 +204,6 @@
 #scm-app .scm-ql-sums dd { margin: 0; font-size: 14px; font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums; }
 #scm-app .scm-ql-sums dd.is-bad { color: var(--cm-bad); }
 #scm-app .scm-ql-sums dd.is-good { color: var(--cm-good); }
-#scm-app .scm-ql-moves { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-#scm-app .scm-ql-label { margin-right: 4px; font-size: 11px; font-weight: 600; color: var(--cm-muted); }
 #scm-app .scm-ql-move { padding: 3px 9px; border-radius: 999px; background: #eff6ff; color: #1e3a5f; font-size: 12px; font-variant-numeric: tabular-nums; }
 #scm-app .scm-ql-move small { color: var(--cm-muted); }
 #scm-app .scm-ql-empty { margin: 0; font-size: 12.5px; }
@@ -214,6 +212,11 @@
 #scm-app .scm-ql-quotes tr.is-muted td { color: #64748b; }
 #scm-app .scm-ql-quotes .scm-cm-source.is-good { color: var(--cm-good); font-weight: 600; }
 #scm-app .scm-ql-quotes td.is-actions .scm-cm-btn { min-height: 32px; }
+#scm-app .scm-cm-badge.is-muted { background: #f1f5f9; color: #64748b; }
+#scm-app .scm-ql-quotes td .scm-ql-move { display: inline-block; margin: 0 4px 4px 0; }
+#scm-app .scm-ql-quotes td > .scm-cm-badge + .scm-cm-badge { margin-left: 4px; }
+#scm-app .scm-ql-quotes strong + .scm-cm-badge { margin-left: 4px; }
+#scm-app .scm-ql-quotes tr.scm-ql-orphan-move td { background: #fffbeb; }
 
 #scm-app .scm-qq-filters .scm-cm-btn-ghost { margin-left: auto; }
 #scm-app .scm-qq-inline { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
