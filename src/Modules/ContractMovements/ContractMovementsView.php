@@ -92,10 +92,6 @@ final class ContractMovementsView
           <span>Destinación</span>
           <select name="destinacion" data-scm-cm-filter="destinacion"><option value="">Todas</option></select>
         </label>
-        <label class="scm-cm-field">
-          <span>Gestión</span>
-          <select name="gestion" data-scm-cm-filter="gestion"><option value="">Todas</option></select>
-        </label>
         <button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-cm-clear disabled>Limpiar filtros</button>
       </form>
 

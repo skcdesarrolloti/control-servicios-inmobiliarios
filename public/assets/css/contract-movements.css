@@ -190,10 +190,6 @@
 #scm-app .scm-cm-kpi.is-good strong { color: var(--cm-good); }
 #scm-app .scm-cm-kpi.is-bad { border-left-color: var(--cm-bad); }
 #scm-app .scm-cm-kpi.is-bad strong { color: var(--cm-bad); }
-#scm-app .scm-cm-delta { font-weight: 700; }
-#scm-app .scm-cm-delta.is-good { color: var(--cm-good); }
-#scm-app .scm-cm-delta.is-bad { color: var(--cm-bad); }
-#scm-app .scm-cm-delta.is-flat { color: var(--cm-muted); }
 
 #scm-app .scm-cm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 #scm-app .scm-cm-grid > .is-wide { grid-column: 1 / -1; }
@@ -250,6 +246,8 @@
 #scm-app .scm-cm-table tr.is-active td { background: #eff6ff; font-weight: 600; }
 #scm-app .scm-cm-table .is-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 #scm-app .scm-cm-detail td { white-space: nowrap; }
+#scm-app .scm-cm-detail td.is-total { font-weight: 700; }
+#scm-app .scm-cm-detail tfoot td { padding: 10px; border-top: 2px solid var(--cm-line); background: var(--cm-soft); font-weight: 700; color: #0f172a; }
 #scm-app .scm-cm-detail td.is-address { min-width: 220px; max-width: 320px; white-space: normal; }
 #scm-app .scm-cm-detail td.is-name { min-width: 160px; max-width: 240px; white-space: normal; }
 #scm-app .scm-cm-muted { color: #94a3b8; }

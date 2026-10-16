@@ -9,7 +9,7 @@
   var MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   var MONTHS_LONG = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   var STATE_LABELS = { entregado: "Entregado", por_recibir: "Por recibir", recibido: "Recibido" };
-  var FILTER_LABELS = { funcionario: "Funcionario", tipo: "Tipo", destinacion: "Destinación", gestion: "Gestión" };
+  var FILTER_LABELS = { funcionario: "Funcionario", tipo: "Tipo", destinacion: "Destinación" };
   var VIEWS = {
     ocupaciones: {
       title: "Ocupaciones",
@@ -92,7 +92,7 @@
     var columns = snapshot.columns || [];
     var names = snapshot.funcionarios || {};
     var years = {};
-    var options = { funcionario: {}, tipo: {}, destinacion: {}, gestion: {} };
+    var options = { funcionario: {}, tipo: {}, destinacion: {} };
     var rows = (snapshot.rows || []).map(function (values) {
       var row = {};
       columns.forEach(function (column, index) { row[column] = values[index]; });
@@ -108,7 +108,7 @@
       if (row.ingY) years[row.ingY] = true;
       if (row.egY && row.estado === "recibido") years[row.egY] = true;
       if (row.funcionario) options.funcionario[row.funcionario] = row.funcionarioNombre;
-      ["tipo", "destinacion", "gestion"].forEach(function (key) {
+      ["tipo", "destinacion"].forEach(function (key) {
         if (row[key]) options[key][row[key]] = row[key];
       });
       return row;
@@ -153,22 +153,9 @@
     });
     return total;
   }
-  function deltaInfo(current, previous) {
-    if (previous == null) return null;
-    if (!previous) return { pct: null, diff: current - previous };
-    return { pct: ((current - previous) / previous) * 100, diff: current - previous };
-  }
-
   function kpi(label, value, note, tone) {
     return '<article class="scm-cm-kpi' + (tone ? " is-" + tone : "") + '"><span>' + esc(label) + "</span><strong>" +
       esc(value) + "</strong>" + (note ? "<small>" + note + "</small>" : "") + "</article>";
-  }
-  function deltaNote(delta, compareLabel, upIsGood, formatter) {
-    if (!delta) return esc(compareLabel || "");
-    var tone = delta.diff === 0 ? "flat" : (delta.diff > 0) === upIsGood ? "good" : "bad";
-    var arrow = delta.diff > 0 ? "▲" : delta.diff < 0 ? "▼" : "■";
-    var text = delta.pct == null ? signed(delta.diff, formatter) : signed(Math.round(delta.pct)) + "%";
-    return '<b class="scm-cm-delta is-' + tone + '">' + arrow + " " + esc(text) + "</b> " + esc(compareLabel);
   }
   function card(title, body, extraClass, aside) {
     return '<section class="scm-cm-card' + (extraClass ? " " + extraClass : "") + '"><header><h2>' + esc(title) + "</h2>" +
@@ -199,7 +186,7 @@
 
     var state = {
       view: VIEWS[module.getAttribute("data-initial-view")] ? module.getAttribute("data-initial-view") : "ocupaciones",
-      filters: { year: String(new Date().getFullYear()), funcionario: "", tipo: "", destinacion: "", gestion: "" },
+      filters: { year: String(new Date().getFullYear()), funcionario: "", tipo: "", destinacion: "" },
       month: 0,
       search: "",
       page: 1,
@@ -278,7 +265,7 @@
       selects.year.innerHTML = '<option value="">Todos los años</option>' + data.years.map(function (year) {
         return '<option value="' + year + '">' + year + "</option>";
       }).join("");
-      ["funcionario", "tipo", "destinacion", "gestion"].forEach(function (key) {
+      ["funcionario", "tipo", "destinacion"].forEach(function (key) {
         var first = selects[key].options[0] ? selects[key].options[0].outerHTML : '<option value="">Todos</option>';
         selects[key].innerHTML = first + data.options[key].map(function (option) {
           return '<option value="' + esc(option.value) + '">' + esc(option.label) + "</option>";
@@ -295,7 +282,7 @@
       if (!selectedYear()) state.month = 0;
       selects.month.value = state.month ? String(state.month) : "";
       selects.month.disabled = !selectedYear();
-      var dirty = !!(state.filters.funcionario || state.filters.tipo || state.filters.destinacion || state.filters.gestion || state.month ||
+      var dirty = !!(state.filters.funcionario || state.filters.tipo || state.filters.destinacion || state.month ||
         state.filters.year !== String(new Date().getFullYear()));
       clearBtn.disabled = !dirty;
     }
@@ -305,8 +292,7 @@
       return state.data.rows.filter(function (row) {
         return (!f.funcionario || row.funcionario === f.funcionario) &&
           (!f.tipo || row.tipo === f.tipo) &&
-          (!f.destinacion || row.destinacion === f.destinacion) &&
-          (!f.gestion || row.gestion === f.gestion);
+          (!f.destinacion || row.destinacion === f.destinacion);
       });
     }
 
@@ -314,15 +300,6 @@
       return Number(state.filters.year) || 0;
     }
 
-    // Compara contra el año anterior; si es el año en curso, solo hasta la misma fecha.
-    function comparable(events, year) {
-      var today = todayIso();
-      var limit = year === new Date().getFullYear() ? (year - 1) + today.slice(4) : null;
-      return {
-        events: events.filter(function (event) { return event.y === year - 1 && (!limit || event.date <= limit); }),
-        label: "vs " + (year - 1) + (limit ? " a la misma fecha" : ""),
-      };
-    }
 
     function render() {
       if (!state.data) return;
@@ -374,16 +351,10 @@
       var period = year ? all.filter(function (event) { return event.y === year; }) : all;
       var shown = year && state.month ? period.filter(function (event) { return event.m === state.month; }) : period;
       var periodLabel = year ? (state.month ? MONTHS_LONG[state.month - 1] + " " + year : String(year)) : "todos los años";
-      var compare = year ? comparable(all, year) : null;
-      if (compare && state.month) {
-        compare.events = compare.events.filter(function (event) { return event.m === state.month; });
-        compare.label = "vs " + MONTHS[state.month - 1] + " " + (year - 1) + (year === new Date().getFullYear() && state.month === new Date().getMonth() + 1 ? " a la misma fecha" : "");
-      }
       var current = summarize(shown);
-      var previous = compare ? summarize(compare.events) : null;
       var html = '<div class="scm-cm-kpis scm-cm-kpis-6">';
       html += kpi(isOcup ? "Total ocupaciones" : "Total desocupaciones", num(current.count),
-        compare ? deltaNote(deltaInfo(current.count, previous.count), compare.label, isOcup) : "Histórico completo", isOcup ? "ocup" : "desoc");
+        esc(year ? periodLabel : "Histórico completo"), isOcup ? "ocup" : "desoc");
       html += kpi("Canon promedio", money(current.avg), esc(current.count ? "Todos los inmuebles del periodo" : "Sin movimientos"));
       var byDestination = function (name) {
         return summarize(shown.filter(function (event) { return event.row.destinacion === name; }));
@@ -462,26 +433,37 @@
       }
       var isDesoc = state.detailKind === "desoc";
       var html = '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr>' +
-        (isDesoc ? "<th>Fecha recibo</th><th>Fin contrato</th>" : "<th>Fecha entrega</th><th>Inicio contrato</th>") +
+        (isDesoc ? "<th>Fecha recibo</th><th>Fin contrato</th>" : "<th>Fecha entrega</th>") +
         '<th>Contrato</th><th title="Código del inmueble">Cód. inmueble</th><th>Dirección</th><th>Arrendatario</th><th>Tipo</th><th>Funcionario</th>' +
         '<th class="is-num">Duración</th>' + (isDesoc ? '<th class="is-num">Permanencia</th>' : '<th class="is-num">Días de gracia</th>') +
-        '<th class="is-num">Canon</th><th class="is-num">Administración</th>' + (isDesoc ? "" : "<th>Estado actual</th>") + "</tr></thead><tbody>";
+        '<th class="is-num">Canon</th><th class="is-num">Administración</th><th class="is-num">Total</th>' + (isDesoc ? "" : "<th>Estado actual</th>") + "</tr></thead><tbody>";
       html += slice.map(function (event) {
         var row = event.row;
         // Si falta la fecha propia del evento, se contó con la fecha de respaldo (inicio o fin del contrato).
         var first = isDesoc ? row.recibo : row.entrega;
-        var firstCell = first ? esc(formatDate(first)) : '<span class="scm-cm-muted" title="Se contó con la fecha ' + (isDesoc ? "de fin" : "de inicio") + ' del contrato">Sin fecha</span>';
-        var second = isDesoc ? row.fin : row.inicio;
-        return "<tr><td>" + firstCell + "</td><td>" + (second ? esc(formatDate(second)) : '<span class="scm-cm-muted">—</span>') + "</td><td>" + esc(row.contrato) +
+        var firstCell = first ? esc(formatDate(first))
+          : esc(formatDate(event.date)) + '<small class="scm-cm-source">' + (isDesoc ? "fin del contrato" : "inicio del contrato") + "</small>";
+        var dates = "<td>" + firstCell + "</td>" + (isDesoc ? "<td>" + (row.fin ? esc(formatDate(row.fin)) : '<span class="scm-cm-muted">—</span>') + "</td>" : "");
+        return "<tr>" + dates + "<td>" + esc(row.contrato) +
           "</td><td>" + esc(row.inmueble) + '</td><td class="is-address">' + esc(row.direccion) + '</td><td class="is-name">' + esc(row.arrendatario) + "</td><td>" +
           esc(row.tipo || "—") + "</td><td>" + esc(row.funcionarioNombre || "—") + '</td><td class="is-num">' + (row.meses ? esc(row.meses + " meses") : "—") + "</td>" +
           (isDesoc
             ? '<td class="is-num">' + (row.permanencia == null ? "—" : esc(num(row.permanencia) + " meses")) + "</td>"
             : '<td class="is-num">' + graceCell(row) + "</td>") +
           '<td class="is-num">' + esc(money(row.canon)) + '</td><td class="is-num">' + (row.admin ? esc(money(row.admin)) : '<span class="scm-cm-muted">No aplica</span>') + "</td>" +
+          '<td class="is-num is-total">' + esc(money((row.canon || 0) + (row.admin || 0))) + "</td>" +
           (isDesoc ? "" : '<td><span class="scm-cm-badge is-' + row.estado + '">' + esc(STATE_LABELS[row.estado] || row.estado) + "</span></td>") + "</tr>";
       }).join("");
-      html += "</tbody></table></div>";
+      // La fila de totales suma todos los contratos filtrados, no solo los de la página.
+      var sumCanon = 0;
+      var sumAdmin = 0;
+      events.forEach(function (event) {
+        sumCanon += event.row.canon || 0;
+        sumAdmin += event.row.admin || 0;
+      });
+      html += '</tbody><tfoot><tr><td colspan="' + (isDesoc ? 10 : 9) + '">Total · ' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) +
+        '</td><td class="is-num">' + esc(money(sumCanon)) + '</td><td class="is-num">' + esc(money(sumAdmin)) + '</td><td class="is-num is-total">' + esc(money(sumCanon + sumAdmin)) +
+        "</td>" + (isDesoc ? "" : "<td></td>") + "</tr></tfoot></table></div>";
       html += '<div class="scm-cm-pager"><span>' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) + "</span>";
       if (pages > 1) {
         html += '<div><button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-cm-page="' + (state.page - 1) + '"' + (state.page === 1 ? " disabled" : "") +
@@ -533,10 +515,7 @@
       var sd = summarize(de.filter(inPeriod));
       var closing = !year || year >= currentYear && !month ? today : month ? lastDayIso(year, month) : year + "-12-31";
       if (closing > today) closing = today;
-      var openingIso = !year ? null : month ? (month === 1 ? (year - 1) + "-12-31" : lastDayIso(year, month - 1)) : (year - 1) + "-12-31";
-      var openingLabel = month ? "vs cierre de " + MONTHS[(month + 10) % 12] + (month === 1 ? " " + (year - 1) : "") : "vs cierre " + (year - 1);
       var stockEnd = stockAt(rows, closing);
-      var stockStart = openingIso ? stockAt(rows, openingIso) : null;
       var net = so.count - sd.count;
 
       var html = '<div class="scm-cm-kpis scm-cm-kpis-6">';
@@ -546,8 +525,7 @@
       html += kpi("Índice de reposición", sd.count ? Math.round((so.count / sd.count) * 100) + "%" : "—",
         esc(sd.count ? "Ocupaciones por cada 100 desocupaciones" : "Sin desocupaciones en el periodo"));
       html += kpi("Canon neto", compactMoney(so.canon - sd.canon), esc(money(so.canon - sd.canon) + " mensual"), so.canon - sd.canon >= 0 ? "good" : "bad");
-      html += kpi("Inventario arrendado", num(stockEnd),
-        stockStart == null ? esc("Contratos arrendados hoy") : deltaNote(deltaInfo(stockEnd, stockStart), openingLabel, true), "stock");
+      html += kpi("Inventario arrendado", num(stockEnd), esc(closing === today ? "Contratos arrendados hoy" : "Al cierre de " + formatDate(closing)), "stock");
       html += "</div>";
 
       var periodRows;
@@ -616,13 +594,14 @@
         name = "ocupaciones-vs-desocupaciones-" + year;
       } else {
         var isDesoc = state.view === "desocupaciones";
-        lines = [["Fecha del movimiento", "Fecha entrega", "Inicio contrato", "Fecha recibo", "Fin contrato", "Contrato", "Codigo inmueble", "Direccion", "Arrendatario",
-          "Tipo inmueble", "Destinacion", "Gestion", "Funcionario", "Estado", "Duracion meses", "Dias de gracia", "Fuente dias de gracia", "Canon", "Administracion", "Permanencia meses"]];
+        lines = [["Fecha del movimiento", "Fecha entrega", "Fecha recibo", "Fin contrato", "Contrato", "Codigo inmueble", "Direccion", "Arrendatario",
+          "Tipo inmueble", "Destinacion", "Funcionario", "Estado", "Duracion meses", "Dias de gracia", "Fuente dias de gracia", "Canon", "Administracion", "Total", "Permanencia meses"]];
         state.detailEvents.forEach(function (event) {
           var row = event.row;
-          lines.push([event.date, row.entrega || "", row.inicio || "", row.recibo || "", row.fin || "", row.contrato, row.inmueble, row.direccion, row.arrendatario,
-            row.tipo, row.destinacion, row.gestion, row.funcionarioNombre, STATE_LABELS[row.estado] || row.estado, row.meses || "",
-            row.dias_gracia == null ? "" : row.dias_gracia, row.dias_gracia == null ? "" : row.dias_gracia_fuente, row.canon, row.admin || 0, row.permanencia == null ? "" : row.permanencia]);
+          lines.push([event.date, row.entrega || "", row.recibo || "", row.fin || "", row.contrato, row.inmueble, row.direccion, row.arrendatario,
+            row.tipo, row.destinacion, row.funcionarioNombre, STATE_LABELS[row.estado] || row.estado, row.meses || "",
+            row.dias_gracia == null ? "" : row.dias_gracia, row.dias_gracia == null ? "" : row.dias_gracia_fuente, row.canon, row.admin || 0,
+            (row.canon || 0) + (row.admin || 0), row.permanencia == null ? "" : row.permanencia]);
         });
         name = state.view + "-" + year + (state.month ? "-" + String(state.month).padStart(2, "0") : "");
       }
@@ -704,7 +683,7 @@
         return;
       }
       if (event.target.closest("[data-scm-cm-clear]")) {
-        state.filters = { year: String(new Date().getFullYear()), funcionario: "", tipo: "", destinacion: "", gestion: "" };
+        state.filters = { year: String(new Date().getFullYear()), funcionario: "", tipo: "", destinacion: "" };
         if (state.data.years.indexOf(Number(state.filters.year)) === -1) state.filters.year = String(state.data.years[0] || "");
         state.month = 0;
         resetDrill();
