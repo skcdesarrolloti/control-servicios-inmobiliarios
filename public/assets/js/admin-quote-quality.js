@@ -277,7 +277,9 @@
     // Conciliación con el auxiliar contable.
     function renderLedgerShell() {
       ledgerEl.innerHTML = '<section class="scm-cm-card is-wide"><header><h2>Conciliar con el auxiliar contable</h2><p class="scm-cm-hint">Sube el auxiliar de administración (AUI) en .xls o .xlsx</p></header>' +
-        '<form class="scm-qq-upload" data-scm-qq-ledger-form><input type="file" accept=".xls,.xlsx" data-scm-qq-ledger-file required aria-label="Auxiliar contable">' +
+        '<form class="scm-qq-upload" data-scm-qq-ledger-form><label class="scm-qq-file"><input type="file" accept=".xls,.xlsx" data-scm-qq-ledger-file aria-label="Auxiliar contable">' +
+        '<span class="material-symbols-outlined" aria-hidden="true">upload_file</span><span class="scm-qq-file-text"><strong data-scm-qq-ledger-name>Elegir auxiliar contable</strong>' +
+        '<small>Archivo .xls o .xlsx exportado de contabilidad</small></span><span class="scm-qq-file-cta">Buscar archivo</span></label>' +
         '<button type="submit" class="scm-cm-btn scm-qq-primary">Conciliar</button><span class="scm-cm-hint" data-scm-qq-ledger-status aria-live="polite"></span></form>' +
         '<div data-scm-qq-ledger-result></div></section>';
     }
@@ -390,6 +392,15 @@
       renderQuality();
       if (!ledgerEl.innerHTML) renderLedgerShell();
       renderLedger();
+    });
+
+    module.addEventListener("change", function (event) {
+      var input = event.target.closest("[data-scm-qq-ledger-file]");
+      if (!input) return;
+      var file = input.files && input.files[0];
+      var label = input.closest(".scm-qq-file");
+      label.classList.toggle("has-file", !!file);
+      label.querySelector("[data-scm-qq-ledger-name]").textContent = file ? file.name : "Elegir auxiliar contable";
     });
 
     module.addEventListener("submit", function (event) {
