@@ -15,7 +15,7 @@ foreach (['mine', 'team', 'due', 'property_history', 'contracts_ending', 'contra
   include dirname(__DIR__) . '/includes/header.php';
   ob_end_clean();
   $check($current_page === $route, 'Reload selected the wrong header item for ' . $route);
-  $check(array_keys($rawNavItems) === ['inicio', 'tickets', 'administrativas', 'contractuales', 'dashboard'], 'Contract activities must follow administrative activities.');
+  $check(array_keys($rawNavItems) === ['inicio', 'tickets', 'administrativas', 'contractuales', 'notificaciones', 'metricas'], 'Contract activities must follow administrative activities.');
   $check(array_keys($rawNavItems['contractuales']['children']) === ['contracts_ending', 'contract_termination', 'contract_non_renewal'], 'Contract group must contain exactly the three requested views.');
   foreach ($rawNavItems['contractuales']['children'] as $key => $item) {
     $check(!isset($rawNavItems['inicio']['children'][$key]), 'Contract view is still in Inicio.');

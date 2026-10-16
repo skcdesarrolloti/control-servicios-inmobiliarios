@@ -21,6 +21,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesRentIncreaseLetters;
   use \SCM\App\Concerns\HandlesPublicServicesLiquidator;
   use \SCM\App\Concerns\HandlesPropertyHistoryActions;
+  use \SCM\App\Concerns\HandlesContractMovements;
   use \SCM\App\Concerns\RendersPublicPqr;
   use \SCM\App\Concerns\RendersDashboard;
 
@@ -141,6 +142,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_RECEIPT_SETTINGS_READ = 'scm_contratos_recibo_configuracion';
   const AJAX_CONTRACT_RECEIPT_SETTINGS_SAVE = 'scm_contratos_recibo_configuracion_guardar';
   const AJAX_DASHBOARD_METRICS = 'scm_dashboard_metricas';
+  const AJAX_CONTRACT_MOVEMENTS = 'scm_ocupaciones_desocupaciones';
   const AJAX_DASHBOARD_FILTER_OPTIONS = 'scm_dashboard_filter_options';
   const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';
   const AJAX_CANON_INSURANCE_AUDIT_IMPORT = 'scm_auditoria_canon_aseguradoras_importar';

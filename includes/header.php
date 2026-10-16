@@ -293,6 +293,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'contratos';
   } elseif (in_array($tabParam, ['administrativas', 'actividades_administrativas', 'scm-panel-actividades-administrativas'], true)) {
     $current_page = 'administrativas';
+  } elseif (in_array($tabParam, ['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones'], true)) {
+    $current_page = $tabParam;
   } elseif (in_array($tabParam, ['metricas', 'dashboard', 'scm-panel-metricas'], true)) {
     $current_page = 'dashboard';
   } else {
@@ -321,7 +323,7 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 // 3. Actividades Administrativas (Dropdown: Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
 // 4. Actividades contractuales (Dropdown: Contratos por terminar, Terminación, No prórroga)
 // 5. Notificaciones
-// 6. Métricas y Dashboard
+// 6. Métricas y Dashboard (Dropdown: Dashboard operativo, Ocupaciones, Desocupaciones, Ocupaciones vs Desocupaciones)
 $rawNavItems = [
   'inicio' => [
     'type' => 'dropdown',
@@ -558,14 +560,48 @@ $rawNavItems = [
     'icon' => 'notifications',
     'perms' => ['notificaciones'],
   ],
-  'dashboard' => [
-    'type' => 'link',
-    'key' => 'dashboard',
+  'metricas' => [
+    'type' => 'dropdown',
+    'key' => 'metricas',
     'label' => 'Métricas y Dashboard',
-    'panel_id' => 'scm-panel-metricas',
-    'url' => $baseUrl . '/index.php?tab=metricas',
     'icon' => 'query_stats',
-    'perms' => ['metricas'],
+    'children' => [
+      'dashboard' => [
+        'key' => 'dashboard',
+        'label' => 'Dashboard operativo',
+        'panel_id' => 'scm-panel-metricas',
+        'url' => $baseUrl . '/index.php?tab=metricas',
+        'icon' => 'monitoring',
+        'perms' => ['metricas'],
+      ],
+      'ocupaciones' => [
+        'key' => 'ocupaciones',
+        'label' => 'Ocupaciones',
+        'panel_id' => 'scm-panel-movimientos-contratos',
+        'subtab' => 'ocupaciones',
+        'url' => $baseUrl . '/index.php?tab=ocupaciones',
+        'icon' => 'login',
+        'perms' => ['metricas'],
+      ],
+      'desocupaciones' => [
+        'key' => 'desocupaciones',
+        'label' => 'Desocupaciones',
+        'panel_id' => 'scm-panel-movimientos-contratos',
+        'subtab' => 'desocupaciones',
+        'url' => $baseUrl . '/index.php?tab=desocupaciones',
+        'icon' => 'logout',
+        'perms' => ['metricas'],
+      ],
+      'ocupaciones_vs_desocupaciones' => [
+        'key' => 'ocupaciones_vs_desocupaciones',
+        'label' => 'Ocupaciones vs Desocupaciones',
+        'panel_id' => 'scm-panel-movimientos-contratos',
+        'subtab' => 'comparativo',
+        'url' => $baseUrl . '/index.php?tab=ocupaciones_vs_desocupaciones',
+        'icon' => 'compare_arrows',
+        'perms' => ['metricas'],
+      ],
+    ],
   ],
 ];
 

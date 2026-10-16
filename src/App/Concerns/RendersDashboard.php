@@ -158,6 +158,10 @@ trait RendersDashboard
       'métricas' => 'scm-panel-metricas',
       'metrics' => 'scm-panel-metricas',
       'scm-panel-metricas' => 'scm-panel-metricas',
+      'ocupaciones' => 'scm-panel-movimientos-contratos',
+      'desocupaciones' => 'scm-panel-movimientos-contratos',
+      'ocupaciones_vs_desocupaciones' => 'scm-panel-movimientos-contratos',
+      'scm-panel-movimientos-contratos' => 'scm-panel-movimientos-contratos',
       'postergados' => 'scm-panel-postergados',
       'scm-panel-postergados' => 'scm-panel-postergados',
       'cerrados' => 'scm-panel-cerrados',
@@ -330,6 +334,7 @@ trait RendersDashboard
       'scm-panel-contratos-arrendamiento' => 'contratos_arrendamiento',
       'scm-panel-admin-notificaciones' => 'notificaciones',
       'scm-panel-metricas' => 'metricas',
+      'scm-panel-movimientos-contratos' => 'metricas',
     ];
     if ($initialTab !== '') {
       $initialTabPermissionKey = $dashboardPanelToTab[$initialTab] ?? '';
@@ -539,6 +544,7 @@ trait RendersDashboard
         'contract_receipt_settings_read' => self::AJAX_CONTRACT_RECEIPT_SETTINGS_READ,
         'contract_receipt_settings_save' => self::AJAX_CONTRACT_RECEIPT_SETTINGS_SAVE,
         'dashboard_metrics' => self::AJAX_DASHBOARD_METRICS,
+        'contract_movements' => self::AJAX_CONTRACT_MOVEMENTS,
         'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,
         'canon_insurance_audit_list' => self::AJAX_CANON_INSURANCE_AUDIT_LIST,
         'canon_insurance_audit_import' => self::AJAX_CANON_INSURANCE_AUDIT_IMPORT,
@@ -702,6 +708,7 @@ trait RendersDashboard
     <link rel="stylesheet" href="<?php echo $cssUrl; ?>" media="all">
     <link rel="stylesheet" href="<?php echo $damageCssUrl; ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/preventive-review.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/preventive-review.css'))); ?>" media="all">
+    <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/contract-movements.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/contract-movements.css'))); ?>" media="all">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
@@ -785,6 +792,7 @@ trait RendersDashboard
           } else {
             if (!in_array($permissionKey, $dashboardAllowedTabs, true)) continue;
             $tabLabel = $panelId === 'scm-panel-actividades-contractuales' ? 'Actividades contractuales' : (string)($dashboardPermissionTabs[$permissionKey] ?? $permissionKey);
+            if ($panelId === 'scm-panel-movimientos-contratos') $tabLabel = 'Ocupaciones y desocupaciones';
           }
           ?>
           <button class="scm-tab<?php echo $initialTab === $panelId ? ' active' : ''; ?>" data-tab="<?php echo esc_attr($panelId); ?>" data-permission-tab="<?php echo esc_attr($permissionKey); ?>" type="button"><?php echo esc_html($tabLabel); ?></button>
@@ -1432,6 +1440,12 @@ trait RendersDashboard
         </div>
       <?php endif; ?>
 
+      <?php if (in_array('metricas', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-movimientos-contratos' ? ' active' : ''; ?>" id="scm-panel-movimientos-contratos" data-permission-tab="metricas" data-scm-loaded="0">
+          <?php echo (new \SCM\Modules\ContractMovements\ContractMovementsView())->renderShell(\SCM\Modules\ContractMovements\ContractMovementsView::viewFromTab($tabKey)); ?>
+        </div>
+      <?php endif; ?>
+
       <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas' ? ' active' : ''; ?> flex flex-col gap-6 w-full" id="scm-panel-metricas" data-permission-tab="metricas" data-scm-metrics="<?php echo self::h((string)$metricsJson); ?>" data-scm-loaded="0">
         <!-- Encabezado de Métricas y Acciones -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
@@ -1788,6 +1802,7 @@ trait RendersDashboard
     <script src="<?php echo $dashboardRuntimeJsUrl; ?>" defer></script>
     <script src="<?php echo $collectionManagementJsUrl; ?>" defer></script>
     <script src="<?php echo $canonInsuranceAuditJsUrl; ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-movements.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-movements.js'))); ?>" defer></script>
     <script src="<?php echo $guideJsUrl; ?>" defer></script>
     <script src="<?php echo $damageJsUrl; ?>" defer></script>
 <?php

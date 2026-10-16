@@ -399,7 +399,8 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
               // Si tiene subtab especificado (ej. vencimientos dentro de inicio)
               if (subtabTarget) {
                 setTimeout(function () {
-                  const subtabBtn = document.querySelector('[data-calendar-section-target="scm-home-calendar-section-' + subtabTarget + '"]');
+                  const subtabBtn = document.querySelector('[data-calendar-section-target="scm-home-calendar-section-' + subtabTarget + '"]')
+                    || document.querySelector('#' + panelTarget + ' [data-scm-subview-target="' + subtabTarget + '"]');
                   if (subtabBtn) subtabBtn.click();
                   if (panelTarget === 'scm-panel-inicio' && selectedTabKey === 'inicio') {
                     const url = new URL(window.location.href);
