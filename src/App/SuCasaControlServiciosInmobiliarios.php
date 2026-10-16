@@ -23,6 +23,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesPropertyHistoryActions;
   use \SCM\App\Concerns\HandlesContractMovements;
   use \SCM\App\Concerns\HandlesContractOwnership;
+  use \SCM\App\Concerns\HandlesMetricsPanels;
   use \SCM\App\Concerns\RendersPublicPqr;
   use \SCM\App\Concerns\RendersDashboard;
 
@@ -144,6 +145,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_RECEIPT_SETTINGS_SAVE = 'scm_contratos_recibo_configuracion_guardar';
   const AJAX_DASHBOARD_METRICS = 'scm_dashboard_metricas';
   const AJAX_CONTRACT_MOVEMENTS = 'scm_ocupaciones_desocupaciones';
+  const AJAX_CASE_METRICS = 'scm_metricas_casos';
+  const AJAX_QUOTE_METRICS = 'scm_metricas_cotizaciones';
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */

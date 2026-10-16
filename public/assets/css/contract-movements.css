@@ -120,7 +120,9 @@
 }
 #scm-app .scm-cm-field { display: flex; flex-direction: column; gap: 4px; margin: 0; }
 #scm-app .scm-cm-field span { font-size: 11px; font-weight: 600; color: var(--cm-muted); }
-#scm-app .scm-cm-field select {
+#scm-app .scm-cm-field select,
+#scm-app .scm-cm-field input {
+  box-sizing: border-box;
   width: 100%;
   min-height: 36px;
   padding: 6px 10px;
@@ -130,7 +132,15 @@
   color: var(--cm-ink);
   font-size: 13px;
 }
-#scm-app .scm-cm-field select:focus { outline: 2px solid #bfdbfe; border-color: #93c5fd; }
+#scm-app .scm-cm-field select:focus,
+#scm-app .scm-cm-field input:focus { outline: 2px solid #bfdbfe; border-color: #93c5fd; }
+#scm-app .scm-cm-btn-icon { justify-content: center; width: 36px; min-height: 36px; padding: 0; }
+#scm-app .scm-quote-month { display: flex; align-items: center; gap: 6px; }
+#scm-app .scm-quote-month input { flex: 1; min-width: 0; }
+#scm-app .scm-quote-filters { grid-template-columns: minmax(220px, 1fr) minmax(180px, 1fr) minmax(240px, 2fr); }
+#scm-app .scm-cm-table tfoot td { padding: 10px; border-top: 2px solid var(--cm-line); background: var(--cm-soft); font-weight: 700; color: #0f172a; }
+#scm-app .scm-cm-table td.is-total { font-weight: 700; }
+#scm-app .scm-cm-table td.is-actions { white-space: nowrap; text-align: right; }
 
 #scm-app .scm-cm-status {
   padding: 10px 14px;
@@ -279,6 +289,7 @@
   #scm-app .scm-cm-kpis-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
+  #scm-app .scm-quote-filters { grid-template-columns: minmax(0, 1fr); }
   #scm-app .scm-cm-kpis-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #scm-app .scm-cm-grid { grid-template-columns: minmax(0, 1fr); }
   #scm-app .scm-cm-head h1 { font-size: 20px; }

@@ -19,8 +19,9 @@ foreach (['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'met
   include dirname(__DIR__) . '/includes/header.php';
   ob_end_clean();
   $menu = $rawNavItems['metricas'];
-  $check($menu['type'] === 'dropdown' && $menu['label'] === 'Métricas y Dashboard', 'Métricas debe ser un desplegable.');
-  $check(array_keys($menu['children']) === ['dashboard', 'ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones'], 'El desplegable de métricas no tiene las vistas pedidas.');
+  $check($menu['type'] === 'dropdown' && $menu['label'] === 'Métricas', 'Métricas debe ser un desplegable.');
+  $check(array_keys($menu['children']) === ['dashboard', 'metricas_cotizaciones', 'ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones'], 'El desplegable de métricas no tiene las vistas pedidas.');
+  $check(array_column($menu['children'], 'group') === ['Casos', 'Mantenimiento', 'Contratos', 'Contratos', 'Contratos'], 'Las vistas de métricas se agrupan en Casos, Mantenimiento y Contratos.');
   $check($current_page === ($route === 'metricas' ? 'dashboard' : $route), 'Al recargar se marca el ítem equivocado para ' . $route);
   foreach (['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones'] as $key) {
     $item = $menu['children'][$key];

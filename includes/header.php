@@ -295,8 +295,10 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'administrativas';
   } elseif (in_array($tabParam, ['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones'], true)) {
     $current_page = $tabParam;
-  } elseif (in_array($tabParam, ['metricas', 'dashboard', 'scm-panel-metricas'], true)) {
+  } elseif (in_array($tabParam, ['metricas', 'dashboard', 'metricas_casos', 'scm-panel-metricas', 'scm-panel-metricas-casos'], true)) {
     $current_page = 'dashboard';
+  } elseif (in_array($tabParam, ['metricas_cotizaciones', 'cotizaciones_metricas', 'scm-panel-metricas-cotizaciones'], true)) {
+    $current_page = 'metricas_cotizaciones';
   } else {
     $current_page = empty($tabParam) ? 'inicio' : 'abiertos';
   }
@@ -323,7 +325,7 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 // 3. Actividades Administrativas (Dropdown: Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
 // 4. Actividades contractuales (Dropdown: Contratos por terminar, Terminación, No prórroga, Funcionario de contratos)
 // 5. Notificaciones
-// 6. Métricas y Dashboard (Dropdown: Dashboard operativo, Ocupaciones, Desocupaciones, Ocupaciones vs Desocupaciones)
+// 6. Métricas (Dropdown por secciones: Casos · Mantenimiento: Cotizaciones · Contratos: Ocupaciones, Desocupaciones, Ocupaciones vs Desocupaciones)
 $rawNavItems = [
   'inicio' => [
     'type' => 'dropdown',
@@ -571,19 +573,30 @@ $rawNavItems = [
   'metricas' => [
     'type' => 'dropdown',
     'key' => 'metricas',
-    'label' => 'Métricas y Dashboard',
+    'label' => 'Métricas',
     'icon' => 'query_stats',
     'children' => [
       'dashboard' => [
         'key' => 'dashboard',
-        'label' => 'Dashboard operativo',
-        'panel_id' => 'scm-panel-metricas',
-        'url' => $baseUrl . '/index.php?tab=metricas',
-        'icon' => 'monitoring',
+        'group' => 'Casos',
+        'label' => 'Casos',
+        'panel_id' => 'scm-panel-metricas-casos',
+        'url' => $baseUrl . '/index.php?tab=dashboard',
+        'icon' => 'confirmation_number',
+        'perms' => ['metricas'],
+      ],
+      'metricas_cotizaciones' => [
+        'key' => 'metricas_cotizaciones',
+        'group' => 'Mantenimiento',
+        'label' => 'Cotizaciones',
+        'panel_id' => 'scm-panel-metricas-cotizaciones',
+        'url' => $baseUrl . '/index.php?tab=metricas_cotizaciones',
+        'icon' => 'request_quote',
         'perms' => ['metricas'],
       ],
       'ocupaciones' => [
         'key' => 'ocupaciones',
+        'group' => 'Contratos',
         'label' => 'Ocupaciones',
         'panel_id' => 'scm-panel-movimientos-contratos',
         'subtab' => 'ocupaciones',
@@ -593,6 +606,7 @@ $rawNavItems = [
       ],
       'desocupaciones' => [
         'key' => 'desocupaciones',
+        'group' => 'Contratos',
         'label' => 'Desocupaciones',
         'panel_id' => 'scm-panel-movimientos-contratos',
         'subtab' => 'desocupaciones',
@@ -602,6 +616,7 @@ $rawNavItems = [
       ],
       'ocupaciones_vs_desocupaciones' => [
         'key' => 'ocupaciones_vs_desocupaciones',
+        'group' => 'Contratos',
         'label' => 'Ocupaciones vs Desocupaciones',
         'panel_id' => 'scm-panel-movimientos-contratos',
         'subtab' => 'comparativo',
@@ -1117,7 +1132,11 @@ foreach ($rawNavItems as $k => $item) {
                 </button>
                 <div class="scm-dropdown-menu absolute left-0 top-full pt-1.5 hidden z-50 min-w-[240px] drop-shadow-xl" data-scm-dropdown-menu>
                   <div class="bg-white rounded-xl shadow-lg border border-slate-200/90 py-1.5 px-1.5 flex flex-col gap-0.5">
+                    <?php $lastChildGroup = ''; ?>
                     <?php foreach ($tab['children'] as $childKey => $child): ?>
+                      <?php if (!empty($child['group']) && $child['group'] !== $lastChildGroup): $lastChildGroup = (string) $child['group']; ?>
+                        <div class="scm-dropdown-group-label" role="presentation"><?php echo htmlspecialchars($lastChildGroup, ENT_QUOTES, 'UTF-8'); ?></div>
+                      <?php endif; ?>
                       <?php
                       $isSubActive = ($current_page === $childKey);
                       $subClass = $isSubActive

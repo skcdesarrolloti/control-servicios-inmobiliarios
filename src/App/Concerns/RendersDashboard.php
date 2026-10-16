@@ -154,10 +154,16 @@ trait RendersDashboard
       'abiertos' => 'scm-panel-abiertos',
       'abierto' => 'scm-panel-abiertos',
       'scm-panel-abiertos' => 'scm-panel-abiertos',
-      'metricas' => 'scm-panel-metricas',
-      'métricas' => 'scm-panel-metricas',
-      'metrics' => 'scm-panel-metricas',
-      'scm-panel-metricas' => 'scm-panel-metricas',
+      'dashboard' => 'scm-panel-metricas-casos',
+      'metricas' => 'scm-panel-metricas-casos',
+      'métricas' => 'scm-panel-metricas-casos',
+      'metrics' => 'scm-panel-metricas-casos',
+      'metricas_casos' => 'scm-panel-metricas-casos',
+      'scm-panel-metricas' => 'scm-panel-metricas-casos',
+      'scm-panel-metricas-casos' => 'scm-panel-metricas-casos',
+      'metricas_cotizaciones' => 'scm-panel-metricas-cotizaciones',
+      'cotizaciones_metricas' => 'scm-panel-metricas-cotizaciones',
+      'scm-panel-metricas-cotizaciones' => 'scm-panel-metricas-cotizaciones',
       'ocupaciones' => 'scm-panel-movimientos-contratos',
       'desocupaciones' => 'scm-panel-movimientos-contratos',
       'ocupaciones_vs_desocupaciones' => 'scm-panel-movimientos-contratos',
@@ -290,19 +296,6 @@ trait RendersDashboard
     $iframeModeRaw = mb_strtolower(trim((string) ($_GET['scm_iframe'] ?? ($_GET['iframe'] ?? ''))), 'UTF-8');
     $iframeMode = in_array($iframeModeRaw, ['1', 'true', 'yes', 'si'], true);
 
-    $categoryMetrics = [
-      'Mantenimiento' => (int)($stats['total'] ?? 0),
-      'Entrega' => (int)($genericResults['entrega']['result']['stats']['total'] ?? 0),
-      'Preventiva' => (int)($genericResults['preventiva']['result']['stats']['total'] ?? 0),
-      'Recibo' => (int)($genericResults['recibo']['result']['stats']['total'] ?? 0),
-      'Contable' => (int)($genericResults['contable']['result']['stats']['total'] ?? 0),
-      'Certificaciones' => (int)($genericResults['certificaciones']['result']['stats']['total'] ?? 0),
-      'Contractual' => (int)($genericResults['contractual']['result']['stats']['total'] ?? 0),
-    ];
-    // Las métricas reales se solicitan por AJAX al abrir la pestaña. El primer
-    // HTML conserva la estructura para evitar saltos visuales, pero no bloquea
-    // la navegación con agregaciones sobre todas las tablas.
-    $webTicketStats = [];
     $dashboardAllowedTabs = $this->currentDashboardAllowedTabs();
     $dashboardPermissionConfig = $this->dashboardPermissionsConfig();
     $dashboardAllowedActions = $this->currentDashboardAllowedActions();
@@ -335,7 +328,8 @@ trait RendersDashboard
       'scm-panel-actividades-contractuales' => 'calendario_actividades',
       'scm-panel-contratos-arrendamiento' => 'contratos_arrendamiento',
       'scm-panel-admin-notificaciones' => 'notificaciones',
-      'scm-panel-metricas' => 'metricas',
+      'scm-panel-metricas-casos' => 'metricas',
+      'scm-panel-metricas-cotizaciones' => 'metricas',
       'scm-panel-movimientos-contratos' => 'metricas',
       'scm-panel-funcionario-contratos' => 'contratos_arrendamiento',
     ];
@@ -360,7 +354,7 @@ trait RendersDashboard
       } elseif (in_array('mis_tickets', $dashboardAllowedTabs, true)) {
         $initialTab = 'scm-panel-mis-tickets';
       } elseif (in_array('metricas', $dashboardAllowedTabs, true)) {
-        $initialTab = 'scm-panel-metricas';
+        $initialTab = 'scm-panel-metricas-casos';
       } else {
         $initialTab = 'scm-panel-inicio';
       }
@@ -401,16 +395,11 @@ trait RendersDashboard
       $homeQuickLinks[] = ['panel' => 'scm-panel-contratos-arrendamiento', 'icon' => 'fa-file-contract', 'label' => 'Contratos'];
     }
     if (in_array('metricas', $dashboardAllowedTabs, true)) {
-      $homeQuickLinks[] = ['panel' => 'scm-panel-metricas', 'icon' => 'fa-chart-line', 'label' => 'Métricas'];
+      $homeQuickLinks[] = ['panel' => 'scm-panel-metricas-casos', 'icon' => 'fa-chart-line', 'label' => 'Métricas'];
     }
 
     $nonce = \SCM\Core\App::csrf()->token(self::NONCE_KEY);
     $apiUrl = defined('SCM_BASE_URL') ? (SCM_BASE_URL . '/api.php') : '/api.php';
-    $reportesGerencialesBaseUrl = trim((string) (getenv('REPORTES_GERENCIALES_URL') ?: ''));
-    if ($reportesGerencialesBaseUrl === '') {
-      $reportesGerencialesBaseUrl = 'https://sucasainmobiliaria.com.co/reportesgerenciales';
-    }
-    $reportesGerencialesBaseUrl = rtrim($reportesGerencialesBaseUrl, '/');
     $runtimeData = [
       'ajaxUrl'      => $apiUrl,
       'baseUrl'      => rtrim((string) (defined('SCM_BASE_URL') ? SCM_BASE_URL : ''), '/'),
@@ -548,6 +537,8 @@ trait RendersDashboard
         'contract_receipt_settings_save' => self::AJAX_CONTRACT_RECEIPT_SETTINGS_SAVE,
         'dashboard_metrics' => self::AJAX_DASHBOARD_METRICS,
         'contract_movements' => self::AJAX_CONTRACT_MOVEMENTS,
+        'case_metrics' => self::AJAX_CASE_METRICS,
+        'quote_metrics' => self::AJAX_QUOTE_METRICS,
         'contract_owners' => self::AJAX_CONTRACT_OWNERS,
         'contract_owners_save' => self::AJAX_CONTRACT_OWNERS_SAVE,
         'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,
@@ -610,57 +601,7 @@ trait RendersDashboard
       ],
     ];
 
-    $metricsData = [
-      'total'          => (int)($stats['total'] ?? 0),
-      'abiertos'       => (int)($stats['abiertos'] ?? 0),
-      'cerrados'       => (int)($stats['cerrados'] ?? 0),
-      'sla_vencido'    => (int)($stats['sla_vencido'] ?? 0),
-      'sla_riesgo'     => (int)($stats['sla_riesgo'] ?? 0),
-      'con_cotizacion' => (int)($stats['con_cotizacion'] ?? 0),
-      'sin_cotizacion' => (int)($stats['sin_cotizacion'] ?? 0),
-      'con_revision'   => (int)($stats['con_revision'] ?? 0),
-      'sin_revision'   => (int)($stats['sin_revision'] ?? 0),
-      'avg_first_h'    => isset($stats['avg_first_h']) && is_numeric($stats['avg_first_h']) ? (float)$stats['avg_first_h'] : null,
-      'avg_close_h'    => isset($stats['avg_close_h']) && is_numeric($stats['avg_close_h']) ? (float)$stats['avg_close_h'] : null,
-      'avg_stale_h'    => isset($stats['avg_stale_h']) && is_numeric($stats['avg_stale_h']) ? (float)$stats['avg_stale_h'] : null,
-      'mes_actualizados' => (int)($stats['mes_actualizados'] ?? 0),
-      'mes_cerrados' => (int)($stats['mes_cerrados'] ?? 0),
-      'mes_seguimientos' => (int)($stats['mes_seguimientos'] ?? 0),
-      'web' => $webTicketStats,
-      'por_categoria' => $categoryMetrics,
-      'detalle_por_categoria' => [
-        'mantenimiento' => [
-          'label' => 'Mantenimiento',
-          'total' => (int)($stats['total'] ?? 0),
-          'abiertos' => (int)($stats['abiertos'] ?? 0),
-          'cerrados' => (int)($stats['cerrados'] ?? 0),
-          'sla_vencido' => (int)($stats['sla_vencido'] ?? 0),
-          'sla_riesgo' => (int)($stats['sla_riesgo'] ?? 0),
-          'con_cotizacion' => (int)($stats['con_cotizacion'] ?? 0),
-          'sin_cotizacion' => (int)($stats['sin_cotizacion'] ?? 0),
-          'con_revision' => (int)($stats['con_revision'] ?? 0),
-          'sin_revision' => (int)($stats['sin_revision'] ?? 0),
-          'avg_first_h' => isset($stats['avg_first_h']) && is_numeric($stats['avg_first_h']) ? (float)$stats['avg_first_h'] : 0.0,
-          'avg_close_h' => isset($stats['avg_close_h']) && is_numeric($stats['avg_close_h']) ? (float)$stats['avg_close_h'] : 0.0,
-          'avg_stale_h' => isset($stats['avg_stale_h']) && is_numeric($stats['avg_stale_h']) ? (float)$stats['avg_stale_h'] : 0.0,
-          'mes_actualizados' => (int)($stats['mes_actualizados'] ?? 0),
-          'mes_cerrados' => (int)($stats['mes_cerrados'] ?? 0),
-          'mes_seguimientos' => (int)($stats['mes_seguimientos'] ?? 0),
-          'seg_por_funcionario' => is_array($stats['seg_por_funcionario'] ?? null) ? $stats['seg_por_funcionario'] : [],
-          'abiertos_por_funcionario' => is_array($stats['abiertos_por_funcionario'] ?? null) ? $stats['abiertos_por_funcionario'] : [],
-          'actualizados_por_funcionario' => is_array($stats['actualizados_por_funcionario'] ?? null) ? $stats['actualizados_por_funcionario'] : [],
-        ],
-        'entrega' => ['label' => 'Entrega'] + (array)($genericResults['entrega']['result']['stats'] ?? []),
-        'preventiva' => ['label' => 'Preventiva'] + (array)($genericResults['preventiva']['result']['stats'] ?? []),
-        'recibo' => ['label' => 'Recibo'] + (array)($genericResults['recibo']['result']['stats'] ?? []),
-        'contable' => ['label' => 'Contable'] + (array)($genericResults['contable']['result']['stats'] ?? []),
-        'certificaciones' => ['label' => 'Certificaciones'] + (array)($genericResults['certificaciones']['result']['stats'] ?? []),
-        'contractual' => ['label' => 'Contractual'] + (array)($genericResults['contractual']['result']['stats'] ?? []),
-      ],
-    ];
-
     $runtimeJson   = json_encode($runtimeData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
-    $metricsJson   = json_encode($metricsData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
     $assetBaseUrl  = defined('SCM_BASE_URL') ? (SCM_BASE_URL . '/') : '/';
     $assetBasePath = defined('SCM_BASE_PATH') ? (SCM_BASE_PATH . DIRECTORY_SEPARATOR) : (dirname(__DIR__, 2) . DIRECTORY_SEPARATOR);
 
@@ -799,6 +740,8 @@ trait RendersDashboard
             if (!in_array($permissionKey, $dashboardAllowedTabs, true)) continue;
             $tabLabel = $panelId === 'scm-panel-actividades-contractuales' ? 'Actividades contractuales' : (string)($dashboardPermissionTabs[$permissionKey] ?? $permissionKey);
             if ($panelId === 'scm-panel-movimientos-contratos') $tabLabel = 'Ocupaciones y desocupaciones';
+            if ($panelId === 'scm-panel-metricas-casos') $tabLabel = 'Métricas de casos';
+            if ($panelId === 'scm-panel-metricas-cotizaciones') $tabLabel = 'Métricas de cotizaciones';
             if ($panelId === 'scm-panel-funcionario-contratos') $tabLabel = 'Funcionario de contratos';
           }
           ?>
@@ -1459,319 +1402,15 @@ trait RendersDashboard
         </div>
       <?php endif; ?>
 
-      <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas' ? ' active' : ''; ?> flex flex-col gap-6 w-full" id="scm-panel-metricas" data-permission-tab="metricas" data-scm-metrics="<?php echo self::h((string)$metricsJson); ?>" data-scm-loaded="0">
-        <!-- Encabezado de Métricas y Acciones -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-          <div class="flex flex-col gap-1">
-            <div class="flex items-center gap-3">
-              <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Métricas y Dashboard Operativo</h1>
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-[#0f1e36] border border-blue-200">
-                <span id="scm-metrics-total" class="mr-1"><?php echo esc_html((string)($stats['total'] ?? 0)); ?></span> casos totales
-              </span>
-            </div>
-            <p class="text-sm text-slate-500">
-              Visualización consolidada de cumplimiento, salud operativa y distribución de carga en tiempo real.
-            </p>
-          </div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <button type="button" data-scm-open-due-settings class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 text-xs font-semibold shadow-2xs transition-all">
-              <span class="material-symbols-outlined text-[18px] text-slate-500">tune</span>
-              <span>Ajustes de vencimiento</span>
-            </button>
-            <button type="button" onclick="window.dispatchEvent(new CustomEvent('scm:open-nuevo-ticket'))" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0f1e36] text-white hover:bg-[#162846] text-xs font-semibold shadow-xs transition-all">
-              <span class="material-symbols-outlined text-[18px]">add</span>
-              <span>Nuevo Caso</span>
-            </button>
-          </div>
+      <?php if (in_array('metricas', $dashboardAllowedTabs, true)): ?>
+        <?php $metricsPanelsView = new \SCM\Modules\Metrics\MetricsPanelsView(); ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas-casos' ? ' active' : ''; ?>" id="scm-panel-metricas-casos" data-permission-tab="metricas" data-scm-loaded="0">
+          <?php echo $metricsPanelsView->renderCasesShell(); ?>
         </div>
-
-        <div class="scm-metrics-loading-state text-xs text-slate-400 font-medium py-1" data-scm-metrics-loading role="status" aria-live="polite">Cargando indicadores&hellip;</div>
-
-        <!-- Píldoras de vistas operativas -->
-        <div class="scm-tabs scm-metric-tabs flex items-center gap-1.5 overflow-x-auto pb-1 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-2xs no-scrollbar" id="scm-metric-tabs">
-          <button class="scm-tab active px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap bg-[#0f1e36] text-white shadow-xs" type="button" data-scm-metric-panel="operativas">Casos</button>
-          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-panel="cotizaciones_mantenimiento">Cotizaciones de mantenimiento</button>
-          <button class="scm-tab px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-slate-900" type="button" data-scm-metric-panel="gestion_contractual">Gestión contractual</button>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas-cotizaciones' ? ' active' : ''; ?>" id="scm-panel-metricas-cotizaciones" data-permission-tab="metricas" data-scm-loaded="0">
+          <?php echo $metricsPanelsView->renderQuotesShell(); ?>
         </div>
-
-        <!-- Panel de Gráficos e Indicadores -->
-        <div class="scm-metrics-pane active" data-scm-metrics-pane="operativas">
-        <!-- Tarjetas Ejecutivas de KPIs de Alta Jerarquía -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-scm-metrics-main-kpis>
-          <!-- KPI 1: Casos Activos -->
-          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col justify-between hover:shadow-elevated transition-shadow">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Casos Activos</span>
-              <span class="p-2 rounded-xl bg-blue-50 text-[#0f1e36]">
-                <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
-              </span>
-            </div>
-            <div class="mt-3 flex items-baseline justify-between">
-              <span class="text-3xl font-extrabold text-slate-900 tracking-tight"><?php echo esc_html((string)($stats['abiertos'] ?? ($stats['total'] ?? 0))); ?> <span class="text-xs font-normal text-slate-500">casos</span></span>
-              <span class="inline-flex items-center text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                <span class="material-symbols-outlined text-[14px] mr-0.5">trending_up</span> +4.2%
-              </span>
-            </div>
-            <div class="mt-3 pt-2.5 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
-              <span>Cotizados: <strong class="text-slate-800"><?php echo esc_html((string)($stats['con_cotizacion'] ?? 0)); ?></strong></span>
-              <span class="text-slate-300">•</span>
-              <span>En revisión: <strong class="text-slate-800"><?php echo esc_html((string)($stats['con_revision'] ?? 0)); ?></strong></span>
-            </div>
-          </div>
-
-          <!-- KPI 2: Salud General -->
-          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col justify-between hover:shadow-elevated transition-shadow">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Salud General</span>
-              <span class="p-2 rounded-xl bg-emerald-50 text-emerald-700">
-                <span class="material-symbols-outlined text-[20px]">donut_large</span>
-              </span>
-            </div>
-            <div class="mt-3 flex items-baseline justify-between">
-              <span class="text-3xl font-extrabold text-slate-900 tracking-tight">74%</span>
-              <span class="text-xs text-slate-400 font-medium">Meta: 85%</span>
-            </div>
-            <!-- Barra Segmentada Tricolor -->
-            <div class="mt-3">
-              <div class="h-2 w-full flex rounded-full overflow-hidden bg-slate-100">
-                <div class="bg-emerald-500 h-full" style="width: 32%" title="En tiempo"></div>
-                <div class="bg-amber-400 h-full" style="width: 10%" title="En riesgo"></div>
-                <div class="bg-rose-500 h-full" style="width: 58%" title="Vencidos"></div>
-              </div>
-              <div class="flex items-center justify-between mt-2 text-[11px] text-slate-500 font-medium">
-                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> En tiempo</span>
-                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> En riesgo</span>
-                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Vencidos</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- KPI 3: 1ª Gestión Promedio -->
-          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col justify-between hover:shadow-elevated transition-shadow">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">1ª Gestión Promedio</span>
-              <span class="p-2 rounded-xl bg-amber-50 text-amber-700">
-                <span class="material-symbols-outlined text-[20px]">avg_time</span>
-              </span>
-            </div>
-            <div class="mt-3 flex items-baseline justify-between">
-              <span class="text-3xl font-extrabold text-slate-900 tracking-tight"><?php echo isset($stats['avg_first_h']) && is_numeric($stats['avg_first_h']) ? number_format((float)$stats['avg_first_h'], 1) : '18.4'; ?> <span class="text-xs font-normal text-slate-500">hrs</span></span>
-              <span class="inline-flex items-center text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                <span class="material-symbols-outlined text-[14px] mr-0.5">trending_down</span> -12.5%
-              </span>
-            </div>
-            <div class="mt-3 pt-2.5 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
-              <span>Histórico: 21.0h</span>
-              <span class="text-slate-300">•</span>
-              <span class="text-emerald-700 font-semibold">Dentro del límite</span>
-            </div>
-          </div>
-
-          <!-- KPI 4: Tiempo Promedio de Resolución -->
-          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col justify-between hover:shadow-elevated transition-shadow">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Tiempo Resolución</span>
-              <span class="p-2 rounded-xl bg-blue-50 text-blue-700">
-                <span class="material-symbols-outlined text-[20px]">task_alt</span>
-              </span>
-            </div>
-            <div class="mt-3 flex items-baseline justify-between">
-              <span class="text-3xl font-extrabold text-slate-900 tracking-tight"><?php echo isset($stats['avg_close_h']) && is_numeric($stats['avg_close_h']) ? number_format((float)$stats['avg_close_h'] / 24, 1) : '4.2'; ?> <span class="text-xs font-normal text-slate-500">días</span></span>
-              <span class="inline-flex items-center text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                Meta: &le; 5.0d
-              </span>
-            </div>
-            <div class="mt-3 pt-2.5 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100">
-              <span>Cerrados en mes: <strong class="text-slate-800"><?php echo esc_html((string)($stats['mes_cerrados'] ?? 0)); ?></strong></span>
-              <span class="text-slate-300">•</span>
-              <span class="text-blue-700 font-semibold">Estable</span>
-            </div>
-          </div>
-        </div>
-
-          <form class="scm-execution-filters scm-metric-case-filters" data-scm-metric-case-filters autocomplete="off">
-            <div class="scm-field">
-              <label for="scm_metric_tema">Tema</label>
-              <select id="scm_metric_tema" name="metric_categoria" class="select select-bordered select-sm scm-select" data-scm-metric-topic-filter>
-                <option value="mantenimiento">Mantenimiento</option>
-                <option value="entrega">Entrega</option>
-                <option value="preventiva">Preventiva</option>
-                <option value="recibo">Recibo</option>
-                <option value="contable">Contable</option>
-                <option value="certificaciones">Certificaciones</option>
-                <option value="contractual">Contractual</option>
-              </select>
-            </div>
-            <div class="scm-field scm-metric-case-funcionario-field">
-              <label for="scm_metric_funcionario">Funcionario</label>
-              <select id="scm_metric_funcionario" name="funcionario" class="select select-bordered select-sm scm-select scm-select2" data-placeholder="Todos los funcionarios" data-scm-metric-funcionario-filter>
-                <option value="">Todos</option>
-                <?php foreach (($filterOptions['funcionarios'] ?? []) as $func): $fId = trim((string)($func['id'] ?? '')); if ($fId === '') continue; ?>
-                  <option value="<?php echo esc_attr($fId); ?>"><?php echo esc_html((string)($func['label'] ?? $fId)); ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-            <div class="scm-metric-case-filter-note" data-scm-metric-case-filter-status aria-live="polite">Mostrando casos de mantenimiento.</div>
-          </form>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
-              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-slate-400">pie_chart</span>
-                <span>Estado General</span>
-              </h3>
-              <div class="scm-donut-wrap">
-                <div class="scm-donut" id="scm-chart-estado-ring"><span id="scm-chart-estado-center"><?php echo esc_html((string)($stats['total'] ?? 0)); ?></span></div>
-                <div class="scm-metrics-legend flex items-center justify-center gap-4 mt-2 text-xs">
-                  <div class="scm-metrics-legend-item flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>Abiertos <strong id="scm-metric-abiertos" class="text-slate-900"><?php echo esc_html((string)($stats['abiertos'] ?? 0)); ?></strong></div>
-                  <div class="scm-metrics-legend-item flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>Cerrados <strong id="scm-metric-cerrados" class="text-slate-900"><?php echo esc_html((string)($stats['cerrados'] ?? 0)); ?></strong></div>
-                </div>
-              </div>
-            </section>
-
-            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
-              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-slate-400">speed</span>
-                <span>Salud operativa</span>
-              </h3>
-              <div class="scm-bars" id="scm-chart-sla"></div>
-            </section>
-
-            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
-              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-slate-400">flowsheet</span>
-                <span>Flujo Operativo</span>
-              </h3>
-              <div class="scm-bars" id="scm-chart-flujo"></div>
-            </section>
-
-            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
-              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-slate-400">timelapse</span>
-                <span>Tiempos Promedio</span>
-              </h3>
-              <div class="scm-bars" id="scm-chart-tiempos"></div>
-            </section>
-
-            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
-              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-slate-400">calendar_today</span>
-                <span>Producción Mensual</span>
-              </h3>
-              <div class="scm-bars" id="scm-chart-produccion"></div>
-            </section>
-
-            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
-              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-slate-400">category</span>
-                <span>Categorías de Carga</span>
-              </h3>
-              <div class="scm-bars" id="scm-chart-categorias"></div>
-            </section>
-
-            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
-              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-slate-400">badge</span>
-                <span>Seguimientos del mes por Funcionario</span>
-              </h3>
-              <div class="scm-bars" id="scm-chart-seg-funcionario"></div>
-            </section>
-
-            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
-              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-slate-400">sync</span>
-                <span>Actualizados del mes por Funcionario</span>
-              </h3>
-              <div class="scm-bars" id="scm-chart-actualizados-funcionario"></div>
-            </section>
-
-            <section class="bg-white rounded-2xl p-5 border border-slate-200 shadow-subtle flex flex-col gap-3">
-              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px] text-slate-400">inbox</span>
-                <span>Casos abiertos por Funcionario</span>
-              </h3>
-              <div class="scm-bars" id="scm-chart-abiertos-funcionario"></div>
-            </section>
-          </div>
-        </div>
-        <div class="scm-metrics-pane" data-scm-metrics-pane="cotizaciones_mantenimiento">
-          <section class="scm-execution-panel scm-maintenance-quote-metrics" data-scm-maintenance-quote-metrics>
-            <div class="scm-execution-head">
-              <div>
-                <span class="scm-eyebrow">Resumen financiero</span>
-                <h3>Cotizaciones de mantenimiento</h3>
-                <p>Filtra por mes de aprobaci&oacute;n para ver aprobadas, administraci&oacute;n ganada y cu&aacute;les ya terminaron trabajo con acta de satisfacci&oacute;n.</p>
-              </div>
-            </div>
-            <form class="scm-execution-filters scm-maintenance-quote-filters" data-scm-maintenance-quote-form autocomplete="off">
-              <div class="scm-field">
-                <label for="scm_metric_cotizaciones_mes">Mes</label>
-                <input id="scm_metric_cotizaciones_mes" name="cotizaciones_mes" class="input input-bordered input-sm" type="month" value="<?php echo esc_attr(date('Y-m')); ?>">
-              </div>
-              <button type="submit" class="scm-btn-primary btn btn-primary">Ver cotizaciones</button>
-            </form>
-            <div class="scm-execution-status" data-scm-maintenance-quote-status aria-live="polite">Resumen del mes actual.</div>
-            <div class="scm-execution-kpis" data-scm-maintenance-quote-kpis></div>
-            <div class="scm-maintenance-quote-list" data-scm-maintenance-quote-list></div>
-          </section>
-        </div>
-        <div class="scm-metrics-pane" data-scm-metrics-pane="gestion_contractual">
-          <section class="scm-execution-panel scm-contractual-report-panel" data-scm-contractual-reports data-api-base="<?php echo esc_attr($reportesGerencialesBaseUrl); ?>">
-            <div class="scm-execution-head">
-              <div>
-                <span class="scm-eyebrow">Reportes gerenciales</span>
-                <h3>Gestión contractual</h3>
-                <p>Consulta desde este tablero los reportes contractuales usando el backend existente de reportes gerenciales.</p>
-              </div>
-            </div>
-            <div class="scm-contractual-native-tabs" data-scm-contractual-tabs aria-label="Reportes incluidos">
-              <button type="button" class="active" data-contractual-report-tab="ocupaciones">Ocupaciones</button>
-              <button type="button" data-contractual-report-tab="desocupaciones">Desocupaciones</button>
-              <button type="button" data-contractual-report-tab="balance">Ocupación vs desocupación</button>
-              <button type="button" data-contractual-report-tab="revision_preventiva">Revisión preventiva</button>
-              <button type="button" data-contractual-report-tab="revision_correctiva">Revisión correctiva</button>
-              <button type="button" data-contractual-report-tab="servicios">Servicios públicos</button>
-            </div>
-            <form class="scm-contractual-report-filters" data-scm-contractual-filters autocomplete="off">
-              <div class="scm-field">
-                <label for="scm_contractual_year">Año</label>
-                <select id="scm_contractual_year" name="year" class="select select-bordered select-sm scm-select">
-                  <?php $currentYear = (int) date('Y'); for ($yearOption = $currentYear; $yearOption >= $currentYear - 5; $yearOption--): ?>
-                    <option value="<?php echo esc_attr((string) $yearOption); ?>" <?php selected($yearOption, $currentYear); ?>><?php echo esc_html((string) $yearOption); ?></option>
-                  <?php endfor; ?>
-                </select>
-              </div>
-              <div class="scm-field">
-                <label for="scm_contractual_month">Mes</label>
-                <select id="scm_contractual_month" name="month" class="select select-bordered select-sm scm-select">
-                  <?php $monthLabels = [1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril', 5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto', 9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre']; $currentMonth = (int) date('n'); foreach ($monthLabels as $monthValue => $monthLabel): ?>
-                    <option value="<?php echo esc_attr((string) $monthValue); ?>" <?php selected($monthValue, $currentMonth); ?>><?php echo esc_html($monthLabel); ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-              <div class="scm-field">
-                <label for="scm_contractual_period">Periodo</label>
-                <select id="scm_contractual_period" name="period" class="select select-bordered select-sm scm-select">
-                  <option value="mesActual">Mes actual</option>
-                  <option value="porMes">Por mes</option>
-                  <option value="anio">Año</option>
-                  <option value="acumulado">Acumulado del año</option>
-                  <option value="anioAnterior">Comparativa año anterior por mes</option>
-                  <option value="acumuladoAnterior">Comparativa acumulado año anterior</option>
-                </select>
-              </div>
-              <button type="submit" class="scm-btn-primary btn btn-primary">Actualizar</button>
-            </form>
-            <div class="scm-execution-status" data-scm-contractual-status aria-live="polite">Selecciona un reporte para cargar los datos.</div>
-            <div class="scm-contractual-utility-tabs" data-scm-contractual-utility-tabs hidden>
-              <button type="button" class="active" data-contractual-utility="luz">Luz</button>
-              <button type="button" data-contractual-utility="agua">Agua</button>
-              <button type="button" data-contractual-utility="gas">Gas</button>
-            </div>
-            <div class="scm-contractual-kpis" data-scm-contractual-kpis></div>
-            <div class="scm-contractual-report-grid" data-scm-contractual-report-grid></div>
-          </section>
-        </div>
-      </div>
+      <?php endif; ?>
 
       <?php echo \SCM\Views\GuideModalView::render(); ?>
       <?php if ($canManageDashboardPermissions): ?>
@@ -1816,6 +1455,8 @@ trait RendersDashboard
     <script src="<?php echo $collectionManagementJsUrl; ?>" defer></script>
     <script src="<?php echo $canonInsuranceAuditJsUrl; ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-movements.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-movements.js'))); ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-case-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-case-metrics.js'))); ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-quote-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-quote-metrics.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-ownership.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-ownership.js'))); ?>" defer></script>
     <script src="<?php echo $guideJsUrl; ?>" defer></script>
     <script src="<?php echo $damageJsUrl; ?>" defer></script>
