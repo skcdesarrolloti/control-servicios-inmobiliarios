@@ -93,7 +93,7 @@ trait PublicServicesReviewConcern
       if ($timestamp !== $oldTs || $month !== (int) ($contract['mes_revision_servicios'] ?? 0) || (int) ($contract['proxima_revision_servicios'] ?? 0) > 0) {
         \SCM\Modules\Pending\PublicServicesReviewStorage::validateToken($token, $contract, Auth::userId());
         $now = date('Y-m-d H:i:s');
-        $payload = ['ultima_revision_servicios' => $timestamp, 'mes_revision_servicios' => $month, 'proxima_revision_servicios' => null, 'cct_modified' => $now, 'cct_author_id' => $employee['id_empleado']];
+        $payload = ['ultima_revision_servicios' => $timestamp, 'mes_revision_servicios' => $month, 'proxima_revision_servicios' => null, 'cct_modified' => $now];
         if ($this->repo->updateContratoArrendamiento($contractId, $payload) !== 1) { throw new \RuntimeException('No fue posible guardar el ajuste.'); }
         $audit = ['contract_pk' => $contractId, 'previous' => ['ultima_revision_servicios' => $contract['ultima_revision_servicios'] ?? null, 'mes_revision_servicios' => $contract['mes_revision_servicios'] ?? null, 'proxima_revision_servicios' => $contract['proxima_revision_servicios'] ?? null], 'adjusted' => ['ultima_revision_servicios' => $timestamp, 'mes_revision_servicios' => $month, 'proxima_revision_servicios' => null], 'next_review' => $next];
         if (!$this->repo->insertHistorialInmueble([
@@ -356,10 +356,8 @@ trait PublicServicesReviewConcern
         'destinacion' => (string) ($contract['destinacion_inmueble'] ?? ''),
         'tipo' => 'Durante la ocupacion',
       ];
+      // El funcionario de la revisión queda en la revisión y el historial; el responsable del contrato no cambia.
       $contractPayload = $configuration['payload'] + [
-        'cct_author_id' => $employeeId,
-        'id_empleado' => $employeeId,
-        'realizado_por' => $employeeName,
         'revisiones_servicios' => (string) $reviewCount,
         'tuvo_revision' => 'Si',
         'ultima_revision_servicios' => $nowTs,
@@ -493,7 +491,6 @@ trait PublicServicesReviewConcern
       $now = date('Y-m-d H:i:s');
       $changedFields = array_keys($changes);
       $changes['cct_modified'] = $now;
-      $changes['cct_author_id'] = (string) $employee['id_empleado'];
       if ($this->repo->updateContratoArrendamiento($contractId, $changes) <= 0) {
         throw new \RuntimeException('No fue posible actualizar los servicios del contrato.');
       }

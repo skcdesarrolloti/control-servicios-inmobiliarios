@@ -240,7 +240,7 @@ if (empty($current_page) || $current_page === 'tickets') {
     if ($subtabParam === '') $subtabParam = 'contracts-ending';
   }
 
-  $sectionTabPages = ['mine' => 'mine', 'team' => 'team', 'due' => 'due', 'property_history' => 'property_history', 'contracts_ending' => 'contracts_ending', 'contract_termination' => 'contract_termination', 'contract_non_renewal' => 'contract_non_renewal'];
+  $sectionTabPages = ['mine' => 'mine', 'team' => 'team', 'due' => 'due', 'property_history' => 'property_history', 'contracts_ending' => 'contracts_ending', 'contract_termination' => 'contract_termination', 'contract_non_renewal' => 'contract_non_renewal', 'contract_owners' => 'contract_owners'];
   if (isset($sectionTabPages[$tabParam])) {
     $current_page = $sectionTabPages[$tabParam];
   } elseif (in_array($tabParam, ['abiertos', 'scm-panel-abiertos'], true)) {
@@ -321,7 +321,7 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 // 1. Inicio (Dropdown: Resumen, Mi Calendario, Calendario Equipo, Vencimientos, Historial Inmueble)
 // 2. Gestión de Casos & Tickets (Dropdown: Tickets Abiertos, Mis Tickets, Tickets Postergados, Tickets Cerrados)
 // 3. Actividades Administrativas (Dropdown: Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
-// 4. Actividades contractuales (Dropdown: Contratos por terminar, Terminación, No prórroga)
+// 4. Actividades contractuales (Dropdown: Contratos por terminar, Terminación, No prórroga, Funcionario de contratos)
 // 5. Notificaciones
 // 6. Métricas y Dashboard (Dropdown: Dashboard operativo, Ocupaciones, Desocupaciones, Ocupaciones vs Desocupaciones)
 $rawNavItems = [
@@ -548,6 +548,14 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=contract_non_renewal',
         'icon' => 'event_busy',
         'perms' => ['calendario_actividades', 'abiertos'],
+      ],
+      'contract_owners' => [
+        'key' => 'contract_owners',
+        'label' => 'Funcionario de contratos',
+        'panel_id' => 'scm-panel-funcionario-contratos',
+        'url' => $baseUrl . '/index.php?tab=contract_owners',
+        'icon' => 'manage_accounts',
+        'perms' => ['contratos_arrendamiento'],
       ],
     ],
   ],

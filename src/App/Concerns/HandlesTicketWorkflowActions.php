@@ -378,6 +378,7 @@ trait HandlesTicketWorkflowActions
     if (array_key_exists('action_permissions', $_POST)) {
       \SCM\Core\App::settings()->set('contract_history_permissions_configured', true, (int) Auth::employeeId());
       \SCM\Core\App::settings()->set('preventive_review_permissions_configured', true, (int) Auth::employeeId());
+      \SCM\Core\App::settings()->set('contract_owner_permissions_configured', true, (int) Auth::employeeId());
     }
     \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
     \SCM\Core\App::settings()->set('admin_due_popup_cargo_ids', $adminDuePopupCargoIds, Auth::userId());
@@ -1398,7 +1399,6 @@ trait HandlesTicketWorkflowActions
         }
         $payload = ['fin_contrato' => (string) $newTs];
         if ($this->column_exists($table, 'cct_modified')) $payload['cct_modified'] = date('Y-m-d H:i:s');
-        if (Auth::employeeId() !== '' && $this->column_exists($table, 'cct_author_id')) $payload['cct_author_id'] = Auth::employeeId();
         if ($this->db->update($table, $payload, ['_ID' => $id]) !== 1) throw new \RuntimeException('No se pudo actualizar el contrato #' . $id . '.');
         $service->audit($id, 'end_date_imported', Auth::employeeId(), ['before' => $current['fin_contrato'] ?? '', 'after' => $newTs]);
         $oldState = $service->get($id, $this->contractTerminationTimestamp($current['fin_contrato'] ?? ''));
@@ -5197,7 +5197,6 @@ trait HandlesTicketWorkflowActions
           if ($dateUpdated) {
             $payload = ['fin_contrato' => (string) $newTs];
             if ($this->column_exists($table, 'cct_modified')) $payload['cct_modified'] = date('Y-m-d H:i:s');
-            if ($this->column_exists($table, 'cct_author_id')) $payload['cct_author_id'] = Auth::employeeId();
             if ($this->db->update($table, $payload, ['_ID' => (int) $contract['_ID']]) !== 1) throw new \RuntimeException('No se pudo guardar la fecha fin del contrato.');
             $renewal->audit((int) $contract['_ID'], 'end_date_corrected', Auth::employeeId(), ['before' => $endTs, 'after' => $newTs, 'case_number' => $ticket['id_ticket'] ?? $ticketPk, 'source' => $source, 'term' => $term, 'calculated_term' => $ticket['_response_calculated_term'] ?? 'unknown']);
             if ($term !== 'dentro' && ($state = $renewal->get((int) $contract['_ID'], $endTs))) {

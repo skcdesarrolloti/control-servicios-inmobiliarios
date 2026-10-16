@@ -23876,6 +23876,7 @@
       if (
         activePanel.id !== "scm-panel-metricas" &&
         activePanel.id !== "scm-panel-movimientos-contratos" &&
+        activePanel.id !== "scm-panel-funcionario-contratos" &&
         !dashboardFilterOptionsLoaded &&
         !skipFilterOptions
       ) {
@@ -23901,6 +23902,13 @@
       }
       if (activePanel.id === "scm-panel-cotizaciones-mantenimiento") {
         return loadPanelOnce(activePanel, "cotizaciones_mantenimiento");
+      }
+      if (activePanel.id === "scm-panel-funcionario-contratos") {
+        var ownersModule = activePanel.querySelector("[data-scm-contract-owners]");
+        if (ownersModule) {
+          ownersModule.dispatchEvent(new CustomEvent("scm:load-contract-owners"));
+        }
+        return Promise.resolve();
       }
       if (activePanel.id === "scm-panel-movimientos-contratos") {
         var movementsModule = activePanel.querySelector("[data-scm-contract-movements]");

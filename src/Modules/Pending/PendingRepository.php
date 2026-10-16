@@ -243,7 +243,8 @@ final class PendingRepository
     }
 
     $payload = [];
-    foreach ($data as $column => $value) {
+    // El responsable del contrato solo se cambia desde "Funcionario de contratos".
+    foreach (\SCM\Modules\ContractOwnership\ContractOwnerFields::strip($data) as $column => $value) {
       $column = trim((string) $column);
       if ($column !== '' && $this->schema()->columnExists($table, $column)) {
         $payload[$column] = $value;

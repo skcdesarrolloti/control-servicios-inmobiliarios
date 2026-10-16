@@ -512,8 +512,6 @@ final class AdministrativeNotificationsService
         'dia_cobro' => $data['siguiente_fecha'],
         'hora_cobro' => $data['siguiente_hora'],
         'tipo_gestion' => $data['tipo_gestion_cobro'],
-        'id_empleado' => $employeeId,
-        'realizado_por' => $sender['name'],
         'tuvo_revision' => 'Si',
       ];
       $contractUpdate = $this->schema->filterTableData($contractTable, $contractUpdate);

@@ -53,7 +53,6 @@ final class PendingService
       $now = date('Y-m-d H:i:s');
       if ($this->repo->updateContratoArrendamiento($contractId, [
         'estado' => 'Recibido', 'tipo' => 'Ex', 'fecha_recibo' => $fechaTs, 'cct_modified' => $now,
-        'cct_author_id' => (string) $employee['id_empleado'], 'id_empleado' => (string) $employee['id_empleado'], 'realizado_por' => $employee['nombre'],
       ]) !== 1) throw new \RuntimeException('No fue posible actualizar el contrato.');
       if (!$this->repo->insertHistorialInmueble([
         'cct_status' => 'publish', 'cct_author_id' => (string) $employee['id_empleado'], 'cct_created' => $now, 'cct_modified' => $now,

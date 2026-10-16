@@ -50,6 +50,8 @@ $db->insert('calendario_google_accounts', ['id_empleado'=>'94004','google_email'
 $base = ['_ID' => 90001, 'contrato' => '2000', 'estado' => 'Entregado', 'id_inmueble' => '80001', 'inmueble' => '204578', 'direccion' => 'Dirección de prueba', 'arrendatario' => 'Arrendatario QA', 'propietario' => 'Propietario QA', 'correo_propietario' => 'owner@example.invalid', 'correo_arrendatario' => 'tenant@example.invalid', 'servicios_publicos' => '', 'mes_revision_servicios' => '11', 'revisiones_servicios' => '4', 'ultima_revision_servicios' => 1700000000];
 $db->insert($contractTable, $base);
 $db->insert($contractTable, array_replace($base, ['_ID' => 90002, 'contrato' => '90001', 'servicios_publicos' => serialize([]), 'gas' => 'OLD-ACCOUNT']));
+$db->update($contractTable, ['id_empleado' => '2837', 'realizado_por' => 'Asesor responsable QA', 'cct_author_id' => '2837'], ['_ID' => 90001]);
+$ownerOf = static fn(array $row): array => [(string) $row['id_empleado'], (string) $row['realizado_por'], (string) $row['cct_author_id']];
 $_SESSION['scm_user_id'] = 70001;
 $_SESSION['scm_user'] = 'Session name must not replace database identity';
 $repo = new \SCM\Modules\Pending\PendingRepository($db);
@@ -108,7 +110,7 @@ try {
   $contract = $repo->getPublicServicesContract(90001);
   $expectedDue = \SCM\Modules\Pending\PublicServicesSchedule::next((int) $contract['ultima_revision_servicios']);
   $assert((int) $contract['mes_revision_servicios'] === (int) date('n', $expectedDue) && (int) $contract['revisiones_servicios'] === 5 && (int) $contract['ultima_revision_servicios'] > 1700000000, 'review schedules three months from actual date despite stale configured November');
-  $assert($contract['id_empleado'] === '94001' && $contract['realizado_por'] === 'Funcionario autenticado QA', 'contract stores authenticated employee');
+  $assert($ownerOf($contract) === ['2837', 'Asesor responsable QA', '2837'], 'review keeps the contract owner (id_empleado, realizado_por, cct_author_id)');
   $rows = $db->getResults("SELECT * FROM `{$queueTable}` ORDER BY id");
   $assert(count($rows) === 2 && count(array_filter($rows, static fn(array $r): bool => $r['status'] === 'pending')) === 2, 'Owner and tenant emails carry configured staff as CC');
   $queuedDestinations = array_map(static fn(array $row): string => strtolower((string) ($row['destination'] ?? '')), $rows);
@@ -156,7 +158,7 @@ try {
   $received = $service->markContratoRecibido(90001,'2026-10-02');
   $receivedRow = $repo->getPublicServicesContract(90001);
   $receivedHistory = $db->getRow("SELECT * FROM `{$historyTable}` ORDER BY _ID DESC LIMIT 1");
-  $assert(!empty($received['ok']) && $receivedRow['estado']==='Recibido' && $receivedRow['tipo']==='Ex' && (string)$receivedRow['cct_author_id']==='94001' && str_contains($receivedHistory['observacion'],'Estado anterior: Entregado') && (string)$receivedHistory['id_empleado']==='94001', 'received action writes contract and before-after audit under authenticated employee');
+  $assert(!empty($received['ok']) && $receivedRow['estado']==='Recibido' && $receivedRow['tipo']==='Ex' && $ownerOf($receivedRow)===['2837', 'Asesor responsable QA', '2837'] && str_contains($receivedHistory['observacion'],'Estado anterior: Entregado') && (string)$receivedHistory['id_empleado']==='94001', 'received action keeps the contract owner and audits under authenticated employee');
   $historyCount=(int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`");
   $assert(!empty($service->markContratoRecibido(90001,'2026-10-03')['ok']) && (int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`")===$historyCount && $repo->getPublicServicesContract(90001)['fecha_recibo']===$receivedRow['fecha_recibo'], 'received retry preserves original date and avoids duplicate history');
   $assert(empty($service->markContratoRecibido(90002,'2026-02-30')['ok']) && empty($service->markContratoRecibido(99999,'2026-10-02')['ok']), 'invalid receipt dates and missing exact contract PK fail closed');

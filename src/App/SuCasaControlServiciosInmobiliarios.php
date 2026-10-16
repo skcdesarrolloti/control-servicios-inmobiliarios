@@ -22,6 +22,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesPublicServicesLiquidator;
   use \SCM\App\Concerns\HandlesPropertyHistoryActions;
   use \SCM\App\Concerns\HandlesContractMovements;
+  use \SCM\App\Concerns\HandlesContractOwnership;
   use \SCM\App\Concerns\RendersPublicPqr;
   use \SCM\App\Concerns\RendersDashboard;
 
@@ -143,6 +144,10 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_RECEIPT_SETTINGS_SAVE = 'scm_contratos_recibo_configuracion_guardar';
   const AJAX_DASHBOARD_METRICS = 'scm_dashboard_metricas';
   const AJAX_CONTRACT_MOVEMENTS = 'scm_ocupaciones_desocupaciones';
+  const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
+  const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
+  /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
+  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change'];
   const AJAX_DASHBOARD_FILTER_OPTIONS = 'scm_dashboard_filter_options';
   const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';
   const AJAX_CANON_INSURANCE_AUDIT_IMPORT = 'scm_auditoria_canon_aseguradoras_importar';
@@ -688,6 +693,12 @@ final class SuCasaControlServiciosInmobiliarios
           'quote_acta_create' => 'Crear acta de cotización',
         ],
       ],
+      'contratos' => [
+        'label' => 'Contratos de arrendamiento',
+        'items' => [
+          'contract_owner_change' => 'Cambiar funcionario responsable del contrato',
+        ],
+      ],
     ];
   }
 
@@ -718,6 +729,13 @@ final class SuCasaControlServiciosInmobiliarios
         if (in_array('corrective_review_manage', $actions, true) && !in_array('preventive_review_manage', $actions, true)) {
           $permissions[$cargo][] = 'preventive_review_manage';
         }
+      }
+    }
+    // Cambiar el responsable de un contrato es sensible: hasta que se configure, solo los cargos administradores.
+    if (!\SCM\Core\App::settings()->get('contract_owner_permissions_configured', false)) {
+      foreach ($this->dashboardPermissionAdminCargos() as $cargo) {
+        $base = $permissions[$cargo] ?? array_values(array_diff($this->dashboardActionPermissionKeys(), self::SENSITIVE_DEFAULT_ACTIONS));
+        $permissions[$cargo] = array_values(array_unique(array_merge($base, ['contract_owner_change'])));
       }
     }
     return $permissions;
@@ -894,7 +912,7 @@ final class SuCasaControlServiciosInmobiliarios
     $permissions = $this->dashboardActionPermissionsConfig();
     $allActions = $this->dashboardActionPermissionKeys();
     if ($cargo === '' || !array_key_exists($cargo, $permissions)) {
-      return array_values(array_filter($allActions, static fn(string $action): bool => $action !== 'contract_history_manage'));
+      return array_values(array_diff($allActions, self::SENSITIVE_DEFAULT_ACTIONS));
     }
     return !empty($permissions[$cargo]) ? $permissions[$cargo] : [];
   }
