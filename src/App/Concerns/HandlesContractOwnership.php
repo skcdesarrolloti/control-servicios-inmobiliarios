@@ -36,10 +36,14 @@ trait HandlesContractOwnership
       if (!is_array($change)) {
         continue;
       }
-      $changes[] = [
+      $clean = [
         'contract_id' => (int) ($change['contract_id'] ?? 0),
         'employee_id' => preg_replace('/[^0-9]/', '', (string) ($change['employee_id'] ?? '')) ?? '',
       ];
+      if (array_key_exists('dias_gracia', $change) && is_scalar($change['dias_gracia']) && trim((string) $change['dias_gracia']) !== '') {
+        $clean['dias_gracia'] = trim((string) $change['dias_gracia']);
+      }
+      $changes[] = $clean;
     }
     try {
       $result = (new ContractOwnershipService($this->db))->assign($changes);

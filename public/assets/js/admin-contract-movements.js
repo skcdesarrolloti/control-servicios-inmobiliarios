@@ -434,7 +434,7 @@
       var isDesoc = state.detailKind === "desoc";
       var html = '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr>' +
         (isDesoc ? "<th>Fecha recibo</th><th>Fin contrato</th>" : "<th>Fecha entrega</th>") +
-        '<th>Contrato</th><th title="Código del inmueble">Cód. inmueble</th><th>Dirección</th><th>Arrendatario</th><th>Tipo</th><th>Funcionario</th>' +
+        '<th>Contrato</th><th title="Código del inmueble">Cód. inmueble</th><th>Dirección</th><th>Arrendatario</th><th>Tipo</th><th>Destinación</th><th>Funcionario</th>' +
         '<th class="is-num">Duración</th>' + (isDesoc ? '<th class="is-num">Permanencia</th>' : '<th class="is-num">Días de gracia</th>') +
         '<th class="is-num">Canon</th><th class="is-num">Administración</th><th class="is-num">Total</th>' + (isDesoc ? "" : "<th>Estado actual</th>") + "</tr></thead><tbody>";
       html += slice.map(function (event) {
@@ -446,7 +446,7 @@
         var dates = "<td>" + firstCell + "</td>" + (isDesoc ? "<td>" + (row.fin ? esc(formatDate(row.fin)) : '<span class="scm-cm-muted">—</span>') + "</td>" : "");
         return "<tr>" + dates + "<td>" + esc(row.contrato) +
           "</td><td>" + esc(row.inmueble) + '</td><td class="is-address">' + esc(row.direccion) + '</td><td class="is-name">' + esc(row.arrendatario) + "</td><td>" +
-          esc(row.tipo || "—") + "</td><td>" + esc(row.funcionarioNombre || "—") + '</td><td class="is-num">' + (row.meses ? esc(row.meses + " meses") : "—") + "</td>" +
+          esc(row.tipo || "—") + "</td><td>" + esc(row.destinacion || "—") + "</td><td>" + esc(row.funcionarioNombre || "—") + '</td><td class="is-num">' + (row.meses ? esc(row.meses + " meses") : "—") + "</td>" +
           (isDesoc
             ? '<td class="is-num">' + (row.permanencia == null ? "—" : esc(num(row.permanencia) + " meses")) + "</td>"
             : '<td class="is-num">' + graceCell(row) + "</td>") +
@@ -461,7 +461,7 @@
         sumCanon += event.row.canon || 0;
         sumAdmin += event.row.admin || 0;
       });
-      html += '</tbody><tfoot><tr><td colspan="' + (isDesoc ? 10 : 9) + '">Total · ' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) +
+      html += '</tbody><tfoot><tr><td colspan="' + (isDesoc ? 11 : 10) + '">Total · ' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) +
         '</td><td class="is-num">' + esc(money(sumCanon)) + '</td><td class="is-num">' + esc(money(sumAdmin)) + '</td><td class="is-num is-total">' + esc(money(sumCanon + sumAdmin)) +
         "</td>" + (isDesoc ? "" : "<td></td>") + "</tr></tfoot></table></div>";
       html += '<div class="scm-cm-pager"><span>' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) + "</span>";

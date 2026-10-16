@@ -90,6 +90,7 @@
 #scm-app .scm-co-field select,
 #scm-app .scm-co-field textarea,
 #scm-app .scm-co-inline select {
+  box-sizing: border-box;
   width: 100%;
   min-height: 36px;
   padding: 6px 10px;
@@ -178,7 +179,7 @@
 #scm-app .scm-co-modal-body ol { margin: 0; padding-left: 20px; }
 body.scm-co-modal-open { overflow: hidden; }
 
-#scm-app .scm-co-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+#scm-app .scm-co-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 #scm-app .scm-co-summary div { padding: 10px 12px; border-radius: 12px; background: var(--co-soft); }
 #scm-app .scm-co-summary span { display: block; font-size: 11px; font-weight: 600; color: var(--co-muted); }
 #scm-app .scm-co-summary strong { font-size: 13px; font-weight: 600; }
@@ -197,6 +198,9 @@ body.scm-co-modal-open { overflow: hidden; }
 #scm-app .scm-co-verdict p { margin-top: 2px; color: #334155; }
 #scm-app .scm-co-warning { font-weight: 600; color: var(--co-bad) !important; }
 #scm-app .scm-co-form { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+#scm-app .scm-co-form-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(140px, 1fr); gap: 10px; }
+#scm-app .scm-co-table td small.scm-co-grace-hint { color: var(--co-warn); font-weight: 600; }
+#scm-app .scm-co-table tr.is-grace-pending td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
 #scm-app .scm-co-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
 #scm-app .scm-co-hint { font-size: 11.5px; color: var(--co-muted); }
 #scm-app .scm-co-form-error { padding: 8px 12px; border-radius: 10px; background: #fff1f2; color: var(--co-bad); font-size: 12px; font-weight: 600; }
@@ -214,6 +218,7 @@ body.scm-co-modal-open { overflow: hidden; }
 @media (max-width: 680px) {
   #scm-app .scm-co-filters,
   #scm-app .scm-co-summary,
+  #scm-app .scm-co-form-grid,
   #scm-app .scm-co-evidence-grid { grid-template-columns: minmax(0, 1fr); }
   #scm-app .scm-co-head h1 { font-size: 20px; }
   #scm-app .scm-co-bulk { top: auto; }

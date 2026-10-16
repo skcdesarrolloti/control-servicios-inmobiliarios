@@ -5,27 +5,33 @@ declare(strict_types=1);
 namespace SCM\Modules\ContractOwnership;
 
 use SCM\Core\Database;
+use SCM\Modules\ContractMovements\ContractMovementsReport;
 use SCM\Support\SchemaInspector;
 
 /**
- * Funcionario responsable de los contratos de arrendamiento.
+ * Funcionario responsable y días de gracia de los contratos de arrendamiento.
  *
  * La ayuda cruza dos documentos de origen:
  * - Hoja de cierre: su `id_empleado` es quien arrendó el inmueble. Es la fuente principal.
  * - Mandato: quien captó el inmueble. Su `id_empleado` y `cct_author_id` no son confiables en
- *   los datos, por eso el funcionario se identifica por el correo o el nombre de `creador`.
+ *   los datos, por eso el funcionario se identifica por el nombre de `creador` (o su correo).
+ * Solo se sugieren consultores: si el documento lo registró un administrativo, no cuenta.
  * Si ambos coinciden la sugerencia es alta; si difieren prevalece la hoja de cierre.
- * Al asignar se actualizan id_empleado, realizado_por y cct_author_id del contrato. Es una herramienta
- * de corrección: no deja historial en el inmueble.
+ * Los días de gracia casi nunca están en el contrato: se sugieren desde la hoja de cierre y,
+ * si no, desde el mandato.
+ *
+ * Es una herramienta de corrección: actualiza id_empleado, realizado_por, cct_author_id y
+ * dias_gracia del contrato sin dejar historial en el inmueble.
  */
 final class ContractOwnershipService
 {
   public const MAX_CHANGES = 500;
+  public const MAX_GRACE_DAYS = 365;
 
   private Database $db;
   private SchemaInspector $schema;
 
-  /** @var array<string,array{id:string,name:string,active:bool,email:string,cargo:string}> */
+  /** @var array<string,array{id:string,name:string,active:bool,email:string,cargo:string,consultant:bool,real_name:string}> */
   private array $employees = [];
   /** @var array<string,string> */
   private array $byEmail = [];
@@ -48,7 +54,7 @@ final class ContractOwnershipService
 
     $rows = $this->db->getResults(
       "SELECT `_ID`, `contrato`, `estado`, `id_inmueble`, `id_inmueble_data`, `direccion`, `propietario`, `arrendatario`,
-              `id_empleado`, `realizado_por`, `id_contrato_mandato`, `id_cierre`, `fecha_entrega`, `inicio_contrato`
+              `id_empleado`, `realizado_por`, `id_contrato_mandato`, `id_cierre`, `dias_gracia`
        FROM `{$contractsTable}` ORDER BY `_ID` DESC"
     );
 
@@ -68,7 +74,9 @@ final class ContractOwnershipService
   }
 
   /**
-   * @param list<array{contract_id:int,employee_id:string}> $changes
+   * Cada cambio trae `contract_id` y, al menos, `employee_id` o `dias_gracia`.
+   *
+   * @param list<array<string,mixed>> $changes
    * @return array{updated:list<array<string,mixed>>,skipped:int}
    */
   public function assign(array $changes): array
@@ -94,41 +102,74 @@ final class ContractOwnershipService
       $seen = [];
       foreach ($changes as $change) {
         $contractId = (int) ($change['contract_id'] ?? 0);
-        $employeeId = trim((string) ($change['employee_id'] ?? ''));
         if ($contractId <= 0 || isset($seen[$contractId])) {
           throw new \InvalidArgumentException('La selección contiene contratos inválidos o repetidos.');
         }
         $seen[$contractId] = true;
-        $employee = $this->employees[$employeeId] ?? null;
-        if ($employee === null || !$employee['active']) {
-          throw new \InvalidArgumentException('Solo puedes asignar funcionarios activos.');
+
+        $employeeId = trim((string) ($change['employee_id'] ?? ''));
+        $employee = null;
+        if ($employeeId !== '') {
+          $employee = $this->employees[$employeeId] ?? null;
+          if ($employee === null || !$employee['active'] || !$employee['consultant']) {
+            throw new \InvalidArgumentException('Solo puedes asignar consultores activos.');
+          }
+        }
+        $grace = null;
+        $setGrace = array_key_exists('dias_gracia', $change) && $change['dias_gracia'] !== null && $change['dias_gracia'] !== '';
+        if ($setGrace) {
+          if (!is_numeric($change['dias_gracia']) || (int) $change['dias_gracia'] != $change['dias_gracia']) {
+            throw new \InvalidArgumentException('Los días de gracia deben ser un número entero.');
+          }
+          $grace = (int) $change['dias_gracia'];
+          if ($grace < 0 || $grace > self::MAX_GRACE_DAYS) {
+            throw new \InvalidArgumentException('Los días de gracia deben estar entre 0 y ' . self::MAX_GRACE_DAYS . '.');
+          }
+        }
+        if ($employee === null && !$setGrace) {
+          throw new \InvalidArgumentException('Indica el funcionario o los días de gracia del contrato #' . $contractId . '.');
         }
 
         $contract = $this->db->getRow(
-          "SELECT `_ID`, `contrato`, `id_inmueble`, `id_empleado`, `realizado_por`, `cct_author_id` FROM `{$contractsTable}` WHERE `_ID` = ? LIMIT 1 FOR UPDATE",
+          "SELECT `_ID`, `id_empleado`, `realizado_por`, `cct_author_id`, `dias_gracia` FROM `{$contractsTable}` WHERE `_ID` = ? LIMIT 1 FOR UPDATE",
           [$contractId]
         );
         if (!$contract) {
           throw new \RuntimeException('El contrato #' . $contractId . ' ya no existe.');
         }
-        $previousId = trim((string) ($contract['id_empleado'] ?? ''));
-        $previousName = trim((string) ($contract['realizado_por'] ?? ''));
-        if ($previousId === $employeeId && $previousName === $employee['name'] && trim((string) ($contract['cct_author_id'] ?? '')) === $employeeId) {
+
+        $payload = [];
+        if ($employee !== null && (
+          trim((string) ($contract['id_empleado'] ?? '')) !== $employeeId
+          || trim((string) ($contract['realizado_por'] ?? '')) !== $employee['name']
+          || trim((string) ($contract['cct_author_id'] ?? '')) !== $employeeId
+        )) {
+          $payload['id_empleado'] = $employeeId;
+          $payload['realizado_por'] = $employee['name'];
+          $payload['cct_author_id'] = $employeeId;
+        }
+        if ($setGrace && trim((string) ($contract['dias_gracia'] ?? '')) !== (string) $grace) {
+          $payload['dias_gracia'] = (string) $grace;
+        }
+        if ($payload === []) {
           $skipped++;
           continue;
         }
-
-        $payload = $this->schema->filterTableData($contractsTable, [
-          'id_empleado' => $employeeId,
-          'realizado_por' => $employee['name'],
-          'cct_author_id' => $employeeId,
-          'cct_modified' => $now,
-        ]);
+        $payload['cct_modified'] = $now;
+        $payload = $this->schema->filterTableData($contractsTable, $payload);
         if ($this->db->update($contractsTable, $payload, ['_ID' => $contractId]) !== 1) {
           throw new \RuntimeException('No se pudo actualizar el contrato #' . $contractId . '.');
         }
 
-        $updated[] = ['contract_id' => $contractId, 'employee_id' => $employeeId, 'employee_name' => $employee['name']];
+        $result = ['contract_id' => $contractId];
+        if (isset($payload['id_empleado'])) {
+          $result['employee_id'] = $employeeId;
+          $result['employee_name'] = $employee['name'];
+        }
+        if (isset($payload['dias_gracia'])) {
+          $result['dias_gracia'] = $grace;
+        }
+        $updated[] = $result;
       }
       if ($ownsTransaction) {
         $pdo->commit();
@@ -183,8 +224,11 @@ final class ContractOwnershipService
         'creador' => trim((string) ($closing['creador'] ?? '')),
         'aprobador' => trim((string) ($closing['aprobador'] ?? '')),
         'employee_id' => $closingEmployee,
+        'eligible' => $this->isEligible($closingEmployee),
         'matched_by' => $matchedBy,
         'via' => $closingVia,
+        'dias_gracia' => ContractMovementsReport::parseGraceDays($closing['dias_gracia'] ?? null),
+        'dias_gracia_raw' => trim((string) ($closing['dias_gracia'] ?? '')),
       ];
     }
 
@@ -204,8 +248,11 @@ final class ContractOwnershipService
         'creador' => trim((string) ($mandate['creador'] ?? '')),
         'correo' => trim((string) ($mandate['email_creador'] ?? '')),
         'employee_id' => $mandateEmployee,
+        'eligible' => $this->isEligible($mandateEmployee),
         'matched_by' => $matchedBy,
         'via' => $mandateVia,
+        'dias_gracia' => ContractMovementsReport::parseGraceDays($mandate['dias_gracia'] ?? null),
+        'dias_gracia_raw' => trim((string) ($mandate['dias_gracia'] ?? '')),
       ];
     }
 
@@ -222,9 +269,15 @@ final class ContractOwnershipService
       'arrendatario' => trim((string) ($row['arrendatario'] ?? '')),
       'employee_id' => $current,
       'employee_name' => trim((string) ($row['realizado_por'] ?? '')),
+      'dias_gracia' => ContractMovementsReport::parseGraceDays($row['dias_gracia'] ?? null),
       'cierre' => $closingEvidence,
       'mandato' => $mandateEvidence,
-      'suggestion' => $this->suggest($closingEvidence['employee_id'] ?? '', $mandateEvidence['employee_id'] ?? '', $mandateEvidence !== null),
+      'suggestion' => $this->suggest(
+        $closingEvidence && $closingEvidence['eligible'] ? $closingEvidence['employee_id'] : '',
+        $mandateEvidence && $mandateEvidence['eligible'] ? $mandateEvidence['employee_id'] : '',
+        $mandateEvidence !== null
+      ),
+      'grace_suggestion' => $this->suggestGrace($closingEvidence['dias_gracia'] ?? null, $mandateEvidence['dias_gracia'] ?? null),
     ];
   }
 
@@ -232,7 +285,7 @@ final class ContractOwnershipService
   public function suggest(string $closingEmployee, string $mandateEmployee, bool $hasMandate): array
   {
     if ($closingEmployee !== '' && $closingEmployee === $mandateEmployee) {
-      return ['employee_id' => $closingEmployee, 'source' => 'ambos', 'confidence' => 'alta', 'reason' => 'La hoja de cierre y el mandato señalan al mismo funcionario.'];
+      return ['employee_id' => $closingEmployee, 'source' => 'ambos', 'confidence' => 'alta', 'reason' => 'La hoja de cierre y el mandato señalan al mismo consultor.'];
     }
     if ($closingEmployee !== '' && $mandateEmployee !== '') {
       return ['employee_id' => $closingEmployee, 'source' => 'cierre', 'confidence' => 'media', 'reason' => 'La hoja de cierre (quien arrendó) y el mandato (quien captó) difieren; prevalece la hoja de cierre.'];
@@ -242,13 +295,25 @@ final class ContractOwnershipService
         'employee_id' => $closingEmployee,
         'source' => 'cierre',
         'confidence' => $hasMandate ? 'media' : 'alta',
-        'reason' => $hasMandate ? 'Solo la hoja de cierre identifica al funcionario; el creador del mandato no se pudo identificar.' : 'Funcionario que registró la hoja de cierre del contrato.',
+        'reason' => $hasMandate ? 'Solo la hoja de cierre identifica a un consultor; el mandato no.' : 'Consultor que registró la hoja de cierre del contrato.',
       ];
     }
     if ($mandateEmployee !== '') {
-      return ['employee_id' => $mandateEmployee, 'source' => 'mandato', 'confidence' => 'baja', 'reason' => 'No hay hoja de cierre; se sugiere quien creó el mandato del inmueble.'];
+      return ['employee_id' => $mandateEmployee, 'source' => 'mandato', 'confidence' => 'baja', 'reason' => 'La hoja de cierre no identifica a un consultor; se sugiere quien creó el mandato del inmueble.'];
     }
-    return ['employee_id' => '', 'source' => '', 'confidence' => 'ninguna', 'reason' => 'No hay hoja de cierre ni mandato con un funcionario identificable.'];
+    return ['employee_id' => '', 'source' => '', 'confidence' => 'ninguna', 'reason' => 'Ni la hoja de cierre ni el mandato identifican a un consultor.'];
+  }
+
+  /** @return array{value:?int,source:string} */
+  public function suggestGrace(?int $closing, ?int $mandate): array
+  {
+    if ($closing !== null) {
+      return ['value' => $closing, 'source' => 'cierre'];
+    }
+    if ($mandate !== null) {
+      return ['value' => $mandate, 'source' => 'mandato'];
+    }
+    return ['value' => null, 'source' => ''];
   }
 
   /** Normaliza un nombre para compararlo sin tildes, mayúsculas ni espacios extra. */
@@ -258,6 +323,16 @@ final class ContractOwnershipService
     $name = strtr($name, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n']);
     $name = preg_replace('/[^a-z0-9 ]+/', ' ', $name) ?? '';
     return trim(preg_replace('/\s+/', ' ', $name) ?? '');
+  }
+
+  /**
+   * Un contrato de arrendamiento lo lleva un consultor: cargo "Consultor de arriendo/venta"
+   * o un asesor que se retiró (al retirarse se renombra como "Asesor de arriendo retirado").
+   */
+  public static function isConsultant(string $cargo, string $name): bool
+  {
+    return preg_match('/^consultora? de (arriendo|venta)/', self::normalizeName($cargo)) === 1
+      || preg_match('/^asesora? de (arriendo|venta)/', self::normalizeName($name)) === 1;
   }
 
   /**
@@ -302,12 +377,15 @@ final class ContractOwnershipService
         continue;
       }
       $name = trim(preg_replace('/\s+/u', ' ', (string) ($row['nombre'] ?? '')) ?? '');
+      $cargo = trim((string) ($row['nombre_cargo'] ?? ''));
       $this->employees[$id] = [
         'id' => $id,
         'name' => $name !== '' ? $name : 'Funcionario ' . $id,
         'active' => mb_strtolower(trim((string) ($row['activo'] ?? '')), 'UTF-8') === 'si',
         'email' => trim((string) ($row['correo'] ?? '')),
-        'cargo' => trim((string) ($row['nombre_cargo'] ?? '')),
+        'cargo' => $cargo,
+        'consultant' => self::isConsultant($cargo, $name),
+        'real_name' => '',
       ];
       $email = mb_strtolower(trim((string) ($row['correo'] ?? '')), 'UTF-8');
       if ($email !== '') {
@@ -324,20 +402,42 @@ final class ContractOwnershipService
       }
     }
     // Las hojas de cierre guardan el nombre con que se registró cada funcionario aunque
-    // después se renombrara (p. ej. "Asesor retirado"); sirven de alias para los mandatos.
+    // después se renombrara (p. ej. "Asesor de arriendo retirado 2"); sirven de alias para
+    // los mandatos y para mostrar quién era la persona retirada.
     $aliases = [];
+    $spellings = [];
     foreach ($closings as $closing) {
       $id = trim((string) ($closing['id_empleado'] ?? ''));
-      $alias = self::normalizeName((string) ($closing['creador'] ?? ''));
-      if ($id !== '' && $alias !== '' && isset($this->employees[$id])) {
-        $aliases[$alias][$id] = ($aliases[$alias][$id] ?? 0) + 1;
+      $creator = trim(preg_replace('/\s+/u', ' ', (string) ($closing['creador'] ?? '')) ?? '');
+      $alias = self::normalizeName($creator);
+      if ($id === '' || $alias === '' || !isset($this->employees[$id])) {
+        continue;
       }
+      $aliases[$alias][$id] = ($aliases[$alias][$id] ?? 0) + 1;
+      $spellings[$id][$creator] = ($spellings[$id][$creator] ?? 0) + 1;
     }
     foreach ($aliases as $alias => $ids) {
       if (!isset($this->byName[$alias]) && count($ids) === 1) {
         $this->byName[$alias] = (string) array_key_first($ids);
       }
     }
+    foreach ($spellings as $id => $names) {
+      $employee = $this->employees[$id];
+      if ($employee['active']) {
+        continue;
+      }
+      // El nombre completo más usado (a igualdad, el más largo) identifica a la persona retirada.
+      uksort($names, static fn(string $a, string $b): int => [$names[$b], strlen($b)] <=> [$names[$a], strlen($a)]);
+      $realName = (string) array_key_first($names);
+      if (self::normalizeName($realName) !== self::normalizeName($employee['name'])) {
+        $this->employees[$id]['real_name'] = $realName;
+      }
+    }
+  }
+
+  private function isEligible(string $employeeId): bool
+  {
+    return $employeeId !== '' && !empty($this->employees[$employeeId]['consultant']);
   }
 
   private function loadEmployees(): void
@@ -369,7 +469,7 @@ final class ContractOwnershipService
       return $out;
     }
     $rows = $this->db->getResults(
-      "SELECT `_ID`, `id_contrato_arrendamiento`, `fecha`, `id_empleado`, `creador`, `aprobador` FROM `{$table}` ORDER BY `_ID` ASC"
+      "SELECT `_ID`, `id_contrato_arrendamiento`, `fecha`, `id_empleado`, `creador`, `aprobador`, `dias_gracia` FROM `{$table}` ORDER BY `_ID` ASC"
     );
     foreach ($rows as $row) {
       $out['byId'][(string) $row['_ID']] = $row;
@@ -390,7 +490,7 @@ final class ContractOwnershipService
       return $out;
     }
     $rows = $this->db->getResults(
-      "SELECT `_ID`, `id_inmueble`, `fecha`, `creador`, `email_creador` FROM `{$table}` ORDER BY `_ID` ASC"
+      "SELECT `_ID`, `id_inmueble`, `fecha`, `creador`, `email_creador`, `dias_gracia` FROM `{$table}` ORDER BY `_ID` ASC"
     );
     foreach ($rows as $row) {
       $out['byId'][(string) $row['_ID']] = $row;

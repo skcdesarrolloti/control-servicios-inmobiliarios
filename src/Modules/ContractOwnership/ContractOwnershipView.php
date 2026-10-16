@@ -15,7 +15,7 @@ final class ContractOwnershipView
         <div>
           <p class="scm-co-kicker">Actividades contractuales</p>
           <h1 id="scm-co-title">Funcionario de contratos</h1>
-          <p class="scm-co-subtitle">Revisa quién es el funcionario responsable de cada contrato de arrendamiento. La ayuda lo sugiere a partir de la hoja de cierre y el mandato.</p>
+          <p class="scm-co-subtitle">Corrige el consultor responsable y los días de gracia de cada contrato de arrendamiento. La ayuda los sugiere a partir de la hoja de cierre y el mandato.</p>
         </div>
         <div class="scm-co-head-actions">
           <button type="button" class="scm-co-btn" data-scm-co-guide>
@@ -41,6 +41,7 @@ final class ContractOwnershipView
             <option value="difiere">Difiere de la sugerencia</option>
             <option value="sin_funcionario">Sin funcionario</option>
             <option value="retirado">Funcionario retirado</option>
+            <option value="dias_gracia">Días de gracia por completar</option>
             <option value="coincide">Coincide con la sugerencia</option>
             <option value="sin_evidencia">Sin hoja de cierre ni mandato</option>
           </select>
@@ -71,7 +72,7 @@ final class ContractOwnershipView
           <button type="button" class="scm-co-btn scm-co-btn-primary" data-scm-co-bulk-suggest>Aplicar sugerencia</button>
           <label class="scm-co-inline">
             <span>o asignar a</span>
-            <select data-scm-co-bulk-employee><option value="">Elige un funcionario activo</option></select>
+            <select data-scm-co-bulk-employee><option value="">Elige un consultor activo</option></select>
           </label>
           <button type="button" class="scm-co-btn" data-scm-co-bulk-assign>Asignar</button>
           <button type="button" class="scm-co-btn scm-co-btn-ghost" data-scm-co-bulk-clear>Quitar selección</button>

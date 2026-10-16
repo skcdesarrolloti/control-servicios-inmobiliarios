@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  // Funcionario responsable de contratos: una sola carga; filtros, ayuda y selección
-  // se resuelven en el navegador y solo se vuelve al servidor para guardar cambios.
+  // Funcionario responsable y días de gracia de los contratos: una sola carga; filtros, ayuda y
+  // selección se resuelven en el navegador y solo se vuelve al servidor para guardar cambios.
   var PAGE_SIZE = 25;
   var CONFIDENCE = {
     alta: { label: "Alta", tone: "good" },
@@ -11,13 +11,7 @@
     ninguna: { label: "Sin sugerencia", tone: "none" },
   };
   var SOURCE_LABELS = { ambos: "Hoja de cierre y mandato", cierre: "Hoja de cierre", mandato: "Mandato" };
-  var STATUS = {
-    difiere: "Difiere de la sugerencia",
-    sin_funcionario: "Sin funcionario",
-    retirado: "Funcionario retirado",
-    coincide: "Coincide con la sugerencia",
-    sin_evidencia: "Sin hoja de cierre ni mandato",
-  };
+  var GRACE_SOURCES = { cierre: "hoja de cierre", mandato: "mandato" };
 
   function esc(value) {
     return String(value == null ? "" : value)
@@ -31,6 +25,9 @@
   }
   function normalize(text) {
     return String(text || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  }
+  function days(value) {
+    return value === 1 ? "1 día" : value + " días";
   }
 
   function init(root) {
@@ -58,6 +55,7 @@
     });
 
     var state = { data: null, employees: {}, pending: null, page: 1, selected: {}, search: "", saving: false, lastFocus: null };
+    var pendingChanges = [];
 
     function setStatus(message, tone) {
       statusEl.textContent = message || "";
@@ -101,20 +99,29 @@
       return state.pending;
     }
 
+    // Los retirados se renombran ("Asesor de arriendo retirado 2"); se muestra quién era.
     function employeeName(id, fallback) {
       if (!id) return "";
-      return state.employees[id] ? state.employees[id].name : fallback || "Funcionario " + id;
+      var employee = state.employees[id];
+      if (!employee) return fallback || "Funcionario " + id;
+      return employee.real_name ? employee.name + " (" + employee.real_name + ")" : employee.name;
     }
     function isActive(id) {
       return !!(id && state.employees[id] && state.employees[id].active);
     }
+    function isAssignable(id) {
+      return isActive(id) && !!state.employees[id].consultant;
+    }
 
     function decorate(row) {
       var suggested = row.suggestion.employee_id;
+      var grace = row.grace_suggestion || { value: null, source: "" };
       row.currentActive = isActive(row.employee_id);
-      row.suggestedActive = isActive(suggested);
+      row.suggestedActive = isAssignable(suggested);
       row.status = !row.employee_id ? "sin_funcionario" : !suggested ? "sin_evidencia" : suggested === row.employee_id ? "coincide" : "difiere";
       row.retired = !!row.employee_id && !row.currentActive;
+      row.gracePending = grace.value !== null && grace.value !== row.dias_gracia;
+      row.ownerApplicable = row.suggestedActive && suggested !== row.employee_id;
       row.blob = normalize([row.contrato, row.inmueble, row.direccion, row.propietario, row.arrendatario, employeeName(row.employee_id, row.employee_name)].join(" "));
     }
 
@@ -129,15 +136,16 @@
         return '<option value="' + esc(value) + '">' + esc(value) + "</option>";
       }).join("");
       filters.employee.innerHTML = '<option value="">Todos</option>' + Object.keys(owners)
-        .map(function (id) { return { id: id, name: id ? employeeName(id) + (isActive(id) ? "" : " (retirado)") : "Sin funcionario" }; })
+        .map(function (id) { return { id: id, name: id ? employeeName(id) + (isActive(id) ? "" : " · retirado") : "Sin funcionario" }; })
         .sort(function (a, b) { return a.name.localeCompare(b.name, "es"); })
         .map(function (option) { return '<option value="' + esc(option.id || "__none") + '">' + esc(option.name) + "</option>"; }).join("");
       var bulkSelect = module.querySelector("[data-scm-co-bulk-employee]");
-      if (bulkSelect) bulkSelect.innerHTML = '<option value="">Elige un funcionario activo</option>' + activeOptions("");
+      if (bulkSelect) bulkSelect.innerHTML = '<option value="">Elige un consultor activo</option>' + consultantOptions("");
     }
 
-    function activeOptions(selected) {
-      return (state.data.employees || []).filter(function (employee) { return employee.active; }).map(function (employee) {
+    // Solo consultores activos pueden quedar como responsables del contrato.
+    function consultantOptions(selected) {
+      return (state.data.employees || []).filter(function (employee) { return employee.active && employee.consultant; }).map(function (employee) {
         return '<option value="' + esc(employee.id) + '"' + (employee.id === selected ? " selected" : "") + ">" + esc(employee.name) +
           (employee.cargo ? " · " + esc(employee.cargo) : "") + "</option>";
       }).join("");
@@ -150,7 +158,9 @@
       var confidence = filters.confidence.value;
       var query = normalize(state.search.trim());
       return state.data.contracts.filter(function (row) {
-        if (status === "retirado" ? !row.retired : status && row.status !== status) return false;
+        if (status === "retirado") { if (!row.retired) return false; }
+        else if (status === "dias_gracia") { if (!row.gracePending) return false; }
+        else if (status && row.status !== status) return false;
         if (estado && row.estado !== estado) return false;
         if (owner && (owner === "__none" ? row.employee_id !== "" : row.employee_id !== owner)) return false;
         if (confidence && row.suggestion.confidence !== confidence) return false;
@@ -166,14 +176,16 @@
     }
 
     function renderKpis() {
-      var counts = { total: state.data.contracts.length, difiere: 0, sin_funcionario: 0, retirado: 0, coincide: 0, sin_evidencia: 0 };
+      var counts = { total: state.data.contracts.length, difiere: 0, sin_funcionario: 0, retirado: 0, coincide: 0, sin_evidencia: 0, dias_gracia: 0 };
       state.data.contracts.forEach(function (row) {
         counts[row.status] += 1;
         if (row.retired) counts.retirado += 1;
+        if (row.gracePending) counts.dias_gracia += 1;
       });
       var active = filters.status.value;
       kpisEl.innerHTML = [["", "Contratos", counts.total, ""], ["difiere", "Difieren de la sugerencia", counts.difiere, "warn"],
         ["sin_funcionario", "Sin funcionario", counts.sin_funcionario, "bad"], ["retirado", "Con funcionario retirado", counts.retirado, "bad"],
+        ["dias_gracia", "Días de gracia por completar", counts.dias_gracia, "warn"],
         ["coincide", "Coinciden", counts.coincide, "good"], ["sin_evidencia", "Sin cierre ni mandato", counts.sin_evidencia, ""]]
         .map(function (kpi) {
           return '<button type="button" class="scm-co-kpi' + (kpi[3] ? " is-" + kpi[3] : "") + (active === kpi[0] ? " is-active" : "") +
@@ -183,7 +195,11 @@
 
     function ownerCell(row) {
       if (!row.employee_id) return '<span class="scm-co-muted">Sin funcionario</span>';
-      return esc(employeeName(row.employee_id, row.employee_name)) + (row.retired ? ' <span class="scm-co-badge is-bad">Retirado</span>' : "");
+      var employee = state.employees[row.employee_id];
+      var notConsultant = employee && employee.active && !employee.consultant;
+      return esc(employeeName(row.employee_id, row.employee_name)) +
+        (row.retired ? ' <span class="scm-co-badge is-bad">Retirado</span>' : "") +
+        (notConsultant ? ' <span class="scm-co-badge is-warn" title="' + esc(employee.cargo || "Administrativo") + '">No es consultor</span>' : "");
     }
 
     function suggestionCell(row) {
@@ -193,6 +209,13 @@
       return '<div class="scm-co-suggest">' + esc(employeeName(s.employee_id)) +
         (row.suggestedActive ? "" : ' <span class="scm-co-badge is-bad">Retirado</span>') +
         '<small><span class="scm-co-badge is-' + conf.tone + '">' + conf.label + "</span> " + esc(SOURCE_LABELS[s.source] || "") + "</small></div>";
+    }
+
+    function graceCell(row) {
+      var current = row.dias_gracia === null || row.dias_gracia === undefined ? '<span class="scm-co-muted">Sin dato</span>' : esc(days(row.dias_gracia));
+      if (!row.gracePending) return current;
+      var g = row.grace_suggestion;
+      return current + '<small class="scm-co-grace-hint">Sugerido: ' + esc(days(g.value)) + " · " + esc(GRACE_SOURCES[g.source] || "") + "</small>";
     }
 
     function renderTable() {
@@ -207,18 +230,18 @@
       var allSelected = canEdit && slice.every(function (row) { return state.selected[row.id]; });
       var html = '<div class="scm-co-table-wrap"><table><thead><tr>' +
         (canEdit ? '<th class="is-check"><input type="checkbox" data-scm-co-check-page aria-label="Seleccionar la página"' + (allSelected ? " checked" : "") + "></th>" : "") +
-        "<th>Contrato</th><th>Inmueble</th><th>Propietario / Arrendatario</th><th>Funcionario actual</th><th>Sugerencia</th><th></th></tr></thead><tbody>";
+        "<th>Contrato</th><th>Inmueble</th><th>Propietario / Arrendatario</th><th>Funcionario actual</th><th>Sugerencia</th><th>Días de gracia</th><th></th></tr></thead><tbody>";
       html += slice.map(function (row) {
-        var quick = canEdit && row.status === "difiere" && row.suggestedActive || canEdit && row.status === "sin_funcionario" && row.suggestedActive;
-        return '<tr class="is-' + row.status + '">' +
+        var quick = canEdit && (row.ownerApplicable || row.gracePending);
+        return '<tr class="is-' + row.status + (row.gracePending ? " is-grace-pending" : "") + '">' +
           (canEdit ? '<td class="is-check"><input type="checkbox" data-scm-co-check="' + row.id + '" aria-label="Seleccionar contrato ' + esc(row.contrato) + '"' + (state.selected[row.id] ? " checked" : "") + "></td>" : "") +
           "<td><strong>" + esc(row.contrato || "#" + row.id) + '</strong><small class="scm-co-state">' + esc(row.estado || "Sin estado") + "</small></td>" +
           "<td>" + esc(row.inmueble) + "<small>" + esc(row.direccion) + "</small></td>" +
           "<td>" + esc(row.propietario || "—") + "<small>" + esc(row.arrendatario || "—") + "</small></td>" +
-          "<td>" + ownerCell(row) + "</td><td>" + suggestionCell(row) + "</td>" +
+          "<td>" + ownerCell(row) + "</td><td>" + suggestionCell(row) + "</td><td>" + graceCell(row) + "</td>" +
           '<td class="is-actions"><button type="button" class="scm-co-btn scm-co-btn-sm" data-scm-co-help="' + row.id + '">' +
           '<span class="material-symbols-outlined" aria-hidden="true">contact_support</span>' + (canEdit ? "Revisar" : "Ver ayuda") + "</button>" +
-          (quick ? '<button type="button" class="scm-co-btn scm-co-btn-sm scm-co-btn-primary" data-scm-co-quick="' + row.id + '" title="Asignar a ' + esc(employeeName(row.suggestion.employee_id)) + '">Aplicar</button>' : "") +
+          (quick ? '<button type="button" class="scm-co-btn scm-co-btn-sm scm-co-btn-primary" data-scm-co-quick="' + row.id + '" title="Aplicar la sugerencia">Aplicar</button>' : "") +
           "</td></tr>";
       }).join("");
       html += "</tbody></table></div>";
@@ -248,7 +271,7 @@
       modalBody.innerHTML = html;
       modal.hidden = false;
       document.body.classList.add("scm-co-modal-open");
-      var focusable = modalBody.querySelector("select, textarea, button") || modal.querySelector("[data-scm-co-close]");
+      var focusable = modalBody.querySelector("select, input, button") || modal.querySelector("[data-scm-co-close]");
       if (focusable) focusable.focus();
     }
     function closeModal() {
@@ -258,58 +281,75 @@
       if (state.lastFocus && state.lastFocus.focus) state.lastFocus.focus();
     }
 
+    function identifiedHtml(evidence) {
+      if (!evidence.employee_id) return '<span class="scm-co-muted">No se pudo identificar</span>';
+      var employee = state.employees[evidence.employee_id] || {};
+      return esc(employeeName(evidence.employee_id)) +
+        (isActive(evidence.employee_id) ? "" : ' <span class="scm-co-badge is-bad">Retirado</span>') +
+        (evidence.eligible ? "" : ' <span class="scm-co-badge is-warn">No es consultor' + (employee.cargo ? " · " + esc(employee.cargo) : "") + "</span>");
+    }
+
+    function graceText(evidence) {
+      if (!evidence.dias_gracia_raw) return "Sin dato";
+      if (evidence.dias_gracia === null) return evidence.dias_gracia_raw + " (no se entiende)";
+      return days(evidence.dias_gracia) + (String(evidence.dias_gracia) !== evidence.dias_gracia_raw ? " (registrado: " + evidence.dias_gracia_raw + ")" : "");
+    }
+
     function evidenceCard(title, icon, evidence, rows) {
       if (!evidence) {
         return '<section class="scm-co-evidence is-missing"><h3><span class="material-symbols-outlined" aria-hidden="true">' + icon + "</span>" + esc(title) +
           "</h3><p>No se encontró " + esc(title.toLowerCase()) + " para este contrato.</p></section>";
       }
-      var identified = evidence.employee_id
-        ? esc(employeeName(evidence.employee_id)) + (isActive(evidence.employee_id) ? "" : ' <span class="scm-co-badge is-bad">Retirado</span>')
-        : '<span class="scm-co-muted">No se pudo identificar</span>';
       return '<section class="scm-co-evidence"><h3><span class="material-symbols-outlined" aria-hidden="true">' + icon + "</span>" + esc(title) + " #" + esc(evidence.id) +
-        "</h3><dl><dt>Funcionario identificado</dt><dd>" + identified + "</dd>" + rows.map(function (item) {
+        "</h3><dl><dt>Funcionario identificado</dt><dd>" + identifiedHtml(evidence) + "</dd><dt>Días de gracia</dt><dd>" + esc(graceText(evidence)) + "</dd>" +
+        rows.map(function (item) {
           return item[1] ? "<dt>" + esc(item[0]) + "</dt><dd>" + esc(item[1]) + "</dd>" : "";
         }).join("") + "</dl></section>";
     }
 
     function helpHtml(row) {
       var s = row.suggestion;
+      var g = row.grace_suggestion;
       var cierre = row.cierre;
       var mandato = row.mandato;
       var conf = CONFIDENCE[s.confidence] || CONFIDENCE.ninguna;
       var html = '<div class="scm-co-summary"><div><span>Contrato</span><strong>' + esc(row.contrato || "#" + row.id) + " · " + esc(row.estado) + "</strong></div>" +
         "<div><span>Inmueble</span><strong>" + esc(row.inmueble) + " · " + esc(row.direccion) + "</strong></div>" +
-        "<div><span>Funcionario actual</span><strong>" + ownerCell(row) + "</strong></div></div>";
+        "<div><span>Funcionario actual</span><strong>" + ownerCell(row) + "</strong></div>" +
+        "<div><span>Días de gracia en el contrato</span><strong>" + (row.dias_gracia === null ? "Sin dato" : esc(days(row.dias_gracia))) + "</strong></div></div>";
       html += '<div class="scm-co-evidence-grid">';
       html += evidenceCard("Hoja de cierre", "handshake", cierre, cierre ? [
         ["Fecha", cierre.fecha ? formatDate(cierre.fecha) : ""],
         ["Registrada por", cierre.creador],
         ["Aprobada por", cierre.aprobador],
-        ["Identificado por", cierre.matched_by === "id_empleado" ? "id_empleado de la hoja de cierre" : cierre.matched_by === "nombre" ? "Nombre de quien la registró" : ""],
         ["Vínculo", cierre.via === "id_cierre" ? "Hoja de cierre enlazada en el contrato" : "Hoja de cierre que apunta a este contrato"],
       ] : []);
       html += evidenceCard("Mandato", "description", mandato, mandato ? [
         ["Fecha", mandato.fecha ? formatDate(mandato.fecha) : ""],
         ["Creado por", mandato.creador],
         ["Correo del creador", mandato.correo],
-        ["Identificado por", mandato.matched_by === "nombre" ? "Nombre de quien lo creó" : mandato.matched_by === "correo" ? "Correo del creador" : ""],
         ["Vínculo", mandato.via === "id_contrato_mandato" ? "Mandato enlazado en el contrato" : "Mandato más reciente del mismo inmueble"],
       ] : []);
       html += "</div>";
       html += '<div class="scm-co-verdict is-' + conf.tone + '"><span class="material-symbols-outlined" aria-hidden="true">' + (s.employee_id ? "lightbulb" : "help") + "</span><div>";
       if (s.employee_id) {
-        html += "<strong>Sugerencia: " + esc(employeeName(s.employee_id)) + "</strong> · Confianza " + conf.label.toLowerCase() + "<p>" + esc(s.reason) + "</p>";
-        if (!row.suggestedActive) html += '<p class="scm-co-warning">Este funcionario está retirado: elige un funcionario activo que hoy atienda el contrato.</p>';
-        if (row.status === "coincide") html += "<p>El contrato ya tiene asignado este funcionario.</p>";
+        html += "<strong>Funcionario sugerido: " + esc(employeeName(s.employee_id)) + "</strong> · Confianza " + conf.label.toLowerCase() + "<p>" + esc(s.reason) + "</p>";
+        if (!row.suggestedActive) html += '<p class="scm-co-warning">Este consultor está retirado: asigna el consultor activo que hoy atiende el contrato.</p>';
       } else {
-        html += "<strong>Sin sugerencia</strong><p>" + esc(s.reason) + " Asigna el funcionario según quien gestiona hoy el contrato.</p>";
+        html += "<strong>Sin funcionario sugerido</strong><p>" + esc(s.reason) + " Asigna el consultor que hoy atiende el contrato.</p>";
       }
+      html += "<p><strong>Días de gracia sugeridos:</strong> " + (g.value === null ? "sin dato en la hoja de cierre ni en el mandato." : esc(days(g.value)) + " (" + esc(GRACE_SOURCES[g.source]) + ").") + "</p>";
       html += "</div></div>";
       if (canEdit) {
-        var preselect = row.suggestedActive ? s.employee_id : row.currentActive ? row.employee_id : "";
-        html += '<form class="scm-co-form" data-scm-co-form="' + row.id + '"><label class="scm-co-field"><span>Funcionario responsable</span>' +
-          '<select name="employee" required><option value="">Elige un funcionario activo</option>' + activeOptions(preselect) + "</select></label>" +
-          '<p class="scm-co-hint">Se corrigen id_empleado, realizado_por y cct_author_id del contrato.</p>' +
+        var preselect = row.suggestedActive ? s.employee_id : "";
+        var currentLabel = row.employee_id ? employeeName(row.employee_id, row.employee_name) : "sin funcionario";
+        var gracePrefill = g.value !== null ? g.value : row.dias_gracia;
+        html += '<form class="scm-co-form" data-scm-co-form="' + row.id + '"><div class="scm-co-form-grid">' +
+          '<label class="scm-co-field"><span>Funcionario responsable</span><select name="employee"><option value="">No cambiar (' + esc(currentLabel) + ")</option>" +
+          consultantOptions(preselect) + "</select></label>" +
+          '<label class="scm-co-field"><span>Días de gracia</span><input type="number" name="dias_gracia" min="0" max="365" step="1" inputmode="numeric" value="' +
+          (gracePrefill === null || gracePrefill === undefined ? "" : esc(gracePrefill)) + '" placeholder="Sin dato"></label></div>' +
+          '<p class="scm-co-hint">Se corrigen id_empleado, realizado_por, cct_author_id y dias_gracia del contrato. Deja un campo vacío para no cambiarlo.</p>' +
           '<div class="scm-co-form-actions"><button type="button" class="scm-co-btn" data-scm-co-close>Cancelar</button><button type="submit" class="scm-co-btn scm-co-btn-primary">Guardar cambio</button></div></form>';
       }
       return html;
@@ -319,34 +359,49 @@
       return '<div class="scm-co-guide"><p>Para cada contrato la ayuda revisa dos documentos:</p><ol>' +
         "<li><strong>Hoja de cierre</strong> — registra quién <em>arrendó</em> el inmueble. Se usa su <code>id_empleado</code>; es la fuente principal.</li>" +
         "<li><strong>Mandato</strong> — registra quién <em>captó</em> el inmueble. Como su <code>id_empleado</code> no es confiable, el funcionario se identifica por el nombre de quien lo creó (y, si no, por su correo). Si el contrato no tiene mandato enlazado, se usa el más reciente del mismo inmueble.</li></ol>" +
+        "<p>Solo se sugieren y se pueden asignar <strong>consultores</strong> (Consultor de Arriendo o de Venta). Si el documento lo registró un administrativo o una gerencia, se muestra pero no se usa para sugerir.</p>" +
         '<table class="scm-co-guide-table"><thead><tr><th>Situación</th><th>Sugerencia</th><th>Confianza</th></tr></thead><tbody>' +
-        "<tr><td>Cierre y mandato señalan al mismo funcionario</td><td>Ese funcionario</td><td>Alta</td></tr>" +
-        "<tr><td>Solo hay hoja de cierre (sin mandato)</td><td>Funcionario del cierre</td><td>Alta</td></tr>" +
-        "<tr><td>Cierre y mandato difieren, o el mandato no se identifica</td><td>Funcionario del cierre</td><td>Media</td></tr>" +
-        "<tr><td>Solo hay mandato</td><td>Funcionario del mandato</td><td>Baja</td></tr>" +
+        "<tr><td>Cierre y mandato señalan al mismo consultor</td><td>Ese consultor</td><td>Alta</td></tr>" +
+        "<tr><td>Solo hay hoja de cierre (sin mandato)</td><td>Consultor del cierre</td><td>Alta</td></tr>" +
+        "<tr><td>Cierre y mandato difieren, o el mandato no identifica a un consultor</td><td>Consultor del cierre</td><td>Media</td></tr>" +
+        "<tr><td>Solo el mandato identifica a un consultor</td><td>Consultor del mandato</td><td>Baja</td></tr>" +
         "<tr><td>Ninguno de los dos</td><td>Elegir manualmente</td><td>—</td></tr></tbody></table>" +
-        "<p>Si el funcionario sugerido está <strong>retirado</strong>, no se puede asignar: elige el funcionario activo que hoy atiende el contrato.</p>" +
+        "<p><strong>Consultores retirados.</strong> Al retirarse, el funcionario se renombra (\"Asesor de arriendo retirado 2\") pero conserva su id, por eso los documentos lo siguen señalando. La ayuda muestra entre paréntesis quién era (tomado de sus hojas de cierre) y no permite asignarlo: filtra \"Con funcionario retirado\", selecciona los contratos y usa <em>Asignar a</em> con el consultor activo que heredó su cartera.</p>" +
+        "<p><strong>Días de gracia.</strong> Casi nunca se copiaron al contrato. Se sugieren desde la hoja de cierre y, si no tiene, desde el mandato (\"1 mes\" = 30 días, \"NO\" = 0).</p>" +
         "<p>Las revisiones, gestiones de cobro y demás acciones del panel ya <strong>no</strong> cambian el funcionario del contrato; este módulo sirve para corregir los contratos que esas acciones habían cambiado.</p></div>";
     }
 
     function confirmHtml(changes, skipped) {
       var groups = {};
-      changes.forEach(function (change) { groups[change.employee_id] = (groups[change.employee_id] || 0) + 1; });
-      return '<form class="scm-co-form" data-scm-co-confirm><p>Vas a cambiar el funcionario de <strong>' + changes.length + (changes.length === 1 ? " contrato" : " contratos") + "</strong>:</p><ul>" +
-        Object.keys(groups).map(function (id) { return "<li>" + esc(employeeName(id)) + ": " + groups[id] + "</li>"; }).join("") + "</ul>" +
-        (skipped ? '<p class="scm-co-hint">' + skipped + (skipped === 1 ? " contrato seleccionado se omite" : " contratos seleccionados se omiten") + " porque no tienen una sugerencia activa distinta del funcionario actual.</p>" : "") +
+      var graceCount = 0;
+      changes.forEach(function (change) {
+        if (change.employee_id) groups[change.employee_id] = (groups[change.employee_id] || 0) + 1;
+        if (change.dias_gracia !== undefined) graceCount += 1;
+      });
+      var ownerCount = Object.keys(groups).reduce(function (sum, id) { return sum + groups[id]; }, 0);
+      return '<form class="scm-co-form" data-scm-co-confirm><p>Vas a corregir <strong>' + changes.length + (changes.length === 1 ? " contrato" : " contratos") + "</strong>:</p><ul>" +
+        (ownerCount ? "<li>Funcionario en " + ownerCount + ":<ul>" + Object.keys(groups).map(function (id) { return "<li>" + esc(employeeName(id)) + ": " + groups[id] + "</li>"; }).join("") + "</ul></li>" : "") +
+        (graceCount ? "<li>Días de gracia en " + graceCount + "</li>" : "") + "</ul>" +
+        (skipped ? '<p class="scm-co-hint">' + skipped + (skipped === 1 ? " contrato seleccionado se omite" : " contratos seleccionados se omiten") + " porque no tienen nada que aplicar.</p>" : "") +
         '<div class="scm-co-form-actions"><button type="button" class="scm-co-btn" data-scm-co-close>Cancelar</button><button type="submit" class="scm-co-btn scm-co-btn-primary">Confirmar cambio</button></div></form>';
     }
 
-    var pendingChanges = [];
     function askConfirm(changes, skipped) {
       if (!changes.length) {
-        openModal("Nada que cambiar", "<p>Los contratos seleccionados ya tienen el funcionario indicado o no tienen una sugerencia activa.</p>" +
+        openModal("Nada que cambiar", "<p>Los contratos seleccionados ya tienen esos datos o no tienen una sugerencia aplicable.</p>" +
           '<div class="scm-co-form-actions"><button type="button" class="scm-co-btn" data-scm-co-close>Entendido</button></div>');
         return;
       }
       pendingChanges = changes;
-      openModal("Confirmar cambio de funcionario", confirmHtml(changes, skipped));
+      openModal("Confirmar cambios", confirmHtml(changes, skipped));
+    }
+
+    // La sugerencia completa de un contrato: consultor activo distinto del actual y días pendientes.
+    function suggestedChange(row) {
+      var change = { contract_id: row.id };
+      if (row.ownerApplicable) change.employee_id = row.suggestion.employee_id;
+      if (row.gracePending) change.dias_gracia = row.grace_suggestion.value;
+      return change.employee_id || change.dias_gracia !== undefined ? change : null;
     }
 
     function save(changes, submitButton) {
@@ -362,8 +417,11 @@
           (result.updated || []).forEach(function (change) {
             var row = byId[change.contract_id];
             if (!row) return;
-            row.employee_id = change.employee_id;
-            row.employee_name = change.employee_name;
+            if (change.employee_id) {
+              row.employee_id = change.employee_id;
+              row.employee_name = change.employee_name;
+            }
+            if (change.dias_gracia !== undefined) row.dias_gracia = change.dias_gracia;
             decorate(row);
             delete state.selected[row.id];
           });
@@ -371,7 +429,7 @@
           closeModal();
           var count = (result.updated || []).length;
           setStatus(count + (count === 1 ? " contrato actualizado." : " contratos actualizados.") +
-            (result.skipped ? " " + result.skipped + " ya tenían ese funcionario." : ""), "success");
+            (result.skipped ? " " + result.skipped + " ya tenían esos datos." : ""), "success");
           fillFilters();
           render();
         })
@@ -388,11 +446,15 @@
         });
     }
 
+    function findRow(id) {
+      return state.data.contracts.find(function (item) { return item.id === Number(id); });
+    }
+
     module.addEventListener("click", function (event) {
       var target = event.target;
       if (target.closest("[data-scm-co-close]")) { closeModal(); return; }
       if (target.closest("[data-scm-co-refresh]")) { state.selected = {}; load(true); return; }
-      if (target.closest("[data-scm-co-guide]")) { openModal("¿Cómo se sugiere el funcionario?", guideHtml()); return; }
+      if (target.closest("[data-scm-co-guide]")) { openModal("¿Cómo se sugiere?", guideHtml()); return; }
       if (!state.data) return;
       var kpi = target.closest("[data-scm-co-kpi]");
       if (kpi) {
@@ -404,16 +466,14 @@
       }
       var help = target.closest("[data-scm-co-help]");
       if (help) {
-        var row = state.data.contracts.find(function (item) { return item.id === Number(help.getAttribute("data-scm-co-help")); });
+        var row = findRow(help.getAttribute("data-scm-co-help"));
         if (row) openModal("Contrato " + (row.contrato || "#" + row.id), helpHtml(row));
         return;
       }
       var quick = target.closest("[data-scm-co-quick]");
       if (quick) {
-        var quickRow = state.data.contracts.find(function (item) { return item.id === Number(quick.getAttribute("data-scm-co-quick")); });
-        if (quickRow) {
-          askConfirm([{ contract_id: quickRow.id, employee_id: quickRow.suggestion.employee_id }], 0);
-        }
+        var quickChange = suggestedChange(findRow(quick.getAttribute("data-scm-co-quick")));
+        askConfirm(quickChange ? [quickChange] : [], 0);
         return;
       }
       var page = target.closest("[data-scm-co-page]");
@@ -426,14 +486,13 @@
       if (target.closest("[data-scm-co-bulk-clear]")) { state.selected = {}; render(); return; }
       if (target.closest("[data-scm-co-bulk-suggest]")) {
         var rows = selectedRows();
-        var changes = rows.filter(function (item) { return item.suggestedActive && item.suggestion.employee_id !== item.employee_id; })
-          .map(function (item) { return { contract_id: item.id, employee_id: item.suggestion.employee_id }; });
+        var changes = rows.map(suggestedChange).filter(Boolean);
         askConfirm(changes, rows.length - changes.length);
         return;
       }
       if (target.closest("[data-scm-co-bulk-assign]")) {
         var employeeId = module.querySelector("[data-scm-co-bulk-employee]").value;
-        if (!employeeId) { setStatus("Elige el funcionario activo al que quieres asignar los contratos.", "error"); return; }
+        if (!employeeId) { setStatus("Elige el consultor activo al que quieres asignar los contratos.", "error"); return; }
         var selected = selectedRows();
         var assign = selected.filter(function (item) { return item.employee_id !== employeeId; })
           .map(function (item) { return { contract_id: item.id, employee_id: employeeId }; });
@@ -466,17 +525,30 @@
         save(pendingChanges, form.querySelector("[type=submit]"));
         return;
       }
-      if (form.hasAttribute("data-scm-co-form")) {
-        var employeeId = form.querySelector("[name=employee]").value;
-        var row = state.data.contracts.find(function (item) { return item.id === Number(form.getAttribute("data-scm-co-form")); });
-        if (!employeeId || !row) return;
-        if (employeeId === row.employee_id) {
-          setStatus("El contrato ya tiene ese funcionario.", "");
-          closeModal();
+      if (!form.hasAttribute("data-scm-co-form")) return;
+      var row = findRow(form.getAttribute("data-scm-co-form"));
+      if (!row) return;
+      var change = { contract_id: row.id };
+      var employeeId = form.querySelector("[name=employee]").value;
+      if (employeeId && employeeId !== row.employee_id) change.employee_id = employeeId;
+      var graceInput = form.querySelector("[name=dias_gracia]");
+      var graceRaw = graceInput.value.trim();
+      if (graceRaw !== "") {
+        var grace = Number(graceRaw);
+        if (!Number.isInteger(grace) || grace < 0 || grace > 365) {
+          graceInput.setCustomValidity("Escribe un número entero entre 0 y 365.");
+          graceInput.reportValidity();
           return;
         }
-        askConfirm([{ contract_id: row.id, employee_id: employeeId }], 0);
+        graceInput.setCustomValidity("");
+        if (grace !== row.dias_gracia) change.dias_gracia = grace;
       }
+      if (!change.employee_id && change.dias_gracia === undefined) {
+        setStatus("El contrato ya tiene esos datos.", "");
+        closeModal();
+        return;
+      }
+      askConfirm([change], 0);
     });
 
     var searchTimer = 0;
