@@ -71,8 +71,11 @@ $check(str_contains($dashboard, "'dashboard' => 'scm-panel-metricas-casos'") && 
 $casesJs = (string) file_get_contents($root . '/public/assets/js/admin-case-metrics.js');
 $quotesJs = (string) file_get_contents($root . '/public/assets/js/admin-quote-metrics.js');
 $check(substr_count($casesJs, 'fetch(') === 1 && str_contains($casesJs, 'sessionStorage'), 'Casos consulta una sola vez y usa caché de sesión.');
-// Una consulta para cargar y otra solo al guardar una fecha de respuesta.
-$check(substr_count($quotesJs, 'fetch(') === 2 && str_contains($quotesJs, 'state.data && !force') && str_contains($quotesJs, 'quote_response_date'), 'Cotizaciones consulta una sola vez y solo vuelve al servidor para guardar fechas.');
+// Métricas consulta una sola vez; calidad/conciliación reutiliza esas filas y solo va al servidor para guardar o conciliar.
+$qualityJs = (string) file_get_contents($root . '/public/assets/js/admin-quote-quality.js');
+$check(substr_count($quotesJs, 'fetch(') === 1 && str_contains($quotesJs, 'state.data && !force') && str_contains($quotesJs, 'scm:quote-data'), 'Cotizaciones consulta una sola vez y comparte sus filas.');
+$check(substr_count($qualityJs, 'fetch(') === 1 && str_contains($qualityJs, 'scm:quote-data') && str_contains($qualityJs, 'scm:quote-reload'), 'Calidad de datos reutiliza las filas y pide recargar tras corregir.');
+$check(str_contains($qualityJs, 'overwrite: mode === "dubious" ? "1" : "0"') && str_contains($qualityJs, 'data-scm-qq-confirm-dates'), 'Corregir fechas existentes exige confirmación explícita.');
 $check(str_contains($quotesJs, 'data-scm-maintenance-quote-open-case') && str_contains($quotesJs, 'scm-maintenance-quote-row'), 'Cotizaciones conserva "Ver caso" con el popup del panel.');
 
 // Completar fecha de respuesta: solo aprobadas sin fecha, sin fechas futuras ni previas a la creación.
@@ -96,8 +99,61 @@ $fails(fn() => $writer->setMissingResponseDate(3, '2026-09-20', '2871'), 'aproba
 $fails(fn() => $writer->setMissingResponseDate(1, '2026-09-20', ''), 'id_empleado', 'Exige el id_empleado real de quien edita');
 $saved = $writer->setMissingResponseDate(1, '2026-09-20', '2871');
 $row = $sqlite->getRow('SELECT fecha_respuesta, cct_author_id FROM wp_jet_cct_cotizacion_mantenimiento WHERE _ID = 1');
-$check($saved === ['id' => 1, 'respuesta' => '2026-09-20'] && $row['cct_author_id'] === '2871', 'Guarda la fecha y el id_empleado real como autor.');
+$check($saved === ['id' => 1, 'respuesta' => '2026-09-20', 'anterior' => null] && $row['cct_author_id'] === '2871', 'Guarda la fecha y el id_empleado real como autor.');
 $check((new DateTimeImmutable('@' . $row['fecha_respuesta']))->setTimezone(new DateTimeZone('America/Bogota'))->format('Y-m-d H:i') === '2026-09-20 12:00', 'La fecha se guarda a mediodía de Colombia.');
 $fails(fn() => $writer->setMissingResponseDate(1, '2026-09-21', '2871'), 'ya tiene fecha', 'Una segunda edición no sobrescribe');
+
+// Corregir una fecha existente (lote mal fechado) exige sobrescritura explícita.
+$fixed = $writer->setResponseDates([['id' => 2, 'date' => '2026-09-10'], ['id' => 3, 'date' => '2026-09-10'], ['id' => 1, 'date' => '2999-01-01']], '2871', true);
+$check(count($fixed['updated']) === 1 && $fixed['updated'][0]['id'] === 2 && $fixed['updated'][0]['anterior'] !== null, 'Con sobrescritura se corrige la fecha existente y se informa la anterior.');
+$check(array_column($fixed['errors'], 'id') === [3, 1], 'En lote, cada cotización inválida se informa sin frenar las demás.');
+
+// Inmueble "No asignado": se copia el del caso, nunca se pisa uno existente.
+$pdo->exec('ALTER TABLE wp_jet_cct_cotizacion_mantenimiento ADD COLUMN inmueble TEXT');
+$pdo->exec('ALTER TABLE wp_jet_cct_cotizacion_mantenimiento ADD COLUMN id_ticket TEXT');
+$pdo->exec('CREATE TABLE wp_jet_cct_tickets(_ID INTEGER PRIMARY KEY, inmueble TEXT)');
+$sqlite->insert('wp_jet_cct_tickets', ['_ID' => 8983, 'inmueble' => '10614']);
+$sqlite->insert('wp_jet_cct_tickets', ['_ID' => 9860, 'inmueble' => '10385']);
+$sqlite->update('wp_jet_cct_cotizacion_mantenimiento', ['inmueble' => 'No asignado', 'id_ticket' => '8983'], ['_ID' => 1]);
+$sqlite->update('wp_jet_cct_cotizacion_mantenimiento', ['inmueble' => '10335', 'id_ticket' => '9860'], ['_ID' => 2]);
+$assigned = $writer->assignCaseProperty([1, 2], '2871');
+$check($assigned === ['updated' => [['id' => 1, 'inmueble' => '10614']], 'skipped' => [2]], 'Asigna el inmueble del caso solo a las cotizaciones sin inmueble.');
+$check($sqlite->getVar('SELECT inmueble FROM wp_jet_cct_cotizacion_mantenimiento WHERE _ID = 2') === '10335', 'Un inmueble existente no se modifica.');
+
+// Conciliación con el auxiliar contable.
+use SCM\Modules\Metrics\QuoteLedgerReconciliation;
+$check(QuoteLedgerReconciliation::parseDate('3/10/2026') === '2026-10-03' && QuoteLedgerReconciliation::parseDate('2026-07-11 00:00:00') === '2026-07-11' && QuoteLedgerReconciliation::parseDate('46000') === '2025-12-09', 'Fechas del auxiliar en d/m/Y, ISO y número de Excel.');
+$quote = static fn(int $id, string $inm, int $admin, string $estado = 'Aprobada', ?string $resp = '2026-07-01', string $caseInm = ''): array => [
+  'id' => $id, 'ticket' => (string) ($id + 9000), 'inmueble' => $inm, 'inmueble_caso' => $caseInm, 'admin' => $admin, 'estado' => $estado,
+  'respuesta' => $resp, 'sugerida' => null, 'fecha' => '2026-06-01', 'destinatario' => 'QA', 'categoria' => 'Inicial',
+];
+$quotes = [
+  $quote(1, '10152', 142500),                                   // coincide exacto
+  $quote(2, 'No asignado', 224410, 'Aprobada', '2026-05-14', '10614'), // inmueble del caso
+  $quote(3, '10385', 108900, 'Aprobada', '2026-07-09'),           // mismo valor, otro inmueble
+  $quote(4, '10329', 55986),                                      // dos cuotas de 27.993
+  $quote(5, '10148', 180000),                                     // valor distinto
+  $quote(6, '10500', 99000, 'Aprobada', '2026-07-20'),            // aprobada sin movimiento
+];
+$entries = [
+  ['fila' => 6, 'transaccion' => 'A', 'fecha' => '2026-07-14', 'inmueble' => '10152', 'valor' => 142500],
+  ['fila' => 7, 'transaccion' => 'B', 'fecha' => '2026-05-14', 'inmueble' => '10614', 'valor' => 224410],
+  ['fila' => 8, 'transaccion' => 'C', 'fecha' => '2026-07-09', 'inmueble' => '10335', 'valor' => 108900],
+  ['fila' => 9, 'transaccion' => 'D', 'fecha' => '2026-07-31', 'inmueble' => '10329', 'valor' => 27993],
+  ['fila' => 10, 'transaccion' => 'E', 'fecha' => '2026-08-31', 'inmueble' => '10329', 'valor' => 27993],
+  ['fila' => 11, 'transaccion' => 'F', 'fecha' => '2026-07-16', 'inmueble' => '10148', 'valor' => 100240],
+  ['fila' => 12, 'transaccion' => 'G', 'fecha' => '2026-07-17', 'inmueble' => '10625', 'valor' => 57500],
+];
+$ledger = (new QuoteLedgerReconciliation())->reconcile($entries, $quotes);
+$states = array_column($ledger['filas'], 'estado', 'transaccion');
+$check($states === ['A' => 'coincide', 'B' => 'coincide_inmueble_caso', 'C' => 'coincide_otro_inmueble', 'D' => 'coincide_suma', 'E' => 'coincide_suma', 'F' => 'diferencia', 'G' => 'sin_cotizacion'], 'Clasifica cada movimiento del auxiliar: ' . json_encode($states));
+$check($ledger['resumen']['conciliados'] === 5 && $ledger['resumen']['total_auxiliar'] === 689536, 'Resume movimientos conciliados y total del auxiliar.');
+$check(array_column($ledger['aprobadas_sin_movimiento'], 'cotizacion') === [6], 'Lista las aprobadas del periodo sin movimiento contable.');
+
+// "Marcar como aprobada" guarda la fecha real de aprobación (por defecto hoy), no siempre "hoy".
+$maintenance = (string) file_get_contents($root . '/src/App/Concerns/HandlesMaintenanceActions.php');
+$runtimeJs = (string) file_get_contents($root . '/public/assets/js/admin-dashboard-runtime.js');
+$check(str_contains($maintenance, "'fecha_respuesta' => \$responseTs") && str_contains($maintenance, "'fecha_respuesta_cotizacion_mantenimiento' => \$responseTs") && str_contains($maintenance, 'no puede ser anterior a la creación de la cotización'), 'La aprobación desde el panel usa la fecha indicada.');
+$check(str_contains($runtimeJs, 'id="swal-approve-date"') && str_contains($runtimeJs, 'fd.append("fecha_aprobacion"'), 'El diálogo de aprobación pide la fecha.');
 
 echo "Metrics panels checks passed.\n";

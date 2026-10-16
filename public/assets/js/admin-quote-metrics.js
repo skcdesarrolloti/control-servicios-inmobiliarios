@@ -59,21 +59,12 @@
     var yearSelect = module.querySelector('[data-scm-quote-filter="year"]');
     var monthSelect = module.querySelector('[data-scm-quote-filter="month"]');
     var categorySelect = module.querySelector('[data-scm-quote-filter="categoria"]');
-    var state = { data: null, pending: null, view: "creadas", search: "", page: 1, monthly: [], detail: [], canEdit: false, saving: false };
-    var modal = document.createElement("div");
-    modal.className = "scm-co-modal";
-    modal.hidden = true;
-    modal.innerHTML = '<div class="scm-co-modal-backdrop" data-scm-quote-close></div><div class="scm-co-modal-card" role="dialog" aria-modal="true" aria-labelledby="scm-qm-modal-title">' +
-      '<header><h2 id="scm-qm-modal-title">Completar fechas de respuesta</h2><button type="button" class="scm-co-icon-btn" data-scm-quote-close aria-label="Cerrar">' +
-      '<span class="material-symbols-outlined" aria-hidden="true">close</span></button></header><div class="scm-co-modal-body" data-scm-quote-modal-body></div></div>';
-    module.appendChild(modal);
-    var modalBody = modal.querySelector("[data-scm-quote-modal-body]");
+    var state = { data: null, pending: null, view: "creadas", search: "", page: 1, monthly: [], detail: [] };
     var tooltip = document.createElement("div");
     tooltip.className = "scm-cc-tooltip";
     tooltip.setAttribute("role", "tooltip");
     tooltip.hidden = true;
     module.appendChild(tooltip);
-
     function setStatus(message, tone) {
       status.textContent = message || "";
       status.hidden = !message;
@@ -125,7 +116,6 @@
       });
       years[module.getAttribute("data-default-year")] = true;
       state.data = { rows: rows, generatedAt: snapshot.generated_at || 0 };
-      state.canEdit = snapshot.can_edit_response === true;
       var currentYear = yearSelect.value;
       yearSelect.innerHTML = Object.keys(years).sort().reverse().map(function (year) {
         return '<option value="' + esc(year) + '">' + esc(year) + "</option>";
@@ -140,6 +130,10 @@
       setStatus("");
       if (panel) panel.setAttribute("data-scm-loaded", "1");
       render();
+      // La calidad de datos y la conciliación (admin-quote-quality.js) usan estas mismas filas.
+      module.dispatchEvent(new CustomEvent("scm:quote-data", {
+        detail: { rows: rows, canEditResponse: snapshot.can_edit_response === true, canEditQuote: snapshot.can_edit_quote === true },
+      }));
     }
 
     function baseRows() {
@@ -208,14 +202,6 @@
         '<input type="search" data-scm-quote-search placeholder="Cotización, caso, contrato, inmueble o dirección" value="' + esc(state.search) + '"></label></header>' +
         '<div data-scm-quote-detail></div></section>';
 
-      var missing = rows.filter(function (row) { return row.approved && !row.respuesta; });
-      var fromCase = rows.filter(function (row) { return row.approved && row.respuesta_fuente === "caso"; }).length;
-      if (missing.length || fromCase) {
-        html += '<p class="scm-cm-note"><span class="material-symbols-outlined" aria-hidden="true">info</span>' + esc(
-          (missing.length ? num(missing.length) + " cotizaciones aprobadas no tienen fecha de respuesta y no se cuentan en ningún mes (" + money(summarize(missing).admin) + " de administración). " : "") +
-          (fromCase ? num(fromCase) + " aprobadas toman la fecha de respuesta registrada en su caso." : "")) +
-          (missing.length && state.canEdit ? '<button type="button" class="scm-cm-btn scm-qm-fill" data-scm-quote-fill-dates>Completar fechas (' + num(missing.length) + ")</button>" : "") + "</p>";
-      }
       content.innerHTML = html;
       renderDetail();
     }
@@ -316,82 +302,6 @@
       return '<span class="scm-cm-badge ' + tone + '">' + esc(row.estado) + "</span>";
     }
 
-    function missingRows() {
-      return state.data.rows.filter(function (row) { return row.approved && !row.respuesta; })
-        .sort(function (a, b) { return (b.fecha || "") < (a.fecha || "") ? -1 : (b.fecha || "") > (a.fecha || "") ? 1 : b.id - a.id; });
-    }
-
-    function openFillDates() {
-      var rows = missingRows();
-      var today = new Date();
-      var max = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
-      modalBody.innerHTML = rows.length
-        ? '<p>Estas cotizaciones están <strong>aprobadas</strong> pero no tienen fecha de respuesta, por eso su administración no cae en ningún mes. ' +
-          "Escribe la fecha en que el propietario aprobó cada una.</p>" +
-          '<div class="scm-cm-table-wrap"><table class="scm-cm-table"><thead><tr><th>Cotización</th><th>Creada</th><th>Caso</th><th>Inmueble</th><th>Destinatario</th>' +
-          '<th class="is-num">Administración</th><th>Fecha de respuesta</th><th></th></tr></thead><tbody>' +
-          rows.map(function (row) {
-            return '<tr data-scm-quote-fill-row="' + row.id + '"><td><strong>#' + esc(row.id) + "</strong></td><td>" + esc(formatDay(row.fecha)) + "</td><td>" +
-              (row.ticket ? "#" + esc(row.ticket) : "—") + "</td><td>" + esc(row.inmueble || "—") + '</td><td class="is-name">' + esc(row.destinatario || "—") +
-              '</td><td class="is-num">' + esc(money(row.admin)) + '</td><td><input type="date" class="scm-qm-date" aria-label="Fecha de respuesta de la cotización ' + esc(row.id) +
-              '" max="' + max + '"' + (row.fecha ? ' min="' + esc(row.fecha) + '"' : "") + '></td><td class="is-actions"><button type="button" class="scm-cm-btn" data-scm-quote-save-date="' +
-              row.id + '">Guardar</button><small class="scm-qm-row-msg" aria-live="polite"></small></td></tr>';
-          }).join("") + "</tbody></table></div>"
-        : "<p>Todas las cotizaciones aprobadas ya tienen fecha de respuesta.</p>";
-      modal.hidden = false;
-      document.body.classList.add("scm-co-modal-open");
-      var first = modalBody.querySelector("input");
-      if (first) first.focus();
-    }
-
-    function closeFillDates() {
-      if (state.saving) return;
-      modal.hidden = true;
-      document.body.classList.remove("scm-co-modal-open");
-      render();
-    }
-
-    function saveDate(button) {
-      var id = Number(button.getAttribute("data-scm-quote-save-date"));
-      var tr = button.closest("tr");
-      var input = tr.querySelector("input");
-      var message = tr.querySelector(".scm-qm-row-msg");
-      if (!input.value || !input.checkValidity()) {
-        message.textContent = !input.value ? "Elige la fecha." : "Fecha fuera de rango.";
-        message.className = "scm-qm-row-msg is-error";
-        input.focus();
-        return;
-      }
-      var body = new FormData();
-      body.append("action", (runtime.actions || {}).quote_response_date || "");
-      body.append("nonce", runtime.nonce || "");
-      body.append("cotizacion_id", String(id));
-      body.append("fecha_respuesta", input.value);
-      state.saving = true;
-      button.disabled = true;
-      message.textContent = "Guardando…";
-      message.className = "scm-qm-row-msg";
-      fetch(runtime.ajaxUrl || "", { method: "POST", body: body, credentials: "same-origin" })
-        .then(function (response) { return response.json(); })
-        .then(function (json) {
-          if (!json || !json.success) throw new Error((json && json.data && json.data.message) || "No se pudo guardar la fecha.");
-          var row = state.data.rows.find(function (item) { return item.id === id; });
-          if (row) {
-            row.respuesta = json.data.respuesta;
-            row.respuesta_fuente = "cotizacion";
-          }
-          tr.remove();
-          var remaining = modalBody.querySelectorAll("[data-scm-quote-fill-row]").length;
-          if (!remaining) modalBody.innerHTML = "<p>Listo: todas las cotizaciones aprobadas ya tienen fecha de respuesta.</p>";
-        })
-        .catch(function (error) {
-          button.disabled = false;
-          message.textContent = error.message;
-          message.className = "scm-qm-row-msg is-error";
-        })
-        .then(function () { state.saving = false; });
-    }
-
     function exportCsv() {
       if (!state.data) return;
       var lines = [["Mes", "Creadas", "Valor creadas", "Administracion creadas", "Sin enviar", "Aprobadas", "Valor aprobado", "Administracion ganada"]];
@@ -433,10 +343,6 @@
     module.addEventListener("click", function (event) {
       if (event.target.closest("[data-scm-quote-refresh]")) { load(true); return; }
       if (!state.data) return;
-      if (event.target.closest("[data-scm-quote-close]")) { closeFillDates(); return; }
-      if (event.target.closest("[data-scm-quote-fill-dates]")) { openFillDates(); return; }
-      var saveButton = event.target.closest("[data-scm-quote-save-date]");
-      if (saveButton) { if (!state.saving) saveDate(saveButton); return; }
       if (event.target.closest("[data-scm-quote-export]")) { exportCsv(); return; }
       var monthButton = event.target.closest("[data-scm-quote-month]");
       if (monthButton) {
@@ -472,11 +378,9 @@
       tooltip.style.top = event.clientY - bounds.top + 14 + "px";
     });
     module.addEventListener("mouseleave", function () { tooltip.hidden = true; });
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape" && !modal.hidden) closeFillDates();
-    });
 
     module.addEventListener("scm:load-metrics", function () { load(false); });
+    module.addEventListener("scm:quote-reload", function () { load(true); });
     if (panel && panel.classList.contains("active")) load(false);
   }
 

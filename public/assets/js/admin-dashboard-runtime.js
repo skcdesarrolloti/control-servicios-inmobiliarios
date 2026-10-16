@@ -23506,19 +23506,38 @@
           showToast("error", "No se pudo abrir la confirmación.");
           return;
         }
+        var approveToday = new Date();
+        var approveTodayIso = approveToday.getFullYear() + "-" + String(approveToday.getMonth() + 1).padStart(2, "0") + "-" + String(approveToday.getDate()).padStart(2, "0");
         window.Swal.fire({
           title: "Marcar cotización como aprobada",
-          text: "Se actualizará esta cotización exacta y se habilitarán sus acciones de órdenes y acta.",
+          html:
+            '<p class="scm-cotizacion-dialog-intro">Se actualizará esta cotización exacta y se habilitarán sus acciones de órdenes y acta.</p>' +
+            '<label class="scm-cotizacion-dialog-field"><span>Fecha en que el propietario la aprobó <em>*</em></span>' +
+            '<input type="date" id="swal-approve-date" value="' + approveTodayIso + '" max="' + approveTodayIso + '">' +
+            "<small>Define en qué mes se cuenta la administración. Si la aprobó otro día, cambia la fecha.</small></label>" +
+            '<label class="scm-cotizacion-dialog-field is-wide"><span>Observación opcional</span>' +
+            '<textarea id="swal-approve-observacion" rows="3" placeholder="Agrega una nota si necesitas dejar contexto interno."></textarea></label>',
           icon: "question",
-          input: "textarea",
-          inputLabel: "Observación opcional",
-          inputPlaceholder: "Agrega una nota si necesitas dejar contexto interno.",
           showCancelButton: true,
           allowOutsideClick: false,
           allowEscapeKey: true,
           confirmButtonText: "Marcar aprobada",
           confirmButtonColor: "#16a34a",
           cancelButtonText: "Cancelar",
+          preConfirm: function () {
+            var dateInput = document.getElementById("swal-approve-date");
+            var date = dateInput ? dateInput.value : "";
+            if (!date) {
+              window.Swal.showValidationMessage("Indica la fecha de aprobación.");
+              return false;
+            }
+            if (date > approveTodayIso) {
+              window.Swal.showValidationMessage("La fecha de aprobación no puede ser futura.");
+              return false;
+            }
+            var note = document.getElementById("swal-approve-observacion");
+            return { date: date, observacion: note ? note.value : "" };
+          },
         }).then(function (res) {
           if (!res.isConfirmed) {
             if (approveReturnContext && typeof approveReturnContext.reopen === "function") {
@@ -23528,7 +23547,8 @@
           }
           var fd = new FormData();
           fd.append("id_cotizacion", approveCotizacionId);
-          fd.append("observacion", res.value || "");
+          fd.append("observacion", (res.value && res.value.observacion) || "");
+          fd.append("fecha_aprobacion", (res.value && res.value.date) || "");
           return submitCotizacionAction(
             fd,
             actionApproveCotizacion,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\App\Concerns;
 
 use SCM\Modules\Metrics\CaseMetricsReport;
+use SCM\Modules\Metrics\QuoteLedgerReconciliation;
 use SCM\Modules\Metrics\QuoteMetricsReport;
 
 trait HandlesMetricsPanels
@@ -32,6 +33,7 @@ trait HandlesMetricsPanels
     try {
       $snapshot = (new QuoteMetricsReport($this->db))->snapshot();
       $snapshot['can_edit_response'] = $this->canUseDashboardAction('quote_respond');
+      $snapshot['can_edit_quote'] = $this->canUseDashboardAction('quote_edit');
       $this->jsonOk($snapshot);
     } catch (\Throwable $exception) {
       error_log('[quote-metrics] ' . $exception->getMessage());
@@ -45,18 +47,72 @@ trait HandlesMetricsPanels
     if (!$this->canAccessDashboardTab('metricas') || !$this->canUseDashboardAction('quote_respond')) {
       $this->jsonFail('No tienes permiso para completar fechas de respuesta.');
     }
+    $decoded = json_decode(wp_unslash((string) ($_POST['changes'] ?? '[]')), true);
+    $changes = [];
+    foreach (is_array($decoded) ? $decoded : [] as $change) {
+      if (is_array($change)) {
+        $changes[] = ['id' => (int) ($change['id'] ?? 0), 'date' => trim((string) ($change['date'] ?? ''))];
+      }
+    }
     try {
-      $result = (new QuoteMetricsReport($this->db))->setMissingResponseDate(
-        (int) ($_POST['cotizacion_id'] ?? 0),
-        trim((string) ($_POST['fecha_respuesta'] ?? '')),
-        $this->current_employee_id()
-      );
-      $this->jsonOk($result);
+      $this->jsonOk((new QuoteMetricsReport($this->db))->setResponseDates(
+        $changes,
+        $this->current_employee_id(),
+        (string) ($_POST['overwrite'] ?? '') === '1'
+      ));
     } catch (\InvalidArgumentException | \RuntimeException $exception) {
       $this->jsonFail($exception->getMessage());
     } catch (\Throwable $exception) {
       error_log('[quote-response-date] ' . $exception->getMessage());
-      $this->jsonFail('No se pudo guardar la fecha de respuesta.');
+      $this->jsonFail('No se pudieron guardar las fechas de respuesta.');
+    }
+  }
+
+  public function ajax_handler_quote_assign_property(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('metricas') || !$this->canUseDashboardAction('quote_edit')) {
+      $this->jsonFail('No tienes permiso para editar cotizaciones.');
+    }
+    $decoded = json_decode(wp_unslash((string) ($_POST['ids'] ?? '[]')), true);
+    try {
+      $this->jsonOk((new QuoteMetricsReport($this->db))->assignCaseProperty(
+        array_map('intval', is_array($decoded) ? $decoded : []),
+        $this->current_employee_id()
+      ));
+    } catch (\InvalidArgumentException | \RuntimeException $exception) {
+      $this->jsonFail($exception->getMessage());
+    } catch (\Throwable $exception) {
+      error_log('[quote-assign-property] ' . $exception->getMessage());
+      $this->jsonFail('No se pudo asignar el inmueble.');
+    }
+  }
+
+  public function ajax_handler_quote_ledger(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('metricas')) {
+      $this->jsonFail('No tienes permiso para ver métricas.');
+    }
+    $file = $_FILES['auxiliar'] ?? null;
+    if (!is_array($file) || (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string) ($file['tmp_name'] ?? ''))) {
+      $this->jsonFail('Sube el auxiliar contable (.xls o .xlsx).');
+    }
+    if ((int) ($file['size'] ?? 0) > 5 * 1024 * 1024) {
+      $this->jsonFail('El auxiliar supera 5 MB.');
+    }
+    try {
+      $report = new QuoteMetricsReport($this->db);
+      $snapshot = $report->snapshot();
+      $quotes = array_map(static fn(array $row): array => array_combine($snapshot['columns'], $row), $snapshot['rows']);
+      $reconciliation = new QuoteLedgerReconciliation();
+      $entries = $reconciliation->parse((string) $file['tmp_name'], (string) ($file['name'] ?? ''));
+      $this->jsonOk($reconciliation->reconcile($entries, $quotes));
+    } catch (\RuntimeException $exception) {
+      $this->jsonFail($exception->getMessage());
+    } catch (\Throwable $exception) {
+      error_log('[quote-ledger] ' . $exception->getMessage());
+      $this->jsonFail('No se pudo conciliar el auxiliar.');
     }
   }
 }

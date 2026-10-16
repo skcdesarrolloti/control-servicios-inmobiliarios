@@ -115,6 +115,8 @@ final class MetricsPanelsView
 
       <div class="scm-cm-status" data-scm-quote-status role="status" aria-live="polite">Cargando cotizaciones&hellip;</div>
       <div class="scm-cm-content" data-scm-quote-content></div>
+      <div data-scm-quote-quality></div>
+      <div data-scm-quote-ledger></div>
     </section>
 <?php
     return (string) ob_get_clean();

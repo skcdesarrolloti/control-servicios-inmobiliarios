@@ -540,6 +540,8 @@ trait RendersDashboard
         'case_metrics' => self::AJAX_CASE_METRICS,
         'quote_metrics' => self::AJAX_QUOTE_METRICS,
         'quote_response_date' => self::AJAX_QUOTE_RESPONSE_DATE,
+        'quote_assign_property' => self::AJAX_QUOTE_ASSIGN_PROPERTY,
+        'quote_ledger' => self::AJAX_QUOTE_LEDGER,
         'contract_owners' => self::AJAX_CONTRACT_OWNERS,
         'contract_owners_save' => self::AJAX_CONTRACT_OWNERS_SAVE,
         'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,
@@ -1458,6 +1460,7 @@ trait RendersDashboard
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-movements.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-movements.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-case-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-case-metrics.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-quote-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-quote-metrics.js'))); ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-quote-quality.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-quote-quality.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-ownership.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-ownership.js'))); ?>" defer></script>
     <script src="<?php echo $guideJsUrl; ?>" defer></script>
     <script src="<?php echo $damageJsUrl; ?>" defer></script>

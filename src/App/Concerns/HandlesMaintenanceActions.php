@@ -2252,6 +2252,24 @@ trait HandlesMaintenanceActions
 
     $now = time();
     $nowMysql = date('Y-m-d H:i:s', $now);
+    // Fecha real en que el propietario aprobó (por defecto hoy): define en qué mes se gana la administración.
+    $responseTs = $now;
+    $approvalDate = trim((string) ($_POST['fecha_aprobacion'] ?? ''));
+    if ($approvalDate !== '' && $approvalDate !== date('Y-m-d', $now)) {
+      $bogota = new \DateTimeZone('America/Bogota');
+      $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $approvalDate, $bogota);
+      if (!$parsed || $parsed->format('Y-m-d') !== $approvalDate) {
+        $this->jsonFail('La fecha de aprobación no es válida.');
+      }
+      if ($approvalDate > (new \DateTimeImmutable('now', $bogota))->format('Y-m-d')) {
+        $this->jsonFail('La fecha de aprobación no puede ser futura.');
+      }
+      $createdTs = (int) ($row['fecha'] ?? 0) > 0 ? (int) $row['fecha'] : (int) strtotime((string) ($row['cct_created'] ?? ''));
+      if ($createdTs > 0 && $approvalDate < (new \DateTimeImmutable('@' . $createdTs))->setTimezone($bogota)->format('Y-m-d')) {
+        $this->jsonFail('La fecha de aprobación no puede ser anterior a la creación de la cotización.');
+      }
+      $responseTs = $parsed->setTime(12, 0)->getTimestamp();
+    }
     $userId = Auth::userId();
     $employeeId = (string) $userId;
     $schema = new \SCM\Support\SchemaInspector($this->db);
@@ -2265,7 +2283,7 @@ trait HandlesMaintenanceActions
     $update = [
       'estado' => 'Aprobada',
       'estado_respuesta_cotizacion_mantenimiento' => 'Aprobada',
-      'fecha_respuesta' => $now,
+      'fecha_respuesta' => $responseTs,
       'observacion_respuesta' => $observacion !== '' ? $observacion : 'Cotizacion marcada como aprobada desde el panel.',
       'motivo' => '',
       'tuvo_seguimiento' => 'Si',
@@ -2306,7 +2324,7 @@ trait HandlesMaintenanceActions
         $ticketUpdate = [
           'estado_cotizacion_mantenimiento' => 'Aprobada',
           'estado_respuesta_cotizacion_mantenimiento' => 'Aprobada',
-          'fecha_respuesta_cotizacion_mantenimiento' => $now,
+          'fecha_respuesta_cotizacion_mantenimiento' => $responseTs,
           'fecha_actualizacion' => $now,
           'cct_modified' => $nowMysql,
         ];
