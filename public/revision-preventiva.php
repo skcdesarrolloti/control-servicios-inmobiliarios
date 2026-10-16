@@ -37,11 +37,25 @@ try {
       'status' => 403,
     ];
     http_response_code(403);
+  } elseif (($_GET['format'] ?? '') === 'pdf') {
+    // Mismo HTML e impresión del informe; la sesión se libera porque generar el PDF toma unos segundos.
+    session_write_close();
+    $bytes = (new SuCasaControlServiciosInmobiliarios(App::db()))->preventiveReviewPdfBytes($reviewId);
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="revision-preventiva-' . $reviewId . '.pdf"');
+    header('Content-Length: ' . (string) strlen($bytes));
+    echo $bytes;
+    exit;
   } else {
+  $pdfQuery = ['numero' => $reviewId, 'format' => 'pdf'] + ($hasValidPublicSignature ? ['expires' => $expires, 'sig' => $signature] : []);
   $view = new PreventiveReviewPublicView(App::db());
-  $result = $view->render($reviewId);
+  $result = $view->render($reviewId, 'revision-preventiva.php?' . http_build_query($pdfQuery));
   http_response_code((int) ($result['status'] ?? 200));
   }
+} catch (DomainException $error) {
+  header('Content-Type: text/html; charset=UTF-8');
+  http_response_code(500);
+  $result['content'] = '<article class="scm-corrective-public-card scm-corrective-public-error"><h1>No disponible</h1><p role="alert">' . $escape($error->getMessage()) . '</p></article>';
 } catch (Throwable $error) {
   http_response_code(500);
   error_log('[revision-preventiva-publica] Error revisión #' . $reviewId . ': ' . $error->getMessage());

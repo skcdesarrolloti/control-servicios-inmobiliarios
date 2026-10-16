@@ -30,8 +30,11 @@ final class PreventiveReviewPublicView
       . '</header>';
   }
 
-  /** @return array{title:string,content:string,status:int} */
-  public function render(int $reviewId): array
+  /**
+   * @param string $pdfUrl enlace de descarga del PDF; vacío dentro del propio PDF
+   * @return array{title:string,content:string,status:int}
+   */
+  public function render(int $reviewId, string $pdfUrl = ''): array
   {
     if ($reviewId <= 0) {
       return $this->error('Revisión no disponible', 'El número de revisión no es válido.', 400);
@@ -68,7 +71,7 @@ final class PreventiveReviewPublicView
 
     $content = '<article class="scm-corrective-public-card scm-corrective-public-hero">'
       . '<div class="scm-corrective-public-title"><h1>' . $this->h($title) . '</h1></div>'
-      . '<div class="scm-corrective-public-actions"><button type="button" data-scm-print>Imprimir</button></div>'
+      . '<div class="scm-corrective-public-actions"><button type="button" data-scm-print>Imprimir</button>' . ($pdfUrl !== '' ? '<a href="' . $this->h($pdfUrl) . '" download>Descargar PDF</a>' : '') . '</div>'
       . '</article>'
       . '<section class="scm-corrective-public-card"><h2>Datos de la revisión</h2><div class="scm-corrective-public-grid">' . $this->grid($meta) . '</div></section>'
       . '<section class="scm-corrective-public-card"><h2>Resumen</h2><div class="scm-corrective-public-grid scm-corrective-public-grid--summary">' . $this->grid($summary) . '</div>'

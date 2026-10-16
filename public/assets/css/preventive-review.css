@@ -475,3 +475,29 @@
   .scm-corrective-public-signature { break-inside: avoid; page-break-inside: avoid; }
   .scm-prev-public-group { break-inside: auto; page-break-inside: auto; }
 }
+
+/* Descarga del PDF junto a "Imprimir" en el informe público. */
+.scm-corrective-public-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.scm-corrective-public-actions a[download] {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid var(--scm-orange, #ff8500);
+  border-radius: 14px;
+  color: var(--scm-orange, #ff8500);
+  background: #fff;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+@media print {
+  .scm-corrective-public-actions a[download] {
+    display: none;
+  }
+}

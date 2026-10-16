@@ -1056,7 +1056,7 @@ trait HandlesPreventiveReviewActions
     $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
     return '<div class="scm-acta scm-corrective-review scm-preventive-review"><section class="scm-corrective-existing"><h3>Revisión preventiva enviada</h3>'
       . '<article><div class="scm-corrective-existing-info"><strong>Revisión #' . $h((string) $reviewId) . '</strong><span>El informe quedó enviado y registrado en el historial del caso.</span></div>'
-      . '<div class="scm-corrective-existing-actions"><button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-url="' . $h(self::preventiveReviewPublicUrl($reviewId)) . '" data-iframe-title="Revisión preventiva #' . $h((string) $reviewId) . '">Ver informe</button></div></article>'
+      . '<div class="scm-corrective-existing-actions"><button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-url="' . $h(self::preventiveReviewPublicUrl($reviewId)) . '" data-iframe-title="Revisión preventiva #' . $h((string) $reviewId) . '">Ver informe</button><a class="scm-acta-button scm-acta-secondary" href="' . $h(self::preventiveReviewPublicUrl($reviewId) . '&format=pdf') . '" download>Descargar PDF</a></div></article>'
       . '<span data-corrective-review-message aria-live="polite"></span></section></div>';
   }
 
@@ -1184,6 +1184,7 @@ trait HandlesPreventiveReviewActions
               </div>
               <div class="scm-corrective-existing-actions">
                 <button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-url="<?= $h(self::preventiveReviewPublicUrl($id)) ?>" data-iframe-title="Revisión preventiva #<?= $h((string) $id) ?>">Ver informe</button>
+                <a class="scm-acta-button scm-acta-secondary" href="<?= $h(self::preventiveReviewPublicUrl($id) . '&format=pdf') ?>" download>Descargar PDF</a>
                 <?php if (!PreventiveReviewChecklist::wasSent($review) && $this->canUseDashboardAction('preventive_review_send')): ?><button type="button" class="scm-acta-button" data-preventive-send-review="<?= $h((string) $id) ?>">Enviar</button><?php endif; ?>
                 <button type="button" class="scm-acta-button scm-acta-secondary" data-preventive-edit-review="<?= $h((string) $id) ?>">Editar</button>
                 <button type="button" class="scm-acta-button scm-acta-danger" data-preventive-delete-review="<?= $h((string) $id) ?>">Eliminar</button>

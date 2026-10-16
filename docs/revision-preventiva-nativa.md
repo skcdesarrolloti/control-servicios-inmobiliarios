@@ -49,7 +49,8 @@ Reemplaza el formulario JetForm "Enviar revisión preventiva".
   mismo motor que las cotizaciones). Va adjunto en el correo al propietario/arrendatario y con botón "Ver PDF".
 - **WhatsApp**: casilla por contacto (celular de la revisión o del contrato, indicativo del contrato o 57). Usa la
   plantilla `scm_revision_preventiva_envio_v1` con el PDF en el encabezado y botón al informe firmado; crearla en Meta
-  con [whatsapp-revision-preventiva-envio-template.json](whatsapp-revision-preventiva-envio-template.json).
+  siguiendo [crear-plantilla-whatsapp-revision-preventiva.md](crear-plantilla-whatsapp-revision-preventiva.md) (definición API en `whatsapp-revision-preventiva-envio-template.json`).
+- **Descargar PDF**: botón en el panel de la revisión y en el informe público (`revision-preventiva.php?numero=ID&format=pdf`, con la misma sesión o firma que la vista).
   Si el PDF no se puede generar, el WhatsApp no se envía (la plantilla exige el documento) y el panel lo avisa.
 
 Cuando el caso ya tiene revisión preventiva se ocultan el contador y las opciones de constancias por no autorización.

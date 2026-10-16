@@ -166,6 +166,9 @@ $assert((int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket 
 try { $call('preventiveReviewSend', 10883, $reviewId); $assert(false, 'No debe reenviar una revisión ya enviada.'); } catch (DomainException $e) { $assert(str_contains($e->getMessage(), 'ya fue enviada'), $e->getMessage()); }
 $panel = $call('renderPreventiveReviewPanel', $call('preventiveReviewContext', 10883), 0);
 $assert(!str_contains($panel, 'data-preventive-send-review') && str_contains($panel, 'Enviada al propietario'), 'Una revisión enviada no debe ofrecer enviar de nuevo.');
+$assert(str_contains($panel, 'revision-preventiva.php?numero=' . $reviewId . '&amp;format=pdf'), 'El panel debe ofrecer descargar el PDF.');
+$withPdf = (new \SCM\Modules\PreventiveReview\PreventiveReviewPublicView($db))->render($reviewId, 'revision-preventiva.php?numero=' . $reviewId . '&format=pdf');
+$assert(str_contains($withPdf['content'], 'Descargar PDF') && !str_contains((new \SCM\Modules\PreventiveReview\PreventiveReviewPublicView($db))->render($reviewId)['content'], 'Descargar PDF'), 'El informe público debe ofrecer el PDF, pero no dentro del propio PDF.');
 $public = (new \SCM\Modules\PreventiveReview\PreventiveReviewPublicView($db))->render($reviewId);
 $assert(str_contains($public['content'], 'Pagos y finanzas') && str_contains($public['content'], 'Debe un mes'), 'El informe público debe mostrar lo diligenciado al enviar.');
 // Cerrar con el envío, como el JetForm.
