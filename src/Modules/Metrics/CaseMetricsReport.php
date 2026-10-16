@@ -7,10 +7,13 @@ namespace SCM\Modules\Metrics;
 use DateTimeImmutable;
 use DateTimeZone;
 use SCM\Core\Database;
-use SCM\Support\SchemaInspector;
+use SCM\Support\FuncionarioOptions;
 
 /**
  * Métricas de casos: estado actual de los casos según su fecha de creación.
+ *
+ * Solo cuenta los casos de los funcionarios configurados para los filtros del panel
+ * (los mismos cargos que usan los filtros de funcionario); el resto se informa aparte.
  *
  * Devuelve todos los casos en una sola respuesta compacta (los textos repetidos van en
  * diccionarios) para que el panel filtre por mes, rango de fechas, tema, departamento y
@@ -49,14 +52,21 @@ final class CaseMetricsReport
       return $index[$dictionary][$value];
     };
 
+    $employees = $this->employees();
     $out = [];
+    $excluded = 0;
     foreach ($rows as $row) {
+      $employeeId = trim((string) ($row['id_empleado'] ?? ''));
+      if (!isset($employees[$employeeId])) {
+        $excluded++;
+        continue;
+      }
       $out[] = [
         $encode('estado', self::clean($row['estado'] ?? '')),
         $encode('estado_administrativo', self::clean($row['estado_administrativo'] ?? '')),
         $encode('tema', self::clean($row['tema_ayuda'] ?? '')),
         $encode('departamento', self::clean($row['departamento'] ?? '')),
-        preg_match('/^\d+$/', trim((string) ($row['id_empleado'] ?? ''))) === 1 ? trim((string) $row['id_empleado']) : '',
+        $employeeId,
         $this->date($row['fecha'] ?? null, $row['cct_created'] ?? null),
       ];
     }
@@ -65,7 +75,8 @@ final class CaseMetricsReport
       'columns' => self::COLUMNS,
       'dictionaries' => $dictionaries,
       'rows' => $out,
-      'funcionarios' => $this->employees(),
+      'funcionarios' => $employees,
+      'excluidos' => $excluded,
       'generated_at' => time(),
     ];
   }
@@ -86,21 +97,19 @@ final class CaseMetricsReport
     return trim(preg_replace('/\s+/u', ' ', (string) ($value ?? '')) ?? '');
   }
 
-  /** @return array<string,array{name:string,active:bool}> */
+  /**
+   * Funcionarios configurados para los filtros del panel.
+   *
+   * @return array<string,array{name:string,active:bool}>
+   */
   private function employees(): array
   {
-    $table = $this->db->table('jet_cct_funcionarios');
-    $schema = new SchemaInspector($this->db);
-    if (!$schema->tableExists($table) || !$schema->columnExists($table, 'id_empleado')) {
-      return [];
-    }
     $out = [];
-    foreach ($this->db->getResults("SELECT `id_empleado`, `nombre`, `activo` FROM `{$table}` WHERE TRIM(COALESCE(`id_empleado`, '')) <> ''") as $row) {
-      $id = trim((string) $row['id_empleado']);
-      $out[$id] = [
-        'name' => self::clean($row['nombre'] ?? '') ?: 'Funcionario ' . $id,
-        'active' => mb_strtolower(trim((string) ($row['activo'] ?? '')), 'UTF-8') === 'si',
-      ];
+    foreach (FuncionarioOptions::panelFuncionarios($this->db) as $employee) {
+      $id = trim((string) ($employee['id'] ?? ''));
+      if ($id !== '') {
+        $out[$id] = ['name' => (string) ($employee['name'] ?? ('Funcionario ' . $id)), 'active' => true];
+      }
     }
     return $out;
   }

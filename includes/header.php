@@ -325,7 +325,7 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 // 3. Actividades Administrativas (Dropdown: Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
 // 4. Actividades contractuales (Dropdown: Contratos por terminar, Terminación, No prórroga, Funcionario de contratos)
 // 5. Notificaciones
-// 6. Métricas (Dropdown por secciones: Casos · Mantenimiento: Cotizaciones · Contratos: Ocupaciones, Desocupaciones, Ocupaciones vs Desocupaciones)
+// 6. Métricas (Dropdown: Casos · Mantenimiento › Cotizaciones · Contratos › Ocupaciones, Desocupaciones, Ocupaciones vs Desocupaciones)
 $rawNavItems = [
   'inicio' => [
     'type' => 'dropdown',
@@ -588,6 +588,7 @@ $rawNavItems = [
       'metricas_cotizaciones' => [
         'key' => 'metricas_cotizaciones',
         'group' => 'Mantenimiento',
+        'group_icon' => 'build',
         'label' => 'Cotizaciones',
         'panel_id' => 'scm-panel-metricas-cotizaciones',
         'url' => $baseUrl . '/index.php?tab=metricas_cotizaciones',
@@ -597,6 +598,7 @@ $rawNavItems = [
       'ocupaciones' => [
         'key' => 'ocupaciones',
         'group' => 'Contratos',
+        'group_icon' => 'contract',
         'label' => 'Ocupaciones',
         'panel_id' => 'scm-panel-movimientos-contratos',
         'subtab' => 'ocupaciones',
@@ -607,6 +609,7 @@ $rawNavItems = [
       'desocupaciones' => [
         'key' => 'desocupaciones',
         'group' => 'Contratos',
+        'group_icon' => 'contract',
         'label' => 'Desocupaciones',
         'panel_id' => 'scm-panel-movimientos-contratos',
         'subtab' => 'desocupaciones',
@@ -617,6 +620,7 @@ $rawNavItems = [
       'ocupaciones_vs_desocupaciones' => [
         'key' => 'ocupaciones_vs_desocupaciones',
         'group' => 'Contratos',
+        'group_icon' => 'contract',
         'label' => 'Ocupaciones vs Desocupaciones',
         'panel_id' => 'scm-panel-movimientos-contratos',
         'subtab' => 'comparativo',
@@ -1132,11 +1136,37 @@ foreach ($rawNavItems as $k => $item) {
                 </button>
                 <div class="scm-dropdown-menu absolute left-0 top-full pt-1.5 hidden z-50 min-w-[240px] drop-shadow-xl" data-scm-dropdown-menu>
                   <div class="bg-white rounded-xl shadow-lg border border-slate-200/90 py-1.5 px-1.5 flex flex-col gap-0.5">
-                    <?php $lastChildGroup = ''; ?>
-                    <?php foreach ($tab['children'] as $childKey => $child): ?>
-                      <?php if (!empty($child['group']) && $child['group'] !== $lastChildGroup): $lastChildGroup = (string) $child['group']; ?>
-                        <div class="scm-dropdown-group-label" role="presentation"><?php echo htmlspecialchars($lastChildGroup, ENT_QUOTES, 'UTF-8'); ?></div>
+                    <?php
+                    // Las opciones con `group` se agrupan en una opción con submenú lateral (hover/foco);
+                    // si el grupo se llama igual que la opción, se muestra como enlace directo.
+                    $dropdownSections = [];
+                    foreach ($tab['children'] as $sectionKey => $sectionChild) {
+                      $sectionGroup = (string) ($sectionChild['group'] ?? '');
+                      $isSubmenu = $sectionGroup !== '' && $sectionGroup !== (string) $sectionChild['label'];
+                      $lastSection = $dropdownSections === [] ? null : array_key_last($dropdownSections);
+                      if ($isSubmenu && $lastSection !== null && $dropdownSections[$lastSection]['group'] === $sectionGroup) {
+                        $dropdownSections[$lastSection]['children'][$sectionKey] = $sectionChild;
+                        continue;
+                      }
+                      $dropdownSections[] = [
+                        'group' => $isSubmenu ? $sectionGroup : '',
+                        'icon' => (string) ($sectionChild['group_icon'] ?? 'folder'),
+                        'children' => [$sectionKey => $sectionChild],
+                      ];
+                    }
+                    ?>
+                    <?php foreach ($dropdownSections as $dropdownSection): ?>
+                      <?php if ($dropdownSection['group'] !== ''): $isSectionActive = in_array($current_page, array_keys($dropdownSection['children']), true); ?>
+                        <div class="scm-dropdown-sub" data-scm-dropdown-sub>
+                          <button type="button" class="scm-dropdown-sub-trigger<?php echo $isSectionActive ? ' is-active' : ''; ?>" aria-haspopup="true">
+                            <span class="material-symbols-outlined" aria-hidden="true"><?php echo htmlspecialchars($dropdownSection['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
+                            <span><?php echo htmlspecialchars($dropdownSection['group'], ENT_QUOTES, 'UTF-8'); ?></span>
+                            <span class="material-symbols-outlined scm-dropdown-sub-chevron" aria-hidden="true">chevron_right</span>
+                          </button>
+                          <div class="scm-dropdown-submenu" role="menu" aria-label="<?php echo htmlspecialchars($dropdownSection['group'], ENT_QUOTES, 'UTF-8'); ?>">
+                            <div class="bg-white rounded-xl shadow-lg border border-slate-200/90 py-1.5 px-1.5 flex flex-col gap-0.5">
                       <?php endif; ?>
+                    <?php foreach ($dropdownSection['children'] as $childKey => $child): ?>
                       <?php
                       $isSubActive = ($current_page === $childKey);
                       $subClass = $isSubActive
@@ -1156,6 +1186,12 @@ foreach ($rawNavItems as $k => $item) {
                         <span class="material-symbols-outlined text-[16px] <?php echo $isSubActive ? 'text-white' : 'text-slate-500'; ?>"><?php echo htmlspecialchars($child['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
                         <span><?php echo htmlspecialchars($child['label'], ENT_QUOTES, 'UTF-8'); ?></span>
                       </a>
+                    <?php endforeach; ?>
+                      <?php if ($dropdownSection['group'] !== ''): ?>
+                            </div>
+                          </div>
+                        </div>
+                      <?php endif; ?>
                     <?php endforeach; ?>
                   </div>
                 </div>
