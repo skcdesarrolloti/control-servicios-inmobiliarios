@@ -80,32 +80,34 @@ trait HandlesMetricsPanels
       $this->jsonFail('No tienes permiso para ver métricas.');
     }
     $id = (int) ($_POST['cotizacion_id'] ?? 0);
-    $date = trim((string) ($_POST['fecha_respuesta'] ?? ''));
+    $text = static function (string $key): ?string {
+      $value = trim(sanitize_text_field(wp_unslash((string) ($_POST[$key] ?? ''))));
+      return $value === '' ? null : $value;
+    };
     $money = static function (string $key): ?int {
       $raw = preg_replace('/\D+/', '', (string) ($_POST[$key] ?? '')) ?? '';
       return $raw === '' ? null : (int) $raw;
     };
+    $state = $text('estado');
+    $created = $text('fecha_creacion');
+    $response = $text('fecha_respuesta');
     $total = $money('total');
     $admin = $money('administracion');
-    if ($date === '' && $total === null && $admin === null) {
+    if ($state === null && $created === null && $response === null && $total === null && $admin === null) {
       $this->jsonFail('No hay cambios para guardar.');
     }
-    if ($date !== '' && !$this->canUseDashboardAction('quote_respond')) {
-      $this->jsonFail('No tienes permiso para cambiar fechas de respuesta.');
+    if (($state !== null || $response !== null) && !$this->canUseDashboardAction('quote_respond')) {
+      $this->jsonFail('No tienes permiso para cambiar el estado o la fecha de respuesta.');
     }
-    if (($total !== null || $admin !== null) && !$this->canUseDashboardAction('quote_edit')) {
+    if (($created !== null || $total !== null || $admin !== null) && !$this->canUseDashboardAction('quote_edit')) {
       $this->jsonFail('No tienes permiso para editar cotizaciones.');
     }
     $actor = $this->current_employee_id();
     $report = new QuoteMetricsReport($this->db, App::settings());
     try {
       $result = ['id' => $id];
-      if ($date !== '') {
-        $dates = $report->setResponseDates([['id' => $id, 'date' => $date]], $actor, true);
-        if ($dates['errors'] !== []) {
-          throw new \InvalidArgumentException($dates['errors'][0]['message']);
-        }
-        $result['respuesta'] = $date;
+      if ($state !== null || $created !== null || $response !== null) {
+        $result = $report->updateStatusAndDates($id, $state, $created, $response, $actor) + $result;
       }
       if ($total !== null || $admin !== null) {
         $result += $report->updateValues($id, $total, $admin, $actor);

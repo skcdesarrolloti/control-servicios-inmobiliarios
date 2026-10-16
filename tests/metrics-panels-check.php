@@ -182,6 +182,20 @@ $check($values === ['id' => 9, 'total' => 1200000, 'admin' => 80000] && $sqlite-
 $fails(fn() => $writer->updateValues(9, 50000, 80000, '2871'), 'mayor que el valor total', 'La administración no puede superar el total');
 $fails(fn() => $writer->updateValues(9, null, 1000, ''), 'id_empleado', 'Editar valores exige el id_empleado real');
 
+// Corregir estado y fechas: "Esperando respuesta" queda sin respuesta; aprobada/desaprobada la exigen.
+$sqlite->insert('wp_jet_cct_cotizacion_mantenimiento', ['_ID' => 10, 'estado' => 'Esperando respuesta', 'fecha' => '1788800000', 'fecha_respuesta' => '0', 'cct_author_id' => '1']);
+$fails(fn() => $writer->updateStatusAndDates(10, 'Aprobada', null, null, '2871'), 'Indica la fecha de respuesta', 'Aprobar exige fecha de respuesta');
+$fails(fn() => $writer->updateStatusAndDates(10, 'Cerrada', null, null, '2871'), 'Estado no válido', 'Solo estados conocidos');
+$fails(fn() => $writer->updateStatusAndDates(10, 'Aprobada', null, '2026-01-01', '2871'), 'anterior a la creación', 'La respuesta no puede ser previa a la creación');
+$fails(fn() => $writer->updateStatusAndDates(10, null, '2999-01-01', null, '2871'), 'futura', 'La creación no puede ser futura');
+$status = $writer->updateStatusAndDates(10, 'Desaprobada', '2026-09-01', '2026-09-20', '2871');
+$quote10 = $sqlite->getRow('SELECT estado, fecha, fecha_respuesta, cct_author_id FROM wp_jet_cct_cotizacion_mantenimiento WHERE _ID = 10');
+$check($status === ['id' => 10, 'estado' => 'Desaprobada', 'fecha' => '2026-09-01', 'respuesta' => '2026-09-20'] && $quote10['estado'] === 'Desaprobada'
+  && $quoteReport->date($quote10['fecha']) === '2026-09-01' && $quoteReport->date($quote10['fecha_respuesta']) === '2026-09-20' && $quote10['cct_author_id'] === '2871',
+  'Guarda estado, fecha de creación y fecha de respuesta: ' . json_encode([$status, $quote10]));
+$status = $writer->updateStatusAndDates(10, 'Esperando respuesta', null, null, '2871');
+$check($status['respuesta'] === null && (int) $sqlite->getVar('SELECT fecha_respuesta FROM wp_jet_cct_cotizacion_mantenimiento WHERE _ID = 10') === 0, 'Volver a "Esperando respuesta" borra la fecha de respuesta.');
+
 // Conciliación con el auxiliar contable.
 use SCM\Modules\Metrics\QuoteLedgerReconciliation;
 $check(QuoteLedgerReconciliation::parseDate('3/10/2026') === '2026-10-03' && QuoteLedgerReconciliation::parseDate('2026-07-11 00:00:00') === '2026-07-11' && QuoteLedgerReconciliation::parseDate('46000') === '2025-12-09', 'Fechas del auxiliar en d/m/Y, ISO y número de Excel.');

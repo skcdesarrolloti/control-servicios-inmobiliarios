@@ -190,6 +190,12 @@
 #scm-app .scm-ql-help { margin: 0 0 12px; }
 #scm-app .scm-ql-all-filters { margin-bottom: 10px; padding: 0; border: 0; }
 #scm-app .scm-qm-row-msg.is-ok { color: var(--cm-good); font-weight: 600; }
+#scm-app .scm-qm-row-msg.is-warn { color: #b45309; font-weight: 600; }
+#scm-app .scm-ql-state { min-width: 150px; font-weight: 600; }
+#scm-app .scm-ql-state.is-entregado { background: #ecfeff; color: var(--cm-ocup); }
+#scm-app .scm-ql-state.is-recibido { background: #fff1f2; color: var(--cm-desoc); }
+#scm-app .scm-ql-state.is-por_recibir { background: #fffbeb; color: #b45309; }
+#scm-app .scm-ql-quotes input[type="date"]:disabled { background: #f8fafc; color: #94a3b8; }
 #scm-app .scm-ql-list { display: flex; flex-direction: column; gap: 12px; }
 #scm-app .scm-ql-prop { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--cm-line); border-left: 4px solid #cbd5e1; border-radius: 12px; background: #fff; }
 #scm-app .scm-ql-prop.is-ok { border-left-color: var(--cm-good); }

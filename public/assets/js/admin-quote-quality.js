@@ -13,6 +13,7 @@
   var PAGE_SIZE = 40;
   var numberFormat = new Intl.NumberFormat("es-CO");
   var moneyFormat = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+  var STATES = ["Esperando respuesta", "Aprobada", "Desaprobada"];
   var STATUS = {
     ok: ["Cuadra", "is-entregado"],
     diff: ["Diferencia", "is-recibido"],
@@ -299,7 +300,7 @@
       var range = ledgerRange();
       var unpaired = group ? group.moves.map(function (move, index) { return { move: move, pair: group.link[index] }; })
         .filter(function (item) { return item.pair.kind === "repetido" || item.pair.kind === "sin_cotizacion"; }) : [];
-      var columns = showProperty ? 9 : 8;
+      var columns = showProperty ? 10 : 9;
       var body = rows.map(function (row) { return quoteRow(row, group, range, showProperty); }).join("");
       body += unpaired.map(function (item) {
         var repeated = item.pair.kind === "repetido";
@@ -310,18 +311,17 @@
       if (!rows.length && !unpaired.length) body = '<tr><td colspan="' + columns + '" class="scm-cm-muted">Sin cotizaciones.</td></tr>';
       if (!rows.length && group) body = '<tr><td colspan="' + columns + '" class="scm-cm-muted">No hay cotizaciones de ' + esc(range.sinceYear) + " en adelante con este inmueble (ni en la cotización ni en su caso).</td></tr>" + body;
       return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-qq-table scm-ql-quotes"><thead><tr><th>Cotización</th>' + (showProperty ? "<th>Inmueble</th>" : "") +
-        '<th>Creada</th><th>Fecha de respuesta</th><th class="is-num">Valor total</th><th class="is-num">Administración</th><th>Auxiliar contable</th><th>Resultado</th><th></th></tr></thead><tbody>' +
+        '<th>Estado</th><th>Creada</th><th>Fecha de respuesta</th><th class="is-num">Valor total</th><th class="is-num">Administración</th><th>Auxiliar contable</th><th>Resultado</th><th></th></tr></thead><tbody>' +
         body + "</tbody></table></div>";
     }
 
     function quoteRow(row, group, range, showProperty) {
       var result = quoteResult(row, group, range);
       var moves = (group && group.byQuote[row.id]) || [];
-      var tone = row.estado === "Aprobada" ? "is-entregado" : row.estado === "Desaprobada" ? "is-recibido" : "is-por_recibir";
       return '<tr class="scm-maintenance-quote-row' + (result.tone === "is-muted" ? " is-muted" : "") + '" data-ql-quote="' + esc(row.id) + '" data-cotizacion-id="' + esc(row.id) + '" data-ticket="' + esc(row.ticket) + '">' +
-        "<td><strong>#" + esc(row.id) + '</strong> <span class="scm-cm-badge ' + tone + '">' + esc(row.estado) + '</span><small class="scm-cm-source">' + (row.ticket ? "Caso #" + esc(row.ticket) : "Sin caso") + "</small></td>" +
+        "<td><strong>#" + esc(row.id) + '</strong><small class="scm-cm-source">' + (row.ticket ? "Caso #" + esc(row.ticket) : "Sin caso") + "</small></td>" +
         (showProperty ? "<td>" + esc(row.inmueble || "—") + "</td>" : "") +
-        "<td>" + esc(day(row.fecha)) + "</td>" +
+        "<td>" + stateSelect(row) + "</td><td>" + createdInput(row) + "</td>" +
         "<td>" + dateInput(row) + "</td>" +
         '<td class="is-num">' + moneyInput("total", row.total, "Valor total de la cotización " + row.id) + "</td>" +
         '<td class="is-num">' + moneyInput("administracion", row.admin, "Administración de la cotización " + row.id) + "</td>" +
@@ -357,29 +357,45 @@
       var shown = rows.slice(0, state.all.limit);
       var label = state.all.month ? (state.all.by === "respuesta" ? "aprobadas en " : "creadas en ") + day(state.all.month + "-01").replace(/^1 /, "") : "todas las fechas";
       holder.innerHTML = '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-qq-table scm-ql-quotes"><thead><tr><th>Cotización</th><th>Contrato</th><th>Inmueble</th>' +
-        '<th>Creada</th><th>Fecha de respuesta</th><th class="is-num">Valor total</th><th class="is-num">Administración</th><th></th></tr></thead><tbody>' +
-        (shown.length ? shown.map(allRow).join("") : '<tr><td colspan="8" class="scm-cm-muted">No hay cotizaciones con estos filtros.</td></tr>') +
-        '</tbody><tfoot><tr><td colspan="5">' + esc(num(rows.length) + (rows.length === 1 ? " cotización · " : " cotizaciones · ") + label) +
+        '<th>Estado</th><th>Creada</th><th>Fecha de respuesta</th><th class="is-num">Valor total</th><th class="is-num">Administración</th><th></th></tr></thead><tbody>' +
+        (shown.length ? shown.map(allRow).join("") : '<tr><td colspan="9" class="scm-cm-muted">No hay cotizaciones con estos filtros.</td></tr>') +
+        '</tbody><tfoot><tr><td colspan="6">' + esc(num(rows.length) + (rows.length === 1 ? " cotización · " : " cotizaciones · ") + label) +
         '</td><td class="is-num">' + esc(money(sum.total)) + '</td><td class="is-num is-total">' + esc(money(sum.admin)) + "</td><td></td></tr></tfoot></table></div>" +
         (rows.length > shown.length ? '<div class="scm-cm-pager"><span>' + num(shown.length) + " de " + num(rows.length) + '</span><button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-qq-all-more>Ver más</button></div>' : "");
     }
 
     function allRow(row) {
-      var tone = row.estado === "Aprobada" ? "is-entregado" : row.estado === "Desaprobada" ? "is-recibido" : "is-por_recibir";
       var property = row.inmueble && !/^no asignado$/i.test(row.inmueble) ? row.inmueble : row.inmueble_caso ? row.inmueble_caso + " (del caso)" : "—";
       return '<tr class="scm-maintenance-quote-row" data-ql-quote="' + esc(row.id) + '" data-cotizacion-id="' + esc(row.id) + '" data-ticket="' + esc(row.ticket) + '">' +
-        "<td><strong>#" + esc(row.id) + '</strong> <span class="scm-cm-badge ' + tone + '">' + esc(row.estado) + '</span><small class="scm-cm-source">' + (row.ticket ? "Caso #" + esc(row.ticket) : "Sin caso") + "</small></td>" +
+        "<td><strong>#" + esc(row.id) + '</strong><small class="scm-cm-source">' + (row.ticket ? "Caso #" + esc(row.ticket) : "Sin caso") + "</small></td>" +
         "<td>" + esc(row.contrato || "—") + "</td><td>" + esc(property) + '<small class="scm-cm-source">' + esc(row.direccion || "") + "</small></td>" +
-        "<td>" + esc(day(row.fecha)) + "</td><td>" + dateInput(row) + "</td>" +
+        "<td>" + stateSelect(row) + "</td><td>" + createdInput(row) + "</td><td>" + dateInput(row) + "</td>" +
         '<td class="is-num">' + moneyInput("total", row.total, "Valor total de la cotización " + row.id) + "</td>" +
         '<td class="is-num">' + moneyInput("administracion", row.admin, "Administración de la cotización " + row.id) + '<small class="scm-qm-row-msg" aria-live="polite"></small></td>' +
         '<td class="is-actions">' + actionButtons(row) + "</td></tr>";
     }
 
+    // Estado (respuesta) de la cotización. Cambiarlo es una corrección de datos: no avisa al cliente.
+    function stateSelect(row) {
+      var tone = row.estado === "Aprobada" ? "is-entregado" : row.estado === "Desaprobada" ? "is-recibido" : "is-por_recibir";
+      if (!state.canEditResponse) return '<span class="scm-cm-badge ' + tone + '">' + esc(row.estado) + "</span>";
+      var options = STATES.indexOf(row.estado) === -1 ? [row.estado].concat(STATES) : STATES;
+      return '<select class="scm-qm-date scm-ql-state ' + tone + '" data-ql-field="estado" data-original="' + esc(row.estado) + '" aria-label="Estado de la cotización ' + esc(row.id) + '">' +
+        options.map(function (value) {
+          return '<option value="' + esc(value) + '"' + (value === row.estado ? " selected" : "") + (STATES.indexOf(value) === -1 ? " disabled" : "") + ">" + esc(value) + "</option>";
+        }).join("") + "</select>";
+    }
+    function createdInput(row) {
+      return state.canEditQuote
+        ? '<input type="date" class="scm-qm-date" data-ql-field="creada" value="' + esc(row.fecha || "") + '" data-original="' + esc(row.fecha || "") + '" max="' + todayIso() + '" aria-label="Fecha de creación de la cotización ' + esc(row.id) + '">'
+        : esc(day(row.fecha));
+    }
+    // La fecha de respuesta aplica a aprobadas y desaprobadas; en "Esperando respuesta" queda vacía.
     function dateInput(row) {
-      return row.approved && state.canEditResponse
+      var waiting = row.estado === "Esperando respuesta" || row.estado === "Sin estado";
+      return state.canEditResponse
         ? '<input type="date" class="scm-qm-date" data-ql-field="fecha" value="' + esc(row.respuesta || "") + '" data-original="' + esc(row.respuesta || "") + '" max="' + todayIso() + '"' +
-          (row.fecha ? ' min="' + esc(row.fecha) + '"' : "") + ' aria-label="Fecha de respuesta de la cotización ' + esc(row.id) + '">' +
+          (waiting ? " disabled" : "") + ' aria-label="Fecha de respuesta de la cotización ' + esc(row.id) + '">' +
           (row.respuesta_fuente === "caso" ? '<small class="scm-cm-source">Fecha tomada del caso</small>' : "")
         : esc(day(row.respuesta));
     }
@@ -389,7 +405,7 @@
         : esc(money(value));
     }
     function actionButtons(row) {
-      return (state.canEditQuote || (row.approved && state.canEditResponse) ? '<button type="button" class="scm-cm-btn scm-qq-primary" data-ql-save disabled>Guardar</button> ' : "") +
+      return (state.canEditQuote || state.canEditResponse ? '<button type="button" class="scm-cm-btn scm-qq-primary" data-ql-save disabled>Guardar</button> ' : "") +
         '<button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-maintenance-quote-open-case data-cotizacion-id="' + esc(row.id) +
         '" data-ticket="' + esc(row.ticket) + '" data-contract="' + esc(row.contrato) + '">Ver caso</button>';
     }
@@ -411,14 +427,25 @@
       tr.querySelectorAll("[data-ql-field]").forEach(function (input) {
         var field = input.getAttribute("data-ql-field");
         var original = input.getAttribute("data-original");
-        if (field === "fecha") {
-          if (input.value && input.value !== original) changes.fecha_respuesta = input.value;
+        if (field === "estado") {
+          if (input.value !== original) changes.estado = input.value;
+        } else if (field === "creada") {
+          if (input.value && input.value !== original) changes.fecha_creacion = input.value;
+        } else if (field === "fecha") {
+          if (!input.disabled && input.value && input.value !== original) changes.fecha_respuesta = input.value;
         } else {
           var value = digits(input.value);
           if (value !== null && value !== Number(original)) changes[field] = value;
         }
       });
+      // Al responder (aprobada/desaprobada) se envía la fecha visible aunque venga del caso.
+      var responseInput = tr.querySelector('[data-ql-field="fecha"]');
+      if (changes.estado && changes.estado !== "Esperando respuesta" && responseInput && responseInput.value) changes.fecha_respuesta = responseInput.value;
       return changes;
+    }
+
+    function changeKey(field) {
+      return { fecha: "fecha_respuesta", creada: "fecha_creacion" }[field] || field;
     }
 
     function refreshGroup(property) {
@@ -440,6 +467,16 @@
       var dateInput = tr.querySelector('[data-ql-field="fecha"]');
       if (dateInput && changes.fecha_respuesta && !dateInput.checkValidity()) { dateInput.reportValidity(); return; }
       if (!Object.keys(changes).length) return;
+      if (changes.estado && tr.dataset.qlConfirm !== "1") {
+        // Confirmación en la misma fila: el cambio de estado mueve la administración entre meses.
+        var before = tr.querySelector('[data-ql-field="estado"]').getAttribute("data-original");
+        tr.dataset.qlConfirm = "1";
+        button.textContent = "Confirmar";
+        message.textContent = "Cambia el estado de " + before + " a " + changes.estado + ". No se avisa al cliente.";
+        message.className = "scm-qm-row-msg is-warn";
+        return;
+      }
+      delete tr.dataset.qlConfirm;
       state.saving = true;
       button.disabled = true;
       button.textContent = "Guardando…";
@@ -449,7 +486,13 @@
         .then(function (result) {
           var row = state.rows.filter(function (item) { return item.id === id; })[0];
           if (row) {
-            if (result.respuesta) { row.respuesta = result.respuesta; row.respuesta_fuente = "cotizacion"; row.revisada = 1; }
+            if (result.estado) { row.estado = result.estado; row.approved = result.estado === "Aprobada"; }
+            if (Object.prototype.hasOwnProperty.call(result, "fecha") && result.fecha) row.fecha = result.fecha;
+            if (Object.prototype.hasOwnProperty.call(result, "respuesta")) {
+              row.respuesta = result.respuesta;
+              row.respuesta_fuente = result.respuesta ? "cotizacion" : "";
+              row.revisada = result.respuesta ? 1 : 0;
+            }
             if (typeof result.total === "number") row.total = result.total;
             if (typeof result.admin === "number") row.admin = result.admin;
           }
@@ -570,7 +613,19 @@
       var tr = field.closest("[data-ql-quote]");
       var save = tr && tr.querySelector("[data-ql-save]");
       if (save) save.disabled = state.saving || !Object.keys(rowChanges(tr)).length;
-      field.classList.toggle("is-changed", Object.prototype.hasOwnProperty.call(rowChanges(tr), field.getAttribute("data-ql-field") === "fecha" ? "fecha_respuesta" : field.getAttribute("data-ql-field")));
+      if (field.getAttribute("data-ql-field") === "estado") {
+        // "Esperando respuesta" no lleva fecha de respuesta.
+        var response = tr.querySelector('[data-ql-field="fecha"]');
+        if (response) {
+          response.disabled = field.value === "Esperando respuesta";
+          if (response.disabled) response.value = "";
+          else if (!response.value) response.value = response.getAttribute("data-original") || "";
+        }
+        if (save) save.disabled = state.saving || !Object.keys(rowChanges(tr)).length;
+        delete tr.dataset.qlConfirm;
+        if (save) save.textContent = "Guardar";
+      }
+      field.classList.toggle("is-changed", Object.prototype.hasOwnProperty.call(rowChanges(tr), changeKey(field.getAttribute("data-ql-field"))));
     });
 
     // Los valores se muestran con separador de miles al salir del campo.

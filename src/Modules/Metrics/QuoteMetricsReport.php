@@ -515,20 +515,99 @@ final class QuoteMetricsReport
     $now = (new DateTimeImmutable('now', $this->timezone))->format('Y-m-d H:i:s');
     $this->db->update($table, $data + ['cct_modified' => $now, 'cct_author_id' => $actorEmployeeId], ['_ID' => $quoteId]);
 
-    if ($this->settings !== null) {
-      $this->settings->refresh();
-      $log = $this->settings->get(self::EDITS_SETTING, []);
-      $log = is_array($log) ? $log : [];
-      $log[] = [
-        'id' => $quoteId,
-        'antes' => ['total' => $oldTotal, 'admin' => $oldAdmin],
-        'despues' => ['total' => $newTotal, 'admin' => $newAdmin],
-        'por' => $actorEmployeeId,
-        'el' => $now,
-      ];
-      $this->settings->set(self::EDITS_SETTING, array_slice($log, -2000), (int) $actorEmployeeId);
-    }
+    $this->logEdit($quoteId, ['total' => $oldTotal, 'admin' => $oldAdmin], ['total' => $newTotal, 'admin' => $newAdmin], $actorEmployeeId, $now);
     return ['id' => $quoteId, 'total' => $newTotal, 'admin' => $newAdmin];
+  }
+
+  public const STATES = ['Esperando respuesta', 'Aprobada', 'Desaprobada'];
+
+  /**
+   * Corrige estado, fecha de creación y/o fecha de respuesta de una cotización (corrección de datos:
+   * no notifica al cliente ni toca el caso). "Esperando respuesta" deja la cotización sin fecha de
+   * respuesta; "Aprobada" y "Desaprobada" la exigen. Las fechas no pueden ser futuras y la respuesta
+   * no puede ser anterior a la creación. Queda registrado en `quote_value_edits`.
+   *
+   * @return array{id:int,estado:string,fecha:?string,respuesta:?string}
+   */
+  public function updateStatusAndDates(int $quoteId, ?string $state, ?string $created, ?string $response, string $actorEmployeeId): array
+  {
+    if ($quoteId <= 0) {
+      throw new \InvalidArgumentException('Cotización inválida.');
+    }
+    if ($actorEmployeeId === '') {
+      throw new \RuntimeException('Tu usuario no tiene un id_empleado registrado.');
+    }
+    if ($state !== null && !in_array($state, self::STATES, true)) {
+      throw new \InvalidArgumentException('Estado no válido.');
+    }
+    $today = (new DateTimeImmutable('now', $this->timezone))->format('Y-m-d');
+    foreach (['creación' => $created, 'respuesta' => $response] as $label => $date) {
+      if ($date === null) continue;
+      if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1 || !checkdate((int) substr($date, 5, 2), (int) substr($date, 8, 2), (int) substr($date, 0, 4))) {
+        throw new \InvalidArgumentException('La fecha de ' . $label . ' no es válida.');
+      }
+      if ($date > $today) {
+        throw new \InvalidArgumentException('La fecha de ' . $label . ' no puede ser futura.');
+      }
+    }
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    $quote = $this->db->getRow("SELECT `_ID`, `estado`, `fecha`, `cct_created`, `fecha_respuesta` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$quoteId]);
+    if (!$quote) {
+      throw new \InvalidArgumentException('La cotización ya no existe.');
+    }
+    $oldState = self::text($quote['estado'] ?? '') ?: 'Sin estado';
+    $oldCreated = $this->date($quote['fecha'] ?? null) ?? $this->createdDate($quote['cct_created'] ?? null);
+    $oldResponse = $this->date($quote['fecha_respuesta'] ?? null);
+
+    $newState = $state ?? $oldState;
+    $newCreated = $created ?? $oldCreated;
+    $newResponse = $newState === 'Esperando respuesta' ? null : ($response ?? $oldResponse);
+    if (in_array($newState, ['Aprobada', 'Desaprobada'], true) && $newResponse === null) {
+      throw new \InvalidArgumentException('Indica la fecha de respuesta de la cotización ' . strtolower($newState) . '.');
+    }
+    if ($newCreated !== null && $newResponse !== null && $newResponse < $newCreated) {
+      throw new \InvalidArgumentException('La fecha de respuesta no puede ser anterior a la creación (' . $newCreated . ').');
+    }
+
+    // Mediodía en Colombia para que la fecha no cambie de día por zona horaria.
+    $noon = fn(string $date): int => (new DateTimeImmutable($date . ' 12:00:00', $this->timezone))->getTimestamp();
+    $data = [];
+    if ($newState !== $oldState) {
+      $data['estado'] = $newState;
+      if ($this->schema()->columnExists($table, 'estado_respuesta_cotizacion_mantenimiento')) {
+        $data['estado_respuesta_cotizacion_mantenimiento'] = $newState;
+      }
+    }
+    if ($newCreated !== $oldCreated && $newCreated !== null) {
+      $data['fecha'] = $noon($newCreated);
+    }
+    if ($newResponse !== $oldResponse) {
+      $data['fecha_respuesta'] = $newResponse === null ? 0 : $noon($newResponse);
+    }
+    $result = ['id' => $quoteId, 'estado' => $newState, 'fecha' => $newCreated, 'respuesta' => $newResponse];
+    if ($data === []) {
+      return $result;
+    }
+    $now = (new DateTimeImmutable('now', $this->timezone))->format('Y-m-d H:i:s');
+    $this->db->update($table, $data + ['cct_modified' => $now, 'cct_author_id' => $actorEmployeeId], ['_ID' => $quoteId]);
+    if ($newResponse !== null && $newResponse !== $oldResponse) {
+      $this->recordReviews([['id' => $quoteId, 'respuesta' => $newResponse]], $actorEmployeeId);
+    }
+    $this->logEdit($quoteId, ['estado' => $oldState, 'fecha' => $oldCreated, 'respuesta' => $oldResponse], ['estado' => $newState, 'fecha' => $newCreated, 'respuesta' => $newResponse], $actorEmployeeId, $now);
+    return $result;
+  }
+
+  /** @param array<string,mixed> $before @param array<string,mixed> $after */
+  private function logEdit(int $quoteId, array $before, array $after, string $actorEmployeeId, string $now): void
+  {
+    if ($this->settings === null) {
+      return;
+    }
+    $this->settings->refresh();
+    $log = $this->settings->get(self::EDITS_SETTING, []);
+    $log = is_array($log) ? $log : [];
+    $log[] = ['id' => $quoteId, 'antes' => $before, 'despues' => $after, 'por' => $actorEmployeeId, 'el' => $now];
+    $this->settings->set(self::EDITS_SETTING, array_slice($log, -2000), (int) $actorEmployeeId);
   }
 
   /** Administración sin IVA: `total_admon` o, si falta, subtotal × `porcentaje_admon`. */
