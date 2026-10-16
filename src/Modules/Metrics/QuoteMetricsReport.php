@@ -90,6 +90,55 @@ final class QuoteMetricsReport
     ];
   }
 
+  /**
+   * Completa la fecha de respuesta de una cotización aprobada que no la tiene.
+   * Solo aplica si sigue en estado Aprobada y sin fecha (no reemplaza fechas existentes).
+   *
+   * @return array{id:int,respuesta:string}
+   */
+  public function setMissingResponseDate(int $quoteId, string $date, string $actorEmployeeId): array
+  {
+    if ($quoteId <= 0) {
+      throw new \InvalidArgumentException('Cotización inválida.');
+    }
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1 || !checkdate((int) substr($date, 5, 2), (int) substr($date, 8, 2), (int) substr($date, 0, 4))) {
+      throw new \InvalidArgumentException('Escribe una fecha válida.');
+    }
+    if ($actorEmployeeId === '') {
+      throw new \RuntimeException('Tu usuario no tiene un id_empleado registrado.');
+    }
+    $today = (new DateTimeImmutable('now', $this->timezone))->format('Y-m-d');
+    if ($date > $today) {
+      throw new \InvalidArgumentException('La fecha de respuesta no puede ser futura.');
+    }
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    $quote = $this->db->getRow("SELECT `_ID`, `estado`, `fecha`, `cct_created`, `fecha_respuesta` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$quoteId]);
+    if (!$quote) {
+      throw new \InvalidArgumentException('La cotización ya no existe.');
+    }
+    if (trim((string) ($quote['estado'] ?? '')) !== 'Aprobada') {
+      throw new \InvalidArgumentException('Solo se completa la fecha de cotizaciones aprobadas.');
+    }
+    if ((int) ($quote['fecha_respuesta'] ?? 0) > 0) {
+      throw new \InvalidArgumentException('La cotización ya tiene fecha de respuesta.');
+    }
+    $created = $this->date($quote['fecha'] ?? null) ?? $this->createdDate($quote['cct_created'] ?? null);
+    if ($created !== null && $date < $created) {
+      throw new \InvalidArgumentException('La fecha de respuesta no puede ser anterior a la creación (' . $created . ').');
+    }
+    // Mediodía en Colombia para que la fecha no cambie de día por zona horaria.
+    $timestamp = (new DateTimeImmutable($date . ' 12:00:00', $this->timezone))->getTimestamp();
+    $stmt = $this->db->pdo()->prepare(
+      "UPDATE `{$table}` SET `fecha_respuesta` = ?, `cct_modified` = ?, `cct_author_id` = ?
+       WHERE `_ID` = ? AND `estado` = 'Aprobada' AND CAST(COALESCE(`fecha_respuesta`, 0) AS SIGNED) = 0"
+    );
+    $stmt->execute([$timestamp, (new DateTimeImmutable('now', $this->timezone))->format('Y-m-d H:i:s'), $actorEmployeeId, $quoteId]);
+    if ($stmt->rowCount() !== 1) {
+      throw new \RuntimeException('Otra persona actualizó la cotización; recarga y vuelve a intentar.');
+    }
+    return ['id' => $quoteId, 'respuesta' => $date];
+  }
+
   /** Administración sin IVA: `total_admon` o, si falta, subtotal × `porcentaje_admon`. */
   public static function adminAmount(array $row): int
   {

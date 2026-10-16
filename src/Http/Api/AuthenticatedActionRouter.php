@@ -143,6 +143,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRACT_MOVEMENTS => 'ajax_handler_contract_movements',
       SuCasaControlServiciosInmobiliarios::AJAX_CASE_METRICS => 'ajax_handler_case_metrics',
       SuCasaControlServiciosInmobiliarios::AJAX_QUOTE_METRICS => 'ajax_handler_quote_metrics',
+      SuCasaControlServiciosInmobiliarios::AJAX_QUOTE_RESPONSE_DATE => 'ajax_handler_quote_response_date',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRACT_OWNERS => 'ajax_handler_contract_owners',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRACT_OWNERS_SAVE => 'ajax_handler_contract_owners_save',
       SuCasaControlServiciosInmobiliarios::AJAX_DASHBOARD_FILTER_OPTIONS => 'ajax_handler_dashboard_filter_options',

@@ -539,6 +539,7 @@ trait RendersDashboard
         'contract_movements' => self::AJAX_CONTRACT_MOVEMENTS,
         'case_metrics' => self::AJAX_CASE_METRICS,
         'quote_metrics' => self::AJAX_QUOTE_METRICS,
+        'quote_response_date' => self::AJAX_QUOTE_RESPONSE_DATE,
         'contract_owners' => self::AJAX_CONTRACT_OWNERS,
         'contract_owners_save' => self::AJAX_CONTRACT_OWNERS_SAVE,
         'dashboard_filter_options' => self::AJAX_DASHBOARD_FILTER_OPTIONS,

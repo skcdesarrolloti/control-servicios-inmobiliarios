@@ -147,6 +147,11 @@
 #scm-app .scm-cc-col.is-active { background: #eff6ff; }
 #scm-app .scm-cc-axis .is-active { font-weight: 700; color: #1d4ed8; }
 #scm-app .scm-cm-table td.is-bad { color: var(--cm-bad); font-weight: 700; }
+#scm-app .scm-qm-fill { margin-left: auto; padding: 5px 12px; }
+#scm-app .scm-cm-note { align-items: center; }
+#scm-app .scm-qm-date { box-sizing: border-box; min-height: 34px; padding: 4px 8px; border: 1px solid var(--cm-line); border-radius: 8px; font: inherit; font-size: 12.5px; }
+#scm-app .scm-qm-row-msg { display: block; margin-top: 4px; font-size: 11px; color: var(--cm-muted); white-space: normal; }
+#scm-app .scm-qm-row-msg.is-error { color: var(--cm-bad); font-weight: 600; }
 #scm-app .scm-cm-table tfoot td { padding: 10px; border-top: 2px solid var(--cm-line); background: var(--cm-soft); font-weight: 700; color: #0f172a; }
 #scm-app .scm-cm-table td.is-total { font-weight: 700; }
 #scm-app .scm-cm-table td.is-actions { white-space: nowrap; text-align: right; }

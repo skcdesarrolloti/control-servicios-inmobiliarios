@@ -147,6 +147,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_MOVEMENTS = 'scm_ocupaciones_desocupaciones';
   const AJAX_CASE_METRICS = 'scm_metricas_casos';
   const AJAX_QUOTE_METRICS = 'scm_metricas_cotizaciones';
+  const AJAX_QUOTE_RESPONSE_DATE = 'scm_metricas_cotizacion_fecha_respuesta';
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
