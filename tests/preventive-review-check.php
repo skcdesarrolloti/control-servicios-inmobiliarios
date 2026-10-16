@@ -150,10 +150,10 @@ $assert(!\SCM\App\SuCasaControlServiciosInmobiliarios::correctiveReviewPublicSig
 $panel = $call('renderPreventiveReviewPanel', $call('preventiveReviewContext', 10883), 0);
 $assert(str_contains($panel, 'data-preventive-send-review="' . $reviewId . '"') && str_contains($panel, 'Pendiente de envío'), 'El panel debe ofrecer enviar la revisión pendiente.');
 $sendForm = $call('renderPreventiveReviewSendForm', $call('preventiveReviewContext', 10883), $call('preventiveReviewSendTarget', $call('preventiveReviewContext', 10883), 0));
-$assert(str_contains($sendForm, 'checklist[finanzas][pregunta_1_finanzas]') && str_contains($sendForm, 'name="cerrar_ticket"'), 'El formulario de envío no tiene los campos de JetForm.');
+$assert(str_contains($sendForm, 'checklist[finanzas][pregunta_1_finanzas]') && str_contains($sendForm, 'name="cerrar_ticket"') && str_contains($sendForm, 'name="notify_whatsapp[]"'), 'El formulario de envío no tiene los campos de JetForm.');
 $_POST = ['review_id' => (string) $reviewId, 'checklist' => ['finanzas' => ['pregunta_1_finanzas' => 'No']]];
 try { $call('preventiveReviewSend', 10883, $reviewId); $assert(false, 'Debió exigir la respuesta de cerrar caso.'); } catch (DomainException $e) { $assert(str_contains($e->getMessage(), 'cierra el caso'), $e->getMessage()); }
-$_POST = ['review_id' => (string) $reviewId, 'cerrar_ticket' => 'No', 'notify' => ['propietario', 'arrendatario'], 'recomendaciones' => 'Pintar fachada', 'checklist' => ['finanzas' => ['pregunta_1_finanzas' => 'No', 'pregunta_2_finanzas' => 'Si', 'observaciones_finanzas' => 'Debe un mes'], 'uso' => ['pregunta_1_uso' => 'Si'], 'renovacion_contrato' => ['pregunta_1_renovacion_contrato' => 'No']]];
+$_POST = ['review_id' => (string) $reviewId, 'cerrar_ticket' => 'No', 'notify' => ['propietario', 'arrendatario'], 'notify_whatsapp' => ['propietario', 'arrendatario'], 'recomendaciones' => 'Pintar fachada', 'checklist' => ['finanzas' => ['pregunta_1_finanzas' => 'No', 'pregunta_2_finanzas' => 'Si', 'observaciones_finanzas' => 'Debe un mes'], 'uso' => ['pregunta_1_uso' => 'Si'], 'renovacion_contrato' => ['pregunta_1_renovacion_contrato' => 'No']]];
 $historyBefore = (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket WHERE id_revision_preventiva = ?', [(string) $reviewId]);
 $call('preventiveReviewSend', 10883, $reviewId);
 $review = $db->getRow('SELECT * FROM wp_jet_cct_revision_preventiva WHERE _ID = ?', [$reviewId]);

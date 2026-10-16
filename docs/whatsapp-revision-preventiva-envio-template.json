@@ -1,0 +1,48 @@
+{
+  "name": "scm_revision_preventiva_envio_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "HEADER",
+      "format": "DOCUMENT",
+      "example": {
+        "header_handle": [
+          "revision-preventiva-ejemplo.pdf"
+        ]
+      }
+    },
+    {
+      "type": "BODY",
+      "text": "Buen día, {{1}}.\n\nLe compartimos el informe de la revisión preventiva #{{2}} del inmueble con contrato #{{3}}, ubicado en {{4}}.\n\nAdjuntamos el PDF y también puede consultarlo desde el botón.\n\nAtentamente,\n{{5}}",
+      "example": {
+        "body_text": [
+          [
+            "María Pérez",
+            "272",
+            "660",
+            "Urbanización Simón Bolívar manzana 20 lote 7",
+            "Funcionario de ejemplo - Coordinador contractual - Cel. 3001234567"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Ver informe",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "control-servicios-inmobiliarios/public/revision-preventiva.php?numero=272&expires=1789680400&sig=abc123"
+          ]
+        }
+      ]
+    }
+  ]
+}

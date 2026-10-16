@@ -752,6 +752,8 @@ trait HandlesPreventiveReviewActions
       }
     }
     $targets = array_values(array_intersect(['propietario', 'arrendatario'], array_map('strval', (array) ($_POST['notify'] ?? []))));
+    $whatsappTargets = array_values(array_intersect(['propietario', 'arrendatario'], array_map('strval', (array) ($_POST['notify_whatsapp'] ?? []))));
+    $contract = is_array($context['contract'] ?? null) ? $context['contract'] : [];
 
     $actor = $this->ticketCompletionActor();
     $actorEmployeeId = $this->correctiveReviewFirstText([$actor['employee_id'] ?? '', Auth::userId()]);
@@ -809,17 +811,39 @@ trait HandlesPreventiveReviewActions
       'Se envió la revisión preventiva #' . $reviewId . ' al propietario y al arrendatario.'
     );
 
+    // El PDF se genera después de guardar para que incluya lo diligenciado al enviar.
+    $document = [];
+    if ($targets !== [] || $whatsappTargets !== []) {
+      try {
+        $document = $this->preventiveReviewStorePdf($reviewId);
+      } catch (\Throwable $pdfError) {
+        error_log('[revision-preventiva] pdf #' . $reviewId . ': ' . $pdfError->getMessage());
+      }
+    }
+    $sentReview = array_merge($review, $update);
     try {
-      $queued = $this->preventiveReviewEnqueueSentNotifications(array_merge($review, $update), $ticket, $actor, $reviewId, $targets);
+      $queued = $this->preventiveReviewEnqueueSentNotifications($sentReview, $ticket, $actor, $reviewId, $targets, $document);
     } catch (\Throwable $notifyError) {
       $queued = 0;
       error_log('[revision-preventiva] envio #' . $reviewId . ': ' . $notifyError->getMessage());
+    }
+    $whatsappQueued = 0;
+    $whatsappMissing = [];
+    if ($whatsappTargets !== []) {
+      try {
+        [$whatsappQueued, $whatsappMissing] = $this->preventiveReviewEnqueueSentWhatsapp($sentReview, $contract, $reviewId, $whatsappTargets, $document);
+      } catch (\Throwable $whatsappError) {
+        error_log('[revision-preventiva] whatsapp #' . $reviewId . ': ' . $whatsappError->getMessage());
+      }
     }
 
     return [
       'message' => 'Revisión preventiva #' . $reviewId . ' enviada.'
         . ($close === 'Si' ? ' Caso cerrado.' : '')
-        . ($queued > 0 ? ' Correos en cola: ' . $queued . '.' : ' No se programaron correos.'),
+        . ($queued > 0 ? ' Correos en cola: ' . $queued . '.' : ' No se programaron correos.')
+        . ($whatsappTargets !== [] ? ' WhatsApp en cola: ' . $whatsappQueued . '.' : '')
+        . ($whatsappMissing !== [] ? ' Sin celular válido: ' . implode(' y ', $whatsappMissing) . '.' : '')
+        . (($targets !== [] || $whatsappTargets !== []) && $document === [] ? ' No se pudo generar el PDF: los correos llevan solo el enlace' . ($whatsappTargets !== [] ? ' y el WhatsApp no se envió' : '') . '.' : ''),
       'review_id' => (string) $reviewId,
       'review_url' => self::preventiveReviewPublicUrl($reviewId),
     ];
@@ -828,8 +852,9 @@ trait HandlesPreventiveReviewActions
   /**
    * @param array<string,mixed> $review @param array<string,mixed> $ticket @param array<string,mixed> $actor
    * @param array<int,string> $targets contactos del caso elegidos al enviar (propietario/arrendatario)
+   * @param array<string,string> $document PDF guardado (path, url, attachment_name) o vacío
    */
-  private function preventiveReviewEnqueueSentNotifications(array $review, array $ticket, array $actor, int $reviewId, array $targets): int
+  private function preventiveReviewEnqueueSentNotifications(array $review, array $ticket, array $actor, int $reviewId, array $targets, array $document = []): int
   {
     $recipients = [];
     if (in_array('propietario', $targets, true)) {
@@ -875,14 +900,22 @@ trait HandlesPreventiveReviewActions
           ? '<p style="margin:0 0 14px;line-height:1.65;">Le informamos que en el inmueble' . $place . ' se llevó a cabo la revisión preventiva correspondiente. Esta revisión se realiza periódicamente conforme a la fecha de inicio del contrato. A continuación encontrará el informe detallado del proceso.</p>' . $signature
           : '<p style="margin:0 0 14px;line-height:1.65;">El funcionario <b>' . $e($sender) . '</b> envió la revisión preventiva #' . $reviewId . ' del inmueble' . $place . '.</p>'
             . '<p style="margin:0;line-height:1.65;"><b>Daños encontrados:</b> ' . $e((string) ($review['encontro_danos'] ?? '-')) . '.</p>');
-      $html = \SCM\Support\EmailTemplate::render($subject, $content, ['buttons' => [['url' => $reviewUrl, 'label' => $isCaseContact ? 'Consultar informe de revisión preventiva' : 'Ver revisión preventiva']]]);
+      $buttons = [['url' => $reviewUrl, 'label' => $isCaseContact ? 'Consultar informe de revisión preventiva' : 'Ver revisión preventiva']];
+      if (($document['url'] ?? '') !== '') {
+        $buttons[] = ['url' => $document['url'], 'label' => 'Ver PDF'];
+      }
+      $html = \SCM\Support\EmailTemplate::render($subject, $content, ['buttons' => $buttons]);
+      $payload = ['review_url' => $reviewUrl, 'reply_to' => (string) ($actor['email'] ?? '')];
+      if ($isCaseContact && ($document['path'] ?? '') !== '') {
+        $payload['attachments'] = [['path' => $document['path'], 'name' => $document['attachment_name']]];
+      }
       $queued += $queue->enqueue((string) $recipient['email'], $subject, $html, [
         'source_module' => 'revision_preventiva',
         'internal_action' => 'revision_preventiva_enviada',
         'internal_cc' => $isCaseContact ? [] : $copies,
         'destination_name' => $name,
         'dedupe_key' => 'revision-preventiva-enviada:' . $reviewId . ':' . $role . ':' . strtolower((string) $recipient['email']),
-        'payload' => ['review_url' => $reviewUrl, 'reply_to' => (string) ($actor['email'] ?? '')],
+        'payload' => $payload,
         'meta' => [
           'event' => 'revision_preventiva_enviada',
           'role' => $role,
@@ -894,6 +927,127 @@ trait HandlesPreventiveReviewActions
       ]);
     }
     return $queued;
+  }
+
+  /** PDF con la misma vista e impresión del informe público. */
+  public function preventiveReviewPdfBytes(int $reviewId): string
+  {
+    $view = new \SCM\Modules\PreventiveReview\PreventiveReviewPublicView($this->db);
+    $result = $view->render($reviewId);
+    if ((int) ($result['status'] ?? 500) !== 200) {
+      throw new \DomainException('No se encontró la revisión preventiva para generar el PDF.');
+    }
+    $root = dirname(__DIR__, 3) . '/public/assets/css/';
+    $bytes = \SCM\Support\HtmlPdfRenderer::render(
+      $view->headerHtml() . (string) $result['content'],
+      (string) $result['title'],
+      [
+        'stylesheets' => [$root . 'corrective-review-public.css', $root . 'preventive-review.css'],
+        'body_class' => 'scm-corrective-public-page',
+        'container_class' => 'scm-corrective-public-shell',
+        'wrapper_class' => 'scm-prev-pdf',
+      ]
+    );
+    if ($bytes === null) {
+      throw new \DomainException('No se pudo generar el PDF de la revisión preventiva.');
+    }
+    return $bytes;
+  }
+
+  /** @return array{path:string,url:string,name:string,attachment_name:string} */
+  private function preventiveReviewStorePdf(int $reviewId): array
+  {
+    $bytes = $this->preventiveReviewPdfBytes($reviewId);
+    $dir = (string) SCM_UPLOAD_PATH;
+    if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
+      throw new \DomainException('No se pudo preparar el PDF para adjuntar.');
+    }
+    $name = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
+    $path = rtrim($dir, '/\\') . '/' . $name;
+    if (file_put_contents($path, $bytes, LOCK_EX) === false) {
+      throw new \DomainException('No se pudo guardar el PDF de la revisión preventiva.');
+    }
+    return [
+      'path' => $path,
+      'url' => \SCM\Support\StoredFileService::fromRuntime()->urlFor($name),
+      'name' => $name,
+      'attachment_name' => 'revision-preventiva-' . $reviewId . '.pdf',
+    ];
+  }
+
+  /** Celular del contacto en formato internacional, con el indicativo del contrato (57 por defecto). */
+  private function preventiveReviewContactPhone(array $review, array $contract, string $role): string
+  {
+    $phone = $this->correctiveReviewFirstText([$review['celular_' . $role] ?? '', $contract['celular_' . $role] ?? '']);
+    return $phone === '' ? '' : $this->maintenance_quote_whatsapp_phone((string) ($contract['indicativo_' . $role] ?? '57'), $phone);
+  }
+
+  /**
+   * WhatsApp al propietario/arrendatario con el PDF en el encabezado (plantilla scm_revision_preventiva_envio_v1).
+   *
+   * @param array<int,string> $targets @param array<string,string> $document
+   * @return array{0:int,1:array<int,string>} encolados y contactos sin celular válido
+   */
+  private function preventiveReviewEnqueueSentWhatsapp(array $review, array $contract, int $reviewId, array $targets, array $document): array
+  {
+    $reviewUrl = self::signedPreventiveReviewPublicUrl($reviewId);
+    $buttonSuffix = $this->maintenance_quote_whatsapp_url_button_suffix($reviewUrl);
+    $signature = (new \SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService($this->db))->senderProfile()['signature_line'];
+    $contractRef = trim((string) ($review['contrato'] ?? '')) ?: '-';
+    $address = trim((string) ($review['direccion'] ?? '')) ?: '-';
+    $documentUrl = (string) ($document['url'] ?? '');
+    $fileName = (string) ($document['attachment_name'] ?? ('revision-preventiva-' . $reviewId . '.pdf'));
+    // La plantilla lleva el PDF en el encabezado: sin documento Meta rechaza el mensaje.
+    if ($documentUrl === '') {
+      return [0, []];
+    }
+    $queue = new \SCM\Support\SmsQueue($this->db);
+    $queued = 0;
+    $missing = [];
+    foreach ($targets as $role) {
+      $phone = $this->preventiveReviewContactPhone($review, $contract, $role);
+      if ($phone === '') {
+        $missing[] = $role;
+        continue;
+      }
+      $name = trim((string) ($review[$role] ?? '')) ?: ($role === 'propietario' ? 'Propietario' : 'Arrendatario');
+      $message = "Buen día, {$name}.\n\n"
+        . "Le compartimos el informe de la revisión preventiva #{$reviewId} del inmueble con contrato #{$contractRef}, ubicado en {$address}.\n\n"
+        . "Adjuntamos el PDF y también puede consultarlo desde el botón.\n\n"
+        . "Enlace directo: {$reviewUrl}\n\n"
+        . "Atentamente,\n{$signature}";
+      $components = [['type' => 'header', 'parameters' => [['type' => 'document', 'document' => ['link' => $documentUrl, 'filename' => $fileName]]]]];
+      $components[] = ['type' => 'body', 'parameters' => [
+        ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($name)],
+        ['type' => 'text', 'text' => (string) $reviewId],
+        ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($contractRef)],
+        ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($address)],
+        ['type' => 'text', 'text' => $this->maintenance_quote_whatsapp_text($signature)],
+      ]];
+      $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $buttonSuffix]]];
+      $ok = $queue->enqueue($phone, $name, $message, [
+        'source_module' => 'revision_preventiva',
+        'campaign_tag' => 'revision_preventiva_envio',
+        'categoria_mensaje' => 'informacion',
+        'id_ticket' => (string) ($review['id_ticket'] ?? ''),
+        'id_revision_preventiva' => $reviewId,
+        'review_url' => $reviewUrl,
+        'pdf_url' => $documentUrl,
+        'document_url' => $documentUrl,
+        'document_filename' => $fileName,
+        'button_url_mode' => 'dynamic_suffix',
+        'dedupe_key' => 'revision-preventiva-envio-whatsapp:' . $reviewId . ':' . $role,
+        'template_name' => 'scm_revision_preventiva_envio_v1',
+        'template_language' => 'es_CO',
+        'template_components' => $components,
+      ]);
+      if ($ok) {
+        $queued++;
+      } else {
+        error_log('[revision-preventiva] whatsapp #' . $reviewId . ' ' . $role . ': ' . $queue->lastError());
+      }
+    }
+    return [$queued, $missing];
   }
 
   /** Respuesta para quien solo puede enviar (sin permiso para editar la revisión). */
@@ -970,11 +1124,15 @@ trait HandlesPreventiveReviewActions
             </div>
           </fieldset>
           <fieldset class="scm-prev-block">
-            <legend>Notificar por correo</legend>
-            <?php foreach ($contacts as $key => $contact): $valid = filter_var($contact['email'], FILTER_VALIDATE_EMAIL) !== false; ?>
-              <label class="scm-prev-notify"><input type="checkbox" name="notify[]" value="<?= $h($key) ?>"<?= $valid ? ' checked' : ' disabled' ?>> <span><b><?= $h($contact['label']) ?>:</b> <?= $h($contact['name'] ?: '-') ?> · <?= $valid ? $h($contact['email']) : 'sin correo registrado' ?></span></label>
+            <legend>Notificar</legend>
+            <?php foreach ($contacts as $key => $contact): $valid = filter_var($contact['email'], FILTER_VALIDATE_EMAIL) !== false; $phone = $this->preventiveReviewContactPhone($review, $contract, $key); ?>
+              <div class="scm-prev-notify-contact">
+                <strong><?= $h($contact['label']) ?>: <?= $h($contact['name'] ?: '-') ?></strong>
+                <label class="scm-prev-notify"><input type="checkbox" name="notify[]" value="<?= $h($key) ?>"<?= $valid ? ' checked' : ' disabled' ?>> <span>Correo · <?= $valid ? $h($contact['email']) : 'sin correo registrado' ?></span></label>
+                <label class="scm-prev-notify"><input type="checkbox" name="notify_whatsapp[]" value="<?= $h($key) ?>"<?= $phone !== '' ? ' checked' : ' disabled' ?>> <span>WhatsApp · <?= $phone !== '' ? $h($phone) : 'sin celular registrado' ?></span></label>
+              </div>
             <?php endforeach; ?>
-            <p class="scm-prev-muted">También se avisa al creador de la revisión y a los funcionarios de Notificaciones internas → Revisión preventiva enviada.</p>
+            <p class="scm-prev-muted">El correo y el WhatsApp llevan el PDF del informe. También se avisa por correo al creador de la revisión y a los funcionarios de Notificaciones internas → Revisión preventiva enviada.</p>
           </fieldset>
         </section>
         <footer class="scm-prev-nav">

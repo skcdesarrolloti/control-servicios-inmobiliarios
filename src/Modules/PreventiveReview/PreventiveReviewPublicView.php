@@ -20,6 +20,16 @@ final class PreventiveReviewPublicView
     $this->shared = new CorrectiveReviewPublicView($db);
   }
 
+  /** Encabezado con logo, igual en la página pública y en el PDF. */
+  public function headerHtml(): string
+  {
+    $logo = function_exists('system_image') ? system_image('portal_logo_url', defined('SCM_DEFAULT_PORTAL_LOGO_URL') ? (string) SCM_DEFAULT_PORTAL_LOGO_URL : '') : '';
+    return '<header class="scm-corrective-public-head">'
+      . '<span class="scm-corrective-public-logo">' . ($logo !== '' ? '<img src="' . $this->h($logo) . '" alt="SKC SuCasa Inmobiliaria">' : '') . '</span>'
+      . '<div><p>SKC SuCasa Inmobiliaria</p><strong>Revisión preventiva</strong></div>'
+      . '</header>';
+  }
+
   /** @return array{title:string,content:string,status:int} */
   public function render(int $reviewId): array
   {

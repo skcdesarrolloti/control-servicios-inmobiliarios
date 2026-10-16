@@ -64,13 +64,7 @@ session_write_close();
 </head>
 <body class="scm-corrective-public-page">
   <main class="scm-corrective-public-shell">
-    <header class="scm-corrective-public-head">
-      <span class="scm-corrective-public-logo"><img src="<?= $escape(system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL)) ?>" alt="SKC SuCasa Inmobiliaria"></span>
-      <div>
-        <p>SKC SuCasa Inmobiliaria</p>
-        <strong>Revisión preventiva</strong>
-      </div>
-    </header>
+    <?= (new PreventiveReviewPublicView(App::db()))->headerHtml() ?>
     <?= (string) ($result['content'] ?? '') ?>
   </main>
 </body>
