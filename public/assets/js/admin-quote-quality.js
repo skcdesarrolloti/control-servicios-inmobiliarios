@@ -5,6 +5,8 @@
   // Al subir el auxiliar (AUI) se agrupan sus movimientos por número de inmueble y, por cada inmueble,
   // se listan TODAS las cotizaciones del sistema con ese inmueble (en la cotización o en su caso),
   // con fecha de respuesta, valor total y administración editables.
+  // Segunda vista, "Todas las cotizaciones": todas las cotizaciones del sistema por mes (creación o
+  // respuesta), filtrables por contrato e inmueble, con las mismas correcciones; no necesita el auxiliar.
   // Usa las filas que ya cargó admin-quote-metrics.js (evento scm:quote-data); al guardar actualiza esas
   // mismas filas y avisa con scm:quote-rows-changed para que el informe se recalcule sin recargar.
   var MONTHS_SHORT = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -45,7 +47,11 @@
     module.dataset.qqInit = "1";
     var actions = runtime.actions || {};
     var ledgerEl = module.querySelector("[data-scm-quote-ledger]");
-    var state = { rows: [], canEditResponse: false, canEditQuote: false, ledger: null, filter: "revisar", search: "", limit: PAGE_SIZE, saving: false };
+    var currentMonth = module.getAttribute("data-current-month") || todayIso().slice(0, 7);
+    var state = {
+      rows: [], canEditResponse: false, canEditQuote: false, ledger: null, filter: "revisar", search: "", limit: PAGE_SIZE, saving: false, sub: "auxiliar",
+      all: { month: currentMonth, by: "fecha", contrato: "", inmueble: "", limit: PAGE_SIZE },
+    };
 
     function post(action, fields, file) {
       var body = new FormData();
@@ -193,12 +199,26 @@
 
     function renderLedgerShell() {
       ledgerEl.innerHTML = '<section class="scm-cm-card is-wide"><header><h2>Conciliar con el auxiliar contable</h2>' +
-        '<p class="scm-cm-hint">Sube el auxiliar de administración (AUI) en .xls o .xlsx: por cada número de inmueble verás qué movimiento corresponde a cada cotización y podrás corregir fecha, total y administración.</p></header>' +
+        '<div class="scm-qm-views" role="tablist" aria-label="Vista de conciliación">' +
+        [["auxiliar", "Por auxiliar contable"], ["todas", "Todas las cotizaciones"]].map(function (sub) {
+          return '<button type="button" role="tab" class="scm-qm-view' + (state.sub === sub[0] ? " is-active" : "") + '" aria-selected="' + (state.sub === sub[0]) + '" data-scm-qq-sub-target="' + sub[0] + '">' + esc(sub[1]) + "</button>";
+        }).join("") + "</div></header>" +
+        '<div data-scm-qq-sub="auxiliar"' + (state.sub === "auxiliar" ? "" : " hidden") + '>' +
+        '<p class="scm-cm-hint">Sube el auxiliar de administración (AUI) en .xls o .xlsx: por cada número de inmueble verás qué movimiento corresponde a cada cotización y podrás corregir fecha, total y administración.</p>' +
         '<form class="scm-qq-upload" data-scm-qq-ledger-form><label class="scm-qq-file"><input type="file" accept=".xls,.xlsx" data-scm-qq-ledger-file aria-label="Auxiliar contable">' +
         '<span class="material-symbols-outlined" aria-hidden="true">upload_file</span><span class="scm-qq-file-text"><strong data-scm-qq-ledger-name>Elegir auxiliar contable</strong>' +
         '<small>Archivo .xls o .xlsx exportado de contabilidad</small></span><span class="scm-qq-file-cta">Buscar archivo</span></label>' +
         '<button type="submit" class="scm-cm-btn scm-qq-primary">Conciliar</button><span class="scm-cm-hint" data-scm-qq-ledger-status aria-live="polite"></span></form>' +
-        '<div data-scm-qq-ledger-result></div></section>';
+        '<div data-scm-qq-ledger-result></div></div>' +
+        '<div data-scm-qq-sub="todas"' + (state.sub === "todas" ? "" : " hidden") + '>' +
+        '<form class="scm-cm-filters scm-ql-all-filters" onsubmit="return false;">' +
+        '<label class="scm-cm-field"><span>Mes</span><input type="month" data-scm-qq-all-filter="month" value="' + esc(state.all.month) + '" max="' + esc(currentMonth) + '"></label>' +
+        '<label class="scm-cm-field"><span>Por fecha de</span><select data-scm-qq-all-filter="by"><option value="fecha">Creación</option><option value="respuesta">Respuesta (aprobadas)</option></select></label>' +
+        '<label class="scm-cm-field"><span>Contrato</span><input type="search" data-scm-qq-all-filter="contrato" placeholder="Número de contrato"></label>' +
+        '<label class="scm-cm-field"><span>Inmueble</span><input type="search" inputmode="numeric" data-scm-qq-all-filter="inmueble" placeholder="Número de inmueble"></label>' +
+        '<button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-qq-all-clear>Todos los meses</button></form>' +
+        '<p class="scm-cm-hint scm-ql-help">Sin mes se listan todas las cotizaciones del filtro. Al cambiar la administración se recalcula su IVA y, si no cambias el total, el total se ajusta solo.</p>' +
+        '<div data-scm-qq-all></div></div></section>';
     }
 
     function kpi(label, value, note, tone) {
@@ -298,29 +318,91 @@
       var result = quoteResult(row, group, range);
       var moves = (group && group.byQuote[row.id]) || [];
       var tone = row.estado === "Aprobada" ? "is-entregado" : row.estado === "Desaprobada" ? "is-recibido" : "is-por_recibir";
-      var dateCell = row.approved && state.canEditResponse
-        ? '<input type="date" class="scm-qm-date" data-ql-field="fecha" value="' + esc(row.respuesta || "") + '" data-original="' + esc(row.respuesta || "") + '" max="' + todayIso() + '"' +
-          (row.fecha ? ' min="' + esc(row.fecha) + '"' : "") + ' aria-label="Fecha de respuesta de la cotización ' + esc(row.id) + '">'
-        : esc(day(row.respuesta));
-      var moneyInput = function (field, value, label) {
-        return state.canEditQuote
-          ? '<input type="text" inputmode="numeric" class="scm-qm-date scm-ql-money" data-ql-field="' + field + '" value="' + esc(num(value)) + '" data-original="' + esc(value || 0) + '" aria-label="' + esc(label) + '">'
-          : esc(money(value));
-      };
       return '<tr class="scm-maintenance-quote-row' + (result.tone === "is-muted" ? " is-muted" : "") + '" data-ql-quote="' + esc(row.id) + '" data-cotizacion-id="' + esc(row.id) + '" data-ticket="' + esc(row.ticket) + '">' +
         "<td><strong>#" + esc(row.id) + '</strong> <span class="scm-cm-badge ' + tone + '">' + esc(row.estado) + '</span><small class="scm-cm-source">' + (row.ticket ? "Caso #" + esc(row.ticket) : "Sin caso") + "</small></td>" +
         (showProperty ? "<td>" + esc(row.inmueble || "—") + "</td>" : "") +
         "<td>" + esc(day(row.fecha)) + "</td>" +
-        "<td>" + dateCell + (row.respuesta_fuente === "caso" ? '<small class="scm-cm-source">Fecha tomada del caso</small>' : "") + "</td>" +
+        "<td>" + dateInput(row) + "</td>" +
         '<td class="is-num">' + moneyInput("total", row.total, "Valor total de la cotización " + row.id) + "</td>" +
         '<td class="is-num">' + moneyInput("administracion", row.admin, "Administración de la cotización " + row.id) + "</td>" +
         "<td>" + (moves.length ? moves.map(function (move) { return moveChip(move); }).join("") : '<span class="scm-cm-muted">—</span>') + "</td>" +
         '<td><span class="scm-cm-badge ' + result.tone + '">' + esc(result.text) + "</span>" + (result.hint ? '<small class="scm-cm-source">' + esc(result.hint) + "</small>" : "") +
         '<small class="scm-qm-row-msg" aria-live="polite"></small></td>' +
-        '<td class="is-actions">' + (state.canEditQuote || (row.approved && state.canEditResponse)
-          ? '<button type="button" class="scm-cm-btn scm-qq-primary" data-ql-save disabled>Guardar</button> ' : "") +
+        '<td class="is-actions">' + actionButtons(row) + "</td></tr>";
+    }
+
+    // ---- Vista "Todas las cotizaciones" ---------------------------------------------------------
+
+    function allRows() {
+      var f = state.all;
+      var contrato = normalize(f.contrato.trim());
+      var inmueble = f.inmueble.trim();
+      return state.rows.filter(function (row) {
+        var date = f.by === "respuesta" ? (row.approved ? row.respuesta : "") : row.fecha;
+        if (f.month && (!date || date.slice(0, 7) !== f.month)) return false;
+        if (contrato && normalize(row.contrato).indexOf(contrato) === -1) return false;
+        if (inmueble && String(row.inmueble).indexOf(inmueble) === -1 && String(row.inmueble_caso || "").indexOf(inmueble) === -1) return false;
+        return true;
+      }).sort(function (a, b) {
+        var key = f.by === "respuesta" ? "respuesta" : "fecha";
+        return (b[key] || "") < (a[key] || "") ? -1 : (b[key] || "") > (a[key] || "") ? 1 : b.id - a.id;
+      });
+    }
+
+    function renderAll() {
+      var holder = ledgerEl.querySelector("[data-scm-qq-all]");
+      if (!holder) return;
+      var rows = allRows();
+      var sum = rows.reduce(function (acc, row) { acc.total += row.total || 0; acc.admin += row.admin || 0; return acc; }, { total: 0, admin: 0 });
+      var shown = rows.slice(0, state.all.limit);
+      var label = state.all.month ? (state.all.by === "respuesta" ? "aprobadas en " : "creadas en ") + day(state.all.month + "-01").replace(/^1 /, "") : "todas las fechas";
+      holder.innerHTML = '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-qq-table scm-ql-quotes"><thead><tr><th>Cotización</th><th>Contrato</th><th>Inmueble</th>' +
+        '<th>Creada</th><th>Fecha de respuesta</th><th class="is-num">Valor total</th><th class="is-num">Administración</th><th></th></tr></thead><tbody>' +
+        (shown.length ? shown.map(allRow).join("") : '<tr><td colspan="8" class="scm-cm-muted">No hay cotizaciones con estos filtros.</td></tr>') +
+        '</tbody><tfoot><tr><td colspan="5">' + esc(num(rows.length) + (rows.length === 1 ? " cotización · " : " cotizaciones · ") + label) +
+        '</td><td class="is-num">' + esc(money(sum.total)) + '</td><td class="is-num is-total">' + esc(money(sum.admin)) + "</td><td></td></tr></tfoot></table></div>" +
+        (rows.length > shown.length ? '<div class="scm-cm-pager"><span>' + num(shown.length) + " de " + num(rows.length) + '</span><button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-qq-all-more>Ver más</button></div>' : "");
+    }
+
+    function allRow(row) {
+      var tone = row.estado === "Aprobada" ? "is-entregado" : row.estado === "Desaprobada" ? "is-recibido" : "is-por_recibir";
+      var property = row.inmueble && !/^no asignado$/i.test(row.inmueble) ? row.inmueble : row.inmueble_caso ? row.inmueble_caso + " (del caso)" : "—";
+      return '<tr class="scm-maintenance-quote-row" data-ql-quote="' + esc(row.id) + '" data-cotizacion-id="' + esc(row.id) + '" data-ticket="' + esc(row.ticket) + '">' +
+        "<td><strong>#" + esc(row.id) + '</strong> <span class="scm-cm-badge ' + tone + '">' + esc(row.estado) + '</span><small class="scm-cm-source">' + (row.ticket ? "Caso #" + esc(row.ticket) : "Sin caso") + "</small></td>" +
+        "<td>" + esc(row.contrato || "—") + "</td><td>" + esc(property) + '<small class="scm-cm-source">' + esc(row.direccion || "") + "</small></td>" +
+        "<td>" + esc(day(row.fecha)) + "</td><td>" + dateInput(row) + "</td>" +
+        '<td class="is-num">' + moneyInput("total", row.total, "Valor total de la cotización " + row.id) + "</td>" +
+        '<td class="is-num">' + moneyInput("administracion", row.admin, "Administración de la cotización " + row.id) + '<small class="scm-qm-row-msg" aria-live="polite"></small></td>' +
+        '<td class="is-actions">' + actionButtons(row) + "</td></tr>";
+    }
+
+    function dateInput(row) {
+      return row.approved && state.canEditResponse
+        ? '<input type="date" class="scm-qm-date" data-ql-field="fecha" value="' + esc(row.respuesta || "") + '" data-original="' + esc(row.respuesta || "") + '" max="' + todayIso() + '"' +
+          (row.fecha ? ' min="' + esc(row.fecha) + '"' : "") + ' aria-label="Fecha de respuesta de la cotización ' + esc(row.id) + '">' +
+          (row.respuesta_fuente === "caso" ? '<small class="scm-cm-source">Fecha tomada del caso</small>' : "")
+        : esc(day(row.respuesta));
+    }
+    function moneyInput(field, value, label) {
+      return state.canEditQuote
+        ? '<input type="text" inputmode="numeric" class="scm-qm-date scm-ql-money" data-ql-field="' + field + '" value="' + esc(num(value)) + '" data-original="' + esc(value || 0) + '" aria-label="' + esc(label) + '">'
+        : esc(money(value));
+    }
+    function actionButtons(row) {
+      return (state.canEditQuote || (row.approved && state.canEditResponse) ? '<button type="button" class="scm-cm-btn scm-qq-primary" data-ql-save disabled>Guardar</button> ' : "") +
         '<button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-maintenance-quote-open-case data-cotizacion-id="' + esc(row.id) +
-        '" data-ticket="' + esc(row.ticket) + '" data-contract="' + esc(row.contrato) + '">Ver caso</button></td></tr>';
+        '" data-ticket="' + esc(row.ticket) + '" data-contract="' + esc(row.contrato) + '">Ver caso</button>';
+    }
+
+    function setSub(sub) {
+      state.sub = sub;
+      ledgerEl.querySelectorAll("[data-scm-qq-sub-target]").forEach(function (button) {
+        var active = button.getAttribute("data-scm-qq-sub-target") === sub;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      ledgerEl.querySelectorAll("[data-scm-qq-sub]").forEach(function (panel) { panel.hidden = panel.getAttribute("data-scm-qq-sub") !== sub; });
+      if (sub === "todas") renderAll();
     }
 
     // Cambios pendientes de una fila: solo los campos que difieren del valor guardado.
@@ -374,10 +456,18 @@
           // El informe de Cotizaciones usa estas mismas filas: se recalcula sin volver a consultar.
           module.dispatchEvent(new CustomEvent("scm:quote-rows-changed"));
           var card = tr.closest("[data-scm-qq-prop]");
-          if (card) {
+          if (tr.closest("[data-scm-qq-all]")) {
+            // Vista "Todas": se repinta conservando los filtros; la conciliación se recalcula al volver a ella.
+            renderAll();
+            if (state.ledger) renderLedger();
+            var saved = ledgerEl.querySelector('[data-scm-qq-all] [data-ql-quote="' + id + '"] .scm-qm-row-msg');
+            if (saved) { saved.textContent = "Guardado"; saved.className = "scm-qm-row-msg is-ok"; }
+          } else if (card) {
             refreshGroup(card.getAttribute("data-scm-qq-prop"));
+            renderAll();
           } else {
             renderLedger();
+            renderAll();
           }
         })
         .catch(function (error) {
@@ -435,6 +525,7 @@
       state.canEditQuote = !!event.detail.canEditQuote;
       if (!ledgerEl.innerHTML) renderLedgerShell();
       renderLedger();
+      renderAll();
     });
 
     module.addEventListener("change", function (event) {
@@ -447,7 +538,20 @@
     });
 
     var searchTimer = 0;
+    var allTimer = 0;
     module.addEventListener("input", function (event) {
+      var allFilter = event.target.closest("[data-scm-qq-all-filter]");
+      if (allFilter) {
+        var key = allFilter.getAttribute("data-scm-qq-all-filter");
+        var filterValue = allFilter.value;
+        window.clearTimeout(allTimer);
+        allTimer = window.setTimeout(function () {
+          state.all[key] = filterValue;
+          state.all.limit = PAGE_SIZE;
+          renderAll();
+        }, key === "contrato" || key === "inmueble" ? 200 : 0);
+        return;
+      }
       var search = event.target.closest("[data-scm-qq-ledger-search]");
       if (search) {
         var value = search.value;
@@ -501,6 +605,17 @@
 
     module.addEventListener("click", function (event) {
       var target = event.target;
+      var sub = target.closest("[data-scm-qq-sub-target]");
+      if (sub) { setSub(sub.getAttribute("data-scm-qq-sub-target")); return; }
+      if (target.closest("[data-scm-qq-all-more]")) { state.all.limit += PAGE_SIZE; renderAll(); return; }
+      if (target.closest("[data-scm-qq-all-clear]")) {
+        state.all.month = "";
+        state.all.limit = PAGE_SIZE;
+        var monthField = ledgerEl.querySelector('[data-scm-qq-all-filter="month"]');
+        if (monthField) monthField.value = "";
+        renderAll();
+        return;
+      }
       var filter = target.closest("[data-scm-qq-ledger-filter]");
       if (filter) { state.filter = filter.getAttribute("data-scm-qq-ledger-filter"); state.limit = PAGE_SIZE; renderLedger(); return; }
       if (target.closest("[data-scm-qq-ledger-more]")) { state.limit += PAGE_SIZE; renderLedger(); return; }

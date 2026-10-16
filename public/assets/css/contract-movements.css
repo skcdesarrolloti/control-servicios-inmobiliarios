@@ -188,6 +188,8 @@
 #scm-app .scm-qq-filters .scm-cm-search { margin-left: auto; min-width: 260px; }
 #scm-app .scm-qq-filters .scm-cm-search + .scm-cm-btn-ghost { margin-left: 0; }
 #scm-app .scm-ql-help { margin: 0 0 12px; }
+#scm-app .scm-ql-all-filters { margin-bottom: 10px; padding: 0; border: 0; }
+#scm-app .scm-qm-row-msg.is-ok { color: var(--cm-good); font-weight: 600; }
 #scm-app .scm-ql-list { display: flex; flex-direction: column; gap: 12px; }
 #scm-app .scm-ql-prop { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--cm-line); border-left: 4px solid #cbd5e1; border-radius: 12px; background: #fff; }
 #scm-app .scm-ql-prop.is-ok { border-left-color: var(--cm-good); }
