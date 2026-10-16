@@ -70,19 +70,22 @@ final class MetricsPanelsView
 
   public function renderQuotesShell(): string
   {
-    $month = date('Y-m');
+    $year = (int) date('Y');
+    $month = (int) date('n');
+    $months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     ob_start();
 ?>
-    <section class="scm-cm scm-quote-metrics" data-scm-quote-metrics aria-labelledby="scm-quote-metrics-title">
+    <section class="scm-cm scm-quote-metrics" data-scm-quote-metrics data-default-year="<?php echo $year; ?>" data-default-month="<?php echo $month; ?>" aria-labelledby="scm-quote-metrics-title">
       <header class="scm-cm-head">
         <div class="scm-cm-head-copy">
           <p class="scm-cm-kicker">Métricas · Mantenimiento</p>
           <h1 id="scm-quote-metrics-title">Cotizaciones</h1>
-          <p class="scm-cm-subtitle">Cotizaciones aprobadas en el mes, administración ganada y cuáles ya terminaron trabajo con acta de satisfacción.</p>
+          <p class="scm-cm-subtitle">Cotizaciones creadas en el mes (valor y administración), cuántas faltan por enviar y la administración ganada por las aprobadas según su fecha de respuesta.</p>
         </div>
         <div class="scm-cm-head-actions">
+          <span class="scm-cm-updated" data-scm-quote-updated></span>
           <button type="button" class="scm-cm-btn" data-scm-quote-export disabled>
-            <span class="material-symbols-outlined" aria-hidden="true">download</span><span>Exportar CSV</span>
+            <span class="material-symbols-outlined" aria-hidden="true">download</span><span>Exportar mes a mes</span>
           </button>
           <button type="button" class="scm-cm-btn" data-scm-quote-refresh>
             <span class="material-symbols-outlined" aria-hidden="true">refresh</span><span>Actualizar</span>
@@ -90,26 +93,23 @@ final class MetricsPanelsView
         </div>
       </header>
 
-      <form class="scm-cm-filters scm-quote-filters" onsubmit="return false;">
-        <div class="scm-cm-field">
-          <span>Mes de la cotización</span>
-          <div class="scm-quote-month">
-            <button type="button" class="scm-cm-btn scm-cm-btn-icon" data-scm-quote-step="-1" aria-label="Mes anterior"><span class="material-symbols-outlined" aria-hidden="true">chevron_left</span></button>
-            <input type="month" data-scm-quote-filter="month" value="<?php echo htmlspecialchars($month, ENT_QUOTES, 'UTF-8'); ?>">
-            <button type="button" class="scm-cm-btn scm-cm-btn-icon" data-scm-quote-step="1" aria-label="Mes siguiente"><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></button>
-          </div>
-        </div>
+      <form class="scm-cm-filters" onsubmit="return false;">
         <label class="scm-cm-field">
-          <span>Trabajo</span>
-          <select data-scm-quote-filter="state">
-            <option value="">Todas las aprobadas</option>
-            <option value="terminada">Terminadas con acta</option>
-            <option value="pendiente">Pendientes de acta</option>
+          <span>Año</span>
+          <select data-scm-quote-filter="year"><option value="<?php echo $year; ?>"><?php echo $year; ?></option></select>
+        </label>
+        <label class="scm-cm-field">
+          <span>Mes</span>
+          <select data-scm-quote-filter="month">
+            <option value="0">Todo el año</option>
+            <?php foreach ($months as $index => $name): ?>
+              <option value="<?php echo $index + 1; ?>"<?php echo $index + 1 === $month ? ' selected' : ''; ?>><?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?></option>
+            <?php endforeach; ?>
           </select>
         </label>
-        <label class="scm-cm-field scm-quote-search">
-          <span>Buscar</span>
-          <input type="search" data-scm-quote-filter="search" placeholder="Cotización, caso, contrato, inmueble o dirección">
+        <label class="scm-cm-field">
+          <span>Categoría</span>
+          <select data-scm-quote-filter="categoria"><option value="">Todas</option></select>
         </label>
       </form>
 

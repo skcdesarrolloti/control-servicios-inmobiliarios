@@ -135,9 +135,18 @@
 #scm-app .scm-cm-field select:focus,
 #scm-app .scm-cm-field input:focus { outline: 2px solid #bfdbfe; border-color: #93c5fd; }
 #scm-app .scm-cm-btn-icon { justify-content: center; width: 36px; min-height: 36px; padding: 0; }
-#scm-app .scm-quote-month { display: flex; align-items: center; gap: 6px; }
-#scm-app .scm-quote-month input { flex: 1; min-width: 0; }
-#scm-app .scm-quote-filters { grid-template-columns: minmax(220px, 1fr) minmax(180px, 1fr) minmax(240px, 2fr); }
+#scm-app .scm-qm-section { margin: 4px 0 -6px; font-size: 13px; font-weight: 700; color: #334155; }
+#scm-app .scm-qm-views { display: flex; flex-wrap: wrap; gap: 6px; }
+#scm-app .scm-qm-view { padding: 6px 12px; border: 1px solid var(--cm-line); border-radius: 999px; background: #fff; color: #475569; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+#scm-app .scm-qm-view b { margin-left: 4px; color: #0f172a; }
+#scm-app .scm-qm-view:hover { background: #1e3a5f; border-color: #1e3a5f; color: #fff; }
+#scm-app .scm-qm-view:hover b,
+#scm-app .scm-qm-view.is-active b { color: #fff; }
+#scm-app .scm-qm-view.is-active { background: var(--cm-navy); border-color: var(--cm-navy); color: #fff; }
+#scm-app button.scm-cc-col { padding: 0; border: 0; background: transparent; cursor: pointer; }
+#scm-app .scm-cc-col.is-active { background: #eff6ff; }
+#scm-app .scm-cc-axis .is-active { font-weight: 700; color: #1d4ed8; }
+#scm-app .scm-cm-table td.is-bad { color: var(--cm-bad); font-weight: 700; }
 #scm-app .scm-cm-table tfoot td { padding: 10px; border-top: 2px solid var(--cm-line); background: var(--cm-soft); font-weight: 700; color: #0f172a; }
 #scm-app .scm-cm-table td.is-total { font-weight: 700; }
 #scm-app .scm-cm-table td.is-actions { white-space: nowrap; text-align: right; }
@@ -336,7 +345,6 @@
 #scm-app .scm-cc-seg:hover { filter: brightness(0.9); }
 
 @media (max-width: 760px) {
-  #scm-app .scm-quote-filters { grid-template-columns: minmax(0, 1fr); }
   #scm-app .scm-cm-kpis-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #scm-app .scm-cm-grid { grid-template-columns: minmax(0, 1fr); }
   #scm-app .scm-cm-head h1 { font-size: 20px; }

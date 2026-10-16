@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\App\Concerns;
 
 use SCM\Modules\Metrics\CaseMetricsReport;
+use SCM\Modules\Metrics\QuoteMetricsReport;
 
 trait HandlesMetricsPanels
 {
@@ -28,12 +29,8 @@ trait HandlesMetricsPanels
     if (!$this->canAccessDashboardTab('metricas')) {
       $this->jsonFail('No tienes permiso para ver métricas.');
     }
-    $month = trim((string) ($_POST['month'] ?? ''));
-    if (preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month) !== 1) {
-      $this->jsonFail('Selecciona un mes válido.');
-    }
     try {
-      $this->jsonOk(['metrics' => $this->maintenance_quote_month_metrics($month)]);
+      $this->jsonOk((new QuoteMetricsReport($this->db))->snapshot());
     } catch (\Throwable $exception) {
       error_log('[quote-metrics] ' . $exception->getMessage());
       $this->jsonFail('No se pudieron cargar las cotizaciones.');
