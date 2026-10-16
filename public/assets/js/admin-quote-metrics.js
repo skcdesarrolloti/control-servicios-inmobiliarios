@@ -78,7 +78,7 @@
     var toInput = module.querySelector('[data-scm-quote-filter="to"]');
     var categorySelect = module.querySelector('[data-scm-quote-filter="categoria"]');
     var currentMonth = module.getAttribute("data-current-month");
-    var state = { data: null, pending: null, mode: "actual", view: "creadas", search: "", page: 1, monthly: [], detail: [] };
+    var state = { data: null, pending: null, tab: "cotizaciones", mode: "actual", view: "creadas", search: "", page: 1, monthly: [], detail: [] };
     var tooltip = document.createElement("div");
     tooltip.className = "scm-cc-tooltip";
     tooltip.setAttribute("role", "tooltip");
@@ -161,25 +161,23 @@
       return state.data.rows.filter(function (row) { return !category || row.categoria === category; });
     }
 
-    // Periodo elegido como rango de meses; `months` son las columnas del mes a mes y `active` el mes resaltado.
+    // Periodo elegido como rango de meses; `months` son las columnas del mes a mes, que solo aplica
+    // al año y al acumulado (un mes suelto no tiene mes a mes).
     function period() {
       var valid = /^\d{4}-\d{2}$/;
       if (state.mode === "anual") {
         var year = yearSelect.value;
-        return { from: year + "-01", to: year + "-12", label: "todo " + year, title: year, months: yearMonths(year), active: "" };
+        return { from: year + "-01", to: year + "-12", label: "todo " + year, title: year, months: yearMonths(year) };
       }
       if (state.mode === "acumulado") {
         var from = valid.test(fromInput.value) ? fromInput.value : currentMonth.slice(0, 4) + "-01";
         var to = valid.test(toInput.value) ? toInput.value : currentMonth;
         if (from > to) { var swap = from; from = to; to = swap; }
         var label = from === to ? monthLabel(from) : monthLabel(from) + " a " + monthLabel(to);
-        return { from: from, to: to, label: label, title: label, months: monthRange(from, to), active: "" };
+        return { from: from, to: to, label: label, title: label, months: monthRange(from, to) };
       }
       var month = state.mode === "mes" && valid.test(monthInput.value) ? monthInput.value : currentMonth;
-      return {
-        from: month, to: month, label: monthLabel(month) + (month === currentMonth ? " (mes actual)" : ""),
-        title: month.slice(0, 4), months: yearMonths(month.slice(0, 4)), active: month,
-      };
+      return { from: month, to: month, label: monthLabel(month) + (month === currentMonth ? " (mes actual)" : ""), title: monthLabel(month), months: [] };
     }
 
     function inPeriod(date, p) {
@@ -209,7 +207,13 @@
       module.querySelectorAll("[data-scm-quote-tab-panel]").forEach(function (tabPanel) {
         tabPanel.hidden = tabPanel.getAttribute("data-scm-quote-tab-panel") !== tab;
       });
-      exportBtn.hidden = tab !== "cotizaciones";
+      state.tab = tab;
+      syncExport();
+    }
+
+    // "Exportar mes a mes" solo existe donde hay mes a mes: pestaña Cotizaciones en Anual o Acumulado.
+    function syncExport() {
+      exportBtn.hidden = state.tab !== "cotizaciones" || !state.monthly.length;
     }
 
     function kpi(label, value, note, tone) {
@@ -245,7 +249,7 @@
       html += kpi("Administración ganada", money(sa.admin), "Administración de las aprobadas (sin IVA)", "good");
       html += "</div>";
 
-      // Mes a mes: los 12 meses del año (mes o año) o los meses del acumulado.
+      // Mes a mes: los 12 meses del año o los meses del acumulado; no aplica a un mes suelto.
       state.monthly = p.months.map(function (ym) {
         var range = { from: ym, to: ym };
         var c = rows.filter(function (row) { return inPeriod(row.fecha, range); });
@@ -253,8 +257,11 @@
         return { month: ym, name: monthLabel(ym).replace(/^./, function (ch) { return ch.toUpperCase(); }), created: summarize(c), unsent: c.filter(function (row) { return !row.enviada; }).length, approved: summarize(a) };
       });
       state.periodTitle = p.title;
-      html += '<section class="scm-cm-card is-wide"><header><h2>Administración ganada mes a mes · ' + esc(p.title) + '</h2><p class="scm-cm-hint">Toca un mes para ver su detalle</p></header>' + monthlyChart(p.active) + "</section>";
-      html += '<section class="scm-cm-card is-wide"><header><h2>Mes a mes · ' + esc(p.title) + "</h2></header>" + monthlyTable(p.active) + "</section>";
+      if (state.monthly.length) {
+        html += '<section class="scm-cm-card is-wide"><header><h2>Administración ganada mes a mes · ' + esc(p.title) + '</h2><p class="scm-cm-hint">Toca un mes para ver su detalle</p></header>' + monthlyChart() + "</section>";
+        html += '<section class="scm-cm-card is-wide"><header><h2>Mes a mes · ' + esc(p.title) + "</h2></header>" + monthlyTable() + "</section>";
+      }
+      syncExport();
 
       // Detalle del periodo.
       state.detail = detailRows({ creadas: created, aprobadas: approved, sin_enviar: unsent });
@@ -288,28 +295,28 @@
         .sort(function (a, b) { return a[key] < b[key] ? 1 : a[key] > b[key] ? -1 : b.id - a.id; });
     }
 
-    function monthlyChart(activeMonth) {
+    function monthlyChart() {
       var max = Math.max.apply(null, state.monthly.map(function (m) { return m.approved.admin; })) || 1;
       var multiYear = state.monthly.length && state.monthly[0].month.slice(0, 4) !== state.monthly[state.monthly.length - 1].month.slice(0, 4);
       var html = '<div class="scm-cc-columns" style="--cols:' + Math.max(1, state.monthly.length) + '"><div class="scm-cc-plot">';
       state.monthly.forEach(function (m) {
         var height = m.approved.admin ? Math.max(2, (m.approved.admin / max) * 100) : 0;
-        html += '<button type="button" class="scm-cc-col' + (activeMonth === m.month ? " is-active" : "") + '" data-scm-quote-month="' + m.month + '" data-tip="' +
+        html += '<button type="button" class="scm-cc-col" data-scm-quote-month="' + m.month + '" data-tip="' +
           esc(m.name + ": " + money(m.approved.admin) + " de administración · " + num(m.approved.count) + " aprobadas") + '">' +
           '<span class="scm-cc-bar" style="height:' + height.toFixed(2) + "%;background:" + SERIES_COLOR + '">' +
           (m.approved.admin ? "<i>" + esc(compactMoney(m.approved.admin)) + "</i>" : "") + "</span></button>";
       });
       return html + '</div><div class="scm-cc-axis">' + state.monthly.map(function (m) {
-        return '<span class="' + (activeMonth === m.month ? "is-active" : "") + '">' + MONTHS_SHORT[Number(m.month.slice(5, 7)) - 1] + (multiYear ? " " + m.month.slice(2, 4) : "") + "</span>";
+        return "<span>" + MONTHS_SHORT[Number(m.month.slice(5, 7)) - 1] + (multiYear ? " " + m.month.slice(2, 4) : "") + "</span>";
       }).join("") + "</div></div>";
     }
 
-    function monthlyTable(activeMonth) {
+    function monthlyTable() {
       var totals = { created: 0, total: 0, admin: 0, unsent: 0, approved: 0, approvedTotal: 0, won: 0 };
       var body = state.monthly.map(function (m) {
         totals.created += m.created.count; totals.total += m.created.total; totals.admin += m.created.admin; totals.unsent += m.unsent;
         totals.approved += m.approved.count; totals.approvedTotal += m.approved.total; totals.won += m.approved.admin;
-        return '<tr class="' + (activeMonth === m.month ? "is-active" : "") + '"><td><button type="button" class="scm-cm-link" data-scm-quote-month="' + m.month + '">' + esc(m.name) +
+        return '<tr><td><button type="button" class="scm-cm-link" data-scm-quote-month="' + m.month + '">' + esc(m.name) +
           '</button></td><td class="is-num">' + num(m.created.count) + '</td><td class="is-num">' + money(m.created.total) + '</td><td class="is-num">' + money(m.created.admin) +
           '</td><td class="is-num' + (m.unsent ? " is-bad" : "") + '">' + num(m.unsent) + '</td><td class="is-num">' + num(m.approved.count) + '</td><td class="is-num">' + money(m.approved.total) +
           '</td><td class="is-num is-total">' + money(m.approved.admin) + "</td></tr>";
@@ -419,15 +426,10 @@
       if (event.target.closest("[data-scm-quote-export]")) { exportCsv(); return; }
       var monthButton = event.target.closest("[data-scm-quote-month]");
       if (monthButton) {
-        // Tocar un mes muestra ese mes; tocar el mes ya elegido vuelve al año completo.
+        // Tocar un mes del año o del acumulado abre ese mes.
         var value = monthButton.getAttribute("data-scm-quote-month");
-        if (state.mode !== "anual" && state.mode !== "acumulado" && period().active === value) {
-          yearSelect.value = value.slice(0, 4);
-          setMode("anual");
-        } else {
-          monthInput.value = value;
-          setMode(value === currentMonth ? "actual" : "mes");
-        }
+        monthInput.value = value;
+        setMode(value === currentMonth ? "actual" : "mes");
         state.page = 1;
         render();
         return;

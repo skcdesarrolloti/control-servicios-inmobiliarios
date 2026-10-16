@@ -85,7 +85,7 @@ final class MetricsPanelsView
         </div>
         <div class="scm-cm-head-actions">
           <span class="scm-cm-updated" data-scm-quote-updated></span>
-          <button type="button" class="scm-cm-btn" data-scm-quote-export disabled>
+          <button type="button" class="scm-cm-btn" data-scm-quote-export disabled hidden>
             <span class="material-symbols-outlined" aria-hidden="true">download</span><span>Exportar mes a mes</span>
           </button>
           <button type="button" class="scm-cm-btn" data-scm-quote-refresh>
