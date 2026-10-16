@@ -16,6 +16,7 @@ use SCM\Support\SchemaInspector;
  * - Mandato: quien captó el inmueble. Su `id_empleado` y `cct_author_id` no son confiables en
  *   los datos, por eso el funcionario se identifica por el correo o el nombre de `creador`.
  * Si ambos coinciden la sugerencia es alta; si difieren prevalece la hoja de cierre.
+ * Al asignar se actualizan id_empleado, realizado_por y cct_author_id del contrato.
  */
 final class ContractOwnershipService
 {
@@ -111,7 +112,7 @@ final class ContractOwnershipService
         }
 
         $contract = $this->db->getRow(
-          "SELECT `_ID`, `contrato`, `id_inmueble`, `id_empleado`, `realizado_por` FROM `{$contractsTable}` WHERE `_ID` = ? LIMIT 1 FOR UPDATE",
+          "SELECT `_ID`, `contrato`, `id_inmueble`, `id_empleado`, `realizado_por`, `cct_author_id` FROM `{$contractsTable}` WHERE `_ID` = ? LIMIT 1 FOR UPDATE",
           [$contractId]
         );
         if (!$contract) {
@@ -119,7 +120,7 @@ final class ContractOwnershipService
         }
         $previousId = trim((string) ($contract['id_empleado'] ?? ''));
         $previousName = trim((string) ($contract['realizado_por'] ?? ''));
-        if ($previousId === $employeeId && $previousName === $employee['name']) {
+        if ($previousId === $employeeId && $previousName === $employee['name'] && trim((string) ($contract['cct_author_id'] ?? '')) === $employeeId) {
           $skipped++;
           continue;
         }
@@ -127,6 +128,7 @@ final class ContractOwnershipService
         $payload = $this->schema->filterTableData($contractsTable, [
           'id_empleado' => $employeeId,
           'realizado_por' => $employee['name'],
+          'cct_author_id' => $employeeId,
           'cct_modified' => $now,
         ]);
         if ($this->db->update($contractsTable, $payload, ['_ID' => $contractId]) !== 1) {

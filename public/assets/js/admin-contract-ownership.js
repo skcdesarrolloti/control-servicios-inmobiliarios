@@ -313,7 +313,7 @@
         html += '<form class="scm-co-form" data-scm-co-form="' + row.id + '"><label class="scm-co-field"><span>Funcionario responsable</span>' +
           '<select name="employee" required><option value="">Elige un funcionario activo</option>' + activeOptions(preselect) + "</select></label>" +
           '<label class="scm-co-field"><span>Motivo del cambio</span><textarea name="reason" rows="2" required minlength="5" placeholder="Ej.: Según hoja de cierre #420">' + esc(reason) + "</textarea></label>" +
-          '<p class="scm-co-hint">Solo se cambian el funcionario y su nombre en el contrato; el cambio queda en el historial del inmueble.</p>' +
+          '<p class="scm-co-hint">Se actualizan id_empleado, realizado_por y cct_author_id del contrato; el cambio queda en el historial del inmueble.</p>' +
           '<div class="scm-co-form-actions"><button type="button" class="scm-co-btn" data-scm-co-close>Cancelar</button><button type="submit" class="scm-co-btn scm-co-btn-primary">Guardar cambio</button></div></form>';
       }
       return html;
