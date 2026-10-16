@@ -5795,3 +5795,16 @@ body,
 @keyframes scm-case-refresh-spin {
   to { transform: rotate(360deg); }
 }
+
+/* Menú principal: hover oscuro para que la opción se distinga claramente */
+[data-scm-main-nav] .nav-tab-pill:hover,
+[data-scm-main-nav] .nav-tab-pill:focus-visible,
+[data-scm-main-nav] .scm-nav-dropdown.open > .nav-tab-dropdown-btn {
+  background-color: #1e3a5f !important;
+  color: #ffffff !important;
+}
+[data-scm-main-nav] .nav-tab-pill:hover .material-symbols-outlined,
+[data-scm-main-nav] .nav-tab-pill:focus-visible .material-symbols-outlined,
+[data-scm-main-nav] .scm-nav-dropdown.open > .nav-tab-dropdown-btn .material-symbols-outlined {
+  color: #ffffff !important;
+}

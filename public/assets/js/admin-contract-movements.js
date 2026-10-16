@@ -8,7 +8,6 @@
   var PAGE_SIZE = 15;
   var MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   var MONTHS_LONG = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-  var COLORS = { ocup: "#0e7490", desoc: "#be123c", prev: "#cbd5e1", stock: "#0f1e36" };
   var STATE_LABELS = { entregado: "Entregado", por_recibir: "Por recibir", recibido: "Recibido" };
   var FILTER_LABELS = { funcionario: "Funcionario", tipo: "Tipo", destinacion: "Destinación", gestion: "Gestión" };
   var VIEWS = {
@@ -144,16 +143,6 @@
     events.forEach(function (event) { canon += event.row.canon || 0; });
     return { count: events.length, canon: canon, avg: events.length ? canon / events.length : 0 };
   }
-  function countBy(events, size, pick) {
-    var values = new Array(size).fill(0);
-    events.forEach(function (event) { values[pick(event)] += 1; });
-    return values;
-  }
-  function canonBy(events, size, pick) {
-    var values = new Array(size).fill(0);
-    events.forEach(function (event) { values[pick(event)] += event.row.canon || 0; });
-    return values;
-  }
   // Contratos arrendados en una fecha: ya entregados y aún no recibidos.
   function stockAt(rows, iso) {
     var total = 0;
@@ -168,50 +157,6 @@
     if (previous == null) return null;
     if (!previous) return { pct: null, diff: current - previous };
     return { pct: ((current - previous) / previous) * 100, diff: current - previous };
-  }
-
-  function columnChart(opts) {
-    var labels = opts.labels;
-    var series = opts.series;
-    var format = opts.format || num;
-    var short = opts.short || format;
-    var max = 0;
-    series.forEach(function (serie) {
-      serie.values.forEach(function (value) { if (value > max) max = value; });
-    });
-    if (!max) {
-      return '<div class="scm-cm-empty">No hay movimientos para graficar con estos filtros.</div>';
-    }
-    var html = '<div class="scm-cm-chart" style="--scm-cm-cols:' + labels.length + '">';
-    html += '<div class="scm-cm-plot">';
-    labels.forEach(function (label, index) {
-      var tag = opts.pick ? "button" : "div";
-      var aria = series.map(function (serie) { return serie.label + ": " + format(serie.values[index]); }).join(", ");
-      html += "<" + tag + ' class="scm-cm-col' + (opts.active === index ? " is-active" : "") + '"' +
-        (opts.pick ? ' type="button" data-scm-cm-pick="' + opts.pick + '" data-value="' + esc(opts.pickValues[index]) + '"' : "") +
-        ' aria-label="' + esc((opts.longLabels ? opts.longLabels[index] : label) + " — " + aria) + '">';
-      html += '<span class="scm-cm-stack">';
-      series.forEach(function (serie) {
-        var value = serie.values[index] || 0;
-        var height = value ? Math.max(2, (value / max) * 100) : 0;
-        html += '<span class="scm-cm-bar" style="--h:' + height.toFixed(2) + "%;--c:" + serie.color + '" title="' +
-          esc(serie.label + ": " + format(value)) + '">' + (value && !serie.quiet ? "<i>" + esc(short(value)) + "</i>" : "") + "</span>";
-      });
-      html += "</span></" + tag + ">";
-    });
-    html += "</div>";
-    html += '<div class="scm-cm-axis">' + labels.map(function (label, index) {
-      return '<span class="' + (opts.active === index ? "is-active" : "") + '">' + esc(label) + "</span>";
-    }).join("") + "</div>";
-    if (opts.footer) {
-      html += '<div class="scm-cm-axis scm-cm-axis-foot">' + opts.footer.map(function (cell) {
-        return '<span class="' + (cell.tone || "") + '">' + esc(cell.text) + "</span>";
-      }).join("") + "</div>";
-    }
-    html += '<div class="scm-cm-legend">' + series.map(function (serie) {
-      return '<span><i style="background:' + serie.color + '"></i>' + esc(serie.label) + "</span>";
-    }).join("") + (opts.footerLegend ? "<span>" + esc(opts.footerLegend) + "</span>" : "") + "</div>";
-    return html + "</div>";
   }
 
   function kpi(label, value, note, tone) {
@@ -422,7 +367,6 @@
 
     function renderMovements(kind) {
       var isOcup = kind === "ocup";
-      var color = isOcup ? COLORS.ocup : COLORS.desoc;
       var noun = isOcup ? "ocupaciones" : "desocupaciones";
       var rows = baseRows();
       var all = eventsOf(rows, kind);
@@ -450,50 +394,6 @@
         var stays = shown.map(function (event) { return event.row.permanencia; }).filter(function (value) { return value != null; });
         var avgStay = stays.length ? stays.reduce(function (a, b) { return a + b; }, 0) / stays.length : 0;
         html += kpi("Permanencia promedio", stays.length ? decimalFormat.format(avgStay) + " meses" : "—", esc("Desde la entrega hasta el recibo"), "stock");
-      }
-      html += "</div>";
-
-      html += '<div class="scm-cm-grid">';
-      if (year) {
-        var prevEvents = all.filter(function (event) { return event.y === year - 1; });
-        var monthPick = function (event) { return event.m - 1; };
-        html += card("Mes a mes " + year, columnChart({
-          labels: MONTHS,
-          longLabels: MONTHS_LONG.map(function (m) { return m + " " + year; }),
-          series: [
-            { label: String(year), color: color, values: countBy(period, 12, monthPick) },
-            { label: String(year - 1), color: COLORS.prev, values: countBy(prevEvents, 12, monthPick), quiet: true },
-          ],
-          active: state.month ? state.month - 1 : null,
-          pick: "month",
-          pickValues: MONTHS.map(function (_, index) { return index + 1; }),
-        }), "", '<p class="scm-cm-hint">Toca un mes para ver su detalle</p>');
-        html += card("Canon mensual por mes " + year, columnChart({
-          labels: MONTHS,
-          series: [{ label: "Canon " + year, color: color, values: canonBy(period, 12, monthPick) }],
-          format: money,
-          short: compactMoney,
-          active: state.month ? state.month - 1 : null,
-        }));
-      }
-      var years = yearsAxis(all);
-      if (years.length) {
-        var yearIndex = function (event) { return years.indexOf(event.y); };
-        html += card("Tendencia anual", columnChart({
-          labels: years.map(String),
-          series: [{ label: noun.charAt(0).toUpperCase() + noun.slice(1), color: color, values: countBy(all, years.length, yearIndex) }],
-          active: year ? years.indexOf(year) : null,
-          pick: "year",
-          pickValues: years,
-        }), "is-wide", '<p class="scm-cm-hint">Toca un año para filtrar</p>');
-        if (!year) {
-          html += card("Canon mensual por año", columnChart({
-            labels: years.map(String),
-            series: [{ label: "Canon", color: color, values: canonBy(all, years.length, yearIndex) }],
-            format: money,
-            short: compactMoney,
-          }), "is-wide");
-        }
       }
       html += "</div>";
 
@@ -683,7 +583,6 @@
         stockStart == null ? esc("Contratos arrendados hoy") : deltaNote(deltaInfo(stockEnd, stockStart), openingLabel, true), "stock");
       html += "</div>";
 
-      html += '<div class="scm-cm-grid">';
       var periodRows;
       var exportRows;
       if (year) {
@@ -698,11 +597,6 @@
           };
         }));
         exportRows = periodRows.map(function (row) { return Object.assign({ periodo: MONTHS_LONG[row.value - 1] + " " + year }, row); });
-        html += card("Ocupaciones vs desocupaciones · " + year, comparisonChart(periodRows, MONTHS));
-        html += card("Inventario arrendado al cierre de cada mes", columnChart({
-          labels: MONTHS,
-          series: [{ label: "Contratos arrendados", color: COLORS.stock, values: periodRows.map(function (row) { return row.stock || 0; }) }],
-        }));
       }
       var years = yearsAxis(oc.concat(de));
       var annualRows = comparisonRows(rows, oc, de, years.map(function (y) {
@@ -715,36 +609,13 @@
       }));
       if (!year) {
         exportRows = annualRows.map(function (row) { return Object.assign({ periodo: row.label }, row); });
-        html += card("Ocupaciones vs desocupaciones por año", comparisonChart(annualRows, years.map(String), "year"), "is-wide",
-          '<p class="scm-cm-hint">Toca un año para ver su detalle mensual</p>');
-        html += card("Inventario arrendado al cierre de cada año", columnChart({
-          labels: years.map(String),
-          series: [{ label: "Contratos arrendados", color: COLORS.stock, values: annualRows.map(function (row) { return row.stock || 0; }) }],
-        }), "is-wide");
       }
-      html += "</div>";
 
       html += card("Resumen anual", comparisonTable(annualRows.slice().reverse(), "Año", year), "is-wide",
         '<p class="scm-cm-hint">Toca un año para filtrar</p>');
       if (year) html += card("Resumen mensual " + year, comparisonTable(periodRows.filter(function (row) { return row.stock != null || row.oc || row.de; }), "Mes"), "is-wide");
       state.exportRows = exportRows;
       return html;
-    }
-
-    function comparisonChart(periodRows, labels, pick) {
-      return columnChart({
-        labels: labels,
-        series: [
-          { label: "Ocupaciones", color: COLORS.ocup, values: periodRows.map(function (row) { return row.oc; }) },
-          { label: "Desocupaciones", color: COLORS.desoc, values: periodRows.map(function (row) { return row.de; }) },
-        ],
-        pick: pick || null,
-        pickValues: periodRows.map(function (row) { return row.value; }),
-        footer: periodRows.map(function (row) {
-          return { text: row.oc || row.de ? signed(row.net) : "", tone: row.net > 0 ? "is-good" : row.net < 0 ? "is-bad" : "" };
-        }),
-        footerLegend: "Fila inferior: balance neto",
-      });
     }
 
     function comparisonTable(periodRows, firstColumn, activeYear) {

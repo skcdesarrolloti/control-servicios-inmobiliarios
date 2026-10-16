@@ -50,7 +50,7 @@ final class ContractMovementsView
         </div>
       </header>
 
-      <div class="scm-cm-views" role="tablist" aria-label="Vistas de ocupación">
+      <div class="scm-cm-views" role="tablist" aria-label="Vistas de ocupación" hidden>
         <?php foreach (self::VIEWS as $view => $def): ?>
           <button
             type="button"

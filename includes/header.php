@@ -1095,7 +1095,7 @@ foreach ($rawNavItems as $k => $item) {
 
       <!-- Fila 2: Subnavegación Horizontal por Píldoras (Altura 48px) -->
       <div class="h-12 flex items-center overflow-x-visible no-scrollbar border-t border-slate-100">
-        <nav class="flex items-center gap-1.5 py-1" aria-label="Pestañas principales del sistema">
+        <nav class="flex items-center gap-1.5 py-1" aria-label="Pestañas principales del sistema" data-scm-main-nav>
           <?php foreach ($filteredNavItems as $tabKey => $tab): ?>
             <?php if ($tab['type'] === 'dropdown'): ?>
               <?php
