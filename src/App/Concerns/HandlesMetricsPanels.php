@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\App\Concerns;
 
+use SCM\Core\App;
 use SCM\Modules\Metrics\CaseMetricsReport;
 use SCM\Modules\Metrics\QuoteLedgerReconciliation;
 use SCM\Modules\Metrics\QuoteMetricsReport;
@@ -31,7 +32,7 @@ trait HandlesMetricsPanels
       $this->jsonFail('No tienes permiso para ver métricas.');
     }
     try {
-      $snapshot = (new QuoteMetricsReport($this->db))->snapshot();
+      $snapshot = (new QuoteMetricsReport($this->db, App::settings()))->snapshot();
       $snapshot['can_edit_response'] = $this->canUseDashboardAction('quote_respond');
       $snapshot['can_edit_quote'] = $this->canUseDashboardAction('quote_edit');
       $this->jsonOk($snapshot);
@@ -55,7 +56,7 @@ trait HandlesMetricsPanels
       }
     }
     try {
-      $this->jsonOk((new QuoteMetricsReport($this->db))->setResponseDates(
+      $this->jsonOk((new QuoteMetricsReport($this->db, App::settings()))->setResponseDates(
         $changes,
         $this->current_employee_id(),
         (string) ($_POST['overwrite'] ?? '') === '1'
@@ -76,7 +77,7 @@ trait HandlesMetricsPanels
     }
     $decoded = json_decode(wp_unslash((string) ($_POST['ids'] ?? '[]')), true);
     try {
-      $this->jsonOk((new QuoteMetricsReport($this->db))->assignCaseProperty(
+      $this->jsonOk((new QuoteMetricsReport($this->db, App::settings()))->assignCaseProperty(
         array_map('intval', is_array($decoded) ? $decoded : []),
         $this->current_employee_id()
       ));
@@ -102,7 +103,7 @@ trait HandlesMetricsPanels
       $this->jsonFail('El auxiliar supera 5 MB.');
     }
     try {
-      $report = new QuoteMetricsReport($this->db);
+      $report = new QuoteMetricsReport($this->db, App::settings());
       $snapshot = $report->snapshot();
       $quotes = array_map(static fn(array $row): array => array_combine($snapshot['columns'], $row), $snapshot['rows']);
       $reconciliation = new QuoteLedgerReconciliation();

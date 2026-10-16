@@ -8,6 +8,7 @@
   var numberFormat = new Intl.NumberFormat("es-CO");
   var moneyFormat = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
   var SOURCE_LABELS = { orden: "primera orden de trabajo", acta: "acta de satisfacción", auxiliar: "fecha contable del auxiliar" };
+  var PROPERTY_SOURCES = { caso: "Inmueble del caso", contrato: "Contrato del caso", codigo: "Código del inmueble" };
   var LEDGER_STATES = {
     coincide: ["Coincide", "is-entregado"],
     coincide_inmueble_caso: ["Coincide · inmueble del caso", "is-entregado"],
@@ -37,8 +38,9 @@
 
   // Fecha de respuesta dudosa: muy posterior a la creación (aprobaciones marcadas tarde, en lote)
   // o muy posterior a la primera orden de trabajo, que solo existe si ya estaba aprobada.
+  // Las que un funcionario ya corrigió o confirmó (revisada) no se vuelven a marcar.
   function isDubious(row) {
-    if (!row.approved || !row.respuesta || row.respuesta_fuente !== "cotizacion" || !row.fecha) return false;
+    if (!row.approved || !row.respuesta || row.respuesta_fuente !== "cotizacion" || !row.fecha || row.revisada) return false;
     return daysBetween(row.respuesta, row.fecha) > 180 || (row.sugerida && daysBetween(row.respuesta, row.sugerida) > 45);
   }
 
@@ -87,7 +89,6 @@
         dubious: rows.filter(isDubious),
         propertyFixable: rows.filter(function (row) { return missingProperty(row.inmueble) && row.inmueble_caso; }),
         propertyManual: rows.filter(function (row) { return missingProperty(row.inmueble) && !row.inmueble_caso; }),
-        zeroAdmin: rows.filter(function (row) { return row.approved && !row.admin; }),
         noState: rows.filter(function (row) { return row.estado === "Sin estado"; }),
       };
     }
@@ -103,11 +104,10 @@
         ["dubious", "Aprobadas con fecha de respuesta dudosa", g.dubious.length,
           money(adminOf(g.dubious)) + " · marcadas mucho después de crearse o de la primera orden de trabajo",
           state.canEditResponse ? "Corregir fechas" : "Ver"],
-        ["propertyFixable", "Sin inmueble, pero su caso sí lo tiene", g.propertyFixable.length,
-          "Se copia el código de inmueble del caso; necesario para conciliar con contabilidad",
-          state.canEditQuote ? "Asignar inmueble del caso" : "Ver"],
-        ["propertyManual", "Sin inmueble ni en la cotización ni en el caso", g.propertyManual.length, "Corrígelas editando el caso", "Ver"],
-        ["zeroAdmin", "Aprobadas con administración en $0", g.zeroAdmin.length, "Falta el porcentaje o el total de administración", "Ver"],
+        ["propertyFixable", "Sin inmueble, pero se obtiene del caso o su contrato", g.propertyFixable.length,
+          "Se toma del caso, del contrato del caso o del código del inmueble; necesario para conciliar con contabilidad",
+          state.canEditQuote ? "Asignar inmuebles" : "Ver"],
+        ["propertyManual", "Sin inmueble que se pueda obtener del caso", g.propertyManual.length, "Ni la cotización, ni el caso, ni su contrato lo identifican; corrígelas editando el caso", "Ver"],
         ["noState", "Cotizaciones sin estado", g.noState.length, "No se sabe si fueron aprobadas o no", "Ver"],
       ];
       var pending = items.filter(function (item) { return item[2] > 0; });
@@ -151,7 +151,8 @@
       var intro = mode === "missing"
         ? "Estas cotizaciones están <strong>aprobadas</strong> pero no tienen fecha de respuesta, así que su administración no cae en ningún mes."
         : "Estas cotizaciones tienen una fecha de respuesta muy posterior a su creación o a su primera orden de trabajo: casi siempre fueron <strong>marcadas como aprobadas tarde</strong> y esa fecha infla el mes en que se marcaron.";
-      var html = "<p>" + intro + " La <strong>fecha sugerida</strong> es la de la primera orden de trabajo (solo se hace con la cotización aprobada) o, si no hay, la del acta de satisfacción; la aprobación ocurrió ese día o antes.</p>";
+      var html = "<p>" + intro + " La <strong>fecha sugerida</strong> es la de la primera orden de trabajo (solo se hace con la cotización aprobada) o, si no hay, la del acta de satisfacción; la aprobación ocurrió ese día o antes.</p>" +
+        (mode === "dubious" ? "<p>Si la fecha actual es la correcta, déjala y guárdala: queda como <strong>revisada</strong> y no vuelve a aparecer aquí.</p>" : "");
       if (editable) {
         html += '<div class="scm-qq-toolbar"><label><input type="checkbox" data-scm-qq-check-all checked> Seleccionar todas</label>' +
           '<button type="button" class="scm-cm-btn scm-qq-primary" data-scm-qq-save-dates>Guardar fechas seleccionadas</button></div>';
@@ -160,7 +161,7 @@
         "<th>Cotización</th><th>Creada</th>" + (mode === "dubious" ? "<th>Respuesta actual</th>" : "") +
         '<th>Sugerida</th><th class="is-num">Administración</th>' + (editable ? "<th>Fecha de respuesta</th>" : "") + "<th></th></tr></thead><tbody>" +
         rows.map(function (row) {
-          var value = row.sugerida || "";
+          var value = row.sugerida || (mode === "dubious" ? row.respuesta : "") || "";
           return '<tr class="scm-maintenance-quote-row" data-qq-row="' + row.id + '" data-cotizacion-id="' + esc(row.id) + '" data-ticket="' + esc(row.ticket) + '">' +
             (editable ? '<td><input type="checkbox" data-qq-pick' + (value ? " checked" : "") + ' aria-label="Seleccionar cotización ' + esc(row.id) + '"></td>' : "") +
             "<td><strong>#" + esc(row.id) + "</strong><small class=\"scm-cm-source\">" + esc(row.inmueble || "Sin inmueble") + "</small></td><td>" + esc(day(row.fecha)) + "</td>" +
@@ -244,11 +245,13 @@
     function openPropertyFix() {
       var rows = groups().propertyFixable;
       state.popup = { mode: "property", changed: false };
-      openModal("Asignar inmueble desde el caso", "<p>Estas cotizaciones quedaron con inmueble <strong>“No asignado”</strong>, pero su caso sí tiene el código. Se copiará ese código a la cotización (no se cambia ningún inmueble existente).</p>" +
-        '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-qq-table"><thead><tr><th>Cotización</th><th>Caso</th><th>Inmueble actual</th><th>Inmueble del caso</th><th>Destinatario</th><th class="is-num">Administración</th></tr></thead><tbody>' +
+      openModal("Asignar inmueble desde el caso", "<p>Estas cotizaciones quedaron sin inmueble o en <strong>“No asignado”</strong>. El inmueble se obtiene del caso, del contrato del caso o del código del inmueble; si el contrato tiene número y a la cotización le falta, también se completa. No se cambia ningún inmueble ya asignado.</p>" +
+        '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-qq-table"><thead><tr><th>Cotización</th><th>Caso</th><th>Inmueble actual</th><th>Inmueble a asignar</th><th>Contrato</th><th>Destinatario</th><th class="is-num">Administración</th></tr></thead><tbody>' +
         rows.map(function (row) {
-          return "<tr><td><strong>#" + esc(row.id) + "</strong></td><td>#" + esc(row.ticket) + '</td><td class="scm-cm-muted">' + esc(row.inmueble || "Vacío") + "</td><td><strong>" +
-            esc(row.inmueble_caso) + '</strong></td><td class="is-name">' + esc(row.destinatario || "—") + '</td><td class="is-num">' + esc(money(row.admin)) + "</td></tr>";
+          return "<tr><td><strong>#" + esc(row.id) + "</strong></td><td>" + (row.ticket ? "#" + esc(row.ticket) : "—") + '</td><td class="scm-cm-muted">' + esc(row.inmueble || "Vacío") + "</td><td><strong>" +
+            esc(row.inmueble_caso) + '</strong><small class="scm-cm-source">' + esc(PROPERTY_SOURCES[row.inmueble_fuente] || "") + "</small></td><td>" +
+            (row.contrato_caso ? "<strong>" + esc(row.contrato_caso) + "</strong>" : esc(row.contrato || "—")) +
+            '</td><td class="is-name">' + esc(row.destinatario || "—") + '</td><td class="is-num">' + esc(money(row.admin)) + "</td></tr>";
         }).join("") + "</tbody></table></div>" +
         (state.canEditQuote ? '<div class="scm-co-form-actions"><button type="button" class="scm-cm-btn" data-scm-qq-close>Cancelar</button><button type="button" class="scm-cm-btn scm-qq-primary" data-scm-qq-assign-property>Asignar inmueble a ' + num(rows.length) + " cotizaciones</button></div>" : ""));
     }
@@ -394,6 +397,13 @@
       renderLedger();
     });
 
+    // Al escribir una fecha en el popup, la fila queda seleccionada para guardarse.
+    module.addEventListener("input", function (event) {
+      var date = event.target.closest("[data-qq-date]");
+      var pick = date && date.closest("[data-qq-row]").querySelector("[data-qq-pick]");
+      if (pick && date.value) pick.checked = true;
+    });
+
     module.addEventListener("change", function (event) {
       var input = event.target.closest("[data-scm-qq-ledger-file]");
       if (!input) return;
@@ -436,8 +446,7 @@
         var key = open.getAttribute("data-scm-qq-open");
         if (key === "missing" || key === "dubious") openDates(key);
         else if (key === "propertyFixable") openPropertyFix();
-        else if (key === "propertyManual") openList(key, "Cotizaciones sin inmueble", "Ni la cotización ni su caso tienen código de inmueble. Corrígelas editando el caso.");
-        else if (key === "zeroAdmin") openList(key, "Aprobadas con administración en $0", "Falta el porcentaje o el total de administración. Edita la cotización desde su caso.");
+        else if (key === "propertyManual") openList(key, "Cotizaciones sin inmueble", "Ni la cotización, ni su caso, ni el contrato del caso permiten identificar el inmueble. Corrígelas editando el caso.");
         else if (key === "noState") openList(key, "Cotizaciones sin estado", "No tienen estado de respuesta. Revisa en el caso si fueron aprobadas o desaprobadas.");
         return;
       }

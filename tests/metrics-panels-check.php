@@ -57,6 +57,11 @@ $quoteBase = ['_ID' => 579, 'id_ticket' => '10963', 'estado' => 'Aprobada', 'se_
 $row = $quoteReport->mapRow($quoteBase + ['fecha_respuesta' => '1792167812', 'ticket_respuesta' => '']);
 $check($row[$cols['fecha']] === '2026-10-15' && $row[$cols['respuesta']] === '2026-10-16' && $row[$cols['respuesta_fuente']] === 'cotizacion', 'Creada por fecha de cotización y aprobada por fecha de respuesta.');
 $check($row[$cols['total']] === 201420 && $row[$cols['admin']] === 18000 && $row[$cols['enviada']] === 1, 'Valor total, administración y envío.');
+$check($row[$cols['revisada']] === 0, 'Una fecha sin revisar no queda marcada como revisada.');
+$row = $quoteReport->mapRow($quoteBase + ['fecha_respuesta' => '1792167812', 'ticket_respuesta' => '', 'revisada' => '2026-10-16']);
+$check($row[$cols['revisada']] === 1, 'La fecha confirmada por un funcionario queda revisada.');
+$row = $quoteReport->mapRow($quoteBase + ['fecha_respuesta' => '1792167812', 'ticket_respuesta' => '', 'revisada' => '2026-09-09']);
+$check($row[$cols['revisada']] === 0, 'Si la fecha cambió después de revisarla, se vuelve a evaluar.');
 $row = $quoteReport->mapRow($quoteBase + ['fecha_respuesta' => '0', 'ticket_respuesta' => '1792167812']);
 $check($row[$cols['respuesta']] === '2026-10-16' && $row[$cols['respuesta_fuente']] === 'caso', 'Sin fecha de respuesta se usa la del caso.');
 $row = $quoteReport->mapRow(['se_envio' => 'No', 'fecha' => '0', 'cct_created' => '2026-09-02 10:00:00', 'fecha_respuesta' => '0', 'ticket_respuesta' => null] + $quoteBase);
@@ -108,17 +113,50 @@ $fixed = $writer->setResponseDates([['id' => 2, 'date' => '2026-09-10'], ['id' =
 $check(count($fixed['updated']) === 1 && $fixed['updated'][0]['id'] === 2 && $fixed['updated'][0]['anterior'] !== null, 'Con sobrescritura se corrige la fecha existente y se informa la anterior.');
 $check(array_column($fixed['errors'], 'id') === [3, 1], 'En lote, cada cotización inválida se informa sin frenar las demás.');
 
-// Inmueble "No asignado": se copia el del caso, nunca se pisa uno existente.
+// Inmueble "No asignado": se obtiene del caso, del contrato del caso o del código; nunca se pisa uno existente.
 $pdo->exec('ALTER TABLE wp_jet_cct_cotizacion_mantenimiento ADD COLUMN inmueble TEXT');
 $pdo->exec('ALTER TABLE wp_jet_cct_cotizacion_mantenimiento ADD COLUMN id_ticket TEXT');
-$pdo->exec('CREATE TABLE wp_jet_cct_tickets(_ID INTEGER PRIMARY KEY, inmueble TEXT)');
+$pdo->exec('ALTER TABLE wp_jet_cct_cotizacion_mantenimiento ADD COLUMN contrato TEXT');
+$pdo->exec('ALTER TABLE wp_jet_cct_cotizacion_mantenimiento ADD COLUMN id_contrato TEXT');
+$pdo->exec('ALTER TABLE wp_jet_cct_cotizacion_mantenimiento ADD COLUMN id_inmueble TEXT');
+$pdo->exec('CREATE TABLE wp_jet_cct_tickets(_ID INTEGER PRIMARY KEY, inmueble TEXT, id_contrato TEXT, id_inmueble TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_contratos_arrendamiento(_ID INTEGER PRIMARY KEY, contrato TEXT, id_inmueble TEXT, id_inmueble_data TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_inmuebles(_ID INTEGER PRIMARY KEY, codigo TEXT, cct_status TEXT)');
+// SQLite no tiene information_schema: se precargan las cachés del inspector con las tablas de la prueba.
+$inspector = new \SCM\Support\SchemaInspector($sqlite);
+$schemaTables = [
+  'wp_jet_cct_cotizacion_mantenimiento' => ['_ID', 'estado', 'inmueble', 'id_ticket', 'contrato', 'id_contrato', 'id_inmueble'],
+  'wp_jet_cct_tickets' => ['_ID', 'inmueble', 'id_contrato', 'id_inmueble'],
+  'wp_jet_cct_contratos_arrendamiento' => ['_ID', 'contrato', 'id_inmueble', 'id_inmueble_data'],
+  'wp_jet_cct_inmuebles' => ['_ID', 'codigo', 'cct_status'],
+];
+(new ReflectionProperty(\SCM\Support\SchemaInspector::class, 'tableExistsCache'))->setValue($inspector, array_map(static fn(): bool => true, $schemaTables));
+(new ReflectionProperty(\SCM\Support\SchemaInspector::class, 'tableColumnsCache'))->setValue($inspector, $schemaTables);
+(new ReflectionProperty(QuoteMetricsReport::class, 'schema'))->setValue($writer, $inspector);
 $sqlite->insert('wp_jet_cct_tickets', ['_ID' => 8983, 'inmueble' => '10614']);
 $sqlite->insert('wp_jet_cct_tickets', ['_ID' => 9860, 'inmueble' => '10385']);
+$sqlite->insert('wp_jet_cct_tickets', ['_ID' => 10727, 'inmueble' => 'No asignado', 'id_contrato' => '778']);
+$sqlite->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 778, 'contrato' => 'No asignado', 'id_inmueble' => '71802', 'id_inmueble_data' => '12177']);
+$sqlite->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 499, 'contrato' => '1167-Diseños', 'id_inmueble' => '79831', 'id_inmueble_data' => '']);
+$sqlite->insert('wp_jet_cct_tickets', ['_ID' => 6373, 'inmueble' => '1247-Diseños', 'id_contrato' => '499', 'id_inmueble' => '79831']);
+$sqlite->insert('wp_jet_cct_inmuebles', ['_ID' => 12356, 'codigo' => '79831', 'cct_status' => 'publish']);
+$sqlite->insert('wp_jet_cct_inmuebles', ['_ID' => 20001, 'codigo' => '555', 'cct_status' => 'publish']);
+$sqlite->insert('wp_jet_cct_inmuebles', ['_ID' => 20002, 'codigo' => '555', 'cct_status' => 'publish']);
 $sqlite->update('wp_jet_cct_cotizacion_mantenimiento', ['inmueble' => 'No asignado', 'id_ticket' => '8983'], ['_ID' => 1]);
 $sqlite->update('wp_jet_cct_cotizacion_mantenimiento', ['inmueble' => '10335', 'id_ticket' => '9860'], ['_ID' => 2]);
-$assigned = $writer->assignCaseProperty([1, 2], '2871');
-$check($assigned === ['updated' => [['id' => 1, 'inmueble' => '10614']], 'skipped' => [2]], 'Asigna el inmueble del caso solo a las cotizaciones sin inmueble.');
+$sqlite->update('wp_jet_cct_cotizacion_mantenimiento', ['inmueble' => 'No asignado', 'id_ticket' => '10727', 'contrato' => 'No asignado'], ['_ID' => 3]);
+$sqlite->insert('wp_jet_cct_cotizacion_mantenimiento', ['_ID' => 4, 'estado' => 'Aprobada', 'inmueble' => '', 'id_ticket' => '6373', 'contrato' => '']);
+$sqlite->insert('wp_jet_cct_cotizacion_mantenimiento', ['_ID' => 5, 'estado' => 'Aprobada', 'inmueble' => '', 'id_ticket' => '', 'id_inmueble' => '555']);
+$assigned = $writer->assignCaseProperty([1, 2, 3, 4, 5], '2871');
+$check($assigned === ['updated' => [
+  ['id' => 1, 'inmueble' => '10614', 'fuente' => 'caso'],
+  ['id' => 3, 'inmueble' => '12177', 'fuente' => 'contrato'],
+  ['id' => 4, 'inmueble' => '12356', 'fuente' => 'codigo'],
+], 'skipped' => [2, 5]], 'Asigna el inmueble del caso, del contrato del caso o del código, solo a las cotizaciones sin inmueble: ' . json_encode($assigned));
 $check($sqlite->getVar('SELECT inmueble FROM wp_jet_cct_cotizacion_mantenimiento WHERE _ID = 2') === '10335', 'Un inmueble existente no se modifica.');
+$quote4 = $sqlite->getRow('SELECT contrato, id_contrato FROM wp_jet_cct_cotizacion_mantenimiento WHERE _ID = 4');
+$check($quote4['contrato'] === '1167-Diseños' && $quote4['id_contrato'] === '499', 'Completa el contrato desde el contrato del caso cuando falta.');
+$check($sqlite->getVar('SELECT contrato FROM wp_jet_cct_cotizacion_mantenimiento WHERE _ID = 3') === 'No asignado', 'Un contrato "No asignado" no se copia.');
 
 // Conciliación con el auxiliar contable.
 use SCM\Modules\Metrics\QuoteLedgerReconciliation;

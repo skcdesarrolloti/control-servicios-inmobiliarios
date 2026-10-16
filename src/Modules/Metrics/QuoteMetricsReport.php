@@ -7,6 +7,7 @@ namespace SCM\Modules\Metrics;
 use DateTimeImmutable;
 use DateTimeZone;
 use SCM\Core\Database;
+use SCM\Core\Settings;
 use SCM\Modules\ContractMovements\ContractMovementsReport;
 use SCM\Support\SchemaInspector;
 
@@ -21,7 +22,10 @@ use SCM\Support\SchemaInspector;
  *
  * Para corregir datos, cada cotización trae una fecha de aprobación sugerida: la primera orden de
  * trabajo (una orden solo se hace con la cotización aprobada) o, si no hay, el acta de satisfacción;
- * y el inmueble del caso, del que se copia el código cuando la cotización quedó "No asignado".
+ * y, si quedó sin inmueble ("No asignado"), el que se obtiene del caso: su campo `inmueble`, el
+ * `id_inmueble_data` del contrato del caso o el código (`id_inmueble`) buscado en inmuebles.
+ * Las fechas de respuesta que un funcionario corrige o confirma quedan registradas como revisadas
+ * (`quote_response_reviews` en la configuración, con quién y cuándo) y dejan de marcarse como dudosas.
  *
  * Devuelve todas las cotizaciones en una sola respuesta para calcular el mes a mes en el navegador.
  */
@@ -30,15 +34,21 @@ final class QuoteMetricsReport
   public const COLUMNS = [
     'id', 'ticket', 'contrato', 'inmueble', 'direccion', 'destinatario', 'categoria', 'estado', 'enviada',
     'fecha', 'respuesta', 'respuesta_fuente', 'total', 'admin', 'sugerida', 'sugerida_fuente', 'inmueble_caso',
+    'inmueble_fuente', 'contrato_caso', 'revisada',
   ];
   public const MAX_BATCH = 200;
+  public const REVIEWS_SETTING = 'quote_response_reviews';
 
   private Database $db;
   private DateTimeZone $timezone;
+  private ?Settings $settings;
+  private ?SchemaInspector $schema = null;
 
-  public function __construct(Database $db)
+  /** Sin `$settings` no se registran ni se leen las fechas revisadas. */
+  public function __construct(Database $db, ?Settings $settings = null)
   {
     $this->db = $db;
+    $this->settings = $settings;
     $this->timezone = new DateTimeZone('America/Bogota');
   }
 
@@ -46,29 +56,184 @@ final class QuoteMetricsReport
   public function snapshot(): array
   {
     $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
-    $tickets = $this->db->table('jet_cct_tickets');
-    $schema = new SchemaInspector($this->db);
-    $hasTickets = $schema->tableExists($tickets);
-    $ticketJoin = $hasTickets ? "LEFT JOIN `{$tickets}` t ON CAST(t.`_ID` AS CHAR) = TRIM(COALESCE(c.`id_ticket`, ''))" : '';
-    $ticketSelect = $hasTickets
-      ? ($schema->columnExists($tickets, 'fecha_respuesta_cotizacion_mantenimiento') ? 't.`fecha_respuesta_cotizacion_mantenimiento`' : "''") . ' AS ticket_respuesta, '
-        . ($schema->columnExists($tickets, 'inmueble') ? 't.`inmueble`' : "''") . ' AS ticket_inmueble'
-      : "'' AS ticket_respuesta, '' AS ticket_inmueble";
+    $schema = $this->schema();
     $rows = $this->db->getResults(
       "SELECT c.`_ID`, c.`id_ticket`, c.`contrato`, c.`inmueble`, c.`direccion`, c.`destinatario`, c.`categoria_cotizacion`,
               c.`estado`, c.`se_envio`, c.`fecha`, c.`cct_created`, c.`fecha_respuesta`, c.`total`, c.`total_admon`,
               c.`porcentaje_admon`, c.`total_materiales`, c.`total_mano_obra`, c.`total_maquinarias`, c.`total_otros_costos`,
-              c.`id_acta_satisfaccion`, {$ticketSelect}
-       FROM `{$table}` c {$ticketJoin}
+              c.`id_acta_satisfaccion`, {$this->linkSelect($schema)}
+       FROM `{$table}` c {$this->ticketJoin($schema)}
        WHERE LOWER(TRIM(COALESCE(c.`cct_status`, 'publish'))) = 'publish'
        ORDER BY c.`_ID` DESC"
     );
     $evidence = $this->approvalEvidence($schema);
+    $resolved = $this->resolveProperties($rows, $schema);
+    $reviews = $this->reviews();
     return [
       'columns' => self::COLUMNS,
-      'rows' => array_map(fn(array $row): array => $this->mapRow($row, $evidence), $rows),
+      'rows' => array_map(function (array $row) use ($evidence, $resolved, $reviews): array {
+        $id = (string) ($row['_ID'] ?? '');
+        $row['resuelto'] = $resolved[$id] ?? null;
+        $row['revisada'] = $reviews[$id]['fecha'] ?? null;
+        return $this->mapRow($row, $evidence);
+      }, $rows),
       'generated_at' => time(),
     ];
+  }
+
+  private function schema(): SchemaInspector
+  {
+    return $this->schema ??= new SchemaInspector($this->db);
+  }
+
+  private function ticketJoin(SchemaInspector $schema): string
+  {
+    $tickets = $this->db->table('jet_cct_tickets');
+    return $schema->tableExists($tickets) ? "LEFT JOIN `{$tickets}` t ON CAST(t.`_ID` AS CHAR) = TRIM(COALESCE(c.`id_ticket`, ''))" : '';
+  }
+
+  /** Columnas de la cotización y del caso que enlazan con el inmueble y el contrato. */
+  private function linkSelect(SchemaInspector $schema): string
+  {
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    $tickets = $this->db->table('jet_cct_tickets');
+    $hasTickets = $schema->tableExists($tickets);
+    $fields = [];
+    foreach (['id_contrato' => 'quote_id_contrato', 'id_inmueble' => 'quote_id_inmueble'] as $column => $alias) {
+      $fields[] = ($schema->columnExists($table, $column) ? "c.`{$column}`" : "''") . " AS {$alias}";
+    }
+    foreach ([
+      'fecha_respuesta_cotizacion_mantenimiento' => 'ticket_respuesta',
+      'inmueble' => 'ticket_inmueble',
+      'id_contrato' => 'ticket_id_contrato',
+      'id_inmueble' => 'ticket_id_inmueble',
+      'id_inmueble_data' => 'ticket_id_inmueble_data',
+    ] as $column => $alias) {
+      $fields[] = ($hasTickets && $schema->columnExists($tickets, $column) ? "t.`{$column}`" : "''") . " AS {$alias}";
+    }
+    return implode(', ', $fields);
+  }
+
+  /**
+   * Inmueble (y contrato) asignable a las cotizaciones sin inmueble, en este orden: `inmueble` del
+   * caso, `id_inmueble_data` del contrato del caso, `id_inmueble_data` del caso y, por último, el
+   * código (`id_inmueble`) buscado en inmuebles cuando corresponde a uno solo.
+   *
+   * @param list<array<string,mixed>> $rows filas con las columnas de linkSelect()
+   * @return array<string,array{inmueble:string,fuente:string,contrato:string,id_contrato:string}>
+   */
+  private function resolveProperties(array $rows, SchemaInspector $schema): array
+  {
+    $pending = array_values(array_filter($rows, static fn(array $row): bool => self::missingProperty((string) ($row['inmueble'] ?? ''))));
+    if ($pending === []) {
+      return [];
+    }
+    $contractOf = static fn(array $row): string => self::positiveId($row['ticket_id_contrato'] ?? '') ?: self::positiveId($row['quote_id_contrato'] ?? '');
+    $contracts = [];
+    $contractIds = array_values(array_unique(array_filter(array_map($contractOf, $pending))));
+    $contractsTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    if ($contractIds !== [] && $schema->tableExists($contractsTable)) {
+      foreach (array_chunk($contractIds, 500) as $chunk) {
+        $marks = implode(',', array_fill(0, count($chunk), '?'));
+        foreach ($this->db->getResults("SELECT `_ID`, `contrato`, `id_inmueble`, `id_inmueble_data` FROM `{$contractsTable}` WHERE `_ID` IN ({$marks})", array_map('intval', $chunk)) as $contract) {
+          $contracts[(string) $contract['_ID']] = $contract;
+        }
+      }
+    }
+    $codesOf = static function (array $row, array $contract): array {
+      return array_values(array_unique(array_filter(array_map(
+        [self::class, 'positiveId'],
+        [$row['quote_id_inmueble'] ?? '', $row['ticket_id_inmueble'] ?? '', $contract['id_inmueble'] ?? '']
+      ))));
+    };
+    $codes = [];
+    foreach ($pending as $row) {
+      foreach ($codesOf($row, $contracts[$contractOf($row)] ?? []) as $code) {
+        $codes[$code] = true;
+      }
+    }
+    $byCode = [];
+    $properties = $this->db->table('jet_cct_inmuebles');
+    if ($codes !== [] && $schema->tableExists($properties)) {
+      foreach (array_chunk(array_map('strval', array_keys($codes)), 500) as $chunk) {
+        $marks = implode(',', array_fill(0, count($chunk), '?'));
+        foreach ($this->db->getResults(
+          "SELECT `_ID`, TRIM(`codigo`) AS codigo FROM `{$properties}`
+           WHERE `codigo` IN ({$marks}) AND LOWER(TRIM(COALESCE(`cct_status`, 'publish'))) = 'publish'",
+          $chunk
+        ) as $property) {
+          $byCode[(string) $property['codigo']][(string) $property['_ID']] = true;
+        }
+      }
+    }
+
+    $out = [];
+    foreach ($pending as $row) {
+      $contractId = $contractOf($row);
+      $contract = $contracts[$contractId] ?? [];
+      $property = '';
+      $source = '';
+      if (self::positiveId($row['ticket_inmueble'] ?? '') !== '') {
+        [$property, $source] = [self::positiveId($row['ticket_inmueble']), 'caso'];
+      } elseif (self::positiveId($contract['id_inmueble_data'] ?? '') !== '') {
+        [$property, $source] = [self::positiveId($contract['id_inmueble_data']), 'contrato'];
+      } elseif (self::positiveId($row['ticket_id_inmueble_data'] ?? '') !== '') {
+        [$property, $source] = [self::positiveId($row['ticket_id_inmueble_data']), 'caso'];
+      } else {
+        foreach ($codesOf($row, $contract) as $code) {
+          // Códigos repetidos en inmuebles son ambiguos: no se asignan.
+          if (count($byCode[$code] ?? []) === 1) {
+            [$property, $source] = [(string) array_key_first($byCode[$code]), 'codigo'];
+            break;
+          }
+        }
+      }
+      if ($property === '') {
+        continue;
+      }
+      $contractNumber = self::text($contract['contrato'] ?? '');
+      $out[(string) $row['_ID']] = [
+        'inmueble' => $property,
+        'fuente' => $source,
+        'contrato' => self::missingContract($contractNumber) ? '' : $contractNumber,
+        'id_contrato' => $contractId,
+      ];
+    }
+    return $out;
+  }
+
+  private static function positiveId($value): string
+  {
+    $value = trim((string) ($value ?? ''));
+    return preg_match('/^\d+$/', $value) === 1 && (int) $value > 0 ? $value : '';
+  }
+
+  private static function missingContract(string $value): bool
+  {
+    $value = mb_strtolower(trim($value), 'UTF-8');
+    return $value === '' || $value === '0' || $value === 'no asignado';
+  }
+
+  /** @return array<string,array{fecha:string,por:string,el:string}> */
+  private function reviews(): array
+  {
+    $reviews = $this->settings ? $this->settings->get(self::REVIEWS_SETTING, []) : [];
+    return is_array($reviews) ? $reviews : [];
+  }
+
+  /** @param list<array{id:int,respuesta:string}> $updated */
+  private function recordReviews(array $updated, string $actorEmployeeId): void
+  {
+    if ($updated === [] || $this->settings === null) {
+      return;
+    }
+    $this->settings->refresh();
+    $reviews = $this->reviews();
+    $now = (new DateTimeImmutable('now', $this->timezone))->format('Y-m-d H:i:s');
+    foreach ($updated as $item) {
+      $reviews[(string) $item['id']] = ['fecha' => $item['respuesta'], 'por' => $actorEmployeeId, 'el' => $now];
+    }
+    $this->settings->set(self::REVIEWS_SETTING, $reviews, (int) $actorEmployeeId);
   }
 
   /**
@@ -109,7 +274,8 @@ final class QuoteMetricsReport
       }
     }
 
-    $caseProperty = self::text($row['ticket_inmueble'] ?? '');
+    $resolved = is_array($row['resuelto'] ?? null) ? $row['resuelto'] : null;
+    $caseProperty = $resolved['inmueble'] ?? self::text($row['ticket_inmueble'] ?? '');
 
     return [
       (int) $id,
@@ -129,6 +295,9 @@ final class QuoteMetricsReport
       $suggested,
       $suggestedSource,
       preg_match('/^\d+$/', $caseProperty) === 1 ? $caseProperty : '',
+      $resolved['fuente'] ?? (preg_match('/^\d+$/', $caseProperty) === 1 ? 'caso' : ''),
+      $resolved['contrato'] ?? '',
+      $response !== null && $responseSource === 'cotizacion' && ($row['revisada'] ?? null) === $response ? 1 : 0,
     ];
   }
 
@@ -225,14 +394,17 @@ final class QuoteMetricsReport
         $errors[] = ['id' => $id, 'message' => $error->getMessage()];
       }
     }
+    // Trazabilidad de quién revisó cada fecha; las revisadas dejan de marcarse como dudosas.
+    $this->recordReviews($updated, $actorEmployeeId);
     return ['updated' => $updated, 'errors' => $errors];
   }
 
   /**
-   * Copia a la cotización el código de inmueble de su caso cuando quedó vacío o "No asignado".
+   * Asigna a la cotización sin inmueble (vacío o "No asignado") el que se obtiene de su caso o del
+   * contrato del caso (ver resolveProperties()); también el contrato si le falta. No cambia inmuebles ya asignados.
    *
    * @param list<int> $quoteIds
-   * @return array{updated:list<array{id:int,inmueble:string}>,skipped:list<int>}
+   * @return array{updated:list<array{id:int,inmueble:string,fuente:string}>,skipped:list<int>}
    */
   public function assignCaseProperty(array $quoteIds, string $actorEmployeeId): array
   {
@@ -244,25 +416,35 @@ final class QuoteMetricsReport
       throw new \RuntimeException('Tu usuario no tiene un id_empleado registrado.');
     }
     $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
-    $tickets = $this->db->table('jet_cct_tickets');
+    $schema = $this->schema();
+    $marks = implode(',', array_fill(0, count($quoteIds), '?'));
+    $rows = $this->db->getResults(
+      "SELECT c.`_ID`, c.`inmueble`, c.`contrato`, {$this->linkSelect($schema)}
+       FROM `{$table}` c {$this->ticketJoin($schema)} WHERE c.`_ID` IN ({$marks})",
+      $quoteIds
+    );
+    $resolved = $this->resolveProperties($rows, $schema);
+    $hasContractId = $schema->columnExists($table, 'id_contrato');
     $now = (new DateTimeImmutable('now', $this->timezone))->format('Y-m-d H:i:s');
     $updated = [];
-    $skipped = [];
-    foreach ($quoteIds as $id) {
-      $row = $this->db->getRow(
-        "SELECT c.`inmueble`, t.`inmueble` AS ticket_inmueble FROM `{$table}` c
-         LEFT JOIN `{$tickets}` t ON CAST(t.`_ID` AS CHAR) = TRIM(COALESCE(c.`id_ticket`, ''))
-         WHERE c.`_ID` = ? LIMIT 1",
-        [$id]
-      );
-      $caseProperty = trim((string) ($row['ticket_inmueble'] ?? ''));
-      if (!$row || !self::missingProperty((string) ($row['inmueble'] ?? '')) || preg_match('/^\d+$/', $caseProperty) !== 1) {
-        $skipped[] = $id;
+    foreach ($rows as $row) {
+      $id = (int) $row['_ID'];
+      $match = $resolved[(string) $id] ?? null;
+      if ($match === null) {
         continue;
       }
-      $this->db->update($table, ['inmueble' => $caseProperty, 'cct_modified' => $now, 'cct_author_id' => $actorEmployeeId], ['_ID' => $id]);
-      $updated[] = ['id' => $id, 'inmueble' => $caseProperty];
+      $data = ['inmueble' => $match['inmueble'], 'cct_modified' => $now, 'cct_author_id' => $actorEmployeeId];
+      if ($match['contrato'] !== '' && self::missingContract((string) ($row['contrato'] ?? ''))) {
+        $data['contrato'] = $match['contrato'];
+      }
+      if ($hasContractId && $match['id_contrato'] !== '' && self::positiveId($row['quote_id_contrato'] ?? '') === '') {
+        $data['id_contrato'] = $match['id_contrato'];
+      }
+      $this->db->update($table, $data, ['_ID' => $id]);
+      $updated[] = ['id' => $id, 'inmueble' => $match['inmueble'], 'fuente' => $match['fuente']];
     }
+    $done = array_column($updated, 'id');
+    $skipped = array_values(array_filter($quoteIds, static fn(int $id): bool => !in_array($id, $done, true)));
     return ['updated' => $updated, 'skipped' => $skipped];
   }
 
