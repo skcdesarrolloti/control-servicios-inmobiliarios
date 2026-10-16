@@ -83,8 +83,9 @@ $check(substr_count($casesJs, 'fetch(') === 1 && str_contains($casesJs, 'session
 // Métricas consulta una sola vez; la conciliación reutiliza esas filas y solo va al servidor para guardar o conciliar.
 $qualityJs = (string) file_get_contents($root . '/public/assets/js/admin-quote-quality.js');
 $check(substr_count($quotesJs, 'fetch(') === 1 && str_contains($quotesJs, 'state.data && !force') && str_contains($quotesJs, 'scm:quote-data'), 'Cotizaciones consulta una sola vez y comparte sus filas.');
-$check(substr_count($qualityJs, 'fetch(') === 1 && str_contains($qualityJs, 'scm:quote-data') && str_contains($qualityJs, 'scm:quote-reload'), 'La conciliación reutiliza las filas y pide recargar tras corregir.');
-$check(str_contains($qualityJs, 'overwrite: "0"') && !str_contains($qualityJs, 'overwrite: "1"'), 'La conciliación solo completa fechas vacías; nunca sobrescribe una fecha existente.');
+$check(substr_count($qualityJs, 'fetch(') === 1 && str_contains($qualityJs, 'scm:quote-data') && str_contains($qualityJs, 'scm:quote-rows-changed'), 'La conciliación reutiliza las filas y avisa al informe tras corregir.');
+$check(str_contains($qualityJs, 'quotesOf(property)') && str_contains($qualityJs, 'row.inmueble_caso') && str_contains($qualityJs, 'quote_ledger_update'), 'La conciliación lista todas las cotizaciones de cada inmueble del auxiliar y permite editarlas.');
+$check(str_contains($qualityJs, 'scm:quote-rows-changed') && str_contains($quotesJs, 'scm:quote-rows-changed'), 'Lo corregido en la conciliación recalcula el informe sin recargar.');
 $check(str_contains($quotesJs, 'data-scm-maintenance-quote-open-case') && str_contains($quotesJs, 'scm-maintenance-quote-row'), 'Cotizaciones conserva "Ver caso" con el popup del panel.');
 
 // Completar fecha de respuesta: solo aprobadas sin fecha, sin fechas futuras ni previas a la creación.
@@ -161,6 +162,20 @@ $check($sqlite->getVar('SELECT inmueble FROM wp_jet_cct_cotizacion_mantenimiento
 $quote4 = $sqlite->getRow('SELECT contrato, id_contrato FROM wp_jet_cct_cotizacion_mantenimiento WHERE _ID = 4');
 $check($quote4['contrato'] === '1167-Diseños' && $quote4['id_contrato'] === '499', 'Completa el contrato desde el contrato del caso cuando falta.');
 $check($sqlite->getVar('SELECT contrato FROM wp_jet_cct_cotizacion_mantenimiento WHERE _ID = 3') === 'No asignado', 'Un contrato "No asignado" no se copia.');
+
+// Corregir total y administración desde la conciliación: el IVA de la administración y el total quedan coherentes.
+foreach (['total', 'total_admon', 'porcentaje_admon', 'iva', 'iva_admon', 'total_admon_mas_iva', 'total_materiales', 'total_mano_obra', 'total_maquinarias', 'total_otros_costos'] as $column) {
+  $pdo->exec('ALTER TABLE wp_jet_cct_cotizacion_mantenimiento ADD COLUMN ' . $column . ' TEXT');
+}
+$sqlite->insert('wp_jet_cct_cotizacion_mantenimiento', ['_ID' => 9, 'estado' => 'Aprobada', 'total' => '1119000', 'total_admon' => '100000', 'porcentaje_admon' => '10', 'iva' => '19', 'iva_admon' => '19000', 'total_admon_mas_iva' => '119000', 'total_mano_obra' => '1000000', 'cct_author_id' => '1']);
+$values = $writer->updateValues(9, null, 80000, '2871');
+$quote9 = $sqlite->getRow('SELECT total, total_admon, iva_admon, total_admon_mas_iva, porcentaje_admon, cct_author_id FROM wp_jet_cct_cotizacion_mantenimiento WHERE _ID = 9');
+$check($values === ['id' => 9, 'total' => 1095200, 'admin' => 80000] && $quote9['iva_admon'] === '15200' && $quote9['total_admon_mas_iva'] === '95200' && $quote9['porcentaje_admon'] === '8' && $quote9['cct_author_id'] === '2871',
+  'Cambiar la administración recalcula su IVA, el porcentaje y ajusta el total: ' . json_encode([$values, $quote9]));
+$values = $writer->updateValues(9, 1200000, null, '2871');
+$check($values === ['id' => 9, 'total' => 1200000, 'admin' => 80000] && $sqlite->getVar('SELECT total FROM wp_jet_cct_cotizacion_mantenimiento WHERE _ID = 9') === '1200000', 'Un total escrito a mano se guarda tal cual.');
+$fails(fn() => $writer->updateValues(9, 50000, 80000, '2871'), 'mayor que el valor total', 'La administración no puede superar el total');
+$fails(fn() => $writer->updateValues(9, null, 1000, ''), 'id_empleado', 'Editar valores exige el id_empleado real');
 
 // Conciliación con el auxiliar contable.
 use SCM\Modules\Metrics\QuoteLedgerReconciliation;

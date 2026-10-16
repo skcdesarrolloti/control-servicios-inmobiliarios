@@ -149,6 +149,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_QUOTE_METRICS = 'scm_metricas_cotizaciones';
   const AJAX_QUOTE_RESPONSE_DATE = 'scm_metricas_cotizacion_fecha_respuesta';
   const AJAX_QUOTE_ASSIGN_PROPERTY = 'scm_metricas_cotizacion_inmueble';
+  const AJAX_QUOTE_LEDGER_UPDATE = 'scm_metricas_cotizacion_valores';
   const AJAX_QUOTE_LEDGER = 'scm_metricas_cotizaciones_auxiliar';
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';

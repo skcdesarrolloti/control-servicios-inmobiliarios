@@ -473,6 +473,8 @@
 
     module.addEventListener("scm:load-metrics", function () { load(false); });
     module.addEventListener("scm:quote-reload", function () { load(true); });
+    // La conciliación corrigió fechas o valores sobre estas mismas filas: solo se recalcula.
+    module.addEventListener("scm:quote-rows-changed", function () { if (state.data) render(); });
     if (panel && panel.classList.contains("active")) load(false);
   }
 

@@ -69,6 +69,56 @@ trait HandlesMetricsPanels
     }
   }
 
+  /**
+   * Conciliación por inmueble: corrige la fecha de respuesta, el valor total y/o la administración
+   * de una cotización. Solo se envían los campos que cambiaron; cada uno exige su permiso.
+   */
+  public function ajax_handler_quote_ledger_update(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('metricas')) {
+      $this->jsonFail('No tienes permiso para ver métricas.');
+    }
+    $id = (int) ($_POST['cotizacion_id'] ?? 0);
+    $date = trim((string) ($_POST['fecha_respuesta'] ?? ''));
+    $money = static function (string $key): ?int {
+      $raw = preg_replace('/\D+/', '', (string) ($_POST[$key] ?? '')) ?? '';
+      return $raw === '' ? null : (int) $raw;
+    };
+    $total = $money('total');
+    $admin = $money('administracion');
+    if ($date === '' && $total === null && $admin === null) {
+      $this->jsonFail('No hay cambios para guardar.');
+    }
+    if ($date !== '' && !$this->canUseDashboardAction('quote_respond')) {
+      $this->jsonFail('No tienes permiso para cambiar fechas de respuesta.');
+    }
+    if (($total !== null || $admin !== null) && !$this->canUseDashboardAction('quote_edit')) {
+      $this->jsonFail('No tienes permiso para editar cotizaciones.');
+    }
+    $actor = $this->current_employee_id();
+    $report = new QuoteMetricsReport($this->db, App::settings());
+    try {
+      $result = ['id' => $id];
+      if ($date !== '') {
+        $dates = $report->setResponseDates([['id' => $id, 'date' => $date]], $actor, true);
+        if ($dates['errors'] !== []) {
+          throw new \InvalidArgumentException($dates['errors'][0]['message']);
+        }
+        $result['respuesta'] = $date;
+      }
+      if ($total !== null || $admin !== null) {
+        $result += $report->updateValues($id, $total, $admin, $actor);
+      }
+      $this->jsonOk($result);
+    } catch (\InvalidArgumentException | \RuntimeException $exception) {
+      $this->jsonFail($exception->getMessage());
+    } catch (\Throwable $exception) {
+      error_log('[quote-ledger-update] ' . $exception->getMessage());
+      $this->jsonFail('No se pudo guardar la cotización.');
+    }
+  }
+
   public function ajax_handler_quote_assign_property(): void
   {
     $this->verifyCsrf();

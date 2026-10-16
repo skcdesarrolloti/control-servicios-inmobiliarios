@@ -541,6 +541,7 @@ trait RendersDashboard
         'quote_metrics' => self::AJAX_QUOTE_METRICS,
         'quote_response_date' => self::AJAX_QUOTE_RESPONSE_DATE,
         'quote_assign_property' => self::AJAX_QUOTE_ASSIGN_PROPERTY,
+        'quote_ledger_update' => self::AJAX_QUOTE_LEDGER_UPDATE,
         'quote_ledger' => self::AJAX_QUOTE_LEDGER,
         'contract_owners' => self::AJAX_CONTRACT_OWNERS,
         'contract_owners_save' => self::AJAX_CONTRACT_OWNERS_SAVE,

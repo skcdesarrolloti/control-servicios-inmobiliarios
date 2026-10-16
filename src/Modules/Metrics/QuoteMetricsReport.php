@@ -38,6 +38,7 @@ final class QuoteMetricsReport
   ];
   public const MAX_BATCH = 200;
   public const REVIEWS_SETTING = 'quote_response_reviews';
+  public const EDITS_SETTING = 'quote_value_edits';
 
   private Database $db;
   private DateTimeZone $timezone;
@@ -446,6 +447,88 @@ final class QuoteMetricsReport
     $done = array_column($updated, 'id');
     $skipped = array_values(array_filter($quoteIds, static fn(int $id): bool => !in_array($id, $done, true)));
     return ['updated' => $updated, 'skipped' => $skipped];
+  }
+
+  /**
+   * Corrige el valor total y/o la administración (sin IVA) de una cotización desde la conciliación.
+   * Al cambiar la administración se recalculan su IVA (`iva_admon`, `total_admon_mas_iva`) y el
+   * porcentaje; si no se envía un total nuevo, el total se ajusta por la diferencia de la
+   * administración con IVA. Cada cambio queda en `quote_value_edits` (antes, después, quién, cuándo).
+   *
+   * @return array{id:int,total:int,admin:int}
+   */
+  public function updateValues(int $quoteId, ?int $total, ?int $admin, string $actorEmployeeId): array
+  {
+    if ($quoteId <= 0) {
+      throw new \InvalidArgumentException('Cotización inválida.');
+    }
+    if ($actorEmployeeId === '') {
+      throw new \RuntimeException('Tu usuario no tiene un id_empleado registrado.');
+    }
+    if (($total !== null && $total < 0) || ($admin !== null && $admin < 0)) {
+      throw new \InvalidArgumentException('Los valores no pueden ser negativos.');
+    }
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    $quote = $this->db->getRow(
+      "SELECT `_ID`, `total`, `total_admon`, `porcentaje_admon`, `iva`, `iva_admon`, `total_admon_mas_iva`,
+              `total_materiales`, `total_mano_obra`, `total_maquinarias`, `total_otros_costos`
+       FROM `{$table}` WHERE `_ID` = ? LIMIT 1",
+      [$quoteId]
+    );
+    if (!$quote) {
+      throw new \InvalidArgumentException('La cotización ya no existe.');
+    }
+    $oldTotal = ContractMovementsReport::parseMoney($quote['total'] ?? null);
+    $oldAdmin = self::adminAmount($quote);
+    $ivaText = trim((string) ($quote['iva'] ?? ''));
+    $ivaRate = $ivaText === '' ? 19.0 : (float) str_replace(',', '.', preg_replace('/[^0-9,.]/', '', $ivaText) ?? '19');
+    $oldAdminWithIva = ContractMovementsReport::parseMoney($quote['total_admon_mas_iva'] ?? null) ?: $oldAdmin + (int) round($oldAdmin * $ivaRate / 100);
+
+    $data = [];
+    $newTotal = $total ?? $oldTotal;
+    $newAdmin = $admin ?? $oldAdmin;
+    if ($admin !== null && $admin !== $oldAdmin) {
+      $ivaAdmin = (int) round($admin * $ivaRate / 100);
+      $data['total_admon'] = (string) $admin;
+      $data['iva_admon'] = (string) $ivaAdmin;
+      $data['total_admon_mas_iva'] = (string) ($admin + $ivaAdmin);
+      $subtotal = 0;
+      foreach (['total_materiales', 'total_mano_obra', 'total_maquinarias', 'total_otros_costos'] as $field) {
+        $subtotal += ContractMovementsReport::parseMoney($quote[$field] ?? null);
+      }
+      if ($subtotal > 0) {
+        $data['porcentaje_admon'] = rtrim(rtrim(number_format($admin / $subtotal * 100, 2, '.', ''), '0'), '.') ?: '0';
+      }
+      if ($total === null) {
+        $newTotal = max(0, $oldTotal - $oldAdminWithIva + $admin + $ivaAdmin);
+      }
+    }
+    if ($newTotal !== $oldTotal) {
+      $data['total'] = (string) $newTotal;
+    }
+    if ($newAdmin > $newTotal) {
+      throw new \InvalidArgumentException('La administración no puede ser mayor que el valor total.');
+    }
+    if ($data === []) {
+      return ['id' => $quoteId, 'total' => $oldTotal, 'admin' => $oldAdmin];
+    }
+    $now = (new DateTimeImmutable('now', $this->timezone))->format('Y-m-d H:i:s');
+    $this->db->update($table, $data + ['cct_modified' => $now, 'cct_author_id' => $actorEmployeeId], ['_ID' => $quoteId]);
+
+    if ($this->settings !== null) {
+      $this->settings->refresh();
+      $log = $this->settings->get(self::EDITS_SETTING, []);
+      $log = is_array($log) ? $log : [];
+      $log[] = [
+        'id' => $quoteId,
+        'antes' => ['total' => $oldTotal, 'admin' => $oldAdmin],
+        'despues' => ['total' => $newTotal, 'admin' => $newAdmin],
+        'por' => $actorEmployeeId,
+        'el' => $now,
+      ];
+      $this->settings->set(self::EDITS_SETTING, array_slice($log, -2000), (int) $actorEmployeeId);
+    }
+    return ['id' => $quoteId, 'total' => $newTotal, 'admin' => $newAdmin];
   }
 
   /** Administración sin IVA: `total_admon` o, si falta, subtotal × `porcentaje_admon`. */
