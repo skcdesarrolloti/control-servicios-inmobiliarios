@@ -131,30 +131,29 @@ $check($byId[105]['mandato']['employee_id'] === '2837', 'Los nombres se comparan
 $check($service->matchName('Kelly') === '' && $service->matchName('Cantillo Devoz') === '5', 'Una sola palabra no basta; nombre y apellido sí.');
 $check(count(array_filter($snapshot['employees'], static fn(array $e): bool => !$e['active'])) === 1, 'Los funcionarios retirados se marcan como inactivos.');
 
-// 3. Guardar: id_empleado, realizado_por y cct_author_id, con historial y validaciones.
+// 3. Guardar: corrige id_empleado, realizado_por y cct_author_id sin dejar historial.
 $fail = static function (callable $fn, string $expected, string $label) use ($check): void {
   try { $fn(); } catch (Throwable $e) { $check(str_contains($e->getMessage(), $expected), $label . ' (mensaje: ' . $e->getMessage() . ')'); return; }
   throw new RuntimeException($label . ' debía fallar.');
 };
-$fail(fn() => $service->assign([['contract_id' => 101, 'employee_id' => '4']], 'Según hoja de cierre'), 'activos', 'No se puede asignar un funcionario retirado');
-$fail(fn() => $service->assign([['contract_id' => 101, 'employee_id' => '5']], 'ok'), 'motivo', 'El motivo es obligatorio');
-$fail(fn() => $service->assign([['contract_id' => 101, 'employee_id' => '5'], ['contract_id' => 101, 'employee_id' => '5']], 'Duplicado de prueba'), 'repetidos', 'No se aceptan contratos repetidos');
-$check($db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble') === 0 || $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble') === '0', 'Un lote inválido no deja historial.');
+$fail(fn() => $service->assign([['contract_id' => 101, 'employee_id' => '4']]), 'activos', 'No se puede asignar un funcionario retirado');
+$fail(fn() => $service->assign([['contract_id' => 101, 'employee_id' => '5'], ['contract_id' => 101, 'employee_id' => '5']]), 'repetidos', 'No se aceptan contratos repetidos');
+$fail(fn() => $service->assign([['contract_id' => 100, 'employee_id' => '5'], ['contract_id' => 999, 'employee_id' => '5']]), 'ya no existe', 'Un contrato inexistente falla el lote');
+$check($db->getVar('SELECT id_empleado FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 100') === '10', 'Un lote fallido no deja cambios a medias.');
 
 $result = $service->assign([
   ['contract_id' => 101, 'employee_id' => '5'],
   ['contract_id' => 100, 'employee_id' => '5'],
-], 'Según hoja de cierre #11');
+]);
 $check(count($result['updated']) === 2 && $result['skipped'] === 0, 'Se actualizan los contratos con cambios.');
 $row = $db->getRow('SELECT id_empleado, realizado_por, cct_author_id FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 101');
 $check($row === ['id_empleado' => '5', 'realizado_por' => 'Jocabeth Cantillo Devoz', 'cct_author_id' => '5'], 'Cambia id_empleado, realizado_por y cct_author_id al funcionario asignado.');
-$history = $db->getRow('SELECT * FROM wp_jet_cct_historial_del_inmueble WHERE id_inmueble = ? ORDER BY _ID DESC LIMIT 1', ['P2']);
-$check($history['cct_author_id'] === '2999' && $history['id_empleado'] === '2999' && $history['funcionario'] === 'Coordinadora QA', 'El historial registra el id_empleado real de quien hizo el cambio.');
-$check(str_contains($history['observacion'], 'sin funcionario a Jocabeth Cantillo Devoz (5)') && str_contains($history['observacion'], 'Motivo: Según hoja de cierre #11'), 'El historial explica el cambio y el motivo.');
 $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 106, 'contrato' => 'C106', 'estado' => 'Entregado', 'id_inmueble' => 'P6', 'id_empleado' => '5', 'realizado_por' => 'Jocabeth Cantillo Devoz', 'cct_author_id' => '1']);
-$author = $service->assign([['contract_id' => 106, 'employee_id' => '5']], 'Alinear autor del registro');
+$author = $service->assign([['contract_id' => 106, 'employee_id' => '5']]);
 $check(count($author['updated']) === 1 && $db->getVar('SELECT cct_author_id FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 106') === '5', 'Si solo difiere cct_author_id, también se alinea.');
-$again = $service->assign([['contract_id' => 101, 'employee_id' => '5']], 'Repetir sin cambios');
-$check($again['updated'] === [] && $again['skipped'] === 1, 'Asignar el mismo funcionario no genera historial nuevo.');
+$again = $service->assign([['contract_id' => 101, 'employee_id' => '5']]);
+$check($again['updated'] === [] && $again['skipped'] === 1, 'Asignar el mismo funcionario no cambia nada.');
+$check((string) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble') === '0', 'Es una corrección: no escribe en el historial del inmueble.');
+$check(!str_contains((string) file_get_contents($root . '/src/Modules/ContractOwnership/ContractOwnershipService.php'), 'historial_del_inmueble'), 'El servicio no referencia el historial.');
 
 echo "Contract ownership checks passed.\n";

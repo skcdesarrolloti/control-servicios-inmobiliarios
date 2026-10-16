@@ -307,13 +307,9 @@
       html += "</div></div>";
       if (canEdit) {
         var preselect = row.suggestedActive ? s.employee_id : row.currentActive ? row.employee_id : "";
-        var reason = s.employee_id && row.suggestedActive
-          ? "Según " + (s.source === "mandato" ? "mandato #" + (mandato ? mandato.id : "") : "hoja de cierre #" + (cierre ? cierre.id : "")) + "."
-          : "";
         html += '<form class="scm-co-form" data-scm-co-form="' + row.id + '"><label class="scm-co-field"><span>Funcionario responsable</span>' +
           '<select name="employee" required><option value="">Elige un funcionario activo</option>' + activeOptions(preselect) + "</select></label>" +
-          '<label class="scm-co-field"><span>Motivo del cambio</span><textarea name="reason" rows="2" required minlength="5" placeholder="Ej.: Según hoja de cierre #420">' + esc(reason) + "</textarea></label>" +
-          '<p class="scm-co-hint">Se actualizan id_empleado, realizado_por y cct_author_id del contrato; el cambio queda en el historial del inmueble.</p>' +
+          '<p class="scm-co-hint">Se corrigen id_empleado, realizado_por y cct_author_id del contrato.</p>' +
           '<div class="scm-co-form-actions"><button type="button" class="scm-co-btn" data-scm-co-close>Cancelar</button><button type="submit" class="scm-co-btn scm-co-btn-primary">Guardar cambio</button></div></form>';
       }
       return html;
@@ -330,37 +326,36 @@
         "<tr><td>Solo hay mandato</td><td>Funcionario del mandato</td><td>Baja</td></tr>" +
         "<tr><td>Ninguno de los dos</td><td>Elegir manualmente</td><td>—</td></tr></tbody></table>" +
         "<p>Si el funcionario sugerido está <strong>retirado</strong>, no se puede asignar: elige el funcionario activo que hoy atiende el contrato.</p>" +
-        "<p>Las revisiones, gestiones de cobro y demás acciones del panel ya <strong>no</strong> cambian el funcionario del contrato; solo este módulo puede hacerlo y cada cambio queda en el historial del inmueble.</p></div>";
+        "<p>Las revisiones, gestiones de cobro y demás acciones del panel ya <strong>no</strong> cambian el funcionario del contrato; este módulo sirve para corregir los contratos que esas acciones habían cambiado.</p></div>";
     }
 
-    function confirmHtml(changes, skipped, preset) {
+    function confirmHtml(changes, skipped) {
       var groups = {};
       changes.forEach(function (change) { groups[change.employee_id] = (groups[change.employee_id] || 0) + 1; });
       return '<form class="scm-co-form" data-scm-co-confirm><p>Vas a cambiar el funcionario de <strong>' + changes.length + (changes.length === 1 ? " contrato" : " contratos") + "</strong>:</p><ul>" +
         Object.keys(groups).map(function (id) { return "<li>" + esc(employeeName(id)) + ": " + groups[id] + "</li>"; }).join("") + "</ul>" +
         (skipped ? '<p class="scm-co-hint">' + skipped + (skipped === 1 ? " contrato seleccionado se omite" : " contratos seleccionados se omiten") + " porque no tienen una sugerencia activa distinta del funcionario actual.</p>" : "") +
-        '<label class="scm-co-field"><span>Motivo del cambio</span><textarea name="reason" rows="2" required minlength="5">' + esc(preset) + "</textarea></label>" +
         '<div class="scm-co-form-actions"><button type="button" class="scm-co-btn" data-scm-co-close>Cancelar</button><button type="submit" class="scm-co-btn scm-co-btn-primary">Confirmar cambio</button></div></form>';
     }
 
     var pendingChanges = [];
-    function askConfirm(changes, skipped, preset) {
+    function askConfirm(changes, skipped) {
       if (!changes.length) {
         openModal("Nada que cambiar", "<p>Los contratos seleccionados ya tienen el funcionario indicado o no tienen una sugerencia activa.</p>" +
           '<div class="scm-co-form-actions"><button type="button" class="scm-co-btn" data-scm-co-close>Entendido</button></div>');
         return;
       }
       pendingChanges = changes;
-      openModal("Confirmar cambio de funcionario", confirmHtml(changes, skipped, preset));
+      openModal("Confirmar cambio de funcionario", confirmHtml(changes, skipped));
     }
 
-    function save(changes, reason, submitButton) {
+    function save(changes, submitButton) {
       state.saving = true;
       if (submitButton) {
         submitButton.disabled = true;
         submitButton.textContent = "Guardando…";
       }
-      return request(actions.contract_owners_save || "", { changes: JSON.stringify(changes), reason: reason })
+      return request(actions.contract_owners_save || "", { changes: JSON.stringify(changes) })
         .then(function (result) {
           var byId = {};
           state.data.contracts.forEach(function (row) { byId[row.id] = row; });
@@ -417,8 +412,7 @@
       if (quick) {
         var quickRow = state.data.contracts.find(function (item) { return item.id === Number(quick.getAttribute("data-scm-co-quick")); });
         if (quickRow) {
-          var src = quickRow.suggestion.source === "mandato" ? "mandato #" + (quickRow.mandato || {}).id : "hoja de cierre #" + (quickRow.cierre || {}).id;
-          askConfirm([{ contract_id: quickRow.id, employee_id: quickRow.suggestion.employee_id }], 0, "Según " + src + ".");
+          askConfirm([{ contract_id: quickRow.id, employee_id: quickRow.suggestion.employee_id }], 0);
         }
         return;
       }
@@ -434,7 +428,7 @@
         var rows = selectedRows();
         var changes = rows.filter(function (item) { return item.suggestedActive && item.suggestion.employee_id !== item.employee_id; })
           .map(function (item) { return { contract_id: item.id, employee_id: item.suggestion.employee_id }; });
-        askConfirm(changes, rows.length - changes.length, "Asignación según hoja de cierre y mandato.");
+        askConfirm(changes, rows.length - changes.length);
         return;
       }
       if (target.closest("[data-scm-co-bulk-assign]")) {
@@ -443,7 +437,7 @@
         var selected = selectedRows();
         var assign = selected.filter(function (item) { return item.employee_id !== employeeId; })
           .map(function (item) { return { contract_id: item.id, employee_id: employeeId }; });
-        askConfirm(assign, selected.length - assign.length, "");
+        askConfirm(assign, selected.length - assign.length);
       }
     });
 
@@ -468,13 +462,8 @@
       var form = event.target;
       event.preventDefault();
       if (state.saving) return;
-      var reason = (form.querySelector("[name=reason]") || {}).value || "";
-      if (reason.trim().length < 5) {
-        form.querySelector("[name=reason]").focus();
-        return;
-      }
       if (form.hasAttribute("data-scm-co-confirm")) {
-        save(pendingChanges, reason.trim(), form.querySelector("[type=submit]"));
+        save(pendingChanges, form.querySelector("[type=submit]"));
         return;
       }
       if (form.hasAttribute("data-scm-co-form")) {
@@ -486,7 +475,7 @@
           closeModal();
           return;
         }
-        askConfirm([{ contract_id: row.id, employee_id: employeeId }], 0, reason.trim());
+        askConfirm([{ contract_id: row.id, employee_id: employeeId }], 0);
       }
     });
 

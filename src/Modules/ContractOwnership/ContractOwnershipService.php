@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace SCM\Modules\ContractOwnership;
 
-use SCM\Core\Auth;
 use SCM\Core\Database;
 use SCM\Support\SchemaInspector;
 
@@ -16,7 +15,8 @@ use SCM\Support\SchemaInspector;
  * - Mandato: quien captó el inmueble. Su `id_empleado` y `cct_author_id` no son confiables en
  *   los datos, por eso el funcionario se identifica por el correo o el nombre de `creador`.
  * Si ambos coinciden la sugerencia es alta; si difieren prevalece la hoja de cierre.
- * Al asignar se actualizan id_empleado, realizado_por y cct_author_id del contrato.
+ * Al asignar se actualizan id_empleado, realizado_por y cct_author_id del contrato. Es una herramienta
+ * de corrección: no deja historial en el inmueble.
  */
 final class ContractOwnershipService
 {
@@ -71,23 +71,16 @@ final class ContractOwnershipService
    * @param list<array{contract_id:int,employee_id:string}> $changes
    * @return array{updated:list<array<string,mixed>>,skipped:int}
    */
-  public function assign(array $changes, string $reason): array
+  public function assign(array $changes): array
   {
-    $reason = trim(preg_replace('/\s+/u', ' ', $reason) ?? '');
     if ($changes === []) {
       throw new \InvalidArgumentException('Selecciona al menos un contrato.');
     }
     if (count($changes) > self::MAX_CHANGES) {
       throw new \InvalidArgumentException('Puedes cambiar hasta ' . self::MAX_CHANGES . ' contratos por vez.');
     }
-    if (mb_strlen($reason, 'UTF-8') < 5) {
-      throw new \InvalidArgumentException('Escribe el motivo del cambio (mínimo 5 caracteres).');
-    }
-
-    $actor = $this->actor();
     $this->loadEmployees();
     $contractsTable = $this->db->table('jet_cct_contratos_arrendamiento');
-    $historyTable = $this->db->table('jet_cct_historial_del_inmueble');
     $pdo = $this->db->pdo();
     $ownsTransaction = !$pdo->inTransaction();
     $updated = [];
@@ -135,25 +128,6 @@ final class ContractOwnershipService
           throw new \RuntimeException('No se pudo actualizar el contrato #' . $contractId . '.');
         }
 
-        $previousLabel = $previousId === ''
-          ? 'sin funcionario'
-          : ($this->employees[$previousId]['name'] ?? ($previousName !== '' ? $previousName : 'funcionario ' . $previousId)) . ' (' . $previousId . ')';
-        $history = $this->schema->filterTableData($historyTable, [
-          'cct_status' => 'publish',
-          'cct_author_id' => $actor['id'],
-          'cct_created' => $now,
-          'cct_modified' => $now,
-          'id_empleado' => $actor['id'],
-          'funcionario' => $actor['name'],
-          'id_inmueble' => (string) ($contract['id_inmueble'] ?? ''),
-          'fecha' => time(),
-          'tipo_reporte' => 'Contractual',
-          'observacion' => 'Funcionario responsable del contrato #' . trim((string) ($contract['contrato'] ?? $contractId))
-            . ' cambiado de ' . $previousLabel . ' a ' . $employee['name'] . ' (' . $employeeId . '). Motivo: ' . $reason,
-        ]);
-        if ($history === [] || !$this->db->insert($historyTable, $history)) {
-          throw new \RuntimeException('No se pudo guardar el historial del contrato #' . $contractId . '.');
-        }
         $updated[] = ['contract_id' => $contractId, 'employee_id' => $employeeId, 'employee_name' => $employee['name']];
       }
       if ($ownsTransaction) {
@@ -426,18 +400,6 @@ final class ContractOwnershipService
       }
     }
     return $out;
-  }
-
-  /** @return array{id:string,name:string} */
-  private function actor(): array
-  {
-    $table = $this->db->table('jet_cct_funcionarios');
-    $row = $this->db->getRow("SELECT `id_empleado`, `nombre` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [(int) Auth::userId()]);
-    $id = trim((string) ($row['id_empleado'] ?? ''));
-    if ($id === '') {
-      throw new \RuntimeException('Tu usuario no tiene un id_empleado registrado; no se puede dejar trazabilidad del cambio.');
-    }
-    return ['id' => $id, 'name' => trim((string) ($row['nombre'] ?? Auth::user()))];
   }
 
   private function date($value): string

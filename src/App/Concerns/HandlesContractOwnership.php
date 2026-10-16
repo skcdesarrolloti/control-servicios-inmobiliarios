@@ -42,10 +42,7 @@ trait HandlesContractOwnership
       ];
     }
     try {
-      $result = (new ContractOwnershipService($this->db))->assign(
-        $changes,
-        sanitize_text_field(wp_unslash((string) ($_POST['reason'] ?? '')))
-      );
+      $result = (new ContractOwnershipService($this->db))->assign($changes);
       $this->jsonOk($result);
     } catch (\InvalidArgumentException $exception) {
       $this->jsonFail($exception->getMessage());
