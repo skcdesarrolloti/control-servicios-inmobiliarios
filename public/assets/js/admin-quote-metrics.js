@@ -167,7 +167,9 @@
       var valid = /^\d{4}-\d{2}$/;
       if (state.mode === "anual") {
         var year = yearSelect.value;
-        return { from: year + "-01", to: year + "-12", label: "todo " + year, title: year, months: yearMonths(year) };
+        // Del año en curso solo se muestran los meses ya transcurridos.
+        var months = yearMonths(year).filter(function (ym) { return ym <= currentMonth; });
+        return { from: year + "-01", to: year + "-12", label: "todo " + year, title: year, months: months };
       }
       if (state.mode === "acumulado") {
         var from = valid.test(fromInput.value) ? fromInput.value : currentMonth.slice(0, 4) + "-01";
@@ -311,22 +313,30 @@
       }).join("") + "</div></div>";
     }
 
+    // Tabla agrupada: Creadas (por fecha de la cotización) | Aprobadas (por fecha de respuesta).
+    // Los ceros van atenuados para que resalten los meses con movimiento.
     function monthlyTable() {
+      var multiYear = state.monthly.length && state.monthly[0].month.slice(0, 4) !== state.monthly[state.monthly.length - 1].month.slice(0, 4);
       var totals = { created: 0, total: 0, admin: 0, unsent: 0, approved: 0, approvedTotal: 0, won: 0 };
+      function count(value, cls) { return '<td class="is-num' + (cls || "") + '">' + (value ? num(value) : '<span class="scm-cm-muted">—</span>') + "</td>"; }
+      function cash(value, cls) { return '<td class="is-num' + (cls || "") + '">' + (value ? money(value) : '<span class="scm-cm-muted">—</span>') + "</td>"; }
       var body = state.monthly.map(function (m) {
         totals.created += m.created.count; totals.total += m.created.total; totals.admin += m.created.admin; totals.unsent += m.unsent;
         totals.approved += m.approved.count; totals.approvedTotal += m.approved.total; totals.won += m.approved.admin;
-        return '<tr><td><button type="button" class="scm-cm-link" data-scm-quote-month="' + m.month + '">' + esc(m.name) +
-          '</button></td><td class="is-num">' + num(m.created.count) + '</td><td class="is-num">' + money(m.created.total) + '</td><td class="is-num">' + money(m.created.admin) +
-          '</td><td class="is-num' + (m.unsent ? " is-bad" : "") + '">' + num(m.unsent) + '</td><td class="is-num">' + num(m.approved.count) + '</td><td class="is-num">' + money(m.approved.total) +
-          '</td><td class="is-num is-total">' + money(m.approved.admin) + "</td></tr>";
+        var name = multiYear ? m.name : MONTHS_LONG[Number(m.month.slice(5, 7)) - 1];
+        return '<tr><td><button type="button" class="scm-cm-link" data-scm-quote-month="' + m.month + '">' + esc(name) + "</button></td>" +
+          count(m.created.count, " is-group-start") + cash(m.created.total) + cash(m.created.admin) + count(m.unsent, m.unsent ? " is-bad" : "") +
+          count(m.approved.count, " is-group-start") + cash(m.approved.total) + cash(m.approved.admin, " is-total") + "</tr>";
       }).join("");
-      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table"><thead><tr><th>Mes</th><th class="is-num">Creadas</th><th class="is-num">Valor creadas</th>' +
-        '<th class="is-num">Administración creadas</th><th class="is-num">Sin enviar</th><th class="is-num">Aprobadas</th><th class="is-num">Valor aprobado</th>' +
-        '<th class="is-num">Administración ganada</th></tr></thead><tbody>' + body + '</tbody><tfoot><tr><td>Total</td><td class="is-num">' + num(totals.created) +
-        '</td><td class="is-num">' + money(totals.total) + '</td><td class="is-num">' + money(totals.admin) + '</td><td class="is-num">' + num(totals.unsent) +
-        '</td><td class="is-num">' + num(totals.approved) + '</td><td class="is-num">' + money(totals.approvedTotal) + '</td><td class="is-num is-total">' + money(totals.won) +
-        "</td></tr></tfoot></table></div>";
+      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-qm-monthly"><thead>' +
+        '<tr><th rowspan="2">Mes</th><th colspan="4" class="scm-qm-group is-group-start">Creadas <small>por fecha de la cotización</small></th>' +
+        '<th colspan="3" class="scm-qm-group is-approved is-group-start">Aprobadas <small>por fecha de respuesta</small></th></tr>' +
+        '<tr><th class="is-num is-group-start">Cantidad</th><th class="is-num">Valor</th><th class="is-num">Administración</th><th class="is-num">Sin enviar</th>' +
+        '<th class="is-num is-group-start">Cantidad</th><th class="is-num">Valor</th><th class="is-num">Administración ganada</th></tr></thead><tbody>' + body +
+        '</tbody><tfoot><tr><td>Total</td><td class="is-num is-group-start">' + num(totals.created) + '</td><td class="is-num">' + money(totals.total) +
+        '</td><td class="is-num">' + money(totals.admin) + '</td><td class="is-num' + (totals.unsent ? " is-bad" : "") + '">' + num(totals.unsent) +
+        '</td><td class="is-num is-group-start">' + num(totals.approved) + '</td><td class="is-num">' + money(totals.approvedTotal) +
+        '</td><td class="is-num is-total">' + money(totals.won) + "</td></tr></tfoot></table></div>";
     }
 
     function renderDetail() {
