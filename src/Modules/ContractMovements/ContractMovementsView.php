@@ -72,6 +72,15 @@ final class ContractMovementsView
           <select name="year" data-scm-cm-filter="year"><option value="">Todos los años</option></select>
         </label>
         <label class="scm-cm-field">
+          <span>Mes</span>
+          <select name="month" data-scm-cm-filter="month">
+            <option value="">Todos los meses</option>
+            <?php foreach (['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] as $index => $monthName): ?>
+              <option value="<?php echo $index + 1; ?>"><?php echo $h($monthName); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+        <label class="scm-cm-field">
           <span>Funcionario</span>
           <select name="funcionario" data-scm-cm-filter="funcionario"><option value="">Todos</option></select>
         </label>

@@ -41,6 +41,13 @@ final class ContractMovementsReport
     'direccion',
     'arrendatario',
     'inmueble',
+    'entrega',
+    'inicio',
+    'recibo',
+    'admin',
+    'meses',
+    'dias_gracia',
+    'dias_gracia_fuente',
   ];
 
   private const STATES = [
@@ -67,13 +74,20 @@ final class ContractMovementsReport
   public function snapshot(): array
   {
     $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    $closings = $this->db->table('jet_cct_cierres');
+    $mandates = $this->db->table('jet_cct_contrato_mandato');
+    // Los días de gracia casi nunca se copian al contrato: se completan desde la hoja de cierre o el mandato.
     $rows = $this->db->getResults(
-      "SELECT `_ID`, `contrato`, `estado`, `fecha_entrega`, `inicio_contrato`, `fecha_recibo`, `fin_contrato`,
-              `valor_canon`, `tipo_inmueble`, `destinacion_inmueble`, `gestion_inmueble`, `id_empleado`,
-              `direccion`, `arrendatario`, `id_inmueble_data`, `id_inmueble`
-       FROM `{$table}`
-       WHERE LOWER(TRIM(COALESCE(`estado`, ''))) IN ('entregado', 'por recibir', 'recibido')
-       ORDER BY `_ID` ASC"
+      "SELECT c.`_ID`, c.`contrato`, c.`estado`, c.`fecha_entrega`, c.`inicio_contrato`, c.`fecha_recibo`, c.`fin_contrato`,
+              c.`valor_canon`, c.`valor_administracion`, c.`meses_contrato`, c.`dias_gracia`,
+              c.`tipo_inmueble`, c.`destinacion_inmueble`, c.`gestion_inmueble`, c.`id_empleado`,
+              c.`direccion`, c.`arrendatario`, c.`id_inmueble_data`, c.`id_inmueble`,
+              h.`dias_gracia` AS dias_gracia_cierre, m.`dias_gracia` AS dias_gracia_mandato
+       FROM `{$table}` c
+       LEFT JOIN `{$closings}` h ON h.`_ID` = c.`id_cierre`
+       LEFT JOIN `{$mandates}` m ON m.`_ID` = c.`id_contrato_mandato`
+       WHERE LOWER(TRIM(COALESCE(c.`estado`, ''))) IN ('entregado', 'por recibir', 'recibido')
+       ORDER BY c.`_ID` ASC"
     );
 
     $out = [];
@@ -112,7 +126,17 @@ final class ContractMovementsReport
     $egreso = $state === 'recibido'
       ? ($this->date($row['fecha_recibo'] ?? null) ?? $this->date($row['fin_contrato'] ?? null))
       : null;
-    $fin = $state === 'recibido' ? null : $this->date($row['fin_contrato'] ?? null);
+    $fin = $this->date($row['fin_contrato'] ?? null);
+    $grace = null;
+    $graceSource = '';
+    foreach (['contrato' => 'dias_gracia', 'cierre' => 'dias_gracia_cierre', 'mandato' => 'dias_gracia_mandato'] as $source => $field) {
+      $grace = self::parseGraceDays($row[$field] ?? null);
+      if ($grace !== null) {
+        $graceSource = $source;
+        break;
+      }
+    }
+    $months = (int) preg_replace('/\D/', '', (string) ($row['meses_contrato'] ?? ''));
     $inmueble = trim((string) ($row['id_inmueble_data'] ?? ''));
     if ($inmueble === '') {
       $inmueble = trim((string) ($row['id_inmueble'] ?? ''));
@@ -133,7 +157,33 @@ final class ContractMovementsReport
       $this->text($row['direccion'] ?? ''),
       $this->text($row['arrendatario'] ?? ''),
       $inmueble,
+      $this->date($row['fecha_entrega'] ?? null),
+      $this->date($row['inicio_contrato'] ?? null),
+      $this->date($row['fecha_recibo'] ?? null),
+      self::parseMoney($row['valor_administracion'] ?? null),
+      $months >= 1 && $months <= 120 ? $months : null,
+      $grace,
+      $graceSource,
     ];
+  }
+
+  /** "15", "7 dias", "1 mes" → días; "0", "NO", "N/a" → 0; vacío o ilegible → null. */
+  public static function parseGraceDays($value): ?int
+  {
+    $raw = mb_strtolower(trim((string) ($value ?? '')), 'UTF-8');
+    if ($raw === '') {
+      return null;
+    }
+    if (in_array($raw, ['no', 'n/a', 'na', 'no aplica', 'ninguno', 'sin'], true)) {
+      return 0;
+    }
+    if (preg_match('/^(\d+)\s*(d[ií]as?|dias?)?$/u', $raw, $match) === 1) {
+      return (int) $match[1];
+    }
+    if (preg_match('/^(\d+)\s*mes(es)?$/u', $raw, $match) === 1) {
+      return (int) $match[1] * 30;
+    }
+    return null;
   }
 
   /** Convierte "$ 1.250.000", "1250000" o "1,250,000.50" en pesos enteros. */

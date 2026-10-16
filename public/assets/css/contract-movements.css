@@ -342,6 +342,12 @@
 #scm-app .scm-cm-table tbody tr:hover td { background: #fafcff; }
 #scm-app .scm-cm-table tr.is-active td { background: #eff6ff; font-weight: 600; }
 #scm-app .scm-cm-table .is-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#scm-app .scm-cm-detail td { white-space: nowrap; }
+#scm-app .scm-cm-detail td.is-address { min-width: 220px; max-width: 320px; white-space: normal; }
+#scm-app .scm-cm-detail td.is-name { min-width: 160px; max-width: 240px; white-space: normal; }
+#scm-app .scm-cm-muted { color: #94a3b8; }
+#scm-app .scm-cm-source { display: block; font-size: 10.5px; color: #94a3b8; }
+#scm-app .scm-cm-field select:disabled { background: #f8fafc; color: #94a3b8; }
 #scm-app .scm-cm-link { padding: 0; border: 0; background: none; color: #1d4ed8; font: inherit; font-weight: 700; cursor: pointer; }
 #scm-app .scm-cm-link:hover { text-decoration: underline; }
 #scm-app .scm-cm-badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; white-space: nowrap; background: #f1f5f9; color: #475569; }

@@ -52,6 +52,18 @@ $delivered = $report->mapRow($base + ['estado' => 'Entregado', 'fecha_entrega' =
 $check($delivered[$cols['ingreso']] === '2021-06-06', 'Sin fecha de entrega la ocupación usa el inicio del contrato.');
 $check($delivered[$cols['egreso']] === null, 'Un contrato entregado no es desocupación aunque tenga fecha de recibo.');
 $check($delivered[$cols['fin']] === '2025-06-06', 'Un contrato activo expone su fin previsto.');
+$check($delivered[$cols['entrega']] === null && $delivered[$cols['inicio']] === '2021-06-06' && $delivered[$cols['recibo']] === null, 'Fecha de entrega, inicio y recibo se exponen por separado (1970 es basura).');
+
+foreach (['15' => 15, '7 dias' => 7, '10 días' => 10, '1 mes' => 30, '1 MES' => 30, '0' => 0, 'NO' => 0, 'N/a' => 0, '' => null, 'pendiente' => null] as $raw => $expected) {
+  $check(ContractMovementsReport::parseGraceDays((string) $raw) === $expected, 'Días de gracia mal interpretados: ' . $raw);
+}
+$extra = $report->mapRow($base + ['estado' => 'Entregado', 'fecha_entrega' => '1622955600', 'inicio_contrato' => '', 'fecha_recibo' => '', 'fin_contrato' => '',
+  'valor_administracion' => 'No aplica', 'meses_contrato' => '12', 'dias_gracia' => '', 'dias_gracia_cierre' => '', 'dias_gracia_mandato' => '15']);
+$check($extra[$cols['admin']] === 0 && $extra[$cols['meses']] === 12, 'Administración "No aplica" es 0 y la duración se lee en meses.');
+$check($extra[$cols['dias_gracia']] === 15 && $extra[$cols['dias_gracia_fuente']] === 'mandato', 'Sin días en contrato ni cierre, se toman del mandato.');
+$fromClosing = $report->mapRow($base + ['estado' => 'Entregado', 'fecha_entrega' => '1622955600', 'valor_administracion' => '250.000', 'meses_contrato' => '1761436800', 'dias_gracia_cierre' => '0', 'dias_gracia_mandato' => '15']);
+$check($fromClosing[$cols['dias_gracia']] === 0 && $fromClosing[$cols['dias_gracia_fuente']] === 'cierre', 'La hoja de cierre prevalece sobre el mandato.');
+$check($fromClosing[$cols['admin']] === 250000 && $fromClosing[$cols['meses']] === null, 'Duraciones absurdas se descartan.');
 
 $check($report->mapRow($base + ['estado' => 'Desistido', 'fecha_entrega' => '1622955600', 'inicio_contrato' => '', 'fecha_recibo' => '', 'fin_contrato' => '']) === null, 'Los desistidos nunca ocuparon el inmueble.');
 $check($report->mapRow($base + ['estado' => 'Por entregar', 'fecha_entrega' => '', 'inicio_contrato' => '', 'fecha_recibo' => '', 'fin_contrato' => '']) === null, 'Los contratos por entregar aún no ocupan.');
@@ -62,6 +74,7 @@ foreach (['ocupaciones' => 'ocupaciones', 'desocupaciones' => 'desocupaciones', 
 $shell = (new ContractMovementsView())->renderShell('comparativo');
 $check(substr_count($shell, 'data-scm-subview-target=') === 3, 'El panel debe ofrecer las tres vistas.');
 $check(str_contains($shell, 'data-initial-view="comparativo"'), 'El panel debe abrir en la vista pedida.');
+$check(str_contains($shell, 'data-scm-cm-filter="month"') && substr_count($shell, '<option value="') >= 12, 'La barra de filtros incluye el mes.');
 
 $js = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/admin-contract-movements.js');
 $check(substr_count($js, 'fetch(') === 1, 'El módulo debe consultar el servidor desde un único punto.');
