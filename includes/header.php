@@ -822,7 +822,7 @@ foreach ($rawNavItems as $k => $item) {
                 <path d="M12 7L7 11.5V18H9V13H15V18H17V11.5L12 7Z" fill="#ffffff"/>
               </svg>
             </div>
-            <div class="flex flex-col">
+            <div class="flex flex-col scm-header-brand-text">
               <span class="text-[17px] font-extrabold tracking-tight text-[#0f172a] leading-none">SuCasa</span>
               <span class="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-none mt-1">Control Inmobiliario</span>
             </div>
@@ -830,7 +830,7 @@ foreach ($rawNavItems as $k => $item) {
         </div>
 
         <!-- Barra de Búsqueda Global con atajo visual ⌘K -->
-        <div class="flex-1 max-w-md mx-2">
+        <div class="flex-1 max-w-md mx-2 scm-header-search">
           <div class="relative flex items-center w-full">
             <span class="material-symbols-outlined absolute left-3 text-slate-400 text-[20px] pointer-events-none select-none">search</span>
             <input
@@ -1113,7 +1113,35 @@ foreach ($rawNavItems as $k => $item) {
       </div>
 
       <!-- Fila 2: Subnavegación Horizontal por Píldoras (Altura 48px) -->
+      <?php
+      // Etiqueta de la sección actual para el botón "Menú" de pantallas angostas.
+      $currentNavLabel = '';
+      foreach ($filteredNavItems as $navKey => $navItem) {
+        if ($navItem['type'] === 'link' && $current_page === $navKey) {
+          $currentNavLabel = (string) $navItem['label'];
+        } elseif ($navItem['type'] === 'dropdown' && isset($navItem['children'][$current_page])) {
+          $currentNavLabel = (string) $navItem['children'][$current_page]['label'];
+        }
+      }
+      $navLinkAttrs = static function (string $key, array $item): string {
+        $attrs = 'href="' . htmlspecialchars((string) $item['url'], ENT_QUOTES, 'UTF-8') . '"'
+          . ' data-tab-key="' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '"'
+          . ' data-panel-target="' . htmlspecialchars((string) $item['panel_id'], ENT_QUOTES, 'UTF-8') . '"';
+        foreach (['subtab' => 'data-subtab-target', 'admin_sub_target' => 'data-admin-sub-target', 'admin_activity_key' => 'data-admin-activity-key'] as $field => $attribute) {
+          if (!empty($item[$field])) {
+            $attrs .= ' ' . $attribute . '="' . htmlspecialchars((string) $item[$field], ENT_QUOTES, 'UTF-8') . '"';
+          }
+        }
+        return $attrs;
+      };
+      ?>
       <div class="h-12 flex items-center overflow-x-visible no-scrollbar border-t border-slate-100">
+        <button type="button" class="scm-nav-toggle" data-scm-nav-toggle aria-expanded="false" aria-controls="scm-nav-mobile">
+          <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+          <span>Menú</span>
+          <?php if ($currentNavLabel !== ''): ?><span class="scm-nav-toggle-current"><?php echo htmlspecialchars($currentNavLabel, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
+          <span class="material-symbols-outlined scm-nav-toggle-chevron" aria-hidden="true">expand_more</span>
+        </button>
         <nav class="flex items-center gap-1.5 py-1" aria-label="Pestañas principales del sistema" data-scm-main-nav>
           <?php foreach ($filteredNavItems as $tabKey => $tab): ?>
             <?php if ($tab['type'] === 'dropdown'): ?>
@@ -1220,6 +1248,74 @@ foreach ($rawNavItems as $k => $item) {
       </div>
 
     </div>
+
+    <!-- Menú para pantallas angostas: mismas opciones y atributos que las píldoras -->
+    <nav class="scm-nav-mobile" id="scm-nav-mobile" data-scm-nav-mobile aria-label="Menú principal" hidden>
+      <?php foreach ($filteredNavItems as $tabKey => $tab): ?>
+        <?php if ($tab['type'] === 'link'): $isActive = $current_page === $tabKey; ?>
+          <a <?php echo $navLinkAttrs($tabKey, $tab); ?> class="nav-tab-pill nav-tab-dropdown-item scm-nav-mobile-link<?php echo $isActive ? ' is-active' : ''; ?>"<?php if ($isActive): ?> aria-current="page"<?php endif; ?>>
+            <span class="material-symbols-outlined" aria-hidden="true"><?php echo htmlspecialchars($tab['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
+            <span><?php echo htmlspecialchars($tab['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+          </a>
+        <?php else: $groupActive = isset($tab['children'][$current_page]); ?>
+          <details class="scm-nav-mobile-group"<?php echo $groupActive ? ' open' : ''; ?>>
+            <summary>
+              <span class="material-symbols-outlined" aria-hidden="true"><?php echo htmlspecialchars($tab['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
+              <span><?php echo htmlspecialchars($tab['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+              <span class="material-symbols-outlined scm-nav-mobile-chevron" aria-hidden="true">expand_more</span>
+            </summary>
+            <div class="scm-nav-mobile-items">
+              <?php $lastMobileGroup = ''; ?>
+              <?php foreach ($tab['children'] as $childKey => $child): ?>
+                <?php
+                $mobileGroup = (string) ($child['group'] ?? '');
+                if ($mobileGroup !== '' && $mobileGroup !== (string) $child['label'] && $mobileGroup !== $lastMobileGroup):
+                  $lastMobileGroup = $mobileGroup;
+                ?>
+                  <span class="scm-nav-mobile-subhead"><?php echo htmlspecialchars($mobileGroup, ENT_QUOTES, 'UTF-8'); ?></span>
+                <?php endif; ?>
+                <?php $isSubActive = $current_page === $childKey; ?>
+                <a <?php echo $navLinkAttrs($childKey, $child); ?> class="nav-tab-pill nav-tab-dropdown-item scm-nav-mobile-link<?php echo $isSubActive ? ' is-active' : ''; ?><?php echo ($mobileGroup !== '' && $mobileGroup !== (string) $child['label']) ? ' is-nested' : ''; ?>"<?php if ($isSubActive): ?> aria-current="page"<?php endif; ?>>
+                  <span class="material-symbols-outlined" aria-hidden="true"><?php echo htmlspecialchars($child['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
+                  <span><?php echo htmlspecialchars($child['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+                </a>
+              <?php endforeach; ?>
+            </div>
+          </details>
+        <?php endif; ?>
+      <?php endforeach; ?>
+    </nav>
+    <script>
+      (function () {
+        var toggle = document.querySelector('[data-scm-nav-toggle]');
+        var panel = document.querySelector('[data-scm-nav-mobile]');
+        if (!toggle || !panel) return;
+        function setOpen(open) {
+          panel.hidden = !open;
+          toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+          toggle.classList.toggle('is-open', open);
+        }
+        toggle.addEventListener('click', function () { setOpen(panel.hidden); });
+        panel.addEventListener('click', function (event) {
+          var link = event.target.closest('a');
+          if (!link) return;
+          var current = toggle.querySelector('.scm-nav-toggle-current');
+          var label = link.querySelector('span:not(.material-symbols-outlined)');
+          if (current && label) current.textContent = label.textContent;
+          panel.querySelectorAll('.scm-nav-mobile-link').forEach(function (item) {
+            item.classList.toggle('is-active', item === link);
+          });
+          setOpen(false);
+        });
+        document.addEventListener('click', function (event) {
+          if (!panel.hidden && !panel.contains(event.target) && !toggle.contains(event.target)) setOpen(false);
+        });
+        document.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape' && !panel.hidden) { setOpen(false); toggle.focus(); }
+        });
+        window.addEventListener('resize', function () { if (window.innerWidth >= 1200 && !panel.hidden) setOpen(false); });
+      })();
+    </script>
   </header>
 
   <!-- ========================================== -->
