@@ -20,6 +20,9 @@ use SCM\Support\SchemaInspector;
  * Los días de gracia casi nunca están en el contrato: se sugieren desde la hoja de cierre y,
  * si no, desde el mandato.
  *
+ * Los consultores retirados también se pueden asignar para conservar el histórico de quién arrendó;
+ * en ese caso `realizado_por` guarda el nombre con que firmaban (el funcionario fue renombrado).
+ *
  * Es una herramienta de corrección: actualiza id_empleado, realizado_por, cct_author_id y
  * dias_gracia del contrato sin dejar historial en el inmueble.
  */
@@ -111,8 +114,8 @@ final class ContractOwnershipService
         $employee = null;
         if ($employeeId !== '') {
           $employee = $this->employees[$employeeId] ?? null;
-          if ($employee === null || !$employee['active'] || !$employee['consultant']) {
-            throw new \InvalidArgumentException('Solo puedes asignar consultores activos.');
+          if ($employee === null || !$employee['consultant']) {
+            throw new \InvalidArgumentException('Solo puedes asignar consultores (activos o retirados).');
           }
         }
         $grace = null;
@@ -139,13 +142,14 @@ final class ContractOwnershipService
         }
 
         $payload = [];
+        $ownerName = $employee !== null ? self::ownerName($employee) : '';
         if ($employee !== null && (
           trim((string) ($contract['id_empleado'] ?? '')) !== $employeeId
-          || trim((string) ($contract['realizado_por'] ?? '')) !== $employee['name']
+          || trim((string) ($contract['realizado_por'] ?? '')) !== $ownerName
           || trim((string) ($contract['cct_author_id'] ?? '')) !== $employeeId
         )) {
           $payload['id_empleado'] = $employeeId;
-          $payload['realizado_por'] = $employee['name'];
+          $payload['realizado_por'] = $ownerName;
           $payload['cct_author_id'] = $employeeId;
         }
         if ($setGrace && trim((string) ($contract['dias_gracia'] ?? '')) !== (string) $grace) {
@@ -164,7 +168,7 @@ final class ContractOwnershipService
         $result = ['contract_id' => $contractId];
         if (isset($payload['id_empleado'])) {
           $result['employee_id'] = $employeeId;
-          $result['employee_name'] = $employee['name'];
+          $result['employee_name'] = $ownerName;
         }
         if (isset($payload['dias_gracia'])) {
           $result['dias_gracia'] = $grace;
@@ -302,6 +306,17 @@ final class ContractOwnershipService
       return ['employee_id' => $mandateEmployee, 'source' => 'mandato', 'confidence' => 'baja', 'reason' => 'La hoja de cierre no identifica a un consultor; se sugiere quien creó el mandato del inmueble.'];
     }
     return ['employee_id' => '', 'source' => '', 'confidence' => 'ninguna', 'reason' => 'Ni la hoja de cierre ni el mandato identifican a un consultor.'];
+  }
+
+  /**
+   * Nombre que queda en `realizado_por`: el de la ficha del funcionario o, si es un retirado
+   * renombrado ("Asesor de arriendo retirado 2"), el nombre con que firmaba.
+   *
+   * @param array{name:string,real_name:string} $employee
+   */
+  public static function ownerName(array $employee): string
+  {
+    return $employee['real_name'] !== '' ? $employee['real_name'] : $employee['name'];
   }
 
   /** @return array{value:?int,source:string} */

@@ -88,6 +88,7 @@ foreach ([
   [6, '2448', 'Asesor de arriendo retirado', 'No', '', ''],
   [7, '1225', 'Nancy Pizarro Escobar', 'Si', 'nancy@example.invalid', '17'],
   [8, '10', 'Dilsa Babilonia Tejedor', 'Si', 'dilsa@example.invalid', '4'],
+  [9, '2532', 'Asesor de venta 1 retirado', 'No', '', ''],
 ] as [$pk, $id, $name, $active, $mail, $cargoId]) {
   $db->insert('wp_jet_cct_funcionarios', ['_ID' => $pk, 'id_empleado' => $id, 'nombre' => $name, 'activo' => $active, 'correo' => $mail, 'id_cargo' => $cargoId]);
 }
@@ -167,9 +168,8 @@ $fail = static function (callable $fn, string $expected, string $label) use ($ch
   try { $fn(); } catch (Throwable $e) { $check(str_contains($e->getMessage(), $expected), $label . ' (mensaje: ' . $e->getMessage() . ')'); return; }
   throw new RuntimeException($label . ' debía fallar.');
 };
-$fail(fn() => $service->assign([['contract_id' => 101, 'employee_id' => '4']]), 'consultores activos', 'No se puede asignar un consultor retirado');
-$fail(fn() => $service->assign([['contract_id' => 101, 'employee_id' => '8']]), 'consultores activos', 'No se puede asignar a una gerente');
-$fail(fn() => $service->assign([['contract_id' => 101, 'employee_id' => '10']]), 'consultores activos', 'No se puede asignar a una asistente');
+$fail(fn() => $service->assign([['contract_id' => 101, 'employee_id' => '8']]), 'Solo puedes asignar consultores', 'No se puede asignar a una gerente');
+$fail(fn() => $service->assign([['contract_id' => 101, 'employee_id' => '10']]), 'Solo puedes asignar consultores', 'No se puede asignar a una asistente');
 $fail(fn() => $service->assign([['contract_id' => 101]]), 'Indica el funcionario o los días', 'Un cambio vacío se rechaza');
 $fail(fn() => $service->assign([['contract_id' => 101, 'dias_gracia' => 400]]), 'entre 0 y 365', 'Días de gracia fuera de rango');
 $fail(fn() => $service->assign([['contract_id' => 101, 'dias_gracia' => '2.5']]), 'número entero', 'Días de gracia no enteros');
@@ -193,6 +193,14 @@ $author = $service->assign([['contract_id' => 106, 'employee_id' => '5']]);
 $check(count($author['updated']) === 1 && $db->getVar('SELECT cct_author_id FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 106') === '5', 'Si solo difiere cct_author_id, también se alinea.');
 $again = $service->assign([['contract_id' => 101, 'employee_id' => '5', 'dias_gracia' => 30]]);
 $check($again['updated'] === [] && $again['skipped'] === 1, 'Aplicar los mismos datos no cambia nada.');
+// Un consultor retirado se puede asignar como histórico de quien arrendó, con su nombre real.
+$retired = $service->assign([['contract_id' => 103, 'employee_id' => '4']]);
+$row = $db->getRow('SELECT id_empleado, realizado_por, cct_author_id FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 103');
+$check($row === ['id_empleado' => '4', 'realizado_por' => 'Kelly Yepes Florian', 'cct_author_id' => '4'], 'Un retirado queda con su id y el nombre con que firmaba.');
+$check($retired['updated'][0]['employee_name'] === 'Kelly Yepes Florian', 'La respuesta devuelve el nombre real del retirado.');
+$check($service->assign([['contract_id' => 103, 'employee_id' => '4']])['skipped'] === 1, 'Reasignar al mismo retirado no cambia nada.');
+$service->assign([['contract_id' => 104, 'employee_id' => '2532']]);
+$check($db->getVar('SELECT realizado_por FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 104') === 'Asesor de venta 1 retirado', 'Un retirado sin hojas de cierre conserva el nombre de su ficha.');
 $check((string) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble') === '0', 'Es una corrección: no escribe en el historial del inmueble.');
 $check(!str_contains((string) file_get_contents($root . '/src/Modules/ContractOwnership/ContractOwnershipService.php'), 'historial_del_inmueble'), 'El servicio no referencia el historial.');
 

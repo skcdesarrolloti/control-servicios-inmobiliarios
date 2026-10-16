@@ -40,7 +40,7 @@ final class ContractOwnershipView
             <option value="">Todas</option>
             <option value="difiere">Difiere de la sugerencia</option>
             <option value="sin_funcionario">Sin funcionario</option>
-            <option value="retirado">Funcionario retirado</option>
+            <option value="retirado">Consultor retirado</option>
             <option value="dias_gracia">Días de gracia por completar</option>
             <option value="coincide">Coincide con la sugerencia</option>
             <option value="sin_evidencia">Sin hoja de cierre ni mandato</option>
@@ -72,7 +72,7 @@ final class ContractOwnershipView
           <button type="button" class="scm-co-btn scm-co-btn-primary" data-scm-co-bulk-suggest>Aplicar sugerencia</button>
           <label class="scm-co-inline">
             <span>o asignar a</span>
-            <select data-scm-co-bulk-employee><option value="">Elige un consultor activo</option></select>
+            <select data-scm-co-bulk-employee><option value="">Elige un consultor</option></select>
           </label>
           <button type="button" class="scm-co-btn" data-scm-co-bulk-assign>Asignar</button>
           <button type="button" class="scm-co-btn scm-co-btn-ghost" data-scm-co-bulk-clear>Quitar selección</button>

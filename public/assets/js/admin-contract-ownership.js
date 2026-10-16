@@ -109,19 +109,20 @@
     function isActive(id) {
       return !!(id && state.employees[id] && state.employees[id].active);
     }
+    // Consultores activos o retirados: un retirado queda como histórico de quien arrendó.
     function isAssignable(id) {
-      return isActive(id) && !!state.employees[id].consultant;
+      return !!(id && state.employees[id] && state.employees[id].consultant);
     }
 
     function decorate(row) {
       var suggested = row.suggestion.employee_id;
       var grace = row.grace_suggestion || { value: null, source: "" };
       row.currentActive = isActive(row.employee_id);
-      row.suggestedActive = isAssignable(suggested);
+      row.suggestedAssignable = isAssignable(suggested);
       row.status = !row.employee_id ? "sin_funcionario" : !suggested ? "sin_evidencia" : suggested === row.employee_id ? "coincide" : "difiere";
       row.retired = !!row.employee_id && !row.currentActive;
       row.gracePending = grace.value !== null && grace.value !== row.dias_gracia;
-      row.ownerApplicable = row.suggestedActive && suggested !== row.employee_id;
+      row.ownerApplicable = row.suggestedAssignable && suggested !== row.employee_id;
       row.blob = normalize([row.contrato, row.inmueble, row.direccion, row.propietario, row.arrendatario, employeeName(row.employee_id, row.employee_name)].join(" "));
     }
 
@@ -140,15 +141,20 @@
         .sort(function (a, b) { return a.name.localeCompare(b.name, "es"); })
         .map(function (option) { return '<option value="' + esc(option.id || "__none") + '">' + esc(option.name) + "</option>"; }).join("");
       var bulkSelect = module.querySelector("[data-scm-co-bulk-employee]");
-      if (bulkSelect) bulkSelect.innerHTML = '<option value="">Elige un consultor activo</option>' + consultantOptions("");
+      if (bulkSelect) bulkSelect.innerHTML = '<option value="">Elige un consultor</option>' + consultantOptions("");
     }
 
-    // Solo consultores activos pueden quedar como responsables del contrato.
+    // Solo consultores pueden quedar como responsables; los retirados, como histórico.
     function consultantOptions(selected) {
-      return (state.data.employees || []).filter(function (employee) { return employee.active && employee.consultant; }).map(function (employee) {
-        return '<option value="' + esc(employee.id) + '"' + (employee.id === selected ? " selected" : "") + ">" + esc(employee.name) +
-          (employee.cargo ? " · " + esc(employee.cargo) : "") + "</option>";
-      }).join("");
+      var option = function (employee) {
+        return '<option value="' + esc(employee.id) + '"' + (employee.id === selected ? " selected" : "") + ">" + esc(employeeName(employee.id)) +
+          (employee.active && employee.cargo ? " · " + esc(employee.cargo) : "") + "</option>";
+      };
+      var consultants = (state.data.employees || []).filter(function (employee) { return employee.consultant; });
+      var active = consultants.filter(function (employee) { return employee.active; });
+      var retired = consultants.filter(function (employee) { return !employee.active; });
+      return '<optgroup label="Consultores activos">' + active.map(option).join("") + "</optgroup>" +
+        (retired.length ? '<optgroup label="Consultores retirados (histórico)">' + retired.map(option).join("") + "</optgroup>" : "");
     }
 
     function filteredRows() {
@@ -184,7 +190,7 @@
       });
       var active = filters.status.value;
       kpisEl.innerHTML = [["", "Contratos", counts.total, ""], ["difiere", "Difieren de la sugerencia", counts.difiere, "warn"],
-        ["sin_funcionario", "Sin funcionario", counts.sin_funcionario, "bad"], ["retirado", "Con funcionario retirado", counts.retirado, "bad"],
+        ["sin_funcionario", "Sin funcionario", counts.sin_funcionario, "bad"], ["retirado", "Con consultor retirado", counts.retirado, ""],
         ["dias_gracia", "Días de gracia por completar", counts.dias_gracia, "warn"],
         ["coincide", "Coinciden", counts.coincide, "good"], ["sin_evidencia", "Sin cierre ni mandato", counts.sin_evidencia, ""]]
         .map(function (kpi) {
@@ -198,7 +204,7 @@
       var employee = state.employees[row.employee_id];
       var notConsultant = employee && employee.active && !employee.consultant;
       return esc(employeeName(row.employee_id, row.employee_name)) +
-        (row.retired ? ' <span class="scm-co-badge is-bad">Retirado</span>' : "") +
+        (row.retired ? ' <span class="scm-co-badge is-low">Retirado</span>' : "") +
         (notConsultant ? ' <span class="scm-co-badge is-warn" title="' + esc(employee.cargo || "Administrativo") + '">No es consultor</span>' : "");
     }
 
@@ -207,7 +213,7 @@
       if (!s.employee_id) return '<span class="scm-co-muted">Sin evidencia</span>';
       var conf = CONFIDENCE[s.confidence] || CONFIDENCE.ninguna;
       return '<div class="scm-co-suggest">' + esc(employeeName(s.employee_id)) +
-        (row.suggestedActive ? "" : ' <span class="scm-co-badge is-bad">Retirado</span>') +
+        (isActive(s.employee_id) ? "" : ' <span class="scm-co-badge is-low">Retirado</span>') +
         '<small><span class="scm-co-badge is-' + conf.tone + '">' + conf.label + "</span> " + esc(SOURCE_LABELS[s.source] || "") + "</small></div>";
     }
 
@@ -285,7 +291,7 @@
       if (!evidence.employee_id) return '<span class="scm-co-muted">No se pudo identificar</span>';
       var employee = state.employees[evidence.employee_id] || {};
       return esc(employeeName(evidence.employee_id)) +
-        (isActive(evidence.employee_id) ? "" : ' <span class="scm-co-badge is-bad">Retirado</span>') +
+        (isActive(evidence.employee_id) ? "" : ' <span class="scm-co-badge is-low">Retirado</span>') +
         (evidence.eligible ? "" : ' <span class="scm-co-badge is-warn">No es consultor' + (employee.cargo ? " · " + esc(employee.cargo) : "") + "</span>");
     }
 
@@ -334,14 +340,14 @@
       html += '<div class="scm-co-verdict is-' + conf.tone + '"><span class="material-symbols-outlined" aria-hidden="true">' + (s.employee_id ? "lightbulb" : "help") + "</span><div>";
       if (s.employee_id) {
         html += "<strong>Funcionario sugerido: " + esc(employeeName(s.employee_id)) + "</strong> · Confianza " + conf.label.toLowerCase() + "<p>" + esc(s.reason) + "</p>";
-        if (!row.suggestedActive) html += '<p class="scm-co-warning">Este consultor está retirado: asigna el consultor activo que hoy atiende el contrato.</p>';
+        if (!isActive(s.employee_id)) html += "<p>Es un consultor retirado: puedes dejarlo como histórico de quien arrendó o asignar el consultor activo que hoy atiende el contrato.</p>";
       } else {
         html += "<strong>Sin funcionario sugerido</strong><p>" + esc(s.reason) + " Asigna el consultor que hoy atiende el contrato.</p>";
       }
       html += "<p><strong>Días de gracia sugeridos:</strong> " + (g.value === null ? "sin dato en la hoja de cierre ni en el mandato." : esc(days(g.value)) + " (" + esc(GRACE_SOURCES[g.source]) + ").") + "</p>";
       html += "</div></div>";
       if (canEdit) {
-        var preselect = row.suggestedActive ? s.employee_id : "";
+        var preselect = row.suggestedAssignable ? s.employee_id : "";
         var currentLabel = row.employee_id ? employeeName(row.employee_id, row.employee_name) : "sin funcionario";
         var gracePrefill = g.value !== null ? g.value : row.dias_gracia;
         html += '<form class="scm-co-form" data-scm-co-form="' + row.id + '"><div class="scm-co-form-grid">' +
@@ -359,14 +365,14 @@
       return '<div class="scm-co-guide"><p>Para cada contrato la ayuda revisa dos documentos:</p><ol>' +
         "<li><strong>Hoja de cierre</strong> — registra quién <em>arrendó</em> el inmueble. Se usa su <code>id_empleado</code>; es la fuente principal.</li>" +
         "<li><strong>Mandato</strong> — registra quién <em>captó</em> el inmueble. Como su <code>id_empleado</code> no es confiable, el funcionario se identifica por el nombre de quien lo creó (y, si no, por su correo). Si el contrato no tiene mandato enlazado, se usa el más reciente del mismo inmueble.</li></ol>" +
-        "<p>Solo se sugieren y se pueden asignar <strong>consultores</strong> (Consultor de Arriendo o de Venta). Si el documento lo registró un administrativo o una gerencia, se muestra pero no se usa para sugerir.</p>" +
+        "<p>Solo se sugieren y se pueden asignar <strong>consultores</strong> (Consultor de Arriendo o de Venta, activos o retirados). Si el documento lo registró un administrativo o una gerencia, se muestra pero no se usa para sugerir.</p>" +
         '<table class="scm-co-guide-table"><thead><tr><th>Situación</th><th>Sugerencia</th><th>Confianza</th></tr></thead><tbody>' +
         "<tr><td>Cierre y mandato señalan al mismo consultor</td><td>Ese consultor</td><td>Alta</td></tr>" +
         "<tr><td>Solo hay hoja de cierre (sin mandato)</td><td>Consultor del cierre</td><td>Alta</td></tr>" +
         "<tr><td>Cierre y mandato difieren, o el mandato no identifica a un consultor</td><td>Consultor del cierre</td><td>Media</td></tr>" +
         "<tr><td>Solo el mandato identifica a un consultor</td><td>Consultor del mandato</td><td>Baja</td></tr>" +
         "<tr><td>Ninguno de los dos</td><td>Elegir manualmente</td><td>—</td></tr></tbody></table>" +
-        "<p><strong>Consultores retirados.</strong> Al retirarse, el funcionario se renombra (\"Asesor de arriendo retirado 2\") pero conserva su id, por eso los documentos lo siguen señalando. La ayuda muestra entre paréntesis quién era (tomado de sus hojas de cierre) y no permite asignarlo: filtra \"Con funcionario retirado\", selecciona los contratos y usa <em>Asignar a</em> con el consultor activo que heredó su cartera.</p>" +
+        "<p><strong>Consultores retirados.</strong> Al retirarse, el funcionario se renombra (\"Asesor de arriendo retirado 2\") pero conserva su id, por eso los documentos lo siguen señalando. La ayuda muestra entre paréntesis quién era (tomado de sus hojas de cierre). Puedes dejarlo asignado como <em>histórico de quien arrendó</em> (en el contrato queda su id y su nombre real) o pasar la cartera: filtra \"Con consultor retirado\", selecciona los contratos y usa <em>Asignar a</em> con el consultor activo que la heredó.</p>" +
         "<p><strong>Días de gracia.</strong> Casi nunca se copiaron al contrato. Se sugieren desde la hoja de cierre y, si no tiene, desde el mandato (\"1 mes\" = 30 días, \"NO\" = 0).</p>" +
         "<p>Las revisiones, gestiones de cobro y demás acciones del panel ya <strong>no</strong> cambian el funcionario del contrato; este módulo sirve para corregir los contratos que esas acciones habían cambiado.</p></div>";
     }
@@ -396,7 +402,7 @@
       openModal("Confirmar cambios", confirmHtml(changes, skipped));
     }
 
-    // La sugerencia completa de un contrato: consultor activo distinto del actual y días pendientes.
+    // La sugerencia completa de un contrato: consultor sugerido distinto del actual y días pendientes.
     function suggestedChange(row) {
       var change = { contract_id: row.id };
       if (row.ownerApplicable) change.employee_id = row.suggestion.employee_id;
@@ -492,7 +498,7 @@
       }
       if (target.closest("[data-scm-co-bulk-assign]")) {
         var employeeId = module.querySelector("[data-scm-co-bulk-employee]").value;
-        if (!employeeId) { setStatus("Elige el consultor activo al que quieres asignar los contratos.", "error"); return; }
+        if (!employeeId) { setStatus("Elige el consultor al que quieres asignar los contratos.", "error"); return; }
         var selected = selectedRows();
         var assign = selected.filter(function (item) { return item.employee_id !== employeeId; })
           .map(function (item) { return { contract_id: item.id, employee_id: employeeId }; });
