@@ -42,10 +42,14 @@ foreach (['month', 'from', 'to', 'tema', 'departamento', 'funcionario'] as $filt
   $check(str_contains($cases, 'data-scm-case-filter="' . $filter . '"'), 'Métricas de casos debe filtrar por ' . $filter . '.');
 }
 $quotes = $view->renderQuotesShell();
-foreach (['year', 'month', 'categoria'] as $filter) {
+foreach (['year', 'month', 'from', 'to', 'categoria'] as $filter) {
   $check(str_contains($quotes, 'data-scm-quote-filter="' . $filter . '"'), 'Cotizaciones debe filtrar por ' . $filter . '.');
 }
-$check(str_contains($quotes, '<option value="0">Todo el año</option>'), 'Cotizaciones permite ver el año completo.');
+foreach (['actual', 'mes', 'anual', 'acumulado'] as $mode) {
+  $check(str_contains($quotes, 'data-scm-quote-mode="' . $mode . '"'), 'Cotizaciones ofrece el periodo ' . $mode . '.');
+}
+$check(str_contains($quotes, 'data-scm-quote-tab-panel="conciliacion"') && str_contains($quotes, 'data-scm-quote-ledger'), 'La conciliación con el auxiliar va en su propia pestaña.');
+$check(!str_contains($quotes, 'data-scm-quote-quality'), 'Cotizaciones ya no muestra calidad de datos.');
 
 // Cotizaciones: administración sin IVA y fecha de respuesta con respaldo del caso.
 $check(QuoteMetricsReport::adminAmount(['total_admon' => '18000', 'porcentaje_admon' => '10']) === 18000, 'La administración usa total_admon.');
@@ -76,11 +80,11 @@ $check(str_contains($dashboard, "'dashboard' => 'scm-panel-metricas-casos'") && 
 $casesJs = (string) file_get_contents($root . '/public/assets/js/admin-case-metrics.js');
 $quotesJs = (string) file_get_contents($root . '/public/assets/js/admin-quote-metrics.js');
 $check(substr_count($casesJs, 'fetch(') === 1 && str_contains($casesJs, 'sessionStorage'), 'Casos consulta una sola vez y usa caché de sesión.');
-// Métricas consulta una sola vez; calidad/conciliación reutiliza esas filas y solo va al servidor para guardar o conciliar.
+// Métricas consulta una sola vez; la conciliación reutiliza esas filas y solo va al servidor para guardar o conciliar.
 $qualityJs = (string) file_get_contents($root . '/public/assets/js/admin-quote-quality.js');
 $check(substr_count($quotesJs, 'fetch(') === 1 && str_contains($quotesJs, 'state.data && !force') && str_contains($quotesJs, 'scm:quote-data'), 'Cotizaciones consulta una sola vez y comparte sus filas.');
-$check(substr_count($qualityJs, 'fetch(') === 1 && str_contains($qualityJs, 'scm:quote-data') && str_contains($qualityJs, 'scm:quote-reload'), 'Calidad de datos reutiliza las filas y pide recargar tras corregir.');
-$check(str_contains($qualityJs, 'overwrite: mode === "dubious" ? "1" : "0"') && str_contains($qualityJs, 'data-scm-qq-confirm-dates'), 'Corregir fechas existentes exige confirmación explícita.');
+$check(substr_count($qualityJs, 'fetch(') === 1 && str_contains($qualityJs, 'scm:quote-data') && str_contains($qualityJs, 'scm:quote-reload'), 'La conciliación reutiliza las filas y pide recargar tras corregir.');
+$check(str_contains($qualityJs, 'overwrite: "0"') && !str_contains($qualityJs, 'overwrite: "1"'), 'La conciliación solo completa fechas vacías; nunca sobrescribe una fecha existente.');
 $check(str_contains($quotesJs, 'data-scm-maintenance-quote-open-case') && str_contains($quotesJs, 'scm-maintenance-quote-row'), 'Cotizaciones conserva "Ver caso" con el popup del panel.');
 
 // Completar fecha de respuesta: solo aprobadas sin fecha, sin fechas futuras ni previas a la creación.

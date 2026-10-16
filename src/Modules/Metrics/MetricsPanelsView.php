@@ -70,17 +70,18 @@ final class MetricsPanelsView
 
   public function renderQuotesShell(): string
   {
-    $year = (int) date('Y');
-    $month = (int) date('n');
-    $months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    $now = new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota'));
+    $year = $now->format('Y');
+    $currentMonth = $now->format('Y-m');
+    $modes = ['actual' => 'Mes actual', 'mes' => 'Por mes', 'anual' => 'Anual', 'acumulado' => 'Acumulado'];
     ob_start();
 ?>
-    <section class="scm-cm scm-quote-metrics" data-scm-quote-metrics data-default-year="<?php echo $year; ?>" data-default-month="<?php echo $month; ?>" aria-labelledby="scm-quote-metrics-title">
+    <section class="scm-cm scm-quote-metrics" data-scm-quote-metrics data-default-year="<?php echo $year; ?>" data-current-month="<?php echo $currentMonth; ?>" aria-labelledby="scm-quote-metrics-title">
       <header class="scm-cm-head">
         <div class="scm-cm-head-copy">
           <p class="scm-cm-kicker">Métricas · Mantenimiento</p>
           <h1 id="scm-quote-metrics-title">Cotizaciones</h1>
-          <p class="scm-cm-subtitle">Cotizaciones creadas en el mes (valor y administración), cuántas faltan por enviar y la administración ganada por las aprobadas según su fecha de respuesta.</p>
+          <p class="scm-cm-subtitle">Cotizaciones creadas en el periodo (valor y administración), cuántas faltan por enviar y la administración ganada por las aprobadas según su fecha de respuesta.</p>
         </div>
         <div class="scm-cm-head-actions">
           <span class="scm-cm-updated" data-scm-quote-updated></span>
@@ -93,30 +94,54 @@ final class MetricsPanelsView
         </div>
       </header>
 
-      <form class="scm-cm-filters" onsubmit="return false;">
-        <label class="scm-cm-field">
-          <span>Año</span>
-          <select data-scm-quote-filter="year"><option value="<?php echo $year; ?>"><?php echo $year; ?></option></select>
-        </label>
-        <label class="scm-cm-field">
-          <span>Mes</span>
-          <select data-scm-quote-filter="month">
-            <option value="0">Todo el año</option>
-            <?php foreach ($months as $index => $name): ?>
-              <option value="<?php echo $index + 1; ?>"<?php echo $index + 1 === $month ? ' selected' : ''; ?>><?php echo htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?></option>
-            <?php endforeach; ?>
-          </select>
-        </label>
-        <label class="scm-cm-field">
-          <span>Categoría</span>
-          <select data-scm-quote-filter="categoria"><option value="">Todas</option></select>
-        </label>
-      </form>
+      <div class="scm-cm-views" role="tablist" aria-label="Vistas de cotizaciones">
+        <button type="button" role="tab" class="scm-cm-view is-active" aria-selected="true" data-scm-quote-tab="cotizaciones">
+          <span class="material-symbols-outlined" aria-hidden="true">request_quote</span><span>Cotizaciones</span>
+        </button>
+        <button type="button" role="tab" class="scm-cm-view" aria-selected="false" data-scm-quote-tab="conciliacion">
+          <span class="material-symbols-outlined" aria-hidden="true">fact_check</span><span>Conciliar con el auxiliar contable</span>
+        </button>
+      </div>
 
-      <div class="scm-cm-status" data-scm-quote-status role="status" aria-live="polite">Cargando cotizaciones&hellip;</div>
-      <div class="scm-cm-content" data-scm-quote-content></div>
-      <div data-scm-quote-quality></div>
-      <div data-scm-quote-ledger></div>
+      <div class="scm-qm-tab" data-scm-quote-tab-panel="cotizaciones">
+        <form class="scm-cm-filters scm-qm-filters" onsubmit="return false;">
+          <div class="scm-cm-field scm-qm-period">
+            <span>Periodo</span>
+            <div class="scm-qm-views" role="radiogroup" aria-label="Periodo">
+              <?php foreach ($modes as $mode => $label): ?>
+                <button type="button" role="radio" class="scm-qm-view<?php echo $mode === 'actual' ? ' is-active' : ''; ?>" aria-checked="<?php echo $mode === 'actual' ? 'true' : 'false'; ?>" data-scm-quote-mode="<?php echo $mode; ?>"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></button>
+              <?php endforeach; ?>
+            </div>
+          </div>
+          <label class="scm-cm-field" data-scm-quote-mode-field="mes" hidden>
+            <span>Mes</span>
+            <input type="month" data-scm-quote-filter="month" value="<?php echo $currentMonth; ?>" max="<?php echo $currentMonth; ?>">
+          </label>
+          <label class="scm-cm-field" data-scm-quote-mode-field="anual" hidden>
+            <span>Año</span>
+            <select data-scm-quote-filter="year"><option value="<?php echo $year; ?>"><?php echo $year; ?></option></select>
+          </label>
+          <label class="scm-cm-field" data-scm-quote-mode-field="acumulado" hidden>
+            <span>Desde</span>
+            <input type="month" data-scm-quote-filter="from" value="<?php echo $year; ?>-01" max="<?php echo $currentMonth; ?>">
+          </label>
+          <label class="scm-cm-field" data-scm-quote-mode-field="acumulado" hidden>
+            <span>Hasta</span>
+            <input type="month" data-scm-quote-filter="to" value="<?php echo $currentMonth; ?>" max="<?php echo $currentMonth; ?>">
+          </label>
+          <label class="scm-cm-field">
+            <span>Categoría</span>
+            <select data-scm-quote-filter="categoria"><option value="">Todas</option></select>
+          </label>
+        </form>
+
+        <div class="scm-cm-status" data-scm-quote-status role="status" aria-live="polite">Cargando cotizaciones&hellip;</div>
+        <div class="scm-cm-content" data-scm-quote-content></div>
+      </div>
+
+      <div class="scm-qm-tab" data-scm-quote-tab-panel="conciliacion" hidden>
+        <div data-scm-quote-ledger></div>
+      </div>
     </section>
 <?php
     return (string) ob_get_clean();

@@ -5,6 +5,8 @@
   // y el mes a mes, los indicadores, el detalle y el CSV se calculan en el navegador.
   // - Creadas: por fecha de la cotización.  - Sin enviar: creadas sin se_envio = Si.
   // - Aprobadas / administración ganada: estado Aprobada con fecha de respuesta en el periodo.
+  // Periodo: mes actual, un mes, un año o acumulado de un mes a otro; siempre es un rango de meses (YYYY-MM).
+  // Pestañas: Cotizaciones y Conciliar con el auxiliar contable (admin-quote-quality.js).
   // "Ver caso" reutiliza el popup del panel ([data-scm-maintenance-quote-open-case]).
   var MONTHS_LONG = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   var MONTHS_SHORT = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -33,6 +35,20 @@
   function normalize(text) {
     return String(text || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   }
+  function monthLabel(ym, short) {
+    var name = (short ? MONTHS_SHORT : MONTHS_LONG)[Number(ym.slice(5, 7)) - 1];
+    return (short ? name : name.toLowerCase()) + " " + ym.slice(0, 4);
+  }
+  function addMonths(ym, delta) {
+    var index = Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1 + delta;
+    return Math.floor(index / 12) + "-" + String((index % 12) + 1).padStart(2, "0");
+  }
+  function monthRange(from, to) {
+    var out = [];
+    for (var ym = from; ym <= to && out.length < 120; ym = addMonths(ym, 1)) out.push(ym);
+    return out;
+  }
+  function yearMonths(year) { return monthRange(year + "-01", year + "-12"); }
   function summarize(rows) {
     var out = { count: rows.length, total: 0, admin: 0 };
     rows.forEach(function (row) {
@@ -57,9 +73,12 @@
     var updatedEl = module.querySelector("[data-scm-quote-updated]");
     var exportBtn = module.querySelector("[data-scm-quote-export]");
     var yearSelect = module.querySelector('[data-scm-quote-filter="year"]');
-    var monthSelect = module.querySelector('[data-scm-quote-filter="month"]');
+    var monthInput = module.querySelector('[data-scm-quote-filter="month"]');
+    var fromInput = module.querySelector('[data-scm-quote-filter="from"]');
+    var toInput = module.querySelector('[data-scm-quote-filter="to"]');
     var categorySelect = module.querySelector('[data-scm-quote-filter="categoria"]');
-    var state = { data: null, pending: null, view: "creadas", search: "", page: 1, monthly: [], detail: [] };
+    var currentMonth = module.getAttribute("data-current-month");
+    var state = { data: null, pending: null, mode: "actual", view: "creadas", search: "", page: 1, monthly: [], detail: [] };
     var tooltip = document.createElement("div");
     tooltip.className = "scm-cc-tooltip";
     tooltip.setAttribute("role", "tooltip");
@@ -116,6 +135,7 @@
       });
       years[module.getAttribute("data-default-year")] = true;
       state.data = { rows: rows, generatedAt: snapshot.generated_at || 0 };
+      years[currentMonth.slice(0, 4)] = true;
       var currentYear = yearSelect.value;
       yearSelect.innerHTML = Object.keys(years).sort().reverse().map(function (year) {
         return '<option value="' + esc(year) + '">' + esc(year) + "</option>";
@@ -141,9 +161,55 @@
       return state.data.rows.filter(function (row) { return !category || row.categoria === category; });
     }
 
-    function inPeriod(date, year, month) {
-      if (!date || date.slice(0, 4) !== String(year)) return false;
-      return !month || Number(date.slice(5, 7)) === month;
+    // Periodo elegido como rango de meses; `months` son las columnas del mes a mes y `active` el mes resaltado.
+    function period() {
+      var valid = /^\d{4}-\d{2}$/;
+      if (state.mode === "anual") {
+        var year = yearSelect.value;
+        return { from: year + "-01", to: year + "-12", label: "todo " + year, title: year, months: yearMonths(year), active: "" };
+      }
+      if (state.mode === "acumulado") {
+        var from = valid.test(fromInput.value) ? fromInput.value : currentMonth.slice(0, 4) + "-01";
+        var to = valid.test(toInput.value) ? toInput.value : currentMonth;
+        if (from > to) { var swap = from; from = to; to = swap; }
+        var label = from === to ? monthLabel(from) : monthLabel(from) + " a " + monthLabel(to);
+        return { from: from, to: to, label: label, title: label, months: monthRange(from, to), active: "" };
+      }
+      var month = state.mode === "mes" && valid.test(monthInput.value) ? monthInput.value : currentMonth;
+      return {
+        from: month, to: month, label: monthLabel(month) + (month === currentMonth ? " (mes actual)" : ""),
+        title: month.slice(0, 4), months: yearMonths(month.slice(0, 4)), active: month,
+      };
+    }
+
+    function inPeriod(date, p) {
+      if (!date) return false;
+      var ym = date.slice(0, 7);
+      return ym >= p.from && ym <= p.to;
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      module.querySelectorAll("[data-scm-quote-mode]").forEach(function (button) {
+        var active = button.getAttribute("data-scm-quote-mode") === mode;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-checked", active ? "true" : "false");
+      });
+      module.querySelectorAll("[data-scm-quote-mode-field]").forEach(function (field) {
+        field.hidden = field.getAttribute("data-scm-quote-mode-field") !== mode;
+      });
+    }
+
+    function setTab(tab) {
+      module.querySelectorAll("[data-scm-quote-tab]").forEach(function (button) {
+        var active = button.getAttribute("data-scm-quote-tab") === tab;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      module.querySelectorAll("[data-scm-quote-tab-panel]").forEach(function (tabPanel) {
+        tabPanel.hidden = tabPanel.getAttribute("data-scm-quote-tab-panel") !== tab;
+      });
+      exportBtn.hidden = tab !== "cotizaciones";
     }
 
     function kpi(label, value, note, tone) {
@@ -153,16 +219,15 @@
 
     function render() {
       if (!state.data) return;
-      var year = Number(yearSelect.value);
-      var month = Number(monthSelect.value);
-      var periodLabel = month ? MONTHS_LONG[month - 1].toLowerCase() + " " + year : "todo " + year;
+      var p = period();
+      var periodLabel = p.label;
       updatedEl.textContent = state.data.generatedAt
         ? "Datos de las " + new Date(state.data.generatedAt * 1000).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
         : "";
       var rows = baseRows();
-      var created = rows.filter(function (row) { return inPeriod(row.fecha, year, month); });
+      var created = rows.filter(function (row) { return inPeriod(row.fecha, p); });
       var unsent = created.filter(function (row) { return !row.enviada; });
-      var approved = rows.filter(function (row) { return row.approved && inPeriod(row.respuesta, year, month); });
+      var approved = rows.filter(function (row) { return row.approved && inPeriod(row.respuesta, p); });
       var sc = summarize(created);
       var sa = summarize(approved);
 
@@ -180,17 +245,16 @@
       html += kpi("Administración ganada", money(sa.admin), "Administración de las aprobadas (sin IVA)", "good");
       html += "</div>";
 
-      // Mes a mes del año.
-      state.monthly = MONTHS_LONG.map(function (name, index) {
-        var m = index + 1;
-        var c = rows.filter(function (row) { return inPeriod(row.fecha, year, m); });
-        var a = rows.filter(function (row) { return row.approved && inPeriod(row.respuesta, year, m); });
-        var created = summarize(c);
-        var won = summarize(a);
-        return { month: m, name: name, created: created, unsent: c.filter(function (row) { return !row.enviada; }).length, approved: won };
+      // Mes a mes: los 12 meses del año (mes o año) o los meses del acumulado.
+      state.monthly = p.months.map(function (ym) {
+        var range = { from: ym, to: ym };
+        var c = rows.filter(function (row) { return inPeriod(row.fecha, range); });
+        var a = rows.filter(function (row) { return row.approved && inPeriod(row.respuesta, range); });
+        return { month: ym, name: monthLabel(ym).replace(/^./, function (ch) { return ch.toUpperCase(); }), created: summarize(c), unsent: c.filter(function (row) { return !row.enviada; }).length, approved: summarize(a) };
       });
-      html += '<section class="scm-cm-card is-wide"><header><h2>Administración ganada mes a mes · ' + year + '</h2><p class="scm-cm-hint">Toca un mes para ver su detalle</p></header>' + monthlyChart(month) + "</section>";
-      html += '<section class="scm-cm-card is-wide"><header><h2>Mes a mes · ' + year + "</h2></header>" + monthlyTable(month) + "</section>";
+      state.periodTitle = p.title;
+      html += '<section class="scm-cm-card is-wide"><header><h2>Administración ganada mes a mes · ' + esc(p.title) + '</h2><p class="scm-cm-hint">Toca un mes para ver su detalle</p></header>' + monthlyChart(p.active) + "</section>";
+      html += '<section class="scm-cm-card is-wide"><header><h2>Mes a mes · ' + esc(p.title) + "</h2></header>" + monthlyTable(p.active) + "</section>";
 
       // Detalle del periodo.
       state.detail = detailRows({ creadas: created, aprobadas: approved, sin_enviar: unsent });
@@ -207,13 +271,12 @@
     }
 
     function periodLists() {
-      var year = Number(yearSelect.value);
-      var month = Number(monthSelect.value);
+      var p = period();
       var rows = baseRows();
-      var created = rows.filter(function (row) { return inPeriod(row.fecha, year, month); });
+      var created = rows.filter(function (row) { return inPeriod(row.fecha, p); });
       return {
         creadas: created,
-        aprobadas: rows.filter(function (row) { return row.approved && inPeriod(row.respuesta, year, month); }),
+        aprobadas: rows.filter(function (row) { return row.approved && inPeriod(row.respuesta, p); }),
         sin_enviar: created.filter(function (row) { return !row.enviada; }),
       };
     }
@@ -227,7 +290,8 @@
 
     function monthlyChart(activeMonth) {
       var max = Math.max.apply(null, state.monthly.map(function (m) { return m.approved.admin; })) || 1;
-      var html = '<div class="scm-cc-columns" style="--cols:12"><div class="scm-cc-plot">';
+      var multiYear = state.monthly.length && state.monthly[0].month.slice(0, 4) !== state.monthly[state.monthly.length - 1].month.slice(0, 4);
+      var html = '<div class="scm-cc-columns" style="--cols:' + Math.max(1, state.monthly.length) + '"><div class="scm-cc-plot">';
       state.monthly.forEach(function (m) {
         var height = m.approved.admin ? Math.max(2, (m.approved.admin / max) * 100) : 0;
         html += '<button type="button" class="scm-cc-col' + (activeMonth === m.month ? " is-active" : "") + '" data-scm-quote-month="' + m.month + '" data-tip="' +
@@ -236,7 +300,7 @@
           (m.approved.admin ? "<i>" + esc(compactMoney(m.approved.admin)) + "</i>" : "") + "</span></button>";
       });
       return html + '</div><div class="scm-cc-axis">' + state.monthly.map(function (m) {
-        return '<span class="' + (activeMonth === m.month ? "is-active" : "") + '">' + MONTHS_SHORT[m.month - 1] + "</span>";
+        return '<span class="' + (activeMonth === m.month ? "is-active" : "") + '">' + MONTHS_SHORT[Number(m.month.slice(5, 7)) - 1] + (multiYear ? " " + m.month.slice(2, 4) : "") + "</span>";
       }).join("") + "</div></div>";
     }
 
@@ -306,7 +370,7 @@
       if (!state.data) return;
       var lines = [["Mes", "Creadas", "Valor creadas", "Administracion creadas", "Sin enviar", "Aprobadas", "Valor aprobado", "Administracion ganada"]];
       state.monthly.forEach(function (m) {
-        lines.push([m.name + " " + yearSelect.value, m.created.count, m.created.total, m.created.admin, m.unsent, m.approved.count, m.approved.total, m.approved.admin]);
+        lines.push([m.name, m.created.count, m.created.total, m.created.admin, m.unsent, m.approved.count, m.approved.total, m.approved.admin]);
       });
       var csv = "﻿" + lines.map(function (line) {
         return line.map(function (cell) {
@@ -316,7 +380,7 @@
       }).join("\r\n");
       var link = document.createElement("a");
       link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-      link.download = "cotizaciones-mes-a-mes-" + yearSelect.value + ".csv";
+      link.download = "cotizaciones-mes-a-mes-" + String(state.periodTitle || "").replace(/[^0-9a-z]+/gi, "-").toLowerCase() + ".csv";
       document.body.appendChild(link);
       link.click();
       setTimeout(function () { URL.revokeObjectURL(link.href); link.remove(); }, 0);
@@ -342,12 +406,28 @@
     });
     module.addEventListener("click", function (event) {
       if (event.target.closest("[data-scm-quote-refresh]")) { load(true); return; }
+      var tab = event.target.closest("[data-scm-quote-tab]");
+      if (tab) { setTab(tab.getAttribute("data-scm-quote-tab")); return; }
+      var mode = event.target.closest("[data-scm-quote-mode]");
+      if (mode) {
+        setMode(mode.getAttribute("data-scm-quote-mode"));
+        state.page = 1;
+        if (state.data) render();
+        return;
+      }
       if (!state.data) return;
       if (event.target.closest("[data-scm-quote-export]")) { exportCsv(); return; }
       var monthButton = event.target.closest("[data-scm-quote-month]");
       if (monthButton) {
+        // Tocar un mes muestra ese mes; tocar el mes ya elegido vuelve al año completo.
         var value = monthButton.getAttribute("data-scm-quote-month");
-        monthSelect.value = monthSelect.value === value ? "0" : value;
+        if (state.mode !== "anual" && state.mode !== "acumulado" && period().active === value) {
+          yearSelect.value = value.slice(0, 4);
+          setMode("anual");
+        } else {
+          monthInput.value = value;
+          setMode(value === currentMonth ? "actual" : "mes");
+        }
         state.page = 1;
         render();
         return;

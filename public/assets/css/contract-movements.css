@@ -135,6 +135,12 @@
 #scm-app .scm-cm-field select:focus,
 #scm-app .scm-cm-field input:focus { outline: 2px solid #bfdbfe; border-color: #93c5fd; }
 #scm-app .scm-cm-btn-icon { justify-content: center; width: 36px; min-height: 36px; padding: 0; }
+#scm-app .scm-cm-field[hidden],
+#scm-app .scm-qm-tab[hidden],
+#scm-app .scm-cm-btn[hidden] { display: none; }
+#scm-app .scm-qm-tab { display: flex; flex-direction: column; gap: 16px; }
+#scm-app .scm-qm-filters .scm-qm-period { grid-column: span 2; }
+#scm-app .scm-qm-period .scm-qm-views { min-height: 36px; align-items: center; }
 #scm-app .scm-qm-section { margin: 4px 0 -6px; font-size: 13px; font-weight: 700; color: #334155; }
 #scm-app .scm-qm-views { display: flex; flex-wrap: wrap; gap: 6px; }
 #scm-app .scm-qm-view { padding: 6px 12px; border: 1px solid var(--cm-line); border-radius: 999px; background: #fff; color: #475569; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
@@ -387,6 +393,7 @@
   #scm-app .scm-qq-list li { grid-template-columns: 44px minmax(0, 1fr); }
   #scm-app .scm-qq-list li .scm-cm-btn { grid-column: 1 / -1; justify-content: center; }
   #scm-app .scm-qq-file-cta { display: none; }
+  #scm-app .scm-qm-filters .scm-qm-period { grid-column: 1 / -1; }
   #scm-app .scm-qq-upload > .scm-qq-primary { flex: 1 1 100%; }
   #scm-app .scm-cm-kpis-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #scm-app .scm-cm-grid { grid-template-columns: minmax(0, 1fr); }
