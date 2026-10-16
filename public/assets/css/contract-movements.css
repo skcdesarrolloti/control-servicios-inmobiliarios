@@ -168,6 +168,7 @@
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 12px;
 }
+#scm-app .scm-cm-kpis-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 #scm-app .scm-cm-kpi {
   display: flex;
   flex-direction: column;
@@ -276,7 +277,11 @@
 }
 #scm-app .scm-cm-note .material-symbols-outlined { font-size: 18px; }
 
+@media (max-width: 1280px) {
+  #scm-app .scm-cm-kpis-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (max-width: 760px) {
+  #scm-app .scm-cm-kpis-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #scm-app .scm-cm-grid { grid-template-columns: minmax(0, 1fr); }
   #scm-app .scm-cm-head h1 { font-size: 20px; }
   #scm-app .scm-cm-kpi strong { font-size: 22px; }

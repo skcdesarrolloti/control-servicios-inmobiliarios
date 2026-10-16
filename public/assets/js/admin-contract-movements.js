@@ -381,20 +381,20 @@
       }
       var current = summarize(shown);
       var previous = compare ? summarize(compare.events) : null;
-      var html = '<div class="scm-cm-kpis">';
-      html += kpi(isOcup ? "Inmuebles ocupados" : "Inmuebles desocupados", num(current.count),
+      var html = '<div class="scm-cm-kpis scm-cm-kpis-6">';
+      html += kpi(isOcup ? "Total ocupaciones" : "Total desocupaciones", num(current.count),
         compare ? deltaNote(deltaInfo(current.count, previous.count), compare.label, isOcup) : "Histórico completo", isOcup ? "ocup" : "desoc");
-      html += kpi(isOcup ? "Canon mensual que ingresó" : "Canon mensual que salió", compactMoney(current.canon),
-        compare ? deltaNote(deltaInfo(current.canon, previous.canon), compare.label, isOcup, compactMoney) : esc(money(current.canon)));
-      html += kpi("Canon promedio", compactMoney(current.avg), esc(money(current.avg)));
-      if (isOcup) {
-        var active = shown.filter(function (event) { return event.row.estado !== "recibido"; }).length;
-        html += kpi("Siguen arrendados", num(active), current.count ? esc(Math.round((active / current.count) * 100) + "% de las ocupaciones del periodo") : "Sin ocupaciones", "stock");
-      } else {
-        var stays = shown.map(function (event) { return event.row.permanencia; }).filter(function (value) { return value != null; });
-        var avgStay = stays.length ? stays.reduce(function (a, b) { return a + b; }, 0) / stays.length : 0;
-        html += kpi("Permanencia promedio", stays.length ? decimalFormat.format(avgStay) + " meses" : "—", esc("Desde la entrega hasta el recibo"), "stock");
-      }
+      html += kpi("Canon promedio", money(current.avg), esc(current.count ? "Todos los inmuebles del periodo" : "Sin movimientos"));
+      var byDestination = function (name) {
+        return summarize(shown.filter(function (event) { return event.row.destinacion === name; }));
+      };
+      var housing = byDestination("Vivienda");
+      var commerce = byDestination("Comercio");
+      var share = function (part) { return current.count ? Math.round((part / current.count) * 100) + "% del total" : "—"; };
+      html += kpi("Vivienda", num(housing.count), esc(share(housing.count)));
+      html += kpi("Canon promedio vivienda", housing.count ? money(housing.avg) : "—", esc(housing.count ? num(housing.count) + " inmuebles" : "Sin vivienda"));
+      html += kpi("Comercio", num(commerce.count), esc(share(commerce.count)));
+      html += kpi("Canon promedio comercio", commerce.count ? money(commerce.avg) : "—", esc(commerce.count ? num(commerce.count) + " inmuebles" : "Sin comercio"));
       html += "</div>";
 
       if (!isOcup) html += renderUpcoming(rows);
