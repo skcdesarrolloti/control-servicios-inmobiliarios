@@ -195,7 +195,6 @@
 #scm-app .scm-cm-delta.is-flat { color: var(--cm-muted); }
 
 #scm-app .scm-cm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-#scm-app .scm-cm-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 #scm-app .scm-cm-grid > .is-wide { grid-column: 1 / -1; }
 
 #scm-app .scm-cm-card {
@@ -215,31 +214,7 @@
 }
 #scm-app .scm-cm-card h2 { margin: 0; font-size: 14px; font-weight: 700; color: #0f172a; }
 #scm-app .scm-cm-hint { margin: 0; font-size: 11px; color: #94a3b8; }
-#scm-app .scm-cm-section { margin: 4px 0 -4px; font-size: 13px; font-weight: 700; color: #334155; }
 #scm-app .scm-cm-empty { padding: 24px 8px; text-align: center; font-size: 12.5px; color: #94a3b8; }
-
-/* Ranking horizontal */
-#scm-app .scm-cm-rank { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
-#scm-app .scm-cm-rank-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2px 8px;
-  width: 100%;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  text-align: left;
-  font: inherit;
-}
-#scm-app button.scm-cm-rank-row { cursor: pointer; }
-#scm-app button.scm-cm-rank-row:hover { background: var(--cm-soft); }
-#scm-app .scm-cm-rank-row.is-active { background: #eff6ff; box-shadow: inset 0 0 0 1px #bfdbfe; }
-#scm-app .scm-cm-rank-label { overflow: hidden; font-size: 12.5px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; color: #1e293b; }
-#scm-app .scm-cm-rank-value { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: #0f172a; }
-#scm-app .scm-cm-rank-value small { font-weight: 500; color: #94a3b8; }
-#scm-app .scm-cm-rank-track { grid-column: 1 / -1; height: 6px; border-radius: 99px; background: #f1f5f9; overflow: hidden; }
-#scm-app .scm-cm-rank-track i { display: block; height: 100%; border-radius: inherit; background: #64748b; }
 
 /* Tablas */
 #scm-app .scm-cm-search {
@@ -301,12 +276,8 @@
 }
 #scm-app .scm-cm-note .material-symbols-outlined { font-size: 18px; }
 
-@media (max-width: 1100px) {
-  #scm-app .scm-cm-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 @media (max-width: 760px) {
-  #scm-app .scm-cm-grid,
-  #scm-app .scm-cm-grid-4 { grid-template-columns: minmax(0, 1fr); }
+  #scm-app .scm-cm-grid { grid-template-columns: minmax(0, 1fr); }
   #scm-app .scm-cm-head h1 { font-size: 20px; }
   #scm-app .scm-cm-kpi strong { font-size: 22px; }
 }

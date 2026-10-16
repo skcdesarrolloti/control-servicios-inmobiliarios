@@ -397,14 +397,6 @@
       }
       html += "</div>";
 
-      html += '<h3 class="scm-cm-section">Composición · ' + esc(periodLabel) + "</h3>";
-      html += '<div class="scm-cm-grid scm-cm-grid-4">';
-      html += rankCard("Tipo de inmueble", "tipo", shown);
-      html += rankCard("Destinación", "destinacion", shown);
-      html += rankCard("Gestión", "gestion", shown);
-      html += rankCard("Funcionario", "funcionario", shown);
-      html += "</div>";
-
       if (!isOcup) html += renderUpcoming(rows);
 
       state.detailEvents = shown.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
@@ -433,31 +425,6 @@
       var out = [];
       for (var y = Math.max(years[0], years[years.length - 1] - 14); y <= years[years.length - 1]; y += 1) out.push(y);
       return out;
-    }
-
-    function rankCard(title, field, events) {
-      var totals = {};
-      events.forEach(function (event) {
-        var key = event.row[field] || "";
-        totals[key] = (totals[key] || 0) + 1;
-      });
-      var keys = Object.keys(totals).sort(function (a, b) { return totals[b] - totals[a]; });
-      if (!keys.length) return card(title, '<div class="scm-cm-empty">Sin datos.</div>');
-      var max = totals[keys[0]];
-      var visible = keys.slice(0, 7);
-      var rest = keys.slice(7).reduce(function (sum, key) { return sum + totals[key]; }, 0);
-      var body = '<ul class="scm-cm-rank">' + visible.map(function (key) {
-        var label = key === "" ? "Sin dato" : field === "funcionario" ? (events.find(function (e) { return e.row.funcionario === key; }).row.funcionarioNombre) : key;
-        var active = state.filters[field] === key && key !== "";
-        var inner = '<span class="scm-cm-rank-label">' + esc(label) + '</span><span class="scm-cm-rank-value">' + num(totals[key]) +
-          " <small>" + Math.round((totals[key] / events.length) * 100) + '%</small></span><span class="scm-cm-rank-track"><i style="width:' +
-          ((totals[key] / max) * 100).toFixed(1) + '%"></i></span>';
-        return "<li>" + (key === ""
-          ? '<div class="scm-cm-rank-row is-static">' + inner + "</div>"
-          : '<button type="button" class="scm-cm-rank-row' + (active ? " is-active" : "") + '" data-scm-cm-set="' + field + '" data-value="' +
-            esc(key) + '" title="' + (active ? "Quitar filtro" : "Filtrar por " + esc(label)) + '">' + inner + "</button>") + "</li>";
-      }).join("") + (rest ? '<li><div class="scm-cm-rank-row is-static"><span class="scm-cm-rank-label">Otros</span><span class="scm-cm-rank-value">' + num(rest) + "</span></div></li>" : "") + "</ul>";
-      return card(title, body);
     }
 
     function renderUpcoming(rows) {
@@ -759,15 +726,6 @@
           var detail = content.querySelector("[data-scm-cm-detail]");
           if (detail) detail.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
-        return;
-      }
-      var set = event.target.closest("[data-scm-cm-set]");
-      if (set) {
-        var field = set.getAttribute("data-scm-cm-set");
-        var next = set.getAttribute("data-value") || "";
-        state.filters[field] = state.filters[field] === next ? "" : next;
-        resetDrill();
-        render();
         return;
       }
       var unset = event.target.closest("[data-scm-cm-unset]");
