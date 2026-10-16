@@ -1114,15 +1114,6 @@ foreach ($rawNavItems as $k => $item) {
 
       <!-- Fila 2: Subnavegación Horizontal por Píldoras (Altura 48px) -->
       <?php
-      // Etiqueta de la sección actual para el botón "Menú" de pantallas angostas.
-      $currentNavLabel = '';
-      foreach ($filteredNavItems as $navKey => $navItem) {
-        if ($navItem['type'] === 'link' && $current_page === $navKey) {
-          $currentNavLabel = (string) $navItem['label'];
-        } elseif ($navItem['type'] === 'dropdown' && isset($navItem['children'][$current_page])) {
-          $currentNavLabel = (string) $navItem['children'][$current_page]['label'];
-        }
-      }
       $navLinkAttrs = static function (string $key, array $item): string {
         $attrs = 'href="' . htmlspecialchars((string) $item['url'], ENT_QUOTES, 'UTF-8') . '"'
           . ' data-tab-key="' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '"'
@@ -1139,7 +1130,6 @@ foreach ($rawNavItems as $k => $item) {
         <button type="button" class="scm-nav-toggle" data-scm-nav-toggle aria-expanded="false" aria-controls="scm-nav-mobile">
           <span class="material-symbols-outlined" aria-hidden="true">menu</span>
           <span>Menú</span>
-          <?php if ($currentNavLabel !== ''): ?><span class="scm-nav-toggle-current"><?php echo htmlspecialchars($currentNavLabel, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
           <span class="material-symbols-outlined scm-nav-toggle-chevron" aria-hidden="true">expand_more</span>
         </button>
         <nav class="flex items-center gap-1.5 py-1" aria-label="Pestañas principales del sistema" data-scm-main-nav>
@@ -1299,9 +1289,6 @@ foreach ($rawNavItems as $k => $item) {
         panel.addEventListener('click', function (event) {
           var link = event.target.closest('a');
           if (!link) return;
-          var current = toggle.querySelector('.scm-nav-toggle-current');
-          var label = link.querySelector('span:not(.material-symbols-outlined)');
-          if (current && label) current.textContent = label.textContent;
           panel.querySelectorAll('.scm-nav-mobile-link').forEach(function (item) {
             item.classList.toggle('is-active', item === link);
           });

@@ -5891,22 +5891,11 @@ body,
   cursor: pointer;
 }
 .scm-nav-toggle .material-symbols-outlined { font-size: 18px !important; color: #475569; }
-.scm-nav-toggle-current {
-  overflow: hidden;
-  padding-left: 0.4rem;
-  border-left: 1px solid #e2e8f0;
-  color: #475569;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .scm-nav-toggle-chevron { transition: transform 0.15s ease; }
 .scm-nav-toggle:hover,
 .scm-nav-toggle.is-open { border-color: #1e3a5f; background: #1e3a5f; color: #ffffff; }
 .scm-nav-toggle:hover .material-symbols-outlined,
-.scm-nav-toggle.is-open .material-symbols-outlined,
-.scm-nav-toggle:hover .scm-nav-toggle-current,
-.scm-nav-toggle.is-open .scm-nav-toggle-current { color: #ffffff; border-color: rgba(255, 255, 255, 0.35); }
+.scm-nav-toggle.is-open .material-symbols-outlined { color: #ffffff; }
 .scm-nav-toggle.is-open .scm-nav-toggle-chevron { transform: rotate(180deg); }
 
 .scm-nav-mobile {
