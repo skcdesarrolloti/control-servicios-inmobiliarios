@@ -188,7 +188,7 @@ namespace {
   $check(array_column($view->public_cotizacion_order_funcionarios(), 'id') === ['2'], 'public response also excludes disabled administrative cargos and includes configured responders');
   $permissionsHtml = $view->permissionsModal();
   $check(str_contains($permissionsHtml, 'id="scm-permissions-cargo"') && str_contains($permissionsHtml, 'value="11" selected'), 'permission editor selects the current cargo');
-  $check(substr_count($permissionsHtml, 'data-permission-cargo="25" hidden') === 4 && str_contains($permissionsHtml, 'name="action_permissions[25][]"'), 'only selected cargo is visible while other cargo inputs remain available for saving');
+  $check(substr_count($permissionsHtml, 'data-permission-cargo="25" hidden') === 3 && str_contains($permissionsHtml, 'name="action_permissions[25][]"'), 'only selected cargo is visible while other cargo inputs remain available for saving');
   $view->actionPermissions = [];
   $view->admin = false;
   $check(!$view->canRespond() && !str_contains($view->detail(), 'data-scm-respond-cotizacion-order'), 'cargo without explicit grant cannot respond or see the button');

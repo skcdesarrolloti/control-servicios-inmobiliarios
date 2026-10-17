@@ -952,19 +952,53 @@
       return Number.isFinite(value) && value > 0 ? value : fallback;
     }
 
+    // Plazos agrupados por proceso; cada campo conserva su name y min para collectStandaloneDueSettings.
+    var DUE_SETTING_GROUPS = [
+      { title: "Cotizaciones", icon: "request_quote", fields: [
+        { name: "cotizaciones_sin_enviar_dias", label: "Cotizaciones sin enviar", note: "Días hábiles desde la creación del caso para emitir la cotización.", min: 1, max: 120, fallback: 3 },
+        { name: "cotizaciones_enviadas_sin_respuesta_dias", label: "Cotizaciones sin respuesta", note: "Días de espera de la respuesta del cliente desde el envío.", min: 1, max: 180, fallback: 10 },
+      ] },
+      { title: "Revisión preventiva", icon: "home_repair_service", fields: [
+        { name: "tickets_preventivos_sin_cita_dias", label: "Casos sin cita preventiva", note: "Días desde que se crea el caso preventivo hasta agendar la cita.", min: 1, max: 120, fallback: 3 },
+        { name: "preventivas_con_cita_sin_realizar_dias", label: "Cita sin realizar", note: "Días desde la fecha de la cita hasta marcarla como realizada. 0 = vence el mismo día.", min: 0, max: 120, fallback: 0 },
+        { name: "preventivas_dias", label: "Preventivas sin enviar", note: "Días desde que se realiza la revisión técnica hasta enviarla.", min: 1, max: 120, fallback: 3 },
+      ] },
+      { title: "Contratos", icon: "contract", fields: [
+        { name: "terminacion_contrato_dias", label: "Solicitud de terminación", note: "Días calendario desde la solicitud para responderla.", min: 1, max: 120, fallback: 3 },
+        { name: "no_prorroga_contrato_dias", label: "Solicitud de no prórroga", note: "Días calendario desde la solicitud para responderla.", min: 1, max: 120, fallback: 3 },
+      ] },
+    ];
+
     function standaloneDueSettingsModalHtml(settings) {
       settings = settings || {};
-      return '<div class="scm-due-settings-intro"><strong>Los plazos configurados</strong> determinan el cálculo de alertas de vencimiento en las bandejas operativas y recordatorios automáticos.</div>' +
-        '<form class="scm-calendar-due-settings-form scm-calendar-due-settings-form--modal" data-scm-calendar-due-settings-modal autocomplete="off">' +
-        '<label class="scm-field"><span>Cotizaciones sin enviar</span><em>Fase emisión</em><small>Días hábiles desde la creación del caso para emitir la cotización.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "cotizaciones_sin_enviar_dias", 3)) + '"></label>' +
-        '<label class="scm-field"><span>Casos sin cita preventiva</span><em>Agendamiento</em><small>Días transcurridos desde que se crea el caso preventivo hasta agendar cita.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="tickets_preventivos_sin_cita_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "tickets_preventivos_sin_cita_dias", 3)) + '"></label>' +
-        '<label class="scm-field"><span>Preventivas con cita sin realizar</span><em>Cita agendada</em><small>Días desde la fecha de la cita preventiva hasta marcarla como realizada.</small><input class="input input-bordered input-sm scm-input" type="number" min="0" max="120" name="preventivas_con_cita_sin_realizar_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "preventivas_con_cita_sin_realizar_dias", 0)) + '"></label>' +
-        '<label class="scm-field"><span>Preventivas sin enviar</span><em>Revisión</em><small>Días de plazo desde que se realiza la revisión preventiva técnica.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "preventivas_dias", 3)) + '"></label>' +
-        '<label class="scm-field"><span>Cotizaciones sin respuesta</span><em>Seguimiento</em><small>Días límite de espera de respuesta del cliente desde el envío inicial.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "cotizaciones_enviadas_sin_respuesta_dias", 10)) + '"></label>' +
-        '<label class="scm-field"><span>Solicitud de terminación de contrato</span><em>Respuesta</em><small>Días calendario desde la solicitud para responderla.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="terminacion_contrato_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "terminacion_contrato_dias", 3)) + '"></label>' +
-        '<label class="scm-field"><span>Solicitud de no prórroga de contrato</span><em>Respuesta</em><small>Días calendario desde la solicitud para responderla.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="no_prorroga_contrato_dias" data-scm-due-setting value="' + escHtml(standaloneDueSettingValue(settings, "no_prorroga_contrato_dias", 3)) + '"></label>' +
-        '<aside class="scm-due-settings-impact"><strong>Impacto en el semáforo de casos</strong><span>Al superar estos días, los casos cambiarán de estado a Por Vencer o Vencido y se notificará al responsable.</span></aside>' +
-        "</form>";
+      var groups = DUE_SETTING_GROUPS.map(function (group) {
+        return '<fieldset class="scm-due-group"><legend><span class="material-symbols-outlined" aria-hidden="true">' + group.icon + "</span>" + escHtml(group.title) + "</legend>" +
+          group.fields.map(function (field) {
+            var value = standaloneDueSettingValue(settings, field.name, field.fallback);
+            var id = "scm-due-" + field.name;
+            return '<div class="scm-due-row"><label for="' + id + '"><strong>' + escHtml(field.label) + "</strong><small>" + escHtml(field.note) + "</small></label>" +
+              '<div class="scm-due-stepper"><button type="button" data-scm-due-step="-1" aria-label="Restar un día">−</button>' +
+              '<input id="' + id + '" type="number" inputmode="numeric" min="' + field.min + '" max="' + field.max + '" name="' + field.name + '" data-scm-due-setting value="' + escHtml(value) + '">' +
+              '<button type="button" data-scm-due-step="1" aria-label="Sumar un día">+</button><span>días</span></div></div>';
+          }).join("") + "</fieldset>";
+      }).join("");
+      return '<form class="scm-due-settings" data-scm-calendar-due-settings-modal autocomplete="off">' +
+        '<p class="scm-due-settings-lead">Al superar estos plazos el caso pasa a <b class="is-warn">Por vencer</b> o <b class="is-bad">Vencido</b> en las bandejas, el calendario y los recordatorios al responsable.</p>' +
+        '<div class="scm-due-groups">' + groups + "</div></form>";
+    }
+
+    function bindDueSettingsSteppers(popup) {
+      if (!popup) return;
+      popup.addEventListener("click", function (event) {
+        var step = event.target.closest("[data-scm-due-step]");
+        if (!step) return;
+        var input = step.parentNode.querySelector("[data-scm-due-setting]");
+        if (!input) return;
+        var min = Number(input.min || 0);
+        var max = Number(input.max || 365);
+        var next = (Number(input.value) || 0) + Number(step.getAttribute("data-scm-due-step"));
+        input.value = String(Math.min(max, Math.max(min, next)));
+      });
     }
 
     function collectStandaloneDueSettings(popup) {
@@ -992,7 +1026,7 @@
           return window.Swal.fire({
             title: "Días de vencimiento",
             html: standaloneDueSettingsModalHtml(settings),
-            width: 980,
+            width: "min(860px, 96vw)",
             showCloseButton: true,
             showCancelButton: true,
             confirmButtonText: "Guardar configuración",
@@ -1003,6 +1037,7 @@
               confirmButton: "scm-btn-primary",
               cancelButton: "scm-btn-secondary",
             },
+            didOpen: bindDueSettingsSteppers,
             preConfirm: function () {
               var popup = window.Swal.getPopup();
               return dashboardAction(actionAdminDueSettingsSave, collectStandaloneDueSettings(popup)).catch(function (err) {
@@ -3509,24 +3544,8 @@
         renderDueBreakdown(calendarEvents);
       }
 
-      function dueSettingValue(settings, key, fallback) {
-        var value = Number(settings && settings[key] ? settings[key] : fallback);
-        return Number.isFinite(value) && value > 0 ? value : fallback;
-      }
-
       function dueSettingsModalHtml(settings) {
-        settings = settings || {};
-        return '<div class="scm-due-settings-intro"><strong>Los plazos configurados</strong> determinan el cálculo de alertas de vencimiento en las bandejas operativas y recordatorios automáticos.</div>' +
-          '<form class="scm-calendar-due-settings-form scm-calendar-due-settings-form--modal" data-scm-calendar-due-settings-modal autocomplete="off">' +
-          '<label class="scm-field"><span>Cotizaciones sin enviar</span><em>Fase emisión</em><small>Días hábiles desde la creación del caso para emitir la cotización.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="cotizaciones_sin_enviar_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_sin_enviar_dias", 3)) + '"></label>' +
-          '<label class="scm-field"><span>Casos sin cita preventiva</span><em>Agendamiento</em><small>Días transcurridos desde que se crea el caso preventivo hasta agendar cita.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="tickets_preventivos_sin_cita_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "tickets_preventivos_sin_cita_dias", 3)) + '"></label>' +
-          '<label class="scm-field"><span>Preventivas con cita sin realizar</span><em>Cita agendada</em><small>Días desde la fecha de la cita preventiva hasta marcarla como realizada.</small><input class="input input-bordered input-sm scm-input" type="number" min="0" max="120" name="preventivas_con_cita_sin_realizar_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "preventivas_con_cita_sin_realizar_dias", 0)) + '"></label>' +
-          '<label class="scm-field"><span>Preventivas sin enviar</span><em>Revisión</em><small>Días de plazo desde que se realiza la revisión preventiva técnica.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="preventivas_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "preventivas_dias", 3)) + '"></label>' +
-          '<label class="scm-field"><span>Cotizaciones sin respuesta</span><em>Seguimiento</em><small>Días límite de espera de respuesta del cliente desde el envío inicial.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="180" name="cotizaciones_enviadas_sin_respuesta_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "cotizaciones_enviadas_sin_respuesta_dias", 10)) + '"></label>' +
-          '<label class="scm-field"><span>Solicitud de terminación de contrato</span><em>Respuesta</em><small>Días calendario desde la solicitud para responderla.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="terminacion_contrato_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "terminacion_contrato_dias", 3)) + '"></label>' +
-          '<label class="scm-field"><span>Solicitud de no prórroga de contrato</span><em>Respuesta</em><small>Días calendario desde la solicitud para responderla.</small><input class="input input-bordered input-sm scm-input" type="number" min="1" max="120" name="no_prorroga_contrato_dias" data-scm-due-setting value="' + escHtml(dueSettingValue(settings, "no_prorroga_contrato_dias", 3)) + '"></label>' +
-          '<aside class="scm-due-settings-impact"><strong>Impacto en el semáforo de casos</strong><span>Al superar estos días, los casos cambiarán de estado a Por Vencer o Vencido y se notificará al responsable.</span></aside>' +
-          "</form>";
+        return standaloneDueSettingsModalHtml(settings);
       }
 
       function collectDueSettingsFromPopup(popup) {
@@ -3556,7 +3575,7 @@
           window.Swal.fire({
             title: "Días de vencimiento",
             html: dueSettingsModalHtml(settings),
-            width: 980,
+            width: "min(860px, 96vw)",
             showCloseButton: true,
             showCancelButton: true,
             confirmButtonText: "Guardar configuración",
@@ -3567,6 +3586,7 @@
               confirmButton: "scm-btn-primary",
               cancelButton: "scm-btn-secondary",
             },
+            didOpen: bindDueSettingsSteppers,
             preConfirm: function () {
               var popup = window.Swal.getPopup();
               var payload = collectDueSettingsFromPopup(popup);
@@ -11459,7 +11479,7 @@
           });
           var btn = card.querySelector("[data-scm-perm-all]");
           if (btn) {
-            btn.textContent = allChecked ? "Quitar todo" : "Todo";
+            btn.textContent = allChecked ? "Quitar todo" : "Marcar todo";
           }
         });
       }
@@ -11495,7 +11515,7 @@
         checks.forEach(function (input) {
           input.checked = shouldCheck;
         });
-        btn.textContent = shouldCheck ? "Quitar todo" : "Todo";
+        btn.textContent = shouldCheck ? "Quitar todo" : "Marcar todo";
         refreshCardState(card);
       });
       form.addEventListener("submit", function (event) {
@@ -11908,37 +11928,68 @@
         derivedBase = "";
       }
       var appBase = configuredBase || derivedBase || "https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public";
-      var bridgeBase = appBase + "/puente-funcionario.php";
-      var createActBase = appBase + "/crear-acta.php";
       var bridgeUrl = function (query) {
-        return bridgeBase + "?" + query;
+        return appBase + "/puente-funcionario.php?" + query;
       };
+      var signed = "&expires=<EXPIRA>&sig=<FIRMA>";
       var autologinSuffix = "&id_empleado=<ID_EMPLEADO>&token=<ACTA_AUTOLOGIN_SECRET>";
-      var linkField = function (label, description, url) {
-        return '<div class="scm-cotizacion-dialog-field is-wide"><span>' +
-          escHtml(label) +
-          '</span><small>' +
-          escHtml(description) +
-          '</small><code>' +
-          escHtml(url) +
-          "</code></div>";
+      // Cada enlace muestra para qué sirve, cómo se obtiene y la URL exacta con botón de copiar.
+      var linkCard = function (item) {
+        return '<article class="scm-guide-link">' +
+          "<header><strong>" + escHtml(item.title) + "</strong>" +
+          (item.badge ? '<span class="scm-guide-link-badge is-' + escHtml(item.tone || "info") + '">' + escHtml(item.badge) + "</span>" : "") +
+          "</header>" +
+          "<p>" + escHtml(item.text) + "</p>" +
+          (item.how ? '<p class="scm-guide-link-how"><span class="material-symbols-outlined" aria-hidden="true">lightbulb</span>' + escHtml(item.how) + "</p>" : "") +
+          '<div class="scm-guide-link-url"><code>' + escHtml(item.url) + '</code><button type="button" data-scm-guide-copy="' + escHtml(item.url) + '" title="Copiar enlace" aria-label="Copiar enlace de ' + escHtml(item.title) + '"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span></button></div>' +
+          "</article>";
       };
+      var section = function (key, title, intro, items) {
+        return '<section class="scm-guide-section" data-scm-guide-section="' + key + '"' + (key === "actas" ? "" : " hidden") + ">" +
+          '<p class="scm-guide-section-intro"><strong>' + escHtml(title) + ".</strong> " + intro + "</p>" +
+          '<div class="scm-guide-links">' + items.map(linkCard).join("") + "</div></section>";
+      };
+      var sections = [
+        { key: "actas", label: "Actas", icon: "task" },
+        { key: "puente", label: "Puente funcionarios", icon: "badge" },
+        { key: "publicas", label: "Vistas públicas", icon: "public" },
+        { key: "autologin", label: "Autologin", icon: "key" },
+      ];
       var html =
-        '<div class="scm-cotizacion-response-form scm-actas-guide-modal">' +
-        '<p class="scm-cotizacion-dialog-intro">Enlaces completos para abrir funciones nativas desde WordPress. Todos pueden evitar login agregando el sufijo de autologin. <strong>&lt;ID_INTERNO_CASO&gt;</strong> es el _ID interno del caso y <strong>&lt;ID_COTIZACION&gt;</strong> es el _ID de la cotizaci&oacute;n.</p>' +
-        '<div class="scm-cotizacion-response-grid">' +
-        '<div class="scm-cotizacion-dialog-field is-wide"><span>Actas</span><strong>Dos procesos distintos</strong><small>Acta directa: soluci&oacute;n/cierre sin cotizaci&oacute;n aprobada. Acta por cotizaci&oacute;n: satisfacci&oacute;n al terminar el trabajo cotizado y aprobado.</small></div>' +
-        linkField("Acta directa del caso", "Abre Complementarias → Acta de solución y firma.", bridgeUrl("accion=acta_satisfaccion&ticket_pk=<ID_INTERNO_CASO>")) +
-        linkField("Acta por cotización aprobada", "Abre el sistema y crea el acta vinculada a esa cotización aprobada.", bridgeUrl("accion=acta_cotizacion&id_cotizacion=<ID_COTIZACION>")) +
-        linkField("Acta por cotización aprobada · directo", "Alternativa directa a crear-acta.php; también acepta el mismo autologin desde WordPress.", createActBase + "?id_cotizacion=<ID_COTIZACION>&source_flow=approved_quote") +
-        '<div class="scm-cotizacion-dialog-field is-wide"><span>Funciones puente para funcionarios</span><strong>Acciones disponibles desde WordPress</strong><small>Usa estos enlaces para migrar los botones externos al sistema nativo sin abrir pestañas innecesarias cuando el funcionario est&aacute; dentro del panel.</small></div>' +
-        linkField("Crear / gestionar revisión correctiva", "Abre la revisión correctiva del caso; si no existe, permite crearla.", bridgeUrl("accion=revision_correctiva&ticket_pk=<ID_INTERNO_CASO>")) +
-        linkField("Crear cotización de mantenimiento", "Abre el formulario nativo de nueva cotización para el caso.", bridgeUrl("accion=crear_cotizacion&ticket_pk=<ID_INTERNO_CASO>")) +
-        linkField("Editar cotización de mantenimiento", "Abre la cotización exacta en modo edición cuando su estado lo permita.", bridgeUrl("accion=editar_cotizacion&id_cotizacion=<ID_COTIZACION>")) +
-        linkField("Enviar cotización", "Abre el envío por correo/WhatsApp de la cotización exacta.", bridgeUrl("accion=enviar_cotizacion&id_cotizacion=<ID_COTIZACION>")) +
-        linkField("Crear orden de mantenimiento", "Abre la creación de orden para la cotización aprobada.", bridgeUrl("accion=crear_orden&id_cotizacion=<ID_COTIZACION>")) +
-        '<div class="scm-cotizacion-dialog-field is-wide"><span>Autologin desde WordPress</span><strong>Agregar al final si el funcionario no tiene sesi&oacute;n</strong><small>Sirve para los enlaces del puente y tambi&eacute;n para crear-acta.php. El sistema elimina token e id_empleado antes de dejar al funcionario en la pantalla final.</small><code>' + escHtml(autologinSuffix) + '</code><small>Ejemplo:</small><code>' + escHtml(bridgeUrl("accion=crear_cotizacion&ticket_pk=<ID_INTERNO_CASO>") + autologinSuffix) + '</code></div>' +
-        '</div></div>';
+        '<div class="scm-guide-modal">' +
+        '<p class="scm-guide-lead">Enlaces para abrir funciones nativas desde WordPress, correos o WhatsApp. Reemplaza los valores entre <code>&lt; &gt;</code>: <strong>&lt;ID_INTERNO_CASO&gt;</strong> es el <code>_ID</code> del caso, <strong>&lt;ID_COTIZACION&gt;</strong> el de la cotizaci&oacute;n y <strong>&lt;ID_REVISION&gt;</strong> el de la revisi&oacute;n.</p>' +
+        '<nav class="scm-guide-tabs" role="tablist" aria-label="Tipos de enlace">' + sections.map(function (item, index) {
+          return '<button type="button" role="tab" class="scm-guide-tab' + (index === 0 ? " is-active" : "") + '" aria-selected="' + (index === 0 ? "true" : "false") + '" data-scm-guide-tab="' + item.key + '"><span class="material-symbols-outlined" aria-hidden="true">' + item.icon + "</span>" + escHtml(item.label) + "</button>";
+        }).join("") + "</nav>" +
+        section("actas", "Dos procesos distintos", "El acta directa cierra un caso sin cotizaci&oacute;n aprobada; el acta por cotizaci&oacute;n certifica la satisfacci&oacute;n al terminar un trabajo cotizado y aprobado.", [
+          { title: "Acta directa del caso", badge: "Funcionario", text: "Abre Complementarias → Acta de solución y firma del caso.", url: bridgeUrl("accion=acta_satisfaccion&ticket_pk=<ID_INTERNO_CASO>") },
+          { title: "Acta por cotización aprobada", badge: "Funcionario", text: "Crea el acta vinculada a esa cotización aprobada.", url: bridgeUrl("accion=acta_cotizacion&id_cotizacion=<ID_COTIZACION>") },
+          { title: "Acta por cotización · directo", badge: "Funcionario", text: "Alternativa directa a crear-acta.php; también acepta el sufijo de autologin.", url: appBase + "/crear-acta.php?id_cotizacion=<ID_COTIZACION>&source_flow=approved_quote" },
+        ]) +
+        section("puente", "Funciones puente", "Llevan los botones externos de WordPress al sistema nativo. Requieren sesi&oacute;n del panel o el sufijo de autologin y validan que el funcionario tenga acceso al caso.", [
+          { title: "Revisión preventiva", badge: "Preventiva", tone: "good", text: "Abre la revisión preventiva del caso para crearla, completarla o enviarla. También acepta accion=preventiva o crear_revision_preventiva.", url: bridgeUrl("accion=revision_preventiva&ticket_pk=<ID_INTERNO_CASO>") },
+          { title: "Revisión correctiva", badge: "Correctiva", text: "Abre la revisión correctiva del caso; si no existe, permite crearla.", url: bridgeUrl("accion=revision_correctiva&ticket_pk=<ID_INTERNO_CASO>") },
+          { title: "Crear cotización de mantenimiento", text: "Abre el formulario nativo de nueva cotización para el caso.", url: bridgeUrl("accion=crear_cotizacion&ticket_pk=<ID_INTERNO_CASO>") },
+          { title: "Editar cotización", text: "Abre la cotización exacta en modo edición cuando su estado lo permita.", url: bridgeUrl("accion=editar_cotizacion&id_cotizacion=<ID_COTIZACION>") },
+          { title: "Enviar cotización", text: "Abre el envío por correo/WhatsApp de la cotización exacta.", url: bridgeUrl("accion=enviar_cotizacion&id_cotizacion=<ID_COTIZACION>") },
+          { title: "Crear orden de mantenimiento", text: "Abre la creación de la orden para la cotización aprobada.", url: bridgeUrl("accion=crear_orden&id_cotizacion=<ID_COTIZACION>") },
+        ]) +
+        section("publicas", "Vistas públicas para destinatarios", "Se abren sin login con un enlace firmado (<code>expires</code> + <code>sig</code>) que el sistema genera al enviar el documento por correo o WhatsApp. La firma no se puede armar a mano: copia el enlace desde la notificaci&oacute;n o el bot&oacute;n del caso. Con sesi&oacute;n del panel basta <code>?numero=</code> para revisar la vista tal como la ver&aacute; el destinatario.", [
+          { title: "Revisión preventiva", badge: "Vence en 180 días", text: "Informe de la revisión preventiva para propietario o arrendatario, con evidencias y botón de imprimir. Agrega &format=pdf para descargar el PDF.", how: "Se genera al crear y al enviar la revisión preventiva desde el caso.", url: appBase + "/revision-preventiva.php?numero=<ID_REVISION>" + signed },
+          { title: "Revisión correctiva", badge: "Vence en 180 días", text: "Informe de la revisión correctiva con hallazgos y evidencias.", how: "Se genera al crear la revisión correctiva y llega en su notificación.", url: appBase + "/revision-correctiva.php?numero=<ID_REVISION>" + signed },
+          { title: "Cotización de mantenimiento", badge: "Vence en 180 días", text: "El destinatario consulta la cotización y la aprueba o desaprueba con observación, motivo y financiación.", how: "Se genera al enviar la cotización.", url: appBase + "/cotizacion-mantenimiento.php?numero=<ID_COTIZACION>" + signed },
+          { title: "Orden de mantenimiento", badge: "Vence en 30 días", tone: "warn", text: "Consulta de la orden y registro de su respuesta desde el enlace.", how: "Se genera al crear o reenviar la orden de la cotización aprobada.", url: appBase + "/orden-publica.php?numero=<ID_ORDEN>" + signed },
+          { title: "Firma de acta", badge: "Token del acta", text: "El firmante revisa y firma el acta; después puede descargar el PDF firmado. Sin token solo la abre un funcionario con sesión.", how: "Se envía al solicitar la firma del acta desde el caso.", url: appBase + "/ticket-acta.php?id=<ID_ACTA>&token=<TOKEN_ACTA>" },
+          { title: "Caso público", badge: "Vence en 30 días", tone: "warn", text: "Seguimiento del caso para el destinatario. Con sesión, ?scm_case=<ID_INTERNO_CASO> abre el caso dentro del panel.", how: "Se genera al registrar el caso desde el panel.", url: appBase + "/?scm_case=<ID>.<EXPIRA>.<AUDIENCIA>.<FIRMA>" },
+          { title: "Revisión de servicios públicos", badge: "Vence en 180 días", text: "Documento de la revisión de servicios públicos para el destinatario.", how: "Usa el botón de copiar enlace público de la revisión.", url: appBase + "/revision-servicios-publicos.php?numero=<ID_REVISION>" + signed },
+          { title: "Solicitudes web del responsable", badge: "Vence en 30 días", tone: "warn", text: "Bandeja de solicitudes web asignadas a un funcionario, sin entrar al panel.", how: "Llega en el aviso de solicitud web nueva o trasladada.", url: appBase + "/solicitudes-web.php?k=<TOKEN_ACCESO>" },
+          { title: "Radicar caso (formularios abiertos)", badge: "Sin firma", tone: "good", text: "Formularios públicos para radicar casos: /ticket deja elegir el tipo; también existen /ticket-arrendatario, /ticket-propietario y /ticket-copropiedad. Se pueden publicar en la web.", url: appBase + "/ticket" },
+        ]) +
+        section("autologin", "Autologin desde WordPress", "Agrega el sufijo al final de cualquier enlace del puente o de crear-acta.php cuando el funcionario no tiene sesi&oacute;n. El sistema elimina <code>token</code> e <code>id_empleado</code> de la URL antes de mostrar la pantalla final. Las vistas p&uacute;blicas no lo necesitan.", [
+          { title: "Sufijo de autologin", text: "<ID_EMPLEADO> es el id_empleado real del funcionario en wp_jet_cct_funcionarios.", url: autologinSuffix },
+          { title: "Ejemplo completo", text: "Crear cotización entrando directamente con la cuenta del funcionario.", url: bridgeUrl("accion=crear_cotizacion&ticket_pk=<ID_INTERNO_CASO>") + autologinSuffix },
+        ]) +
+        "</div>";
       if (!window.Swal) {
         showToast("info", "Enlaces puente: revisión, cotización, envío, orden y actas.");
         return;
@@ -11946,18 +11997,44 @@
       window.Swal.fire({
         title: "Tipos de actas y enlaces",
         html: html,
-        width: "min(900px, 96vw)",
+        width: "min(960px, 96vw)",
         showCloseButton: true,
         confirmButtonText: "Entendido",
         buttonsStyling: false,
         focusConfirm: false,
         customClass: {
-          popup: "scm-cotizacion-dialog scm-cotizacion-response-swal",
+          popup: "scm-cotizacion-dialog scm-cotizacion-response-swal scm-guide-swal",
           title: "scm-cotizacion-dialog-title",
           htmlContainer: "scm-cotizacion-dialog-body",
           actions: "scm-cotizacion-dialog-actions",
           confirmButton: "scm-cotizacion-dialog-confirm",
           closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+        },
+        didOpen: function (popup) {
+          popup.addEventListener("click", function (event) {
+            var tab = event.target.closest("[data-scm-guide-tab]");
+            if (tab) {
+              var key = tab.getAttribute("data-scm-guide-tab");
+              popup.querySelectorAll("[data-scm-guide-tab]").forEach(function (item) {
+                var active = item === tab;
+                item.classList.toggle("is-active", active);
+                item.setAttribute("aria-selected", active ? "true" : "false");
+              });
+              popup.querySelectorAll("[data-scm-guide-section]").forEach(function (panel) {
+                panel.hidden = panel.getAttribute("data-scm-guide-section") !== key;
+              });
+              return;
+            }
+            var copy = event.target.closest("[data-scm-guide-copy]");
+            if (!copy) return;
+            var value = copy.getAttribute("data-scm-guide-copy");
+            var done = function () { showToast("success", "Enlace copiado. Reemplaza los valores entre < >."); };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(value).then(done).catch(function () { window.prompt("Copia el enlace:", value); });
+            } else {
+              window.prompt("Copia el enlace:", value);
+            }
+          });
         },
       });
     }

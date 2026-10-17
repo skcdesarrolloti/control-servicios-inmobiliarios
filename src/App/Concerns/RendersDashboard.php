@@ -1456,6 +1456,7 @@ trait RendersDashboard
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/ticket-completion-form-state.js?v=' . SCM_VERSION); ?>" data-scm-draft-user="<?php echo self::h((string) \SCM\Core\Auth::userId()); ?>" defer></script>
     <script src="<?php echo $jsUrl; ?>" defer></script>
     <script src="<?php echo $dashboardRuntimeJsUrl; ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-config-modals.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-config-modals.js'))); ?>" defer></script>
     <script src="<?php echo $collectionManagementJsUrl; ?>" defer></script>
     <script src="<?php echo $canonInsuranceAuditJsUrl; ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-movements.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-movements.js'))); ?>" defer></script>
@@ -1476,12 +1477,16 @@ trait RendersDashboard
       $label = trim((string) ($definition['label'] ?? $tabKey));
       $topics = self::sanitizeTicketTopicList($definition['temas'] ?? []);
       $topicCount = count($topics);
-      $topicTabsHtml .= '<label class="scm-ticket-topic-config-field scm-tw-card bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col gap-3">';
-      $topicTabsHtml .= '<span class="scm-topic-card-head flex items-center justify-between gap-2"><strong>' . esc_html($label) . '</strong><em>' . esc_html((string) $topicCount) . ' temas</em></span>';
-      $topicTabsHtml .= '<small>Temas reconocidos</small>';
-      $topicTabsHtml .= '<textarea name="topics[' . esc_attr((string) $tabKey) . ']" class="textarea textarea-bordered scm-input" rows="4">' . esc_textarea(implode("\n", $topics)) . '</textarea>';
-      $topicTabsHtml .= '<span class="scm-topic-card-foot">Bandeja sincronizada</span>';
-      $topicTabsHtml .= '</label>';
+      $topicChips = '';
+      foreach ($topics as $topic) {
+        $topicChips .= '<span class="scm-topic-chip">' . esc_html($topic) . '</span>';
+      }
+      $topicTabsHtml .= '<section class="scm-ticket-topic-config-field scm-topic-card" data-scm-topic-card="' . esc_attr((string) $tabKey) . '" data-scm-topic-label="' . esc_attr($label) . '">';
+      $topicTabsHtml .= '<header class="scm-topic-card-head"><strong>' . esc_html($label) . '</strong><em data-scm-topic-count>' . esc_html((string) $topicCount) . ' temas</em></header>';
+      $topicTabsHtml .= '<div class="scm-topic-chips" data-scm-topic-chips>' . $topicChips . '</div>';
+      $topicTabsHtml .= '<div class="scm-topic-add"><input type="text" data-scm-topic-input placeholder="Agregar tema y presionar Enter" aria-label="Agregar tema a ' . esc_attr($label) . '" autocomplete="off"><button type="button" data-scm-topic-add aria-label="Agregar tema"><span class="material-symbols-outlined" aria-hidden="true">add</span></button></div>';
+      $topicTabsHtml .= '<details class="scm-topic-raw"><summary>Editar como lista</summary><textarea name="topics[' . esc_attr((string) $tabKey) . ']" class="textarea textarea-bordered scm-input" rows="5" data-scm-topic-source aria-label="Temas de ' . esc_attr($label) . ', uno por línea">' . esc_textarea(implode("\n", $topics)) . '</textarea><small>Un tema por l&iacute;nea. Sirve para pegar varios temas a la vez.</small></details>';
+      $topicTabsHtml .= '</section>';
     }
 
     ob_start();
@@ -1495,7 +1500,14 @@ trait RendersDashboard
           <span class="scm-config-head-badge inline-flex rounded-full text-[10px] font-bold uppercase">Taxonom&iacute;a operativa</span>
           <p>Define qu&eacute; valores de <code>tema_ayuda</code> alimentan Entrega, Preventiva, Recibo, Contractual y las dem&aacute;s pesta&ntilde;as operativas.</p>
         </div>
-        <div class="scm-config-info-strip bg-slate-50 border-b border-slate-200 px-6 py-3"><strong>Mapeo autom&aacute;tico:</strong> Cada l&iacute;nea ingresada alimenta la bandeja operativa correspondiente para los funcionarios.</div>
+        <div class="scm-topic-toolbar">
+          <label class="scm-perm-search">
+            <span class="material-symbols-outlined" aria-hidden="true">search</span>
+            <input type="search" data-scm-topic-search placeholder="Buscar un tema en todas las bandejas" aria-label="Buscar tema" autocomplete="off">
+          </label>
+          <p data-scm-topic-summary></p>
+        </div>
+        <div class="scm-config-info-strip"><strong>C&oacute;mo funciona:</strong> un caso entra a la bandeja cuyo tema coincide con su <code>tema_ayuda</code>. Los temas marcados en &aacute;mbar est&aacute;n en m&aacute;s de una bandeja. Si dejas una bandeja vac&iacute;a, vuelve a usar sus temas por defecto.</div>
         <section class="scm-pqr-settings-section bg-slate-100 p-6">
           <form id="scm-ticket-topic-tabs-form" class="scm-ticket-topic-tabs-form scm-pqr-config-form" method="post" autocomplete="off">
             <div class="scm-ticket-topic-config-grid"><?php echo $topicTabsHtml; ?></div>
@@ -1771,128 +1783,141 @@ trait RendersDashboard
             <span class="scm-config-head-icon material-symbols-outlined" aria-hidden="true">admin_panel_settings</span>
             <h3 id="scm-permissions-title" class="text-2xl font-bold text-white">Permisos por cargo</h3>
             <span class="scm-config-head-badge inline-flex rounded-full text-[10px] font-bold uppercase">Control de accesos &amp; roles</span>
-            <p>Activa o desactiva las pesta&ntilde;as que puede ver cada cargo. Si un cargo no aparece configurado, seguir&aacute; viendo todas las pesta&ntilde;as.</p>
+            <p>Elige un cargo y define qu&eacute; pesta&ntilde;as ve, qu&eacute; botones puede usar y si aparece como funcionario operativo. Los cambios se aplican al guardar.</p>
           </div>
         </div>
-        <form class="scm-permissions-form" id="scm-permissions-form">
-          <div class="scm-permissions-toolbar">
-            <label class="scm-permissions-cargo-picker" for="scm-permissions-cargo">Cargo a configurar
-              <select id="scm-permissions-cargo">
-                <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; ?>
-                  <option value="<?php echo esc_attr($cargoId); ?>" <?php selected($selectedPermissionCargo, $cargoId); ?>><?php echo esc_html((string) ($cargo['name'] ?? $cargo['label'] ?? ('Cargo ' . $cargoId))); ?></option>
+        <form class="scm-permissions-form scm-perm-form" id="scm-permissions-form" data-scm-perm-form>
+          <div class="scm-perm-layout">
+            <aside class="scm-perm-sidebar" aria-label="Cargos">
+              <label class="scm-perm-cargo-select" for="scm-permissions-cargo">
+                <span>Cargo a configurar</span>
+                <select id="scm-permissions-cargo">
+                  <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; ?>
+                    <option value="<?php echo esc_attr($cargoId); ?>" <?php selected($selectedPermissionCargo, $cargoId); ?>><?php echo esc_html((string) ($cargo['name'] ?? $cargo['label'] ?? ('Cargo ' . $cargoId))); ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </label>
+              <label class="scm-perm-search">
+                <span class="material-symbols-outlined" aria-hidden="true">search</span>
+                <input type="search" data-scm-perm-cargo-search placeholder="Buscar cargo" aria-label="Buscar cargo" autocomplete="off">
+              </label>
+              <div class="scm-perm-cargo-list" role="list">
+                <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; $cargoName = trim((string) ($cargo['name'] ?? ($cargo['label'] ?? ''))); $cargoName = $cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId); $cargoTotal = trim((string) ($cargo['total'] ?? '')); ?>
+                  <button type="button" role="listitem" class="scm-perm-cargo<?php echo $cargoId === $selectedPermissionCargo ? ' is-active' : ''; ?>" data-scm-perm-cargo-pick="<?php echo esc_attr($cargoId); ?>" data-scm-perm-cargo-name="<?php echo esc_attr(mb_strtolower($cargoName, 'UTF-8')); ?>">
+                    <strong><?php echo esc_html($cargoName); ?></strong>
+                    <small><?php echo $cargoTotal !== '' ? esc_html($cargoTotal . ' funcionario' . ($cargoTotal === '1' ? '' : 's')) : 'ID ' . esc_html($cargoId); ?></small>
+                    <em data-scm-perm-cargo-summary="<?php echo esc_attr($cargoId); ?>"></em>
+                  </button>
                 <?php endforeach; ?>
-              </select>
-            </label>
-            <small>Los cambios se aplican al guardar.</small>
-          </div>
-          <div class="scm-permissions-cards">
-            <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowed = $permissions[$cargoId] ?? array_keys($tabs); $cargoName = trim((string)($cargo['name'] ?? ($cargo['label'] ?? ('Cargo ' . $cargoId)))); $cargoTotal = trim((string)($cargo['total'] ?? '')); ?>
-              <section class="scm-permission-card" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
-                <div class="scm-permission-card-head">
+                <p class="scm-perm-empty" data-scm-perm-cargo-empty hidden>Ning&uacute;n cargo coincide.</p>
+              </div>
+              <p class="scm-perm-hint">Un cargo sin configurar sigue viendo todas las pesta&ntilde;as y acciones.</p>
+            </aside>
+
+            <div class="scm-perm-main">
+              <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; $cargoName = trim((string) ($cargo['name'] ?? ($cargo['label'] ?? ''))); $cargoName = $cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId); $cargoTotal = trim((string) ($cargo['total'] ?? '')); $isSelectedCargo = isset($selectedEmployeeCargoIds[$cargoId]); $isSelectedPopupCargo = isset($selectedAdminDuePopupCargoIds[$cargoId]); ?>
+                <header class="scm-perm-cargo-head" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
                   <div>
-                    <h4><?php echo esc_html($cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId)); ?></h4>
+                    <h4><?php echo esc_html($cargoName); ?></h4>
                     <p>ID cargo <strong><?php echo esc_html($cargoId); ?></strong><?php if ($cargoTotal !== ''): ?> · <?php echo esc_html($cargoTotal); ?> funcionario<?php echo $cargoTotal === '1' ? '' : 's'; ?><?php endif; ?></p>
                   </div>
-                  <button type="button" class="scm-permission-select-all" data-scm-perm-all="<?php echo esc_attr($cargoId); ?>">Todo</button>
-                </div>
-                <div class="scm-permission-options">
-                  <?php foreach ($mainPermissionTabs as $tabKey => $tabLabel): $isChecked = in_array($tabKey, $allowed, true); ?>
-                    <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>">
-                      <input type="checkbox" name="permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr($tabKey); ?>" <?php checked($isChecked); ?>>
-                      <span><?php echo esc_html($tabLabel); ?></span>
+                  <div class="scm-perm-switches">
+                    <label class="scm-permissions-check scm-perm-switch scm-funcionario-cargo-check<?php echo $isSelectedCargo ? ' is-checked' : ''; ?>" title="Aparece en filtros de funcionario, traslados, calendario, responsables y notificaciones internas. No cambia permisos de acceso.">
+                      <input type="checkbox" name="employee_cargo_ids[]" value="<?php echo esc_attr($cargoId); ?>" <?php checked($isSelectedCargo); ?>>
+                      <span><b>Funcionario operativo</b><small>Visible en filtros, traslados y responsables</small></span>
                     </label>
-                  <?php endforeach; ?>
-                  <?php if (!empty($activityPermissionTabs)): ?>
-                    <div class="scm-permissions-option-group">
-                      <div class="scm-permissions-option-group-title">Actividades administrativas (Opciones del Desplegable)</div>
-                      <small style="display:block;margin-bottom:8px;font-size:11px;color:#64748b;">Marca las actividades que este cargo podr&aacute; ver y seleccionar dentro del men&uacute; desplegable interno de Actividades Administrativas.</small>
-                      <div class="scm-permissions-option-group-grid">
-                        <?php foreach ($activityPermissionTabs as $tabKey => $tabLabel): $isChecked = in_array($tabKey, $allowed, true); ?>
-                          <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>">
-                            <input type="checkbox" name="permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr($tabKey); ?>" <?php checked($isChecked); ?>>
-                            <span><?php echo esc_html($tabLabel); ?></span>
-                          </label>
-                        <?php endforeach; ?>
-                      </div>
-                    </div>
+                    <label class="scm-permissions-check scm-perm-switch scm-due-popup-cargo-check<?php echo $isSelectedPopupCargo ? ' is-checked' : ''; ?>" title="Muestra el aviso de vencimientos administrativos al entrar al panel.">
+                      <input type="checkbox" name="admin_due_popup_cargo_ids[]" value="<?php echo esc_attr($cargoId); ?>" <?php checked($isSelectedPopupCargo); ?>>
+                      <span><b>Popup de vencimientos</b><small>Aviso al entrar al panel</small></span>
+                    </label>
+                  </div>
+                </header>
+              <?php endforeach; ?>
+
+              <div class="scm-perm-toolbar">
+                <div class="scm-perm-panes" role="tablist" aria-label="Tipo de permiso">
+                  <button type="button" role="tab" class="scm-perm-pane-btn is-active" aria-selected="true" data-scm-perm-pane="tabs">
+                    <span class="material-symbols-outlined" aria-hidden="true">tab</span>Pesta&ntilde;as <em data-scm-perm-pane-count="tabs"></em>
+                  </button>
+                  <?php if (!empty($actionCatalog)): ?>
+                    <button type="button" role="tab" class="scm-perm-pane-btn" aria-selected="false" data-scm-perm-pane="actions">
+                      <span class="material-symbols-outlined" aria-hidden="true">smart_button</span>Acciones <em data-scm-perm-pane-count="actions"></em>
+                    </button>
                   <?php endif; ?>
                 </div>
-              </section>
-            <?php endforeach; ?>
-          </div>
-          <section class="scm-permission-employee-cargos" aria-labelledby="scm-employee-cargos-title">
-            <div class="scm-permission-employee-cargos-head">
-              <div>
-                <h4 id="scm-employee-cargos-title">Funcionarios visibles por cargo</h4>
-                <p>Estos cargos aparecer&aacute;n en filtros de funcionario, traslados, calendario, responsables y notificaciones internas del panel.</p>
-              </div>
-              <small>No cambia permisos de acceso; solo controla qui&eacute;n aparece como funcionario operativo.</small>
-            </div>
-            <div class="scm-permission-employee-cargos-grid">
-              <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $cargoName = trim((string)($cargo['name'] ?? ($cargo['label'] ?? ('Cargo ' . $cargoId)))); $cargoTotal = trim((string)($cargo['total'] ?? '')); $isSelectedCargo = isset($selectedEmployeeCargoIds[$cargoId]); ?>
-                <label class="scm-permissions-check scm-funcionario-cargo-check<?php echo $isSelectedCargo ? ' is-checked' : ''; ?>" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
-                  <input type="checkbox" name="employee_cargo_ids[]" value="<?php echo esc_attr($cargoId); ?>" <?php checked($isSelectedCargo); ?>>
-                  <span><?php echo esc_html($cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId)); ?><?php if ($cargoTotal !== ''): ?> · <?php echo esc_html($cargoTotal); ?><?php endif; ?></span>
+                <label class="scm-perm-search scm-perm-filter">
+                  <span class="material-symbols-outlined" aria-hidden="true">filter_list</span>
+                  <input type="search" data-scm-perm-filter placeholder="Filtrar permisos" aria-label="Filtrar permisos" autocomplete="off">
                 </label>
-              <?php endforeach; ?>
-            </div>
-          </section>
-          <section class="scm-permission-employee-cargos scm-permission-due-popup-cargos" aria-labelledby="scm-due-popup-cargos-title">
-            <div class="scm-permission-employee-cargos-head">
-              <div>
-                <h4 id="scm-due-popup-cargos-title">Popup de vencimientos administrativos</h4>
-                <p>El aviso se mostrar&aacute; al entrar al panel solo para los cargos seleccionados.</p>
               </div>
-              <small>Si no marcas ning&uacute;n cargo, el aviso no se mostrar&aacute; autom&aacute;ticamente.</small>
-            </div>
-            <div class="scm-permission-employee-cargos-grid">
-              <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $cargoName = trim((string)($cargo['name'] ?? ($cargo['label'] ?? ('Cargo ' . $cargoId)))); $cargoTotal = trim((string)($cargo['total'] ?? '')); $isSelectedPopupCargo = isset($selectedAdminDuePopupCargoIds[$cargoId]); ?>
-                <label class="scm-permissions-check scm-due-popup-cargo-check<?php echo $isSelectedPopupCargo ? ' is-checked' : ''; ?>" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
-                  <input type="checkbox" name="admin_due_popup_cargo_ids[]" value="<?php echo esc_attr($cargoId); ?>" <?php checked($isSelectedPopupCargo); ?>>
-                  <span><?php echo esc_html($cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId)); ?><?php if ($cargoTotal !== ''): ?> · <?php echo esc_html($cargoTotal); ?><?php endif; ?></span>
-                </label>
-              <?php endforeach; ?>
-            </div>
-          </section>
-          <?php if (!empty($actionCatalog)): ?>
-            <section class="scm-permission-employee-cargos scm-permission-action-cargos" aria-labelledby="scm-action-permissions-title">
-              <div class="scm-permission-employee-cargos-head">
-                <div>
-                  <h4 id="scm-action-permissions-title">Acciones y botones por cargo</h4>
-                  <p>Controla qu&eacute; botones funcionales puede usar cada cargo dentro del popup del caso, cotizaciones, &oacute;rdenes y actas.</p>
-                </div>
-                <small>Si un cargo no est&aacute; configurado aqu&iacute;, conserva todas las acciones para no romper el flujo actual.</small>
-              </div>
-              <div class="scm-permissions-cards scm-permissions-action-cards">
-                <?php foreach ($cargos as $cargo): $cargoId = trim((string)($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowedActions = array_key_exists($cargoId, $actionPermissions) ? (array) $actionPermissions[$cargoId] : $allActionKeys; $cargoName = trim((string)($cargo['name'] ?? ($cargo['label'] ?? ('Cargo ' . $cargoId)))); $cargoTotal = trim((string)($cargo['total'] ?? '')); ?>
-                  <section class="scm-permission-card scm-permission-action-card" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
+
+              <div class="scm-perm-pane" data-scm-perm-pane-body="tabs">
+                <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowed = $permissions[$cargoId] ?? array_keys($tabs); ?>
+                  <section class="scm-permission-card" data-scm-perm-kind="tabs" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
                     <div class="scm-permission-card-head">
-                      <div>
-                        <h4><?php echo esc_html($cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId)); ?></h4>
-                        <p>Acciones permitidas<?php if ($cargoTotal !== ''): ?> · <?php echo esc_html($cargoTotal); ?> funcionario<?php echo $cargoTotal === '1' ? '' : 's'; ?><?php endif; ?></p>
-                      </div>
-                      <button type="button" class="scm-permission-select-all" data-scm-perm-all="<?php echo esc_attr($cargoId); ?>">Todo</button>
+                      <p>Pesta&ntilde;as que ver&aacute; este cargo en el panel. <span data-scm-perm-card-count></span></p>
+                      <button type="button" class="scm-permission-select-all" data-scm-perm-all="<?php echo esc_attr($cargoId); ?>">Marcar todo</button>
                     </div>
                     <div class="scm-permission-options">
-                      <?php foreach ($actionCatalog as $group): $items = (array) ($group['items'] ?? []); if (empty($items)) continue; ?>
-                        <div class="scm-permissions-option-group">
-                          <div class="scm-permissions-option-group-title"><?php echo esc_html((string) ($group['label'] ?? 'Acciones')); ?></div>
+                      <div class="scm-permissions-option-group" data-scm-perm-group>
+                        <div class="scm-permissions-option-group-title"><span>Pesta&ntilde;as del panel</span><button type="button" class="scm-perm-group-toggle" data-scm-perm-group-all>Marcar grupo</button></div>
+                        <div class="scm-permissions-option-group-grid">
+                          <?php foreach ($mainPermissionTabs as $tabKey => $tabLabel): $isChecked = in_array($tabKey, $allowed, true); ?>
+                            <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>">
+                              <input type="checkbox" name="permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr($tabKey); ?>" <?php checked($isChecked); ?>>
+                              <span><?php echo esc_html($tabLabel); ?></span>
+                            </label>
+                          <?php endforeach; ?>
+                        </div>
+                      </div>
+                      <?php if (!empty($activityPermissionTabs)): ?>
+                        <div class="scm-permissions-option-group" data-scm-perm-group>
+                          <div class="scm-permissions-option-group-title"><span>Actividades administrativas <small>Opciones del desplegable interno</small></span><button type="button" class="scm-perm-group-toggle" data-scm-perm-group-all>Marcar grupo</button></div>
                           <div class="scm-permissions-option-group-grid">
-                            <?php foreach ($items as $actionKey => $actionLabel): $isChecked = in_array((string) $actionKey, $allowedActions, true); ?>
+                            <?php foreach ($activityPermissionTabs as $tabKey => $tabLabel): $isChecked = in_array($tabKey, $allowed, true); ?>
                               <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>">
-                                <input type="checkbox" name="action_permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr((string) $actionKey); ?>" <?php checked($isChecked); ?>>
-                                <span><?php echo esc_html((string) $actionLabel); ?></span>
+                                <input type="checkbox" name="permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr($tabKey); ?>" <?php checked($isChecked); ?>>
+                                <span><?php echo esc_html($tabLabel); ?></span>
                               </label>
                             <?php endforeach; ?>
                           </div>
                         </div>
-                      <?php endforeach; ?>
+                      <?php endif; ?>
                     </div>
                   </section>
                 <?php endforeach; ?>
               </div>
-            </section>
-          <?php endif; ?>
+
+              <?php if (!empty($actionCatalog)): ?>
+                <div class="scm-perm-pane" data-scm-perm-pane-body="actions" hidden>
+                  <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowedActions = array_key_exists($cargoId, $actionPermissions) ? (array) $actionPermissions[$cargoId] : $allActionKeys; ?>
+                    <section class="scm-permission-card scm-permission-action-card" data-scm-perm-kind="actions" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
+                      <div class="scm-permission-card-head">
+                        <p>Botones del popup del caso, cotizaciones, &oacute;rdenes y actas. <span data-scm-perm-card-count></span></p>
+                        <button type="button" class="scm-permission-select-all" data-scm-perm-all="<?php echo esc_attr($cargoId); ?>">Marcar todo</button>
+                      </div>
+                      <div class="scm-permission-options">
+                        <?php foreach ($actionCatalog as $group): $items = (array) ($group['items'] ?? []); if (empty($items)) continue; ?>
+                          <div class="scm-permissions-option-group" data-scm-perm-group>
+                            <div class="scm-permissions-option-group-title"><span><?php echo esc_html((string) ($group['label'] ?? 'Acciones')); ?></span><button type="button" class="scm-perm-group-toggle" data-scm-perm-group-all>Marcar grupo</button></div>
+                            <div class="scm-permissions-option-group-grid">
+                              <?php foreach ($items as $actionKey => $actionLabel): $isChecked = in_array((string) $actionKey, $allowedActions, true); ?>
+                                <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>">
+                                  <input type="checkbox" name="action_permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr((string) $actionKey); ?>" <?php checked($isChecked); ?>>
+                                  <span><?php echo esc_html((string) $actionLabel); ?></span>
+                                </label>
+                              <?php endforeach; ?>
+                            </div>
+                          </div>
+                        <?php endforeach; ?>
+                      </div>
+                    </section>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
+              <p class="scm-perm-empty" data-scm-perm-filter-empty hidden>Ning&uacute;n permiso coincide con el filtro.</p>
+            </div>
+          </div>
           <div class="scm-permissions-actions">
             <p class="scm-permissions-msg" id="scm-permissions-msg" aria-live="polite"></p>
             <button type="submit" class="scm-btn-primary btn btn-primary">Guardar permisos</button>
