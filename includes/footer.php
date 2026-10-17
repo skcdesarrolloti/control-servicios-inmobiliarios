@@ -282,8 +282,7 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
         });
       });
 
-      // 2. Atajo global de búsqueda: Cmd+K o Ctrl+K, y cierre con Escape
-      const searchInput = document.getElementById('global-search-input');
+      // 2. Cierre de menús con Escape
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
           if (dropdownMenu) {
@@ -306,13 +305,6 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
             const trigger = container.querySelector('.nav-tab-dropdown-btn');
             if (trigger) trigger.setAttribute('aria-expanded', 'false');
           });
-        }
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-          e.preventDefault();
-          if (searchInput) {
-            searchInput.focus();
-            searchInput.select();
-          }
         }
       });
 
@@ -569,15 +561,6 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
         const guideBtn = document.getElementById('scm-open-guide');
         if (guideBtn) guideBtn.click();
       });
-
-      // 5. Búsqueda rápida global vinculada con filtros de tablas activas
-      if (searchInput) {
-        searchInput.addEventListener('input', function () {
-          const query = this.value.trim().toLowerCase();
-          // Despachar evento para que cualquier vista activa pueda auto-filtrar en tiempo real
-          window.dispatchEvent(new CustomEvent('scm:global-search', { detail: { query: query } }));
-        });
-      }
 
       // 6. Colapsar / Expandir panel de filtros avanzados
       const filterCollapseBtn = document.getElementById('scm-filter-collapse-toggle');

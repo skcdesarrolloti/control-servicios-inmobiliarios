@@ -824,25 +824,12 @@ foreach ($rawNavItems as $k => $item) {
             </div>
             <div class="flex flex-col scm-header-brand-text">
               <span class="text-[17px] font-extrabold tracking-tight text-[#0f172a] leading-none">SuCasa</span>
-              <span class="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-none mt-1">Control Inmobiliario</span>
+              <span class="text-[9px] font-bold uppercase tracking-wider text-slate-500 leading-none mt-1">Dashboard Administrativo</span>
             </div>
           </a>
         </div>
 
-        <!-- Barra de Búsqueda Global con atajo visual ⌘K -->
-        <div class="flex-1 max-w-md mx-2 scm-header-search">
-          <div class="relative flex items-center w-full">
-            <span class="material-symbols-outlined absolute left-3 text-slate-400 text-[20px] pointer-events-none select-none">search</span>
-            <input
-              id="global-search-input"
-              type="text"
-              placeholder="Buscar contratos, propiedades, cédulas o casos..."
-              class="w-full pl-10 pr-14 py-2 rounded-xl bg-slate-100/80 text-slate-900 text-xs sm:text-sm placeholder-slate-400 border border-transparent focus:border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f1e36]/10 transition-all shadow-inner"
-              autocomplete="off"
-            >
-            <kbd class="absolute right-3 px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-slate-500 font-mono text-[10px] font-semibold shadow-2xs select-none">⌘K</kbd>
-          </div>
-        </div>
+        <div class="flex-1" aria-hidden="true"></div>
 
         <!-- Acciones Rápidas & Perfil de Funcionario -->
         <div class="flex items-center gap-2 sm:gap-3 shrink-0">
