@@ -25,6 +25,12 @@ $safeNext = static function (string $raw): string {
       ? 'crear-acta.php?' . http_build_query($out, '', '&', PHP_QUERY_RFC3986)
       : '';
   }
+  if ($path === 'revision.php') {
+    $kind = (string) ($query['tipo'] ?? '');
+    return in_array($kind, ['preventiva', 'correctiva'], true) && isset($query['ticket_pk']) && $digits($query['ticket_pk'])
+      ? 'revision.php?' . http_build_query(['tipo' => $kind, 'ticket_pk' => (string) $query['ticket_pk']], '', '&', PHP_QUERY_RFC3986)
+      : '';
+  }
   if ($path === 'index.php') {
     if (isset($query['scm_case']) && $digits($query['scm_case'])) {
       return 'index.php?scm_case=' . rawurlencode((string) $query['scm_case']);

@@ -305,6 +305,13 @@
         return;
       }
       var status = document.querySelector(".scm-standalone-function-status");
+      if (!status && root.parentNode) {
+        // El header moderno no trae el contenedor de estado: se crea para que el error sea visible.
+        status = document.createElement("div");
+        status.className = "scm-standalone-function-status";
+        status.style.cssText = "max-width:640px;margin:24px auto;padding:20px 24px;border:1px solid #fecaca;border-radius:16px;background:#fef2f2;color:#991b1b;font-size:15px;line-height:1.5;text-align:center;";
+        root.parentNode.insertBefore(status, root);
+      }
       if (status) {
         status.setAttribute("role", "alert");
         status.innerHTML =

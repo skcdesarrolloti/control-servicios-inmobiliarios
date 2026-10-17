@@ -11306,5 +11306,7 @@
     getLlavesDetailPayload: getLlavesDetailPayload,
     getConsultorEntregaDetailPayload: getConsultorEntregaDetailPayload,
     openStandaloneDetail: openStandaloneDetail,
+    // Vista propia revision.php: abre el editor de revisión preventiva o correctiva sin el panel.
+    openDamageReviewEditor: openDamageReviewEditor,
   };
 })();

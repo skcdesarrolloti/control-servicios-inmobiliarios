@@ -113,6 +113,13 @@ if ($action === 'acta_cotizacion' && $quotePk > 0) {
 $standaloneActTarget = $standaloneActQuery !== []
   ? 'crear-acta.php?' . http_build_query($standaloneActQuery, '', '&', PHP_QUERY_RFC3986)
   : '';
+// Las revisiones tienen vista propia (revision.php), como el acta: no dependen del panel completo.
+if (in_array($action, ['revision_preventiva', 'revision_correctiva'], true) && $ticketPk > 0) {
+  $standaloneActTarget = 'revision.php?' . http_build_query([
+    'tipo' => $action === 'revision_preventiva' ? 'preventiva' : 'correctiva',
+    'ticket_pk' => $ticketPk,
+  ], '', '&', PHP_QUERY_RFC3986);
+}
 
 if (in_array($action, $quoteActions, true)) {
   $targetQuery['scm_tab'] = 'cotizaciones_mantenimiento';
