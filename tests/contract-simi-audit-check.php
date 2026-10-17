@@ -58,9 +58,10 @@ $check($row[$cols['estado_simi']] === '' && $row[$cols['obs_simi']] === '', 'Sin
 // Guardado: solo toca los campos SIMI y deja historial con el funcionario que audita.
 $pdo = new SimiTestPdo();
 $db = new \SCM\Core\Database($pdo, 'wp_');
-$pdo->exec('CREATE TABLE wp_jet_cct_contratos_arrendamiento(_ID INTEGER PRIMARY KEY, contrato TEXT, id_inmueble TEXT, id_inmueble_data TEXT, id_empleado TEXT, realizado_por TEXT, cct_author_id TEXT, cct_modified TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_contratos_arrendamiento(_ID INTEGER PRIMARY KEY, contrato TEXT, inmueble TEXT, id_inmueble TEXT, id_inmueble_data TEXT, id_empleado TEXT, realizado_por TEXT, cct_author_id TEXT, cct_modified TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_historial_del_inmueble(_ID INTEGER PRIMARY KEY, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT, id_empleado TEXT, nombre_empleado TEXT, funcionario TEXT, id_inmueble TEXT, id_inmueble_data TEXT, fecha TEXT, tipo_reporte TEXT, observacion TEXT)');
-$db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 5, 'contrato' => '777', 'id_inmueble' => '84016', 'id_inmueble_data' => '12466', 'id_empleado' => '1508', 'realizado_por' => 'Kellys Roqueme Camacho', 'cct_author_id' => '1508', 'cct_modified' => '2025-01-01 00:00:00']);
+$pdo->exec('CREATE TABLE wp_jet_cct_historial_contrato_arrendamiento(_ID INTEGER PRIMARY KEY, cct_status TEXT, id_inmueble TEXT, id_inmueble_data TEXT, fecha INTEGER, tipo_reporte TEXT, observacion TEXT, funcionario TEXT, id_empleado TEXT, id_ticket TEXT, cct_author_id INTEGER, cct_created TEXT, cct_modified TEXT, inmueble TEXT, contrato TEXT, id_contrato TEXT)');
+$db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 5, 'contrato' => '777', 'inmueble' => '10532', 'id_inmueble' => '84016', 'id_inmueble_data' => '12466', 'id_empleado' => '1508', 'realizado_por' => 'Kellys Roqueme Camacho', 'cct_author_id' => '1508', 'cct_modified' => '2025-01-01 00:00:00']);
 
 $audit = new ContractSimiAudit($db);
 $actor = ['id_empleado' => '2999', 'name' => 'Coordinadora QA'];
@@ -91,8 +92,15 @@ $check($history[0]['id_inmueble'] === '84016' && $history[0]['id_inmueble_data']
 $check($history[0]['id_empleado'] === '2999' && $history[0]['cct_author_id'] === '2999' && $history[0]['funcionario'] === 'Coordinadora QA', 'El historial registra al funcionario que audita con su id_empleado.');
 $check($history[0]['tipo_reporte'] === 'Auditoría de contrato' && str_contains($history[0]['observacion'], 'Se encontró incorrecto. Observaciones: Canon distinto'), 'El historial describe el resultado.');
 
+$contractHistory = $db->getResults('SELECT * FROM wp_jet_cct_historial_contrato_arrendamiento');
+$check(count($contractHistory) === 1, 'Debe quedar un registro en el historial del contrato.');
+$check($contractHistory[0]['id_contrato'] === '5' && $contractHistory[0]['contrato'] === '777' && $contractHistory[0]['inmueble'] === '10532' && $contractHistory[0]['id_inmueble'] === '84016', 'El historial del contrato identifica contrato e inmueble.');
+$check((string) $contractHistory[0]['cct_author_id'] === '2999' && $contractHistory[0]['id_empleado'] === '2999' && $contractHistory[0]['funcionario'] === 'Coordinadora QA', 'El historial del contrato registra al funcionario que audita.');
+$check($contractHistory[0]['tipo_reporte'] === 'Auditoría de contrato' && $contractHistory[0]['observacion'] === $history[0]['observacion'], 'Ambos historiales describen la misma auditoría.');
+
 $same = $audit->save(5, 'Incorrecto', "Canon distinto\nen SIMI", $actor);
 $check(!$same['changed'] && count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_inmueble')) === 1, 'Repetir la misma auditoría no agrega historial.');
+$check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_contrato_arrendamiento')) === 1, 'Repetir la misma auditoría tampoco duplica el historial del contrato.');
 $fixed = $audit->save(5, 'Correcto', '', $actor);
 $history = $db->getResults('SELECT * FROM wp_jet_cct_historial_del_inmueble ORDER BY _ID');
 $check($fixed['changed'] && count($history) === 2 && str_ends_with($history[1]['observacion'], 'Se encontró correcto.'), 'Un nuevo resultado agrega su propio registro al historial.');

@@ -11,7 +11,7 @@ use SCM\Support\SchemaInspector;
  * Auditoría del contrato de arrendamiento contra SIMI.
  *
  * Guarda `estado_simi` (Correcto/Incorrecto) y `observaciones_estado_simi` en el contrato y deja
- * constancia en el historial del inmueble. Solo toca esos dos campos y `cct_modified`: el
+ * constancia en el historial del inmueble y en el historial del contrato. Solo toca esos dos campos y `cct_modified`: el
  * funcionario, el autor y demás datos del contrato se conservan.
  */
 final class ContractSimiAudit
@@ -84,7 +84,7 @@ final class ContractSimiAudit
     }
     try {
       $contract = $this->db->getRow(
-        "SELECT `_ID`, `contrato`, `id_inmueble`, `id_inmueble_data`, `estado_simi`, `observaciones_estado_simi` FROM `{$table}` WHERE `_ID` = ? LIMIT 1 FOR UPDATE",
+        "SELECT `_ID`, `contrato`, `inmueble`, `id_inmueble`, `id_inmueble_data`, `estado_simi`, `observaciones_estado_simi` FROM `{$table}` WHERE `_ID` = ? LIMIT 1 FOR UPDATE",
         [$contractId]
       );
       if (!$contract) {
@@ -102,6 +102,7 @@ final class ContractSimiAudit
         ]);
         $this->db->update($table, $payload, ['_ID' => $contractId]);
         $this->recordHistory($contract, $state, $observation, $actor, $now, $nowSql);
+        $this->recordContractHistory($contract, $state, $observation, $actor, $now, $nowSql);
       }
       if ($ownsTransaction) {
         $pdo->commit();
@@ -119,6 +120,38 @@ final class ContractSimiAudit
       'observaciones_estado_simi' => $observation,
       'changed' => $changed,
     ];
+  }
+
+  /**
+   * @param array<string,mixed> $contract
+   * @param array{id_empleado:string,name:string} $actor
+   */
+  private function recordContractHistory(array $contract, string $state, string $observation, array $actor, int $now, string $nowSql): void
+  {
+    $table = $this->db->table('jet_cct_historial_contrato_arrendamiento');
+    if (!$this->schema->tableExists($table)) {
+      return;
+    }
+    $employeeId = trim((string) ($actor['id_empleado'] ?? ''));
+    $payload = $this->schema->filterTableData($table, [
+      'cct_status' => 'publish',
+      'cct_author_id' => $employeeId,
+      'cct_created' => $nowSql,
+      'cct_modified' => $nowSql,
+      'id_empleado' => $employeeId,
+      'funcionario' => trim((string) ($actor['name'] ?? '')),
+      'id_contrato' => (string) ($contract['_ID'] ?? ''),
+      'contrato' => trim((string) ($contract['contrato'] ?? '')),
+      'inmueble' => trim((string) ($contract['inmueble'] ?? '')),
+      'id_inmueble' => trim((string) ($contract['id_inmueble'] ?? '')),
+      'id_inmueble_data' => trim((string) ($contract['id_inmueble_data'] ?? '')),
+      'fecha' => $now,
+      'tipo_reporte' => 'Auditoría de contrato',
+      'observacion' => self::historyMessage(trim((string) ($contract['contrato'] ?? '')), $state, $observation),
+    ]);
+    if ($payload !== []) {
+      $this->db->insert($table, $payload);
+    }
   }
 
   /**

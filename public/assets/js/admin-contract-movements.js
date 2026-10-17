@@ -551,7 +551,7 @@
         html: '<div class="scm-cm-simi-form"><p>Inmueble <strong>' + esc(row.inmueble || "—") + "</strong> · " + esc(row.direccion || "") + "<br>" + esc(row.arrendatario || "") + "</p>" +
           '<div class="scm-cm-simi-options" role="radiogroup" aria-label="Estado en SIMI">' + option("Correcto", "ok") + option("Incorrecto", "bad") + "</div>" +
           '<label class="scm-cm-simi-obs"><span>Observaciones</span><textarea rows="4" maxlength="2000" data-scm-cm-simi-obs placeholder="Qué se revisó o qué se debe corregir en SIMI">' + esc(row.obs_simi) + "</textarea></label>" +
-          "<small>Al guardar queda registrado en el historial del inmueble.</small></div>",
+          "<small>Al guardar queda registrado en el historial del inmueble y del contrato.</small></div>",
         width: "min(560px, 96vw)",
         showCloseButton: true,
         showCancelButton: true,

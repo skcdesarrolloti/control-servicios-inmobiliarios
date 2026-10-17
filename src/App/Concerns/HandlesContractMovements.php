@@ -42,7 +42,7 @@ trait HandlesContractMovements
         is_string($_POST['observaciones_estado_simi'] ?? null) ? $_POST['observaciones_estado_simi'] : '',
         ['id_empleado' => $employeeId, 'name' => Auth::user()]
       );
-      $this->jsonOk($result + ['message' => $result['changed'] ? 'Auditoría guardada y registrada en el historial del inmueble.' : 'No hubo cambios en la auditoría.']);
+      $this->jsonOk($result + ['message' => $result['changed'] ? 'Auditoría guardada y registrada en el historial del inmueble y del contrato.' : 'No hubo cambios en la auditoría.']);
     } catch (\InvalidArgumentException | \DomainException $exception) {
       $this->jsonFail($exception->getMessage());
     } catch (\Throwable $exception) {
