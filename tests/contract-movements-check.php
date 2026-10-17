@@ -39,7 +39,7 @@ foreach (['1.250.000' => 1250000, '$ 4.498.821' => 4498821, '1587766' => 1587766
 
 $report = (new ReflectionClass(ContractMovementsReport::class))->newInstanceWithoutConstructor();
 (new ReflectionProperty(ContractMovementsReport::class, 'timezone'))->setValue($report, new DateTimeZone('America/Bogota'));
-$base = ['_ID' => 7, 'contrato' => ' 12 ', 'valor_canon' => '1.000.000', 'tipo_inmueble' => 'apartamento', 'destinacion_inmueble' => 'Vivienda', 'gestion_inmueble' => 'a:0:{}', 'id_empleado' => '10', 'direccion' => 'CL 1', 'arrendatario' => 'Ana', 'id_inmueble_data' => '', 'id_inmueble' => '501'];
+$base = ['_ID' => 7, 'contrato' => ' 12 ', 'valor_canon' => '1.000.000', 'tipo_inmueble' => 'apartamento', 'destinacion_inmueble' => 'Vivienda', 'gestion_inmueble' => 'a:0:{}', 'id_empleado' => '10', 'direccion' => 'CL 1', 'arrendatario' => 'Ana', 'inmueble' => '501', 'id_inmueble_data' => '12466', 'id_inmueble' => '84016'];
 $cols = array_flip(ContractMovementsReport::COLUMNS);
 
 $received = $report->mapRow($base + ['estado' => 'Recibido', 'fecha_entrega' => '1622955600', 'inicio_contrato' => '', 'fecha_recibo' => '', 'fin_contrato' => '1749186000']);

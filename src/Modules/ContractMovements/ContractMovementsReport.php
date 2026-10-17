@@ -81,7 +81,7 @@ final class ContractMovementsReport
       "SELECT c.`_ID`, c.`contrato`, c.`estado`, c.`fecha_entrega`, c.`inicio_contrato`, c.`fecha_recibo`, c.`fin_contrato`,
               c.`valor_canon`, c.`valor_administracion`, c.`meses_contrato`, c.`dias_gracia`,
               c.`tipo_inmueble`, c.`destinacion_inmueble`, c.`gestion_inmueble`, c.`id_empleado`,
-              c.`direccion`, c.`arrendatario`, c.`id_inmueble_data`, c.`id_inmueble`,
+              c.`direccion`, c.`arrendatario`, c.`inmueble`,
               h.`dias_gracia` AS dias_gracia_cierre, m.`dias_gracia` AS dias_gracia_mandato
        FROM `{$table}` c
        LEFT JOIN `{$closings}` h ON h.`_ID` = c.`id_cierre`
@@ -137,10 +137,8 @@ final class ContractMovementsReport
       }
     }
     $months = (int) preg_replace('/\D/', '', (string) ($row['meses_contrato'] ?? ''));
-    $inmueble = trim((string) ($row['id_inmueble_data'] ?? ''));
-    if ($inmueble === '') {
-      $inmueble = trim((string) ($row['id_inmueble'] ?? ''));
-    }
+    // El código visible del inmueble es la columna `inmueble`; los `id_inmueble*` son referencias internas.
+    $inmueble = trim((string) ($row['inmueble'] ?? ''));
 
     return [
       (int) ($row['_ID'] ?? 0),

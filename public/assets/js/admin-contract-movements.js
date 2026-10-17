@@ -3,7 +3,7 @@
 
   // Los contratos llegan en una sola petición y todo lo demás (vistas, filtros,
   // drill-down por mes, tablas y CSV) se calcula aquí, sin volver al servidor.
-  var CACHE_KEY = "scm-contract-movements-v1";
+  var CACHE_KEY = "scm-contract-movements-v2";
   var CACHE_TTL_MS = 10 * 60 * 1000;
   var PAGE_SIZE = 15;
   var MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -450,7 +450,7 @@
       var isDesoc = state.detailKind === "desoc";
       var html = '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr>' +
         (isDesoc ? "<th>Fecha recibo</th><th>Fin contrato</th>" : "<th>Fecha entrega</th>") +
-        '<th>Contrato</th><th title="Código del inmueble">Cód. inmueble</th><th>Dirección</th><th>Arrendatario</th><th>Tipo</th><th>Destinación</th><th>Funcionario</th>' +
+        '<th>Contrato</th><th>Inmueble</th><th>Dirección</th><th>Arrendatario</th><th>Tipo</th><th>Destinación</th><th>Funcionario</th>' +
         '<th class="is-num">Duración</th>' + (isDesoc ? '<th class="is-num">Permanencia</th>' : '<th class="is-num">Días de gracia</th>') +
         '<th class="is-num">Canon</th><th class="is-num">Administración</th><th class="is-num">Total</th>' + (isDesoc ? "" : "<th>Estado actual</th>") + "</tr></thead><tbody>";
       html += slice.map(function (event) {
@@ -610,7 +610,7 @@
         name = "ocupaciones-vs-desocupaciones-" + year;
       } else {
         var isDesoc = state.view === "desocupaciones";
-        lines = [["Fecha del movimiento", "Fecha entrega", "Fecha recibo", "Fin contrato", "Contrato", "Codigo inmueble", "Direccion", "Arrendatario",
+        lines = [["Fecha del movimiento", "Fecha entrega", "Fecha recibo", "Fin contrato", "Contrato", "Inmueble", "Direccion", "Arrendatario",
           "Tipo inmueble", "Destinacion", "Funcionario", "Estado", "Duracion meses", "Dias de gracia", "Fuente dias de gracia", "Canon", "Administracion", "Total", "Permanencia meses"]];
         state.detailEvents.forEach(function (event) {
           var row = event.row;
