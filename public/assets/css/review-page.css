@@ -28,7 +28,8 @@ body.scm-review-page .material-symbols-outlined { font-family: "Material Symbols
   box-shadow: 0 4px 18px rgba(15, 30, 54, 0.25);
 }
 .rp-brand { display: flex; align-items: center; gap: 12px; color: #fff; font-weight: 700; font-size: 15px; text-decoration: none; }
-.rp-brand img { height: 40px; width: auto; padding: 4px 8px; border-radius: 10px; background: #fff; }
+/* El logo tiene letras blancas: va sobre fondo oscuro, como en el acta. */
+.rp-brand img { height: 40px; width: auto; padding: 6px 10px; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 12px; background: linear-gradient(135deg, #10264a 0%, #173d70 100%); filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.22)); }
 .rp-user { display: flex; align-items: center; gap: 12px; font-size: 14px; }
 .rp-avatar { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: var(--rp-accent); color: var(--rp-navy); font-weight: 800; }
 .rp-user-name strong { font-weight: 700; }
@@ -221,8 +222,8 @@ body.scm-review-page .scm-review-page-status a { background: #e2e8f0; color: var
   body.scm-review-page .scm-review-page-shell { margin-top: 18px; }
 }
 .rp-link-button { white-space: nowrap; }
-.rp-brand img { max-width: 160px; max-height: 40px; object-fit: contain; }
-@media (max-width: 760px) { .rp-brand img { max-width: 120px; max-height: 34px; } }
+.rp-brand img { max-width: 180px; max-height: 54px; object-fit: contain; }
+@media (max-width: 760px) { .rp-brand img { max-width: 130px; max-height: 46px; } }
 body.scm-review-page #scm-app h3[tabindex="-1"]:focus { outline: none; }
 
 /* cotizacion.php: el panel se usa como motor oculto; solo se ven el formulario y esta tarjeta. */
@@ -239,3 +240,7 @@ body.scm-quote-page .qp-actions button,
 body.scm-quote-page .qp-actions a { display: inline-flex; align-items: center; padding: 12px 22px; border: 0; border-radius: 999px; font: inherit; font-size: 15px; font-weight: 700; text-decoration: none; cursor: pointer; }
 body.scm-quote-page .qp-actions button { background: var(--rp-navy); color: #fff; }
 body.scm-quote-page .qp-actions a { background: #e2e8f0; color: var(--rp-navy); }
+
+/* crear-acta.php con el mismo marco: sin el margen de la página de acta clásica. */
+body.scm-acta-create-modern { padding: 0 !important; }
+body.scm-acta-create-modern .rp-acta-card { padding: clamp(14px, 3vw, 24px); }

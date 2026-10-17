@@ -116,28 +116,41 @@ try {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Crear acta de satisfacción · SuCasa</title>
+  <title><?= $editActId > 0 ? 'Editar acta' : 'Crear acta' ?> · Caso #<?= $escape($caseNumber) ?> · SKC SuCasa Inmobiliaria</title>
   <link rel="icon" href="<?= $escape(system_image('portal_favicon_url', SCM_DEFAULT_PORTAL_FAVICON_URL)) ?>" sizes="32x32">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
   <link rel="stylesheet" href="assets/css/ticket-completion.css?v=<?= $escape(SCM_VERSION) ?>">
+  <link rel="stylesheet" href="assets/css/review-page.css?v=<?= $escape(SCM_VERSION . '-' . (string) @filemtime(__DIR__ . '/assets/css/review-page.css')) ?>">
   <script defer src="assets/js/ticket-completion-form-state.js?v=<?= $escape(SCM_VERSION) ?>"></script>
   <script defer src="assets/js/ticket-completion-create.js?v=<?= $escape(SCM_VERSION) ?>"></script>
 </head>
-<body class="scm-acta-page scm-acta-create-body">
-  <div class="scm-acta-create-top">
-    <a class="scm-acta-create-brand" href="<?= $escape(rtrim((string) SCM_BASE_URL, '/') . '/index.php') ?>">
-      <span class="scm-acta-logo"><img src="<?= $escape(system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL)) ?>" alt="SuCasa Inmobiliaria"></span>
-      <span>Control Servicios Inmobiliarios</span>
+<?php
+$userName = (string) Auth::user();
+$firstName = trim((string) strtok(trim($userName), ' ')) ?: $userName;
+$address = trim((string) ($ticket['direccion'] ?? ''));
+$actaSteps = [
+  ['build', 'Describe la solución', 'Qué se hizo y quién lo hizo.'],
+  ['draw', 'Elige quién firma', 'Propietario, arrendatario u otra persona.'],
+  ['send', 'Genera el acta', 'Se envía para firma por correo y WhatsApp.'],
+];
+?>
+<body class="scm-acta-page scm-acta-create-body scm-review-page scm-acta-create-modern">
+  <header class="rp-topbar">
+    <a class="rp-brand" href="<?= $escape(rtrim((string) SCM_BASE_URL, '/') . '/index.php') ?>">
+      <img src="<?= $escape(system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL)) ?>" alt="SKC SuCasa Inmobiliaria">
+      <span>SKC SuCasa Inmobiliaria</span>
     </a>
-    <div class="scm-acta-create-session">
-      <span>Elaborando como: <strong><?= $escape(Auth::user()) ?></strong></span>
-      <a href="<?= $escape($redirectUrl) ?>">Ver actas de satisfacción</a>
+    <div class="rp-user">
+      <span class="rp-avatar" aria-hidden="true"><?= $escape(mb_strtoupper(mb_substr($firstName, 0, 1, 'UTF-8'), 'UTF-8')) ?></span>
+      <span class="rp-user-name">Hola, <strong><?= $escape($firstName) ?></strong></span>
+      <a class="rp-link-button" href="<?= $escape($redirectUrl) ?>"><span class="material-symbols-outlined" aria-hidden="true">fact_check</span><span>Ver actas</span></a>
     </div>
-  </div>
+  </header>
 
   <main
-    class="scm-acta-create-shell"
+    class="scm-acta-create-shell scm-review-page-shell"
     data-acta-create-page
     data-ticket-pk="<?= $ticketPk ?>"
     data-action="<?= $escape(SuCasaControlServiciosInmobiliarios::AJAX_TICKET_COMPLETION) ?>"
@@ -147,12 +160,31 @@ try {
     data-login-url="<?= $escape(rtrim((string) SCM_BASE_URL, '/') . '/login.php?next=' . rawurlencode($relativeTarget)) ?>"
     data-redirect-url="<?= $escape($redirectUrl) ?>"
   >
-    <header class="scm-acta scm-acta-create-hero">
-      <p class="scm-acta-eyebrow">Creación directa autenticada</p>
-      <h1><?= $editActId > 0 ? 'Editar acta de solución y satisfacción' : 'Crear acta de solución y satisfacción' ?></h1>
-      <p>Caso <strong>#<?= $escape($caseNumber) ?></strong><?= $property !== '' ? ' · Inmueble <strong>' . $escape($property) . '</strong>' : '' ?>. <?= $editActId > 0 ? 'Al guardar los cambios, se invalidan códigos anteriores y se envía una nueva invitación.' : 'Al generar el acta se enviará a la bandeja de <strong>Actas de satisfacción</strong> para seguimiento y firma.' ?></p>
-    </header>
-    <?= $panel ?>
+    <section class="rp-hero">
+      <span class="rp-hero-icon material-symbols-outlined" aria-hidden="true">assignment_turned_in</span>
+      <div class="rp-hero-text">
+        <p class="rp-eyebrow"><?= $quotePk > 0 ? 'Acta de satisfacción de una cotización aprobada' : 'Acta de solución del caso' ?></p>
+        <h1><?= $editActId > 0 ? 'Editar acta de solución y satisfacción' : 'Crear acta de solución y satisfacción' ?></h1>
+        <dl class="rp-facts">
+          <div><dt>Caso</dt><dd>#<?= $escape($caseNumber) ?></dd></div>
+          <?php if ($property !== ''): ?><div><dt>Inmueble</dt><dd><?= $escape($property) ?></dd></div><?php endif; ?>
+          <?php if ($address !== ''): ?><div><dt>Dirección</dt><dd><?= $escape($address) ?></dd></div><?php endif; ?>
+          <div><dt>Elaborando como</dt><dd><?= $escape($userName) ?></dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <ol class="rp-steps" aria-label="Pasos">
+      <?php foreach ($actaSteps as $index => [$stepIcon, $stepTitle, $stepText]): ?>
+        <li><span class="rp-step-number"><?= $index + 1 ?></span><span class="material-symbols-outlined" aria-hidden="true"><?= $escape($stepIcon) ?></span><div><strong><?= $escape($stepTitle) ?></strong><small><?= $escape($stepText) ?></small></div></li>
+      <?php endforeach; ?>
+    </ol>
+
+    <section class="rp-card rp-acta-card">
+      <?= $panel ?>
+    </section>
+
+    <p class="rp-footnote"><span class="material-symbols-outlined" aria-hidden="true">info</span><?= $editActId > 0 ? 'Al guardar los cambios se invalidan los códigos anteriores y se envía una nueva invitación de firma.' : 'El caso sigue abierto hasta que la persona firme. Lo que escribas queda como borrador en este equipo.' ?></p>
   </main>
 </body>
 </html>
