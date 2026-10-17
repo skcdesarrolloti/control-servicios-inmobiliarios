@@ -821,6 +821,7 @@
         "scm-case-submodal--postpone",
         "scm-case-submodal--quote",
         "scm-case-submodal--contract",
+        "scm-case-submodal--review",
       );
       return existing;
     }
@@ -3891,6 +3892,8 @@
     var body = sub.querySelector(".scm-case-submodal-body");
     var busy = false;
     if (title) title.textContent = cfg.label;
+    // Más ancho y con su propio diseño (10-review-forms.css).
+    sub.classList.add("scm-case-submodal--review");
     setCaseSubmodalMeta(sub, caseBtn);
     sub.classList.add("open");
     sub.setAttribute("aria-hidden", "false");
