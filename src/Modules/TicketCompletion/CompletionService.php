@@ -885,7 +885,9 @@ final class CompletionService
     $channels = array_values(array_unique($channels));
     foreach ($channels as $channel) {
       if (($channel === 'email' && !filter_var($contact['email'], FILTER_VALIDATE_EMAIL)) || ($channel === 'whatsapp' && $contact['phone'] === '')) {
-        throw new \DomainException('Falta el contacto registrado para el canal seleccionado: ' . $channel . '.');
+        throw new \DomainException($channel === 'whatsapp'
+          ? 'El firmante no tiene celular registrado para WhatsApp. Elige "Solo correo" o registra el celular.'
+          : 'El firmante no tiene un correo válido. Elige "Solo WhatsApp" o registra el correo.');
       }
     }
     $signerName = CompletionPolicy::text($input['signer_name'] ?? '', 'nombre de quien firma', 160);

@@ -41,7 +41,8 @@ final class CompletionView
     $selectedSigner = (string) ($formPayload['signer']['role'] ?? '');
     $signerName = (string) ($formPayload['signer']['name'] ?? '');
     $selectedChannels = (array) ($formPayload['channels'] ?? []);
-    $selectedChannel = count($selectedChannels) > 1 ? 'both' : (string) ($selectedChannels[0] ?? 'email');
+    // Por defecto la invitación y la copia firmada salen por correo y WhatsApp.
+    $selectedChannel = count($selectedChannels) !== 1 ? 'both' : (string) $selectedChannels[0];
     $suggestedItems = is_array($context['suggested_items'] ?? null) ? $context['suggested_items'] : [];
     $formItems = is_array($formPayload['items'] ?? null) && $formPayload['items'] ? $formPayload['items'] : ($suggestedItems ?: [[]]);
     $normalizeDamage = static fn(string $text): string => trim(preg_replace('/[ \t\x{00A0}]+/u', ' ', str_replace(["\r\n", "\r"], "\n", html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8'))) ?? '');
@@ -119,7 +120,7 @@ final class CompletionView
             <label>Nombre completo de la persona que firma *<input name="signer_name" maxlength="160" required autocomplete="off" data-acta-signer-name value="<?= self::e($signerName) ?>"></label>
             <label>Correo registrado para recibir la firma<input type="email" readonly data-acta-signer-email value="<?= self::e($formPayload['signer']['email'] ?? '') ?>"></label>
             <label>WhatsApp registrado<input type="tel" readonly data-acta-signer-phone value="<?= self::e($formPayload['signer']['phone'] ?? '') ?>"></label>
-            <label>Enviar invitación y copia firmada por *<select name="channels[]" required><option value="email" <?= $selectedChannel === 'email' ? 'selected' : '' ?>>Correo</option><option value="whatsapp" <?= $selectedChannel === 'whatsapp' ? 'selected' : '' ?>>WhatsApp</option><option value="both" <?= $selectedChannel === 'both' ? 'selected' : '' ?>>Correo y WhatsApp</option></select></label>
+            <label>Enviar invitación y copia firmada por *<select name="channels[]" required><option value="both" <?= $selectedChannel === 'both' ? 'selected' : '' ?>>Correo y WhatsApp</option><option value="email" <?= $selectedChannel === 'email' ? 'selected' : '' ?>>Solo correo</option><option value="whatsapp" <?= $selectedChannel === 'whatsapp' ? 'selected' : '' ?>>Solo WhatsApp</option></select></label>
           </div>
           <p class="scm-acta-help">Solo se usan los contactos registrados. Para empresas o copropiedades, indica el nombre de quien firma en su representación. El destinatario confirma su nombre y verifica un código antes del cierre.</p>
           <?php if (CompletionDelivery::otpTemplate() === ''): ?><p class="scm-acta-notice">El enlace puede enviarse por WhatsApp, pero el código se enviará por correo hasta configurar la plantilla de autenticación de WhatsApp. El firmante necesita correo válido.</p><?php endif; ?>
