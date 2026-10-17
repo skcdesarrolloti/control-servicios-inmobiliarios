@@ -23,6 +23,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesPropertyHistoryActions;
   use \SCM\App\Concerns\HandlesContractMovements;
   use \SCM\App\Concerns\HandlesContractNotes;
+  use \SCM\App\Concerns\HandlesAutologinLinks;
   use \SCM\App\Concerns\HandlesContractOwnership;
   use \SCM\App\Concerns\HandlesMetricsPanels;
   use \SCM\App\Concerns\RendersPublicPqr;

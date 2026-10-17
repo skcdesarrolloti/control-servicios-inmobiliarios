@@ -790,3 +790,16 @@
 .scm-contract-note-recent article strong { color: #0f172a; }
 .scm-contract-note-recent article span { color: #94a3b8; font-size: 11px; }
 .scm-contract-note-recent article p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+
+/* Guía: generador de enlace con autologin */
+.swal2-popup.scm-guide-swal .scm-guide-generator { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
+.swal2-popup.scm-guide-swal .scm-guide-generator .is-wide { grid-column: 1 / -1; }
+.swal2-popup.scm-guide-swal .scm-guide-generator label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #334155; }
+.swal2-popup.scm-guide-swal .scm-guide-generator select,
+.swal2-popup.scm-guide-swal .scm-guide-generator input { height: 38px; padding: 0 10px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; font: inherit; font-size: 13px; color: #0f172a; }
+.swal2-popup.scm-guide-swal .scm-guide-generator select:focus,
+.swal2-popup.scm-guide-swal .scm-guide-generator input:focus { outline: 2px solid #bfdbfe; border-color: #93c5fd; }
+.swal2-popup.scm-guide-swal .scm-guide-generator button[type="submit"] { justify-self: start; }
+.swal2-popup.scm-guide-swal .scm-guide-generator p { margin: 0; font-size: 12px; color: #475569; }
+.swal2-popup.scm-guide-swal .scm-guide-generator .scm-guide-link-url[hidden] { display: none; }
+@media (max-width: 640px) { .swal2-popup.scm-guide-swal .scm-guide-generator { grid-template-columns: 1fr; } }

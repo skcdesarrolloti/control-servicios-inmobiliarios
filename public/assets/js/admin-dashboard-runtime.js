@@ -11932,7 +11932,7 @@
         return appBase + "/puente-funcionario.php?" + query;
       };
       var signed = "&expires=<EXPIRA>&sig=<FIRMA>";
-      var autologinSuffix = "&id_empleado=<ID_EMPLEADO>&token=<ACTA_AUTOLOGIN_SECRET>";
+      var autologinSuffix = "&id_empleado=<ID_EMPLEADO>&token=<TOKEN_DEL_FUNCIONARIO>";
       // Cada enlace muestra para qué sirve, cómo se obtiene y la URL exacta con botón de copiar.
       var linkCard = function (item) {
         return '<article class="scm-guide-link">' +
@@ -11949,12 +11949,33 @@
           '<p class="scm-guide-section-intro"><strong>' + escHtml(title) + ".</strong> " + intro + "</p>" +
           '<div class="scm-guide-links">' + items.map(linkCard).join("") + "</div></section>";
       };
+      var canGenerate = !!(runtime.dashboardPermissions && runtime.dashboardPermissions.canManage);
       var sections = [
         { key: "actas", label: "Actas", icon: "task" },
         { key: "puente", label: "Puente funcionarios", icon: "badge" },
         { key: "publicas", label: "Vistas públicas", icon: "public" },
         { key: "autologin", label: "Autologin", icon: "key" },
       ];
+      if (canGenerate) sections.push({ key: "generar", label: "Generar enlace", icon: "link" });
+      var actionLabels = {
+        acta_satisfaccion: "Acta directa del caso", acta_cotizacion: "Acta por cotización aprobada",
+        revision_preventiva: "Revisión preventiva", revision_correctiva: "Revisión correctiva",
+        crear_cotizacion: "Crear cotización", editar_cotizacion: "Editar cotización",
+        enviar_cotizacion: "Enviar cotización", crear_orden: "Crear orden de mantenimiento",
+      };
+      // El enlace se arma en el servidor: el secreto de autologin nunca llega al navegador.
+      var generator = canGenerate
+        ? '<section class="scm-guide-section" data-scm-guide-section="generar" hidden>' +
+          '<p class="scm-guide-section-intro"><strong>Enlace completo con autologin.</strong> Elige la acción, el ID y el funcionario. El token queda firmado para ese funcionario: no sirve si alguien cambia el id_empleado. Solo administradores de permisos pueden generarlo.</p>' +
+          '<form class="scm-guide-generator" data-scm-guide-generator autocomplete="off">' +
+          '<label><span>Acción</span><select name="accion">' + Object.keys(actionLabels).map(function (key) { return '<option value="' + key + '">' + escHtml(actionLabels[key]) + "</option>"; }).join("") + "</select></label>" +
+          '<label><span data-scm-guide-record-label>ID interno del caso (_ID)</span><input name="record_id" inputmode="numeric" placeholder="Ej. 10916"></label>' +
+          '<label class="is-wide"><span>Funcionario</span><select name="id_empleado"><option value="">Cargando funcionarios…</option></select></label>' +
+          '<button type="submit" class="scm-cotizacion-dialog-confirm">Generar enlace</button>' +
+          '<p class="is-wide" data-scm-guide-generator-status role="status" aria-live="polite"></p>' +
+          '<div class="is-wide scm-guide-link-url" data-scm-guide-generated hidden><code></code><button type="button" data-scm-guide-copy="" title="Copiar enlace" aria-label="Copiar enlace generado"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span></button></div>' +
+          "</form></section>"
+        : "";
       var html =
         '<div class="scm-guide-modal">' +
         '<p class="scm-guide-lead">Enlaces para abrir funciones nativas desde WordPress, correos o WhatsApp. Reemplaza los valores entre <code>&lt; &gt;</code>: <strong>&lt;ID_INTERNO_CASO&gt;</strong> es el <code>_ID</code> del caso, <strong>&lt;ID_COTIZACION&gt;</strong> el de la cotizaci&oacute;n y <strong>&lt;ID_REVISION&gt;</strong> el de la revisi&oacute;n.</p>' +
@@ -11985,9 +12006,10 @@
           { title: "Radicar caso (formularios abiertos)", badge: "Sin firma", tone: "good", text: "Formularios públicos para radicar casos: /ticket deja elegir el tipo; también existen /ticket-arrendatario, /ticket-propietario y /ticket-copropiedad. Se pueden publicar en la web.", url: appBase + "/ticket" },
         ]) +
         section("autologin", "Autologin desde WordPress", "Agrega el sufijo al final de cualquier enlace del puente cuando el funcionario no tiene sesi&oacute;n. El sistema elimina <code>token</code> e <code>id_empleado</code> de la URL antes de mostrar la pantalla final. Las vistas p&uacute;blicas no lo necesitan.", [
-          { title: "Sufijo de autologin", text: "<ID_EMPLEADO> es el id_empleado real del funcionario en wp_jet_cct_funcionarios.", url: autologinSuffix },
+          { title: "Sufijo de autologin", text: "<ID_EMPLEADO> es el id_empleado real del funcionario en wp_jet_cct_funcionarios. Usa la pestaña Generar enlace para obtener el token firmado de cada funcionario.", url: autologinSuffix },
           { title: "Ejemplo completo", text: "Crear cotización entrando directamente con la cuenta del funcionario.", url: bridgeUrl("accion=crear_cotizacion&ticket_pk=<ID_INTERNO_CASO>") + autologinSuffix },
         ]) +
+        generator +
         "</div>";
       if (!window.Swal) {
         showToast("info", "Enlaces puente: revisión, cotización, envío, orden y actas.");
@@ -12010,6 +12032,51 @@
           closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
         },
         didOpen: function (popup) {
+          var form = popup.querySelector("[data-scm-guide-generator]");
+          var loadedEmployees = false;
+          var recordParams = {};
+          var syncRecordLabel = function () {
+            if (!form) return;
+            var byQuote = recordParams[form.elements.accion.value] === "id_cotizacion";
+            popup.querySelector("[data-scm-guide-record-label]").textContent = byQuote ? "ID de la cotización (_ID)" : "ID interno del caso (_ID)";
+          };
+          var loadEmployees = function () {
+            if (!form || loadedEmployees) return;
+            loadedEmployees = true;
+            dashboardAction("scm_autologin_link_options", {}).then(function (data) {
+              recordParams = data.actions || {};
+              syncRecordLabel();
+              form.elements.id_empleado.innerHTML = '<option value="">Selecciona el funcionario</option>' + (data.employees || []).map(function (employee) {
+                return '<option value="' + escHtml(employee.id) + '">' + escHtml(employee.label) + "</option>";
+              }).join("");
+            }).catch(function (error) {
+              loadedEmployees = false;
+              form.elements.id_empleado.innerHTML = '<option value="">No se pudieron cargar</option>';
+              popup.querySelector("[data-scm-guide-generator-status]").textContent = error.message || "No se pudieron cargar los funcionarios.";
+            });
+          };
+          if (form) {
+            form.elements.accion.addEventListener("change", syncRecordLabel);
+            form.addEventListener("submit", function (event) {
+              event.preventDefault();
+              var status = popup.querySelector("[data-scm-guide-generator-status]");
+              var output = popup.querySelector("[data-scm-guide-generated]");
+              output.hidden = true;
+              status.textContent = "Generando enlace…";
+              dashboardAction("scm_autologin_link", {
+                accion: form.elements.accion.value,
+                record_id: form.elements.record_id.value.trim(),
+                id_empleado: form.elements.id_empleado.value,
+              }).then(function (data) {
+                output.querySelector("code").textContent = data.url;
+                output.querySelector("[data-scm-guide-copy]").setAttribute("data-scm-guide-copy", data.url);
+                output.hidden = false;
+                status.textContent = "Enlace listo para " + (data.employee || "el funcionario") + ". No lo compartas con otras personas: abre el sistema con su cuenta.";
+              }).catch(function (error) {
+                status.textContent = error.message || "No se pudo generar el enlace.";
+              });
+            });
+          }
           popup.addEventListener("click", function (event) {
             var tab = event.target.closest("[data-scm-guide-tab]");
             if (tab) {
@@ -12022,6 +12089,7 @@
               popup.querySelectorAll("[data-scm-guide-section]").forEach(function (panel) {
                 panel.hidden = panel.getAttribute("data-scm-guide-section") !== key;
               });
+              if (key === "generar") loadEmployees();
               return;
             }
             var copy = event.target.closest("[data-scm-guide-copy]");

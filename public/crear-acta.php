@@ -51,7 +51,7 @@ $tryEmployeeTokenLogin = static function (): bool {
   $token = trim((string) ($_GET['token'] ?? ''));
   $secret = defined('SCM_ACTA_AUTOLOGIN_SECRET') ? trim((string) SCM_ACTA_AUTOLOGIN_SECRET) : '';
 
-  if ($secret === '' || $employeeId === '' || $token === '' || !hash_equals($secret, $token)) {
+  if (!\SCM\Support\ActaAutologin::valid($secret, $employeeId, $token)) {
     return false;
   }
 

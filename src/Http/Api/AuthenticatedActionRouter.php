@@ -31,6 +31,8 @@ final class AuthenticatedActionRouter
       'scm_contract_note_options' => 'ajax_handler_contract_note_options',
       'scm_contract_note_history' => 'ajax_handler_contract_note_history',
       'scm_contract_note_create' => 'ajax_handler_contract_note_create',
+      'scm_autologin_link_options' => 'ajax_handler_autologin_link_options',
+      'scm_autologin_link' => 'ajax_handler_autologin_link',
       'scm_panel_case_read' => 'ajax_handler_panel_case_read',
       SuCasaControlServiciosInmobiliarios::AJAX_SEGUIMIENTO => 'ajax_handler_seguimiento',
       SuCasaControlServiciosInmobiliarios::AJAX_NOTA => 'ajax_handler_nota',
