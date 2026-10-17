@@ -11963,8 +11963,7 @@
         }).join("") + "</nav>" +
         section("actas", "Dos procesos distintos", "El acta directa cierra un caso sin cotizaci&oacute;n aprobada; el acta por cotizaci&oacute;n certifica la satisfacci&oacute;n al terminar un trabajo cotizado y aprobado.", [
           { title: "Acta directa del caso", badge: "Funcionario", text: "Abre Complementarias → Acta de solución y firma del caso.", url: bridgeUrl("accion=acta_satisfaccion&ticket_pk=<ID_INTERNO_CASO>") },
-          { title: "Acta por cotización aprobada", badge: "Funcionario", text: "Crea el acta vinculada a esa cotización aprobada.", url: bridgeUrl("accion=acta_cotizacion&id_cotizacion=<ID_COTIZACION>") },
-          { title: "Acta por cotización · directo", badge: "Funcionario", text: "Alternativa directa a crear-acta.php; también acepta el sufijo de autologin.", url: appBase + "/crear-acta.php?id_cotizacion=<ID_COTIZACION>&source_flow=approved_quote" },
+          { title: "Acta por cotización aprobada", badge: "Funcionario", text: "Crea el acta de satisfacción vinculada a esa cotización aprobada. Solo funciona con cotizaciones aprobadas.", url: bridgeUrl("accion=acta_cotizacion&id_cotizacion=<ID_COTIZACION>") },
         ]) +
         section("puente", "Funciones puente", "Llevan los botones externos de WordPress al sistema nativo. Requieren sesi&oacute;n del panel o el sufijo de autologin y validan que el funcionario tenga acceso al caso.", [
           { title: "Revisión preventiva", badge: "Preventiva", tone: "good", text: "Abre la revisión preventiva del caso para crearla, completarla o enviarla. También acepta accion=preventiva o crear_revision_preventiva.", url: bridgeUrl("accion=revision_preventiva&ticket_pk=<ID_INTERNO_CASO>") },
@@ -11985,7 +11984,7 @@
           { title: "Solicitudes web del responsable", badge: "Vence en 30 días", tone: "warn", text: "Bandeja de solicitudes web asignadas a un funcionario, sin entrar al panel.", how: "Llega en el aviso de solicitud web nueva o trasladada.", url: appBase + "/solicitudes-web.php?k=<TOKEN_ACCESO>" },
           { title: "Radicar caso (formularios abiertos)", badge: "Sin firma", tone: "good", text: "Formularios públicos para radicar casos: /ticket deja elegir el tipo; también existen /ticket-arrendatario, /ticket-propietario y /ticket-copropiedad. Se pueden publicar en la web.", url: appBase + "/ticket" },
         ]) +
-        section("autologin", "Autologin desde WordPress", "Agrega el sufijo al final de cualquier enlace del puente o de crear-acta.php cuando el funcionario no tiene sesi&oacute;n. El sistema elimina <code>token</code> e <code>id_empleado</code> de la URL antes de mostrar la pantalla final. Las vistas p&uacute;blicas no lo necesitan.", [
+        section("autologin", "Autologin desde WordPress", "Agrega el sufijo al final de cualquier enlace del puente cuando el funcionario no tiene sesi&oacute;n. El sistema elimina <code>token</code> e <code>id_empleado</code> de la URL antes de mostrar la pantalla final. Las vistas p&uacute;blicas no lo necesitan.", [
           { title: "Sufijo de autologin", text: "<ID_EMPLEADO> es el id_empleado real del funcionario en wp_jet_cct_funcionarios.", url: autologinSuffix },
           { title: "Ejemplo completo", text: "Crear cotización entrando directamente con la cuenta del funcionario.", url: bridgeUrl("accion=crear_cotizacion&ticket_pk=<ID_INTERNO_CASO>") + autologinSuffix },
         ]) +
