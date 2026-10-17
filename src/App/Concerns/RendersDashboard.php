@@ -1388,6 +1388,7 @@ trait RendersDashboard
 
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-dashboard-inline.js?v=' . SCM_VERSION); ?>" defer></script>
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-case-create.js?v=' . SCM_VERSION); ?>" defer></script>
+      <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-contract-note.js?v=' . SCM_VERSION . '-' . (string) @filemtime(dirname(__DIR__, 3) . '/public/assets/js/admin-contract-note.js')); ?>" defer></script>
 
       <?php if (in_array('notificaciones', $dashboardAllowedTabs, true)): ?>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-admin-notificaciones' ? ' active' : ''; ?>" id="scm-panel-admin-notificaciones" data-permission-tab="notificaciones" data-scm-loaded="0">

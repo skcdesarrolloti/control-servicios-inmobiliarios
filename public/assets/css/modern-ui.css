@@ -5963,3 +5963,7 @@ body,
 @media (max-width: 480px) {
   .scm-header-brand-text { display: none !important; }
 }
+
+/* Botón "Añadir nota al contrato" del header */
+.scm-header-note-btn { border: 1px solid #cbd5e1; background: #fff; color: #0f1e36; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+.scm-header-note-btn:hover { border-color: #0f1e36; background: #f1f5fb; }
