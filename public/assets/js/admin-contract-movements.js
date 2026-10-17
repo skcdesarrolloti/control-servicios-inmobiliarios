@@ -9,7 +9,8 @@
   var MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   var MONTHS_LONG = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   var STATE_LABELS = { entregado: "Entregado", por_recibir: "Por recibir", recibido: "Recibido" };
-  var FILTER_LABELS = { funcionario: "Funcionario", tipo: "Tipo", destinacion: "Destinación" };
+  var FILTER_LABELS = { funcionario: "Funcionario", tipo: "Tipo", destinacion: "Destinación", arrendatario: "Arrendatario", inmueble: "Inmueble", contrato: "Contrato" };
+  var TEXT_FILTERS = ["arrendatario", "inmueble", "contrato"];
   var VIEWS = {
     ocupaciones: {
       title: "Ocupaciones",
@@ -39,6 +40,13 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+  // Compara sin mayúsculas ni tildes para los filtros de texto libre.
+  function fold(value) {
+    return String(value == null ? "" : value).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  }
+  function emptyFilters() {
+    return { year: String(new Date().getFullYear()), funcionario: "", tipo: "", destinacion: "", arrendatario: "", inmueble: "", contrato: "" };
   }
   function num(value) { return numberFormat.format(value || 0); }
   function money(value) { return moneyFormat.format(value || 0); }
@@ -186,7 +194,7 @@
 
     var state = {
       view: VIEWS[module.getAttribute("data-initial-view")] ? module.getAttribute("data-initial-view") : "ocupaciones",
-      filters: { year: String(new Date().getFullYear()), funcionario: "", tipo: "", destinacion: "" },
+      filters: emptyFilters(),
       month: 0,
       search: "",
       page: 1,
@@ -276,23 +284,31 @@
 
     function syncSelects() {
       Object.keys(selects).forEach(function (key) {
-        if (key !== "month") selects[key].value = state.filters[key] || "";
+        // No se reescribe un campo de texto igual para no mover el cursor mientras se escribe.
+        if (key !== "month" && selects[key].value !== (state.filters[key] || "")) selects[key].value = state.filters[key] || "";
       });
       // El mes solo tiene sentido dentro de un año.
       if (!selectedYear()) state.month = 0;
       selects.month.value = state.month ? String(state.month) : "";
       selects.month.disabled = !selectedYear();
       var dirty = !!(state.filters.funcionario || state.filters.tipo || state.filters.destinacion || state.month ||
+        TEXT_FILTERS.some(function (key) { return state.filters[key]; }) ||
         state.filters.year !== String(new Date().getFullYear()));
       clearBtn.disabled = !dirty;
     }
 
     function baseRows() {
       var f = state.filters;
+      var tenant = fold(f.arrendatario);
+      var property = fold(f.inmueble);
+      var contract = fold(f.contrato);
       return state.data.rows.filter(function (row) {
         return (!f.funcionario || row.funcionario === f.funcionario) &&
           (!f.tipo || row.tipo === f.tipo) &&
-          (!f.destinacion || row.destinacion === f.destinacion);
+          (!f.destinacion || row.destinacion === f.destinacion) &&
+          (!tenant || fold(row.arrendatario).indexOf(tenant) !== -1) &&
+          (!property || fold(row.inmueble).indexOf(property) !== -1 || fold(row.direccion).indexOf(property) !== -1) &&
+          (!contract || fold(row.contrato).indexOf(contract) !== -1);
       });
     }
 
@@ -329,10 +345,10 @@
       }
       Object.keys(FILTER_LABELS).forEach(function (key) {
         var value = state.filters[key];
-        if (!value) return;
+        if (!value || !String(value).trim()) return;
         var label = key === "funcionario"
           ? (state.data.options.funcionario.find(function (o) { return o.value === value; }) || { label: value }).label
-          : value;
+          : String(value).trim();
         chips.push({ key: key, label: FILTER_LABELS[key] + ": " + label });
       });
       if (!chips.length) return "";
@@ -683,7 +699,7 @@
         return;
       }
       if (event.target.closest("[data-scm-cm-clear]")) {
-        state.filters = { year: String(new Date().getFullYear()), funcionario: "", tipo: "", destinacion: "" };
+        state.filters = emptyFilters();
         if (state.data.years.indexOf(Number(state.filters.year)) === -1) state.filters.year = String(state.data.years[0] || "");
         state.month = 0;
         resetDrill();
@@ -725,7 +741,7 @@
 
     module.addEventListener("change", function (event) {
       var select = event.target.closest("[data-scm-cm-filter]");
-      if (!select || !state.data) return;
+      if (!select || !state.data || select.hasAttribute("data-scm-cm-text")) return;
       var key = select.getAttribute("data-scm-cm-filter");
       if (key === "month") {
         state.month = Number(select.value) || 0;
@@ -740,7 +756,21 @@
     });
 
     var searchTimer = 0;
+    var textTimer = 0;
     module.addEventListener("input", function (event) {
+      var textFilter = event.target.closest("[data-scm-cm-text]");
+      if (textFilter) {
+        var key = textFilter.getAttribute("data-scm-cm-filter");
+        var text = textFilter.value;
+        window.clearTimeout(textTimer);
+        textTimer = window.setTimeout(function () {
+          if (!state.data) return;
+          state.filters[key] = text;
+          state.page = 1;
+          render();
+        }, 250);
+        return;
+      }
       if (!event.target.matches("[data-scm-cm-search]")) return;
       var value = event.target.value;
       window.clearTimeout(searchTimer);

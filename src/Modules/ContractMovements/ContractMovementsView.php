@@ -92,6 +92,18 @@ final class ContractMovementsView
           <span>Destinación</span>
           <select name="destinacion" data-scm-cm-filter="destinacion"><option value="">Todas</option></select>
         </label>
+        <label class="scm-cm-field">
+          <span>Arrendatario</span>
+          <input type="search" name="arrendatario" data-scm-cm-filter="arrendatario" data-scm-cm-text placeholder="Nombre del arrendatario" autocomplete="off">
+        </label>
+        <label class="scm-cm-field">
+          <span>Inmueble</span>
+          <input type="search" name="inmueble" data-scm-cm-filter="inmueble" data-scm-cm-text placeholder="Código o dirección" autocomplete="off">
+        </label>
+        <label class="scm-cm-field">
+          <span>Contrato</span>
+          <input type="search" name="contrato" data-scm-cm-filter="contrato" data-scm-cm-text placeholder="Número de contrato" autocomplete="off">
+        </label>
         <button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-cm-clear disabled>Limpiar filtros</button>
       </form>
 
