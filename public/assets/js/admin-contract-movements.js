@@ -563,12 +563,12 @@
       ].filter(function (field) { return state.data.correctable.indexOf(field.key) !== -1; });
       var initial = function (field) {
         if (field.value == null) return "";
-        return field.prefix ? String(Math.round(field.value)) : String(field.value).replace(".", ",");
+        return field.prefix ? numberFormat.format(Math.round(field.value)) : String(field.value).replace(".", ",");
       };
       var fieldsHtml = fields.length
         ? '<fieldset class="scm-cm-simi-fields"><legend>Condiciones del contrato</legend><div>' + fields.map(function (field) {
           return '<label><span>' + esc(field.label) + "</span><span class=\"scm-cm-simi-input\">" + (field.prefix ? "<b>" + field.prefix + "</b>" : "") +
-            '<input type="text" inputmode="decimal" data-scm-cm-fix="' + field.key + '" data-initial="' + esc(initial(field)) + '" value="' + esc(initial(field)) + '">' +
+            '<input type="text" inputmode="' + (field.prefix ? "numeric" : "decimal") + '" data-scm-cm-fix="' + field.key + '"' + (field.prefix ? " data-scm-cm-money" : "") + ' data-initial="' + esc(initial(field)) + '" value="' + esc(initial(field)) + '">' +
             (field.suffix ? "<b>" + field.suffix + "</b>" : "") + "</span>" + (field.hint ? "<small>" + esc(field.hint) + "</small>" : "") + "</label>";
         }).join("") + "</div><small>Corrige solo lo que no coincide con SIMI o con el contrato firmado. El cambio queda en el historial con el valor anterior.</small></fieldset>"
         : "";
@@ -586,6 +586,21 @@
         cancelButtonText: "Cancelar",
         focusConfirm: false,
         customClass: { popup: "scm-cm-simi-swal" },
+        didOpen: function (popup) {
+          // Canon y administración se muestran con separador de miles mientras se escribe.
+          popup.addEventListener("input", function (event) {
+            var input = event.target;
+            if (!input.matches || !input.matches("[data-scm-cm-money]")) return;
+            var digitsBefore = input.value.slice(0, input.selectionStart || 0).replace(/\D/g, "").length;
+            var digits = input.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+            input.value = digits ? numberFormat.format(Number(digits)) : "";
+            var caret = 0;
+            for (var seen = 0; caret < input.value.length && seen < digitsBefore; caret++) {
+              if (/\d/.test(input.value[caret])) seen++;
+            }
+            input.setSelectionRange(caret, caret);
+          });
+        },
         preConfirm: function () {
           var popup = window.Swal.getPopup();
           var checked = popup.querySelector('input[name="scm_cm_simi"]:checked');
