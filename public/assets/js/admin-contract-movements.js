@@ -186,6 +186,7 @@
     var panel = module.closest(".scm-tab-panel");
     var content = module.querySelector("[data-scm-cm-content]");
     var status = module.querySelector("[data-scm-cm-status]");
+    var kpiSlot = module.querySelector("[data-scm-cm-kpis]");
     var titleEl = module.querySelector("[data-scm-cm-title]");
     var subtitleEl = module.querySelector("[data-scm-cm-subtitle]");
     var updatedEl = module.querySelector("[data-scm-cm-updated]");
@@ -347,6 +348,7 @@
       var html = renderChips();
       html += state.view === "comparativo" ? renderComparison() : renderMovements(state.view === "ocupaciones" ? "ocup" : "desoc");
       content.innerHTML = html;
+      kpiSlot.innerHTML = state.kpiHtml || "";
       renderDetail();
     }
 
@@ -397,6 +399,9 @@
       html += kpi("Comercio", num(commerce.count), esc(share(commerce.count)));
       html += kpi("Canon promedio comercio", commerce.count ? money(commerce.avg) : "—", esc(commerce.count ? num(commerce.count) + " inmuebles" : "Sin comercio"));
       html += "</div>";
+      // Los KPI van encima de los filtros; el resto del contenido, debajo.
+      state.kpiHtml = html;
+      html = "";
 
       if (!isOcup) html += renderUpcoming(rows);
 
@@ -660,6 +665,8 @@
       html += kpi("Canon neto", compactMoney(so.canon - sd.canon), esc(money(so.canon - sd.canon) + " mensual"), so.canon - sd.canon >= 0 ? "good" : "bad");
       html += kpi("Inventario arrendado", num(stockEnd), esc(closing === today ? "Contratos arrendados hoy" : "Al cierre de " + formatDate(closing)), "stock");
       html += "</div>";
+      state.kpiHtml = html;
+      html = "";
 
       var periodRows;
       var exportRows;

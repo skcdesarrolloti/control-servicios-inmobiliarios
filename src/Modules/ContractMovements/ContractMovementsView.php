@@ -66,6 +66,8 @@ final class ContractMovementsView
         <?php endforeach; ?>
       </div>
 
+      <div class="scm-cm-kpi-slot" data-scm-cm-kpis></div>
+
       <form class="scm-cm-filters" data-scm-cm-filters onsubmit="return false;">
         <label class="scm-cm-field">
           <span>Año</span>

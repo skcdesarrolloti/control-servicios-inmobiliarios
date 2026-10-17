@@ -521,3 +521,4 @@
   #scm-app .scm-cm-detail-tools { flex-wrap: nowrap; }
   #scm-app .scm-cm-detail-tools .scm-cm-search { min-width: 240px; }
 }
+#scm-app .scm-cm-kpi-slot:empty { display: none; }
