@@ -350,6 +350,16 @@
     }, 250);
   }
 
+  // Token de seguridad vencido: la sesión sigue activa, basta con recargar esta pestaña.
+  function reloadPage(event) {
+    if (event && typeof event.preventDefault === "function") event.preventDefault();
+    try { if (redirectTimer) window.clearTimeout(redirectTimer); } catch (_error) {}
+    try { if (countdownTimer) window.clearInterval(countdownTimer); } catch (_error) {}
+    try { preserveDrafts(); } catch (_error) {}
+    try { rememberNavigation(); } catch (_error) {}
+    window.location.reload();
+  }
+
   function createExpirationModal(reason) {
     var existing = document.getElementById("scm-session-expired");
     if (existing) return existing;
@@ -364,27 +374,27 @@
       '<div class="scm-session-expired-dialog" role="alertdialog" aria-modal="true" aria-labelledby="scm-session-expired-title" aria-describedby="scm-session-expired-description">' +
       '<span class="scm-session-expired-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" focusable="false" style="width:30px;height:30px;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.8;"><path d="M12 8v5m0 3h.01M10.3 3.7 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/></svg></span>' +
       '<span class="scm-session-expired-kicker">Seguridad de la cuenta</span>' +
-      '<h2 id="scm-session-expired-title">Tu sesión terminó</h2>' +
-      '<p id="scm-session-expired-description">' +
       (reason === "csrf"
-        ? "La verificación de seguridad venció."
-        : "La sesión venció por inactividad o por una renovación del servidor.") +
-      " Inicia sesión nuevamente para continuar.</p>" +
+        ? '<h2 id="scm-session-expired-title">Actualiza la página</h2>' +
+          '<p id="scm-session-expired-description">Esta pestaña estuvo abierta mucho tiempo y su verificación de seguridad venció. Tu sesión sigue activa: solo hay que recargar.</p>'
+        : '<h2 id="scm-session-expired-title">Tu sesión terminó</h2>' +
+          '<p id="scm-session-expired-description">La sesión venció por inactividad o por una renovación del servidor. Inicia sesión nuevamente para continuar.</p>') +
       (savedDraftCount > 0
         ? '<p class="scm-session-expired-draft"><strong>Tu trabajo no se perdió.</strong> Recuperaremos ' +
           (savedDraftCount === 1 ? "el formulario abierto" : "los formularios abiertos") +
           " después de ingresar.</p>"
         : "") +
-      '<button type="button" class="scm-session-expired-action" data-scm-session-login>Iniciar sesión nuevamente</button>' +
-      '<p class="scm-session-expired-countdown" role="status" aria-live="polite">Redirigiendo en <strong data-scm-session-countdown>' +
+      '<button type="button" class="scm-session-expired-action" data-scm-session-login>' + (reason === "csrf" ? "Actualizar la página" : "Iniciar sesión nuevamente") + "</button>" +
+      '<p class="scm-session-expired-countdown" role="status" aria-live="polite">' + (reason === "csrf" ? "Actualizando" : "Redirigiendo") + ' en <strong data-scm-session-countdown>' +
       autoRedirectSeconds +
       "</strong> segundos.</p>" +
       "</div>";
     document.body.appendChild(overlay);
     document.body.classList.add("scm-session-locked");
     var button = overlay.querySelector("[data-scm-session-login]");
+    var proceed = reason === "csrf" ? reloadPage : redirectToLogin;
     if (button) {
-      button.addEventListener("click", redirectToLogin);
+      button.addEventListener("click", proceed);
       window.setTimeout(function () { button.focus(); }, 30);
     }
     overlay.addEventListener("click", function (event) {
@@ -392,7 +402,7 @@
         ? event.target.closest("[data-scm-session-login]")
         : null;
       if (target) {
-        redirectToLogin(event);
+        proceed(event);
       }
     });
     Array.prototype.forEach.call(document.body.children, function (child) {
@@ -445,7 +455,7 @@
       var node = overlay.querySelector("[data-scm-session-countdown]");
       if (node) node.textContent = String(Math.max(0, remaining));
     }, 1000);
-    redirectTimer = window.setTimeout(redirectToLogin, autoRedirectSeconds * 1000);
+    redirectTimer = window.setTimeout(reason === "csrf" ? reloadPage : redirectToLogin, autoRedirectSeconds * 1000);
     try {
       document.dispatchEvent(
         new CustomEvent("scm:session-expired", { detail: { reason: reason || "expired" } }),
@@ -469,7 +479,8 @@
           if (response.status === 401 || authState === "required") {
             handleExpiration("expired", true);
           } else if (authState === "csrf-expired") {
-            handleExpiration("csrf", true);
+            // Un token vencido es de esta pestaña: la sesión sigue activa y las demás pestañas no se cierran.
+            handleExpiration("csrf", false);
           }
         }
         return response;

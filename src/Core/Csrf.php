@@ -14,15 +14,26 @@ final class Csrf
     $this->secret = $secret;
   }
 
-  /** Genera un token CSRF para una acción. */
+  /** Tokens recientes que siguen siendo válidos por acción (una pestaña o página por token). */
+  private const POOL_SIZE = 30;
+
+  /**
+   * Genera un token CSRF para una acción.
+   *
+   * Cada pestaña o página del panel recibe su propio token. Los anteriores siguen siendo válidos
+   * (hasta POOL_SIZE por acción): abrir el panel en otra pestaña no invalida las que ya están abiertas.
+   */
   public function token(string $action): string
   {
     $salt  = bin2hex(random_bytes(8));
     $value = hash_hmac('sha256', $action . '|' . $salt, $this->secret);
     $token = $salt . '|' . $value;
 
-    // Guardarlo en sesión para validación
+    // El último token queda en scm_csrf (algunas páginas lo reutilizan) y todos en el pool.
     $_SESSION['scm_csrf'][$action] = $token;
+    $pool = is_array($_SESSION['scm_csrf_pool'][$action] ?? null) ? $_SESSION['scm_csrf_pool'][$action] : [];
+    $pool[] = $token;
+    $_SESSION['scm_csrf_pool'][$action] = array_slice(array_values(array_unique($pool)), -self::POOL_SIZE);
     return $token;
   }
 
@@ -34,15 +45,22 @@ final class Csrf
    */
   public function verify(string $action, string $token, bool $singleUse = true): bool
   {
-    if ($token === '' || !isset($_SESSION['scm_csrf'][$action])) {
+    if ($token === '') {
       return false;
     }
 
-    $stored = $_SESSION['scm_csrf'][$action];
-    $ok     = hash_equals($stored, $token);
+    $latest = is_string($_SESSION['scm_csrf'][$action] ?? null) ? $_SESSION['scm_csrf'][$action] : '';
+    $pool = is_array($_SESSION['scm_csrf_pool'][$action] ?? null) ? $_SESSION['scm_csrf_pool'][$action] : [];
+    $ok = $latest !== '' && hash_equals($latest, $token);
+    foreach ($pool as $candidate) {
+      $ok = $ok || (is_string($candidate) && hash_equals($candidate, $token));
+    }
 
     if ($ok && $singleUse) {
-      unset($_SESSION['scm_csrf'][$action]);
+      if ($latest !== '' && hash_equals($latest, $token)) {
+        unset($_SESSION['scm_csrf'][$action]);
+      }
+      $_SESSION['scm_csrf_pool'][$action] = array_values(array_filter($pool, static fn($candidate): bool => !is_string($candidate) || !hash_equals($candidate, $token)));
     }
 
     return $ok;
