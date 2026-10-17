@@ -3,7 +3,7 @@
 
   // Los contratos llegan en una sola petición y todo lo demás (vistas, filtros,
   // drill-down por mes, tablas y CSV) se calcula aquí, sin volver al servidor.
-  var CACHE_KEY = "scm-contract-movements-v3";
+  var CACHE_KEY = "scm-contract-movements-v4";
   var CACHE_TTL_MS = 10 * 60 * 1000;
   var PAGE_SIZE = 15;
   var MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -51,6 +51,7 @@
   }
   function num(value) { return numberFormat.format(value || 0); }
   function money(value) { return moneyFormat.format(value || 0); }
+  function percent(value) { return value == null ? "" : decimalFormat.format(value) + "%"; }
   function compactMoney(value) {
     var abs = Math.abs(value || 0);
     var sign = value < 0 ? "-" : "";
@@ -134,6 +135,7 @@
       rows: rows,
       generatedAt: Number(snapshot.generated_at || 0),
       simiEnabled: !!snapshot.simi_enabled,
+      correctable: Array.isArray(snapshot.correctable) ? snapshot.correctable : [],
       years: Object.keys(years).map(Number).sort(function (a, b) { return b - a; }),
       options: sortedOptions,
     };
@@ -491,6 +493,7 @@
         (isDesoc ? "<th>Fecha recibo</th><th>Fin contrato</th>" : "<th>Fecha entrega</th>") +
         '<th>Contrato</th><th>Inmueble</th><th>Dirección</th><th>Arrendatario</th><th>Tipo</th><th>Destinación</th><th>Funcionario</th>' +
         '<th class="is-num">Duración</th>' + (isDesoc ? '<th class="is-num">Permanencia</th>' : '<th class="is-num">Días de gracia</th>') +
+        '<th class="is-num" title="Derechos inmobiliarios">% Derechos</th><th class="is-num" title="Tasa de administración">% Admin.</th>' +
         '<th class="is-num">Canon</th><th class="is-num">Administración</th><th class="is-num">Total</th>' + (isDesoc ? "" : "<th>Estado actual</th>") + "<th>Estado SIMI</th><th>Observaciones SIMI</th></tr></thead><tbody>";
       html += slice.map(function (event) {
         var row = event.row;
@@ -505,6 +508,8 @@
           (isDesoc
             ? '<td class="is-num">' + (row.permanencia == null ? "—" : esc(num(row.permanencia) + " meses")) + "</td>"
             : '<td class="is-num">' + graceCell(row) + "</td>") +
+          '<td class="is-num">' + (row.derechos == null ? '<span class="scm-cm-muted">—</span>' : esc(percent(row.derechos))) + "</td>" +
+          '<td class="is-num">' + (row.tasa_admin == null ? '<span class="scm-cm-muted">—</span>' : esc(percent(row.tasa_admin))) + "</td>" +
           '<td class="is-num">' + esc(money(row.canon)) + '</td><td class="is-num">' + (row.admin ? esc(money(row.admin)) : '<span class="scm-cm-muted">No aplica</span>') + "</td>" +
           '<td class="is-num is-total">' + esc(money((row.canon || 0) + (row.admin || 0))) + "</td>" +
           (isDesoc ? "" : '<td><span class="scm-cm-badge is-' + row.estado + '">' + esc(STATE_LABELS[row.estado] || row.estado) + "</span></td>") +
@@ -518,7 +523,7 @@
         sumCanon += event.row.canon || 0;
         sumAdmin += event.row.admin || 0;
       });
-      html += '</tbody><tfoot><tr><td colspan="' + (isDesoc ? 11 : 10) + '">Total · ' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) +
+      html += '</tbody><tfoot><tr><td colspan="' + (isDesoc ? 13 : 12) + '">Total · ' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) +
         '</td><td class="is-num">' + esc(money(sumCanon)) + '</td><td class="is-num">' + esc(money(sumAdmin)) + '</td><td class="is-num is-total">' + esc(money(sumCanon + sumAdmin)) +
         "</td>" + (isDesoc ? "" : "<td></td>") + "<td></td><td></td></tr></tfoot></table></div>";
       html += '<div class="scm-cm-pager"><span>' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) + "</span>";
@@ -546,13 +551,35 @@
         return '<label class="scm-cm-simi-option is-' + tone + '"><input type="radio" name="scm_cm_simi" value="' + value + '"' +
           (row.estado_simi === value ? " checked" : "") + "><span>" + value + "</span></label>";
       };
+      // Condiciones que se pueden corregir en la misma auditoría; solo se envían las modificadas.
+      var fields = [
+        { key: "canon", label: "Canon", value: row.canon, prefix: "$" },
+        { key: "admin", label: "Administración", value: row.admin, prefix: "$" },
+        { key: "meses", label: "Duración (meses)", value: row.meses },
+        { key: "derechos", label: "% derechos", value: row.derechos, suffix: "%" },
+        { key: "tasa_admin", label: "% administración", value: row.tasa_admin, suffix: "%" },
+        { key: "dias_gracia", label: "Días de gracia", value: row.dias_gracia_fuente === "contrato" ? row.dias_gracia : null,
+          hint: row.dias_gracia != null && row.dias_gracia_fuente !== "contrato" ? "Sin dato en el contrato; " + (row.dias_gracia_fuente === "cierre" ? "hoja de cierre" : "mandato") + ": " + row.dias_gracia : "" },
+      ].filter(function (field) { return state.data.correctable.indexOf(field.key) !== -1; });
+      var initial = function (field) {
+        if (field.value == null) return "";
+        return field.prefix ? String(Math.round(field.value)) : String(field.value).replace(".", ",");
+      };
+      var fieldsHtml = fields.length
+        ? '<fieldset class="scm-cm-simi-fields"><legend>Condiciones del contrato</legend><div>' + fields.map(function (field) {
+          return '<label><span>' + esc(field.label) + "</span><span class=\"scm-cm-simi-input\">" + (field.prefix ? "<b>" + field.prefix + "</b>" : "") +
+            '<input type="text" inputmode="decimal" data-scm-cm-fix="' + field.key + '" data-initial="' + esc(initial(field)) + '" value="' + esc(initial(field)) + '">' +
+            (field.suffix ? "<b>" + field.suffix + "</b>" : "") + "</span>" + (field.hint ? "<small>" + esc(field.hint) + "</small>" : "") + "</label>";
+        }).join("") + "</div><small>Corrige solo lo que no coincide con SIMI o con el contrato firmado. El cambio queda en el historial con el valor anterior.</small></fieldset>"
+        : "";
       window.Swal.fire({
         title: "Auditoría SIMI · contrato " + row.contrato,
         html: '<div class="scm-cm-simi-form"><p>Inmueble <strong>' + esc(row.inmueble || "—") + "</strong> · " + esc(row.direccion || "") + "<br>" + esc(row.arrendatario || "") + "</p>" +
           '<div class="scm-cm-simi-options" role="radiogroup" aria-label="Estado en SIMI">' + option("Correcto", "ok") + option("Incorrecto", "bad") + "</div>" +
+          fieldsHtml +
           '<label class="scm-cm-simi-obs"><span>Observaciones</span><textarea rows="4" maxlength="2000" data-scm-cm-simi-obs placeholder="Qué se revisó o qué se debe corregir en SIMI">' + esc(row.obs_simi) + "</textarea></label>" +
           "<small>Al guardar queda registrado en el historial del inmueble y del contrato.</small></div>",
-        width: "min(560px, 96vw)",
+        width: "min(680px, 96vw)",
         showCloseButton: true,
         showCancelButton: true,
         confirmButtonText: "Guardar auditoría",
@@ -566,11 +593,17 @@
             window.Swal.showValidationMessage("Selecciona Correcto o Incorrecto.");
             return false;
           }
-          return request(auditAction, {
+          var payload = {
             contract_id: String(row.id),
             estado_simi: checked.value,
             observaciones_estado_simi: popup.querySelector("[data-scm-cm-simi-obs]").value,
-          })
+          };
+          popup.querySelectorAll("[data-scm-cm-fix]").forEach(function (input) {
+            if (input.value.trim() !== input.getAttribute("data-initial")) {
+              payload["corrections[" + input.getAttribute("data-scm-cm-fix") + "]"] = input.value.trim();
+            }
+          });
+          return request(auditAction, payload)
             .catch(function (error) {
               window.Swal.showValidationMessage(error.message || "No se pudo guardar la auditoría.");
               return false;
@@ -580,9 +613,14 @@
         if (!result.isConfirmed || !result.value) return;
         row.estado_simi = result.value.estado_simi;
         row.obs_simi = result.value.observaciones_estado_simi;
+        var values = result.value.values || {};
+        Object.keys(values).forEach(function (key) {
+          row[key] = values[key];
+          if (key === "dias_gracia") row.dias_gracia_fuente = "contrato";
+        });
         // La caché guardada ya no refleja el cambio; la próxima carga vuelve a consultar.
         clearCache();
-        renderDetail();
+        render();
         window.Swal.fire({ icon: "success", title: result.value.message, timer: 2200, showConfirmButton: false });
       });
     }
@@ -731,13 +769,13 @@
       } else {
         var isDesoc = state.view === "desocupaciones";
         lines = [["Fecha del movimiento", "Fecha entrega", "Fecha recibo", "Fin contrato", "Contrato", "Inmueble", "Direccion", "Arrendatario",
-          "Tipo inmueble", "Destinacion", "Funcionario", "Estado", "Duracion meses", "Dias de gracia", "Fuente dias de gracia", "Canon", "Administracion", "Total", "Permanencia meses", "Estado SIMI", "Observaciones SIMI"]];
+          "Tipo inmueble", "Destinacion", "Funcionario", "Estado", "Duracion meses", "Dias de gracia", "Fuente dias de gracia", "Canon", "Administracion", "Total", "Permanencia meses", "% Derechos", "% Administracion", "Estado SIMI", "Observaciones SIMI"]];
         state.detailEvents.forEach(function (event) {
           var row = event.row;
           lines.push([event.date, row.entrega || "", row.recibo || "", row.fin || "", row.contrato, row.inmueble, row.direccion, row.arrendatario,
             row.tipo, row.destinacion, row.funcionarioNombre, STATE_LABELS[row.estado] || row.estado, row.meses || "",
             row.dias_gracia == null ? "" : row.dias_gracia, row.dias_gracia == null ? "" : row.dias_gracia_fuente, row.canon, row.admin || 0,
-            (row.canon || 0) + (row.admin || 0), row.permanencia == null ? "" : row.permanencia, row.estado_simi, row.obs_simi]);
+            (row.canon || 0) + (row.admin || 0), row.permanencia == null ? "" : row.permanencia, row.derechos == null ? "" : row.derechos, row.tasa_admin == null ? "" : row.tasa_admin, row.estado_simi, row.obs_simi]);
         });
         name = state.view + "-" + year + (state.month ? "-" + String(state.month).padStart(2, "0") : "");
       }

@@ -105,4 +105,33 @@ $fixed = $audit->save(5, 'Correcto', '', $actor);
 $history = $db->getResults('SELECT * FROM wp_jet_cct_historial_del_inmueble ORDER BY _ID');
 $check($fixed['changed'] && count($history) === 2 && str_ends_with($history[1]['observacion'], 'Se encontró correcto.'), 'Un nuevo resultado agrega su propio registro al historial.');
 
+// Correcciones de condiciones del contrato en la misma auditoría.
+foreach (['valor_canon', 'valor_administracion', 'meses_contrato', 'derechos_inmobiliarios', 'tasa_administracion', 'dias_gracia'] as $column) {
+  $pdo->exec('ALTER TABLE wp_jet_cct_contratos_arrendamiento ADD COLUMN ' . $column . ' TEXT');
+}
+$db->update('wp_jet_cct_contratos_arrendamiento', ['valor_canon' => '1.000.000', 'valor_administracion' => '120000.00', 'meses_contrato' => '12', 'derechos_inmobiliarios' => '10', 'tasa_administracion' => '8%', 'dias_gracia' => ''], ['_ID' => 5]);
+$audit = new ContractSimiAudit($db);
+$check(ContractSimiAudit::correctableKeys($db, new \SCM\Support\SchemaInspector($db)) === ['canon', 'admin', 'meses', 'derechos', 'tasa_admin', 'dias_gracia'], 'Las seis condiciones se pueden corregir cuando existen.');
+foreach ([['meses', '0'], ['derechos', '120'], ['dias_gracia', '-1'], ['canon', 'abc'], ['otro', '1']] as [$key, $bad]) {
+  try {
+    $audit->save(5, 'Correcto', '', $actor, [$key => $bad]);
+    $check(false, 'Debía rechazar ' . $key . '=' . $bad);
+  } catch (InvalidArgumentException) {
+  }
+}
+$historyBefore = count($db->getResults('SELECT * FROM wp_jet_cct_historial_contrato_arrendamiento'));
+$fix = $audit->save(5, 'Correcto', '', $actor, ['canon' => '1.100.000', 'admin' => '120000', 'derechos' => '10,5', 'dias_gracia' => '15']);
+$contract = $db->getRow('SELECT * FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 5');
+$check($contract['valor_canon'] === '1100000.00' && $contract['derechos_inmobiliarios'] === '10.5' && $contract['dias_gracia'] === '15', 'Las condiciones corregidas se guardan en el contrato.');
+$check($contract['valor_administracion'] === '120000.00' && $contract['meses_contrato'] === '12' && $contract['tasa_administracion'] === '8%', 'Lo que no cambia no se reescribe.');
+$check($contract['id_empleado'] === '1508' && $contract['cct_author_id'] === '1508', 'Corregir condiciones no cambia el funcionario ni el autor.');
+$check($fix['changed'] && $fix['values'] === ['canon' => 1100000, 'admin' => 120000, 'derechos' => 10.5, 'dias_gracia' => 15], 'Devuelve los valores aplicados.');
+$check($fix['adjustments'] === ['Canon de $1.000.000 a $1.100.000', '% derechos de 10% a 10,5%', 'Días de gracia de sin dato a 15 días'], 'Registra el valor anterior y el nuevo: ' . json_encode($fix['adjustments'], JSON_UNESCAPED_UNICODE));
+$last = $db->getRow('SELECT * FROM wp_jet_cct_historial_contrato_arrendamiento ORDER BY _ID DESC LIMIT 1');
+$check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_contrato_arrendamiento')) === $historyBefore + 1 && str_contains($last['observacion'], 'Se encontró correcto. Ajustes: Canon de $1.000.000 a $1.100.000; % derechos de 10% a 10,5%'), 'El historial del contrato describe los ajustes.');
+$lastProperty = $db->getRow('SELECT * FROM wp_jet_cct_historial_del_inmueble ORDER BY _ID DESC LIMIT 1');
+$check(str_contains($lastProperty['observacion'], 'Ajustes: Canon de $1.000.000'), 'El historial del inmueble también describe los ajustes.');
+$same = $audit->save(5, 'Correcto', '', $actor, ['canon' => '1100000']);
+$check(!$same['changed'] && $same['adjustments'] === [], 'Repetir el mismo valor no agrega historial.');
+
 echo "Contract SIMI audit checks passed.\n";

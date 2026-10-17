@@ -534,3 +534,13 @@
 #scm-app .scm-cm-accordion > summary .material-symbols-outlined { color: #64748b; transition: transform 0.15s ease; }
 #scm-app .scm-cm-accordion[open] > summary { margin-bottom: 12px; }
 #scm-app .scm-cm-accordion[open] > summary .material-symbols-outlined { transform: rotate(180deg); }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-fields { margin: 0; padding: 10px 12px 12px; border: 1px solid #e2e8f0; border-radius: 12px; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-fields legend { padding: 0 6px; font-size: 12px; font-weight: 700; color: #0f172a; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-fields > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 8px; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-fields label { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 11.5px; font-weight: 600; color: #475569; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-fields label small { font-weight: 400; font-size: 10.5px; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-input { display: flex; align-items: center; gap: 4px; padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 9px; background: #fff; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-input:focus-within { border-color: #93c5fd; outline: 2px solid #bfdbfe; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-input b { color: #94a3b8; font-size: 12px; font-weight: 600; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-input input { flex: 1 1 auto; min-width: 0; height: 34px; border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: #0f172a; }
+@media (max-width: 560px) { .swal2-popup.scm-cm-simi-swal .scm-cm-simi-fields > div { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

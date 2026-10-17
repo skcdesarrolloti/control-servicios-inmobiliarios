@@ -50,6 +50,8 @@ final class ContractMovementsReport
     'dias_gracia_fuente',
     'estado_simi',
     'obs_simi',
+    'derechos',
+    'tasa_admin',
   ];
 
   private const STATES = [
@@ -80,7 +82,13 @@ final class ContractMovementsReport
     $mandates = $this->db->table('jet_cct_contrato_mandato');
     // La auditoría SIMI usa campos que se crean desde JetEngine; mientras no existan se omiten.
     $simiEnabled = ContractSimiAudit::columnsExist($this->db, new SchemaInspector($this->db));
+    $schema = new SchemaInspector($this->db);
     $simiSelect = $simiEnabled ? ', c.`estado_simi`, c.`observaciones_estado_simi`' : '';
+    foreach (['derechos_inmobiliarios', 'tasa_administracion'] as $percentColumn) {
+      if ($schema->columnExists($table, $percentColumn)) {
+        $simiSelect .= ', c.`' . $percentColumn . '`';
+      }
+    }
     // Los días de gracia casi nunca se copian al contrato: se completan desde la hoja de cierre o el mandato.
     $rows = $this->db->getResults(
       "SELECT c.`_ID`, c.`contrato`, c.`estado`, c.`fecha_entrega`, c.`inicio_contrato`, c.`fecha_recibo`, c.`fin_contrato`,
@@ -113,6 +121,7 @@ final class ContractMovementsReport
       'rows' => $out,
       'funcionarios' => $this->employeeNames(array_keys($employeeIds)),
       'simi_enabled' => $simiEnabled,
+      'correctable' => ContractSimiAudit::correctableKeys($this->db, $schema),
       'generated_at' => time(),
     ];
   }
@@ -170,6 +179,8 @@ final class ContractMovementsReport
       $graceSource,
       ContractSimiAudit::normalizeState($row['estado_simi'] ?? ''),
       trim((string) ($row['observaciones_estado_simi'] ?? '')),
+      ContractSimiAudit::parsePercent($row['derechos_inmobiliarios'] ?? null),
+      ContractSimiAudit::parsePercent($row['tasa_administracion'] ?? null),
     ];
   }
 
