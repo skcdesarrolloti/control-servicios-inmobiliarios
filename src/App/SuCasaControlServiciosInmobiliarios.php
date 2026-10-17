@@ -481,6 +481,11 @@ final class SuCasaControlServiciosInmobiliarios
       'mantenimiento' => [
         'label' => 'Mantenimiento',
         'items' => [
+          'acta_enviada' => [
+            'label' => 'Acta enviada o reenviada a firma',
+            'description' => 'Cuando se envía, reenvía o vuelve a enviar tras editar un acta de solución o satisfacción para firma. Es un aviso aparte: no incluye el enlace personal del firmante.',
+            'channel' => 'Email interno en cola',
+          ],
           'acta_firmada' => [
             'label' => 'Acta firmada',
             'description' => 'Al firmar un acta de solución o satisfacción se avisa al creador original y a los funcionarios seleccionados aquí.',
@@ -489,16 +494,6 @@ final class SuCasaControlServiciosInmobiliarios
           'revision_correctiva_creada' => [
             'label' => 'Revisión correctiva creada',
             'description' => 'Cuando se registra una revisión correctiva desde el panel.',
-            'channel' => 'Email interno en cola',
-          ],
-          'revision_preventiva_creada' => [
-            'label' => 'Revisión preventiva creada',
-            'description' => 'Cuando se registra una revisión preventiva desde el panel (reemplaza los correos fijos del formulario de WordPress).',
-            'channel' => 'Email interno en cola',
-          ],
-          'revision_preventiva_enviada' => [
-            'label' => 'Revisión preventiva enviada',
-            'description' => 'Cuando se envía el informe de la revisión preventiva al propietario y al arrendatario (reemplaza los correos fijos del formulario "Enviar revisión preventiva").',
             'channel' => 'Email interno en cola',
           ],
           'ticket_administrativo_creado' => [
@@ -539,6 +534,16 @@ final class SuCasaControlServiciosInmobiliarios
           'comunicacion_no_acceso' => [
             'label' => 'Comunicación por no autorización',
             'description' => 'Recibe CC del correo con la comunicación por no acceso. Si no hay correo del arrendatario, el aviso es solo interno.',
+            'channel' => 'Email interno en cola',
+          ],
+          'revision_preventiva_creada' => [
+            'label' => 'Revisión preventiva creada',
+            'description' => 'Cuando se registra una revisión preventiva desde el panel (reemplaza los correos fijos del formulario de WordPress).',
+            'channel' => 'Email interno en cola',
+          ],
+          'revision_preventiva_enviada' => [
+            'label' => 'Revisión preventiva enviada',
+            'description' => 'Cuando se envía el informe de la revisión preventiva al propietario y al arrendatario (reemplaza los correos fijos del formulario "Enviar revisión preventiva").',
             'channel' => 'Email interno en cola',
           ],
           'acta_preventiva' => [

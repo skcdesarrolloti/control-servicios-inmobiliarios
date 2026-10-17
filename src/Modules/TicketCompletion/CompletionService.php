@@ -1062,6 +1062,44 @@ final class CompletionService
     return $this->notify($act, $act['status'] === 'signed', true);
   }
 
+  /**
+   * Aviso interno (evento acta_enviada) cuando el acta se envía o reenvía a firma. Es un correo
+   * aparte del de la invitación: el enlace personal del firmante nunca se copia a funcionarios.
+   */
+  private function tryNotifySentStaff(array $act, array $payload, int $generation, bool $resend, array $channelResults): void
+  {
+    try {
+      $contacts = \SCM\Support\InternalNotificationRecipients::contactsForAction($this->repo->db, 'acta_enviada');
+      $copies = \SCM\Support\InternalEmailCopies::emails(array_column($contacts, 'email'));
+      if ($copies === []) { return; }
+      $to = \SCM\Support\InternalEmailCopies::plan([], $copies)['to'][0];
+      $verb = $resend ? 'reenvió' : 'envió';
+      $channelLabels = ['email' => 'correo', 'whatsapp' => 'WhatsApp'];
+      $channels = [];
+      foreach ($channelResults as $channel => $queued) {
+        $channels[] = ($channelLabels[$channel] ?? $channel) . ($queued ? '' : ' (no se pudo encolar)');
+      }
+      $channelText = $channels !== [] ? implode(' y ', $channels) : 'los canales seleccionados';
+      $url = $this->viewUrl((int) $act['id']);
+      $subject = 'Acta #' . $act['id'] . ' ' . ($resend ? 'reenviada' : 'enviada') . ' a firma · Caso #' . $payload['ticket_number'];
+      $signer = trim((string) ($payload['signer']['name'] ?? '')) ?: 'el firmante';
+      $body = '<p>Se ' . $verb . ' el acta #' . (int) $act['id'] . ' del caso #' . EmailTemplate::e($payload['ticket_number']) . ' a <strong>' . EmailTemplate::e($signer) . '</strong> por ' . EmailTemplate::e($channelText) . ' para su firma.</p>'
+        . '<p>Contrato: <strong>' . EmailTemplate::e($payload['contract'] ?? '') . '</strong> · Inmueble SIMI: <strong>' . EmailTemplate::e($payload['property'] ?? '') . '</strong> · Enlace vigente hasta ' . date('d/m/Y', (int) $act['expires_at']) . '.</p>'
+        . '<p><a href="' . EmailTemplate::e($url) . '">Consultar el acta</a> (requiere iniciar sesión en el panel).</p>';
+      $text = 'Se ' . $verb . ' el acta #' . $act['id'] . ' del caso #' . $payload['ticket_number'] . ' a ' . $signer . ' por ' . $channelText . ' para su firma. Consultar: ' . $url;
+      ($this->enqueueInternal)($to, $subject, EmailTemplate::render($subject, $body), [
+        'channel' => 'email', 'source_module' => 'ticket-completion', 'provider' => 'email_smtp',
+        'internal_action' => 'acta_enviada', 'internal_cc' => $copies,
+        'destination_name' => 'Equipo interno', 'priority' => 100, 'message_text' => $text,
+        'ticket_number' => $payload['ticket_number'], 'act_id' => (string) $act['id'], 'act_url' => $url,
+        'dedupe_key' => 'ticket-acta:' . $act['id'] . ':acta_enviada:' . $generation . ':' . $act['token_nonce'],
+        'meta' => ['event' => 'acta_enviada', 'ticket_pk' => (int) $act['ticket_pk'], 'act_id' => (int) $act['id'], 'notification_actor_employee_id' => $this->notificationActorId($act, $payload)],
+      ]);
+    } catch (\Throwable $error) {
+      error_log('[ticket-completion] Acta #' . (int) $act['id'] . ': no se pudo registrar el aviso interno de envío: ' . $error->getMessage());
+    }
+  }
+
   private function tryNotifySignedStaff(array $act): void
   {
     try { $this->notifySignedStaff($act); }
@@ -1187,6 +1225,7 @@ final class CompletionService
       $this->repo->db->update($this->repo->table(), ['delivery_json' => json_encode($delivery, JSON_THROW_ON_ERROR)], ['id' => (int) $act['id']]);
     }
     $this->repo->db->update($this->repo->table(), ['invitation_queued_at' => time()], ['id' => (int) $act['id']]);
+    if (!$receipt) { $this->tryNotifySentStaff($act, $payload, $generation, $resend, $results); }
     $all = !in_array(false, $results, true);
     $sent = true;
     foreach ($channels as $channel) $sent = $sent && !empty($delivery[$event][$channel]['sent']);
