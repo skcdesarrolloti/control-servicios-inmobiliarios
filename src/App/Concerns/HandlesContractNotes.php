@@ -47,7 +47,7 @@ trait HandlesContractNotes
     if (!$receipt || !flock($receipt, LOCK_EX)) {
       $this->jsonFail('No se pudo bloquear la solicitud. Intenta nuevamente.');
     }
-    $stored = ['images' => [], 'document' => ''];
+    $stored = ['images' => [], 'documents' => []];
     try {
       $saved = json_decode((string) stream_get_contents($receipt), true);
       if (is_array($saved) && !empty($saved['id'])) {
@@ -57,11 +57,11 @@ trait HandlesContractNotes
         $expected = $service->validateFiles($_FILES);
         $files = StoredFileService::fromRuntime();
         $stored = ContractNoteService::storeFiles($files);
-        if (count($stored['images']) !== $expected['images'] || ($stored['document'] !== '') !== $expected['document']) {
+        if (count($stored['images']) !== $expected['images'] || count($stored['documents']) !== $expected['documents']) {
           throw new \RuntimeException('No se pudieron guardar todos los adjuntos. Intenta nuevamente.');
         }
         $note = $service->create($_POST, ['employee_id' => $employeeId, 'name' => Auth::user()], $stored);
-        $result = $note + ['message' => 'Nota registrada en el historial del contrato ' . $note['contrato'] . '.'];
+        $result = $note + ['message' => 'Nota registrada en el historial del contrato ' . $note['contrato'] . ' y del inmueble.'];
         rewind($receipt);
         ftruncate($receipt, 0);
         fwrite($receipt, (string) json_encode($result, JSON_UNESCAPED_UNICODE));
@@ -83,11 +83,11 @@ trait HandlesContractNotes
     $this->jsonOk($result);
   }
 
-  /** @param array{images:list<string>,document:string} $stored */
+  /** @param array{images:list<string>,documents:list<string>} $stored */
   private function removeStoredContractNoteFiles(array $stored): void
   {
     $files = StoredFileService::fromRuntime();
-    foreach (array_merge($stored['images'], $stored['document'] !== '' ? [$stored['document']] : []) as $url) {
+    foreach (array_merge($stored['images'], $stored['documents']) as $url) {
       parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
       $path = $files->pathFor((string) ($query['n'] ?? ''));
       if ($path !== null) {

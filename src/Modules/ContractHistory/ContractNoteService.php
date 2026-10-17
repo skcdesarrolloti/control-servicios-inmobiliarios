@@ -12,14 +12,16 @@ use SCM\Support\StoredFileService;
  * Notas del historial del contrato de arrendamiento (`jet_cct_historial_contrato_arrendamiento`).
  *
  * Un funcionario elige el contrato, el tipo de reporte y describe lo que se hizo. Puede adjuntar
- * imágenes (campo galería `imagen`, URLs separadas por coma como en los casos) y un documento
- * (campo media `archivo`, URL). Las imágenes se comprimen al guardarse. No toca el contrato.
+ * imágenes (campo galería `imagen`) y documentos (campo `archivo`), ambos como URLs separadas por
+ * coma. Solo las imágenes se comprimen; los documentos se guardan tal cual. La misma gestión queda
+ * también en el historial del inmueble. No toca el contrato.
  */
 final class ContractNoteService
 {
   public const TABLE = 'jet_cct_historial_contrato_arrendamiento';
   public const DEFAULT_TYPES = ['Nota', 'Llamada', 'Correo', 'WhatsApp', 'Visita', 'Acuerdo', 'Novedad', 'Documento'];
   public const MAX_IMAGES = 10;
+  public const MAX_DOCUMENTS = 5;
   public const MAX_OBSERVATION = 5000;
   public const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
   private const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -67,6 +69,7 @@ final class ContractNoteService
       'document_enabled' => $exists && $this->schema->columnExists($table, 'archivo'),
       'max_file_bytes' => $this->maxFileBytes(),
       'max_images' => self::MAX_IMAGES,
+      'max_documents' => self::MAX_DOCUMENTS,
       'document_extensions' => array_keys(self::DOCUMENT_TYPES),
     ];
   }
@@ -94,8 +97,8 @@ final class ContractNoteService
   /**
    * Valida los adjuntos de $_FILES antes de guardar nada.
    *
-   * @param array<string,mixed> $files `imagenes` (varias) y `archivo` (uno)
-   * @return array{images:int,document:bool}
+   * @param array<string,mixed> $files `imagenes` y `archivos` (varios)
+   * @return array{images:int,documents:int}
    */
   public function validateFiles(array $files): array
   {
@@ -114,32 +117,32 @@ final class ContractNoteService
     if ($images > self::MAX_IMAGES) {
       throw new \InvalidArgumentException('Puedes adjuntar hasta ' . self::MAX_IMAGES . ' imágenes.');
     }
-    $documents = $this->uploads($files['archivo'] ?? null);
-    if (count($documents) > 1) {
-      throw new \InvalidArgumentException('Adjunta un solo documento por nota.');
+    $documents = $this->uploads($files['archivos'] ?? null);
+    if (count($documents) > self::MAX_DOCUMENTS) {
+      throw new \InvalidArgumentException('Puedes adjuntar hasta ' . self::MAX_DOCUMENTS . ' documentos.');
     }
     foreach ($documents as $file) {
       $this->assertUpload($file, $max);
       $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
       $mime = (string) (new \finfo(FILEINFO_MIME_TYPE))->file((string) $file['tmp_name']);
       if (!isset(self::DOCUMENT_TYPES[$extension]) || !in_array($mime, self::DOCUMENT_TYPES[$extension], true)) {
-        throw new \InvalidArgumentException('El documento debe ser PDF, Word o Excel.');
+        throw new \InvalidArgumentException('Los documentos deben ser PDF, Word o Excel.');
       }
       $total += (int) $file['size'];
     }
     if ($total > self::MAX_TOTAL_BYTES) {
       throw new \InvalidArgumentException('Los adjuntos superan 25 MB en total.');
     }
-    return ['images' => $images, 'document' => $documents !== []];
+    return ['images' => $images, 'documents' => count($documents)];
   }
 
   /**
    * @param array<string,mixed> $input
    * @param array{employee_id:string,name:string} $actor
-   * @param array{images:list<string>,document:string} $stored URLs ya guardadas
+   * @param array{images:list<string>,documents:list<string>} $stored URLs ya guardadas
    * @return array{id:int,contract_id:int,contrato:string}
    */
-  public function create(array $input, array $actor, array $stored = ['images' => [], 'document' => '']): array
+  public function create(array $input, array $actor, array $stored = ['images' => [], 'documents' => []]): array
   {
     $table = $this->db->table(self::TABLE);
     if (!$this->schema->tableExists($table)) {
@@ -160,7 +163,7 @@ final class ContractNoteService
     if ($stored['images'] !== [] && !$this->schema->columnExists($table, 'imagen')) {
       throw new \DomainException('Falta el campo imagen en el historial del contrato (JetEngine).');
     }
-    if ($stored['document'] !== '' && !$this->schema->columnExists($table, 'archivo')) {
+    if ($stored['documents'] !== [] && !$this->schema->columnExists($table, 'archivo')) {
       throw new \DomainException('Falta el campo archivo en el historial del contrato (JetEngine).');
     }
     $contract = $this->db->getRow(
@@ -173,6 +176,21 @@ final class ContractNoteService
 
     $now = time();
     $nowSql = date('Y-m-d H:i:s', $now);
+    $base = [
+      'cct_status' => 'publish',
+      'cct_author_id' => $employeeId,
+      'cct_created' => $nowSql,
+      'cct_modified' => $nowSql,
+      'id_empleado' => $employeeId,
+      'funcionario' => trim((string) ($actor['name'] ?? '')),
+      'id_inmueble' => trim((string) ($contract['id_inmueble'] ?? '')),
+      'id_inmueble_data' => trim((string) ($contract['id_inmueble_data'] ?? '')),
+      'fecha' => $now,
+      'tipo_reporte' => $type,
+      'imagen' => implode(',', $stored['images']),
+      'archivo' => implode(',', $stored['documents']),
+    ];
+    $contractNumber = trim((string) ($contract['contrato'] ?? ''));
     $payload = $this->schema->filterTableData($table, [
       'cct_status' => 'publish',
       'cct_author_id' => $employeeId,
@@ -189,24 +207,54 @@ final class ContractNoteService
       'tipo_reporte' => $type,
       'observacion' => $observation,
       'imagen' => implode(',', $stored['images']),
-      'archivo' => $stored['document'],
+      'archivo' => implode(',', $stored['documents']),
     ]);
-    if (!$this->db->insert($table, $payload)) {
-      throw new \RuntimeException('No se pudo guardar la nota del contrato.');
+    $pdo = $this->db->pdo();
+    $ownsTransaction = !$pdo->inTransaction();
+    if ($ownsTransaction) {
+      $pdo->beginTransaction();
     }
-    return ['id' => (int) $this->db->lastInsertId(), 'contract_id' => (int) $contract['_ID'], 'contrato' => (string) ($contract['contrato'] ?? '')];
+    try {
+      if (!$this->db->insert($table, $payload)) {
+        throw new \RuntimeException('No se pudo guardar la nota del contrato.');
+      }
+      $id = (int) $this->db->lastInsertId();
+      // La misma gestión queda en el historial del inmueble, indicando el contrato.
+      $propertyTable = $this->db->table('jet_cct_historial_del_inmueble');
+      if ($this->schema->tableExists($propertyTable)) {
+        $propertyNote = ($contractNumber !== '' ? 'Contrato #' . $contractNumber . ': ' : '') . $observation;
+        $propertyPayload = $this->schema->filterTableData($propertyTable, $base + [
+          'tipo_de_reporte_his' => $type,
+          'observacion_his' => $propertyNote,
+          'observacion' => $propertyNote,
+          'nombre_empleado' => trim((string) ($actor['name'] ?? '')),
+        ]);
+        if ($propertyPayload !== [] && !$this->db->insert($propertyTable, $propertyPayload)) {
+          throw new \RuntimeException('No se pudo registrar la nota en el historial del inmueble.');
+        }
+      }
+      if ($ownsTransaction) {
+        $pdo->commit();
+      }
+    } catch (\Throwable $error) {
+      if ($ownsTransaction && $pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      throw $error;
+    }
+    return ['id' => $id, 'contract_id' => (int) $contract['_ID'], 'contrato' => $contractNumber];
   }
 
   /**
-   * Guarda los adjuntos ya validados: imágenes comprimidas y el documento tal cual.
+   * Guarda los adjuntos ya validados: imágenes comprimidas (máx. 1600 px, JPEG) y documentos tal cual.
    *
-   * @return array{images:list<string>,document:string}
+   * @return array{images:list<string>,documents:list<string>}
    */
   public static function storeFiles(StoredFileService $files): array
   {
     $images = array_column($files->storeImagesDetailed('imagenes', self::MAX_IMAGES), 'url');
-    $documents = $files->storeDocuments('archivo', [], 1);
-    return ['images' => array_values(array_map('strval', $images)), 'document' => (string) ($documents[0]['archivo'] ?? '')];
+    $documents = array_column($files->storeDocuments('archivos', [], self::MAX_DOCUMENTS), 'archivo');
+    return ['images' => array_values(array_map('strval', $images)), 'documents' => array_values(array_map('strval', $documents))];
   }
 
   /** @return list<array<string,mixed>> */

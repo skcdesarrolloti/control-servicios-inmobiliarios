@@ -8,6 +8,23 @@
   const IMAGE_TYPES = {'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp'};
   const MAX_TOTAL = 25 * 1024 * 1024;
   const icon = name => `<span class="material-symbols-outlined" aria-hidden="true">${name}</span>`;
+  // Las imágenes se reducen a 1600 px en JPEG antes de subirlas (el servidor vuelve a comprimir).
+  const compressImage = async file => {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+      if (scale === 1 && file.size <= 600 * 1024) { bitmap.close?.(); return file; }
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close?.();
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+      if (!blob || blob.size >= file.size) return file;
+      return new File([blob], file.name.replace(/\.[a-z0-9]+$/i, '') + '.jpg', {type: 'image/jpeg'});
+    } catch (_) { return file; }
+  };
 
   window.addEventListener('scm:open-contract-note', async () => {
     if (dialog) { if (!dialog.open) dialog.showModal(); return; }
@@ -20,13 +37,13 @@
     let sequence = 0;
     let requestId = crypto.randomUUID();
     const images = [];
-    let documentFile = null;
+    const documents = [];
 
     dialog = document.createElement('dialog');
     dialog.className = 'scm-new-case scm-contract-note';
     dialog.setAttribute('aria-labelledby', 'scm-contract-note-title');
     dialog.innerHTML = `<header class="scm-new-case-header">
-      <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Historial del contrato</p><h2 id="scm-contract-note-title" class="text-xl font-bold text-slate-900 mt-1">Añadir nota al contrato de arrendamiento</h2><p class="text-sm text-slate-500 mt-1">Registra una gestión con su soporte en imágenes o documento.</p></div>
+      <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Historial del contrato</p><h2 id="scm-contract-note-title" class="text-xl font-bold text-slate-900 mt-1">Añadir nota al contrato de arrendamiento</h2><p class="text-sm text-slate-500 mt-1">Registra una gestión con sus soportes. Queda en el historial del contrato y del inmueble.</p></div>
       <button type="button" data-close class="scm-new-case-icon" aria-label="Cerrar popup"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
     </header><div data-content class="p-6"><p role="status" class="text-sm text-slate-500">Cargando…</p></div>`;
     document.body.append(dialog);
@@ -86,18 +103,18 @@
               ${config.images_enabled ? `<button type="button" data-pick-images class="scm-case-media-button">${icon('image')}Adjuntar imagen</button><button type="button" data-paste class="scm-case-media-button">${icon('content_paste')}Pegar (Ctrl+V)</button>` : ''}
               ${config.document_enabled ? `<button type="button" data-pick-document class="scm-case-media-button">${icon('description')}Adjuntar documento</button>` : ''}
             </div>
-            <p data-attach-status role="status" aria-live="polite" class="mt-3 text-xs text-slate-500">${config.images_enabled ? 'Copia una captura y presiona Ctrl+V, o arrastra los archivos aquí.' : 'Arrastra el documento aquí o usa el botón.'}</p>
+            <p data-attach-status role="status" aria-live="polite" class="mt-3 text-xs text-slate-500">${config.images_enabled ? 'Copia una captura y presiona Ctrl+V, o arrastra los archivos aquí.' : 'Arrastra los documentos aquí o usa el botón.'}</p>
             <input hidden type="file" data-images-input accept="image/jpeg,image/png,image/webp" multiple>
-            <input hidden type="file" data-document-input accept="${escape(docAccept)}">
+            <input hidden type="file" data-document-input accept="${escape(docAccept)}" multiple>
             <div data-previews class="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
             <div data-document class="mt-3"></div>
           </div>
-          <p class="text-xs text-slate-500">${config.images_enabled ? `Hasta ${config.max_images} imágenes JPG, PNG o WebP (se comprimen al guardar)` : ''}${config.images_enabled && config.document_enabled ? ' y ' : ''}${config.document_enabled ? `un documento PDF, Word o Excel` : ''}. Máximo ${maxMb} MB por archivo y 25 MB en total.</p>`
+          <p class="text-xs text-slate-500">${config.images_enabled ? `Hasta ${config.max_images} imágenes JPG, PNG o WebP (se comprimen al guardar)` : ''}${config.images_enabled && config.document_enabled ? ' y ' : ''}${config.document_enabled ? `hasta ${config.max_documents} documentos PDF, Word o Excel` : ''}. Máximo ${maxMb} MB por archivo y 25 MB en total.</p>`
           : '<p class="text-xs text-slate-500">Para adjuntar soportes crea en JetEngine los campos imagen (galería) y archivo (media) del historial del contrato.</p>'}
         </section>
       </div></fieldset>
       <p data-error hidden role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"></p>
-      <footer class="border-t border-slate-200 pt-4 flex flex-wrap items-center justify-between gap-3"><p class="text-xs text-slate-500 max-w-sm">La nota queda en el historial del contrato con tu nombre y la fecha.</p><div class="flex gap-2"><button type="button" data-cancel class="scm-new-case-button">Cancelar</button><button type="submit" data-submit hidden disabled class="scm-new-case-primary">Guardar nota</button></div></footer>
+      <footer class="border-t border-slate-200 pt-4 flex flex-wrap items-center justify-between gap-3"><p class="text-xs text-slate-500 max-w-sm">La nota queda en el historial del contrato y del inmueble con tu nombre y la fecha.</p><div class="flex gap-2"><button type="button" data-cancel class="scm-new-case-button">Cancelar</button><button type="submit" data-submit hidden disabled class="scm-new-case-primary">Guardar nota</button></div></footer>
     </form>`;
 
     const form = current.querySelector('form');
@@ -169,42 +186,43 @@
     searchInput.onkeydown = event => { if (event.key === 'Enter') { event.preventDefault(); search(); } };
 
     // Adjuntos: imágenes (seleccionadas, pegadas o arrastradas) y un documento.
-    const totalBytes = extra => images.reduce((sum, image) => sum + image.file.size, 0) + (documentFile ? documentFile.size : 0) + extra;
+    const totalBytes = extra => images.reduce((sum, image) => sum + image.file.size, 0) + documents.reduce((sum, file) => sum + file.size, 0) + extra;
     const renderAttachments = () => {
       const previews = current.querySelector('[data-previews]');
       if (previews) previews.innerHTML = images.map((image, index) => `<figure class="scm-contract-note-thumb"><img src="${image.url}" alt="Imagen ${index + 1}"><figcaption><span>${escape(image.file.name)}</span><button type="button" data-remove-image="${index}" aria-label="Quitar ${escape(image.file.name)}">×</button></figcaption></figure>`).join('');
       const doc = current.querySelector('[data-document]');
-      if (doc) doc.innerHTML = documentFile ? `<div class="scm-contract-note-doc">${icon('description')}<span>${escape(documentFile.name)} · ${(documentFile.size / 1024 / 1024).toFixed(1)} MB</span><button type="button" data-remove-document aria-label="Quitar documento">×</button></div>` : '';
+      if (doc) doc.innerHTML = documents.map((file, index) => `<div class="scm-contract-note-doc">${icon('description')}<span>${escape(file.name)} · ${(file.size / 1024 / 1024).toFixed(1)} MB</span><button type="button" data-remove-document="${index}" aria-label="Quitar ${escape(file.name)}">×</button></div>`).join('');
     };
-    const addImages = blobs => {
+    const addImages = async originals => {
       if (busy || !selected || !config.images_enabled) return;
-      if (blobs.some(blob => !IMAGE_TYPES[blob.type])) { attachStatus.textContent = 'Usa imágenes JPG, PNG o WebP.'; return; }
-      if (images.length + blobs.length > config.max_images) { attachStatus.textContent = `Puedes adjuntar hasta ${config.max_images} imágenes.`; return; }
+      if (originals.some(blob => !IMAGE_TYPES[blob.type])) { attachStatus.textContent = 'Usa imágenes JPG, PNG o WebP.'; return; }
+      if (images.length + originals.length > config.max_images) { attachStatus.textContent = `Puedes adjuntar hasta ${config.max_images} imágenes.`; return; }
+      attachStatus.textContent = 'Comprimiendo imágenes…';
+      const named = originals.map((blob, index) => blob instanceof File && blob.name ? blob : new File([blob], `captura-${Date.now()}-${index + 1}.${IMAGE_TYPES[blob.type]}`, {type: blob.type}));
+      const blobs = await Promise.all(named.map(compressImage));
+      if (!current.isConnected) return;
       if (blobs.some(blob => !blob.size || blob.size > config.max_file_bytes) || totalBytes(blobs.reduce((sum, blob) => sum + blob.size, 0)) > MAX_TOTAL) {
         attachStatus.textContent = `Cada archivo debe pesar máximo ${maxMb} MB y el total 25 MB.`; return;
       }
-      blobs.forEach((blob, index) => {
-        const file = blob instanceof File && blob.name ? blob : new File([blob], `captura-${Date.now()}-${index + 1}.${IMAGE_TYPES[blob.type]}`, {type: blob.type});
-        images.push({file, url: URL.createObjectURL(file)});
-      });
+      blobs.forEach(file => images.push({file, url: URL.createObjectURL(file)}));
       renderAttachments();
       attachStatus.textContent = blobs.length === 1 ? 'Imagen agregada.' : `${blobs.length} imágenes agregadas.`;
     };
-    const setDocument = file => {
-      if (busy || !selected || !config.document_enabled || !file) return;
-      const extension = (file.name.split('.').pop() || '').toLowerCase();
-      if (!config.document_extensions.includes(extension)) { attachStatus.textContent = 'El documento debe ser PDF, Word o Excel.'; return; }
-      if (file.size > config.max_file_bytes || totalBytes(file.size - (documentFile ? documentFile.size : 0)) > MAX_TOTAL) { attachStatus.textContent = `El documento debe pesar máximo ${maxMb} MB y el total 25 MB.`; return; }
-      documentFile = file;
+    const addDocuments = files => {
+      if (busy || !selected || !config.document_enabled || !files.length) return;
+      if (files.some(file => !config.document_extensions.includes((file.name.split('.').pop() || '').toLowerCase()))) { attachStatus.textContent = 'Los documentos deben ser PDF, Word o Excel.'; return; }
+      if (documents.length + files.length > config.max_documents) { attachStatus.textContent = `Puedes adjuntar hasta ${config.max_documents} documentos.`; return; }
+      if (files.some(file => !file.size || file.size > config.max_file_bytes) || totalBytes(files.reduce((sum, file) => sum + file.size, 0)) > MAX_TOTAL) { attachStatus.textContent = `Cada documento debe pesar máximo ${maxMb} MB y el total 25 MB.`; return; }
+      documents.push(...files);
       renderAttachments();
-      attachStatus.textContent = 'Documento agregado. Solo se guarda uno por nota; uno nuevo reemplaza al anterior.';
+      attachStatus.textContent = files.length === 1 ? 'Documento agregado.' : `${files.length} documentos agregados.`;
     };
     const imagesInput = current.querySelector('[data-images-input]');
     const documentInput = current.querySelector('[data-document-input]');
     current.querySelector('[data-pick-images]')?.addEventListener('click', () => imagesInput.click());
     current.querySelector('[data-pick-document]')?.addEventListener('click', () => documentInput.click());
     if (imagesInput) imagesInput.onchange = () => { addImages([...imagesInput.files]); imagesInput.value = ''; };
-    if (documentInput) documentInput.onchange = () => { setDocument(documentInput.files[0]); documentInput.value = ''; };
+    if (documentInput) documentInput.onchange = () => { addDocuments([...documentInput.files]); documentInput.value = ''; };
     const drop = current.querySelector('[data-drop]');
     if (drop) {
       ['dragenter', 'dragover'].forEach(type => drop.addEventListener(type, event => { event.preventDefault(); drop.classList.add('is-over'); }));
@@ -214,8 +232,8 @@
         const files = [...(event.dataTransfer?.files || [])];
         const imageFiles = files.filter(file => IMAGE_TYPES[file.type]);
         if (imageFiles.length) addImages(imageFiles);
-        const doc = files.find(file => !IMAGE_TYPES[file.type]);
-        if (doc) setDocument(doc);
+        const docs = files.filter(file => !IMAGE_TYPES[file.type]);
+        if (docs.length) addDocuments(docs);
       });
       drop.addEventListener('click', event => {
         const removeImage = event.target.closest('[data-remove-image]');
@@ -224,7 +242,8 @@
           if (removed) URL.revokeObjectURL(removed.url);
           renderAttachments(); attachStatus.textContent = 'Imagen quitada.';
         }
-        if (event.target.closest('[data-remove-document]') && !busy) { documentFile = null; renderAttachments(); attachStatus.textContent = 'Documento quitado.'; }
+        const removeDocument = event.target.closest('[data-remove-document]');
+        if (removeDocument && !busy) { documents.splice(Number(removeDocument.dataset.removeDocument), 1); renderAttachments(); attachStatus.textContent = 'Documento quitado.'; }
       });
     }
     // Ctrl+V en cualquier parte del formulario pega capturas; el texto se pega normal.
@@ -263,7 +282,7 @@
       data.set('tipo_reporte', form.elements.tipo_reporte.value.trim());
       data.set('observacion', form.elements.observacion.value.trim());
       images.forEach(image => data.append('imagenes[]', image.file, image.file.name));
-      if (documentFile) data.set('archivo', documentFile, documentFile.name);
+      documents.forEach(file => data.append('archivos[]', file, file.name));
       busy = true;
       submit.textContent = 'Guardando…';
       const controls = [...current.querySelectorAll('input, textarea, select, button')];
