@@ -145,6 +145,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_RECEIPT_SETTINGS_SAVE = 'scm_contratos_recibo_configuracion_guardar';
   const AJAX_DASHBOARD_METRICS = 'scm_dashboard_metricas';
   const AJAX_CONTRACT_MOVEMENTS = 'scm_ocupaciones_desocupaciones';
+  const AJAX_CONTRACT_SIMI_AUDIT = 'scm_auditoria_simi_contrato';
   const AJAX_CASE_METRICS = 'scm_metricas_casos';
   const AJAX_QUOTE_METRICS = 'scm_metricas_cotizaciones';
   const AJAX_QUOTE_RESPONSE_DATE = 'scm_metricas_cotizacion_fecha_respuesta';

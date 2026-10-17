@@ -537,6 +537,7 @@ trait RendersDashboard
         'contract_receipt_settings_save' => self::AJAX_CONTRACT_RECEIPT_SETTINGS_SAVE,
         'dashboard_metrics' => self::AJAX_DASHBOARD_METRICS,
         'contract_movements' => self::AJAX_CONTRACT_MOVEMENTS,
+        'contract_simi_audit' => self::AJAX_CONTRACT_SIMI_AUDIT,
         'case_metrics' => self::AJAX_CASE_METRICS,
         'quote_metrics' => self::AJAX_QUOTE_METRICS,
         'quote_response_date' => self::AJAX_QUOTE_RESPONSE_DATE,

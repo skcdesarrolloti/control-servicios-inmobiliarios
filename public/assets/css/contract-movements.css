@@ -450,3 +450,74 @@
   #scm-app .scm-cm-head h1 { font-size: 20px; }
   #scm-app .scm-cm-kpi strong { font-size: 22px; }
 }
+
+/* Auditoría SIMI en el detalle de ocupaciones y desocupaciones */
+#scm-app .scm-cm-detail-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#scm-app .scm-cm-simi-filter {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--cm-line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--cm-ink);
+  font-size: 12.5px;
+}
+#scm-app .scm-cm-badge.is-simi-ok { background: #dcfce7; color: #166534; }
+#scm-app .scm-cm-badge.is-simi-bad { background: #fee2e2; color: #b91c1c; }
+#scm-app .scm-cm-simi-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+}
+#scm-app .scm-cm-simi-btn .material-symbols-outlined { font-size: 15px; color: #94a3b8; }
+#scm-app .scm-cm-simi-btn:hover .material-symbols-outlined { color: #0f172a; }
+#scm-app .scm-cm-table td.is-simi-obs {
+  min-width: 180px;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-form { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-form p { margin: 0; color: #475569; font-size: 13px; line-height: 1.5; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-option input { accent-color: currentColor; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-option.is-ok { color: #166534; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-option.is-bad { color: #b91c1c; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-option.is-ok:has(input:checked) { border-color: #16a34a; background: #f0fdf4; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-option.is-bad:has(input:checked) { border-color: #dc2626; background: #fef2f2; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-obs { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #475569; }
+.swal2-popup.scm-cm-simi-swal .scm-cm-simi-obs textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  resize: vertical;
+}
+.swal2-popup.scm-cm-simi-swal small { color: #94a3b8; font-size: 11.5px; }
+#scm-app .scm-cm-detail-tools .scm-cm-search { min-width: min(100%, 280px); }
+@media (min-width: 900px) {
+  #scm-app .scm-cm-detail-tools { flex-wrap: nowrap; }
+  #scm-app .scm-cm-detail-tools .scm-cm-search { min-width: 240px; }
+}

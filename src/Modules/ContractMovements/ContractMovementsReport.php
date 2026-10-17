@@ -48,6 +48,8 @@ final class ContractMovementsReport
     'meses',
     'dias_gracia',
     'dias_gracia_fuente',
+    'estado_simi',
+    'obs_simi',
   ];
 
   private const STATES = [
@@ -69,20 +71,23 @@ final class ContractMovementsReport
   }
 
   /**
-   * @return array{columns:list<string>,rows:list<list<int|string|null>>,funcionarios:array<string,string>,generated_at:int}
+   * @return array{columns:list<string>,rows:list<list<int|string|null>>,funcionarios:array<string,string>,simi_enabled:bool,generated_at:int}
    */
   public function snapshot(): array
   {
     $table = $this->db->table('jet_cct_contratos_arrendamiento');
     $closings = $this->db->table('jet_cct_cierres');
     $mandates = $this->db->table('jet_cct_contrato_mandato');
+    // La auditoría SIMI usa campos que se crean desde JetEngine; mientras no existan se omiten.
+    $simiEnabled = ContractSimiAudit::columnsExist($this->db, new SchemaInspector($this->db));
+    $simiSelect = $simiEnabled ? ', c.`estado_simi`, c.`observaciones_estado_simi`' : '';
     // Los días de gracia casi nunca se copian al contrato: se completan desde la hoja de cierre o el mandato.
     $rows = $this->db->getResults(
       "SELECT c.`_ID`, c.`contrato`, c.`estado`, c.`fecha_entrega`, c.`inicio_contrato`, c.`fecha_recibo`, c.`fin_contrato`,
               c.`valor_canon`, c.`valor_administracion`, c.`meses_contrato`, c.`dias_gracia`,
               c.`tipo_inmueble`, c.`destinacion_inmueble`, c.`gestion_inmueble`, c.`id_empleado`,
               c.`direccion`, c.`arrendatario`, c.`inmueble`,
-              h.`dias_gracia` AS dias_gracia_cierre, m.`dias_gracia` AS dias_gracia_mandato
+              h.`dias_gracia` AS dias_gracia_cierre, m.`dias_gracia` AS dias_gracia_mandato{$simiSelect}
        FROM `{$table}` c
        LEFT JOIN `{$closings}` h ON h.`_ID` = c.`id_cierre`
        LEFT JOIN `{$mandates}` m ON m.`_ID` = c.`id_contrato_mandato`
@@ -107,6 +112,7 @@ final class ContractMovementsReport
       'columns' => self::COLUMNS,
       'rows' => $out,
       'funcionarios' => $this->employeeNames(array_keys($employeeIds)),
+      'simi_enabled' => $simiEnabled,
       'generated_at' => time(),
     ];
   }
@@ -162,6 +168,8 @@ final class ContractMovementsReport
       $months >= 1 && $months <= 120 ? $months : null,
       $grace,
       $graceSource,
+      ContractSimiAudit::normalizeState($row['estado_simi'] ?? ''),
+      trim((string) ($row['observaciones_estado_simi'] ?? '')),
     ];
   }
 

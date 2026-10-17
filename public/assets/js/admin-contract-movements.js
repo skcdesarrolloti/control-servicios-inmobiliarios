@@ -3,12 +3,13 @@
 
   // Los contratos llegan en una sola petición y todo lo demás (vistas, filtros,
   // drill-down por mes, tablas y CSV) se calcula aquí, sin volver al servidor.
-  var CACHE_KEY = "scm-contract-movements-v2";
+  var CACHE_KEY = "scm-contract-movements-v3";
   var CACHE_TTL_MS = 10 * 60 * 1000;
   var PAGE_SIZE = 15;
   var MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   var MONTHS_LONG = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   var STATE_LABELS = { entregado: "Entregado", por_recibir: "Por recibir", recibido: "Recibido" };
+  var SIMI_FILTERS = { "": "Auditoría SIMI: todas", Correcto: "Correcto", Incorrecto: "Incorrecto", pendiente: "Sin auditar" };
   var FILTER_LABELS = { funcionario: "Funcionario", tipo: "Tipo", destinacion: "Destinación", arrendatario: "Arrendatario", inmueble: "Inmueble", contrato: "Contrato" };
   var TEXT_FILTERS = ["arrendatario", "inmueble", "contrato"];
   var VIEWS = {
@@ -105,6 +106,8 @@
       var row = {};
       columns.forEach(function (column, index) { row[column] = values[index]; });
       row.funcionario = row.funcionario ? String(row.funcionario) : "";
+      row.estado_simi = row.estado_simi || "";
+      row.obs_simi = row.obs_simi || "";
       row.funcionarioNombre = row.funcionario ? names[row.funcionario] || "Funcionario " + row.funcionario : "";
       row.ingY = row.ingreso ? Number(row.ingreso.slice(0, 4)) : 0;
       row.ingM = row.ingreso ? Number(row.ingreso.slice(5, 7)) : 0;
@@ -130,6 +133,7 @@
     return {
       rows: rows,
       generatedAt: Number(snapshot.generated_at || 0),
+      simiEnabled: !!snapshot.simi_enabled,
       years: Object.keys(years).map(Number).sort(function (a, b) { return b - a; }),
       options: sortedOptions,
     };
@@ -197,6 +201,7 @@
       filters: emptyFilters(),
       month: 0,
       search: "",
+      simi: "",
       page: 1,
       data: null,
       pending: null,
@@ -209,10 +214,12 @@
       status.className = "scm-cm-status" + (tone ? " is-" + tone : "");
     }
 
-    function request() {
+    // Único punto de consulta al servidor: sin argumentos carga los contratos; con fields guarda.
+    function request(actionName, fields) {
       var body = new FormData();
-      body.append("action", action);
+      body.append("action", actionName || action);
       body.append("nonce", runtime.nonce || "");
+      Object.keys(fields || {}).forEach(function (key) { body.append(key, fields[key]); });
       return fetch(runtime.ajaxUrl || "", { method: "POST", body: body, credentials: "same-origin" })
         .then(function (response) {
           return response.json().catch(function () {
@@ -389,8 +396,18 @@
       state.detailEvents = shown.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
       state.detailKind = kind;
       html += card("Detalle de " + noun + " · " + periodLabel, '<div data-scm-cm-detail></div>', "is-wide",
+        '<div class="scm-cm-detail-tools">' +
+        '<select class="scm-cm-simi-filter" data-scm-cm-simi-filter aria-label="Filtrar por auditoría SIMI">' + Object.keys(SIMI_FILTERS).map(function (key) {
+          return '<option value="' + key + '"' + (state.simi === key ? " selected" : "") + ">" + esc(SIMI_FILTERS[key]) + "</option>";
+        }).join("") + "</select>" +
+        '<button type="button" class="scm-cm-btn" data-scm-cm-simi-report title="Excel con contrato, inmueble, estado SIMI y observaciones del listado">' +
+        '<span class="material-symbols-outlined" aria-hidden="true">table_view</span><span>Informe SIMI</span></button>' +
         '<label class="scm-cm-search"><span class="material-symbols-outlined" aria-hidden="true">search</span>' +
-        '<input type="search" data-scm-cm-search placeholder="Buscar contrato, inmueble, dirección o arrendatario" value="' + esc(state.search) + '"></label>');
+        '<input type="search" data-scm-cm-search placeholder="Buscar contrato, inmueble, dirección o arrendatario" value="' + esc(state.search) + '"></label></div>');
+      if (!state.data.simiEnabled) {
+        html += '<p class="scm-cm-note"><span class="material-symbols-outlined" aria-hidden="true">info</span>' +
+          "Para auditar contra SIMI crea en JetEngine los campos estado_simi (Correcto/Incorrecto) y observaciones_estado_simi del CCT Contratos de arrendamiento y pulsa Actualizar.</p>";
+      }
 
       var missing = isOcup
         ? rows.filter(function (row) { return !row.ingreso; })
@@ -429,22 +446,36 @@
       return card("Por desocupar · " + num(upcoming.length) + " en estado Por recibir", body, "is-wide");
     }
 
+    // Lista del detalle con la búsqueda y el filtro SIMI aplicados; el informe usa la misma.
+    function visibleEvents() {
+      var query = state.search.trim().toLowerCase();
+      return state.detailEvents.filter(function (event) {
+        var row = event.row;
+        if (state.simi === "pendiente" ? row.estado_simi : state.simi && row.estado_simi !== state.simi) return false;
+        return !query || [row.contrato, row.inmueble, row.direccion, row.arrendatario, row.funcionarioNombre, row.tipo]
+          .join(" ").toLowerCase().indexOf(query) !== -1;
+      });
+    }
+
+    function simiCell(row) {
+      var badge = row.estado_simi
+        ? '<span class="scm-cm-badge is-simi-' + (row.estado_simi === "Correcto" ? "ok" : "bad") + '">' + esc(row.estado_simi) + "</span>"
+        : '<span class="scm-cm-badge is-muted">Sin auditar</span>';
+      if (!state.data.simiEnabled) return badge;
+      return '<button type="button" class="scm-cm-simi-btn" data-scm-cm-simi="' + row.id + '" title="Auditar contrato ' + esc(row.contrato) + ' en SIMI">' + badge +
+        '<span class="material-symbols-outlined" aria-hidden="true">edit</span></button>';
+    }
+
     function renderDetail() {
       var holder = content.querySelector("[data-scm-cm-detail]");
       if (!holder) return;
       var query = state.search.trim().toLowerCase();
-      var events = query
-        ? state.detailEvents.filter(function (event) {
-          var row = event.row;
-          return [row.contrato, row.inmueble, row.direccion, row.arrendatario, row.funcionarioNombre, row.tipo]
-            .join(" ").toLowerCase().indexOf(query) !== -1;
-        })
-        : state.detailEvents;
+      var events = visibleEvents();
       var pages = Math.max(1, Math.ceil(events.length / PAGE_SIZE));
       state.page = Math.min(Math.max(1, state.page), pages);
       var slice = events.slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE);
       if (!slice.length) {
-        holder.innerHTML = '<div class="scm-cm-empty">' + (query ? "Ningún contrato coincide con la búsqueda." : "No hay movimientos en este periodo.") + "</div>";
+        holder.innerHTML = '<div class="scm-cm-empty">' + (query || state.simi ? "Ningún contrato coincide con la búsqueda o el filtro." : "No hay movimientos en este periodo.") + "</div>";
         return;
       }
       var isDesoc = state.detailKind === "desoc";
@@ -452,7 +483,7 @@
         (isDesoc ? "<th>Fecha recibo</th><th>Fin contrato</th>" : "<th>Fecha entrega</th>") +
         '<th>Contrato</th><th>Inmueble</th><th>Dirección</th><th>Arrendatario</th><th>Tipo</th><th>Destinación</th><th>Funcionario</th>' +
         '<th class="is-num">Duración</th>' + (isDesoc ? '<th class="is-num">Permanencia</th>' : '<th class="is-num">Días de gracia</th>') +
-        '<th class="is-num">Canon</th><th class="is-num">Administración</th><th class="is-num">Total</th>' + (isDesoc ? "" : "<th>Estado actual</th>") + "</tr></thead><tbody>";
+        '<th class="is-num">Canon</th><th class="is-num">Administración</th><th class="is-num">Total</th>' + (isDesoc ? "" : "<th>Estado actual</th>") + "<th>Estado SIMI</th><th>Observaciones SIMI</th></tr></thead><tbody>";
       html += slice.map(function (event) {
         var row = event.row;
         // Si falta la fecha propia del evento, se contó con la fecha de respaldo (inicio o fin del contrato).
@@ -468,7 +499,9 @@
             : '<td class="is-num">' + graceCell(row) + "</td>") +
           '<td class="is-num">' + esc(money(row.canon)) + '</td><td class="is-num">' + (row.admin ? esc(money(row.admin)) : '<span class="scm-cm-muted">No aplica</span>') + "</td>" +
           '<td class="is-num is-total">' + esc(money((row.canon || 0) + (row.admin || 0))) + "</td>" +
-          (isDesoc ? "" : '<td><span class="scm-cm-badge is-' + row.estado + '">' + esc(STATE_LABELS[row.estado] || row.estado) + "</span></td>") + "</tr>";
+          (isDesoc ? "" : '<td><span class="scm-cm-badge is-' + row.estado + '">' + esc(STATE_LABELS[row.estado] || row.estado) + "</span></td>") +
+          "<td>" + simiCell(row) + '</td><td class="is-simi-obs"' + (row.obs_simi ? ' title="' + esc(row.obs_simi) + '"' : "") + ">" +
+          (row.obs_simi ? esc(row.obs_simi) : '<span class="scm-cm-muted">—</span>') + "</td></tr>";
       }).join("");
       // La fila de totales suma todos los contratos filtrados, no solo los de la página.
       var sumCanon = 0;
@@ -479,7 +512,7 @@
       });
       html += '</tbody><tfoot><tr><td colspan="' + (isDesoc ? 11 : 10) + '">Total · ' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) +
         '</td><td class="is-num">' + esc(money(sumCanon)) + '</td><td class="is-num">' + esc(money(sumAdmin)) + '</td><td class="is-num is-total">' + esc(money(sumCanon + sumAdmin)) +
-        "</td>" + (isDesoc ? "" : "<td></td>") + "</tr></tfoot></table></div>";
+        "</td>" + (isDesoc ? "" : "<td></td>") + "<td></td><td></td></tr></tfoot></table></div>";
       html += '<div class="scm-cm-pager"><span>' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) + "</span>";
       if (pages > 1) {
         html += '<div><button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-cm-page="' + (state.page - 1) + '"' + (state.page === 1 ? " disabled" : "") +
@@ -495,6 +528,83 @@
         ? '<small class="scm-cm-source">' + (row.dias_gracia_fuente === "cierre" ? "hoja de cierre" : "mandato") + "</small>"
         : "";
       return esc(row.dias_gracia === 1 ? "1 día" : num(row.dias_gracia) + " días") + source;
+    }
+
+    function openSimiAudit(rowId) {
+      var row = state.data.rows.find(function (item) { return item.id === rowId; });
+      var auditAction = (runtime.actions || {}).contract_simi_audit || "";
+      if (!row || !window.Swal || !auditAction) return;
+      var option = function (value, tone) {
+        return '<label class="scm-cm-simi-option is-' + tone + '"><input type="radio" name="scm_cm_simi" value="' + value + '"' +
+          (row.estado_simi === value ? " checked" : "") + "><span>" + value + "</span></label>";
+      };
+      window.Swal.fire({
+        title: "Auditoría SIMI · contrato " + row.contrato,
+        html: '<div class="scm-cm-simi-form"><p>Inmueble <strong>' + esc(row.inmueble || "—") + "</strong> · " + esc(row.direccion || "") + "<br>" + esc(row.arrendatario || "") + "</p>" +
+          '<div class="scm-cm-simi-options" role="radiogroup" aria-label="Estado en SIMI">' + option("Correcto", "ok") + option("Incorrecto", "bad") + "</div>" +
+          '<label class="scm-cm-simi-obs"><span>Observaciones</span><textarea rows="4" maxlength="2000" data-scm-cm-simi-obs placeholder="Qué se revisó o qué se debe corregir en SIMI">' + esc(row.obs_simi) + "</textarea></label>" +
+          "<small>Al guardar queda registrado en el historial del inmueble.</small></div>",
+        width: "min(560px, 96vw)",
+        showCloseButton: true,
+        showCancelButton: true,
+        confirmButtonText: "Guardar auditoría",
+        cancelButtonText: "Cancelar",
+        focusConfirm: false,
+        customClass: { popup: "scm-cm-simi-swal" },
+        preConfirm: function () {
+          var popup = window.Swal.getPopup();
+          var checked = popup.querySelector('input[name="scm_cm_simi"]:checked');
+          if (!checked) {
+            window.Swal.showValidationMessage("Selecciona Correcto o Incorrecto.");
+            return false;
+          }
+          return request(auditAction, {
+            contract_id: String(row.id),
+            estado_simi: checked.value,
+            observaciones_estado_simi: popup.querySelector("[data-scm-cm-simi-obs]").value,
+          })
+            .catch(function (error) {
+              window.Swal.showValidationMessage(error.message || "No se pudo guardar la auditoría.");
+              return false;
+            });
+        },
+      }).then(function (result) {
+        if (!result.isConfirmed || !result.value) return;
+        row.estado_simi = result.value.estado_simi;
+        row.obs_simi = result.value.observaciones_estado_simi;
+        // La caché guardada ya no refleja el cambio; la próxima carga vuelve a consultar.
+        clearCache();
+        renderDetail();
+        window.Swal.fire({ icon: "success", title: result.value.message, timer: 2200, showConfirmButton: false });
+      });
+    }
+
+    // Excel (.xls en HTML, como el resto de exportaciones del panel) con filas verdes o rojas según SIMI.
+    function exportSimiReport() {
+      var events = visibleEvents();
+      if (!events.length) return;
+      var styles = { Correcto: "background:#C6EFCE;mso-pattern:auto none;color:#006100;", Incorrecto: "background:#FFC7CE;mso-pattern:auto none;color:#9C0006;" };
+      var cell = function (value, style) {
+        return '<td style="mso-number-format:\'\\@\';' + (style || "") + '">' + esc(value) + "</td>";
+      };
+      var rows = events.map(function (event) {
+        var row = event.row;
+        var style = styles[row.estado_simi] || "";
+        return "<tr>" + cell(row.contrato, style) + cell(row.inmueble, style) +
+          cell(row.estado_simi || "Sin auditar", style + (style ? "font-weight:bold;" : "")) + cell(row.obs_simi, style) + "</tr>";
+      }).join("");
+      var html = '<html><head><meta charset="UTF-8"><style>td,th{border:1px solid #b7b7b7;padding:6px;vertical-align:top}th{background:#0f1e36;color:#fff}</style></head><body>' +
+        "<table><thead><tr><th>Contrato</th><th>Inmueble</th><th>Estado SIMI</th><th>Observaciones SIMI</th></tr></thead><tbody>" + rows + "</tbody></table></body></html>";
+      var year = selectedYear() || "historico";
+      var link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob(["\ufeff" + html], { type: "application/vnd.ms-excel;charset=utf-8" }));
+      link.download = "auditoria-simi-" + state.view + "-" + year + (state.month ? "-" + String(state.month).padStart(2, "0") : "") + ".xls";
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(function () {
+        URL.revokeObjectURL(link.href);
+        link.remove();
+      }, 0);
     }
 
     function comparisonRows(rows, oc, de, buckets) {
@@ -611,13 +721,13 @@
       } else {
         var isDesoc = state.view === "desocupaciones";
         lines = [["Fecha del movimiento", "Fecha entrega", "Fecha recibo", "Fin contrato", "Contrato", "Inmueble", "Direccion", "Arrendatario",
-          "Tipo inmueble", "Destinacion", "Funcionario", "Estado", "Duracion meses", "Dias de gracia", "Fuente dias de gracia", "Canon", "Administracion", "Total", "Permanencia meses"]];
+          "Tipo inmueble", "Destinacion", "Funcionario", "Estado", "Duracion meses", "Dias de gracia", "Fuente dias de gracia", "Canon", "Administracion", "Total", "Permanencia meses", "Estado SIMI", "Observaciones SIMI"]];
         state.detailEvents.forEach(function (event) {
           var row = event.row;
           lines.push([event.date, row.entrega || "", row.recibo || "", row.fin || "", row.contrato, row.inmueble, row.direccion, row.arrendatario,
             row.tipo, row.destinacion, row.funcionarioNombre, STATE_LABELS[row.estado] || row.estado, row.meses || "",
             row.dias_gracia == null ? "" : row.dias_gracia, row.dias_gracia == null ? "" : row.dias_gracia_fuente, row.canon, row.admin || 0,
-            (row.canon || 0) + (row.admin || 0), row.permanencia == null ? "" : row.permanencia]);
+            (row.canon || 0) + (row.admin || 0), row.permanencia == null ? "" : row.permanencia, row.estado_simi, row.obs_simi]);
         });
         name = state.view + "-" + year + (state.month ? "-" + String(state.month).padStart(2, "0") : "");
       }
@@ -671,6 +781,7 @@
     function resetDrill() {
       state.page = 1;
       state.search = "";
+      state.simi = "";
     }
 
     module.addEventListener("click", function (event) {
@@ -696,6 +807,15 @@
       }
       if (event.target.closest("[data-scm-cm-export]")) {
         exportCsv();
+        return;
+      }
+      var simiButton = event.target.closest("[data-scm-cm-simi]");
+      if (simiButton) {
+        openSimiAudit(Number(simiButton.getAttribute("data-scm-cm-simi")));
+        return;
+      }
+      if (event.target.closest("[data-scm-cm-simi-report]")) {
+        exportSimiReport();
         return;
       }
       if (event.target.closest("[data-scm-cm-clear]")) {
@@ -740,6 +860,12 @@
     });
 
     module.addEventListener("change", function (event) {
+      if (event.target.matches("[data-scm-cm-simi-filter]")) {
+        state.simi = event.target.value;
+        state.page = 1;
+        renderDetail();
+        return;
+      }
       var select = event.target.closest("[data-scm-cm-filter]");
       if (!select || !state.data || select.hasAttribute("data-scm-cm-text")) return;
       var key = select.getAttribute("data-scm-cm-filter");
