@@ -25,6 +25,13 @@ $safeNext = static function (string $raw): string {
       ? 'crear-acta.php?' . http_build_query($out, '', '&', PHP_QUERY_RFC3986)
       : '';
   }
+  if ($path === 'cotizacion.php') {
+    $pageAction = (string) ($query['accion'] ?? '');
+    $param = $pageAction === 'crear' ? 'ticket_pk' : 'id_cotizacion';
+    return in_array($pageAction, ['crear', 'editar', 'enviar', 'orden'], true) && isset($query[$param]) && $digits($query[$param])
+      ? 'cotizacion.php?' . http_build_query(['accion' => $pageAction, $param => (string) $query[$param]], '', '&', PHP_QUERY_RFC3986)
+      : '';
+  }
   if ($path === 'revision.php') {
     $kind = (string) ($query['tipo'] ?? '');
     return in_array($kind, ['preventiva', 'correctiva'], true) && isset($query['ticket_pk']) && $digits($query['ticket_pk'])

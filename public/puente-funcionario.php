@@ -120,6 +120,14 @@ if (in_array($action, ['revision_preventiva', 'revision_correctiva'], true) && $
     'ticket_pk' => $ticketPk,
   ], '', '&', PHP_QUERY_RFC3986);
 }
+// Las cotizaciones y órdenes también tienen página propia (cotizacion.php).
+$quotePageActions = ['crear_cotizacion' => 'crear', 'editar_cotizacion' => 'editar', 'enviar_cotizacion' => 'enviar', 'crear_orden' => 'orden'];
+if (isset($quotePageActions[$action])) {
+  $quotePageQuery = $action === 'crear_cotizacion' ? ['ticket_pk' => $ticketPk] : ['id_cotizacion' => $quotePk];
+  if (reset($quotePageQuery) > 0) {
+    $standaloneActTarget = 'cotizacion.php?' . http_build_query(['accion' => $quotePageActions[$action]] + $quotePageQuery, '', '&', PHP_QUERY_RFC3986);
+  }
+}
 
 if (in_array($action, $quoteActions, true)) {
   $targetQuery['scm_tab'] = 'cotizaciones_mantenimiento';

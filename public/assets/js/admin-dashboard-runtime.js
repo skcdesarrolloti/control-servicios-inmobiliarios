@@ -299,7 +299,13 @@
       root.classList.add("scm-standalone-function-ready");
     }
 
+    var bridgeFailureHandler = null;
+
     function showStandaloneFunctionFailure(message) {
+      if (typeof bridgeFailureHandler === "function") {
+        bridgeFailureHandler(message || "La acción solicitada no está disponible.");
+        return;
+      }
       if (!funcionarioBridgeMode) {
         showToast("error", message || "No se pudo abrir la acción solicitada.");
         return;
@@ -23187,7 +23193,19 @@
       var ticketPk = String(params.get("scm_bridge_ticket_pk") || "").trim();
       var quoteId = String(params.get("scm_bridge_quote_id") || "").trim();
       clearFuncionarioBridgeParams(params);
+      runFuncionarioBridgeAction(action, ticketPk, quoteId);
+    }
 
+    // Páginas propias (cotizacion.php) abren la acción directamente y reciben el error en su tarjeta.
+    window.SCMFuncionarioBridge = {
+      run: function (action, ids, onFailure) {
+        ids = ids || {};
+        bridgeFailureHandler = typeof onFailure === "function" ? onFailure : null;
+        runFuncionarioBridgeAction(String(action || ""), String(ids.ticketPk || ""), String(ids.quoteId || ""));
+      },
+    };
+
+    function runFuncionarioBridgeAction(action, ticketPk, quoteId) {
       if (action === "crear_cotizacion") {
         if (!/^[1-9][0-9]*$/.test(ticketPk)) {
           showStandaloneFunctionFailure("Falta el caso interno para crear la cotización.");

@@ -932,6 +932,13 @@ final class SuCasaControlServiciosInmobiliarios
     return !empty($permissions[$cargo]) ? $permissions[$cargo] : [];
   }
 
+  /** Permiso para abrir una acción de cotización desde su página propia (cotizacion.php). */
+  public function canOpenQuoteFunction(string $pageAction): bool
+  {
+    $map = ['crear' => 'quote_create', 'editar' => 'quote_edit', 'enviar' => 'quote_send', 'orden' => 'quote_order_create'];
+    return isset($map[$pageAction]) && $this->canUseDashboardAction($map[$pageAction]);
+  }
+
   private function canUseDashboardAction(string $action): bool
   {
     $action = preg_replace('/[^a-z0-9_]/', '', strtolower($action)) ?: '';

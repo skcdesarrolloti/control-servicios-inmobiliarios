@@ -224,3 +224,18 @@ body.scm-review-page .scm-review-page-status a { background: #e2e8f0; color: var
 .rp-brand img { max-width: 160px; max-height: 40px; object-fit: contain; }
 @media (max-width: 760px) { .rp-brand img { max-width: 120px; max-height: 34px; } }
 body.scm-review-page #scm-app h3[tabindex="-1"]:focus { outline: none; }
+
+/* cotizacion.php: el panel se usa como motor oculto; solo se ven el formulario y esta tarjeta. */
+body.scm-quote-page .qp-engine { display: none !important; }
+body.scm-quote-page .qp-status[hidden] { display: none; }
+body.scm-quote-page .qp-state { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px 24px; text-align: center; }
+body.scm-quote-page .qp-state[hidden] { display: none; }
+body.scm-quote-page .qp-state p { max-width: 560px; margin: 0; color: #475569; font-size: 16px; line-height: 1.5; }
+body.scm-quote-page .qp-state h2 { margin: 0; color: var(--rp-navy); font-size: 22px; font-weight: 800; }
+body.scm-quote-page .qp-state-icon { color: #16a34a; font-size: 48px !important; }
+body.scm-quote-page .qp-state.is-error .qp-state-icon { color: #dc2626; }
+body.scm-quote-page .qp-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 6px; }
+body.scm-quote-page .qp-actions button,
+body.scm-quote-page .qp-actions a { display: inline-flex; align-items: center; padding: 12px 22px; border: 0; border-radius: 999px; font: inherit; font-size: 15px; font-weight: 700; text-decoration: none; cursor: pointer; }
+body.scm-quote-page .qp-actions button { background: var(--rp-navy); color: #fff; }
+body.scm-quote-page .qp-actions a { background: #e2e8f0; color: var(--rp-navy); }
