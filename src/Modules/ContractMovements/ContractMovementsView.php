@@ -92,6 +92,15 @@ final class ContractMovementsView
           <span>Destinación</span>
           <select name="destinacion" data-scm-cm-filter="destinacion"><option value="">Todas</option></select>
         </label>
+        <label class="scm-cm-field" data-scm-cm-only="ocupaciones"<?php echo $initialView === 'ocupaciones' ? '' : ' hidden'; ?>>
+          <span>Estado actual</span>
+          <select name="estado" data-scm-cm-filter="estado">
+            <option value="">Todos</option>
+            <option value="entregado">Entregado</option>
+            <option value="por_recibir">Por recibir</option>
+            <option value="recibido">Recibido (ya salió)</option>
+          </select>
+        </label>
         <label class="scm-cm-field">
           <span>Arrendatario</span>
           <input type="search" name="arrendatario" data-scm-cm-filter="arrendatario" data-scm-cm-text placeholder="Nombre del arrendatario" autocomplete="off">

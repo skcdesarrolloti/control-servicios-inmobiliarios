@@ -10,7 +10,7 @@
   var MONTHS_LONG = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   var STATE_LABELS = { entregado: "Entregado", por_recibir: "Por recibir", recibido: "Recibido" };
   var SIMI_FILTERS = { "": "Auditoría SIMI: todas", Correcto: "Correcto", Incorrecto: "Incorrecto", pendiente: "Sin auditar" };
-  var FILTER_LABELS = { funcionario: "Funcionario", tipo: "Tipo", destinacion: "Destinación", arrendatario: "Arrendatario", inmueble: "Inmueble", contrato: "Contrato" };
+  var FILTER_LABELS = { estado: "Estado actual", funcionario: "Funcionario", tipo: "Tipo", destinacion: "Destinación", arrendatario: "Arrendatario", inmueble: "Inmueble", contrato: "Contrato" };
   var TEXT_FILTERS = ["arrendatario", "inmueble", "contrato"];
   var VIEWS = {
     ocupaciones: {
@@ -47,7 +47,7 @@
     return String(value == null ? "" : value).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
   }
   function emptyFilters() {
-    return { year: String(new Date().getFullYear()), funcionario: "", tipo: "", destinacion: "", arrendatario: "", inmueble: "", contrato: "" };
+    return { year: String(new Date().getFullYear()), estado: "", funcionario: "", tipo: "", destinacion: "", arrendatario: "", inmueble: "", contrato: "" };
   }
   function num(value) { return numberFormat.format(value || 0); }
   function money(value) { return moneyFormat.format(value || 0); }
@@ -298,7 +298,7 @@
       if (!selectedYear()) state.month = 0;
       selects.month.value = state.month ? String(state.month) : "";
       selects.month.disabled = !selectedYear();
-      var dirty = !!(state.filters.funcionario || state.filters.tipo || state.filters.destinacion || state.month ||
+      var dirty = !!(state.filters.estado || state.filters.funcionario || state.filters.tipo || state.filters.destinacion || state.month ||
         TEXT_FILTERS.some(function (key) { return state.filters[key]; }) ||
         state.filters.year !== String(new Date().getFullYear()));
       clearBtn.disabled = !dirty;
@@ -309,8 +309,11 @@
       var tenant = fold(f.arrendatario);
       var property = fold(f.inmueble);
       var contract = fold(f.contrato);
+      // El estado actual solo filtra Ocupaciones: separa las que siguen arrendadas de las que ya salieron.
+      var estado = state.view === "ocupaciones" ? f.estado : "";
       return state.data.rows.filter(function (row) {
-        return (!f.funcionario || row.funcionario === f.funcionario) &&
+        return (!estado || row.estado === estado) &&
+          (!f.funcionario || row.funcionario === f.funcionario) &&
           (!f.tipo || row.tipo === f.tipo) &&
           (!f.destinacion || row.destinacion === f.destinacion) &&
           (!tenant || fold(row.arrendatario).indexOf(tenant) !== -1) &&
@@ -337,6 +340,9 @@
       updatedEl.textContent = state.data.generatedAt
         ? "Datos de las " + new Date(state.data.generatedAt * 1000).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
         : "";
+      module.querySelectorAll("[data-scm-cm-only]").forEach(function (field) {
+        field.hidden = field.getAttribute("data-scm-cm-only") !== state.view;
+      });
       syncSelects();
       var html = renderChips();
       html += state.view === "comparativo" ? renderComparison() : renderMovements(state.view === "ocupaciones" ? "ocup" : "desoc");
@@ -353,9 +359,10 @@
       Object.keys(FILTER_LABELS).forEach(function (key) {
         var value = state.filters[key];
         if (!value || !String(value).trim()) return;
+        if (key === "estado" && state.view !== "ocupaciones") return;
         var label = key === "funcionario"
           ? (state.data.options.funcionario.find(function (o) { return o.value === value; }) || { label: value }).label
-          : String(value).trim();
+          : key === "estado" ? STATE_LABELS[value] || value : String(value).trim();
         chips.push({ key: key, label: FILTER_LABELS[key] + ": " + label });
       });
       if (!chips.length) return "";
