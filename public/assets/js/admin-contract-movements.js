@@ -201,7 +201,6 @@
       view: VIEWS[module.getAttribute("data-initial-view")] ? module.getAttribute("data-initial-view") : "ocupaciones",
       filters: emptyFilters(),
       month: 0,
-      search: "",
       simi: "",
       page: 1,
       data: null,
@@ -413,9 +412,7 @@
           return '<option value="' + key + '"' + (state.simi === key ? " selected" : "") + ">" + esc(SIMI_FILTERS[key]) + "</option>";
         }).join("") + "</select>" +
         '<button type="button" class="scm-cm-btn" data-scm-cm-simi-report title="Excel con contrato, inmueble, estado SIMI y observaciones del listado">' +
-        '<span class="material-symbols-outlined" aria-hidden="true">table_view</span><span>Informe SIMI</span></button>' +
-        '<label class="scm-cm-search"><span class="material-symbols-outlined" aria-hidden="true">search</span>' +
-        '<input type="search" data-scm-cm-search placeholder="Buscar contrato, inmueble, dirección o arrendatario" value="' + esc(state.search) + '"></label></div>');
+        '<span class="material-symbols-outlined" aria-hidden="true">table_view</span><span>Informe SIMI</span></button></div>');
       if (!state.data.simiEnabled) {
         html += '<p class="scm-cm-note"><span class="material-symbols-outlined" aria-hidden="true">info</span>' +
           "Para auditar contra SIMI crea en JetEngine los campos estado_simi (Correcto/Incorrecto) y observaciones_estado_simi del CCT Contratos de arrendamiento y pulsa Actualizar.</p>";
@@ -455,17 +452,17 @@
             "</td><td>" + esc(row.inmueble) + "</td><td>" + esc(row.direccion) + "</td><td>" + esc(row.funcionarioNombre || "—") +
             '</td><td class="is-num">' + esc(money(row.canon)) + "</td></tr>";
         }).join("") + "</tbody></table></div>";
-      return card("Por desocupar · " + num(upcoming.length) + " en estado Por recibir", body, "is-wide");
+      // Acordeón cerrado por defecto; recuerda si se abrió mientras se cambian filtros.
+      return '<details class="scm-cm-card is-wide scm-cm-accordion" data-scm-cm-upcoming' + (state.upcomingOpen ? " open" : "") + ">" +
+        '<summary><h2>Por desocupar · ' + esc(num(upcoming.length)) + " en estado Por recibir</h2>" +
+        '<span class="material-symbols-outlined" aria-hidden="true">expand_more</span></summary>' + body + "</details>";
     }
 
-    // Lista del detalle con la búsqueda y el filtro SIMI aplicados; el informe usa la misma.
+    // Lista del detalle con el filtro SIMI aplicado; el informe usa la misma.
     function visibleEvents() {
-      var query = state.search.trim().toLowerCase();
       return state.detailEvents.filter(function (event) {
         var row = event.row;
-        if (state.simi === "pendiente" ? row.estado_simi : state.simi && row.estado_simi !== state.simi) return false;
-        return !query || [row.contrato, row.inmueble, row.direccion, row.arrendatario, row.funcionarioNombre, row.tipo]
-          .join(" ").toLowerCase().indexOf(query) !== -1;
+        return state.simi === "pendiente" ? !row.estado_simi : !state.simi || row.estado_simi === state.simi;
       });
     }
 
@@ -481,13 +478,12 @@
     function renderDetail() {
       var holder = content.querySelector("[data-scm-cm-detail]");
       if (!holder) return;
-      var query = state.search.trim().toLowerCase();
       var events = visibleEvents();
       var pages = Math.max(1, Math.ceil(events.length / PAGE_SIZE));
       state.page = Math.min(Math.max(1, state.page), pages);
       var slice = events.slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE);
       if (!slice.length) {
-        holder.innerHTML = '<div class="scm-cm-empty">' + (query || state.simi ? "Ningún contrato coincide con la búsqueda o el filtro." : "No hay movimientos en este periodo.") + "</div>";
+        holder.innerHTML = '<div class="scm-cm-empty">' + (state.simi ? "Ningún contrato coincide con el filtro de auditoría SIMI." : "No hay movimientos en este periodo.") + "</div>";
         return;
       }
       var isDesoc = state.detailKind === "desoc";
@@ -794,7 +790,6 @@
 
     function resetDrill() {
       state.page = 1;
-      state.search = "";
       state.simi = "";
     }
 
@@ -895,7 +890,6 @@
       render();
     });
 
-    var searchTimer = 0;
     var textTimer = 0;
     module.addEventListener("input", function (event) {
       var textFilter = event.target.closest("[data-scm-cm-text]");
@@ -911,15 +905,11 @@
         }, 250);
         return;
       }
-      if (!event.target.matches("[data-scm-cm-search]")) return;
-      var value = event.target.value;
-      window.clearTimeout(searchTimer);
-      searchTimer = window.setTimeout(function () {
-        state.search = value;
-        state.page = 1;
-        renderDetail();
-      }, 150);
     });
+
+    module.addEventListener("toggle", function (event) {
+      if (event.target.matches && event.target.matches("[data-scm-cm-upcoming]")) state.upcomingOpen = event.target.open;
+    }, true);
 
     module.addEventListener("scm:load-contract-movements", function () {
       load(false);

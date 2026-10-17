@@ -522,3 +522,15 @@
   #scm-app .scm-cm-detail-tools .scm-cm-search { min-width: 240px; }
 }
 #scm-app .scm-cm-kpi-slot:empty { display: none; }
+#scm-app .scm-cm-accordion > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+}
+#scm-app .scm-cm-accordion > summary::-webkit-details-marker { display: none; }
+#scm-app .scm-cm-accordion > summary .material-symbols-outlined { color: #64748b; transition: transform 0.15s ease; }
+#scm-app .scm-cm-accordion[open] > summary { margin-bottom: 12px; }
+#scm-app .scm-cm-accordion[open] > summary .material-symbols-outlined { transform: rotate(180deg); }
