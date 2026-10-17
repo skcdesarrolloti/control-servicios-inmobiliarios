@@ -311,8 +311,11 @@
       var contract = fold(f.contrato);
       // El estado actual solo filtra Ocupaciones: separa las que siguen arrendadas de las que ya salieron.
       var estado = state.view === "ocupaciones" ? f.estado : "";
+      // El filtro de auditoría SIMI vive en el detalle de ocupaciones/desocupaciones y también mueve los KPI.
+      var simi = state.view === "comparativo" ? "" : state.simi;
       return state.data.rows.filter(function (row) {
         return (!estado || row.estado === estado) &&
+          (!simi || (simi === "pendiente" ? !row.estado_simi : row.estado_simi === simi)) &&
           (!f.funcionario || row.funcionario === f.funcionario) &&
           (!f.tipo || row.tipo === f.tipo) &&
           (!f.destinacion || row.destinacion === f.destinacion) &&
@@ -458,12 +461,9 @@
         '<span class="material-symbols-outlined" aria-hidden="true">expand_more</span></summary>' + body + "</details>";
     }
 
-    // Lista del detalle con el filtro SIMI aplicado; el informe usa la misma.
+    // Lista del detalle (ya con todos los filtros, incluido SIMI); el informe usa la misma.
     function visibleEvents() {
-      return state.detailEvents.filter(function (event) {
-        var row = event.row;
-        return state.simi === "pendiente" ? !row.estado_simi : !state.simi || row.estado_simi === state.simi;
-      });
+      return state.detailEvents;
     }
 
     function simiCell(row) {
@@ -872,7 +872,7 @@
       if (event.target.matches("[data-scm-cm-simi-filter]")) {
         state.simi = event.target.value;
         state.page = 1;
-        renderDetail();
+        render();
         return;
       }
       var select = event.target.closest("[data-scm-cm-filter]");
