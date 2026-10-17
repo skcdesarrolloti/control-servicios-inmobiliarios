@@ -1878,6 +1878,17 @@ trait HandlesMaintenanceActions
       $params[] = $revisionId;
     }
     $existingReportId = (int) $this->db->getVar("SELECT `_ID` FROM `{$table}` WHERE " . implode(' AND ', $where) . " LIMIT 1", $params);
+    // La revisión preventiva ya se cobró al crearla: la cotización no genera un segundo cobro ni
+    // modifica el existente (puede estar exportado o pagado).
+    if ($isPreventive) {
+      $previousCharge = $existingReportId > 0 ? $existingReportId : (int) $this->db->getVar(
+        "SELECT `_ID` FROM `{$table}` WHERE TRIM(COALESCE(`id_ticket`, '')) = ? AND LOWER(TRIM(COALESCE(`categoria`, ''))) = 'revision preventiva' LIMIT 1",
+        [$ticketRef]
+      );
+      if ($previousCharge > 0) {
+        return $previousCharge;
+      }
+    }
 
     $config = [];
     $configTable = $this->db->table('jet_cct_confi_sistema');
@@ -1929,6 +1940,11 @@ trait HandlesMaintenanceActions
 
     $payload = $schema->filterTableData($table, $payload);
     if ($existingReportId > 0) {
+      // Un cobro ya exportado o pagado no se toca.
+      $locked = $this->db->getRow("SELECT `exportado`, `fue_pagado` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$existingReportId]) ?: [];
+      if (strcasecmp(trim((string) ($locked['exportado'] ?? '')), 'Si') === 0 || strcasecmp(trim((string) ($locked['fue_pagado'] ?? '')), 'Si') === 0) {
+        return $existingReportId;
+      }
       $reportUpdate = $payload;
       unset($reportUpdate['cct_created'], $reportUpdate['fecha'], $reportUpdate['fue_pagado'], $reportUpdate['exportado'], $reportUpdate['cct_author_id'], $reportUpdate['id_empleado'], $reportUpdate['creador']);
       if (empty($reportUpdate)) {

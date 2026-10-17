@@ -137,6 +137,14 @@ $review = $db->getRow('SELECT * FROM wp_jet_cct_revision_preventiva WHERE _ID = 
 $report = $db->getRow('SELECT * FROM wp_jet_cct_reportes_administrativos WHERE id_revision_preventiva = ?', [(string) $reviewId]);
 $assert($review['encontro_danos'] === 'No' && unserialize($review['evaluacion_de_danos']) === [] && (int) $report['valor'] === $fee && (int) $report['transporte'] === 0, 'La edición no actualizó daños o cobro.');
 
+// El cobro se registra una sola vez: si se eliminó, editar la revisión no lo vuelve a crear.
+$savedReport = $report;
+$db->delete('wp_jet_cct_reportes_administrativos', ['_ID' => (int) $report['_ID']]);
+$result = $call('preventiveReviewUpdate', 10883, $reviewId);
+$assert(!$db->getRow('SELECT * FROM wp_jet_cct_reportes_administrativos WHERE id_revision_preventiva = ?', [(string) $reviewId]) && str_contains($result['message'], 'no tiene cobro administrativo registrado'), 'Editar la revisión volvió a generar el cobro.');
+$db->insert('wp_jet_cct_reportes_administrativos', $savedReport);
+$report = $db->getRow('SELECT * FROM wp_jet_cct_reportes_administrativos WHERE id_revision_preventiva = ?', [(string) $reviewId]);
+
 // Informe público nativo.
 $public = (new \SCM\Modules\PreventiveReview\PreventiveReviewPublicView($db))->render($reviewId);
 $assert($public['status'] === 200 && str_contains($public['content'], 'Revisión preventiva #' . $reviewId) && str_contains($public['content'], 'is-alert') && str_contains($public['content'], 'Vivienda familiar') && !str_contains($public['content'], 'Sucursal'), 'El informe público no se generó bien.');

@@ -401,11 +401,10 @@ trait HandlesPreventiveReviewActions
           $this->db->update($this->db->table('jet_cct_reportes_administrativos'), $reportUpdate, ['_ID' => (int) $report['_ID']]);
           $chargeMessage = ' Cobro ajustado a $' . number_format($fee + $transport, 0, ',', '.') . '.';
         }
-      } elseif (!$report && $charge['fee']) {
-        $merged = array_merge($review, $update);
-        if ($this->preventiveReviewEnsureReport($schema, $reviewId, $merged, $context['ticket'], $actor, $actorEmployeeId, (int) $charge['fee'], $transport, $now, $nowSql) > 0) {
-          $chargeMessage = ' Se registró el cobro administrativo pendiente.';
-        }
+      } elseif (!$report) {
+        // El cobro se registra una sola vez, al crear la revisión. Si no existe (se eliminó en
+        // Reportes administrativos o falló al crearla), editar no lo vuelve a generar.
+        $chargeMessage = ' Esta revisión no tiene cobro administrativo registrado; si corresponde, regístralo en Reportes administrativos.';
       }
 
       return [
@@ -1313,7 +1312,7 @@ trait HandlesPreventiveReviewActions
       </section>
 
       <section class="scm-prev-step" data-prev-step="cobro" hidden>
-        <header><h3>Cobro administrativo</h3><p>Al <?= $editing ? 'guardar' : 'crear' ?> la revisión se registra el cobro en Reportes administrativos (tarifa de revisión + transporte).</p></header>
+        <header><h3>Cobro administrativo</h3><p><?= $editing ? 'El cobro se registró una sola vez al crear la revisión. Aquí solo puedes ajustar el transporte mientras no se haya exportado ni pagado; editar no genera un cobro nuevo.' : 'Al crear la revisión se registra un único cobro en Reportes administrativos (tarifa de revisión + transporte). Las cotizaciones de esta revisión no generan otro cobro.' ?></p></header>
         <div class="scm-prev-charge">
           <div><span>Tarifa de revisión</span><strong data-prev-fee="<?= $h((string) $fee) ?>"><?= $fee > 0 ? '$' . $h(number_format($fee, 0, ',', '.')) : 'Sin configurar' ?></strong></div>
           <label><span>Transporte</span>
