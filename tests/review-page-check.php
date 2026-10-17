@@ -37,4 +37,21 @@ $check(str_contains($page, 'ActaAutologin::valid($secret, $employeeId, $token)')
 $admin = (string) file_get_contents($root . '/public/assets/js/scm-admin.js');
 $check(str_contains($admin, 'openDamageReviewEditor: openDamageReviewEditor,'), 'El editor de revisiones está disponible para la vista propia.');
 
+// Página propia de cotizaciones y órdenes.
+$quoteHtml = (new \SCM\Views\QuotePageView())->render([
+  'action' => 'orden', 'record_id' => 577, 'case' => '10203', 'quote' => '577', 'address' => 'CR 49', 'user' => 'Royner Guardo',
+  'base_url' => '', 'logo' => '', 'favicon' => '', 'panel_html' => '<div id="scm-app"></div>', 'css' => [], 'js' => ['quote-page.js'],
+]);
+$check(str_contains($quoteHtml, 'data-bridge-action="crear_orden"') && str_contains($quoteHtml, 'data-record-param="id_cotizacion"') && str_contains($quoteHtml, 'data-record-id="577"'), 'La página de orden sabe qué abrir.');
+$check(str_contains($quoteHtml, 'class="qp-engine"') && str_contains($quoteHtml, 'Se cerró el formulario') && str_contains($quoteHtml, 'Abrir de nuevo'), 'El panel queda oculto y hay tarjeta al cerrar.');
+foreach (['crear' => 'crear_cotizacion', 'editar' => 'editar_cotizacion', 'enviar' => 'enviar_cotizacion', 'orden' => 'crear_orden'] as $pageAction => $bridgeAction) {
+  $check(\SCM\Views\QuotePageView::ACTIONS[$pageAction][5] === $bridgeAction, 'Acción mal conectada: ' . $pageAction);
+}
+$check(str_contains($bridge, "'cotizacion.php?'") && str_contains($bridge, "'crear_orden' => 'orden'"), 'El puente lleva las cotizaciones a su página propia.');
+$check(str_contains($login, "\$path === 'cotizacion.php'"), 'Después del login se vuelve a la página de cotización.');
+$quotePage = (string) file_get_contents($root . '/public/cotizacion.php');
+$check(str_contains($quotePage, 'ActaAutologin::valid($secret, $employeeId, $token)') && str_contains($quotePage, 'canOpenQuoteFunction($action)'), 'La página de cotización exige sesión y permiso del cargo.');
+$runtime = (string) file_get_contents($root . '/public/assets/js/admin-dashboard-runtime.js');
+$check(str_contains($runtime, 'window.SCMFuncionarioBridge = {') && str_contains($runtime, 'bridgeFailureHandler(message'), 'El runtime abre la acción y entrega el error a la página.');
+
 echo "Review page checks passed.\n";
