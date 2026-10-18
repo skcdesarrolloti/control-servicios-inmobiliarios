@@ -16,11 +16,8 @@ final class PublicServicesCriticalTicket
     if (!$this->db->pdo()->inTransaction()) throw new \LogicException('El caso crítico debe guardarse dentro de la operación de revisión.');
     $schema = new SchemaInspector($this->db);
     $tables = array_map([$this->db, 'table'], ['jet_cct_tickets','jet_cct_historial_del_ticket','jet_cct_historial_del_inmueble']);
-    foreach ($tables as $table) {
-      if (!$schema->tableExists($table)) throw new \DomainException('No está disponible el esquema de casos e historial.');
-      $definition=$this->db->getRow('SHOW CREATE TABLE `'.$table.'`');
-      if(!preg_match('/\bENGINE=InnoDB\b/i',(string)($definition['Create Table']??''))) throw new \DomainException('Ejecuta bin/migrate-public-services.php: los casos y sus historiales deben usar InnoDB.');
-    }
+    // Legacy MyISAM case tables are accepted: the review still saves, only their rollback is not transactional.
+    foreach ($tables as $table) if (!$schema->tableExists($table)) throw new \DomainException('No está disponible el esquema de casos e historial.');
     $c=$payload['contract']; $e=$payload['employee'];
     $actor=(string)($e['id_empleado']??'');
     if ($actor==='' || $actor==='0' || empty($c['id_inmueble'])) throw new \DomainException('Faltan el funcionario real o el inmueble del caso crítico.');

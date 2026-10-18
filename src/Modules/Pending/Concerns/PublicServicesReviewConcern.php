@@ -186,6 +186,8 @@ trait PublicServicesReviewConcern
     try {
       $storage = new \SCM\Modules\Pending\PublicServicesReviewStorage($db);
       $storage->requireSchema();
+      // Critical follow-up tables are created on demand, before the transaction (DDL commits implicitly).
+      (new \SCM\Modules\Pending\PublicServicesCritical($db))->ensureSchema();
       $pdo->beginTransaction();
       $contract = $this->repo->getPublicServicesContract($contractId, true);
       if (!$contract) throw new \DomainException('Contrato no encontrado.');

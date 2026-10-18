@@ -53,11 +53,19 @@ final class PublicServicesCritical
     }
     return $case;
   }
+  /** Self-provision the module tables; DDL commits implicitly, so call it outside transactions. */
+  public function ensureSchema(): void
+  {
+    if($this->available())return;
+    if($this->db->pdo()->inTransaction())throw new \LogicException('Prepara el seguimiento crítico antes de iniciar la operación.');
+    foreach($this->schema() as $sql)$this->db->pdo()->exec($sql);
+    $this->schemaAvailable=null;
+  }
   public function requireSchema(): void
   {
     self::$verifiedSchemas??=new \WeakMap();
     if(!empty(self::$verifiedSchemas[$this->db->pdo()]))return;
-    if(!$this->available())throw new \DomainException('Ejecuta bin/migrate-public-services.php para preparar el seguimiento crítico.');
+    if(!$this->available())throw new \DomainException('No se pudieron preparar las tablas del seguimiento crítico. Verifica los permisos de la base de datos.');
     $tables=array_map(fn($suffix)=>$this->table($suffix),['cases','payments','audit','jobs']);
     $engines=$this->db->getCol('SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN (?,?,?,?)',$tables);
     if(count($engines)!==4||array_filter($engines,static fn($e)=>strcasecmp((string)$e,'InnoDB')!==0))throw new \DomainException('El seguimiento crítico necesita tablas InnoDB para conservar la operación completa.');
@@ -103,7 +111,8 @@ final class PublicServicesCritical
   }
   public function configHtml(): string
   {
-    $googleEmployeeIds = array_column($this->connectedCalendarContacts(),'employee_id');
+    try { $googleEmployeeIds = array_column($this->connectedCalendarContacts(),'employee_id'); }
+    catch (\Throwable $e) { $googleEmployeeIds = []; }
     return PublicServicesUi::render('critical-config',['config'=>$this->config(),'contacts'=>FuncionarioOptions::panelFuncionarios($this->db,new SchemaInspector($this->db),'primary',[]),'events'=>(array)(new Settings($this->db,true))->get('internal_admin_notifications',[]),'googleEmployeeIds'=>$googleEmployeeIds]);
   }
   public static function admin(array $employee): bool { return !empty($employee['id_empleado']) && in_array((string)($employee['id_cargo']??''),['11','12','13','14'],true); }
@@ -138,7 +147,6 @@ final class PublicServicesCritical
   {
     $services = array_filter($result['_services'], static fn($s)=>$s['status']==='Estado critico');
     if (!$services) return null;
-    if (!$this->available()) throw new \DomainException('Prepara el esquema de seguimiento crítico con bin/migrate-public-services.php antes de guardar una revisión crítica.');
     $this->requireSchema();
     $id = (int) $result['review_id']; $created = (int) $result['_context']['fecha'];
     $documents=[];foreach($services as $s){$key=$s['debt_document_field'];if(isset($result['_documents'][$key]))$documents[$key]=$result['_documents'][$key];}
@@ -197,7 +205,9 @@ final class PublicServicesCritical
         $this->notifyJobs($case,$r,$body,$link,$p['documents'],false);
       }
       $selectedCalendarContacts = $this->contacts(self::EVENT);
-      $connected = $selectedCalendarContacts ? $this->connectedCalendarContacts() : [];
+      // A missing Google accounts table must not block the case notices; reminders still go to the internal calendar.
+      try { $connected = $selectedCalendarContacts ? $this->connectedCalendarContacts() : []; }
+      catch (\Throwable $e) { $connected = []; error_log('[services-critical-calendar] ' . $e->getMessage()); }
       $googleIds = array_fill_keys(array_column($connected,'employee_id'), true);
       $calendarRecipients = [];
       foreach ($selectedCalendarContacts as $r) $calendarRecipients[(string)$r['employee_id']] = $r;

@@ -30,7 +30,7 @@ La guía completa está en [Plantilla y proceso de servicios públicos](guia-pla
 
 ## Despliegue
 
-Ejecutar antes de registrar nuevas revisiones críticas:
+Las tablas `scm_services_critical_*` se crean automáticamente al guardar la primera revisión (antes de abrir la transacción). Si `jet_cct_tickets` o sus historiales siguen en MyISAM, la revisión crítica se guarda igual; solo se pierde el rollback transaccional del caso. La migración es opcional:
 
 ```sh
 php bin/migrate-public-services.php

@@ -59,12 +59,33 @@ final class PublicServicesWorkspace
     $rows = $this->db->getResults('SELECT * FROM `' . $table . '` WHERE ' . $sqlWhere . ' ORDER BY fecha ' . $order . ', _ID ' . $order . ' LIMIT 30 OFFSET ' . (($page - 1) * 30), $args);
     $critical = new PublicServicesCritical($this->db);
     $criticalReviewIds = $critical->available() ? array_fill_keys($this->db->getCol('SELECT review_id FROM `' . $critical->table() . '`'), true) : [];
-    return self::historyList($rows, $input, $total, $page, $pages, $criticalReviewIds);
+    $kpis = $this->historyKpis($table, $sqlWhere, $args, $critical);
+    return self::historyList($rows, $input, $total, $page, $pages, $criticalReviewIds, $kpis);
   }
 
-  public static function historyList(array $rows, array $input, int $total, int $page, int $pages, array $criticalReviewIds = []): string
+  /** Each review counts once, by its worst service result; legacy values are matched accent-insensitively. */
+  private function historyKpis(string $table, string $sqlWhere, array $args, PublicServicesCritical $critical): array
   {
-    return PublicServicesUi::render('history', compact('rows','input','total','page','pages','criticalReviewIds'));
+    $columns = array_values(array_intersect(['resultado_tiempo_luz','resultado_tiempo_agua','resultado_tiempo_gas'], (new \SCM\Support\SchemaInspector($this->db))->getTableColumns($table)));
+    $status = $columns ? "LOWER(CONCAT_WS('|'," . implode(',', array_map(static fn($c) => "COALESCE(`{$c}`,'')", $columns)) . '))' : "''";
+    $level = "CASE WHEN {$status} LIKE '%critic%' THEN 4 WHEN {$status} LIKE '%60%' THEN 3 WHEN {$status} LIKE '%30%' THEN 2 WHEN {$status} LIKE '%al d%' THEN 1 ELSE 0 END";
+    $monthStart = (new \DateTimeImmutable('first day of this month 00:00', new \DateTimeZone('America/Bogota')))->getTimestamp();
+    $row = $this->db->getRow('SELECT COUNT(*) total, SUM(fecha >= ?) month, SUM(lvl=1) al_dia, SUM(lvl=2) m30, SUM(lvl=3) m60, SUM(lvl=4) critico, SUM(lvl=0) sin_resultado FROM (SELECT fecha, ' . $level . ' lvl FROM `' . $table . '` WHERE ' . $sqlWhere . ') r', array_merge([$monthStart], $args)) ?? [];
+    $kpis = array_map('intval', $row) + ['total'=>0,'month'=>0,'al_dia'=>0,'m30'=>0,'m60'=>0,'critico'=>0,'sin_resultado'=>0,'open'=>0,'overdue'=>0];
+    if ($critical->available()) {
+      $now = time();
+      foreach ($this->db->getResults('SELECT c.deadline_at, t._ID ticket_id, t.estado, t.estado_administrativo FROM `' . $critical->table() . '` c JOIN `' . $this->db->table('jet_cct_tickets') . '` t ON t._ID=CAST(JSON_UNQUOTE(JSON_EXTRACT(c.payload_json,\'$.ticket_id\')) AS UNSIGNED)') as $case) {
+        if (!PublicServicesCriticalTicket::open(['_ID'=>$case['ticket_id'],'estado'=>$case['estado'],'estado_administrativo'=>$case['estado_administrativo']])) continue;
+        $kpis['open']++;
+        if ((int) $case['deadline_at'] < $now) $kpis['overdue']++;
+      }
+    }
+    return $kpis;
+  }
+
+  public static function historyList(array $rows, array $input, int $total, int $page, int $pages, array $criticalReviewIds = [], array $kpis = []): string
+  {
+    return PublicServicesUi::render('history', compact('rows','input','total','page','pages','criticalReviewIds','kpis'));
   }
 
   public function critical(array $input): string
