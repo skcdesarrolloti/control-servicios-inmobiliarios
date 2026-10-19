@@ -88,7 +88,7 @@ final class LeaseContractsView
   }
 
   /** @param array<int,array<string,mixed>> $rows */
-  public function renderTable(array $rows, bool $canSend): string
+  public function renderTable(array $rows, bool $canSend, bool $canDesist = false): string
   {
     $ui = UI::class;
     if ($rows === []) {
@@ -130,6 +130,9 @@ final class LeaseContractsView
       }
       if ($id !== '' && !in_array(strtolower($v('estado', '')), ['recibido', 'desistido'], true)) {
         $html .= '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start" data-scm-mark-contract-received data-contract-context="contratos" data-contract-id="' . esc_attr($id) . '" data-contract-code="' . esc_attr($code) . '">' . $ui::icon('check', '!sp-w-3 !sp-h-3') . 'Marcar recibido</button>';
+        if ($canDesist) {
+          $html .= '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start !sp-text-rose-700 !sp-border-rose-200 hover:!sp-bg-rose-50 hover:!sp-border-rose-300" data-lease-action="desistir"' . $attrs . '>' . $ui::icon('close', '!sp-w-3 !sp-h-3') . 'Marcar desistido</button>';
+        }
       }
       $html .= '</div></td></tr>';
     }
@@ -456,6 +459,30 @@ final class LeaseContractsView
       . '<div class="!sp-flex !sp-flex-wrap !sp-justify-end !sp-gap-2"><button type="button" class="' . $ui::SECONDARY . '" data-lease-modal-close>Cancelar</button><button type="submit" class="' . $ui::PRIMARY . '" data-lease-send-submit>' . $ui::icon('bolt') . 'Generar actas y enviar anexos</button></div>'
       . '</form>';
     return $html;
+  }
+
+  /** @param array<string,mixed> $c @param string[] $reasons opciones del glosario "Razón de desistir" */
+  public function renderDesistForm(array $c, array $reasons): string
+  {
+    $ui = UI::class;
+    $v = static fn(string $key): string => trim((string) ($c[$key] ?? ''));
+    $options = '<option value="">Selecciona el motivo</option>';
+    foreach ($reasons as $reason) {
+      $options .= '<option value="' . esc_attr($reason) . '">' . esc_html($reason) . '</option>';
+    }
+    return '<form class="!sp-space-y-4" data-lease-desist-form autocomplete="off" novalidate>'
+      . '<input type="hidden" name="contract_id" value="' . esc_attr($v('_ID')) . '">'
+      . '<div class="!sp-p-4 !sp-rounded-xl !sp-border !sp-border-solid !sp-border-rose-200 !sp-bg-rose-50 !sp-text-[11px] !sp-leading-relaxed !sp-text-rose-800"><strong class="!sp-block !sp-mb-1">Vas a marcar el contrato #' . esc_html($v('contrato')) . ' como desistido.</strong>'
+      . 'Estado actual: <strong>' . esc_html($v('estado') !== '' ? $v('estado') : 'Sin estado') . '</strong> · ' . esc_html($v('direccion')) . '. El cambio queda registrado en el historial del contrato y del inmueble con el motivo y tu usuario.</div>'
+      . '<div class="' . $ui::CARD . ' !sp-p-5 !sp-grid !sp-grid-cols-1 !sp-gap-4">'
+      . '<label class="!sp-block"><span class="' . $ui::LABEL . '">Motivo <em class="!sp-text-rose-600 !sp-not-italic">*</em></span><select class="' . $ui::INPUT . '" name="razon_desistido" required>' . $options . '</select></label>'
+      . '<label class="!sp-block"><span class="' . $ui::LABEL . '">Observación</span><textarea class="' . $ui::INPUT . ' !sp-h-auto !sp-py-2" name="observacion" rows="3" maxlength="1000" placeholder="Detalle o soporte del desistimiento (opcional)"></textarea></label>'
+      . '<label class="!sp-flex !sp-items-start !sp-gap-2 !sp-text-[11px]"><input type="checkbox" name="confirmar" value="1" required class="!sp-mt-0.5"><span>Confirmo que el contrato no continuará y debe quedar como <strong>Desistido</strong>.</span></label>'
+      . '</div>'
+      . '<p class="!sp-hidden !sp-m-0 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-rose-200 !sp-bg-rose-50 !sp-text-[11px] !sp-text-rose-700" data-lease-desist-error role="alert"></p>'
+      . '<div class="!sp-flex !sp-flex-wrap !sp-justify-end !sp-gap-2"><button type="button" class="' . $ui::SECONDARY . '" data-lease-modal-close>Cancelar</button>'
+      . '<button type="submit" class="!sp-inline-flex !sp-items-center !sp-gap-2 !sp-px-4 !sp-py-2.5 !sp-rounded-lg !sp-bg-rose-600 !sp-text-white !sp-border !sp-border-solid !sp-border-rose-600 !sp-text-xs !sp-font-semibold !sp-font-sans !sp-cursor-pointer hover:!sp-bg-rose-700 focus-visible:!sp-ring-2 focus-visible:!sp-ring-rose-300 disabled:!sp-opacity-50" data-lease-desist-submit>' . $ui::icon('close') . 'Marcar como desistido</button></div>'
+      . '</form>';
   }
 
   /** @param array<string,mixed> $result */

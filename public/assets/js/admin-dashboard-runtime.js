@@ -263,6 +263,7 @@
     var actionMaintenanceOrdersQuotes = actions.maintenance_orders_quotes || "";
     var actionLeaseContractView = actions.lease_contract_view || "";
     var actionLeaseContractSend = actions.lease_contract_send || "";
+    var actionLeaseContractDesist = actions.lease_contract_desist || "";
     var duePopupConfig = runtime.duePopup || {};
     var dashboardDuePopupShown = {};
     var dashboardDuePopupPromise = null;
@@ -20060,6 +20061,53 @@
       });
 
       wrap.addEventListener("submit", function (event) {
+        var desistForm = event.target && event.target.closest ? event.target.closest("[data-lease-desist-form]") : null;
+        if (desistForm) {
+          event.preventDefault();
+          var desistError = desistForm.querySelector("[data-lease-desist-error]");
+          var desistSubmit = desistForm.querySelector("[data-lease-desist-submit]");
+          var showDesistError = function (message) {
+            if (!desistError) return;
+            desistError.textContent = message || "";
+            desistError.classList.toggle("!sp-hidden", !message);
+          };
+          showDesistError("");
+          if (!desistForm.elements.razon_desistido.value) {
+            showDesistError("Selecciona el motivo del desistimiento.");
+            desistForm.elements.razon_desistido.focus();
+            return;
+          }
+          if (!desistForm.elements.confirmar.checked) {
+            showDesistError("Confirma que el contrato debe quedar como desistido.");
+            return;
+          }
+          if (!actionLeaseContractDesist) {
+            showDesistError("Actualiza la página para marcar el contrato.");
+            return;
+          }
+          var desistData = new FormData(desistForm);
+          desistData.set("action", actionLeaseContractDesist);
+          desistData.set("nonce", nonce);
+          sending = true;
+          if (desistSubmit) desistSubmit.disabled = true;
+          fetch(ajaxUrl, { method: "POST", body: desistData, credentials: "same-origin" })
+            .then(function (response) { return response.json(); })
+            .then(function (json) {
+              if (!json || !json.success) {
+                throw new Error((json && json.data && json.data.message) || "No se pudo marcar el contrato como desistido.");
+              }
+              sending = false;
+              showToast("success", json.data.message || "Contrato marcado como desistido.");
+              closeModal();
+              root.dispatchEvent(new CustomEvent("scm:contracts-refresh"));
+            })
+            .catch(function (err) {
+              sending = false;
+              if (desistSubmit) desistSubmit.disabled = false;
+              showDesistError(err.message || "No se pudo marcar el contrato como desistido.");
+            });
+          return;
+        }
         var form = event.target && event.target.closest ? event.target.closest("[data-lease-send-form]") : null;
         if (!form) return;
         event.preventDefault();

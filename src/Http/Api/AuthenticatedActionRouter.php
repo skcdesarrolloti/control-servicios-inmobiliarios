@@ -175,6 +175,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_MAINTENANCE_ORDERS_QUOTES => 'ajax_handler_maintenance_orders_quotes',
       SuCasaControlServiciosInmobiliarios::AJAX_LEASE_CONTRACT_VIEW => 'ajax_handler_lease_contract_view',
       SuCasaControlServiciosInmobiliarios::AJAX_LEASE_CONTRACT_SEND => 'ajax_handler_lease_contract_send',
+      SuCasaControlServiciosInmobiliarios::AJAX_LEASE_CONTRACT_DESIST => 'ajax_handler_lease_contract_desist',
     ];
 
     $this->guideRoutes = [

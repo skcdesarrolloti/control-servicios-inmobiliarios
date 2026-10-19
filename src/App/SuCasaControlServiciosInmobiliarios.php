@@ -180,6 +180,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_MAINTENANCE_ORDERS_QUOTES = 'scm_ordenes_mantenimiento_cotizaciones';
   const AJAX_LEASE_CONTRACT_VIEW = 'scm_contrato_arrendamiento_vista';
   const AJAX_LEASE_CONTRACT_SEND = 'scm_contrato_arrendamiento_enviar_anexos';
+  const AJAX_LEASE_CONTRACT_DESIST = 'scm_contrato_arrendamiento_desistir';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';
@@ -473,6 +474,11 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Avisos internos al crear el recibo antes de la fecha fin del contrato.',
             'channel' => 'Email interno en cola',
           ],
+          'contrato_desistido' => [
+            'label' => 'Contrato de arrendamiento desistido',
+            'description' => 'Cuando se marca un contrato como desistido desde Contratos de arrendamiento, con el motivo y la observación.',
+            'channel' => 'Email interno en cola',
+          ],
           'anexos_contrato_arrendamiento' => [
             'label' => 'Envío de anexos del contrato de arrendamiento',
             'description' => 'Resumen con las actas de bienvenida cuando se envían los anexos al propietario, arrendatario y codeudores desde Contratos de arrendamiento.',
@@ -728,6 +734,7 @@ final class SuCasaControlServiciosInmobiliarios
         'label' => 'Contratos de arrendamiento',
         'items' => [
           'contract_annexes_send' => 'Enviar anexos del contrato de arrendamiento',
+          'contract_desist' => 'Marcar contrato de arrendamiento como desistido',
           'contract_owner_change' => 'Cambiar funcionario responsable del contrato',
         ],
       ],
@@ -766,7 +773,7 @@ final class SuCasaControlServiciosInmobiliarios
     // El envío de anexos reemplaza el formulario de WordPress: hasta guardar permisos lo conservan todos los cargos.
     if (!\SCM\Core\App::settings()->get('contract_annexes_permissions_configured', false)) {
       foreach ($permissions as $cargo => $actions) {
-        $permissions[$cargo] = array_values(array_unique(array_merge($actions, ['contract_annexes_send'])));
+        $permissions[$cargo] = array_values(array_unique(array_merge($actions, ['contract_annexes_send', 'contract_desist'])));
       }
     }
     // Cambiar el responsable de un contrato es sensible: hasta que se configure, solo los cargos administradores.

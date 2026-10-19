@@ -55,6 +55,110 @@ final class LeaseAnnexesService
     return is_array($row) ? $row : ($this->db->getRow("SELECT * FROM `{$table}` ORDER BY `_ID` ASC LIMIT 1") ?? []);
   }
 
+  /** Glosario JetEngine "Razón de desistir" que usa el campo razon_desistido. */
+  public const DESIST_GLOSSARY_ID = 1463;
+  public const DESIST_INTERNAL_ACTION = 'contrato_desistido';
+
+  /** @return string[] */
+  public function desistReasons(): array
+  {
+    $fallback = ['Arrendatario desistio', 'Propietario desistio', 'No aprobado por aseguradora', 'Documentacion incompleta', 'No pago de valores iniciales', 'No hubo acuerdo económico', 'No hubo acuerdo en condiciones del contrato', 'Inmueble no apto para entrega', 'Falta de respuesta del cliente', 'Falta de acuerdo en reparaciones', 'Demora operativa', 'Error operativo / registro duplicado', 'Motivo personal del cliente', 'Cambio de inmueble'];
+    $table = $this->db->table('jet_post_types');
+    if (!$this->schema->tableExists($table)) {
+      return $fallback;
+    }
+    $raw = (string) ($this->db->getVar("SELECT `meta_fields` FROM `{$table}` WHERE `id` = ? AND `status` = 'glossary' LIMIT 1", [self::DESIST_GLOSSARY_ID]) ?? '');
+    $items = @unserialize($raw, ['allowed_classes' => false]);
+    $options = [];
+    foreach (is_array($items) ? $items : [] as $item) {
+      $value = trim((string) ($item['value'] ?? ''));
+      if ($value !== '') {
+        $options[$value] = $value;
+      }
+    }
+    return $options !== [] ? array_values($options) : $fallback;
+  }
+
+  /**
+   * Marca el contrato como desistido con un motivo del glosario y deja trazabilidad.
+   *
+   * @param array{employee_id:string,name:string,cargo:string,phone:string} $sender
+   * @return array{message:string,internal:int}
+   */
+  public function desist(int $contractId, string $reason, string $note, array $sender): array
+  {
+    if (!in_array($reason, $this->desistReasons(), true)) {
+      throw new \DomainException('Selecciona el motivo del desistimiento.');
+    }
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    $pdo = $this->db->pdo();
+    $pdo->beginTransaction();
+    try {
+      $contract = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? FOR UPDATE", [$contractId]);
+      if (!is_array($contract)) {
+        throw new \DomainException('Contrato no encontrado.');
+      }
+      $previous = trim((string) ($contract['estado'] ?? ''));
+      if (in_array(strtolower($previous), ['desistido', 'recibido'], true)) {
+        throw new \DomainException('El contrato ya está ' . strtolower($previous) . '; no se puede marcar como desistido.');
+      }
+      $now = time();
+      $this->db->update($table, $this->schema->filterTableData($table, [
+        'estado' => 'Desistido',
+        'razon_desistido' => $reason,
+        'cct_modified' => date('Y-m-d H:i:s', $now),
+      ]), ['_ID' => $contractId]);
+      $summary = 'Contrato #' . (string) ($contract['contrato'] ?? $contractId) . ' marcado como desistido. Motivo: ' . $reason . '. Estado anterior: ' . ($previous !== '' ? $previous : 'sin estado') . '.' . ($note !== '' ? ' Observación: ' . $note : '');
+      $this->insertTrace($contract, 'Contrato desistido', 'Contractual', $summary, $sender, $now);
+      $pdo->commit();
+    } catch (\Throwable $error) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      throw $error;
+    }
+
+    $internal = 0;
+    $recipients = InternalNotificationRecipients::emailsForAction($this->db, self::DESIST_INTERNAL_ACTION);
+    if ($recipients !== []) {
+      $subject = 'Contrato de arrendamiento #' . (string) ($contract['contrato'] ?? $contractId) . ' desistido';
+      $body = '<p style="margin:0 0 14px;line-height:1.65;">' . EmailTemplate::e($summary) . '</p>'
+        . '<p style="margin:0;line-height:1.65;">Inmueble <b>' . EmailTemplate::e((string) ($contract['inmueble'] ?? '')) . '</b> · ' . EmailTemplate::e((string) ($contract['direccion'] ?? ''))
+        . '<br>Propietario: ' . EmailTemplate::e((string) ($contract['propietario'] ?? '-')) . ' · Arrendatario: ' . EmailTemplate::e((string) ($contract['arrendatario'] ?? '-'))
+        . '<br>Registrado por <b>' . EmailTemplate::e($sender['name']) . '</b>.</p>';
+      $internal = (new EmailQueue($this->db))->enqueue($recipients, $subject, EmailTemplate::render($subject, $body), [
+        'source_module' => 'contratos_arrendamiento',
+        'internal_cc' => [],
+        'destination_name' => 'Equipo interno',
+        'dedupe_key' => 'contrato_desistido_' . $contractId . '_' . $now,
+        'meta' => ['contract_id' => $contractId, 'internal_action' => self::DESIST_INTERNAL_ACTION],
+      ]);
+    }
+    return ['message' => 'Contrato #' . (string) ($contract['contrato'] ?? $contractId) . ' marcado como desistido.' . ($internal > 0 ? ' Avisos internos en cola: ' . $internal . '.' : ''), 'internal' => $internal];
+  }
+
+  /** @param array<string,mixed> $contract @param array<string,string> $sender */
+  private function insertTrace(array $contract, string $contractType, string $propertyType, string $summary, array $sender, int $now): void
+  {
+    $nowSql = date('Y-m-d H:i:s', $now);
+    $common = [
+      'cct_status' => 'publish', 'cct_author_id' => $sender['employee_id'], 'cct_created' => $nowSql, 'cct_modified' => $nowSql,
+      'fecha' => $now, 'id_empleado' => $sender['employee_id'], 'funcionario' => $sender['name'],
+      'id_inmueble' => trim((string) ($contract['id_inmueble'] ?? '')), 'id_inmueble_data' => trim((string) ($contract['id_inmueble_data'] ?? '')),
+    ];
+    $contractHistory = $this->db->table('jet_cct_historial_contrato_arrendamiento');
+    if ($this->schema->tableExists($contractHistory)) {
+      $this->db->insert($contractHistory, $this->schema->filterTableData($contractHistory, $common + [
+        'tipo_reporte' => $contractType, 'observacion' => $summary, 'inmueble' => trim((string) ($contract['inmueble'] ?? '')),
+        'contrato' => trim((string) ($contract['contrato'] ?? '')), 'id_contrato' => (string) ($contract['_ID'] ?? ''),
+      ]));
+    }
+    $propertyHistory = $this->db->table('jet_cct_historial_del_inmueble');
+    if ($this->schema->tableExists($propertyHistory)) {
+      $this->db->insert($propertyHistory, $this->schema->filterTableData($propertyHistory, $common + ['tipo_reporte' => $propertyType, 'observacion' => $summary]));
+    }
+  }
+
   /** Cargos de jet_cct_funcionarios que aparecen en las actas de bienvenida. */
   public const STAFF_CARGOS = ['contractual' => '7', 'propietarios' => '5', 'arrendatarios' => '4', 'comercial' => '12', 'legal' => '14'];
 

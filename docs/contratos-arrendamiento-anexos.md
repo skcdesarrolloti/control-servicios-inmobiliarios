@@ -13,6 +13,7 @@ Acciones por contrato, todas dentro del panel:
 - **Historial inmueble**: el mismo informe de *Historial inmueble* (`scm_property_history_report`).
 - **Historial contrato**: registros de `jet_cct_historial_contrato_arrendamiento`.
 - **Crear caso**: abre *Crear nuevo caso* con el contrato ya seleccionado.
+- **Marcar desistido**: pide motivo del glosario JetEngine "Razón de desistir" (id 1463), observación opcional y confirmación. Cambia `estado` a `Desistido` y guarda `razon_desistido`; registra el cambio en el historial del contrato y del inmueble y avisa a quienes se configuren en Notificaciones internas › Contratos › Contrato de arrendamiento desistido (`contrato_desistido`). Requiere la acción `contract_desist`.
 - **Enviar / Reenviar anexos**: reemplaza el formulario JetForm "Enviar contrato de arrendamiento". Requiere la acción `contract_annexes_send`; hasta que se guarden los permisos, todos los cargos la conservan.
 
 ## Envío de anexos

@@ -39,6 +39,9 @@ trait HandlesLeaseContracts
         'envio' => $this->canUseDashboardAction('contract_annexes_send')
           ? ['Enviar anexos del contrato', $renderer->renderSendForm($contract, $service->staff())]
           : throw new \DomainException('No tienes permiso para enviar anexos de contratos.'),
+        'desistir' => $this->canUseDashboardAction('contract_desist')
+          ? ['Marcar contrato desistido', $renderer->renderDesistForm($contract, $service->desistReasons())]
+          : throw new \DomainException('No tienes permiso para marcar contratos como desistidos.'),
         default => throw new \DomainException('Vista no disponible.'),
       };
     } catch (\DomainException $error) {
@@ -84,6 +87,31 @@ trait HandlesLeaseContracts
       'message' => sprintf('Anexos enviados. Correos: %d, WhatsApp: %d, avisos internos: %d.', (int) ($queued['email'] ?? 0), (int) ($queued['whatsapp'] ?? 0), (int) ($queued['internal'] ?? 0)),
       'html' => (new LeaseContractsView())->renderSendResult($result),
     ]);
+  }
+
+  public function ajax_handler_lease_contract_desist(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('contratos_arrendamiento') || !$this->canUseDashboardAction('contract_desist')) {
+      $this->jsonFail('No tienes permiso para marcar contratos como desistidos.');
+    }
+    if ((string) ($_POST['confirmar'] ?? '') !== '1') {
+      $this->jsonFail('Confirma que el contrato debe quedar como desistido.');
+    }
+    $contractId = (int) ($_POST['contract_id'] ?? 0);
+    $note = trim(strip_tags(wp_unslash((string) ($_POST['observacion'] ?? ''))));
+    try {
+      $result = (new LeaseAnnexesService($this->db))->desist(
+        $contractId,
+        trim(sanitize_text_field(wp_unslash((string) ($_POST['razon_desistido'] ?? '')))),
+        mb_substr($note, 0, 1000),
+        $this->lease_contract_sender()
+      );
+    } catch (\Throwable $error) {
+      error_log('[lease_contract_desist] #' . $contractId . ': ' . $error->getMessage());
+      $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudo marcar el contrato como desistido.');
+    }
+    $this->jsonOk(['message' => $result['message']]);
   }
 
   /** @return array{url:string,path:string}|null */
