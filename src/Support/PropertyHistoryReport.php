@@ -104,14 +104,14 @@ final class PropertyHistoryReport
 
     $html .= self::sectionHead('Cronología', 'Línea de tiempo del inmueble', $movements . ' movimiento(s)');
     if (!$pdf && $timeline !== []) {
-      $html .= '<div class="phr-toolbar" data-phr-toolbar><label class="phr-search"><span>Buscar</span><input type="search" placeholder="Caso, contrato, actividad, detalle..." data-phr-search></label><div class="phr-filters" role="group" aria-label="Filtrar por fuente"><button type="button" class="phr-filter is-active" data-phr-filter="">Todo <b>' . $movements . '</b></button>';
+      $html .= '<div class="phr-toolbar" data-phr-toolbar><label class="phr-search"><span>Buscar</span><input type="search" placeholder="Número de caso o contrato, actividad, detalle, fecha..." data-phr-search></label><p class="phr-count" data-phr-count aria-live="polite">' . $movements . ' movimiento(s)</p><div class="phr-filters" role="group" aria-label="Filtrar por fuente"><button type="button" class="phr-filter is-active" data-phr-filter="">Todo <b data-phr-filter-count>' . $movements . '</b></button>';
       foreach ($sections as $section) {
         $sectionCount = count(array_filter($timeline, static fn(array $item): bool => $item['source_key'] === ($section['key'] ?? '')));
         if ($sectionCount > 0) {
-          $html .= '<button type="button" class="phr-filter phr-tone-' . self::tone((string) $section['key']) . '" data-phr-filter="' . self::e((string) $section['key']) . '">' . self::e((string) $section['label']) . ' <b>' . $sectionCount . '</b></button>';
+          $html .= '<button type="button" class="phr-filter phr-tone-' . self::tone((string) $section['key']) . '" data-phr-filter="' . self::e((string) $section['key']) . '">' . self::e((string) $section['label']) . ' <b data-phr-filter-count>' . $sectionCount . '</b></button>';
         }
       }
-      $html .= '</div><p class="phr-noresults" data-phr-noresults hidden>Ningún movimiento coincide con el filtro.</p></div>';
+      $html .= '</div><p class="phr-noresults" data-phr-noresults hidden>Ningún movimiento coincide. Busca por número de caso o contrato, una palabra del detalle o una fecha (dd/mm/aaaa).</p></div>';
     }
     if ($timeline === []) {
       $html .= '<p class="phr-empty">No se encontraron movimientos para este inmueble.</p>';
@@ -127,7 +127,9 @@ final class PropertyHistoryReport
         }
         $key = (string) $item['source_key'];
         $detail = trim((string) ($item['detail'] ?? ''));
-        $search = mb_strtolower(implode(' ', [(string) ($item['title'] ?? ''), $detail, (string) ($item['reference'] ?? ''), (string) ($item['source'] ?? '')]), 'UTF-8');
+        // "Inmueble <código>" está en todos los movimientos; no sirve para buscar y haría que todo coincida.
+        $reference = implode(' ', array_filter(array_map('trim', explode(' · ', (string) ($item['reference'] ?? ''))), static fn(string $part): bool => !str_starts_with($part, 'Inmueble ')));
+        $search = mb_strtolower(implode(' ', [(string) ($item['title'] ?? ''), $detail, $reference, (string) ($item['source'] ?? ''), (string) ($item['date'] ?? '')]), 'UTF-8');
         $html .= '<li class="phr-event phr-tone-' . self::tone($key) . '" data-phr-item data-phr-source="' . self::e($key) . '" data-phr-text="' . self::e($search) . '">'
           . '<span class="phr-dot" aria-hidden="true"></span>'
           . '<div class="phr-event-date">' . self::e($ts > 0 ? date('d/m/Y', $ts) : (string) ($item['date'] ?? '-')) . ($ts > 0 && date('H:i', $ts) !== '00:00' ? '<small>' . date('g:i a', $ts) . '</small>' : '') . '</div>'

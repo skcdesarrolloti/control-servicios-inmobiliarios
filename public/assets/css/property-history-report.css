@@ -40,6 +40,7 @@
 .phr-filter.is-active{border-color:var(--phr-ink);background:var(--phr-ink);color:#fff}.phr-filter.is-active b{background:var(--phr-accent);color:var(--phr-ink)}
 .phr-filter:focus-visible{outline:2px solid var(--phr-accent);outline-offset:2px}
 .phr-noresults{color:var(--phr-muted);font-size:12px}
+.phr-count{color:var(--phr-muted);font-size:11px;font-weight:600}.phr-filter.is-empty{opacity:.45}
 .phr-month+.phr-month{margin-top:14px}
 .phr-month h4{position:sticky;top:0;z-index:1;margin:0 0 6px;padding:4px 0;background:#fff;color:var(--phr-muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
 .phr-month ol{position:relative;margin:0;padding:0 0 0 18px;list-style:none;border-left:2px solid var(--phr-line)}
