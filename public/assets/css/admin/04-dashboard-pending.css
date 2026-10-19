@@ -16310,75 +16310,9 @@
   color: #0f766e;
 }
 
-#scm-app .scm-rent-increase-table thead tr {
-  background: #061d49 !important;
-}
-
-#scm-app .scm-rent-increase-table thead th {
-  color: #fff !important;
-  border-color: rgba(255, 255, 255, 0.16);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.28);
-}
-
+/* Rent increase table, tabs and pagination are styled with Tailwind (RentIncreaseView). */
 #scm-app .scm-rent-increase-table td {
   vertical-align: middle;
-}
-
-#scm-app .scm-rent-increase-table td small {
-  color: #64748b;
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  margin-top: 5px;
-}
-
-#scm-app .scm-rent-increase-table .scm-pending-action-cell {
-  min-width: 210px;
-}
-
-#scm-app .scm-rent-increase .scm-pagination {
-  display: flex;
-  justify-content: flex-end;
-}
-
-#scm-app .scm-rent-increase .scm-page-controls {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px;
-  border: 1px solid #d7e3ef;
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 8px 22px rgba(15, 39, 69, 0.08);
-}
-
-#scm-app .scm-rent-increase .scm-page-info {
-  color: #17304f;
-  font-size: 15px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-#scm-app .scm-rent-increase .scm-page-btn-rent-increase {
-  min-height: 42px;
-  min-width: 112px;
-  padding: 0 18px;
-  border: 1px solid #c7d8e8;
-  border-radius: 10px;
-  background: #061d49;
-  color: #fff;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 800;
-}
-
-#scm-app .scm-rent-increase .scm-page-btn-rent-increase:hover:not(:disabled) {
-  background: #0b2d68;
-}
-
-#scm-app .scm-rent-increase .scm-page-btn-rent-increase:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
 }
 
 body.scm-session-locked {

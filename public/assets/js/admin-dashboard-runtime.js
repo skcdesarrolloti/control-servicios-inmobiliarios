@@ -19996,6 +19996,7 @@
           var key = tab.getAttribute("data-rent-increase-tab") || "contracts";
           wrap.querySelectorAll("[data-rent-increase-tab]").forEach(function (item) {
             item.classList.toggle("active", item === tab);
+            item.setAttribute("aria-pressed", item === tab ? "true" : "false");
           });
           wrap.querySelectorAll("[data-rent-increase-section]").forEach(function (section) {
             section.classList.toggle(

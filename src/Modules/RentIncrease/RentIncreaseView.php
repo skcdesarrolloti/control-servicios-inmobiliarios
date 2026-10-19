@@ -4,33 +4,34 @@ declare(strict_types=1);
 
 namespace SCM\Modules\RentIncrease;
 
+use SCM\Modules\Pending\PublicServicesUi as UI;
+
 final class RentIncreaseView
 {
   public function renderPanel(): string
   {
+    $ui = UI::class;
+    $tabs = ['contracts' => ['Contratos activos', 'document'], 'canon' => ['Aumentos en canon', 'refresh'], 'administracion' => ['Aumentos en administración', 'building']];
     ob_start();
 ?>
-    <div class="scm-rent-increase" data-rent-increase-panel>
-      <div class="scm-pending-header scm-pending-header--brand">
-        <div>
-          <h2>Cartas de aumento</h2>
-          <p>Contratos de arrendamiento activos, generación de cartas y seguimiento de aumentos guardados.</p>
-        </div>
-        <div>
-          <div class="scm-pending-count" data-rent-increase-count>0</div>
-          <div class="scm-pending-count-label">registros filtrados</div>
-        </div>
-      </div>
-      <div class="scm-status-subtabs scm-rent-increase-tabs" role="tablist" aria-label="Cartas de aumento">
-        <button type="button" class="scm-status-topic-tab active" data-rent-increase-tab="contracts">Contratos</button>
-        <button type="button" class="scm-status-topic-tab" data-rent-increase-tab="canon">Aumentos en canon</button>
-        <button type="button" class="scm-status-topic-tab" data-rent-increase-tab="administracion">Aumentos en administración</button>
-      </div>
-      <?php foreach (['contracts' => 'Contratos activos', 'canon' => 'Aumentos en canon', 'administracion' => 'Aumentos en administración'] as $key => $label): ?>
-        <section class="scm-rent-increase-section<?php echo $key === 'contracts' ? ' active' : ''; ?>" data-rent-increase-section="<?php echo esc_attr($key); ?>" data-scm-loaded="0">
-          <?php echo $this->renderFilters($key, $label); ?>
-          <div class="scm-table-wrap" data-rent-increase-table><p style="padding:32px;text-align:center;color:var(--scm-text-muted);">Selecciona esta vista para cargar la información.</p></div>
-          <div class="scm-pagination" data-rent-increase-pagination></div>
+    <div class="scm-rent-increase !sp-font-sans !sp-text-service-navy !sp-bg-service-background !sp-p-3 sm:!sp-p-5 !sp-space-y-5" data-rent-increase-panel>
+      <header class="<?php echo $ui::CARD; ?> !sp-p-5 !sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-4">
+        <div class="!sp-flex !sp-items-center !sp-gap-3"><span class="!sp-p-2.5 !sp-bg-amber-50 !sp-rounded-xl !sp-border !sp-border-solid !sp-border-amber-200"><?php echo $ui::icon('document', '!sp-w-6 !sp-h-6'); ?></span><div><h2 class="!sp-m-0 !sp-text-xl !sp-font-bold !sp-text-service-navy">Cartas de aumento</h2><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">Contratos de arrendamiento activos · Generación de cartas · Seguimiento de aumentos guardados</p></div></div>
+        <div class="!sp-text-right !sp-border-y-0 !sp-border-r-0 !sp-border-l !sp-border-solid !sp-border-slate-200 !sp-pl-4"><strong class="!sp-text-xl" data-rent-increase-count>0</strong><p class="!sp-m-0 !sp-text-[9px] !sp-uppercase !sp-text-service-muted">Registros filtrados</p></div>
+      </header>
+      <nav class="scm-rent-increase-tabs !sp-flex !sp-flex-wrap !sp-items-center !sp-gap-1 !sp-p-1 !sp-bg-slate-100 !sp-rounded-lg !sp-w-fit !sp-max-w-full" role="tablist" aria-label="Cartas de aumento">
+        <?php foreach ($tabs as $key => $tab): ?>
+          <button type="button" class="sp-group !sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-3 !sp-py-2 !sp-rounded-md !sp-bg-transparent !sp-border-0 !sp-text-service-muted !sp-font-sans !sp-text-[10px] !sp-font-medium !sp-cursor-pointer aria-pressed:!sp-bg-service-navy aria-pressed:!sp-text-white aria-pressed:!sp-font-semibold focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow<?php echo $key === 'contracts' ? ' active' : ''; ?>" data-rent-increase-tab="<?php echo esc_attr($key); ?>" aria-pressed="<?php echo $key === 'contracts' ? 'true' : 'false'; ?>"><?php echo $ui::icon($tab[1], '!sp-w-3 !sp-h-3 group-aria-pressed:!sp-text-service-yellow'); ?><span><?php echo esc_html($tab[0]); ?></span></button>
+        <?php endforeach; ?>
+      </nav>
+      <?php foreach ($tabs as $key => $tab): ?>
+        <section class="scm-rent-increase-section !sp-space-y-5<?php echo $key === 'contracts' ? ' active' : ''; ?>" data-rent-increase-section="<?php echo esc_attr($key); ?>" data-scm-loaded="0">
+          <?php echo $this->renderFilters($key, $tab[0]); ?>
+          <div class="<?php echo $ui::CARD; ?>">
+            <div class="!sp-p-4"><h3 class="!sp-m-0 !sp-font-bold !sp-text-sm"><?php echo esc_html($key === 'contracts' ? 'Contratos activos para generar cartas' : $tab[0] . ' guardados'); ?></h3><p class="!sp-m-0 !sp-mt-1 !sp-text-[10px] !sp-text-service-muted"><?php echo esc_html($key === 'contracts' ? 'Genera la carta de aumento de canon o de administración y notifica a los interesados.' : 'Cartas generadas con su valor y fecha de incremento. Ábrelas sin salir del panel.'); ?></p></div>
+            <div data-rent-increase-table><p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">Selecciona esta vista para cargar la información.</p></div>
+            <div class="!sp-p-4 !sp-bg-slate-50/50 empty:!sp-hidden" data-rent-increase-pagination></div>
+          </div>
         </section>
       <?php endforeach; ?>
       <div class="scm-cia-modal" data-rent-increase-modal hidden>
@@ -50,28 +51,37 @@ final class RentIncreaseView
 
   private function renderFilters(string $scope, string $label): string
   {
+    $ui = UI::class;
+    $field = static fn(string $label, string $control): string => '<label class="!sp-block"><span class="' . $ui::LABEL . '">' . esc_html($label) . '</span>' . $control . '</label>';
+    $input = static fn(string $name, string $type, string $placeholder = ''): string => '<input class="' . $ui::INPUT . '" name="' . $name . '" type="' . $type . '"' . ($placeholder !== '' ? ' placeholder="' . esc_attr($placeholder) . '"' : '') . '>';
+    $months = '<option value="0">Todos</option>';
+    for ($m = 1; $m <= 12; $m++) {
+      $months .= '<option value="' . $m . '">' . esc_html($this->monthName($m)) . '</option>';
+    }
     ob_start();
 ?>
-    <div class="scm-filter-card">
-      <h3>Filtros - <?php echo esc_html($label); ?></h3>
+    <div class="<?php echo $ui::CARD; ?> !sp-p-5">
+      <div class="!sp-flex !sp-flex-wrap !sp-justify-between !sp-items-center !sp-gap-2 !sp-pb-3 !sp-mb-4 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><h3 class="!sp-m-0 !sp-flex !sp-gap-2 !sp-items-center !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide"><?php echo $ui::icon('filter'); ?>Filtros · <?php echo esc_html($label); ?></h3><span class="!sp-text-[10px] !sp-text-service-muted">Datos del contrato, fechas de incremento y fin de contrato</span></div>
       <form autocomplete="off" data-rent-increase-form="<?php echo esc_attr($scope); ?>">
         <input type="hidden" name="page" value="1">
         <input type="hidden" name="scope" value="<?php echo esc_attr($scope); ?>">
-        <div class="scm-grid" style="grid-template-columns:repeat(6,minmax(0,1fr));">
-          <div class="scm-field"><label>Desde canon</label><input name="canon_from" type="date"></div>
-          <div class="scm-field"><label>Hasta canon</label><input name="canon_to" type="date"></div>
-          <div class="scm-field"><label>Desde administración</label><input name="admin_from" type="date"></div>
-          <div class="scm-field"><label>Hasta administración</label><input name="admin_to" type="date"></div>
-          <div class="scm-field"><label>Mes fin contrato</label><select name="month"><option value="0">Todos</option><?php for ($m = 1; $m <= 12; $m++): ?><option value="<?php echo esc_attr((string) $m); ?>"><?php echo esc_html($this->monthName($m)); ?></option><?php endfor; ?></select></div>
-          <div class="scm-field"><label>Por página</label><select name="per_page"><option value="20">20</option><option value="30">30</option><option value="60">60</option><option value="100">100</option></select></div>
-          <div class="scm-field"><label>Propietario</label><input name="propietario" type="text" placeholder="Nombre"></div>
-          <div class="scm-field"><label>Arrendatario</label><input name="arrendatario" type="text" placeholder="Nombre"></div>
-          <div class="scm-field"><label>Contrato</label><input name="contrato" type="text" placeholder="Código"></div>
-          <div class="scm-field"><label>Inmueble</label><input name="inmueble" type="text" placeholder="# inmueble"></div>
+        <div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-4 !sp-gap-4">
+          <?php
+          echo $field('Propietario', $input('propietario', 'text', 'Buscar por nombre...'));
+          echo $field('Arrendatario', $input('arrendatario', 'text', 'Buscar por nombre...'));
+          echo $field('Contrato', $input('contrato', 'text', 'Código contrato...'));
+          echo $field('Inmueble', $input('inmueble', 'text', 'Ej: 10156'));
+          echo $field('Incremento canon desde', $input('canon_from', 'date'));
+          echo $field('Incremento canon hasta', $input('canon_to', 'date'));
+          echo $field('Incremento administración desde', $input('admin_from', 'date'));
+          echo $field('Incremento administración hasta', $input('admin_to', 'date'));
+          echo $field('Mes fin de contrato', '<select class="' . $ui::INPUT . '" name="month">' . $months . '</select>');
+          echo $field('Registros por página', '<select class="' . $ui::INPUT . '" name="per_page"><option value="20">20</option><option value="30">30</option><option value="60">60</option><option value="100">100</option></select>');
+          ?>
         </div>
-        <div class="scm-actions">
-          <button class="scm-btn-primary-cyan" type="submit">Filtrar</button>
-          <button class="scm-btn-secondary" type="button" data-rent-increase-clear>Limpiar</button>
+        <div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-3 !sp-mt-5">
+          <button class="<?php echo $ui::PRIMARY; ?>" type="submit"><?php echo $ui::icon('filter'); ?>Filtrar</button>
+          <button class="!sp-bg-transparent !sp-border-0 !sp-text-service-muted !sp-text-xs !sp-cursor-pointer" type="button" data-rent-increase-clear>Limpiar filtros</button>
           <span class="scm-spinner"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
         </div>
       </form>
@@ -83,35 +93,40 @@ final class RentIncreaseView
   /** @param array<int,array<string,mixed>> $rows */
   public function renderTable(array $rows, string $scope): string
   {
+    $ui = UI::class;
     if ($rows === []) {
-      return '<div class="scm-table-wrap"><p style="padding:32px;text-align:center;color:var(--scm-text-muted);">No hay registros con los filtros actuales.</p></div>';
+      return '<p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">No hay registros con los filtros actuales.</p>';
     }
-    $html = '<div class="scm-table-wrap"><table class="scm-table scm-table-prev scm-rent-increase-table"><thead><tr>'
-      . '<th>Contrato</th><th>Inmueble</th><th>Canon</th><th>Admin</th><th>Dirección</th><th>Propietario</th><th>Arrendatario</th><th>Inicio</th><th>Fin</th><th>Acciones</th>'
-      . '</tr></thead><tbody>';
+    $th = '!sp-text-left !sp-text-[9px] !sp-uppercase !sp-tracking-wide !sp-font-bold !sp-text-service-muted !sp-px-3 !sp-py-4 !sp-border-x-0 !sp-border-y !sp-border-solid !sp-border-slate-200';
+    $td = '!sp-border-x-0 !sp-border-y-0 !sp-px-3 !sp-py-4';
+    $html = '<div class="!sp-overflow-x-auto"><table class="scm-rent-increase-table !sp-w-full !sp-border-collapse !sp-text-[10px] !sp-text-service-navy !sp-min-w-[1150px]"><thead class="!sp-bg-slate-50"><tr>';
+    foreach (['Contrato', 'Inmueble', 'Canon', 'Administración', 'Dirección', 'Propietario', 'Arrendatario', 'Inicio', 'Fin', 'Acciones'] as $label) {
+      $html .= '<th class="' . $th . '">' . $label . '</th>';
+    }
+    $html .= '</tr></thead><tbody>';
     foreach ($rows as $row) {
       $row = (array) $row;
-      $html .= '<tr>';
-      $html .= '<td><span class="scm-ticket-badge">' . esc_html((string) ($row['contrato'] ?? $row['_ID'] ?? '-')) . '</span></td>';
-      $html .= '<td><span class="scm-inmueble-badge">' . esc_html((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '-')) . '</span></td>';
-      $html .= '<td>' . esc_html($this->money($row['valor_canon'] ?? '')) . $this->dateSmall($row['fecha_incremento_canon'] ?? null) . '</td>';
-      $html .= '<td>' . esc_html($this->money($row['valor_administracion'] ?? '')) . $this->dateSmall($row['fecha_incremento_admin'] ?? null) . '</td>';
-      $html .= '<td style="max-width:220px;">' . esc_html((string) ($row['direccion'] ?? '-')) . '</td>';
-      $html .= '<td>' . esc_html((string) ($row['propietario'] ?? '-')) . '</td>';
-      $html .= '<td>' . esc_html((string) ($row['arrendatario'] ?? '-')) . '</td>';
-      $html .= '<td class="scm-date-cell">' . esc_html($this->dateText($row['inicio_contrato'] ?? null)) . '</td>';
-      $html .= '<td class="scm-date-cell">' . esc_html($this->dateText($row['fin_contrato'] ?? null)) . '</td>';
-      $html .= '<td class="scm-pending-action-cell">';
+      $html .= '<tr class="!sp-bg-white hover:!sp-bg-slate-50 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100">';
+      $html .= '<td class="' . $td . '"><span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200 !sp-text-amber-900 !sp-font-bold">#' . esc_html((string) ($row['contrato'] ?? $row['_ID'] ?? '-')) . '</span></td>';
+      $html .= '<td class="' . $td . '"><span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-bg-emerald-50 !sp-border !sp-border-solid !sp-border-emerald-200 !sp-text-emerald-700 !sp-font-semibold">' . esc_html((string) ($row['inmueble'] ?? $row['id_inmueble'] ?? '-')) . '</span></td>';
+      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap"><strong class="!sp-block !sp-text-xs">' . esc_html($this->money($row['valor_canon'] ?? '')) . '</strong>' . $this->dateSmall($row['fecha_incremento_canon'] ?? null) . '</td>';
+      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap"><strong class="!sp-block !sp-text-xs">' . esc_html($this->money($row['valor_administracion'] ?? '')) . '</strong>' . $this->dateSmall($row['fecha_incremento_admin'] ?? null) . '</td>';
+      $html .= '<td class="' . $td . ' !sp-max-w-[220px] !sp-leading-relaxed !sp-font-medium">' . esc_html((string) ($row['direccion'] ?? '-')) . '</td>';
+      $html .= '<td class="' . $td . ' !sp-max-w-[200px] !sp-leading-relaxed">' . esc_html((string) ($row['propietario'] ?? '-')) . '</td>';
+      $html .= '<td class="' . $td . ' !sp-max-w-[200px] !sp-leading-relaxed">' . esc_html((string) ($row['arrendatario'] ?? '-')) . '</td>';
+      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap !sp-text-service-muted">' . esc_html($this->dateText($row['inicio_contrato'] ?? null)) . '</td>';
+      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap"><span class="!sp-bg-slate-100 !sp-rounded !sp-px-2 !sp-py-1">' . esc_html($this->dateText($row['fin_contrato'] ?? null)) . '</span></td>';
+      $html .= '<td class="' . $td . '"><div class="!sp-flex !sp-flex-wrap !sp-gap-2">';
       if ($scope === 'contracts') {
         $html .= $this->actionButton('canon', $row) . $this->actionButton('administracion', $row);
       } else {
         $field = $scope === 'canon' ? 'carta_aumento_canon' : 'carta_aumento_admin';
         $url = trim((string) ($row[$field] ?? ''));
-        if ($url !== '') {
-          $html .= '<button type="button" class="scm-pending-action-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($url) . '" data-iframe-title="Carta de aumento">Ver carta</button>';
-        }
+        $html .= $url !== ''
+          ? '<button type="button" class="' . $ui::NAVY . ' !sp-whitespace-nowrap" data-scm-open-iframe data-iframe-url="' . esc_attr($url) . '" data-iframe-title="Carta de aumento">' . $ui::icon('eye', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . 'Ver carta</button>'
+          : '<span class="!sp-text-service-muted">Sin carta</span>';
       }
-      $html .= '</td></tr>';
+      $html .= '</div></td></tr>';
     }
     return $html . '</tbody></table></div>';
   }
@@ -119,6 +134,7 @@ final class RentIncreaseView
   /** @param array<string,mixed> $row */
   private function actionButton(string $type, array $row): string
   {
+    $ui = UI::class;
     $label = $type === 'canon' ? 'Aumentar canon' : 'Aumentar administración';
     $attrs = [
       'type' => $type,
@@ -134,7 +150,8 @@ final class RentIncreaseView
     foreach ($attrs as $key => $value) {
       $htmlAttrs .= ' data-' . $key . '="' . esc_attr($value) . '"';
     }
-    return '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;" data-rent-increase-open' . $htmlAttrs . '>' . esc_html($label) . '</button>';
+    $class = $type === 'canon' ? $ui::NAVY : $ui::SECONDARY . ' !sp-text-[10px]';
+    return '<button type="button" class="' . $class . ' !sp-whitespace-nowrap" data-rent-increase-open' . $htmlAttrs . '>' . $ui::icon($type === 'canon' ? 'refresh' : 'building', '!sp-w-3 !sp-h-3') . esc_html($label) . '</button>';
   }
 
   /** @param array<string,mixed> $pagination */
@@ -143,13 +160,16 @@ final class RentIncreaseView
     $page = max(1, (int) ($pagination['page'] ?? 1));
     $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
     $total = max(0, (int) ($pagination['total'] ?? 0));
+    $info = '<span class="!sp-text-[10px] !sp-text-service-muted">';
     if ($totalPages <= 1) {
-      return $total > 0 ? '<span class="scm-page-info">Mostrando ' . esc_html((string) $total) . ' registro(s)</span>' : '';
+      return $total > 0 ? $info . 'Mostrando ' . esc_html((string) $total) . ' registro(s)</span>' : '';
     }
-    return '<div class="scm-page-controls">'
-      . '<button type="button" class="scm-page-btn-rent-increase" data-page="' . esc_attr((string) max(1, $page - 1)) . '"' . ($page <= 1 ? ' disabled' : '') . '>Anterior</button>'
-      . '<span class="scm-page-info">Página ' . esc_html((string) $page) . ' de ' . esc_html((string) $totalPages) . ' | ' . esc_html((string) $total) . ' registros</span>'
-      . '<button type="button" class="scm-page-btn-rent-increase" data-page="' . esc_attr((string) min($totalPages, $page + 1)) . '"' . ($page >= $totalPages ? ' disabled' : '') . '>Siguiente</button>'
+    $button = static fn(int $target, bool $disabled, string $label): string => '<button type="button" class="scm-page-btn-rent-increase ' . UI::SECONDARY . '" data-page="' . esc_attr((string) $target) . '"' . ($disabled ? ' disabled' : '') . '>' . $label . '</button>';
+    return '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-3 !sp-font-sans">'
+      . $info . 'Página ' . esc_html((string) $page) . ' de ' . esc_html((string) $totalPages) . ' · ' . esc_html((string) $total) . ' registros</span>'
+      . '<div class="!sp-flex !sp-items-center !sp-gap-2">' . $button(max(1, $page - 1), $page <= 1, 'Anterior')
+      . '<span class="!sp-bg-service-navy !sp-text-white !sp-text-[10px] !sp-px-3 !sp-py-2 !sp-rounded">' . esc_html((string) $page) . '</span>'
+      . $button(min($totalPages, $page + 1), $page >= $totalPages, 'Siguiente') . '</div>'
       . '</div>';
   }
 
@@ -207,7 +227,7 @@ final class RentIncreaseView
   private function dateSmall($value): string
   {
     $date = $this->dateText($value);
-    return $date === '' || $date === '-' ? '' : '<small>' . esc_html($date) . '</small>';
+    return $date === '' || $date === '-' ? '' : '<small class="!sp-block !sp-mt-1 !sp-text-[9px] !sp-text-service-muted">Incremento ' . esc_html($date) . '</small>';
   }
 
   private function monthName(int $month): string
