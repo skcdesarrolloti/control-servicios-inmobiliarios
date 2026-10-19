@@ -168,6 +168,9 @@ trait RendersDashboard
       'scm-panel-metricas-preventivas' => 'scm-panel-metricas-preventivas',
       'metricas_servicios_publicos' => 'scm-panel-metricas-servicios-publicos',
       'scm-panel-metricas-servicios-publicos' => 'scm-panel-metricas-servicios-publicos',
+      'metricas_crecimiento' => 'scm-panel-metricas-crecimiento',
+      'crecimiento' => 'scm-panel-metricas-crecimiento',
+      'scm-panel-metricas-crecimiento' => 'scm-panel-metricas-crecimiento',
       'ocupaciones' => 'scm-panel-movimientos-contratos',
       'desocupaciones' => 'scm-panel-movimientos-contratos',
       'ocupaciones_vs_desocupaciones' => 'scm-panel-movimientos-contratos',
@@ -336,6 +339,7 @@ trait RendersDashboard
       'scm-panel-metricas-cotizaciones' => 'metricas',
       'scm-panel-metricas-preventivas' => 'metricas',
       'scm-panel-metricas-servicios-publicos' => 'metricas',
+      'scm-panel-metricas-crecimiento' => 'metricas',
       'scm-panel-movimientos-contratos' => 'metricas',
       'scm-panel-funcionario-contratos' => 'contratos_arrendamiento',
     ];
@@ -756,6 +760,7 @@ trait RendersDashboard
             if ($panelId === 'scm-panel-metricas-cotizaciones') $tabLabel = 'Métricas de cotizaciones';
             if ($panelId === 'scm-panel-metricas-preventivas') $tabLabel = 'Métricas de revisión preventiva';
             if ($panelId === 'scm-panel-metricas-servicios-publicos') $tabLabel = 'Métricas de servicios públicos';
+            if ($panelId === 'scm-panel-metricas-crecimiento') $tabLabel = 'Crecimiento de la empresa';
             if ($panelId === 'scm-panel-funcionario-contratos') $tabLabel = 'Funcionario de contratos';
           }
           ?>
@@ -1431,6 +1436,9 @@ trait RendersDashboard
         </div>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas-servicios-publicos' ? ' active' : ''; ?>" id="scm-panel-metricas-servicios-publicos" data-permission-tab="metricas" data-scm-loaded="0">
           <?php echo $maintenanceMetricsView->shell('servicios'); ?>
+        </div>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas-crecimiento' ? ' active' : ''; ?>" id="scm-panel-metricas-crecimiento" data-permission-tab="metricas" data-scm-loaded="0">
+          <?php echo $maintenanceMetricsView->shell('crecimiento'); ?>
         </div>
       <?php endif; ?>
 

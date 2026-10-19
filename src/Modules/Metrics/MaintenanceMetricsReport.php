@@ -181,6 +181,70 @@ final class MaintenanceMetricsReport
     return ['pending' => $pending, 'queues' => $queues, 'reviews' => $reviews, 'quotes' => $quotes, 'staff' => self::topStaff($staff), 'trend' => self::sortTrend($trend)];
   }
 
+  /**
+   * Crecimiento por cartas de aumento. La carta guarda el valor nuevo y el porcentaje: el valor anterior
+   * es la carta previa del mismo tipo y contrato o, si no hay, el nuevo ÷ (1 + %).
+   */
+  public function growth(int $fromTs, int $toTs): array
+  {
+    $empty = ['letters' => 0, 'increase' => 0, 'before' => 0, 'after' => 0, 'pct_sum' => 0.0, 'pct_count' => 0, 'unknown' => 0];
+    $types = ['canon' => $empty, 'admin' => $empty];
+    $trend = []; $top = [];
+    $table = $this->db->table('jet_cct_cartas_aumento');
+    $columns = $this->schema->getTableColumns($table);
+    if (in_array('tipo_carta', $columns, true)) {
+      $pick = array_values(array_intersect(['_ID', 'fecha', 'cct_created', 'id_contrato', 'contrato', 'inmueble', 'direccion', 'arrendatario', 'tipo_carta', 'incremento', 'canon', 'administracion'], $columns));
+      $date = in_array('fecha', $columns, true) ? "COALESCE(NULLIF(CAST(`fecha` AS UNSIGNED),0), UNIX_TIMESTAMP(`cct_created`))" : 'UNIX_TIMESTAMP(`cct_created`)';
+      $status = in_array('cct_status', $columns, true) ? " WHERE LOWER(TRIM(COALESCE(`cct_status`,'publish'))) <> 'trash'" : '';
+      $rows = $this->db->getResults('SELECT ' . implode(',', array_map(static fn($c) => '`' . $c . '`', $pick)) . ", {$date} AS `_scm_ts` FROM `{$table}`{$status} ORDER BY `_scm_ts`, `_ID`");
+      $last = [];
+      foreach ($rows as $row) {
+        $kind = self::lower($row['tipo_carta'] ?? '');
+        $type = str_contains($kind, 'canon') ? 'canon' : (str_contains($kind, 'admin') ? 'admin' : '');
+        if ($type === '') continue;
+        $after = ContractMovementsReport::parseMoney($row[$type === 'canon' ? 'canon' : 'administracion'] ?? null);
+        $pct = self::percent((string) ($row['incremento'] ?? ''));
+        $contract = trim((string) (($row['id_contrato'] ?? '') ?: ($row['contrato'] ?? '')));
+        $key = $type . '|' . $contract;
+        $before = $contract !== '' && isset($last[$key]) && $last[$key] > 0 && $last[$key] <= $after ? $last[$key] : ($pct > 0 && $after > 0 ? (int) round($after / (1 + $pct / 100)) : 0);
+        if ($contract !== '' && $after > 0) $last[$key] = $after;
+        $ts = (int) $row['_scm_ts'];
+        if ($ts < $fromTs || $ts > $toTs || $after <= 0) continue;
+        $increase = $before > 0 ? max(0, $after - $before) : 0;
+        $t = &$types[$type];
+        $t['letters']++;
+        if ($before > 0) { $t['increase'] += $increase; $t['before'] += $before; $t['after'] += $after; } else { $t['unknown']++; }
+        if ($pct > 0) { $t['pct_sum'] += $pct; $t['pct_count']++; }
+        unset($t);
+        $bucket = date('Y-m', $ts);
+        $trend[$bucket] ??= ['canon' => 0, 'canon_increase' => 0, 'admin' => 0, 'admin_increase' => 0];
+        $trend[$bucket][$type]++;
+        $trend[$bucket][$type . '_increase'] += $increase;
+        $top[] = ['type' => $type, 'contract' => (string) ($row['contrato'] ?? $contract), 'property' => (string) ($row['inmueble'] ?? ''), 'tenant' => (string) ($row['arrendatario'] ?? ''), 'date' => $ts, 'before' => $before, 'after' => $after, 'increase' => $increase, 'pct' => $pct];
+      }
+    }
+    usort($top, static fn(array $a, array $b): int => $b['increase'] <=> $a['increase']);
+
+    $portfolio = ['contracts' => 0, 'canon' => 0, 'admin' => 0];
+    $contracts = $this->db->table('jet_cct_contratos_arrendamiento');
+    if ($this->schema->tableExists($contracts)) {
+      foreach ($this->db->getResults("SELECT `valor_canon`, `valor_administracion` FROM `{$contracts}` WHERE LOWER(TRIM(COALESCE(`estado`,'')))='entregado'") as $contract) {
+        $portfolio['contracts']++;
+        $portfolio['canon'] += ContractMovementsReport::parseMoney($contract['valor_canon'] ?? null);
+        $portfolio['admin'] += ContractMovementsReport::parseMoney($contract['valor_administracion'] ?? null);
+      }
+    }
+    return ['types' => $types, 'trend' => self::sortTrend($trend), 'top' => array_slice($top, 0, 15), 'portfolio' => $portfolio];
+  }
+
+  /** "9,28%", "9.28 %", "IPC 9,28" → 9.28; 0 when there is no usable number. */
+  public static function percent(string $value): float
+  {
+    if (!preg_match('/(\d+(?:[.,]\d+)?)/', $value, $match)) return 0.0;
+    $number = (float) str_replace(',', '.', $match[1]);
+    return $number > 0 && $number < 100 ? $number : 0.0;
+  }
+
   /** Quotes linked by `id_revision` or, for legacy rows, by the review's case. @return array<int,array<int,array<string,mixed>>> */
   private function preventiveQuotes(array $reviews): array
   {

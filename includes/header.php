@@ -303,6 +303,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'metricas_preventivas';
   } elseif (in_array($tabParam, ['metricas_servicios_publicos', 'scm-panel-metricas-servicios-publicos'], true)) {
     $current_page = 'metricas_servicios_publicos';
+  } elseif (in_array($tabParam, ['metricas_crecimiento', 'crecimiento', 'scm-panel-metricas-crecimiento'], true)) {
+    $current_page = 'metricas_crecimiento';
   } else {
     $current_page = empty($tabParam) ? 'inicio' : 'abiertos';
   }
@@ -669,6 +671,16 @@ $rawNavItems = [
         'subtab' => 'comparativo',
         'url' => $baseUrl . '/index.php?tab=ocupaciones_vs_desocupaciones',
         'icon' => 'compare_arrows',
+        'perms' => ['metricas'],
+      ],
+      'metricas_crecimiento' => [
+        'key' => 'metricas_crecimiento',
+        'group' => 'Contratos',
+        'group_icon' => 'contract',
+        'label' => 'Crecimiento de la empresa',
+        'panel_id' => 'scm-panel-metricas-crecimiento',
+        'url' => $baseUrl . '/index.php?tab=metricas_crecimiento',
+        'icon' => 'trending_up',
         'perms' => ['metricas'],
       ],
     ],

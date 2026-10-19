@@ -39,7 +39,9 @@ trait HandlesMetricsPanels
     try {
       $metrics = new \SCM\Modules\Metrics\MaintenanceMetricsReport($this->db);
       [$fromTs, $toTs, $from, $to] = $metrics->period((string) ($_POST['from'] ?? ''), (string) ($_POST['to'] ?? ''));
-      if ($report === 'servicios') {
+      if ($report === 'crecimiento') {
+        $data = $metrics->growth($fromTs, $toTs);
+      } elseif ($report === 'servicios') {
         $payload = $this->get_pending_controller()->buildServiciosPublicosPayload([]);
         $data = $metrics->publicServices($fromTs, $toTs, (array) ($payload['items'] ?? []), (array) ($payload['configuration_items'] ?? []));
       } else {

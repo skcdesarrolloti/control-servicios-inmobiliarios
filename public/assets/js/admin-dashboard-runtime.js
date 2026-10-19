@@ -24293,6 +24293,7 @@
         activePanel.id !== "scm-panel-metricas-cotizaciones" &&
         activePanel.id !== "scm-panel-metricas-preventivas" &&
         activePanel.id !== "scm-panel-metricas-servicios-publicos" &&
+        activePanel.id !== "scm-panel-metricas-crecimiento" &&
         !dashboardFilterOptionsLoaded &&
         !skipFilterOptions
       ) {
@@ -24326,7 +24327,7 @@
         }
         return Promise.resolve();
       }
-      if (activePanel.id === "scm-panel-metricas-preventivas" || activePanel.id === "scm-panel-metricas-servicios-publicos") {
+      if (activePanel.id === "scm-panel-metricas-preventivas" || activePanel.id === "scm-panel-metricas-servicios-publicos" || activePanel.id === "scm-panel-metricas-crecimiento") {
         return loadMaintenanceMetrics(activePanel.querySelector("[data-maint-metrics]"), false);
       }
       if (activePanel.id === "scm-panel-funcionario-contratos") {

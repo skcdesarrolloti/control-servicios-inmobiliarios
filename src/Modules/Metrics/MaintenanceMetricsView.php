@@ -9,9 +9,12 @@ use SCM\Modules\Pending\PublicServicesUi as UI;
 /** Métricas › Servicios públicos y Métricas › Mantenimiento › Revisión preventiva (Tailwind sp-). */
 final class MaintenanceMetricsView
 {
+  private const PENDING_NOTE = 'El periodo aplica a revisiones, resultados, daños, cotizaciones y casos creados. Pendientes, sin cita y sin enviar muestran la situación actual.';
+  /** report => [title, subtitle, icon, period note, template]. */
   public const REPORTS = [
-    'servicios' => ['Revisiones de servicios públicos', 'Pendientes, revisiones realizadas por resultado, deuda reportada y casos críticos de 72 horas.', 'drop'],
-    'preventiva' => ['Revisión preventiva', 'Pendientes, citas, revisiones realizadas, daños, cotizaciones y administración ganada.', 'check'],
+    'servicios' => ['Revisiones de servicios públicos', 'Pendientes, revisiones realizadas por resultado, deuda reportada y casos críticos de 72 horas.', 'drop', self::PENDING_NOTE, 'public-services'],
+    'preventiva' => ['Revisión preventiva', 'Pendientes, citas, revisiones realizadas, daños, cotizaciones y administración ganada.', 'check', self::PENDING_NOTE, 'preventive'],
+    'crecimiento' => ['Crecimiento de la empresa', 'Aumentos de canon y de administración generados con las cartas de aumento.', 'refresh', 'El periodo aplica a la fecha de las cartas de aumento. La cartera administrada muestra los contratos entregados hoy.', 'growth'],
   ];
 
   public static function e(mixed $value): string
@@ -85,7 +88,7 @@ final class MaintenanceMetricsView
 
   public function shell(string $report): string
   {
-    [$title, $subtitle, $icon] = self::REPORTS[$report];
+    [$title, $subtitle, $icon, $note] = self::REPORTS[$report];
     $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
     $quick = ['month' => 'Mes actual', 'year' => 'Este año', 'last12' => 'Últimos 12 meses', 'all' => 'Todo'];
     ob_start();
@@ -102,7 +105,7 @@ final class MaintenanceMetricsView
         <div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2 !sp-text-[10px] !sp-text-service-muted">Periodo rápido:
           <?php foreach ($quick as $key => $label): ?><button type="button" class="<?= UI::SECONDARY ?> aria-pressed:!sp-bg-service-navy aria-pressed:!sp-text-white" aria-pressed="<?= $key === 'year' ? 'true' : 'false' ?>" data-maint-metrics-quick="<?= $key ?>"><?= $label ?></button><?php endforeach ?>
         </div>
-        <p class="!sp-m-0 !sp-w-full !sp-text-[10px] !sp-text-service-muted">El periodo aplica a revisiones, resultados, daños, cotizaciones y casos creados. Pendientes, sin cita y sin enviar muestran la situación actual.</p>
+        <p class="!sp-m-0 !sp-w-full !sp-text-[10px] !sp-text-service-muted"><?= self::e($note) ?></p>
       </form>
       <div data-maint-metrics-content aria-live="polite"><p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">Abre esta métrica para cargar la información.</p></div>
     </div>
@@ -115,7 +118,7 @@ final class MaintenanceMetricsView
     extract($data, EXTR_SKIP);
     $period = date('d/m/Y', (int) strtotime($from)) . ' – ' . date('d/m/Y', (int) strtotime($to));
     ob_start();
-    require dirname(__DIR__, 3) . '/resources/views/metrics/' . ($report === 'servicios' ? 'public-services' : 'preventive') . '.php';
+    require dirname(__DIR__, 3) . '/resources/views/metrics/' . self::REPORTS[$report][4] . '.php';
     return (string) ob_get_clean();
   }
 }
