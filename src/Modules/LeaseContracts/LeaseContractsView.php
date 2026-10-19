@@ -65,13 +65,14 @@ final class LeaseContractsView
       <div class="!sp-flex !sp-flex-wrap !sp-justify-between !sp-items-center !sp-gap-2 !sp-pb-3 !sp-mb-4 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><h3 class="!sp-m-0 !sp-flex !sp-gap-2 !sp-items-center !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide"><?php echo $ui::icon('filter'); ?>Filtros · <?php echo esc_html($label); ?></h3><span class="!sp-text-[10px] !sp-text-service-muted">Contrato, inmueble y partes</span></div>
       <form method="post" autocomplete="off" class="sca_form">
         <input type="hidden" name="sca_page" value="1">
-        <div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-3 xl:!sp-grid-cols-6 !sp-gap-4">
+        <div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-4 xl:!sp-grid-cols-7 !sp-gap-4">
           <?php
           echo $input('sca_contrato', 'Contrato', 'Código contrato...');
           echo $input('sca_inmueble', 'Inmueble', 'SIMI o código web...');
           echo $input('sca_direccion', 'Dirección', 'Dirección...');
           echo $input('sca_propietario', 'Propietario', 'Nombre o documento...');
           echo $input('sca_arrendatario', 'Arrendatario', 'Nombre o documento...');
+          echo $input('sca_codeudor', 'Codeudor', 'Nombre o documento...');
           ?>
           <label class="!sp-block"><span class="<?php echo $ui::LABEL; ?>">Registros por página</span><select class="<?php echo $ui::INPUT; ?>" name="sca_per_page"><option value="30">30</option><option value="60">60</option><option value="100">100</option></select></label>
         </div>

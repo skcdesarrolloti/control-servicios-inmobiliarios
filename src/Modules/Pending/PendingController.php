@@ -145,6 +145,7 @@ final class PendingController
       'direccion' => $clean($input['sca_direccion'] ?? ''),
       'propietario' => $clean($input['sca_propietario'] ?? ''),
       'arrendatario' => $clean($input['sca_arrendatario'] ?? ''),
+      'codeudor' => $clean($input['sca_codeudor'] ?? ''),
     ];
   }
 

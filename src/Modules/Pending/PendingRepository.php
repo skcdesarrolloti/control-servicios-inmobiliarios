@@ -328,8 +328,9 @@ final class PendingRepository
       'contrato' => ['contrato'],
       'inmueble' => ['inmueble', 'id_inmueble'],
       'direccion' => ['direccion'],
-      'propietario' => ['propietario', 'id_propietario'],
-      'arrendatario' => ['arrendatario', 'id_arrendatario'],
+      'propietario' => ['propietario', 'id_propietario', 'documento_propietario'],
+      'arrendatario' => ['arrendatario', 'id_arrendatario', 'documento_arrendatario'],
+      'codeudor' => ['codeudor_1', 'codeudor_2', 'codeudor_3', 'codeudor_4', 'documento_codeudor_1', 'documento_codeudor_2', 'documento_codeudor_3', 'documento_codeudor_4'],
     ];
     foreach ($likeFilters as $filterKey => $columns) {
       $value = trim((string) ($filters[$filterKey] ?? ''));
