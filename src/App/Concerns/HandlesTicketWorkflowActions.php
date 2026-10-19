@@ -1796,7 +1796,7 @@ trait HandlesTicketWorkflowActions
     $controller = $this->get_pending_controller();
     $payload = $controller->buildPreventivasPayload($_POST);
     $view = new \SCM\Modules\Pending\PendingView();
-    $kpis = $view->renderPreventivasKpis((int)($payload['count'] ?? 0), (string)($payload['corte'] ?? ''));
+    $kpis = $view->renderPreventivasKpis((int)($payload['count'] ?? 0), (string)($payload['corte'] ?? ''), (array)($payload['items'] ?? []));
     $table = $view->renderPreventivasTable((array)($payload['items'] ?? []));
     $this->jsonOk([
       'kpis_html' => $kpis,

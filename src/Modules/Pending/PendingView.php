@@ -8,89 +8,7 @@ final class PendingView
 
   public function renderPreventivasPanel(array $filters, array $funcionarios, array $items, int $count, string $corte): string
   {
-    ob_start();
-?>
-    <div class="scm-pending-wrap">
-
-      <!-- Header -->
-      <div class="scm-pending-header scm-pending-header--brand">
-        <div>
-          <h2>Revision Preventiva &mdash; Pendientes</h2>
-          <p>Contratos <strong>estado = Entregado</strong> sin revision en <?php echo esc_html((string) date('Y')); ?></p>
-        </div>
-        <div>
-          <div class="scm-pending-count" id="spp-kpi-count"><?php echo esc_html((string) $count); ?></div>
-          <div class="scm-pending-count-label">contratos pendientes</div>
-        </div>
-      </div>
-
-      <?php echo PreventiveWorkspace::tabs(null); ?>
-      <?php foreach (array_keys(PreventiveWorkspace::TABS) as $section) : if ($section === 'pending') continue; ?>
-        <section data-preventive-section="<?php echo esc_attr($section); ?>" hidden><div data-preventive-workspace-content="<?php echo esc_attr($section); ?>"></div></section>
-      <?php endforeach; ?>
-      <section data-preventive-section="pending">
-
-      <!-- Filtros -->
-      <div class="scm-filter-card">
-        <h3>Filtros</h3>
-        <form method="post" autocomplete="off" id="spp_form">
-          <div class="scm-grid" style="grid-template-columns:repeat(6,minmax(0,1fr));">
-            <div class="scm-field">
-              <label for="spp_mes">Mes</label>
-              <select id="spp_mes" name="spp_mes">
-                <option value="0">Todos</option>
-                <?php for ($m = 1; $m <= 12; $m++) : ?>
-                  <option value="<?php echo esc_attr((string) $m); ?>" <?php selected((int) ($filters['mes'] ?? 0), $m); ?>><?php echo esc_html($this->monthName($m)); ?></option>
-                <?php endfor; ?>
-              </select>
-            </div>
-            <div class="scm-field">
-              <label for="spp_inmueble">Inmueble</label>
-              <input id="spp_inmueble" name="spp_inmueble" type="text" value="<?php echo esc_attr((string) ($filters['inmueble'] ?? '')); ?>" placeholder="# inmueble">
-            </div>
-            <div class="scm-field">
-              <label for="spp_propietario">Propietario</label>
-              <input id="spp_propietario" name="spp_propietario" type="text" value="<?php echo esc_attr((string) ($filters['propietario'] ?? '')); ?>" placeholder="Nombre">
-            </div>
-            <div class="scm-field">
-              <label for="spp_arrendatario">Arrendatario</label>
-              <input id="spp_arrendatario" name="spp_arrendatario" type="text" value="<?php echo esc_attr((string) ($filters['arrendatario'] ?? '')); ?>" placeholder="Nombre">
-            </div>
-            <div class="scm-field">
-              <label for="spp_contrato">Contrato</label>
-              <input id="spp_contrato" name="spp_contrato" type="text" value="<?php echo esc_attr((string) ($filters['contrato'] ?? '')); ?>" placeholder="Codigo">
-            </div>
-            <div class="scm-field">
-              <label for="spp_caso"># caso</label>
-              <input id="spp_caso" name="spp_caso" type="text" value="<?php echo esc_attr((string) ($filters['id_ticket'] ?? '')); ?>" placeholder="Ej: 10368">
-            </div>
-          </div>
-          <div class="scm-actions">
-            <button class="scm-btn-primary-cyan" type="submit">Filtrar</button>
-            <button class="scm-btn-secondary" type="button" data-pending-clear="spp_">Limpiar</button>
-            <span class="scm-spinner" id="spp_spinner">
-              <span class="scm-spinner-dot"></span>
-              <span class="scm-spinner-dot"></span>
-              <span class="scm-spinner-dot"></span>
-            </span>
-          </div>
-        </form>
-      </div>
-
-      <!-- KPIs -->
-      <div class="scm-kpis" id="spp_kpis">
-        <?php echo $this->renderPreventivasKpis($count, $corte); ?>
-      </div>
-
-      <!-- Tabla -->
-      <div id="spp_table">
-        <?php echo $this->renderPreventivasTable($items); ?>
-      </div>
-
-      </section>
-    </div>
-  <?php
-    return (string) ob_get_clean();
+    return PreventiveWorkspace::render('panel', ['view' => $this, 'filters' => $filters, 'items' => $items, 'count' => $count, 'corte' => $corte]);
   }
 
   // Servicios Publicos ---------------------------------------------------------
@@ -298,16 +216,9 @@ final class PendingView
 
   // KPI fragments --------------------------------------------------------------
 
-  public function renderPreventivasKpis(int $count, string $corte, string $empleado = ''): string
+  public function renderPreventivasKpis(int $count, string $corte, array $items = []): string
   {
-    return '<div class="scm-kpi">'
-      . '<div class="scm-kpi-label">Corte</div>'
-      . '<div class="scm-kpi-value" id="spp-kpi-corte" style="font-size:18px;">' . esc_html($corte) . '</div>'
-      . '</div>'
-      . '<div class="scm-kpi">'
-      . '<div class="scm-kpi-label">Pendientes filtrados</div>'
-      . '<div class="scm-kpi-value" id="spp-kpi-count2">' . esc_html((string) $count) . '</div>'
-      . '</div>';
+    return PreventiveWorkspace::render('kpis', compact('count', 'corte', 'items'));
   }
 
   public function renderServiciosPublicosKpis(int $count, string $corte, array $items = [], array $configurationItems = []): string
@@ -366,18 +277,22 @@ final class PendingView
 
   public function renderPreventivasTable(array $items, string $empleado = ''): string
   {
+    $ui = PublicServicesUi::class;
     if (empty($items)) {
-      return '<div class="scm-table-wrap"><p style="padding:32px;text-align:center;color:var(--scm-text-muted);">No hay contratos pendientes con los filtros actuales.</p></div>';
+      return '<div class="' . $ui::CARD . ' !sp-font-sans"><p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">No hay contratos pendientes con los filtros actuales.</p></div>';
     }
 
-    $html = '<div class="scm-table-wrap">'
-      . '<table class="scm-table scm-table-prev">'
-      . '<thead><tr>'
-      . '<th>Contrato</th><th>Estado</th><th>Inmueble</th><th>Direccion</th>'
-      . '<th>Propietario</th><th>Arrendatario</th>'
-      . '<th>Inicio</th><th>Fin</th><th>Entrega</th>'
-      . '<th>Ult. revision</th><th>Sig. revision</th><th>Acciones</th>'
-      . '</tr></thead><tbody>';
+    $th = '!sp-text-left !sp-text-[9px] !sp-uppercase !sp-tracking-wide !sp-font-bold !sp-px-3 !sp-py-4 !sp-border-x-0 !sp-border-y !sp-border-solid !sp-border-slate-200';
+    $td = '!sp-border-x-0 !sp-border-y-0 !sp-px-3 !sp-py-4';
+    $html = '<div class="' . $ui::CARD . ' !sp-font-sans !sp-text-service-navy">'
+      . '<div class="!sp-p-4"><h3 class="!sp-m-0 !sp-font-bold !sp-text-sm">Listado de contratos con revisión preventiva pendiente <span class="!sp-bg-service-navy !sp-text-service-yellow !sp-text-[9px] !sp-px-2 !sp-py-1 !sp-rounded">' . count($items) . ' registros</span></h3>'
+      . '<p class="!sp-m-0 !sp-mt-1 !sp-text-[10px] !sp-text-service-muted">Ordenados por fecha de la última revisión. La siguiente revisión vence un año después.</p></div>'
+      . '<div class="!sp-overflow-x-auto"><table class="scm-table-prev !sp-w-full !sp-border-collapse !sp-text-[10px] !sp-text-service-navy !sp-min-w-[1250px]">'
+      . '<thead class="!sp-bg-slate-50"><tr>';
+    foreach (['Contrato', 'Estado', 'Inmueble', 'Dirección del inmueble', 'Propietario', 'Arrendatario', 'Inicio', 'Fin', 'Entrega', 'Últ. revisión', 'Sig. revisión', 'Acciones'] as $label) {
+      $html .= '<th class="' . $th . '">' . $label . '</th>';
+    }
+    $html .= '</tr></thead><tbody>';
 
     foreach ($items as $item) {
       $row  = (array) ($item['row']  ?? []);
@@ -385,20 +300,21 @@ final class PendingView
       $estadoContrato = trim((string) ($row['estado'] ?? ''));
       $estadoNorm = strtolower($estadoContrato);
       $estadoClass = $estadoNorm === 'entregado'
-        ? 'scm-contract-state--active'
-        : ($estadoNorm === 'recibido' ? 'scm-contract-state--closed' : 'scm-contract-state--neutral');
-      $html .= '<tr>';
-      $html .= '<td><span class="scm-ticket-badge">'   . esc_html((string) ($row['contrato']  ?? $row['_ID'] ?? '-')) . '</span></td>';
-      $html .= '<td><span class="scm-contract-state ' . esc_attr($estadoClass) . '">' . esc_html($estadoContrato !== '' ? $estadoContrato : '-') . '</span></td>';
-      $html .= '<td><span class="scm-inmueble-badge">' . esc_html((string) ($row['inmueble']  ?? '-')) . '</span></td>';
-      $html .= '<td style="max-width:200px;">'         . esc_html((string) ($row['direccion'] ?? '-')) . '</td>';
-      $html .= '<td>'                                  . esc_html((string) ($row['propietario']  ?? '-')) . '</td>';
-      $html .= '<td>'                                  . esc_html((string) ($row['arrendatario'] ?? '-')) . '</td>';
-      $html .= '<td class="scm-date-cell">'            . esc_html($this->fmt($this->ts($row['inicio_contrato'] ?? null))) . '</td>';
-      $html .= '<td class="scm-date-cell">'            . esc_html($this->fmt($this->ts($row['fin_contrato']    ?? null))) . '</td>';
-      $html .= '<td class="scm-date-cell">'            . esc_html($this->fmt($this->ts($row['fecha_entrega']   ?? null))) . '</td>';
-      $html .= '<td class="scm-date-cell">'            . esc_html($this->fmt((int) ($item['ultima'] ?? 0))) . '</td>';
-      $html .= '<td class="scm-date-cell scm-date-warn">' . esc_html($this->fmt((int) ($item['due'] ?? 0))) . '</td>';
+        ? '!sp-bg-emerald-50 !sp-text-emerald-700'
+        : ($estadoNorm === 'recibido' ? '!sp-bg-slate-100 !sp-text-service-muted' : '!sp-bg-amber-50 !sp-text-amber-900');
+      $dueTs = (int) ($item['due'] ?? 0);
+      $html .= '<tr class="!sp-bg-white hover:!sp-bg-slate-50 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100">';
+      $html .= '<td class="' . $td . '"><span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200 !sp-text-amber-900 !sp-font-bold">#' . esc_html((string) ($row['contrato'] ?? $row['_ID'] ?? '-')) . '</span></td>';
+      $html .= '<td class="' . $td . '"><span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-font-semibold !sp-uppercase !sp-text-[9px] ' . $estadoClass . '">' . esc_html($estadoContrato !== '' ? $estadoContrato : '-') . '</span></td>';
+      $html .= '<td class="' . $td . '"><span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-bg-emerald-50 !sp-border !sp-border-solid !sp-border-emerald-200 !sp-text-emerald-700 !sp-font-semibold">' . esc_html((string) ($row['inmueble'] ?? '-')) . '</span></td>';
+      foreach (['direccion', 'propietario', 'arrendatario'] as $field) {
+        $html .= '<td class="' . $td . ' !sp-max-w-[200px] !sp-leading-relaxed' . ($field === 'direccion' ? ' !sp-font-medium' : '') . '">' . esc_html((string) ($row[$field] ?? '-')) . '</td>';
+      }
+      foreach (['inicio_contrato', 'fin_contrato', 'fecha_entrega'] as $field) {
+        $html .= '<td class="' . $td . ' !sp-whitespace-nowrap !sp-text-service-muted">' . esc_html($this->fmt($this->ts($row[$field] ?? null))) . '</td>';
+      }
+      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap"><span class="!sp-bg-slate-100 !sp-rounded !sp-px-2 !sp-py-1">' . esc_html($this->fmt((int) ($item['ultima'] ?? 0))) . '</span></td>';
+      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap !sp-font-semibold ' . ($dueTs > 0 && $dueTs < strtotime('today') ? '!sp-text-rose-600' : '!sp-text-amber-700') . '">' . esc_html($this->fmt($dueTs)) . '</td>';
 
       // Actions cell: Ver ticket (link) if active ticket this year, else Crear ticket
       $ticket   = $item['ticket'] ?? null;
@@ -423,21 +339,21 @@ final class PendingView
       }
       $ticketsCount = count($allTickets);
       $ticketsListId = 'scm-prev-tickets-' . preg_replace('/[^a-zA-Z0-9_-]/', '', $contractPk ?: uniqid('', false));
-      $html .= '<td class="scm-pending-action-cell">';
+      $html .= '<td class="' . $td . '"><div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2">';
       if ($contractPk !== '' && $estado !== 'recibido') {
-        $html .= '<button type="button" class="scm-pending-action-btn scm-contract-received-btn"'
+        $html .= '<button type="button" class="' . $ui::SECONDARY . ' !sp-text-[10px] !sp-whitespace-nowrap"'
           . ' data-scm-mark-contract-received data-contract-context="preventiva"'
           . ' data-contract-id="' . esc_attr($contractPk) . '"'
           . ' data-contract-code="' . esc_attr($contractCode !== '' ? $contractCode : $contractPk) . '">'
           . 'Contrato recibido</button>';
       }
       if ($ticketId !== '') {
-        $html .= '<button type="button" class="scm-pending-action-btn scm-btn-case"'
+        $html .= '<button type="button" class="scm-btn-case ' . $ui::NAVY . ' !sp-whitespace-nowrap"'
           . $this->preventivaTicketCaseAttrs((array) $ticket, $row, (int) ($item['ultima'] ?? 0), (int) ($item['due'] ?? 0))
           . '>'
-          . 'Ver caso</button>';
+          . $ui::icon('eye', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . 'Ver caso</button>';
       } else {
-        $html .= '<button type="button" class="scm-pending-action-btn"'
+        $html .= '<button type="button" class="' . $ui::PRIMARY . ' !sp-py-2 !sp-text-[10px] !sp-whitespace-nowrap"'
           . ' data-scm-open-admin-ticket data-ticket-mode="preventiva"'
           . ' data-ticket-title="Crear caso preventivo"'
           . $this->contractTicketAttrs($row)
@@ -445,18 +361,18 @@ final class PendingView
           . 'Crear caso</button>';
       }
       if ($ticketsCount > 0) {
-        $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;"'
+        $html .= '<button type="button" class="' . $ui::SECONDARY . ' !sp-text-[10px] !sp-whitespace-nowrap"'
           . ' data-scm-toggle-preventiva-tickets data-target="' . esc_attr($ticketsListId) . '"'
           . ' data-contract-code="' . esc_attr($contractCode !== '' ? $contractCode : $contractPk) . '">'
           . 'Ver casos (' . esc_html((string) $ticketsCount) . ')</button>';
       }
       if ($contractPk !== '' && $estado !== 'recibido') {
-        $html .= '<button type="button" class="scm-pending-action-btn"'
+        $html .= '<button type="button" class="!sp-bg-transparent !sp-border-0 !sp-text-service-muted !sp-text-[10px] !sp-underline !sp-cursor-pointer !sp-whitespace-nowrap"'
           . ' data-scm-postpone-preventiva data-contract-id="' . esc_attr($contractPk) . '"'
           . ' data-contract-code="' . esc_attr($contractCode !== '' ? $contractCode : $contractPk) . '">'
           . 'Pasar a próximo año</button>';
       }
-      $html .= '</td>';
+      $html .= '</div></td>';
 
       $html .= '</tr>';
       if ($ticketId !== '') {
@@ -471,7 +387,7 @@ final class PendingView
       }
     }
 
-    return $html . '</tbody></table></div>';
+    return $html . '</tbody></table></div></div>';
   }
 
   public function renderContratosArrendamientoTable(array $items): string

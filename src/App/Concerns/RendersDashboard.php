@@ -259,11 +259,11 @@ trait RendersDashboard
       ],
       'preventivas_pendientes' => [
         'panel' => 'scm-panel-preventivas-pendientes',
-        'label' => $dashboardPermissionTabs['preventivas_pendientes'] ?? 'Preventivas Pendientes',
+        'label' => $dashboardPermissionTabs['preventivas_pendientes'] ?? 'Revisión Preventiva',
       ],
       'servicios_publicos_pendientes' => [
         'panel' => 'scm-panel-servicios-publicos-pendientes',
-        'label' => $dashboardPermissionTabs['servicios_publicos_pendientes'] ?? 'Servicios Publicos Pendientes',
+        'label' => $dashboardPermissionTabs['servicios_publicos_pendientes'] ?? 'Revisiones de Servicios Públicos',
       ],
       'liquidador_servicios_publicos' => [
         'panel' => 'scm-panel-liquidador-servicios-publicos',

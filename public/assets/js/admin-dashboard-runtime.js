@@ -13916,6 +13916,12 @@
             if (tabCount && data.count != null) tabCount.textContent = data.count;
             panel.querySelectorAll('[data-services-quick]').forEach(function (button) { button.setAttribute('aria-pressed', 'false'); });
           }
+          if (prefix === 'spp_' && data.count != null) {
+            var preventiveFilterCount = panel.querySelector('[data-preventive-filter-count]');
+            if (preventiveFilterCount) preventiveFilterCount.textContent = data.count + ' contratos encontrados';
+            var preventiveTabCount = panel.querySelector('[data-preventive-tab-count]');
+            if (preventiveTabCount) preventiveTabCount.textContent = data.count;
+          }
           panel.setAttribute("data-scm-loaded", "1");
           return true;
         })

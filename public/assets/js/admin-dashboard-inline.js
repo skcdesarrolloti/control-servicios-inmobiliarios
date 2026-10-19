@@ -58,6 +58,11 @@
                   if (prefix === 'spp_') {
                     var headerCount = document.getElementById('spp-kpi-count');
                     if (headerCount && typeof d.count === 'string') headerCount.textContent = d.count;
+                    var sppPanel = document.getElementById('scm-panel-preventivas-pendientes');
+                    var sppFilterCount = sppPanel && sppPanel.querySelector('[data-preventive-filter-count]');
+                    if (sppFilterCount && d.count != null) sppFilterCount.textContent = d.count + ' contratos encontrados';
+                    var sppTabCount = sppPanel && sppPanel.querySelector('[data-preventive-tab-count]');
+                    if (sppTabCount && d.count != null) sppTabCount.textContent = d.count;
                   }
                   if (prefix === 'rsp_') {
                     var rspHeaderCount = document.getElementById('rsp-kpi-count');
