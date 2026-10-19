@@ -316,7 +316,7 @@ final class PendingRepository
       $args[] = 'no asignado';
     } elseif ($bucket === 'anexos_pendientes') {
       $where[] = "LOWER(TRIM(COALESCE(`estado`, ''))) = 'entregado' AND LOWER(TRIM(COALESCE(`se_envio`, ''))) <> 'si'";
-    } elseif (in_array($bucket, ['por_entregar', 'entregado', 'desistido', 'por_recibir'], true)) {
+    } elseif (in_array($bucket, ['por_entregar', 'entregado', 'desistido', 'por_recibir', 'recibido'], true)) {
       $status = str_replace('_', ' ', $bucket);
       $where[] = "LOWER(TRIM(COALESCE(`estado`, ''))) = ?";
       $args[] = $status;

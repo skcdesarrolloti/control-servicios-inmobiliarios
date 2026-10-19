@@ -127,6 +127,7 @@ final class PendingController
       'por_entregar' => ['label' => 'Por entregar', 'icon' => 'clock', 'title' => 'Contratos por entregar'],
       'entregado' => ['label' => 'Entregado', 'icon' => 'check', 'title' => 'Contratos entregados'],
       'por_recibir' => ['label' => 'Por recibir', 'icon' => 'refresh', 'title' => 'Contratos por recibir'],
+      'recibido' => ['label' => 'Recibido', 'icon' => 'building', 'title' => 'Contratos recibidos', 'description' => 'Inmuebles ya recibidos del arrendatario o devueltos al propietario.'],
       'desistido' => ['label' => 'Desistido', 'icon' => 'close', 'title' => 'Contratos desistidos'],
       'no_asignado' => ['label' => 'No asignado', 'icon' => 'alert', 'title' => 'Contratos sin número asignado'],
     ];
