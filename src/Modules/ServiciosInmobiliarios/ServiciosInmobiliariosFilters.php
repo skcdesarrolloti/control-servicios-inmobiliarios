@@ -45,6 +45,7 @@ final class ServiciosInmobiliariosFilters
       'fRevision' => $this->value($input, $prefix . 'revision'),
       'fMagnitud' => $this->value($input, $prefix . 'magnitud'),
       'fMagnitudCaso' => $this->value($input, $prefix . 'magnitud_caso'),
+      'fEjecutado' => $this->value($input, $prefix . 'ejecutado'),
       'fInmueble' => $this->value($input, $prefix . 'inmueble'),
       'fContrato' => $this->value($input, $prefix . 'contrato'),
       'fCaso' => $this->value($input, $prefix . 'caso'),

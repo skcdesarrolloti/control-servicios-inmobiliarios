@@ -18241,6 +18241,11 @@
       alto: ["_magnitud_caso", "alto"],
       medio: ["_magnitud_caso", "medio"],
       bajo: ["_magnitud_caso", "bajo"],
+      "ejecuta-inmobiliaria": ["_ejecutado", "inmobiliaria"],
+      "ejecuta-propietario": ["_ejecutado", "propietario"],
+      "ejecuta-arrendatario": ["_ejecutado", "arrendatario"],
+      "ejecuta-copropiedad": ["_ejecutado", "copropiedad"],
+      "ejecuta-sin-definir": ["_ejecutado", "sin_definir"],
     };
 
     function kpiKey(card) {
@@ -18426,6 +18431,11 @@
           updateKPI("scm-kpi-magnitud-alto", d.kpi_magnitud_alto || "0");
           updateKPI("scm-kpi-magnitud-medio", d.kpi_magnitud_medio || "0");
           updateKPI("scm-kpi-magnitud-bajo", d.kpi_magnitud_bajo || "0");
+          updateKPI("scm-kpi-ejecuta-inmobiliaria", d.kpi_ejecuta_inmobiliaria || "0");
+          updateKPI("scm-kpi-ejecuta-propietario", d.kpi_ejecuta_propietario || "0");
+          updateKPI("scm-kpi-ejecuta-arrendatario", d.kpi_ejecuta_arrendatario || "0");
+          updateKPI("scm-kpi-ejecuta-copropiedad", d.kpi_ejecuta_copropiedad || "0");
+          updateKPI("scm-kpi-ejecuta-sin-definir", d.kpi_ejecuta_sin_definir || "0");
           updateKPI("scm-kpi-header-count", d.kpi_total || "0");
           if (mantPanel) {
             mantPanel.setAttribute("data-scm-loaded", "1");

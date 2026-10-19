@@ -123,6 +123,12 @@ trait MaintenanceStatisticsConcern
       $args[] = strtolower(trim($magnitudCasoFilter));
     }
 
+    $ejecutadoFilter = strtolower(trim((string) ($filters['fEjecutado'] ?? '')));
+    if (in_array($ejecutadoFilter, $this->maintenanceExecutorKeys(), true)) {
+      // Valor de lista blanca en línea: comparar con un parámetro mezcla collations en MySQL.
+      $where[] = $this->maintenanceExecutorKeyExpression('t') . " = '{$ejecutadoFilter}'";
+    }
+
     $cotizacion = (string) ($filters['fCotizacion'] ?? '');
     if ($cotizacion !== '') {
       $cotFilter = trim($cotizacion);
@@ -392,6 +398,12 @@ trait MaintenanceStatisticsConcern
       'magnitud_alto' => 0,
       'magnitud_medio' => 0,
       'magnitud_bajo' => 0,
+      'ejecuta_inmobiliaria' => 0,
+      'ejecuta_propietario' => 0,
+      'ejecuta_arrendatario' => 0,
+      'ejecuta_copropiedad' => 0,
+      'ejecuta_externo' => 0,
+      'ejecuta_sin_definir' => 0,
     ];
   }
 

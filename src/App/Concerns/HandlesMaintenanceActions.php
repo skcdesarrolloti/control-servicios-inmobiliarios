@@ -607,7 +607,7 @@ trait HandlesMaintenanceActions
         $warnPostSave('no se pudo crear/verificar el reporte administrativo', $error);
       }
       try {
-        $this->maintenance_quote_update_ticket($schema, $ticket, $quoteIdSaved, $tipoMantenimiento, $now, $nowSql);
+        $this->maintenance_quote_update_ticket($schema, $ticket, $quoteIdSaved, $tipoMantenimiento, $now, $nowSql, (string) ($quoteData['ejecutado'] ?? ''));
       } catch (\Throwable $error) {
         $warnPostSave('no se pudo actualizar el caso', $error);
       }
@@ -735,7 +735,7 @@ trait HandlesMaintenanceActions
 
     $actor = $this->ticketCompletionActor();
     $recipientOptions = $this->maintenance_quote_recipient_options($ticket, is_array($revision) ? $revision : [], $quote);
-    $defaultExecutor = $this->maintenance_quote_first([$quote['ejecutado'] ?? '', $revision['ejecutado'] ?? '', 'Inmobiliaria']);
+    $defaultExecutor = $this->maintenance_quote_first([$quote['ejecutado'] ?? '', $ticket['ejecutado'] ?? '', $revision['ejecutado'] ?? '', 'Inmobiliaria']);
     $defaultRecipient = $recipientOptions[$this->maintenance_quote_executor_key($defaultExecutor)] ?? [];
     $defaultDestinatario = $this->maintenance_quote_first([
       $quote['destinatario'] ?? '',
@@ -1766,7 +1766,7 @@ trait HandlesMaintenanceActions
   }
 
   /** @param array<string,mixed> $ticket */
-  private function maintenance_quote_update_ticket(\SCM\Support\SchemaInspector $schema, array $ticket, int $quoteId, string $tipoMantenimiento, int $now, string $nowSql): void
+  private function maintenance_quote_update_ticket(\SCM\Support\SchemaInspector $schema, array $ticket, int $quoteId, string $tipoMantenimiento, int $now, string $nowSql, string $executor = ''): void
   {
     $ticketId = (int) ($ticket['_ID'] ?? 0);
     if ($ticketId <= 0) {
@@ -1787,6 +1787,10 @@ trait HandlesMaintenanceActions
       'fecha_actualizacion' => $now,
       'cct_modified' => $nowSql,
     ];
+    // Quién ejecuta queda en el caso para KPIs/filtros y puede corregirse desde "Editar datos del caso".
+    if (trim($executor) !== '') {
+      $update['ejecutado'] = trim($executor);
+    }
     $update = $schema->filterTableData($table, $update);
     if (!empty($update)) {
       $this->db->update($table, $update, ['_ID' => $ticketId]);
@@ -2344,6 +2348,10 @@ trait HandlesMaintenanceActions
           'fecha_actualizacion' => $now,
           'cct_modified' => $nowMysql,
         ];
+        // La cotización aprobada define quién ejecuta el caso.
+        if (trim((string) ($row['ejecutado'] ?? '')) !== '') {
+          $ticketUpdate['ejecutado'] = trim((string) $row['ejecutado']);
+        }
         $ticketUpdate = $schema->filterTableData($ticketsTable, $ticketUpdate);
         if (!empty($ticketUpdate)) {
           $ticketRowsUpdated += $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => (int) ($ticketRow['_ID'] ?? 0)]);
@@ -4755,6 +4763,31 @@ trait HandlesMaintenanceActions
     return $options;
   }
 
+  /** @return array<int,string> Opciones del glosario JetEngine 853 (campo `ejecutado`). */
+  private function caseExecutorOptions(): array
+  {
+    $options = $this->maintenance_quote_glossary_options(853, [
+      ['value' => 'Propietario', 'label' => 'Propietario'],
+      ['value' => 'Arrendatario', 'label' => 'Arrendatario'],
+      ['value' => 'Copropiedad', 'label' => 'Copropiedad'],
+      ['value' => 'Inmobiliaria', 'label' => 'Inmobiliaria'],
+      ['value' => 'Externo', 'label' => 'Externo'],
+    ]);
+    return array_values(array_unique(array_map(static fn(array $option): string => (string) $option['value'], $options)));
+  }
+
+  private function caseLatestQuoteExecutor(int $ticketPk): string
+  {
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    if (!$this->table_exists($table) || !$this->column_exists($table, 'ejecutado')) {
+      return '';
+    }
+    return trim((string) ($this->db->getVar(
+      "SELECT TRIM(`ejecutado`) FROM `{$table}` WHERE TRIM(COALESCE(`id_ticket`, '')) = ? AND TRIM(COALESCE(`ejecutado`, '')) <> '' ORDER BY `_ID` DESC LIMIT 1",
+      [(string) $ticketPk]
+    ) ?? ''));
+  }
+
   public function ajax_handler_edit_case_data(): void
   {
     $this->verifyCsrf();
@@ -4773,11 +4806,21 @@ trait HandlesMaintenanceActions
     }
 
     $options = $this->caseDataEditOptions($table);
-    $fields = ['asunto' => 'Asunto', 'tema_ayuda' => 'Tema', 'prioridad' => 'Prioridad', 'departamento' => 'Departamento'];
+    $fields = ['asunto' => 'Asunto', 'tema_ayuda' => 'Tema', 'prioridad' => 'Prioridad', 'departamento' => 'Departamento', 'ejecutado' => 'Ejecutado por'];
     $current = [];
     foreach ($fields as $column => $_label) {
       if ($this->column_exists($table, $column)) {
         $current[$column] = trim((string) ($ticket[$column] ?? ''));
+      }
+    }
+    if (array_key_exists('ejecutado', $current)) {
+      $options['ejecutado'] = $this->caseExecutorOptions();
+      // Casos antiguos solo guardaban quién ejecuta en la cotización: se propone ese valor.
+      if ($current['ejecutado'] === '') {
+        $suggested = $this->caseLatestQuoteExecutor($ticketPk);
+        if ($suggested !== '') {
+          $options['ejecutado_sugerido'] = [$suggested];
+        }
       }
     }
 
@@ -4796,6 +4839,10 @@ trait HandlesMaintenanceActions
       if ($column === 'asunto') {
         if ($value === '' || mb_strlen($value) > 200) {
           $this->jsonFail('El asunto es obligatorio y debe tener máximo 200 caracteres.');
+        }
+      } elseif ($column === 'ejecutado') {
+        if ($value !== '' && !in_array($value, $options['ejecutado'] ?? [], true)) {
+          $this->jsonFail('Ejecutado por no válido.');
         }
       } elseif (!in_array($value, $options[$column] ?? [], true)) {
         $this->jsonFail($fields[$column] . ' no válido.');

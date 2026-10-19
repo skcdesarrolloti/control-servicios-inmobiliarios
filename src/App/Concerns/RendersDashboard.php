@@ -1055,12 +1055,36 @@ trait RendersDashboard
           </div>
         </div>
 
+        <div class="scm-kpis-executor-group">
+          <div class="scm-kpis-executor-title"><span class="material-symbols-outlined">engineering</span>&iquest;Qui&eacute;n ejecuta?</div>
+          <div class="scm-kpis scm-kpis-stitch scm-kpis-executor">
+            <?php foreach ([
+              'inmobiliaria' => ['INMOBILIARIA', 'apartment'],
+              'propietario' => ['PROPIETARIO', 'person'],
+              'arrendatario' => ['ARRENDATARIO', 'key'],
+              'copropiedad' => ['COPROPIEDAD', 'domain'],
+              'sin_definir' => ['SIN DEFINIR', 'help'],
+            ] as $executorKey => [$executorLabel, $executorIcon]): $executorSlug = str_replace('_', '-', $executorKey); ?>
+            <div class="scm-kpi scm-kpi-executor-<?php echo esc_attr($executorSlug); ?>" data-kpi="ejecuta-<?php echo esc_attr($executorSlug); ?>">
+              <div class="scm-kpi-header">
+                <span class="scm-kpi-label"><?php echo esc_html($executorLabel); ?></span>
+                <span class="material-symbols-outlined scm-kpi-icon"><?php echo esc_html($executorIcon); ?></span>
+              </div>
+              <div class="scm-kpi-value-row">
+                <span class="scm-kpi-value" id="scm-kpi-ejecuta-<?php echo esc_attr($executorSlug); ?>"><?php echo esc_html((string)($stats['ejecuta_' . $executorKey] ?? 0)); ?></span>
+              </div>
+              <div class="scm-kpi-indicator scm-kpi-indicator-ejecuta-<?php echo esc_attr($executorSlug); ?>"></div>
+            </div>
+            <?php endforeach; ?>
+          </div>
+        </div>
+
         <div class="scm-filter-card card">
           <div class="scm-filter-header flex items-center justify-between mb-4">
             <div class="flex items-center gap-2.5">
               <span class="material-symbols-outlined text-[20px] text-slate-700">tune</span>
               <h3 class="text-sm font-bold text-slate-800 m-0">Filtros Avanzados de Casos</h3>
-              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">17 Criterios</span>
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">18 Criterios</span>
             </div>
             <button type="button" class="scm-filter-collapse-btn flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 font-medium" id="scm-filter-collapse-toggle">
               <span id="scm-filter-collapse-label">Colapsar panel</span>
@@ -1145,6 +1169,12 @@ trait RendersDashboard
                   <option value="alto" <?php selected(($params['fMagnitudCaso'] ?? ''), 'alto'); ?>>Alto</option>
                   <option value="medio" <?php selected(($params['fMagnitudCaso'] ?? ''), 'medio'); ?>>Medio</option>
                   <option value="bajo" <?php selected(($params['fMagnitudCaso'] ?? ''), 'bajo'); ?>>Bajo</option>
+                </select></div>
+              <div class="scm-field"><label for="scm_ejecutado">EJECUTADO POR</label><select id="scm_ejecutado" name="scm_ejecutado" class="select select-bordered select-sm scm-select">
+                  <option value="">Todos</option>
+                  <?php foreach (['inmobiliaria' => 'Inmobiliaria', 'propietario' => 'Propietario', 'arrendatario' => 'Arrendatario', 'copropiedad' => 'Copropiedad', 'externo' => 'Externo', 'sin_definir' => 'Sin definir'] as $executorValue => $executorText): ?>
+                  <option value="<?php echo esc_attr($executorValue); ?>" <?php selected(($params['fEjecutado'] ?? ''), $executorValue); ?>><?php echo esc_html($executorText); ?></option>
+                  <?php endforeach; ?>
                 </select></div>
             </div>
             <div class="scm-actions flex items-center justify-between flex-wrap gap-3 mt-4 pt-3 border-t border-slate-100">

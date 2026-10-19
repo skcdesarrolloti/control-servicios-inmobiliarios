@@ -2207,6 +2207,25 @@
         if ("departamento" in values) {
           fields += selectHtml("departamento", "Departamento", options.departamento, values.departamento || "");
         }
+        if ("ejecutado" in values) {
+          // Opcional: vacío = sin definir. Si el caso no lo tiene, se propone el de la última cotización.
+          var executorList = (options.ejecutado || []).slice();
+          var executorCurrent = values.ejecutado || (options.ejecutado_sugerido || [])[0] || "";
+          if (executorCurrent && executorList.indexOf(executorCurrent) < 0) executorList.unshift(executorCurrent);
+          fields +=
+            '<label class="scm-seg-field"><span>¿Quién ejecuta?</span><select name="ejecutado">' +
+            '<option value="">Sin definir</option>' +
+            executorList
+              .map(function (value) {
+                return '<option value="' + escHtml(value) + '"' + (value === executorCurrent ? " selected" : "") + ">" + escHtml(value) + "</option>";
+              })
+              .join("") +
+            "</select>" +
+            (!values.ejecutado && executorCurrent
+              ? '<small class="scm-muted">Tomado de la última cotización; se guardará en el caso al confirmar.</small>'
+              : "") +
+            "</label>";
+        }
         body.innerHTML =
           '<form class="scm-case-data-edit-form" data-scm-case-data-form style="display:flex;flex-direction:column;gap:12px;">' +
           '<p class="scm-muted">Los cambios quedan registrados como nota interna del caso.</p>' +
@@ -2246,6 +2265,7 @@
               if (saved.tema_ayuda) caseBtn.dataset.tema = saved.tema_ayuda;
               if (saved.prioridad) caseBtn.dataset.prioridad = saved.prioridad;
               if (saved.departamento) caseBtn.dataset.departamento = saved.departamento;
+              if ("ejecutado" in saved) caseBtn.dataset.ejecutado = saved.ejecutado;
               refreshCaseHeaderData(modal, caseBtn);
               scmNotify(
                 "success",
@@ -10392,7 +10412,7 @@
           sidebarStateButtons.push(
             '<button type="button" class="scm-case-work-btn w-full" data-scm-edit-case-data>' +
               '<span class="material-symbols-outlined scm-btn-icon">edit_note</span>' +
-              '<div class="scm-btn-text"><span class="scm-btn-label">Editar datos del caso</span><span class="scm-btn-sub">Asunto, tema, prioridad y departamento</span></div>' +
+              '<div class="scm-btn-text"><span class="scm-btn-label">Editar datos del caso</span><span class="scm-btn-sub">Asunto, tema, prioridad, departamento y quién ejecuta</span></div>' +
               "</button>",
           );
         }

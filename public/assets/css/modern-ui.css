@@ -5967,3 +5967,38 @@ body,
 /* Botón "Añadir nota al contrato" del header */
 .scm-header-note-btn { border: 1px solid #cbd5e1; background: #fff; color: #0f1e36; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
 .scm-header-note-btn:hover { border-color: #0f1e36; background: #f1f5fb; }
+
+/* KPIs "¿Quién ejecuta?" (mantenimiento): fila propia, sin heredar los colores nth-child de la fila principal */
+#scm-app .scm-kpis-executor-group { margin: -0.4rem 0 1.25rem !important; }
+#scm-app .scm-kpis-executor-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  margin: 0 0 0.45rem 0.15rem !important;
+  font-size: 0.625rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  color: #64748b !important;
+}
+#scm-app .scm-kpis-executor-title .material-symbols-outlined { font-size: 15px !important; }
+#scm-app .scm-kpis.scm-kpis-stitch.scm-kpis-executor {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  margin-bottom: 0 !important;
+}
+@media (max-width: 900px) {
+  #scm-app .scm-kpis.scm-kpis-stitch.scm-kpis-executor { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 540px) {
+  #scm-app .scm-kpis.scm-kpis-stitch.scm-kpis-executor { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+#scm-app .scm-kpis.scm-kpis-executor .scm-kpi-executor-inmobiliaria { border-bottom: 3.5px solid #8a4b12 !important; }
+#scm-app .scm-kpis.scm-kpis-executor .scm-kpi-executor-propietario { border-bottom: 3.5px solid #0f1e36 !important; }
+#scm-app .scm-kpis.scm-kpis-executor .scm-kpi-executor-arrendatario { border-bottom: 3.5px solid #7c3aed !important; }
+#scm-app .scm-kpis.scm-kpis-executor .scm-kpi-executor-copropiedad { border-bottom: 3.5px solid #0d9488 !important; }
+#scm-app .scm-kpis.scm-kpis-executor .scm-kpi-executor-sin-definir { border-bottom: 3.5px solid #cbd5e1 !important; }
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-ejecuta-inmobiliaria { background-color: #8a4b12 !important; }
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-ejecuta-propietario { background-color: #0f1e36 !important; }
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-ejecuta-arrendatario { background-color: #7c3aed !important; }
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-ejecuta-copropiedad { background-color: #0d9488 !important; }
+#scm-app .scm-kpis-stitch .scm-kpi-indicator-ejecuta-sin-definir { background-color: #94a3b8 !important; }
