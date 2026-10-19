@@ -491,8 +491,10 @@ final class LeaseAnnexesService
           ['type' => 'body', 'parameters' => array_map(fn(string $value): array => ['type' => 'text', 'text' => $this->waText($value)], [
             $actor['name'], strtoupper($actor['role']), $contractNumber,
             (string) ($contract['id_inmueble'] ?? $contract['inmueble'] ?? '-'), (string) ($contract['direccion'] ?? '-'),
-            $actor['annexes_url'], $signature,
+            $signature,
           ])],
+          // Botón "Ver anexos": la plantilla fija https://sucasainmobiliaria.com.co/ y el resto del enlace firmado va como variable.
+          ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $this->urlButtonSuffix($actor['annexes_url'])]]],
         ],
         'contract_id' => (int) ($contract['_ID'] ?? 0),
         'document_url' => $documents[$key]['url'],
@@ -551,6 +553,16 @@ final class LeaseAnnexesService
       return null;
     }
     return ['path' => $path, 'name' => 'Contrato-de-arrendamiento-' . preg_replace('/[^A-Za-z0-9]+/', '-', (string) ($contract['contrato'] ?? '')) . '.' . pathinfo($path, PATHINFO_EXTENSION)];
+  }
+
+  private function urlButtonSuffix(string $url): string
+  {
+    $parts = parse_url($url);
+    $path = ltrim((string) ($parts['path'] ?? ''), '/');
+    $query = (string) ($parts['query'] ?? '');
+    return strtolower((string) ($parts['host'] ?? '')) === 'sucasainmobiliaria.com.co' && $path !== ''
+      ? $path . ($query !== '' ? '?' . $query : '')
+      : $url;
   }
 
   private function date(string $value): int

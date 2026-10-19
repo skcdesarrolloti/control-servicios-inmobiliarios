@@ -21,7 +21,7 @@ Acciones por contrato, todas dentro del panel:
 2. Genera un **acta de bienvenida por actor** (Chromium, mismo diseño que las actas de servicios públicos) con la razón social de la sucursal y los funcionarios activos de `jet_cct_funcionarios` por `id_cargo`: contractual 7, servicio al propietario (pagos) 5, servicio al arrendatario 4, gerencia comercial 12 y gerencia general 14, que firma todas las actas con su firma cargada. Si no hay un funcionario activo con cargo 14 el envío se detiene.
 3. Actualiza el contrato (`acta_*`, partes, fechas, `contrato_arrendamiento`, `se_envio = Si`; `asegurado = No` solo si estaba vacío). No cambia `estado`, `id_empleado`, `creador`, `cct_author_id` ni `cct_created` del contrato.
 4. Registra el envío en el historial del contrato y del inmueble.
-5. Encola por actor un correo (acta adjunta; arrendatario y codeudores también reciben el contrato de arrendamiento) y un WhatsApp con la plantilla `scm_anexos_contrato_arrendamiento_v1` (`docs/whatsapp-anexos-contrato-arrendamiento-template.json`).
+5. Encola por actor un correo (acta adjunta; arrendatario y codeudores también reciben el contrato de arrendamiento) y un WhatsApp con la plantilla `scm_anexos_contrato_arrendamiento_v1` (acta en el encabezado y botón "Ver anexos" con el enlace firmado) (`docs/whatsapp-anexos-contrato-arrendamiento-template.json`).
 6. Envía un resumen interno con todas las actas a quienes se configuren en **Notificaciones internas › Contratos › Envío de anexos del contrato de arrendamiento** (`anexos_contrato_arrendamiento`).
 
 ## Vista pública
