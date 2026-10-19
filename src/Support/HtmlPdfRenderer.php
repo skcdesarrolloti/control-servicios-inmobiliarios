@@ -142,7 +142,7 @@ final class HtmlPdfRenderer
   private static function inlineConfiguredLogo(string $content): string
   {
     return (string) preg_replace_callback(
-      '/(<(?:div|span) class="(?:scm-cotizacion-native-logo|scm-order-invoice-brand|scm-acta-logo|scm-corrective-public-logo)"[^>]*><img src=")([^"]+)(")/',
+      '/(<(?:div|span) class="(?:scm-cotizacion-native-logo|scm-order-invoice-brand|scm-acta-logo|scm-corrective-public-logo|phr-logo)"[^>]*><img src=")([^"]+)(")/',
       static function (array $match): string {
         $url = html_entity_decode($match[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
         if (!str_starts_with($url, 'https://')) {

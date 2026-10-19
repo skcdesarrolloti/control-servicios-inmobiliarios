@@ -752,6 +752,7 @@ foreach ($rawNavItems as $k => $item) {
   ?>
   <link rel="stylesheet" href="<?php echo htmlspecialchars($baseUrl . '/assets/css/tailwind-admin.css?v=' . $tailwindCssVer, ENT_QUOTES, 'UTF-8'); ?>">
   <link rel="stylesheet" href="<?php echo htmlspecialchars($baseUrl . '/assets/css/tailwind-services.css?v=' . SCM_VERSION, ENT_QUOTES, 'UTF-8'); ?>">
+  <link rel="stylesheet" href="<?php echo htmlspecialchars($baseUrl . '/assets/css/property-history-report.css?v=' . SCM_VERSION, ENT_QUOTES, 'UTF-8'); ?>">
 
   <style>
     @font-face {

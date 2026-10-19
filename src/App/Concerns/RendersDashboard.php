@@ -843,28 +843,21 @@ trait RendersDashboard
               ]); ?>
             </div>
             <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-property-history' ? ' active' : ''; ?>" id="scm-home-calendar-section-property-history" data-calendar-section-panel>
-              <section class="scm-property-history-panel" data-scm-property-history-panel aria-live="polite">
-                <div class="scm-property-history-head">
-                  <div>
-                    <span class="scm-calendar-action-kicker">Consulta</span>
-                    <h3>Historial del inmueble</h3>
-                    <p>Busca por contrato o por c&oacute;digo web/inmueble para visualizar el informe completo y generar PDF.</p>
+              <?php $phUi = \SCM\Modules\Pending\PublicServicesUi::class; ?>
+              <section class="scm-property-history-v2 !sp-font-sans !sp-text-service-navy !sp-space-y-4" data-scm-property-history-panel aria-live="polite">
+                <div class="<?php echo $phUi::CARD; ?> !sp-p-5 !sp-space-y-4">
+                  <div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-3">
+                    <div class="!sp-flex !sp-items-center !sp-gap-3"><span class="!sp-p-2.5 !sp-bg-amber-50 !sp-rounded-xl !sp-border !sp-border-solid !sp-border-amber-200"><?php echo $phUi::icon('clock', '!sp-w-6 !sp-h-6'); ?></span><div><h3 class="!sp-m-0 !sp-text-xl !sp-font-bold">Historial del inmueble</h3><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">Contratos, casos, revisiones, cotizaciones, gestiones y movimientos en una sola línea de tiempo. Busca por contrato o por código web / inmueble.</p></div></div>
                   </div>
+                  <form class="!sp-grid !sp-grid-cols-1 md:!sp-grid-cols-[1fr_1fr_auto_auto] !sp-items-end !sp-gap-3" data-scm-property-history-form autocomplete="off">
+                    <label class="!sp-block" for="scm_property_history_contract"><span class="<?php echo $phUi::LABEL; ?>">Número de contrato</span><input id="scm_property_history_contract" name="contract_number" type="text" class="<?php echo $phUi::INPUT; ?>" placeholder="Ej: 660"></label>
+                    <label class="!sp-block" for="scm_property_history_code"><span class="<?php echo $phUi::LABEL; ?>">Código web / inmueble</span><input id="scm_property_history_code" name="property_code" type="text" class="<?php echo $phUi::INPUT; ?>" placeholder="Ej: 3825"></label>
+                    <button type="submit" class="<?php echo $phUi::PRIMARY; ?> !sp-h-10"><?php echo $phUi::icon('filter'); ?>Consultar historial</button>
+                    <button type="button" class="<?php echo $phUi::SECONDARY; ?> !sp-h-10" data-scm-property-history-pdf disabled><?php echo $phUi::icon('download'); ?>Descargar PDF</button>
+                  </form>
+                  <p class="!sp-m-0 !sp-text-[11px] !sp-text-service-muted" data-scm-property-history-status role="status">Ingresa un contrato o un código web / inmueble para consultar.</p>
                 </div>
-                <form class="scm-property-history-form" data-scm-property-history-form autocomplete="off">
-                  <label class="scm-field" for="scm_property_history_contract">
-                    <span>N&uacute;mero de contrato</span>
-                    <input id="scm_property_history_contract" name="contract_number" type="text" class="input input-bordered" placeholder="Ej: 660">
-                  </label>
-                  <label class="scm-field" for="scm_property_history_code">
-                    <span>C&oacute;digo web / inmueble</span>
-                    <input id="scm_property_history_code" name="property_code" type="text" class="input input-bordered" placeholder="Ej: 3825">
-                  </label>
-                  <button type="submit" class="scm-case-work-btn scm-primary-action">Consultar historial</button>
-                  <button type="button" class="scm-case-work-btn" data-scm-property-history-pdf disabled>Generar PDF</button>
-                </form>
-                <div class="scm-property-history-status" data-scm-property-history-status>Ingresa un contrato o un c&oacute;digo web/inmueble para consultar.</div>
-                <div class="scm-property-history-results" data-scm-property-history-results></div>
+                <div data-scm-property-history-results></div>
               </section>
             </div>
 
@@ -1427,6 +1420,7 @@ trait RendersDashboard
 
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-dashboard-inline.js?v=' . SCM_VERSION); ?>" defer></script>
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-case-create.js?v=' . SCM_VERSION); ?>" defer></script>
+      <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/property-history-report.js?v=' . SCM_VERSION); ?>" defer></script>
       <script src="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/js/admin-contract-note.js?v=' . SCM_VERSION . '-' . (string) @filemtime(dirname(__DIR__, 3) . '/public/assets/js/admin-contract-note.js')); ?>" defer></script>
 
       <?php if (in_array('notificaciones', $dashboardAllowedTabs, true)): ?>

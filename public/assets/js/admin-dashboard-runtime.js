@@ -16628,7 +16628,8 @@
         status.textContent = "Informe generado " + String((data && data.generated_at) || "") + ".";
       }
       if (!results) return;
-      results.innerHTML = propertyHistoryResultsHtml(data);
+      results.innerHTML = data && data.html ? data.html : propertyHistoryResultsHtml(data);
+      if (typeof window.scmPropertyHistoryBind === "function") window.scmPropertyHistoryBind(results);
     }
 
     function propertyHistoryResultsHtml(data) {
@@ -20094,7 +20095,8 @@
           })
           .then(function (data) {
             if (seq !== requestSeq) return;
-            body.innerHTML = '<div class="scm-property-history-results">' + propertyHistoryResultsHtml(data || {}) + "</div>";
+            body.innerHTML = data && data.html ? data.html : '<div class="scm-property-history-results">' + propertyHistoryResultsHtml(data || {}) + "</div>";
+            if (typeof window.scmPropertyHistoryBind === "function") window.scmPropertyHistoryBind(body);
           })
           .catch(function (error) {
             if (seq !== requestSeq) return;

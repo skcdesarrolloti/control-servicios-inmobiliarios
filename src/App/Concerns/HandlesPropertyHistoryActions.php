@@ -18,7 +18,20 @@ trait HandlesPropertyHistoryActions
       $this->jsonFail('Escribe un contrato o un codigo web/inmueble para consultar.');
     }
 
-    $this->jsonOk($this->property_history_payload($contractNumber, $propertyCode));
+    $payload = $this->property_history_payload($contractNumber, $propertyCode);
+    $payload['html'] = $this->property_history_document($payload, false);
+    $this->jsonOk($payload);
+  }
+
+  /** Informe con el componente compartido (panel, PDF de Chromium, bot y portal del propietario). @param array<string,mixed> $payload */
+  private function property_history_document(array $payload, bool $pdf): string
+  {
+    $actor = $this->property_history_current_employee_signature();
+    return \SCM\Support\PropertyHistoryReport::render($payload, [
+      'pdf' => $pdf,
+      'logo' => 'https://sucasainmobiliaria.com.co/wp-content/uploads/2022/05/logo-white-skc-e1781617234571.png',
+      'generated_by' => ['name' => $actor['name'], 'details' => str_replace(' | ', ' · ', $actor['details'])],
+    ]);
   }
 
   public function ajax_handler_property_history_pdf(): void
@@ -34,7 +47,6 @@ trait HandlesPropertyHistoryActions
     }
 
     $payload = $this->property_history_payload($contractNumber, $propertyCode);
-    $pdf = $this->property_history_build_pdf($payload);
     $basename = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
     $dir = (string) SCM_STORAGE_PATH . '/tmp';
     if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
@@ -42,7 +54,18 @@ trait HandlesPropertyHistoryActions
     }
 
     $path = $dir . '/' . $basename;
-    $pdf->save($path);
+    // Chromium imprime el mismo informe que se ve en el panel; si no está disponible se usa el PDF básico.
+    $root = dirname(__DIR__, 3);
+    $bytes = \SCM\Support\HtmlPdfRenderer::render($this->property_history_document($payload, true), 'Historial del inmueble ' . (string) ($payload['property']['codigo'] ?? ''), [
+      'stylesheets' => [$root . '/public/assets/css/property-history-report.css'],
+      'external_fonts' => false, 'body_class' => 'scm-property-history-pdf',
+      'wrapper_class' => 'scm-property-history-pdf-root', 'container_class' => 'scm-property-history-pdf-main', 'allow_fallback' => false,
+    ]);
+    if (is_string($bytes) && $bytes !== '') {
+      file_put_contents($path, $bytes, LOCK_EX);
+    } else {
+      $this->property_history_build_pdf($payload)->save($path);
+    }
     $filenameToken = preg_replace('/[^0-9A-Za-z_-]+/', '-', (string) ($payload['property']['codigo'] ?? $propertyCode ?: $contractNumber)) ?: 'inmueble';
 
     if (ob_get_level() > 0) {
@@ -150,6 +173,7 @@ trait HandlesPropertyHistoryActions
       foreach ((array) ($section['items'] ?? []) as $item) {
         $timeline[] = [
           'source' => (string) ($section['label'] ?? ''),
+          'source_key' => (string) ($section['key'] ?? ''),
           'date' => (string) ($item['date'] ?? ''),
           'date_ts' => (int) ($item['date_ts'] ?? 0),
           'title' => (string) ($item['title'] ?? ''),
@@ -472,7 +496,8 @@ trait HandlesPropertyHistoryActions
       'end_date' => $endDate !== '' ? $this->property_history_date_label($endDate) : '',
       'status' => $status,
       'tenant' => $tenant,
-      'canon' => $this->format_cop_currency($canonRaw),
+      // "600.000" usa punto de miles; sin normalizar se leía como 600.
+      'canon' => $this->format_cop_currency(preg_match('/^\$?\s*\d{1,3}(\.\d{3})+$/', trim($canonRaw)) === 1 ? preg_replace('/\D/', '', $canonRaw) : $canonRaw),
       'reference' => $relation,
     ];
   }
