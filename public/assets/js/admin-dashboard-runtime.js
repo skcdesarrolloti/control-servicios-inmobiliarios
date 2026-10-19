@@ -814,7 +814,23 @@
         }
         return;
       }
+      var openCriticalServices = key === "servicios_publicos_critico";
+      if (openCriticalServices) key = "servicios_publicos_pendientes";
       dashboardDuePopupShown.administrative = true;
+      if (openCriticalServices) {
+        // The services workspace renders after its activity tab opens; wait for the sub-tabs before selecting "critical".
+        var attempts = 0;
+        var selectCritical = function () {
+          var criticalTab = root.querySelector('[data-services-tab="critical"]');
+          if (criticalTab && criticalTab.offsetParent !== null) {
+            criticalTab.click();
+            criticalTab.focus({ preventScroll: true });
+            return;
+          }
+          if (++attempts < 30) window.setTimeout(selectCritical, 200);
+        };
+        window.setTimeout(selectCritical, 300);
+      }
       var adminTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-actividades-administrativas"]');
       if (adminTab) {
         adminTab.click();
@@ -903,7 +919,7 @@
       });
       var groupHtml = groupOrder.map(function (type) {
         var summaryGroup = summaryByType[type] || {};
-        var targetTab = String(summaryGroup.target_tab || (type === "terminacion_contrato_pendiente" ? "contract_termination" : type === "no_prorroga_contrato_pendiente" ? "contract_non_renewal" : ""));
+        var targetTab = String(summaryGroup.target_tab || (type === "terminacion_contrato_pendiente" ? "contract_termination" : type === "no_prorroga_contrato_pendiente" ? "contract_non_renewal" : type === "servicios_publicos_critico" ? "servicios_publicos_critico" : ""));
         var buttonHtml = targetTab
           ? '<button type="button" class="scm-due-entry-group-link" data-scm-dashboard-due-open-admin-tab="' + escHtml(targetTab) + '">Ver pestaña <span class="material-symbols-outlined">chevron_right</span></button>'
           : "";
