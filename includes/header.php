@@ -299,6 +299,10 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'dashboard';
   } elseif (in_array($tabParam, ['metricas_cotizaciones', 'cotizaciones_metricas', 'scm-panel-metricas-cotizaciones'], true)) {
     $current_page = 'metricas_cotizaciones';
+  } elseif (in_array($tabParam, ['metricas_preventivas', 'scm-panel-metricas-preventivas'], true)) {
+    $current_page = 'metricas_preventivas';
+  } elseif (in_array($tabParam, ['metricas_servicios_publicos', 'scm-panel-metricas-servicios-publicos'], true)) {
+    $current_page = 'metricas_servicios_publicos';
   } else {
     $current_page = empty($tabParam) ? 'inicio' : 'abiertos';
   }
@@ -612,6 +616,26 @@ $rawNavItems = [
         'panel_id' => 'scm-panel-metricas-cotizaciones',
         'url' => $baseUrl . '/index.php?tab=metricas_cotizaciones',
         'icon' => 'request_quote',
+        'perms' => ['metricas'],
+      ],
+      'metricas_preventivas' => [
+        'key' => 'metricas_preventivas',
+        'group' => 'Mantenimiento',
+        'group_icon' => 'build',
+        'label' => 'Revisión preventiva',
+        'panel_id' => 'scm-panel-metricas-preventivas',
+        'url' => $baseUrl . '/index.php?tab=metricas_preventivas',
+        'icon' => 'pending_actions',
+        'perms' => ['metricas'],
+      ],
+      'metricas_servicios_publicos' => [
+        'key' => 'metricas_servicios_publicos',
+        'group' => 'Servicios públicos',
+        'group_icon' => 'water_drop',
+        'label' => 'Revisiones de servicios públicos',
+        'panel_id' => 'scm-panel-metricas-servicios-publicos',
+        'url' => $baseUrl . '/index.php?tab=metricas_servicios_publicos',
+        'icon' => 'receipt_long',
         'perms' => ['metricas'],
       ],
       'ocupaciones' => [

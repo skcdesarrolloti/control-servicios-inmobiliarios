@@ -164,6 +164,10 @@ trait RendersDashboard
       'metricas_cotizaciones' => 'scm-panel-metricas-cotizaciones',
       'cotizaciones_metricas' => 'scm-panel-metricas-cotizaciones',
       'scm-panel-metricas-cotizaciones' => 'scm-panel-metricas-cotizaciones',
+      'metricas_preventivas' => 'scm-panel-metricas-preventivas',
+      'scm-panel-metricas-preventivas' => 'scm-panel-metricas-preventivas',
+      'metricas_servicios_publicos' => 'scm-panel-metricas-servicios-publicos',
+      'scm-panel-metricas-servicios-publicos' => 'scm-panel-metricas-servicios-publicos',
       'ocupaciones' => 'scm-panel-movimientos-contratos',
       'desocupaciones' => 'scm-panel-movimientos-contratos',
       'ocupaciones_vs_desocupaciones' => 'scm-panel-movimientos-contratos',
@@ -330,6 +334,8 @@ trait RendersDashboard
       'scm-panel-admin-notificaciones' => 'notificaciones',
       'scm-panel-metricas-casos' => 'metricas',
       'scm-panel-metricas-cotizaciones' => 'metricas',
+      'scm-panel-metricas-preventivas' => 'metricas',
+      'scm-panel-metricas-servicios-publicos' => 'metricas',
       'scm-panel-movimientos-contratos' => 'metricas',
       'scm-panel-funcionario-contratos' => 'contratos_arrendamiento',
     ];
@@ -540,6 +546,7 @@ trait RendersDashboard
         'contract_simi_audit' => self::AJAX_CONTRACT_SIMI_AUDIT,
         'case_metrics' => self::AJAX_CASE_METRICS,
         'quote_metrics' => self::AJAX_QUOTE_METRICS,
+        'maintenance_metrics' => self::AJAX_MAINTENANCE_METRICS,
         'quote_response_date' => self::AJAX_QUOTE_RESPONSE_DATE,
         'quote_assign_property' => self::AJAX_QUOTE_ASSIGN_PROPERTY,
         'quote_ledger_update' => self::AJAX_QUOTE_LEDGER_UPDATE,
@@ -747,6 +754,8 @@ trait RendersDashboard
             if ($panelId === 'scm-panel-movimientos-contratos') $tabLabel = 'Ocupaciones y desocupaciones';
             if ($panelId === 'scm-panel-metricas-casos') $tabLabel = 'Métricas de casos';
             if ($panelId === 'scm-panel-metricas-cotizaciones') $tabLabel = 'Métricas de cotizaciones';
+            if ($panelId === 'scm-panel-metricas-preventivas') $tabLabel = 'Métricas de revisión preventiva';
+            if ($panelId === 'scm-panel-metricas-servicios-publicos') $tabLabel = 'Métricas de servicios públicos';
             if ($panelId === 'scm-panel-funcionario-contratos') $tabLabel = 'Funcionario de contratos';
           }
           ?>
@@ -1415,6 +1424,13 @@ trait RendersDashboard
         </div>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas-cotizaciones' ? ' active' : ''; ?>" id="scm-panel-metricas-cotizaciones" data-permission-tab="metricas" data-scm-loaded="0">
           <?php echo $metricsPanelsView->renderQuotesShell(); ?>
+        </div>
+        <?php $maintenanceMetricsView = new \SCM\Modules\Metrics\MaintenanceMetricsView(); ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas-preventivas' ? ' active' : ''; ?>" id="scm-panel-metricas-preventivas" data-permission-tab="metricas" data-scm-loaded="0">
+          <?php echo $maintenanceMetricsView->shell('preventiva'); ?>
+        </div>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas-servicios-publicos' ? ' active' : ''; ?>" id="scm-panel-metricas-servicios-publicos" data-permission-tab="metricas" data-scm-loaded="0">
+          <?php echo $maintenanceMetricsView->shell('servicios'); ?>
         </div>
       <?php endif; ?>
 

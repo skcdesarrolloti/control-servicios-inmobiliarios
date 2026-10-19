@@ -25,6 +25,45 @@ trait HandlesMetricsPanels
     }
   }
 
+  /** Métricas de revisiones de servicios públicos y de revisión preventiva (HTML listo para el panel). */
+  public function ajax_handler_maintenance_metrics(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('metricas')) {
+      $this->jsonFail('No tienes permiso para ver métricas.');
+    }
+    $report = sanitize_key((string) ($_POST['report'] ?? ''));
+    if (!isset(\SCM\Modules\Metrics\MaintenanceMetricsView::REPORTS[$report])) {
+      $this->jsonFail('Métrica no válida.');
+    }
+    try {
+      $metrics = new \SCM\Modules\Metrics\MaintenanceMetricsReport($this->db);
+      [$fromTs, $toTs, $from, $to] = $metrics->period((string) ($_POST['from'] ?? ''), (string) ($_POST['to'] ?? ''));
+      if ($report === 'servicios') {
+        $payload = $this->get_pending_controller()->buildServiciosPublicosPayload([]);
+        $data = $metrics->publicServices($fromTs, $toTs, (array) ($payload['items'] ?? []), (array) ($payload['configuration_items'] ?? []));
+      } else {
+        $payload = $this->get_pending_controller()->buildPreventivasPayload([]);
+        $settings = $this->adminDueCalendarSettings();
+        $until = strtotime('+20 years') ?: PHP_INT_MAX;
+        $types = ['ticket_preventiva_sin_cita' => 'sin_cita', 'preventiva_cita_sin_realizar' => 'cita_sin_realizar', 'preventiva_sin_enviar' => 'sin_enviar'];
+        $queues = array_fill_keys(array_values($types), ['total' => 0, 'overdue' => 0]);
+        $events = array_merge($this->adminDuePreventivaTicketItems($settings, 0, $until), $this->adminDuePreventivaItems($settings, 0, $until));
+        foreach ($events as $event) {
+          $key = $types[(string) ($event['tipo_vencimiento'] ?? '')] ?? '';
+          if ($key === '') continue;
+          $queues[$key]['total']++;
+          if (strtolower((string) ($event['estado'] ?? '')) === 'vencido') $queues[$key]['overdue']++;
+        }
+        $data = $metrics->preventive($fromTs, $toTs, (array) ($payload['items'] ?? []), $queues);
+      }
+      $this->jsonOk(['html' => (new \SCM\Modules\Metrics\MaintenanceMetricsView())->render($report, $data, $from, $to), 'from' => $from, 'to' => $to]);
+    } catch (\Throwable $exception) {
+      error_log('[maintenance-metrics] ' . $exception->getMessage());
+      $this->jsonFail('No se pudieron cargar las métricas.');
+    }
+  }
+
   public function ajax_handler_quote_metrics(): void
   {
     $this->verifyCsrf();

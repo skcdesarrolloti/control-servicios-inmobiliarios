@@ -12386,6 +12386,86 @@
       }).finally(function () { if (target._request === request) target.removeAttribute("aria-busy"); });
     }
 
+    // Métricas › Revisión preventiva y Servicios públicos: HTML del servidor según el periodo.
+    var actionMaintenanceMetrics = actions.maintenance_metrics || "";
+    function loadMaintenanceMetrics(module, force) {
+      if (!module || !actionMaintenanceMetrics) return Promise.resolve();
+      if (!force && module.getAttribute("data-loaded") === "1") return Promise.resolve();
+      var form = module.querySelector("[data-maint-metrics-form]");
+      var content = module.querySelector("[data-maint-metrics-content]");
+      var request = (module._request || 0) + 1;
+      module._request = request;
+      content.setAttribute("aria-busy", "true");
+      if (!module.getAttribute("data-loaded")) content.innerHTML = '<p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted" role="status">Calculando métricas...</p>';
+      var fd = new FormData(form);
+      fd.set("action", actionMaintenanceMetrics);
+      fd.set("nonce", nonce);
+      fd.set("report", module.getAttribute("data-maint-metrics"));
+      return fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (!json || !json.success) throw new Error((json && json.data && json.data.message) || "No se pudieron cargar las métricas.");
+          if (module._request !== request) return;
+          content.innerHTML = json.data.html || "";
+          module.setAttribute("data-loaded", "1");
+        })
+        .catch(function (error) {
+          showToast("error", error.message);
+          if (module._request === request && module.getAttribute("data-loaded") !== "1") content.innerHTML = '<p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs" role="alert">' + escHtml(error.message) + '</p>';
+        })
+        .finally(function () { if (module._request === request) content.removeAttribute("aria-busy"); });
+    }
+    function maintenanceMetricsQuickRange(key) {
+      var today = new Date();
+      var pad = function (n) { return String(n).padStart(2, "0"); };
+      var iso = function (d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+      var from = new Date(today.getFullYear(), 0, 1);
+      if (key === "month") from = new Date(today.getFullYear(), today.getMonth(), 1);
+      if (key === "last12") from = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+      if (key === "all") from = new Date(2000, 0, 1);
+      return { from: iso(from), to: iso(today) };
+    }
+    root.addEventListener("click", function (event) {
+      var module = event.target.closest("[data-maint-metrics]");
+      if (!module) return;
+      var quick = event.target.closest("[data-maint-metrics-quick]");
+      if (quick) {
+        var range = maintenanceMetricsQuickRange(quick.getAttribute("data-maint-metrics-quick"));
+        var form = module.querySelector("[data-maint-metrics-form]");
+        form.elements.from.value = range.from;
+        form.elements.to.value = range.to;
+        module.querySelectorAll("[data-maint-metrics-quick]").forEach(function (button) { button.setAttribute("aria-pressed", button === quick ? "true" : "false"); });
+        loadMaintenanceMetrics(module, true);
+        return;
+      }
+      if (event.target.closest("[data-maint-metrics-refresh]")) { loadMaintenanceMetrics(module, true); return; }
+      if (event.target.closest("[data-maint-metrics-export]")) {
+        var lines = [];
+        module.querySelectorAll("[data-maint-metrics-content] [data-maint-metrics-table]").forEach(function (table) {
+          var card = table.closest(".\\!sp-overflow-x-auto");
+          var title = card && card.previousElementSibling ? card.previousElementSibling.querySelector("h3") : null;
+          if (title) lines.push([title.textContent.trim()]);
+          table.querySelectorAll("tr").forEach(function (row) {
+            lines.push(Array.from(row.cells).map(function (cell) { return cell.textContent.replace(/\s+/g, " ").trim(); }));
+          });
+          lines.push([]);
+        });
+        if (!lines.length) { showToast("info", "Carga las métricas antes de exportar."); return; }
+        var csv = "﻿" + lines.map(function (line) { return line.map(function (value) { return '"' + (/^[=+@-]/.test(value) ? "'" : "") + value.replace(/"/g, '""') + '"'; }).join(";"); }).join("\r\n");
+        var url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+        var link = document.createElement("a"); link.href = url; link.download = "metricas-" + module.getAttribute("data-maint-metrics") + ".csv"; link.click();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      }
+    });
+    root.addEventListener("submit", function (event) {
+      var form = event.target.closest("[data-maint-metrics-form]");
+      if (!form) return;
+      event.preventDefault();
+      var module = form.closest("[data-maint-metrics]");
+      module.querySelectorAll("[data-maint-metrics-quick]").forEach(function (button) { button.setAttribute("aria-pressed", "false"); });
+      loadMaintenanceMetrics(module, true);
+    });
+
     // Preventivas pendientes: sub-tabs (history and due-date queues) loaded through the same panel action.
     function loadPreventiveWorkspace(section, fields) {
       var target = root.querySelector('[data-preventive-workspace-content="' + section + '"]');
@@ -24211,6 +24291,8 @@
         activePanel.id !== "scm-panel-funcionario-contratos" &&
         activePanel.id !== "scm-panel-metricas-casos" &&
         activePanel.id !== "scm-panel-metricas-cotizaciones" &&
+        activePanel.id !== "scm-panel-metricas-preventivas" &&
+        activePanel.id !== "scm-panel-metricas-servicios-publicos" &&
         !dashboardFilterOptionsLoaded &&
         !skipFilterOptions
       ) {
@@ -24243,6 +24325,9 @@
           metricsModule.dispatchEvent(new CustomEvent("scm:load-metrics"));
         }
         return Promise.resolve();
+      }
+      if (activePanel.id === "scm-panel-metricas-preventivas" || activePanel.id === "scm-panel-metricas-servicios-publicos") {
+        return loadMaintenanceMetrics(activePanel.querySelector("[data-maint-metrics]"), false);
       }
       if (activePanel.id === "scm-panel-funcionario-contratos") {
         var ownersModule = activePanel.querySelector("[data-scm-contract-owners]");

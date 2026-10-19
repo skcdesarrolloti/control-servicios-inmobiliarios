@@ -150,6 +150,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_SIMI_AUDIT = 'scm_auditoria_simi_contrato';
   const AJAX_CASE_METRICS = 'scm_metricas_casos';
   const AJAX_QUOTE_METRICS = 'scm_metricas_cotizaciones';
+  const AJAX_MAINTENANCE_METRICS = 'scm_metricas_mantenimiento';
   const AJAX_QUOTE_RESPONSE_DATE = 'scm_metricas_cotizacion_fecha_respuesta';
   const AJAX_QUOTE_ASSIGN_PROPERTY = 'scm_metricas_cotizacion_inmueble';
   const AJAX_QUOTE_LEDGER_UPDATE = 'scm_metricas_cotizacion_valores';
