@@ -55,6 +55,61 @@ final class LeaseAnnexesService
     return is_array($row) ? $row : ($this->db->getRow("SELECT * FROM `{$table}` ORDER BY `_ID` ASC LIMIT 1") ?? []);
   }
 
+  /** Cargos de jet_cct_funcionarios que aparecen en las actas de bienvenida. */
+  public const STAFF_CARGOS = ['contractual' => '7', 'propietarios' => '5', 'arrendatarios' => '4', 'comercial' => '12', 'legal' => '14'];
+
+  /** @return array<string,array{nombre:string,celular:string,correo:string,firma:string,cargo:string}> funcionario activo por cargo */
+  public function staff(): array
+  {
+    $table = $this->db->table('jet_cct_funcionarios');
+    $cargos = $this->db->table('jet_cct_cargos');
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+    $hasCargos = $this->schema->tableExists($cargos);
+    $rows = $this->db->getResults(
+      "SELECT f.`_ID`, TRIM(COALESCE(f.`id_cargo`, '')) AS id_cargo, f.`nombre`, f.`celular`, f.`correo`, f.`firma`"
+        . ($hasCargos ? ', c.`nombre_cargo`' : ", '' AS nombre_cargo")
+        . " FROM `{$table}` f" . ($hasCargos ? " LEFT JOIN `{$cargos}` c ON CAST(c.`_ID` AS CHAR) = TRIM(COALESCE(f.`id_cargo`, ''))" : '')
+        . " WHERE LOWER(TRIM(COALESCE(f.`activo`, ''))) IN ('si', 'sí') AND TRIM(COALESCE(f.`id_cargo`, '')) IN ('" . implode("','", self::STAFF_CARGOS) . "')"
+        . ' ORDER BY f.`_ID` ASC'
+    );
+    $out = [];
+    foreach (self::STAFF_CARGOS as $key => $cargoId) {
+      foreach ($rows as $row) {
+        if ((string) $row['id_cargo'] === $cargoId && trim((string) ($row['nombre'] ?? '')) !== '') {
+          $out[$key] = [
+            'nombre' => trim((string) $row['nombre']),
+            'celular' => trim((string) ($row['celular'] ?? '')),
+            'correo' => trim((string) ($row['correo'] ?? '')),
+            'firma' => trim((string) ($row['firma'] ?? '')),
+            'cargo' => trim((string) ($row['nombre_cargo'] ?? '')),
+          ];
+          break;
+        }
+      }
+    }
+    return $out;
+  }
+
+  /** @return array<string,string> claves que usan las actas y los correos */
+  private function staffContext(): array
+  {
+    $staff = $this->staff();
+    $get = static fn(string $key, string $field): string => (string) ($staff[$key][$field] ?? '');
+    if ($get('legal', 'nombre') === '') {
+      throw new \DomainException('No hay un funcionario activo con el cargo 14 (Gerencia General / representante legal) para firmar las actas.');
+    }
+    return [
+      'nombre_contractual' => $get('contractual', 'nombre'), 'celular_contractual' => $get('contractual', 'celular'), 'correo_contractual' => $get('contractual', 'correo'),
+      'nombre_propietarios' => $get('propietarios', 'nombre'), 'celular_propietarios' => $get('propietarios', 'celular'), 'correo_propietarios' => $get('propietarios', 'correo'),
+      'nombre_arrendatarios' => $get('arrendatarios', 'nombre'), 'celular_arrendatarios' => $get('arrendatarios', 'celular'), 'correo_arrendatarios' => $get('arrendatarios', 'correo'),
+      'gerente_comercial' => $get('comercial', 'nombre'), 'celular_ge_comercial' => $get('comercial', 'celular'), 'correo_ge_comercial' => $get('comercial', 'correo'),
+      'representante_legal' => $get('legal', 'nombre'), 'celular_legal' => $get('legal', 'celular'), 'correo_legal' => $get('legal', 'correo'),
+      'cargo_legal' => $get('legal', 'cargo'), 'firma_legal' => $get('legal', 'firma'),
+    ];
+  }
+
   /** @param array<string,mixed> $contract @return array<string,mixed> */
   public function property(array $contract): array
   {
@@ -150,9 +205,7 @@ final class LeaseAnnexesService
       // Razón social de la sucursal: es la que firma el contrato y la que se nombra en la bienvenida.
       'razon_social' => mb_strtoupper(trim((string) ($branch['nombre'] ?? '')) ?: 'Soluciones Comerciales y Constructivas SAS', 'UTF-8'),
     ]);
-    foreach (['nombre_contractual', 'celular_contractual', 'correo_contractual', 'nombre_propietarios', 'celular_propietarios', 'correo_propietarios', 'nombre_arrendatarios', 'celular_arrendatarios', 'correo_arrendatarios', 'representante_legal', 'celular_legal', 'gerente_comercial', 'celular_ge_comercial', 'correo_ge_comercial'] as $field) {
-      $context[$field] = trim((string) ($branch[$field] ?? ''));
-    }
+    $context = array_merge($context, $this->staffContext());
 
     $expires = max($now + 400 * 86400, (int) $data['fin_contrato'] + 180 * 86400);
     $actors = $this->actors($data, $contract, $contractId, $expires);

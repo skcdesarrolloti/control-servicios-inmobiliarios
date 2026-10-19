@@ -396,8 +396,8 @@ final class LeaseContractsView
     return $html . '</ol>';
   }
 
-  /** @param array<string,mixed> $c @param array<string,mixed> $branch */
-  public function renderSendForm(array $c, array $branch): string
+  /** @param array<string,mixed> $c @param array<string,array<string,string>> $staff funcionario activo por cargo */
+  public function renderSendForm(array $c, array $staff): string
   {
     $ui = UI::class;
     $v = static fn(string $key): string => trim((string) ($c[$key] ?? ''));
@@ -441,11 +441,16 @@ final class LeaseContractsView
     for ($i = 1; $i <= 4; $i++) {
       $html .= $person('codeudor_' . $i, 'Codeudor ' . $i);
     }
-    $contractual = trim((string) ($branch['nombre_contractual'] ?? ''));
+    $staffLabels = ['legal' => 'Representante legal (cargo 14)', 'contractual' => 'Contractual (cargo 7)', 'propietarios' => 'Pagos · propietario (cargo 5)', 'arrendatarios' => 'Servicio al arrendatario (cargo 4)', 'comercial' => 'Gerencia comercial (cargo 12)'];
+    $staffList = '';
+    foreach ($staffLabels as $key => $label) {
+      $name = (string) ($staff[$key]['nombre'] ?? '');
+      $staffList .= '<li>' . esc_html($label) . ': <strong class="' . ($name !== '' ? '!sp-text-service-navy' : '!sp-text-rose-700') . '">' . esc_html($name !== '' ? $name : 'Sin funcionario activo') . '</strong></li>';
+    }
     $html .= '</div>'
       . '<div class="' . $ui::CARD . ' !sp-p-5 !sp-text-[10px] !sp-leading-relaxed !sp-text-service-muted"><strong class="!sp-block !sp-mb-1 !sp-text-service-navy">Qué se envía</strong>'
       . 'Se genera un acta de bienvenida por cada actor. El propietario recibe su acta, el registro fotográfico, el inventario, el acta de entrega y el contrato de mandato. El arrendatario y los codeudores reciben su acta y el contrato de arrendamiento, sin el contrato de mandato. Todos reciben correo y WhatsApp con el enlace a sus anexos.'
-      . ($contractual !== '' ? ' Funcionario contractual que aparece en las actas: <strong class="!sp-text-service-navy">' . esc_html($contractual) . '</strong>.' : '') . '</div>'
+      . '<span class="!sp-block !sp-mt-2">Funcionarios que aparecen en las actas:</span><ul class="!sp-m-0 !sp-mt-1 !sp-pl-4">' . $staffList . '</ul></div>'
       . '<p class="!sp-hidden !sp-m-0 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-rose-200 !sp-bg-rose-50 !sp-text-[11px] !sp-text-rose-700" data-lease-send-error role="alert"></p>'
       . '<div class="!sp-flex !sp-flex-wrap !sp-justify-end !sp-gap-2"><button type="button" class="' . $ui::SECONDARY . '" data-lease-modal-close>Cancelar</button><button type="submit" class="' . $ui::PRIMARY . '" data-lease-send-submit>' . $ui::icon('bolt') . 'Generar actas y enviar anexos</button></div>'
       . '</form>';

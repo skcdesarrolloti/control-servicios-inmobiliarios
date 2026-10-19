@@ -99,7 +99,9 @@ final class LeaseAnnexesDocument
       $html .= '<li>' . Doc::e($label) . '</li>';
     }
     $html .= '</ul><p class="scm-lease-link"><a href="' . Doc::e($annexesUrl) . '">Ver anexos del contrato</a></p></section>'
-      . '<footer class="scm-acta-receipt-footer scm-services-signatures"><div><span>Firmado original</span><strong>' . Doc::e(($context['representante_legal'] ?? '') !== '' ? $context['representante_legal'] : 'Representante legal') . '</strong><p>Representante legal' . (($context['celular_legal'] ?? '') !== '' ? ' · ' . Doc::e($context['celular_legal']) : '') . '</p></div>'
+      . '<footer class="scm-acta-receipt-footer scm-services-signatures"><div><span>Firmado original</span>'
+      . (filter_var((string) ($context['firma_legal'] ?? ''), FILTER_VALIDATE_URL) ? '<img class="scm-lease-signature" src="' . Doc::e($context['firma_legal']) . '" alt="Firma del representante legal">' : '')
+      . '<strong>' . Doc::e(($context['representante_legal'] ?? '') !== '' ? $context['representante_legal'] : 'Representante legal') . '</strong><p>Representante legal' . (($context['cargo_legal'] ?? '') !== '' ? ' · ' . Doc::e($context['cargo_legal']) : '') . (($context['celular_legal'] ?? '') !== '' ? ' · ' . Doc::e($context['celular_legal']) : '') . '</p></div>'
       . '<div><span>Realizado por</span><strong>' . Doc::e($context['realizado_por'] ?? 'SKC SuCasa Inmobiliaria') . '</strong><p>' . Doc::e(implode(' · ', array_filter([(string) ($context['realizado_por_cargo'] ?? ''), (string) ($context['realizado_por_telefono'] ?? '')]))) . '</p></div>'
       . '<p class="scm-services-company">SKC SuCasa Inmobiliaria · NIT 900623242-4</p></footer>'
       . $letterheadFooter . '</article>';
