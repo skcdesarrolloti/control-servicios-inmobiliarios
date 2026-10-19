@@ -426,16 +426,6 @@ $rawNavItems = [
     'label' => 'Actividades Administrativas',
     'icon' => 'folder_shared',
     'children' => [
-      'gestiones_cobro' => [
-        'key' => 'gestiones_cobro',
-        'label' => 'Gestiones de Cobro',
-        'panel_id' => 'scm-panel-actividades-administrativas',
-        'admin_sub_target' => 'scm-panel-gestiones-cobro',
-        'admin_activity_key' => 'gestiones_cobro',
-        'url' => $baseUrl . '/index.php?tab=gestiones_cobro',
-        'icon' => 'payments',
-        'perms' => ['gestiones_cobro'],
-      ],
       'cotizaciones_mantenimiento' => [
         'key' => 'cotizaciones_mantenimiento',
         'label' => 'Cotizaciones de Mantenimiento',
@@ -463,6 +453,8 @@ $rawNavItems = [
       'preventivas_pendientes' => [
         'key' => 'preventivas_pendientes',
         'label' => 'Revisión Preventiva',
+        'group' => 'Mantenimiento',
+        'group_icon' => 'build',
         'panel_id' => 'scm-panel-actividades-administrativas',
         'admin_sub_target' => 'scm-panel-preventivas-pendientes',
         'admin_activity_key' => 'preventivas_pendientes',
@@ -500,16 +492,6 @@ $rawNavItems = [
         'icon' => 'summarize',
         'perms' => ['reportes_administrativos_pendientes'],
       ],
-      'auditoria_canon_aseguradoras' => [
-        'key' => 'auditoria_canon_aseguradoras',
-        'label' => 'Auditoría Canon y Aseguradoras',
-        'panel_id' => 'scm-panel-actividades-administrativas',
-        'admin_sub_target' => 'scm-panel-auditoria-canon-aseguradoras',
-        'admin_activity_key' => 'auditoria_canon_aseguradoras',
-        'url' => $baseUrl . '/index.php?tab=auditoria_canon_aseguradoras',
-        'icon' => 'verified_user',
-        'perms' => ['auditoria_canon_aseguradoras'],
-      ],
       'cartas_aumento' => [
         'key' => 'cartas_aumento',
         'label' => 'Cartas de Aumento',
@@ -519,6 +501,35 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=cartas_aumento',
         'icon' => 'mail',
         'perms' => ['cartas_aumento'],
+      ],
+    ],
+  ],
+  // Cartera reuses the administrative activities panel; only the menu grouping changes.
+  'cartera' => [
+    'type' => 'dropdown',
+    'key' => 'cartera',
+    'label' => 'Actividades de Cartera',
+    'icon' => 'account_balance_wallet',
+    'children' => [
+      'gestiones_cobro' => [
+        'key' => 'gestiones_cobro',
+        'label' => 'Gestiones de Cobro',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-gestiones-cobro',
+        'admin_activity_key' => 'gestiones_cobro',
+        'url' => $baseUrl . '/index.php?tab=gestiones_cobro',
+        'icon' => 'payments',
+        'perms' => ['gestiones_cobro'],
+      ],
+      'auditoria_canon_aseguradoras' => [
+        'key' => 'auditoria_canon_aseguradoras',
+        'label' => 'Auditoría Canon y Aseguradoras',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-auditoria-canon-aseguradoras',
+        'admin_activity_key' => 'auditoria_canon_aseguradoras',
+        'url' => $baseUrl . '/index.php?tab=auditoria_canon_aseguradoras',
+        'icon' => 'verified_user',
+        'perms' => ['auditoria_canon_aseguradoras'],
       ],
     ],
   ],
