@@ -257,6 +257,10 @@
       actions.rent_increase_letters_list || "";
     var actionRentIncreaseLettersCreate =
       actions.rent_increase_letters_create || "";
+    var actionMaintenanceOrdersList = actions.maintenance_orders_list || "";
+    var actionMaintenanceOrdersDetail = actions.maintenance_orders_detail || "";
+    var actionMaintenanceOrdersDelete = actions.maintenance_orders_delete || "";
+    var actionMaintenanceOrdersQuotes = actions.maintenance_orders_quotes || "";
     var duePopupConfig = runtime.duePopup || {};
     var dashboardDuePopupShown = {};
     var dashboardDuePopupPromise = null;
@@ -13789,6 +13793,10 @@
           calendarRefresh.click();
         }
         return Promise.resolve();
+      } else if (activeKey === "ordenes_mantenimiento") {
+        return typeof reloadMaintenanceOrders === "function"
+          ? reloadMaintenanceOrders()
+          : Promise.resolve();
       } else if (activeKey === "preventivas_pendientes") {
         return reloadPendingPanel(
           activeAdministrativePanel ||
@@ -13889,6 +13897,9 @@
       }
       if (panelId === "scm-panel-actas-satisfaccion") {
         return "actas_satisfaccion";
+      }
+      if (panelId === "scm-panel-ordenes-mantenimiento") {
+        return "ordenes_mantenimiento";
       }
       if (panelId === "scm-panel-servicios-publicos-pendientes") {
         return "servicios_publicos_pendientes";
@@ -20171,6 +20182,394 @@
 
     initRentIncreasePanel();
 
+    var reloadMaintenanceOrders = null;
+
+    function initMaintenanceOrdersPanel() {
+      var wrap = root.querySelector("[data-maintenance-orders-panel]");
+      if (!wrap || !ajaxUrl || !actionMaintenanceOrdersList) {
+        return;
+      }
+      var form = wrap.querySelector("[data-maintenance-orders-form]");
+      var table = wrap.querySelector("[data-maintenance-orders-table]");
+      var pagination = wrap.querySelector("[data-maintenance-orders-pagination]");
+      var spinner = form ? form.querySelector(".scm-spinner") : null;
+      var panel = wrap.closest(".scm-admin-activity-panel");
+      var tabsMeta = {};
+      try {
+        var metaNode = wrap.querySelector("[data-maintenance-orders-tabs]");
+        tabsMeta = metaNode ? JSON.parse(metaNode.textContent || "{}") : {};
+      } catch (ignore) {}
+      var requestSeq = 0;
+      if (!form || !table) {
+        return;
+      }
+
+      function postOrders(fd, actionName) {
+        fd.append("action", actionName);
+        fd.append("nonce", nonce);
+        return fetch(ajaxUrl, {
+          method: "POST",
+          body: fd,
+          credentials: "same-origin",
+        })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error(
+                (json && json.data && json.data.message) ||
+                  "No se pudo procesar la solicitud.",
+              );
+            }
+            return json.data || {};
+          });
+      }
+
+      function setFormValue(name, value) {
+        var input = form.querySelector('[name="' + name + '"]');
+        if (input) input.value = value;
+      }
+
+      function loadOrders() {
+        var seq = ++requestSeq;
+        if (spinner) spinner.classList.add("active");
+        form.classList.add("scm-loading");
+        return postOrders(new FormData(form), actionMaintenanceOrdersList)
+          .then(function (data) {
+            if (seq !== requestSeq) return;
+            table.innerHTML = data.table_html || "";
+            if (pagination) pagination.innerHTML = data.pagination_html || "";
+            var counts = data.counts || {};
+            wrap.querySelectorAll("[data-maintenance-orders-count]").forEach(function (badge) {
+              var key = badge.getAttribute("data-maintenance-orders-count") || "";
+              badge.textContent = String(counts[key] || 0);
+            });
+            var value = wrap.querySelector("[data-maintenance-orders-value]");
+            if (value) value.textContent = data.total_value || "$ 0";
+            if (panel) panel.setAttribute("data-scm-loaded", "1");
+          })
+          .catch(function (err) {
+            if (seq !== requestSeq) return;
+            showToast("error", err.message || "No se pudieron cargar las órdenes de mantenimiento.");
+          })
+          .finally(function () {
+            if (seq !== requestSeq) return;
+            if (spinner) spinner.classList.remove("active");
+            form.classList.remove("scm-loading");
+          });
+      }
+      reloadMaintenanceOrders = loadOrders;
+
+      function selectTab(key) {
+        setFormValue("scope", key);
+        setFormValue("page", "1");
+        wrap.querySelectorAll("[data-maintenance-orders-tab]").forEach(function (tab) {
+          tab.setAttribute(
+            "aria-pressed",
+            tab.getAttribute("data-maintenance-orders-tab") === key ? "true" : "false",
+          );
+        });
+        var meta = tabsMeta[key] || {};
+        var title = wrap.querySelector("[data-maintenance-orders-title]");
+        var description = wrap.querySelector("[data-maintenance-orders-description]");
+        if (title && meta.title) title.textContent = meta.title;
+        if (description && meta.description) description.textContent = meta.description;
+        return loadOrders();
+      }
+
+      function openOrderDetail(orderId) {
+        if (!actionMaintenanceOrdersDetail || !window.Swal) {
+          showToast("error", "Actualiza la página para ver el detalle de la orden.");
+          return;
+        }
+        var fd = new FormData();
+        fd.append("id_orden", orderId);
+        window.Swal.fire({
+          title: "Cargando orden #" + orderId,
+          allowOutsideClick: false,
+          didOpen: function () {
+            if (window.Swal.showLoading) window.Swal.showLoading();
+          },
+        });
+        postOrders(fd, actionMaintenanceOrdersDetail)
+          .then(function (data) {
+            return window.Swal.fire({
+              title: "Detalle de la orden #" + orderId,
+              html: data.html || "",
+              width: "min(920px, 94vw)",
+              showCloseButton: true,
+              confirmButtonText: "Cerrar",
+              buttonsStyling: false,
+              focusConfirm: false,
+              returnFocus: true,
+              customClass: {
+                popup: "scm-cotizacion-dialog scm-cotizacion-order-detail-swal",
+                title: "scm-cotizacion-dialog-title",
+                htmlContainer: "scm-cotizacion-dialog-body",
+                actions: "scm-cotizacion-dialog-actions",
+                confirmButton: "scm-cotizacion-dialog-confirm",
+                closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+              },
+              didOpen: function () {
+                var popup = window.Swal.getPopup();
+                if (!popup) return;
+                popup.addEventListener("click", function (event) {
+                  var target = event.target && event.target.closest ? event.target : null;
+                  if (!target) return;
+                  var pdfButton = target.closest("[data-scm-cotizacion-order-pdf]");
+                  if (pdfButton) {
+                    event.preventDefault();
+                    downloadCotizacionOrderPdf(pdfButton.getAttribute("data-order-id") || "", pdfButton);
+                    return;
+                  }
+                  var responseButton = target.closest("[data-scm-respond-cotizacion-order]");
+                  if (responseButton) {
+                    event.preventDefault();
+                    openCotizacionOrderResponseModal(responseButton);
+                  }
+                });
+              },
+            });
+          })
+          .catch(function (err) {
+            if (window.Swal.isVisible && window.Swal.isVisible()) window.Swal.close();
+            showToast("error", err.message || "No se pudo cargar la orden.");
+          });
+      }
+
+      function deleteOrder(button) {
+        if (!actionMaintenanceOrdersDelete || !window.Swal) {
+          showToast("error", "Actualiza la página para eliminar órdenes.");
+          return;
+        }
+        var orderId = button.getAttribute("data-order-id") || "";
+        var state = button.getAttribute("data-order-state") || "";
+        var value = button.getAttribute("data-order-value") || "";
+        var category = button.getAttribute("data-order-category") || "";
+        window.Swal.fire({
+          title: "¿Eliminar la orden #" + orderId + "?",
+          html:
+            '<div class="scm-cotizacion-delete-form">' +
+            '<p class="scm-cotizacion-dialog-intro scm-cotizacion-delete-intro">La orden saldrá de los listados y su valor se devolverá al saldo de la cotización. Queda registro en el historial del caso y del inmueble.</p>' +
+            '<div class="scm-cotizacion-order-response-summary"><div><span>Tipo</span><strong>' + escHtml(category || "-") + '</strong></div><div><span>Estado</span><strong>' + escHtml(state || "-") + '</strong></div><div><span>Valor</span><strong>' + escHtml(value || "-") + '</strong></div></div>' +
+            '<label class="scm-cotizacion-dialog-field is-wide"><span>Motivo de la eliminación <em>*</em></span><textarea id="swal-order-delete-reason" rows="4" placeholder="Explica por qué se elimina esta orden"></textarea></label>' +
+            "</div>",
+          width: "min(640px, 94vw)",
+          showCloseButton: true,
+          showCancelButton: true,
+          confirmButtonText: "Sí, eliminar orden",
+          cancelButtonText: "Cancelar",
+          buttonsStyling: false,
+          focusConfirm: false,
+          returnFocus: true,
+          customClass: {
+            popup: "scm-cotizacion-dialog scm-cotizacion-response-swal",
+            title: "scm-cotizacion-dialog-title",
+            htmlContainer: "scm-cotizacion-dialog-body",
+            actions: "scm-cotizacion-dialog-actions",
+            confirmButton: "scm-cotizacion-dialog-confirm scm-cotizacion-order-response-confirm is-danger",
+            cancelButton: "scm-cotizacion-dialog-cancel",
+            closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+          },
+          didOpen: function () {
+            var reason = document.getElementById("swal-order-delete-reason");
+            if (reason) reason.focus();
+          },
+          preConfirm: function () {
+            var reason = document.getElementById("swal-order-delete-reason");
+            var text = reason ? reason.value.trim() : "";
+            if (!text) {
+              window.Swal.showValidationMessage("Escribe el motivo de la eliminación.");
+              return false;
+            }
+            var fd = new FormData();
+            fd.append("id_orden", orderId);
+            fd.append("order_version", button.getAttribute("data-order-version") || "");
+            fd.append("motivo", text);
+            return postOrders(fd, actionMaintenanceOrdersDelete).catch(function (err) {
+              window.Swal.showValidationMessage(err.message || "No se pudo eliminar la orden.");
+              return false;
+            });
+          },
+        }).then(function (res) {
+          if (!res.isConfirmed || !res.value) return;
+          showToast("success", res.value.message || "Orden eliminada.");
+          loadOrders();
+        });
+      }
+
+      function quotePickerResults(quotes) {
+        if (!quotes.length) {
+          return '<p class="scm-order-quote-picker-empty">No hay cotizaciones aprobadas con saldo disponible para esta búsqueda.</p>';
+        }
+        return quotes
+          .map(function (quote) {
+            var balances = (quote.balances || [])
+              .map(function (balance) {
+                return "<span>" + escHtml(balance.label) + ": <b>" + escHtml(balance.value) + "</b></span>";
+              })
+              .join("");
+            return (
+              '<button type="button" class="scm-order-quote-picker-item" data-pick-quote="' + escHtml(quote.id) + '" data-ticket-pk="' + escHtml(quote.ticket || "") + '">' +
+              '<span class="scm-order-quote-picker-head"><strong>Cotización #' + escHtml(quote.id) + "</strong><em>Saldo " + escHtml(quote.available) + "</em></span>" +
+              '<span class="scm-order-quote-picker-meta">Caso #' + escHtml(quote.ticket || "-") + " · Contrato #" + escHtml(quote.contrato || "-") + " · Inmueble " + escHtml(quote.inmueble || "-") + "</span>" +
+              '<span class="scm-order-quote-picker-address">' + escHtml(quote.direccion || "Sin dirección") + (quote.destinatario ? " · " + escHtml(quote.destinatario) : "") + "</span>" +
+              '<span class="scm-order-quote-picker-balances">' + balances + "</span>" +
+              "</button>"
+            );
+          })
+          .join("");
+      }
+
+      function openCreateOrder() {
+        if (!actionMaintenanceOrdersQuotes || !window.Swal) {
+          showToast("error", "Actualiza la página para crear órdenes.");
+          return;
+        }
+        var picked = null;
+        var searchTimer = null;
+        var searchSeq = 0;
+        window.Swal.fire({
+          title: "Crear orden de mantenimiento",
+          html:
+            '<div class="scm-order-quote-picker">' +
+            '<p class="scm-cotizacion-dialog-intro">Elige la cotización aprobada que respalda la orden. Solo aparecen cotizaciones con saldo disponible.</p>' +
+            '<label class="scm-cotizacion-dialog-field is-wide"><span>Buscar cotización</span><input type="search" id="swal-order-quote-search" placeholder="Cotización, caso, contrato, inmueble, dirección o destinatario" autocomplete="off"></label>' +
+            '<div class="scm-order-quote-picker-list" id="swal-order-quote-results" aria-live="polite"><p class="scm-order-quote-picker-empty">Cargando cotizaciones...</p></div>' +
+            "</div>",
+          width: "min(760px, 94vw)",
+          showCloseButton: true,
+          showConfirmButton: false,
+          showCancelButton: true,
+          cancelButtonText: "Cancelar",
+          buttonsStyling: false,
+          returnFocus: true,
+          customClass: {
+            popup: "scm-cotizacion-dialog",
+            title: "scm-cotizacion-dialog-title",
+            htmlContainer: "scm-cotizacion-dialog-body",
+            actions: "scm-cotizacion-dialog-actions",
+            cancelButton: "scm-cotizacion-dialog-cancel",
+            closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+          },
+          didOpen: function () {
+            var input = document.getElementById("swal-order-quote-search");
+            var results = document.getElementById("swal-order-quote-results");
+            function search() {
+              var seq = ++searchSeq;
+              var fd = new FormData();
+              fd.append("q", input ? input.value.trim() : "");
+              postOrders(fd, actionMaintenanceOrdersQuotes)
+                .then(function (data) {
+                  if (seq === searchSeq && results) results.innerHTML = quotePickerResults(data.quotes || []);
+                })
+                .catch(function (err) {
+                  if (seq === searchSeq && results) {
+                    results.innerHTML = '<p class="scm-order-quote-picker-empty">' + escHtml(err.message || "No se pudieron cargar las cotizaciones.") + "</p>";
+                  }
+                });
+            }
+            if (input) {
+              input.focus();
+              input.addEventListener("input", function () {
+                window.clearTimeout(searchTimer);
+                searchTimer = window.setTimeout(search, 300);
+              });
+            }
+            if (results) {
+              results.addEventListener("click", function (event) {
+                var item = event.target.closest ? event.target.closest("[data-pick-quote]") : null;
+                if (!item) return;
+                picked = item;
+                window.Swal.close();
+              });
+            }
+            search();
+          },
+          willClose: function () {
+            window.clearTimeout(searchTimer);
+          },
+        }).then(function () {
+          if (!picked) return;
+          var trigger = document.createElement("button");
+          trigger.setAttribute("data-cotizacion-id", picked.getAttribute("data-pick-quote") || "");
+          trigger.setAttribute("data-ticket-pk", picked.getAttribute("data-ticket-pk") || "");
+          openCotizacionOrderFormModal(trigger);
+        });
+      }
+
+      wrap.querySelectorAll("[data-maintenance-orders-tab]").forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          selectTab(tab.getAttribute("data-maintenance-orders-tab") || "pendientes");
+        });
+      });
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        setFormValue("page", "1");
+        loadOrders();
+      });
+
+      wrap.addEventListener("click", function (e) {
+        var target = e.target && e.target.closest ? e.target : null;
+        if (!target) return;
+        if (target.closest("[data-maintenance-orders-clear]")) {
+          e.preventDefault();
+          form.querySelectorAll("input[type='text'], input[type='date']").forEach(function (input) {
+            input.value = "";
+          });
+          form.querySelectorAll("select").forEach(function (select) {
+            select.selectedIndex = 0;
+          });
+          setFormValue("page", "1");
+          loadOrders();
+          return;
+        }
+        var pageBtn = target.closest("[data-maintenance-orders-page]");
+        if (pageBtn && !pageBtn.disabled) {
+          e.preventDefault();
+          setFormValue("page", pageBtn.getAttribute("data-maintenance-orders-page") || "1");
+          loadOrders();
+          return;
+        }
+        if (target.closest("[data-maintenance-orders-create]")) {
+          e.preventDefault();
+          openCreateOrder();
+          return;
+        }
+        var view = target.closest("[data-maintenance-order-view]");
+        if (view) {
+          e.preventDefault();
+          openOrderDetail(view.getAttribute("data-order-id") || "");
+          return;
+        }
+        var pdf = target.closest("[data-maintenance-order-pdf]");
+        if (pdf) {
+          e.preventDefault();
+          downloadCotizacionOrderPdf(pdf.getAttribute("data-order-id") || "", pdf);
+          return;
+        }
+        var respond = target.closest("[data-maintenance-order-respond]");
+        if (respond) {
+          e.preventDefault();
+          openCotizacionOrderResponseModal(respond);
+          return;
+        }
+        var remove = target.closest("[data-maintenance-order-delete]");
+        if (remove) {
+          e.preventDefault();
+          deleteOrder(remove);
+        }
+      });
+
+      if (wrap.closest(".scm-admin-activity-panel.active")) {
+        loadOrders();
+      }
+    }
+
+    initMaintenanceOrdersPanel();
+
     function submitCotizacionAction(formData, action, errorMessage) {
       if (!ajaxUrl || !action) {
         showToast("error", "Accion no disponible.");
@@ -22109,6 +22508,7 @@
         return;
       }
       var originalText = button ? button.textContent : "";
+      var originalHtml = button ? button.innerHTML : "";
       if (button) {
         button.disabled = true;
         button.textContent = "Generando...";
@@ -22162,7 +22562,11 @@
         .finally(function () {
           if (button) {
             button.disabled = false;
-            button.textContent = originalText || "Generar documento para pago";
+            if (originalHtml) {
+              button.innerHTML = originalHtml;
+            } else {
+              button.textContent = originalText || "Generar documento para pago";
+            }
           }
         });
     }
@@ -24402,6 +24806,15 @@
             auditModule.dispatchEvent(new CustomEvent("scm:load-canon-audit"));
           }
           return Promise.resolve();
+        }
+        if (
+          activeAdministrativePanel &&
+          administrativeKey === "ordenes_mantenimiento"
+        ) {
+          return activeAdministrativePanel.getAttribute("data-scm-loaded") === "1" ||
+            typeof reloadMaintenanceOrders !== "function"
+            ? Promise.resolve()
+            : reloadMaintenanceOrders();
         }
         if (
           activeAdministrativePanel &&

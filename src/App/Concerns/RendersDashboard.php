@@ -190,6 +190,10 @@ trait RendersDashboard
       'cotizaciones-mantenimiento' => 'scm-panel-cotizaciones-mantenimiento',
       'cotizaciones' => 'scm-panel-cotizaciones-mantenimiento',
       'scm-panel-cotizaciones-mantenimiento' => 'scm-panel-cotizaciones-mantenimiento',
+      'ordenes_mantenimiento' => 'scm-panel-ordenes-mantenimiento',
+      'ordenes-mantenimiento' => 'scm-panel-ordenes-mantenimiento',
+      'ordenes' => 'scm-panel-ordenes-mantenimiento',
+      'scm-panel-ordenes-mantenimiento' => 'scm-panel-ordenes-mantenimiento',
       'actas_satisfaccion' => 'scm-panel-actas-satisfaccion',
       'actas-satisfaccion' => 'scm-panel-actas-satisfaccion',
       'actas sin firmar' => 'scm-panel-actas-satisfaccion',
@@ -260,6 +264,10 @@ trait RendersDashboard
         'panel' => 'scm-panel-cotizaciones-mantenimiento',
         'label' => $dashboardPermissionTabs['cotizaciones_mantenimiento'] ?? 'Cotizaciones de Mantenimiento',
       ],
+      'ordenes_mantenimiento' => [
+        'panel' => 'scm-panel-ordenes-mantenimiento',
+        'label' => $dashboardPermissionTabs['ordenes_mantenimiento'] ?? 'Órdenes de Mantenimiento',
+      ],
       'actas_satisfaccion' => [
         'panel' => 'scm-panel-actas-satisfaccion',
         'label' => $dashboardPermissionTabs['actas_satisfaccion'] ?? 'Actas de satisfacción',
@@ -315,6 +323,7 @@ trait RendersDashboard
     $canManagePublicPqrSettings = $this->canManagePublicPqrSettings();
     $canManageInternalNotificationSettings = $this->canManageInternalNotificationSettings();
     $cartasAumentoHtml = $this->renderRentIncreaseLettersPanel();
+    $ordenesMantenimientoHtml = in_array('ordenes_mantenimiento', $dashboardAllowedTabs, true) ? $this->renderMaintenanceOrdersPanel() : '';
     $liquidadorServiciosPublicosHtml = $this->renderPublicServicesLiquidatorPanel();
     $allowedAdministrativeActivityTabs = [];
     foreach (array_keys($administrativeActivityTabs) as $activityTabKey) {
@@ -570,6 +579,10 @@ trait RendersDashboard
         'canon_insurance_audit_purge' => self::AJAX_CANON_INSURANCE_AUDIT_PURGE,
         'rent_increase_letters_list' => self::AJAX_RENT_INCREASE_LETTERS_LIST,
         'rent_increase_letters_create' => self::AJAX_RENT_INCREASE_LETTERS_CREATE,
+        'maintenance_orders_list' => self::AJAX_MAINTENANCE_ORDERS_LIST,
+        'maintenance_orders_detail' => self::AJAX_MAINTENANCE_ORDERS_DETAIL,
+        'maintenance_orders_delete' => self::AJAX_MAINTENANCE_ORDERS_DELETE,
+        'maintenance_orders_quotes' => self::AJAX_MAINTENANCE_ORDERS_QUOTES,
         // Guía
         'guide_gcd_read' => self::AJAX_GUIDE_GCD_READ,
         'guide_gcd_save' => self::AJAX_GUIDE_GCD_SAVE,
@@ -1356,6 +1369,12 @@ trait RendersDashboard
             </div>
           <?php endif; ?>
 
+          <?php if (in_array('ordenes_mantenimiento', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'ordenes_mantenimiento' ? ' active' : ''; ?>" id="scm-panel-ordenes-mantenimiento" data-permission-tab="ordenes_mantenimiento" data-admin-activity-panel="ordenes_mantenimiento" data-scm-loaded="0">
+              <?php echo $ordenesMantenimientoHtml; ?>
+            </div>
+          <?php endif; ?>
+
           <?php if (in_array('actas_satisfaccion', $allowedAdministrativeActivityTabs, true)): ?>
             <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'actas_satisfaccion' ? ' active' : ''; ?>" id="scm-panel-actas-satisfaccion" data-permission-tab="actas_satisfaccion" data-admin-activity-panel="actas_satisfaccion" data-scm-loaded="0">
               <?php echo $actasSatisfaccionHtml; ?>
@@ -1767,6 +1786,7 @@ trait RendersDashboard
     $activityPermissionKeys = [
       'gestiones_cobro',
       'cotizaciones_mantenimiento',
+      'ordenes_mantenimiento',
       'actas_satisfaccion',
       'preventivas_pendientes',
       'servicios_publicos_pendientes',

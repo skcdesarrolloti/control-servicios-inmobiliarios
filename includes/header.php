@@ -275,6 +275,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'gestiones_cobro';
   } elseif (in_array($tabParam, ['cotizaciones_mantenimiento', 'cotizaciones', 'scm-panel-cotizaciones-mantenimiento'], true)) {
     $current_page = 'cotizaciones_mantenimiento';
+  } elseif (in_array($tabParam, ['ordenes_mantenimiento', 'ordenes', 'scm-panel-ordenes-mantenimiento'], true)) {
+    $current_page = 'ordenes_mantenimiento';
   } elseif (in_array($tabParam, ['actas_satisfaccion', 'actas', 'scm-panel-actas-satisfaccion'], true)) {
     $current_page = 'actas_satisfaccion';
   } elseif (in_array($tabParam, ['preventivas_pendientes', 'scm-panel-preventivas-pendientes'], true)) {
@@ -443,6 +445,18 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=cotizaciones_mantenimiento',
         'icon' => 'request_quote',
         'perms' => ['cotizaciones_mantenimiento'],
+      ],
+      'ordenes_mantenimiento' => [
+        'key' => 'ordenes_mantenimiento',
+        'label' => 'Órdenes de Mantenimiento',
+        'group' => 'Mantenimiento',
+        'group_icon' => 'build',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-ordenes-mantenimiento',
+        'admin_activity_key' => 'ordenes_mantenimiento',
+        'url' => $baseUrl . '/index.php?tab=ordenes_mantenimiento',
+        'icon' => 'engineering',
+        'perms' => ['ordenes_mantenimiento'],
       ],
       'actas_satisfaccion' => [
         'key' => 'actas_satisfaccion',

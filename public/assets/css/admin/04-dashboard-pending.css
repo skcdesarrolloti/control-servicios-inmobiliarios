@@ -16640,3 +16640,87 @@ body.scm-session-locked {
 }
 
 .scm-field[data-scm-financing-filter][hidden] { display:none !important; }
+
+/* Órdenes de mantenimiento: selector de cotización para crear una orden. */
+.scm-order-quote-picker-list {
+  display: grid;
+  gap: 10px;
+  max-height: min(52vh, 460px);
+  margin-top: 14px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.scm-order-quote-picker-item {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  color: #061d49;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.scm-order-quote-picker-item:hover,
+.scm-order-quote-picker-item:focus-visible {
+  border-color: #f8cf4a;
+  background: #fffdf3;
+  box-shadow: 0 8px 18px rgba(6, 29, 73, 0.08);
+  outline: none;
+}
+
+.scm-order-quote-picker-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.scm-order-quote-picker-head em {
+  padding: 3px 9px;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.scm-order-quote-picker-meta,
+.scm-order-quote-picker-address {
+  color: #5a6a85;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.scm-order-quote-picker-balances {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scm-order-quote-picker-balances span {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 10px;
+}
+
+.scm-order-quote-picker-empty {
+  margin: 0;
+  padding: 22px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  color: #64748b;
+  font-size: 12px;
+  text-align: center;
+}

@@ -169,6 +169,10 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_CANON_INSURANCE_AUDIT_PURGE => 'ajax_handler_canon_insurance_audit_purge',
       SuCasaControlServiciosInmobiliarios::AJAX_RENT_INCREASE_LETTERS_LIST => 'ajax_handler_rent_increase_letters_list',
       SuCasaControlServiciosInmobiliarios::AJAX_RENT_INCREASE_LETTERS_CREATE => 'ajax_handler_rent_increase_letters_create',
+      SuCasaControlServiciosInmobiliarios::AJAX_MAINTENANCE_ORDERS_LIST => 'ajax_handler_maintenance_orders_list',
+      SuCasaControlServiciosInmobiliarios::AJAX_MAINTENANCE_ORDERS_DETAIL => 'ajax_handler_maintenance_orders_detail',
+      SuCasaControlServiciosInmobiliarios::AJAX_MAINTENANCE_ORDERS_DELETE => 'ajax_handler_maintenance_orders_delete',
+      SuCasaControlServiciosInmobiliarios::AJAX_MAINTENANCE_ORDERS_QUOTES => 'ajax_handler_maintenance_orders_quotes',
     ];
 
     $this->guideRoutes = [

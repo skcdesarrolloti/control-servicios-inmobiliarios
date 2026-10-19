@@ -3404,6 +3404,7 @@ trait HandlesMaintenanceActions
   {
     return $this->canUseDashboardAction('quote_order_create') && (
       $this->canAccessDashboardTab('cotizaciones_mantenimiento')
+      || $this->canAccessDashboardTab('ordenes_mantenimiento')
       || $this->canAccessDashboardTab('abiertos')
       || $this->canAccessDashboardTab('postergados')
       || $this->canAccessDashboardTab('mis_tickets')
@@ -3418,6 +3419,7 @@ trait HandlesMaintenanceActions
       || $this->canUseDashboardAction('quote_order_respond')
     ) && (
       $this->canAccessDashboardTab('cotizaciones_mantenimiento')
+      || $this->canAccessDashboardTab('ordenes_mantenimiento')
       || $this->canAccessDashboardTab('abiertos')
       || $this->canAccessDashboardTab('postergados')
       || $this->canAccessDashboardTab('mis_tickets')
@@ -3436,6 +3438,7 @@ trait HandlesMaintenanceActions
       : $this->canManageDashboardPermissions();
     return $allowed && (
       $this->canAccessDashboardTab('cotizaciones_mantenimiento')
+      || $this->canAccessDashboardTab('ordenes_mantenimiento')
       || $this->canAccessDashboardTab('abiertos')
       || $this->canAccessDashboardTab('postergados')
       || $this->canAccessDashboardTab('mis_tickets')

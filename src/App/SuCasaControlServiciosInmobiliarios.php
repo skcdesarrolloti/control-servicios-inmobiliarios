@@ -13,6 +13,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesCorrectiveReviewActions;
   use \SCM\App\Concerns\HandlesPreventiveReviewActions;
   use \SCM\App\Concerns\HandlesMaintenanceActions;
+  use \SCM\App\Concerns\HandlesMaintenanceOrdersPanel;
   use \SCM\App\Concerns\HandlesPublicPqrActions;
   use \SCM\App\Concerns\HandlesPanelCaseCreation;
   use \SCM\App\Concerns\HandlesAdministrativeNotifications;
@@ -158,7 +159,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
-  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change'];
+  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete'];
   const AJAX_DASHBOARD_FILTER_OPTIONS = 'scm_dashboard_filter_options';
   const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';
   const AJAX_CANON_INSURANCE_AUDIT_IMPORT = 'scm_auditoria_canon_aseguradoras_importar';
@@ -172,6 +173,10 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CANON_INSURANCE_AUDIT_PURGE = 'scm_auditoria_canon_aseguradoras_borrar_pruebas';
   const AJAX_RENT_INCREASE_LETTERS_LIST = 'scm_cartas_aumento_arrendamiento_listar';
   const AJAX_RENT_INCREASE_LETTERS_CREATE = 'scm_cartas_aumento_arrendamiento_crear';
+  const AJAX_MAINTENANCE_ORDERS_LIST = 'scm_ordenes_mantenimiento_listar';
+  const AJAX_MAINTENANCE_ORDERS_DETAIL = 'scm_ordenes_mantenimiento_detalle';
+  const AJAX_MAINTENANCE_ORDERS_DELETE = 'scm_ordenes_mantenimiento_eliminar';
+  const AJAX_MAINTENANCE_ORDERS_QUOTES = 'scm_ordenes_mantenimiento_cotizaciones';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';
@@ -306,6 +311,7 @@ final class SuCasaControlServiciosInmobiliarios
       'cerrados' => 'Cerrados',
       'mis_tickets' => 'Mis casos',
       'cotizaciones_mantenimiento' => 'Cotizaciones de Mantenimiento',
+      'ordenes_mantenimiento' => 'Órdenes de Mantenimiento',
       'actas_satisfaccion' => 'Actas de satisfacción',
       'calendario_actividades' => 'Calendario',
       'notificaciones' => 'Notificaciones',
@@ -706,6 +712,7 @@ final class SuCasaControlServiciosInmobiliarios
           'quote_order_view' => 'Ver órdenes de cotización',
           'quote_order_create' => 'Añadir orden de mantenimiento',
           'quote_order_respond' => 'Responder orden de mantenimiento',
+          'quote_order_delete' => 'Eliminar orden de mantenimiento',
           'quote_acta_create' => 'Crear acta de cotización',
         ],
       ],
@@ -911,6 +918,9 @@ final class SuCasaControlServiciosInmobiliarios
           break;
         }
       }
+    }
+    if (isset($selected['cotizaciones_mantenimiento']) && !isset($selected['ordenes_mantenimiento'])) {
+      $selected['ordenes_mantenimiento'] = 'ordenes_mantenimiento';
     }
     if (isset($selected['servicios_publicos_pendientes']) && !isset($selected['liquidador_servicios_publicos'])) {
       $selected['liquidador_servicios_publicos'] = 'liquidador_servicios_publicos';
