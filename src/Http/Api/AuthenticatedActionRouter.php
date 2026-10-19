@@ -177,6 +177,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_LEASE_CONTRACT_SEND => 'ajax_handler_lease_contract_send',
       SuCasaControlServiciosInmobiliarios::AJAX_LEASE_CONTRACT_DESIST => 'ajax_handler_lease_contract_desist',
       SuCasaControlServiciosInmobiliarios::AJAX_LEASE_CONTRACT_CREATE => 'ajax_handler_lease_contract_create',
+      SuCasaControlServiciosInmobiliarios::AJAX_LEASE_CONTRACT_RESEND_ACTS => 'ajax_handler_lease_contract_resend_acts',
     ];
 
     $this->guideRoutes = [

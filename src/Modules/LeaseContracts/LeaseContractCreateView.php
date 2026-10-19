@@ -114,6 +114,35 @@ final class LeaseContractCreateView
     return $html;
   }
 
+  /**
+   * Reenvío del acta de notificación de ingreso y de la carta de presentación a la copropiedad.
+   *
+   * @param array<string,mixed> $c
+   * @param array{notificacion:?array{url:string},administracion:?array{url:string}} $acts
+   */
+  public function renderResendActs(array $c, array $acts): string
+  {
+    $ui = UI::class;
+    $v = static fn(string $key): string => trim((string) ($c[$key] ?? ''));
+    $card = function (string $target, string $title, ?array $act, string $who, string $email, string $phone) use ($ui): string {
+      $contact = implode(' · ', array_filter([$email, $phone]));
+      if ($act === null) {
+        return '<div class="' . self::SECTION . '"><span class="' . $ui::LABEL . '">' . esc_html($title) . '</span><p class="!sp-m-0 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-rose-200 !sp-bg-rose-50 !sp-text-[11px] !sp-text-rose-700">Este contrato no tiene esta acta generada.</p></div>';
+      }
+      return '<div class="' . self::SECTION . ' !sp-space-y-3"><div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2"><span class="' . $ui::LABEL . ' !sp-mb-0">' . esc_html($title) . '</span>'
+        . '<button type="button" class="' . self::SMALL_BUTTON . '" data-scm-open-iframe data-iframe-url="' . esc_attr($act['url']) . '" data-iframe-title="' . esc_attr($title) . '">' . $ui::icon('eye', '!sp-w-3 !sp-h-3') . 'Ver acta</button></div>'
+        . '<p class="!sp-m-0 !sp-text-[11px]"><strong>' . esc_html($who !== '' ? $who : 'Sin nombre') . '</strong><br><span class="!sp-text-service-muted">' . esc_html($contact !== '' ? $contact : 'Sin correo ni celular registrado') . '</span></p>'
+        . '<label class="!sp-flex !sp-items-center !sp-gap-2 !sp-text-[11px] !sp-font-semibold"><input type="checkbox" name="targets[]" value="' . $target . '"' . ($contact !== '' ? ' checked' : ' disabled') . '>Reenviar por correo y WhatsApp</label></div>';
+    };
+    return '<form class="!sp-space-y-4" data-lease-resend-form autocomplete="off" novalidate><input type="hidden" name="contract_id" value="' . esc_attr($v('_ID')) . '">'
+      . '<p class="!sp-m-0 !sp-text-[11px] !sp-text-service-muted">Se reenvía el acta ya generada, con el mismo documento. Los datos de contacto son los del contrato; si cambiaron, actualízalos antes. El reenvío queda en el historial del contrato y del inmueble.</p>'
+      . '<div class="!sp-grid !sp-grid-cols-1 md:!sp-grid-cols-2 !sp-gap-4">'
+      . $card('arrendatario', 'Notificación de ingreso al arrendatario', $acts['notificacion'], $v('arrendatario'), $v('correo_arrendatario'), $v('celular_arrendatario'))
+      . $card('copropiedad', 'Presentación del nuevo inquilino a la copropiedad', $acts['administracion'], trim($v('administrador') . ($v('copropiedad') !== '' ? ' · ' . $v('copropiedad') : ''), ' ·'), $v('correo_copropiedad'), $v('celular_copropiedad'))
+      . '</div><p class="!sp-hidden !sp-m-0 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-rose-200 !sp-bg-rose-50 !sp-text-[11px] !sp-text-rose-700" data-lease-resend-error role="alert"></p>'
+      . '<div class="!sp-flex !sp-flex-wrap !sp-justify-end !sp-gap-2"><button type="button" class="' . $ui::SECONDARY . '" data-lease-modal-close>Cancelar</button><button type="submit" class="' . $ui::PRIMARY . '" data-lease-resend-submit>' . $ui::icon('refresh') . 'Reenviar actas</button></div></form>';
+  }
+
   /** @param array<string,mixed> $result */
   public function renderResult(array $result): string
   {

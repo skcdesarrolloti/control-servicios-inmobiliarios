@@ -42,6 +42,9 @@ trait HandlesLeaseContracts
           ? ['Enviar anexos del contrato', $renderer->renderSendForm($contract, $service->staff(), $service->annexRecords($contract))]
           : throw new \DomainException('No tienes permiso para enviar anexos de contratos.'),
         'crear' => $this->lease_contract_create_view($contract),
+        'actas-copropiedad' => $this->canUseDashboardAction('contract_annexes_send')
+          ? ['Reenviar actas de copropiedad', (new LeaseContractCreateView())->renderResendActs($contract, (new LeaseContractCreationService($this->db))->buildingActs($contract))]
+          : throw new \DomainException('No tienes permiso para reenviar actas de contratos.'),
         'desistir' => $this->canUseDashboardAction('contract_desist')
           ? ['Marcar contrato desistido', $renderer->renderDesistForm($contract, $service->desistReasons())]
           : throw new \DomainException('No tienes permiso para marcar contratos como desistidos.'),
@@ -134,6 +137,23 @@ trait HandlesLeaseContracts
       'message' => 'Contrato #' . $result['contrato'] . ' creado.',
       'html' => (new LeaseContractCreateView())->renderResult($result),
     ]);
+  }
+
+  public function ajax_handler_lease_contract_resend_acts(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('contratos_arrendamiento') || !$this->canUseDashboardAction('contract_annexes_send')) {
+      $this->jsonFail('No tienes permiso para reenviar actas de contratos.');
+    }
+    $contractId = (int) ($_POST['contract_id'] ?? 0);
+    $targets = array_map(static fn($value): string => sanitize_key((string) $value), (array) ($_POST['targets'] ?? []));
+    try {
+      $result = (new LeaseContractCreationService($this->db))->resendBuildingActs($contractId, $targets, $this->lease_contract_sender());
+    } catch (\Throwable $error) {
+      error_log('[lease_contract_resend_acts] #' . $contractId . ': ' . $error->getMessage());
+      $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudieron reenviar las actas.');
+    }
+    $this->jsonOk(['message' => $result['message'] . ' Correos: ' . $result['email'] . ', WhatsApp: ' . $result['whatsapp'] . '.']);
   }
 
   public function ajax_handler_lease_contract_desist(): void

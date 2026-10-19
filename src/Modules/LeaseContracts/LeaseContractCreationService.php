@@ -464,43 +464,10 @@ final class LeaseContractCreationService
     $e = static fn($value): string => EmailTemplate::e((string) $value);
 
     if ($ph) {
-      $tenantHtml = $p('Apreciado(a) <b>' . $e($context['arrendatario']) . '</b>:')
-        . $p('Por medio de la presente le damos la más cordial bienvenida a <b>' . $e($company) . '</b>, donde lo hemos incorporado como <b>ARRENDATARIO</b>. Ya que el inmueble al cual ingresará pertenece a la copropiedad <b>' . $e($context['copropiedad']) . '</b>, hemos realizado el acta de notificación para que la copropiedad esté enterada de su ingreso.')
-        . $p('<b>Nota:</b> el acta también se adjunta a este correo electrónico.')
-        . $p('Le recordamos que tiene acceso al portal de arrendatario usando su <b>número de documento como usuario y contraseña</b>.')
-        . $p('Cordialmente: <b>' . $e($signature) . '</b>.');
-      $subject = 'Te notificamos la bienvenida ' . $context['arrendatario'];
-      $queued['email'] += $email->enqueue($context['correo_arrendatario'], $subject, EmailTemplate::render($subject, $tenantHtml, ['buttons' => [
-        ['url' => $documents['notificacion']['url'], 'label' => 'Ver acta'], ['url' => 'https://sucasainmobiliaria.com.co/arrendatario', 'label' => 'Entrar a mi cuenta'], ['url' => 'https://sucasainmobiliaria.com.co/revista/', 'label' => 'Ver revista'],
-      ]]), [
-        'source_module' => 'contratos_arrendamiento', 'internal_cc' => [], 'destination_name' => $context['arrendatario'], 'dedupe_key' => $dedupe . '_arrendatario',
-        'payload' => ['attachments' => [['path' => $documents['notificacion']['path'], 'name' => $documents['notificacion']['name']]], 'reply_to' => (string) ($context['correo_contractual'] ?? '')],
-        'meta' => ['contract_id' => $contractId, 'recipient_role' => 'arrendatario'],
-      ]);
-      $queued['whatsapp'] += $this->whatsapp($sms, (string) $context['celular_arrendatario'], (string) $context['arrendatario'], self::TEMPLATE_TENANT, $documents['notificacion'], $dedupe . '_wa_arrendatario', $contractId,
-        [$context['arrendatario'], $company, $context['contrato'], $context['direccion'], $context['copropiedad'], $signature]) ? 1 : 0;
-
-      $buildingHtml = $p('Apreciado(a) Sr./Sra. <b>' . $e($context['administrador']) . '</b> de la copropiedad <b>' . $e($context['copropiedad']) . '</b>:')
-        . $p('Me dirijo a usted por medio de la presente para informarle que el inmueble ubicado en <b>' . $e($context['direccion']) . '</b> será ocupado por el nuevo inquilino <b>' . $e($context['arrendatario']) . '</b>, bajo el contrato número <b>#' . $e($context['contrato']) . '</b>.')
-        . $p('Agradecemos de antemano su colaboración para que la experiencia del nuevo inquilino en la copropiedad sea lo más positiva posible.')
-        . $p('<b>Nota:</b> el acta también se adjunta a este correo electrónico.')
-        . $p('Cordialmente: <b>' . $e($signature) . '</b>.');
-      $subject = 'Presentación nuevo inquilino · ' . $context['direccion'];
-      $queued['email'] += $email->enqueue($context['correo_copropiedad'], $subject, EmailTemplate::render($subject, $buildingHtml, ['buttons' => [
-        ['url' => $documents['administracion']['url'], 'label' => 'Ver acta'], ['url' => 'https://sucasainmobiliaria.com.co/revista/', 'label' => 'Ver revista'],
-      ]]), [
-        'source_module' => 'contratos_arrendamiento', 'internal_cc' => [], 'destination_name' => $context['administrador'], 'dedupe_key' => $dedupe . '_copropiedad',
-        'payload' => ['attachments' => [['path' => $documents['administracion']['path'], 'name' => $documents['administracion']['name']]], 'reply_to' => (string) ($context['correo_contractual'] ?? '')],
-        'meta' => ['contract_id' => $contractId, 'recipient_role' => 'copropiedad', 'acta_administracion_id' => $actaId],
-      ]);
-      $building = $this->row('jet_cct_copropiedades', $context['id_copropiedad'] ?? '');
-      $phone = (string) $context['celular_copropiedad'];
-      $indicative = preg_replace('/\D+/', '', (string) ($building['indicativo'] ?? '')) ?? '';
-      if ($indicative !== '' && !str_starts_with($phone, '+')) {
-        $phone = '+' . $indicative . ltrim($phone, '0');
+      foreach ([$this->sendTenantNotice($context, $documents['notificacion'], $dedupe, $contractId), $this->sendBuildingLetter($context, $documents['administracion'], $dedupe, $contractId, $actaId)] as [$mails, $messages]) {
+        $queued['email'] += $mails;
+        $queued['whatsapp'] += $messages;
       }
-      $queued['whatsapp'] += $this->whatsapp($sms, $phone, (string) $context['administrador'], self::TEMPLATE_BUILDING, $documents['administracion'], $dedupe . '_wa_copropiedad', $contractId,
-        [$context['administrador'], $context['copropiedad'], $context['arrendatario'], $context['direccion'], $context['contrato'], $signature]) ? 1 : 0;
     }
 
     $internal = InternalNotificationRecipients::emailsForAction($this->db, self::INTERNAL_ACTION);
@@ -516,6 +483,171 @@ final class LeaseContractCreationService
       ]);
     }
     return $queued;
+  }
+
+  /**
+   * Reenvía el acta de notificación de ingreso y/o la carta de presentación ya generadas.
+   *
+   * @param string[] $targets 'arrendatario' y/o 'copropiedad'
+   * @param array{employee_id:string,name:string,cargo:string,phone:string} $sender
+   * @return array{email:int,whatsapp:int,message:string}
+   */
+  public function resendBuildingActs(int $contractId, array $targets, array $sender): array
+  {
+    $contract = $this->annexes->contract($contractId);
+    $acts = $this->buildingActs($contract);
+    $targets = array_values(array_intersect($targets, ['arrendatario', 'copropiedad']));
+    if ($targets === []) {
+      throw new \DomainException('Selecciona a quién reenviar.');
+    }
+    $context = $this->notifyContext($contract, $sender);
+    $now = time();
+    $dedupe = 'contrato_actas_reenvio_' . $contractId . '_' . $now;
+    $queued = ['email' => 0, 'whatsapp' => 0];
+    $sent = [];
+    foreach ($targets as $target) {
+      $document = $target === 'arrendatario' ? $acts['notificacion'] : $acts['administracion'];
+      if ($document === null) {
+        throw new \DomainException($target === 'arrendatario' ? 'El contrato no tiene acta de notificación de ingreso generada.' : 'El contrato no tiene carta de presentación a la copropiedad generada.');
+      }
+      if ($target === 'arrendatario') {
+        if (!filter_var($context['correo_arrendatario'], FILTER_VALIDATE_EMAIL) && trim($context['celular_arrendatario']) === '') {
+          throw new \DomainException('El arrendatario no tiene correo ni celular registrado.');
+        }
+        [$mails, $messages] = $this->sendTenantNotice($context, $document, $dedupe, $contractId);
+        $sent[] = 'notificación de ingreso al arrendatario';
+      } else {
+        if (!filter_var($context['correo_copropiedad'], FILTER_VALIDATE_EMAIL) && trim($context['celular_copropiedad']) === '') {
+          throw new \DomainException('La copropiedad no tiene correo ni celular registrado.');
+        }
+        [$mails, $messages] = $this->sendBuildingLetter($context, $document, $dedupe, $contractId, 0);
+        $sent[] = 'presentación del nuevo inquilino a la copropiedad';
+      }
+      $queued['email'] += $mails;
+      $queued['whatsapp'] += $messages;
+    }
+    $summary = 'Se reenvió la ' . implode(' y la ', $sent) . ' del contrato #' . (string) ($contract['contrato'] ?? $contractId) . '.';
+    $this->history($contract, ['contrato' => (string) ($contract['contrato'] ?? ''), 'inmueble' => (string) ($contract['inmueble'] ?? '')], $summary, $sender, $now, date('Y-m-d H:i:s', $now), 'Reenvío de actas de copropiedad');
+    return $queued + ['message' => $summary];
+  }
+
+  /**
+   * Actas de copropiedad ya generadas del contrato (las nativas y las que dejó el formulario de WordPress).
+   *
+   * @param array<string,mixed> $contract
+   * @return array{notificacion:?array{url:string,path:string,name:string},administracion:?array{url:string,path:string,name:string}}
+   */
+  public function buildingActs(array $contract): array
+  {
+    $doc = function (string $field, string $name) use ($contract): ?array {
+      $url = trim(html_entity_decode((string) ($contract[$field] ?? ''), ENT_QUOTES, 'UTF-8'));
+      if (!filter_var($url, FILTER_VALIDATE_URL)) {
+        return null;
+      }
+      parse_str((string) (parse_url($url, PHP_URL_QUERY) ?? ''), $query);
+      $path = isset($query['n']) ? (string) (StoredFileService::fromRuntime()->pathFor((string) $query['n']) ?? '') : '';
+      // Actas antiguas de JetForm: viven en wp-content/uploads del WordPress que aloja el panel.
+      $urlPath = rawurldecode((string) (parse_url($url, PHP_URL_PATH) ?? ''));
+      $pos = stripos($urlPath, '/wp-content/uploads/');
+      if ($path === '' && $pos !== false) {
+        foreach (array_unique([dirname((string) SCM_ROOT), dirname((string) SCM_ROOT, 2), trim((string) getenv('SCM_WORDPRESS_ROOT'))]) as $wpRoot) {
+          $candidate = rtrim($wpRoot, '/\\') . substr($urlPath, $pos);
+          if ($wpRoot !== '' && is_file($candidate) && strtolower(pathinfo($candidate, PATHINFO_EXTENSION)) === 'pdf') {
+            $path = $candidate;
+            break;
+          }
+        }
+      }
+      return ['url' => $url, 'path' => $path, 'name' => $name . '-' . preg_replace('/[^A-Za-z0-9]+/', '-', (string) ($contract['contrato'] ?? '')) . '.pdf'];
+    };
+    return [
+      'notificacion' => $doc('acta_notificacion_arrendatario', 'Acta-de-notificacion-de-ingreso'),
+      'administracion' => $doc('acta_administracion', 'Carta-de-presentacion-del-inquilino'),
+    ];
+  }
+
+  /** @param array<string,mixed> $contract @param array<string,string> $sender @return array<string,mixed> */
+  private function notifyContext(array $contract, array $sender): array
+  {
+    $staff = $this->annexes->staff();
+    return array_merge($contract, [
+      'realizado_por' => $sender['name'],
+      'correo_contractual' => $staff['contractual']['correo'] ?? '',
+      'representante_legal' => $staff['legal']['nombre'] ?? '',
+      'celular_legal' => $staff['legal']['celular'] ?? '',
+      'arrendatario' => trim((string) ($contract['arrendatario'] ?? '')),
+      'correo_arrendatario' => strtolower(trim((string) ($contract['correo_arrendatario'] ?? ''))),
+      'celular_arrendatario' => trim((string) ($contract['celular_arrendatario'] ?? '')),
+      'copropiedad' => trim((string) ($contract['copropiedad'] ?? '')),
+      'administrador' => trim((string) ($contract['administrador'] ?? '')),
+      'correo_copropiedad' => strtolower(trim((string) ($contract['correo_copropiedad'] ?? ''))),
+      'celular_copropiedad' => trim((string) ($contract['celular_copropiedad'] ?? '')),
+    ]);
+  }
+
+  private function company(array $context): string
+  {
+    return mb_strtoupper(trim((string) ($this->annexes->branch($context)['nombre'] ?? '')) ?: 'Soluciones Comerciales y Constructivas SAS', 'UTF-8');
+  }
+
+  private function signature(array $context): string
+  {
+    return trim(($context['representante_legal'] ?? '') . (($context['celular_legal'] ?? '') !== '' ? ' | ' . $context['celular_legal'] : '')) . ' - Representante legal';
+  }
+
+  /** @param array<string,mixed> $context @param array{url:string,path:string,name:string} $document @return array{0:int,1:int} */
+  private function sendTenantNotice(array $context, array $document, string $dedupe, int $contractId): array
+  {
+    $p = static fn(string $text): string => '<p style="margin:0 0 14px;line-height:1.65;">' . $text . '</p>';
+    $e = static fn($value): string => EmailTemplate::e((string) $value);
+    $company = $this->company($context);
+    $signature = $this->signature($context);
+    $html = $p('Apreciado(a) <b>' . $e($context['arrendatario']) . '</b>:')
+      . $p('Por medio de la presente le damos la más cordial bienvenida a <b>' . $e($company) . '</b>, donde lo hemos incorporado como <b>ARRENDATARIO</b>. Ya que el inmueble al cual ingresará pertenece a la copropiedad <b>' . $e($context['copropiedad']) . '</b>, hemos realizado el acta de notificación para que la copropiedad esté enterada de su ingreso.')
+      . $p('<b>Nota:</b> el acta también se adjunta a este correo electrónico.')
+      . $p('Le recordamos que tiene acceso al portal de arrendatario usando su <b>número de documento como usuario y contraseña</b>.')
+      . $p('Cordialmente: <b>' . $e($signature) . '</b>.');
+    $subject = 'Te notificamos la bienvenida ' . $context['arrendatario'];
+    $mails = (new EmailQueue($this->db))->enqueue((string) $context['correo_arrendatario'], $subject, EmailTemplate::render($subject, $html, ['buttons' => [
+      ['url' => $document['url'], 'label' => 'Ver acta'], ['url' => 'https://sucasainmobiliaria.com.co/arrendatario', 'label' => 'Entrar a mi cuenta'], ['url' => 'https://sucasainmobiliaria.com.co/revista/', 'label' => 'Ver revista'],
+    ]]), [
+      'source_module' => 'contratos_arrendamiento', 'internal_cc' => [], 'destination_name' => $context['arrendatario'], 'dedupe_key' => $dedupe . '_arrendatario',
+      'payload' => ['attachments' => $document['path'] !== '' ? [['path' => $document['path'], 'name' => $document['name']]] : [], 'reply_to' => (string) ($context['correo_contractual'] ?? '')],
+      'meta' => ['contract_id' => $contractId, 'recipient_role' => 'arrendatario'],
+    ]);
+    $messages = $this->whatsapp(new SmsQueue($this->db), (string) $context['celular_arrendatario'], (string) $context['arrendatario'], self::TEMPLATE_TENANT, $document, $dedupe . '_wa_arrendatario', $contractId,
+      [$context['arrendatario'], $company, $context['contrato'], $context['direccion'], $context['copropiedad'], $signature]) ? 1 : 0;
+    return [$mails, $messages];
+  }
+
+  /** @param array<string,mixed> $context @param array{url:string,path:string,name:string} $document @return array{0:int,1:int} */
+  private function sendBuildingLetter(array $context, array $document, string $dedupe, int $contractId, int $actaId): array
+  {
+    $p = static fn(string $text): string => '<p style="margin:0 0 14px;line-height:1.65;">' . $text . '</p>';
+    $e = static fn($value): string => EmailTemplate::e((string) $value);
+    $signature = $this->signature($context);
+    $html = $p('Apreciado(a) Sr./Sra. <b>' . $e($context['administrador']) . '</b> de la copropiedad <b>' . $e($context['copropiedad']) . '</b>:')
+      . $p('Me dirijo a usted por medio de la presente para informarle que el inmueble ubicado en <b>' . $e($context['direccion']) . '</b> será ocupado por el nuevo inquilino <b>' . $e($context['arrendatario']) . '</b>, bajo el contrato número <b>#' . $e($context['contrato']) . '</b>.')
+      . $p('Agradecemos de antemano su colaboración para que la experiencia del nuevo inquilino en la copropiedad sea lo más positiva posible.')
+      . $p('<b>Nota:</b> el acta también se adjunta a este correo electrónico.')
+      . $p('Cordialmente: <b>' . $e($signature) . '</b>.');
+    $subject = 'Presentación nuevo inquilino · ' . $context['direccion'];
+    $mails = (new EmailQueue($this->db))->enqueue((string) $context['correo_copropiedad'], $subject, EmailTemplate::render($subject, $html, ['buttons' => [
+      ['url' => $document['url'], 'label' => 'Ver acta'], ['url' => 'https://sucasainmobiliaria.com.co/revista/', 'label' => 'Ver revista'],
+    ]]), [
+      'source_module' => 'contratos_arrendamiento', 'internal_cc' => [], 'destination_name' => $context['administrador'], 'dedupe_key' => $dedupe . '_copropiedad',
+      'payload' => ['attachments' => $document['path'] !== '' ? [['path' => $document['path'], 'name' => $document['name']]] : [], 'reply_to' => (string) ($context['correo_contractual'] ?? '')],
+      'meta' => ['contract_id' => $contractId, 'recipient_role' => 'copropiedad', 'acta_administracion_id' => $actaId],
+    ]);
+    $building = $this->row('jet_cct_copropiedades', $context['id_copropiedad'] ?? '');
+    $phone = (string) $context['celular_copropiedad'];
+    $indicative = preg_replace('/\D+/', '', (string) ($building['indicativo'] ?? '')) ?? '';
+    if ($indicative !== '' && $phone !== '' && !str_starts_with($phone, '+')) {
+      $phone = '+' . $indicative . ltrim($phone, '0');
+    }
+    $messages = $this->whatsapp(new SmsQueue($this->db), $phone, (string) $context['administrador'], self::TEMPLATE_BUILDING, $document, $dedupe . '_wa_copropiedad', $contractId,
+      [$context['administrador'], $context['copropiedad'], $context['arrendatario'], $context['direccion'], $context['contrato'], $signature]) ? 1 : 0;
+    return [$mails, $messages];
   }
 
   /** @param array{url:string,name:string} $document @param array<int,mixed> $params */
@@ -563,7 +695,7 @@ final class LeaseContractCreationService
   }
 
   /** @param array<string,mixed> $contract @param array<string,mixed> $data @param array<string,string> $sender */
-  private function history(array $contract, array $data, string $summary, array $sender, int $now, string $nowSql): void
+  private function history(array $contract, array $data, string $summary, array $sender, int $now, string $nowSql, string $type = 'Creación de contrato'): void
   {
     $common = [
       'cct_status' => 'publish', 'cct_author_id' => $sender['employee_id'], 'cct_created' => $nowSql, 'cct_modified' => $nowSql, 'fecha' => $now,
@@ -573,7 +705,7 @@ final class LeaseContractCreationService
     $contractHistory = $this->db->table('jet_cct_historial_contrato_arrendamiento');
     if ($this->schema->tableExists($contractHistory)) {
       $this->db->insert($contractHistory, $this->schema->filterTableData($contractHistory, $common + [
-        'tipo_reporte' => 'Creación de contrato', 'observacion' => $summary, 'inmueble' => $data['inmueble'], 'contrato' => $data['contrato'], 'id_contrato' => (string) ($contract['_ID'] ?? ''),
+        'tipo_reporte' => $type, 'observacion' => $summary, 'inmueble' => $data['inmueble'], 'contrato' => $data['contrato'], 'id_contrato' => (string) ($contract['_ID'] ?? ''),
       ]));
     }
     $propertyHistory = $this->db->table('jet_cct_historial_del_inmueble');

@@ -265,6 +265,7 @@
     var actionLeaseContractSend = actions.lease_contract_send || "";
     var actionLeaseContractDesist = actions.lease_contract_desist || "";
     var actionLeaseContractCreate = actions.lease_contract_create || "";
+    var actionLeaseContractResendActs = actions.lease_contract_resend_acts || "";
     var duePopupConfig = runtime.duePopup || {};
     var dashboardDuePopupShown = {};
     var dashboardDuePopupPromise = null;
@@ -20131,6 +20132,47 @@
       });
 
       wrap.addEventListener("submit", function (event) {
+        var resendForm = event.target && event.target.closest ? event.target.closest("[data-lease-resend-form]") : null;
+        if (resendForm) {
+          event.preventDefault();
+          var resendError = resendForm.querySelector("[data-lease-resend-error]");
+          var resendSubmit = resendForm.querySelector("[data-lease-resend-submit]");
+          var showResendError = function (message) {
+            if (!resendError) return;
+            resendError.textContent = message || "";
+            resendError.classList.toggle("!sp-hidden", !message);
+          };
+          showResendError("");
+          if (!resendForm.querySelector('input[name="targets[]"]:checked')) {
+            showResendError("Selecciona al menos un acta para reenviar.");
+            return;
+          }
+          if (!actionLeaseContractResendActs) {
+            showResendError("Actualiza la página para reenviar las actas.");
+            return;
+          }
+          var resendData = new FormData(resendForm);
+          resendData.set("action", actionLeaseContractResendActs);
+          resendData.set("nonce", nonce);
+          sending = true;
+          if (resendSubmit) resendSubmit.disabled = true;
+          fetch(ajaxUrl, { method: "POST", body: resendData, credentials: "same-origin" })
+            .then(function (response) { return response.json(); })
+            .then(function (json) {
+              if (!json || !json.success) {
+                throw new Error((json && json.data && json.data.message) || "No se pudieron reenviar las actas.");
+              }
+              sending = false;
+              showToast("success", json.data.message || "Actas reenviadas.");
+              closeModal();
+            })
+            .catch(function (err) {
+              sending = false;
+              if (resendSubmit) resendSubmit.disabled = false;
+              showResendError(err.message || "No se pudieron reenviar las actas.");
+            });
+          return;
+        }
         var createForm = event.target && event.target.closest ? event.target.closest("[data-lease-create-form]") : null;
         if (createForm) {
           event.preventDefault();
