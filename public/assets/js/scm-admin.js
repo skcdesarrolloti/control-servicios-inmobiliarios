@@ -2143,6 +2143,99 @@
     }
   }
 
+  function caseExecutorLabel(value) {
+    return String(value || "").trim() || "Sin definir";
+  }
+
+  function refreshCaseExecutorSide(modal, caseBtn) {
+    modal.querySelectorAll("[data-scm-case-executor-value]").forEach(function (el) {
+      el.textContent = caseExecutorLabel(caseBtn.dataset.ejecutado);
+    });
+    modal.querySelectorAll("[data-scm-case-executor-sub]").forEach(function (el) {
+      el.textContent = "Actual: " + caseExecutorLabel(caseBtn.dataset.ejecutado);
+    });
+  }
+
+  // "¿Quién ejecuta?" (campo ejecutado): lo cuentan los KPI; ver docs/ejecutado-caso.md.
+  function openCaseExecutorEditor(modal, root, caseBtn) {
+    var sub = ensureCaseSubmodal(modal);
+    if (!sub || !caseBtn) return;
+    var title = sub.querySelector(".scm-case-submodal-title");
+    var body = sub.querySelector(".scm-case-submodal-body");
+    var ticketPk = caseBtn.dataset.ticketPk || "";
+    if (title) title.textContent = "Editar quién ejecuta";
+    setCaseSubmodalMeta(sub, caseBtn);
+    if (body) body.innerHTML = '<p class="scm-muted">Cargando...</p>';
+    sub.classList.add("open");
+    sub.setAttribute("aria-hidden", "false");
+    if (!body || !ticketPk) return;
+
+    postCaseDataEdit(root, { ticket_pk: ticketPk, op: "load", scope: "executor" })
+      .then(function (data) {
+        var values = data.values || {};
+        var options = data.options || {};
+        if (!("ejecutado" in values)) {
+          body.innerHTML = '<p class="scm-muted">Este caso no tiene el campo "Ejecutado por".</p>';
+          return;
+        }
+        var list = (options.ejecutado || []).slice();
+        var current = values.ejecutado || (options.ejecutado_sugerido || [])[0] || "";
+        if (current && list.indexOf(current) < 0) list.unshift(current);
+        body.innerHTML =
+          '<form data-scm-case-executor-form style="display:flex;flex-direction:column;gap:12px;">' +
+          '<p class="scm-muted">Indica quién ejecuta (y paga) la reparación. Es el dato que cuentan los indicadores "¿Quién ejecuta?". El cambio queda como nota interna.</p>' +
+          '<label class="scm-seg-field"><span>¿Quién ejecuta?</span><select name="ejecutado"><option value="">Sin definir</option>' +
+          list
+            .map(function (value) {
+              return '<option value="' + escHtml(value) + '"' + (value === current ? " selected" : "") + ">" + escHtml(value) + "</option>";
+            })
+            .join("") +
+          "</select>" +
+          (!values.ejecutado && current
+            ? '<small class="scm-muted">Tomado de la última cotización; se guardará en el caso al confirmar.</small>'
+            : "") +
+          "</label>" +
+          '<div style="display:flex;justify-content:flex-end;gap:8px;align-items:center;">' +
+          '<small class="scm-case-data-edit-msg"></small>' +
+          '<button type="button" class="btn btn-outline btn-sm" data-scm-case-executor-cancel>Cancelar</button>' +
+          '<button type="submit" class="btn btn-primary btn-sm">Guardar</button>' +
+          "</div></form>";
+        var form = body.querySelector("[data-scm-case-executor-form]");
+        var msg = body.querySelector(".scm-case-data-edit-msg");
+        body.querySelector("[data-scm-case-executor-cancel]").addEventListener("click", function () {
+          sub.classList.remove("open");
+          sub.setAttribute("aria-hidden", "true");
+        });
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var submitBtn = form.querySelector('button[type="submit"]');
+          if (submitBtn) submitBtn.disabled = true;
+          if (msg) msg.textContent = "Guardando...";
+          postCaseDataEdit(root, { ticket_pk: ticketPk, op: "save", scope: "executor", ejecutado: form.elements.ejecutado.value })
+            .then(function (result) {
+              var saved = result.values || {};
+              caseBtn.dataset.ejecutado = saved.ejecutado || "";
+              refreshCaseExecutorSide(modal, caseBtn);
+              scmNotify("success", result.message || "Quién ejecuta el caso actualizado.", "Caso actualizado");
+              if (result.changes && result.changes.length && root && typeof window.CustomEvent === "function") {
+                root.dispatchEvent(new CustomEvent("scm:case-action-saved", { detail: { ticketPk: ticketPk, fromNode: sub } }));
+              }
+              sub.classList.remove("open");
+              sub.setAttribute("aria-hidden", "true");
+            })
+            .catch(function (err) {
+              if (submitBtn) submitBtn.disabled = false;
+              var text = err && err.message ? err.message : "No se pudo guardar.";
+              if (msg) msg.textContent = text;
+              scmNotify("error", text);
+            });
+        });
+      })
+      .catch(function (err) {
+        body.innerHTML = '<p class="scm-muted">' + escHtml(err && err.message ? err.message : "No se pudo cargar.") + "</p>";
+      });
+  }
+
   function openCaseDataEditor(modal, root, caseBtn) {
     var sub = ensureCaseSubmodal(modal);
     if (!sub || !caseBtn) return;
@@ -2207,25 +2300,6 @@
         if ("departamento" in values) {
           fields += selectHtml("departamento", "Departamento", options.departamento, values.departamento || "");
         }
-        if ("ejecutado" in values) {
-          // Opcional: vacío = sin definir. Si el caso no lo tiene, se propone el de la última cotización.
-          var executorList = (options.ejecutado || []).slice();
-          var executorCurrent = values.ejecutado || (options.ejecutado_sugerido || [])[0] || "";
-          if (executorCurrent && executorList.indexOf(executorCurrent) < 0) executorList.unshift(executorCurrent);
-          fields +=
-            '<label class="scm-seg-field"><span>¿Quién ejecuta?</span><select name="ejecutado">' +
-            '<option value="">Sin definir</option>' +
-            executorList
-              .map(function (value) {
-                return '<option value="' + escHtml(value) + '"' + (value === executorCurrent ? " selected" : "") + ">" + escHtml(value) + "</option>";
-              })
-              .join("") +
-            "</select>" +
-            (!values.ejecutado && executorCurrent
-              ? '<small class="scm-muted">Tomado de la última cotización; se guardará en el caso al confirmar.</small>'
-              : "") +
-            "</label>";
-        }
         body.innerHTML =
           '<form class="scm-case-data-edit-form" data-scm-case-data-form style="display:flex;flex-direction:column;gap:12px;">' +
           '<p class="scm-muted">Los cambios quedan registrados como nota interna del caso.</p>' +
@@ -2265,7 +2339,6 @@
               if (saved.tema_ayuda) caseBtn.dataset.tema = saved.tema_ayuda;
               if (saved.prioridad) caseBtn.dataset.prioridad = saved.prioridad;
               if (saved.departamento) caseBtn.dataset.departamento = saved.departamento;
-              if ("ejecutado" in saved) caseBtn.dataset.ejecutado = saved.ejecutado;
               refreshCaseHeaderData(modal, caseBtn);
               scmNotify(
                 "success",
@@ -2814,10 +2887,7 @@
       "Por inspeccionar",
       "Inspeccionado",
       "Cotizado",
-      "En ejecucion por inmobiliaria",
-      "En ejecucion por propietario",
-      "En ejecucion por arrendatario",
-      "En ejecucion por copropiedad",
+      "En ejecucion",
       "Finalizado",
       "Trasladado",
       "Entregado",
@@ -2834,6 +2904,34 @@
         );
       })
       .join("");
+  }
+
+  // "Ejecutado por" junto a respuesta/seguimiento: el cambio queda como nota interna (docs/ejecutado-caso.md).
+  function renderComposerExecutorField(caseBtn, isPublicPqr) {
+    if (isPublicPqr || !caseBtn) return "";
+    var root = findRootFromNode(caseBtn);
+    var runtime = root ? parseRuntime(root) || {} : {};
+    var allowed = runtime.actionPermissions && runtime.actionPermissions.actions;
+    if (allowed && allowed.case_edit_executor !== true) return "";
+    var options = Array.isArray(runtime.caseExecutorOptions) && runtime.caseExecutorOptions.length
+      ? runtime.caseExecutorOptions
+      : ["Propietario", "Arrendatario", "Copropiedad", "Inmobiliaria", "Externo"];
+    return (
+      '<div class="scm-composer-response-options scm-composer-executor-options" data-scm-composer-executor-wrap>' +
+      '<label class="scm-composer-response-field">' +
+      "<span>Ejecutado por <em>Actual: " +
+      escHtml(String(caseBtn.dataset.ejecutado || "").trim() || "Sin definir") +
+      "</em></span>" +
+      '<select class="scm-select scm-composer-response-select" data-scm-composer-executor>' +
+      '<option value="__keep__">Sin cambio</option>' +
+      options
+        .map(function (value) {
+          return '<option value="' + escHtml(value) + '">' + escHtml(value) + "</option>";
+        })
+        .join("") +
+      '<option value="">Sin definir</option>' +
+      "</select></label></div>"
+    );
   }
 
   function renderComposerResponseOptions(caseBtn, isPublicPqr, statusBucket) {
@@ -4723,7 +4821,7 @@
         '">' +
         renderCaseWorkflowMeta(caseBtn, modal) +
         '<label class="scm-seg-field scm-transfer-field"><span>Estado administrativo</span><select name="estado_administrativo">' +
-        '<option value="__keep__">Sin cambio</option><option value="Nuevo">Nuevo</option><option value="En espera de respuesta">En espera de respuesta</option><option value="Por inspeccionar">Por inspeccionar</option><option value="Inspeccionado">Inspeccionado</option><option value="Cotizado">Cotizado</option><option value="En ejecucion por inmobiliaria">En ejecucion por inmobiliaria</option><option value="En ejecucion por propietario">En ejecucion por propietario</option><option value="En ejecucion por arrendatario">En ejecucion por arrendatario</option><option value="En ejecucion por copropiedad">En ejecucion por copropiedad</option><option value="Finalizado">Finalizado</option><option value="Trasladado">Trasladado</option><option value="Entregado">Entregado</option><option value="Recibido">Recibido</option><option value="Desistido">Desistido</option>' +
+        '<option value="__keep__">Sin cambio</option><option value="Nuevo">Nuevo</option><option value="En espera de respuesta">En espera de respuesta</option><option value="Por inspeccionar">Por inspeccionar</option><option value="Inspeccionado">Inspeccionado</option><option value="Cotizado">Cotizado</option><option value="En ejecucion">En ejecucion</option><option value="Finalizado">Finalizado</option><option value="Trasladado">Trasladado</option><option value="Entregado">Entregado</option><option value="Recibido">Recibido</option><option value="Desistido">Desistido</option>' +
         "</select></label>" +
         '<label class="scm-seg-field scm-transfer-field"><span>Respuesta <em>*</em></span><textarea name="respuesta" rows="7" required placeholder="Escribe la respuesta que se enviara al solicitante..."></textarea></label>' +
         (isPreventiva
@@ -8453,10 +8551,7 @@
         '<option value="Por inspeccionar">Por inspeccionar</option>' +
         '<option value="Inspeccionado">Inspeccionado</option>' +
         '<option value="Cotizado">Cotizado</option>' +
-        '<option value="En ejecucion por inmobiliaria">En ejecucion por inmobiliaria</option>' +
-        '<option value="En ejecucion por propietario">En ejecucion por propietario</option>' +
-        '<option value="En ejecucion por arrendatario">En ejecucion por arrendatario</option>' +
-        '<option value="En ejecucion por copropiedad">En ejecucion por copropiedad</option>' +
+        '<option value="En ejecucion">En ejecucion</option>' +
         '<option value="Finalizado">Finalizado</option>' +
         '<option value="Trasladado">Trasladado</option>' +
         '<option value="Entregado">Entregado</option>' +
@@ -8598,6 +8693,7 @@
     var adminStateSelect = composer.querySelector(
       "[data-scm-composer-admin-state]",
     );
+    var executorSelect = composer.querySelector("[data-scm-composer-executor]");
     var closeTicketCheck = composer.querySelector(
       "[data-scm-composer-close-ticket]",
     );
@@ -9318,6 +9414,7 @@
             adminState = "En espera de respuesta";
           }
           fd.append("estado_administrativo", adminState);
+          if (executorSelect) fd.append("ejecutado", executorSelect.value);
           fd.append(
             "cerrar_ticket",
             closeTicketCheck && closeTicketCheck.checked ? "1" : "0",
@@ -9354,6 +9451,7 @@
           fd.append("observacion", text);
           fd.append("estado_ticket", "__keep__");
           fd.append("estado_administrativo", "__keep__");
+          if (executorSelect) fd.append("ejecutado", executorSelect.value);
           fd.append("estado_cotizacion", "__keep__");
         } else {
           fd.append("action", actions.nota || "scm_ajax_case_note");
@@ -9385,6 +9483,13 @@
               showToast("success", successMsg);
             }
 
+            if (json.data && typeof json.data.ejecutado === "string") {
+              caseBtn.dataset.ejecutado = json.data.ejecutado;
+              refreshCaseExecutorSide(modal, caseBtn);
+              var executorCurrent = composer.querySelector("[data-scm-composer-executor-wrap] em");
+              if (executorCurrent) executorCurrent.textContent = "Actual: " + caseExecutorLabel(json.data.ejecutado);
+            }
+            if (executorSelect) executorSelect.value = "__keep__";
             if (input) input.value = "";
             if (additionalEmailInput) additionalEmailInput.value = "";
             composerFiles = [];
@@ -10053,6 +10158,7 @@
           "</div>" +
           '<div class="scm-case-composer-body">' +
           renderComposerResponseOptions(btn, isPublicPqr, statusBucket) +
+          renderComposerExecutorField(btn, isPublicPqr) +
           '<textarea class="scm-composer-textarea" rows="3" placeholder="Escriba una respuesta o actualización sobre el caso..." data-scm-composer-input></textarea>' +
           '<div class="scm-composer-file-preview" data-scm-composer-preview style="display:none;"></div>' +
           '<div class="scm-composer-docs-list" data-scm-composer-docs style="display:none;"></div>' +
@@ -10381,6 +10487,10 @@
             '<div class="flex items-center justify-between pt-1 border-t border-slate-100"><span class="scm-spec-label text-xs">Magnitud:</span><span data-scm-case-magnitude-badge>' +
             renderMagnitudeBadge(sideMagnitude) +
             "</span></div>";
+          sidebarHtml +=
+            '<div class="flex items-center justify-between pt-1"><span class="scm-spec-label text-xs">Ejecuta:</span><strong class="text-xs" data-scm-case-executor-value>' +
+            escHtml(caseExecutorLabel(btn.dataset.ejecutado)) +
+            "</strong></div>";
           if (isPreventivaCase(btn)) {
             var noAccessSideCount = Math.max(
               0,
@@ -10408,11 +10518,21 @@
               "</button>",
           );
         }
+        if (!isPublicPqr && canUseDashboardAction("case_edit_executor")) {
+          sidebarStateButtons.push(
+            '<button type="button" class="scm-case-work-btn w-full" data-scm-edit-case-executor>' +
+              '<span class="material-symbols-outlined scm-btn-icon">engineering</span>' +
+              '<div class="scm-btn-text"><span class="scm-btn-label">Editar ejecutado</span><span class="scm-btn-sub" data-scm-case-executor-sub>Actual: ' +
+              escHtml(caseExecutorLabel(btn.dataset.ejecutado)) +
+              "</span></div>" +
+              "</button>",
+          );
+        }
         if (!isPublicPqr && canUseDashboardAction("case_edit_data")) {
           sidebarStateButtons.push(
             '<button type="button" class="scm-case-work-btn w-full" data-scm-edit-case-data>' +
               '<span class="material-symbols-outlined scm-btn-icon">edit_note</span>' +
-              '<div class="scm-btn-text"><span class="scm-btn-label">Editar datos del caso</span><span class="scm-btn-sub">Asunto, tema, prioridad, departamento y quién ejecuta</span></div>' +
+              '<div class="scm-btn-text"><span class="scm-btn-label">Editar datos del caso</span><span class="scm-btn-sub">Asunto, tema, prioridad y departamento</span></div>' +
               "</button>",
           );
         }
@@ -10772,6 +10892,14 @@
         .forEach(function (editBtn) {
           editBtn.addEventListener("click", function () {
             openCaseMagnitudeEditor(modal, root, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-edit-case-executor]")
+        .forEach(function (editBtn) {
+          editBtn.addEventListener("click", function () {
+            openCaseExecutorEditor(modal, root, btn);
           });
         });
 

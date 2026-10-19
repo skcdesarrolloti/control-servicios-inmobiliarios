@@ -9,12 +9,10 @@ final class CompletionPolicy
   public const WAITING = 'En espera de firma';
   public const ROLES = ['propietario' => 'Propietario', 'arrendatario' => 'Arrendatario', 'copropiedad' => 'Copropiedad'];
   public const EXECUTORS = ['inmobiliaria' => 'Inmobiliaria'] + self::ROLES;
-  public const EXECUTION_STATES = [
-    'inmobiliaria' => 'En ejecucion por inmobiliaria',
-    'propietario' => 'En ejecucion por propietario',
-    'arrendatario' => 'En ejecucion por arrendatario',
-    'copropiedad' => 'En ejecucion por copropiedad',
-  ];
+  /** Estado administrativo único mientras se ejecuta; quién ejecuta queda en `ejecutado` (docs/ejecutado-caso.md). */
+  public const EXECUTION_STATE = 'En ejecucion';
+  /** Estados anteriores "En ejecucion por …": se conservan para firmar actas creadas antes del cambio. */
+  public const LEGACY_EXECUTION_PREFIX = 'En ejecucion por ';
   public const CONSENT = 'Confirmo que soy la persona designada para firmar, revisé el acta y recibí a satisfacción las soluciones descritas. Acepto firmarla electrónicamente con mi nombre y cerrar este caso.';
   public const DRAWN_CONSENT = 'Confirmo que soy la persona designada, revisé los daños, soluciones y observaciones del acta y los recibo a satisfacción. Acepto firmar electrónicamente con mi trazo, nombre, documento y código de verificación, y autorizar el cierre de este caso.';
   public const TYPED_OTP_CONSENT = 'Confirmo que soy la persona designada, revisé el acta y recibí a satisfacción las soluciones descritas. Acepto firmarla electrónicamente con mi nombre y código de verificación, y cerrar este caso.';
@@ -32,10 +30,10 @@ final class CompletionPolicy
 
   public static function executionState(string $executor): string
   {
-    if (!isset(self::EXECUTION_STATES[$executor])) {
+    if (!isset(self::EXECUTORS[$executor])) {
       throw new \DomainException('Selecciona quién realizó la solución.');
     }
-    return self::EXECUTION_STATES[$executor];
+    return self::EXECUTION_STATE;
   }
 
   /** Numeric strokes only: no uploaded SVG, image URL or executable content. */

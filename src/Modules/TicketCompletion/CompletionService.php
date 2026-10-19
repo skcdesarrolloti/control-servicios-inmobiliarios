@@ -1408,7 +1408,11 @@ final class CompletionService
       // Acts created before execution states were adopted remain signable while
       // their ticket still carries the former waiting value.
       $expectedAdminState = (string) ($payload['pending_admin_state'] ?? CompletionPolicy::WAITING);
-      if ($act['status'] !== 'pending' || (int) $act['active_slot'] !== 1 || ($ticket['estado_administrativo'] ?? '') !== $expectedAdminState || strcasecmp((string) $ticket['estado'], 'Cerrado') === 0) {
+      $currentAdminState = (string) ($ticket['estado_administrativo'] ?? '');
+      // Actas con el estado anterior "En ejecucion por …" siguen siendo firmables tras migrar el caso a "En ejecucion".
+      $adminStateMatches = $currentAdminState === $expectedAdminState
+        || (str_starts_with($expectedAdminState, CompletionPolicy::LEGACY_EXECUTION_PREFIX) && $currentAdminState === CompletionPolicy::EXECUTION_STATE);
+      if ($act['status'] !== 'pending' || (int) $act['active_slot'] !== 1 || !$adminStateMatches || strcasecmp((string) $ticket['estado'], 'Cerrado') === 0) {
         throw new \DomainException('El estado del caso cambió. Contacta a la inmobiliaria antes de firmar.');
       }
       if (!hash_equals((string) $act['payload_hash'], (string) ($input['document_hash'] ?? ''))) {

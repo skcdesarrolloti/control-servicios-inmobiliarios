@@ -606,6 +606,7 @@ final class PendingRepository
       'id_cotizacion_mantenimiento',
       'estado_cotizacion_mantenimiento',
       'magnitud_caso',
+      'ejecutado',
       'perturbacion',
       'justificacion_perturbacion',
       'valor_bonificacion',

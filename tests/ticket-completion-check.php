@@ -55,7 +55,8 @@ $rejects(static fn() => Policy::strokes('[[[0,0],[99999,2]]]'), 'out of bounds s
 $rejects(static fn() => Policy::strokes('<svg onload=alert(1)>'), 'executable drawing data rejected');
 $assert(Policy::phone('300 123 4567') === '+573001234567', 'Colombian phone normalized');
 $assert(Policy::phone('120363@g.us') === '', 'group WhatsApp recipients prohibited for personal signature');
-$assert(Policy::executionState('inmobiliaria') === 'En ejecucion por inmobiliaria', 'executor maps to an allowed administrative execution state');
+$assert(Policy::executionState('inmobiliaria') === 'En ejecucion' && Policy::executionState('copropiedad') === 'En ejecucion', 'every executor moves the case to the single En ejecucion state');
+$rejects(static fn() => Policy::executionState('externo'), 'unknown executor rejected');
 $adminJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/scm-admin.js');
 $assert(str_contains($adminJs, 'data-acta-remove-photo') && str_contains($adminJs, 'form.addEventListener("paste"'), 'act photo UI supports individual removal and pasted clipboard images');
 $assert(!str_contains($adminJs, 'MAX_PHOTOS_PER_DAMAGE') && !str_contains($adminJs, 'MAX_PER_DAMAGE') && !str_contains($adminJs, 'MAX_TOTAL'), 'act and corrective photo UI have no quantity caps');

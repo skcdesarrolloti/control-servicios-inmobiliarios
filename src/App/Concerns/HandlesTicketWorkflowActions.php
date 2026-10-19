@@ -381,6 +381,7 @@ trait HandlesTicketWorkflowActions
       \SCM\Core\App::settings()->set('contract_owner_permissions_configured', true, (int) Auth::employeeId());
       \SCM\Core\App::settings()->set('contract_annexes_permissions_configured', true, (int) Auth::employeeId());
       \SCM\Core\App::settings()->set('contract_lifecycle_permissions_configured', true, (int) Auth::employeeId());
+      \SCM\Core\App::settings()->set('case_executor_permissions_configured', true, (int) Auth::employeeId());
     }
     \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
     \SCM\Core\App::settings()->set('admin_due_popup_cargo_ids', $adminDuePopupCargoIds, Auth::userId());
@@ -549,6 +550,8 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail('La observacion es obligatoria.');
     }
 
+    $executorChange = $this->caseExecutorFromRequest();
+
     $service = $this->get_seguimiento_service();
     if (!($service instanceof \SCM\Modules\ServiciosInmobiliarios\SeguimientoService)) {
       $this->jsonFail('Servicio de seguimiento no disponible.');
@@ -563,9 +566,11 @@ trait HandlesTicketWorkflowActions
     if (($result['ok'] ?? '0') !== '1') {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar seguimiento.'));
     }
+    $executorChanged = $this->applyCaseExecutorChange($ticketPk, $executorChange, 'un seguimiento');
 
     $this->jsonOk([
-      'message' => (string) ($result['message'] ?? 'Seguimiento guardado.'),
+      'message' => (string) ($result['message'] ?? 'Seguimiento guardado.') . ($executorChanged !== '' ? ' ' . $executorChanged . '.' : ''),
+      'ejecutado' => $executorChange,
       'seg_saved' => (string) ($result['seg_saved'] ?? '0'),
       'hist_saved' => (string) ($result['hist_saved'] ?? '0'),
       'cot_rows' => (string) ($result['cot_rows'] ?? '0'),
@@ -821,6 +826,8 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail('No tienes permiso para responder cotizaciones.');
     }
 
+    $executorChange = $this->caseExecutorFromRequest();
+
     $service = $this->get_seguimiento_service();
     try { $additionalEmails = \SCM\Support\AdditionalEmailRecipients::parse($_POST['additional_emails'] ?? ''); }
     catch (\InvalidArgumentException $error) { $this->jsonFail($error->getMessage()); return; }
@@ -830,6 +837,14 @@ trait HandlesTicketWorkflowActions
     $result = $service->saveTicketResponse($ticketPk, $respuesta, $estadoAdministrativo, $cerrarTicket, $notifyRecipients, $imagenes, $documentos, $estadoCotizacion, $observacionCotizacion, $motivoCotizacion, $financiacionCotizacion, $generarActaNoAccesoPreventiva, $targetCotizacionId, $additionalEmails);
     if (($result['ok'] ?? '0') !== '1') {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la respuesta.'));
+    }
+    // Después de guardar: si la respuesta también aprobó una cotización, prevalece lo elegido aquí.
+    $executorChanged = $this->applyCaseExecutorChange($ticketPk, $executorChange, 'una respuesta');
+    if ($executorChanged !== '') {
+      $result['message'] = trim((string) ($result['message'] ?? '') . ' ' . $executorChanged . '.');
+    }
+    if ($executorChange !== null) {
+      $result['ejecutado'] = $executorChange;
     }
     $this->jsonOk($result);
   }
@@ -2701,6 +2716,7 @@ trait HandlesTicketWorkflowActions
       'admin' => $this->adminDueFirstText([$ticket], ['estado_administrativo']) ?: '-',
       'prioridad' => $this->adminDueFirstText([$ticket], ['prioridad']) ?: '-',
       'magnitud_caso' => $this->adminDueFirstText([$ticket], ['magnitud_caso']) ?: '-',
+      'ejecutado' => $this->adminDueFirstText([$ticket], ['ejecutado']),
       'departamento' => $this->adminDueFirstText([$ticket], ['departamento']) ?: '-',
       'tema' => $this->adminDueFirstText([$ticket], ['tema_ayuda']) ?: '-',
       'contrato' => $this->adminDueHashLabel($this->adminDueFirstText([$ticket], ['contrato', 'id_contrato'])),
@@ -2925,6 +2941,7 @@ trait HandlesTicketWorkflowActions
       'admin' => $this->adminDueFirstText([$ticketRow, $row], ['estado_administrativo', 'estado_administrativo_ticket']) ?: '-',
       'prioridad' => $this->adminDueFirstText([$ticketRow, $row], ['prioridad']) ?: '-',
       'magnitud_caso' => $this->adminDueFirstText([$ticketRow, $row], ['magnitud_caso']) ?: '-',
+      'ejecutado' => $this->adminDueFirstText([$ticketRow], ['ejecutado']),
       'departamento' => $this->adminDueFirstText([$ticketRow, $row], ['departamento']) ?: '-',
       'tema' => $this->adminDueFirstText([$ticketRow, $row], ['tema_ayuda', 'tema']) ?: '-',
       'contrato' => $contrato !== '' ? $this->adminDueHashLabel($contrato) : '-',
@@ -2990,6 +3007,7 @@ trait HandlesTicketWorkflowActions
       'admin' => $this->adminDueFirstText([$ticket], ['estado_administrativo']) ?: '-',
       'prioridad' => $this->adminDueFirstText([$ticket, $row], ['prioridad']) ?: '-',
       'magnitud_caso' => $this->adminDueFirstText([$ticket, $row], ['magnitud_caso']) ?: '-',
+      'ejecutado' => $this->adminDueFirstText([$ticket], ['ejecutado']),
       'departamento' => $this->adminDueFirstText([$ticket, $row], ['departamento']) ?: '-',
       'tema' => $this->adminDueFirstText([$ticket, $row], ['tema_ayuda', 'tema']) ?: '-',
       'contrato' => $contrato !== '' ? $this->adminDueHashLabel($contrato) : '-',

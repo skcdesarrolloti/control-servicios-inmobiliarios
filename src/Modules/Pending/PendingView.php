@@ -654,6 +654,7 @@ final class PendingView
       . ' data-admin="' . esc_attr($estadoAdmin !== '' ? $estadoAdmin : '-') . '"'
       . ' data-prioridad="' . esc_attr(trim((string) ($ticket['prioridad'] ?? '')) ?: '-') . '"'
       . ' data-magnitud-caso="' . esc_attr(trim((string) ($ticket['magnitud_caso'] ?? '')) ?: '-') . '"'
+      . ' data-ejecutado="' . esc_attr(trim((string) ($ticket['ejecutado'] ?? ''))) . '"'
       . ' data-perturbacion="' . esc_attr((string) ($ticket['perturbacion'] ?? '')) . '"'
       . ' data-justificacion-perturbacion="' . esc_attr((string) ($ticket['justificacion_perturbacion'] ?? '')) . '"'
       . ' data-valor-bonificacion="' . esc_attr((string) ($ticket['valor_bonificacion'] ?? '')) . '"'

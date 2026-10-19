@@ -302,6 +302,7 @@ trait TableRowsConcern
         . ' data-admin="' . esc_attr($estadoAdmin !== '' ? $estadoAdmin : '-') . '"'
         . ' data-prioridad="' . esc_attr($prioridad !== '' ? $prioridad : '-') . '"'
         . ' data-magnitud-caso="' . esc_attr($magnitudCaso !== '' ? ucfirst($magnitudCaso) : '-') . '"'
+        . ' data-ejecutado="' . esc_attr(trim((string) ($row['ejecutado'] ?? ''))) . '"'
         . ' data-perturbacion="' . esc_attr($perturbacionRaw) . '"'
         . ' data-justificacion-perturbacion="' . esc_attr($justificacionPerturbacionRaw) . '"'
         . ' data-valor-bonificacion="' . esc_attr($valorBonificacionRaw) . '"'

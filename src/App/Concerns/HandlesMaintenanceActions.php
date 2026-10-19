@@ -4020,7 +4020,8 @@ trait HandlesMaintenanceActions
       return;
     }
     $update = [
-      'estado_administrativo' => 'En ejecucion por inmobiliaria',
+      // Quién ejecuta se registra en `ejecutado`; el estado administrativo ya no lo codifica.
+      'estado_administrativo' => \SCM\Modules\TicketCompletion\CompletionPolicy::EXECUTION_STATE,
       'fecha_actualizacion' => $now,
       'cct_modified' => $nowMysql,
     ];
@@ -4788,6 +4789,66 @@ trait HandlesMaintenanceActions
     return array_values(array_unique(array_map(static fn(array $option): string => (string) $option['value'], $options)));
   }
 
+  /**
+   * "Ejecutado por" enviado junto a una respuesta o seguimiento: null = sin cambio, '' = Sin definir.
+   * Valida permiso y valor antes de guardar la respuesta para no dejarla a medias.
+   */
+  private function caseExecutorFromRequest(): ?string
+  {
+    $raw = trim(sanitize_text_field(wp_unslash((string) ($_POST['ejecutado'] ?? '__keep__'))));
+    if ($raw === '__keep__') {
+      return null;
+    }
+    if (!$this->canUseDashboardAction('case_edit_executor')) {
+      $this->jsonFail('No tienes permiso para cambiar quién ejecuta el caso.');
+    }
+    if ($raw !== '' && !in_array($raw, $this->caseExecutorOptions(), true)) {
+      $this->jsonFail('Ejecutado por no válido.');
+    }
+    return $raw;
+  }
+
+  /** Aplica el cambio de "Ejecutado por" y deja nota interna; devuelve el texto del cambio o '' si no cambió. */
+  private function applyCaseExecutorChange(int $ticketPk, ?string $value, string $origin): string
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    if ($value === null || $ticketPk <= 0 || !$this->column_exists($table, 'ejecutado')) {
+      return '';
+    }
+    $before = trim((string) ($this->db->getVar("SELECT `ejecutado` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]) ?? ''));
+    if ($before === $value) {
+      return '';
+    }
+    $now = time();
+    $nowSql = date('Y-m-d H:i:s', $now);
+    $update = ['ejecutado' => $value];
+    if ($this->column_exists($table, 'cct_modified')) {
+      $update['cct_modified'] = $nowSql;
+    }
+    $this->db->update($table, $update, ['_ID' => $ticketPk]);
+    $change = 'Ejecutado por: "' . ($before !== '' ? $before : 'Sin definir') . '" → "' . ($value !== '' ? $value : 'Sin definir') . '"';
+    $notesTable = $this->db->table('jet_cct_notas_ticket');
+    if ($this->table_exists($notesTable)) {
+      $actor = $this->ticketCompletionActor();
+      $actorEmployeeId = trim((string) ($actor['employee_id'] ?? ''));
+      $note = array_filter([
+        'cct_status' => 'publish',
+        'id_ticket' => $ticketPk,
+        'id_empleado' => $actorEmployeeId,
+        'cct_author_id' => $actorEmployeeId,
+        'fecha' => $now,
+        'nombre' => (string) ($actor['name'] ?? Auth::user()),
+        'observacion' => 'Quién ejecuta el caso actualizado desde ' . $origin . ":\n" . $change,
+        'cct_created' => $nowSql,
+        'cct_modified' => $nowSql,
+      ], fn($column) => $this->column_exists($notesTable, (string) $column), ARRAY_FILTER_USE_KEY);
+      if ($note !== []) {
+        $this->db->insert($notesTable, $note);
+      }
+    }
+    return $change;
+  }
+
   private function caseLatestQuoteExecutor(int $ticketPk): string
   {
     $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
@@ -4803,8 +4864,10 @@ trait HandlesMaintenanceActions
   public function ajax_handler_edit_case_data(): void
   {
     $this->verifyCsrf();
-    if (!$this->canUseDashboardAction('case_edit_data')) {
-      $this->jsonFail('No tienes permiso para editar los datos del caso.');
+    // "Editar ejecutado" usa este mismo endpoint con scope=executor y su propio permiso.
+    $executorScope = (string) ($_POST['scope'] ?? '') === 'executor';
+    if (!$this->canUseDashboardAction($executorScope ? 'case_edit_executor' : 'case_edit_data')) {
+      $this->jsonFail($executorScope ? 'No tienes permiso para editar quién ejecuta el caso.' : 'No tienes permiso para editar los datos del caso.');
     }
 
     $ticketPk = (int) ($_POST['ticket_pk'] ?? 0);
@@ -4817,8 +4880,10 @@ trait HandlesMaintenanceActions
       $this->jsonFail('Caso no encontrado.');
     }
 
-    $options = $this->caseDataEditOptions($table);
-    $fields = ['asunto' => 'Asunto', 'tema_ayuda' => 'Tema', 'prioridad' => 'Prioridad', 'departamento' => 'Departamento', 'ejecutado' => 'Ejecutado por'];
+    $options = $executorScope ? [] : $this->caseDataEditOptions($table);
+    $fields = $executorScope
+      ? ['ejecutado' => 'Ejecutado por']
+      : ['asunto' => 'Asunto', 'tema_ayuda' => 'Tema', 'prioridad' => 'Prioridad', 'departamento' => 'Departamento'];
     $current = [];
     foreach ($fields as $column => $_label) {
       if ($this->column_exists($table, $column)) {
@@ -4889,7 +4954,7 @@ trait HandlesMaintenanceActions
         'cct_author_id' => $actorEmployeeId,
         'fecha' => $now,
         'nombre' => (string) ($actor['name'] ?? Auth::user()),
-        'observacion' => "Datos del caso editados:\n" . implode("\n", $changes),
+        'observacion' => ($executorScope ? "Quién ejecuta el caso actualizado:\n" : "Datos del caso editados:\n") . implode("\n", $changes),
         'cct_created' => $nowSql,
         'cct_modified' => $nowSql,
       ];
@@ -4900,7 +4965,7 @@ trait HandlesMaintenanceActions
     }
 
     $this->jsonOk([
-      'message' => 'Datos del caso actualizados.',
+      'message' => $executorScope ? 'Quién ejecuta el caso actualizado.' : 'Datos del caso actualizados.',
       'ticket_pk' => (string) $ticketPk,
       'values' => array_merge($current, $update),
       'changes' => $changes,

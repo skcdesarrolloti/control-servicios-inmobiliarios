@@ -714,6 +714,7 @@ final class SuCasaControlServiciosInmobiliarios
           'case_close' => 'Cerrar caso',
           'case_edit_magnitude' => 'Editar magnitud del caso',
           'case_edit_data' => 'Editar datos del caso (asunto, tema, prioridad, departamento)',
+          'case_edit_executor' => 'Editar quién ejecuta el caso (Ejecutado por)',
           'case_completion_act' => 'Acta de solución y firma',
           'corrective_review_manage' => 'Gestionar revisión correctiva (casos de mantenimiento)',
           'preventive_review_manage' => 'Gestionar revisión preventiva (casos preventivos)',
@@ -789,6 +790,14 @@ final class SuCasaControlServiciosInmobiliarios
     if (!\SCM\Core\App::settings()->get('contract_lifecycle_permissions_configured', false)) {
       foreach ($permissions as $cargo => $actions) {
         $permissions[$cargo] = array_values(array_unique(array_merge($actions, ['contract_desist', 'contract_create'])));
+      }
+    }
+    // "Editar ejecutado" se separó de "Editar datos del caso": hasta guardar permisos lo hereda de ese permiso.
+    if (!\SCM\Core\App::settings()->get('case_executor_permissions_configured', false)) {
+      foreach ($permissions as $cargo => $actions) {
+        if (in_array('case_edit_data', $actions, true) && !in_array('case_edit_executor', $actions, true)) {
+          $permissions[$cargo][] = 'case_edit_executor';
+        }
       }
     }
     // Cambiar el responsable de un contrato es sensible: hasta que se configure, solo los cargos administradores.

@@ -490,28 +490,10 @@ final class GuideModalView
         'contenido' => '<strong>Definición:</strong> Valoración económica (mano de obra, materiales, etc.).<br><br><strong>Política:</strong> Discriminar actividades detalladamente y anexar cotizaciones de proveedores.',
       ],
       [
-        'titulo'    => 'En ejecución por inmobiliaria',
+        'titulo'    => 'En ejecución',
         'icono'     => 'construction',
         'color'     => 'scm-gc-orange',
-        'contenido' => '<strong>Definición:</strong> La inmobiliaria gestiona directamente la reparación o actividad pendiente.<br><br><strong>Política:</strong> Registrar seguimientos con fotos, avances, proveedor asignado y fecha estimada de cierre.',
-      ],
-      [
-        'titulo'    => 'En ejecución por propietario',
-        'icono'     => 'person',
-        'color'     => 'scm-gc-blue',
-        'contenido' => '<strong>Definición:</strong> El propietario asumió la ejecución de la reparación o actividad pendiente.<br><br><strong>Política:</strong> Hacer seguimiento al propietario, solicitar soportes/fotos y validar terminación antes del acta de satisfacción.',
-      ],
-      [
-        'titulo'    => 'En ejecución por arrendatario',
-        'icono'     => 'how_to_reg',
-        'color'     => 'scm-gc-indigo',
-        'contenido' => '<strong>Definición:</strong> El arrendatario asumió la ejecución de la reparación o actividad pendiente.<br><br><strong>Política:</strong> Dejar evidencia de autorización, responsable, soportes y validación final para evitar reprocesos.',
-      ],
-      [
-        'titulo'    => 'En ejecución por copropiedad',
-        'icono'     => 'apartment',
-        'color'     => 'scm-gc-teal',
-        'contenido' => '<strong>Definición:</strong> La solución depende de la copropiedad, administración del edificio o zona común.<br><br><strong>Política:</strong> Registrar radicados, contactos, respuestas de administración y fechas de seguimiento hasta cierre.',
+        'contenido' => '<strong>Definición:</strong> La reparación o actividad pendiente está en curso. Quién la ejecuta (inmobiliaria, propietario, arrendatario, copropiedad o externo) se registra con el botón <strong>Editar ejecutado</strong> del caso, no en el estado.<br><br><strong>Política:</strong> Registrar seguimientos con fotos, avances y fecha estimada de cierre, y mantener actualizado <strong>Ejecutado por</strong>, que alimenta los indicadores “¿Quién ejecuta?”.',
       ],
       [
         'titulo'    => 'Finalizado',

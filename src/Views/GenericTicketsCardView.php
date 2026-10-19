@@ -405,6 +405,7 @@ final class GenericTicketsCardView
     $dataAttrs .= ' data-admin="' . esc_attr($estadoAdmRaw !== '' ? $estadoAdmRaw : '-') . '"';
     $dataAttrs .= ' data-prioridad="' . esc_attr($prioridadRaw !== '' ? $prioridadRaw : '-') . '"';
     $dataAttrs .= ' data-magnitud-caso="' . esc_attr($magnitudCasoRaw !== '' ? ucfirst($magnitudCasoRaw) : '-') . '"';
+    $dataAttrs .= ' data-ejecutado="' . esc_attr(trim((string) ($row['ejecutado'] ?? ''))) . '"';
     $dataAttrs .= ' data-perturbacion="' . esc_attr($perturbacionRaw) . '"';
     $dataAttrs .= ' data-justificacion-perturbacion="' . esc_attr($justificacionPerturbacionRaw) . '"';
     $dataAttrs .= ' data-valor-bonificacion="' . esc_attr($valorBonificacionRaw) . '"';

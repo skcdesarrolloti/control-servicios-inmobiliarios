@@ -70,3 +70,37 @@ $result=$generic->run_query_generic(['Reparaciones necesarias'],$generic->parse_
 $assert(!isset($result['stats']['ejecuta_propietario']),'tabs without quotes skip executor counts');
 $html=\SCM\Support\CaseFilterFields::executor('scmpv_',['fEjecutado'=>'copropiedad']);
 $assert(str_contains($html,'name="scmpv_ejecutado"') && str_contains($html,'value="copropiedad" selected'),'executor filter field keeps the selected value');
+// "Ejecutado por" desde respuesta/seguimiento: valida antes de guardar y deja nota interna.
+$pdo->exec('CREATE TABLE wp_jet_cct_notas_ticket (_ID INTEGER PRIMARY KEY AUTOINCREMENT, id_ticket TEXT, id_empleado TEXT, cct_author_id TEXT, nombre TEXT, observacion TEXT, fecha TEXT)');
+$actions = new class($db, true) {
+  use \SCM\App\Concerns\HandlesMaintenanceActions;
+  public function __construct(private \SCM\Core\Database $db, private bool $allowed) {}
+  private function canUseDashboardAction(string $action): bool { return $this->allowed && $action === 'case_edit_executor'; }
+  private function jsonFail(string $message): never { throw new \RuntimeException($message); }
+  private function table_exists($t): bool { return in_array($t, ['wp_jet_cct_tickets', 'wp_jet_cct_notas_ticket'], true); }
+  private function column_exists($t, $c): bool { return $t === 'wp_jet_cct_notas_ticket' ? $c !== 'cct_status' && $c !== 'cct_created' && $c !== 'cct_modified' : in_array($c, ['_ID', 'ejecutado'], true); }
+  private function ticketCompletionActor(): array { return ['employee_id' => '77', 'name' => 'Ana Funcionaria']; }
+  public function fromRequest(): ?string { return $this->caseExecutorFromRequest(); }
+  public function apply(int $id, ?string $value, string $origin): string { return $this->applyCaseExecutorChange($id, $value, $origin); }
+};
+$_POST = [];
+$assert($actions->fromRequest() === null, 'composer without executor keeps the case value');
+$_POST = ['ejecutado' => 'Hacker'];
+try { $actions->fromRequest(); throw new \LogicException('invalid executor accepted'); }
+catch (\RuntimeException $error) { $assert(str_contains($error->getMessage(), 'no válido'), 'composer rejects executors outside the glossary'); }
+$_POST = ['ejecutado' => 'Copropiedad'];
+$value = $actions->fromRequest();
+$change = $actions->apply(5, $value, 'un seguimiento');
+$note = $db->getRow('SELECT * FROM wp_jet_cct_notas_ticket ORDER BY _ID DESC LIMIT 1');
+$assert($db->getVar('SELECT ejecutado FROM wp_jet_cct_tickets WHERE _ID = 5') === 'Copropiedad' && str_contains($change, '"Sin definir" → "Copropiedad"'), 'followup executor change updates the case');
+$assert($note['cct_author_id'] === '77' && str_contains($note['observacion'], 'desde un seguimiento'), 'executor change leaves an internal note by the real employee');
+$assert($actions->apply(5, 'Copropiedad', 'una respuesta') === '' && (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_notas_ticket') === 1, 'unchanged executor adds no duplicate note');
+$denied = new class($db, false) {
+  use \SCM\App\Concerns\HandlesMaintenanceActions;
+  public function __construct(private \SCM\Core\Database $db, private bool $allowed) {}
+  private function canUseDashboardAction(string $action): bool { return false; }
+  private function jsonFail(string $message): never { throw new \RuntimeException($message); }
+  public function fromRequest(): ?string { return $this->caseExecutorFromRequest(); }
+};
+try { $denied->fromRequest(); throw new \LogicException('executor change without permission accepted'); }
+catch (\RuntimeException $error) { $assert(str_contains($error->getMessage(), 'permiso'), 'executor change requires case_edit_executor'); }

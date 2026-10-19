@@ -82,7 +82,7 @@ final class CompletionView
       : '';
     ob_start(); ?>
     <section class="scm-acta">
-      <p class="scm-acta-notice">Documenta la solución y elige el firmante. El caso conservará el <strong>estado de ejecución seleccionado</strong> mientras el acta queda pendiente. Puedes hacer seguimiento desde <strong>Actividades administrativas → Actas de satisfacción</strong>. Solo la firma registrará el cierre; no se creará reporte administrativo nuevo desde esta acta.</p>
+      <p class="scm-acta-notice">Documenta la solución y elige el firmante. El caso quedará en <strong>En ejecución</strong> mientras el acta está pendiente, y quién realizó la solución se guarda en <strong>Ejecutado por</strong>. Puedes hacer seguimiento desde <strong>Actividades administrativas → Actas de satisfacción</strong>. Solo la firma registrará el cierre; no se creará reporte administrativo nuevo desde esta acta.</p>
       <?php if ($sourceNotice !== ''): ?><p class="scm-acta-notice"><?= self::e($sourceNotice) ?></p><?php endif; ?>
       <?php if ($editAct): ?><p class="scm-acta-notice">Estás editando el acta #<?= self::e($editAct['id']) ?>. Al guardar <?= $editAct['status'] === 'signed' ? 'quedará sin firmar y el caso volverá a estar en proceso. La versión firmada anterior se conservará en el historial. Se invalidan la firma, enlaces y códigos anteriores y se solicita una nueva firma.' : 'se invalidan los códigos anteriores y se envía una nueva invitación.' ?></p><?php endif; ?>
       <div class="scm-acta-meta"><span>Caso <strong>#<?= self::e($ticket['id_ticket'] ?: $ticket['_ID']) ?></strong></span><span>Contrato <strong><?= self::e($ticket['contrato'] ?? '—') ?></strong> · Inmueble SIMI <strong><?= self::e($ticket['inmueble'] ?? '—') ?></strong></span></div>

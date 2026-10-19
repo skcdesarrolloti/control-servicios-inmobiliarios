@@ -614,6 +614,7 @@ trait RendersDashboard
         'employeeCargoIds' => $dashboardFuncionarioCargoIds,
         'adminDuePopupCargoIds' => $adminDuePopupCargoIds,
       ],
+      'caseExecutorOptions' => $this->caseExecutorOptions(),
       'actionPermissions' => [
         'actions' => array_fill_keys($dashboardAllowedActions, true),
         'maintenanceQuoteManage' => (

@@ -612,6 +612,7 @@
         admin: "admin",
         prioridad: "prioridad",
         magnitud_caso: "magnitud-caso",
+        ejecutado: "ejecutado",
         perturbacion: "perturbacion",
         justificacion_perturbacion: "justificacion-perturbacion",
         valor_bonificacion: "valor-bonificacion",
@@ -2534,6 +2535,7 @@
           admin: "admin",
           prioridad: "prioridad",
           magnitud_caso: "magnitud-caso",
+          ejecutado: "ejecutado",
           perturbacion: "perturbacion",
           justificacion_perturbacion: "justificacion-perturbacion",
           valor_bonificacion: "valor-bonificacion",
@@ -4045,10 +4047,7 @@
           "Por inspeccionar",
           "Inspeccionado",
           "Cotizado",
-          "En ejecucion por inmobiliaria",
-          "En ejecucion por propietario",
-          "En ejecucion por arrendatario",
-          "En ejecucion por copropiedad",
+          "En ejecucion",
         ].map(function (value) {
           return '<option value="' + escHtml(value) + '">' + escHtml(value) + "</option>";
         }).join("");

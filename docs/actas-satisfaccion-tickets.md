@@ -73,8 +73,8 @@ Se normalizan números colombianos a `+57`; no se aceptan destinos de grupos.
 La aprobación de la plantilla y la entrega real deben comprobarse en Meta y en
 la cola del entorno desplegado; las pruebas automatizadas usan proveedores inertes.
 
-Generar el acta deja `estado = En proceso` y conserva uno de los estados
-`En ejecucion por inmobiliaria/propietario/arrendatario/copropiedad`, según quién
+Generar el acta deja `estado = En proceso`, el estado administrativo
+`En ejecucion` y guarda en `ejecutado` quién
 realizó la solución. Se guarda una copia inmutable de
 los datos en `wp_scm_ticket_completion_acts` (prefijo configurable), y se encola
 la invitación en **shared-notifications**. Una falla de la cola conserva el acta
