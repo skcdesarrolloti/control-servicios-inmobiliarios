@@ -380,6 +380,7 @@ trait HandlesTicketWorkflowActions
       \SCM\Core\App::settings()->set('preventive_review_permissions_configured', true, (int) Auth::employeeId());
       \SCM\Core\App::settings()->set('contract_owner_permissions_configured', true, (int) Auth::employeeId());
       \SCM\Core\App::settings()->set('contract_annexes_permissions_configured', true, (int) Auth::employeeId());
+      \SCM\Core\App::settings()->set('contract_lifecycle_permissions_configured', true, (int) Auth::employeeId());
     }
     \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
     \SCM\Core\App::settings()->set('admin_due_popup_cargo_ids', $adminDuePopupCargoIds, Auth::userId());

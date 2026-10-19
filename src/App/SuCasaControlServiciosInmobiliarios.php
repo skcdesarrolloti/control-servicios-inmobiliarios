@@ -781,7 +781,13 @@ final class SuCasaControlServiciosInmobiliarios
     // El envío de anexos reemplaza el formulario de WordPress: hasta guardar permisos lo conservan todos los cargos.
     if (!\SCM\Core\App::settings()->get('contract_annexes_permissions_configured', false)) {
       foreach ($permissions as $cargo => $actions) {
-        $permissions[$cargo] = array_values(array_unique(array_merge($actions, ['contract_annexes_send', 'contract_desist', 'contract_create'])));
+        $permissions[$cargo] = array_values(array_unique(array_merge($actions, ['contract_annexes_send'])));
+      }
+    }
+    // Desistir y crear contratos llegaron después; los conservan todos los cargos hasta que se guarden con estas opciones.
+    if (!\SCM\Core\App::settings()->get('contract_lifecycle_permissions_configured', false)) {
+      foreach ($permissions as $cargo => $actions) {
+        $permissions[$cargo] = array_values(array_unique(array_merge($actions, ['contract_desist', 'contract_create'])));
       }
     }
     // Cambiar el responsable de un contrato es sensible: hasta que se configure, solo los cargos administradores.

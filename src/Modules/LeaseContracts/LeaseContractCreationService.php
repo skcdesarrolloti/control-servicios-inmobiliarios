@@ -505,10 +505,14 @@ final class LeaseContractCreationService
     $dedupe = 'contrato_actas_reenvio_' . $contractId . '_' . $now;
     $queued = ['email' => 0, 'whatsapp' => 0];
     $sent = [];
+    $generated = [];
     foreach ($targets as $target) {
-      $document = $target === 'arrendatario' ? $acts['notificacion'] : $acts['administracion'];
+      $key = $target === 'arrendatario' ? 'notificacion' : 'administracion';
+      $document = $acts[$key];
       if ($document === null) {
-        throw new \DomainException($target === 'arrendatario' ? 'El contrato no tiene acta de notificación de ingreso generada.' : 'El contrato no tiene carta de presentación a la copropiedad generada.');
+        // Muchos contratos con copropiedad nunca tuvieron las actas (en JetForm esa acción estaba desactivada): se generan ahora.
+        $document = $this->generateBuildingAct($contract, $key, $sender, $now);
+        $generated[] = $document['path'];
       }
       if ($target === 'arrendatario') {
         if (!filter_var($context['correo_arrendatario'], FILTER_VALIDATE_EMAIL) && trim($context['celular_arrendatario']) === '') {
@@ -526,9 +530,70 @@ final class LeaseContractCreationService
       $queued['email'] += $mails;
       $queued['whatsapp'] += $messages;
     }
-    $summary = 'Se reenvió la ' . implode(' y la ', $sent) . ' del contrato #' . (string) ($contract['contrato'] ?? $contractId) . '.';
+    $summary = 'Se reenvió la ' . implode(' y la ', $sent) . ' del contrato #' . (string) ($contract['contrato'] ?? $contractId) . '.' . ($generated !== [] ? ' Las actas que faltaban se generaron en este envío.' : '');
     $this->history($contract, ['contrato' => (string) ($contract['contrato'] ?? ''), 'inmueble' => (string) ($contract['inmueble'] ?? '')], $summary, $sender, $now, date('Y-m-d H:i:s', $now), 'Reenvío de actas de copropiedad');
     return $queued + ['message' => $summary];
+  }
+
+  /**
+   * Genera el acta que falta con los datos del contrato, su hoja de cierre y el acta de administración, y la guarda en el contrato.
+   *
+   * @param array<string,mixed> $contract
+   * @param array{employee_id:string,name:string,cargo:string,phone:string} $sender
+   * @return array{url:string,path:string,name:string}
+   */
+  private function generateBuildingAct(array $contract, string $key, array $sender, int $now): array
+  {
+    if (strtolower(trim((string) ($contract['propiedad_horizontal'] ?? ''))) !== 'si') {
+      throw new \DomainException('El contrato no pertenece a una copropiedad; no aplica esta acta.');
+    }
+    $closing = $this->closing($contract);
+    $record = [];
+    $table = $this->db->table('jet_cct_actas_administracion');
+    if ($this->schema->tableExists($table)) {
+      $record = $this->db->getRow("SELECT * FROM `{$table}` WHERE TRIM(COALESCE(`id_contrato_arrendamiento`, '')) = ? ORDER BY `_ID` DESC LIMIT 1", [(string) ($contract['_ID'] ?? '')]) ?? [];
+    }
+    $first = static function (string $field, array ...$sources): string {
+      foreach ($sources as $source) {
+        $value = trim((string) ($source[$field] ?? ''));
+        if ($value !== '') {
+          return $value;
+        }
+      }
+      return '';
+    };
+    $data = [];
+    foreach (array_merge(self::SCHEDULES, ['tiene_mascotas', 'tiene_vehiculo', 'convive_personas', 'copropiedad', 'administrador', 'direccion', 'arrendatario', 'tiene_parqueadero', 'tipo_parqueadero', 'parqueaderos', 'numero_parqueadero']) as $field) {
+      $data[$field] = $first($field, $contract, $record, $closing);
+    }
+    $data['zonas_sociales'] = $this->list($first('zonas_sociales', $record, $closing));
+    $data['mascotas'] = $this->list($first('mascotas', $record, $closing));
+    $data['vehiculos'] = $this->list($first('vehiculo', $record, $closing));
+    $data['personas'] = $this->list($first('personas', $record, $closing));
+    if ($data['copropiedad'] === '' || $data['arrendatario'] === '') {
+      throw new \DomainException('Faltan la copropiedad o el arrendatario del contrato para generar el acta.');
+    }
+    $staff = $this->annexes->staff();
+    if (($staff['legal']['nombre'] ?? '') === '') {
+      throw new \DomainException('No hay un funcionario activo con el cargo 14 (representante legal) para firmar el acta.');
+    }
+    $context = array_merge($contract, $data, [
+      'fecha' => $now, 'ciudad' => 'Cartagena de Indias',
+      'realizado_por' => $sender['name'], 'realizado_por_cargo' => $sender['cargo'], 'realizado_por_telefono' => $sender['phone'],
+      'nombre_contractual' => $staff['contractual']['nombre'] ?? '', 'celular_contractual' => $staff['contractual']['celular'] ?? '', 'correo_contractual' => $staff['contractual']['correo'] ?? '',
+      'nombre_propietarios' => $staff['propietarios']['nombre'] ?? '', 'celular_propietarios' => $staff['propietarios']['celular'] ?? '', 'correo_propietarios' => $staff['propietarios']['correo'] ?? '',
+      'nombre_arrendatarios' => $staff['arrendatarios']['nombre'] ?? '', 'celular_arrendatarios' => $staff['arrendatarios']['celular'] ?? '', 'correo_arrendatarios' => $staff['arrendatarios']['correo'] ?? '',
+      'representante_legal' => $staff['legal']['nombre'], 'celular_legal' => $staff['legal']['celular'] ?? '', 'cargo_legal' => $staff['legal']['cargo'] ?? '', 'firma_legal' => $staff['legal']['firma'] ?? '',
+    ]);
+    $document = $key === 'notificacion'
+      ? $this->pdf(LeaseContractActs::tenantNotice($context, true), 'Acta de notificacion de ingreso - ' . $data['arrendatario'])
+      : $this->pdf(LeaseContractActs::buildingLetter($context, true), 'Carta de presentacion del inquilino - ' . $data['copropiedad']);
+    $field = $key === 'notificacion' ? 'acta_notificacion_arrendatario' : 'acta_administracion';
+    $this->update('jet_cct_contratos_arrendamiento', (int) $contract['_ID'], [$field => $document['url'], 'cct_modified' => date('Y-m-d H:i:s', $now)]);
+    if ($record !== []) {
+      $this->update('jet_cct_actas_administracion', (int) $record['_ID'], [$key === 'notificacion' ? 'acta_notificacion' : 'acta_administracion' => $document['url'], 'cct_modified' => date('Y-m-d H:i:s', $now)]);
+    }
+    return $document;
   }
 
   /**

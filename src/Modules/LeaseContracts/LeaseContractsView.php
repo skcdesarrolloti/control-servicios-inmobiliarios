@@ -131,8 +131,9 @@ final class LeaseContractsView
       } elseif ($canSend && !$unassigned && strtolower($v('estado', '')) !== 'desistido') {
         $html .= '<button type="button" class="' . $ui::NAVY . ' !sp-justify-start" data-lease-action="envio"' . $attrs . '>' . $ui::icon('bolt', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . ($sent ? 'Reenviar anexos' : 'Enviar anexos') . '</button>';
       }
-      if ($canSend && !$unassigned && strtolower($v('propiedad_horizontal', '')) === 'si' && ($v('acta_notificacion_arrendatario', '') !== '' || $v('acta_administracion', '') !== '')) {
-        $html .= '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start" data-lease-action="actas-copropiedad"' . $attrs . '>' . $ui::icon('building', '!sp-w-3 !sp-h-3') . 'Reenviar actas copropiedad</button>';
+      if ($canSend && !$unassigned && strtolower($v('propiedad_horizontal', '')) === 'si') {
+        $hasActs = $v('acta_notificacion_arrendatario', '') !== '' || $v('acta_administracion', '') !== '';
+        $html .= '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start" data-lease-action="actas-copropiedad"' . $attrs . '>' . $ui::icon('building', '!sp-w-3 !sp-h-3') . ($hasActs ? 'Reenviar actas copropiedad' : 'Enviar actas copropiedad') . '</button>';
       }
       if ($id !== '' && !in_array(strtolower($v('estado', '')), ['recibido', 'desistido'], true)) {
         $html .= '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start" data-scm-mark-contract-received data-contract-context="contratos" data-contract-id="' . esc_attr($id) . '" data-contract-code="' . esc_attr($code) . '">' . $ui::icon('check', '!sp-w-3 !sp-h-3') . 'Marcar recibido</button>';

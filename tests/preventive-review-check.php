@@ -202,7 +202,7 @@ $settingsData = new ReflectionProperty(\SCM\Core\Settings::class, 'data');
 $settingsData->setValue(\SCM\Core\App::settings(), ['contract_history_permissions_configured' => true, 'dashboard_action_permissions' => ['3' => ['corrective_review_manage'], '4' => ['case_note']]]);
 $perms = $call('dashboardActionPermissionsConfig');
 $assert(in_array('preventive_review_manage', $perms['3'], true) && !in_array('preventive_review_manage', $perms['4'], true), 'La preventiva debe heredar la correctiva antes de configurarse.');
-$settingsData->setValue(\SCM\Core\App::settings(), ['contract_history_permissions_configured' => true, 'preventive_review_permissions_configured' => true, 'contract_annexes_permissions_configured' => true, 'dashboard_action_permissions' => ['3' => ['corrective_review_manage'], '5' => ['preventive_review_manage']]]);
+$settingsData->setValue(\SCM\Core\App::settings(), ['contract_history_permissions_configured' => true, 'preventive_review_permissions_configured' => true, 'contract_annexes_permissions_configured' => true, 'contract_lifecycle_permissions_configured' => true, 'dashboard_action_permissions' => ['3' => ['corrective_review_manage'], '5' => ['preventive_review_manage']]]);
 $perms = $call('dashboardActionPermissionsConfig');
 $assert(!in_array('preventive_review_manage', $perms['3'], true) && $perms['5'] === ['preventive_review_manage'], 'Una vez configurados, los permisos deben ser independientes.');
 
