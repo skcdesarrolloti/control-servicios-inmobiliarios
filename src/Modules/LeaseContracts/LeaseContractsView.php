@@ -126,6 +126,9 @@ final class LeaseContractsView
       $html .= $this->action('historial-contrato', 'Historial contrato', 'copy', $attrs);
       $html .= '<button type="button" class="' . $ui::SECONDARY . ' !sp-text-[10px] !sp-justify-start" data-lease-action="caso"' . $attrs . '>' . $ui::icon('edit', '!sp-w-3 !sp-h-3') . 'Crear caso</button>';
       $unassigned = strtolower($code) === 'no asignado';
+      if ($canSend && !$sent && strtolower($v('estado', '')) === 'recibido') {
+        $html .= '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start !sp-text-emerald-700 !sp-border-emerald-200 hover:!sp-bg-emerald-50" data-lease-annexes-ok' . $attrs . '>' . $ui::icon('check', '!sp-w-3 !sp-h-3') . 'Marcar anexos al día</button>';
+      }
       if ($unassigned && $canCreate && strtolower($v('estado', '')) !== 'desistido') {
         $html .= '<button type="button" class="' . $ui::PRIMARY . ' !sp-text-[10px] !sp-py-2 !sp-justify-start" data-lease-action="crear"' . $attrs . '>' . $ui::icon('document', '!sp-w-3 !sp-h-3') . 'Crear contrato</button>';
       } elseif ($canSend && !$unassigned && strtolower($v('estado', '')) !== 'desistido') {

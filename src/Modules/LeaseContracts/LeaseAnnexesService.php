@@ -160,6 +160,41 @@ final class LeaseAnnexesService
     return ['message' => 'Contrato #' . (string) ($contract['contrato'] ?? $contractId) . ' marcado como desistido.' . ($internal > 0 ? ' Avisos internos en cola: ' . $internal . '.' : ''), 'internal' => $internal];
   }
 
+  /**
+   * Marca los anexos como al día sin enviar nada (contratos recibidos cuyos anexos se gestionaron por fuera del panel).
+   *
+   * @param array{employee_id:string,name:string,cargo:string,phone:string} $sender
+   */
+  public function markAnnexesUpToDate(int $contractId, string $note, array $sender): string
+  {
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    $pdo = $this->db->pdo();
+    $pdo->beginTransaction();
+    try {
+      $contract = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? FOR UPDATE", [$contractId]);
+      if (!is_array($contract)) {
+        throw new \DomainException('Contrato no encontrado.');
+      }
+      if (strtolower(trim((string) ($contract['estado'] ?? ''))) !== 'recibido') {
+        throw new \DomainException('Solo se marcan al día los anexos de contratos recibidos.');
+      }
+      if (strtolower(trim((string) ($contract['se_envio'] ?? ''))) === 'si') {
+        throw new \DomainException('Los anexos de este contrato ya estaban al día.');
+      }
+      $now = time();
+      $this->db->update($table, $this->schema->filterTableData($table, ['se_envio' => 'Si', 'cct_modified' => date('Y-m-d H:i:s', $now)]), ['_ID' => $contractId]);
+      $summary = 'Anexos del contrato #' . (string) ($contract['contrato'] ?? $contractId) . ' marcados al día sin envío (contrato recibido). Valor anterior de envío: ' . (trim((string) ($contract['se_envio'] ?? '')) ?: 'vacío') . '.' . ($note !== '' ? ' Observación: ' . $note : '');
+      $this->insertTrace($contract, 'Anexos al día', 'Contractual', $summary, $sender, $now);
+      $pdo->commit();
+    } catch (\Throwable $error) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      throw $error;
+    }
+    return 'Anexos del contrato #' . (string) ($contract['contrato'] ?? $contractId) . ' marcados al día.';
+  }
+
   /** @param array<string,mixed> $contract @param array<string,string> $sender */
   private function insertTrace(array $contract, string $contractType, string $propertyType, string $summary, array $sender, int $now): void
   {

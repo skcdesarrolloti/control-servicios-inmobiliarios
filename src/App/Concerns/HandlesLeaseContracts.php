@@ -156,6 +156,22 @@ trait HandlesLeaseContracts
     $this->jsonOk(['message' => $result['message'] . ' Correos: ' . $result['email'] . ', WhatsApp: ' . $result['whatsapp'] . '.']);
   }
 
+  public function ajax_handler_lease_contract_annexes_up_to_date(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('contratos_arrendamiento') || !$this->canUseDashboardAction('contract_annexes_send')) {
+      $this->jsonFail('No tienes permiso para actualizar los anexos de contratos.');
+    }
+    $contractId = (int) ($_POST['contract_id'] ?? 0);
+    try {
+      $message = (new LeaseAnnexesService($this->db))->markAnnexesUpToDate($contractId, mb_substr(trim(strip_tags(wp_unslash((string) ($_POST['observacion'] ?? '')))), 0, 500), $this->lease_contract_sender());
+    } catch (\Throwable $error) {
+      error_log('[lease_contract_annexes_up_to_date] #' . $contractId . ': ' . $error->getMessage());
+      $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudieron marcar los anexos al día.');
+    }
+    $this->jsonOk(['message' => $message]);
+  }
+
   public function ajax_handler_lease_contract_desist(): void
   {
     $this->verifyCsrf();

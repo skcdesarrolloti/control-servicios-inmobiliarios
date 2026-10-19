@@ -183,6 +183,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_LEASE_CONTRACT_DESIST = 'scm_contrato_arrendamiento_desistir';
   const AJAX_LEASE_CONTRACT_CREATE = 'scm_contrato_arrendamiento_crear';
   const AJAX_LEASE_CONTRACT_RESEND_ACTS = 'scm_contrato_arrendamiento_reenviar_actas';
+  const AJAX_LEASE_CONTRACT_ANNEXES_OK = 'scm_contrato_arrendamiento_anexos_al_dia';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';

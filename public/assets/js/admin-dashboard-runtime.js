@@ -266,6 +266,7 @@
     var actionLeaseContractDesist = actions.lease_contract_desist || "";
     var actionLeaseContractCreate = actions.lease_contract_create || "";
     var actionLeaseContractResendActs = actions.lease_contract_resend_acts || "";
+    var actionLeaseContractAnnexesOk = actions.lease_contract_annexes_ok || "";
     var duePopupConfig = runtime.duePopup || {};
     var dashboardDuePopupShown = {};
     var dashboardDuePopupPromise = null;
@@ -19994,6 +19995,54 @@
         });
       }
 
+      // Contratos recibidos: deja los anexos al día sin enviar nada, con confirmación y trazabilidad.
+      function markAnnexesUpToDate(button) {
+        var code = button.getAttribute("data-contract-code") || "";
+        if (!actionLeaseContractAnnexesOk || !window.Swal) {
+          showToast("error", "Actualiza la página para marcar los anexos.");
+          return;
+        }
+        window.Swal.fire({
+          title: "¿Marcar anexos al día del contrato #" + code + "?",
+          html:
+            '<div class="scm-cotizacion-response-form">' +
+            '<p class="scm-cotizacion-dialog-intro">El contrato ya fue recibido. Los anexos quedarán como enviados sin notificar a nadie, y el cambio queda en el historial del contrato y del inmueble.</p>' +
+            '<label class="scm-cotizacion-dialog-field is-wide"><span>Observación</span><textarea id="swal-lease-annexes-note" rows="3" placeholder="Opcional: por qué se marcan al día"></textarea></label>' +
+            "</div>",
+          width: "min(560px, 94vw)",
+          showCloseButton: true,
+          showCancelButton: true,
+          confirmButtonText: "Sí, marcar al día",
+          cancelButtonText: "Cancelar",
+          buttonsStyling: false,
+          focusConfirm: false,
+          returnFocus: true,
+          customClass: {
+            popup: "scm-cotizacion-dialog scm-cotizacion-response-swal",
+            title: "scm-cotizacion-dialog-title",
+            htmlContainer: "scm-cotizacion-dialog-body",
+            actions: "scm-cotizacion-dialog-actions",
+            confirmButton: "scm-cotizacion-dialog-confirm scm-cotizacion-order-response-confirm is-success",
+            cancelButton: "scm-cotizacion-dialog-cancel",
+            closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+          },
+          preConfirm: function () {
+            var note = document.getElementById("swal-lease-annexes-note");
+            return dashboardAction(actionLeaseContractAnnexesOk, {
+              contract_id: button.getAttribute("data-contract-id") || "",
+              observacion: note ? note.value : "",
+            }).catch(function (error) {
+              window.Swal.showValidationMessage(error.message || "No se pudieron marcar los anexos al día.");
+              return false;
+            });
+          },
+        }).then(function (result) {
+          if (!result.isConfirmed || !result.value) return;
+          showToast("success", result.value.message || "Anexos marcados al día.");
+          root.dispatchEvent(new CustomEvent("scm:contracts-refresh"));
+        });
+      }
+
       function loadView(view, trigger) {
         var contractId = trigger.getAttribute("data-contract-id") || "";
         var code = trigger.getAttribute("data-contract-code") || contractId;
@@ -20059,6 +20108,12 @@
         if (target.closest("[data-lease-modal-close]") || target === modal) {
           event.preventDefault();
           closeModal();
+          return;
+        }
+        var annexesOk = target.closest("[data-lease-annexes-ok]");
+        if (annexesOk) {
+          event.preventDefault();
+          markAnnexesUpToDate(annexesOk);
           return;
         }
         var action = target.closest("[data-lease-action]");
