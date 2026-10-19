@@ -152,9 +152,10 @@ final class PublicServicesCritical
     $documents=[];foreach($services as $s){$key=$s['debt_document_field'];if(isset($result['_documents'][$key]))$documents[$key]=$result['_documents'][$key];}
     $payload = ['contract'=>$result['_contract'], 'employee'=>$result['_employee'], 'services'=>$services,'documents'=>$documents];
     $payload['workflow']=self::WORKFLOW;
+    $payload['notify_owner']=!empty($result['_notify_owner']);
     $payload['ticket_id']=(new PublicServicesCriticalTicket($this->db))->create($id,$payload,$created,$created+self::HOURS*3600);
     $this->db->insert($this->table(), ['review_id'=>$id,'contract_id'=>(int)$result['_contract']['_ID'],'created_at'=>$created,'deadline_at'=>$created+self::HOURS*3600,'payload_json'=>self::json($payload)]);
-    $this->audit($id, 'critical_ticket_created', (string)$result['_employee']['id_empleado'], ['ticket_id'=>$payload['ticket_id'],'deadline_at'=>$created+self::HOURS*3600,'services'=>array_keys($services)]);
+    $this->audit($id, 'critical_ticket_created', (string)$result['_employee']['id_empleado'], ['ticket_id'=>$payload['ticket_id'],'deadline_at'=>$created+self::HOURS*3600,'services'=>array_keys($services),'notify_owner'=>$payload['notify_owner']]);
     return $payload['ticket_id'];
   }
   public static function json(array $data): string { return json_encode($data, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR); }
@@ -173,7 +174,7 @@ final class PublicServicesCritical
     $contacts = $this->contacts($event);
     if($event===self::RESPONSE_EVENT)$contacts=array_merge($contacts,$this->contacts(self::EVENT));
     $e = $payload['employee'];
-    $contacts[] = ['name'=>$e['nombre'],'email'=>$e['correo']??'','phone'=>$e['celular']??$e['telefono']??'','employee_id'=>$e['id_empleado']];
+    $contacts[] = ['name'=>$e['nombre'],'email'=>$e['correo']??'','phone'=>$e['celular']??$e['telefono']??'','employee_id'=>$e['id_empleado'],'role'=>'creador'];
     return $contacts;
   }
   public function summary(array $payload): string
@@ -194,7 +195,9 @@ final class PublicServicesCritical
       if (!$case || empty($case['ticket_id']) || $case['planned'] || $case['status']==='closed' || $case['status']==='verified') { $pdo->commit(); return; }
       $p=json_decode($case['payload_json'],true,32,JSON_THROW_ON_ERROR); $contract=$p['contract'];
       $recipients=$this->internalRecipients($p,self::EVENT);
-      $recipients[]=['name'=>$contract['arrendatario'],'email'=>$contract['correo_arrendatario']??'','phone'=>$contract['celular_arrendatario']??$contract['telefono_arrendatario']??''];
+      $recipients[]=['name'=>$contract['arrendatario'],'email'=>$contract['correo_arrendatario']??'','phone'=>$contract['celular_arrendatario']??$contract['telefono_arrendatario']??'','role'=>'arrendatario'];
+      // Opt-in from the review form: the owner gets the same critical notice with informative wording.
+      if(!empty($p['notify_owner']))$recipients[]=['name'=>$contract['propietario']??'','email'=>$contract['correo_propietario']??'','phone'=>$contract['celular_propietario']??$contract['telefono_propietario']??'','role'=>'propietario'];
       $copies=array_column($this->contacts(self::EVENT),'email');
       $primaryEmails=\SCM\Support\InternalEmailCopies::plan(array_column($recipients,'email'),$copies)['to'];
       $details='Caso #'.(int)($p['ticket_id']??0).' · '.$this->summary($p); $deadline=date('d/m/Y H:i',(int)$case['deadline_at']).' (Colombia)'; $link=self::url($id, (int)$case['created_at']+180*86400);
@@ -223,12 +226,12 @@ final class PublicServicesCritical
   {
     $id=(int)$case['review_id']; $base='services-critical:'.$id.':revision-ticket';
     $email=strtolower(trim((string)($r['email']??'')));
-    if (empty($r['email_as_cc']) && filter_var($email,FILTER_VALIDATE_EMAIL)) $this->job($id,'email',$base.':email:'.hash('sha256',$email),['destination'=>$email,'destination_name'=>$r['name'],'body'=>$body,'url'=>$url,'documents'=>$docs,'response'=>false,'workflow'=>self::WORKFLOW,'internal_cc'=>$r['internal_cc']??[]]);
+    if (empty($r['email_as_cc']) && filter_var($email,FILTER_VALIDATE_EMAIL)) $this->job($id,'email',$base.':email:'.hash('sha256',$email),['destination'=>$email,'destination_name'=>$r['name'],'body'=>$body,'url'=>$url,'documents'=>$docs,'response'=>false,'workflow'=>self::WORKFLOW,'role'=>$r['role']??'interno','internal_cc'=>$r['internal_cc']??[]]);
     elseif (empty($r['email_as_cc'])) $this->audit($id,'contact_missing','system',['recipient'=>$r['name'],'channel'=>'email']);
     $phone=preg_replace('/\D/','',(string)($r['phone']??'')); if(strlen($phone)===10)$phone='57'.$phone;
     if(!preg_match('/^[1-9][0-9]{7,14}$/D',$phone)) { $this->audit($id,'contact_missing','system',['recipient'=>$r['name'],'channel'=>'whatsapp']); return; }
     foreach ($docs as $key=>$doc) {
-      $this->job($id,'whatsapp',$base.':wa:'.$phone.':'.$key,['destination'=>'+'.$phone,'destination_name'=>$r['name'],'body'=>$body,'url'=>$url,'document'=>$doc,'response'=>false,'workflow'=>self::WORKFLOW]);
+      $this->job($id,'whatsapp',$base.':wa:'.$phone.':'.$key,['destination'=>'+'.$phone,'destination_name'=>$r['name'],'body'=>$body,'url'=>$url,'document'=>$doc,'response'=>false,'workflow'=>self::WORKFLOW,'role'=>$r['role']??'interno']);
     }
   }
   public function report(int $id,array $file,string $note,string $requestKey): int
@@ -359,8 +362,8 @@ final class PublicServicesCritical
     if($job['kind']==='email'){
       $attachments=[];foreach($p['documents'] as $d)if(!empty($d['path']))$attachments[]=['path'=>$d['path'],'name'=>$d['filename']??$d['attachment_name']??basename($d['path'])];
       $options['payload']=['attachments'=>$attachments,'cc'=>array_values(array_diff(\SCM\Support\InternalEmailCopies::emails($p['internal_cc']??[]),[strtolower($p['destination'])]))];
-      $html='<p>'.nl2br(PublicServicesDocument::e($p['body'])).'</p><p><a href="'.PublicServicesDocument::e($p['url']).'">'.'Ver revisión'.'</a></p>';
-      return ['queue_ids'=>$queue->enqueueEmail([$p['destination']],'Revisión de servicios públicos críticos · caso con plazo de 72 horas',$html,$options)];
+      [$subject,$html]=$this->emailHtml($p,$data,$case);
+      return ['queue_ids'=>$queue->enqueueEmail([$p['destination']],$subject,$html,$options)];
     }
     $cfg=$this->config();$template=$cfg['whatsapp_template'];
     if(!$cfg['whatsapp_enabled']||!$template)throw new \RuntimeException('WhatsApp pendiente: configura y activa las plantillas aprobadas por Meta en Plantillas de actas.');
@@ -369,6 +372,31 @@ final class PublicServicesCritical
     $values=[$p['destination_name'],(string)$data['contract']['contrato'],mb_substr($p['body'],0,900),date('d/m/Y H:i',(int)$case['deadline_at']).' Colombia',$data['employee']['nombre']];
     $components=[['type'=>'header','parameters'=>[['type'=>'document','document'=>['link'=>$p['document']['url'],'filename'=>$p['document']['filename']??$p['document']['attachment_name']??'acta.pdf']]]],['type'=>'body','parameters'=>array_map(static fn($v)=>['type'=>'text','text'=>preg_replace('/\s+/u',' ',(string)$v)],$values)],['type'=>'button','sub_type'=>'url','index'=>'0','parameters'=>[['type'=>'text','text'=>substr($p['url'],strlen($buttonBase))]]]];
     return ['queue_id'=>$queue->enqueueWhatsAppOfficialTemplate($p['destination'],$template,$components,$options+['template_language'=>$cfg['language'],'message_text'=>$p['body']])];
+  }
+  /** Branded critical notice; the lead paragraph depends on who receives it. @return array{0:string,1:string} */
+  private function emailHtml(array $p,array $data,array $case): array
+  {
+    $e=[\SCM\Support\EmailTemplate::class,'e'];
+    $c=$data['contract']??[];$ticket=(int)($case['ticket_id']??$data['ticket_id']??0);
+    $deadline=date('d/m/Y H:i',(int)$case['deadline_at']).' (Colombia)';
+    $subject='Servicio público crítico · contrato #'.($c['contrato']??'').($ticket?' · caso #'.$ticket:'').' · plazo de 72 horas';
+    $lead=match($p['role']??''){
+      'arrendatario'=>'Le solicitamos normalizar el pago de la obligación y remitir el soporte a SKC SuCasa Inmobiliaria antes de la fecha límite. Las actas de requerimiento se adjuntan a este correo.',
+      'propietario'=>'Le informamos esta situación para su conocimiento. La inmobiliaria ya inició la gestión del caso con el arrendatario y le mantendrá al tanto.',
+      default=>'Se creó el caso'.($ticket?' #'.$ticket:'').' con tema Servicio publico critico para su gestión dentro del plazo. Las actas emitidas se adjuntan a este correo.',
+    };
+    $rows='';
+    foreach($data['services']??[] as $s){
+      $rows.='<tr><td style="padding:9px 10px;border-bottom:1px solid #e2e8f0;font-weight:600;">'.$e($s['display_label']??$s['label']??'').'</td><td style="padding:9px 10px;border-bottom:1px solid #e2e8f0;">'.$e($s['account']??'').'</td><td style="padding:9px 10px;border-bottom:1px solid #e2e8f0;">'.$e($s['meter']??'').'</td><td style="padding:9px 10px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:700;color:#be123c;white-space:nowrap;">$'.number_format((int)($s['amount']??0),0,',','.').' COP</td></tr>';
+    }
+    $th='padding:8px 10px;text-align:left;font-size:12px;color:#475569;background:#f1f5f9;border-bottom:1px solid #e2e8f0;';
+    $content='<p style="margin:0 0 16px;font-weight:600;">Apreciado(a) '.$e($p['destination_name']?:'Usuario').':</p>'
+      .'<p style="margin:0 0 14px;line-height:1.65;">En la revisión de servicios públicos <b>#'.(int)$case['review_id'].'</b> del contrato <b>#'.$e($c['contrato']??'').'</b>, inmueble <b>#'.$e($c['inmueble']??$c['id_inmueble']??'').'</b>, ubicado en '.$e($c['direccion']??'').', se encontraron servicios en <b>estado crítico</b> (mora superior a 90 días).</p>'
+      .'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;background:#fff1f2;border:1px solid #fecdd3;border-radius:8px;"><tr><td style="padding:14px 16px;color:#9f1239;line-height:1.6;"><b>'.($ticket?'Caso #'.$ticket.' · ':'').'Plazo de atención: 72 horas</b><br>Fecha límite: '.$e($deadline).'</td></tr></table>'
+      .'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;border:1px solid #e2e8f0;border-collapse:collapse;font-size:13px;"><tr><th style="'.$th.'">Servicio</th><th style="'.$th.'">Referencia</th><th style="'.$th.'">Medidor</th><th style="'.$th.'text-align:right;">Valor adeudado</th></tr>'.$rows.'</table>'
+      .'<p style="margin:0 0 14px;line-height:1.65;">'.$e($lead).'</p>'
+      .'<p style="margin:0;line-height:1.65;color:#475569;">Realizado por: <b>'.$e($data['employee']['nombre']??'').'</b></p>';
+    return [$subject,\SCM\Support\EmailTemplate::render($subject,$content,['buttons'=>[['url'=>$p['url'],'label'=>'Ver revisión y actas']]])];
   }
   private function calendar(string $kind,array $p): array
   {

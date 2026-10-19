@@ -3512,6 +3512,7 @@ trait HandlesTicketWorkflowActions
     $input = [];
     $input['configuration_present'] = (string) ($_POST['configuration_present'] ?? '');
     $input['request_token'] = (string) ($_POST['request_token'] ?? '');
+    $input['notificar_propietario_critico'] = (string) ($_POST['notificar_propietario_critico'] ?? '') === '1' ? '1' : '';
     $configuredRaw = is_array($_POST['servicios_configurados'] ?? null) ? $_POST['servicios_configurados'] : [];
     $input['servicios_configurados'] = array_map(static fn($value): string => is_scalar($value) ? sanitize_key(wp_unslash((string) $value)) : '', $configuredRaw);
     $servicesRaw = is_array($_POST['servicios'] ?? null) ? $_POST['servicios'] : [];

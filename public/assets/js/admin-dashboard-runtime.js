@@ -12669,6 +12669,7 @@
         }
         if (event.target && event.target.matches && event.target.matches("[data-public-service-status]")) {
           syncPublicServiceAmount(event.target);
+          syncPublicServicesReviewForm(form);
         }
       });
       modal.addEventListener("input", function () {
@@ -12752,6 +12753,13 @@
       if (notice) notice.textContent = reviewing ? notice.dataset.reviewText : notice.dataset.configText;
       var button = form.querySelector("[data-public-services-review-submit]");
       if (button) button.textContent = reviewing ? "Guardar servicios, revisión y actas" : "Guardar servicios";
+      var ownerOption = form.querySelector("[data-public-services-owner-option]");
+      if (ownerOption) {
+        var critical = Array.prototype.some.call(form.querySelectorAll("[data-public-service-status]:not([disabled])"), function (field) { return field.value === "Estado critico"; });
+        ownerOption.hidden = !critical;
+        var ownerCheck = ownerOption.querySelector("input");
+        if (!critical && ownerCheck) ownerCheck.checked = false;
+      }
     }
 
     function syncPublicServiceAmount(statusField) {
