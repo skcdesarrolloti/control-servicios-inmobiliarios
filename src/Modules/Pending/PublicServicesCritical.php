@@ -375,9 +375,25 @@ final class PublicServicesCritical
     if(!$cfg['whatsapp_enabled']||!$template)throw new \RuntimeException('WhatsApp pendiente: configura y activa las plantillas aprobadas por Meta en Plantillas de actas.');
     $buttonBase=(string)$cfg['button_base'];
     if(!str_starts_with($p['url'],$buttonBase))throw new \RuntimeException('La base del botón de Meta no coincide con el enlace público.');
-    $values=[$p['destination_name'],(string)$data['contract']['contrato'],mb_substr($p['body'],0,900),date('d/m/Y H:i',(int)$case['deadline_at']).' Colombia',$data['employee']['nombre']];
-    $components=[['type'=>'header','parameters'=>[['type'=>'document','document'=>['link'=>$p['document']['url'],'filename'=>$p['document']['filename']??$p['document']['attachment_name']??'acta.pdf']]]],['type'=>'body','parameters'=>array_map(static fn($v)=>['type'=>'text','text'=>preg_replace('/\s+/u',' ',(string)$v)],$values)],['type'=>'button','sub_type'=>'url','index'=>'0','parameters'=>[['type'=>'text','text'=>substr($p['url'],strlen($buttonBase))]]]];
+    $values=self::whatsappValues($p['destination_name'],(string)$data['contract']['contrato'],(int)($case['ticket_id']??0),(int)$job['review_id'],$data['services']??[],(int)$case['deadline_at'],(string)($data['employee']['nombre']??''));
+    $components=[['type'=>'header','parameters'=>[['type'=>'document','document'=>['link'=>$p['document']['url'],'filename'=>$p['document']['filename']??$p['document']['attachment_name']??'acta.pdf']]]],['type'=>'body','parameters'=>array_map(static fn($v)=>['type'=>'text','text'=>$v],$values)],['type'=>'button','sub_type'=>'url','index'=>'0','parameters'=>[['type'=>'text','text'=>substr($p['url'],strlen($buttonBase))]]]];
     return ['queue_id'=>$queue->enqueueWhatsAppOfficialTemplate($p['destination'],$template,$components,$options+['template_language'=>$cfg['language'],'message_text'=>$p['body']])];
+  }
+  /**
+   * Body parameters for scm_servicios_revision_critica. Meta rejects (#132018) empty values, line breaks,
+   * runs of spaces and messages over 1024 characters; the fixed template text uses about 453 of them.
+   * @return array<int,string>
+   */
+  public static function whatsappValues(string $name,string $contract,int $ticketId,int $reviewId,array $services,int $deadline,string $creator): array
+  {
+    $clean=static fn(string $v,int $max): string=>($v=mb_substr(trim((string)preg_replace('/\s+/u',' ',$v)),0,$max))!==''?$v:'-';
+    $name=$clean($name,60);$contract=$clean($contract,30);$creator=$clean($creator,60);
+    $due=date('d/m/Y H:i',$deadline).' Colombia';
+    $parts=[];
+    foreach($services as $s)$parts[]=($s['display_label']??$s['label']??'').', ref. '.($s['account']??'').', $'.number_format((int)($s['amount']??0),0,',','.').' COP';
+    $budget=max(80,1000-453-mb_strlen($name.$contract.$due.$creator));
+    $details=$clean(($ticketId?'Caso #'.$ticketId.'. ':'').'Revisión #'.$reviewId.'. '.implode('; ',$parts),$budget);
+    return [$name,$contract,$details,$due,$creator];
   }
   /** Branded critical notice; the lead paragraph depends on who receives it. @return array{0:string,1:string} */
   private function emailHtml(array $p,array $data,array $case): array
