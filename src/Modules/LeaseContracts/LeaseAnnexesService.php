@@ -55,6 +55,29 @@ final class LeaseAnnexesService
     return is_array($row) ? $row : ($this->db->getRow("SELECT * FROM `{$table}` ORDER BY `_ID` ASC LIMIT 1") ?? []);
   }
 
+  /**
+   * El acta de entrega y el inventario son obligatorios en el envío: deben existir y estar publicados.
+   *
+   * @param array<string,mixed> $contract
+   * @return array{acta_entrega:array{id:string,exists:bool,url:string},inventario:array{id:string,exists:bool,url:string}}
+   */
+  public function annexRecords(array $contract): array
+  {
+    $sources = [
+      'acta_entrega' => ['id_acta_entrega', 'jet_cct_actas_de_entrega', 'https://sucasainmobiliaria.com.co/acta-de-entrega/?numero='],
+      'inventario' => ['id_inventario', 'jet_cct_inventario', 'https://sucasainmobiliaria.com.co/inventario-inmueble/?numero='],
+    ];
+    $out = [];
+    foreach ($sources as $key => [$field, $tableName, $base]) {
+      $id = trim((string) ($contract[$field] ?? ''));
+      $table = $this->db->table($tableName);
+      $exists = ctype_digit($id) && (int) $id > 0 && $this->schema->tableExists($table)
+        && (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` WHERE `_ID` = ? AND COALESCE(`cct_status`, 'publish') = 'publish'", [(int) $id]) > 0;
+      $out[$key] = ['id' => $id, 'exists' => $exists, 'url' => $exists ? $base . rawurlencode($id) : ''];
+    }
+    return $out;
+  }
+
   /** Glosario JetEngine "Razón de desistir" que usa el campo razon_desistido. */
   public const DESIST_GLOSSARY_ID = 1463;
   public const DESIST_INTERNAL_ACTION = 'contrato_desistido';
@@ -399,8 +422,8 @@ final class LeaseAnnexesService
       'contrato' => trim((string) ($contract['contrato'] ?? '')),
       'direccion' => trim((string) ($contract['direccion'] ?? '')),
       'registro_fotografico' => $text('registro_fotografico'),
-      'id_acta_entrega' => $text('id_acta_entrega'),
-      'id_inventario' => $text('id_inventario'),
+      'id_acta_entrega' => trim((string) ($contract['id_acta_entrega'] ?? '')),
+      'id_inventario' => trim((string) ($contract['id_inventario'] ?? '')),
       'inicio_contrato' => $this->date($text('inicio_contrato')),
       'fin_contrato' => $this->date($text('fin_contrato')),
       'contrato_arrendamiento' => $leaseFile['url'] ?? trim((string) ($contract['contrato_arrendamiento'] ?? '')),
@@ -417,8 +440,15 @@ final class LeaseAnnexesService
     if (!filter_var($data['registro_fotografico'], FILTER_VALIDATE_URL)) {
       throw new \DomainException('El registro fotográfico debe ser un enlace válido (https://...).');
     }
-    if ($data['id_acta_entrega'] === '' || $data['id_inventario'] === '') {
-      throw new \DomainException('Indica el ID del acta de entrega y el ID del inventario.');
+    $records = $this->annexRecords($contract);
+    $missing = [];
+    foreach (['acta_entrega' => 'el acta de entrega', 'inventario' => 'el inventario'] as $key => $label) {
+      if (!$records[$key]['exists']) {
+        $missing[] = $label . ($records[$key]['id'] !== '' ? ' #' . $records[$key]['id'] . ' (no existe)' : '');
+      }
+    }
+    if ($missing !== []) {
+      throw new \DomainException('No se pueden enviar los anexos: el contrato no tiene ' . implode(' ni ', $missing) . '. Regístralo antes de enviar.');
     }
     if ($data['contrato_arrendamiento'] === '') {
       throw new \DomainException('Adjunta el contrato de arrendamiento; el arrendatario y los codeudores deben recibirlo.');

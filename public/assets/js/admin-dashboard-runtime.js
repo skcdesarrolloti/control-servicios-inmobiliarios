@@ -20060,6 +20060,16 @@
         if (select) syncCodebtors(select.form);
       });
 
+      // El botón "Abrir carpeta" sigue el enlace que se escriba en Registro fotográfico.
+      wrap.addEventListener("input", function (event) {
+        var input = event.target && event.target.closest ? event.target.closest("[data-lease-photo-input]") : null;
+        var link = input && input.form ? input.form.querySelector("[data-lease-photo-link]") : null;
+        if (!link) return;
+        var valid = /^https?:\/\/\S+$/i.test(input.value.trim());
+        link.href = valid ? input.value.trim() : "#";
+        link.classList.toggle("!sp-hidden", !valid);
+      });
+
       wrap.addEventListener("submit", function (event) {
         var desistForm = event.target && event.target.closest ? event.target.closest("[data-lease-desist-form]") : null;
         if (desistForm) {

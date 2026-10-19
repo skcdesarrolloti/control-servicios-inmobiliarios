@@ -400,8 +400,12 @@ final class LeaseContractsView
     return $html . '</ol>';
   }
 
-  /** @param array<string,mixed> $c @param array<string,array<string,string>> $staff funcionario activo por cargo */
-  public function renderSendForm(array $c, array $staff): string
+  /**
+   * @param array<string,mixed> $c
+   * @param array<string,array<string,string>> $staff funcionario activo por cargo
+   * @param array<string,array{id:string,exists:bool,url:string}> $records acta de entrega e inventario verificados
+   */
+  public function renderSendForm(array $c, array $staff, array $records = []): string
   {
     $ui = UI::class;
     $v = static fn(string $key): string => trim((string) ($c[$key] ?? ''));
@@ -433,9 +437,10 @@ final class LeaseContractsView
       . $field('Dirección', $input('direccion', $v('direccion'), 'text', ' readonly'), 'lg:!sp-col-span-2')
       . $field('Fecha de inicio <em class="!sp-text-rose-600 !sp-not-italic">*</em>', $input('inicio_contrato', $dateValue($c['inicio_contrato'] ?? null) ?: $dateValue($c['fecha_entrega'] ?? null), 'date', ' required'))
       . $field('Fecha final <em class="!sp-text-rose-600 !sp-not-italic">*</em>', $input('fin_contrato', $dateValue($c['fin_contrato'] ?? null), 'date', ' required'))
-      . $field('Registro fotográfico <em class="!sp-text-rose-600 !sp-not-italic">*</em>', $input('registro_fotografico', $v('registro_fotografico'), 'url', ' required placeholder="https://drive.google.com/..."'))
-      . $field('ID acta de entrega <em class="!sp-text-rose-600 !sp-not-italic">*</em>', $input('id_acta_entrega', $v('id_acta_entrega'), 'text', ' required'))
-      . $field('ID del inventario <em class="!sp-text-rose-600 !sp-not-italic">*</em>', $input('id_inventario', $v('id_inventario'), 'text', ' required'))
+      . $field('Registro fotográfico <em class="!sp-text-rose-600 !sp-not-italic">*</em>', '<div class="!sp-flex !sp-gap-2">' . $input('registro_fotografico', $v('registro_fotografico'), 'url', ' required placeholder="https://drive.google.com/..." data-lease-photo-input')
+        . '<a class="' . self::MODAL_BUTTON . ' !sp-shrink-0 !sp-px-3' . (filter_var($v('registro_fotografico'), FILTER_VALIDATE_URL) ? '' : ' !sp-hidden') . '" href="' . esc_attr(filter_var($v('registro_fotografico'), FILTER_VALIDATE_URL) ? $v('registro_fotografico') : '#') . '" target="_blank" rel="noopener noreferrer" data-lease-photo-link>' . $ui::icon('eye', '!sp-w-3 !sp-h-3') . 'Abrir carpeta</a></div>')
+      . $this->annexRecordCard('Acta de entrega', $records['acta_entrega'] ?? ['id' => $v('id_acta_entrega'), 'exists' => false, 'url' => ''])
+      . $this->annexRecordCard('Inventario del inmueble', $records['inventario'] ?? ['id' => $v('id_inventario'), 'exists' => false, 'url' => ''])
       . $field('Contrato de arrendamiento (PDF o Word, máx. 10 MB)' . ($leaseUrl === '' ? ' <em class="!sp-text-rose-600 !sp-not-italic">*</em>' : ''), '<input class="' . $ui::INPUT . ' !sp-h-auto !sp-py-2" name="contrato_arrendamiento" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"' . ($leaseUrl === '' ? ' required' : '') . '>'
         . ($leaseUrl !== '' ? '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-mt-2" data-scm-open-iframe data-iframe-url="' . esc_attr($leaseUrl) . '" data-iframe-title="Contrato de arrendamiento">' . $ui::icon('eye', '!sp-w-3 !sp-h-3') . 'Ver contrato cargado</button><small class="!sp-block !sp-mt-1 !sp-text-[9px] !sp-text-service-muted">Adjunta un archivo solo si quieres reemplazarlo.</small>' : ''), 'sm:!sp-col-span-2 lg:!sp-col-span-3')
       . '</div></fieldset>'
@@ -445,6 +450,7 @@ final class LeaseContractsView
     for ($i = 1; $i <= 4; $i++) {
       $html .= $person('codeudor_' . $i, 'Codeudor ' . $i);
     }
+    $missingRecords = array_keys(array_filter($records, static fn(array $record): bool => !$record['exists']));
     $staffLabels = ['legal' => 'Representante legal (cargo 14)', 'contractual' => 'Contractual (cargo 7)', 'propietarios' => 'Pagos · propietario (cargo 5)', 'arrendatarios' => 'Servicio al arrendatario (cargo 4)', 'comercial' => 'Gerencia comercial (cargo 12)'];
     $staffList = '';
     foreach ($staffLabels as $key => $label) {
@@ -456,7 +462,8 @@ final class LeaseContractsView
       . 'Se genera un acta de bienvenida por cada actor. El propietario recibe su acta, el registro fotográfico, el inventario, el acta de entrega y el contrato de mandato. El arrendatario y los codeudores reciben su acta y el contrato de arrendamiento, sin el contrato de mandato. Todos reciben correo y WhatsApp con el enlace a sus anexos.'
       . '<span class="!sp-block !sp-mt-2">Funcionarios que aparecen en las actas:</span><ul class="!sp-m-0 !sp-mt-1 !sp-pl-4">' . $staffList . '</ul></div>'
       . '<p class="!sp-hidden !sp-m-0 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-rose-200 !sp-bg-rose-50 !sp-text-[11px] !sp-text-rose-700" data-lease-send-error role="alert"></p>'
-      . '<div class="!sp-flex !sp-flex-wrap !sp-justify-end !sp-gap-2"><button type="button" class="' . $ui::SECONDARY . '" data-lease-modal-close>Cancelar</button><button type="submit" class="' . $ui::PRIMARY . '" data-lease-send-submit>' . $ui::icon('bolt') . 'Generar actas y enviar anexos</button></div>'
+      . ($missingRecords !== [] ? '<p class="!sp-m-0 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-rose-200 !sp-bg-rose-50 !sp-text-[11px] !sp-text-rose-700" role="alert">No se pueden enviar los anexos hasta registrar ' . esc_html(implode(' y ', array_map(static fn(string $key): string => $key === 'inventario' ? 'el inventario' : 'el acta de entrega', $missingRecords))) . ' del contrato.</p>' : '')
+      . '<div class="!sp-flex !sp-flex-wrap !sp-justify-end !sp-gap-2"><button type="button" class="' . $ui::SECONDARY . '" data-lease-modal-close>Cancelar</button><button type="submit" class="' . $ui::PRIMARY . '" data-lease-send-submit' . ($missingRecords !== [] ? ' disabled' : '') . '>' . $ui::icon('bolt') . 'Generar actas y enviar anexos</button></div>'
       . '</form>';
     return $html;
   }
@@ -497,6 +504,23 @@ final class LeaseContractsView
         . '<button type="button" class="' . self::MODAL_BUTTON . '" data-scm-open-iframe data-iframe-url="' . esc_attr((string) $actor['annexes_url']) . '" data-iframe-title="Anexos del contrato">' . $ui::icon('eye', '!sp-w-3 !sp-h-3') . 'Ver anexos</button></div></div>';
     }
     return $html . '</div><div class="!sp-flex !sp-justify-end"><button type="button" class="' . $ui::NAVY . '" data-lease-modal-close>Cerrar</button></div></div>';
+  }
+
+  /** @param array{id:string,exists:bool,url:string} $record */
+  private function annexRecordCard(string $label, array $record): string
+  {
+    $ui = UI::class;
+    $head = '<span class="' . $ui::LABEL . '">' . esc_html($label) . ' <em class="!sp-text-rose-600 !sp-not-italic">*</em></span>';
+    if ($record['exists']) {
+      return '<div>' . $head . '<div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-h-10 !sp-px-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-emerald-200 !sp-bg-emerald-50"><span class="!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-text-[11px] !sp-font-semibold !sp-text-emerald-800">' . $ui::icon('check', '!sp-w-3.5 !sp-h-3.5') . '#' . esc_html($record['id']) . '</span>'
+        . '<button type="button" class="' . self::MODAL_BUTTON . '" data-scm-open-iframe data-iframe-url="' . esc_attr($record['url']) . '" data-iframe-title="' . esc_attr($label . ' #' . $record['id']) . '">' . $ui::icon('eye', '!sp-w-3 !sp-h-3') . 'Ver</button></div></div>';
+    }
+    $feminine = str_starts_with($label, 'Acta');
+    $noun = mb_strtolower($label, 'UTF-8');
+    $message = $record['id'] !== ''
+      ? ($feminine ? 'La ' : 'El ') . $noun . ' #' . $record['id'] . ' registrad' . ($feminine ? 'a' : 'o') . ' en el contrato no existe.'
+      : 'Este contrato no tiene ' . $noun . ' registrad' . ($feminine ? 'a' : 'o') . '.';
+    return '<div>' . $head . '<div class="!sp-flex !sp-items-center !sp-gap-1.5 !sp-min-h-10 !sp-px-3 !sp-py-2 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-rose-200 !sp-bg-rose-50 !sp-text-[11px] !sp-font-semibold !sp-text-rose-700" role="status">' . $ui::icon('alert', '!sp-w-3.5 !sp-h-3.5') . esc_html($message) . '</div></div>';
   }
 
   private function party(string $role, string $badge, string $name, string $document, string $email, string $phone): string

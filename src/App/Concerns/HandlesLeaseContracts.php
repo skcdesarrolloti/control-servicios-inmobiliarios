@@ -37,7 +37,7 @@ trait HandlesLeaseContracts
         'ficha' => ['Ficha del inmueble', $renderer->renderProperty($contract, $service->property($contract))],
         'historial-contrato' => ['Historial del contrato', $renderer->renderContractHistory($service->history((int) $contract['_ID']))],
         'envio' => $this->canUseDashboardAction('contract_annexes_send')
-          ? ['Enviar anexos del contrato', $renderer->renderSendForm($contract, $service->staff())]
+          ? ['Enviar anexos del contrato', $renderer->renderSendForm($contract, $service->staff(), $service->annexRecords($contract))]
           : throw new \DomainException('No tienes permiso para enviar anexos de contratos.'),
         'desistir' => $this->canUseDashboardAction('contract_desist')
           ? ['Marcar contrato desistido', $renderer->renderDesistForm($contract, $service->desistReasons())]
