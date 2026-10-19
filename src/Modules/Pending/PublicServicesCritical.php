@@ -15,6 +15,9 @@ final class PublicServicesCritical
   public const WORKFLOW = 'ticket-v1';
   public const EVENT = 'servicios_publicos_critico';
   public const RESPONSE_EVENT = 'servicios_publicos_pago_reportado';
+  /** Approved in Meta (Utility, Spanish COL): document header, 5 body variables, URL button "Ver revisión". */
+  public const WHATSAPP_TEMPLATE = 'scm_servicios_revision_critica';
+  public const WHATSAPP_LANGUAGE = 'es_CO';
   /** Legacy settings key, retained for compatibility; calendar recipients use EVENT. */
   public const CALENDAR_EVENT = 'servicios_publicos_critico_calendario';
   private ?\Closure $calendarHttp;
@@ -74,8 +77,11 @@ final class PublicServicesCritical
   public function config(): array
   {
     $cfg=(array)(new Settings($this->db,true))->get('public_services_critical',[]);
-    if(($cfg['workflow']??'')!==self::WORKFLOW){$cfg['whatsapp_enabled']=false;$cfg['whatsapp_template']='';}
-    return $cfg + ['whatsapp_template'=>'','language'=>'es','whatsapp_enabled'=>false,'button_base'=>rtrim((string) SCM_BASE_URL, '/') . '/'];
+    // The approved Meta template is the default; old payment-flow settings never carry over.
+    if(($cfg['workflow']??'')!==self::WORKFLOW || trim((string)($cfg['whatsapp_template']??''))==='')$cfg=['whatsapp_template'=>self::WHATSAPP_TEMPLATE,'language'=>self::WHATSAPP_LANGUAGE,'whatsapp_enabled'=>true]+$cfg;
+    if(trim((string)($cfg['language']??''))==='')$cfg['language']=self::WHATSAPP_LANGUAGE;
+    $cfg['button_base']=rtrim((string) SCM_BASE_URL, '/') . '/';
+    return $cfg + ['whatsapp_enabled'=>false];
   }
   public function saveConfig(array $input, array $actor): void
   {
