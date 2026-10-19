@@ -6,6 +6,8 @@ namespace SCM\App\Concerns;
 
 use SCM\Core\Auth;
 use SCM\Modules\LeaseContracts\LeaseAnnexesService;
+use SCM\Modules\LeaseContracts\LeaseContractCreateView;
+use SCM\Modules\LeaseContracts\LeaseContractCreationService;
 use SCM\Modules\LeaseContracts\LeaseContractsView;
 use SCM\Support\StoredFileService;
 
@@ -39,6 +41,7 @@ trait HandlesLeaseContracts
         'envio' => $this->canUseDashboardAction('contract_annexes_send')
           ? ['Enviar anexos del contrato', $renderer->renderSendForm($contract, $service->staff(), $service->annexRecords($contract))]
           : throw new \DomainException('No tienes permiso para enviar anexos de contratos.'),
+        'crear' => $this->lease_contract_create_view($contract),
         'desistir' => $this->canUseDashboardAction('contract_desist')
           ? ['Marcar contrato desistido', $renderer->renderDesistForm($contract, $service->desistReasons())]
           : throw new \DomainException('No tienes permiso para marcar contratos como desistidos.'),
@@ -86,6 +89,50 @@ trait HandlesLeaseContracts
     $this->jsonOk([
       'message' => sprintf('Anexos enviados. Correos: %d, WhatsApp: %d, avisos internos: %d.', (int) ($queued['email'] ?? 0), (int) ($queued['whatsapp'] ?? 0), (int) ($queued['internal'] ?? 0)),
       'html' => (new LeaseContractsView())->renderSendResult($result),
+    ]);
+  }
+
+  /** @param array<string,mixed> $contract @return array{0:string,1:string} */
+  private function lease_contract_create_view(array $contract): array
+  {
+    if (!$this->canUseDashboardAction('contract_create')) {
+      throw new \DomainException('No tienes permiso para crear contratos de arrendamiento.');
+    }
+    if (!LeaseContractCreationService::isUnassigned($contract)) {
+      throw new \DomainException('Este contrato ya tiene número asignado.');
+    }
+    $service = new LeaseContractCreationService($this->db);
+    return ['Crear contrato de arrendamiento', (new LeaseContractCreateView())->render($contract, $service->prefill($contract), $service->options())];
+  }
+
+  public function ajax_handler_lease_contract_create(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('contratos_arrendamiento') || !$this->canUseDashboardAction('contract_create')) {
+      $this->jsonFail('No tienes permiso para crear contratos de arrendamiento.');
+    }
+    $contractId = (int) ($_POST['contract_id'] ?? 0);
+    $clean = static function ($value) use (&$clean) {
+      if (is_array($value)) {
+        return array_map($clean, $value);
+      }
+      return trim(strip_tags(wp_unslash((string) $value)));
+    };
+    $input = [];
+    foreach ($_POST as $key => $value) {
+      if (is_string($key) && preg_match('/^[a-z0-9_]+$/', $key) === 1) {
+        $input[$key] = $clean($value);
+      }
+    }
+    try {
+      $result = (new LeaseContractCreationService($this->db))->create($contractId, $input, $this->lease_contract_sender());
+    } catch (\Throwable $error) {
+      error_log('[lease_contract_create] #' . $contractId . ': ' . $error->getMessage());
+      $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudo crear el contrato. Intenta nuevamente.');
+    }
+    $this->jsonOk([
+      'message' => 'Contrato #' . $result['contrato'] . ' creado.',
+      'html' => (new LeaseContractCreateView())->renderResult($result),
     ]);
   }
 

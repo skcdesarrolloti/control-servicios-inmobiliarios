@@ -1,0 +1,49 @@
+{
+  "name": "scm_presentacion_inquilino_copropiedad_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "HEADER",
+      "format": "DOCUMENT",
+      "example": {
+        "header_handle": [
+          "acta-ejemplo.pdf"
+        ]
+      }
+    },
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}, administración de {{2}}.\n\nLe informamos que el inquilino {{3}} ocupará el inmueble ubicado en {{4}}, bajo el contrato #{{5}}.\n\nAdjuntamos la carta de presentación del nuevo inquilino. Agradecemos su colaboración para que su experiencia en la copropiedad sea lo más positiva posible.\n\nAtentamente,\n{{6}}",
+      "example": {
+        "body_text": [
+          [
+            "Tatiana Zuñiga",
+            "Edificio Laguna de San Lazaro",
+            "Leudis Colon Cuadrado",
+            "K 22A 29A 108 AP 5A",
+            "848",
+            "Nassif Abuita Nassar | 3114156735 - Representante legal"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Ver acta",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "control-servicios-inmobiliarios/public/file.php?n=abc123_1789680400.pdf&s=abc123"
+          ]
+        }
+      ]
+    }
+  ]
+}

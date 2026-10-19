@@ -3387,7 +3387,7 @@ trait HandlesTicketWorkflowActions
     $payload = $controller->buildContratosArrendamientoPayload($_POST);
     $items = (array)($payload['items'] ?? []);
     $view = new \SCM\Modules\LeaseContracts\LeaseContractsView();
-    $table = $view->renderTable($items, $this->canUseDashboardAction('contract_annexes_send'), $this->canUseDashboardAction('contract_desist'));
+    $table = $view->renderTable($items, $this->canUseDashboardAction('contract_annexes_send'), $this->canUseDashboardAction('contract_desist'), $this->canUseDashboardAction('contract_create'));
     $pagination = $view->renderPagination((array)($payload['pagination'] ?? []));
     $this->jsonOk([
       'bucket' => (string)($payload['bucket'] ?? ''),

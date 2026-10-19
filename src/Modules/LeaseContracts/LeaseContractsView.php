@@ -88,7 +88,7 @@ final class LeaseContractsView
   }
 
   /** @param array<int,array<string,mixed>> $rows */
-  public function renderTable(array $rows, bool $canSend, bool $canDesist = false): string
+  public function renderTable(array $rows, bool $canSend, bool $canDesist = false, bool $canCreate = false): string
   {
     $ui = UI::class;
     if ($rows === []) {
@@ -125,7 +125,10 @@ final class LeaseContractsView
       $html .= $this->action('historial-inmueble', 'Historial inmueble', 'clock', $attrs);
       $html .= $this->action('historial-contrato', 'Historial contrato', 'copy', $attrs);
       $html .= '<button type="button" class="' . $ui::SECONDARY . ' !sp-text-[10px] !sp-justify-start" data-lease-action="caso"' . $attrs . '>' . $ui::icon('edit', '!sp-w-3 !sp-h-3') . 'Crear caso</button>';
-      if ($canSend && strtolower($v('estado', '')) !== 'desistido') {
+      $unassigned = strtolower($code) === 'no asignado';
+      if ($unassigned && $canCreate && strtolower($v('estado', '')) !== 'desistido') {
+        $html .= '<button type="button" class="' . $ui::PRIMARY . ' !sp-text-[10px] !sp-py-2 !sp-justify-start" data-lease-action="crear"' . $attrs . '>' . $ui::icon('document', '!sp-w-3 !sp-h-3') . 'Crear contrato</button>';
+      } elseif ($canSend && !$unassigned && strtolower($v('estado', '')) !== 'desistido') {
         $html .= '<button type="button" class="' . $ui::NAVY . ' !sp-justify-start" data-lease-action="envio"' . $attrs . '>' . $ui::icon('bolt', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . ($sent ? 'Reenviar anexos' : 'Enviar anexos') . '</button>';
       }
       if ($id !== '' && !in_array(strtolower($v('estado', '')), ['recibido', 'desistido'], true)) {

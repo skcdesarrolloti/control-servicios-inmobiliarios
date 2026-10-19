@@ -586,6 +586,7 @@ trait RendersDashboard
         'lease_contract_view' => self::AJAX_LEASE_CONTRACT_VIEW,
         'lease_contract_send' => self::AJAX_LEASE_CONTRACT_SEND,
         'lease_contract_desist' => self::AJAX_LEASE_CONTRACT_DESIST,
+        'lease_contract_create' => self::AJAX_LEASE_CONTRACT_CREATE,
         // Guía
         'guide_gcd_read' => self::AJAX_GUIDE_GCD_READ,
         'guide_gcd_save' => self::AJAX_GUIDE_GCD_SAVE,

@@ -1,0 +1,49 @@
+{
+  "name": "scm_notificacion_ingreso_arrendatario_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "HEADER",
+      "format": "DOCUMENT",
+      "example": {
+        "header_handle": [
+          "acta-ejemplo.pdf"
+        ]
+      }
+    },
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}.\n\nTe damos la bienvenida a {{2}} como ARRENDATARIO del contrato #{{3}}, inmueble ubicado en {{4}}.\n\nComo el inmueble pertenece a la copropiedad {{5}}, te compartimos el acta de notificación de ingreso con sus horarios y amenidades. También puedes consultarla desde el botón.\n\nAtentamente,\n{{6}}",
+      "example": {
+        "body_text": [
+          [
+            "María Pérez",
+            "SOLUCIONES COMERCIALES Y CONSTRUCTIVAS SAS",
+            "848",
+            "K 22A 29A 108 Edificio Laguna San Lázaro AP 5A",
+            "Edificio Laguna de San Lazaro",
+            "Nassif Abuita Nassar | 3114156735 - Representante legal"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Ver acta",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "control-servicios-inmobiliarios/public/file.php?n=abc123_1789680400.pdf&s=abc123"
+          ]
+        }
+      ]
+    }
+  ]
+}

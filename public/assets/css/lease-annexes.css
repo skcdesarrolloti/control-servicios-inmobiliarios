@@ -33,4 +33,8 @@
   .scm-services-pdf .scm-lease-act .scm-acta-receipt-footer{margin-top:10px;padding-top:8px}
   .scm-services-pdf .scm-lease-act .scm-services-letterhead-top{margin-bottom:2mm}
   .scm-services-pdf .scm-lease-act .scm-services-letterhead-top img{width:52%}
+  .scm-services-pdf .scm-lease-act .scm-acta-receipt-data{font-size:9.5px}
+  .scm-services-pdf .scm-lease-act .scm-acta-receipt-data th,.scm-services-pdf .scm-lease-act .scm-acta-receipt-data td{padding:2px 7px;line-height:1.35}
+  .scm-services-pdf .scm-lease-act .scm-lease-note{margin-bottom:4px}
+  .scm-services-pdf .scm-lease-act .scm-lease-signature{max-height:44px}
 }

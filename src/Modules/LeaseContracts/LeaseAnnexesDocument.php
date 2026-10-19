@@ -67,14 +67,7 @@ final class LeaseAnnexesDocument
       $contacts[] = ['Servicio al arrendatario', $context['nombre_arrendatarios'] ?? '', $context['celular_arrendatarios'] ?? '', $context['correo_arrendatarios'] ?? ''];
     }
 
-    $letterhead = $letterheadFooter = '';
-    if ($pdf) {
-      $assets = dirname(__DIR__, 3) . '/resources/assets/';
-      $top = 'data:image/jpeg;base64,' . base64_encode((string) file_get_contents($assets . 'membrete-sucasa-header.jpg'));
-      $bottom = 'data:image/jpeg;base64,' . base64_encode((string) file_get_contents($assets . 'membrete-sucasa-footer.jpg'));
-      $letterhead = '<style>@page{size:letter;margin:12mm 18mm 14mm;@bottom-left{content:none}@bottom-center{content:none}}</style><div class="scm-services-letterhead-top"><img src="' . $top . '" alt="Membrete institucional"></div>';
-      $letterheadFooter = '<div class="scm-services-letterhead-bottom"><img src="' . $bottom . '" alt=""></div>';
-    }
+    [$letterhead, $letterheadFooter] = self::letterhead($pdf);
 
     $html = '<article class="scm-acta-receipt scm-services-document scm-services-act scm-lease-act">' . $letterhead
       . Doc::header('Acta de bienvenida · ' . self::ROLES[$role], false)
@@ -84,11 +77,7 @@ final class LeaseAnnexesDocument
     foreach ($paragraphs as $paragraph) {
       $html .= '<p>' . Doc::paragraph($paragraph) . '</p>';
     }
-    $html .= '</section><section class="scm-acta-receipt-section"><h2>Funcionarios de contacto</h2><div class="scm-lease-contacts">';
-    foreach ($contacts as [$label, $contactName, $phone, $email]) {
-      $html .= '<div class="scm-lease-contact"><span>' . Doc::e($label) . '</span><strong>' . Doc::e($contactName !== '' ? $contactName : 'Por asignar') . '</strong><p>' . Doc::e(implode(' · ', array_filter([(string) $phone, (string) $email]))) . '</p></div>';
-    }
-    $html .= '</div>';
+    $html .= '</section><section class="scm-acta-receipt-section"><h2>Funcionarios de contacto</h2>' . self::contacts($contacts);
     if ($role === 'codeudor') {
       $html .= '<p class="scm-lease-note">De todas formas, le anunciamos que el funcionario que a continuación se relaciona estará listo para apoyarlo como <strong>CLIENTE ESPECIAL</strong> en caso de tener algún requerimiento en el tema inmobiliario:</p>'
         . '<div class="scm-lease-contacts"><div class="scm-lease-contact"><span>Gerencia comercial</span><strong>' . Doc::e(($context['gerente_comercial'] ?? '') !== '' ? $context['gerente_comercial'] : 'Por asignar') . '</strong><p>' . Doc::e(implode(' · ', array_filter([(string) ($context['celular_ge_comercial'] ?? ''), (string) ($context['correo_ge_comercial'] ?? '')]))) . '</p></div></div>'
@@ -99,13 +88,43 @@ final class LeaseAnnexesDocument
       $html .= '<li>' . Doc::e($label) . '</li>';
     }
     $html .= '</ul><p class="scm-lease-link"><a href="' . Doc::e($annexesUrl) . '">Ver anexos del contrato</a></p></section>'
-      . '<footer class="scm-acta-receipt-footer scm-services-signatures"><div><span>Firmado original</span>'
+      . self::signatureFooter($context) . $letterheadFooter . '</article>';
+    return $html;
+  }
+
+  /** Membrete superior e inferior del PDF, igual que las actas de servicios públicos. @return array{0:string,1:string} */
+  public static function letterhead(bool $pdf): array
+  {
+    if (!$pdf) {
+      return ['', ''];
+    }
+    $assets = dirname(__DIR__, 3) . '/resources/assets/';
+    $top = 'data:image/jpeg;base64,' . base64_encode((string) file_get_contents($assets . 'membrete-sucasa-header.jpg'));
+    $bottom = 'data:image/jpeg;base64,' . base64_encode((string) file_get_contents($assets . 'membrete-sucasa-footer.jpg'));
+    return [
+      '<style>@page{size:letter;margin:12mm 18mm 14mm;@bottom-left{content:none}@bottom-center{content:none}}</style><div class="scm-services-letterhead-top"><img src="' . $top . '" alt="Membrete institucional"></div>',
+      '<div class="scm-services-letterhead-bottom"><img src="' . $bottom . '" alt=""></div>',
+    ];
+  }
+
+  /** @param array<int,array{0:string,1:mixed,2:mixed,3:mixed}> $contacts [etiqueta, nombre, celular, correo] */
+  public static function contacts(array $contacts): string
+  {
+    $html = '<div class="scm-lease-contacts">';
+    foreach ($contacts as [$label, $contactName, $phone, $email]) {
+      $html .= '<div class="scm-lease-contact"><span>' . Doc::e($label) . '</span><strong>' . Doc::e((string) $contactName !== '' ? $contactName : 'Por asignar') . '</strong><p>' . Doc::e(implode(' · ', array_filter([(string) $phone, (string) $email]))) . '</p></div>';
+    }
+    return $html . '</div>';
+  }
+
+  /** Cierre con la firma del representante legal (cargo 14) y el sello "Realizado por". @param array<string,mixed> $context */
+  public static function signatureFooter(array $context): string
+  {
+    return '<footer class="scm-acta-receipt-footer scm-services-signatures"><div><span>Firmado original</span>'
       . (filter_var((string) ($context['firma_legal'] ?? ''), FILTER_VALIDATE_URL) ? '<img class="scm-lease-signature" src="' . Doc::e($context['firma_legal']) . '" alt="Firma del representante legal">' : '')
       . '<strong>' . Doc::e(($context['representante_legal'] ?? '') !== '' ? $context['representante_legal'] : 'Representante legal') . '</strong><p>Representante legal' . (($context['cargo_legal'] ?? '') !== '' ? ' · ' . Doc::e($context['cargo_legal']) : '') . (($context['celular_legal'] ?? '') !== '' ? ' · ' . Doc::e($context['celular_legal']) : '') . '</p></div>'
       . '<div><span>Realizado por</span><strong>' . Doc::e($context['realizado_por'] ?? 'SKC SuCasa Inmobiliaria') . '</strong><p>' . Doc::e(implode(' · ', array_filter([(string) ($context['realizado_por_cargo'] ?? ''), (string) ($context['realizado_por_telefono'] ?? '')]))) . '</p></div>'
-      . '<p class="scm-services-company">SKC SuCasa Inmobiliaria · NIT 900623242-4</p></footer>'
-      . $letterheadFooter . '</article>';
-    return $html;
+      . '<p class="scm-services-company">SKC SuCasa Inmobiliaria · NIT 900623242-4</p></footer>';
   }
 
   /** @return string[] Anexos que ve cada actor: el propietario no recibe el contrato de arrendamiento y los demás no reciben el mandato. */

@@ -1,4 +1,4 @@
-# Contratos de arrendamiento y envío de anexos
+# Contratos de arrendamiento: creación y envío de anexos
 
 Menú: **Actividades contractuales › Contratos de arrendamiento** (permiso de pestaña `contratos_arrendamiento`).
 
@@ -15,6 +15,15 @@ Acciones por contrato, todas dentro del panel:
 - **Crear caso**: abre *Crear nuevo caso* con el contrato ya seleccionado.
 - **Marcar desistido**: pide motivo del glosario JetEngine "Razón de desistir" (id 1463), observación opcional y confirmación. Cambia `estado` a `Desistido` y guarda `razon_desistido`; registra el cambio en el historial del contrato y del inmueble y avisa a quienes se configuren en Notificaciones internas › Contratos › Contrato de arrendamiento desistido (`contrato_desistido`). Requiere la acción `contract_desist`.
 - **Enviar / Reenviar anexos**: reemplaza el formulario JetForm "Enviar contrato de arrendamiento". Requiere la acción `contract_annexes_send`; hasta que se guarden los permisos, todos los cargos la conservan.
+
+## Crear contrato (registros "No asignado")
+
+Reemplaza el formulario JetForm "Crear contrato de arrendamiento". Se ofrece en los contratos con número `No asignado` (acción `contract_create`).
+
+- Prellena desde la hoja de cierre (`jet_cct_cierres.id_contrato_arrendamiento`), el propietario, el arrendatario, la copropiedad, el estudio de aseguradora y el contrato. Usa los glosarios 783, 785, 784, 1003, 175, 1011, 1016, 992, 991, 990 y 853, y las zonas de `jet_cct_zonas_sociales`.
+- Al guardar: asigna número e inmueble al contrato (estado Por entregar, tipo Nuevo, `se_envio = No`; `id_empleado`, `realizado_por` y `creador` solo si estaban vacíos), marca el cierre como `Realizada` y el mandato `estado_hoja_cierre = Realizada`, actualiza los casos de entrega y daños, la revisión de entrega y el inventario, crea los codeudores, conecta las relaciones JetEngine 864, 865, 658 y 863, actualiza los metadatos del post `inmuebles` y registra el historial del contrato y del inmueble.
+- Con propiedad horizontal genera el **acta de notificación de ingreso** (arrendatario) y la **carta de presentación del nuevo inquilino** (copropiedad), las guarda en `acta_notificacion_arrendatario` / `acta_administracion`, crea el registro en `jet_cct_actas_administracion` y las envía por correo y WhatsApp (`scm_notificacion_ingreso_arrendatario_v1` y `scm_presentacion_inquilino_copropiedad_v1`).
+- Aviso interno configurable: **Notificaciones internas › Contratos › Contrato de arrendamiento creado** (`contrato_arrendamiento_creado`).
 
 ## Envío de anexos
 

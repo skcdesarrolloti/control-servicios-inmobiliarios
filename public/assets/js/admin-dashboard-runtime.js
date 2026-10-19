@@ -264,6 +264,7 @@
     var actionLeaseContractView = actions.lease_contract_view || "";
     var actionLeaseContractSend = actions.lease_contract_send || "";
     var actionLeaseContractDesist = actions.lease_contract_desist || "";
+    var actionLeaseContractCreate = actions.lease_contract_create || "";
     var duePopupConfig = runtime.duePopup || {};
     var dashboardDuePopupShown = {};
     var dashboardDuePopupPromise = null;
@@ -19966,6 +19967,32 @@
         }
       }
 
+      // Muestra u oculta los bloques data-lease-when="campo=valor" y deshabilita sus campos ocultos.
+      function syncCreateForm(form) {
+        form.querySelectorAll("[data-lease-when]").forEach(function (block) {
+          var rule = String(block.getAttribute("data-lease-when") || "").split("=");
+          var control = form.elements[rule[0]];
+          var matches = !!control && String(control.value || "") === rule[1];
+          var parentHidden = block.parentElement && block.parentElement.closest("[data-lease-when][data-lease-hidden='1']");
+          var visible = matches && !parentHidden;
+          block.setAttribute("data-lease-hidden", visible ? "0" : "1");
+          block.classList.toggle("!sp-hidden", !visible);
+        });
+        form.querySelectorAll("input, select, textarea").forEach(function (field) {
+          if (field.closest("template") || field.closest("[data-lease-person]")) return;
+          field.disabled = !!field.closest("[data-lease-when][data-lease-hidden='1']");
+        });
+        var checked = {};
+        form.querySelectorAll('[data-lease-agreements] input[type="checkbox"]').forEach(function (box) {
+          checked[box.value] = box.checked;
+        });
+        form.querySelectorAll("[data-lease-agreement]").forEach(function (box) {
+          var on = !!checked[box.getAttribute("data-lease-agreement")];
+          box.classList.toggle("!sp-hidden", !on);
+          box.querySelectorAll("textarea").forEach(function (area) { area.disabled = !on; });
+        });
+      }
+
       function loadView(view, trigger) {
         var contractId = trigger.getAttribute("data-contract-id") || "";
         var code = trigger.getAttribute("data-contract-code") || contractId;
@@ -19977,8 +20004,10 @@
             if (kicker) kicker.textContent = data.kicker || "Contrato";
             if (title) title.textContent = data.title || "Contrato #" + code;
             body.innerHTML = data.html || "";
-            var form = body.querySelector("[data-lease-send-form]");
+            var form = body.querySelector("[data-lease-send-form], [data-lease-create-form]");
             if (form) syncCodebtors(form);
+            var createForm = body.querySelector("[data-lease-create-form]");
+            if (createForm) syncCreateForm(createForm);
           })
           .catch(function (error) {
             if (seq !== requestSeq) return;
@@ -20058,6 +20087,37 @@
       wrap.addEventListener("change", function (event) {
         var select = event.target && event.target.closest ? event.target.closest("[data-lease-codebtors]") : null;
         if (select) syncCodebtors(select.form);
+        var createForm = event.target && event.target.closest ? event.target.closest("[data-lease-create-form]") : null;
+        if (createForm) syncCreateForm(createForm);
+      });
+
+      // Repetidores (mascotas, vehículos, personas) del formulario de creación.
+      wrap.addEventListener("click", function (event) {
+        var target = event.target && event.target.closest ? event.target : null;
+        if (!target) return;
+        var add = target.closest("[data-lease-repeat-add]");
+        if (add) {
+          event.preventDefault();
+          var box = add.closest("[data-lease-repeat]");
+          var template = box ? box.querySelector("[data-lease-repeat-template]") : null;
+          var list = box ? box.querySelector("[data-lease-repeat-list]") : null;
+          if (!template || !list) return;
+          var holder = document.createElement("div");
+          holder.innerHTML = template.innerHTML.replace(/__i__/g, String(Date.now()));
+          var row = holder.firstElementChild;
+          if (row) {
+            list.appendChild(row);
+            var first = row.querySelector("input, select");
+            if (first) first.focus();
+          }
+          return;
+        }
+        var remove = target.closest("[data-lease-repeat-remove]");
+        if (remove) {
+          event.preventDefault();
+          var item = remove.closest("[data-lease-repeat-row]");
+          if (item) item.remove();
+        }
       });
 
       // El botón "Abrir carpeta" sigue el enlace que se escriba en Registro fotográfico.
@@ -20071,6 +20131,63 @@
       });
 
       wrap.addEventListener("submit", function (event) {
+        var createForm = event.target && event.target.closest ? event.target.closest("[data-lease-create-form]") : null;
+        if (createForm) {
+          event.preventDefault();
+          var createError = createForm.querySelector("[data-lease-create-error]");
+          var createSubmit = createForm.querySelector("[data-lease-create-submit]");
+          var showCreateError = function (message) {
+            if (!createError) return;
+            createError.textContent = message || "";
+            createError.classList.toggle("!sp-hidden", !message);
+            if (message) createError.scrollIntoView({ block: "nearest" });
+          };
+          showCreateError("");
+          syncCreateForm(createForm);
+          if (!createForm.checkValidity()) {
+            var invalidField = createForm.querySelector(":invalid");
+            showCreateError("Revisa los campos obligatorios" + (invalidField && invalidField.name ? " (" + invalidField.name.replace(/[_\[\]]+/g, " ").trim() + ")" : "") + ".");
+            if (invalidField) invalidField.focus();
+            return;
+          }
+          if (!actionLeaseContractCreate) {
+            showCreateError("Actualiza la página para crear el contrato.");
+            return;
+          }
+          var createData = new FormData(createForm);
+          createData.set("action", actionLeaseContractCreate);
+          createData.set("nonce", nonce);
+          sending = true;
+          if (createSubmit) {
+            createSubmit.disabled = true;
+            createSubmit.textContent = "Creando contrato...";
+          }
+          fetch(ajaxUrl, { method: "POST", body: createData, credentials: "same-origin" })
+            .then(function (response) {
+              return response.json().catch(function () {
+                throw new Error("El servidor no respondió correctamente. Revisa en el historial del contrato si quedó creado antes de reintentar.");
+              });
+            })
+            .then(function (json) {
+              if (!json || !json.success) {
+                throw new Error((json && json.data && json.data.message) || "No se pudo crear el contrato.");
+              }
+              sending = false;
+              showToast("success", json.data.message || "Contrato creado.");
+              if (kicker) kicker.textContent = "Contrato creado";
+              body.innerHTML = json.data.html || "";
+              root.dispatchEvent(new CustomEvent("scm:contracts-refresh"));
+            })
+            .catch(function (err) {
+              sending = false;
+              showCreateError(err.message || "No se pudo crear el contrato.");
+              if (createSubmit) {
+                createSubmit.disabled = false;
+                createSubmit.textContent = "Crear contrato de arrendamiento";
+              }
+            });
+          return;
+        }
         var desistForm = event.target && event.target.closest ? event.target.closest("[data-lease-desist-form]") : null;
         if (desistForm) {
           event.preventDefault();
