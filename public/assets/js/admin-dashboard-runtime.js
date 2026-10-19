@@ -12415,26 +12415,17 @@
         })
         .finally(function () { if (module._request === request) content.removeAttribute("aria-busy"); });
     }
-    function maintenanceMetricsQuickRange(key) {
-      var today = new Date();
-      var pad = function (n) { return String(n).padStart(2, "0"); };
-      var iso = function (d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
-      var from = new Date(today.getFullYear(), 0, 1);
-      if (key === "month") from = new Date(today.getFullYear(), today.getMonth(), 1);
-      if (key === "last12") from = new Date(today.getFullYear(), today.getMonth() - 11, 1);
-      if (key === "all") from = new Date(2000, 0, 1);
-      return { from: iso(from), to: iso(today) };
-    }
     root.addEventListener("click", function (event) {
       var module = event.target.closest("[data-maint-metrics]");
       if (!module) return;
-      var quick = event.target.closest("[data-maint-metrics-quick]");
-      if (quick) {
-        var range = maintenanceMetricsQuickRange(quick.getAttribute("data-maint-metrics-quick"));
-        var form = module.querySelector("[data-maint-metrics-form]");
-        form.elements.from.value = range.from;
-        form.elements.to.value = range.to;
-        module.querySelectorAll("[data-maint-metrics-quick]").forEach(function (button) { button.setAttribute("aria-pressed", button === quick ? "true" : "false"); });
+      var modeButton = event.target.closest("[data-maint-metrics-mode]");
+      if (modeButton) {
+        var mode = modeButton.getAttribute("data-maint-metrics-mode");
+        module.querySelector('[data-maint-metrics-form] [name="mode"]').value = mode;
+        module.querySelectorAll("[data-maint-metrics-mode]").forEach(function (button) { button.setAttribute("aria-checked", button === modeButton ? "true" : "false"); });
+        module.querySelectorAll("[data-maint-metrics-mode-field]").forEach(function (field) { field.hidden = field.getAttribute("data-maint-metrics-mode-field") !== mode; });
+        var apply = module.querySelector("[data-maint-metrics-apply]");
+        if (apply) apply.hidden = mode !== "acumulado";
         loadMaintenanceMetrics(module, true);
         return;
       }
@@ -12461,9 +12452,12 @@
       var form = event.target.closest("[data-maint-metrics-form]");
       if (!form) return;
       event.preventDefault();
-      var module = form.closest("[data-maint-metrics]");
-      module.querySelectorAll("[data-maint-metrics-quick]").forEach(function (button) { button.setAttribute("aria-pressed", "false"); });
-      loadMaintenanceMetrics(module, true);
+      loadMaintenanceMetrics(form.closest("[data-maint-metrics]"), true);
+    });
+    root.addEventListener("change", function (event) {
+      // Por mes y Anual se recalculan al elegir; Acumulado espera a "Aplicar" para no recargar con cada extremo.
+      if (!event.target.matches('[data-maint-metrics-form] [name="month"], [data-maint-metrics-form] [name="year"]')) return;
+      loadMaintenanceMetrics(event.target.closest("[data-maint-metrics]"), true);
     });
 
     // Preventivas pendientes: sub-tabs (history and due-date queues) loaded through the same panel action.

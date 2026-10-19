@@ -90,7 +90,9 @@ final class MaintenanceMetricsView
   {
     [$title, $subtitle, $icon, $note] = self::REPORTS[$report];
     $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
-    $quick = ['month' => 'Mes actual', 'year' => 'Este año', 'last12' => 'Últimos 12 meses', 'all' => 'Todo'];
+    $month = $today->format('Y-m');
+    $year = (int) $today->format('Y');
+    $modes = ['actual' => 'Mes actual', 'mes' => 'Por mes', 'anual' => 'Anual', 'acumulado' => 'Acumulado'];
     ob_start();
 ?>
     <div class="!sp-font-sans !sp-text-service-navy !sp-bg-service-background !sp-p-3 sm:!sp-p-5 !sp-space-y-5" data-maint-metrics="<?= self::e($report) ?>">
@@ -99,12 +101,15 @@ final class MaintenanceMetricsView
         <div class="!sp-flex !sp-flex-wrap !sp-gap-2"><button type="button" class="<?= UI::SECONDARY ?>" data-maint-metrics-export><?= UI::icon('download') ?>Exportar Excel</button><button type="button" class="<?= UI::NAVY ?>" data-maint-metrics-refresh><?= UI::icon('refresh') ?>Actualizar</button></div>
       </header>
       <form class="<?= UI::CARD ?> !sp-p-5 !sp-flex !sp-flex-wrap !sp-items-end !sp-gap-4" data-maint-metrics-form>
-        <label><span class="<?= UI::LABEL ?>">Desde</span><input class="<?= UI::INPUT ?> !sp-w-44" type="date" name="from" value="<?= $today->format('Y') ?>-01-01" max="<?= $today->format('Y-m-d') ?>"></label>
-        <label><span class="<?= UI::LABEL ?>">Hasta</span><input class="<?= UI::INPUT ?> !sp-w-44" type="date" name="to" value="<?= $today->format('Y-m-d') ?>" max="<?= $today->format('Y-m-d') ?>"></label>
-        <button type="submit" class="<?= UI::PRIMARY ?>"><?= UI::icon('filter') ?>Aplicar periodo</button>
-        <div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2 !sp-text-[10px] !sp-text-service-muted">Periodo rápido:
-          <?php foreach ($quick as $key => $label): ?><button type="button" class="<?= UI::SECONDARY ?> aria-pressed:!sp-bg-service-navy aria-pressed:!sp-text-white" aria-pressed="<?= $key === 'year' ? 'true' : 'false' ?>" data-maint-metrics-quick="<?= $key ?>"><?= $label ?></button><?php endforeach ?>
-        </div>
+        <input type="hidden" name="mode" value="actual">
+        <div><span class="<?= UI::LABEL ?>">Periodo</span><div class="!sp-flex !sp-flex-wrap !sp-gap-1 !sp-p-1 !sp-bg-slate-100 !sp-rounded-lg" role="radiogroup" aria-label="Periodo">
+          <?php foreach ($modes as $key => $label): ?><button type="button" role="radio" class="!sp-px-3 !sp-py-2 !sp-rounded-md !sp-bg-transparent !sp-border-0 !sp-text-service-muted !sp-font-sans !sp-text-[10px] !sp-font-medium !sp-cursor-pointer aria-checked:!sp-bg-service-navy aria-checked:!sp-text-white aria-checked:!sp-font-semibold" aria-checked="<?= $key === 'actual' ? 'true' : 'false' ?>" data-maint-metrics-mode="<?= $key ?>"><?= $label ?></button><?php endforeach ?>
+        </div></div>
+        <label class="[&[hidden]]:!sp-hidden" data-maint-metrics-mode-field="mes" hidden><span class="<?= UI::LABEL ?>">Mes</span><input class="<?= UI::INPUT ?> !sp-w-44" type="month" name="month" value="<?= $month ?>" max="<?= $month ?>"></label>
+        <label class="[&[hidden]]:!sp-hidden" data-maint-metrics-mode-field="anual" hidden><span class="<?= UI::LABEL ?>">Año</span><select class="<?= UI::INPUT ?> !sp-w-32" name="year"><?php for ($y = $year; $y >= 2015; $y--): ?><option value="<?= $y ?>"><?= $y ?></option><?php endfor ?></select></label>
+        <label class="[&[hidden]]:!sp-hidden" data-maint-metrics-mode-field="acumulado" hidden><span class="<?= UI::LABEL ?>">Desde</span><input class="<?= UI::INPUT ?> !sp-w-44" type="month" name="from_month" value="<?= $year ?>-01" max="<?= $month ?>"></label>
+        <label class="[&[hidden]]:!sp-hidden" data-maint-metrics-mode-field="acumulado" hidden><span class="<?= UI::LABEL ?>">Hasta</span><input class="<?= UI::INPUT ?> !sp-w-44" type="month" name="to_month" value="<?= $month ?>" max="<?= $month ?>"></label>
+        <button type="submit" class="<?= UI::PRIMARY ?> [&[hidden]]:!sp-hidden" data-maint-metrics-apply hidden><?= UI::icon('filter') ?>Aplicar</button>
         <p class="!sp-m-0 !sp-w-full !sp-text-[10px] !sp-text-service-muted"><?= self::e($note) ?></p>
       </form>
       <div data-maint-metrics-content aria-live="polite"><p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">Abre esta métrica para cargar la información.</p></div>

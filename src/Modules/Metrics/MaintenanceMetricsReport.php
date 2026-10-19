@@ -42,6 +42,41 @@ final class MaintenanceMetricsReport
     return [$fromDate->getTimestamp(), $toDate->getTimestamp() + 86399, $fromDate->format('Y-m-d'), $toDate->format('Y-m-d')];
   }
 
+  /**
+   * Same period modes as Casos and Cotizaciones: mes actual, por mes, anual and acumulado (month range).
+   * Periods never end after today. @return array{0:int,1:int,2:string,3:string}
+   */
+  public function periodFromInput(array $input): array
+  {
+    $today = new \DateTimeImmutable('today', $this->timezone);
+    $month = static function (mixed $value) use ($today): \DateTimeImmutable {
+      $date = \DateTimeImmutable::createFromFormat('!Y-m', (string) $value, $today->getTimezone());
+      return $date && $date->format('Y-m') === (string) $value ? $date : $today->modify('first day of this month');
+    };
+    $cap = static fn(\DateTimeImmutable $date): \DateTimeImmutable => $date > $today ? $today : $date;
+    switch ((string) ($input['mode'] ?? 'actual')) {
+      case 'mes':
+        $from = $month($input['month'] ?? '');
+        $to = $from->modify('last day of this month');
+        break;
+      case 'anual':
+        $year = max(2000, min((int) $today->format('Y'), (int) ($input['year'] ?? $today->format('Y'))));
+        $from = $today->setDate($year, 1, 1);
+        $to = $today->setDate($year, 12, 31);
+        break;
+      case 'acumulado':
+        $from = $month($input['from_month'] ?? '');
+        $to = $month($input['to_month'] ?? '');
+        if ($to < $from) [$from, $to] = [$to, $from];
+        $to = $to->modify('last day of this month');
+        break;
+      default:
+        $from = $today->modify('first day of this month');
+        $to = $today;
+    }
+    return $this->period($from->format('Y-m-d'), $cap($to)->format('Y-m-d'));
+  }
+
   public static function status(string $value): string
   {
     // Manual accent folding: iconv transliteration differs between servers.

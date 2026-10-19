@@ -38,7 +38,7 @@ trait HandlesMetricsPanels
     }
     try {
       $metrics = new \SCM\Modules\Metrics\MaintenanceMetricsReport($this->db);
-      [$fromTs, $toTs, $from, $to] = $metrics->period((string) ($_POST['from'] ?? ''), (string) ($_POST['to'] ?? ''));
+      [$fromTs, $toTs, $from, $to] = $metrics->periodFromInput(wp_unslash($_POST));
       if ($report === 'crecimiento') {
         $data = $metrics->growth($fromTs, $toTs);
       } elseif ($report === 'servicios') {
