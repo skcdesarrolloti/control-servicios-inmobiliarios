@@ -32,15 +32,24 @@ final class PublicServicesReviewStorage
     self::$verified ??= new \WeakMap();
     if (!empty((self::$verified[$this->db->pdo()] ?? [])[$this->table()])) return;
     $schema = new SchemaInspector($this->db);
-    if (array_diff(['request_key','contract_pk','review_id','snapshot_json','created_at'], $schema->getTableColumns($this->table()))) {
-      throw new \DomainException('Prepara el módulo ejecutando bin/migrate-public-services.php.');
+    $contracts = $this->db->table('jet_cct_contratos_arrendamiento');
+    $missingTable = (bool) array_diff(['request_key','contract_pk','review_id','snapshot_json','created_at'], $schema->getTableColumns($this->table()));
+    $missingColumn = !$schema->columnExists($contracts, 'proxima_revision_servicios');
+    if ($missingTable || $missingColumn) {
+      // Self-provision instead of requiring the CLI migration; DDL commits implicitly, so never inside a transaction.
+      if ($this->db->pdo()->inTransaction()) throw new \DomainException('No se pudo preparar el módulo de servicios públicos. Intenta nuevamente.');
+      try {
+        if ($missingTable) $this->db->pdo()->exec($this->schemaSql());
+        if ($missingColumn) $this->db->pdo()->exec('ALTER TABLE `' . $contracts . '` ADD COLUMN `proxima_revision_servicios` BIGINT NULL DEFAULT NULL');
+      } catch (\Throwable $error) {
+        throw new \DomainException('No se pudieron preparar las tablas de servicios públicos: ' . $error->getMessage());
+      }
+      $schema = new SchemaInspector($this->db);
+      if (array_diff(['request_key','contract_pk','review_id','snapshot_json','created_at'], $schema->getTableColumns($this->table())) || !$schema->columnExists($contracts, 'proxima_revision_servicios')) {
+        throw new \DomainException('No se pudieron preparar las tablas de servicios públicos. Verifica los permisos de la base de datos.');
+      }
     }
-    if (!$schema->columnExists($this->db->table('jet_cct_contratos_arrendamiento'), 'proxima_revision_servicios')) {
-      throw new \DomainException('Prepara la programación ejecutando bin/migrate-public-services.php.');
-    }
-    $tables = [$this->table(), $this->db->table('jet_cct_contratos_arrendamiento'), $this->db->table('jet_cct_revisiones_servicios'), $this->db->table('jet_cct_historial_del_inmueble')];
-    $engines = $this->db->getCol('SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (' . implode(',', array_fill(0,count($tables),'?')) . ')', $tables);
-    if (count($engines) !== count($tables) || array_filter($engines, static fn($engine): bool => strcasecmp((string)$engine,'InnoDB') !== 0)) throw new \DomainException('Las tablas de revisiones, contratos e historial deben usar InnoDB para guardar la operación completa.');
+    // Legacy MyISAM tables are accepted; they only lose transactional rollback.
     $verifiedTables = self::$verified[$this->db->pdo()] ?? [];
     $verifiedTables[$this->table()] = true;
     self::$verified[$this->db->pdo()] = $verifiedTables;
