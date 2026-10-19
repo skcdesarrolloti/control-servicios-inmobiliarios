@@ -937,6 +937,7 @@ final class GenericTicketsUiView
                 <option value="medio" <?php selected((string) ($p['fMagnitudCaso'] ?? ''), 'medio'); ?>>Medio</option>
                 <option value="bajo" <?php selected((string) ($p['fMagnitudCaso'] ?? ''), 'bajo'); ?>>Bajo</option>
               </select></div><?php endif; ?>
+          <?php if (in_array($baseTabKey, ['entrega', 'preventiva', 'recibo'], true)) echo \SCM\Support\CaseFilterFields::executor($prefix, $p); ?>
         </div>
         <div class="scm-actions">
           <button class="scm-btn-primary btn btn-primary" type="submit"><?php echo $svgSearch; ?> Filtrar</button>

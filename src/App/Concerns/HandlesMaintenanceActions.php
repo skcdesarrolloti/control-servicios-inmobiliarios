@@ -102,6 +102,12 @@ trait HandlesMaintenanceActions
       'kpi_magnitud_bajo' => (string)($stats['magnitud_bajo'] ?? 0),
       'kpi_danos_si' => (string)($stats['danos_si'] ?? 0),
       'kpi_danos_no' => (string)($stats['danos_no'] ?? 0),
+      'kpi_ejecuta_inmobiliaria' => (string)($stats['ejecuta_inmobiliaria'] ?? 0),
+      'kpi_ejecuta_propietario' => (string)($stats['ejecuta_propietario'] ?? 0),
+      'kpi_ejecuta_arrendatario' => (string)($stats['ejecuta_arrendatario'] ?? 0),
+      'kpi_ejecuta_copropiedad' => (string)($stats['ejecuta_copropiedad'] ?? 0),
+      'kpi_ejecuta_externo' => (string)($stats['ejecuta_externo'] ?? 0),
+      'kpi_ejecuta_sin_definir' => (string)($stats['ejecuta_sin_definir'] ?? 0),
       'pagination' => $paginationHtml,
     ]);
   }
@@ -163,6 +169,12 @@ trait HandlesMaintenanceActions
       'kpi_magnitud_bajo' => (string)($stats['magnitud_bajo'] ?? 0),
       'kpi_danos_si' => (string)($stats['danos_si'] ?? 0),
       'kpi_danos_no' => (string)($stats['danos_no'] ?? 0),
+      'kpi_ejecuta_inmobiliaria' => (string)($stats['ejecuta_inmobiliaria'] ?? 0),
+      'kpi_ejecuta_propietario' => (string)($stats['ejecuta_propietario'] ?? 0),
+      'kpi_ejecuta_arrendatario' => (string)($stats['ejecuta_arrendatario'] ?? 0),
+      'kpi_ejecuta_copropiedad' => (string)($stats['ejecuta_copropiedad'] ?? 0),
+      'kpi_ejecuta_externo' => (string)($stats['ejecuta_externo'] ?? 0),
+      'kpi_ejecuta_sin_definir' => (string)($stats['ejecuta_sin_definir'] ?? 0),
     ]);
   }
 

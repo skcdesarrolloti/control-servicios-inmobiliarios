@@ -57,6 +57,9 @@ trait GenericQueryConcern
       'fDanos' => $clean($input[$prefix . 'danos'] ?? ''),
       'fMagnitud' => $clean($input[$prefix . 'magnitud'] ?? ''),
       'fMagnitudCaso' => $clean($input[$prefix . 'magnitud_caso'] ?? ''),
+      'fEjecutado' => $clean($input[$prefix . 'ejecutado'] ?? ''),
+      // Solo las pestañas con cotizaciones (Entrega, Preventiva, Recibo) muestran "¿Quién ejecuta?".
+      '_scmExecutorKpis' => in_array($prefix, ['scmeg_', 'scmpv_', 'scmrc_'], true),
       'fPerturbacion' => $clean($input[$prefix . 'perturbacion'] ?? ''),
       'fAtraso' => $clean($input[$prefix . 'atraso'] ?? ''),
       'fSinActualizar' => $clean($input[$prefix . 'sin_actualizar'] ?? ''),
@@ -372,6 +375,10 @@ trait GenericQueryConcern
       $where[] = "LOWER(TRIM(COALESCE(`magnitud_caso`, ''))) = ?";
       $args[] = strtolower(trim($magnitudCasoFilter));
     }
+    $ejecutadoFilter = strtolower(trim((string) ($p['fEjecutado'] ?? '')));
+    if (\SCM\Support\CaseExecutorSql::isKey($ejecutadoFilter)) {
+      $where[] = \SCM\Support\CaseExecutorSql::filterCondition($this->generic_executor_column_check(), $tabla, $this->db->table('jet_cct_cotizacion_mantenimiento'), "`{$tabla}`", $ejecutadoFilter);
+    }
     if (!empty($p['fPerturbacion'])) {
       $cotTabla = $this->db->table('jet_cct_cotizacion_mantenimiento');
       if ($this->table_exists($cotTabla)) {
@@ -612,6 +619,7 @@ trait GenericQueryConcern
         {$firstExpr} AS avg_first_h
       FROM `{$tabla}` WHERE {$whereStr}";
     $agg = $this->db->getRow($aggSql, $args);
+    $executorCounts = empty($p['_scmExecutorKpis']) ? [] : \SCM\Support\CaseExecutorSql::counts($this->db, $this->generic_executor_column_check(), $tabla, $this->db->table('jet_cct_cotizacion_mantenimiento'), "`{$tabla}`", "`{$tabla}`", $whereStr, $args);
 
     $perPage = max(10, min(100, (int) ($p['fPerPage'] ?? 10)));
     $page = max(1, (int) ($p['fPage'] ?? 1));
@@ -649,7 +657,7 @@ trait GenericQueryConcern
     return [
       'rows' => $rows,
       'admin_status_options' => $adminOptions,
-      'stats' => [
+      'stats' => $executorCounts + [
         'total' => $total,
         'abiertos' => $abiertos,
         'cerrados' => $cerrados,
@@ -678,6 +686,11 @@ trait GenericQueryConcern
       ],
       'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
     ];
+  }
+
+  private function generic_executor_column_check(): \Closure
+  {
+    return fn(string $table, string $column): bool => $this->table_exists($table) && $this->column_exists($table, $column);
   }
 
   private function normalize_generic_sort(string $sort): string

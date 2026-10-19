@@ -53,3 +53,20 @@ $rows=$maintenance->queryMaintenance(array_replace($filters,['fEjecutado'=>'sin_
 $assert($ids($rows)===[5],'cases without executor are reachable from Sin definir');
 $rows=$maintenance->queryMaintenance(array_replace($filters,['fEjecutado'=>'cualquiera']));
 $assert(count($rows)===6,'unknown executor filter values are ignored');
+$generic=new class($db,$tables) {
+ use \SCM\Modules\GenericTickets\Concerns\GenericQueryConcern;
+ public function __construct(private \SCM\Core\Database $db,private array $tables){}
+ private function table_exists($t){return isset($this->tables[$t]);}
+ private function column_exists($t,$c){return in_array($c,$this->tables[$t]??[],true);}
+ private function detect_first_existing_column($t,$columns){foreach($columns as $c)if($this->column_exists($t,$c))return $c;return '';}
+ private function generic_topic_where_sql($topics,&$args){$args=array_merge($args,$topics);return 'tema_ayuda IN ('.implode(',',array_fill(0,count($topics),'?')).')';}
+};
+$params=$generic->parse_params_generic([],'scmpv_');
+$result=$generic->run_query_generic(['Reparaciones necesarias'],$params,[],false);
+$assert(($result['stats']['ejecuta_propietario']??null)===2 && $result['stats']['ejecuta_arrendatario']===1 && $result['stats']['ejecuta_sin_definir']===1,'generic quote tabs count executors with the same rule');
+$result=$generic->run_query_generic(['Reparaciones necesarias'],$generic->parse_params_generic(['scmpv_ejecutado'=>'arrendatario'],'scmpv_'),[],false);
+$assert($result['stats']['total']===1,'generic executor filter narrows the tab');
+$result=$generic->run_query_generic(['Reparaciones necesarias'],$generic->parse_params_generic([],'scmco_'),[],false);
+$assert(!isset($result['stats']['ejecuta_propietario']),'tabs without quotes skip executor counts');
+$html=\SCM\Support\CaseFilterFields::executor('scmpv_',['fEjecutado'=>'copropiedad']);
+$assert(str_contains($html,'name="scmpv_ejecutado"') && str_contains($html,'value="copropiedad" selected'),'executor filter field keeps the selected value');

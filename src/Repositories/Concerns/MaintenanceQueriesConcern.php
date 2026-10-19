@@ -701,48 +701,18 @@ trait MaintenanceQueriesConcern
   /** @return array<int,string> */
   private function maintenanceExecutorKeys(): array
   {
-    return ['inmobiliaria', 'propietario', 'arrendatario', 'copropiedad', 'externo', 'sin_definir'];
+    return \SCM\Support\CaseExecutorSql::KEYS;
   }
 
-  /**
-   * Quién ejecuta el caso: el valor `ejecutado` del caso manda; si está vacío se usa el de
-   * la cotización más reciente (flujos JetForm antiguos no lo copiaban al caso).
-   * Devuelve una clave normalizada de maintenanceExecutorKeys().
-   */
-  private function maintenanceExecutorKeyExpression(string $alias = 't', ?string $quoteExecutorColumn = null): string
+  private function maintenanceExecutorColumnCheck(): \Closure
   {
-    $ticketTable = $this->ticketsTable();
-    $sources = [];
-    if ($this->schema->columnExists($ticketTable, 'ejecutado')) {
-      $sources[] = "NULLIF(TRIM(COALESCE({$alias}.`ejecutado`, '')), '')";
-    }
-    if ($quoteExecutorColumn !== null) {
-      $sources[] = "NULLIF(TRIM(COALESCE({$quoteExecutorColumn}, '')), '')";
-    } elseif ($this->maintenanceQuoteExecutorAvailable()) {
-      $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
-      $sources[] = "(SELECT TRIM(cot_exec.`ejecutado`) FROM `{$cotTable}` cot_exec"
-        . " WHERE TRIM(COALESCE(cot_exec.`id_ticket`, '')) = CAST({$alias}.`_ID` AS CHAR)"
-        . " AND TRIM(COALESCE(cot_exec.`ejecutado`, '')) <> ''"
-        . ' ORDER BY cot_exec.`_ID` DESC LIMIT 1)';
-    }
-    if ($sources === []) {
-      return "'sin_definir'";
-    }
-    $raw = 'LOWER(COALESCE(' . implode(', ', $sources) . ", ''))";
-    return "(CASE WHEN {$raw} LIKE '%propiet%' THEN 'propietario'"
-      . " WHEN {$raw} LIKE '%arrend%' THEN 'arrendatario'"
-      . " WHEN {$raw} LIKE '%coprop%' THEN 'copropiedad'"
-      . " WHEN {$raw} LIKE '%inmobil%' THEN 'inmobiliaria'"
-      . " WHEN {$raw} LIKE '%extern%' THEN 'externo'"
-      . " ELSE 'sin_definir' END)";
+    return fn(string $table, string $column): bool => $this->schema->tableExists($table) && $this->schema->columnExists($table, $column);
   }
 
-  private function maintenanceQuoteExecutorAvailable(): bool
+  /** Clave normalizada de quién ejecuta el caso (ver \SCM\Support\CaseExecutorSql). */
+  private function maintenanceExecutorKeyExpression(string $alias = 't'): string
   {
-    $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
-    return $this->schema->tableExists($cotTable)
-      && $this->schema->columnExists($cotTable, 'ejecutado')
-      && $this->schema->columnExists($cotTable, 'id_ticket');
+    return \SCM\Support\CaseExecutorSql::keyExpression($this->maintenanceExecutorColumnCheck(), $this->ticketsTable(), $this->db->table('jet_cct_cotizacion_mantenimiento'), $alias);
   }
 
   /**
@@ -752,31 +722,17 @@ trait MaintenanceQueriesConcern
    */
   private function aggregateMaintenanceExecutorCounts(array $where, array $args): array
   {
-    $counts = array_fill_keys($this->maintenanceExecutorKeys(), 0);
     $table = $this->ticketsTable();
-    // Para contar se une una sola vez la última cotización con ejecutor (evita una subconsulta por fila).
-    $join = '';
-    $quoteColumn = null;
-    if ($this->maintenanceQuoteExecutorAvailable()) {
-      $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
-      $join = " LEFT JOIN (SELECT TRIM(COALESCE(q.`id_ticket`, '')) AS ticket_ref, MAX(q.`_ID`) AS quote_id FROM `{$cotTable}` q"
-        . " WHERE TRIM(COALESCE(q.`ejecutado`, '')) <> '' GROUP BY TRIM(COALESCE(q.`id_ticket`, ''))) exec_latest"
-        . ' ON exec_latest.ticket_ref = CAST(t.`_ID` AS CHAR)'
-        . " LEFT JOIN `{$cotTable}` exec_quote ON exec_quote.`_ID` = exec_latest.quote_id";
-      $quoteColumn = 'exec_quote.`ejecutado`';
-    }
-    $sql = 'SELECT exec_key, COUNT(1) AS total FROM (SELECT ' . $this->maintenanceExecutorKeyExpression('t', $quoteColumn) . " AS exec_key FROM `{$table}` t{$join} WHERE " . implode(' AND ', $where) . ') executor_rows GROUP BY exec_key';
-    foreach ($this->db->getResults($this->convertSql($sql), $args) as $row) {
-      $key = (string) ($row['exec_key'] ?? '');
-      if (array_key_exists($key, $counts)) {
-        $counts[$key] = (int) ($row['total'] ?? 0);
-      }
-    }
-    $out = [];
-    foreach ($counts as $key => $total) {
-      $out['ejecuta_' . $key] = $total;
-    }
-    return $out;
+    return \SCM\Support\CaseExecutorSql::counts(
+      $this->db,
+      $this->maintenanceExecutorColumnCheck(),
+      $table,
+      $this->db->table('jet_cct_cotizacion_mantenimiento'),
+      't',
+      "`{$table}` t",
+      $this->convertSql(implode(' AND ', $where)),
+      $args
+    );
   }
 
   private function maintenanceRevisionExistsExpression(string $alias = 't', string $type = 'any'): string

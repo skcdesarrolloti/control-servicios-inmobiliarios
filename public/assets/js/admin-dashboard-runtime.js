@@ -19308,6 +19308,11 @@
             );
             updateGenericKPI(tabKey, "danos-si", d.kpi_danos_si || "0");
             updateGenericKPI(tabKey, "danos-no", d.kpi_danos_no || "0");
+            updateGenericKPI(tabKey, "ejecuta-inmobiliaria", d.kpi_ejecuta_inmobiliaria || "0");
+            updateGenericKPI(tabKey, "ejecuta-propietario", d.kpi_ejecuta_propietario || "0");
+            updateGenericKPI(tabKey, "ejecuta-arrendatario", d.kpi_ejecuta_arrendatario || "0");
+            updateGenericKPI(tabKey, "ejecuta-copropiedad", d.kpi_ejecuta_copropiedad || "0");
+            updateGenericKPI(tabKey, "ejecuta-sin-definir", d.kpi_ejecuta_sin_definir || "0");
             applyRevisionKpiVisibility(
               "scm-" + tabKey + "-",
               d.kpi_con_prev,

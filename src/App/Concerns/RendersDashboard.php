@@ -1055,29 +1055,7 @@ trait RendersDashboard
           </div>
         </div>
 
-        <div class="scm-kpis-executor-group">
-          <div class="scm-kpis-executor-title"><span class="material-symbols-outlined">engineering</span>&iquest;Qui&eacute;n ejecuta?</div>
-          <div class="scm-kpis scm-kpis-stitch scm-kpis-executor">
-            <?php foreach ([
-              'inmobiliaria' => ['INMOBILIARIA', 'apartment'],
-              'propietario' => ['PROPIETARIO', 'person'],
-              'arrendatario' => ['ARRENDATARIO', 'key'],
-              'copropiedad' => ['COPROPIEDAD', 'domain'],
-              'sin_definir' => ['SIN DEFINIR', 'help'],
-            ] as $executorKey => [$executorLabel, $executorIcon]): $executorSlug = str_replace('_', '-', $executorKey); ?>
-            <div class="scm-kpi scm-kpi-executor-<?php echo esc_attr($executorSlug); ?>" data-kpi="ejecuta-<?php echo esc_attr($executorSlug); ?>">
-              <div class="scm-kpi-header">
-                <span class="scm-kpi-label"><?php echo esc_html($executorLabel); ?></span>
-                <span class="material-symbols-outlined scm-kpi-icon"><?php echo esc_html($executorIcon); ?></span>
-              </div>
-              <div class="scm-kpi-value-row">
-                <span class="scm-kpi-value" id="scm-kpi-ejecuta-<?php echo esc_attr($executorSlug); ?>"><?php echo esc_html((string)($stats['ejecuta_' . $executorKey] ?? 0)); ?></span>
-              </div>
-              <div class="scm-kpi-indicator scm-kpi-indicator-ejecuta-<?php echo esc_attr($executorSlug); ?>"></div>
-            </div>
-            <?php endforeach; ?>
-          </div>
-        </div>
+        <?php echo $this->render_executor_kpis('scm-', $stats); ?>
 
         <div class="scm-filter-card card">
           <div class="scm-filter-header flex items-center justify-between mb-4">
@@ -1170,12 +1148,7 @@ trait RendersDashboard
                   <option value="medio" <?php selected(($params['fMagnitudCaso'] ?? ''), 'medio'); ?>>Medio</option>
                   <option value="bajo" <?php selected(($params['fMagnitudCaso'] ?? ''), 'bajo'); ?>>Bajo</option>
                 </select></div>
-              <div class="scm-field"><label for="scm_ejecutado">EJECUTADO POR</label><select id="scm_ejecutado" name="scm_ejecutado" class="select select-bordered select-sm scm-select">
-                  <option value="">Todos</option>
-                  <?php foreach (['inmobiliaria' => 'Inmobiliaria', 'propietario' => 'Propietario', 'arrendatario' => 'Arrendatario', 'copropiedad' => 'Copropiedad', 'externo' => 'Externo', 'sin_definir' => 'Sin definir'] as $executorValue => $executorText): ?>
-                  <option value="<?php echo esc_attr($executorValue); ?>" <?php selected(($params['fEjecutado'] ?? ''), $executorValue); ?>><?php echo esc_html($executorText); ?></option>
-                  <?php endforeach; ?>
-                </select></div>
+              <?php echo \SCM\Support\CaseFilterFields::executor('scm_', $params, 'EJECUTADO POR'); ?>
             </div>
             <div class="scm-actions flex items-center justify-between flex-wrap gap-3 mt-4 pt-3 border-t border-slate-100">
               <div class="flex items-center gap-2.5 flex-wrap">
@@ -1340,6 +1313,7 @@ trait RendersDashboard
               </div>
             <?php endif; ?>
           </div>
+          <?php if (in_array($gTabKey, ['entrega', 'preventiva', 'recibo'], true)) echo $this->render_executor_kpis('scm-' . $gTabKey . '-', $gStats); ?>
           <?php echo $gFormHtml; ?>
           <div class="scm-cards-wrap">
             <div class="scm-ticket-cards" id="scm-cards-<?php echo esc_attr($gTabKey); ?>"><?php echo $gCardsHtml; ?></div>
@@ -6065,5 +6039,28 @@ trait RendersDashboard
       'por_estado_comercial' => $byCommercial,
       'por_estado_administrativo' => $byAdmin,
     ];
+  }
+
+  /** Fila "¿Quién ejecuta?" (ver docs/ejecutado-caso.md); $idPrefix: 'scm-' o 'scm-<pestaña>-'. */
+  private function render_executor_kpis(string $idPrefix, array $stats): string
+  {
+    $cards = [
+      'inmobiliaria' => ['Inmobiliaria', 'apartment'],
+      'propietario' => ['Propietario', 'person'],
+      'arrendatario' => ['Arrendatario', 'key'],
+      'copropiedad' => ['Copropiedad', 'domain'],
+      'sin_definir' => ['Sin definir', 'help'],
+    ];
+    $html = '<div class="scm-kpis-executor-group"><div class="scm-kpis-executor-title"><span class="material-symbols-outlined">engineering</span>&iquest;Qui&eacute;n ejecuta?</div>'
+      . '<div class="scm-kpis scm-kpis-stitch scm-kpis-executor">';
+    foreach ($cards as $key => [$label, $icon]) {
+      $slug = str_replace('_', '-', $key);
+      $html .= '<div class="scm-kpi scm-kpi-executor-' . esc_attr($slug) . '" data-kpi="ejecuta-' . esc_attr($slug) . '">'
+        . '<div class="scm-kpi-header"><span class="scm-kpi-label">' . esc_html(mb_strtoupper($label, 'UTF-8')) . '</span><span class="material-symbols-outlined scm-kpi-icon">' . esc_html($icon) . '</span></div>'
+        . '<div class="scm-kpi-value-row"><span class="scm-kpi-value" id="' . esc_attr($idPrefix . 'kpi-ejecuta-' . $slug) . '">' . esc_html((string) ($stats['ejecuta_' . $key] ?? 0)) . '</span></div>'
+        . '<div class="scm-kpi-indicator scm-kpi-indicator-ejecuta-' . esc_attr($slug) . '"></div>'
+        . '</div>';
+    }
+    return $html . '</div></div>';
   }
 }

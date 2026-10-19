@@ -1814,6 +1814,7 @@ final class SuCasaControlServiciosInmobiliarios
               <option value="medio" <?php selected(($p['fMagnitudCaso'] ?? ''), 'medio'); ?>>Medio</option>
               <option value="bajo" <?php selected(($p['fMagnitudCaso'] ?? ''), 'bajo'); ?>>Bajo</option>
             </select></div>
+          <?php echo \SCM\Support\CaseFilterFields::executor($prefix, $p); ?>
         </div>
         <div class="scm-actions">
           <button class="scm-btn-primary btn btn-primary" type="submit">Filtrar</button>

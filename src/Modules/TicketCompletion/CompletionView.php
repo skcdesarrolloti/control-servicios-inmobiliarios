@@ -36,6 +36,17 @@ final class CompletionView
       }
     }
     $executor = str_replace('En ejecucion por ', '', (string) ($ticket['estado_administrativo'] ?? ''));
+    if (!isset(CompletionPolicy::EXECUTORS[$executor])) {
+      // Sin estado "En ejecucion por …": se propone quién ejecuta según el caso (o su cotización).
+      $caseExecutor = mb_strtolower(trim((string) ($ticket['ejecutado'] ?? '')), 'UTF-8');
+      $executor = '';
+      foreach (CompletionPolicy::EXECUTORS as $role => $_label) {
+        if ($caseExecutor !== '' && str_starts_with($caseExecutor, substr($role, 0, 6))) {
+          $executor = $role;
+          break;
+        }
+      }
+    }
     $formPayload = is_array($editPayload) ? $editPayload : [];
     $selectedExecutor = (string) ($formPayload['executor'] ?? $executor);
     $selectedSigner = (string) ($formPayload['signer']['role'] ?? '');

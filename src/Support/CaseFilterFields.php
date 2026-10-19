@@ -15,6 +15,17 @@ final class CaseFilterFields
     return $html . '</select></div>';
   }
 
+  public static function executor(string $prefix, array $params, string $label = 'Ejecutado por'): string
+  {
+    $e = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+    $name = $e($prefix . 'ejecutado');
+    $html = '<div class="scm-field"><label for="' . $name . '">' . $e($label) . '</label><select class="select select-bordered select-sm scm-select" id="' . $name . '" name="' . $name . '"><option value="">Todos</option>';
+    foreach (CaseExecutorSql::LABELS as $value => $text) {
+      $html .= '<option value="' . $value . '"' . (($params['fEjecutado'] ?? '') === $value ? ' selected' : '') . '>' . $e($text) . '</option>';
+    }
+    return $html . '</select></div>';
+  }
+
   public static function administrativeStatus(string $prefix, array $params, array $values): string
   {
     $e = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
