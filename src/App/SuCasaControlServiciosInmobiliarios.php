@@ -14,6 +14,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesPreventiveReviewActions;
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   use \SCM\App\Concerns\HandlesMaintenanceOrdersPanel;
+  use \SCM\App\Concerns\HandlesLeaseContracts;
   use \SCM\App\Concerns\HandlesPublicPqrActions;
   use \SCM\App\Concerns\HandlesPanelCaseCreation;
   use \SCM\App\Concerns\HandlesAdministrativeNotifications;
@@ -177,6 +178,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_MAINTENANCE_ORDERS_DETAIL = 'scm_ordenes_mantenimiento_detalle';
   const AJAX_MAINTENANCE_ORDERS_DELETE = 'scm_ordenes_mantenimiento_eliminar';
   const AJAX_MAINTENANCE_ORDERS_QUOTES = 'scm_ordenes_mantenimiento_cotizaciones';
+  const AJAX_LEASE_CONTRACT_VIEW = 'scm_contrato_arrendamiento_vista';
+  const AJAX_LEASE_CONTRACT_SEND = 'scm_contrato_arrendamiento_enviar_anexos';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';
@@ -470,6 +473,11 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Avisos internos al crear el recibo antes de la fecha fin del contrato.',
             'channel' => 'Email interno en cola',
           ],
+          'anexos_contrato_arrendamiento' => [
+            'label' => 'Envío de anexos del contrato de arrendamiento',
+            'description' => 'Resumen con las actas de bienvenida cuando se envían los anexos al propietario, arrendatario y codeudores desde Contratos de arrendamiento.',
+            'channel' => 'Email interno en cola',
+          ],
         ],
       ],
       'cartas_aumento' => [
@@ -719,6 +727,7 @@ final class SuCasaControlServiciosInmobiliarios
       'contratos' => [
         'label' => 'Contratos de arrendamiento',
         'items' => [
+          'contract_annexes_send' => 'Enviar anexos del contrato de arrendamiento',
           'contract_owner_change' => 'Cambiar funcionario responsable del contrato',
         ],
       ],
@@ -752,6 +761,12 @@ final class SuCasaControlServiciosInmobiliarios
         if (in_array('corrective_review_manage', $actions, true) && !in_array('preventive_review_manage', $actions, true)) {
           $permissions[$cargo][] = 'preventive_review_manage';
         }
+      }
+    }
+    // El envío de anexos reemplaza el formulario de WordPress: hasta guardar permisos lo conservan todos los cargos.
+    if (!\SCM\Core\App::settings()->get('contract_annexes_permissions_configured', false)) {
+      foreach ($permissions as $cargo => $actions) {
+        $permissions[$cargo] = array_values(array_unique(array_merge($actions, ['contract_annexes_send'])));
       }
     }
     // Cambiar el responsable de un contrato es sensible: hasta que se configure, solo los cargos administradores.

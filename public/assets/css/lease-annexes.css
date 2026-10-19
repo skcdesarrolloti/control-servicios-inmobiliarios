@@ -1,0 +1,35 @@
+/* Actas de bienvenida y vista pública de anexos del contrato de arrendamiento.
+   Se apoya en public-services-document.css (mismo diseño que la revisión de servicios públicos). */
+.scm-lease-contacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:0 0 14px}
+.scm-lease-contact{padding:12px 14px;border:1px solid #bbb;break-inside:avoid;page-break-inside:avoid}
+.scm-lease-contact span{display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:#555}
+.scm-lease-contact strong{display:block;margin-top:4px;font-size:14px;color:#202020}
+.scm-lease-contact p{margin:4px 0 0;font-size:12px;color:#444;overflow-wrap:anywhere}
+.scm-lease-note{margin:0 0 12px;line-height:1.6}
+.scm-lease-annex-list{margin:0 0 12px;padding-left:20px;line-height:1.7}
+.scm-lease-link a{color:#10264a;font-weight:700;overflow-wrap:anywhere}
+.scm-lease-annex-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.scm-lease-annex{padding:14px 16px;border:1px solid #bbb;break-inside:avoid;page-break-inside:avoid}
+.scm-lease-annex h3{margin:0 0 6px}
+.scm-lease-annex .scm-services-button{margin-top:6px}
+@media(max-width:600px){.scm-lease-contacts,.scm-lease-annex-grid{grid-template-columns:1fr}}
+@media print{
+  .scm-lease-contacts,.scm-lease-annex-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .scm-lease-contact,.scm-lease-annex{padding:6px 8px}
+  .scm-lease-contact strong{font-size:11px}
+  .scm-lease-contact p,.scm-lease-note,.scm-lease-annex-list{font-size:10px;margin-bottom:6px}
+  .scm-lease-annex h3{font-size:11px;margin:0}
+  .scm-lease-public .scm-lease-annex .scm-services-button{display:none!important}
+  /* El acta en PDF debe caber en una hoja carta con el membrete superior e inferior. */
+  .scm-services-pdf .scm-lease-act .scm-acta-receipt-head{padding-bottom:8px}
+  .scm-services-pdf .scm-lease-act h1{font-size:19px}
+  .scm-services-pdf .scm-lease-act h2{font-size:13px;margin-bottom:6px}
+  .scm-services-pdf .scm-lease-act .scm-acta-receipt-date{margin:6px 0}
+  .scm-services-pdf .scm-lease-act .scm-acta-receipt-section{margin:8px 0}
+  .scm-services-pdf .scm-lease-act .scm-services-letter p{margin-bottom:6px;font-size:10.5px;line-height:1.5}
+  .scm-services-pdf .scm-lease-act .scm-lease-contacts{margin-bottom:6px}
+  .scm-services-pdf .scm-lease-act .scm-lease-annex-list{columns:2;margin-bottom:4px;line-height:1.5}
+  .scm-services-pdf .scm-lease-act .scm-acta-receipt-footer{margin-top:10px;padding-top:8px}
+  .scm-services-pdf .scm-lease-act .scm-services-letterhead-top{margin-bottom:2mm}
+  .scm-services-pdf .scm-lease-act .scm-services-letterhead-top img{width:52%}
+}

@@ -7,6 +7,8 @@
     var open = event.target.closest("[data-services-preview]");
     if (open && dialog) {
       dialog._trigger = open;
+      var heading = dialog.querySelector("header strong");
+      if (heading && open.getAttribute("data-services-preview-title")) heading.textContent = open.getAttribute("data-services-preview-title");
       dialog.querySelector("iframe").src = open.getAttribute("data-services-preview");
       dialog.showModal();
     }

@@ -379,6 +379,7 @@ trait HandlesTicketWorkflowActions
       \SCM\Core\App::settings()->set('contract_history_permissions_configured', true, (int) Auth::employeeId());
       \SCM\Core\App::settings()->set('preventive_review_permissions_configured', true, (int) Auth::employeeId());
       \SCM\Core\App::settings()->set('contract_owner_permissions_configured', true, (int) Auth::employeeId());
+      \SCM\Core\App::settings()->set('contract_annexes_permissions_configured', true, (int) Auth::employeeId());
     }
     \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
     \SCM\Core\App::settings()->set('admin_due_popup_cargo_ids', $adminDuePopupCargoIds, Auth::userId());
@@ -3385,9 +3386,9 @@ trait HandlesTicketWorkflowActions
     $controller = $this->get_pending_controller();
     $payload = $controller->buildContratosArrendamientoPayload($_POST);
     $items = (array)($payload['items'] ?? []);
-    $view = new \SCM\Modules\Pending\PendingView();
-    $table = $view->renderContratosArrendamientoTable($items);
-    $pagination = $view->renderContratosPagination((array)($payload['pagination'] ?? []));
+    $view = new \SCM\Modules\LeaseContracts\LeaseContractsView();
+    $table = $view->renderTable($items, $this->canUseDashboardAction('contract_annexes_send'));
+    $pagination = $view->renderPagination((array)($payload['pagination'] ?? []));
     $this->jsonOk([
       'bucket' => (string)($payload['bucket'] ?? ''),
       'label' => (string)($payload['label'] ?? ''),

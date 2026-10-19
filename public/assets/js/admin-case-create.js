@@ -30,8 +30,10 @@
     });
   };
 
-  window.addEventListener('scm:open-nuevo-ticket', async () => {
+  window.addEventListener('scm:open-nuevo-ticket', async event => {
     if (dialog) { if (!dialog.open) dialog.showModal(); return; }
+    // Desde Contratos de arrendamiento llega el contrato para dejarlo seleccionado.
+    const presetContract = event?.detail?.contract?.id ? event.detail.contract : null;
     const root = document.querySelector('[data-scm-runtime]');
     if (!root) return;
     const runtime = JSON.parse(root.dataset.scmRuntime || '{}');
@@ -534,8 +536,23 @@
         } catch (_) { draftStatus.textContent = 'El autoguardado no está disponible en este navegador. Mantén abierto el formulario para conservarlo.'; }
         finally { searchInput.disabled = searchBy.disabled = current.querySelector('[data-search-button]').disabled = false; }
       } else draftStatus.textContent = 'El autoguardado no está disponible. Mantén abierto el formulario para conservar los datos.';
+      if (presetContract && current.isConnected) {
+        if (selected && String(selected._ID) !== String(presetContract.id)) {
+          status.textContent = 'Recuperamos un borrador con otro contrato. Descártalo o busca el contrato ' + presetContract.code + '.';
+        } else if (!selected && String(presetContract.code || '').trim().length >= 2) {
+          searchBy.value = 'contrato'; searchInput.value = String(presetContract.code).trim();
+          status.textContent = 'Buscando el contrato seleccionado…';
+          const data = new FormData(); data.set('by', 'contrato'); data.set('query', searchInput.value);
+          try {
+            const response = await api('scm_panel_case_search', data);
+            if (!current.isConnected) return;
+            const contract = response.contracts.find(item => String(item._ID) === String(presetContract.id));
+            if (contract) selectContract(contract); else status.textContent = 'No encontramos el contrato ' + presetContract.code + '. Búscalo manualmente.';
+          } catch (e) { if (current.isConnected) status.textContent = e.message; }
+        }
+      }
       draftReady = true;
-      searchInput.focus();
+      if (!selected) searchInput.focus();
     } catch (e) {
       if (current.isConnected) current.querySelector('[data-content]').innerHTML = `<p role="alert" class="text-sm text-rose-700">${escape(e.message)}</p>`;
     }

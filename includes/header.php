@@ -292,7 +292,7 @@ if (empty($current_page) || $current_page === 'tickets') {
   } elseif (in_array($tabParam, ['liquidacion', 'liquidador', 'liquidador_servicios_publicos', 'scm-panel-liquidador-servicios-publicos'], true)) {
     $current_page = 'liquidador_servicios_publicos';
   } elseif (in_array($tabParam, ['contratos', 'contratos-arrendamiento', 'contratos_arrendamiento', 'scm-panel-contratos-arrendamiento'], true)) {
-    $current_page = 'contratos';
+    $current_page = 'contratos_arrendamiento';
   } elseif (in_array($tabParam, ['administrativas', 'actividades_administrativas', 'scm-panel-actividades-administrativas'], true)) {
     $current_page = 'administrativas';
   } elseif (in_array($tabParam, ['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones'], true)) {
@@ -589,6 +589,14 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=contract_non_renewal',
         'icon' => 'event_busy',
         'perms' => ['calendario_actividades', 'abiertos'],
+      ],
+      'contratos_arrendamiento' => [
+        'key' => 'contratos_arrendamiento',
+        'label' => 'Contratos de arrendamiento',
+        'panel_id' => 'scm-panel-contratos-arrendamiento',
+        'url' => $baseUrl . '/index.php?tab=contratos_arrendamiento',
+        'icon' => 'description',
+        'perms' => ['contratos_arrendamiento'],
       ],
       'contract_owners' => [
         'key' => 'contract_owners',

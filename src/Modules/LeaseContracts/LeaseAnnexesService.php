@@ -1,0 +1,478 @@
+<?php
+
+declare(strict_types=1);
+
+namespace SCM\Modules\LeaseContracts;
+
+use SCM\Core\Database;
+use SCM\Support\EmailQueue;
+use SCM\Support\EmailTemplate;
+use SCM\Support\HtmlPdfRenderer;
+use SCM\Support\InternalNotificationRecipients;
+use SCM\Support\SchemaInspector;
+use SCM\Support\SmsQueue;
+use SCM\Support\StoredFileService;
+
+/**
+ * Envío de anexos del contrato de arrendamiento (antes formulario JetForm "Enviar contrato de arrendamiento"):
+ * genera un acta de bienvenida por actor, actualiza el contrato y encola correo y WhatsApp.
+ */
+final class LeaseAnnexesService
+{
+  public const INTERNAL_ACTION = 'anexos_contrato_arrendamiento';
+  public const WHATSAPP_TEMPLATE = 'scm_anexos_contrato_arrendamiento_v1';
+  private const CODEBTOR_OPTIONS = ['Ninguno', '1', '2', '3', '4'];
+
+  private SchemaInspector $schema;
+
+  public function __construct(private Database $db)
+  {
+    $this->schema = new SchemaInspector($db);
+  }
+
+  /** @return array<string,mixed> */
+  public function contract(int $contractId): array
+  {
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    $row = $contractId > 0 && $this->schema->tableExists($table)
+      ? $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$contractId])
+      : null;
+    if (!is_array($row)) {
+      throw new \DomainException('Contrato no encontrado.');
+    }
+    return $row;
+  }
+
+  /** @param array<string,mixed> $contract @return array<string,mixed> */
+  public function branch(array $contract): array
+  {
+    $table = $this->db->table('jet_cct_sucursales');
+    if (!$this->schema->tableExists($table)) {
+      return [];
+    }
+    $id = trim((string) ($contract['sucursal'] ?? ''));
+    $row = $id !== '' ? $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$id]) : null;
+    return is_array($row) ? $row : ($this->db->getRow("SELECT * FROM `{$table}` ORDER BY `_ID` ASC LIMIT 1") ?? []);
+  }
+
+  /** @param array<string,mixed> $contract @return array<string,mixed> */
+  public function property(array $contract): array
+  {
+    $table = $this->db->table('jet_cct_inmuebles');
+    $code = trim((string) ($contract['id_inmueble'] ?? ''));
+    if ($code === '' || !$this->schema->tableExists($table)) {
+      return [];
+    }
+    return $this->db->getRow("SELECT * FROM `{$table}` WHERE TRIM(COALESCE(`codigo`, '')) = ? ORDER BY `_ID` DESC LIMIT 1", [$code]) ?? [];
+  }
+
+  /** @return array<int,array<string,string>> */
+  public function history(int $contractId): array
+  {
+    $table = $this->db->table('jet_cct_historial_contrato_arrendamiento');
+    if ($contractId <= 0 || !$this->schema->tableExists($table)) {
+      return [];
+    }
+    $rows = $this->db->getResults(
+      "SELECT * FROM `{$table}` WHERE TRIM(COALESCE(`id_contrato`, '')) = ? ORDER BY `fecha` DESC, `_ID` DESC LIMIT 60",
+      [(string) $contractId]
+    );
+    return array_map(static fn(array $row): array => [
+      'fecha' => (int) ($row['fecha'] ?? 0) > 0 ? date('d/m/Y g:i a', (int) $row['fecha']) : '',
+      'tipo' => trim((string) ($row['tipo_reporte'] ?? '')),
+      'observacion' => trim((string) ($row['observacion'] ?? '')),
+      'funcionario' => trim((string) ($row['funcionario'] ?? '')),
+      'imagen' => trim((string) ($row['imagen'] ?? '')),
+      'archivo' => trim((string) ($row['archivo'] ?? '')),
+    ], $rows);
+  }
+
+  /**
+   * @param array<string,mixed> $input campos del formulario ya limpios
+   * @param array{url:string,path:string}|null $leaseFile contrato de arrendamiento recién cargado
+   * @param array{employee_id:string,name:string,cargo:string,phone:string} $sender
+   * @return array<string,mixed>
+   */
+  public function send(int $contractId, array $input, ?array $leaseFile, array $sender): array
+  {
+    $contract = $this->contract($contractId);
+    if (strtolower(trim((string) ($contract['estado'] ?? ''))) === 'desistido') {
+      throw new \DomainException('El contrato está desistido; no se pueden enviar anexos.');
+    }
+    $data = $this->validate($input, $contract, $leaseFile);
+    $branch = $this->branch($contract);
+    $now = time();
+    $context = array_merge($contract, $data, [
+      'fecha' => $now,
+      'ciudad' => 'Cartagena de Indias',
+      'realizado_por' => $sender['name'],
+      'realizado_por_cargo' => $sender['cargo'],
+      'realizado_por_telefono' => $sender['phone'],
+    ]);
+    foreach (['nombre_contractual', 'celular_contractual', 'correo_contractual', 'nombre_propietarios', 'celular_propietarios', 'correo_propietarios', 'nombre_arrendatarios', 'celular_arrendatarios', 'correo_arrendatarios', 'representante_legal', 'celular_legal', 'gerente_comercial', 'celular_ge_comercial', 'correo_ge_comercial'] as $field) {
+      $context[$field] = trim((string) ($branch[$field] ?? ''));
+    }
+
+    $expires = max($now + 400 * 86400, (int) $data['fin_contrato'] + 180 * 86400);
+    $actors = $this->actors($data, $contract, $contractId, $expires);
+    $documents = [];
+    try {
+      foreach ($actors as $key => $actor) {
+        $documents[$key] = $this->generateAct($context, $actor);
+      }
+      $update = [
+        'contrato_arrendamiento' => $data['contrato_arrendamiento'],
+        'registro_fotografico' => $data['registro_fotografico'],
+        'id_acta_entrega' => $data['id_acta_entrega'],
+        'id_inventario' => $data['id_inventario'],
+        'inicio_contrato' => $data['inicio_contrato'],
+        'fin_contrato' => $data['fin_contrato'],
+        'num_codeudores' => $data['num_codeudores'],
+        'se_envio' => 'Si',
+        'cct_modified' => date('Y-m-d H:i:s', $now),
+      ];
+      foreach (['propietario', 'arrendatario'] as $role) {
+        foreach (['', 'documento_', 'correo_', 'celular_'] as $prefix) {
+          $update[$prefix . $role] = $data[$prefix . $role];
+        }
+      }
+      for ($i = 1; $i <= 4; $i++) {
+        if ($i <= $data['codebtors']) {
+          foreach (['', 'documento_', 'correo_', 'celular_'] as $prefix) {
+            $update[$prefix . 'codeudor_' . $i] = $data[$prefix . 'codeudor_' . $i];
+          }
+        }
+      }
+      foreach ($documents as $key => $document) {
+        $update['acta_' . $key] = $document['url'];
+      }
+      if (trim((string) ($contract['asegurado'] ?? '')) === '') {
+        $update['asegurado'] = 'No';
+      }
+
+      $pdo = $this->db->pdo();
+      $pdo->beginTransaction();
+      try {
+        $table = $this->db->table('jet_cct_contratos_arrendamiento');
+        $this->db->update($table, $this->schema->filterTableData($table, $update), ['_ID' => $contractId]);
+        $recipients = implode(', ', array_map(static fn(array $actor): string => $actor['label'], $actors));
+        $summary = 'Se enviaron los anexos del contrato de arrendamiento #' . $data['contrato'] . ' a: ' . $recipients . '.';
+        $this->insertHistories($contract, $data, $summary, $sender, $now);
+        $pdo->commit();
+      } catch (\Throwable $error) {
+        if ($pdo->inTransaction()) {
+          $pdo->rollBack();
+        }
+        throw $error;
+      }
+    } catch (\Throwable $error) {
+      foreach ($documents as $document) {
+        if (is_file($document['path'])) {
+          @unlink($document['path']);
+        }
+      }
+      throw $error;
+    }
+
+    $updated = array_merge($contract, $update);
+    $queued = $this->queueNotifications($context, $updated, $actors, $documents, $leaseFile, $now);
+    return [
+      'contract_id' => $contractId,
+      'queued' => $queued,
+      'actors' => array_values(array_map(static fn(array $actor, string $key): array => [
+        'label' => $actor['label'],
+        'name' => $actor['name'],
+        'act_url' => $documents[$key]['url'],
+        'annexes_url' => $actor['annexes_url'],
+      ], $actors, array_keys($actors))),
+    ];
+  }
+
+  /**
+   * @param array<string,mixed> $input
+   * @param array<string,mixed> $contract
+   * @param array{url:string,path:string}|null $leaseFile
+   * @return array<string,mixed>
+   */
+  private function validate(array $input, array $contract, ?array $leaseFile): array
+  {
+    $text = static fn(string $key): string => trim((string) ($input[$key] ?? ''));
+    $data = [
+      'contrato' => trim((string) ($contract['contrato'] ?? '')),
+      'direccion' => trim((string) ($contract['direccion'] ?? '')),
+      'registro_fotografico' => $text('registro_fotografico'),
+      'id_acta_entrega' => $text('id_acta_entrega'),
+      'id_inventario' => $text('id_inventario'),
+      'inicio_contrato' => $this->date($text('inicio_contrato')),
+      'fin_contrato' => $this->date($text('fin_contrato')),
+      'contrato_arrendamiento' => $leaseFile['url'] ?? trim((string) ($contract['contrato_arrendamiento'] ?? '')),
+    ];
+    if ($data['contrato'] === '' || $data['direccion'] === '') {
+      throw new \DomainException('El contrato no tiene número o dirección. Complétalos antes de enviar los anexos.');
+    }
+    if ($data['inicio_contrato'] <= 0 || $data['fin_contrato'] <= 0) {
+      throw new \DomainException('Indica la fecha de inicio y la fecha final del contrato.');
+    }
+    if ($data['fin_contrato'] <= $data['inicio_contrato']) {
+      throw new \DomainException('La fecha final debe ser posterior a la fecha de inicio.');
+    }
+    if (!filter_var($data['registro_fotografico'], FILTER_VALIDATE_URL)) {
+      throw new \DomainException('El registro fotográfico debe ser un enlace válido (https://...).');
+    }
+    if ($data['id_acta_entrega'] === '' || $data['id_inventario'] === '') {
+      throw new \DomainException('Indica el ID del acta de entrega y el ID del inventario.');
+    }
+    if ($data['contrato_arrendamiento'] === '') {
+      throw new \DomainException('Adjunta el contrato de arrendamiento; el arrendatario y los codeudores deben recibirlo.');
+    }
+
+    $people = ['propietario' => 'propietario', 'arrendatario' => 'arrendatario'];
+    $codebtors = $text('num_codeudores');
+    if (!in_array($codebtors, self::CODEBTOR_OPTIONS, true)) {
+      throw new \DomainException('Selecciona el número de codeudores.');
+    }
+    $data['num_codeudores'] = $codebtors;
+    $data['codebtors'] = $codebtors === 'Ninguno' ? 0 : (int) $codebtors;
+    for ($i = 1; $i <= $data['codebtors']; $i++) {
+      $people['codeudor_' . $i] = 'codeudor ' . $i;
+    }
+    foreach ($people as $field => $label) {
+      $data[$field] = $text($field);
+      $data['documento_' . $field] = $text('documento_' . $field);
+      $data['correo_' . $field] = strtolower($text('correo_' . $field));
+      $data['celular_' . $field] = preg_replace('/[^\d+]/', '', $text('celular_' . $field)) ?? '';
+      if ($data[$field] === '' || $data['documento_' . $field] === '') {
+        throw new \DomainException('Completa el nombre y el documento del ' . $label . '.');
+      }
+      if (!filter_var($data['correo_' . $field], FILTER_VALIDATE_EMAIL)) {
+        throw new \DomainException('El correo del ' . $label . ' no es válido.');
+      }
+      if (strlen(ltrim($data['celular_' . $field], '+')) < 7) {
+        throw new \DomainException('El celular del ' . $label . ' no es válido.');
+      }
+    }
+    return $data;
+  }
+
+  /**
+   * @param array<string,mixed> $data
+   * @param array<string,mixed> $contract
+   * @return array<string,array{role:string,index:int,label:string,name:string,email:string,phone:string,annexes_url:string}>
+   */
+  private function actors(array $data, array $contract, int $contractId, int $expires): array
+  {
+    $phone = static function (string $phone, string $indicative): string {
+      $digits = preg_replace('/\D+/', '', $indicative) ?? '';
+      return $digits !== '' && !str_starts_with($phone, '+') ? '+' . $digits . ltrim($phone, '0') : $phone;
+    };
+    $actors = [];
+    foreach (['propietario', 'arrendatario'] as $role) {
+      $actors[$role] = [
+        'role' => $role, 'index' => 0, 'label' => LeaseAnnexesDocument::ROLES[$role], 'name' => $data[$role],
+        'email' => $data['correo_' . $role], 'phone' => $phone($data['celular_' . $role], (string) ($contract['indicativo_' . $role] ?? '')),
+        'annexes_url' => LeaseAnnexesDocument::url($contractId, $role, 0, $expires),
+      ];
+    }
+    for ($i = 1; $i <= $data['codebtors']; $i++) {
+      $actors['codeudor_' . $i] = [
+        'role' => 'codeudor', 'index' => $i, 'label' => 'Codeudor ' . $i, 'name' => $data['codeudor_' . $i],
+        'email' => $data['correo_codeudor_' . $i], 'phone' => $data['celular_codeudor_' . $i],
+        'annexes_url' => LeaseAnnexesDocument::url($contractId, 'codeudor', $i, $expires),
+      ];
+    }
+    return $actors;
+  }
+
+  /**
+   * @param array<string,mixed> $context
+   * @param array{role:string,index:int,label:string,name:string,annexes_url:string} $actor
+   * @return array{url:string,path:string,name:string}
+   */
+  private function generateAct(array $context, array $actor): array
+  {
+    $root = dirname(__DIR__, 3);
+    $title = 'Acta de bienvenida ' . strtolower($actor['label']) . ' - ' . $actor['name'];
+    $bytes = HtmlPdfRenderer::render(LeaseAnnexesDocument::welcome($context, $actor, $actor['annexes_url'], true), $title, [
+      'stylesheets' => [$root . '/public/assets/css/ticket-completion-document.css', $root . '/public/assets/css/public-services-document.css', $root . '/public/assets/css/lease-annexes.css'],
+      'external_fonts' => false, 'body_class' => 'scm-services-page scm-services-pdf',
+      'wrapper_class' => 'scm-services-pdf-root', 'container_class' => 'scm-services-public-root', 'allow_fallback' => false,
+    ]);
+    if ($bytes === null) {
+      throw new \DomainException('No se pudo generar el acta de ' . strtolower($actor['label']) . '. Verifica el servicio de PDF e intenta nuevamente.');
+    }
+    $basename = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
+    $path = (string) SCM_UPLOAD_PATH . '/' . $basename;
+    if (file_put_contents($path, $bytes, LOCK_EX) === false) {
+      throw new \RuntimeException('No fue posible guardar el acta en PDF.');
+    }
+    $slug = trim((string) preg_replace('/[^A-Za-z0-9]+/', '-', iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $actor['name']) ?: 'actor'), '-');
+    return [
+      'url' => StoredFileService::fromRuntime()->urlFor($basename),
+      'path' => $path,
+      'name' => 'Acta-de-bienvenida-' . strtolower(str_replace(' ', '-', $actor['label'])) . '-' . ($slug !== '' ? $slug : 'actor') . '.pdf',
+    ];
+  }
+
+  /** @param array<string,mixed> $contract @param array<string,mixed> $data @param array<string,string> $sender */
+  private function insertHistories(array $contract, array $data, string $summary, array $sender, int $now): void
+  {
+    $nowSql = date('Y-m-d H:i:s', $now);
+    $common = [
+      'cct_status' => 'publish',
+      'cct_author_id' => $sender['employee_id'],
+      'cct_created' => $nowSql,
+      'cct_modified' => $nowSql,
+      'fecha' => $now,
+      'id_empleado' => $sender['employee_id'],
+      'funcionario' => $sender['name'],
+      'id_inmueble' => trim((string) ($contract['id_inmueble'] ?? '')),
+      'id_inmueble_data' => trim((string) ($contract['id_inmueble_data'] ?? '')),
+    ];
+    $contractHistory = $this->db->table('jet_cct_historial_contrato_arrendamiento');
+    if ($this->schema->tableExists($contractHistory)) {
+      $this->db->insert($contractHistory, $this->schema->filterTableData($contractHistory, $common + [
+        'tipo_reporte' => 'Envío de anexos',
+        'observacion' => $summary,
+        'inmueble' => trim((string) ($contract['inmueble'] ?? '')),
+        'contrato' => $data['contrato'],
+        'id_contrato' => (string) ($contract['_ID'] ?? ''),
+        'archivo' => $data['contrato_arrendamiento'],
+      ]));
+    }
+    $propertyHistory = $this->db->table('jet_cct_historial_del_inmueble');
+    if ($this->schema->tableExists($propertyHistory)) {
+      $this->db->insert($propertyHistory, $this->schema->filterTableData($propertyHistory, $common + [
+        'tipo_reporte' => 'Contrato de arrendamiento',
+        'observacion' => $summary,
+      ]));
+    }
+  }
+
+  /**
+   * @param array<string,mixed> $context
+   * @param array<string,mixed> $contract
+   * @param array<string,array<string,mixed>> $actors
+   * @param array<string,array{url:string,path:string,name:string}> $documents
+   * @param array{url:string,path:string}|null $leaseFile
+   * @return array{email:int,whatsapp:int,internal:int}
+   */
+  private function queueNotifications(array $context, array $contract, array $actors, array $documents, ?array $leaseFile, int $now): array
+  {
+    $emailQueue = new EmailQueue($this->db);
+    $sms = new SmsQueue($this->db);
+    $contractNumber = (string) ($contract['contrato'] ?? '');
+    $subject = 'Anexos del contrato de arrendamiento #' . $contractNumber;
+    $leaseAttachment = $this->localLeaseAttachment($contract, $leaseFile);
+    $signature = trim(($context['representante_legal'] ?? '') . (($context['celular_legal'] ?? '') !== '' ? ' | ' . $context['celular_legal'] : '')) . ' - Representante legal';
+    $dedupe = 'anexos_contrato_' . (int) ($contract['_ID'] ?? 0) . '_' . $now;
+    $queued = ['email' => 0, 'whatsapp' => 0, 'internal' => 0];
+
+    foreach ($actors as $key => $actor) {
+      $attachments = [['path' => $documents[$key]['path'], 'name' => $documents[$key]['name']]];
+      if ($actor['role'] !== 'propietario' && $leaseAttachment !== null) {
+        $attachments[] = $leaseAttachment;
+      }
+      $buttons = [['url' => $actor['annexes_url'], 'label' => 'Ver anexos']];
+      if ($actor['role'] !== 'codeudor') {
+        $buttons[] = ['url' => 'https://sucasainmobiliaria.com.co/' . $actor['role'], 'label' => 'Entrar a mi cuenta'];
+      }
+      $buttons[] = ['url' => 'https://sucasainmobiliaria.com.co/revista/', 'label' => 'Ver revista'];
+      $html = EmailTemplate::render($subject, $this->emailBody($actor, $contract, $signature), ['buttons' => $buttons]);
+      $queued['email'] += $emailQueue->enqueue($actor['email'], $subject, $html, [
+        'source_module' => 'anexos_contrato_arrendamiento',
+        'internal_cc' => [],
+        'destination_name' => $actor['name'],
+        'dedupe_key' => $dedupe . '_' . $key,
+        'payload' => ['attachments' => $attachments, 'reply_to' => (string) ($context['correo_contractual'] ?? '')],
+        'meta' => ['contract_id' => (int) ($contract['_ID'] ?? 0), 'recipient_role' => $actor['label'], 'act_url' => $documents[$key]['url']],
+      ]);
+
+      $ok = $sms->enqueue($actor['phone'], $actor['name'], 'Anexos del contrato #' . $contractNumber . ': ' . $actor['annexes_url'], [
+        'source_module' => 'anexos_contrato_arrendamiento',
+        'dedupe_key' => $dedupe . '_whatsapp_' . $key,
+        'template_name' => self::WHATSAPP_TEMPLATE,
+        'template_language' => 'es_CO',
+        'template_components' => [
+          ['type' => 'header', 'parameters' => [['type' => 'document', 'document' => ['link' => $documents[$key]['url'], 'filename' => $documents[$key]['name']]]]],
+          ['type' => 'body', 'parameters' => array_map(fn(string $value): array => ['type' => 'text', 'text' => $this->waText($value)], [
+            $actor['name'], strtoupper($actor['role']), $contractNumber,
+            (string) ($contract['id_inmueble'] ?? $contract['inmueble'] ?? '-'), (string) ($contract['direccion'] ?? '-'),
+            $actor['annexes_url'], $signature,
+          ])],
+        ],
+        'contract_id' => (int) ($contract['_ID'] ?? 0),
+        'document_url' => $documents[$key]['url'],
+        'document_filename' => $documents[$key]['name'],
+      ]);
+      $queued['whatsapp'] += $ok ? 1 : 0;
+    }
+
+    $internal = InternalNotificationRecipients::emailsForAction($this->db, self::INTERNAL_ACTION);
+    if ($internal !== []) {
+      $rows = '';
+      foreach ($actors as $key => $actor) {
+        $rows .= '<li style="margin:0 0 8px;"><b>' . EmailTemplate::e($actor['label']) . ':</b> ' . EmailTemplate::e($actor['name']) . ' · ' . EmailTemplate::e($actor['email'])
+          . ' · <a href="' . EmailTemplate::e($documents[$key]['url']) . '">acta</a> · <a href="' . EmailTemplate::e($actor['annexes_url']) . '">anexos</a></li>';
+      }
+      $body = '<p style="margin:0 0 14px;line-height:1.65;">Se enviaron los anexos del contrato <b>#' . EmailTemplate::e($contractNumber) . '</b>, ubicado en <b>' . EmailTemplate::e((string) ($contract['direccion'] ?? '')) . '</b>, entregado al arrendatario <b>' . EmailTemplate::e((string) ($contract['arrendatario'] ?? '')) . '</b>.</p>'
+        . '<ul style="margin:0 0 14px;padding-left:18px;">' . $rows . '</ul>'
+        . '<p style="margin:0;line-height:1.65;">Envío realizado por <b>' . EmailTemplate::e((string) ($context['realizado_por'] ?? '')) . '</b>. Las actas también están adjuntas.</p>';
+      $queued['internal'] = $emailQueue->enqueue($internal, $subject, EmailTemplate::render($subject, $body), [
+        'source_module' => 'anexos_contrato_arrendamiento',
+        'internal_cc' => [],
+        'destination_name' => 'Equipo interno',
+        'dedupe_key' => $dedupe . '_interno',
+        'payload' => ['attachments' => array_values(array_map(static fn(array $document): array => ['path' => $document['path'], 'name' => $document['name']], $documents))],
+        'meta' => ['contract_id' => (int) ($contract['_ID'] ?? 0), 'internal_action' => self::INTERNAL_ACTION],
+      ]);
+    }
+    return $queued;
+  }
+
+  /** @param array<string,mixed> $actor @param array<string,mixed> $contract */
+  private function emailBody(array $actor, array $contract, string $signature): string
+  {
+    $annexes = implode(', ', array_slice(LeaseAnnexesDocument::annexLabels($actor['role']), 1));
+    $portal = $actor['role'] !== 'codeudor'
+      ? '<p style="margin:0 0 14px;line-height:1.65;">Le recordamos que tiene acceso al portal de ' . EmailTemplate::e($actor['role']) . ' usando su <b>número de documento como usuario y contraseña</b>.</p>'
+      : '';
+    return '<p style="margin:0 0 16px;font-weight:600;">Apreciado(a) ' . EmailTemplate::e($actor['name']) . ':</p>'
+      . '<p style="margin:0 0 14px;line-height:1.65;">Por medio de la presente le damos la más cordial bienvenida a <b>SKC SuCasa Inmobiliaria</b>, donde ha sido incorporado(a) como <b>' . EmailTemplate::e(strtoupper($actor['role'])) . '</b> del contrato <b>#' . EmailTemplate::e((string) ($contract['contrato'] ?? '')) . '</b>, inmueble ubicado en <b>' . EmailTemplate::e((string) ($contract['direccion'] ?? '')) . '</b>.</p>'
+      . '<p style="margin:0 0 14px;line-height:1.65;"><b>Nota:</b> el acta de bienvenida se encuentra adjunta a este correo.</p>'
+      . '<p style="margin:0 0 14px;line-height:1.65;">Para consultar los anexos digitales <b>(' . EmailTemplate::e($annexes) . ')</b> use el botón <b>Ver anexos</b>.</p>'
+      . $portal
+      . '<p style="margin:0 0 14px;line-height:1.65;">¡Descubra nuestra revista digital! Manténgase al día con las mejores oportunidades inmobiliarias, tips exclusivos y tendencias del mercado.</p>'
+      . '<p style="margin:0;line-height:1.65;">Cordialmente: <b>' . EmailTemplate::e($signature) . '</b>.</p>';
+  }
+
+  /** @param array<string,mixed> $contract @param array{url:string,path:string}|null $leaseFile @return array{path:string,name:string}|null */
+  private function localLeaseAttachment(array $contract, ?array $leaseFile): ?array
+  {
+    $path = $leaseFile['path'] ?? '';
+    if ($path === '') {
+      parse_str((string) (parse_url((string) ($contract['contrato_arrendamiento'] ?? ''), PHP_URL_QUERY) ?? ''), $query);
+      $path = (string) (StoredFileService::fromRuntime()->pathFor((string) ($query['n'] ?? '')) ?? '');
+    }
+    if ($path === '' || !is_file($path) || filesize($path) > 10 * 1024 * 1024) {
+      return null;
+    }
+    return ['path' => $path, 'name' => 'Contrato-de-arrendamiento-' . preg_replace('/[^A-Za-z0-9]+/', '-', (string) ($contract['contrato'] ?? '')) . '.' . pathinfo($path, PATHINFO_EXTENSION)];
+  }
+
+  private function date(string $value): int
+  {
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
+      return 0;
+    }
+    $ts = strtotime($value . ' 00:00:00');
+    return $ts === false ? 0 : $ts;
+  }
+
+  private function waText(string $text): string
+  {
+    $text = preg_replace('/[\r\n\t]+/u', ' | ', html_entity_decode($text, ENT_QUOTES, 'UTF-8')) ?? $text;
+    $text = preg_replace('/ {2,}/u', ' ', $text) ?? $text;
+    $text = trim($text, " \t\n\r\0\x0B|");
+    return mb_substr($text !== '' ? $text : '-', 0, 1024, 'UTF-8');
+  }
+}

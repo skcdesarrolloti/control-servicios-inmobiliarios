@@ -1,0 +1,37 @@
+{
+  "name": "scm_anexos_contrato_arrendamiento_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "HEADER",
+      "format": "DOCUMENT",
+      "example": {
+        "header_handle": [
+          "acta-de-bienvenida-ejemplo.pdf"
+        ]
+      }
+    },
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}.\n\nTe damos la bienvenida a SKC SuCasa Inmobiliaria como {{2}} del contrato de arrendamiento #{{3}}, inmueble #{{4}}, ubicado en {{5}}.\n\nTe compartimos tu acta de bienvenida. Consulta los anexos del contrato aquí: {{6}}\n\nAtentamente,\n{{7}}",
+      "example": {
+        "body_text": [
+          [
+            "María Pérez",
+            "ARRENDATARIO",
+            "848",
+            "95444",
+            "LA CAROLINA DIAGONAL 38 # 82-70 T 3 Apto 1102",
+            "https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/anexos-contrato.php?numero=1",
+            "Representante legal | 3001234567 - Representante legal"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    }
+  ]
+}

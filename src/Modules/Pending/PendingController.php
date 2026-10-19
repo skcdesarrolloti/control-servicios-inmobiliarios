@@ -122,12 +122,13 @@ final class PendingController
   public function getContratoBucketDefinitions(): array
   {
     return [
-      'todos' => ['label' => 'Todos'],
-      'por_entregar' => ['label' => 'Por entregar'],
-      'entregado' => ['label' => 'Entregado'],
-      'desistido' => ['label' => 'Desistido'],
-      'por_recibir' => ['label' => 'Por recibir'],
-      'no_asignado' => ['label' => 'No asignado'],
+      'todos' => ['label' => 'Todos', 'icon' => 'document', 'title' => 'Todos los contratos'],
+      'anexos_pendientes' => ['label' => 'Anexos pendientes', 'icon' => 'bolt', 'title' => 'Contratos entregados sin envío de anexos', 'description' => 'Envía las actas de bienvenida y los anexos al propietario, arrendatario y codeudores.'],
+      'por_entregar' => ['label' => 'Por entregar', 'icon' => 'clock', 'title' => 'Contratos por entregar'],
+      'entregado' => ['label' => 'Entregado', 'icon' => 'check', 'title' => 'Contratos entregados'],
+      'por_recibir' => ['label' => 'Por recibir', 'icon' => 'refresh', 'title' => 'Contratos por recibir'],
+      'desistido' => ['label' => 'Desistido', 'icon' => 'close', 'title' => 'Contratos desistidos'],
+      'no_asignado' => ['label' => 'No asignado', 'icon' => 'alert', 'title' => 'Contratos sin número asignado'],
     ];
   }
 

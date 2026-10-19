@@ -314,6 +314,8 @@ final class PendingRepository
     if ($bucket === 'no_asignado') {
       $where[] = "LOWER(TRIM(COALESCE(`contrato`, ''))) = ?";
       $args[] = 'no asignado';
+    } elseif ($bucket === 'anexos_pendientes') {
+      $where[] = "LOWER(TRIM(COALESCE(`estado`, ''))) = 'entregado' AND LOWER(TRIM(COALESCE(`se_envio`, ''))) <> 'si'";
     } elseif (in_array($bucket, ['por_entregar', 'entregado', 'desistido', 'por_recibir'], true)) {
       $status = str_replace('_', ' ', $bucket);
       $where[] = "LOWER(TRIM(COALESCE(`estado`, ''))) = ?";
@@ -399,6 +401,8 @@ final class PendingRepository
       'registro_fotografico',
       'barrio',
       'fecha_preventiva',
+      'se_envio',
+      'num_codeudores',
     ];
     $selectable = [];
     foreach ($columns as $column) {

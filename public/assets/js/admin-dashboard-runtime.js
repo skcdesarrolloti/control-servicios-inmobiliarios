@@ -261,6 +261,8 @@
     var actionMaintenanceOrdersDetail = actions.maintenance_orders_detail || "";
     var actionMaintenanceOrdersDelete = actions.maintenance_orders_delete || "";
     var actionMaintenanceOrdersQuotes = actions.maintenance_orders_quotes || "";
+    var actionLeaseContractView = actions.lease_contract_view || "";
+    var actionLeaseContractSend = actions.lease_contract_send || "";
     var duePopupConfig = runtime.duePopup || {};
     var dashboardDuePopupShown = {};
     var dashboardDuePopupPromise = null;
@@ -16622,7 +16624,16 @@
         status.textContent = "Informe generado " + String((data && data.generated_at) || "") + ".";
       }
       if (!results) return;
-      results.innerHTML =
+      results.innerHTML = propertyHistoryResultsHtml(data);
+    }
+
+    function propertyHistoryResultsHtml(data) {
+      var property = (data && data.property) || {};
+      var sources = Array.isArray(data && data.sources) ? data.sources : [];
+      var timeline = Array.isArray(data && data.timeline) ? data.timeline : [];
+      var sections = Array.isArray(data && data.sections) ? data.sections : [];
+      var contracts = Array.isArray(data && data.contracts) ? data.contracts : [];
+      return (
         '<div class="scm-property-history-summary">' +
           propertyHistoryField("Código / inmueble", property.codigo) +
           propertyHistoryField("ID interno", property.id_interno) +
@@ -16644,7 +16655,8 @@
         "</section>" +
         '<div class="scm-property-history-sections">' + sections.filter(function (section) {
           return Number(section && section.count || 0) > 0;
-        }).map(propertyHistorySection).join("") + "</div>";
+        }).map(propertyHistorySection).join("") + "</div>"
+      );
     }
 
     function propertyHistoryFiltersFromForm(form) {
@@ -19817,10 +19829,9 @@
         tab.addEventListener("click", function () {
           var bucket = tab.getAttribute("data-contract-bucket") || "";
           wrap.querySelectorAll(".scm-contract-tab").forEach(function (item) {
-            item.classList.toggle(
-              "active",
-              item.getAttribute("data-contract-bucket") === bucket,
-            );
+            var isActive = item.getAttribute("data-contract-bucket") === bucket;
+            item.classList.toggle("active", isActive);
+            item.setAttribute("aria-pressed", isActive ? "true" : "false");
           });
           wrap.querySelectorAll(".scm-contract-panel").forEach(function (panel) {
             panel.classList.toggle(
@@ -19901,6 +19912,200 @@
     }
 
     initContractsPanel();
+
+    function initLeaseContractActions() {
+      var wrap = root.querySelector("[data-lease-contracts]");
+      var modal = wrap ? wrap.querySelector("[data-lease-modal]") : null;
+      if (!wrap || !modal || !ajaxUrl || !actionLeaseContractView) {
+        return;
+      }
+      var body = modal.querySelector("[data-lease-modal-body]");
+      var title = modal.querySelector("[data-lease-modal-title]");
+      var kicker = modal.querySelector("[data-lease-modal-kicker]");
+      var opener = null;
+      var sending = false;
+      var requestSeq = 0;
+
+      function loadingHtml(text) {
+        return '<p class="!sp-m-0 !sp-p-10 !sp-text-center !sp-text-xs !sp-text-service-muted" role="status">' + escHtml(text) + "</p>";
+      }
+
+      function openModal(kickerText, titleText, html, trigger) {
+        opener = trigger || opener;
+        if (kicker) kicker.textContent = kickerText || "Contrato";
+        if (title) title.textContent = titleText || "Contrato";
+        body.innerHTML = html;
+        modal.classList.remove("!sp-hidden");
+        modal.classList.add("!sp-flex");
+        document.documentElement.classList.add("scm-lease-modal-open");
+        var close = modal.querySelector("[data-lease-modal-close]");
+        if (close) close.focus();
+      }
+
+      function closeModal() {
+        if (sending) return;
+        requestSeq++;
+        modal.classList.add("!sp-hidden");
+        modal.classList.remove("!sp-flex");
+        body.innerHTML = "";
+        document.documentElement.classList.remove("scm-lease-modal-open");
+        if (opener && opener.isConnected) opener.focus();
+        opener = null;
+      }
+
+      function syncCodebtors(form) {
+        var select = form.querySelector("[data-lease-codebtors]");
+        var count = select && /^\d$/.test(select.value) ? Number(select.value) : 0;
+        for (var i = 1; i <= 4; i += 1) {
+          var block = form.querySelector('[data-lease-person="codeudor_' + i + '"]');
+          if (!block) continue;
+          var visible = i <= count;
+          block.classList.toggle("!sp-hidden", !visible);
+          block.disabled = !visible;
+        }
+      }
+
+      function loadView(view, trigger) {
+        var contractId = trigger.getAttribute("data-contract-id") || "";
+        var code = trigger.getAttribute("data-contract-code") || contractId;
+        var seq = ++requestSeq;
+        openModal("Contrato", "Contrato #" + code, loadingHtml("Cargando información del contrato..."), trigger);
+        dashboardAction(actionLeaseContractView, { view: view, contract_id: contractId })
+          .then(function (data) {
+            if (seq !== requestSeq) return;
+            if (kicker) kicker.textContent = data.kicker || "Contrato";
+            if (title) title.textContent = data.title || "Contrato #" + code;
+            body.innerHTML = data.html || "";
+            var form = body.querySelector("[data-lease-send-form]");
+            if (form) syncCodebtors(form);
+          })
+          .catch(function (error) {
+            if (seq !== requestSeq) return;
+            body.innerHTML = '<p class="!sp-m-0 !sp-p-6 !sp-text-center !sp-text-xs !sp-text-rose-700" role="alert">' + escHtml(error.message || "No se pudo cargar la información.") + "</p>";
+          });
+      }
+
+      function loadPropertyHistory(trigger) {
+        var code = trigger.getAttribute("data-contract-code") || "";
+        var property = trigger.getAttribute("data-property-code") || "";
+        var seq = ++requestSeq;
+        openModal("Historial del inmueble", "Contrato #" + code + (property ? " · Inmueble " + property : ""), loadingHtml("Consultando el historial del inmueble..."), trigger);
+        if (!actionPropertyHistoryReport) {
+          body.innerHTML = propertyHistoryEmpty("La consulta de historial no está disponible.");
+          return;
+        }
+        dashboardAction(actionPropertyHistoryReport, { contract_number: code, property_code: property })
+          .then(function (data) {
+            if (seq !== requestSeq) return;
+            body.innerHTML = '<div class="scm-property-history-results">' + propertyHistoryResultsHtml(data || {}) + "</div>";
+          })
+          .catch(function (error) {
+            if (seq !== requestSeq) return;
+            body.innerHTML = propertyHistoryEmpty(error.message || "No se pudo consultar el historial.");
+          });
+      }
+
+      wrap.addEventListener("click", function (event) {
+        var target = event.target && event.target.closest ? event.target : null;
+        if (!target) return;
+        if (target.closest("[data-lease-modal-close]") || target === modal) {
+          event.preventDefault();
+          closeModal();
+          return;
+        }
+        var action = target.closest("[data-lease-action]");
+        if (!action) return;
+        event.preventDefault();
+        var key = action.getAttribute("data-lease-action") || "";
+        if (key === "caso") {
+          window.dispatchEvent(new CustomEvent("scm:open-nuevo-ticket", {
+            detail: { contract: { id: action.getAttribute("data-contract-id") || "", code: action.getAttribute("data-contract-code") || "" } },
+          }));
+          return;
+        }
+        if (key === "historial-inmueble") {
+          loadPropertyHistory(action);
+          return;
+        }
+        loadView(key, action);
+      });
+
+      modal.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeModal();
+        }
+      });
+
+      wrap.addEventListener("change", function (event) {
+        var select = event.target && event.target.closest ? event.target.closest("[data-lease-codebtors]") : null;
+        if (select) syncCodebtors(select.form);
+      });
+
+      wrap.addEventListener("submit", function (event) {
+        var form = event.target && event.target.closest ? event.target.closest("[data-lease-send-form]") : null;
+        if (!form) return;
+        event.preventDefault();
+        var error = form.querySelector("[data-lease-send-error]");
+        var submit = form.querySelector("[data-lease-send-submit]");
+        var showError = function (message) {
+          if (!error) return;
+          error.textContent = message || "";
+          error.classList.toggle("!sp-hidden", !message);
+          if (message) error.scrollIntoView({ block: "nearest" });
+        };
+        showError("");
+        if (!form.checkValidity()) {
+          var invalid = form.querySelector(":invalid");
+          showError("Revisa los campos obligatorios" + (invalid && invalid.name ? " (" + invalid.name.replace(/_/g, " ") + ")" : "") + ".");
+          if (invalid) invalid.focus();
+          return;
+        }
+        var file = form.querySelector('input[name="contrato_arrendamiento"]');
+        if (file && file.files && file.files[0] && file.files[0].size > 10 * 1024 * 1024) {
+          showError("El contrato de arrendamiento supera 10 MB.");
+          return;
+        }
+        if (!actionLeaseContractSend) {
+          showError("Actualiza la página para enviar los anexos.");
+          return;
+        }
+        var fd = new FormData(form);
+        fd.set("action", actionLeaseContractSend);
+        fd.set("nonce", nonce);
+        sending = true;
+        if (submit) {
+          submit.disabled = true;
+          submit.textContent = "Generando actas y enviando...";
+        }
+        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          .then(function (response) {
+            return response.json().catch(function () {
+              throw new Error("El servidor no respondió correctamente. Revisa en el historial del contrato si el envío quedó registrado antes de reintentar.");
+            });
+          })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error((json && json.data && json.data.message) || "No se pudieron enviar los anexos.");
+            }
+            sending = false;
+            showToast("success", json.data.message || "Anexos enviados.");
+            if (kicker) kicker.textContent = "Envío de anexos";
+            body.innerHTML = json.data.html || "";
+            root.dispatchEvent(new CustomEvent("scm:contracts-refresh"));
+          })
+          .catch(function (err) {
+            sending = false;
+            showError(err.message || "No se pudieron enviar los anexos.");
+            if (submit) {
+              submit.disabled = false;
+              submit.textContent = "Generar actas y enviar anexos";
+            }
+          });
+      });
+    }
+
+    initLeaseContractActions();
 
     function initRentIncreasePanel() {
       var wrap = root.querySelector("[data-rent-increase-panel]");

@@ -124,7 +124,7 @@ trait RendersDashboard
     $serviciosPublicosPendientesHtml = $this->render_pending_servicios_publicos_shell($_GET);
     $reportesAdministrativosPendientesHtml = $pendingController->renderReportesAdministrativosShell($filterOptions);
     $actasSatisfaccionHtml = $this->render_ticket_completion_acts_shell($_GET);
-    $contratosArrendamientoHtml = $pendingController->renderContratosArrendamientoTab();
+    $contratosArrendamientoHtml = $this->renderLeaseContractsPanel();
     $cartasAumentoHtml = '';
     $dashboardPermissionTabs = $this->dashboardPermissionTabs();
     $tabMap = [
@@ -583,6 +583,8 @@ trait RendersDashboard
         'maintenance_orders_detail' => self::AJAX_MAINTENANCE_ORDERS_DETAIL,
         'maintenance_orders_delete' => self::AJAX_MAINTENANCE_ORDERS_DELETE,
         'maintenance_orders_quotes' => self::AJAX_MAINTENANCE_ORDERS_QUOTES,
+        'lease_contract_view' => self::AJAX_LEASE_CONTRACT_VIEW,
+        'lease_contract_send' => self::AJAX_LEASE_CONTRACT_SEND,
         // Guía
         'guide_gcd_read' => self::AJAX_GUIDE_GCD_READ,
         'guide_gcd_save' => self::AJAX_GUIDE_GCD_SAVE,

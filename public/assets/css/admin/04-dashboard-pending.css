@@ -16724,3 +16724,8 @@ body.scm-session-locked {
   font-size: 12px;
   text-align: center;
 }
+
+/* Contratos de arrendamiento: bloquea el scroll del panel mientras el popup está abierto. */
+html.scm-lease-modal-open {
+  overflow: hidden;
+}
