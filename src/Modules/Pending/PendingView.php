@@ -24,6 +24,12 @@ final class PendingView
         </div>
       </div>
 
+      <?php echo PreventiveWorkspace::tabs(null); ?>
+      <?php foreach (array_keys(PreventiveWorkspace::TABS) as $section) : if ($section === 'pending') continue; ?>
+        <section data-preventive-section="<?php echo esc_attr($section); ?>" hidden><div data-preventive-workspace-content="<?php echo esc_attr($section); ?>"></div></section>
+      <?php endforeach; ?>
+      <section data-preventive-section="pending">
+
       <!-- Filtros -->
       <div class="scm-filter-card">
         <h3>Filtros</h3>
@@ -81,6 +87,7 @@ final class PendingView
         <?php echo $this->renderPreventivasTable($items); ?>
       </div>
 
+      </section>
     </div>
   <?php
     return (string) ob_get_clean();

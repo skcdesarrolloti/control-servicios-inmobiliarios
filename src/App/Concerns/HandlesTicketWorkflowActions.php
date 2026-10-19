@@ -1754,6 +1754,23 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk($result);
   }
 
+  /** Sub-tabs of Preventivas pendientes; the queues reuse the admin calendar rules over all dates. */
+  private function preventiveWorkspaceHtml(string $operation, array $input): string
+  {
+    $canSend = $this->canUseDashboardAction('preventive_review_send');
+    $workspace = new \SCM\Modules\Pending\PreventiveWorkspace($this->db);
+    if ($operation === 'history') {
+      return $workspace->history($input, $canSend);
+    }
+    $type = \SCM\Modules\Pending\PreventiveWorkspace::dueType($operation);
+    $settings = $this->adminDueCalendarSettings();
+    $until = strtotime('+20 years') ?: PHP_INT_MAX;
+    $items = $type === 'preventiva_sin_enviar'
+      ? $this->adminDuePreventivaItems($settings, 0, $until)
+      : $this->adminDuePreventivaTicketItems($settings, 0, $until);
+    return \SCM\Modules\Pending\PreventiveWorkspace::agenda($operation, $items, $input, $canSend);
+  }
+
   public function ajax_handler_preventivas_pendientes()
   {
     $this->verifyCsrf();
@@ -1766,6 +1783,14 @@ trait HandlesTicketWorkflowActions
     }
     if (!$this->canAccessDashboardTab('preventivas_pendientes')) {
       $this->jsonFail('No tienes permiso para ver esta pestaña.');
+    }
+    $operation = sanitize_key((string) ($_POST['operation'] ?? ''));
+    if ($operation !== '') {
+      try {
+        $this->jsonOk(['html' => $this->preventiveWorkspaceHtml($operation, wp_unslash($_POST))]);
+      } catch (\Throwable $error) {
+        $this->jsonFail($error->getMessage());
+      }
     }
 
     $controller = $this->get_pending_controller();

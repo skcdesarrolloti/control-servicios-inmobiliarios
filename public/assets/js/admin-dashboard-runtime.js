@@ -814,22 +814,28 @@
         }
         return;
       }
-      var openCriticalServices = key === "servicios_publicos_critico";
-      if (openCriticalServices) key = "servicios_publicos_pendientes";
+      // Due types that live in a sub-tab: [activity tab, sub-tab button selector].
+      var subTab = {
+        servicios_publicos_critico: ["servicios_publicos_pendientes", '[data-services-tab="critical"]'],
+        ticket_preventiva_sin_cita: ["preventivas_pendientes", '[data-preventive-tab="sin_cita"]'],
+        preventiva_cita_sin_realizar: ["preventivas_pendientes", '[data-preventive-tab="cita_sin_realizar"]'],
+        preventiva_sin_enviar: ["preventivas_pendientes", '[data-preventive-tab="sin_enviar"]'],
+      }[key];
+      if (subTab) key = subTab[0];
       dashboardDuePopupShown.administrative = true;
-      if (openCriticalServices) {
-        // The services workspace renders after its activity tab opens; wait for the sub-tabs before selecting "critical".
+      if (subTab) {
+        // The workspace renders after its activity tab opens; wait for the sub-tab button before selecting it.
         var attempts = 0;
-        var selectCritical = function () {
-          var criticalTab = root.querySelector('[data-services-tab="critical"]');
-          if (criticalTab && criticalTab.offsetParent !== null) {
-            criticalTab.click();
-            criticalTab.focus({ preventScroll: true });
+        var selectSubTab = function () {
+          var subTabButton = root.querySelector(subTab[1]);
+          if (subTabButton && subTabButton.offsetParent !== null) {
+            subTabButton.click();
+            subTabButton.focus({ preventScroll: true });
             return;
           }
-          if (++attempts < 30) window.setTimeout(selectCritical, 200);
+          if (++attempts < 30) window.setTimeout(selectSubTab, 200);
         };
-        window.setTimeout(selectCritical, 300);
+        window.setTimeout(selectSubTab, 300);
       }
       var adminTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-actividades-administrativas"]');
       if (adminTab) {
@@ -919,7 +925,7 @@
       });
       var groupHtml = groupOrder.map(function (type) {
         var summaryGroup = summaryByType[type] || {};
-        var targetTab = String(summaryGroup.target_tab || (type === "terminacion_contrato_pendiente" ? "contract_termination" : type === "no_prorroga_contrato_pendiente" ? "contract_non_renewal" : type === "servicios_publicos_critico" ? "servicios_publicos_critico" : ""));
+        var targetTab = String(summaryGroup.target_tab || (type === "terminacion_contrato_pendiente" ? "contract_termination" : type === "no_prorroga_contrato_pendiente" ? "contract_non_renewal" : ["servicios_publicos_critico", "ticket_preventiva_sin_cita", "preventiva_cita_sin_realizar", "preventiva_sin_enviar"].indexOf(type) !== -1 ? type : ""));
         var buttonHtml = targetTab
           ? '<button type="button" class="scm-due-entry-group-link" data-scm-dashboard-due-open-admin-tab="' + escHtml(targetTab) + '">Ver pestaña <span class="material-symbols-outlined">chevron_right</span></button>'
           : "";
@@ -12379,6 +12385,112 @@
         if (target._request === request && !target.querySelector("form")) target.innerHTML = '<p role="alert">' + escHtml(error.message) + '</p><button type="button" class="scm-btn-secondary" data-services-tab="' + section + '">Reintentar</button>';
       }).finally(function () { if (target._request === request) target.removeAttribute("aria-busy"); });
     }
+
+    // Preventivas pendientes: sub-tabs (history and due-date queues) loaded through the same panel action.
+    function loadPreventiveWorkspace(section, fields) {
+      var target = root.querySelector('[data-preventive-workspace-content="' + section + '"]');
+      if (!target || !actionPreventivasPendientes) return Promise.resolve();
+      var request = (target._request || 0) + 1;
+      target._request = request;
+      target.setAttribute("aria-busy", "true");
+      if (!target.innerHTML) target.innerHTML = '<p role="status">Cargando...</p>';
+      var fd = fields || new FormData();
+      fd.set("action", actionPreventivasPendientes);
+      fd.set("nonce", nonce);
+      fd.set("operation", section);
+      return fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (!json || !json.success) throw new Error((json && json.data && json.data.message) || "No fue posible cargar las preventivas.");
+          if (target._request === request) target.innerHTML = (json.data && json.data.html) || "";
+        })
+        .catch(function (error) {
+          showToast("error", error.message);
+          if (target._request === request && !target.querySelector("form")) target.innerHTML = '<p role="alert">' + escHtml(error.message) + '</p><button type="button" class="scm-btn-secondary" data-preventive-tab="' + section + '">Reintentar</button>';
+        })
+        .finally(function () { if (target._request === request) target.removeAttribute("aria-busy"); });
+    }
+
+    function showPreventiveSection(section) {
+      var panel = root.querySelector("#scm-panel-preventivas-pendientes");
+      if (!panel) return;
+      panel.querySelectorAll("[data-preventive-section]").forEach(function (item) { item.hidden = item.dataset.preventiveSection !== section; });
+      panel.querySelectorAll("[data-preventive-tab]").forEach(function (button) { button.setAttribute("aria-pressed", button.dataset.preventiveTab === section ? "true" : "false"); });
+      if (section !== "pending") loadPreventiveWorkspace(section);
+    }
+
+    function openPreventiveCase(button) {
+      if (!actionAdminDueCase) return;
+      var send = button.hasAttribute("data-preventive-send");
+      var reviewId = button.getAttribute("data-id-revision-preventiva") || "";
+      button.disabled = true;
+      dashboardAction(actionAdminDueCase, {
+        tipo_vencimiento: button.getAttribute("data-due-type") || "",
+        ticket_pk: button.getAttribute("data-ticket-pk") || "",
+        ticket: button.getAttribute("data-ticket-pk") || "",
+        id_revision_preventiva: reviewId,
+      }).then(function (data) {
+        var caseData = data.case || {};
+        if (!caseData.case_source_html) throw new Error("No se encontró el detalle del caso.");
+        var holder = document.createElement("div"); holder.className = "scm-ticket-card"; holder.hidden = true;
+        holder.innerHTML = '<button type="button" data-scm-due-case-loaded="1"></button><div class="scm-case-source"></div>';
+        root.appendChild(holder);
+        var trigger = holder.querySelector("button");
+        dashboardApplyDueCaseData(trigger, caseData);
+        // Send the review chosen in the list, not just the latest one of the case.
+        if (reviewId) trigger.setAttribute("data-id-revision-preventiva", reviewId);
+        openDashboardDueCaseFromButton(trigger, caseData.case_source_html);
+        holder.remove();
+        if (!send) return;
+        var attempts = 0;
+        var openSender = function () {
+          var sendButton = root.querySelector("#scm-case-modal.open [data-scm-send-preventive-review]");
+          if (sendButton) { sendButton.click(); return; }
+          if (++attempts < 20) { window.setTimeout(openSender, 150); return; }
+          showToast("info", "El caso está abierto. Usa Enviar revisión preventiva dentro del caso.");
+        };
+        window.setTimeout(openSender, 200);
+      }).catch(function (error) {
+        showToast("error", error.message || "No se pudo cargar el caso.");
+      }).finally(function () { button.disabled = false; });
+    }
+
+    root.addEventListener("click", function (event) {
+      var tab = event.target.closest("[data-preventive-tab]");
+      if (tab) { event.preventDefault(); showPreventiveSection(tab.dataset.preventiveTab); return; }
+      var caseButton = event.target.closest("[data-preventive-open-case]");
+      if (caseButton) { event.preventDefault(); openPreventiveCase(caseButton); return; }
+      var content = event.target.closest("[data-preventive-workspace-content]");
+      if (!content) return;
+      var section = content.getAttribute("data-preventive-workspace-content");
+      var form = content.querySelector("[data-preventive-workspace-form]");
+      var page = event.target.closest("[data-preventive-page]");
+      if (page && form) {
+        var pageData = new FormData(form); pageData.set("page", page.getAttribute("data-preventive-page"));
+        loadPreventiveWorkspace(section, pageData); return;
+      }
+      if (event.target.closest("[data-preventive-clear]")) { loadPreventiveWorkspace(section, new FormData()); return; }
+      var exportButton = event.target.closest("[data-preventive-export]");
+      if (exportButton) {
+        var table = content.querySelector("[data-preventive-table]");
+        servicesExportTable(table, table ? Array.from(table.tBodies[0].rows).filter(function (row) { return row.cells.length > 1; }) : [], exportButton.getAttribute("data-preventive-export"));
+      }
+    });
+    root.addEventListener("submit", function (event) {
+      var form = event.target.closest("[data-preventive-workspace-form]");
+      if (!form) return;
+      event.preventDefault();
+      var fd = new FormData(form); fd.set("page", "1");
+      loadPreventiveWorkspace(form.getAttribute("data-preventive-workspace-form"), fd);
+    });
+    root.addEventListener("change", function (event) {
+      if (!event.target.matches("[data-preventive-order]")) return;
+      var content = event.target.closest("[data-preventive-workspace-content]");
+      var form = content ? content.querySelector("[data-preventive-workspace-form]") : null;
+      if (!form) return;
+      var fd = new FormData(form); fd.set("order", event.target.value); fd.set("page", "1");
+      loadPreventiveWorkspace(content.getAttribute("data-preventive-workspace-content"), fd);
+    });
 
     function servicesTemplateCanLeave() {
       var form = root.querySelector("[data-services-template-form]");

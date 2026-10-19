@@ -1,6 +1,6 @@
 // Services-only utilities: no reset and no changes to the panel's existing theme.
 module.exports = {
-  content: ['./resources/views/public-services/*.php', './src/Modules/Pending/PublicServicesUi.php', './src/Modules/Pending/PublicServicesWorkspace.php', './public/assets/js/admin-dashboard-runtime.js'],
+  content: ['./resources/views/public-services/*.php', './resources/views/preventive/*.php', './src/Modules/Pending/PreventiveWorkspace.php', './src/Modules/Pending/PublicServicesUi.php', './src/Modules/Pending/PublicServicesWorkspace.php', './public/assets/js/admin-dashboard-runtime.js'],
   // Panel-wide legacy form rules use !important and IDs; scope the utility
   // selector strongly, with Tailwind's ! modifier on each services utility.
   prefix: 'sp-', important: '#scm-app#scm-app', corePlugins: { preflight: false },
