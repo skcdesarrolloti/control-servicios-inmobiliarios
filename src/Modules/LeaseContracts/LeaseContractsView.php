@@ -277,7 +277,7 @@ final class LeaseContractsView
     $ui = UI::class;
     $pick = static function (array $row, array $keys): string {
       foreach ($keys as $key) {
-        $value = trim((string) ($row[$key] ?? ''));
+        $value = self::readable($row[$key] ?? '');
         if ($value !== '' && $value !== '0') {
           return $value;
         }
@@ -312,7 +312,14 @@ final class LeaseContractsView
         'Administrador' => $pick($c, ['administrador']),
         'Contacto' => implode(' · ', array_filter([$pick($c, ['celular_copropiedad']), $pick($c, ['correo_copropiedad'])])),
       ],
+      'Dotación' => [
+        'Interiores' => $pick($p, ['interiores']),
+        'Exteriores' => $pick($p, ['exteriores']),
+        'Zonas sociales' => $pick($p, ['zonas_sociales']),
+        'Alrededores' => $pick($p, ['alrededores']),
+      ],
       'Servicios públicos' => [
+        'Servicios del inmueble' => $pick($p, ['servicios_publicos']),
         'Energía · medidor' => $pick($c, ['medidor_luz', 'luz']),
         'Agua · medidor' => $pick($c, ['medidor_agua', 'agua']),
         'Gas · medidor' => $pick($c, ['medidor_gas', 'gas']),
@@ -323,10 +330,18 @@ final class LeaseContractsView
         'Precio de arriendo publicado' => $this->money($pick($p, ['precio_arriendo'])),
       ],
     ];
-    $photo = $pick($p, ['foto_portada']);
+    $photos = array_values(array_filter((array) ($p['_photos'] ?? []), static fn($url): bool => is_string($url) && filter_var($url, FILTER_VALIDATE_URL) !== false));
     $html = '<div class="!sp-space-y-4">';
-    if (filter_var($photo, FILTER_VALIDATE_URL)) {
-      $html .= '<div class="' . $ui::CARD . '"><img src="' . esc_attr($photo) . '" alt="Foto del inmueble" class="!sp-block !sp-w-full !sp-max-h-72 !sp-object-cover"></div>';
+    if ($photos !== []) {
+      $html .= '<div class="' . $ui::CARD . ' !sp-p-3"><button type="button" class="!sp-block !sp-w-full !sp-p-0 !sp-border-0 !sp-bg-transparent !sp-cursor-zoom-in" data-scm-open-iframe data-iframe-url="' . esc_attr($photos[0]) . '" data-iframe-title="Foto del inmueble 1"><img src="' . esc_attr($photos[0]) . '" alt="Foto principal del inmueble" loading="lazy" class="!sp-block !sp-w-full !sp-max-h-80 !sp-object-cover !sp-rounded-lg"></button>';
+      if (count($photos) > 1) {
+        $html .= '<div class="!sp-grid !sp-grid-cols-4 sm:!sp-grid-cols-6 !sp-gap-2 !sp-mt-2">';
+        foreach (array_slice($photos, 1) as $index => $url) {
+          $html .= '<button type="button" class="!sp-block !sp-p-0 !sp-border-0 !sp-bg-transparent !sp-cursor-zoom-in focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow !sp-rounded-md" data-scm-open-iframe data-iframe-url="' . esc_attr($url) . '" data-iframe-title="Foto del inmueble ' . ($index + 2) . '"><img src="' . esc_attr($url) . '" alt="Foto del inmueble ' . ($index + 2) . '" loading="lazy" class="!sp-block !sp-w-full !sp-h-16 !sp-object-cover !sp-rounded-md"></button>';
+        }
+        $html .= '</div>';
+      }
+      $html .= '<p class="!sp-m-0 !sp-mt-2 !sp-text-[9px] !sp-text-service-muted">' . count($photos) . ' foto(s) del inmueble. Haz clic para ampliar.</p></div>';
     }
     $html .= '<div class="!sp-grid !sp-grid-cols-1 md:!sp-grid-cols-2 !sp-gap-4">';
     foreach ($groups as $title => $fields) {
@@ -458,6 +473,37 @@ final class LeaseContractsView
       . '<small class="!sp-block !sp-mt-1 !sp-text-[10px] !sp-text-service-muted">Documento: ' . esc_html($document !== '' ? $document : '-') . '</small>'
       . '<small class="!sp-block !sp-text-[10px] !sp-text-service-muted">Correo: ' . esc_html($email !== '' ? $email : '-') . '</small>'
       . '<small class="!sp-block !sp-text-[10px] !sp-text-service-muted">Tel: ' . esc_html($phone !== '' ? $phone : '-') . '</small></div>';
+  }
+
+  /** JetEngine guarda checkboxes como arreglos PHP serializados o JSON; se muestran como lista legible. */
+  private static function readable(mixed $value): string
+  {
+    if (is_array($value)) {
+      $items = $value;
+    } else {
+      $text = trim(html_entity_decode((string) $value, ENT_QUOTES, 'UTF-8'));
+      if (preg_match('/^a:\d+:\{.*\}$/s', $text) === 1) {
+        $items = @unserialize($text, ['allowed_classes' => false]);
+      } elseif (preg_match('/^[\[{].*[\]}]$/s', $text) === 1) {
+        $items = json_decode($text, true);
+      } else {
+        return $text;
+      }
+      if (!is_array($items)) {
+        return '';
+      }
+    }
+    $flat = [];
+    array_walk_recursive($items, static function ($item, $key) use (&$flat): void {
+      if (is_bool($item)) {
+        // Formato {"Opción": true}: la clave es la opción marcada.
+        if ($item && is_string($key)) $flat[] = $key;
+        return;
+      }
+      $item = trim((string) $item);
+      if ($item !== '' && strtolower($item) !== 'false') $flat[] = $item;
+    });
+    return implode(', ', array_unique($flat));
   }
 
   private function date(mixed $value): string

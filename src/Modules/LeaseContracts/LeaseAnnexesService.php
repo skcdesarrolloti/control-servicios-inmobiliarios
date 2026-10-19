@@ -63,7 +63,46 @@ final class LeaseAnnexesService
     if ($code === '' || !$this->schema->tableExists($table)) {
       return [];
     }
-    return $this->db->getRow("SELECT * FROM `{$table}` WHERE TRIM(COALESCE(`codigo`, '')) = ? ORDER BY `_ID` DESC LIMIT 1", [$code]) ?? [];
+    $property = $this->db->getRow("SELECT * FROM `{$table}` WHERE TRIM(COALESCE(`codigo`, '')) = ? ORDER BY `_ID` DESC LIMIT 1", [$code]) ?? [];
+    if ($property !== []) {
+      $property['_photos'] = $this->attachmentUrls(array_merge(
+        [(string) ($property['foto_portada'] ?? '')],
+        explode(',', (string) ($property['galeria'] ?? ''))
+      ));
+    }
+    return $property;
+  }
+
+  /** La portada y la galería guardan IDs de adjuntos de WordPress. @param string[] $refs @return string[] */
+  private function attachmentUrls(array $refs): array
+  {
+    $ids = [];
+    $urls = [];
+    foreach ($refs as $ref) {
+      $ref = trim($ref);
+      if (ctype_digit($ref) && (int) $ref > 0) {
+        $ids[(int) $ref] = (int) $ref;
+      } elseif (filter_var($ref, FILTER_VALIDATE_URL)) {
+        $urls[$ref] = $ref;
+      }
+    }
+    $posts = $this->db->table('posts');
+    if ($ids !== [] && $this->schema->tableExists($posts)) {
+      $rows = $this->db->getResults(
+        "SELECT `ID`, `guid` FROM `{$posts}` WHERE `post_type` = 'attachment' AND `ID` IN (" . implode(',', array_fill(0, count($ids), '?')) . ')',
+        array_values($ids)
+      );
+      $byId = [];
+      foreach ($rows as $row) {
+        $byId[(int) $row['ID']] = trim((string) ($row['guid'] ?? ''));
+      }
+      foreach ($ids as $id) {
+        if (filter_var($byId[$id] ?? '', FILTER_VALIDATE_URL)) {
+          $urls[$byId[$id]] = $byId[$id];
+        }
+      }
+    }
+    return array_values($urls);
   }
 
   /** @return array<int,array<string,string>> */
@@ -108,6 +147,8 @@ final class LeaseAnnexesService
       'realizado_por' => $sender['name'],
       'realizado_por_cargo' => $sender['cargo'],
       'realizado_por_telefono' => $sender['phone'],
+      // Razón social de la sucursal: es la que firma el contrato y la que se nombra en la bienvenida.
+      'razon_social' => mb_strtoupper(trim((string) ($branch['nombre'] ?? '')) ?: 'Soluciones Comerciales y Constructivas SAS', 'UTF-8'),
     ]);
     foreach (['nombre_contractual', 'celular_contractual', 'correo_contractual', 'nombre_propietarios', 'celular_propietarios', 'correo_propietarios', 'nombre_arrendatarios', 'celular_arrendatarios', 'correo_arrendatarios', 'representante_legal', 'celular_legal', 'gerente_comercial', 'celular_ge_comercial', 'correo_ge_comercial'] as $field) {
       $context[$field] = trim((string) ($branch[$field] ?? ''));
@@ -377,7 +418,7 @@ final class LeaseAnnexesService
         $buttons[] = ['url' => 'https://sucasainmobiliaria.com.co/' . $actor['role'], 'label' => 'Entrar a mi cuenta'];
       }
       $buttons[] = ['url' => 'https://sucasainmobiliaria.com.co/revista/', 'label' => 'Ver revista'];
-      $html = EmailTemplate::render($subject, $this->emailBody($actor, $contract, $signature), ['buttons' => $buttons]);
+      $html = EmailTemplate::render($subject, $this->emailBody($actor, $contract, $signature, (string) $context['razon_social']), ['buttons' => $buttons]);
       $queued['email'] += $emailQueue->enqueue($actor['email'], $subject, $html, [
         'source_module' => 'anexos_contrato_arrendamiento',
         'internal_cc' => [],
@@ -430,14 +471,14 @@ final class LeaseAnnexesService
   }
 
   /** @param array<string,mixed> $actor @param array<string,mixed> $contract */
-  private function emailBody(array $actor, array $contract, string $signature): string
+  private function emailBody(array $actor, array $contract, string $signature, string $company): string
   {
     $annexes = implode(', ', array_slice(LeaseAnnexesDocument::annexLabels($actor['role']), 1));
     $portal = $actor['role'] !== 'codeudor'
       ? '<p style="margin:0 0 14px;line-height:1.65;">Le recordamos que tiene acceso al portal de ' . EmailTemplate::e($actor['role']) . ' usando su <b>número de documento como usuario y contraseña</b>.</p>'
       : '';
     return '<p style="margin:0 0 16px;font-weight:600;">Apreciado(a) ' . EmailTemplate::e($actor['name']) . ':</p>'
-      . '<p style="margin:0 0 14px;line-height:1.65;">Por medio de la presente le damos la más cordial bienvenida a <b>SKC SuCasa Inmobiliaria</b>, donde ha sido incorporado(a) como <b>' . EmailTemplate::e(strtoupper($actor['role'])) . '</b> del contrato <b>#' . EmailTemplate::e((string) ($contract['contrato'] ?? '')) . '</b>, inmueble ubicado en <b>' . EmailTemplate::e((string) ($contract['direccion'] ?? '')) . '</b>.</p>'
+      . '<p style="margin:0 0 14px;line-height:1.65;">Por medio de la presente le damos la más cordial bienvenida a <b>' . EmailTemplate::e($company) . '</b>, donde ha sido incorporado(a) como <b>' . EmailTemplate::e(strtoupper($actor['role'])) . '</b> del contrato <b>#' . EmailTemplate::e((string) ($contract['contrato'] ?? '')) . '</b>, inmueble ubicado en <b>' . EmailTemplate::e((string) ($contract['direccion'] ?? '')) . '</b>.</p>'
       . '<p style="margin:0 0 14px;line-height:1.65;"><b>Nota:</b> el acta de bienvenida se encuentra adjunta a este correo.</p>'
       . '<p style="margin:0 0 14px;line-height:1.65;">Para consultar los anexos digitales <b>(' . EmailTemplate::e($annexes) . ')</b> use el botón <b>Ver anexos</b>.</p>'
       . $portal

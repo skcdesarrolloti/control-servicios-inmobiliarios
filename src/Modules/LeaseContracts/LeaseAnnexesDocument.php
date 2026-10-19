@@ -51,7 +51,7 @@ final class LeaseAnnexesDocument
         'Para poder darle un trato personalizado, le informamos los funcionarios que podrán colaborarle en todos sus requerimientos:',
       ],
       'arrendatario' => [
-        'Por medio de la presente le damos la más cordial bienvenida a **SKC SuCasa Inmobiliaria**, donde lo hemos incorporado en calidad de **ARRENDATARIO**, ocupando el inmueble identificado con el código **#' . (string) ($context['inmueble'] ?? $propertyCode) . '** y número de contrato **#' . $contract . '** con fecha de inicio **' . $start . '**, día en el cual se ha perfeccionado el mismo.',
+        'Por medio de la presente le damos la más cordial bienvenida a **' . (string) ($context['razon_social'] ?? 'SOLUCIONES COMERCIALES Y CONSTRUCTIVAS SAS') . '**, donde lo hemos incorporado en calidad de **ARRENDATARIO**, ocupando el inmueble identificado con el código **#' . (string) ($context['inmueble'] ?? $propertyCode) . '** y número de contrato **#' . $contract . '** con fecha de inicio **' . $start . '**, día en el cual se ha perfeccionado el mismo.',
         'Nuestra misión se mantiene: hacer todo lo que esté a nuestro alcance para atenderlo y prestarle un servicio para que su permanencia en el inmueble sea memorable.',
         'Por tanto, los funcionarios que a continuación relacionamos serán los responsables directos de atender todos sus requerimientos:',
       ],

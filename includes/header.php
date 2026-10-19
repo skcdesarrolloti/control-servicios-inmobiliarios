@@ -563,6 +563,14 @@ $rawNavItems = [
     'label' => 'Actividades contractuales',
     'icon' => 'contract',
     'children' => [
+      'contratos_arrendamiento' => [
+        'key' => 'contratos_arrendamiento',
+        'label' => 'Contratos de arrendamiento',
+        'panel_id' => 'scm-panel-contratos-arrendamiento',
+        'url' => $baseUrl . '/index.php?tab=contratos_arrendamiento',
+        'icon' => 'description',
+        'perms' => ['contratos_arrendamiento'],
+      ],
       'contracts_ending' => [
         'key' => 'contracts_ending',
         'label' => 'Contratos por terminar',
@@ -589,14 +597,6 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=contract_non_renewal',
         'icon' => 'event_busy',
         'perms' => ['calendario_actividades', 'abiertos'],
-      ],
-      'contratos_arrendamiento' => [
-        'key' => 'contratos_arrendamiento',
-        'label' => 'Contratos de arrendamiento',
-        'panel_id' => 'scm-panel-contratos-arrendamiento',
-        'url' => $baseUrl . '/index.php?tab=contratos_arrendamiento',
-        'icon' => 'description',
-        'perms' => ['contratos_arrendamiento'],
       ],
       'contract_owners' => [
         'key' => 'contract_owners',

@@ -14,7 +14,7 @@
     },
     {
       "type": "BODY",
-      "text": "Hola {{1}}.\n\nTe damos la bienvenida a SKC SuCasa Inmobiliaria como {{2}} del contrato de arrendamiento #{{3}}, inmueble #{{4}}, ubicado en {{5}}.\n\nTe compartimos tu acta de bienvenida. Consulta los anexos del contrato aquí: {{6}}\n\nAtentamente,\n{{7}}",
+      "text": "Hola {{1}}.\n\nTe damos la bienvenida a Soluciones Comerciales y Constructivas SAS como {{2}} del contrato de arrendamiento #{{3}}, inmueble #{{4}}, ubicado en {{5}}.\n\nTe compartimos tu acta de bienvenida. Consulta los anexos del contrato aquí: {{6}}\n\nAtentamente,\n{{7}}",
       "example": {
         "body_text": [
           [

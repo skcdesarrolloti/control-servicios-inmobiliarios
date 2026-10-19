@@ -19994,7 +19994,24 @@
           body.innerHTML = propertyHistoryEmpty("La consulta de historial no está disponible.");
           return;
         }
-        dashboardAction(actionPropertyHistoryReport, { contract_number: code, property_code: property })
+        // "No asignado" u otros textos no son números de contrato: se consulta solo por el inmueble.
+        var contractNumber = /^[0-9A-Za-z_-]+$/.test(code) && /\d/.test(code) ? code : "";
+        var request = function (withContract) {
+          return dashboardAction(actionPropertyHistoryReport, {
+            contract_number: withContract ? contractNumber : "",
+            property_code: property,
+          });
+        };
+        if (!contractNumber && !property) {
+          body.innerHTML = propertyHistoryEmpty("El contrato no tiene número ni código de inmueble para consultar su historial.");
+          return;
+        }
+        request(!!contractNumber)
+          .catch(function (error) {
+            // Si el número del contrato no coincide en el historial, se reintenta con el código del inmueble.
+            if (contractNumber && property) return request(false);
+            throw error;
+          })
           .then(function (data) {
             if (seq !== requestSeq) return;
             body.innerHTML = '<div class="scm-property-history-results">' + propertyHistoryResultsHtml(data || {}) + "</div>";
