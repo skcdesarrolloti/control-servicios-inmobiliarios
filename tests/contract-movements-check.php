@@ -25,7 +25,7 @@ foreach (['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'met
   $check($current_page === ($route === 'metricas' ? 'dashboard' : $route), 'Al recargar se marca el ítem equivocado para ' . $route);
   foreach (['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones'] as $key) {
     $item = $menu['children'][$key];
-    $check($item['panel_id'] === 'scm-panel-movimientos-contratos' && $item['perms'] === ['metricas_contratos'], 'Ítem mal conectado: ' . $key);
+    $check($item['panel_id'] === 'scm-panel-movimientos-contratos' && $item['perms'] === [['ocupaciones' => 'metricas_ocupaciones', 'desocupaciones' => 'metricas_desocupaciones', 'ocupaciones_vs_desocupaciones' => 'metricas_ocupaciones_vs'][$key]], 'Ítem mal conectado: ' . $key);
     $check(str_ends_with($item['url'], '?tab=' . $key), 'La ruta debe usar tab=' . $key);
   }
 }

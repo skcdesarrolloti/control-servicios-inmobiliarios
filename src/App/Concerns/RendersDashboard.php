@@ -1348,7 +1348,17 @@ trait RendersDashboard
 
       <?php if (in_array('metricas_contratos', $dashboardAllowedTabs, true)): ?>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-movimientos-contratos' ? ' active' : ''; ?>" id="scm-panel-movimientos-contratos" data-permission-tab="metricas_contratos" data-scm-loaded="0">
-          <?php echo (new \SCM\Modules\ContractMovements\ContractMovementsView())->renderShell(\SCM\Modules\ContractMovements\ContractMovementsView::viewFromTab($tabKey)); ?>
+          <?php
+          // Abre la vista pedida si el cargo la tiene; si no, la primera de las tres que tenga.
+          $contractMovementsView = \SCM\Modules\ContractMovements\ContractMovementsView::viewFromTab($tabKey);
+          $contractMovementsTabs = ['ocupaciones' => 'metricas_ocupaciones', 'desocupaciones' => 'metricas_desocupaciones', 'comparativo' => 'metricas_ocupaciones_vs'];
+          if (!in_array($contractMovementsTabs[$contractMovementsView] ?? '', $dashboardAllowedTabs, true)) {
+            foreach ($contractMovementsTabs as $movementView => $movementTab) {
+              if (in_array($movementTab, $dashboardAllowedTabs, true)) { $contractMovementsView = $movementView; break; }
+            }
+          }
+          echo (new \SCM\Modules\ContractMovements\ContractMovementsView())->renderShell($contractMovementsView);
+          ?>
         </div>
       <?php endif; ?>
 
@@ -1748,7 +1758,9 @@ trait RendersDashboard
         'metricas_cotizaciones' => '',
         'metricas_preventivas' => '',
         'metricas_servicios_publicos' => '',
-        'metricas_contratos' => 'Ocupaciones, Desocupaciones y Ocupaciones vs Desocupaciones',
+        'metricas_ocupaciones' => '',
+        'metricas_desocupaciones' => '',
+        'metricas_ocupaciones_vs' => '',
         'metricas_crecimiento' => '',
       ]],
     ];

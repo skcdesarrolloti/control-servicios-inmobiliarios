@@ -72,7 +72,7 @@ $check(isset($runtime['admin_notifications_send']), 'runtime keeps allowed AJAX 
 
 // Pestañas: una por opción del menú; los permisos guardados antes se traducen a lo que el cargo veía.
 $tabKeys = array_keys($invoke('dashboardPermissionTabs'));
-$check(!array_intersect(['calendario_actividades', 'metricas'], $tabKeys) && !array_diff(['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble', 'contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga', 'funcionario_contratos', 'metricas_casos', 'metricas_contratos'], $tabKeys), 'each menu option has its own tab permission');
+$check(!array_intersect(['calendario_actividades', 'metricas'], $tabKeys) && !array_diff(['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble', 'contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga', 'funcionario_contratos', 'metricas_casos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs'], $tabKeys) && !in_array('metricas_contratos', $tabKeys, true), 'each menu option has its own tab permission');
 $setSettings(['dashboard_tab_permissions' => ['5' => ['abiertos', 'metricas', 'contratos_arrendamiento', 'cotizaciones_mantenimiento'], '6' => ['mis_tickets']]]);
 $_SESSION['scm_user_cargo'] = '5';
 $tabs = $invoke('currentDashboardAllowedTabs');
@@ -94,5 +94,11 @@ $setSettings([
   'dashboard_tab_permissions_known_keys' => $tabKeys,
 ]);
 $check(!in_array('ordenes_mantenimiento', $invoke('currentDashboardAllowedTabs'), true), 'unchecking Órdenes is respected after saving');
+$setSettings(['dashboard_tab_permissions' => ['5' => ['metricas_contratos']], 'dashboard_tab_permissions_known_keys' => $tabKeys]);
+$tabs = $invoke('currentDashboardAllowedTabs');
+$check(!array_diff(['metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_contratos'], $tabs), 'the former single occupancy option becomes its three views');
+$setSettings(['dashboard_tab_permissions' => ['5' => ['metricas_desocupaciones']], 'dashboard_tab_permissions_known_keys' => $tabKeys]);
+$tabs = $invoke('currentDashboardAllowedTabs');
+$check(in_array('metricas_contratos', $tabs, true) && !in_array('metricas_ocupaciones', $tabs, true), 'each occupancy view is its own permission and still opens the shared panel');
 
 echo "{$checks} dashboard action permission checks passed.\n";

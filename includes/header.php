@@ -671,7 +671,7 @@ $rawNavItems = [
         'subtab' => 'ocupaciones',
         'url' => $baseUrl . '/index.php?tab=ocupaciones',
         'icon' => 'login',
-        'perms' => ['metricas_contratos'],
+        'perms' => ['metricas_ocupaciones'],
       ],
       'desocupaciones' => [
         'key' => 'desocupaciones',
@@ -682,7 +682,7 @@ $rawNavItems = [
         'subtab' => 'desocupaciones',
         'url' => $baseUrl . '/index.php?tab=desocupaciones',
         'icon' => 'logout',
-        'perms' => ['metricas_contratos'],
+        'perms' => ['metricas_desocupaciones'],
       ],
       'ocupaciones_vs_desocupaciones' => [
         'key' => 'ocupaciones_vs_desocupaciones',
@@ -693,7 +693,7 @@ $rawNavItems = [
         'subtab' => 'comparativo',
         'url' => $baseUrl . '/index.php?tab=ocupaciones_vs_desocupaciones',
         'icon' => 'compare_arrows',
-        'perms' => ['metricas_contratos'],
+        'perms' => ['metricas_ocupaciones_vs'],
       ],
       'metricas_crecimiento' => [
         'key' => 'metricas_crecimiento',

@@ -352,7 +352,9 @@ final class SuCasaControlServiciosInmobiliarios
       'metricas_cotizaciones' => 'Cotizaciones',
       'metricas_preventivas' => 'Revisión preventiva',
       'metricas_servicios_publicos' => 'Revisiones de servicios públicos',
-      'metricas_contratos' => 'Ocupaciones y desocupaciones',
+      'metricas_ocupaciones' => 'Ocupaciones',
+      'metricas_desocupaciones' => 'Desocupaciones',
+      'metricas_ocupaciones_vs' => 'Ocupaciones vs Desocupaciones',
       'metricas_crecimiento' => 'Crecimiento de la empresa',
     ];
   }
@@ -361,7 +363,9 @@ final class SuCasaControlServiciosInmobiliarios
   private const DERIVED_DASHBOARD_TABS = [
     'calendario_actividades' => ['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble'],
     'actividades_contractuales' => ['contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga'],
-    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'metricas_contratos', 'metricas_crecimiento'],
+    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento'],
+    // Panel compartido de ocupaciones y desocupaciones (una consulta para sus tres vistas).
+    'metricas_contratos' => ['metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs'],
   ];
 
   private function canManageDashboardPermissions(): bool
@@ -728,6 +732,12 @@ final class SuCasaControlServiciosInmobiliarios
     if (!is_array(\SCM\Core\App::settings()->get('dashboard_tab_permissions_known_keys', null))) {
       foreach ($raw as $cargo => $tabs) {
         $raw[$cargo] = $this->expandLegacyDashboardTabs((array) $tabs);
+      }
+    }
+    // "Ocupaciones y desocupaciones" se guardó un tiempo como una sola opción; ahora son tres.
+    foreach ($raw as $cargo => $tabs) {
+      if (in_array('metricas_contratos', (array) $tabs, true)) {
+        $raw[$cargo] = array_merge((array) $tabs, self::DERIVED_DASHBOARD_TABS['metricas_contratos']);
       }
     }
     return $this->sanitizeDashboardPermissions($raw);
