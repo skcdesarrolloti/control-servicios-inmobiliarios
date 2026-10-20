@@ -23340,6 +23340,17 @@
         });
     }
 
+    function copyQuoteDirectLink(button) {
+      var url = button.getAttribute('data-quote-url') || '';
+      if (!url) return;
+      var done = function () { showToast('success', 'Enlace directo copiado. Es el mismo que recibe el destinatario y vence en 180 días.'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done).catch(function () { window.prompt('Copia el enlace directo:', url); });
+      } else {
+        window.prompt('Copia el enlace directo:', url);
+      }
+    }
+
     function saveQuoteFinancing(button, options) {
       options = options || {};
       var card = button.closest('.scm-cotizacion-card');
@@ -23389,7 +23400,7 @@
           root.querySelectorAll('.scm-cotizacion-card').forEach(function(other){
             if(other.getAttribute('data-cotizacion-id')===id){
               var control=other.querySelector('[data-scm-save-quote-financing]');
-              if(control){control.setAttribute('data-financiacion',result.value);control.textContent='Financiamiento · '+(result.value==='Si'?'Sí':'No');}
+              if(control){control.setAttribute('data-financiacion',result.value);control.textContent='Configurar financiamiento · '+(result.value==='Si'?'Sí':'No');}
             }
           });
           showToast('success','Financiamiento actualizado.');
@@ -24220,6 +24231,8 @@
               popup.addEventListener("click", function (event) {
                 var financingButton=event.target.closest('[data-scm-save-quote-financing]');
                 if(financingButton){event.preventDefault();event.stopPropagation();saveQuoteFinancing(financingButton, {onClose:makeCaseCotizacionesReturn(button)});return;}
+                var copyLinkButton=event.target.closest('[data-scm-copy-quote-link]');
+                if(copyLinkButton){event.preventDefault();event.stopPropagation();copyQuoteDirectLink(copyLinkButton);return;}
 
                 var orderBtn = event.target && event.target.closest
                   ? event.target.closest("[data-scm-add-cotizacion-order]")
@@ -24537,6 +24550,8 @@
     root.addEventListener("click", function (e) {
       var financingButton=e.target.closest('[data-scm-save-quote-financing]');
       if(financingButton){e.preventDefault();saveQuoteFinancing(financingButton);return;}
+      var copyLinkButton=e.target.closest('[data-scm-copy-quote-link]');
+      if(copyLinkButton){e.preventDefault();copyQuoteDirectLink(copyLinkButton);return;}
 
       var maintenanceMetricCaseBtn =
         e.target && e.target.closest

@@ -8,7 +8,7 @@ const functions = extract('    function syncCaseFinancingFilter(', '    function
  const browser = await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
  try {
   const page=await browser.newPage();
-  await page.setContent('<div id="root"><form><select name="scm_estado_admin"><option>Estado ajeno</option></select></form><article class="scm-cotizacion-card" data-cotizacion-id="573"><button data-scm-save-quote-financing data-financiacion="">Financiamiento · Sin definir</button></article></div>');
+  await page.setContent('<div id="root"><form><select name="scm_estado_admin"><option>Estado ajeno</option></select></form><article class="scm-cotizacion-card" data-cotizacion-id="573"><button data-scm-save-quote-financing data-financiacion="">Configurar financiamiento · Sin definir</button></article></div>');
   await page.addScriptTag({content:`
    const root=document.querySelector('#root'),nonce='test',ajaxUrl='/api.php',cotizacionCardCache={573:{stale:true}};
    window.requests=[];window.refreshes=0;window.returns=0;window.toasts=[];window.validation='';
@@ -50,7 +50,7 @@ const functions = extract('    function syncCaseFinancingFilter(', '    function
   assert.equal(saved,'Si');
   await page.evaluate(()=>{finishPopup({isConfirmed:true,value:'Si'});return opening;});
   assert.deepEqual(await page.evaluate(()=>requests[0]),{action:'scm_cotizacion_financing',nonce:'test',id_cotizacion:'573',financiacion:'Si'});
-  assert.equal(await page.locator('[data-scm-save-quote-financing]').textContent(),'Financiamiento · Sí');
+  assert.equal(await page.locator('[data-scm-save-quote-financing]').textContent(),'Configurar financiamiento · Sí');
   assert.equal(await page.evaluate(()=>refreshes),1);
   assert.equal(await page.evaluate(()=>returns),1);
   assert.equal(await page.evaluate(()=>cotizacionCardCache[573]),undefined);

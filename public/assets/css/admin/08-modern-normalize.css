@@ -169,3 +169,50 @@
 #scm-app .scm-contract-renewal-table button { margin: 3px; }
 
 #scm-app [data-scm-contracts-ending-import][hidden] { display: none !important; }
+
+/* Acciones de la tarjeta de cotización: la regla general de .scm-case-work-btn (fondo blanco) no debe ocultar su intención. */
+:is(#scm-app, .swal2-popup, .scm-case-cotizaciones-modal) .scm-cotizacion-actions .scm-case-work-btn.scm-cotizacion-approve-action {
+  background: #16a34a !important;
+  border-color: #16a34a !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(22, 163, 74, 0.22) !important;
+}
+
+:is(#scm-app, .swal2-popup, .scm-case-cotizaciones-modal) .scm-cotizacion-actions .scm-case-work-btn.scm-cotizacion-approve-action:hover {
+  background: #15803d !important;
+  border-color: #15803d !important;
+}
+
+:is(#scm-app, .swal2-popup, .scm-case-cotizaciones-modal) .scm-cotizacion-actions .scm-case-work-btn.scm-cotizacion-delete-action {
+  background: #fef2f2 !important;
+  border-color: #fca5a5 !important;
+  color: #b91c1c !important;
+  box-shadow: none !important;
+}
+
+:is(#scm-app, .swal2-popup, .scm-case-cotizaciones-modal) .scm-cotizacion-actions .scm-case-work-btn.scm-cotizacion-delete-action:hover {
+  background: #fee2e2 !important;
+  border-color: #f87171 !important;
+}
+
+:is(#scm-app, .swal2-popup, .scm-case-cotizaciones-modal) .scm-cotizacion-actions .scm-case-work-btn.scm-cotizacion-financing-action {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #1d4ed8 !important;
+}
+
+:is(#scm-app, .swal2-popup, .scm-case-cotizaciones-modal) .scm-cotizacion-actions .scm-case-work-btn.scm-cotizacion-financing-action:hover {
+  background: #dbeafe !important;
+  border-color: #60a5fa !important;
+}
+
+:is(#scm-app, .swal2-popup, .scm-case-cotizaciones-modal) .scm-cotizacion-actions .scm-case-work-btn.scm-cotizacion-copy-link-action {
+  background: #f0fdfa !important;
+  border-color: #5eead4 !important;
+  color: #0f766e !important;
+}
+
+:is(#scm-app, .swal2-popup, .scm-case-cotizaciones-modal) .scm-cotizacion-actions .scm-case-work-btn.scm-cotizacion-copy-link-action:hover {
+  background: #ccfbf1 !important;
+  border-color: #2dd4bf !important;
+}
