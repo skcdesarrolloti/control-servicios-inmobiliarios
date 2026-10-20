@@ -6002,3 +6002,342 @@ body,
 #scm-app .scm-kpis-stitch .scm-kpi-indicator-ejecuta-arrendatario { background-color: #7c3aed !important; }
 #scm-app .scm-kpis-stitch .scm-kpi-indicator-ejecuta-copropiedad { background-color: #0d9488 !important; }
 #scm-app .scm-kpis-stitch .scm-kpi-indicator-ejecuta-sin-definir { background-color: #94a3b8 !important; }
+
+/* ==========================================================================
+   POPUP DEL CASO EN MÓVIL
+   Pantalla completa con un solo scroll: la cabecera se desplaza con el
+   contenido en vez de quedarse fija y dejar una franja mínima para trabajar.
+   ========================================================================== */
+@media (max-width: 760px) {
+  #scm-app .scm-case-modal.open {
+    padding: 0 !important;
+    align-items: stretch !important;
+    overflow: hidden !important;
+  }
+
+  #scm-app .scm-case-dialog,
+  #scm-app .scm-case-modal.open .scm-case-dialog {
+    display: block !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #scm-app .scm-case-close {
+    position: fixed !important;
+    top: 10px !important;
+    right: 10px !important;
+    z-index: 40 !important;
+    box-shadow: 0 2px 8px rgba(15, 30, 54, 0.18) !important;
+  }
+
+  #scm-app .scm-case-head,
+  #scm-app .scm-case-modal.open .scm-case-head {
+    display: flex !important;
+    padding: 14px 56px 12px 14px !important;
+    gap: 0.6rem !important;
+  }
+
+  #scm-app .scm-case-breadcrumb {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    font-size: 0.75rem !important;
+  }
+
+  #scm-app .scm-case-breadcrumb > span:first-child,
+  #scm-app .scm-case-breadcrumb > span:first-child + span,
+  #scm-app .scm-case-breadcrumb > span:first-child + span + span {
+    display: none !important;
+  }
+
+  #scm-app .scm-case-head-main {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  #scm-app .scm-case-head-meta {
+    gap: 0.35rem !important;
+  }
+
+  #scm-app .scm-case-head-meta .scm-chip {
+    font-size: 0.6875rem !important;
+  }
+
+  #scm-app #scm-case-title,
+  #scm-app .scm-case-head h3 {
+    font-size: 1.15rem !important;
+    line-height: 1.25 !important;
+    overflow-wrap: anywhere;
+  }
+
+  #scm-app #scm-case-subtitle {
+    gap: 0.35rem 0.85rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  #scm-app #scm-case-subtitle .scm-meta-bit {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  #scm-app .scm-case-head-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    /* La cabecera reserva 56px a la derecha para la X; los botones bajan de ella. */
+    width: calc(100% + 42px) !important;
+    max-width: none !important;
+    align-self: stretch !important;
+    gap: 0.4rem !important;
+    padding-top: 0.6rem !important;
+  }
+
+  #scm-app .scm-case-head-actions:empty {
+    display: none !important;
+  }
+
+  #scm-app .scm-case-head-actions .scm-case-side-link {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 40px;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    white-space: normal !important;
+    line-height: 1.2 !important;
+    padding: 0.45rem 0.6rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  #scm-app .scm-case-body,
+  #scm-app .scm-case-modal.open .scm-case-body {
+    padding: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  #scm-app .scm-case-layout,
+  #scm-app .scm-case-modal.open .scm-case-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0.85rem !important;
+    padding: 0.75rem 0.75rem 1.5rem !important;
+    min-width: 0 !important;
+  }
+
+  #scm-app .scm-case-main,
+  #scm-app .scm-case-sidebar {
+    gap: 0.85rem !important;
+    min-width: 0 !important;
+  }
+
+  #scm-app .scm-case-main > *,
+  #scm-app .scm-case-sidebar > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  #scm-app .scm-case-description,
+  #scm-app .scm-case-work-actions,
+  #scm-app .scm-case-composer-card {
+    padding: 1rem !important;
+  }
+
+  #scm-app .scm-case-description-content {
+    padding: 0.85rem !important;
+  }
+
+  #scm-app .scm-case-work-actions h4 {
+    margin-bottom: 0.85rem !important;
+  }
+
+  #scm-app .scm-case-work-action-list {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0.5rem !important;
+    margin-bottom: 0.85rem !important;
+  }
+
+  #scm-app .scm-case-work-btn {
+    width: 100% !important;
+    min-height: 48px;
+  }
+
+  #scm-app .scm-case-composer-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr)) !important;
+    gap: 0.4rem !important;
+    width: 100% !important;
+  }
+
+  #scm-app .scm-case-composer-tabs .scm-composer-tab {
+    min-width: 0 !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 0.55rem 0.4rem !important;
+    font-size: 0.75rem !important;
+    line-height: 1.15 !important;
+  }
+
+  #scm-app .scm-composer-tools {
+    flex-wrap: wrap !important;
+    min-width: 0 !important;
+  }
+
+  #scm-app .scm-case-composer-card input,
+  #scm-app .scm-case-composer-card select,
+  #scm-app .scm-case-composer-card textarea {
+    max-width: 100% !important;
+    font-size: 16px !important; /* evita el zoom automático de iOS */
+  }
+
+  #scm-app .scm-case-modal table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  #scm-app .scm-case-modal img,
+  #scm-app .scm-case-modal iframe,
+  #scm-app .scm-case-modal video {
+    max-width: 100% !important;
+  }
+
+  /* Subpopups del caso (revisiones, cotizaciones, órdenes, actas…) */
+  #scm-app .scm-case-submodal {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 50 !important;
+    padding: 0 !important;
+    align-items: stretch !important;
+  }
+
+  #scm-app .scm-case-submodal .scm-case-submodal-dialog,
+  #scm-app .scm-case-submodal[class*="scm-case-submodal--"] .scm-case-submodal-dialog {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  #scm-app .scm-case-submodal .scm-case-submodal-head {
+    padding: 12px 52px 10px 14px !important;
+  }
+
+  #scm-app .scm-case-submodal .scm-case-submodal-close {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 18px !important;
+    z-index: 5;
+  }
+
+  #scm-app .scm-case-submodal .scm-case-submodal-body {
+    padding: 12px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Formularios de cotización y órdenes (SweetAlert) a pantalla completa en móvil,
+   con los botones de guardar/cancelar siempre visibles al pie. */
+@media (max-width: 760px) {
+  .swal2-container:has(> .swal2-popup.scm-maint-quote-swal),
+  .swal2-container:has(> .swal2-popup.scm-cotizacion-order-form-swal),
+  .swal2-container:has(> .swal2-popup.scm-cotizacion-response-swal),
+  .swal2-container:has(> .swal2-popup.scm-cotizacion-orders-swal),
+  .swal2-container:has(> .swal2-popup.scm-case-cotizaciones-swal),
+  .swal2-container:has(> .swal2-popup.scm-cotizacion-order-detail-swal) {
+    padding: 0 !important;
+  }
+
+  .swal2-popup.scm-cotizacion-dialog.scm-maint-quote-swal,
+  .swal2-popup.scm-cotizacion-dialog.scm-cotizacion-order-form-swal,
+  .swal2-popup.scm-cotizacion-dialog.scm-cotizacion-response-swal,
+  .swal2-popup.scm-cotizacion-dialog.scm-cotizacion-orders-swal,
+  .swal2-popup.scm-cotizacion-dialog.scm-case-cotizaciones-swal,
+  .swal2-popup.scm-cotizacion-dialog.scm-cotizacion-order-detail-swal {
+    display: flex !important;
+    flex-direction: column;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0 !important;
+    border: 0;
+    border-radius: 0 !important;
+  }
+
+  .swal2-popup.scm-cotizacion-dialog.scm-maint-quote-swal .scm-cotizacion-dialog-title,
+  .swal2-popup.scm-cotizacion-dialog.scm-cotizacion-order-form-swal .scm-cotizacion-dialog-title,
+  .swal2-popup.scm-cotizacion-dialog.scm-cotizacion-response-swal .scm-cotizacion-dialog-title,
+  .swal2-popup.scm-cotizacion-dialog.scm-cotizacion-orders-swal .scm-cotizacion-dialog-title,
+  .swal2-popup.scm-cotizacion-dialog.scm-case-cotizaciones-swal .scm-cotizacion-dialog-title,
+  .swal2-popup.scm-cotizacion-dialog.scm-cotizacion-order-detail-swal .scm-cotizacion-dialog-title {
+    flex: 0 0 auto;
+    padding: 14px 60px 12px 14px;
+    font-size: 17px;
+  }
+
+  .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-close {
+    top: 8px;
+    right: 8px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .swal2-popup.scm-cotizacion-dialog.scm-maint-quote-swal .scm-cotizacion-dialog-body,
+  .swal2-popup.scm-cotizacion-dialog.scm-cotizacion-order-form-swal .scm-cotizacion-dialog-body,
+  .swal2-popup.scm-cotizacion-dialog.scm-cotizacion-response-swal .scm-cotizacion-dialog-body,
+  .swal2-popup.scm-cotizacion-dialog.scm-cotizacion-orders-swal .scm-cotizacion-dialog-body,
+  .swal2-popup.scm-cotizacion-dialog.scm-case-cotizaciones-swal .scm-cotizacion-dialog-body,
+  .swal2-popup.scm-cotizacion-dialog.scm-cotizacion-order-detail-swal .scm-cotizacion-dialog-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none !important;
+    padding: 12px !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-actions {
+    flex: 0 0 auto;
+    flex-wrap: nowrap !important;
+    gap: 8px;
+    margin: 0;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    border-top: 1px solid #e2e8f0;
+    background: #fff;
+  }
+
+  .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-actions > button {
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+  }
+
+  .swal2-popup.scm-cotizacion-dialog .scm-cotizacion-dialog-cancel {
+    order: -1;
+  }
+
+  .swal2-popup.scm-cotizacion-dialog input:not([type="checkbox"]):not([type="radio"]),
+  .swal2-popup.scm-cotizacion-dialog select,
+  .swal2-popup.scm-cotizacion-dialog textarea {
+    font-size: 16px !important; /* evita el zoom automático de iOS */
+  }
+}
