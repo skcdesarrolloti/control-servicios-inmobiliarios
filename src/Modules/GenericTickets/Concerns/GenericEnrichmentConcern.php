@@ -281,8 +281,6 @@ trait GenericEnrichmentConcern
         'cct_modified',
         'created_at',
         'updated_at',
-        'inicio_trabajo',
-        'final_trabajo',
         'id_acta_satisfaccion',
         'se_envio',
       ]
@@ -306,7 +304,6 @@ trait GenericEnrichmentConcern
         'fecha_respuesta',
         'cct_created',
         'cct_modified',
-        'final_trabajo',
         'id_acta_satisfaccion',
         'se_envio',
       ]
@@ -351,7 +348,6 @@ trait GenericEnrichmentConcern
       $row['_scm_cot_fecha_registro'] = $row['_scm_cot_fecha_registro'] ?? '';
       $row['_scm_cot_fecha_envio'] = $row['_scm_cot_fecha_envio'] ?? '';
       $row['_scm_cot_fecha_respuesta'] = $row['_scm_cot_fecha_respuesta'] ?? '';
-      $row['_scm_cot_final_trabajo'] = $row['_scm_cot_final_trabajo'] ?? '';
       $row['_scm_cot_id_acta'] = $row['_scm_cot_id_acta'] ?? '';
       $row['_scm_cot_perturbacion'] = $row['_scm_cot_perturbacion'] ?? '';
       $row['_scm_cot_justificacion_perturbacion'] = $row['_scm_cot_justificacion_perturbacion'] ?? '';
@@ -364,7 +360,6 @@ trait GenericEnrichmentConcern
       $row['cot_fecha_registro'] = $row['cot_fecha_registro'] ?? '';
       $row['cot_fecha_envio'] = $row['cot_fecha_envio'] ?? '';
       $row['cot_fecha_respuesta'] = $row['cot_fecha_respuesta'] ?? '';
-      $row['cot_final_trabajo'] = $row['cot_final_trabajo'] ?? '';
       $row['ticket_cct_created'] = $row['ticket_cct_created'] ?? '';
       $row['id_cita_agendada'] = $row['id_cita_agendada'] ?? '';
       $row['cita_evento_id'] = $row['cita_evento_id'] ?? '';
@@ -451,21 +446,17 @@ trait GenericEnrichmentConcern
         $cotSentOk = in_array(strtolower(trim((string) $cotSentFlag)), ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true);
         $cotSend = $cotSentOk ? $this->first_existing_value($cotRow, ['fecha_envio_cotizacion_mantenimiento', 'fecha_envio', 'fecha_enviada', 'fecha_envio_correo']) : '';
         $cotResp = $this->first_existing_value($cotRow, ['fecha_respuesta', 'fecha_actualizacion', 'cct_modified', 'updated_at']);
-        $cotFinal = $this->first_existing_value($cotRow, ['final_trabajo']);
 
         $cotRegTs = $this->parse_unix_ts($cotReg);
         $cotSendTs = $this->parse_unix_ts($cotSend);
         $cotRespTs = $this->parse_unix_ts($cotResp);
-        $cotFinalTs = $this->parse_unix_ts($cotFinal);
         $row['_scm_cot_fecha_registro'] = $cotRegTs > 0 ? (string) $cotRegTs : '';
         $row['_scm_cot_fecha_envio'] = $cotSendTs > 0 ? (string) $cotSendTs : '';
         $row['_scm_cot_fecha_respuesta'] = $cotRespTs > 0 ? (string) $cotRespTs : '';
-        $row['_scm_cot_final_trabajo'] = $cotFinalTs > 0 ? (string) $cotFinalTs : '';
         $row['cot_id'] = trim((string) ($cotRow['_ID'] ?? $cotRow['id_cotizacion_mantenimiento'] ?? $cotRow['id_cotizacion'] ?? ''));
         $row['cot_fecha_registro'] = $row['_scm_cot_fecha_registro'];
         $row['cot_fecha_envio'] = $row['_scm_cot_fecha_envio'];
         $row['cot_fecha_respuesta'] = $row['_scm_cot_fecha_respuesta'];
-        $row['cot_final_trabajo'] = $row['_scm_cot_final_trabajo'];
         $row['_scm_cot_id_acta'] = trim((string) ($cotRow['id_acta_satisfaccion'] ?? ''));
         $row['_scm_cot_perturbacion'] = trim((string) ($cotRow['perturbacion'] ?? ''));
         $row['_scm_cot_justificacion_perturbacion'] = trim((string) ($cotRow['justificacion_perturbacion'] ?? ''));

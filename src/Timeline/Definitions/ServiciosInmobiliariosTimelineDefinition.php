@@ -106,7 +106,6 @@ final class ServiciosInmobiliariosTimelineDefinition
       'fecha_envio_cotizacion_mantenimiento',
       '_scm_cot_fecha_respuesta',
       'fecha_respuesta_cotizacion_mantenimiento',
-      '_scm_cot_final_trabajo',
       'final_trabajo',
     ] as $field) {
       if (trim((string)($row[$field] ?? '')) !== '') {

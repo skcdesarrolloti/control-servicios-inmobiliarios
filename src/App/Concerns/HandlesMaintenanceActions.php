@@ -4037,6 +4037,7 @@ trait HandlesMaintenanceActions
     if (!empty($update)) {
       $this->db->update($table, $update, ['_ID' => (int) ($ticket['_ID'] ?? 0)]);
     }
+    \SCM\Support\CaseWorkStart::markIfEmpty($this->db, (int) ($ticket['_ID'] ?? 0), $now);
   }
 
   /** @param array<string,mixed> $cotizacion @param array<string,string> $user */

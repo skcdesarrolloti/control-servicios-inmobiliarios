@@ -53,8 +53,6 @@ trait RelatedEnrichmentConcern
         'cct_modified',
         'created_at',
         'updated_at',
-        'inicio_trabajo',
-        'final_trabajo',
         'id_acta_satisfaccion',
         'perturbacion',
         'justificacion_perturbacion',
@@ -115,8 +113,6 @@ trait RelatedEnrichmentConcern
       $row['_scm_prev_encontro_danos'] = '';
       $row['_scm_prev_se_envio'] = '';
       $row['_scm_corr_fecha'] = 0;
-      $row['_scm_cot_inicio_trabajo'] = 0;
-      $row['_scm_cot_final_trabajo'] = 0;
       $row['_scm_cot_id_acta'] = '';
       $row['_scm_cot_perturbacion'] = '';
       $row['_scm_cot_justificacion_perturbacion'] = '';
@@ -170,15 +166,6 @@ trait RelatedEnrichmentConcern
         }
         if ((int) $row['_scm_cot_fecha_respuesta'] > 0) {
           $row['fecha_respuesta_cotizacion_mantenimiento'] = $row['_scm_cot_fecha_respuesta'];
-        }
-
-        $inicioRaw = $this->firstExistingValue($cotRow, ['inicio_trabajo']);
-        $finalRaw = $this->firstExistingValue($cotRow, ['final_trabajo']);
-        if ($inicioRaw !== '') {
-          $row['_scm_cot_inicio_trabajo'] = $this->parser->parse($inicioRaw);
-        }
-        if ($finalRaw !== '') {
-          $row['_scm_cot_final_trabajo'] = $this->parser->parse($finalRaw);
         }
 
         $row['_scm_cot_id_acta'] = trim((string) ($cotRow['id_acta_satisfaccion'] ?? ''));

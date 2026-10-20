@@ -675,6 +675,7 @@ final class CompletionService
       $id = (int) $this->repo->db->lastInsertId();
       // Legacy timelines treat any act row as completion; publish the CCT record only on signature.
       $this->repo->updateTicket($ticketId, ['estado' => 'En proceso', 'estado_administrativo' => $payload['pending_admin_state'], 'ejecutado' => CompletionPolicy::EXECUTORS[$payload['executor']]]);
+      \SCM\Support\CaseWorkStart::markIfEmpty($this->repo->db, $ticketId, $now);
       $sourceText = (($payload['source']['flow'] ?? '') === 'approved_quote' && trim((string) ($payload['source']['quote_id'] ?? '')) !== '')
         ? ' Asociada a la cotización aprobada #' . trim((string) $payload['source']['quote_id']) . '.'
         : '';
@@ -758,6 +759,7 @@ final class CompletionService
         $this->repo->audit($ticketId, 'Acta firmada #' . $id . ' reabierta para corrección. Firma anterior conservada en la versión interna #' . $versionId . '; se retiró el cierre del caso y se requiere nueva firma.', $actor['name'], $actor['employee_id']);
       }
       $this->repo->updateTicket($ticketId, ['estado' => 'En proceso', 'estado_administrativo' => $payload['pending_admin_state'], 'ejecutado' => CompletionPolicy::EXECUTORS[$payload['executor']]]);
+      \SCM\Support\CaseWorkStart::markIfEmpty($this->repo->db, $ticketId, $now);
       $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' editada. Se invalidaron códigos anteriores y se solicitó nueva firma de ' . htmlspecialchars($payload['signer']['name'], ENT_QUOTES, 'UTF-8') . '. El caso permanece abierto en “' . $payload['pending_admin_state'] . '”.', $actor['name'], $actor['employee_id']);
       return $this->repo->act($id);
     });
@@ -939,7 +941,7 @@ final class CompletionService
         'phone' => trim((string) ($branchContact['phone'] ?? '')),
       ],
       'owner_id' => (string) ($ticket['id_propietario'] ?? ''), 'tenant_id' => (string) ($ticket['id_arrendatario'] ?? ''),
-      'previous' => $previous ?: ['estado_administrativo' => (string) ($ticket['estado_administrativo'] ?? ''), 'ejecutado' => (string) ($ticket['ejecutado'] ?? ''), 'id_acta_satisfaccion' => (string) ($ticket['id_acta_satisfaccion'] ?? ''), 'estado_acta_satisfaccion' => (string) ($ticket['estado_acta_satisfaccion'] ?? 'No')],
+      'previous' => $previous ?: ['estado_administrativo' => (string) ($ticket['estado_administrativo'] ?? ''), 'ejecutado' => (string) ($ticket['ejecutado'] ?? ''), 'id_acta_satisfaccion' => (string) ($ticket['id_acta_satisfaccion'] ?? ''), 'estado_acta_satisfaccion' => (string) ($ticket['estado_acta_satisfaccion'] ?? 'No'), 'inicio_trabajo' => (string) ($ticket['inicio_trabajo'] ?? '')],
       'report' => [
         'service_fee' => $fee, 'transport' => $transport, 'total' => $fee + $transport,
         'transport_base' => $context['transport_base'], 'transport_max' => $transportMax,
@@ -1373,11 +1375,17 @@ final class CompletionService
     }
   }
 
-  /** Devuelve "¿Quién ejecuta?" del caso al valor previo al acta (actas antiguas no lo guardaban). */
+  /** Devuelve "¿Quién ejecuta?" e inicio del trabajo al valor previo al acta (actas antiguas no los guardaban). */
   private function previousExecutorUpdate(array $payload): array
   {
     $previous = (array) ($payload['previous'] ?? []);
-    return array_key_exists('ejecutado', $previous) ? ['ejecutado' => (string) $previous['ejecutado']] : [];
+    $update = [];
+    foreach (['ejecutado', 'inicio_trabajo'] as $field) {
+      if (array_key_exists($field, $previous)) {
+        $update[$field] = (string) $previous[$field];
+      }
+    }
+    return $update;
   }
 
   private function retirePending(int $id, string $reason, array $actor, string $status, string $actionName, string $statusLabel): void

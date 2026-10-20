@@ -83,8 +83,6 @@ trait TimelineEnrichmentConcern
         'fecha',
         'fecha_envio',
         'fecha_respuesta',
-        'inicio_trabajo',
-        'final_trabajo',
         'estado',
         'estado_respuesta',
         'estado_cotizacion_mantenimiento',
@@ -152,8 +150,6 @@ trait TimelineEnrichmentConcern
         $cotSentOk = in_array(strtolower(trim((string) $cotSentFlag)), ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true);
         $cotSendRaw = $cotSentOk ? $this->firstExistingValue($latestCot, ['fecha_envio', 'fecha_envio_cotizacion_mantenimiento', 'fecha_enviada', 'fecha_envio_correo']) : '';
         $cotRespRaw = $this->firstExistingValue($latestCot, ['fecha_respuesta', 'cct_modified', 'updated_at']);
-        $cotStartRaw = $this->firstExistingValue($latestCot, ['inicio_trabajo']);
-        $cotEndRaw = $this->firstExistingValue($latestCot, ['final_trabajo']);
 
         $cotRegTs = $this->parser->parse($cotRegRaw);
         if ($cotRegTs > 0) {
@@ -169,16 +165,6 @@ trait TimelineEnrichmentConcern
         if ($cotRespTs > 0) {
           $row['_scm_cot_fecha_respuesta'] = $cotRespTs;
           $row['fecha_respuesta_cotizacion_mantenimiento'] = $cotRespTs;
-        }
-
-        $cotStartTs = $this->parser->parse($cotStartRaw);
-        if ($cotStartTs > 0) {
-          $row['_scm_cot_inicio_trabajo'] = $cotStartTs;
-        }
-
-        $cotEndTs = $this->parser->parse($cotEndRaw);
-        if ($cotEndTs > 0) {
-          $row['_scm_cot_final_trabajo'] = $cotEndTs;
         }
 
         $cotEstado = $this->firstExistingValue($latestCot, ['estado_cotizacion_mantenimiento', 'estado']);

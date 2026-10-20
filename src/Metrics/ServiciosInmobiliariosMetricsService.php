@@ -278,7 +278,6 @@ final class ServiciosInmobiliariosMetricsService
   {
     $candidates = [
       $this->parser->parse($row['_scm_acta_fecha'] ?? null),
-      $this->parser->parse($row['_scm_cot_final_trabajo'] ?? null),
       $this->parser->parse($row['final_trabajo'] ?? null),
       $this->parser->parse($row['fecha_actualizacion'] ?? null),
     ];
