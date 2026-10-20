@@ -962,6 +962,7 @@ trait RendersDashboard
           </div>
 
       <div class="scm-open-topic-panel<?php echo $activeOpenTopic === 'mant' ? ' active' : ''; ?>" id="scm-panel-mant" data-open-topic="mant" data-scm-loaded="<?php echo $hydrateMaintenanceRows ? '1' : '0'; ?>">
+        <div class="scm-kpis-accordion" data-scm-kpis-accordion>
         <div class="scm-kpis scm-kpis-stitch scm-kpis-main">
           <div class="scm-kpi" data-kpi="total">
             <div class="scm-kpi-header">
@@ -1015,6 +1016,13 @@ trait RendersDashboard
           </div>
         </div>
 
+        <?php /* En celular solo se ve Total; este botón despliega los demás indicadores. */ ?>
+        <button type="button" class="scm-kpis-mobile-toggle" data-scm-kpis-toggle aria-expanded="false" aria-controls="scm-mant-kpis-more">
+          <span data-scm-kpis-toggle-label>Ver más indicadores</span>
+          <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+        </button>
+        <div class="scm-kpis-more" id="scm-mant-kpis-more">
+
         <div class="scm-kpis-group scm-kpis-magnitude-group" data-scm-kpi-group="magnitud">
           <div class="scm-kpis-group-title"><span class="material-symbols-outlined">local_fire_department</span>Magnitud del caso</div>
           <div class="scm-kpis scm-kpis-stitch scm-kpis-magnitude">
@@ -1062,6 +1070,8 @@ trait RendersDashboard
         </div>
 
         <?php echo $this->render_executor_kpis('scm-', $stats); ?>
+        </div>
+        </div>
 
         <div class="scm-filter-card card">
           <div class="scm-filter-header flex items-center justify-between mb-4">
@@ -1083,11 +1093,6 @@ trait RendersDashboard
                 </select></div>
               <div class="scm-field"><label for="scm_estado_admin">ESTADO ADMINISTRATIVO</label><select id="scm_estado_admin" name="scm_estado_admin" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions["estado_admin"] ?? []) as $opt): ?><option value="<?php echo esc_attr($opt); ?>" <?php selected(($params["fEstadoAdmin"] ?? ""), $opt); ?>><?php echo esc_html($opt); ?></option><?php endforeach; ?>
-                </select></div>
-              <div class="scm-field"><label for="scm_origen">ORIGEN DE SOLICITUD</label><select id="scm_origen" name="scm_origen" class="select select-bordered select-sm scm-select">
-                  <option value="">Todos</option>
-                  <option value="web" <?php selected(($params['fOrigen'] ?? ''), 'web'); ?>>Guardian</option>
-                  <option value="interno" <?php selected(($params['fOrigen'] ?? ''), 'interno'); ?>>No Guardian</option>
                 </select></div>
               <div class="scm-field"><label for="scm_id_empleado">FUNCIONARIO ASIGNADO</label><select id="scm_id_empleado" name="scm_id_empleado" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option><?php foreach (($filterOptions["funcionarios"] ?? []) as $func): $fId = trim((string)($func["id"] ?? ""));

@@ -6404,3 +6404,33 @@ body,
 #scm-app .scm-kpis.scm-kpis-magnitude .scm-kpi-alto { border-bottom: 3.5px solid #d97706 !important; }
 #scm-app .scm-kpis.scm-kpis-magnitude .scm-kpi-medio { border-bottom: 3.5px solid #64748b !important; }
 #scm-app .scm-kpis.scm-kpis-magnitude .scm-kpi-bajo { border-bottom: 3.5px solid #cbd5e1 !important; }
+
+/* KPIs de Mantenimiento en celular: solo Total a la vista; el resto en acordeón. */
+#scm-app .scm-kpis-mobile-toggle { display: none; }
+@media (max-width: 640px) {
+  #scm-app .scm-kpis-accordion .scm-kpis.scm-kpis-stitch.scm-kpis-main { margin-bottom: 0.5rem !important; }
+  #scm-app .scm-kpis-accordion .scm-kpis-main .scm-kpi[data-kpi="total"] { grid-column: 1 / -1; }
+  #scm-app .scm-kpis-accordion:not(.is-open) .scm-kpis-main .scm-kpi:not([data-kpi="total"]),
+  #scm-app .scm-kpis-accordion:not(.is-open) .scm-kpis-more { display: none !important; }
+  #scm-app .scm-kpis-accordion.is-open .scm-kpis-more { margin-top: 1.1rem; }
+  #scm-app .scm-kpis-mobile-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
+    min-height: 40px;
+    margin: 0 0 1.25rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #dce9ff;
+    border-radius: 0.75rem;
+    background: #eff4ff;
+    color: #0f1e36;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #scm-app .scm-kpis-accordion.is-open .scm-kpis-mobile-toggle { margin-bottom: 0; }
+  #scm-app .scm-kpis-mobile-toggle .material-symbols-outlined { font-size: 20px; transition: transform 0.2s ease; }
+  #scm-app .scm-kpis-accordion.is-open .scm-kpis-mobile-toggle .material-symbols-outlined { transform: rotate(180deg); }
+}

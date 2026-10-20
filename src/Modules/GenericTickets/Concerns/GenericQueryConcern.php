@@ -35,7 +35,8 @@ trait GenericQueryConcern
       'fEstado' => $clean($input[$prefix . 'estado'] ?? ''),
       'fFinanciacion' => $clean($input[$prefix . 'cotizacion'] ?? '') === 'has' ? $clean($input[$prefix . 'financiacion'] ?? '') : '',
       'fEstadoAdmin' => $clean($input[$prefix . 'estado_admin'] ?? ''),
-      'fOrigen' => $clean($input[$prefix . 'origen'] ?? ''),
+      // El filtro "Origen de solicitud" se retiró de los tabs: un enlace viejo no debe filtrar a escondidas.
+      'fOrigen' => '',
       'fBusqueda' => $clean($input[$prefix . 'busqueda'] ?? ''),
       'fInmueble' => $clean($input[$prefix . 'inmueble'] ?? ''),
       'fContrato' => $clean($input[$prefix . 'contrato'] ?? ''),

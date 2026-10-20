@@ -1754,11 +1754,6 @@ final class SuCasaControlServiciosInmobiliarios
               <option value="magnitude_desc" <?php selected((string) ($p['fSort'] ?? ''), 'magnitude_desc'); ?>>Mayor magnitud</option>
               <option value="magnitude_asc" <?php selected((string) ($p['fSort'] ?? ''), 'magnitude_asc'); ?>>Menor magnitud</option>
             </select></div>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>origen">Origen</label><select id="<?php echo esc_attr($prefix); ?>origen" name="<?php echo esc_attr($prefix); ?>origen" class="select select-bordered select-sm scm-select">
-              <option value="">Todos</option>
-              <option value="web" <?php selected(($p['fOrigen'] ?? ''), 'web'); ?>>Guardian</option>
-              <option value="interno" <?php selected(($p['fOrigen'] ?? ''), 'interno'); ?>>No Guardian</option>
-            </select></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>id_empleado">Funcionario</label><select id="<?php echo esc_attr($prefix); ?>id_empleado" name="<?php echo esc_attr($prefix); ?>id_empleado" class="select select-bordered select-sm scm-select">
               <option value="">Todos</option><?php foreach (($filterOptions["funcionarios"] ?? []) as $func): $fId = trim((string)($func["id"] ?? ""));
                                                 if ($fId === "") continue; ?>

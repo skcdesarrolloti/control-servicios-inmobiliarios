@@ -18325,6 +18325,22 @@
       syncKpiActiveState(form);
     }
 
+    // En celular los KPIs de Mantenimiento muestran solo Total; el botón despliega el resto.
+    if (!root._scmKpisAccordionBound) root.addEventListener("click", function (event) {
+      var toggle = event.target && event.target.closest
+        ? event.target.closest("[data-scm-kpis-toggle]")
+        : null;
+      if (!toggle) return;
+      var accordion = toggle.closest("[data-scm-kpis-accordion]");
+      if (!accordion) return;
+      var open = !accordion.classList.contains("is-open");
+      accordion.classList.toggle("is-open", open);
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      var label = toggle.querySelector("[data-scm-kpis-toggle-label]");
+      if (label) label.textContent = open ? "Ocultar indicadores" : "Ver más indicadores";
+    });
+    root._scmKpisAccordionBound = true;
+
     root.querySelectorAll(".scm-open-topic-panel .scm-kpi").forEach(function (card) {
       var key = kpiKey(card);
       var form = kpiForm(card);

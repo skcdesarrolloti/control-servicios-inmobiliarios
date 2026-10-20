@@ -36,7 +36,8 @@ final class ServiciosInmobiliariosFilters
       'fEstado' => $this->value($input, $prefix . 'estado'),
       'fFinanciacion' => $this->value($input, $prefix . 'cotizacion') === 'has' ? $this->value($input, $prefix . 'financiacion') : '',
       'fEstadoAdmin' => $this->value($input, $prefix . 'estado_admin'),
-      'fOrigen' => $this->value($input, $prefix . 'origen'),
+      // El filtro "Origen de solicitud" se retiró de los tabs: un enlace viejo no debe filtrar a escondidas.
+      'fOrigen' => '',
       'fPrioridad' => $this->value($input, $prefix . 'prioridad'),
       'fCotizacion' => $this->value($input, $prefix . 'cotizacion'),
       'fCotizacionEstado' => $this->value($input, $prefix . 'cotizacion_estado'),
