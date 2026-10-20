@@ -18372,6 +18372,12 @@
       }
     }
     if (!root._scmKpisAccordionBound) {
+      root.addEventListener("scm:kpis-rendered", function () {
+        root.querySelectorAll("[data-scm-kpis-accordion]").forEach(function (accordion) {
+          accordion.classList.toggle("is-collapsed", readPref(KPIS_COLLAPSED_KEY));
+          syncKpisAccordion(accordion);
+        });
+      });
       root.addEventListener("click", function (event) {
         var target = event.target && event.target.closest ? event.target : null;
         if (!target) return;
@@ -19287,6 +19293,12 @@
             if (tabKey === "mis_tickets") {
               var myTotal = root.querySelector('[data-my-tickets-total]');
               if (myTotal) myTotal.textContent = d.count || "0";
+              // Cada categoría de "Mis casos" trae sus propios KPIs.
+              var myKpis = root.querySelector('[data-scm-my-tickets-kpis]');
+              if (myKpis && typeof d.kpis_html === "string" && d.kpis_html) {
+                myKpis.innerHTML = d.kpis_html;
+                root.dispatchEvent(new CustomEvent("scm:kpis-rendered"));
+              }
             }
             if (tabPanel) {
               tabPanel.setAttribute("data-scm-loaded", "1");
@@ -25063,7 +25075,8 @@
       var page = fetcher.form.querySelector('[name="scm_my_page"]');
       if (page) page.value = "1";
       var view = fetcher.form.querySelector('#scm_my_estado_bloqueado');
-      if (view) view.value = "Mis casos · " + labels[bucket];
+      var activeCategory = root.querySelector('[data-my-tickets-category].active');
+      if (view) view.value = "Mis casos · " + (activeCategory ? activeCategory.textContent.trim() + " · " : "") + labels[bucket];
       root.querySelectorAll('[data-my-tickets-status]').forEach(function(button) {
         var selected = button.getAttribute('data-my-tickets-status') === bucket;
         button.classList.toggle('active', selected);
@@ -25079,6 +25092,35 @@
       }
       return refresh ? fetcher.fetchTab(new FormData(fetcher.form)) : Promise.resolve();
     }
+
+    // Pestañas de categoría (Mantenimiento, Preventiva…): cada una abre en sus Abiertos.
+    function selectMyTicketsCategory(category) {
+      var fetcher = tabFetchers.mis_tickets;
+      if (!fetcher || !fetcher.form) return Promise.resolve();
+      var input = fetcher.form.querySelector('[name="scm_my_categoria"]');
+      if (!input) return Promise.resolve();
+      input.value = category;
+      root.querySelectorAll('[data-my-tickets-category]').forEach(function(button) {
+        var selected = button.getAttribute('data-my-tickets-category') === category;
+        button.classList.toggle('active', selected);
+        button.setAttribute('aria-selected', selected ? 'true' : 'false');
+        button.tabIndex = selected ? 0 : -1;
+      });
+      var bucketInput = fetcher.form.querySelector('[name="scm_my_bucket"]');
+      if (bucketInput) bucketInput.value = "";
+      return selectMyTicketsBucket("active", true);
+    }
+
+    root.querySelectorAll('[data-my-tickets-category]').forEach(function(button, index, buttons) {
+      button.addEventListener('click', function() { selectMyTicketsCategory(button.getAttribute('data-my-tickets-category')); });
+      button.addEventListener('keydown', function(event) {
+        var target = event.key === 'ArrowRight' ? (index + 1) % buttons.length : event.key === 'ArrowLeft' ? (index + buttons.length - 1) % buttons.length : event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : -1;
+        if (target < 0) return;
+        event.preventDefault();
+        buttons[target].focus();
+        buttons[target].click();
+      });
+    });
 
     root.querySelectorAll('[data-my-tickets-status]').forEach(function(button, index, buttons) {
       button.addEventListener('click', function() { selectMyTicketsBucket(button.getAttribute('data-my-tickets-status'), true); });

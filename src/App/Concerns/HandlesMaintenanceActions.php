@@ -133,6 +133,11 @@ trait HandlesMaintenanceActions
     $employeeId = $this->current_employee_id();
     $params['fEmpleado'] = $employeeId !== '' ? $employeeId : '__sin_funcionario__';
     $params['_scmStatusBucket'] = $this->myTicketsStatusBucket($_POST['scm_my_bucket'] ?? 'active');
+    // La pestaña (Mantenimiento, Preventiva…) define el tema; el filtro "Tema" ya no se usa aquí.
+    $params['_scmMyCategory'] = $this->my_tickets_category($_POST['scm_my_categoria'] ?? 'mantenimiento');
+    $params['_scmExecutorKpis'] = in_array($params['_scmMyCategory'], ['mantenimiento', 'preventiva'], true);
+    if (!$params['_scmExecutorKpis']) $params['fEjecutado'] = '';
+    $params['fTema'] = '';
     $params['fEstado'] = '';
     $params['_scmExcludeDepartamento'] = 'Servicio al cliente';
     $result = $this->run_query_generic([], $params, $config);
@@ -144,6 +149,8 @@ trait HandlesMaintenanceActions
       'admin_status_options' => $result['admin_status_options'] ?? [],
       'cards' => $this->render_generic_cards($rows, $config, 'mis_tickets', $params['_scmStatusBucket']),
       'status_bucket' => $params['_scmStatusBucket'],
+      'category' => $params['_scmMyCategory'],
+      'kpis_html' => $this->render_my_tickets_kpis($params['_scmMyCategory'], $stats),
       'pagination' => $this->get_generic_tickets_module()->render_generic_pagination('mis_tickets', $pagination),
       'count' => (string) ($stats['total'] ?? 0),
       'kpi_total' => (string) ($stats['total'] ?? 0),

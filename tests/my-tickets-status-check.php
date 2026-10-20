@@ -22,6 +22,8 @@ final class MyTicketsProbe {
   private function canAccessDashboardTab($tab):bool { return $this->allowed; }
   private function current_employee_id():string { return $this->employee; }
   private static function defaultCorrectiveReviewUrl():string { return 'https://example.invalid/review'; }
+  private static function defaultPreventiveReviewUrl():string { return 'https://example.invalid/preventive-review'; }
+  private function get_generic_tab_definitions():array { return \SCM\App\SuCasaControlServiciosInmobiliarios::defaultGenericTicketTabDefinitions(); }
   private static function sanitizeUrl($value):string { return (string)$value; }
   private function jsonOk($data):never { throw new MyTicketsResult(true,$data); }
   private function jsonFail($message):never { throw new MyTicketsResult(false,['message'=>$message]); }
@@ -38,11 +40,13 @@ final class MyTicketsProbe {
 }
 $pdo=new PDO('sqlite::memory:');$pdo->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
 $pdo->sqliteCreateFunction('UNIX_TIMESTAMP',static fn()=>time());
-$pdo->exec('CREATE TABLE wp_jet_cct_tickets(_ID INTEGER PRIMARY KEY,id_ticket TEXT,id_empleado TEXT,departamento TEXT,estado TEXT,estado_administrativo TEXT,fecha INTEGER,fecha_actualizacion INTEGER,magnitud_caso TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_tickets(_ID INTEGER PRIMARY KEY,id_ticket TEXT,id_empleado TEXT,departamento TEXT,estado TEXT,estado_administrativo TEXT,fecha INTEGER,fecha_actualizacion INTEGER,magnitud_caso TEXT,tema_ayuda TEXT)');
 $db=new SCM\Core\Database($pdo);$probe=new MyTicketsProbe($db);
-foreach(range(1,15) as $id)$db->insert('wp_jet_cct_tickets',['_ID'=>$id,'id_ticket'=>(string)$id,'id_empleado'=>'employee-a','departamento'=>'Servicio al propietario','estado'=>$id%2?'Nuevo':'En proceso','estado_administrativo'=>'Nuevo','fecha'=>1000+$id,'fecha_actualizacion'=>2000,'magnitud_caso'=>'alto']);
-foreach([[21,'En proceso','Postergado'],[22,'Nuevo','En espera de respuesta'],[31,'Cerrado','Nuevo'],[32,'En proceso','Finalizado'],[33,'Resuelto','Nuevo']] as [$id,$state,$admin])$db->insert('wp_jet_cct_tickets',['_ID'=>$id,'id_ticket'=>(string)$id,'id_empleado'=>'employee-a','departamento'=>'Servicio al propietario','estado'=>$state,'estado_administrativo'=>$admin,'fecha'=>1000+$id,'fecha_actualizacion'=>2000]);
-foreach([[41,'Nuevo','Nuevo'],[42,'En proceso','Postergado'],[43,'Cerrado','Finalizado']] as [$id,$state,$admin])foreach(['employee-b','employee-a'] as $offset=>$employee)$db->insert('wp_jet_cct_tickets',['_ID'=>$id+$offset*10,'id_ticket'=>(string)($id+$offset*10),'id_empleado'=>$employee,'departamento'=>$offset?'Servicio al cliente':'Servicio al propietario','estado'=>$state,'estado_administrativo'=>$admin,'fecha'=>1000+$id,'fecha_actualizacion'=>2000]);
+foreach(range(1,15) as $id)$db->insert('wp_jet_cct_tickets',['_ID'=>$id,'id_ticket'=>(string)$id,'id_empleado'=>'employee-a','departamento'=>'Mantenimiento','estado'=>$id%2?'Nuevo':'En proceso','estado_administrativo'=>'Nuevo','fecha'=>1000+$id,'fecha_actualizacion'=>2000,'magnitud_caso'=>'alto']);
+foreach([[21,'En proceso','Postergado'],[22,'Nuevo','En espera de respuesta'],[31,'Cerrado','Nuevo'],[32,'En proceso','Finalizado'],[33,'Resuelto','Nuevo']] as [$id,$state,$admin])$db->insert('wp_jet_cct_tickets',['_ID'=>$id,'id_ticket'=>(string)$id,'id_empleado'=>'employee-a','departamento'=>'Mantenimiento','estado'=>$state,'estado_administrativo'=>$admin,'fecha'=>1000+$id,'fecha_actualizacion'=>2000]);
+foreach([[41,'Nuevo','Nuevo'],[42,'En proceso','Postergado'],[43,'Cerrado','Finalizado']] as [$id,$state,$admin])foreach(['employee-b','employee-a'] as $offset=>$employee)$db->insert('wp_jet_cct_tickets',['_ID'=>$id+$offset*10,'id_ticket'=>(string)($id+$offset*10),'id_empleado'=>$employee,'departamento'=>$offset?'Servicio al cliente':'Mantenimiento','estado'=>$state,'estado_administrativo'=>$admin,'fecha'=>1000+$id,'fecha_actualizacion'=>2000]);
+// Un caso de Preventiva asignado al mismo funcionario no debe aparecer en la pestaña Mantenimiento.
+$db->insert('wp_jet_cct_tickets',['_ID'=>61,'id_ticket'=>'61','id_empleado'=>'employee-a','departamento'=>'Servicio al propietario','tema_ayuda'=>'Revision preventiva','estado'=>'Nuevo','estado_administrativo'=>'Nuevo','fecha'=>1051,'fecha_actualizacion'=>2000]);
 if(($argv[1]??'')==='--html'){echo $probe->html();exit;}
 $call=static function(array $post)use($probe):MyTicketsResult{$_POST=$post;try{$probe->ajax_handler_my_tickets();throw new RuntimeException('No response');}catch(MyTicketsResult $result){return $result;}};
 $check=static function(bool $ok,string $label):void{if(!$ok)throw new RuntimeException($label);echo 'PASS: '.$label.PHP_EOL;};
@@ -56,5 +60,9 @@ foreach([[],['scm_my_bucket'=>'all'],['scm_my_bucket'=>['cerrados']]] as $post){
 $page=$call(['scm_my_bucket'=>'active','scm_my_page'=>2]);$check(count(json_decode($page->data['cards'],true)['ids'])===5&&json_decode($page->data['pagination'],true)['page']===2,'Open case pagination stays in its status');
 $probe->employee='';$check((int)$call(['scm_my_bucket'=>'cerrados'])->data['count']===0,'Missing employee never exposes another employee cases');
 $probe->allowed=false;$check(!$call([])->ok,'Personal tab permissions remain enforced');
-$check((int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tickets')===26,'Filtering never changes case records');
+$maintenance=$call(['scm_my_categoria'=>'mantenimiento']);$check($maintenance->data['category']==='mantenimiento'&&!in_array(61,json_decode($maintenance->data['cards'],true)['ids'],true),'Maintenance tab excludes cases from other categories');
+$check($call(['scm_my_categoria'=>'desconocida'])->data['category']==='mantenimiento','Unknown category falls back to Maintenance');
+$check(str_contains($maintenance->data['kpis_html'],'scm-mis_tickets-kpi-magnitud-critico')&&str_contains($maintenance->data['kpis_html'],'Magnitud del caso'),'Maintenance tab returns its KPI rows');
+$check(!str_contains($call(['scm_my_categoria'=>'desconocida','scm_my_tema'=>'Revision preventiva'])->data['cards'],'61'),'Old topic filter links are ignored');
+$probe->allowed=true;$check((int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_tickets')===27,'Filtering never changes case records');
 echo "OK: in-memory status, scope and pagination checks. No production access or messages.\n";

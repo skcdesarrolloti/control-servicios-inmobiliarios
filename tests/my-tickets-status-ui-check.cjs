@@ -18,7 +18,7 @@ const slice=(start,end,offset=0)=>{const a=source.indexOf(start,offset),b=source
       window.requests=[];window.held=[];window.hold=false;window.opened=[];
       function setListLoading(el,busy){el.dataset.busy=String(busy);}
       function updateGenericKPI(key,name,value){var el=document.getElementById('scm-'+key+'-kpi-'+name);if(el)el.textContent=value;}
-      function applyRevisionKpiVisibility(){} function applyBinaryFilterKpiVisibility(){} function applyCotizacionDependentFilters(){}
+      function applyRevisionKpiVisibility(){} function applyBinaryFilterKpiVisibility(){} function applyCotizacionDependentFilters(){} function updateAdministrativeStatusOptions(){}
       window.fetch=async function(url,options){var data=Object.fromEntries(options.body),bucket=data.scm_my_bucket;requests.push(data);var json={success:true,data:{cards:'<p>'+bucket+'</p>',count:bucket==='active'?'15':bucket==='postergados'?'2':'3',kpi_total:bucket==='active'?'15':bucket==='postergados'?'2':'3',pagination:'<button class="scm-page-btn-generic" data-page="2">2</button>'}};if(hold)return new Promise(resolve=>held.push(()=>resolve({json:async()=>json})));return {json:async()=>json};};
       ${slice('    function makeTabFetcher(', '    function makeStatusFetcher(')}
       tabFetchers.mis_tickets=makeTabFetcher('mis_tickets','my-cases');
@@ -42,13 +42,13 @@ const slice=(start,end,offset=0)=>{const a=source.indexOf(start,offset),b=source
     await page.waitForFunction(()=>document.querySelector('#scm-cards-mis_tickets').textContent==='postergados');
     assert.equal(await page.locator('[data-my-tickets-total]').textContent(),'2');
     assert.equal(await page.locator('#scm-mis_tickets-kpi-total').textContent(),'2');
-    assert.equal(await page.locator('#scm_my_estado_bloqueado').inputValue(),'Mis casos · Postergados');
+    assert.equal(await page.locator('#scm_my_estado_bloqueado').inputValue(),'Mis casos · Mantenimiento · Postergados');
     await page.locator('.scm-page-btn-generic').click();
     await page.waitForFunction(()=>requests.at(-1).scm_my_page==='2');
     assert.equal(await page.evaluate(()=>requests.at(-1).scm_my_bucket),'postergados');
     await page.locator('#scm-clear-mis_tickets').click();
     await page.waitForFunction(()=>requests.at(-1).scm_my_page==='1');
-    assert.equal(await page.locator('#scm_my_estado_bloqueado').inputValue(),'Mis casos · Postergados','clearing filters retains status label');
+    assert.equal(await page.locator('#scm_my_estado_bloqueado').inputValue(),'Mis casos · Mantenimiento · Postergados','clearing filters retains status label');
     await page.locator('[data-my-tickets-status=cerrados]').click();
     await page.waitForFunction(()=>document.querySelector('#scm-cards-mis_tickets').textContent==='cerrados');
     assert.equal(await page.evaluate(()=>requests.at(-1).scm_my_page),'1');
@@ -74,6 +74,12 @@ const slice=(start,end,offset=0)=>{const a=source.indexOf(start,offset),b=source
       await page.setViewportSize({width,height:900});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'tabs fit '+width+'px');
       fs.mkdirSync(path.join(__dirname,'../output/my-tickets'),{recursive:true});await page.screenshot({path:path.join(__dirname,'../output/my-tickets/status-'+width+'.png'),fullPage:true});
     }
+    await page.locator('[data-my-tickets-category=preventiva]').click();
+    await page.waitForFunction(()=>requests.at(-1).scm_my_categoria==='preventiva');
+    assert.equal(await page.evaluate(()=>requests.at(-1).scm_my_bucket),'active','switching category opens its Abiertos');
+    assert.equal(await page.locator('#scm_my_estado_bloqueado').inputValue(),'Mis casos · Preventiva · Abiertos');
+    assert.equal(await page.locator('[aria-selected=true][data-my-tickets-category]').textContent(),'Preventiva');
+    assert.equal(await page.locator('#scm_my_tema').count(),0,'topic filter removed');
     assert.equal(await tabs.count(),3);assert.deepEqual(errors,[]);
     console.log('PASS: initial/re-entry open status, tabs, KPIs, pagination, filters, keyboard, stale requests, notification popup and responsive layout. No network used.');
   } finally {await browser.close();}

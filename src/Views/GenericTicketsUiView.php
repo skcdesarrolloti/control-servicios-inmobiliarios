@@ -840,7 +840,7 @@ final class GenericTicketsUiView
       <h3>Filtros</h3>
       <form id="scm-form-<?php echo esc_attr($tabKey); ?>" autocomplete="off">
         <input type="hidden" id="<?php echo esc_attr($prefix); ?>page" name="<?php echo esc_attr($prefix); ?>page" value="<?php echo esc_attr((string) ($p['fPage'] ?? 1)); ?>">
-        <?php if ($tabKey === 'mis_tickets'): ?><input type="hidden" name="scm_my_bucket" value="<?php echo esc_attr((string) ($p['_scmStatusBucket'] ?? 'active')); ?>"><?php endif; ?>
+        <?php if ($tabKey === 'mis_tickets'): ?><input type="hidden" name="scm_my_bucket" value="<?php echo esc_attr((string) ($p['_scmStatusBucket'] ?? 'active')); ?>"><input type="hidden" name="scm_my_categoria" value="<?php echo esc_attr((string) ($p['_scmMyCategory'] ?? 'mantenimiento')); ?>"><?php endif; ?>
         <div class="scm-grid">
           <?php if ($showTema): ?>
             <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>tema">Tema</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>tema" name="<?php echo esc_attr($prefix); ?>tema">

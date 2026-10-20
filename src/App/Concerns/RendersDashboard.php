@@ -99,6 +99,8 @@ trait RendersDashboard
     $myTicketsParams = $this->parse_params_generic($_GET, 'scm_my_');
     $myTicketsParams['fEmpleado'] = $currentEmployeeId !== '' ? $currentEmployeeId : '__sin_funcionario__';
     $myTicketsParams['_scmStatusBucket'] = 'active';
+    $myTicketsParams['_scmMyCategory'] = $this->my_tickets_category($_GET['scm_my_categoria'] ?? 'mantenimiento');
+    $myTicketsParams['fTema'] = '';
     $myTicketsParams['fEstado'] = '';
     $myTicketsParams['_scmExcludeDepartamento'] = 'Servicio al cliente';
     $myTicketsResult = ['tbody' => $this->render_lazy_tickets_placeholder('Abre esta pestaña para cargar tus casos.'), 'pagination_html' => ''];
@@ -2318,36 +2320,64 @@ trait RendersDashboard
     return '';
   }
 
+  /** Pestañas de "Mis casos" por categoría; cada una tiene sus propios Abiertos/Postergados/Cerrados. */
+  private function my_tickets_categories(): array
+  {
+    // Mismo orden que las pestañas de casos abiertos.
+    $categories = ['mantenimiento' => 'Mantenimiento'];
+    $labels = ['preventiva' => 'Preventiva', 'entrega' => 'Entrega', 'recibo' => 'Recibo', 'contractual' => 'Contractual', 'contable' => 'Contable', 'certificaciones' => 'Certificaciones'];
+    $definitions = $this->get_generic_tab_definitions();
+    foreach ($labels as $key => $label) {
+      if (isset($definitions[$key])) $categories[$key] = $label;
+    }
+    foreach (array_keys($definitions) as $key) {
+      $categories[$key] = $categories[$key] ?? ucfirst((string) $key);
+    }
+    $categories['otros'] = 'Otros';
+    return $categories;
+  }
+
+  private function my_tickets_category($value): string
+  {
+    $category = is_string($value) ? strtolower(trim($value)) : '';
+    return array_key_exists($category, $this->my_tickets_categories()) ? $category : 'mantenimiento';
+  }
+
+  private function render_my_tickets_kpis(string $category, array $stats): string
+  {
+    return $this->render_generic_tab_kpis($category, $stats, 'scm-mis_tickets-');
+  }
+
   private function render_my_tickets_panel(array $result, array $stats, array $params, array $filterOptions): string
   {
     $cards = (string) ($result['tbody'] ?? '');
     $pagination = (string) ($result['pagination_html'] ?? '');
-    $temaOptions = is_array($filterOptions['my_ticket_topics'] ?? null) ? $filterOptions['my_ticket_topics'] : [];
-    if (empty($temaOptions)) {
-      $temaOptions = is_array($filterOptions['tema'] ?? null) ? $filterOptions['tema'] : [];
-    }
     $bucket = $this->myTicketsStatusBucket($params['_scmStatusBucket'] ?? 'active');
+    $category = $this->my_tickets_category($params['_scmMyCategory'] ?? 'mantenimiento');
+    $categories = $this->my_tickets_categories();
     $labels = ['active'=>'Abiertos', 'postergados'=>'Postergados', 'cerrados'=>'Cerrados'];
     $params['_scmStatusBucket'] = $bucket;
+    $params['_scmMyCategory'] = $category;
+    $categoryTabs = '<div class="scm-status-subtabs scm-my-ticket-category-tabs" role="tablist" aria-label="Categoría de mis casos"><div class="flex items-center gap-1.5 flex-wrap">';
+    foreach ($categories as $key => $label) {
+      $selected = $key === $category;
+      $categoryTabs .= '<button type="button" class="scm-status-topic-tab' . ($selected ? ' active' : '') . '" role="tab" aria-selected="' . ($selected ? 'true' : 'false') . '" tabindex="' . ($selected ? '0' : '-1') . '" data-my-tickets-category="' . esc_attr($key) . '">' . esc_html($label) . '</button>';
+    }
+    $categoryTabs .= '</div></div>';
     $tabs = '<div class="scm-my-ticket-state-tabs" role="tablist" aria-label="Estado de mis casos">';
     foreach ($labels as $key => $label) {
       $selected = $key === $bucket;
       $tabs .= '<button type="button" class="scm-my-ticket-state-tab' . ($selected ? ' active' : '') . '" id="scm-my-state-' . $key . '" role="tab" aria-controls="scm-my-tickets-results" aria-selected="' . ($selected ? 'true' : 'false') . '" tabindex="' . ($selected ? '0' : '-1') . '" data-my-tickets-status="' . $key . '">' . $label . '</button>';
     }
     $tabs .= '</div>';
-    $form = $this->render_generic_filter_form('mis_tickets', 'scm_my_', $params, true, $temaOptions, $filterOptions, 'mis_tickets', 'Mis casos · ' . $labels[$bucket]);
-    $kpis = '<div class="scm-kpis scm-kpis-daisy">'
-      . '<div class="scm-kpi"><div class="scm-kpi-label">TOTAL</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-total">' . esc_html((string) ($stats['total'] ?? 0)) . '</div></div>'
-      . '<div class="scm-kpi scm-kpi-magnitud scm-kpi-critico"><div class="scm-kpi-label">CR&Iacute;TICOS</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-magnitud-critico">' . esc_html((string) ($stats['magnitud_critico'] ?? 0)) . '</div></div>'
-      . '<div class="scm-kpi scm-kpi-magnitud scm-kpi-alto"><div class="scm-kpi-label">ALTOS</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-magnitud-alto">' . esc_html((string) ($stats['magnitud_alto'] ?? 0)) . '</div></div>'
-      . '<div class="scm-kpi scm-kpi-magnitud scm-kpi-medio"><div class="scm-kpi-label">MEDIOS</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-magnitud-medio">' . esc_html((string) ($stats['magnitud_medio'] ?? 0)) . '</div></div>'
-      . '<div class="scm-kpi scm-kpi-magnitud scm-kpi-bajo"><div class="scm-kpi-label">BAJOS</div><div class="scm-kpi-value" id="scm-mis_tickets-kpi-magnitud-bajo">' . esc_html((string) ($stats['magnitud_bajo'] ?? 0)) . '</div></div>'
-      . '</div>';
+    // La categoría ya define el tema: el filtro "Tema" no se muestra.
+    $form = $this->render_generic_filter_form('mis_tickets', 'scm_my_', $params, false, [], $filterOptions, 'mis_tickets', 'Mis casos · ' . $categories[$category] . ' · ' . $labels[$bucket]);
     return '<span id="scm-mis_tickets-count" style="display:none;">' . esc_html((string) ($stats['total'] ?? 0)) . '</span>'
       . '<div class="scm-status-topic-head"><div><h3>Mis casos</h3><p>Casos asignados a tu funcionario, excepto los de Servicio al cliente.</p></div><span class="scm-status-count"><strong data-my-tickets-total>' . esc_html((string) ($stats['total'] ?? 0)) . '</strong> casos</span></div>'
+      . $categoryTabs
       . $tabs
       . '<div id="scm-my-tickets-results" role="tabpanel" aria-labelledby="scm-my-state-' . $bucket . '">'
-      . $kpis
+      . '<div data-scm-my-tickets-kpis>' . $this->render_my_tickets_kpis($category, $stats) . '</div>'
       . $form
       . '<div class="scm-cards-wrap"><div class="scm-ticket-cards" id="scm-cards-mis_tickets">' . $cards . '</div></div>'
       . '<div class="scm-pagination" id="scm-pagination-mis_tickets">' . $pagination . '</div></div>';
@@ -5947,16 +5977,16 @@ trait RendersDashboard
    * KPIs de las pestañas Preventiva, Entrega, Recibo, Contractual, Contable y Certificaciones con el
    * mismo diseño de Mantenimiento: cada pestaña muestra solo los indicadores que le aplican.
    */
-  private function render_generic_tab_kpis(string $tabKey, array $stats): string
+  private function render_generic_tab_kpis(string $tabKey, array $stats, string $prefix = ''): string
   {
-    $prefix = 'scm-' . $tabKey . '-';
+    $prefix = $prefix !== '' ? $prefix : 'scm-' . $tabKey . '-';
     $cards = [['total', 'Total', 'inbox', 'navy', 'total']];
     if ($tabKey === 'entrega') {
       $cards[] = ['con-rev-entrega', 'Con revisión de entrega', 'fact_check', 'blue', 'con_revision_entrega'];
       $cards[] = ['sin-rev-entrega', 'Sin revisión de entrega', 'visibility_off', 'slate', 'sin_revision_entrega'];
       $cards[] = ['con-inventario', 'Con inventario', 'inventory_2', 'green', 'con_inventario'];
       $cards[] = ['sin-inventario', 'Sin inventario', 'inventory', 'orange', 'sin_inventario'];
-    } elseif (in_array($tabKey, ['contractual', 'contable', 'certificaciones'], true)) {
+    } elseif (in_array($tabKey, ['contractual', 'contable', 'certificaciones', 'otros'], true)) {
       $cards[] = ['nuevo', 'Nuevo', 'fiber_new', 'blue', 'estado_nuevo'];
       $cards[] = ['en-proceso', 'En proceso', 'pending', 'orange', 'estado_en_proceso'];
     } elseif ($tabKey === 'recibo') {
@@ -5979,8 +6009,10 @@ trait RendersDashboard
     foreach ($cards as [$suffix, $label, $icon, $tone, $statKey]) {
       $main .= $this->render_kpi_card($prefix . 'kpi-' . $suffix, $label, $icon, $tone, $stats[$statKey] ?? 0, $suffix === 'total' ? 'total' : '');
     }
-    $more = ($tabKey === 'preventiva' ? $this->render_magnitude_kpis($prefix, $stats) : '')
-      . ($tabKey === 'preventiva' ? $this->render_executor_kpis($prefix, $stats) : '');
+    // Magnitud y "¿Quién ejecuta?" solo aplican a Mantenimiento (en "Mis casos") y Preventiva.
+    $withCaseRows = in_array($tabKey, ['mantenimiento', 'preventiva'], true);
+    $more = ($withCaseRows ? $this->render_magnitude_kpis($prefix, $stats) : '')
+      . ($withCaseRows ? $this->render_executor_kpis($prefix, $stats) : '');
 
     return '<div class="scm-kpis-accordion" data-scm-kpis-accordion>'
       . '<div class="scm-kpis scm-kpis-stitch scm-kpis-main" style="--scm-kpi-cols: ' . count($cards) . '">' . $main . '</div>'

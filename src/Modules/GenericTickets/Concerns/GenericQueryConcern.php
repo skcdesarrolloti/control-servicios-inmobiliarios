@@ -92,6 +92,11 @@ trait GenericQueryConcern
       $args[] = $p['fTema'];
     }
 
+    $myCategory = trim((string) ($p['_scmMyCategory'] ?? ''));
+    if ($myCategory !== '') {
+      $where[] = $this->my_tickets_category_where_sql($tabla, $myCategory, $args);
+    }
+
     $excludedDepartment = trim((string) ($p['_scmExcludeDepartamento'] ?? ''));
     if ($excludedDepartment !== '' && $this->column_exists($tabla, 'departamento')) {
       $where[] = "LOWER(TRIM(COALESCE(`departamento`, ''))) <> ?";
@@ -733,6 +738,49 @@ trait GenericQueryConcern
     }
     $creadorExpr = "LOWER(TRIM(COALESCE(`creador_por`, '')))";
     return "({$creadorExpr} <> '' AND {$creadorExpr} <> 'funcionario')";
+  }
+
+  /**
+   * Pestañas de "Mis casos": 'mantenimiento' usa el mismo universo que la pestaña Mantenimiento
+   * (departamento o temas de reparación), las demás los temas configurados de su pestaña y
+   * 'otros' lo que no cae en ninguna, para que ningún caso asignado quede sin mostrarse.
+   * @param array<int,mixed> $args
+   */
+  private function my_tickets_category_where_sql(string $tabla, string $category, array &$args): string
+  {
+    $maintenanceSql = function (array &$args) use ($tabla): string {
+      $topics = \SCM\Repositories\TicketsRepository::MAINTENANCE_TOPICS;
+      $parts = [];
+      if ($this->column_exists($tabla, 'departamento')) {
+        $parts[] = "LOWER(TRIM(COALESCE(`departamento`, ''))) = ?";
+        $args[] = 'mantenimiento';
+      }
+      $parts[] = "LOWER(TRIM(COALESCE(`tema_ayuda`, ''))) IN (" . implode(',', array_fill(0, count($topics), '?')) . ')';
+      foreach ($topics as $topic) {
+        $args[] = $topic;
+      }
+      $parts[] = "LOWER(COALESCE(`tema_ayuda`, '')) LIKE ?";
+      $args[] = '%reparacion%';
+      $parts[] = "LOWER(COALESCE(`tema_ayuda`, '')) LIKE ?";
+      $args[] = '%mantenimiento%';
+      return '(' . implode(' OR ', $parts) . ')';
+    };
+    $defs = \SCM\App\SuCasaControlServiciosInmobiliarios::configuredGenericTicketTabDefinitions();
+
+    if ($category === 'mantenimiento') {
+      return $maintenanceSql($args);
+    }
+    if (isset($defs[$category])) {
+      return $this->generic_topic_where_sql((array) ($defs[$category]['temas'] ?? []), $args);
+    }
+    if ($category === 'otros') {
+      $known = [$maintenanceSql($args)];
+      foreach ($defs as $def) {
+        $known[] = $this->generic_topic_where_sql((array) ($def['temas'] ?? []), $args);
+      }
+      return 'NOT (' . implode(' OR ', $known) . ')';
+    }
+    return '1 = 0';
   }
 
   /**
