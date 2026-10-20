@@ -901,6 +901,9 @@ final class CompletionService
     if ($source['flow'] === 'approved_quote') {
       $executor = 'inmobiliaria';
       $pendingAdminState = CompletionPolicy::executionState($executor);
+    } elseif (!isset(CompletionPolicy::ROLES[$executor])) {
+      // Sin cotización aprobada la inmobiliaria no ejecutó: la solución la hizo propietario, arrendatario o copropiedad.
+      throw new \DomainException('Selecciona propietario, arrendatario o copropiedad como responsable de la solución.');
     }
     $hasAdministrativeReport = false;
     $transportMax = $context['transport_max'];

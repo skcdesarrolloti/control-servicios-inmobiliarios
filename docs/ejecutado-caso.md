@@ -20,7 +20,7 @@ El trabajo cotizado siempre lo ejecuta la inmobiliaria (`CaseExecutorSql::QUOTE_
 Solo estas acciones cambian `ejecutado` del caso:
 
 1. **Crear o editar una cotización**: deja el caso en **Inmobiliaria** (`maintenance_quote_update_ticket`). El selector de la cotización solo guarda quién aprueba; por defecto propone el valor de la cotización o Propietario.
-2. **Acta de solución y firma**: al generarla o editarla, deja el caso en "En ejecucion" y copia "¿Quién realizó la solución?". Si el acta viene de una cotización aprobada (acta de satisfacción del trabajo, flujo `approved_quote`), el ejecutor es siempre **Inmobiliaria** y el formulario solo ofrece esa opción. Al anular, archivar o eliminar el acta, el caso recupera el valor que tenía antes.
+2. **Acta de solución y firma**: al generarla o editarla, deja el caso en "En ejecucion" y copia "¿Quién realizó la solución?". Si el acta viene de una cotización aprobada (acta de satisfacción del trabajo, flujo `approved_quote`), el ejecutor es siempre **Inmobiliaria** y el formulario solo ofrece esa opción. En el acta de solución del caso (flujo `ticket_solution`) solo se ofrecen Propietario, Arrendatario o Copropiedad: si ejecutó la inmobiliaria, hay cotización. Al anular, archivar o eliminar el acta, el caso recupera el valor que tenía antes.
 3. **Botón "Editar ejecutado"** del detalle del caso (permiso `case_edit_executor`): cambia el valor o lo deja en "Sin definir". Si el caso está vacío y tiene cotización, propone Inmobiliaria.
 4. **Responder caso** y **Seguimiento**: el selector "Ejecutado por" (por defecto "Sin cambio") permite cambiarlo al publicar.
 

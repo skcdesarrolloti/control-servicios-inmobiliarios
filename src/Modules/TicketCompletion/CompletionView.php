@@ -77,10 +77,13 @@ final class CompletionView
     $sourceFlow = is_array($formPayload['source'] ?? null) ? $formPayload['source'] : (is_array($context['source_flow'] ?? null) ? $context['source_flow'] : []);
     $sourceName = (string) ($sourceFlow['flow'] ?? 'ticket_solution');
     $sourceQuoteId = (string) ($sourceFlow['quote_id'] ?? '');
-    // Con cotización aprobada ejecuta la inmobiliaria; el servicio lo impone igual al guardar.
-    $executorOptions = $sourceName === 'approved_quote' ? ['inmobiliaria' => CompletionPolicy::EXECUTORS['inmobiliaria']] : CompletionPolicy::EXECUTORS;
+    // Con cotización aprobada ejecuta la inmobiliaria; sin cotización la solución la hizo otro responsable.
+    // El servicio valida lo mismo al guardar.
+    $executorOptions = $sourceName === 'approved_quote' ? ['inmobiliaria' => CompletionPolicy::EXECUTORS['inmobiliaria']] : CompletionPolicy::ROLES;
     if ($sourceName === 'approved_quote') {
       $selectedExecutor = 'inmobiliaria';
+    } elseif (!isset($executorOptions[$selectedExecutor])) {
+      $selectedExecutor = '';
     }
     $sourceNotice = $sourceName === 'approved_quote' && trim($sourceQuoteId) !== ''
       ? 'Esta acta quedará asociada a la cotización aprobada #' . trim($sourceQuoteId) . '. Al firmarse cerrará el caso y registrará el trabajo finalizado sin cambiar el estado de la cotización ni generar reporte administrativo nuevo.'
