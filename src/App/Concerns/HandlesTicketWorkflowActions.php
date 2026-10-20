@@ -382,6 +382,8 @@ trait HandlesTicketWorkflowActions
       \SCM\Core\App::settings()->set('contract_annexes_permissions_configured', true, (int) Auth::employeeId());
       \SCM\Core\App::settings()->set('contract_lifecycle_permissions_configured', true, (int) Auth::employeeId());
       \SCM\Core\App::settings()->set('case_executor_permissions_configured', true, (int) Auth::employeeId());
+      // Desde aquí las acciones del catálogo dejan de heredarse: lo guardado es la configuración real.
+      \SCM\Core\App::settings()->set('dashboard_action_permissions_known_keys', $this->dashboardActionPermissionKeys(), (int) Auth::employeeId());
     }
     \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
     \SCM\Core\App::settings()->set('admin_due_popup_cargo_ids', $adminDuePopupCargoIds, Auth::userId());
@@ -691,7 +693,7 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_export_cases_excel(): void
   {
     $this->verifyCsrf();
-    if (!$this->canManageDashboardPermissions()) {
+    if (!$this->canUseDashboardAction('case_export_excel') && !$this->canManageDashboardPermissions()) {
       $this->jsonFail('No tienes permiso para exportar casos.');
     }
 
@@ -3545,6 +3547,9 @@ trait HandlesTicketWorkflowActions
       ]);
     }
 
+    if (in_array($operation, ['submit', 'configure', 'adjust_date'], true)) {
+      $this->requireDashboardAction('public_services_review_save', 'Tu cargo no tiene permiso para guardar revisiones de servicios públicos.');
+    }
     if ($operation === 'adjust_date') {
       $result = $controller->adjustServiciosPublicosReviewDate($contractId, [
         'request_token' => (string) ($_POST['request_token'] ?? ''),
@@ -3671,6 +3676,7 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_crear_ticket_administrativo(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('admin_case_create', 'Tu cargo no tiene permiso para crear casos administrativos o preventivos.');
 
     $clean = static function (string $key): string {
       return trim(wp_kses_post(wp_unslash((string) ($_POST[$key] ?? ''))));
@@ -3728,6 +3734,7 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_aprobar_reporte_administrativo()
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('admin_report_review', 'Tu cargo no tiene permiso para aprobar reportes administrativos.');
     $preId = isset($_POST['pre_id']) ? (int) $_POST['pre_id'] : 0;
     if ($preId <= 0) {
       $this->jsonFail('Reporte administrativo invalido.');
@@ -3745,6 +3752,7 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_desaprobar_reporte_administrativo()
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('admin_report_review', 'Tu cargo no tiene permiso para desaprobar reportes administrativos.');
     $preId = isset($_POST['pre_id']) ? (int) $_POST['pre_id'] : 0;
     if ($preId <= 0) {
       $this->jsonFail('Reporte administrativo invalido.');
@@ -6339,6 +6347,7 @@ trait HandlesTicketWorkflowActions
   public function ajax_handler_contacts_update()
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('case_contacts_edit', 'Tu cargo no tiene permiso para editar datos de contacto.');
 
     $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
     if ($ticketPk <= 0) {

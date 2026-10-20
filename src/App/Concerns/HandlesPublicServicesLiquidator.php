@@ -57,6 +57,7 @@ trait HandlesPublicServicesLiquidator
   public function ajax_handler_public_services_liquidator_generate(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('public_services_liquidation_generate', 'Tu cargo no tiene permiso para generar liquidaciones de servicios públicos.');
     if (!$this->canAccessDashboardTab('liquidador_servicios_publicos')) {
       $this->jsonFail('No tienes permiso para usar el liquidador de servicios publicos.');
     }

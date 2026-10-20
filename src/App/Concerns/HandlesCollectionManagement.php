@@ -13,6 +13,7 @@ trait HandlesCollectionManagement
   public function ajax_handler_collection_portfolio_import(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('collection_import', 'Tu cargo no tiene permiso para importar la cartera.');
     if (!$this->canAccessDashboardTab('gestiones_cobro')) {
       $this->jsonFail('No tienes permiso para importar la cartera.');
     }
@@ -32,6 +33,7 @@ trait HandlesCollectionManagement
   public function ajax_handler_collection_portfolio_action(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('collection_action', 'Tu cargo no tiene permiso para registrar gestiones de cobro.');
     if (!$this->canAccessDashboardTab('gestiones_cobro')) {
       $this->jsonFail('No tienes permiso para actualizar la cartera.');
     }

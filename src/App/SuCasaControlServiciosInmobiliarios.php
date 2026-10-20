@@ -160,7 +160,16 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
-  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete'];
+  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel'];
+  /** Acciones que existían antes del catálogo ampliado; las demás heredan permisos hasta guardar (applyNewDashboardActionDefaults). */
+  const LEGACY_DASHBOARD_ACTION_KEYS = [
+    'case_followup', 'case_schedule', 'case_note', 'case_postpone', 'case_respond', 'contract_history_manage', 'case_transfer',
+    'case_activate', 'case_close', 'case_edit_magnitude', 'case_edit_data', 'case_edit_executor', 'case_completion_act',
+    'corrective_review_manage', 'preventive_review_manage', 'preventive_review_send',
+    'quote_manage', 'quote_create', 'quote_edit', 'quote_send', 'quote_respond', 'quote_approve', 'quote_delete',
+    'quote_repair_followup', 'quote_order_view', 'quote_order_create', 'quote_order_respond', 'quote_order_delete', 'quote_acta_create',
+    'contract_annexes_send', 'contract_desist', 'contract_create', 'contract_owner_change',
+  ];
   const AJAX_DASHBOARD_FILTER_OPTIONS = 'scm_dashboard_filter_options';
   const AJAX_CANON_INSURANCE_AUDIT_LIST = 'scm_auditoria_canon_aseguradoras_listar';
   const AJAX_CANON_INSURANCE_AUDIT_IMPORT = 'scm_auditoria_canon_aseguradoras_importar';
@@ -313,24 +322,24 @@ final class SuCasaControlServiciosInmobiliarios
   private function dashboardPermissionTabs(): array
   {
     return [
-      'abiertos' => 'Abiertos',
-      'postergados' => 'Postergados',
-      'cerrados' => 'Cerrados',
+      'abiertos' => 'Casos abiertos',
+      'postergados' => 'Casos postergados',
+      'cerrados' => 'Casos cerrados',
       'mis_tickets' => 'Mis casos',
       'cotizaciones_mantenimiento' => 'Cotizaciones de Mantenimiento',
       'ordenes_mantenimiento' => 'Órdenes de Mantenimiento',
-      'actas_satisfaccion' => 'Actas de satisfacción',
-      'calendario_actividades' => 'Calendario',
+      'actas_satisfaccion' => 'Actas de Satisfacción',
+      'calendario_actividades' => 'Inicio y calendarios',
       'notificaciones' => 'Notificaciones',
-      'gestiones_cobro' => 'Gestiones de cobro',
+      'gestiones_cobro' => 'Gestiones de Cobro',
       'preventivas_pendientes' => 'Revisión Preventiva',
       'contratos_arrendamiento' => 'Contratos de arrendamiento',
       'servicios_publicos_pendientes' => 'Revisiones de Servicios Públicos',
-      'liquidador_servicios_publicos' => 'Liquidador de servicios publicos',
+      'liquidador_servicios_publicos' => 'Liquidador de Servicios',
       'reportes_administrativos_pendientes' => 'Reportes Administrativos',
-      'auditoria_canon_aseguradoras' => 'Auditoría de canon y aseguradoras',
-      'cartas_aumento' => 'Cartas de aumento',
-      'metricas' => 'Metricas',
+      'auditoria_canon_aseguradoras' => 'Auditoría Canon y Aseguradoras',
+      'cartas_aumento' => 'Cartas de Aumento',
+      'metricas' => 'Métricas',
     ];
   }
 
@@ -716,17 +725,23 @@ final class SuCasaControlServiciosInmobiliarios
           'case_edit_data' => 'Editar datos del caso (asunto, tema, prioridad, departamento)',
           'case_edit_executor' => 'Editar quién ejecuta el caso (Ejecutado por)',
           'case_completion_act' => 'Acta de solución y firma',
+          'act_resend' => 'Reenviar acta para firma',
+          'act_cancel' => 'Anular acta de satisfacción',
           'corrective_review_manage' => 'Gestionar revisión correctiva (casos de mantenimiento)',
           'preventive_review_manage' => 'Gestionar revisión preventiva (casos preventivos)',
           'preventive_review_send' => 'Enviar revisión preventiva al propietario y arrendatario',
+          'case_contacts_edit' => 'Editar datos de contacto de arrendatario y propietario',
+          'case_magnitude_calculate' => 'Calcular magnitud del daño (botón de los filtros)',
+          'case_export_excel' => 'Exportar casos a Excel',
         ],
       ],
       'cotizaciones' => [
-        'label' => 'Cotizaciones de mantenimiento',
+        'label' => 'Cotizaciones y órdenes de mantenimiento',
         'items' => [
           'quote_manage' => 'Gestionar cotizaciones del caso',
           'quote_create' => 'Añadir cotización',
           'quote_edit' => 'Editar cotización',
+          'quote_financing' => 'Cambiar financiamiento de la cotización',
           'quote_send' => 'Enviar cotización',
           'quote_respond' => 'Responder cotización',
           'quote_approve' => 'Marcar cotización como aprobada',
@@ -734,9 +749,38 @@ final class SuCasaControlServiciosInmobiliarios
           'quote_repair_followup' => 'Seguimiento de reparaciones',
           'quote_order_view' => 'Ver órdenes de cotización',
           'quote_order_create' => 'Añadir orden de mantenimiento',
+          'quote_order_edit' => 'Editar orden de mantenimiento',
           'quote_order_respond' => 'Responder orden de mantenimiento',
           'quote_order_delete' => 'Eliminar orden de mantenimiento',
           'quote_acta_create' => 'Crear acta de cotización',
+        ],
+      ],
+      'administrativas' => [
+        'label' => 'Actividades administrativas',
+        'items' => [
+          'admin_case_create' => 'Crear caso administrativo o preventivo (contratos y vencimientos)',
+          'admin_report_review' => 'Aprobar o desaprobar reportes administrativos',
+          'public_services_review_save' => 'Guardar revisión de servicios públicos',
+          'public_services_liquidation_generate' => 'Generar liquidación de servicios públicos',
+          'rent_increase_letter_create' => 'Generar cartas de aumento',
+        ],
+      ],
+      'cartera' => [
+        'label' => 'Actividades de cartera',
+        'items' => [
+          'collection_import' => 'Importar cartera',
+          'collection_action' => 'Registrar gestiones de cobro',
+          'canon_audit_import' => 'Importar archivos de auditoría de canon y aseguradoras',
+          'canon_audit_edit' => 'Registrar observaciones, solicitudes y mandatos de auditoría',
+        ],
+      ],
+      'notificaciones' => [
+        'label' => 'Notificaciones',
+        'items' => [
+          'notifications_send' => 'Enviar notificaciones',
+          'notifications_import' => 'Importar bases y recibos de pago',
+          'notifications_queue_delete' => 'Eliminar mensajes de la cola',
+          'notifications_community_edit' => 'Editar comunidades y catálogo',
         ],
       ],
       'contratos' => [
@@ -805,6 +849,51 @@ final class SuCasaControlServiciosInmobiliarios
       foreach ($this->dashboardPermissionAdminCargos() as $cargo) {
         $base = $permissions[$cargo] ?? array_values(array_diff($this->dashboardActionPermissionKeys(), self::SENSITIVE_DEFAULT_ACTIONS));
         $permissions[$cargo] = array_values(array_unique(array_merge($base, ['contract_owner_change'])));
+      }
+    }
+    return $this->applyNewDashboardActionDefaults($permissions);
+  }
+
+  /**
+   * Acciones agregadas al catálogo después de la última vez que se guardaron los permisos: cada cargo
+   * conserva lo que podía hacer antes (heredando de la acción de la que se separó o, si antes solo se
+   * exigía la pestaña, quedando permitida). Al guardar permisos se fija la lista y deja de heredarse.
+   * @param array<string,array<int,string>> $permissions @return array<string,array<int,string>>
+   */
+  private function applyNewDashboardActionDefaults(array $permissions): array
+  {
+    $known = \SCM\Core\App::settings()->get('dashboard_action_permissions_known_keys', null);
+    $known = is_array($known) ? array_map('strval', $known) : self::LEGACY_DASHBOARD_ACTION_KEYS;
+    $newKeys = array_values(array_diff($this->dashboardActionPermissionKeys(), $known));
+    if (!$newKeys) {
+      return $permissions;
+    }
+    $inherits = [
+      'quote_financing' => ['quote_edit'],
+      'quote_order_edit' => ['quote_order_create'],
+      'act_resend' => ['case_completion_act', 'quote_acta_create'],
+      'act_cancel' => ['case_completion_act', 'quote_acta_create'],
+    ];
+    $adminCargos = $this->dashboardPermissionAdminCargos();
+    foreach ($permissions as $cargo => $actions) {
+      foreach ($newKeys as $key) {
+        if (in_array($key, $actions, true)) continue;
+        if (in_array($key, self::SENSITIVE_DEFAULT_ACTIONS, true)) {
+          $grant = in_array((string) $cargo, $adminCargos, true);
+        } elseif (isset($inherits[$key])) {
+          $grant = (bool) array_intersect($inherits[$key], $actions);
+        } else {
+          $grant = true;
+        }
+        if ($grant) $permissions[$cargo][] = $key;
+      }
+    }
+    // Cargos administradores sin configurar: conservan las acciones sensibles nuevas (antes solo ellos las tenían).
+    foreach ($adminCargos as $cargo) {
+      if (array_key_exists($cargo, $permissions)) continue;
+      $sensitiveNew = array_values(array_intersect($newKeys, self::SENSITIVE_DEFAULT_ACTIONS));
+      if ($sensitiveNew) {
+        $permissions[$cargo] = array_values(array_unique(array_merge(array_values(array_diff($this->dashboardActionPermissionKeys(), self::SENSITIVE_DEFAULT_ACTIONS)), $sensitiveNew)));
       }
     }
     return $permissions;
@@ -1000,6 +1089,14 @@ final class SuCasaControlServiciosInmobiliarios
   {
     $action = preg_replace('/[^a-z0-9_]/', '', strtolower($action)) ?: '';
     return $action !== '' && in_array($action, $this->currentDashboardAllowedActions(), true);
+  }
+
+  /** Corta la petición si el cargo no tiene la acción del catálogo de permisos. */
+  private function requireDashboardAction(string $action, string $message = 'Tu cargo no tiene permiso para esta acción.'): void
+  {
+    if (!$this->canUseDashboardAction($action)) {
+      $this->jsonFail($message);
+    }
   }
 
   /** @return array<int,array<string,string>> */
@@ -1822,7 +1919,7 @@ final class SuCasaControlServiciosInmobiliarios
         </div>
         <div class="scm-actions">
           <button class="scm-btn-primary btn btn-primary" type="submit">Filtrar</button>
-          <?php if ($allowExport && $this->canManageDashboardPermissions()): ?>
+          <?php if ($allowExport && ($this->canManageDashboardPermissions() || $this->canUseDashboardAction('case_export_excel'))): ?>
             <button class="scm-btn-secondary btn btn-outline" type="button" data-scm-export-cases data-scm-export-topic="mantenimiento" data-scm-export-bucket="<?php echo esc_attr($statusBucket); ?>"><i class="fas fa-file-excel" aria-hidden="true"></i> Exportar Excel</button>
           <?php endif; ?>
           <button class="scm-btn-secondary btn btn-outline" type="button" id="scm-clear-<?php echo esc_attr($domKey); ?>">Limpiar</button>

@@ -60,6 +60,7 @@ trait HandlesRentIncreaseLetters
   public function ajax_handler_rent_increase_letters_create(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('rent_increase_letter_create', 'Tu cargo no tiene permiso para generar cartas de aumento.');
     if (!$this->canAccessDashboardTab('cartas_aumento')) {
       $this->jsonFail('No tienes permiso para crear cartas de aumento.');
     }

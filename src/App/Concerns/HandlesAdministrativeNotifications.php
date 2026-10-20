@@ -105,6 +105,7 @@ trait HandlesAdministrativeNotifications
   public function ajax_handler_admin_notifications_community_save(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('notifications_community_edit', 'Tu cargo no tiene permiso para editar comunidades.');
     if (!$this->canAccessDashboardTab('notificaciones')) {
       $this->jsonFail('No tienes permiso para gestionar copropiedades.');
     }
@@ -152,6 +153,7 @@ trait HandlesAdministrativeNotifications
   public function ajax_handler_admin_notifications_community_catalog_add(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('notifications_community_edit', 'Tu cargo no tiene permiso para editar el catálogo de comunidades.');
     if (!$this->canAccessDashboardTab('notificaciones')) {
       $this->jsonFail('No tienes permiso para gestionar copropiedades.');
     }
@@ -181,6 +183,7 @@ trait HandlesAdministrativeNotifications
   public function ajax_handler_admin_notifications_community_link(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('notifications_community_edit', 'Tu cargo no tiene permiso para vincular contratos a comunidades.');
     if (!$this->canAccessDashboardTab('notificaciones')) {
       $this->jsonFail('No tienes permiso para gestionar copropiedades.');
     }
@@ -222,6 +225,7 @@ trait HandlesAdministrativeNotifications
   {
     try {
       $this->verifyCsrf();
+    $this->requireDashboardAction('notifications_send', 'Tu cargo no tiene permiso para enviar notificaciones.');
       if (!$this->canAccessDashboardTab('notificaciones')) {
         $this->jsonFail('No tienes permiso para usar Notificaciones.');
       }
@@ -294,6 +298,7 @@ trait HandlesAdministrativeNotifications
   public function ajax_handler_admin_notifications_import(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('notifications_import', 'Tu cargo no tiene permiso para importar bases de notificaciones.');
     if (!$this->canAccessDashboardTab('notificaciones')) {
       $this->jsonFail('No tienes permiso para usar Notificaciones.');
     }
@@ -347,6 +352,7 @@ trait HandlesAdministrativeNotifications
   public function ajax_handler_admin_notifications_payment_receipts_import(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('notifications_import', 'Tu cargo no tiene permiso para importar recibos de pago.');
     if (!$this->canAccessDashboardTab('notificaciones')) {
       $this->jsonFail('No tienes permiso para usar Notificaciones.');
     }
@@ -372,6 +378,7 @@ trait HandlesAdministrativeNotifications
   public function ajax_handler_admin_notifications_payment_receipts_confirm(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('notifications_import', 'Tu cargo no tiene permiso para confirmar recibos de pago.');
     if (!$this->canAccessDashboardTab('notificaciones')) {
       $this->jsonFail('No tienes permiso para usar Notificaciones.');
     }
@@ -471,6 +478,7 @@ trait HandlesAdministrativeNotifications
   public function ajax_handler_admin_notifications_queue_delete(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('notifications_queue_delete', 'Tu cargo no tiene permiso para eliminar mensajes de la cola.');
     if (!$this->canAccessDashboardTab('notificaciones')) {
       $this->jsonFail('No tienes permiso para eliminar registros de la cola de Notificaciones.');
     }

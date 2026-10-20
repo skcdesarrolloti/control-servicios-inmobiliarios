@@ -45,6 +45,7 @@ trait HandlesCanonInsuranceAudits
   public function ajax_handler_canon_insurance_audit_import(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('canon_audit_import', 'Tu cargo no tiene permiso para importar archivos de auditoría.');
     if (!$this->canAccessDashboardTab('auditoria_canon_aseguradoras')) {
       $this->jsonFail('No tienes permiso para realizar esta auditoria.');
     }
@@ -74,6 +75,7 @@ trait HandlesCanonInsuranceAudits
   public function ajax_handler_canon_insurance_audit_observation(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('canon_audit_edit', 'Tu cargo no tiene permiso para registrar observaciones de auditoría.');
     if (!$this->canAccessDashboardTab('auditoria_canon_aseguradoras')) {
       $this->jsonFail('No tienes permiso para registrar observaciones.');
     }
@@ -164,6 +166,7 @@ trait HandlesCanonInsuranceAudits
   public function ajax_handler_canon_insurance_audit_link_mandate(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('canon_audit_edit', 'Tu cargo no tiene permiso para vincular mandatos.');
     if (!$this->canAccessDashboardTab('auditoria_canon_aseguradoras')) {
       $this->jsonFail('No tienes permiso para vincular mandatos.');
     }
@@ -212,6 +215,7 @@ trait HandlesCanonInsuranceAudits
   public function ajax_handler_canon_insurance_audit_update_request(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('canon_audit_edit', 'Tu cargo no tiene permiso para actualizar solicitudes de auditoría.');
     if (!$this->canAccessDashboardTab('auditoria_canon_aseguradoras')) {
       $this->jsonFail('No tienes permiso para completar solicitudes.');
     }
@@ -233,6 +237,7 @@ trait HandlesCanonInsuranceAudits
   public function ajax_handler_canon_insurance_audit_update_platform_values(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('canon_audit_edit', 'Tu cargo no tiene permiso para actualizar valores de plataforma.');
     if (!$this->canAccessDashboardTab('auditoria_canon_aseguradoras')) {
       $this->jsonFail('No tienes permiso para corregir valores de Plataforma.');
     }

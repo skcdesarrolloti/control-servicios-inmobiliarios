@@ -11,7 +11,7 @@ trait HandlesMaintenanceActions
   public function ajax_handler_cotizacion_financing(): void
   {
     $this->verifyCsrf();
-    if (!$this->canUseDashboardAction('quote_edit') || (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('abiertos') && !$this->canAccessDashboardTab('postergados') && !$this->canAccessDashboardTab('mis_tickets'))) {
+    if (!$this->canUseDashboardAction('quote_financing') || (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('abiertos') && !$this->canAccessDashboardTab('postergados') && !$this->canAccessDashboardTab('mis_tickets'))) {
       $this->jsonFail('No tienes permiso para editar cotizaciones.');
       return;
     }
@@ -2394,8 +2394,8 @@ trait HandlesMaintenanceActions
   public function ajax_handler_cotizacion_order_context(): void
   {
     $this->verifyCsrf();
-    if (!$this->maintenance_order_can_manage()) {
-      $this->jsonFail('No tienes permiso para crear ordenes de mantenimiento.');
+    if (!$this->maintenance_order_can_manage((int) ($_POST['id_orden'] ?? 0) > 0)) {
+      $this->jsonFail((int) ($_POST['id_orden'] ?? 0) > 0 ? 'No tienes permiso para editar ordenes de mantenimiento.' : 'No tienes permiso para crear ordenes de mantenimiento.');
     }
 
     $cotizacionId = (int) ($_POST['id_cotizacion'] ?? 0);
@@ -2433,8 +2433,8 @@ trait HandlesMaintenanceActions
   public function ajax_handler_cotizacion_order_save(): void
   {
     $this->verifyCsrf();
-    if (!$this->maintenance_order_can_manage()) {
-      $this->jsonFail('No tienes permiso para crear ordenes de mantenimiento.');
+    if (!$this->maintenance_order_can_manage((int) ($_POST['id_orden'] ?? 0) > 0)) {
+      $this->jsonFail((int) ($_POST['id_orden'] ?? 0) > 0 ? 'No tienes permiso para editar ordenes de mantenimiento.' : 'No tienes permiso para crear ordenes de mantenimiento.');
     }
 
     $cotizacionId = (int) ($_POST['id_cotizacion'] ?? 0);
@@ -3425,9 +3425,10 @@ trait HandlesMaintenanceActions
     return $stmt->rowCount() === 1;
   }
 
-  private function maintenance_order_can_manage(): bool
+  /** Crear órdenes (o editarlas, con $edit) desde una pestaña donde se ven cotizaciones. */
+  private function maintenance_order_can_manage(bool $edit = false): bool
   {
-    return $this->canUseDashboardAction('quote_order_create') && (
+    return $this->canUseDashboardAction($edit ? 'quote_order_edit' : 'quote_order_create') && (
       $this->canAccessDashboardTab('cotizaciones_mantenimiento')
       || $this->canAccessDashboardTab('ordenes_mantenimiento')
       || $this->canAccessDashboardTab('abiertos')
@@ -4627,6 +4628,7 @@ trait HandlesMaintenanceActions
   public function ajax_handler_classify_magnitude(): void
   {
     $this->verifyCsrf();
+    $this->requireDashboardAction('case_magnitude_calculate', 'Tu cargo no tiene permiso para calcular la magnitud del daño.');
 
     $type = strtolower(trim(sanitize_text_field((string)($_POST['revision_type'] ?? 'correctiva'))));
     if (!in_array($type, ['correctiva', 'preventiva'], true)) {

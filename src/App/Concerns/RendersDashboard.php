@@ -639,6 +639,7 @@ trait RendersDashboard
       ],
     ];
 
+    $runtimeData['actions'] = $this->filterRuntimeActionsByPermission((array) $runtimeData['actions']);
     $runtimeJson   = json_encode($runtimeData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
     $assetBaseUrl  = defined('SCM_BASE_URL') ? (SCM_BASE_URL . '/') : '/';
     $assetBasePath = defined('SCM_BASE_PATH') ? (SCM_BASE_PATH . DIRECTORY_SEPARATOR) : (dirname(__DIR__, 2) . DIRECTORY_SEPARATOR);
@@ -1121,7 +1122,7 @@ trait RendersDashboard
                   <span class="material-symbols-outlined text-[16px]">search</span>
                   <span>Filtrar Casos</span>
                 </button>
-                <?php if ($canManageDashboardPermissions): ?>
+                <?php if ($canManageDashboardPermissions || $this->canUseDashboardAction('case_export_excel')): ?>
                   <button class="scm-btn-secondary btn btn-outline font-medium text-xs sm:text-sm flex items-center gap-1.5" type="button" data-scm-export-cases data-scm-export-topic="mantenimiento">
                     <span class="material-symbols-outlined text-[16px]">description</span>
                     <span>Exportar Excel</span>
@@ -1659,20 +1660,50 @@ trait RendersDashboard
   /** @param array<string,string> $tabs @param array<int,array<string,string>> $cargos @param array<string,array<int,string>> $permissions @param array<int,string> $employeeCargoIds @param array<int,string> $adminDuePopupCargoIds @param array<string,array{label:string,items:array<string,string>}> $actionCatalog @param array<string,array<int,string>> $actionPermissions */
   private function renderDashboardPermissionsModal(array $tabs, array $cargos, array $permissions, array $employeeCargoIds, array $adminDuePopupCargoIds, array $actionCatalog = [], array $actionPermissions = []): string
   {
-    $activityPermissionKeys = [
-      'gestiones_cobro',
-      'cotizaciones_mantenimiento',
-      'ordenes_mantenimiento',
-      'actas_satisfaccion',
-      'preventivas_pendientes',
-      'servicios_publicos_pendientes',
-      'liquidador_servicios_publicos',
-      'reportes_administrativos_pendientes',
-      'auditoria_canon_aseguradoras',
-      'cartas_aumento',
+    // Mismos grupos y orden que el menú del header (includes/header.php); cada nota dice qué habilita.
+    $tabGroupDefs = [
+      ['label' => 'Inicio', 'tabs' => ['calendario_actividades' => 'Resumen, Mi calendario, Calendario equipo, Vencimientos e Historial inmueble']],
+      ['label' => 'Gestión de casos', 'tabs' => [
+        'abiertos' => 'También habilita Inicio y las solicitudes de terminación y no prórroga',
+        'mis_tickets' => '',
+        'postergados' => '',
+        'cerrados' => '',
+      ]],
+      ['label' => 'Actividades administrativas', 'hint' => 'Mantenimiento', 'tabs' => [
+        'cotizaciones_mantenimiento' => '',
+        'ordenes_mantenimiento' => '',
+        'actas_satisfaccion' => '',
+        'preventivas_pendientes' => '',
+      ]],
+      ['label' => 'Actividades administrativas', 'hint' => 'Servicios públicos y otras', 'tabs' => [
+        'servicios_publicos_pendientes' => '',
+        'liquidador_servicios_publicos' => '',
+        'reportes_administrativos_pendientes' => '',
+        'cartas_aumento' => '',
+      ]],
+      ['label' => 'Actividades de cartera', 'tabs' => [
+        'gestiones_cobro' => '',
+        'auditoria_canon_aseguradoras' => '',
+      ]],
+      ['label' => 'Actividades contractuales', 'tabs' => ['contratos_arrendamiento' => 'Contratos de arrendamiento y Funcionario de contratos']],
+      ['label' => 'Notificaciones', 'tabs' => ['notificaciones' => '']],
+      ['label' => 'Métricas', 'tabs' => ['metricas' => 'Casos, cotizaciones, preventivas, servicios públicos, contratos y crecimiento']],
     ];
-    $mainPermissionTabs = array_diff_key($tabs, array_flip($activityPermissionKeys));
-    $activityPermissionTabs = array_intersect_key($tabs, array_flip($activityPermissionKeys));
+    $tabGroups = [];
+    $groupedTabKeys = [];
+    foreach ($tabGroupDefs as $groupDef) {
+      $items = [];
+      foreach ($groupDef['tabs'] as $tabKey => $tabHint) {
+        if (!isset($tabs[$tabKey])) continue;
+        $items[$tabKey] = ['label' => $tabs[$tabKey], 'hint' => $tabHint];
+        $groupedTabKeys[$tabKey] = true;
+      }
+      if ($items) $tabGroups[] = ['label' => $groupDef['label'], 'hint' => (string) ($groupDef['hint'] ?? ''), 'items' => $items];
+    }
+    $ungroupedTabs = array_diff_key($tabs, $groupedTabKeys);
+    if ($ungroupedTabs) {
+      $tabGroups[] = ['label' => 'Otras pestañas', 'hint' => '', 'items' => array_map(static fn(string $label): array => ['label' => $label, 'hint' => ''], $ungroupedTabs)];
+    }
     $selectedEmployeeCargoIds = [];
     foreach ($employeeCargoIds as $cargoId) {
       $cargoId = trim((string) $cargoId);
@@ -1781,30 +1812,19 @@ trait RendersDashboard
                       <button type="button" class="scm-permission-select-all" data-scm-perm-all="<?php echo esc_attr($cargoId); ?>">Marcar todo</button>
                     </div>
                     <div class="scm-permission-options">
-                      <div class="scm-permissions-option-group" data-scm-perm-group>
-                        <div class="scm-permissions-option-group-title"><span>Pesta&ntilde;as del panel</span><button type="button" class="scm-perm-group-toggle" data-scm-perm-group-all>Marcar grupo</button></div>
-                        <div class="scm-permissions-option-group-grid">
-                          <?php foreach ($mainPermissionTabs as $tabKey => $tabLabel): $isChecked = in_array($tabKey, $allowed, true); ?>
-                            <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>">
-                              <input type="checkbox" name="permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr($tabKey); ?>" <?php checked($isChecked); ?>>
-                              <span><?php echo esc_html($tabLabel); ?></span>
-                            </label>
-                          <?php endforeach; ?>
-                        </div>
-                      </div>
-                      <?php if (!empty($activityPermissionTabs)): ?>
+                      <?php foreach ($tabGroups as $tabGroup): ?>
                         <div class="scm-permissions-option-group" data-scm-perm-group>
-                          <div class="scm-permissions-option-group-title"><span>Actividades administrativas <small>Opciones del desplegable interno</small></span><button type="button" class="scm-perm-group-toggle" data-scm-perm-group-all>Marcar grupo</button></div>
+                          <div class="scm-permissions-option-group-title"><span><?php echo esc_html($tabGroup['label']); ?><?php if ($tabGroup['hint'] !== ''): ?> <small><?php echo esc_html($tabGroup['hint']); ?></small><?php endif; ?></span><button type="button" class="scm-perm-group-toggle" data-scm-perm-group-all>Marcar grupo</button></div>
                           <div class="scm-permissions-option-group-grid">
-                            <?php foreach ($activityPermissionTabs as $tabKey => $tabLabel): $isChecked = in_array($tabKey, $allowed, true); ?>
-                              <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>">
+                            <?php foreach ($tabGroup['items'] as $tabKey => $tabItem): $isChecked = in_array($tabKey, $allowed, true); ?>
+                              <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>"<?php if ($tabItem['hint'] !== ''): ?> title="<?php echo esc_attr($tabItem['hint']); ?>"<?php endif; ?>>
                                 <input type="checkbox" name="permissions[<?php echo esc_attr($cargoId); ?>][]" value="<?php echo esc_attr($tabKey); ?>" <?php checked($isChecked); ?>>
-                                <span><?php echo esc_html($tabLabel); ?></span>
+                                <span><?php echo esc_html($tabItem['label']); ?><?php if ($tabItem['hint'] !== ''): ?><small class="scm-permissions-check-hint"><?php echo esc_html($tabItem['hint']); ?></small><?php endif; ?></span>
                               </label>
                             <?php endforeach; ?>
                           </div>
                         </div>
-                      <?php endif; ?>
+                      <?php endforeach; ?>
                     </div>
                   </section>
                 <?php endforeach; ?>
@@ -1815,7 +1835,7 @@ trait RendersDashboard
                   <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowedActions = array_key_exists($cargoId, $actionPermissions) ? (array) $actionPermissions[$cargoId] : $allActionKeys; ?>
                     <section class="scm-permission-card scm-permission-action-card" data-scm-perm-kind="actions" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
                       <div class="scm-permission-card-head">
-                        <p>Botones del popup del caso, cotizaciones, &oacute;rdenes y actas. <span data-scm-perm-card-count></span></p>
+                        <p>Botones del caso, cotizaciones, &oacute;rdenes, actas, actividades administrativas, cartera, notificaciones y contratos. <span data-scm-perm-card-count></span></p>
                         <button type="button" class="scm-permission-select-all" data-scm-perm-all="<?php echo esc_attr($cargoId); ?>">Marcar todo</button>
                       </div>
                       <div class="scm-permission-options">
@@ -4674,7 +4694,7 @@ trait RendersDashboard
         . '<div class="scm-cotizacion-order-card-actions">'
         . '<button type="button" class="scm-cotizacion-order-view" data-scm-view-cotizacion-order="' . esc_attr($orderKey) . '" aria-label="Ver detalle de la orden ' . esc_attr($orderId !== '' ? '#' . $orderId : '') . '">Ver orden <span aria-hidden="true">&rarr;</span></button>'
         . ($orderId !== '' ? '<button type="button" class="scm-cotizacion-order-view" data-scm-cotizacion-order-pdf data-order-id="' . esc_attr($orderId) . '">Generar documento para pago</button>' : '')
-        . ($orderId !== '' && $this->canUseDashboardAction('quote_order_create') && strtolower(trim($estado)) === 'aprobada' && in_array(strtolower($orderState), ['', 'esperando respuesta', 'aprobada', 'desaprobada'], true)
+        . ($orderId !== '' && $this->canUseDashboardAction('quote_order_edit') && strtolower(trim($estado)) === 'aprobada' && in_array(strtolower($orderState), ['', 'esperando respuesta', 'aprobada', 'desaprobada'], true)
           ? '<button type="button" class="scm-cotizacion-order-view" data-scm-edit-cotizacion-order data-order-id="' . esc_attr($orderId) . '" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Editar orden</button>' : '')
         . ($orderPending && $canRespondMaintenanceOrder ? '<button type="button" class="scm-cotizacion-order-view scm-cotizacion-order-response" data-scm-respond-cotizacion-order' . $orderResponseAttrs . '>Responder orden</button>' : '')
         . '</div>'
@@ -4781,7 +4801,7 @@ trait RendersDashboard
 
     $financing = trim((string) ($row['financiacion'] ?? ''));
     $financingLabel = $financing === 'Si' ? 'Sí' : ($financing === 'No' ? 'No' : 'Sin definir');
-    $financingHtml = $canQuoteEdit
+    $financingHtml = $canManageMaintenanceQuote && $this->canUseDashboardAction('quote_financing')
       ? '<button type="button" class="scm-case-work-btn" data-scm-save-quote-financing data-financiacion="' . esc_attr($financing) . '">Financiamiento · ' . esc_html($financingLabel) . '</button>'
       : '<span class="scm-cotizacion-pill">Financiamiento: ' . esc_html($financingLabel) . '</span>';
 
@@ -5956,6 +5976,47 @@ trait RendersDashboard
       'por_estado_comercial' => $byCommercial,
       'por_estado_administrativo' => $byAdmin,
     ];
+  }
+
+  /**
+   * Quita del runtime las acciones AJAX que el cargo no tiene en el catálogo de permisos: el JS ya trata
+   * una acción ausente como no disponible (oculta o no ejecuta), y el servidor la rechaza igualmente.
+   * @param array<string,string> $actions @return array<string,string>
+   */
+  private function filterRuntimeActionsByPermission(array $actions): array
+  {
+    $required = [
+      'export_cases_excel' => 'case_export_excel',
+      'contacts_update' => 'case_contacts_edit',
+      'classify_magnitude' => 'case_magnitude_calculate',
+      'crear_ticket_administrativo' => 'admin_case_create',
+      'aprobar_reporte_administrativo' => 'admin_report_review',
+      'desaprobar_reporte_administrativo' => 'admin_report_review',
+      'public_services_liquidator_generate' => 'public_services_liquidation_generate',
+      'rent_increase_letters_create' => 'rent_increase_letter_create',
+      'collection_portfolio_import' => 'collection_import',
+      'collection_portfolio_action' => 'collection_action',
+      'canon_insurance_audit_import' => 'canon_audit_import',
+      'canon_insurance_audit_observation' => 'canon_audit_edit',
+      'canon_insurance_audit_link_mandate' => 'canon_audit_edit',
+      'canon_insurance_audit_update_request' => 'canon_audit_edit',
+      'canon_insurance_audit_update_platform_values' => 'canon_audit_edit',
+      'admin_notifications_send' => 'notifications_send',
+      'admin_notifications_import' => 'notifications_import',
+      'admin_notifications_payment_receipts_import' => 'notifications_import',
+      'admin_notifications_payment_receipts_confirm' => 'notifications_import',
+      'admin_notifications_queue_delete' => 'notifications_queue_delete',
+      'admin_notifications_community_save' => 'notifications_community_edit',
+      'admin_notifications_community_link' => 'notifications_community_edit',
+      'admin_notifications_community_catalog_add' => 'notifications_community_edit',
+    ];
+    foreach ($required as $actionKey => $permission) {
+      if (isset($actions[$actionKey]) && !$this->canUseDashboardAction($permission)
+        && !($actionKey === 'export_cases_excel' && $this->canManageDashboardPermissions())) {
+        unset($actions[$actionKey]);
+      }
+    }
+    return $actions;
   }
 
   /** Tarjeta KPI con el estilo de Mantenimiento: etiqueta, icono, valor y barra de color ($tone). */

@@ -273,8 +273,10 @@ trait HandlesTicketCompletion
           throw new \DomainException('El acta no pertenece al caso seleccionado.');
         }
         if ($operation === 'resend') {
+          if (!$this->canUseDashboardAction('act_resend')) throw new \DomainException('Tu cargo no tiene permiso para reenviar actas.');
           $result = $service->resend($id);
         } elseif ($operation === 'cancel') {
+          if (!$this->canUseDashboardAction('act_cancel')) throw new \DomainException('Tu cargo no tiene permiso para anular actas.');
           $service->cancel($id, (string) ($_POST['reason'] ?? ''), $actor);
           $result = ['message' => 'Acta anulada. Puedes generar una nueva versión; el caso sigue abierto.'];
         } elseif ($operation === 'archive') {

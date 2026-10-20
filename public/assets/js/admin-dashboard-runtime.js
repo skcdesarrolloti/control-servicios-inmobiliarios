@@ -132,6 +132,46 @@
     var config = runtime.config || {};
     var actions = runtime.actions || {};
 
+    // Botones de acciones que el cargo no tiene en "Permisos por cargo": se ocultan con una regla CSS,
+    // así también desaparecen los que se dibujan después por AJAX (el servidor las rechaza igual).
+    (function hideActionButtonsWithoutPermission() {
+      var allowed = runtime.actionPermissions && runtime.actionPermissions.actions;
+      if (!allowed || document.querySelector("style[data-scm-action-permissions]")) return;
+      var selectors = {
+        case_contacts_edit: "[data-scm-open-contacts]",
+        case_magnitude_calculate: ".scm-classify-magnitude",
+        admin_case_create: "[data-scm-open-admin-ticket], [data-scm-dashboard-due-create-ticket]",
+        admin_report_review: "[data-sra-action]",
+        quote_financing: "[data-scm-save-quote-financing]",
+        quote_order_edit: "[data-scm-edit-cotizacion-order]",
+        act_resend: "[data-acta-resend]",
+        act_cancel: "[data-acta-cancel]",
+        public_services_review_save: "[data-public-services-review-submit]",
+        public_services_liquidation_generate: "[data-psl-generate]",
+        rent_increase_letter_create: "[data-rent-increase-open]",
+        collection_import: "[data-scm-portfolio-import]",
+        collection_action: "[data-scm-portfolio-management], [data-scm-portfolio-letter], [data-scm-portfolio-bulkbar], [data-scm-portfolio-bulk-check], [data-scm-portfolio-reset]",
+        canon_audit_import: "[data-cia-upload-form], [data-cia-upload-button]",
+        canon_audit_edit: "[data-cia-observation-form], [data-cia-link-mandate-form], [data-cia-update-request-form], [data-cia-platform-values-form]",
+        notifications_send: "[data-admin-notif-send]",
+        notifications_import: "[data-admin-notif-import], [data-admin-notif-payment-receipts-import]",
+        notifications_queue_delete: "[data-admin-notif-queue-delete], [data-admin-notif-queue-delete-selected]",
+        notifications_community_edit: "[data-admin-notif-community-new], [data-admin-notif-community-link], [data-admin-notif-community-unlink]",
+      };
+      var rules = [];
+      Object.keys(selectors).forEach(function (key) {
+        if (allowed[key] === true) return;
+        rules.push(selectors[key] + "{display:none!important}");
+      });
+      // Exportar a Excel también lo conservan los administradores de permisos (el servidor deja la acción).
+      if (!actions.export_cases_excel) rules.push("[data-scm-export-cases]{display:none!important}");
+      if (!rules.length) return;
+      var style = document.createElement("style");
+      style.setAttribute("data-scm-action-permissions", "");
+      style.textContent = rules.join("\n");
+      document.head.appendChild(style);
+    })();
+
     var actionMant = actions.mant || "";
     var actionSeg = actions.seg || "";
     var actionNote = actions.nota || "";
@@ -6739,7 +6779,8 @@
 
     function initAdminNotificationsPanel(forceReload) {
       var panel = root.querySelector("[data-scm-admin-notifications]");
-      if (!panel || !actionAdminNotificationsRecipients || !actionAdminNotificationsSend) {
+      // Sin el permiso "Enviar notificaciones" el panel sigue disponible para consultar; solo no envía.
+      if (!panel || !actionAdminNotificationsRecipients) {
         return Promise.resolve();
       }
       var searchForm = panel.querySelector("[data-admin-notif-search]");
@@ -11307,6 +11348,10 @@
 
         sendForm.addEventListener("submit", function (event) {
           event.preventDefault();
+          if (!actionAdminNotificationsSend) {
+            showToast("error", "Tu cargo no tiene permiso para enviar notificaciones.");
+            return;
+          }
           syncContext();
           if (selected.size === 0) {
             showToast("error", "Selecciona destinatarios o usa Seleccionar todos los filtrados.");
