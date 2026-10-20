@@ -847,7 +847,9 @@ final class GenericTicketsUiView
                 <option value="">Todas</option><?php foreach ($temaOpts as $t): ?><option value="<?php echo esc_attr($t); ?>" <?php selected(strtolower((string) ($p['fTema'] ?? '')), strtolower($t)); ?>><?php echo esc_html($t); ?></option><?php endforeach; ?>
               </select></div>
           <?php endif; ?>
-          <?php if ($lockedStatusLabel !== ''): ?>
+          <?php /* "Mis casos" usa un formulario reducido: sin Vista, Funcionario, Asunto, Ordenar por, Atraso, Sin actualizar ni Tuvo seguimiento. */ $myCasesForm = $tabKey === 'mis_tickets'; ?>
+          <?php if ($myCasesForm): ?>
+          <?php elseif ($lockedStatusLabel !== ''): ?>
             <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>estado_bloqueado">Vista</label><input class="input input-bordered input-sm scm-input" id="<?php echo esc_attr($prefix); ?>estado_bloqueado" type="text" value="<?php echo esc_attr($lockedStatusLabel); ?>" readonly></div>
           <?php else: ?>
             <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>estado">Estado</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>estado" name="<?php echo esc_attr($prefix); ?>estado">
@@ -855,14 +857,14 @@ final class GenericTicketsUiView
               </select></div>
           <?php endif; ?>
           <?= \SCM\Support\CaseFilterFields::administrativeStatus($prefix, $p, $filterOptions['estado_admin'] ?? []) ?>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>empleado">Funcionario</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>empleado" name="<?php echo esc_attr($prefix); ?>empleado">
+          <?php if (!$myCasesForm): ?><div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>empleado">Funcionario</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>empleado" name="<?php echo esc_attr($prefix); ?>empleado">
               <option value="">Todos</option><?php foreach (($filterOptions['funcionarios'] ?? []) as $func): $fId = trim((string) ($func['id'] ?? ''));
                                                 if ($fId === '') continue; ?><option value="<?php echo esc_attr($fId); ?>" <?php selected((string) ($p['fEmpleado'] ?? ''), $fId); ?>><?php echo esc_html((string) ($func['label'] ?? $fId)); ?></option><?php endforeach; ?>
-            </select></div>
+            </select></div><?php endif; ?>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>inmueble">Inmueble SIMI</label><input class="input input-bordered input-sm scm-input" id="<?php echo esc_attr($prefix); ?>inmueble" name="<?php echo esc_attr($prefix); ?>inmueble" type="text" value="<?php echo esc_attr((string) ($p['fInmueble'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>contrato">Contrato</label><input class="input input-bordered input-sm scm-input" id="<?php echo esc_attr($prefix); ?>contrato" name="<?php echo esc_attr($prefix); ?>contrato" type="text" value="<?php echo esc_attr((string) ($p['fContrato'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>caso"># caso</label><input class="input input-bordered input-sm scm-input" id="<?php echo esc_attr($prefix); ?>caso" name="<?php echo esc_attr($prefix); ?>caso" type="text" value="<?php echo esc_attr((string) ($p['fCaso'] ?? '')); ?>" placeholder="Ej: 10368"></div>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>asunto">Asunto</label><input class="input input-bordered input-sm scm-input" id="<?php echo esc_attr($prefix); ?>asunto" name="<?php echo esc_attr($prefix); ?>asunto" type="text" value="<?php echo esc_attr((string) ($p['fAsunto'] ?? '')); ?>"></div>
+          <?php if (!$myCasesForm): ?><div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>asunto">Asunto</label><input class="input input-bordered input-sm scm-input" id="<?php echo esc_attr($prefix); ?>asunto" name="<?php echo esc_attr($prefix); ?>asunto" type="text" value="<?php echo esc_attr((string) ($p['fAsunto'] ?? '')); ?>"></div><?php endif; ?>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>arrendatario">Arrendatario</label><input class="input input-bordered input-sm scm-input" id="<?php echo esc_attr($prefix); ?>arrendatario" name="<?php echo esc_attr($prefix); ?>arrendatario" type="text" value="<?php echo esc_attr((string) ($p['fArrendatario'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>propietario">Propietario</label><input class="input input-bordered input-sm scm-input" id="<?php echo esc_attr($prefix); ?>propietario" name="<?php echo esc_attr($prefix); ?>propietario" type="text" value="<?php echo esc_attr((string) ($p['fPropietario'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>barrio">Barrio</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>barrio" name="<?php echo esc_attr($prefix); ?>barrio">
@@ -870,14 +872,14 @@ final class GenericTicketsUiView
             </select></div>
           <?php if ($baseTabKey === 'entrega'): ?><div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>aseguradora">Numero aseguradora</label><input class="input input-bordered input-sm scm-input" id="<?php echo esc_attr($prefix); ?>aseguradora" name="<?php echo esc_attr($prefix); ?>aseguradora" type="text" value="<?php echo esc_attr((string) ($p['fAseguradora'] ?? '')); ?>"></div><?php endif; ?>
           <?php if ($baseTabKey === 'entrega'): ?><div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>consultor_entrega">Consultor de entrega</label><input class="input input-bordered input-sm scm-input" id="<?php echo esc_attr($prefix); ?>consultor_entrega" name="<?php echo esc_attr($prefix); ?>consultor_entrega" type="text" value="<?php echo esc_attr((string) ($p['fConsultorEntrega'] ?? '')); ?>"></div><?php endif; ?>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>sort">Ordenar por</label><select class="select select-bordered select-sm scm-select scm-sort-select" id="<?php echo esc_attr($prefix); ?>sort" name="<?php echo esc_attr($prefix); ?>sort">
+          <?php if (!$myCasesForm): ?><div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>sort">Ordenar por</label><select class="select select-bordered select-sm scm-select scm-sort-select" id="<?php echo esc_attr($prefix); ?>sort" name="<?php echo esc_attr($prefix); ?>sort">
               <option value="created_desc" <?php selected((string) ($p['fSort'] ?? 'created_desc'), 'created_desc'); ?>>Fecha de creaci&oacute;n reciente</option>
               <option value="created_asc" <?php selected((string) ($p['fSort'] ?? ''), 'created_asc'); ?>>Fecha de creaci&oacute;n antigua</option>
               <option value="stale_desc" <?php selected((string) ($p['fSort'] ?? ''), 'stale_desc'); ?>>M&aacute;s tiempo sin actualizar</option>
               <option value="stale_asc" <?php selected((string) ($p['fSort'] ?? ''), 'stale_asc'); ?>>Actualizados recientemente</option>
               <option value="magnitude_desc" <?php selected((string) ($p['fSort'] ?? ''), 'magnitude_desc'); ?>>Mayor magnitud</option>
               <option value="magnitude_asc" <?php selected((string) ($p['fSort'] ?? ''), 'magnitude_asc'); ?>>Menor magnitud</option>
-            </select></div>
+            </select></div><?php endif; ?>
           <div class="scm-field scm-date-range-field"><label id="<?php echo esc_attr($prefix); ?>fecha_rango_label">Fecha</label><div class="scm-date-range-control" role="group" aria-labelledby="<?php echo esc_attr($prefix); ?>fecha_rango_label"><div class="scm-date-range-part"><span>Desde</span><input id="<?php echo esc_attr($prefix); ?>fecha_desde" name="<?php echo esc_attr($prefix); ?>fecha_desde" type="date" value="<?php echo esc_attr((string) ($p['fFechaDesde'] ?? '')); ?>" aria-label="Fecha desde"></div><span class="scm-date-range-separator" aria-hidden="true">&rarr;</span><div class="scm-date-range-part"><span>Hasta</span><input id="<?php echo esc_attr($prefix); ?>fecha_hasta" name="<?php echo esc_attr($prefix); ?>fecha_hasta" type="date" value="<?php echo esc_attr((string) ($p['fFechaHasta'] ?? '')); ?>" aria-label="Fecha hasta"></div></div></div>
           <?php if ($baseTabKey === 'preventiva'): ?><div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>cotizacion">Cotizacion</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>cotizacion" name="<?php echo esc_attr($prefix); ?>cotizacion">
                 <option value="">Todas</option>
@@ -908,7 +910,7 @@ final class GenericTicketsUiView
                 <option value="has" <?php selected((string) ($p['fDanos'] ?? ''), 'has'); ?>>Con da&ntilde;os</option>
                 <option value="none" <?php selected((string) ($p['fDanos'] ?? ''), 'none'); ?>>Sin da&ntilde;os</option>
               </select></div><?php endif; ?>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>atraso">Atraso desde creacion</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>atraso" name="<?php echo esc_attr($prefix); ?>atraso">
+          <?php if (!$myCasesForm): ?><div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>atraso">Atraso desde creacion</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>atraso" name="<?php echo esc_attr($prefix); ?>atraso">
               <option value="">Todos</option>
               <option value="3" <?php selected((string) ($p['fAtraso'] ?? ''), '3'); ?>>+3 dias</option>
               <option value="5" <?php selected((string) ($p['fAtraso'] ?? ''), '5'); ?>>+5 dias</option>
@@ -924,7 +926,7 @@ final class GenericTicketsUiView
               <option value="">Todos</option>
               <option value="Si" <?php selected((string) ($p['fTuvoSeguimiento'] ?? ''), 'Si'); ?>>Si</option>
               <option value="No" <?php selected((string) ($p['fTuvoSeguimiento'] ?? ''), 'No'); ?>>No</option>
-            </select></div>
+            </select></div><?php endif; ?>
           <?php if ($baseTabKey === 'preventiva'): ?><div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>magnitud_caso">Magnitud caso</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>magnitud_caso" name="<?php echo esc_attr($prefix); ?>magnitud_caso">
                 <option value="">Todas las magnitudes</option>
                 <option value="critico" <?php selected((string) ($p['fMagnitudCaso'] ?? ''), 'critico'); ?>>Critico</option>

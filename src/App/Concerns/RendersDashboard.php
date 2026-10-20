@@ -100,7 +100,7 @@ trait RendersDashboard
     $myTicketsParams['fEmpleado'] = $currentEmployeeId !== '' ? $currentEmployeeId : '__sin_funcionario__';
     $myTicketsParams['_scmStatusBucket'] = 'active';
     $myTicketsParams['_scmMyCategory'] = $this->my_tickets_category($_GET['scm_my_categoria'] ?? 'mantenimiento');
-    $myTicketsParams['fTema'] = '';
+    $myTicketsParams = $this->strip_my_tickets_hidden_filters($myTicketsParams);
     $myTicketsParams['fEstado'] = '';
     $myTicketsParams['_scmExcludeDepartamento'] = 'Servicio al cliente';
     $myTicketsResult = ['tbody' => $this->render_lazy_tickets_placeholder('Abre esta pestaña para cargar tus casos.'), 'pagination_html' => ''];
@@ -2343,9 +2343,26 @@ trait RendersDashboard
     return array_key_exists($category, $this->my_tickets_categories()) ? $category : 'mantenimiento';
   }
 
+  /** "Mis casos" muestra solo Total y "Magnitud del caso" en todas sus pestañas. */
   private function render_my_tickets_kpis(string $category, array $stats): string
   {
-    return $this->render_generic_tab_kpis($category, $stats, 'scm-mis_tickets-');
+    $prefix = 'scm-mis_tickets-';
+    return '<div class="scm-kpis-accordion" data-scm-kpis-accordion>'
+      . '<div class="scm-kpis scm-kpis-stitch scm-kpis-main" style="--scm-kpi-cols: 5">' . $this->render_kpi_card($prefix . 'kpi-total', 'Total', 'inbox', 'navy', $stats['total'] ?? 0, 'total') . '</div>'
+      . '<div class="scm-kpis-more" id="' . esc_attr($prefix . 'kpis-more') . '">' . $this->render_magnitude_kpis($prefix, $stats) . '</div>'
+      . $this->render_kpis_toggle($prefix . 'kpis-more')
+      . '</div>';
+  }
+
+  /** Filtros que "Mis casos" no muestra; se anulan para que un enlace viejo no filtre a escondidas. */
+  private function strip_my_tickets_hidden_filters(array $params): array
+  {
+    foreach (['fTema', 'fAsunto', 'fAtraso', 'fSinActualizar', 'fTuvoSeguimiento', 'fEjecutado'] as $key) {
+      $params[$key] = '';
+    }
+    $params['fSort'] = 'created_desc';
+    $params['_scmExecutorKpis'] = false;
+    return $params;
   }
 
   private function render_my_tickets_panel(array $result, array $stats, array $params, array $filterOptions): string

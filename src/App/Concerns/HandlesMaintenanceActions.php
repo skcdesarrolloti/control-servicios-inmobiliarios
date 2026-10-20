@@ -135,9 +135,7 @@ trait HandlesMaintenanceActions
     $params['_scmStatusBucket'] = $this->myTicketsStatusBucket($_POST['scm_my_bucket'] ?? 'active');
     // La pestaña (Mantenimiento, Preventiva…) define el tema; el filtro "Tema" ya no se usa aquí.
     $params['_scmMyCategory'] = $this->my_tickets_category($_POST['scm_my_categoria'] ?? 'mantenimiento');
-    $params['_scmExecutorKpis'] = in_array($params['_scmMyCategory'], ['mantenimiento', 'preventiva'], true);
-    if (!$params['_scmExecutorKpis']) $params['fEjecutado'] = '';
-    $params['fTema'] = '';
+    $params = $this->strip_my_tickets_hidden_filters($params);
     $params['fEstado'] = '';
     $params['_scmExcludeDepartamento'] = 'Servicio al cliente';
     $result = $this->run_query_generic([], $params, $config);

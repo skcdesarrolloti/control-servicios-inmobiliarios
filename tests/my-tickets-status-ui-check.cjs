@@ -42,13 +42,12 @@ const slice=(start,end,offset=0)=>{const a=source.indexOf(start,offset),b=source
     await page.waitForFunction(()=>document.querySelector('#scm-cards-mis_tickets').textContent==='postergados');
     assert.equal(await page.locator('[data-my-tickets-total]').textContent(),'2');
     assert.equal(await page.locator('#scm-mis_tickets-kpi-total').textContent(),'2');
-    assert.equal(await page.locator('#scm_my_estado_bloqueado').inputValue(),'Mis casos · Mantenimiento · Postergados');
     await page.locator('.scm-page-btn-generic').click();
     await page.waitForFunction(()=>requests.at(-1).scm_my_page==='2');
     assert.equal(await page.evaluate(()=>requests.at(-1).scm_my_bucket),'postergados');
     await page.locator('#scm-clear-mis_tickets').click();
     await page.waitForFunction(()=>requests.at(-1).scm_my_page==='1');
-    assert.equal(await page.locator('#scm_my_estado_bloqueado').inputValue(),'Mis casos · Mantenimiento · Postergados','clearing filters retains status label');
+    assert.equal(await page.locator('[aria-selected=true][data-my-tickets-status]').textContent(),'Postergados','clearing filters retains status');
     await page.locator('[data-my-tickets-status=cerrados]').click();
     await page.waitForFunction(()=>document.querySelector('#scm-cards-mis_tickets').textContent==='cerrados');
     assert.equal(await page.evaluate(()=>requests.at(-1).scm_my_page),'1');
@@ -77,7 +76,9 @@ const slice=(start,end,offset=0)=>{const a=source.indexOf(start,offset),b=source
     await page.locator('[data-my-tickets-category=preventiva]').click();
     await page.waitForFunction(()=>requests.at(-1).scm_my_categoria==='preventiva');
     assert.equal(await page.evaluate(()=>requests.at(-1).scm_my_bucket),'active','switching category opens its Abiertos');
-    assert.equal(await page.locator('#scm_my_estado_bloqueado').inputValue(),'Mis casos · Preventiva · Abiertos');
+    for(const id of ['estado_bloqueado','empleado','asunto','sort','atraso','sin_actualizar','tuvo_seguimiento'])assert.equal(await page.locator('#scm_my_'+id).count(),0,'My cases hides '+id);
+    assert.equal(await page.locator('#scm-mis_tickets-kpi-con-cotz').count()+await page.locator('#scm-mis_tickets-kpi-ejecuta-propietario').count(),0,'My cases keeps only Total and magnitude KPIs');
+    assert.equal(await page.locator('#scm-mis_tickets-kpi-magnitud-critico').count(),1);
     assert.equal(await page.locator('[aria-selected=true][data-my-tickets-category]').textContent(),'Preventiva');
     assert.equal(await page.locator('#scm_my_tema').count(),0,'topic filter removed');
     assert.equal(await tabs.count(),3);assert.deepEqual(errors,[]);
