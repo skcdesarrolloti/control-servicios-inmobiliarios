@@ -14,6 +14,7 @@ const markup = execFileSync('php', ['-r', String.raw`
 function esc_html($s) { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 function esc_attr($s) { return esc_html($s); }
 $activeContractSection = 'scm-home-calendar-section-contract-termination';
+$sectionAllowed = static fn(string $sectionId): bool => true;
 $source = file_get_contents('src/App/Concerns/RendersDashboard.php');
 $start = strpos($source, "            <?php foreach (['termination' =>");
 $end = strpos($source, '<?php endforeach; ?>', $start) + strlen('<?php endforeach; ?>');

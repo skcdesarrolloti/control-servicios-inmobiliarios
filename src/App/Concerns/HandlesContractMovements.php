@@ -13,7 +13,7 @@ trait HandlesContractMovements
   public function ajax_handler_contract_movements(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('metricas')) {
+    if (!$this->canAccessDashboardTab('metricas_contratos')) {
       $this->jsonFail('No tienes permiso para ver métricas.');
     }
     try {
@@ -27,7 +27,7 @@ trait HandlesContractMovements
   public function ajax_handler_contract_simi_audit(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('metricas')) {
+    if (!$this->canAccessDashboardTab('metricas_contratos')) {
       $this->jsonFail('No tienes permiso para auditar contratos.');
     }
     // Quien audita queda en el historial con su id_empleado real, no con el _ID de la sesión.

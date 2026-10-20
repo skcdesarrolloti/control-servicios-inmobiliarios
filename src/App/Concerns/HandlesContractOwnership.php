@@ -11,7 +11,7 @@ trait HandlesContractOwnership
   public function ajax_handler_contract_owners(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('contratos_arrendamiento')) {
+    if ((!$this->canAccessDashboardTab('contratos_arrendamiento') && !$this->canAccessDashboardTab('funcionario_contratos'))) {
       $this->jsonFail('No tienes permiso para ver los contratos de arrendamiento.');
     }
     try {
@@ -27,7 +27,7 @@ trait HandlesContractOwnership
   public function ajax_handler_contract_owners_save(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('contratos_arrendamiento') || !$this->canUseDashboardAction('contract_owner_change')) {
+    if ((!$this->canAccessDashboardTab('contratos_arrendamiento') && !$this->canAccessDashboardTab('funcionario_contratos')) || !$this->canUseDashboardAction('contract_owner_change')) {
       $this->jsonFail('No tienes permiso para cambiar el funcionario de los contratos.');
     }
     $decoded = json_decode(wp_unslash((string) ($_POST['changes'] ?? '[]')), true);

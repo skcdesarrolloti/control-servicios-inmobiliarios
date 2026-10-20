@@ -2,7 +2,7 @@
 
 El modal **Permisos por cargo** tiene dos secciones:
 
-- **Pestañas**: agrupadas igual que el menú del header (Inicio, Gestión de casos, Actividades administrativas, Actividades de cartera, Actividades contractuales, Notificaciones y Métricas). La lista está en `dashboardPermissionTabs()` y los grupos en `renderDashboardPermissionsModal()`.
+- **Pestañas**: una por opción del menú del header, en sus mismos grupos (Inicio, Gestión de casos, Actividades administrativas, Actividades de cartera, Actividades contractuales, Notificaciones y Métricas). La lista está en `dashboardPermissionTabs()` y los grupos en `renderDashboardPermissionsModal()`. Las claves internas `calendario_actividades` (panel Inicio), `actividades_contractuales` y `metricas` ya no se marcan: se activan si alguna de sus opciones lo está (`DERIVED_DASHBOARD_TABS`). Los permisos guardados con el formato anterior se traducen a lo que el cargo veía (`expandLegacyDashboardTabs()`) hasta que se guarden de nuevo, cuando se registra `dashboard_tab_permissions_known_keys`. Desde entonces cada opción es independiente: por ejemplo, **Casos abiertos** ya no habilita Inicio ni las solicitudes contractuales, y **Cotizaciones** ya no añade **Órdenes** si se desmarca.
 - **Acciones**: el catálogo está en `dashboardActionPermissionCatalog()`. Cada acción se valida en el servidor con `canUseDashboardAction()` o `requireDashboardAction()`. `tests/dashboard-action-permissions-check.php` falla si el código exige una acción que no está en el catálogo.
 
 ## Acciones nuevas

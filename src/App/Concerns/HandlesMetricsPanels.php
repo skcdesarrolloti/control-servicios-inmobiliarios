@@ -14,7 +14,7 @@ trait HandlesMetricsPanels
   public function ajax_handler_case_metrics(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('metricas')) {
+    if (!$this->canAccessDashboardTab('metricas_casos')) {
       $this->jsonFail('No tienes permiso para ver métricas.');
     }
     try {
@@ -29,10 +29,12 @@ trait HandlesMetricsPanels
   public function ajax_handler_maintenance_metrics(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('metricas')) {
+    $report = sanitize_key((string) ($_POST['report'] ?? ''));
+    // Cada informe tiene su propio permiso (Métricas › Revisión preventiva, Servicios públicos, Crecimiento).
+    $reportTab = ['preventiva' => 'metricas_preventivas', 'servicios' => 'metricas_servicios_publicos', 'crecimiento' => 'metricas_crecimiento'][$report] ?? '';
+    if ($reportTab === '' || !$this->canAccessDashboardTab($reportTab)) {
       $this->jsonFail('No tienes permiso para ver métricas.');
     }
-    $report = sanitize_key((string) ($_POST['report'] ?? ''));
     if (!isset(\SCM\Modules\Metrics\MaintenanceMetricsView::REPORTS[$report])) {
       $this->jsonFail('Métrica no válida.');
     }
@@ -69,7 +71,7 @@ trait HandlesMetricsPanels
   public function ajax_handler_quote_metrics(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('metricas')) {
+    if (!$this->canAccessDashboardTab('metricas_cotizaciones')) {
       $this->jsonFail('No tienes permiso para ver métricas.');
     }
     try {
@@ -86,7 +88,7 @@ trait HandlesMetricsPanels
   public function ajax_handler_quote_response_date(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('metricas') || !$this->canUseDashboardAction('quote_respond')) {
+    if (!$this->canAccessDashboardTab('metricas_cotizaciones') || !$this->canUseDashboardAction('quote_respond')) {
       $this->jsonFail('No tienes permiso para completar fechas de respuesta.');
     }
     $decoded = json_decode(wp_unslash((string) ($_POST['changes'] ?? '[]')), true);
@@ -117,7 +119,7 @@ trait HandlesMetricsPanels
   public function ajax_handler_quote_ledger_update(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('metricas')) {
+    if (!$this->canAccessDashboardTab('metricas_cotizaciones')) {
       $this->jsonFail('No tienes permiso para ver métricas.');
     }
     $id = (int) ($_POST['cotizacion_id'] ?? 0);
@@ -165,7 +167,7 @@ trait HandlesMetricsPanels
   public function ajax_handler_quote_assign_property(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('metricas') || !$this->canUseDashboardAction('quote_edit')) {
+    if (!$this->canAccessDashboardTab('metricas_cotizaciones') || !$this->canUseDashboardAction('quote_edit')) {
       $this->jsonFail('No tienes permiso para editar cotizaciones.');
     }
     $decoded = json_decode(wp_unslash((string) ($_POST['ids'] ?? '[]')), true);
@@ -185,7 +187,7 @@ trait HandlesMetricsPanels
   public function ajax_handler_quote_ledger(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('metricas')) {
+    if (!$this->canAccessDashboardTab('metricas_cotizaciones')) {
       $this->jsonFail('No tienes permiso para ver métricas.');
     }
     $file = $_FILES['auxiliar'] ?? null;

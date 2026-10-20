@@ -374,6 +374,8 @@ trait HandlesTicketWorkflowActions
     }
 
     \SCM\Core\App::settings()->set('dashboard_tab_permissions', $permissions, Auth::userId());
+    // Desde aquí las pestañas guardadas ya usan las opciones separadas del menú (sin traducir el formato anterior).
+    \SCM\Core\App::settings()->set('dashboard_tab_permissions_known_keys', array_keys($this->dashboardPermissionTabs()), Auth::userId());
     \SCM\Core\App::settings()->set('dashboard_action_permissions', $actionPermissions, Auth::userId());
     if (array_key_exists('action_permissions', $_POST)) {
       \SCM\Core\App::settings()->set('contract_history_permissions_configured', true, (int) Auth::employeeId());
@@ -1872,6 +1874,7 @@ trait HandlesTicketWorkflowActions
       && !$this->canAccessDashboardTab('preventivas_pendientes')
       && !$this->canAccessDashboardTab('servicios_publicos_pendientes')
       && !$this->canAccessDashboardTab('contractual')
+      && !$this->canAccessDashboardTab('vencimientos')
       && !$this->canUseDashboardAction('case_respond')
     ) {
       $this->jsonFail('No tienes permiso para ver vencimientos administrativos.');
@@ -1903,6 +1906,7 @@ trait HandlesTicketWorkflowActions
       && !$this->canAccessDashboardTab('preventivas_pendientes')
       && !$this->canAccessDashboardTab('servicios_publicos_pendientes')
       && !$this->canAccessDashboardTab('contractual')
+      && !$this->canAccessDashboardTab('vencimientos')
       && !$this->canUseDashboardAction('case_respond')
     ) {
       $this->jsonFail('No tienes permiso para ver vencimientos administrativos.');
@@ -4058,6 +4062,8 @@ trait HandlesTicketWorkflowActions
   private function canAccessContractTerminationRequests(): bool
   {
     return $this->canUseDashboardAction('case_respond')
+      || $this->canAccessDashboardTab('solicitudes_terminacion')
+      || $this->canAccessDashboardTab('solicitudes_no_prorroga')
       || $this->canAccessDashboardTab('contractual')
       || $this->canAccessDashboardTab('mis_tickets')
       || $this->canAccessDashboardTab('abiertos');
@@ -5033,6 +5039,7 @@ trait HandlesTicketWorkflowActions
   private function canAccessContractsEndingPanel(): bool
   {
     return $this->canAccessDashboardTab('contratos_arrendamiento')
+      || $this->canAccessDashboardTab('contratos_por_terminar')
       || $this->canAccessDashboardTab('contractual')
       || $this->canUseDashboardAction('case_respond');
   }

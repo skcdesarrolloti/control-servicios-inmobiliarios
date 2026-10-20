@@ -321,7 +321,13 @@ final class SuCasaControlServiciosInmobiliarios
   /** @return array<string,string> */
   private function dashboardPermissionTabs(): array
   {
+    // Una pestaña por opción del menú del header. "calendario_actividades", "actividades_contractuales" y
+    // "metricas" ya no se configuran: se derivan de sus opciones (dashboardPermissionCompatibilityTabs).
     return [
+      'mi_calendario' => 'Mi calendario',
+      'calendario_equipo' => 'Calendario equipo',
+      'vencimientos' => 'Vencimientos',
+      'historial_inmueble' => 'Historial inmueble',
       'abiertos' => 'Casos abiertos',
       'postergados' => 'Casos postergados',
       'cerrados' => 'Casos cerrados',
@@ -329,19 +335,34 @@ final class SuCasaControlServiciosInmobiliarios
       'cotizaciones_mantenimiento' => 'Cotizaciones de Mantenimiento',
       'ordenes_mantenimiento' => 'Órdenes de Mantenimiento',
       'actas_satisfaccion' => 'Actas de Satisfacción',
-      'calendario_actividades' => 'Inicio y calendarios',
       'notificaciones' => 'Notificaciones',
       'gestiones_cobro' => 'Gestiones de Cobro',
       'preventivas_pendientes' => 'Revisión Preventiva',
       'contratos_arrendamiento' => 'Contratos de arrendamiento',
+      'contratos_por_terminar' => 'Contratos por terminar',
+      'solicitudes_terminacion' => 'Solicitudes de terminación de contrato',
+      'solicitudes_no_prorroga' => 'Solicitudes de no prórroga de contrato',
+      'funcionario_contratos' => 'Funcionario de contratos',
       'servicios_publicos_pendientes' => 'Revisiones de Servicios Públicos',
       'liquidador_servicios_publicos' => 'Liquidador de Servicios',
       'reportes_administrativos_pendientes' => 'Reportes Administrativos',
       'auditoria_canon_aseguradoras' => 'Auditoría Canon y Aseguradoras',
       'cartas_aumento' => 'Cartas de Aumento',
-      'metricas' => 'Métricas',
+      'metricas_casos' => 'Casos',
+      'metricas_cotizaciones' => 'Cotizaciones',
+      'metricas_preventivas' => 'Revisión preventiva',
+      'metricas_servicios_publicos' => 'Revisiones de servicios públicos',
+      'metricas_contratos' => 'Ocupaciones y desocupaciones',
+      'metricas_crecimiento' => 'Crecimiento de la empresa',
     ];
   }
+
+  /** Opciones que, si alguna está permitida, habilitan el panel o la verificación agrupada. */
+  private const DERIVED_DASHBOARD_TABS = [
+    'calendario_actividades' => ['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble'],
+    'actividades_contractuales' => ['contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga'],
+    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'metricas_contratos', 'metricas_crecimiento'],
+  ];
 
   private function canManageDashboardPermissions(): bool
   {
@@ -702,7 +723,48 @@ final class SuCasaControlServiciosInmobiliarios
   private function dashboardPermissionsConfig(): array
   {
     $raw = \SCM\Core\App::settings()->get('dashboard_tab_permissions', []);
-    return $this->sanitizeDashboardPermissions(is_array($raw) ? $raw : []);
+    $raw = is_array($raw) ? $raw : [];
+    // Permisos guardados antes de separar las opciones del menú: se traducen a lo que el cargo veía.
+    if (!is_array(\SCM\Core\App::settings()->get('dashboard_tab_permissions_known_keys', null))) {
+      foreach ($raw as $cargo => $tabs) {
+        $raw[$cargo] = $this->expandLegacyDashboardTabs((array) $tabs);
+      }
+    }
+    return $this->sanitizeDashboardPermissions($raw);
+  }
+
+  /**
+   * Traduce permisos de pestañas guardados con el formato anterior: aplica las reglas que entonces se
+   * aplicaban siempre y reparte las pestañas agrupadas en las opciones del menú que habilitaban.
+   * @param array<int,mixed> $tabs @return array<int,string>
+   */
+  private function expandLegacyDashboardTabs(array $tabs): array
+  {
+    $selected = [];
+    foreach ($tabs as $tab) {
+      $tabKey = preg_replace('/[^a-z0-9_]/', '', strtolower((string) $tab)) ?: '';
+      if ($tabKey !== '') $selected[$tabKey] = $tabKey;
+    }
+    if (!isset($selected['cartas_aumento'])) {
+      foreach (['contratos_arrendamiento', 'auditoria_canon_aseguradoras', 'reportes_administrativos_pendientes', 'notificaciones'] as $relatedTab) {
+        if (isset($selected[$relatedTab])) {
+          $selected['cartas_aumento'] = 'cartas_aumento';
+          break;
+        }
+      }
+    }
+    if (isset($selected['cotizaciones_mantenimiento'])) $selected['ordenes_mantenimiento'] = 'ordenes_mantenimiento';
+    if (isset($selected['servicios_publicos_pendientes'])) $selected['liquidador_servicios_publicos'] = 'liquidador_servicios_publicos';
+    // Antes todos los cargos tenían Inicio y las solicitudes contractuales (calendario_actividades se concedía siempre).
+    foreach (array_merge(self::DERIVED_DASHBOARD_TABS['calendario_actividades'], self::DERIVED_DASHBOARD_TABS['actividades_contractuales']) as $tabKey) {
+      $selected[$tabKey] = $tabKey;
+    }
+    if (isset($selected['contratos_arrendamiento'])) $selected['funcionario_contratos'] = 'funcionario_contratos';
+    if (isset($selected['metricas'])) {
+      foreach (self::DERIVED_DASHBOARD_TABS['metricas'] as $tabKey) $selected[$tabKey] = $tabKey;
+    }
+    unset($selected['calendario_actividades'], $selected['metricas']);
+    return array_values($selected);
   }
 
   /** @return array<string,array{label:string,items:array<string,string>}> */
@@ -1024,7 +1086,7 @@ final class SuCasaControlServiciosInmobiliarios
     $permissions = $this->dashboardPermissionsConfig();
     $allTabs = array_keys($this->dashboardPermissionTabs());
     if ($cargo === '' || !array_key_exists($cargo, $permissions)) {
-      return $allTabs;
+      return $this->dashboardPermissionCompatibilityTabs($allTabs);
     }
     $allowed = !empty($permissions[$cargo]) ? $permissions[$cargo] : ['mis_tickets'];
     return $this->dashboardPermissionCompatibilityTabs($allowed);
@@ -1046,22 +1108,14 @@ final class SuCasaControlServiciosInmobiliarios
         $selected[$tabKey] = $tabKey;
       }
     }
-    if (!isset($selected['cartas_aumento'])) {
-      foreach (['contratos_arrendamiento', 'auditoria_canon_aseguradoras', 'reportes_administrativos_pendientes', 'notificaciones'] as $relatedTab) {
-        if (isset($selected[$relatedTab])) {
-          $selected['cartas_aumento'] = 'cartas_aumento';
+    // Paneles agrupados (Inicio, Actividades contractuales, Métricas): se habilitan si alguna de sus opciones lo está.
+    foreach (self::DERIVED_DASHBOARD_TABS as $derivedTab => $sourceTabs) {
+      foreach ($sourceTabs as $sourceTab) {
+        if (isset($selected[$sourceTab])) {
+          $selected[$derivedTab] = $derivedTab;
           break;
         }
       }
-    }
-    if (isset($selected['cotizaciones_mantenimiento']) && !isset($selected['ordenes_mantenimiento'])) {
-      $selected['ordenes_mantenimiento'] = 'ordenes_mantenimiento';
-    }
-    if (isset($selected['servicios_publicos_pendientes']) && !isset($selected['liquidador_servicios_publicos'])) {
-      $selected['liquidador_servicios_publicos'] = 'liquidador_servicios_publicos';
-    }
-    if (!isset($selected['calendario_actividades'])) {
-      $selected['calendario_actividades'] = 'calendario_actividades';
     }
     return array_values($selected);
   }

@@ -70,4 +70,29 @@ $setSettings([
 $runtime = $invoke('filterRuntimeActionsByPermission', ['admin_notifications_send' => 'a']);
 $check(isset($runtime['admin_notifications_send']), 'runtime keeps allowed AJAX actions');
 
+// Pestañas: una por opción del menú; los permisos guardados antes se traducen a lo que el cargo veía.
+$tabKeys = array_keys($invoke('dashboardPermissionTabs'));
+$check(!array_intersect(['calendario_actividades', 'metricas'], $tabKeys) && !array_diff(['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble', 'contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga', 'funcionario_contratos', 'metricas_casos', 'metricas_contratos'], $tabKeys), 'each menu option has its own tab permission');
+$setSettings(['dashboard_tab_permissions' => ['5' => ['abiertos', 'metricas', 'contratos_arrendamiento', 'cotizaciones_mantenimiento'], '6' => ['mis_tickets']]]);
+$_SESSION['scm_user_cargo'] = '5';
+$tabs = $invoke('currentDashboardAllowedTabs');
+$check(!array_diff(['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble', 'solicitudes_terminacion', 'funcionario_contratos', 'metricas_casos', 'metricas_crecimiento', 'ordenes_mantenimiento'], $tabs), 'legacy permissions keep every option the cargo used to see');
+$check(!array_diff(['calendario_actividades', 'actividades_contractuales', 'metricas'], $tabs), 'grouped panels stay enabled through their options');
+$_SESSION['scm_user_cargo'] = '6';
+$tabs = $invoke('currentDashboardAllowedTabs');
+$check(in_array('mi_calendario', $tabs, true) && !in_array('metricas_casos', $tabs, true) && !in_array('funcionario_contratos', $tabs, true), 'legacy cargo without metrics or contracts does not gain them');
+$setSettings([
+  'dashboard_tab_permissions' => ['5' => ['abiertos', 'vencimientos', 'metricas_cotizaciones']],
+  'dashboard_tab_permissions_known_keys' => $tabKeys,
+]);
+$_SESSION['scm_user_cargo'] = '5';
+$tabs = $invoke('currentDashboardAllowedTabs');
+$check(in_array('vencimientos', $tabs, true) && !in_array('mi_calendario', $tabs, true) && !in_array('solicitudes_terminacion', $tabs, true) && !in_array('metricas_casos', $tabs, true), 'saved permissions keep each option separate: Casos abiertos no longer grants Inicio or contract requests');
+$check(in_array('calendario_actividades', $tabs, true) && in_array('metricas', $tabs, true) && !in_array('actividades_contractuales', $tabs, true), 'grouped panels follow only the options that were checked');
+$setSettings([
+  'dashboard_tab_permissions' => ['5' => ['abiertos', 'cotizaciones_mantenimiento']],
+  'dashboard_tab_permissions_known_keys' => $tabKeys,
+]);
+$check(!in_array('ordenes_mantenimiento', $invoke('currentDashboardAllowedTabs'), true), 'unchecking Órdenes is respected after saving');
+
 echo "{$checks} dashboard action permission checks passed.\n";

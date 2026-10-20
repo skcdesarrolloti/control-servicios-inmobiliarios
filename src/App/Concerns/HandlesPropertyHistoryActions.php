@@ -83,7 +83,8 @@ trait HandlesPropertyHistoryActions
 
   private function property_history_can_access(): bool
   {
-    return $this->canAccessDashboardTab('calendario_actividades')
+    return $this->canAccessDashboardTab('historial_inmueble')
+      || $this->canAccessDashboardTab('calendario_actividades')
       || $this->canAccessDashboardTab('contratos_arrendamiento')
       || $this->canAccessDashboardTab('abiertos')
       || $this->canAccessDashboardTab('mis_tickets')

@@ -348,7 +348,7 @@ $rawNavItems = [
         'subtab' => 'mine',
         'url' => $baseUrl . '/index.php?tab=ini',
         'icon' => 'dashboard',
-        'perms' => ['calendario_actividades', 'abiertos'],
+        'perms' => ['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble'],
       ],
       'mine' => [
         'key' => 'mine',
@@ -357,7 +357,7 @@ $rawNavItems = [
         'subtab' => 'mine',
         'url' => $baseUrl . '/index.php?tab=mine',
         'icon' => 'calendar_today',
-        'perms' => ['calendario_actividades', 'abiertos'],
+        'perms' => ['mi_calendario'],
       ],
       'team' => [
         'key' => 'team',
@@ -366,7 +366,7 @@ $rawNavItems = [
         'subtab' => 'team',
         'url' => $baseUrl . '/index.php?tab=team',
         'icon' => 'groups',
-        'perms' => ['calendario_actividades', 'abiertos'],
+        'perms' => ['calendario_equipo'],
       ],
       'due' => [
         'key' => 'due',
@@ -375,7 +375,7 @@ $rawNavItems = [
         'subtab' => 'due',
         'url' => $baseUrl . '/index.php?tab=due',
         'icon' => 'calendar_month',
-        'perms' => ['calendario_actividades', 'reportes_administrativos_pendientes', 'abiertos'],
+        'perms' => ['vencimientos'],
       ],
       'property_history' => [
         'key' => 'property_history',
@@ -384,7 +384,7 @@ $rawNavItems = [
         'subtab' => 'property-history',
         'url' => $baseUrl . '/index.php?tab=property_history',
         'icon' => 'history',
-        'perms' => ['calendario_actividades', 'abiertos'],
+        'perms' => ['historial_inmueble'],
       ],
     ],
   ],
@@ -504,7 +504,7 @@ $rawNavItems = [
         'admin_activity_key' => 'liquidador_servicios_publicos',
         'url' => $baseUrl . '/index.php?tab=liquidador_servicios_publicos',
         'icon' => 'calculate',
-        'perms' => ['liquidador_servicios_publicos', 'servicios_publicos_pendientes'],
+        'perms' => ['liquidador_servicios_publicos'],
       ],
       'reportes_administrativos_pendientes' => [
         'key' => 'reportes_administrativos_pendientes',
@@ -578,7 +578,7 @@ $rawNavItems = [
         'subtab' => 'contracts-ending',
         'url' => $baseUrl . '/index.php?tab=contracts_ending',
         'icon' => 'event_upcoming',
-        'perms' => ['calendario_actividades', 'abiertos'],
+        'perms' => ['contratos_por_terminar'],
       ],
       'contract_termination' => [
         'key' => 'contract_termination',
@@ -587,7 +587,7 @@ $rawNavItems = [
         'subtab' => 'contract-termination',
         'url' => $baseUrl . '/index.php?tab=contract_termination',
         'icon' => 'assignment_late',
-        'perms' => ['calendario_actividades', 'abiertos'],
+        'perms' => ['solicitudes_terminacion'],
       ],
       'contract_non_renewal' => [
         'key' => 'contract_non_renewal',
@@ -596,7 +596,7 @@ $rawNavItems = [
         'subtab' => 'contract-non-renewal',
         'url' => $baseUrl . '/index.php?tab=contract_non_renewal',
         'icon' => 'event_busy',
-        'perms' => ['calendario_actividades', 'abiertos'],
+        'perms' => ['solicitudes_no_prorroga'],
       ],
       'contract_owners' => [
         'key' => 'contract_owners',
@@ -604,7 +604,7 @@ $rawNavItems = [
         'panel_id' => 'scm-panel-funcionario-contratos',
         'url' => $baseUrl . '/index.php?tab=contract_owners',
         'icon' => 'manage_accounts',
-        'perms' => ['contratos_arrendamiento'],
+        'perms' => ['funcionario_contratos'],
       ],
     ],
   ],
@@ -630,7 +630,7 @@ $rawNavItems = [
         'panel_id' => 'scm-panel-metricas-casos',
         'url' => $baseUrl . '/index.php?tab=dashboard',
         'icon' => 'confirmation_number',
-        'perms' => ['metricas'],
+        'perms' => ['metricas_casos'],
       ],
       'metricas_cotizaciones' => [
         'key' => 'metricas_cotizaciones',
@@ -640,7 +640,7 @@ $rawNavItems = [
         'panel_id' => 'scm-panel-metricas-cotizaciones',
         'url' => $baseUrl . '/index.php?tab=metricas_cotizaciones',
         'icon' => 'request_quote',
-        'perms' => ['metricas'],
+        'perms' => ['metricas_cotizaciones'],
       ],
       'metricas_preventivas' => [
         'key' => 'metricas_preventivas',
@@ -650,7 +650,7 @@ $rawNavItems = [
         'panel_id' => 'scm-panel-metricas-preventivas',
         'url' => $baseUrl . '/index.php?tab=metricas_preventivas',
         'icon' => 'pending_actions',
-        'perms' => ['metricas'],
+        'perms' => ['metricas_preventivas'],
       ],
       'metricas_servicios_publicos' => [
         'key' => 'metricas_servicios_publicos',
@@ -660,7 +660,7 @@ $rawNavItems = [
         'panel_id' => 'scm-panel-metricas-servicios-publicos',
         'url' => $baseUrl . '/index.php?tab=metricas_servicios_publicos',
         'icon' => 'receipt_long',
-        'perms' => ['metricas'],
+        'perms' => ['metricas_servicios_publicos'],
       ],
       'ocupaciones' => [
         'key' => 'ocupaciones',
@@ -671,7 +671,7 @@ $rawNavItems = [
         'subtab' => 'ocupaciones',
         'url' => $baseUrl . '/index.php?tab=ocupaciones',
         'icon' => 'login',
-        'perms' => ['metricas'],
+        'perms' => ['metricas_contratos'],
       ],
       'desocupaciones' => [
         'key' => 'desocupaciones',
@@ -682,7 +682,7 @@ $rawNavItems = [
         'subtab' => 'desocupaciones',
         'url' => $baseUrl . '/index.php?tab=desocupaciones',
         'icon' => 'logout',
-        'perms' => ['metricas'],
+        'perms' => ['metricas_contratos'],
       ],
       'ocupaciones_vs_desocupaciones' => [
         'key' => 'ocupaciones_vs_desocupaciones',
@@ -693,7 +693,7 @@ $rawNavItems = [
         'subtab' => 'comparativo',
         'url' => $baseUrl . '/index.php?tab=ocupaciones_vs_desocupaciones',
         'icon' => 'compare_arrows',
-        'perms' => ['metricas'],
+        'perms' => ['metricas_contratos'],
       ],
       'metricas_crecimiento' => [
         'key' => 'metricas_crecimiento',
@@ -703,7 +703,7 @@ $rawNavItems = [
         'panel_id' => 'scm-panel-metricas-crecimiento',
         'url' => $baseUrl . '/index.php?tab=metricas_crecimiento',
         'icon' => 'trending_up',
-        'perms' => ['metricas'],
+        'perms' => ['metricas_crecimiento'],
       ],
     ],
   ],
