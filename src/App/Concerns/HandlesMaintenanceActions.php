@@ -624,7 +624,7 @@ trait HandlesMaintenanceActions
         $warnPostSave('no se pudo crear/verificar el reporte administrativo', $error);
       }
       try {
-        $this->maintenance_quote_update_ticket($schema, $ticket, $quoteIdSaved, $tipoMantenimiento, $now, $nowSql, (string) ($quoteData['ejecutado'] ?? ''));
+        $this->maintenance_quote_update_ticket($schema, $ticket, $quoteIdSaved, $tipoMantenimiento, $now, $nowSql);
       } catch (\Throwable $error) {
         $warnPostSave('no se pudo actualizar el caso', $error);
       }
@@ -752,7 +752,8 @@ trait HandlesMaintenanceActions
 
     $actor = $this->ticketCompletionActor();
     $recipientOptions = $this->maintenance_quote_recipient_options($ticket, is_array($revision) ? $revision : [], $quote);
-    $defaultExecutor = $this->maintenance_quote_first([$quote['ejecutado'] ?? '', $ticket['ejecutado'] ?? '', $revision['ejecutado'] ?? '', 'Inmobiliaria']);
+    // `ejecutado` de la cotización = quién aprueba; no se toma del caso, que guarda quién ejecuta.
+    $defaultExecutor = $this->maintenance_quote_first([$quote['ejecutado'] ?? '', 'Propietario']);
     $defaultRecipient = $recipientOptions[$this->maintenance_quote_executor_key($defaultExecutor)] ?? [];
     $defaultDestinatario = $this->maintenance_quote_first([
       $quote['destinatario'] ?? '',
@@ -1783,7 +1784,7 @@ trait HandlesMaintenanceActions
   }
 
   /** @param array<string,mixed> $ticket */
-  private function maintenance_quote_update_ticket(\SCM\Support\SchemaInspector $schema, array $ticket, int $quoteId, string $tipoMantenimiento, int $now, string $nowSql, string $executor = ''): void
+  private function maintenance_quote_update_ticket(\SCM\Support\SchemaInspector $schema, array $ticket, int $quoteId, string $tipoMantenimiento, int $now, string $nowSql): void
   {
     $ticketId = (int) ($ticket['_ID'] ?? 0);
     if ($ticketId <= 0) {
@@ -1804,10 +1805,8 @@ trait HandlesMaintenanceActions
       'fecha_actualizacion' => $now,
       'cct_modified' => $nowSql,
     ];
-    // Quién ejecuta queda en el caso para KPIs/filtros y puede corregirse desde "Editar datos del caso".
-    if (trim($executor) !== '') {
-      $update['ejecutado'] = trim($executor);
-    }
+    // Con cotización ejecuta la inmobiliaria; el campo de la cotización solo dice quién aprueba (docs/ejecutado-caso.md).
+    $update['ejecutado'] = \SCM\Support\CaseExecutorSql::QUOTE_EXECUTOR;
     $update = $schema->filterTableData($table, $update);
     if (!empty($update)) {
       $this->db->update($table, $update, ['_ID' => $ticketId]);
@@ -2366,10 +2365,6 @@ trait HandlesMaintenanceActions
           'fecha_actualizacion' => $now,
           'cct_modified' => $nowMysql,
         ];
-        // La cotización aprobada define quién ejecuta el caso.
-        if (trim((string) ($row['ejecutado'] ?? '')) !== '') {
-          $ticketUpdate['ejecutado'] = trim((string) $row['ejecutado']);
-        }
         $ticketUpdate = $schema->filterTableData($ticketsTable, $ticketUpdate);
         if (!empty($ticketUpdate)) {
           $ticketRowsUpdated += $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => (int) ($ticketRow['_ID'] ?? 0)]);
@@ -4860,16 +4855,18 @@ trait HandlesMaintenanceActions
     return $change;
   }
 
-  private function caseLatestQuoteExecutor(int $ticketPk): string
+  /** Sugerencia para un caso vacío: si tiene cotización ejecuta la inmobiliaria (la cotización dice quién aprueba). */
+  private function caseQuoteExecutorSuggestion(int $ticketPk): string
   {
     $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
-    if (!$this->table_exists($table) || !$this->column_exists($table, 'ejecutado')) {
+    if (!$this->table_exists($table) || !$this->column_exists($table, 'id_ticket')) {
       return '';
     }
-    return trim((string) ($this->db->getVar(
-      "SELECT TRIM(`ejecutado`) FROM `{$table}` WHERE TRIM(COALESCE(`id_ticket`, '')) = ? AND TRIM(COALESCE(`ejecutado`, '')) <> '' ORDER BY `_ID` DESC LIMIT 1",
+    $hasQuote = (int) ($this->db->getVar(
+      "SELECT COUNT(*) FROM `{$table}` WHERE TRIM(COALESCE(`id_ticket`, '')) = ?",
       [(string) $ticketPk]
-    ) ?? ''));
+    ) ?? 0) > 0;
+    return $hasQuote ? \SCM\Support\CaseExecutorSql::QUOTE_EXECUTOR : '';
   }
 
   public function ajax_handler_edit_case_data(): void
@@ -4905,7 +4902,7 @@ trait HandlesMaintenanceActions
       $options['ejecutado'] = $this->caseExecutorOptions();
       // Casos antiguos solo guardaban quién ejecuta en la cotización: se propone ese valor.
       if ($current['ejecutado'] === '') {
-        $suggested = $this->caseLatestQuoteExecutor($ticketPk);
+        $suggested = $this->caseQuoteExecutorSuggestion($ticketPk);
         if ($suggested !== '') {
           $options['ejecutado_sugerido'] = [$suggested];
         }

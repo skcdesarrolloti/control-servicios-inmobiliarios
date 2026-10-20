@@ -7,12 +7,15 @@ namespace SCM\Support;
 /**
  * SQL compartido para "¿Quién ejecuta?" (`ejecutado`) en las pestañas de casos.
  *
- * El valor del caso manda; si está vacío se usa el de la cotización más reciente con ejecutor
- * (flujos JetForm antiguos no lo copiaban al caso). Ver docs/ejecutado-caso.md.
+ * El valor del caso manda; si está vacío y el caso tiene cotización, ejecuta la inmobiliaria.
+ * El `ejecutado` de la cotización dice quién aprueba, no quién ejecuta. Ver docs/ejecutado-caso.md.
  */
 final class CaseExecutorSql
 {
   /** Claves normalizadas en el orden de las tarjetas KPI. */
+  /** Quién ejecuta un caso con cotización: el trabajo cotizado siempre lo hace la inmobiliaria. */
+  public const QUOTE_EXECUTOR = 'Inmobiliaria';
+
   public const KEYS = ['inmobiliaria', 'propietario', 'arrendatario', 'copropiedad', 'externo', 'sin_definir'];
 
   public const LABELS = [
@@ -32,8 +35,8 @@ final class CaseExecutorSql
   /**
    * @param callable(string,string):bool $columnExists Verifica tabla/columna (la tabla inexistente devuelve false).
    * @param string $ticketRef Referencia SQL de la fila del caso: alias (`t`) o tabla entre comillas.
-   * @param string|null $quoteExecutorSql Expresión ya resuelta del ejecutor de la última cotización
-   *   (p. ej. desde countsJoin()); null usa una subconsulta correlacionada.
+   * @param string|null $quoteExecutorSql Expresión ya resuelta del respaldo por cotización
+   *   (p. ej. desde counts()); null usa una subconsulta correlacionada.
    */
   public static function keyExpression(callable $columnExists, string $ticketsTable, string $quoteTable, string $ticketRef, ?string $quoteExecutorSql = null): string
   {
@@ -44,10 +47,8 @@ final class CaseExecutorSql
     if ($quoteExecutorSql !== null) {
       $sources[] = "NULLIF(TRIM(COALESCE({$quoteExecutorSql}, '')), '')";
     } elseif (self::quoteAvailable($columnExists, $quoteTable)) {
-      $sources[] = "(SELECT TRIM(cot_exec.`ejecutado`) FROM `{$quoteTable}` cot_exec"
-        . " WHERE TRIM(COALESCE(cot_exec.`id_ticket`, '')) = CAST({$ticketRef}.`_ID` AS CHAR)"
-        . " AND TRIM(COALESCE(cot_exec.`ejecutado`, '')) <> ''"
-        . ' ORDER BY cot_exec.`_ID` DESC LIMIT 1)';
+      $sources[] = "(SELECT '" . self::QUOTE_EXECUTOR . "' FROM `{$quoteTable}` cot_exec"
+        . " WHERE TRIM(COALESCE(cot_exec.`id_ticket`, '')) = CAST({$ticketRef}.`_ID` AS CHAR) LIMIT 1)";
     }
     if ($sources === []) {
       return "'sin_definir'";
@@ -71,7 +72,7 @@ final class CaseExecutorSql
   }
 
   /**
-   * Cuenta casos por ejecutor uniendo una sola vez la última cotización con ejecutor por caso.
+   * Cuenta casos por ejecutor uniendo una sola vez la última cotización de cada caso.
    * El JOIN solo aporta `exec_latest.ticket_ref`/`quote_id`, así no choca con columnas sin calificar del WHERE.
    *
    * @param array<int,mixed> $args
@@ -83,9 +84,9 @@ final class CaseExecutorSql
     $quoteExecutorSql = null;
     if (self::quoteAvailable($columnExists, $quoteTable)) {
       $join = " LEFT JOIN (SELECT TRIM(COALESCE(q.`id_ticket`, '')) AS ticket_ref, MAX(q.`_ID`) AS quote_id FROM `{$quoteTable}` q"
-        . " WHERE TRIM(COALESCE(q.`ejecutado`, '')) <> '' GROUP BY TRIM(COALESCE(q.`id_ticket`, ''))) exec_latest"
+        . " GROUP BY TRIM(COALESCE(q.`id_ticket`, ''))) exec_latest"
         . " ON exec_latest.ticket_ref = CAST({$ticketRef}.`_ID` AS CHAR)";
-      $quoteExecutorSql = "(SELECT exec_quote.`ejecutado` FROM `{$quoteTable}` exec_quote WHERE exec_quote.`_ID` = exec_latest.quote_id)";
+      $quoteExecutorSql = "(CASE WHEN exec_latest.quote_id IS NOT NULL THEN '" . self::QUOTE_EXECUTOR . "' END)";
     }
     $sql = 'SELECT exec_key, COUNT(1) AS total FROM (SELECT '
       . self::keyExpression($columnExists, $ticketsTable, $quoteTable, $ticketRef, $quoteExecutorSql)
@@ -106,6 +107,6 @@ final class CaseExecutorSql
 
   private static function quoteAvailable(callable $columnExists, string $quoteTable): bool
   {
-    return $columnExists($quoteTable, 'ejecutado') && $columnExists($quoteTable, 'id_ticket');
+    return $columnExists($quoteTable, 'id_ticket');
   }
 }

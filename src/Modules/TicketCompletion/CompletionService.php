@@ -897,6 +897,11 @@ final class CompletionService
     if ($source['flow'] === 'approved_quote' && !$this->repo->isApprovedMaintenanceQuoteForTicket($ticket, $source['quote_id'])) {
       throw new \DomainException('Solo se puede crear esta acta desde una cotización aprobada asociada al caso.');
     }
+    // El acta de satisfacción de una cotización aprobada cierra un trabajo que siempre ejecuta la inmobiliaria.
+    if ($source['flow'] === 'approved_quote') {
+      $executor = 'inmobiliaria';
+      $pendingAdminState = CompletionPolicy::executionState($executor);
+    }
     $hasAdministrativeReport = false;
     $transportMax = $context['transport_max'];
     $transport = $hasAdministrativeReport ? ($transportMax ?? 0) : 0;

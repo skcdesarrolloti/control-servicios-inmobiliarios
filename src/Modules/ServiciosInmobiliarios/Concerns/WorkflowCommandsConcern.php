@@ -1208,14 +1208,6 @@ trait WorkflowCommandsConcern
       'cct_modified' => $nowMysql,
       'id_encargado_seguimiento' => $employeeId,
     ];
-    // La cotización aprobada define quién ejecuta el caso.
-    if (strcasecmp(trim($estado), 'Aprobada') === 0) {
-      $approvedQuote = $this->fetchCotizacion($cotTable, (string) end($cotIds));
-      $approvedExecutor = is_array($approvedQuote) ? trim((string) ($approvedQuote['ejecutado'] ?? '')) : '';
-      if ($approvedExecutor !== '') {
-        $ticketUpdate['ejecutado'] = $approvedExecutor;
-      }
-    }
     $ticketUpdate = $this->schema->filterTableData($ticketsTable, $ticketUpdate);
     if (!empty($ticketUpdate)) {
       $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => $ticketPk]);

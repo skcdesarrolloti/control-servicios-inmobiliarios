@@ -37,7 +37,7 @@ final class CompletionView
     }
     $executor = str_replace('En ejecucion por ', '', (string) ($ticket['estado_administrativo'] ?? ''));
     if (!isset(CompletionPolicy::EXECUTORS[$executor])) {
-      // Sin estado "En ejecucion por …": se propone quién ejecuta según el caso (o su cotización).
+      // Sin estado "En ejecucion por …": se propone quién ejecuta según el caso.
       $caseExecutor = mb_strtolower(trim((string) ($ticket['ejecutado'] ?? '')), 'UTF-8');
       $executor = '';
       foreach (CompletionPolicy::EXECUTORS as $role => $_label) {
@@ -77,6 +77,11 @@ final class CompletionView
     $sourceFlow = is_array($formPayload['source'] ?? null) ? $formPayload['source'] : (is_array($context['source_flow'] ?? null) ? $context['source_flow'] : []);
     $sourceName = (string) ($sourceFlow['flow'] ?? 'ticket_solution');
     $sourceQuoteId = (string) ($sourceFlow['quote_id'] ?? '');
+    // Con cotización aprobada ejecuta la inmobiliaria; el servicio lo impone igual al guardar.
+    $executorOptions = $sourceName === 'approved_quote' ? ['inmobiliaria' => CompletionPolicy::EXECUTORS['inmobiliaria']] : CompletionPolicy::EXECUTORS;
+    if ($sourceName === 'approved_quote') {
+      $selectedExecutor = 'inmobiliaria';
+    }
     $sourceNotice = $sourceName === 'approved_quote' && trim($sourceQuoteId) !== ''
       ? 'Esta acta quedará asociada a la cotización aprobada #' . trim($sourceQuoteId) . '. Al firmarse cerrará el caso y registrará el trabajo finalizado sin cambiar el estado de la cotización ni generar reporte administrativo nuevo.'
       : '';
@@ -126,7 +131,7 @@ final class CompletionView
           <input type="hidden" name="source_cotizacion_id" value="<?= self::e($sourceQuoteId) ?>">
           <h3>1. <?= $editAct ? 'Editar solución y firmante' : 'Solución y firmante' ?></h3>
           <div class="scm-acta-grid">
-            <label>¿Quién realizó la solución? *<select name="executor" required><option value="">Seleccionar responsable</option><?php foreach (CompletionPolicy::EXECUTORS as $role => $label): ?><option value="<?= self::e($role) ?>" <?= $selectedExecutor === $role ? 'selected' : '' ?>><?= self::e($label) ?></option><?php endforeach; ?></select></label>
+            <label>¿Quién realizó la solución? *<select name="executor" required><option value="">Seleccionar responsable</option><?php foreach ($executorOptions as $role => $label): ?><option value="<?= self::e($role) ?>" <?= $selectedExecutor === $role ? 'selected' : '' ?>><?= self::e($label) ?></option><?php endforeach; ?></select></label>
             <label>¿A quién se solicita la firma? *<select name="signer_role" required data-acta-signer><option value="">Seleccionar firmante</option><?php foreach ($context['contacts'] as $role => $contact): ?><option value="<?= self::e($role) ?>" data-name="<?= self::e($contact['name']) ?>" data-email="<?= self::e($contact['email']) ?>" data-phone="<?= self::e($contact['phone']) ?>" <?= $selectedSigner === $role ? 'selected' : '' ?> <?= !$contact['available'] ? 'disabled' : '' ?>><?= self::e($contact['label']) ?><?= !$contact['available'] ? ' — falta contacto para verificación' : ' · ' . self::e($contact['name']) ?></option><?php endforeach; ?></select></label>
             <label>Nombre completo de la persona que firma *<input name="signer_name" maxlength="160" required autocomplete="off" data-acta-signer-name value="<?= self::e($signerName) ?>"></label>
             <label>Correo registrado para recibir la firma<input type="email" readonly data-acta-signer-email value="<?= self::e($formPayload['signer']['email'] ?? '') ?>"></label>

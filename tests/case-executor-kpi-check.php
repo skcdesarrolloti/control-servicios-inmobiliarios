@@ -20,13 +20,13 @@ $schema = new \SCM\Support\SchemaInspector($db);
 $insert=$pdo->prepare("INSERT INTO wp_jet_cct_tickets (_ID,id_ticket,departamento,tema_ayuda,estado,estado_administrativo,fecha,fecha_actualizacion,id_empleado,ejecutado) VALUES (?,?,'Mantenimiento','Reparaciones necesarias','En proceso','Cotizado',1000,1000,'99',?)");
 foreach([
  [1,'Propietario'],   // valor del caso
- [2,''],              // sin valor en el caso: usa la última cotización (Arrendatario)
- [3,'Inmobiliaria'],  // el caso manda sobre la cotización (Propietario)
+ [2,''],              // sin valor en el caso pero con cotización: ejecuta la inmobiliaria
+ [3,'Inmobiliaria'],  // el caso manda; la cotización solo dice quién aprueba (Propietario)
  [4,'Copropiedad'],
  [5,null],            // sin caso ni cotización
  [6,'Propietario'],
 ] as [$id,$executor]) $insert->execute([$id,(string)(100+$id),$executor]);
-$pdo->exec("INSERT INTO wp_jet_cct_cotizacion_mantenimiento (_ID,id_ticket,ejecutado,estado) VALUES (10,'2','Propietario','Desaprobada'),(11,'2','Arrendatario',''),(12,'3','Propietario','Aprobada'),(13,'5','','')");
+$pdo->exec("INSERT INTO wp_jet_cct_cotizacion_mantenimiento (_ID,id_ticket,ejecutado,estado) VALUES (10,'2','Propietario','Desaprobada'),(11,'2','Arrendatario',''),(12,'3','Propietario','Aprobada'),(13,'99','','')");
 $maintenance=new class($db,$schema) {
  use \SCM\Repositories\Concerns\MaintenanceQueriesConcern, \SCM\Repositories\Concerns\MaintenanceStatisticsConcern;
  public const MAINTENANCE_TOPICS=['reparaciones necesarias'];
@@ -40,12 +40,15 @@ $maintenance=new class($db,$schema) {
 $assert=static function($ok,$label){if(!$ok)throw new RuntimeException($label);echo "PASS: $label\n";};
 $filters=(new \SCM\Modules\ServiciosInmobiliarios\ServiciosInmobiliariosFilters())->parse([]);
 $counts=$maintenance->executorCounts($filters);
-$assert($counts===['ejecuta_inmobiliaria'=>1,'ejecuta_propietario'=>2,'ejecuta_arrendatario'=>1,'ejecuta_copropiedad'=>1,'ejecuta_externo'=>0,'ejecuta_sin_definir'=>1],'executor KPIs prefer the case value and fall back to the latest quote');
+$assert($counts===['ejecuta_inmobiliaria'=>2,'ejecuta_propietario'=>2,'ejecuta_arrendatario'=>0,'ejecuta_copropiedad'=>1,'ejecuta_externo'=>0,'ejecuta_sin_definir'=>1],'executor KPIs prefer the case value and count quoted cases as Inmobiliaria');
 $parsed=(new \SCM\Modules\ServiciosInmobiliarios\ServiciosInmobiliariosFilters())->parse(['scm_ejecutado'=>'arrendatario']);
 $assert($parsed['fEjecutado']==='arrendatario','parser reads the executor filter');
 $ids=static fn(array $rows)=>array_map('intval',array_column($rows,'_ID'));
 $rows=$maintenance->queryMaintenance($parsed);
-$assert($ids($rows)===[2],'executor filter matches cases resolved from the latest quote');
+$assert($ids($rows)===[],'the quote approver never becomes the case executor');
+$rows=$maintenance->queryMaintenance(array_replace($filters,['fEjecutado'=>'inmobiliaria']));
+$inmobiliariaIds=$ids($rows); sort($inmobiliariaIds);
+$assert($inmobiliariaIds===[2,3],'empty cases with a quote resolve to Inmobiliaria');
 $rows=$maintenance->queryMaintenance(array_replace($filters,['fEjecutado'=>'propietario']));
 $propietarioIds=$ids($rows); sort($propietarioIds);
 $assert($propietarioIds===[1,6],'case executor overrides an older quote executor');
@@ -63,9 +66,9 @@ $generic=new class($db,$tables) {
 };
 $params=$generic->parse_params_generic([],'scmpv_');
 $result=$generic->run_query_generic(['Reparaciones necesarias'],$params,[],false);
-$assert(($result['stats']['ejecuta_propietario']??null)===2 && $result['stats']['ejecuta_arrendatario']===1 && $result['stats']['ejecuta_sin_definir']===1,'generic quote tabs count executors with the same rule');
-$result=$generic->run_query_generic(['Reparaciones necesarias'],$generic->parse_params_generic(['scmpv_ejecutado'=>'arrendatario'],'scmpv_'),[],false);
-$assert($result['stats']['total']===1,'generic executor filter narrows the tab');
+$assert(($result['stats']['ejecuta_propietario']??null)===2 && $result['stats']['ejecuta_inmobiliaria']===2 && $result['stats']['ejecuta_arrendatario']===0 && $result['stats']['ejecuta_sin_definir']===1,'generic quote tabs count executors with the same rule');
+$result=$generic->run_query_generic(['Reparaciones necesarias'],$generic->parse_params_generic(['scmpv_ejecutado'=>'inmobiliaria'],'scmpv_'),[],false);
+$assert($result['stats']['total']===2,'generic executor filter narrows the tab');
 $result=$generic->run_query_generic(['Reparaciones necesarias'],$generic->parse_params_generic([],'scmco_'),[],false);
 $assert(!isset($result['stats']['ejecuta_propietario']),'tabs without quotes skip executor counts');
 $html=\SCM\Support\CaseFilterFields::executor('scmpv_',['fEjecutado'=>'copropiedad']);

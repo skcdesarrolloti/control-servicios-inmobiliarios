@@ -21619,7 +21619,7 @@
         '<input type="hidden" name="materiales_oferta_image" value="">' +
         maintenanceQuoteWarningHtml(context) +
         '<section class="scm-maint-quote-section"><h4>Datos de la cotización</h4><div class="scm-maint-quote-grid">' +
-        '<label class="scm-cotizacion-dialog-field"><span>¿Quién ejecutará y aprobará? <em>*</em></span><select name="ejecutado" required><option value="">Elige una opción</option>' + cotizacionFormOptionHtml(context.executor_options, d.ejecutado) + '</select></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>¿Quién aprobará la cotización? <em>*</em></span><select name="ejecutado" required><option value="">Elige una opción</option>' + cotizacionFormOptionHtml(context.executor_options, d.ejecutado) + '</select></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Destinatario <em>*</em></span><input name="destinatario" value="' + escHtml(d.destinatario || "") + '" required></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Email</span><input type="email" name="email_destinatario" value="' + escHtml(d.email_destinatario || "") + '"></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Indicativo</span><input name="indicativo_destinarario" value="' + escHtml(d.indicativo_destinarario || "57") + '"></label>' +
