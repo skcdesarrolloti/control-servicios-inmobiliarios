@@ -5969,8 +5969,10 @@ body,
 .scm-header-note-btn:hover { border-color: #0f1e36; background: #f1f5fb; }
 
 /* KPIs "¿Quién ejecuta?" (mantenimiento): fila propia, sin heredar los colores nth-child de la fila principal */
-#scm-app .scm-kpis-executor-group { margin: -0.4rem 0 1.25rem !important; }
-#scm-app .scm-kpis-executor-title {
+#scm-app .scm-kpis-executor-group,
+#scm-app .scm-kpis-group { margin: -0.4rem 0 1.25rem !important; }
+#scm-app .scm-kpis-executor-title,
+#scm-app .scm-kpis-group-title {
   display: flex !important;
   align-items: center !important;
   gap: 0.35rem !important;
@@ -5981,7 +5983,8 @@ body,
   text-transform: uppercase !important;
   color: #64748b !important;
 }
-#scm-app .scm-kpis-executor-title .material-symbols-outlined { font-size: 15px !important; }
+#scm-app .scm-kpis-executor-title .material-symbols-outlined,
+#scm-app .scm-kpis-group-title .material-symbols-outlined { font-size: 15px !important; }
 #scm-app .scm-kpis.scm-kpis-stitch.scm-kpis-executor {
   grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
   margin-bottom: 0 !important;
@@ -6382,3 +6385,22 @@ body,
     font-size: 16px !important; /* evita el zoom automático de iOS */
   }
 }
+
+/* KPIs de Mantenimiento: fila principal (5), "Magnitud del caso" (4) y "¿Quién ejecuta?" (5) */
+#scm-app .scm-kpis.scm-kpis-stitch.scm-kpis-main { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+#scm-app .scm-kpis.scm-kpis-stitch.scm-kpis-magnitude {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  margin-bottom: 0 !important;
+}
+#scm-app .scm-kpis-group[hidden] { display: none !important; }
+@media (max-width: 900px) {
+  #scm-app .scm-kpis.scm-kpis-stitch.scm-kpis-main { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 540px) {
+  #scm-app .scm-kpis.scm-kpis-stitch.scm-kpis-main,
+  #scm-app .scm-kpis.scm-kpis-stitch.scm-kpis-magnitude { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+#scm-app .scm-kpis.scm-kpis-magnitude .scm-kpi-critico { border-bottom: 3.5px solid #ef4444 !important; }
+#scm-app .scm-kpis.scm-kpis-magnitude .scm-kpi-alto { border-bottom: 3.5px solid #d97706 !important; }
+#scm-app .scm-kpis.scm-kpis-magnitude .scm-kpi-medio { border-bottom: 3.5px solid #64748b !important; }
+#scm-app .scm-kpis.scm-kpis-magnitude .scm-kpi-bajo { border-bottom: 3.5px solid #cbd5e1 !important; }

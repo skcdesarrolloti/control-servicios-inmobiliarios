@@ -15552,6 +15552,12 @@
       toggleKpiVisibility(prefix + "kpi-magnitud-alto", showMagnitude);
       toggleKpiVisibility(prefix + "kpi-magnitud-medio", showMagnitude);
       toggleKpiVisibility(prefix + "kpi-magnitud-bajo", showMagnitude);
+      // La fila "Magnitud del caso" tiene título propio: se oculta junto con sus tarjetas.
+      var magnitudeValue = root.querySelector("#" + prefix + "kpi-magnitud-critico");
+      var magnitudeGroup = magnitudeValue && magnitudeValue.closest
+        ? magnitudeValue.closest('[data-scm-kpi-group="magnitud"]')
+        : null;
+      if (magnitudeGroup) magnitudeGroup.hidden = !showMagnitude;
     }
 
     function syncCaseFinancingFilter(form) {

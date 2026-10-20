@@ -962,7 +962,7 @@ trait RendersDashboard
           </div>
 
       <div class="scm-open-topic-panel<?php echo $activeOpenTopic === 'mant' ? ' active' : ''; ?>" id="scm-panel-mant" data-open-topic="mant" data-scm-loaded="<?php echo $hydrateMaintenanceRows ? '1' : '0'; ?>">
-        <div class="scm-kpis scm-kpis-stitch">
+        <div class="scm-kpis scm-kpis-stitch scm-kpis-main">
           <div class="scm-kpi" data-kpi="total">
             <div class="scm-kpi-header">
               <span class="scm-kpi-label">TOTAL</span>
@@ -1013,46 +1013,51 @@ trait RendersDashboard
             </div>
             <div class="scm-kpi-indicator scm-kpi-indicator-sin-prev"></div>
           </div>
+        </div>
 
-          <div class="scm-kpi scm-kpi-magnitud scm-kpi-critico" data-kpi="critico">
-            <div class="scm-kpi-header">
-              <span class="scm-kpi-label text-rose-600">CRÍTICOS</span>
-              <span class="material-symbols-outlined scm-kpi-icon text-rose-500">local_fire_department</span>
+        <div class="scm-kpis-group scm-kpis-magnitude-group" data-scm-kpi-group="magnitud">
+          <div class="scm-kpis-group-title"><span class="material-symbols-outlined">local_fire_department</span>Magnitud del caso</div>
+          <div class="scm-kpis scm-kpis-stitch scm-kpis-magnitude">
+            <div class="scm-kpi scm-kpi-magnitud scm-kpi-critico" data-kpi="critico">
+              <div class="scm-kpi-header">
+                <span class="scm-kpi-label text-rose-600">CRÍTICOS</span>
+                <span class="material-symbols-outlined scm-kpi-icon text-rose-500">local_fire_department</span>
+              </div>
+              <div class="scm-kpi-value-row flex items-baseline gap-1.5">
+                <span class="scm-kpi-value text-rose-600" id="scm-kpi-magnitud-critico"><?php echo esc_html((string)($stats['magnitud_critico'] ?? 0)); ?></span>
+              </div>
+              <div class="scm-kpi-indicator scm-kpi-indicator-critico"></div>
             </div>
-            <div class="scm-kpi-value-row flex items-baseline gap-1.5">
-              <span class="scm-kpi-value text-rose-600" id="scm-kpi-magnitud-critico"><?php echo esc_html((string)($stats['magnitud_critico'] ?? 0)); ?></span>
+            <div class="scm-kpi scm-kpi-magnitud scm-kpi-alto" data-kpi="alto">
+              <div class="scm-kpi-header">
+                <span class="scm-kpi-label text-amber-600">ALTOS</span>
+                <span class="material-symbols-outlined scm-kpi-icon text-amber-500">warning</span>
+              </div>
+              <div class="scm-kpi-value-row">
+                <span class="scm-kpi-value text-amber-600" id="scm-kpi-magnitud-alto"><?php echo esc_html((string)($stats['magnitud_alto'] ?? 0)); ?></span>
+              </div>
+              <div class="scm-kpi-indicator scm-kpi-indicator-alto"></div>
             </div>
-            <div class="scm-kpi-indicator scm-kpi-indicator-critico"></div>
-          </div>
-          <div class="scm-kpi scm-kpi-magnitud scm-kpi-alto" data-kpi="alto">
-            <div class="scm-kpi-header">
-              <span class="scm-kpi-label text-amber-600">ALTOS</span>
-              <span class="material-symbols-outlined scm-kpi-icon text-amber-500">warning</span>
+            <div class="scm-kpi scm-kpi-magnitud scm-kpi-medio" data-kpi="medio">
+              <div class="scm-kpi-header">
+                <span class="scm-kpi-label text-blue-600">MEDIOS</span>
+                <span class="material-symbols-outlined scm-kpi-icon text-blue-400">info</span>
+              </div>
+              <div class="scm-kpi-value-row">
+                <span class="scm-kpi-value text-blue-600" id="scm-kpi-magnitud-medio"><?php echo esc_html((string)($stats['magnitud_medio'] ?? 0)); ?></span>
+              </div>
+              <div class="scm-kpi-indicator scm-kpi-indicator-medio"></div>
             </div>
-            <div class="scm-kpi-value-row">
-              <span class="scm-kpi-value text-amber-600" id="scm-kpi-magnitud-alto"><?php echo esc_html((string)($stats['magnitud_alto'] ?? 0)); ?></span>
+            <div class="scm-kpi scm-kpi-magnitud scm-kpi-bajo" data-kpi="bajo">
+              <div class="scm-kpi-header">
+                <span class="scm-kpi-label text-emerald-600">BAJOS</span>
+                <span class="material-symbols-outlined scm-kpi-icon text-emerald-500">check_circle</span>
+              </div>
+              <div class="scm-kpi-value-row">
+                <span class="scm-kpi-value text-emerald-600" id="scm-kpi-magnitud-bajo"><?php echo esc_html((string)($stats['magnitud_bajo'] ?? 0)); ?></span>
+              </div>
+              <div class="scm-kpi-indicator scm-kpi-indicator-bajo"></div>
             </div>
-            <div class="scm-kpi-indicator scm-kpi-indicator-alto"></div>
-          </div>
-          <div class="scm-kpi scm-kpi-magnitud scm-kpi-medio" data-kpi="medio">
-            <div class="scm-kpi-header">
-              <span class="scm-kpi-label text-blue-600">MEDIOS</span>
-              <span class="material-symbols-outlined scm-kpi-icon text-blue-400">info</span>
-            </div>
-            <div class="scm-kpi-value-row">
-              <span class="scm-kpi-value text-blue-600" id="scm-kpi-magnitud-medio"><?php echo esc_html((string)($stats['magnitud_medio'] ?? 0)); ?></span>
-            </div>
-            <div class="scm-kpi-indicator scm-kpi-indicator-medio"></div>
-          </div>
-          <div class="scm-kpi scm-kpi-magnitud scm-kpi-bajo" data-kpi="bajo">
-            <div class="scm-kpi-header">
-              <span class="scm-kpi-label text-emerald-600">BAJOS</span>
-              <span class="material-symbols-outlined scm-kpi-icon text-emerald-500">check_circle</span>
-            </div>
-            <div class="scm-kpi-value-row">
-              <span class="scm-kpi-value text-emerald-600" id="scm-kpi-magnitud-bajo"><?php echo esc_html((string)($stats['magnitud_bajo'] ?? 0)); ?></span>
-            </div>
-            <div class="scm-kpi-indicator scm-kpi-indicator-bajo"></div>
           </div>
         </div>
 
