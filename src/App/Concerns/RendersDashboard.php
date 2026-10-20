@@ -1503,6 +1503,7 @@ trait RendersDashboard
         </div>
       </div>
     </div>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/scm-photo-compress.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/scm-photo-compress.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/ticket-completion-form-state.js?v=' . SCM_VERSION); ?>" data-scm-draft-user="<?php echo self::h((string) \SCM\Core\Auth::userId()); ?>" defer></script>
     <script src="<?php echo $jsUrl; ?>" defer></script>
     <script src="<?php echo $dashboardRuntimeJsUrl; ?>" defer></script>

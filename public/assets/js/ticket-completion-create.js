@@ -147,58 +147,27 @@
     }, []);
   }
 
-  function decodePhoto(file) {
-    if (window.createImageBitmap) {
-      return createImageBitmap(file, { imageOrientation: "from-image" }).catch(function () { return createImageBitmap(file); });
-    }
-    return new Promise(function (resolve, reject) {
-      var url = URL.createObjectURL(file);
-      var image = new Image();
-      image.onload = function () { URL.revokeObjectURL(url); resolve(image); };
-      image.onerror = function () { URL.revokeObjectURL(url); reject(new Error("No se pudo leer " + file.name + ".")); };
-      image.src = url;
-    });
-  }
-
+  // Compresión compartida y tolerante a fallos en celulares (assets/js/scm-photo-compress.js).
   function compressPhoto(file) {
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > MAX_SOURCE_PHOTO_BYTES) {
-      return Promise.reject(new Error("Usa fotos JPG, PNG o WebP de máximo 25 MB antes de comprimir."));
-    }
-    return decodePhoto(file).then(function (image) {
-      var width = image.width || image.naturalWidth;
-      var height = image.height || image.naturalHeight;
-      var ratio = Math.min(1, 1600 / width, 1600 / height);
-      var canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(width * ratio));
-      canvas.height = Math.max(1, Math.round(height * ratio));
-      var context = canvas.getContext("2d", { alpha: false });
-      context.fillStyle = "#fff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      if (typeof image.close === "function") image.close();
-      return new Promise(function (resolve, reject) {
-        canvas.toBlob(function (blob) {
-          blob
-            ? resolve(new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg", lastModified: Date.now() }))
-            : reject(new Error("No se pudo comprimir " + file.name + "."));
-        }, "image/jpeg", 0.78);
-      });
-    });
+    return window.ScmPhotoCompress
+      ? window.ScmPhotoCompress.compress(file)
+      : Promise.resolve(file);
   }
-
   function compressedFormData() {
+    var bytes = 0;
     var data = new FormData(form);
     var inputs = Array.from(form.querySelectorAll("[data-acta-photos], [data-acta-corrective-wrap]:not([hidden]) [data-corrective-photos]"));
     return Promise.all(inputs.map(function (input) {
       var name = input.name;
       data.delete(name);
       return Promise.all(selectedPhotos(input).map(compressPhoto)).then(function (files) {
-        files.forEach(function (file) { data.append(name, file, file.name); });
+        files.forEach(function (file) {
+          // Las fotos que el navegador no pudo comprimir las reduce el servidor (máx. 1,5 MB).
+          bytes += window.ScmPhotoCompress ? window.ScmPhotoCompress.uploadBytes(file) : file.size;
+          data.append(name, file, file.name);
+        });
       });
     })).then(function () {
-      var bytes = Array.from(data.entries()).reduce(function (sum, entry) {
-        return sum + (entry[1] instanceof File ? entry[1].size : 0);
-      }, 0);
       if (bytes > 8 * 1000 * 1000) throw new Error("Las fotos superan 8 MB después de comprimir. Retira algunas evidencias.");
       return data;
     });

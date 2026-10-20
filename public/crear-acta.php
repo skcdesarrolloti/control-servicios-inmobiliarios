@@ -123,6 +123,7 @@ try {
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
   <link rel="stylesheet" href="assets/css/ticket-completion.css?v=<?= $escape(SCM_VERSION) ?>">
   <link rel="stylesheet" href="assets/css/review-page.css?v=<?= $escape(SCM_VERSION . '-' . (string) @filemtime(__DIR__ . '/assets/css/review-page.css')) ?>">
+  <script defer src="assets/js/scm-photo-compress.js?v=<?= $escape(SCM_VERSION . '-' . (string) @filemtime(__DIR__ . '/assets/js/scm-photo-compress.js')) ?>"></script>
   <script defer src="assets/js/ticket-completion-form-state.js?v=<?= $escape(SCM_VERSION) ?>"></script>
   <script defer src="assets/js/ticket-completion-create.js?v=<?= $escape(SCM_VERSION) ?>"></script>
 </head>
