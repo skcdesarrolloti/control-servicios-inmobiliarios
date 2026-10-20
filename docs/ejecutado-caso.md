@@ -28,7 +28,7 @@ En los puntos 5 y 6 cada cambio queda como **nota interna** del caso: indica qui
 
 `case_edit_executor` ("Editar quién ejecuta el caso") controla el botón y el selector del compositor. Mientras no se guarden los permisos con esta opción, lo tienen los cargos con "Editar datos del caso".
 
-## KPI y filtro (Mantenimiento, Preventiva, Entrega y Recibo)
+## KPI y filtro (solo Mantenimiento y Preventiva)
 
 La fila **¿Quién ejecuta?** cuenta los casos del universo filtrado según:
 

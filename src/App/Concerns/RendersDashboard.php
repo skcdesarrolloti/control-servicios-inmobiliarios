@@ -5980,7 +5980,7 @@ trait RendersDashboard
       $main .= $this->render_kpi_card($prefix . 'kpi-' . $suffix, $label, $icon, $tone, $stats[$statKey] ?? 0, $suffix === 'total' ? 'total' : '');
     }
     $more = ($tabKey === 'preventiva' ? $this->render_magnitude_kpis($prefix, $stats) : '')
-      . (in_array($tabKey, ['entrega', 'preventiva', 'recibo'], true) ? $this->render_executor_kpis($prefix, $stats) : '');
+      . ($tabKey === 'preventiva' ? $this->render_executor_kpis($prefix, $stats) : '');
 
     return '<div class="scm-kpis-accordion" data-scm-kpis-accordion>'
       . '<div class="scm-kpis scm-kpis-stitch scm-kpis-main" style="--scm-kpi-cols: ' . count($cards) . '">' . $main . '</div>'

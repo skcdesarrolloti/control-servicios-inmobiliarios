@@ -58,9 +58,9 @@ trait GenericQueryConcern
       'fDanos' => $clean($input[$prefix . 'danos'] ?? ''),
       'fMagnitud' => $clean($input[$prefix . 'magnitud'] ?? ''),
       'fMagnitudCaso' => $clean($input[$prefix . 'magnitud_caso'] ?? ''),
-      'fEjecutado' => $clean($input[$prefix . 'ejecutado'] ?? ''),
-      // Solo las pestañas con cotizaciones (Entrega, Preventiva, Recibo) muestran "¿Quién ejecuta?".
-      '_scmExecutorKpis' => in_array($prefix, ['scmeg_', 'scmpv_', 'scmrc_'], true),
+      // "¿Quién ejecuta?" solo aplica en Mantenimiento y Preventiva; en otras pestañas no filtra.
+      'fEjecutado' => $prefix === 'scmpv_' ? $clean($input[$prefix . 'ejecutado'] ?? '') : '',
+      '_scmExecutorKpis' => $prefix === 'scmpv_',
       'fPerturbacion' => $clean($input[$prefix . 'perturbacion'] ?? ''),
       'fAtraso' => $clean($input[$prefix . 'atraso'] ?? ''),
       'fSinActualizar' => $clean($input[$prefix . 'sin_actualizar'] ?? ''),
