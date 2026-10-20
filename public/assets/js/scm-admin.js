@@ -9699,8 +9699,10 @@
       }
       if (subtitle) {
         var creadoDate = btn.dataset.creado || "";
-        var dirText = btn.dataset.direccion || "";
-        var barrioText = btn.dataset.barrio || "";
+        var dirText = (btn.dataset.direccion || "").trim();
+        var barrioText = (btn.dataset.barrio || "").trim();
+        if (dirText === "-") dirText = "";
+        if (barrioText === "-") barrioText = "";
         var contratoText = (btn.dataset.contrato || "")
           .trim()
           .replace(/^#+/, "");
@@ -10142,9 +10144,9 @@
           '<div class="scm-case-composer-tabs" role="tablist">' +
           '<button type="button" class="scm-composer-tab active" data-composer-tab="reply">' +
           '<span class="material-symbols-outlined text-[16px]">reply</span>' +
-          "<span>" +
-          (isPublicPqr ? "Responder solicitud" : "Responder caso") +
-          "</span>" +
+          '<span>Responder<span class="scm-composer-tab-extra">' +
+          (isPublicPqr ? " solicitud" : " caso") +
+          "</span></span>" +
           "</button>" +
           '<button type="button" class="scm-composer-tab" data-composer-tab="followup">' +
           '<span class="material-symbols-outlined text-[16px]">add_comment</span>' +
@@ -10152,7 +10154,7 @@
           "</button>" +
           '<button type="button" class="scm-composer-tab" data-composer-tab="note">' +
           '<span class="material-symbols-outlined text-[16px]">lock</span>' +
-          "<span>Nota Interna (Privada)</span>" +
+          '<span>Nota Interna<span class="scm-composer-tab-extra"> (Privada)</span></span>' +
           "</button>" +
           "</div>" +
           "</div>" +

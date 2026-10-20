@@ -18,3 +18,5 @@
 
 /storage/public-services-payments/*
 !/storage/public-services-payments/.htaccess
+
+/node_modules/
