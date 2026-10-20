@@ -1016,61 +1016,13 @@ trait RendersDashboard
           </div>
         </div>
 
-        <?php /* En celular solo se ve Total; este botón despliega los demás indicadores. */ ?>
-        <button type="button" class="scm-kpis-mobile-toggle" data-scm-kpis-toggle aria-expanded="false" aria-controls="scm-mant-kpis-more">
-          <span data-scm-kpis-toggle-label>Ver más indicadores</span>
-          <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
-        </button>
         <div class="scm-kpis-more" id="scm-mant-kpis-more">
 
-        <div class="scm-kpis-group scm-kpis-magnitude-group" data-scm-kpi-group="magnitud">
-          <div class="scm-kpis-group-title"><span class="material-symbols-outlined">local_fire_department</span>Magnitud del caso</div>
-          <div class="scm-kpis scm-kpis-stitch scm-kpis-magnitude">
-            <div class="scm-kpi scm-kpi-magnitud scm-kpi-critico" data-kpi="critico">
-              <div class="scm-kpi-header">
-                <span class="scm-kpi-label text-rose-600">CRÍTICOS</span>
-                <span class="material-symbols-outlined scm-kpi-icon text-rose-500">local_fire_department</span>
-              </div>
-              <div class="scm-kpi-value-row flex items-baseline gap-1.5">
-                <span class="scm-kpi-value text-rose-600" id="scm-kpi-magnitud-critico"><?php echo esc_html((string)($stats['magnitud_critico'] ?? 0)); ?></span>
-              </div>
-              <div class="scm-kpi-indicator scm-kpi-indicator-critico"></div>
-            </div>
-            <div class="scm-kpi scm-kpi-magnitud scm-kpi-alto" data-kpi="alto">
-              <div class="scm-kpi-header">
-                <span class="scm-kpi-label text-amber-600">ALTOS</span>
-                <span class="material-symbols-outlined scm-kpi-icon text-amber-500">warning</span>
-              </div>
-              <div class="scm-kpi-value-row">
-                <span class="scm-kpi-value text-amber-600" id="scm-kpi-magnitud-alto"><?php echo esc_html((string)($stats['magnitud_alto'] ?? 0)); ?></span>
-              </div>
-              <div class="scm-kpi-indicator scm-kpi-indicator-alto"></div>
-            </div>
-            <div class="scm-kpi scm-kpi-magnitud scm-kpi-medio" data-kpi="medio">
-              <div class="scm-kpi-header">
-                <span class="scm-kpi-label text-blue-600">MEDIOS</span>
-                <span class="material-symbols-outlined scm-kpi-icon text-blue-400">info</span>
-              </div>
-              <div class="scm-kpi-value-row">
-                <span class="scm-kpi-value text-blue-600" id="scm-kpi-magnitud-medio"><?php echo esc_html((string)($stats['magnitud_medio'] ?? 0)); ?></span>
-              </div>
-              <div class="scm-kpi-indicator scm-kpi-indicator-medio"></div>
-            </div>
-            <div class="scm-kpi scm-kpi-magnitud scm-kpi-bajo" data-kpi="bajo">
-              <div class="scm-kpi-header">
-                <span class="scm-kpi-label text-emerald-600">BAJOS</span>
-                <span class="material-symbols-outlined scm-kpi-icon text-emerald-500">check_circle</span>
-              </div>
-              <div class="scm-kpi-value-row">
-                <span class="scm-kpi-value text-emerald-600" id="scm-kpi-magnitud-bajo"><?php echo esc_html((string)($stats['magnitud_bajo'] ?? 0)); ?></span>
-              </div>
-              <div class="scm-kpi-indicator scm-kpi-indicator-bajo"></div>
-            </div>
-          </div>
-        </div>
+        <?php echo $this->render_magnitude_kpis('scm-', $stats); ?>
 
         <?php echo $this->render_executor_kpis('scm-', $stats); ?>
         </div>
+        <?php echo $this->render_kpis_toggle('scm-mant-kpis-more'); ?>
         </div>
 
         <div class="scm-filter-card card">
@@ -1078,7 +1030,7 @@ trait RendersDashboard
             <div class="flex items-center gap-2.5">
               <span class="material-symbols-outlined text-[20px] text-slate-700">tune</span>
               <h3 class="text-sm font-bold text-slate-800 m-0">Filtros Avanzados de Casos</h3>
-              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">18 Criterios</span>
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100" data-scm-filter-criteria-count>Criterios</span>
             </div>
             <button type="button" class="scm-filter-collapse-btn flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 font-medium" id="scm-filter-collapse-toggle">
               <span id="scm-filter-collapse-label">Colapsar panel</span>
@@ -1230,101 +1182,7 @@ trait RendersDashboard
         $gPaginationHtml = $gLoaded ? $this->get_generic_tickets_module()->render_generic_pagination($gTabKey, $gPagination) : ''; ?>
         <div class="scm-open-topic-panel<?php echo $activeOpenTopic === $gTabKey ? ' active' : ''; ?>" id="scm-panel-<?php echo esc_attr($gTabKey); ?>" data-open-topic="<?php echo esc_attr($gTabKey); ?>" data-scm-loaded="<?php echo $gLoaded ? '1' : '0'; ?>">
           <span id="scm-<?php echo esc_attr($gTabKey); ?>-count" style="display:none;"><?php echo esc_html((string)($gStats['total'] ?? 0)); ?></span>
-          <div class="scm-kpis scm-kpis-daisy">
-            <div class="scm-kpi">
-              <div class="scm-kpi-label">Total</div>
-              <div class="scm-kpi-value" id="scm-<?php echo esc_attr($gTabKey); ?>-kpi-total"><?php echo esc_html((string)($gStats['total'] ?? 0)); ?></div>
-            </div>
-            <?php if ($gTabKey === 'entrega'): ?>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Con revisi&oacute;n de entrega</div>
-                <div class="scm-kpi-value" id="scm-entrega-kpi-con-rev-entrega"><?php echo esc_html((string)($gStats['con_revision_entrega'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Sin revisi&oacute;n de entrega</div>
-                <div class="scm-kpi-value" id="scm-entrega-kpi-sin-rev-entrega"><?php echo esc_html((string)($gStats['sin_revision_entrega'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Con inventario</div>
-                <div class="scm-kpi-value" id="scm-entrega-kpi-con-inventario"><?php echo esc_html((string)($gStats['con_inventario'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Sin inventario</div>
-                <div class="scm-kpi-value" id="scm-entrega-kpi-sin-inventario"><?php echo esc_html((string)($gStats['sin_inventario'] ?? 0)); ?></div>
-              </div>
-            <?php elseif (in_array($gTabKey, ['contractual', 'contable', 'certificaciones'], true)): ?>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Nuevo</div>
-                <div class="scm-kpi-value" id="scm-<?php echo esc_attr($gTabKey); ?>-kpi-nuevo"><?php echo esc_html((string)($gStats['estado_nuevo'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">En proceso</div>
-                <div class="scm-kpi-value" id="scm-<?php echo esc_attr($gTabKey); ?>-kpi-en-proceso"><?php echo esc_html((string)($gStats['estado_en_proceso'] ?? 0)); ?></div>
-              </div>
-            <?php elseif ($gTabKey === 'recibo'): ?>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Con cita</div>
-                <div class="scm-kpi-value" id="scm-recibo-kpi-con-cita"><?php echo esc_html((string)($gStats['con_cita'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Sin cita</div>
-                <div class="scm-kpi-value" id="scm-recibo-kpi-sin-cita"><?php echo esc_html((string)($gStats['sin_cita'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Con revisi&oacute;n de recibo</div>
-                <div class="scm-kpi-value" id="scm-recibo-kpi-con-rev-recibo"><?php echo esc_html((string)($gStats['con_revision_recibo'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Sin revisi&oacute;n de recibo</div>
-                <div class="scm-kpi-value" id="scm-recibo-kpi-sin-rev-recibo"><?php echo esc_html((string)($gStats['sin_revision_recibo'] ?? 0)); ?></div>
-              </div>
-            <?php else: ?>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Con cotizaci&oacute;n</div>
-                <div class="scm-kpi-value" id="scm-<?php echo esc_attr($gTabKey); ?>-kpi-con-cotz"><?php echo esc_html((string)($gStats['con_cotizacion'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Sin cotizaci&oacute;n</div>
-                <div class="scm-kpi-value" id="scm-<?php echo esc_attr($gTabKey); ?>-kpi-sin-cotz"><?php echo esc_html((string)($gStats['sin_cotizacion'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Con revisi&oacute;n</div>
-                <div class="scm-kpi-value" id="scm-<?php echo esc_attr($gTabKey); ?>-kpi-con-prev"><?php echo esc_html((string)($gStats['con_revision'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Sin revisi&oacute;n</div>
-                <div class="scm-kpi-value" id="scm-<?php echo esc_attr($gTabKey); ?>-kpi-sin-prev"><?php echo esc_html((string)($gStats['sin_revision'] ?? 0)); ?></div>
-              </div>
-            <?php endif; ?>
-
-            <?php if ($gTabKey === 'preventiva'): ?>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Con da&ntilde;os</div>
-                <div class="scm-kpi-value" id="scm-<?php echo esc_attr($gTabKey); ?>-kpi-danos-si"><?php echo esc_html((string)($gStats['danos_si'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi">
-                <div class="scm-kpi-label">Sin da&ntilde;os</div>
-                <div class="scm-kpi-value" id="scm-<?php echo esc_attr($gTabKey); ?>-kpi-danos-no"><?php echo esc_html((string)($gStats['danos_no'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi scm-kpi-magnitud scm-kpi-critico">
-                <div class="scm-kpi-label">Cr&iacute;ticos</div>
-                <div class="scm-kpi-value" id="scm-<?php echo esc_attr($gTabKey); ?>-kpi-magnitud-critico"><?php echo esc_html((string)($gStats['magnitud_critico'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi scm-kpi-magnitud scm-kpi-alto">
-                <div class="scm-kpi-label">Altos</div>
-                <div class="scm-kpi-value" id="scm-<?php echo esc_attr($gTabKey); ?>-kpi-magnitud-alto"><?php echo esc_html((string)($gStats['magnitud_alto'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi scm-kpi-magnitud scm-kpi-medio">
-                <div class="scm-kpi-label">Medios</div>
-                <div class="scm-kpi-value" id="scm-<?php echo esc_attr($gTabKey); ?>-kpi-magnitud-medio"><?php echo esc_html((string)($gStats['magnitud_medio'] ?? 0)); ?></div>
-              </div>
-              <div class="scm-kpi scm-kpi-magnitud scm-kpi-bajo">
-                <div class="scm-kpi-label">Bajos</div>
-                <div class="scm-kpi-value" id="scm-<?php echo esc_attr($gTabKey); ?>-kpi-magnitud-bajo"><?php echo esc_html((string)($gStats['magnitud_bajo'] ?? 0)); ?></div>
-              </div>
-            <?php endif; ?>
-          </div>
-          <?php if (in_array($gTabKey, ['entrega', 'preventiva', 'recibo'], true)) echo $this->render_executor_kpis('scm-' . $gTabKey . '-', $gStats); ?>
+          <?php echo $this->render_generic_tab_kpis($gTabKey, (array) $gStats); ?>
           <?php echo $gFormHtml; ?>
           <div class="scm-cards-wrap">
             <div class="scm-ticket-cards" id="scm-cards-<?php echo esc_attr($gTabKey); ?>"><?php echo $gCardsHtml; ?></div>
@@ -6051,6 +5909,93 @@ trait RendersDashboard
       'por_estado_comercial' => $byCommercial,
       'por_estado_administrativo' => $byAdmin,
     ];
+  }
+
+  /** Tarjeta KPI con el estilo de Mantenimiento: etiqueta, icono, valor y barra de color ($tone). */
+  private function render_kpi_card(string $valueId, string $label, string $icon, string $tone, $value, string $dataKpi = ''): string
+  {
+    return '<div class="scm-kpi scm-kpi-tone-' . esc_attr($tone) . '"' . ($dataKpi !== '' ? ' data-kpi="' . esc_attr($dataKpi) . '"' : '') . '>'
+      . '<div class="scm-kpi-header"><span class="scm-kpi-label">' . esc_html(mb_strtoupper($label, 'UTF-8')) . '</span><span class="material-symbols-outlined scm-kpi-icon">' . esc_html($icon) . '</span></div>'
+      . '<div class="scm-kpi-value-row"><span class="scm-kpi-value" id="' . esc_attr($valueId) . '">' . esc_html((string) $value) . '</span></div>'
+      . '<div class="scm-kpi-indicator"></div>'
+      . '</div>';
+  }
+
+  /** Fila "Magnitud del caso" con su título; $idPrefix: 'scm-' o 'scm-<pestaña>-'. */
+  private function render_magnitude_kpis(string $idPrefix, array $stats): string
+  {
+    $cards = [
+      'critico' => ['Críticos', 'local_fire_department'],
+      'alto' => ['Altos', 'warning'],
+      'medio' => ['Medios', 'info'],
+      'bajo' => ['Bajos', 'check_circle'],
+    ];
+    $html = '<div class="scm-kpis-group scm-kpis-magnitude-group" data-scm-kpi-group="magnitud">'
+      . '<div class="scm-kpis-group-title"><span class="material-symbols-outlined">local_fire_department</span>Magnitud del caso</div>'
+      . '<div class="scm-kpis scm-kpis-stitch scm-kpis-magnitude">';
+    foreach ($cards as $key => [$label, $icon]) {
+      $html .= '<div class="scm-kpi scm-kpi-magnitud scm-kpi-' . esc_attr($key) . '" data-kpi="' . esc_attr($key) . '">'
+        . '<div class="scm-kpi-header"><span class="scm-kpi-label">' . esc_html(mb_strtoupper($label, 'UTF-8')) . '</span><span class="material-symbols-outlined scm-kpi-icon">' . esc_html($icon) . '</span></div>'
+        . '<div class="scm-kpi-value-row"><span class="scm-kpi-value" id="' . esc_attr($idPrefix . 'kpi-magnitud-' . $key) . '">' . esc_html((string) ($stats['magnitud_' . $key] ?? 0)) . '</span></div>'
+        . '<div class="scm-kpi-indicator scm-kpi-indicator-' . esc_attr($key) . '"></div>'
+        . '</div>';
+    }
+    return $html . '</div></div>';
+  }
+
+  /**
+   * KPIs de las pestañas Preventiva, Entrega, Recibo, Contractual, Contable y Certificaciones con el
+   * mismo diseño de Mantenimiento: cada pestaña muestra solo los indicadores que le aplican.
+   */
+  private function render_generic_tab_kpis(string $tabKey, array $stats): string
+  {
+    $prefix = 'scm-' . $tabKey . '-';
+    $cards = [['total', 'Total', 'inbox', 'navy', 'total']];
+    if ($tabKey === 'entrega') {
+      $cards[] = ['con-rev-entrega', 'Con revisión de entrega', 'fact_check', 'blue', 'con_revision_entrega'];
+      $cards[] = ['sin-rev-entrega', 'Sin revisión de entrega', 'visibility_off', 'slate', 'sin_revision_entrega'];
+      $cards[] = ['con-inventario', 'Con inventario', 'inventory_2', 'green', 'con_inventario'];
+      $cards[] = ['sin-inventario', 'Sin inventario', 'inventory', 'orange', 'sin_inventario'];
+    } elseif (in_array($tabKey, ['contractual', 'contable', 'certificaciones'], true)) {
+      $cards[] = ['nuevo', 'Nuevo', 'fiber_new', 'blue', 'estado_nuevo'];
+      $cards[] = ['en-proceso', 'En proceso', 'pending', 'orange', 'estado_en_proceso'];
+    } elseif ($tabKey === 'recibo') {
+      $cards[] = ['con-cita', 'Con cita', 'event_available', 'green', 'con_cita'];
+      $cards[] = ['sin-cita', 'Sin cita', 'event_busy', 'orange', 'sin_cita'];
+      $cards[] = ['con-rev-recibo', 'Con revisión de recibo', 'fact_check', 'blue', 'con_revision_recibo'];
+      $cards[] = ['sin-rev-recibo', 'Sin revisión de recibo', 'visibility_off', 'slate', 'sin_revision_recibo'];
+    } else {
+      $cards[] = ['con-cotz', 'Con cotización', 'receipt_long', 'green', 'con_cotizacion'];
+      $cards[] = ['sin-cotz', 'Sin cotización', 'note_add', 'orange', 'sin_cotizacion'];
+      $cards[] = ['con-prev', 'Con revisión', 'fact_check', 'blue', 'con_revision'];
+      $cards[] = ['sin-prev', 'Sin revisión', 'visibility_off', 'slate', 'sin_revision'];
+    }
+    if ($tabKey === 'preventiva') {
+      $cards[] = ['danos-si', 'Con daños', 'report', 'red', 'danos_si'];
+      $cards[] = ['danos-no', 'Sin daños', 'verified', 'teal', 'danos_no'];
+    }
+
+    $main = '';
+    foreach ($cards as [$suffix, $label, $icon, $tone, $statKey]) {
+      $main .= $this->render_kpi_card($prefix . 'kpi-' . $suffix, $label, $icon, $tone, $stats[$statKey] ?? 0, $suffix === 'total' ? 'total' : '');
+    }
+    $more = ($tabKey === 'preventiva' ? $this->render_magnitude_kpis($prefix, $stats) : '')
+      . (in_array($tabKey, ['entrega', 'preventiva', 'recibo'], true) ? $this->render_executor_kpis($prefix, $stats) : '');
+
+    return '<div class="scm-kpis-accordion" data-scm-kpis-accordion>'
+      . '<div class="scm-kpis scm-kpis-stitch scm-kpis-main" style="--scm-kpi-cols: ' . count($cards) . '">' . $main . '</div>'
+      . '<div class="scm-kpis-more" id="' . esc_attr($prefix . 'kpis-more') . '">' . $more . '</div>'
+      . $this->render_kpis_toggle($prefix . 'kpis-more')
+      . '</div>';
+  }
+
+  /** Botón del acordeón de KPIs (celular: "Ver más"; PC: permite ocultarlos). */
+  private function render_kpis_toggle(string $controls): string
+  {
+    return '<button type="button" class="scm-kpis-toggle" data-scm-kpis-toggle aria-expanded="false" aria-controls="' . esc_attr($controls) . '">'
+      . '<span data-scm-kpis-toggle-label>Ver más indicadores</span>'
+      . '<span class="material-symbols-outlined" aria-hidden="true">expand_more</span>'
+      . '</button>';
   }
 
   /** Fila "¿Quién ejecuta?" (ver docs/ejecutado-caso.md); $idPrefix: 'scm-' o 'scm-<pestaña>-'. */

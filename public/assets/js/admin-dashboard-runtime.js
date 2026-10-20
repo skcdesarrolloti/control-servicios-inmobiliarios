@@ -18325,21 +18325,86 @@
       syncKpiActiveState(form);
     }
 
-    // En celular los KPIs de Mantenimiento muestran solo Total; el botón despliega el resto.
-    if (!root._scmKpisAccordionBound) root.addEventListener("click", function (event) {
-      var toggle = event.target && event.target.closest
-        ? event.target.closest("[data-scm-kpis-toggle]")
-        : null;
+    // KPIs de Mantenimiento en acordeón. Celular: solo Total y el botón despliega el resto
+    // (.is-open). PC: todo visible y el botón lo oculta (.is-collapsed, recordado en el navegador).
+    // "Colapsar panel" de los filtros también se recuerda.
+    var KPIS_COLLAPSED_KEY = "scm-mant-kpis-collapsed";
+    var FILTERS_COLLAPSED_KEY = "scm-mant-filters-collapsed";
+    var mobileKpis = window.matchMedia ? window.matchMedia("(max-width: 640px)") : null;
+    function readPref(key) {
+      try { return window.localStorage.getItem(key) === "1"; } catch (e) { return false; }
+    }
+    function writePref(key, value) {
+      try { window.localStorage.setItem(key, value ? "1" : "0"); } catch (e) {}
+    }
+    function syncKpisAccordion(accordion) {
+      var toggle = accordion.querySelector("[data-scm-kpis-toggle]");
       if (!toggle) return;
-      var accordion = toggle.closest("[data-scm-kpis-accordion]");
-      if (!accordion) return;
-      var open = !accordion.classList.contains("is-open");
-      accordion.classList.toggle("is-open", open);
-      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      var expanded = mobileKpis && mobileKpis.matches
+        ? accordion.classList.contains("is-open")
+        : !accordion.classList.contains("is-collapsed");
+      toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
       var label = toggle.querySelector("[data-scm-kpis-toggle-label]");
-      if (label) label.textContent = open ? "Ocultar indicadores" : "Ver más indicadores";
+      if (label) label.textContent = expanded ? "Ocultar indicadores" : "Ver más indicadores";
+    }
+    function syncFilterPanel(card, collapsed) {
+      card.classList.toggle("is-collapsed", collapsed);
+      var button = card.querySelector("#scm-filter-collapse-toggle");
+      if (button) button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      var label = card.querySelector("#scm-filter-collapse-label");
+      if (label) label.textContent = collapsed ? "Expandir panel" : "Colapsar panel";
+      var icon = card.querySelector("#scm-filter-collapse-icon");
+      if (icon) icon.textContent = collapsed ? "expand_more" : "expand_less";
+    }
+    root.querySelectorAll("[data-scm-kpis-accordion]").forEach(function (accordion) {
+      accordion.classList.toggle("is-collapsed", readPref(KPIS_COLLAPSED_KEY));
+      syncKpisAccordion(accordion);
     });
-    root._scmKpisAccordionBound = true;
+    var filterCollapseButton = root.querySelector("#scm-filter-collapse-toggle");
+    var filterCard = filterCollapseButton ? filterCollapseButton.closest(".scm-filter-card") : null;
+    if (filterCard) {
+      filterCollapseButton.setAttribute("aria-controls", "scm-form");
+      syncFilterPanel(filterCard, readPref(FILTERS_COLLAPSED_KEY));
+      var criteria = filterCard.querySelector("[data-scm-filter-criteria-count]");
+      if (criteria) {
+        var criteriaCount = filterCard.querySelectorAll("#scm-filter-grid .scm-field").length;
+        criteria.textContent = criteriaCount + " Criterios";
+      }
+    }
+    if (!root._scmKpisAccordionBound) {
+      root.addEventListener("click", function (event) {
+        var target = event.target && event.target.closest ? event.target : null;
+        if (!target) return;
+        var toggle = target.closest("[data-scm-kpis-toggle]");
+        var accordion = toggle ? toggle.closest("[data-scm-kpis-accordion]") : null;
+        if (accordion) {
+          if (mobileKpis && mobileKpis.matches) {
+            accordion.classList.toggle("is-open");
+          } else {
+            var collapsed = !accordion.classList.contains("is-collapsed");
+            accordion.classList.toggle("is-collapsed", collapsed);
+            writePref(KPIS_COLLAPSED_KEY, collapsed);
+          }
+          syncKpisAccordion(accordion);
+          return;
+        }
+        var collapseButton = target.closest("#scm-filter-collapse-toggle");
+        var card = collapseButton ? collapseButton.closest(".scm-filter-card") : null;
+        if (card) {
+          var nowCollapsed = !card.classList.contains("is-collapsed");
+          syncFilterPanel(card, nowCollapsed);
+          writePref(FILTERS_COLLAPSED_KEY, nowCollapsed);
+        }
+      });
+      if (mobileKpis) {
+        var resync = function () {
+          root.querySelectorAll("[data-scm-kpis-accordion]").forEach(syncKpisAccordion);
+        };
+        if (mobileKpis.addEventListener) mobileKpis.addEventListener("change", resync);
+        else if (mobileKpis.addListener) mobileKpis.addListener(resync);
+      }
+      root._scmKpisAccordionBound = true;
+    }
 
     root.querySelectorAll(".scm-open-topic-panel .scm-kpi").forEach(function (card) {
       var key = kpiKey(card);
