@@ -9275,15 +9275,11 @@
           fd.append("additional_emails", additionalEmails);
         }
 
-        if (mode !== "note") {
-          composerFiles.forEach(function (file) {
-            if (mode === "reply") {
-              fd.append("imagen[]", file);
-            } else {
-              fd.append("evidencia[]", file);
-            }
-          });
-        }
+        // Fotos elegidas, pegadas o arrastradas se comprimen al enviar (scm-photo-compress.js).
+        var composerUploads = mode !== "note" ? composerFiles.slice() : [];
+        var composerUploadsReady = window.ScmPhotoCompress
+          ? window.ScmPhotoCompress.prepareAll(composerUploads)
+          : Promise.resolve(composerUploads);
 
         if (mode !== "note") {
           validDocs.forEach(function (doc) {
@@ -9353,7 +9349,13 @@
           fd.append("observacion", text);
         }
 
-        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+        composerUploadsReady
+          .then(function (uploads) {
+            uploads.forEach(function (file) {
+              fd.append(mode === "reply" ? "imagen[]" : "evidencia[]", file);
+            });
+            return fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" });
+          })
           .then(function (r) {
             return r.json();
           })

@@ -355,7 +355,7 @@
         if (!enabled) clearPastedImages();
         renderFiles();
       };
-      const addPastedImages = blobs => {
+      const addPastedImages = async blobs => {
         if (busy || !selected || !assistantChoice || !current.isConnected) return;
         const allowedTypes = {'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp'};
         if (blobs.some(blob => !allowedTypes[blob.type])) { showError('Pega imágenes en formato JPG, PNG o WebP.'); return; }
@@ -365,10 +365,11 @@
         }
         form.elements.has_attachments.value = 'Si';
         form.elements.has_attachments.onchange();
-        blobs.forEach(blob => {
-          const file = new File([blob], `captura-${Date.now()}-${++captureNumber}.${allowedTypes[blob.type]}`, {type: blob.type});
-          pastedImages.push({file, url: URL.createObjectURL(file)});
-        });
+        const named = blobs.map(blob => new File([blob], `captura-${Date.now()}-${++captureNumber}.${allowedTypes[blob.type]}`, {type: blob.type}));
+        // Las capturas pegadas se comprimen igual que las fotos elegidas (scm-photo-compress.js).
+        const prepared = window.ScmPhotoCompress ? await window.ScmPhotoCompress.prepareAll(named) : named;
+        if (!current.isConnected) return;
+        prepared.forEach(file => pastedImages.push({file, url: URL.createObjectURL(file)}));
         renderFiles();
         showError('');
         pasteStatus.textContent = blobs.length === 1 ? 'Captura agregada. Puedes pegar otra o quitarla antes de guardar.' : `${blobs.length} capturas agregadas. Puedes revisarlas antes de guardar.`;

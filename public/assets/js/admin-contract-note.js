@@ -10,6 +10,8 @@
   const icon = name => `<span class="material-symbols-outlined" aria-hidden="true">${name}</span>`;
   // Las imágenes se reducen a 1600 px en JPEG antes de subirlas (el servidor vuelve a comprimir).
   const compressImage = async file => {
+    // Compresión compartida: una foto a la vez y ya reducida, para no agotar la memoria del celular.
+    if (window.ScmPhotoCompress) return window.ScmPhotoCompress.prepare(file);
     try {
       const bitmap = await createImageBitmap(file);
       const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));

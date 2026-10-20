@@ -163,5 +163,59 @@
     return uncompressed && uncompressed.has(file) ? Math.min(file.size, SERVER_COMPRESSED_BYTES) : file.size;
   }
 
-  window.ScmPhotoCompress = { compress: compress, uploadBytes: uploadBytes };
+  function compressible(file) {
+    return !!file && !!imageType(file) && file.size > 0 && file.size <= MAX_SOURCE_BYTES;
+  }
+
+  // Para adjuntos generales: comprime JPG/PNG/WebP y deja intacto lo demás (PDF, HEIC, GIF…).
+  // Nunca rechaza: si el navegador no puede, se sube el original y lo comprime el servidor.
+  function prepare(file) {
+    if (!compressible(file)) return Promise.resolve(file);
+    return compress(file).catch(function () {
+      return file;
+    });
+  }
+
+  function prepareAll(files) {
+    return Promise.all(Array.prototype.map.call(files || [], prepare));
+  }
+
+  // Cualquier <input type="file"> del sitio con fotos se comprime antes de que el formulario
+  // las lea. Los módulos que comprimen por su cuenta se excluyen para no recomprimir.
+  var OWN_COMPRESSION = "[data-acta-photos], [data-corrective-photos], [data-scm-composer-files], [data-images-input], [data-scm-no-auto-compress]";
+  function onChange(event) {
+    var input = event.target;
+    if (!input || input.tagName !== "INPUT" || input.type !== "file") return;
+    if (input._scmPhotoRedispatch) {
+      input._scmPhotoRedispatch = false;
+      return;
+    }
+    if (typeof DataTransfer !== "function" || (input.matches && input.matches(OWN_COMPRESSION))) return;
+    var files = Array.prototype.slice.call(input.files || []);
+    if (!files.some(compressible)) return;
+    event.stopImmediatePropagation();
+    input.setAttribute("aria-busy", "true");
+    prepareAll(files).then(function (prepared) {
+      try {
+        var transfer = new DataTransfer();
+        prepared.forEach(function (file) {
+          transfer.items.add(file);
+        });
+        input.files = transfer.files;
+      } catch (error) {
+        // Navegador sin DataTransfer editable: se envían los originales.
+      }
+      input.removeAttribute("aria-busy");
+      input._scmPhotoRedispatch = true;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+  document.addEventListener("change", onChange, true);
+
+  window.ScmPhotoCompress = {
+    compress: compress,
+    prepare: prepare,
+    prepareAll: prepareAll,
+    uploadBytes: uploadBytes,
+  };
 })();

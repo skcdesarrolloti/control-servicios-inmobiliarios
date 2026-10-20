@@ -107,6 +107,29 @@ const helper = fs.readFileSync(path.join(__dirname, '../public/assets/js/scm-pho
     assert.equal(order, 1);
     pass('photos are decoded one at a time');
 
+    const auto = await page.evaluate(async () => {
+      document.body.insertAdjacentHTML('beforeend', '<form><input type="file" id="generic" multiple><input type="file" id="own" data-acta-photos multiple></form>');
+      const seen = { generic: [], own: [] };
+      const generic = document.getElementById('generic'), own = document.getElementById('own');
+      generic.onchange = () => seen.generic.push([...generic.files].map(f => ({ name: f.name, type: f.type, size: f.size })));
+      own.addEventListener('change', () => seen.own.push([...own.files].map(f => f.size)));
+      const big = await makePhoto(3600, 2700, 'image/jpeg', 'camara.jpg');
+      const pdf = new File(['%PDF-1.4 prueba'], 'soporte.pdf', { type: 'application/pdf' });
+      const put = (input, files) => { const dt = new DataTransfer(); files.forEach(f => dt.items.add(f)); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); };
+      put(generic, [big, pdf]);
+      put(own, [big]);
+      await new Promise(r => setTimeout(r, 1500));
+      return { seen, bigSize: big.size, pdfSize: pdf.size, busy: generic.getAttribute('aria-busy') };
+    });
+    assert.equal(auto.seen.generic.length, 1, 'form handler runs once, after compression');
+    assert.equal(auto.seen.generic[0][0].type, 'image/jpeg');
+    assert.ok(auto.seen.generic[0][0].size < auto.bigSize, 'photo reaches the form already compressed');
+    assert.deepEqual(auto.seen.generic[0][1], { name: 'soporte.pdf', type: 'application/pdf', size: auto.pdfSize });
+    assert.equal(auto.busy, null);
+    pass('any photo input on the site is compressed before its form reads it; documents stay untouched');
+    assert.deepEqual(auto.seen.own, [[auto.bigSize]]);
+    pass('inputs that compress on their own are left alone');
+
     console.log(checks + ' photo compression checks passed.');
   } finally {
     await browser.close();
