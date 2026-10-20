@@ -197,6 +197,8 @@ trait TimelineEnrichmentConcern
           $row['estado_respuesta_cotizacion_mantenimiento'] = $cotRespEstado;
         }
       }
+      // Solo pisa lo aplicado por id_cotizacion_mantenimiento si esta cotización es más reciente.
+      $row = \SCM\Support\CurrentQuote::applyToRow($row, \SCM\Support\CurrentQuote::pick($cotCandidates));
     }
     unset($row);
 

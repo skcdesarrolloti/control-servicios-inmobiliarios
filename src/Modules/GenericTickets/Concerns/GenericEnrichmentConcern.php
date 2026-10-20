@@ -284,6 +284,7 @@ trait GenericEnrichmentConcern
         'inicio_trabajo',
         'final_trabajo',
         'id_acta_satisfaccion',
+        'se_envio',
       ]
     );
 
@@ -295,10 +296,19 @@ trait GenericEnrichmentConcern
       [
         '_ID',
         'id_ticket',
+        'estado',
         'perturbacion',
         'justificacion_perturbacion',
         'valor_bonificacion',
         'area_afectada',
+        'fecha',
+        'fecha_envio',
+        'fecha_respuesta',
+        'cct_created',
+        'cct_modified',
+        'final_trabajo',
+        'id_acta_satisfaccion',
+        'se_envio',
       ]
     );
 
@@ -410,22 +420,27 @@ trait GenericEnrichmentConcern
         }
       }
 
-      $cotRow = $this->first_related_row($cotRows, $row['id_cotizacion_mantenimiento'] ?? $row['id_cotizacion'] ?? '');
-      if (!is_array($cotRow)) {
-        foreach ($this->resolve_ticket_lookup_keys($row) as $tk) {
-          if (!empty($cotRowsByTicket[$tk]) && is_array($cotRowsByTicket[$tk][0] ?? null)) {
-            $chosen = $cotRowsByTicket[$tk][0];
-            foreach ($cotRowsByTicket[$tk] as $candidate) {
-              if (!is_array($candidate)) {
-                continue;
-              }
-              $pVal = strtolower(trim((string) ($candidate['perturbacion'] ?? '')));
-              if ($pVal !== '' && $pVal !== '0' && $pVal !== 'no' && $pVal !== 'false' && $pVal !== 'null') {
-                $chosen = $candidate;
-                break;
-              }
+      $cotIdCandidates = [];
+      foreach ($this->split_id_values($row['id_cotizacion_mantenimiento'] ?? $row['id_cotizacion'] ?? '') as $cotIdValue) {
+        if (isset($cotRows[$cotIdValue])) {
+          $cotIdCandidates[] = $cotRows[$cotIdValue];
+        }
+      }
+      $cotTicketCandidates = [];
+      foreach ($this->resolve_ticket_lookup_keys($row) as $tk) {
+        if (!empty($cotRowsByTicket[$tk])) {
+          $cotTicketCandidates = $cotRowsByTicket[$tk];
+          break;
+        }
+      }
+      // La cotización vigente (la más reciente) define envío, estado y fechas del caso.
+      $cotRow = \SCM\Support\CurrentQuote::pick($cotIdCandidates, $cotTicketCandidates);
+      if (is_array($cotRow) && !$this->generic_quote_has_perturbation($cotRow)) {
+        foreach (array_merge($cotIdCandidates, $cotTicketCandidates) as $candidate) {
+          if (is_array($candidate) && $this->generic_quote_has_perturbation($candidate)) {
+            foreach (['perturbacion', 'justificacion_perturbacion', 'valor_bonificacion', 'area_afectada'] as $pertField) {
+              $cotRow[$pertField] = $candidate[$pertField] ?? '';
             }
-            $cotRow = $chosen;
             break;
           }
         }
@@ -481,6 +496,8 @@ trait GenericEnrichmentConcern
         if ($cotRespEstado !== '' && trim((string) ($row['estado_respuesta_cotizacion_mantenimiento'] ?? '')) === '') {
           $row['estado_respuesta_cotizacion_mantenimiento'] = $cotRespEstado;
         }
+        $row = \SCM\Support\CurrentQuote::applyToRow($row, $cotRow);
+        $row['cot_fecha_envio'] = $row['_scm_cot_fecha_envio'];
       }
 
       foreach ($this->resolve_ticket_lookup_keys($row) as $tk) {
@@ -856,6 +873,13 @@ trait GenericEnrichmentConcern
   }
 
   /** @param array<string,array<string,mixed>> $relatedRows */
+  /** @param array<string,mixed> $quote */
+  private function generic_quote_has_perturbation(array $quote): bool
+  {
+    $value = strtolower(trim((string) ($quote['perturbacion'] ?? '')));
+    return !in_array($value, ['', '0', 'no', 'false', 'null'], true);
+  }
+
   private function first_related_row(array $relatedRows, $rawIds): ?array
   {
     foreach ($this->split_id_values($rawIds) as $id) {

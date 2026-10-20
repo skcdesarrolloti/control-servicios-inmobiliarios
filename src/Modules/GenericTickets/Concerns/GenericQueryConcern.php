@@ -315,65 +315,18 @@ trait GenericQueryConcern
         $where[] = "NOT ({$cotExistsExpr})";
       }
     }
-    if (!empty($p['fCotizacionEstado']) || !empty($p['fCotizacionEnviada'])) {
-      $cotTabla = $this->db->table('jet_cct_cotizacion_mantenimiento');
-      if ($this->table_exists($cotTabla) && $this->column_exists($cotTabla, '_ID')) {
-        $cotConds = [];
-        if (!empty($p['fCotizacionEstado'])) {
-          $stateParts = [];
-          foreach (['estado', 'estado_cotizacion_mantenimiento', 'estado_respuesta_cotizacion_mantenimiento', 'estado_respuesta'] as $cotStateCol) {
-            if ($this->column_exists($cotTabla, $cotStateCol)) {
-              $stateParts[] = "LOWER(TRIM(COALESCE(cot_dyn.`{$cotStateCol}`, ''))) = ?";
-              $args[] = strtolower(trim((string) $p['fCotizacionEstado']));
-            }
-          }
-          if (!empty($stateParts)) {
-            $cotConds[] = '(' . implode(' OR ', $stateParts) . ')';
-          }
-        }
-        if (!empty($p['fCotizacionEnviada'])) {
-          $sent = strtolower(trim((string) $p['fCotizacionEnviada']));
-          $sentColumns = [];
-          foreach (['se_envio', 'fue_enviada_cotizacion_mantenimiento', 'fue_enviada'] as $sentCol) {
-            if ($this->column_exists($cotTabla, $sentCol)) {
-              $sentColumns[] = $sentCol;
-            }
-          }
-          if (in_array($sent, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true)) {
-            $sentParts = [];
-            foreach ($sentColumns as $sentCol) {
-              $sentParts[] = "LOWER(TRIM(COALESCE(cot_dyn.`{$sentCol}`, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado')";
-            }
-            if (!empty($sentParts)) {
-              $cotConds[] = '(' . implode(' OR ', $sentParts) . ')';
-            }
-          } elseif (in_array($sent, ['no', '0', 'false', 'none', 'sin'], true)) {
-            $sentParts = [];
-            foreach ($sentColumns as $sentCol) {
-              $sentParts[] = "(TRIM(COALESCE(cot_dyn.`{$sentCol}`, '')) = '' OR LOWER(TRIM(COALESCE(cot_dyn.`{$sentCol}`, ''))) IN ('no', '0', 'false'))";
-            }
-            if (!empty($sentParts)) {
-              $cotConds[] = '(' . implode(' AND ', $sentParts) . ')';
-            }
-          }
-        }
-        if (!empty($cotConds)) {
-          $joinParts = [];
-          $cotCol = $this->detect_first_existing_column($tabla, ['id_cotizacion_mantenimiento', 'id_cotizacion']);
-          if ($cotCol !== '') {
-            $joinParts[] = "FIND_IN_SET(CAST(cot_dyn._ID AS CHAR), REPLACE(COALESCE(`{$tabla}`.`{$cotCol}`, ''), ' ', '')) > 0";
-          }
-          if ($this->column_exists($cotTabla, 'id_ticket')) {
-            $joinParts[] = "(TRIM(COALESCE(cot_dyn.id_ticket, '')) <> '' AND TRIM(COALESCE(cot_dyn.id_ticket, '')) = CAST(`{$tabla}`.`_ID` AS CHAR))";
-            if ($this->column_exists($tabla, 'id_ticket')) {
-              $joinParts[] = "(TRIM(COALESCE(`{$tabla}`.`id_ticket`, '')) <> '' AND TRIM(COALESCE(cot_dyn.id_ticket, '')) <> '' AND TRIM(COALESCE(cot_dyn.id_ticket, '')) = TRIM(COALESCE(`{$tabla}`.`id_ticket`, '')))";
-            }
-          }
-          if (!empty($joinParts)) {
-            $where[] = "EXISTS (SELECT 1 FROM `{$cotTabla}` cot_dyn WHERE (" . implode(' OR ', $joinParts) . ') AND ' . implode(' AND ', $cotConds) . ')';
-          }
-        }
-      }
+    // Estado y envío se evalúan sobre la cotización vigente del caso, no sobre cualquiera ni sobre el ticket.
+    $cotCurrentCond = \SCM\Support\CurrentQuote::filterCondition(
+      $this->generic_executor_column_check(),
+      $this->generic_cotizacion_exists_expression($tabla),
+      $this->db->table('jet_cct_cotizacion_mantenimiento'),
+      (string) ($p['fCotizacionEstado'] ?? ''),
+      (string) ($p['fCotizacionEnviada'] ?? ''),
+      '?',
+      $args
+    );
+    if ($cotCurrentCond !== null) {
+      $where[] = $cotCurrentCond;
     }
     $magnitudCasoFilter = (string) (!empty($p['fMagnitudCaso']) ? $p['fMagnitudCaso'] : ($p['fMagnitud'] ?? ''));
 

@@ -2253,6 +2253,7 @@ trait HandlesMaintenanceActions
       $update['cct_modified'] = date('Y-m-d H:i:s', $now);
     }
     $this->db->update($table, $update, ['_ID' => $cotizacionId]);
+    \SCM\Support\CurrentQuote::syncTicketForQuote($this->db, $cotizacionId);
 
     $this->jsonOk([
       'message' => 'Cotizacion eliminada/desaprobada correctamente.',
@@ -2376,6 +2377,7 @@ trait HandlesMaintenanceActions
       }
     }
 
+    \SCM\Support\CurrentQuote::syncTicketForQuote($this->db, $cotizacionId);
     $ticket = $this->maintenance_quote_ticket_row_for_quote($schema, $row);
     $notifications = $this->get_seguimiento_service()->notifyCotizacionResponse(
       is_array($ticket) ? $ticket : [],
@@ -3165,6 +3167,7 @@ trait HandlesMaintenanceActions
           $this->db->update($ticketTable, $ticketUpdate, ['_ID' => (int) ($ticket['_ID'] ?? 0)]);
         }
       }
+      \SCM\Support\CurrentQuote::syncTicketForQuote($this->db, $cotizacionId);
       $this->maintenance_quote_insert_send_histories($schema, $cotizacionId, array_merge($quote, $quoteUpdate), is_array($ticket) ? $ticket : [], $actor, $employeeId, $now, $nowSql);
 
       $warnings = [];
@@ -4002,6 +4005,7 @@ trait HandlesMaintenanceActions
     $update = $schema->filterTableData($table, $update);
     if (!empty($update)) {
       $this->db->update($table, $update, ['_ID' => (int) ($cotizacion['_ID'] ?? 0)]);
+      \SCM\Support\CurrentQuote::syncTicketForQuote($this->db, (int) ($cotizacion['_ID'] ?? 0));
     }
   }
 

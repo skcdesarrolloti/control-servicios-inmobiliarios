@@ -182,73 +182,23 @@ trait MaintenanceQueriesConcern
       } elseif (strpos($cotFilter, 'state:') === 0) {
         $state = strtolower(trim(substr($cotFilter, 6)));
         if ($state !== '') {
-          $where[] = "(LOWER(TRIM(COALESCE(t.estado_cotizacion_mantenimiento, ''))) = %s OR LOWER(TRIM(COALESCE(t.estado_respuesta_cotizacion_mantenimiento, ''))) = %s)";
-          $args[] = $state;
-          $args[] = $state;
+          $where[] = (string) \SCM\Support\CurrentQuote::filterCondition($this->maintenanceExecutorColumnCheck(), $cotExistsExpr, $this->db->table('jet_cct_cotizacion_mantenimiento'), $state, '', '%s', $args);
         }
       }
     }
 
-    $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
-    if (
-      (($filters['fCotizacionEstado'] ?? '') !== '' || ($filters['fCotizacionEnviada'] ?? '') !== '')
-      && $this->schema->tableExists($cotTable)
-      && $this->schema->columnExists($cotTable, '_ID')
-    ) {
-      $cotExtra = [];
-      if (($filters['fCotizacionEstado'] ?? '') !== '') {
-        $stateParts = [];
-        foreach (['estado', 'estado_cotizacion_mantenimiento', 'estado_respuesta_cotizacion_mantenimiento', 'estado_respuesta'] as $cotStateCol) {
-          if ($this->schema->columnExists($cotTable, $cotStateCol)) {
-            $stateParts[] = "LOWER(TRIM(COALESCE(cot_dyn.`{$cotStateCol}`, ''))) = %s";
-            $args[] = strtolower(trim((string) $filters['fCotizacionEstado']));
-          }
-        }
-        if (!empty($stateParts)) {
-          $cotExtra[] = '(' . implode(' OR ', $stateParts) . ')';
-        }
-      }
-      if (($filters['fCotizacionEnviada'] ?? '') !== '') {
-        $sent = strtolower(trim((string) $filters['fCotizacionEnviada']));
-        $sentColumns = [];
-        foreach (['se_envio', 'fue_enviada_cotizacion_mantenimiento', 'fue_enviada'] as $sentCol) {
-          if ($this->schema->columnExists($cotTable, $sentCol)) {
-            $sentColumns[] = $sentCol;
-          }
-        }
-        if (in_array($sent, ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true)) {
-          $sentParts = [];
-          foreach ($sentColumns as $sentCol) {
-            $sentParts[] = "LOWER(TRIM(COALESCE(cot_dyn.`{$sentCol}`, ''))) IN ('si', 'sí', '1', 'true', 'enviada', 'enviado')";
-          }
-          if (!empty($sentParts)) {
-            $cotExtra[] = '(' . implode(' OR ', $sentParts) . ')';
-          }
-        } elseif (in_array($sent, ['no', '0', 'false', 'none', 'sin'], true)) {
-          $sentParts = [];
-          foreach ($sentColumns as $sentCol) {
-            $sentParts[] = "(TRIM(COALESCE(cot_dyn.`{$sentCol}`, '')) = '' OR LOWER(TRIM(COALESCE(cot_dyn.`{$sentCol}`, ''))) IN ('no', '0', 'false'))";
-          }
-          if (!empty($sentParts)) {
-            $cotExtra[] = '(' . implode(' AND ', $sentParts) . ')';
-          }
-        }
-      }
-      if (!empty($cotExtra)) {
-        $joinParts = [];
-        if ($this->schema->columnExists($table, 'id_cotizacion_mantenimiento')) {
-          $joinParts[] = "FIND_IN_SET(CAST(cot_dyn._ID AS CHAR), REPLACE(COALESCE(t.id_cotizacion_mantenimiento, ''), ' ', '')) > 0";
-        }
-        if ($this->schema->columnExists($cotTable, 'id_ticket')) {
-          $joinParts[] = "(TRIM(COALESCE(cot_dyn.id_ticket, '')) <> '' AND TRIM(COALESCE(cot_dyn.id_ticket, '')) = CAST(t._ID AS CHAR))";
-          if ($this->schema->columnExists($table, 'id_ticket')) {
-            $joinParts[] = "(TRIM(COALESCE(t.id_ticket, '')) <> '' AND TRIM(COALESCE(cot_dyn.id_ticket, '')) <> '' AND TRIM(COALESCE(cot_dyn.id_ticket, '')) = TRIM(COALESCE(t.id_ticket, '')))";
-          }
-        }
-        if (!empty($joinParts)) {
-          $where[] = "EXISTS (SELECT 1 FROM `{$cotTable}` cot_dyn WHERE (" . implode(' OR ', $joinParts) . ') AND ' . implode(' AND ', $cotExtra) . ')';
-        }
-      }
+    // Estado y envío se evalúan sobre la cotización vigente del caso, no sobre cualquiera ni sobre el ticket.
+    $cotCurrentCond = \SCM\Support\CurrentQuote::filterCondition(
+      $this->maintenanceExecutorColumnCheck(),
+      $this->maintenanceCotizacionExistsExpression('t'),
+      $this->db->table('jet_cct_cotizacion_mantenimiento'),
+      (string) ($filters['fCotizacionEstado'] ?? ''),
+      (string) ($filters['fCotizacionEnviada'] ?? ''),
+      '%s',
+      $args
+    );
+    if ($cotCurrentCond !== null) {
+      $where[] = $cotCurrentCond;
     }
 
     if (($filters['fPerturbacion'] ?? '') !== '') {

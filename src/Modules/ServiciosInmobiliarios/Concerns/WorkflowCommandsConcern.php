@@ -1220,6 +1220,7 @@ trait WorkflowCommandsConcern
     if (!empty($ticketUpdate)) {
       $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => $ticketPk]);
     }
+    \SCM\Support\CurrentQuote::syncTicket($this->db, $ticketPk);
 
     $ticketHistorySaved = $writeTicketHistory
       ? $this->insertCotizacionResponseTicketHistory($ticket, $ticketPk, $cotIds, $estado, $observacion, $motivo, $financiacion, $userId, $employeeId, $userName, $nowTs, $nowMysql)

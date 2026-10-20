@@ -61,6 +61,7 @@ trait RelatedEnrichmentConcern
         'valor_bonificacion',
         'area_afectada',
         'resumen_calculo_perturbacion',
+        'se_envio',
       ]
     );
 
@@ -127,13 +128,14 @@ trait RelatedEnrichmentConcern
       $row['_scm_cita_cal_fecha'] = 0;
       $row['_scm_acta_fecha'] = 0;
 
-      $cotRow = null;
+      // La cotización vigente (la más reciente ligada) define envío, estado y fechas del caso.
+      $cotCandidates = [];
       foreach ($this->splitIds($row['id_cotizacion_mantenimiento'] ?? '') as $id) {
         if (isset($cotData['rows'][$id])) {
-          $cotRow = $cotData['rows'][$id];
-          break;
+          $cotCandidates[] = $cotData['rows'][$id];
         }
       }
+      $cotRow = \SCM\Support\CurrentQuote::pick($cotCandidates);
 
       if (is_array($cotRow)) {
         $cotEstado = $this->firstExistingValue($cotRow, ['estado_cotizacion_mantenimiento', 'estado']);
@@ -194,6 +196,7 @@ trait RelatedEnrichmentConcern
         if (trim((string) ($row['area_afectada'] ?? '')) === '' && $row['_scm_cot_area_afectada'] !== '') {
           $row['area_afectada'] = $row['_scm_cot_area_afectada'];
         }
+        $row = \SCM\Support\CurrentQuote::applyToRow($row, $cotRow);
       }
 
       $prevRow = null;
