@@ -216,3 +216,19 @@
   background: #ccfbf1 !important;
   border-color: #2dd4bf !important;
 }
+
+/* Aviso informativo de la tarjeta de cotización (no es un botón). */
+:is(#scm-app, .swal2-popup, .scm-case-cotizaciones-modal) .scm-cotizacion-notice {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid #f59e0b;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+:is(#scm-app, .swal2-popup, .scm-case-cotizaciones-modal) .scm-cotizacion-notice strong {
+  color: #78350f;
+}
