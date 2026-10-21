@@ -268,6 +268,17 @@ trait AdministrativeTicketCreationConcern
     if (!empty($warnings)) {
       $message .= ' ' . implode(' ', $warnings);
     }
+    // Recibo: los destinatarios del correo también reciben WhatsApp; si falla no afecta el recibo ni sus avisos.
+    $whatsapp = ['whatsapp' => 0, 'details' => []];
+    if (isset($generatedPdfs['acta_desocupacion']) && !in_array('none', $notifyRecipients, true)) {
+      try {
+        $whatsapp = (new \SCM\Support\PanelCaseNotifications($db, $schema))->enqueueReceiptWhatsApp($ticketId, $ticketPayload, (string) ($ticketPayload['internal_notification_action'] ?? ''));
+      } catch (\Throwable $exception) {
+        error_log('[receipt_whatsapp] ' . $exception->getMessage());
+        $whatsapp['details'][] = 'No se pudo encolar el WhatsApp; el aviso se envió por correo.';
+      }
+      $message .= ' WhatsApp encolados: ' . $whatsapp['whatsapp'] . '.';
+    }
 
     return [
       'ok' => '1',
@@ -275,6 +286,8 @@ trait AdministrativeTicketCreationConcern
       'ticket_id' => (string) $ticketId,
       'ticket_url' => 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode((string) $ticketId),
       'emails_queued' => (string) $queued,
+      'whatsapp_queued' => (string) $whatsapp['whatsapp'],
+      'whatsapp_details' => $whatsapp['details'],
       'warnings' => $warnings,
     ];
   }

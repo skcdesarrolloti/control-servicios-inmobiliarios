@@ -122,9 +122,9 @@ trait HandlesPanelCaseCreation
     return [
       'ticket_id' => (int) $result['ticket_id'],
       'queued' => (int) ($result['emails_queued'] ?? 0),
-      'whatsapp_queued' => 0,
-      'notification_details' => [],
-      'message' => (string) $result['message'] . ' Se generó la carta de aviso previo y se envió al arrendatario, al responsable y a los funcionarios del aviso "Caso de recibo creado desde el panel".',
+      'whatsapp_queued' => (int) ($result['whatsapp_queued'] ?? 0),
+      'notification_details' => array_values((array) ($result['whatsapp_details'] ?? [])),
+      'message' => (string) $result['message'] . ' Se generó la carta de aviso previo y se envió por correo y WhatsApp al arrendatario, al responsable y a los funcionarios del aviso "Caso de recibo creado desde el panel".',
     ];
   }
 

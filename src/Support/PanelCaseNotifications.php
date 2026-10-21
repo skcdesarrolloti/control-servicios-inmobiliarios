@@ -86,6 +86,58 @@ final class PanelCaseNotifications
     return ['role' => $role, 'name' => $name, 'email' => $email, 'phone' => self::phone($rawPhone, $country)];
   }
 
+  /**
+   * Recibo de inmuebles: los mismos destinatarios del correo (responsable, funcionarios del aviso interno y arrendatario)
+   * reciben WhatsApp con las plantillas de casos. No bloquea el recibo, porque la carta ya va por correo.
+   * @param array<string,mixed> $ticket
+   * @return array{whatsapp:int,details:array<int,string>}
+   */
+  public function enqueueReceiptWhatsApp(int $id, array $ticket, string $internalAction): array
+  {
+    $config = self::config();
+    if (!$config['enabled']) return ['whatsapp' => 0, 'details' => ['WhatsApp pendiente de activar en la configuración interna del sistema.']];
+    $queue = (new SharedNotificationsBridge($this->db))->queue();
+    if (!$queue) return ['whatsapp' => 0, 'details' => ['La cola de WhatsApp no está disponible; el aviso se envió solo por correo.']];
+    $text = static fn(string $key, string $default = ''): string => trim((string) ($ticket[$key] ?? '')) !== '' ? trim((string) $ticket[$key]) : $default;
+    $assignee = $text('nombre_empleado', 'Funcionario asignado');
+    $people = [['label' => 'Responsable', 'name' => $assignee, 'phone' => self::phone($text('celular_empleado')), 'role' => null]];
+    foreach (InternalNotificationRecipients::contactsForAction($this->db, $internalAction) as $contact) {
+      $people[] = ['label' => 'Funcionario', 'name' => (string) ($contact['name'] ?? ''), 'phone' => self::phone((string) ($contact['phone'] ?? '')), 'role' => null];
+    }
+    $people[] = ['label' => 'Arrendatario', 'name' => $text('arrendatario', 'Arrendatario'), 'phone' => self::phone($text('celular_arrendatario')), 'role' => 'arrendatario'];
+
+    $count = 0;
+    $details = [];
+    $phones = [];
+    foreach ($people as $person) {
+      $label = $person['label'] . ': ' . $person['name'];
+      if ($person['phone'] === '') { $details[] = $label . ' — sin WhatsApp: falta un celular válido.'; continue; }
+      if (isset($phones[$person['phone']])) { $details[] = $label . ' — comparte celular con ' . $phones[$person['phone']] . '; se encoló un solo mensaje.'; continue; }
+      $external = $person['role'] !== null;
+      $values = [$person['name'], (string) $id, $text('asunto', 'Recibo de inmuebles'), $text('tema_ayuda', 'Recibo de inmuebles'), $text('contrato', 'Sin número'), $assignee];
+      $values = array_map(static fn($v, $limit) => mb_substr(preg_replace('/\s+/u', ' ', trim((string) $v)) ?: 'Sin dato', 0, $limit), $values, [80, 20, 200, 100, 50, 80]);
+      $components = [['type' => 'body', 'parameters' => array_map(static fn($v) => ['type' => 'text', 'text' => $v], $values)]];
+      $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => PublicCaseAccess::reference($id, null, $external ? 'arrendatario' : 'funcionario')]]];
+      try {
+        $queuedId = $queue->enqueueWhatsAppOfficialTemplate($person['phone'], $config[$external ? 'external_template' : 'assigned_template'], $components, [
+          'project_code' => 'control-servicios-inmobiliarios', 'source_module' => $internalAction,
+          'destination_name' => $person['name'], 'template_language' => $config['language'], 'max_attempts' => 5,
+          'message_text' => 'Caso #' . $id . ' · Recibo de inmuebles · Contrato ' . $text('contrato'),
+          'dedupe_key' => 'recibo_inmueble:' . $id . ':whatsapp:' . $person['phone'],
+          'meta' => ['ticket_id' => $id, 'recipient_role' => $person['role'] ?? 'funcionario'],
+        ]);
+      } catch (\Throwable $exception) {
+        error_log('[receipt_whatsapp] ' . $exception->getMessage());
+        $queuedId = 0;
+      }
+      if ($queuedId <= 0) { $details[] = $label . ' — no se pudo encolar el WhatsApp.'; continue; }
+      $phones[$person['phone']] = $person['name'];
+      $count++;
+      $details[] = $label . ' — WhatsApp encolado.';
+    }
+    return ['whatsapp' => $count, 'details' => $details];
+  }
+
   public function enqueue(array $plan, int $id, array $contract, string $title, string $description, string $theme, array $creator, array $internalEmails): array
   {
     $config = $plan['config'];
