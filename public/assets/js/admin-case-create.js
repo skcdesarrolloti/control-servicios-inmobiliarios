@@ -40,6 +40,8 @@
     const opener = document.activeElement;
     let busy = false;
     let selected = null;
+    // Se asigna más abajo: completa título, descripción, departamento y adjuntos de un recibo.
+    let applyReceiptDefaults = () => {};
     // fin_contrato llega como timestamp (segundos o milisegundos) o como fecha; el campo usa AAAA-MM-DD.
     const contractEndDate = value => {
       const raw = String(value || '').trim();
@@ -126,7 +128,6 @@
             <label class="scm-new-case-label">Tema<select name="tema_ayuda" required>${option('', 'Selecciona un tema')}${config.themes.map(t => option(t)).join('')}</select></label>
             <label class="scm-new-case-label">Departamento<select name="departamento" required>${option('', 'Selecciona el departamento')}${config.departments.map(t => option(t)).join('')}</select></label>
           </div>
-          <p data-receipt-hint hidden class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Recibo de inmuebles: al crear el caso se genera el aviso previo de revisión antes de la desocupación del inmueble con la fecha fin del contrato y se envía por correo y WhatsApp al arrendatario, al responsable y a los funcionarios de &quot;Caso de recibo creado desde el panel&quot; en Notificaciones internas. El arrendatario debe tener correo válido y el contrato no puede tener ya un recibo para esa fecha.</p>
           <label data-receipt-date hidden class="scm-new-case-label">Fecha prevista de recibo<input type="date" name="fecha_entrega_recibo"><small class="text-xs text-slate-500" data-receipt-date-help>Se usa en el aviso previo de revisión. Por defecto es la fecha fin del contrato.</small></label>
           <label class="scm-new-case-label">Asignar a<select name="id_empleado" required>${option('', 'Selecciona un funcionario activo')}${config.employees.map(e => option(e.employee_id, `${e.name} · ${e.cargo}${e.email ? '' : ' · Sin correo'}`)).join('')}</select></label>
           <p data-assignee class="text-xs text-slate-500">El responsable recibirá correo${config.whatsapp_enabled ? ' y WhatsApp' : '. WhatsApp pendiente de activar en la configuración interna del sistema'}.</p>
@@ -166,6 +167,7 @@
       const invalidateSelection = () => { sequence++; resetAi(); assistantChoice = ''; selected = null; setAssistantChoice(''); summary.hidden = true; setContractStepsVisible(false); showError(''); results.replaceChildren(); status.textContent = 'Busca y selecciona el contrato correspondiente.'; };
       const selectContract = contract => {
         selected = contract;
+        applyReceiptDefaults();
         const receiptDate = form.elements.fecha_entrega_recibo;
         if (receiptDate) {
           receiptDate.value = contractEndDate(contract.fin_contrato);
@@ -456,17 +458,34 @@
       scheduleDraft = () => { if (draftReady && !draftFinished) { clearTimeout(draftTimer); draftTimer = setTimeout(persistDraft, 200); } };
       form.addEventListener('input', scheduleDraft);
       form.addEventListener('change', scheduleDraft);
-      // El recibo envía su propia carta al arrendatario: se ocultan los avisos opcionales del paso 4.
+      const isReceiptTopic = () => ['recibo de inmuebles', 'recibo de inmueble'].includes(String(form.elements.tema_ayuda.value || '').trim().toLowerCase());
+      // Recibo: título y descripción se completan solos (sin pisar lo que el funcionario escribió), departamento arrendatario y sin adjuntos.
+      const receiptAutofill = {asunto: '', descripcion: ''};
+      applyReceiptDefaults = () => {
+        if (!isReceiptTopic()) return;
+        const values = {
+          asunto: 'Recibo de inmueble contrato #' + (selected?.contrato || ''),
+          descripcion: 'Coordinar la revisión antes de la desocupación y el recibo del inmueble por terminación del contrato de arrendamiento.',
+        };
+        Object.entries(values).forEach(([name, value]) => {
+          const field = form.elements[name];
+          if (field.value.trim() === '' || field.value === receiptAutofill[name]) { field.value = value; receiptAutofill[name] = value; }
+        });
+        if (config.departments.includes('Servicio al arrendatario')) form.elements.departamento.value = 'Servicio al arrendatario';
+        form.elements.has_attachments.value = 'No';
+        form.elements.has_attachments.onchange();
+        scheduleDraft();
+      };
+      // El recibo envía su propio aviso al arrendatario: se ocultan los avisos opcionales del paso 4.
       const syncReceiptTopic = () => {
-        const isReceipt = ['recibo de inmuebles', 'recibo de inmueble'].includes(String(form.elements.tema_ayuda.value || '').trim().toLowerCase());
-        form.querySelector('[data-receipt-hint]').hidden = !isReceipt;
+        const isReceipt = isReceiptTopic();
         form.querySelector('[data-receipt-date]').hidden = !isReceipt;
         form.elements.fecha_entrega_recibo.required = isReceipt;
         const notifySection = form.querySelector('[data-notify-section]');
         notifySection.hidden = isReceipt;
         if (isReceipt) notifySection.querySelectorAll('[name="notify_roles[]"]').forEach(input => { input.checked = false; });
       };
-      form.elements.tema_ayuda.addEventListener('change', syncReceiptTopic);
+      form.elements.tema_ayuda.addEventListener('change', () => { syncReceiptTopic(); applyReceiptDefaults(); });
       syncReceiptTopic();
       const onPageHide = () => { persistDraft(); };
       const onVisibility = () => { if (document.visibilityState === 'hidden') persistDraft(); };

@@ -35,7 +35,9 @@ $checks = [
     && is_file($root . '/docs/crear-plantilla-whatsapp-aviso-revision-desocupacion.md'),
   'manual receipt internal event is configurable' => str_contains($app, "'contrato_recibo_manual' => ["),
   'contract modal always offers the receipt topic' => str_contains($runtime, 'if (!isPreventiva && topicOptions.indexOf("Recibo de inmuebles") < 0) topicOptions.push("Recibo de inmuebles");'),
-  'panel form explains the receipt and hides optional notices' => str_contains($create, 'data-receipt-hint') && str_contains($create, 'notifySection.hidden = isReceipt;'),
+  'panel form fills the receipt fields and hides optional notices' => !str_contains($create, 'data-receipt-hint')
+    && str_contains($create, "asunto: 'Recibo de inmueble contrato #'") && str_contains($create, "form.elements.departamento.value = 'Servicio al arrendatario'")
+    && str_contains($create, "form.elements.has_attachments.value = 'No';") && str_contains($create, 'notifySection.hidden = isReceipt;'),
 ];
 
 $failed = array_keys(array_filter($checks, static fn(bool $ok): bool => !$ok));
