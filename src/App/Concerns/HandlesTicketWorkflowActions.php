@@ -5103,7 +5103,9 @@ trait HandlesTicketWorkflowActions
     if ($existing !== '') {
       return ['ok' => '0', 'message' => 'Este contrato ya tiene el caso de recibo #' . $existing . ' para esa fecha de recibo.'];
     }
-    if (!filter_var(trim((string) ($contract['correo_arrendatario'] ?? '')), FILTER_VALIDATE_EMAIL)) {
+    // Por defecto se notifica al arrendatario; desde Crear nuevo caso puede desmarcarse.
+    $notifyTenant = !array_key_exists('notify_tenant', $input) || !empty($input['notify_tenant']);
+    if ($notifyTenant && !filter_var(trim((string) ($contract['correo_arrendatario'] ?? '')), FILTER_VALIDATE_EMAIL)) {
       return ['ok' => '0', 'message' => 'El arrendatario necesita un correo válido para recibir el aviso previo de revisión antes de la desocupación.'];
     }
     $input = array_merge($input, [
@@ -5118,7 +5120,7 @@ trait HandlesTicketWorkflowActions
       'require_receipt_letter' => true,
     ]);
     try {
-      return $this->get_pending_controller()->createAdministrativeTicket($input, $imagenes, $documentos, ['empleado', 'solicitante', 'admin']);
+      return $this->get_pending_controller()->createAdministrativeTicket($input, $imagenes, $documentos, $notifyTenant ? ['empleado', 'solicitante', 'admin'] : ['empleado', 'admin']);
     } catch (\Throwable $exception) {
       error_log('[manual_receipt_case] ' . $exception->getMessage());
       return ['ok' => '0', 'message' => 'No se pudo crear el recibo: ' . $exception->getMessage()];

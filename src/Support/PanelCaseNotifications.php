@@ -96,7 +96,7 @@ final class PanelCaseNotifications
    * @param array<string,string> $letter PDF del aviso (url).
    * @return array{whatsapp:int,details:array<int,string>}
    */
-  public function enqueueReceiptWhatsApp(int $id, array $ticket, string $internalAction, array $letter): array
+  public function enqueueReceiptWhatsApp(int $id, array $ticket, string $internalAction, array $letter, bool $notifyTenant = true): array
   {
     $config = self::config();
     if (!$config['enabled']) return ['whatsapp' => 0, 'details' => ['WhatsApp pendiente de activar en la configuración interna del sistema.']];
@@ -108,7 +108,7 @@ final class PanelCaseNotifications
     foreach (InternalNotificationRecipients::contactsForAction($this->db, $internalAction) as $contact) {
       $people[] = ['label' => 'Funcionario', 'name' => (string) ($contact['name'] ?? ''), 'phone' => self::phone((string) ($contact['phone'] ?? '')), 'role' => null];
     }
-    $people[] = ['label' => 'Arrendatario', 'name' => $text('arrendatario', 'Arrendatario'), 'phone' => self::phone($text('celular_arrendatario')), 'role' => 'arrendatario'];
+    if ($notifyTenant) $people[] = ['label' => 'Arrendatario', 'name' => $text('arrendatario', 'Arrendatario'), 'phone' => self::phone($text('celular_arrendatario')), 'role' => 'arrendatario'];
 
     $count = 0;
     $details = [];

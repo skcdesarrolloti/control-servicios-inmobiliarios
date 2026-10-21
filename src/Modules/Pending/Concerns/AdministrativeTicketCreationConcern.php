@@ -272,7 +272,7 @@ trait AdministrativeTicketCreationConcern
     $whatsapp = ['whatsapp' => 0, 'details' => []];
     if (isset($generatedPdfs['acta_desocupacion']) && !in_array('none', $notifyRecipients, true)) {
       try {
-        $whatsapp = (new \SCM\Support\PanelCaseNotifications($db, $schema))->enqueueReceiptWhatsApp($ticketId, $ticketPayload, (string) ($ticketPayload['internal_notification_action'] ?? ''), $generatedPdfs['acta_desocupacion']);
+        $whatsapp = (new \SCM\Support\PanelCaseNotifications($db, $schema))->enqueueReceiptWhatsApp($ticketId, $ticketPayload, (string) ($ticketPayload['internal_notification_action'] ?? ''), $generatedPdfs['acta_desocupacion'], (bool) array_intersect(['solicitante', 'arrendatario'], $notifyRecipients));
       } catch (\Throwable $exception) {
         error_log('[receipt_whatsapp] ' . $exception->getMessage());
         $whatsapp['details'][] = 'No se pudo encolar el WhatsApp; el aviso se envió por correo.';

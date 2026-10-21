@@ -115,6 +115,7 @@ trait HandlesPanelCaseCreation
       'descripcion' => $description,
       'departamento' => in_array($department, $options['departments'], true) ? $department : '',
       'fecha_entrega_recibo' => trim((string) ($_POST['fecha_entrega_recibo'] ?? '')),
+      'notify_tenant' => in_array('arrendatario', array_map('strval', (array) ($_POST['notify_roles'] ?? [])), true),
     ], $this->handleImageUploads('imagenes', 10), $this->handleDocumentUploads('archivos', $documentTitles, 10));
     if (($result['ok'] ?? '0') !== '1') {
       throw new \RuntimeException((string) ($result['message'] ?? 'No se pudo crear el recibo.'));
@@ -124,7 +125,7 @@ trait HandlesPanelCaseCreation
       'queued' => (int) ($result['emails_queued'] ?? 0),
       'whatsapp_queued' => (int) ($result['whatsapp_queued'] ?? 0),
       'notification_details' => array_values((array) ($result['whatsapp_details'] ?? [])),
-      'message' => (string) $result['message'] . ' Se generó el aviso previo de revisión antes de la desocupación del inmueble y se envió por correo y WhatsApp al arrendatario, al responsable y a los funcionarios del aviso "Caso de recibo creado desde el panel".',
+      'message' => (string) $result['message'] . ' Se generó el aviso previo de revisión antes de la desocupación del inmueble.',
     ];
   }
 

@@ -476,14 +476,20 @@
         form.elements.has_attachments.onchange();
         scheduleDraft();
       };
-      // El recibo envía su propio aviso al arrendatario: se ocultan los avisos opcionales del paso 4.
+      // Recibo: el aviso es para el arrendatario. Paso 4 con Arrendatario marcado por defecto; propietario y copropiedad no aplican.
+      let receiptTenantAutoChecked = false;
       const syncReceiptTopic = () => {
         const isReceipt = isReceiptTopic();
         form.querySelector('[data-receipt-date]').hidden = !isReceipt;
         form.elements.fecha_entrega_recibo.required = isReceipt;
-        const notifySection = form.querySelector('[data-notify-section]');
-        notifySection.hidden = isReceipt;
-        if (isReceipt) notifySection.querySelectorAll('[name="notify_roles[]"]').forEach(input => { input.checked = false; });
+        form.querySelectorAll('[name="notify_roles[]"]').forEach(input => {
+          const tenant = input.value === 'arrendatario';
+          if (isReceipt && tenant && !input.checked) { input.checked = true; receiptTenantAutoChecked = true; }
+          if (!isReceipt && tenant && receiptTenantAutoChecked) { input.checked = false; receiptTenantAutoChecked = false; }
+          if (isReceipt && !tenant) input.checked = false;
+          input.disabled = isReceipt && !tenant;
+          input.closest('label').classList.toggle('opacity-50', isReceipt && !tenant);
+        });
       };
       form.elements.tema_ayuda.addEventListener('change', () => { syncReceiptTopic(); applyReceiptDefaults(); });
       syncReceiptTopic();

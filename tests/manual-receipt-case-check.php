@@ -37,7 +37,11 @@ $checks = [
   'contract modal always offers the receipt topic' => str_contains($runtime, 'if (!isPreventiva && topicOptions.indexOf("Recibo de inmuebles") < 0) topicOptions.push("Recibo de inmuebles");'),
   'panel form fills the receipt fields and hides optional notices' => !str_contains($create, 'data-receipt-hint')
     && str_contains($create, "asunto: 'Recibo de inmueble contrato #'") && str_contains($create, "form.elements.departamento.value = 'Servicio al arrendatario'")
-    && str_contains($create, "form.elements.has_attachments.value = 'No';") && str_contains($create, 'notifySection.hidden = isReceipt;'),
+    && str_contains($create, "form.elements.has_attachments.value = 'No';")
+    && str_contains($create, "if (isReceipt && tenant && !input.checked) { input.checked = true;") && str_contains($create, 'input.disabled = isReceipt && !tenant;'),
+  'unchecking Arrendatario skips the tenant email and WhatsApp' => str_contains($panel, "'notify_tenant' => in_array('arrendatario',")
+    && str_contains($workflow, "\$notifyTenant ? ['empleado', 'solicitante', 'admin'] : ['empleado', 'admin']")
+    && str_contains($whatsapp, "if (\$notifyTenant) \$people[] = ['label' => 'Arrendatario'"),
 ];
 
 $failed = array_keys(array_filter($checks, static fn(bool $ok): bool => !$ok));
