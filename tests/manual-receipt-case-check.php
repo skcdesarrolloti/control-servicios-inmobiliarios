@@ -1,0 +1,30 @@
+<?php
+
+declare(strict_types=1);
+
+// Recibo de inmuebles creado por un funcionario: Crear nuevo caso y Contratos usan el flujo con carta de aviso previo.
+$root = dirname(__DIR__);
+$workflow = (string) file_get_contents($root . '/src/App/Concerns/HandlesTicketWorkflowActions.php');
+$panel = (string) file_get_contents($root . '/src/App/Concerns/HandlesPanelCaseCreation.php');
+$app = (string) file_get_contents($root . '/src/App/SuCasaControlServiciosInmobiliarios.php');
+$runtime = (string) file_get_contents($root . '/public/assets/js/admin-dashboard-runtime.js');
+$create = (string) file_get_contents($root . '/public/assets/js/admin-case-create.js');
+
+$checks = [
+  'contract modal routes receipt topic to the receipt flow' => str_contains($workflow, "\$this->isReceiptTopic(\$input['tema_ayuda'] ?? '')\n      ? \$this->createManualReceiptCase("),
+  'panel create routes receipt topic to the receipt flow' => str_contains($panel, "? \$this->createPanelReceiptCase(\$service)"),
+  'receipt requires the letter and notifies employee, tenant and internal event' => str_contains($workflow, "'require_receipt_letter' => true,")
+    && str_contains($workflow, "'internal_notification_action' => 'contrato_recibo_manual',")
+    && str_contains($workflow, "['empleado', 'solicitante', 'admin']")
+    && str_contains($workflow, "'solicitante_tipo' => 'arrendatario',"),
+  'receipt is not duplicated for the same contract end date' => str_contains($workflow, '$existing = $this->contractEndingReceiptTicketId($contract);'),
+  'manual receipt internal event is configurable' => str_contains($app, "'contrato_recibo_manual' => ["),
+  'contract modal always offers the receipt topic' => str_contains($runtime, 'if (!isPreventiva && topicOptions.indexOf("Recibo de inmuebles") < 0) topicOptions.push("Recibo de inmuebles");'),
+  'panel form explains the receipt and hides optional notices' => str_contains($create, 'data-receipt-hint') && str_contains($create, 'notifySection.hidden = isReceipt;'),
+];
+
+$failed = array_keys(array_filter($checks, static fn(bool $ok): bool => !$ok));
+foreach ($checks as $label => $ok) {
+  echo ($ok ? 'PASS: ' : 'FAIL: ') . $label . PHP_EOL;
+}
+exit($failed === [] ? 0 : 1);

@@ -117,6 +117,7 @@
             <label class="scm-new-case-label">Tema<select name="tema_ayuda" required>${option('', 'Selecciona un tema')}${config.themes.map(t => option(t)).join('')}</select></label>
             <label class="scm-new-case-label">Departamento<select name="departamento" required>${option('', 'Selecciona el departamento')}${config.departments.map(t => option(t)).join('')}</select></label>
           </div>
+          <p data-receipt-hint hidden class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Recibo de inmuebles: al crear el caso se genera la carta de aviso previo de entrega con la fecha fin del contrato y se envía al arrendatario, al responsable y a los funcionarios de &quot;Caso de recibo creado desde el panel&quot; en Notificaciones internas. El arrendatario debe tener correo válido y el contrato no puede tener ya un recibo para esa fecha.</p>
           <label class="scm-new-case-label">Asignar a<select name="id_empleado" required>${option('', 'Selecciona un funcionario activo')}${config.employees.map(e => option(e.employee_id, `${e.name} · ${e.cargo}${e.email ? '' : ' · Sin correo'}`)).join('')}</select></label>
           <p data-assignee class="text-xs text-slate-500">El responsable recibirá correo${config.whatsapp_enabled ? ' y WhatsApp' : '. WhatsApp pendiente de activar en la configuración interna del sistema'}.</p>
         </section>
@@ -125,7 +126,7 @@
           <div data-attachments hidden><input hidden type="file" name="imagenes[]" accept="image/jpeg,image/png,image/webp" multiple aria-label="Imágenes del caso"><input hidden type="file" name="archivos[]" accept="application/pdf,.pdf" multiple aria-label="Documentos PDF del caso">
           <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4"><div class="flex flex-wrap gap-2">${pickMedia('images', 'Adjuntar imagen', 'image')}<button type="button" data-paste-image class="scm-case-media-button">${mediaIcon('paste')}Pegar (Ctrl+V)</button>${pickMedia('documents', 'Adjuntar documento', 'document')}</div><p data-paste-status role="status" aria-live="polite" class="mt-3 text-xs text-slate-500">Copia una captura y presiona Ctrl+V, o selecciona un archivo con los botones.</p><div data-pasted-images class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3"></div></div><p class="text-xs text-slate-500 mt-3">Hasta 10 archivos, ${Math.floor(config.max_file_bytes / 1024 / 1024)} MB por archivo y 25 MB en total. Imágenes JPG, PNG o WebP de máximo 16 megapíxeles.</p><ul data-files class="mt-3 text-xs text-slate-600 flex flex-col gap-1"></ul></div>
         </section>
-        <section class="flex flex-col gap-3"><h3 class="scm-new-case-section"><span>4</span> Notifica a los interesados</h3>
+        <section data-notify-section class="flex flex-col gap-3"><h3 class="scm-new-case-section"><span>4</span> Notifica a los interesados</h3>
           <p class="text-sm text-slate-500">Opcional. Selecciona a quién avisar por correo y WhatsApp con el título, tema, contrato y responsable. El correo también incluye la descripción.</p>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">${[['propietario', 'Propietario'], ['arrendatario', 'Arrendatario'], ['copropiedad', 'Copropiedad']].map(([value, label]) => `<label class="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700"><input type="checkbox" name="notify_roles[]" value="${value}" class="h-4 w-4">${label}</label>`).join('')}</div>
           <p class="text-xs text-slate-500">Se usan los datos del contrato y su ficha. Deben tener correo y celular válidos.${config.whatsapp_enabled ? '' : ' WhatsApp está pendiente de activar; por ahora se encolará solo el correo.'}</p>
@@ -438,6 +439,16 @@
       scheduleDraft = () => { if (draftReady && !draftFinished) { clearTimeout(draftTimer); draftTimer = setTimeout(persistDraft, 200); } };
       form.addEventListener('input', scheduleDraft);
       form.addEventListener('change', scheduleDraft);
+      // El recibo envía su propia carta al arrendatario: se ocultan los avisos opcionales del paso 4.
+      const syncReceiptTopic = () => {
+        const isReceipt = ['recibo de inmuebles', 'recibo de inmueble'].includes(String(form.elements.tema_ayuda.value || '').trim().toLowerCase());
+        form.querySelector('[data-receipt-hint]').hidden = !isReceipt;
+        const notifySection = form.querySelector('[data-notify-section]');
+        notifySection.hidden = isReceipt;
+        if (isReceipt) notifySection.querySelectorAll('[name="notify_roles[]"]').forEach(input => { input.checked = false; });
+      };
+      form.elements.tema_ayuda.addEventListener('change', syncReceiptTopic);
+      syncReceiptTopic();
       const onPageHide = () => { persistDraft(); };
       const onVisibility = () => { if (document.visibilityState === 'hidden') persistDraft(); };
       window.addEventListener('pagehide', onPageHide);

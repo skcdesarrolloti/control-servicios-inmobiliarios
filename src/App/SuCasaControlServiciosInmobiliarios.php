@@ -512,6 +512,11 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Avisos internos al crear el recibo antes de la fecha fin del contrato.',
             'channel' => 'Email interno en cola',
           ],
+          'contrato_recibo_manual' => [
+            'label' => 'Caso de recibo creado desde el panel',
+            'description' => 'Cuando un funcionario crea un caso con tema Recibo de inmuebles desde Crear nuevo caso o desde Contratos. Incluye la carta de aviso previo de entrega.',
+            'channel' => 'Email interno en cola',
+          ],
           'contrato_arrendamiento_creado' => [
             'label' => 'Contrato de arrendamiento creado',
             'description' => 'Cuando se crea un contrato desde un registro "No asignado". Incluye el acta de notificación de ingreso y la carta a la copropiedad si aplica.',
@@ -657,7 +662,7 @@ final class SuCasaControlServiciosInmobiliarios
       $selected = [];
       foreach ((array) $ids as $id) {
         $idKey = trim((string) ((int) $id));
-        $allowed = in_array($actionKey, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_no_salida','nuevo_caso_panel'], true) ? $allActiveIds : $validFuncionarioIds;
+        $allowed = in_array($actionKey, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_recibo_manual','contrato_no_salida','nuevo_caso_panel'], true) ? $allActiveIds : $validFuncionarioIds;
         if ($idKey !== '' && $idKey !== '0' && isset($allowed[$idKey])) {
           $selected[$idKey] = $idKey;
         }

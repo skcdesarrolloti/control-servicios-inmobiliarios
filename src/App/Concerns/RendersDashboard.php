@@ -1750,7 +1750,7 @@ trait RendersDashboard
         $groupsHtml .= '<span>' . esc_html(str_replace(['Email interno en cola','Email interno'],['CC por correo','CC por correo'],(string) ($item['channel'] ?? 'CC por correo'))) . '</span>';
         $groupsHtml .= '</div>';
         $groupsHtml .= '<p>' . esc_html((string) ($item['description'] ?? '')) . '</p>';
-        $groupsHtml .= '<select name="settings[' . esc_attr($action) . '][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $buildOptions($selectedIds, in_array($action, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_no_salida','nuevo_caso_panel'], true)) . '</select>';
+        $groupsHtml .= '<select name="settings[' . esc_attr($action) . '][]" class="select select-bordered select-sm scm-select" multiple size="4">' . $buildOptions($selectedIds, in_array($action, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_recibo_manual','contrato_no_salida','nuevo_caso_panel'], true)) . '</select>';
         $groupsHtml .= '</div>';
       }
       $groupsHtml .= '</section>';

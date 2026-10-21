@@ -11965,6 +11965,17 @@
 
     bindCaseCatalogSettings();
 
+    document.addEventListener("change", function (event) {
+      var select = event.target && event.target.closest ? event.target.closest("[data-scm-admin-ticket-topic]") : null;
+      if (!select) return;
+      var form = select.closest("form");
+      var hint = form ? form.querySelector("[data-scm-admin-ticket-receipt-hint]") : null;
+      var isReceipt = ["recibo de inmuebles", "recibo de inmueble"].indexOf(String(select.value || "").trim().toLowerCase()) !== -1;
+      if (hint) hint.hidden = !isReceipt;
+      var solicitante = form ? form.querySelector('select[name="solicitante_tipo"]') : null;
+      if (solicitante && isReceipt) solicitante.value = "arrendatario";
+    });
+
     function bindInternalNotificationsSettings() {
       var openBtn = root.querySelector("#scm-open-internal-notifications");
       var modal = root.querySelector("#scm-internal-notifications-modal");
@@ -13353,6 +13364,8 @@
       // Mismos temas de ayuda que "Crear nuevo caso" (Configuración → Temas de ayuda y categorías).
       var topicOptions = (Array.isArray(runtime.caseHelpTopics) ? runtime.caseHelpTopics : []).slice();
       if (defaultTema && topicOptions.indexOf(defaultTema) < 0) topicOptions.unshift(defaultTema);
+      // Desde Contratos siempre se puede crear el recibo (genera la carta de aviso previo al arrendatario).
+      if (!isPreventiva && topicOptions.indexOf("Recibo de inmuebles") < 0) topicOptions.push("Recibo de inmuebles");
       var priorityOptions = [
         "Prioridad urgente",
         "Prioridad alta",
@@ -13520,11 +13533,12 @@
         '<label class="scm-seg-field"><span>Departamento</span><select name="departamento" required>' +
         ticketAdminSelectOptions(deptOptions, defaultDepartamento, "Selecciona departamento") +
         "</select></label>" +
-        '<label class="scm-seg-field"><span>Tema de ayuda</span><select name="tema_ayuda" required>' +
+        '<label class="scm-seg-field"><span>Tema de ayuda</span><select name="tema_ayuda" required data-scm-admin-ticket-topic>' +
         ticketAdminSelectOptions(topicOptions, defaultTema, "Selecciona tema") +
         "</select></label>" +
         solicitanteField +
         "</div>" +
+        '<p class="scm-muted" data-scm-admin-ticket-receipt-hint hidden style="margin-top:8px;padding:10px 12px;border:1px solid #fde68a;background:#fffbeb;border-radius:10px;">Recibo de inmuebles: se genera la carta de aviso previo de entrega con la fecha fin del contrato y se env&iacute;a al arrendatario (solicitante), al responsable y a los funcionarios de &quot;Caso de recibo creado desde el panel&quot; en Notificaciones internas.</p>' +
         "</section>" +
         '<section class="scm-admin-ticket-section">' +
         '<h5 class="scm-admin-ticket-section-title">Inmueble y contrato</h5>' +

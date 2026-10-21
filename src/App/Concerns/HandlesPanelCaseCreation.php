@@ -86,6 +86,47 @@ trait HandlesPanelCaseCreation
     $this->jsonOk(['draft' => $draft, 'contract_id' => (string) $contract['_ID']]);
   }
 
+  /**
+   * "Crear nuevo caso" con tema Recibo de inmuebles: se crea como el recibo de Contratos (carta de aviso previo y avisos).
+   * @return array<string,mixed>
+   */
+  private function createPanelReceiptCase(PublicTicketsService $service): array
+  {
+    $options = $service->panelCaseOptions();
+    $theme = trim((string) ($_POST['tema_ayuda'] ?? ''));
+    $title = trim(strip_tags((string) wp_unslash($_POST['asunto'] ?? '')));
+    $description = trim(strip_tags((string) wp_unslash($_POST['descripcion'] ?? '')));
+    $employeeId = trim((string) ($_POST['id_empleado'] ?? ''));
+    if (!in_array($theme, $options['themes'], true)) {
+      throw new \InvalidArgumentException('Selecciona un tema válido.');
+    }
+    if ($title === '' || mb_strlen($title) > 200 || $description === '' || mb_strlen($description) > 10000) {
+      throw new \InvalidArgumentException('Completa el título (máximo 200 caracteres) y la descripción (máximo 10.000).');
+    }
+    if (!in_array($employeeId, array_map('strval', array_column($options['employees'], 'employee_id')), true)) {
+      throw new \InvalidArgumentException('Selecciona un responsable activo de los cargos habilitados en Configuración.');
+    }
+    $department = trim((string) ($_POST['departamento'] ?? ''));
+    $documentTitles = array_map('strval', (array) ($_FILES['archivos']['name'] ?? []));
+    $result = $this->createManualReceiptCase([
+      'contract_pk' => trim((string) ($_POST['contract_id'] ?? '')),
+      'id_empleado' => $employeeId,
+      'asunto' => $title,
+      'descripcion' => $description,
+      'departamento' => in_array($department, $options['departments'], true) ? $department : '',
+    ], $this->handleImageUploads('imagenes', 10), $this->handleDocumentUploads('archivos', $documentTitles, 10));
+    if (($result['ok'] ?? '0') !== '1') {
+      throw new \RuntimeException((string) ($result['message'] ?? 'No se pudo crear el recibo.'));
+    }
+    return [
+      'ticket_id' => (int) $result['ticket_id'],
+      'queued' => (int) ($result['emails_queued'] ?? 0),
+      'whatsapp_queued' => 0,
+      'notification_details' => [],
+      'message' => (string) $result['message'] . ' Se generó la carta de aviso previo y se envió al arrendatario, al responsable y a los funcionarios del aviso "Caso de recibo creado desde el panel".',
+    ];
+  }
+
   public function ajax_handler_panel_case_create(): void
   {
     $service = $this->panelCaseService();
@@ -101,7 +142,9 @@ trait HandlesPanelCaseCreation
       if (is_array($saved) && !empty($saved['ticket_id'])) {
         $result = $saved;
       } else {
-        $result = $service->createPanelTicket($_POST);
+        $result = $this->isReceiptTopic((string) ($_POST['tema_ayuda'] ?? ''))
+          ? $this->createPanelReceiptCase($service)
+          : $service->createPanelTicket($_POST);
         rewind($receipt);
         ftruncate($receipt, 0);
         fwrite($receipt, (string) json_encode($result, JSON_UNESCAPED_UNICODE));

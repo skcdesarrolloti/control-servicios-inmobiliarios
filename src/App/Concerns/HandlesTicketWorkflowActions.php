@@ -3760,7 +3760,9 @@ trait HandlesTicketWorkflowActions
     $documentos = $this->handleDocumentUploads('documento', $documentTitles, 10);
 
     $controller = $this->get_pending_controller();
-    $result = $controller->createAdministrativeTicket($input, $imagenes, $documentos, $notifyRecipients);
+    $result = $this->isReceiptTopic($input['tema_ayuda'] ?? '')
+      ? $this->createManualReceiptCase($input, $imagenes, $documentos)
+      : $controller->createAdministrativeTicket($input, $imagenes, $documentos, $notifyRecipients);
     if (($result['ok'] ?? '0') !== '1') {
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo crear el caso.'));
     }
@@ -5059,6 +5061,55 @@ trait HandlesTicketWorkflowActions
       }
     }
     return $stats;
+  }
+
+  private function isReceiptTopic(string $topic): bool
+  {
+    return in_array(mb_strtolower(trim($topic), 'UTF-8'), ['recibo de inmuebles', 'recibo de inmueble'], true);
+  }
+
+  /**
+   * Recibo creado por un funcionario (Crear nuevo caso o Contratos): mismo flujo del recibo automático,
+   * con la carta de aviso previo para el arrendatario y avisos del evento interno contrato_recibo_manual.
+   * @param array<string,mixed> $input
+   * @return array<string,mixed>
+   */
+  private function createManualReceiptCase(array $input, array $imagenes = [], array $documentos = []): array
+  {
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    $contractPk = trim((string) ($input['contract_pk'] ?? ''));
+    $contract = ctype_digit($contractPk) ? $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [(int) $contractPk]) : null;
+    if (!is_array($contract)) {
+      return ['ok' => '0', 'message' => 'Selecciona un contrato existente para crear el recibo.'];
+    }
+    if (trim((string) ($contract['fin_contrato'] ?? '')) === '') {
+      return ['ok' => '0', 'message' => 'El contrato no tiene fecha de terminación; la carta de aviso previo la necesita.'];
+    }
+    $existing = $this->contractEndingReceiptTicketId($contract);
+    if ($existing !== '') {
+      return ['ok' => '0', 'message' => 'Este contrato ya tiene el caso de recibo #' . $existing . ' para su fecha de terminación.'];
+    }
+    if (!filter_var(trim((string) ($contract['correo_arrendatario'] ?? '')), FILTER_VALIDATE_EMAIL)) {
+      return ['ok' => '0', 'message' => 'El arrendatario necesita un correo válido para recibir la carta de aviso previo.'];
+    }
+    $input = array_merge($input, [
+      'ticket_mode' => 'administrativo',
+      'contract_pk' => (string) $contract['_ID'],
+      'tema_ayuda' => 'Recibo de inmuebles',
+      'solicitante_tipo' => 'arrendatario',
+      'departamento' => trim((string) ($input['departamento'] ?? '')) ?: 'Servicio al arrendatario',
+      'prioridad' => trim((string) ($input['prioridad'] ?? '')) ?: 'Prioridad urgente',
+      // La fecha de la carta y el control de duplicados salen siempre del contrato.
+      'fecha_final_contrato' => '',
+      'internal_notification_action' => 'contrato_recibo_manual',
+      'require_receipt_letter' => true,
+    ]);
+    try {
+      return $this->get_pending_controller()->createAdministrativeTicket($input, $imagenes, $documentos, ['empleado', 'solicitante', 'admin']);
+    } catch (\Throwable $exception) {
+      error_log('[manual_receipt_case] ' . $exception->getMessage());
+      return ['ok' => '0', 'message' => 'No se pudo crear el recibo: ' . $exception->getMessage()];
+    }
   }
 
   private function contractEndingReceiptTicketId(array $contract): string
