@@ -17,7 +17,11 @@ $checks = [
     && str_contains($workflow, "'internal_notification_action' => 'contrato_recibo_manual',")
     && str_contains($workflow, "['empleado', 'solicitante', 'admin']")
     && str_contains($workflow, "'solicitante_tipo' => 'arrendatario',"),
-  'receipt is not duplicated for the same contract end date' => str_contains($workflow, '$existing = $this->contractEndingReceiptTicketId($contract);'),
+  'receipt is not duplicated for the same contract end date' => str_contains($workflow, '$existing = $this->contractEndingReceiptTicketId($contract, $endValue);'),
+  'receipt asks for the delivery date when the contract has none' => str_contains($workflow, "'fecha_entrega_recibo',")
+    && str_contains($workflow, 'indica la fecha prevista de entrega para la carta.')
+    && str_contains($workflow, "'fecha_final_contrato' => \$endValue,")
+    && str_contains($create, 'name="fecha_entrega_recibo"') && str_contains($runtime, 'name="fecha_entrega_recibo"'),
   'manual receipt internal event is configurable' => str_contains($app, "'contrato_recibo_manual' => ["),
   'contract modal always offers the receipt topic' => str_contains($runtime, 'if (!isPreventiva && topicOptions.indexOf("Recibo de inmuebles") < 0) topicOptions.push("Recibo de inmuebles");'),
   'panel form explains the receipt and hides optional notices' => str_contains($create, 'data-receipt-hint') && str_contains($create, 'notifySection.hidden = isReceipt;'),

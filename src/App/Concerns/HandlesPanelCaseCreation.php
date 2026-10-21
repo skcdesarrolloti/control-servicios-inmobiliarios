@@ -114,6 +114,7 @@ trait HandlesPanelCaseCreation
       'asunto' => $title,
       'descripcion' => $description,
       'departamento' => in_array($department, $options['departments'], true) ? $department : '',
+      'fecha_entrega_recibo' => trim((string) ($_POST['fecha_entrega_recibo'] ?? '')),
     ], $this->handleImageUploads('imagenes', 10), $this->handleDocumentUploads('archivos', $documentTitles, 10));
     if (($result['ok'] ?? '0') !== '1') {
       throw new \RuntimeException((string) ($result['message'] ?? 'No se pudo crear el recibo.'));

@@ -3747,6 +3747,7 @@ trait HandlesTicketWorkflowActions
       'celular_arrendatario',
       'registro_fotografico',
       'fecha_final_contrato',
+      'fecha_entrega_recibo',
     ] as $key) {
       $input[$key] = $clean($key);
     }
@@ -5082,12 +5083,25 @@ trait HandlesTicketWorkflowActions
     if (!is_array($contract)) {
       return ['ok' => '0', 'message' => 'Selecciona un contrato existente para crear el recibo.'];
     }
-    if (trim((string) ($contract['fin_contrato'] ?? '')) === '') {
-      return ['ok' => '0', 'message' => 'El contrato no tiene fecha de terminación; la carta de aviso previo la necesita.'];
+    // Fecha prevista de entrega: la del formulario (editable) o, si no llega, la fecha fin del contrato.
+    $contractEnd = (string) ($contract['fin_contrato'] ?? '');
+    $contractEndTs = $this->contractTerminationTimestamp($contractEnd);
+    $deliveryDate = trim((string) ($input['fecha_entrega_recibo'] ?? ''));
+    if ($deliveryDate !== '') {
+      $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $deliveryDate);
+      if (!$parsed || $parsed->format('Y-m-d') !== $deliveryDate) {
+        return ['ok' => '0', 'message' => 'La fecha prevista de entrega no es válida.'];
+      }
+      // Si coincide con el contrato se conserva su valor original para que el recibo automático no lo duplique.
+      $endValue = ($contractEndTs > 0 && date('Y-m-d', $contractEndTs) === $deliveryDate) ? $contractEnd : (string) $parsed->getTimestamp();
+    } elseif ($contractEndTs > 0) {
+      $endValue = $contractEnd;
+    } else {
+      return ['ok' => '0', 'message' => 'El contrato no tiene fecha de terminación: indica la fecha prevista de entrega para la carta.'];
     }
-    $existing = $this->contractEndingReceiptTicketId($contract);
+    $existing = $this->contractEndingReceiptTicketId($contract, $endValue);
     if ($existing !== '') {
-      return ['ok' => '0', 'message' => 'Este contrato ya tiene el caso de recibo #' . $existing . ' para su fecha de terminación.'];
+      return ['ok' => '0', 'message' => 'Este contrato ya tiene el caso de recibo #' . $existing . ' para esa fecha de entrega.'];
     }
     if (!filter_var(trim((string) ($contract['correo_arrendatario'] ?? '')), FILTER_VALIDATE_EMAIL)) {
       return ['ok' => '0', 'message' => 'El arrendatario necesita un correo válido para recibir la carta de aviso previo.'];
@@ -5099,8 +5113,7 @@ trait HandlesTicketWorkflowActions
       'solicitante_tipo' => 'arrendatario',
       'departamento' => trim((string) ($input['departamento'] ?? '')) ?: 'Servicio al arrendatario',
       'prioridad' => trim((string) ($input['prioridad'] ?? '')) ?: 'Prioridad urgente',
-      // La fecha de la carta y el control de duplicados salen siempre del contrato.
-      'fecha_final_contrato' => '',
+      'fecha_final_contrato' => $endValue,
       'internal_notification_action' => 'contrato_recibo_manual',
       'require_receipt_letter' => true,
     ]);
@@ -5112,11 +5125,11 @@ trait HandlesTicketWorkflowActions
     }
   }
 
-  private function contractEndingReceiptTicketId(array $contract): string
+  private function contractEndingReceiptTicketId(array $contract, ?string $endValue = null): string
   {
     $table = $this->db->table('jet_cct_tickets');
     if (!$this->column_exists($table, 'fecha_terminacion_contrato')) return '';
-    $row = $this->db->getRow("SELECT `_ID`, `id_ticket` FROM `{$table}` WHERE `id_contrato` = ? AND LOWER(TRIM(`tema_ayuda`)) IN ('recibo de inmuebles','recibo de inmueble') AND `fecha_terminacion_contrato` = ? ORDER BY `_ID` DESC LIMIT 1", [(string) $contract['_ID'], (string) ($contract['fin_contrato'] ?? '')]);
+    $row = $this->db->getRow("SELECT `_ID`, `id_ticket` FROM `{$table}` WHERE `id_contrato` = ? AND LOWER(TRIM(`tema_ayuda`)) IN ('recibo de inmuebles','recibo de inmueble') AND `fecha_terminacion_contrato` = ? ORDER BY `_ID` DESC LIMIT 1", [(string) $contract['_ID'], $endValue ?? (string) ($contract['fin_contrato'] ?? '')]);
     return $row ? (string) ($row['id_ticket'] ?: $row['_ID']) : '';
   }
 

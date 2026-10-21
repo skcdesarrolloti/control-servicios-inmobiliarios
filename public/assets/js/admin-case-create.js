@@ -40,6 +40,15 @@
     const opener = document.activeElement;
     let busy = false;
     let selected = null;
+    // fin_contrato llega como timestamp (segundos o milisegundos) o como fecha; el campo usa AAAA-MM-DD.
+    const contractEndDate = value => {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+      const date = /^\d+$/.test(raw) ? new Date(Number(raw) * (raw.length > 10 ? 1 : 1000)) : new Date(raw.replace(' ', 'T'));
+      if (Number.isNaN(date.getTime())) return '';
+      return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+    };
     let sequence = 0;
     let aiSequence = 0;
     let aiController = null;
@@ -118,6 +127,7 @@
             <label class="scm-new-case-label">Departamento<select name="departamento" required>${option('', 'Selecciona el departamento')}${config.departments.map(t => option(t)).join('')}</select></label>
           </div>
           <p data-receipt-hint hidden class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Recibo de inmuebles: al crear el caso se genera la carta de aviso previo de entrega con la fecha fin del contrato y se envía al arrendatario, al responsable y a los funcionarios de &quot;Caso de recibo creado desde el panel&quot; en Notificaciones internas. El arrendatario debe tener correo válido y el contrato no puede tener ya un recibo para esa fecha.</p>
+          <label data-receipt-date hidden class="scm-new-case-label">Fecha prevista de entrega<input type="date" name="fecha_entrega_recibo"><small class="text-xs text-slate-500" data-receipt-date-help>Se usa en la carta de aviso previo. Por defecto es la fecha fin del contrato.</small></label>
           <label class="scm-new-case-label">Asignar a<select name="id_empleado" required>${option('', 'Selecciona un funcionario activo')}${config.employees.map(e => option(e.employee_id, `${e.name} · ${e.cargo}${e.email ? '' : ' · Sin correo'}`)).join('')}</select></label>
           <p data-assignee class="text-xs text-slate-500">El responsable recibirá correo${config.whatsapp_enabled ? ' y WhatsApp' : '. WhatsApp pendiente de activar en la configuración interna del sistema'}.</p>
         </section>
@@ -156,6 +166,13 @@
       const invalidateSelection = () => { sequence++; resetAi(); assistantChoice = ''; selected = null; setAssistantChoice(''); summary.hidden = true; setContractStepsVisible(false); showError(''); results.replaceChildren(); status.textContent = 'Busca y selecciona el contrato correspondiente.'; };
       const selectContract = contract => {
         selected = contract;
+        const receiptDate = form.elements.fecha_entrega_recibo;
+        if (receiptDate) {
+          receiptDate.value = contractEndDate(contract.fin_contrato);
+          form.querySelector('[data-receipt-date-help]').textContent = receiptDate.value
+            ? 'Se usa en la carta de aviso previo. Viene de la fecha fin del contrato; puedes ajustarla.'
+            : 'El contrato no tiene fecha fin registrada: indica la fecha prevista de entrega para la carta.';
+        }
         results.replaceChildren();
         summary.innerHTML = `<strong>Contrato ${escape(contract.contrato)} · SIMI ${escape(contract.inmueble)}</strong><p class="mt-1">${escape(contract.direccion)}</p><p class="text-xs mt-1">Propietario: ${escape(contract.propietario)} · Arrendatario: ${escape(contract.arrendatario)}</p>`;
         summary.hidden = false; status.textContent = 'Contrato seleccionado. Puedes cambiarlo realizando otra búsqueda.';
@@ -443,6 +460,8 @@
       const syncReceiptTopic = () => {
         const isReceipt = ['recibo de inmuebles', 'recibo de inmueble'].includes(String(form.elements.tema_ayuda.value || '').trim().toLowerCase());
         form.querySelector('[data-receipt-hint]').hidden = !isReceipt;
+        form.querySelector('[data-receipt-date]').hidden = !isReceipt;
+        form.elements.fecha_entrega_recibo.required = isReceipt;
         const notifySection = form.querySelector('[data-notify-section]');
         notifySection.hidden = isReceipt;
         if (isReceipt) notifySection.querySelectorAll('[name="notify_roles[]"]').forEach(input => { input.checked = false; });

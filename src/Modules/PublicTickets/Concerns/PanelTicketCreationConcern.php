@@ -75,7 +75,7 @@ trait PanelTicketCreationConcern
     }
     if ($where === []) return [];
     $select = ['_ID'];
-    foreach (['contrato', 'inmueble', 'direccion', 'propietario', 'arrendatario', 'estado'] as $column) {
+    foreach (['contrato', 'inmueble', 'direccion', 'propietario', 'arrendatario', 'estado', 'fin_contrato'] as $column) {
       if ($this->schema->columnExists($table, $column)) $select[] = $column;
     }
     return $this->db->getResults('SELECT `' . implode('`, `', $select) . "` FROM `{$table}` WHERE (" . implode(' OR ', $where) . ') ORDER BY `_ID` DESC LIMIT 30', $args);

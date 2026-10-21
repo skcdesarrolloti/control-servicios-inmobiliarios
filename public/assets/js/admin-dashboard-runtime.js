@@ -11972,6 +11972,11 @@
       var hint = form ? form.querySelector("[data-scm-admin-ticket-receipt-hint]") : null;
       var isReceipt = ["recibo de inmuebles", "recibo de inmueble"].indexOf(String(select.value || "").trim().toLowerCase()) !== -1;
       if (hint) hint.hidden = !isReceipt;
+      var receiptDate = form ? form.querySelector("[data-scm-admin-ticket-receipt-date]") : null;
+      if (receiptDate) {
+        receiptDate.hidden = !isReceipt;
+        receiptDate.querySelector("input").required = isReceipt;
+      }
       var solicitante = form ? form.querySelector('select[name="solicitante_tipo"]') : null;
       if (solicitante && isReceipt) solicitante.value = "arrendatario";
     });
@@ -12362,6 +12367,16 @@
           .join("") +
         "</datalist>"
       );
+    }
+
+    // fin_contrato llega como timestamp (segundos o milisegundos) o como fecha; el campo usa AAAA-MM-DD.
+    function adminTicketDateValue(value) {
+      var raw = String(value || "").trim();
+      if (!raw) return "";
+      if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+      var date = /^\d+$/.test(raw) ? new Date(Number(raw) * (raw.length > 10 ? 1 : 1000)) : new Date(raw.replace(" ", "T"));
+      if (isNaN(date.getTime())) return "";
+      return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
     }
 
     function ticketAdminSelectOptions(values, selected, placeholder) {
@@ -13539,6 +13554,9 @@
         solicitanteField +
         "</div>" +
         '<p class="scm-muted" data-scm-admin-ticket-receipt-hint hidden style="margin-top:8px;padding:10px 12px;border:1px solid #fde68a;background:#fffbeb;border-radius:10px;">Recibo de inmuebles: se genera la carta de aviso previo de entrega con la fecha fin del contrato y se env&iacute;a al arrendatario (solicitante), al responsable y a los funcionarios de &quot;Caso de recibo creado desde el panel&quot; en Notificaciones internas.</p>' +
+        '<label class="scm-seg-field" data-scm-admin-ticket-receipt-date hidden><span>Fecha prevista de entrega</span><input type="date" name="fecha_entrega_recibo" value="' +
+        escHtml(adminTicketDateValue(contractDataset(btn, "fechaFinalContrato"))) +
+        '"><small>' + (adminTicketDateValue(contractDataset(btn, "fechaFinalContrato")) ? "Viene de la fecha fin del contrato; puedes ajustarla." : "El contrato no tiene fecha fin registrada: ind&iacute;cala para la carta.") + "</small></label>" +
         "</section>" +
         '<section class="scm-admin-ticket-section">' +
         '<h5 class="scm-admin-ticket-section-title">Inmueble y contrato</h5>' +
