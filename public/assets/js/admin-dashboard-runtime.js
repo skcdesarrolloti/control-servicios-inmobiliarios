@@ -11969,9 +11969,25 @@
       var select = event.target && event.target.closest ? event.target.closest("[data-scm-admin-ticket-topic]") : null;
       if (!select) return;
       var form = select.closest("form");
-      var hint = form ? form.querySelector("[data-scm-admin-ticket-receipt-hint]") : null;
       var isReceipt = ["recibo de inmuebles", "recibo de inmueble"].indexOf(String(select.value || "").trim().toLowerCase()) !== -1;
-      if (hint) hint.hidden = !isReceipt;
+      // Recibo: asunto y descripción se completan solos (sin pisar lo escrito) y el departamento es el del arrendatario.
+      if (form && isReceipt) {
+        var contractField = form.querySelector('[name="contrato"]');
+        var receiptValues = {
+          asunto: "Recibo de inmueble contrato #" + String((contractField && contractField.value) || "").trim(),
+          descripcion: "Coordinar la revisión antes de la desocupación y el recibo del inmueble por terminación del contrato de arrendamiento.",
+        };
+        Object.keys(receiptValues).forEach(function (name) {
+          var field = form.querySelector('[name="' + name + '"]');
+          var autoKey = "scmReceiptAuto" + name;
+          if (field && (!String(field.value || "").trim() || field.value === form.dataset[autoKey])) {
+            field.value = receiptValues[name];
+            form.dataset[autoKey] = receiptValues[name];
+          }
+        });
+        var department = form.querySelector('select[name="departamento"]');
+        if (department && department.querySelector('option[value="Servicio al arrendatario"]')) department.value = "Servicio al arrendatario";
+      }
       var receiptDate = form ? form.querySelector("[data-scm-admin-ticket-receipt-date]") : null;
       if (receiptDate) {
         receiptDate.hidden = !isReceipt;
@@ -13553,7 +13569,6 @@
         "</select></label>" +
         solicitanteField +
         "</div>" +
-        '<p class="scm-muted" data-scm-admin-ticket-receipt-hint hidden style="margin-top:8px;padding:10px 12px;border:1px solid #fde68a;background:#fffbeb;border-radius:10px;">Recibo de inmuebles: se genera el aviso previo de revisi&oacute;n antes de la desocupaci&oacute;n del inmueble con la fecha fin del contrato y se env&iacute;a por correo y WhatsApp al arrendatario (solicitante), al responsable y a los funcionarios de &quot;Caso de recibo creado desde el panel&quot; en Notificaciones internas.</p>' +
         '<label class="scm-seg-field" data-scm-admin-ticket-receipt-date hidden><span>Fecha prevista de recibo</span><input type="date" name="fecha_entrega_recibo" value="' +
         escHtml(adminTicketDateValue(contractDataset(btn, "fechaFinalContrato"))) +
         '"><small>' + (adminTicketDateValue(contractDataset(btn, "fechaFinalContrato")) ? "Viene de la fecha fin del contrato; puedes ajustarla." : "El contrato no tiene fecha fin registrada: ind&iacute;cala para la carta.") + "</small></label>" +

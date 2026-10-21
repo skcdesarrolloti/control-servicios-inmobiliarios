@@ -33,6 +33,8 @@ $checks = [
   'tenant WhatsApp uses its own template with the notice PDF' => str_contains($whatsapp, "RECEIPT_TENANT_TEMPLATE = 'scm_aviso_revision_desocupacion_v1'")
     && str_contains($whatsapp, "['type' => 'header', 'parameters' => [['type' => 'document', 'document' => ['link' => \$letterUrl")
     && is_file($root . '/docs/crear-plantilla-whatsapp-aviso-revision-desocupacion.md'),
+  'contract modal fills the receipt fields without the notice' => !str_contains($runtime, 'data-scm-admin-ticket-receipt-hint')
+    && str_contains($runtime, 'asunto: "Recibo de inmueble contrato #"') && str_contains($runtime, 'department.value = "Servicio al arrendatario"'),
   'manual receipt internal event is configurable' => str_contains($app, "'contrato_recibo_manual' => ["),
   'contract modal always offers the receipt topic' => str_contains($runtime, 'if (!isPreventiva && topicOptions.indexOf("Recibo de inmuebles") < 0) topicOptions.push("Recibo de inmuebles");'),
   'panel form fills the receipt fields and hides optional notices' => !str_contains($create, 'data-receipt-hint')
