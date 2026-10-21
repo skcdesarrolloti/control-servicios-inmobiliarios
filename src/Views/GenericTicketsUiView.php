@@ -881,7 +881,24 @@ final class GenericTicketsUiView
               <option value="magnitude_asc" <?php selected((string) ($p['fSort'] ?? ''), 'magnitude_asc'); ?>>Menor magnitud</option>
             </select></div><?php endif; ?>
           <div class="scm-field scm-date-range-field"><label id="<?php echo esc_attr($prefix); ?>fecha_rango_label">Fecha</label><div class="scm-date-range-control" role="group" aria-labelledby="<?php echo esc_attr($prefix); ?>fecha_rango_label"><div class="scm-date-range-part"><span>Desde</span><input id="<?php echo esc_attr($prefix); ?>fecha_desde" name="<?php echo esc_attr($prefix); ?>fecha_desde" type="date" value="<?php echo esc_attr((string) ($p['fFechaDesde'] ?? '')); ?>" aria-label="Fecha desde"></div><span class="scm-date-range-separator" aria-hidden="true">&rarr;</span><div class="scm-date-range-part"><span>Hasta</span><input id="<?php echo esc_attr($prefix); ?>fecha_hasta" name="<?php echo esc_attr($prefix); ?>fecha_hasta" type="date" value="<?php echo esc_attr((string) ($p['fFechaHasta'] ?? '')); ?>" aria-label="Fecha hasta"></div></div></div>
-          <?php if ($baseTabKey === 'preventiva'): ?><div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>cotizacion">Cotizacion</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>cotizacion" name="<?php echo esc_attr($prefix); ?>cotizacion">
+          <?php if ($baseTabKey === 'preventiva'): ?><div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>magnitud_caso">Magnitud caso</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>magnitud_caso" name="<?php echo esc_attr($prefix); ?>magnitud_caso">
+                <option value="">Todas las magnitudes</option>
+                <option value="critico" <?php selected((string) ($p['fMagnitudCaso'] ?? ''), 'critico'); ?>>Critico</option>
+                <option value="alto" <?php selected((string) ($p['fMagnitudCaso'] ?? ''), 'alto'); ?>>Alto</option>
+                <option value="medio" <?php selected((string) ($p['fMagnitudCaso'] ?? ''), 'medio'); ?>>Medio</option>
+                <option value="bajo" <?php selected((string) ($p['fMagnitudCaso'] ?? ''), 'bajo'); ?>>Bajo</option>
+              </select></div>
+            <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>revision">Revision</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>revision" name="<?php echo esc_attr($prefix); ?>revision">
+                <option value="">Todas</option>
+                <option value="has" <?php selected((string) ($p['fRevision'] ?? ''), 'has'); ?>>Con revision</option>
+                <option value="none" <?php selected((string) ($p['fRevision'] ?? ''), 'none'); ?>>Sin revision</option>
+              </select></div>
+            <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>perturbacion">Perturbacion</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>perturbacion" name="<?php echo esc_attr($prefix); ?>perturbacion">
+                <option value="">Todas</option>
+                <option value="has" <?php selected(strtolower((string) ($p['fPerturbacion'] ?? '')), 'has'); ?>>Con perturbacion</option>
+                <option value="none" <?php selected(strtolower((string) ($p['fPerturbacion'] ?? '')), 'none'); ?>>Sin perturbacion</option>
+              </select></div>
+            <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>cotizacion">Cotizacion</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>cotizacion" name="<?php echo esc_attr($prefix); ?>cotizacion">
                 <option value="">Todas</option>
                 <option value="has" <?php selected((string) ($p['fCotizacion'] ?? ''), 'has'); ?>>Con cotizacion</option>
                 <option value="none" <?php selected((string) ($p['fCotizacion'] ?? ''), 'none'); ?>>Sin cotizacion</option>
@@ -895,16 +912,6 @@ final class GenericTicketsUiView
                 <option value="">Todos</option><?php foreach (($filterOptions['cotizacion_estado'] ?? []) as $cotEstadoOpt): ?><option value="<?php echo esc_attr((string) $cotEstadoOpt); ?>" <?php selected((string) ($p['fCotizacionEstado'] ?? ''), (string) $cotEstadoOpt); ?>><?php echo esc_html((string) $cotEstadoOpt); ?></option><?php endforeach; ?>
               </select></div>
           <?= \SCM\Support\CaseFilterFields::financing($prefix, $p) ?>
-            <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>perturbacion">Perturbacion</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>perturbacion" name="<?php echo esc_attr($prefix); ?>perturbacion">
-                <option value="">Todas</option>
-                <option value="has" <?php selected(strtolower((string) ($p['fPerturbacion'] ?? '')), 'has'); ?>>Con perturbacion</option>
-                <option value="none" <?php selected(strtolower((string) ($p['fPerturbacion'] ?? '')), 'none'); ?>>Sin perturbacion</option>
-              </select></div>
-            <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>revision">Revision</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>revision" name="<?php echo esc_attr($prefix); ?>revision">
-                <option value="">Todas</option>
-                <option value="has" <?php selected((string) ($p['fRevision'] ?? ''), 'has'); ?>>Con revision</option>
-                <option value="none" <?php selected((string) ($p['fRevision'] ?? ''), 'none'); ?>>Sin revision</option>
-              </select></div>
             <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>danos">Da&ntilde;os</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>danos" name="<?php echo esc_attr($prefix); ?>danos">
                 <option value="">Todos</option>
                 <option value="has" <?php selected((string) ($p['fDanos'] ?? ''), 'has'); ?>>Con da&ntilde;os</option>
@@ -927,13 +934,6 @@ final class GenericTicketsUiView
               <option value="Si" <?php selected((string) ($p['fTuvoSeguimiento'] ?? ''), 'Si'); ?>>Si</option>
               <option value="No" <?php selected((string) ($p['fTuvoSeguimiento'] ?? ''), 'No'); ?>>No</option>
             </select></div><?php endif; ?>
-          <?php if ($baseTabKey === 'preventiva'): ?><div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>magnitud_caso">Magnitud caso</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>magnitud_caso" name="<?php echo esc_attr($prefix); ?>magnitud_caso">
-                <option value="">Todas las magnitudes</option>
-                <option value="critico" <?php selected((string) ($p['fMagnitudCaso'] ?? ''), 'critico'); ?>>Critico</option>
-                <option value="alto" <?php selected((string) ($p['fMagnitudCaso'] ?? ''), 'alto'); ?>>Alto</option>
-                <option value="medio" <?php selected((string) ($p['fMagnitudCaso'] ?? ''), 'medio'); ?>>Medio</option>
-                <option value="bajo" <?php selected((string) ($p['fMagnitudCaso'] ?? ''), 'bajo'); ?>>Bajo</option>
-              </select></div><?php endif; ?>
           <?php if ($baseTabKey === 'preventiva') echo \SCM\Support\CaseFilterFields::executor($prefix, $p); ?>
         </div>
         <div class="scm-actions">

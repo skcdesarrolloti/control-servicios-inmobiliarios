@@ -1101,6 +1101,23 @@ trait RendersDashboard
                 </select></div>
               <div class="scm-field scm-date-range-field"><label id="scm_fecha_rango_label">RANGO DE FECHA</label><div class="scm-date-range-control" role="group" aria-labelledby="scm_fecha_rango_label"><div class="scm-date-range-part"><input id="scm_fecha_desde" name="scm_fecha_desde" type="date" value="<?php echo esc_attr((string)($params["fFechaDesde"] ?? "")); ?>" aria-label="Fecha desde"></div><span class="scm-date-range-separator" aria-hidden="true">&rarr;</span><div class="scm-date-range-part"><input id="scm_fecha_hasta" name="scm_fecha_hasta" type="date" value="<?php echo esc_attr((string)($params["fFechaHasta"] ?? "")); ?>" aria-label="Fecha hasta"></div></div></div>
 
+              <div class="scm-field"><label for="scm_magnitud_caso">MAGNITUD / SEVERIDAD</label><select id="scm_magnitud_caso" name="scm_magnitud_caso" class="select select-bordered select-sm scm-select">
+                  <option value="">Todas las magnitudes</option>
+                  <option value="critico" <?php selected(($params['fMagnitudCaso'] ?? ''), 'critico'); ?>>Cr&iacute;tico</option>
+                  <option value="alto" <?php selected(($params['fMagnitudCaso'] ?? ''), 'alto'); ?>>Alto</option>
+                  <option value="medio" <?php selected(($params['fMagnitudCaso'] ?? ''), 'medio'); ?>>Medio</option>
+                  <option value="bajo" <?php selected(($params['fMagnitudCaso'] ?? ''), 'bajo'); ?>>Bajo</option>
+                </select></div>
+              <div class="scm-field"><label for="scm_revision">REVISIÓN</label><select id="scm_revision" name="scm_revision" class="select select-bordered select-sm scm-select">
+                  <option value="">Todas</option>
+                  <option value="has" <?php selected(($params['fRevision'] ?? ''), 'has'); ?>>Con revisi&oacute;n</option>
+                  <option value="none" <?php selected(($params['fRevision'] ?? ''), 'none'); ?>>Sin revisi&oacute;n</option>
+                </select></div>
+              <div class="scm-field"><label for="scm_perturbacion">PERTURBACIÓN</label><select id="scm_perturbacion" name="scm_perturbacion" class="select select-bordered select-sm scm-select">
+                  <option value="">Todas</option>
+                  <option value="has" <?php selected(strtolower((string) ($params['fPerturbacion'] ?? '')), 'has'); ?>>Con perturbaci&oacute;n</option>
+                  <option value="none" <?php selected(strtolower((string) ($params['fPerturbacion'] ?? '')), 'none'); ?>>Sin perturbaci&oacute;n</option>
+                </select></div>
               <div class="scm-field"><label for="scm_cotizacion">COTIZACIÓN</label><select id="scm_cotizacion" name="scm_cotizacion" class="select select-bordered select-sm scm-select">
                   <option value="">Todas</option>
                   <option value="has" <?php selected(($params['fCotizacion'] ?? ''), 'has'); ?>>Con cotizaci&oacute;n</option>
@@ -1115,16 +1132,6 @@ trait RendersDashboard
                   <option value="">Todos</option><?php foreach (($filterOptions["cotizacion_estado"] ?? []) as $cotEstadoOpt): ?><option value="<?php echo esc_attr((string)$cotEstadoOpt); ?>" <?php selected((string)($params["fCotizacionEstado"] ?? ""), (string)$cotEstadoOpt); ?>><?php echo esc_html((string)$cotEstadoOpt); ?></option><?php endforeach; ?>
                 </select></div>
                 <?= \SCM\Support\CaseFilterFields::financing('scm_', $params) ?>
-              <div class="scm-field"><label for="scm_perturbacion">PERTURBACIÓN</label><select id="scm_perturbacion" name="scm_perturbacion" class="select select-bordered select-sm scm-select">
-                  <option value="">Todas</option>
-                  <option value="has" <?php selected(strtolower((string) ($params['fPerturbacion'] ?? '')), 'has'); ?>>Con perturbaci&oacute;n</option>
-                  <option value="none" <?php selected(strtolower((string) ($params['fPerturbacion'] ?? '')), 'none'); ?>>Sin perturbaci&oacute;n</option>
-                </select></div>
-              <div class="scm-field"><label for="scm_revision">REVISIÓN</label><select id="scm_revision" name="scm_revision" class="select select-bordered select-sm scm-select">
-                  <option value="">Todas</option>
-                  <option value="has" <?php selected(($params['fRevision'] ?? ''), 'has'); ?>>Con revisi&oacute;n</option>
-                  <option value="none" <?php selected(($params['fRevision'] ?? ''), 'none'); ?>>Sin revisi&oacute;n</option>
-                </select></div>
               <div class="scm-field"><label for="scm_atraso">ATRASO DESDE CREACIÓN</label><select id="scm_atraso" name="scm_atraso" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option>
                   <option value="3" <?php selected(($params['fAtraso'] ?? ''), '3'); ?>>+3 d&iacute;as</option>
@@ -1141,13 +1148,6 @@ trait RendersDashboard
                   <option value="">Todos</option>
                   <option value="Si" <?php selected(($params['fTuvoSeguimiento'] ?? ''), 'Si'); ?>>Si</option>
                   <option value="No" <?php selected(($params['fTuvoSeguimiento'] ?? ''), 'No'); ?>>No</option>
-                </select></div>
-              <div class="scm-field"><label for="scm_magnitud_caso">MAGNITUD / SEVERIDAD</label><select id="scm_magnitud_caso" name="scm_magnitud_caso" class="select select-bordered select-sm scm-select">
-                  <option value="">Todas las magnitudes</option>
-                  <option value="critico" <?php selected(($params['fMagnitudCaso'] ?? ''), 'critico'); ?>>Cr&iacute;tico</option>
-                  <option value="alto" <?php selected(($params['fMagnitudCaso'] ?? ''), 'alto'); ?>>Alto</option>
-                  <option value="medio" <?php selected(($params['fMagnitudCaso'] ?? ''), 'medio'); ?>>Medio</option>
-                  <option value="bajo" <?php selected(($params['fMagnitudCaso'] ?? ''), 'bajo'); ?>>Bajo</option>
                 </select></div>
               <?php echo \SCM\Support\CaseFilterFields::executor('scm_', $params, 'EJECUTADO POR'); ?>
             </div>

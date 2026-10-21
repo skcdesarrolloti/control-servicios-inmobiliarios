@@ -1931,6 +1931,23 @@ final class SuCasaControlServiciosInmobiliarios
               <option value="">Todos</option><?php foreach (($filterOptions["barrios"] ?? []) as $barrioOpt): ?><option value="<?php echo esc_attr((string)$barrioOpt); ?>" <?php selected((string)($p["fBarrio"] ?? ""), (string)$barrioOpt); ?>><?php echo esc_html((string)$barrioOpt); ?></option><?php endforeach; ?>
             </select></div>
           <div class="scm-field scm-date-range-field"><label id="<?php echo esc_attr($prefix); ?>fecha_rango_label">Fecha</label><div class="scm-date-range-control" role="group" aria-labelledby="<?php echo esc_attr($prefix); ?>fecha_rango_label"><div class="scm-date-range-part"><span>Desde</span><input id="<?php echo esc_attr($prefix); ?>fecha_desde" name="<?php echo esc_attr($prefix); ?>fecha_desde" type="date" value="<?php echo esc_attr((string)($p["fFechaDesde"] ?? "")); ?>" aria-label="Fecha desde"></div><span class="scm-date-range-separator" aria-hidden="true">&rarr;</span><div class="scm-date-range-part"><span>Hasta</span><input id="<?php echo esc_attr($prefix); ?>fecha_hasta" name="<?php echo esc_attr($prefix); ?>fecha_hasta" type="date" value="<?php echo esc_attr((string)($p["fFechaHasta"] ?? "")); ?>" aria-label="Fecha hasta"></div></div></div>
+          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>magnitud_caso">Magnitud caso</label><select id="<?php echo esc_attr($prefix); ?>magnitud_caso" name="<?php echo esc_attr($prefix); ?>magnitud_caso" class="select select-bordered select-sm scm-select">
+              <option value="">Todas las magnitudes</option>
+              <option value="critico" <?php selected(($p['fMagnitudCaso'] ?? ''), 'critico'); ?>>Cr&iacute;tico</option>
+              <option value="alto" <?php selected(($p['fMagnitudCaso'] ?? ''), 'alto'); ?>>Alto</option>
+              <option value="medio" <?php selected(($p['fMagnitudCaso'] ?? ''), 'medio'); ?>>Medio</option>
+              <option value="bajo" <?php selected(($p['fMagnitudCaso'] ?? ''), 'bajo'); ?>>Bajo</option>
+            </select></div>
+          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>revision">Revisi&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>revision" name="<?php echo esc_attr($prefix); ?>revision" class="select select-bordered select-sm scm-select">
+              <option value="">Todas</option>
+              <option value="has" <?php selected(($p['fRevision'] ?? ''), 'has'); ?>>Con revisi&oacute;n</option>
+              <option value="none" <?php selected(($p['fRevision'] ?? ''), 'none'); ?>>Sin revisi&oacute;n</option>
+            </select></div>
+          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>perturbacion">Perturbaci&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>perturbacion" name="<?php echo esc_attr($prefix); ?>perturbacion" class="select select-bordered select-sm scm-select">
+              <option value="">Todas</option>
+              <option value="has" <?php selected(strtolower((string) ($p['fPerturbacion'] ?? '')), 'has'); ?>>Con perturbaci&oacute;n</option>
+              <option value="none" <?php selected(strtolower((string) ($p['fPerturbacion'] ?? '')), 'none'); ?>>Sin perturbaci&oacute;n</option>
+            </select></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>cotizacion">Cotizaci&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>cotizacion" name="<?php echo esc_attr($prefix); ?>cotizacion" class="select select-bordered select-sm scm-select">
               <option value="">Todas</option>
               <option value="has" <?php selected(($p['fCotizacion'] ?? ''), 'has'); ?>>Con cotizaci&oacute;n</option>
@@ -1945,16 +1962,6 @@ final class SuCasaControlServiciosInmobiliarios
               <option value="">Todos</option><?php foreach (($filterOptions["cotizacion_estado"] ?? []) as $cotEstadoOpt): ?><option value="<?php echo esc_attr((string)$cotEstadoOpt); ?>" <?php selected((string)($p["fCotizacionEstado"] ?? ""), (string)$cotEstadoOpt); ?>><?php echo esc_html((string)$cotEstadoOpt); ?></option><?php endforeach; ?>
             </select></div>
           <?= \SCM\Support\CaseFilterFields::financing($prefix, $p) ?>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>perturbacion">Perturbaci&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>perturbacion" name="<?php echo esc_attr($prefix); ?>perturbacion" class="select select-bordered select-sm scm-select">
-              <option value="">Todas</option>
-              <option value="has" <?php selected(strtolower((string) ($p['fPerturbacion'] ?? '')), 'has'); ?>>Con perturbaci&oacute;n</option>
-              <option value="none" <?php selected(strtolower((string) ($p['fPerturbacion'] ?? '')), 'none'); ?>>Sin perturbaci&oacute;n</option>
-            </select></div>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>revision">Revisi&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>revision" name="<?php echo esc_attr($prefix); ?>revision" class="select select-bordered select-sm scm-select">
-              <option value="">Todas</option>
-              <option value="has" <?php selected(($p['fRevision'] ?? ''), 'has'); ?>>Con revisi&oacute;n</option>
-              <option value="none" <?php selected(($p['fRevision'] ?? ''), 'none'); ?>>Sin revisi&oacute;n</option>
-            </select></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>atraso">Atraso desde creaci&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>atraso" name="<?php echo esc_attr($prefix); ?>atraso" class="select select-bordered select-sm scm-select">
               <option value="">Todos</option>
               <option value="3" <?php selected(($p['fAtraso'] ?? ''), '3'); ?>>+3 d&iacute;as</option>
@@ -1971,13 +1978,6 @@ final class SuCasaControlServiciosInmobiliarios
               <option value="">Todos</option>
               <option value="Si" <?php selected(($p['fTuvoSeguimiento'] ?? ''), 'Si'); ?>>Si</option>
               <option value="No" <?php selected(($p['fTuvoSeguimiento'] ?? ''), 'No'); ?>>No</option>
-            </select></div>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>magnitud_caso">Magnitud caso</label><select id="<?php echo esc_attr($prefix); ?>magnitud_caso" name="<?php echo esc_attr($prefix); ?>magnitud_caso" class="select select-bordered select-sm scm-select">
-              <option value="">Todas las magnitudes</option>
-              <option value="critico" <?php selected(($p['fMagnitudCaso'] ?? ''), 'critico'); ?>>Cr&iacute;tico</option>
-              <option value="alto" <?php selected(($p['fMagnitudCaso'] ?? ''), 'alto'); ?>>Alto</option>
-              <option value="medio" <?php selected(($p['fMagnitudCaso'] ?? ''), 'medio'); ?>>Medio</option>
-              <option value="bajo" <?php selected(($p['fMagnitudCaso'] ?? ''), 'bajo'); ?>>Bajo</option>
             </select></div>
           <?php echo \SCM\Support\CaseFilterFields::executor($prefix, $p); ?>
         </div>
