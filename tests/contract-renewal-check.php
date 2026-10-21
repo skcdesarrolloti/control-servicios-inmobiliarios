@@ -305,7 +305,7 @@ try {
   check($letterResult['ok']==='1' && (int)$letterResult['emails_queued']===1,'Letter uses one tenant email with configured employee in CC');
   check($db->getVar('SELECT cct_author_id FROM wp_jet_cct_historial_del_ticket WHERE id_ticket=?',[$letterResult['ticket_id']])==='EMP-900','Other administrative topics retain their creation history and real actor');
   $letterJob=json_decode($db->getVar("SELECT payload FROM test_jobs WHERE payload LIKE '%signed-letter.pdf%' LIMIT 1"),true);
-  check(str_starts_with($letterJob['subject'],'Caso administrativo #'),'Other administrative topics keep their email titles');
+  check(str_starts_with($letterJob['subject'],'Aviso previo de entrega del inmueble - Contrato ') && !str_contains((string) json_encode($letterJob),'id_ticket='),'Tenant receipt letter uses its own title without the internal case link');
   check(($letterJob['meta']['documents'][0]['url'] ?? '')==='https://example.invalid/signed-letter.pdf','Queued letter must retain signed PDF link');
   check($letterJob['payload']['cc']===['test@example.invalid'],'Configured internal employee receives CC of the same signed letter');
   check(\SharedNotifications\NotificationQueue::$constructions===1,'All transactions must reuse the prewarmed queue');

@@ -5083,25 +5083,25 @@ trait HandlesTicketWorkflowActions
     if (!is_array($contract)) {
       return ['ok' => '0', 'message' => 'Selecciona un contrato existente para crear el recibo.'];
     }
-    // Fecha prevista de entrega: la del formulario (editable) o, si no llega, la fecha fin del contrato.
+    // Fecha prevista de recibo: la del formulario (editable) o, si no llega, la fecha fin del contrato.
     $contractEnd = (string) ($contract['fin_contrato'] ?? '');
     $contractEndTs = $this->contractTerminationTimestamp($contractEnd);
     $deliveryDate = trim((string) ($input['fecha_entrega_recibo'] ?? ''));
     if ($deliveryDate !== '') {
       $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $deliveryDate);
       if (!$parsed || $parsed->format('Y-m-d') !== $deliveryDate) {
-        return ['ok' => '0', 'message' => 'La fecha prevista de entrega no es válida.'];
+        return ['ok' => '0', 'message' => 'La fecha prevista de recibo no es válida.'];
       }
       // Si coincide con el contrato se conserva su valor original para que el recibo automático no lo duplique.
       $endValue = ($contractEndTs > 0 && date('Y-m-d', $contractEndTs) === $deliveryDate) ? $contractEnd : (string) $parsed->getTimestamp();
     } elseif ($contractEndTs > 0) {
       $endValue = $contractEnd;
     } else {
-      return ['ok' => '0', 'message' => 'El contrato no tiene fecha de terminación: indica la fecha prevista de entrega para la carta.'];
+      return ['ok' => '0', 'message' => 'El contrato no tiene fecha de terminación: indica la fecha prevista de recibo para la carta.'];
     }
     $existing = $this->contractEndingReceiptTicketId($contract, $endValue);
     if ($existing !== '') {
-      return ['ok' => '0', 'message' => 'Este contrato ya tiene el caso de recibo #' . $existing . ' para esa fecha de entrega.'];
+      return ['ok' => '0', 'message' => 'Este contrato ya tiene el caso de recibo #' . $existing . ' para esa fecha de recibo.'];
     }
     if (!filter_var(trim((string) ($contract['correo_arrendatario'] ?? '')), FILTER_VALIDATE_EMAIL)) {
       return ['ok' => '0', 'message' => 'El arrendatario necesita un correo válido para recibir la carta de aviso previo.'];

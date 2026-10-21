@@ -123,13 +123,25 @@ trait PendingNotificationsAndDatesConcern
         $extraContent .= '<p style="margin:0;color:#475569;">Consulta el documento correspondiente desde el botón de acceso.</p>';
         $extraContent .= '</div>';
       }
-      $html = EmailTemplate::render($subject, $extraContent, [
-        'ticket_url' => $ticketUrl,
-        'buttons' => $pdfButtons,
-      ]);
-      $queuedCount = $queue->enqueue((string) $job['email'], $subject, $html, [
+      $jobSubject = $subject;
+      $jobCopies = $copies;
+      // El arrendatario recibe su propio aviso de recibo (sin datos internos ni enlace al caso); los funcionarios, el correo interno.
+      $tenantEmail = strtolower(trim((string) ($ticketPayload['correo_arrendatario'] ?? '')));
+      if (isset($generatedPdfs['acta_desocupacion']) && $tenantEmail !== '' && strtolower((string) $job['email']) === $tenantEmail) {
+        $jobSubject = 'Aviso previo de entrega del inmueble - Contrato ' . trim((string) ($ticketPayload['contrato'] ?? ''));
+        $html = EmailTemplate::render('Aviso previo de entrega del inmueble', $this->receiptTenantEmailContent($ticketPayload), [
+          'buttons' => $pdfButtons,
+        ]);
+        if (count($primaryEmails) > 1) $jobCopies = [];
+      } else {
+        $html = EmailTemplate::render($subject, $extraContent, [
+          'ticket_url' => $ticketUrl,
+          'buttons' => $pdfButtons,
+        ]);
+      }
+      $queuedCount = $queue->enqueue((string) $job['email'], $jobSubject, $html, [
         'source' => 'scm_ticket_administrativo_nativo',
-        'internal_action'=>$adminAction, 'internal_cc'=>$copies,
+        'internal_action'=>$adminAction, 'internal_cc'=>$jobCopies,
         'dedupe_key' => 'ticket_admin_created_' . $ticketId,
         'meta' => [
           'documents' => $documents,
@@ -140,6 +152,32 @@ trait PendingNotificationsAndDatesConcern
       if (!empty($ticketPayload['require_receipt_letter']) && $queuedCount < 1) throw new \RuntimeException('No se pudo encolar la carta para todos los destinatarios.');
     }
     return count($primaryEmails);
+  }
+
+  /** Correo para el arrendatario con la carta de aviso previo de entrega (caso de recibo). */
+  private function receiptTenantEmailContent(array $ticketPayload): string
+  {
+    $value = trim((string) ($ticketPayload['fecha_terminacion_contrato'] ?? ''));
+    $ts = ctype_digit($value) ? (int) (strlen($value) > 10 ? floor((int) $value / 1000) : (int) $value) : (int) strtotime($value);
+    $date = $ts > 0 ? date('d/m/Y', $ts) : '';
+    $name = trim((string) ($ticketPayload['arrendatario'] ?? ''));
+    $address = trim((string) ($ticketPayload['direccion'] ?? ''));
+    $contract = trim((string) ($ticketPayload['contrato'] ?? ''));
+    $html = '<p style="margin:0 0 12px;">' . ($name !== '' ? 'Señor(a) <b>' . EmailTemplate::e($name) . '</b>,' : 'Cordial saludo,') . '</p>';
+    $html .= '<p style="margin:0 0 12px;line-height:1.55;">Le escribimos de SKC SuCasa Inmobiliaria porque su contrato de arrendamiento'
+      . ($contract !== '' ? ' <b>' . EmailTemplate::e($contract) . '</b>' : '')
+      . ($address !== '' ? ' del inmueble ubicado en <b>' . EmailTemplate::e($address) . '</b>' : '')
+      . ' se encuentra próximo a finalizar.'
+      . ($date !== '' ? ' La fecha prevista para la entrega del inmueble es el <b>' . EmailTemplate::e($date) . '</b>.' : '') . '</p>';
+    $html .= '<p style="margin:0 0 12px;line-height:1.55;">En la notificación adjunta encontrará las condiciones de entrega: el inmueble desocupado, con sus llaves y demás elementos recibidos, las reparaciones que sean de su responsabilidad y las obligaciones al día (canon, servicios públicos y administración cuando aplique).</p>';
+    $contact = array_filter([
+      trim((string) ($ticketPayload['nombre_empleado'] ?? '')),
+      trim((string) ($ticketPayload['celular_empleado'] ?? '')),
+      trim((string) ($ticketPayload['correo_empleado'] ?? '')),
+    ]);
+    $html .= '<p style="margin:0;line-height:1.55;">Para coordinar la revisión y el recibo del inmueble'
+      . ($contact !== [] ? ' comuníquese con <b>' . EmailTemplate::e(implode(' · ', $contact)) . '</b>.' : ' comuníquese con nuestro equipo.') . '</p>';
+    return $html;
   }
 
   /** @param array<int,string> $notifyRecipients @return array<int,string> */

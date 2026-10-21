@@ -13554,7 +13554,7 @@
         solicitanteField +
         "</div>" +
         '<p class="scm-muted" data-scm-admin-ticket-receipt-hint hidden style="margin-top:8px;padding:10px 12px;border:1px solid #fde68a;background:#fffbeb;border-radius:10px;">Recibo de inmuebles: se genera la carta de aviso previo de entrega con la fecha fin del contrato y se env&iacute;a al arrendatario (solicitante), al responsable y a los funcionarios de &quot;Caso de recibo creado desde el panel&quot; en Notificaciones internas.</p>' +
-        '<label class="scm-seg-field" data-scm-admin-ticket-receipt-date hidden><span>Fecha prevista de entrega</span><input type="date" name="fecha_entrega_recibo" value="' +
+        '<label class="scm-seg-field" data-scm-admin-ticket-receipt-date hidden><span>Fecha prevista de recibo</span><input type="date" name="fecha_entrega_recibo" value="' +
         escHtml(adminTicketDateValue(contractDataset(btn, "fechaFinalContrato"))) +
         '"><small>' + (adminTicketDateValue(contractDataset(btn, "fechaFinalContrato")) ? "Viene de la fecha fin del contrato; puedes ajustarla." : "El contrato no tiene fecha fin registrada: ind&iacute;cala para la carta.") + "</small></label>" +
         "</section>" +

@@ -9,6 +9,7 @@ $panel = (string) file_get_contents($root . '/src/App/Concerns/HandlesPanelCaseC
 $app = (string) file_get_contents($root . '/src/App/SuCasaControlServiciosInmobiliarios.php');
 $runtime = (string) file_get_contents($root . '/public/assets/js/admin-dashboard-runtime.js');
 $create = (string) file_get_contents($root . '/public/assets/js/admin-case-create.js');
+$notifications = (string) file_get_contents($root . '/src/Modules/Pending/Concerns/PendingNotificationsAndDatesConcern.php');
 
 $checks = [
   'contract modal routes receipt topic to the receipt flow' => str_contains($workflow, "\$this->isReceiptTopic(\$input['tema_ayuda'] ?? '')\n      ? \$this->createManualReceiptCase("),
@@ -19,9 +20,11 @@ $checks = [
     && str_contains($workflow, "'solicitante_tipo' => 'arrendatario',"),
   'receipt is not duplicated for the same contract end date' => str_contains($workflow, '$existing = $this->contractEndingReceiptTicketId($contract, $endValue);'),
   'receipt asks for the delivery date when the contract has none' => str_contains($workflow, "'fecha_entrega_recibo',")
-    && str_contains($workflow, 'indica la fecha prevista de entrega para la carta.')
+    && str_contains($workflow, 'indica la fecha prevista de recibo para la carta.')
     && str_contains($workflow, "'fecha_final_contrato' => \$endValue,")
     && str_contains($create, 'name="fecha_entrega_recibo"') && str_contains($runtime, 'name="fecha_entrega_recibo"'),
+  'tenant gets its own receipt email without the internal case link' => str_contains($notifications, "\$jobSubject = 'Aviso previo de entrega del inmueble - Contrato '")
+    && str_contains($notifications, '$this->receiptTenantEmailContent($ticketPayload)'),
   'manual receipt internal event is configurable' => str_contains($app, "'contrato_recibo_manual' => ["),
   'contract modal always offers the receipt topic' => str_contains($runtime, 'if (!isPreventiva && topicOptions.indexOf("Recibo de inmuebles") < 0) topicOptions.push("Recibo de inmuebles");'),
   'panel form explains the receipt and hides optional notices' => str_contains($create, 'data-receipt-hint') && str_contains($create, 'notifySection.hidden = isReceipt;'),

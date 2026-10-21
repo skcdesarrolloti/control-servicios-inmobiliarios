@@ -913,12 +913,12 @@ final class SimplePdf
       return;
     }
 
-    $wordsWidth = array_sum(array_map(fn(string $word): float => $this->textWidth($word, $size), $words));
+    $wordsWidth = array_sum(array_map(fn(string $word): float => $this->textWidth($word, $size, $font), $words));
     $gapWidth = max($size * 0.22, ($width - $wordsWidth) / $gaps);
     $cursorX = $x;
     foreach ($words as $word) {
       $this->text($cursorX, $topY, $word, $size, $font);
-      $cursorX += $this->textWidth($word, $size) + $gapWidth;
+      $cursorX += $this->textWidth($word, $size, $font) + $gapWidth;
     }
   }
 
@@ -943,10 +943,23 @@ final class SimplePdf
     return array_values(array_filter($words, static fn(string $word): bool => $word !== ''));
   }
 
-  private function textWidth(string $text, int $size): float
+  /** Ancho real con las métricas de Helvetica (F1) y Helvetica-Bold (F2) para que el justificado no pegue palabras. */
+  private function textWidth(string $text, int $size, string $font = 'F1'): float
   {
-    $length = function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text);
-    return $length * $size * 0.52;
+    static $regular = null, $bold = null;
+    if ($regular === null) {
+      $ascii = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
+      $regular = array_combine(str_split($ascii), [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584]);
+      $bold = array_combine(str_split($ascii), [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584]);
+    }
+    $widths = $font === 'F2' ? $bold : $regular;
+    $base = ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n', 'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ü' => 'U', 'Ñ' => 'N', '¿' => '?', '¡' => '!', '«' => '$', '»' => '$', '‘' => ',', '’' => ',', '“' => '"', '”' => '"'];
+    $special = ['—' => 1000, '–' => 556, '…' => 1000, '°' => 400, 'º' => 365, 'ª' => 370, '€' => 556];
+    $units = 0;
+    foreach (preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $char) {
+      $units += $special[$char] ?? $widths[$base[$char] ?? $char] ?? 556;
+    }
+    return $units * $size / 1000;
   }
 
   private function rect(float $x, float $topY, float $w, float $h): void
