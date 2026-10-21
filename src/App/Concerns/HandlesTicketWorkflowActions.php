@@ -5071,7 +5071,7 @@ trait HandlesTicketWorkflowActions
 
   /**
    * Recibo creado por un funcionario (Crear nuevo caso o Contratos): mismo flujo del recibo automático,
-   * con la carta de aviso previo para el arrendatario y avisos del evento interno contrato_recibo_manual.
+   * con el aviso previo de revisión antes de la desocupación para el arrendatario y avisos del evento interno contrato_recibo_manual.
    * @param array<string,mixed> $input
    * @return array<string,mixed>
    */
@@ -5104,7 +5104,7 @@ trait HandlesTicketWorkflowActions
       return ['ok' => '0', 'message' => 'Este contrato ya tiene el caso de recibo #' . $existing . ' para esa fecha de recibo.'];
     }
     if (!filter_var(trim((string) ($contract['correo_arrendatario'] ?? '')), FILTER_VALIDATE_EMAIL)) {
-      return ['ok' => '0', 'message' => 'El arrendatario necesita un correo válido para recibir la carta de aviso previo.'];
+      return ['ok' => '0', 'message' => 'El arrendatario necesita un correo válido para recibir el aviso previo de revisión antes de la desocupación.'];
     }
     $input = array_merge($input, [
       'ticket_mode' => 'administrativo',

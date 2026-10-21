@@ -5,10 +5,10 @@ namespace SCM\Modules\Pending;
 
 use SCM\Support\HtmlPdfRenderer;
 
-/** Carta de aviso previo de entrega (recibo de inmuebles) con el diseño de las actas de servicios públicos. */
+/** Aviso previo de revisión antes de la desocupación del inmueble (recibo de inmuebles) con el diseño de las actas de servicios públicos. */
 final class ReceiptNoticeDocument
 {
-  public const TITLE = 'Notificación previa para entrega del inmueble';
+  public const TITLE = 'Aviso previo de revisión antes de la desocupación del inmueble';
   private const INVENTORY_URL = 'https://sucasainmobiliaria.com.co/inventario-inmueble/?numero=';
 
   /**
@@ -49,7 +49,7 @@ final class ReceiptNoticeDocument
         'Contrato / Inmueble SIMI' => '#' . $value('contrato', '-') . ' · ' . $value('inmueble', '-'),
         'Dirección' => $value('direccion'),
         'Arrendatario' => $value('arrendatario'),
-        'Fecha prevista de entrega' => $deliveryDate,
+        'Fecha prevista de desocupación' => $deliveryDate,
       ]) . '</section>'
       . '<section class="scm-acta-receipt-section scm-services-letter"><h2>2. Comunicación</h2>'
       . '<p>Señor(a) <strong>' . $e($value('arrendatario', 'Arrendatario')) . '</strong>:</p>'

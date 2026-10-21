@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-// Recibo de inmuebles creado por un funcionario: Crear nuevo caso y Contratos usan el flujo con carta de aviso previo.
+// Recibo de inmuebles creado por un funcionario: Crear nuevo caso y Contratos usan el flujo con el aviso previo de revisión antes de la desocupación.
 $root = dirname(__DIR__);
 $workflow = (string) file_get_contents($root . '/src/App/Concerns/HandlesTicketWorkflowActions.php');
 $panel = (string) file_get_contents($root . '/src/App/Concerns/HandlesPanelCaseCreation.php');
@@ -25,11 +25,14 @@ $checks = [
     && str_contains($workflow, 'indica la fecha prevista de recibo para la carta.')
     && str_contains($workflow, "'fecha_final_contrato' => \$endValue,")
     && str_contains($create, 'name="fecha_entrega_recibo"') && str_contains($runtime, 'name="fecha_entrega_recibo"'),
-  'tenant gets its own receipt email without the internal case link' => str_contains($notifications, "\$jobSubject = 'Aviso previo de entrega del inmueble - Contrato '")
+  'tenant gets its own receipt email without the internal case link' => str_contains($notifications, "\$jobSubject = \SCM\Modules\Pending\ReceiptNoticeDocument::TITLE . ' - Contrato '")
     && str_contains($notifications, '$this->receiptTenantEmailContent($ticketPayload)'),
   'receipt sends WhatsApp to the same recipients without blocking the case' => str_contains($creation, '->enqueueReceiptWhatsApp($ticketId, $ticketPayload,')
     && str_contains($whatsapp, "'label' => 'Responsable'") && str_contains($whatsapp, "'label' => 'Arrendatario'")
     && str_contains($whatsapp, 'InternalNotificationRecipients::contactsForAction($this->db, $internalAction)'),
+  'tenant WhatsApp uses its own template with the notice PDF' => str_contains($whatsapp, "RECEIPT_TENANT_TEMPLATE = 'scm_aviso_revision_desocupacion_v1'")
+    && str_contains($whatsapp, "['type' => 'header', 'parameters' => [['type' => 'document', 'document' => ['link' => \$letterUrl")
+    && is_file($root . '/docs/crear-plantilla-whatsapp-aviso-revision-desocupacion.md'),
   'manual receipt internal event is configurable' => str_contains($app, "'contrato_recibo_manual' => ["),
   'contract modal always offers the receipt topic' => str_contains($runtime, 'if (!isPreventiva && topicOptions.indexOf("Recibo de inmuebles") < 0) topicOptions.push("Recibo de inmuebles");'),
   'panel form explains the receipt and hides optional notices' => str_contains($create, 'data-receipt-hint') && str_contains($create, 'notifySection.hidden = isReceipt;'),

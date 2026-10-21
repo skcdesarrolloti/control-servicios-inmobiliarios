@@ -225,7 +225,7 @@ trait AdministrativeTicketCreationConcern
         : $this->generateTicketPdfs($mode, $tema, $ticketId, $ticketPayload);
       $generatedPdfs = $generated['pdfs'];
       $warnings = array_merge($warnings, $generated['warnings']);
-      if (!empty($input['require_receipt_letter']) && empty($generatedPdfs['acta_desocupacion'])) throw new \RuntimeException('No se pudo generar la carta de aviso previo.');
+      if (!empty($input['require_receipt_letter']) && empty($generatedPdfs['acta_desocupacion'])) throw new \RuntimeException('No se pudo generar el aviso previo de revisión antes de la desocupación.');
       if (!empty($generatedPdfs)) {
         $this->applyGeneratedPdfsToPayload($ticketPayload, $documentos, $generatedPdfs);
         $updatePayload = $schema->filterTableData($ticketsTable, $this->ticketGeneratedPdfData($ticketPayload));
@@ -272,7 +272,7 @@ trait AdministrativeTicketCreationConcern
     $whatsapp = ['whatsapp' => 0, 'details' => []];
     if (isset($generatedPdfs['acta_desocupacion']) && !in_array('none', $notifyRecipients, true)) {
       try {
-        $whatsapp = (new \SCM\Support\PanelCaseNotifications($db, $schema))->enqueueReceiptWhatsApp($ticketId, $ticketPayload, (string) ($ticketPayload['internal_notification_action'] ?? ''));
+        $whatsapp = (new \SCM\Support\PanelCaseNotifications($db, $schema))->enqueueReceiptWhatsApp($ticketId, $ticketPayload, (string) ($ticketPayload['internal_notification_action'] ?? ''), $generatedPdfs['acta_desocupacion']);
       } catch (\Throwable $exception) {
         error_log('[receipt_whatsapp] ' . $exception->getMessage());
         $whatsapp['details'][] = 'No se pudo encolar el WhatsApp; el aviso se envió por correo.';

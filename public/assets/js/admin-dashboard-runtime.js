@@ -13379,7 +13379,7 @@
       // Mismos temas de ayuda que "Crear nuevo caso" (Configuración → Temas de ayuda y categorías).
       var topicOptions = (Array.isArray(runtime.caseHelpTopics) ? runtime.caseHelpTopics : []).slice();
       if (defaultTema && topicOptions.indexOf(defaultTema) < 0) topicOptions.unshift(defaultTema);
-      // Desde Contratos siempre se puede crear el recibo (genera la carta de aviso previo al arrendatario).
+      // Desde Contratos siempre se puede crear el recibo (genera el aviso previo de revisión antes de la desocupación para el arrendatario).
       if (!isPreventiva && topicOptions.indexOf("Recibo de inmuebles") < 0) topicOptions.push("Recibo de inmuebles");
       var priorityOptions = [
         "Prioridad urgente",
@@ -13553,7 +13553,7 @@
         "</select></label>" +
         solicitanteField +
         "</div>" +
-        '<p class="scm-muted" data-scm-admin-ticket-receipt-hint hidden style="margin-top:8px;padding:10px 12px;border:1px solid #fde68a;background:#fffbeb;border-radius:10px;">Recibo de inmuebles: se genera la carta de aviso previo de entrega con la fecha fin del contrato y se env&iacute;a por correo y WhatsApp al arrendatario (solicitante), al responsable y a los funcionarios de &quot;Caso de recibo creado desde el panel&quot; en Notificaciones internas.</p>' +
+        '<p class="scm-muted" data-scm-admin-ticket-receipt-hint hidden style="margin-top:8px;padding:10px 12px;border:1px solid #fde68a;background:#fffbeb;border-radius:10px;">Recibo de inmuebles: se genera el aviso previo de revisi&oacute;n antes de la desocupaci&oacute;n del inmueble con la fecha fin del contrato y se env&iacute;a por correo y WhatsApp al arrendatario (solicitante), al responsable y a los funcionarios de &quot;Caso de recibo creado desde el panel&quot; en Notificaciones internas.</p>' +
         '<label class="scm-seg-field" data-scm-admin-ticket-receipt-date hidden><span>Fecha prevista de recibo</span><input type="date" name="fecha_entrega_recibo" value="' +
         escHtml(adminTicketDateValue(contractDataset(btn, "fechaFinalContrato"))) +
         '"><small>' + (adminTicketDateValue(contractDataset(btn, "fechaFinalContrato")) ? "Viene de la fecha fin del contrato; puedes ajustarla." : "El contrato no tiene fecha fin registrada: ind&iacute;cala para la carta.") + "</small></label>" +
@@ -17996,7 +17996,7 @@
           title: 'Configurar recibos automáticos',
           customClass: contractsEndingDialogClasses('receipt'), width:'min(560px,94vw)', buttonsStyling:false,
           html: '<form data-contract-receipt-settings-form class="scm-ending-dialog-form">' +
-            '<p>Genera el caso y la carta de aviso previo 15 días antes de la fecha fin del contrato seleccionado.</p>' +
+            '<p>Genera el caso y el aviso previo de revisión antes de la desocupación 15 días antes de la fecha fin del contrato seleccionado.</p>' +
             '<label class="scm-ending-dialog-check"><input type="checkbox" name="receipt_enabled" ' + (config.enabled ? 'checked' : '') + '><span>Activar recibos automáticos</span></label>' +
             '<label>Contrato: código interno<input type="number" min="1" max="999999999" required name="receipt_contract_id" value="' + escHtml(config.contract_id) + '"></label>' +
             '<label>Funcionario al que se asignan los casos<select name="receipt_employee_id">' + options(config.employee_id) + '</select></label>' +

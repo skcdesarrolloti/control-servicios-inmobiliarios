@@ -12,6 +12,8 @@ final class PanelCaseNotifications
 {
   public const SETTINGS_KEY = 'panel_case_notifications';
   public const ROLES = ['propietario' => 'Propietario', 'arrendatario' => 'Arrendatario', 'copropiedad' => 'Copropiedad'];
+  /** Plantilla de Meta para el arrendatario en el recibo; ver docs/crear-plantilla-whatsapp-aviso-revision-desocupacion.md. */
+  public const RECEIPT_TENANT_TEMPLATE = 'scm_aviso_revision_desocupacion_v1';
 
   public function __construct(private Database $db, private SchemaInspector $schema) {}
 
@@ -87,12 +89,14 @@ final class PanelCaseNotifications
   }
 
   /**
-   * Recibo de inmuebles: los mismos destinatarios del correo (responsable, funcionarios del aviso interno y arrendatario)
-   * reciben WhatsApp con las plantillas de casos. No bloquea el recibo, porque la carta ya va por correo.
+   * Recibo de inmuebles: los mismos destinatarios del correo reciben WhatsApp. Responsable y funcionarios del aviso interno
+   * con la plantilla de caso asignado; el arrendatario con la plantilla del aviso y el PDF adjunto.
+   * No bloquea el recibo, porque el aviso ya va por correo.
    * @param array<string,mixed> $ticket
+   * @param array<string,string> $letter PDF del aviso (url).
    * @return array{whatsapp:int,details:array<int,string>}
    */
-  public function enqueueReceiptWhatsApp(int $id, array $ticket, string $internalAction): array
+  public function enqueueReceiptWhatsApp(int $id, array $ticket, string $internalAction, array $letter): array
   {
     $config = self::config();
     if (!$config['enabled']) return ['whatsapp' => 0, 'details' => ['WhatsApp pendiente de activar en la configuración interna del sistema.']];
@@ -114,15 +118,31 @@ final class PanelCaseNotifications
       if ($person['phone'] === '') { $details[] = $label . ' — sin WhatsApp: falta un celular válido.'; continue; }
       if (isset($phones[$person['phone']])) { $details[] = $label . ' — comparte celular con ' . $phones[$person['phone']] . '; se encoló un solo mensaje.'; continue; }
       $external = $person['role'] !== null;
-      $values = [$person['name'], (string) $id, $text('asunto', 'Recibo de inmuebles'), $text('tema_ayuda', 'Recibo de inmuebles'), $text('contrato', 'Sin número'), $assignee];
-      $values = array_map(static fn($v, $limit) => mb_substr(preg_replace('/\s+/u', ' ', trim((string) $v)) ?: 'Sin dato', 0, $limit), $values, [80, 20, 200, 100, 50, 80]);
-      $components = [['type' => 'body', 'parameters' => array_map(static fn($v) => ['type' => 'text', 'text' => $v], $values)]];
-      $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => PublicCaseAccess::reference($id, null, $external ? 'arrendatario' : 'funcionario')]]];
+      $clean = static fn($v, int $limit) => mb_substr(preg_replace('/\s+/u', ' ', trim((string) $v)) ?: 'Sin dato', 0, $limit);
+      if ($external) {
+        $letterUrl = trim((string) ($letter['url'] ?? ''));
+        // La plantilla lleva el PDF en el encabezado: sin documento Meta rechaza el mensaje.
+        if ($letterUrl === '') { $details[] = $label . ' — sin WhatsApp: no hay PDF del aviso.'; continue; }
+        $caseUrl = parse_url(PublicCaseAccess::url($id, 'arrendatario'));
+        $suffix = ltrim((string) ($caseUrl['path'] ?? ''), '/') . (isset($caseUrl['query']) ? '?' . $caseUrl['query'] : '');
+        $contact = implode(' · ', array_filter([$assignee, $text('celular_empleado') !== '' ? 'Cel. ' . $text('celular_empleado') : '']));
+        $values = [$clean($person['name'], 80), $clean($text('contrato', 'Sin número'), 50), $clean($text('direccion', 'Sin dirección'), 200), $clean($contact, 120)];
+        $template = self::RECEIPT_TENANT_TEMPLATE;
+        $components = [['type' => 'header', 'parameters' => [['type' => 'document', 'document' => ['link' => $letterUrl, 'filename' => 'Aviso-revision-desocupacion-' . $id . '.pdf']]]]];
+        $components[] = ['type' => 'body', 'parameters' => array_map(static fn($v) => ['type' => 'text', 'text' => $v], $values)];
+        $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $suffix]]];
+      } else {
+        $values = [$person['name'], (string) $id, $text('asunto', 'Recibo de inmuebles'), $text('tema_ayuda', 'Recibo de inmuebles'), $text('contrato', 'Sin número'), $assignee];
+        $values = array_map($clean, $values, [80, 20, 200, 100, 50, 80]);
+        $template = $config['assigned_template'];
+        $components = [['type' => 'body', 'parameters' => array_map(static fn($v) => ['type' => 'text', 'text' => $v], $values)]];
+        $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => PublicCaseAccess::reference($id, null, 'funcionario')]]];
+      }
       try {
-        $queuedId = $queue->enqueueWhatsAppOfficialTemplate($person['phone'], $config[$external ? 'external_template' : 'assigned_template'], $components, [
+        $queuedId = $queue->enqueueWhatsAppOfficialTemplate($person['phone'], $template, $components, [
           'project_code' => 'control-servicios-inmobiliarios', 'source_module' => $internalAction,
           'destination_name' => $person['name'], 'template_language' => $config['language'], 'max_attempts' => 5,
-          'message_text' => 'Caso #' . $id . ' · Recibo de inmuebles · Contrato ' . $text('contrato'),
+          'message_text' => 'Caso #' . $id . ' · Aviso previo de revisión antes de la desocupación del inmueble · Contrato ' . $text('contrato'),
           'dedupe_key' => 'recibo_inmueble:' . $id . ':whatsapp:' . $person['phone'],
           'meta' => ['ticket_id' => $id, 'recipient_role' => $person['role'] ?? 'funcionario'],
         ]);

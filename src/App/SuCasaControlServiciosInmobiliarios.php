@@ -514,7 +514,7 @@ final class SuCasaControlServiciosInmobiliarios
           ],
           'contrato_recibo_manual' => [
             'label' => 'Caso de recibo creado desde el panel',
-            'description' => 'Cuando un funcionario crea un caso con tema Recibo de inmuebles desde Crear nuevo caso o desde Contratos. Incluye la carta de aviso previo de entrega.',
+            'description' => 'Cuando un funcionario crea un caso con tema Recibo de inmuebles desde Crear nuevo caso o desde Contratos. Incluye el aviso previo de revisión antes de la desocupación del inmueble.',
             'channel' => 'Email interno en cola',
           ],
           'contrato_arrendamiento_creado' => [

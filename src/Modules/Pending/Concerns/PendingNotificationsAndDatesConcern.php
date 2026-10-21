@@ -119,7 +119,7 @@ trait PendingNotificationsAndDatesConcern
       $extraContent = $content;
       if (!empty($pdfButtons)) {
         $extraContent .= '<div style="margin:16px 0;padding:14px 16px;border:1px solid #fde2bd;background:#fff8ef;border-radius:10px;">';
-        $extraContent .= '<p style="margin:0 0 6px;color:#061d49;font-weight:700;">' . (isset($generatedPdfs['acta_desocupacion']) ? 'Notificación previa para entrega del inmueble' : 'Ofrecimiento de revisión preventiva') . '</p>';
+        $extraContent .= '<p style="margin:0 0 6px;color:#061d49;font-weight:700;">' . (isset($generatedPdfs['acta_desocupacion']) ? \SCM\Modules\Pending\ReceiptNoticeDocument::TITLE : 'Ofrecimiento de revisión preventiva') . '</p>';
         $extraContent .= '<p style="margin:0;color:#475569;">Consulta el documento correspondiente desde el botón de acceso.</p>';
         $extraContent .= '</div>';
       }
@@ -128,8 +128,8 @@ trait PendingNotificationsAndDatesConcern
       // El arrendatario recibe su propio aviso de recibo (sin datos internos ni enlace al caso); los funcionarios, el correo interno.
       $tenantEmail = strtolower(trim((string) ($ticketPayload['correo_arrendatario'] ?? '')));
       if (isset($generatedPdfs['acta_desocupacion']) && $tenantEmail !== '' && strtolower((string) $job['email']) === $tenantEmail) {
-        $jobSubject = 'Aviso previo de entrega del inmueble - Contrato ' . trim((string) ($ticketPayload['contrato'] ?? ''));
-        $html = EmailTemplate::render('Aviso previo de entrega del inmueble', $this->receiptTenantEmailContent($ticketPayload), [
+        $jobSubject = \SCM\Modules\Pending\ReceiptNoticeDocument::TITLE . ' - Contrato ' . trim((string) ($ticketPayload['contrato'] ?? ''));
+        $html = EmailTemplate::render(\SCM\Modules\Pending\ReceiptNoticeDocument::TITLE, $this->receiptTenantEmailContent($ticketPayload), [
           'buttons' => $pdfButtons,
         ]);
         if (count($primaryEmails) > 1) $jobCopies = [];
@@ -154,7 +154,7 @@ trait PendingNotificationsAndDatesConcern
     return count($primaryEmails);
   }
 
-  /** Correo para el arrendatario con la carta de aviso previo de entrega (caso de recibo). */
+  /** Correo para el arrendatario con el aviso previo de revisión antes de la desocupación (caso de recibo). */
   private function receiptTenantEmailContent(array $ticketPayload): string
   {
     $name = trim((string) ($ticketPayload['arrendatario'] ?? ''));
@@ -165,7 +165,7 @@ trait PendingNotificationsAndDatesConcern
       . ($contract !== '' ? ' <b>' . EmailTemplate::e($contract) . '</b>' : '')
       . ($address !== '' ? ' del inmueble ubicado en <b>' . EmailTemplate::e($address) . '</b>' : '')
       . ' se encuentra próximo a finalizar.</p>';
-    $html .= '<p style="margin:0 0 12px;line-height:1.55;">En la notificación adjunta encontrará las condiciones de entrega: el inmueble desocupado, con sus llaves y demás elementos recibidos, las reparaciones que sean de su responsabilidad y las obligaciones al día (canon, servicios públicos y administración cuando aplique).</p>';
+    $html .= '<p style="margin:0 0 12px;line-height:1.55;">En el aviso adjunto encontrará las condiciones para la desocupación y el recibo del inmueble: el inmueble desocupado, con sus llaves y demás elementos recibidos, las reparaciones que sean de su responsabilidad y las obligaciones al día (canon, servicios públicos y administración cuando aplique).</p>';
     $contact = array_filter([
       trim((string) ($ticketPayload['nombre_empleado'] ?? '')),
       trim((string) ($ticketPayload['celular_empleado'] ?? '')),

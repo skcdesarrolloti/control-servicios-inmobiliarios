@@ -87,7 +87,7 @@ trait HandlesPanelCaseCreation
   }
 
   /**
-   * "Crear nuevo caso" con tema Recibo de inmuebles: se crea como el recibo de Contratos (carta de aviso previo y avisos).
+   * "Crear nuevo caso" con tema Recibo de inmuebles: se crea como el recibo de Contratos (aviso previo de revisión antes de la desocupación y notificaciones).
    * @return array<string,mixed>
    */
   private function createPanelReceiptCase(PublicTicketsService $service): array
@@ -124,7 +124,7 @@ trait HandlesPanelCaseCreation
       'queued' => (int) ($result['emails_queued'] ?? 0),
       'whatsapp_queued' => (int) ($result['whatsapp_queued'] ?? 0),
       'notification_details' => array_values((array) ($result['whatsapp_details'] ?? [])),
-      'message' => (string) $result['message'] . ' Se generó la carta de aviso previo y se envió por correo y WhatsApp al arrendatario, al responsable y a los funcionarios del aviso "Caso de recibo creado desde el panel".',
+      'message' => (string) $result['message'] . ' Se generó el aviso previo de revisión antes de la desocupación del inmueble y se envió por correo y WhatsApp al arrendatario, al responsable y a los funcionarios del aviso "Caso de recibo creado desde el panel".',
     ];
   }
 

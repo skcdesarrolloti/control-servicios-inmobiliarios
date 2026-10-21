@@ -233,8 +233,8 @@ final class TicketPdfGenerator
     $pdf = new SimplePdf();
     $pdf->backgroundImage($this->letterheadPath());
     $pdf->actaDesign('Gestión contractual');
-    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Aviso previo de entrega');
-    $pdf->title('Notificación previa para entrega del inmueble');
+    $pdf->footerLabel('SKC SuCasa Inmobiliaria - Aviso previo de revisión antes de la desocupación');
+    $pdf->title(ReceiptNoticeDocument::TITLE);
     $pdf->line($this->value($ticket, 'ciudad', 'Cartagena de Indias') . ', ' . date('d/m/Y'));
     $pdf->line('Señor(a): ' . $this->value($ticket, 'arrendatario', 'Arrendatario'));
     $pdf->line('Inmueble: ' . $this->value($ticket, 'direccion', $this->value($ticket, 'inmueble', '-')));

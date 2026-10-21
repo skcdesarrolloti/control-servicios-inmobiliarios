@@ -1,0 +1,47 @@
+{
+  "name": "scm_aviso_revision_desocupacion_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "HEADER",
+      "format": "DOCUMENT",
+      "example": {
+        "header_handle": [
+          "aviso-revision-desocupacion-ejemplo.pdf"
+        ]
+      }
+    },
+    {
+      "type": "BODY",
+      "text": "Buen día, {{1}}.\n\nLe informamos que su contrato de arrendamiento #{{2}} del inmueble ubicado en {{3}} se encuentra próximo a finalizar.\n\nAdjuntamos el aviso previo de revisión antes de la desocupación del inmueble con las condiciones para el recibo. También puede consultarlo desde el botón.\n\nPara coordinar la revisión comuníquese con {{4}}.",
+      "example": {
+        "body_text": [
+          [
+            "María Pérez",
+            "1380",
+            "Cra. 3 #8-129, Edificio Ejemplo Apto 502, Bocagrande",
+            "Funcionario de ejemplo · Cel. 3001234567"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Ver aviso",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "control-servicios-inmobiliarios/public/?scm_case=10452.1790000000.arrendatario.demo"
+          ]
+        }
+      ]
+    }
+  ]
+}
