@@ -157,9 +157,6 @@ trait PendingNotificationsAndDatesConcern
   /** Correo para el arrendatario con la carta de aviso previo de entrega (caso de recibo). */
   private function receiptTenantEmailContent(array $ticketPayload): string
   {
-    $value = trim((string) ($ticketPayload['fecha_terminacion_contrato'] ?? ''));
-    $ts = ctype_digit($value) ? (int) (strlen($value) > 10 ? floor((int) $value / 1000) : (int) $value) : (int) strtotime($value);
-    $date = $ts > 0 ? date('d/m/Y', $ts) : '';
     $name = trim((string) ($ticketPayload['arrendatario'] ?? ''));
     $address = trim((string) ($ticketPayload['direccion'] ?? ''));
     $contract = trim((string) ($ticketPayload['contrato'] ?? ''));
@@ -167,8 +164,7 @@ trait PendingNotificationsAndDatesConcern
     $html .= '<p style="margin:0 0 12px;line-height:1.55;">Le escribimos de SKC SuCasa Inmobiliaria porque su contrato de arrendamiento'
       . ($contract !== '' ? ' <b>' . EmailTemplate::e($contract) . '</b>' : '')
       . ($address !== '' ? ' del inmueble ubicado en <b>' . EmailTemplate::e($address) . '</b>' : '')
-      . ' se encuentra próximo a finalizar.'
-      . ($date !== '' ? ' La fecha prevista para la entrega del inmueble es el <b>' . EmailTemplate::e($date) . '</b>.' : '') . '</p>';
+      . ' se encuentra próximo a finalizar.</p>';
     $html .= '<p style="margin:0 0 12px;line-height:1.55;">En la notificación adjunta encontrará las condiciones de entrega: el inmueble desocupado, con sus llaves y demás elementos recibidos, las reparaciones que sean de su responsabilidad y las obligaciones al día (canon, servicios públicos y administración cuando aplique).</p>';
     $contact = array_filter([
       trim((string) ($ticketPayload['nombre_empleado'] ?? '')),
