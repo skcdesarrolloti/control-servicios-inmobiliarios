@@ -200,6 +200,11 @@ trait AdministrativeTicketCreationConcern
     }
 
     $pdo = $db->pdo();
+    // La cola compartida solo se inicializa fuera de una transacción; los correos del caso se encolan dentro de ella.
+    $queueReady = (new \SCM\Support\SharedNotificationsBridge($db))->queue() !== null;
+    if (!$queueReady && !empty($input['require_receipt_letter'])) {
+      return ['ok' => '0', 'message' => 'La cola de notificaciones no está disponible. Intenta nuevamente.'];
+    }
     $startedTransaction = false;
     $ticketId = 0;
     $warnings = [];

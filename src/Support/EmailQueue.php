@@ -23,6 +23,7 @@ final class EmailQueue
   {
     $queue = $this->bridge->queue();
     if (!$queue instanceof \SharedNotifications\NotificationQueue) {
+      error_log('[email_queue] cola no disponible: ' . $this->bridge->lastError());
       return 0;
     }
 
@@ -87,7 +88,8 @@ final class EmailQueue
         ]);
         $queued++;
       } catch (\Throwable $exception) {
-        // No interrumpir el flujo principal si la cola falla.
+        // No interrumpir el flujo principal si la cola falla, pero dejar el motivo en el log.
+        error_log('[email_queue] ' . $sourceModule . ' → ' . $email . ': ' . $exception->getMessage());
       }
     }
     return $queued;
