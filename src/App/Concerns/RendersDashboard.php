@@ -533,6 +533,7 @@ trait RendersDashboard
         'guardar_corresponsable_pqr_publico' => self::AJAX_GUARDAR_CORRESPONSABLE_PQR_PUBLICO,
         'notif_responsable_pqr' => self::AJAX_GUARDAR_NOTIF_RESPONSABLE_PQR,
         'ticket_topic_settings_save' => self::AJAX_TICKET_TOPIC_SETTINGS_SAVE,
+        'case_catalog_settings_save' => self::AJAX_CASE_CATALOG_SETTINGS_SAVE,
         'session_heartbeat' => self::AJAX_SESSION_HEARTBEAT,
         'dashboard_permissions_read' => self::AJAX_DASHBOARD_PERMISSIONS_READ,
         'dashboard_permissions_save' => self::AJAX_DASHBOARD_PERMISSIONS_SAVE,
@@ -648,6 +649,8 @@ trait RendersDashboard
         'adminDuePopupCargoIds' => $adminDuePopupCargoIds,
       ],
       'caseExecutorOptions' => $this->caseExecutorOptions(),
+      'caseHelpTopics' => \SCM\Support\PanelCaseCatalog::helpTopics(),
+      'calendarCategoryIds' => \SCM\Support\PanelCaseCatalog::calendarCategoryIds(),
       'actionPermissions' => [
         'actions' => array_fill_keys($dashboardAllowedActions, true),
         'maintenanceQuoteManage' => (
@@ -1401,6 +1404,8 @@ trait RendersDashboard
         <div id="scm-pqr-settings-modal" data-scm-lazy-settings="public-pqr" aria-hidden="true"></div>
         <button type="button" id="scm-open-ticket-topic-settings" style="display:none !important;" aria-hidden="true" tabindex="-1">Temas de Casos</button>
         <?php echo $this->renderDashboardTicketTopicSettingsModal(); ?>
+        <button type="button" id="scm-open-case-catalog-settings" style="display:none !important;" aria-hidden="true" tabindex="-1">Temas de ayuda y categor&iacute;as</button>
+        <?php echo $this->renderDashboardCaseCatalogSettingsModal(); ?>
       <?php endif; ?>
       <?php if ($canManageInternalNotificationSettings): ?>
         <div id="scm-internal-notifications-modal" data-scm-lazy-settings="internal-notifications" aria-hidden="true"></div>
@@ -1491,6 +1496,78 @@ trait RendersDashboard
             <div class="scm-pqr-config-actions">
               <button type="submit" class="scm-btn-primary btn btn-primary btn-sm">Guardar temas</button>
               <small class="scm-ticket-topic-tabs-msg" aria-live="polite"></small>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
+  /** Categorías de la tabla compartida del calendario. @return array<int,array{id:string,nombre:string}> */
+  private function panelCalendarCategoryRows(): array
+  {
+    if (!$this->table_exists('categorias_calendario')) {
+      return [];
+    }
+    $out = [];
+    foreach ($this->db->getResults('SELECT * FROM `categorias_calendario` ORDER BY `nombre` ASC LIMIT 300') as $row) {
+      $id = trim((string) ($row['id'] ?? ''));
+      if ($id !== '') {
+        $out[] = ['id' => $id, 'nombre' => trim((string) ($row['nombre'] ?? $id))];
+      }
+    }
+    return $out;
+  }
+
+  private function renderDashboardCaseCatalogSettingsModal(): string
+  {
+    $topics = \SCM\Support\PanelCaseCatalog::helpTopics();
+    $topicChips = '';
+    foreach ($topics as $topic) {
+      $topicChips .= '<span class="scm-topic-chip">' . esc_html($topic) . '</span>';
+    }
+    $selectedCategories = array_fill_keys(\SCM\Support\PanelCaseCatalog::calendarCategoryIds(), true);
+    $categoryRows = $this->panelCalendarCategoryRows();
+    $categoriesHtml = '';
+    foreach ($categoryRows as $category) {
+      $checked = ($selectedCategories === [] || isset($selectedCategories[$category['id']])) ? ' checked' : '';
+      $categoriesHtml .= '<label class="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" name="calendar_categories[]" value="' . esc_attr($category['id']) . '"' . $checked . '> <span>' . esc_html($category['nombre']) . '</span></label>';
+    }
+    if ($categoriesHtml === '') {
+      $categoriesHtml = '<p class="text-sm text-slate-500">No se encontraron categor&iacute;as del calendario.</p>';
+    }
+
+    ob_start();
+?>
+    <div id="scm-case-catalog-settings-modal" class="scm-pqr-settings-modal scm-ticket-topic-settings-modal scm-config-modal--topics scm-tw-modal fixed inset-0 z-50 p-3 bg-slate-900/70 backdrop-blur-md" aria-hidden="true">
+      <div class="scm-pqr-settings-dialog scm-tw-dialog bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-slate-200" role="dialog" aria-modal="true" aria-labelledby="scm-case-catalog-settings-title">
+        <button type="button" class="scm-pqr-settings-close scm-tw-close" id="scm-close-case-catalog-settings" aria-label="Cerrar">&times;</button>
+        <div class="scm-pqr-settings-head scm-tw-head bg-[#0f1e36] text-white px-6 py-5 flex items-start gap-4">
+          <span class="scm-config-head-icon material-symbols-outlined shrink-0" aria-hidden="true">category</span>
+          <h3 id="scm-case-catalog-settings-title" class="text-2xl font-bold text-white">Temas de ayuda y categor&iacute;as</h3>
+          <span class="scm-config-head-badge inline-flex rounded-full text-[10px] font-bold uppercase">Opciones del panel</span>
+          <p>Define qu&eacute; temas de ayuda se ofrecen al crear o editar un caso y qu&eacute; categor&iacute;as del calendario aparecen como opciones en el panel.</p>
+        </div>
+        <section class="scm-pqr-settings-section bg-slate-100 p-6">
+          <form id="scm-case-catalog-form" class="scm-pqr-config-form" method="post" autocomplete="off">
+            <div class="scm-ticket-topic-config-grid">
+              <section class="scm-ticket-topic-config-field scm-topic-card" data-scm-topic-card="help_topics" data-scm-topic-label="Temas de ayuda">
+                <header class="scm-topic-card-head"><strong>Temas de ayuda</strong><em data-scm-topic-count><?php echo esc_html((string) count($topics)); ?> temas</em></header>
+                <div class="scm-topic-chips" data-scm-topic-chips><?php echo $topicChips; ?></div>
+                <div class="scm-topic-add"><input type="text" data-scm-topic-input placeholder="Agregar tema y presionar Enter" aria-label="Agregar tema de ayuda" autocomplete="off"><button type="button" data-scm-topic-add aria-label="Agregar tema"><span class="material-symbols-outlined" aria-hidden="true">add</span></button></div>
+                <details class="scm-topic-raw"><summary>Editar como lista</summary><textarea name="help_topics" class="textarea textarea-bordered scm-input" rows="6" data-scm-topic-source aria-label="Temas de ayuda, uno por línea"><?php echo esc_textarea(implode("\n", $topics)); ?></textarea><small>Un tema por l&iacute;nea. Se usan en Crear nuevo caso, Editar datos del caso y crear caso desde contratos.</small></details>
+              </section>
+              <section class="scm-ticket-topic-config-field scm-topic-card">
+                <header class="scm-topic-card-head"><strong>Categor&iacute;as del calendario</strong><em><?php echo esc_html((string) count($categoryRows)); ?> categor&iacute;as</em></header>
+                <p class="text-xs text-slate-500 mb-2">Marca las que deben aparecer en filtros, eventos e informes del calendario del panel.</p>
+                <div class="flex flex-col gap-1.5" style="max-height:320px;overflow:auto;"><?php echo $categoriesHtml; ?></div>
+              </section>
+            </div>
+            <div class="scm-pqr-config-actions">
+              <button type="submit" class="scm-btn-primary btn btn-primary btn-sm">Guardar configuraci&oacute;n</button>
+              <small class="scm-case-catalog-msg" aria-live="polite"></small>
             </div>
           </form>
         </section>

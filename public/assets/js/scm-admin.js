@@ -4985,8 +4985,16 @@
     });
   }
 
-  function administrativeCalendarCategories(rows) {
+  function administrativeCalendarCategories(rows, root) {
     rows = Array.isArray(rows) ? rows : [];
+    // Categorías elegidas en Configuración → Temas de ayuda y categorías; sin configurar se usa el filtro por nombre.
+    var runtime = root ? parseRuntime(root) || {} : {};
+    var allowed = Array.isArray(runtime.calendarCategoryIds) ? runtime.calendarCategoryIds.map(String) : [];
+    if (allowed.length) {
+      return rows.filter(function (row) {
+        return allowed.indexOf(String(row.id || row._ID || row.id_categoria || "").trim()) !== -1;
+      });
+    }
     var filtered = rows.filter(isAdministrativeCalendarCategory);
     return filtered.length ? filtered : rows;
   }
@@ -7496,7 +7504,7 @@
         if (!categorySelect) return;
         categorySelect.innerHTML =
           '<option value="">Selecciona categoria</option>';
-        administrativeCalendarCategories(rows).forEach(function (row) {
+        administrativeCalendarCategories(rows, root).forEach(function (row) {
           var id = String(row.id || row._ID || row.id_categoria || "").trim();
           var name = calendarCategoryLabel(row) || id;
           if (!id) return;

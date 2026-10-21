@@ -132,6 +132,39 @@ trait HandlesTicketWorkflowActions
     ]);
   }
 
+  public function ajax_handler_case_catalog_settings_save(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canManagePublicPqrSettings()) {
+      $this->jsonFail('No tienes permiso para configurar temas de ayuda y categorías.');
+    }
+
+    $topics = \SCM\Support\PanelCaseCatalog::sanitizeList(wp_unslash((string) ($_POST['help_topics'] ?? '')));
+    if ($topics === []) {
+      $this->jsonFail('Agrega al menos un tema de ayuda.');
+    }
+    $categories = \SCM\Support\PanelCaseCatalog::sanitizeList(is_array($_POST['calendar_categories'] ?? null) ? $_POST['calendar_categories'] : []);
+    if ($categories === []) {
+      $this->jsonFail('Marca al menos una categoría del calendario.');
+    }
+    $allCategories = array_column($this->panelCalendarCategoryRows(), 'id');
+    $categories = array_values(array_intersect($categories, $allCategories));
+    // Si quedan todas marcadas se guarda vacío: las categorías nuevas aparecen sin reconfigurar.
+    if (count($categories) === count($allCategories)) {
+      $categories = [];
+    }
+
+    \SCM\Core\App::settings()->set(\SCM\Support\PanelCaseCatalog::HELP_TOPICS_SETTING, $topics, Auth::userId());
+    \SCM\Core\App::settings()->set(\SCM\Support\PanelCaseCatalog::CALENDAR_CATEGORIES_SETTING, $categories, Auth::userId());
+    \SCM\Core\App::settings()->refresh();
+
+    $this->jsonOk([
+      'message' => 'Temas de ayuda y categorías guardados.',
+      'help_topics' => $topics,
+      'calendar_categories' => $categories,
+    ]);
+  }
+
   public function ajax_handler_dashboard_filter_options(): void
   {
     $this->verifyCsrf();

@@ -4732,28 +4732,8 @@ trait HandlesMaintenanceActions
   private function caseDataEditOptions(string $table): array
   {
     $base = [
-      'tema_ayuda' => [
-        'Reparaciones necesarias',
-        'Reparaciones locativas',
-        'Mejoras utiles',
-        'Reparaciones voluntarias',
-        'Reparaciones antes de la entrega',
-        'Reparaciones antes del recibo',
-        'Mantenimiento',
-        'Revision preventiva',
-        'Entrega de inmuebles',
-        'Recibo de inmuebles',
-        'Contable y tributaria',
-        'Certificaciones tributarias',
-        'Procesos juridicos',
-        'Solicitud contractual',
-        'Solicitud de servicios publicos',
-        \SCM\Modules\Pending\PublicServicesCriticalTicket::TOPIC,
-        'No prorroga de contrato',
-        'Terminacion de contrato',
-        'Retencion de contrato',
-        'Otros servicios',
-      ],
+      // Mismos temas que "Crear nuevo caso", configurables en Temas de ayuda y categorías.
+      'tema_ayuda' => \SCM\Support\PanelCaseCatalog::helpTopics(),
       'prioridad' => ['Prioridad urgente', 'Prioridad alta', 'Prioridad media', 'Prioridad baja'],
       'departamento' => ['Servicio al cliente', 'Servicio al propietario', 'Servicio al arrendatario', 'Servicio a la copropiedad'],
     ];
@@ -4762,11 +4742,13 @@ trait HandlesMaintenanceActions
       if (!$this->column_exists($table, $column)) {
         continue;
       }
-      $rows = $this->db->getResults(
-        "SELECT DISTINCT TRIM(`{$column}`) AS v FROM `{$table}` WHERE TRIM(COALESCE(`{$column}`, '')) NOT IN ('', '-') LIMIT 200"
-      );
-      foreach ($rows as $row) {
-        $values[] = (string) ($row['v'] ?? '');
+      if ($column !== 'tema_ayuda') {
+        $rows = $this->db->getResults(
+          "SELECT DISTINCT TRIM(`{$column}`) AS v FROM `{$table}` WHERE TRIM(COALESCE(`{$column}`, '')) NOT IN ('', '-') LIMIT 200"
+        );
+        foreach ($rows as $row) {
+          $values[] = (string) ($row['v'] ?? '');
+        }
       }
       $seen = [];
       $options[$column] = [];
@@ -4930,7 +4912,8 @@ trait HandlesMaintenanceActions
         if ($value !== '' && !in_array($value, $options['ejecutado'] ?? [], true)) {
           $this->jsonFail('Ejecutado por no válido.');
         }
-      } elseif (!in_array($value, $options[$column] ?? [], true)) {
+      } elseif ($value !== $before && !in_array($value, $options[$column] ?? [], true)) {
+        // Un valor histórico que ya no está en la lista se conserva mientras no se cambie.
         $this->jsonFail($fields[$column] . ' no válido.');
       }
       if ($value !== $before) {

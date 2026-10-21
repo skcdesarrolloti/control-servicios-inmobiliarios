@@ -95,6 +95,9 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
             const el = document.getElementById('scm-open-ticket-topic-settings');
             if (el) el.click();
             else window.dispatchEvent(new CustomEvent('scm:open-ticket-topic-settings'));
+          } else if (action === 'case-catalog-settings') {
+            const el = document.getElementById('scm-open-case-catalog-settings');
+            if (el) el.click();
           } else if (action === 'notifications') {
             const el = document.getElementById('scm-open-internal-notifications') || document.getElementById('scm-open-pqr-settings');
             if (el) el.click();

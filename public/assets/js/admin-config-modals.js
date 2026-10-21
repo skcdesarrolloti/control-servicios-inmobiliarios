@@ -294,6 +294,7 @@
   function boot() {
     initPermissions(document.querySelector("#scm-permissions-form[data-scm-perm-form]"));
     initTopics(document.querySelector("#scm-ticket-topic-tabs-form"));
+    initTopics(document.querySelector("#scm-case-catalog-form"));
   }
 
   if (document.readyState === "loading") {

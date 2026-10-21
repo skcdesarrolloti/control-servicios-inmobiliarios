@@ -6427,6 +6427,14 @@
             var id = String(row.id || row._ID || row.id_categoria || "").trim();
             if (id) categoriesById[id] = row;
           });
+          // Como opciones solo salen las categorías habilitadas en Configuración → Temas de ayuda y categorías
+          // (vacío = todas); los eventos existentes conservan el nombre de su categoría.
+          var allowedCategoryIds = Array.isArray(runtime.calendarCategoryIds) ? runtime.calendarCategoryIds.map(String) : [];
+          if (allowedCategoryIds.length) {
+            categories = categories.filter(function (row) {
+              return allowedCategoryIds.indexOf(String(row.id || row._ID || row.id_categoria || "").trim()) !== -1;
+            });
+          }
           applyCalendarEmployeeOptions(funcionarios, currentCalendarEmployeeId);
           fillCategoryOptions(panel.querySelector("[data-scm-calendar-filter-categories]"), calendarAdminCategories(), "Todas las categorías");
         }).catch(function (err) {
@@ -11890,6 +11898,73 @@
       if (openBtn) openBtn.click();
     });
 
+    function bindCaseCatalogSettings() {
+      var openBtn = root.querySelector("#scm-open-case-catalog-settings");
+      var modal = root.querySelector("#scm-case-catalog-settings-modal");
+      var form = root.querySelector("#scm-case-catalog-form");
+      if (!openBtn || !modal || !form || modal.dataset.scmSettingsBound === "1") {
+        return;
+      }
+      modal.dataset.scmSettingsBound = "1";
+      var closeBtn = modal.querySelector("#scm-close-case-catalog-settings");
+      var msg = modal.querySelector(".scm-case-catalog-msg");
+
+      function closeModal() {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+      }
+
+      function setMessage(text, isError) {
+        if (!msg) return;
+        msg.textContent = text || "";
+        msg.classList.toggle("error", !!isError);
+      }
+
+      openBtn.addEventListener("click", function () {
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+      });
+      if (closeBtn) {
+        closeBtn.addEventListener("click", closeModal);
+      }
+      modal.addEventListener("click", function (event) {
+        if (event.target === modal) {
+          closeModal();
+        }
+      });
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var action = actions.case_catalog_settings_save || "scm_case_catalog_settings_save";
+        var btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+        setMessage("Guardando...", false);
+
+        var fd = new FormData(form);
+        fd.append("action", action);
+        fd.append("nonce", nonce);
+        fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
+          .then(function (response) { return response.json(); })
+          .then(function (json) {
+            if (!json || !json.success) {
+              throw new Error((json && json.data && json.data.message) || "No se pudo guardar la configuración.");
+            }
+            runtime.caseHelpTopics = (json.data && json.data.help_topics) || runtime.caseHelpTopics;
+            runtime.calendarCategoryIds = (json.data && json.data.calendar_categories) || [];
+            setMessage((json.data && json.data.message) || "Configuración guardada.", false);
+            showToast("success", "Temas de ayuda y categorías guardados. Recarga para ver las categorías en el calendario.");
+          })
+          .catch(function (error) {
+            setMessage(error.message || "No se pudo guardar la configuración.", true);
+            showToast("error", error.message || "No se pudo guardar la configuración.");
+          })
+          .finally(function () {
+            if (btn) btn.disabled = false;
+          });
+      });
+    }
+
+    bindCaseCatalogSettings();
+
     function bindInternalNotificationsSettings() {
       var openBtn = root.querySelector("#scm-open-internal-notifications");
       var modal = root.querySelector("#scm-internal-notifications-modal");
@@ -13275,21 +13350,9 @@
         "Servicio al arrendatario",
         "Servicio a la copropiedad",
       ];
-      var topicOptions = [
-        "Mantenimiento",
-        "Revision preventiva",
-        "Entrega de inmuebles",
-        "Recibo de inmuebles",
-        "Procesos juridicos",
-        "Solicitud contractual",
-        "Solicitud de servicios publicos",
-        "No prorroga de contrato",
-        "Terminacion de contrato",
-        "Retencion de contrato",
-        "Otros servicios",
-        "Contable y tributaria",
-        "Certificaciones tributarias",
-      ];
+      // Mismos temas de ayuda que "Crear nuevo caso" (Configuración → Temas de ayuda y categorías).
+      var topicOptions = (Array.isArray(runtime.caseHelpTopics) ? runtime.caseHelpTopics : []).slice();
+      if (defaultTema && topicOptions.indexOf(defaultTema) < 0) topicOptions.unshift(defaultTema);
       var priorityOptions = [
         "Prioridad urgente",
         "Prioridad alta",

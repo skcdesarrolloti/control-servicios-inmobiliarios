@@ -92,6 +92,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_GUARDAR_CORRESPONSABLE_PQR_PUBLICO = 'scm_guardar_corresponsable_pqr_publico';
   const AJAX_GUARDAR_NOTIF_RESPONSABLE_PQR = 'scm_guardar_notif_responsable_pqr';
   const AJAX_TICKET_TOPIC_SETTINGS_SAVE = 'scm_ticket_topic_settings_save';
+  const AJAX_CASE_CATALOG_SETTINGS_SAVE = 'scm_case_catalog_settings_save';
   const AJAX_FILTER_PQR_PUBLICO = 'scm_filtrar_pqr_publico';
   const AJAX_SESSION_HEARTBEAT = 'scm_session_heartbeat';
   const AJAX_DASHBOARD_PERMISSIONS_READ = 'scm_dashboard_permissions_read';

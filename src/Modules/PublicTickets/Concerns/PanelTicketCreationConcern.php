@@ -10,6 +10,7 @@ use SCM\Support\EmailTemplate;
 use SCM\Support\FuncionarioOptions;
 use SCM\Support\InternalNotificationRecipients;
 use SCM\Support\PanelCaseAttachments;
+use SCM\Support\PanelCaseCatalog;
 use SCM\Support\PanelCaseNotifications;
 use SCM\Support\SharedNotificationsBridge;
 
@@ -17,21 +18,7 @@ trait PanelTicketCreationConcern
 {
   public function panelCaseOptions(): array
   {
-    $themes = [
-      'Reparaciones necesarias',
-      'Reparaciones locativas',
-      'Mejoras utiles',
-      'Reparaciones voluntarias',
-      'Contable y tributaria',
-      'Certificaciones tributarias',
-      'Procesos juridicos',
-      'Solicitud contractual',
-      'Solicitud de servicios publicos',
-      'Otros servicios',
-      'Reparaciones antes de la entrega',
-      'Reparaciones antes del recibo',
-      PublicServicesCriticalTicket::TOPIC,
-    ];
+    $themes = PanelCaseCatalog::helpTopics();
     $departments = ['Servicio al propietario', 'Servicio al arrendatario', 'Servicio a la copropiedad'];
     $themeDepartments = [PublicServicesCriticalTicket::TOPIC => 'Servicio al arrendatario'];
     return [
