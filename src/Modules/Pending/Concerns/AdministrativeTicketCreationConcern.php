@@ -194,18 +194,6 @@ trait AdministrativeTicketCreationConcern
       $ticketPayload['archivos'] = serialize(array_values($documentos));
     }
 
-    // PDF-only context: decode existing CCT evidence without instantiating serialized objects.
-    $photoUrls = $imagenes;
-    foreach (['imagenes', 'imagen', 'registro_fotografico'] as $photoKey) {
-      $raw = $contract[$photoKey] ?? '';
-      $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
-      if (!is_array($decoded) && is_string($raw) && preg_match('/^a:\\d+:/', $raw)) $decoded = @unserialize($raw, ['allowed_classes' => false]);
-      if (is_array($decoded)) {
-        array_walk_recursive($decoded, static function ($value) use (&$photoUrls) { if (is_string($value)) $photoUrls[] = $value; });
-      } elseif (is_string($raw) && $raw !== '') $photoUrls[] = $raw;
-    }
-    $ticketPayload['receipt_photo_urls'] = array_values(array_unique(array_filter($photoUrls, 'is_string')));
-
     $insertPayload = $schema->filterTableData($ticketsTable, $ticketPayload);
     if (empty($insertPayload)) {
       return ['ok' => '0', 'message' => 'No se pudo preparar la informacion del caso.'];

@@ -32,12 +32,16 @@ final class TicketPdfGenerator
     }
 
     if ($temaNorm === 'recibo de inmuebles') {
-      $out['acta_desocupacion'] = $this->save(
-        $this->buildActaDesocupacion($ticket),
-        'acta_desocupacion_' . $ticketId,
-        'Notificación previa para entrega del inmueble',
-        'acta_desocupacion'
-      );
+      // Diseño de las actas de servicios públicos (Chromium); si el servicio de PDF no responde, el formato clásico.
+      $bytes = ReceiptNoticeDocument::pdf($ticket);
+      $out['acta_desocupacion'] = $bytes !== null
+        ? $this->saveBytes($bytes, ReceiptNoticeDocument::TITLE, 'acta_desocupacion')
+        : $this->save(
+          $this->buildActaDesocupacion($ticket),
+          'acta_desocupacion_' . $ticketId,
+          ReceiptNoticeDocument::TITLE,
+          'acta_desocupacion'
+        );
     }
 
     return $out;
@@ -244,24 +248,20 @@ final class TicketPdfGenerator
     $pdf->paragraph('Cuando dicha entrega se extienda a un nuevo período de facturación, se generará inicialmente el cobro del canon mensual completo vigente; una vez se produzca la entrega formal del inmueble, se realizará la liquidación correspondiente a los días efectivamente causados y se reintegrará o abonará a su favor el valor correspondiente a los días posteriores a la entrega que no hayan sido consumidos.');
     $pdf->paragraph('Por lo anterior, recomendamos atender previamente cualquier reparación, obligación o novedad que pueda retrasar el proceso de entrega. Agradecemos coordinar oportunamente con nuestro equipo la revisión y recepción del inmueble.');
     $pdf->paragraph('Nota: Es de tener en cuenta que para efectos de la devolución del saldo restante del depósito de servicios públicos y del saldo a favor del arrendatario, este valor será reembolsado en los 60 días siguientes a la terminación del contrato de arrendamiento.');
-    $pdf->heading('Registro fotográfico');
+    // Registro fotográfico e inventario son enlaces; la carta no incrusta fotos.
+    $pdf->heading('Registro fotográfico e inventario');
     $registro = $this->value($ticket, 'registro_fotografico', '');
     if (filter_var($registro, FILTER_VALIDATE_URL) && in_array(strtolower((string) parse_url($registro, PHP_URL_SCHEME)), ['https', 'http'], true)) {
       $pdf->linkText('Consultar registro fotográfico del inmueble', $registro);
+    } else {
+      $pdf->paragraph('No hay registro fotográfico disponible en el contrato.');
     }
-    $inserted = 0;
-    $files = StoredFileService::fromRuntime();
-    foreach (array_unique((array) ($ticket['receipt_photo_urls'] ?? [])) as $url) {
-      $query = []; parse_str((string) parse_url((string) $url, PHP_URL_QUERY), $query);
-      $name = (string) ($query['n'] ?? $query['file'] ?? $query['name'] ?? basename((string) parse_url((string) $url, PHP_URL_PATH)));
-      $path = $files->pathFor($name);
-      if ($path === null || filesize($path) > 10 * 1024 * 1024) continue;
-      $info = @getimagesize($path);
-      if (!$info || (int) $info[0] * (int) $info[1] > 16000000) continue;
-      if ($pdf->image($path, 440, 240)) { $inserted++; $pdf->spacer(8); }
-      if ($inserted >= 20) break;
+    $inventario = $this->value($ticket, 'id_inventario', '');
+    if ($inventario !== '' && $inventario !== '0') {
+      $pdf->linkText('Consultar inventario del inmueble', 'https://sucasainmobiliaria.com.co/inventario-inmueble/?numero=' . rawurlencode($inventario));
+    } else {
+      $pdf->paragraph('El contrato no tiene inventario vinculado.');
     }
-    if ($registro === '' && $inserted === 0) $pdf->paragraph('No hay registro fotográfico disponible en el contrato.');
     $pdf->paragraph('Cordialmente, SKC SuCasa Inmobiliaria.');
     $contractual = $this->contactParts($ticket, 'contractual');
     $checker = $this->contactParts($ticket, 'empleado');
@@ -270,6 +270,15 @@ final class TicketPdfGenerator
     $signatures[] = ['label' => 'Realizado por', 'name' => $checker['name'], 'details' => $checker['details']];
     $pdf->signatureGroup($signatures);
     return $pdf;
+  }
+
+  /** @return array{key:string,title:string,url:string,path:string} */
+  private function saveBytes(string $bytes, string $title, string $key): array
+  {
+    $basename = bin2hex(random_bytes(12)) . '_' . time() . '.pdf';
+    $path = (string) SCM_UPLOAD_PATH . '/' . $basename;
+    if (file_put_contents($path, $bytes, LOCK_EX) === false) throw new \RuntimeException('No fue posible guardar el PDF.');
+    return ['key' => $key, 'title' => $title, 'url' => StoredFileService::fromRuntime()->urlFor($basename), 'path' => $path];
   }
 
   /**
