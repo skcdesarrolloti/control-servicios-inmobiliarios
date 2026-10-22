@@ -9874,11 +9874,18 @@
 
         var cotEstadoKey = normalizeCaseActionState(btn.dataset.cotEstado || "");
         var hasApprovedCaseQuote = !!cotizacionId && cotEstadoKey === "aprobada";
+        // Algunas vistas no envían el bucket, así que el estado del caso también cuenta como cerrado.
+        var isClosedCase =
+          statusBucket === "cerrados" ||
+          ["cerrado", "cerrada", "finalizado", "finalizada"].indexOf(
+            normalizeCaseActionState(btn.dataset.estado || ""),
+          ) !== -1;
 
         if (!isPublicPqr) {
           if (
             canUseDashboardAction("case_completion_act") &&
-            !hasApprovedCaseQuote
+            !hasApprovedCaseQuote &&
+            !isClosedCase
           ) {
             complementaryActionButtons.push(
               '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-acta>Acta de solución y firma</button>',
