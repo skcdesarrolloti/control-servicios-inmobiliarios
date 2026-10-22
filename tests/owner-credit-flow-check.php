@@ -92,11 +92,11 @@ $approved = $result['credit'];
 $check(array_key_exists('internal_whatsapp', $result['queued']), 'staff WhatsApp is attempted on decisions without breaking them when no staff is configured');
 $check($approved['status'] === 'aprobado' && (int) $approved['policy_override'] === 1 && (float) $approved['approved_amount'] === 3000000.0 && (int) $approved['approved_term'] === 12, 'approved outside policy with conditions and override flag');
 $check(abs((float) $approved['monthly_payment'] - 288931.18) < 1 && abs((float) $approved['approved_rate'] - 0.023) < 1e-9, 'monthly payment is recalculated on the server');
-$check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_ticket WHERE id_ticket = ?', ['10821'])) === 1, 'decision is written to the case history');
+$check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_ticket WHERE id_ticket = ?', ['10821'])) === 2, 'request and decision are written to the case history');
 $contractHistory = $db->getResults('SELECT * FROM wp_jet_cct_historial_contrato_arrendamiento WHERE id_contrato = ?', ['7']);
-$check(count($contractHistory) === 1 && $contractHistory[0]['tipo_reporte'] === 'Crédito aprobado' && str_contains($contractHistory[0]['observacion'], 'fuera de política'), 'decision is written to the contract history');
+$check(count($contractHistory) === 2 && $contractHistory[0]['tipo_reporte'] === 'Solicitud de crédito' && str_contains($contractHistory[0]['observacion'], 'solicitado por el propietario Ana Dueña: $893.723 para la cotización #574') && $contractHistory[1]['tipo_reporte'] === 'Crédito aprobado' && str_contains($contractHistory[1]['observacion'], 'fuera de política'), 'request and decision are written to the contract history');
 $propertyHistory = $db->getResults('SELECT * FROM wp_jet_cct_historial_del_inmueble WHERE id_inmueble = ?', ['10420']);
-$check(count($propertyHistory) === 1 && $propertyHistory[0]['tipo_reporte'] === 'Crédito aprobado' && str_starts_with($propertyHistory[0]['observacion'], 'Contrato #817: Crédito #') && $propertyHistory[0]['nombre_empleado'] === 'Analista QA', 'decision is written to the property history with the contract');
+$check(count($propertyHistory) === 2 && $propertyHistory[0]['tipo_reporte'] === 'Solicitud de crédito' && $propertyHistory[1]['tipo_reporte'] === 'Crédito aprobado' && str_starts_with($propertyHistory[1]['observacion'], 'Contrato #817: Crédito #') && $propertyHistory[1]['nombre_empleado'] === 'Analista QA', 'request and decision are written to the property history with the contract');
 try {
   $service->decide((int) $credit['id'], 'rechazado', ['note' => 'Intento repetido de decisión.'], $actor);
   $check(false, 'a decided credit cannot be decided again');
@@ -125,13 +125,14 @@ $check($service->find((int) $second['id'])['status'] === 'rechazado', 'request i
 
 $service->changeStatus((int) $credit['id'], 'pagado', 'Se descontó la última cuota en el giro.', $actor);
 $check($service->find((int) $credit['id'])['status'] === 'pagado', 'approved credit can be marked as paid');
-$check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_inmueble WHERE id_inmueble = ?', ['10420'])) === 2, 'marking as paid is also written to the property history');
+$check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_inmueble WHERE id_inmueble = ?', ['10420'])) === 3, 'marking as paid is also written to the property history');
 $check(!in_array('prestamos', array_column(array_filter($service->workspace((int) $second['id'])['policies'], static fn(array $p): bool => !$p['ok']), 'key'), true), 'a paid credit no longer counts as an active loan');
 
 $db->insert('wp_jet_cct_cotizacion_mantenimiento', ['_ID' => 576, 'id_ticket' => '10823', 'contrato' => '817', 'id_contrato' => '7', 'total' => '100000', 'financiacion' => 'Si']);
 $service->syncFromQuote(576, 'Si', $actor);
 $service->syncFromQuote(576, 'No', $actor);
 $check($service->byQuote(576)['status'] === 'anulado', 'financing "No" annuls the pending request');
+$check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_ticket WHERE id_ticket = ?', ['10823'])) === 2, 'automatic annulment is written to the histories');
 $service->syncFromQuote(576, 'Si', $actor);
 $check($service->byQuote(576)['status'] === 'pendiente', 'financing "Sí" again reopens the annulled request');
 

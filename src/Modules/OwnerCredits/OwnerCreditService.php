@@ -112,11 +112,13 @@ final class OwnerCreditService
         } elseif ($credit['status'] === 'anulado') {
           $this->setStatus((int) $credit['id'], 'pendiente', ['closed_at' => null]);
           $this->event((int) $credit['id'], 'reabierto', $actor, ['motivo' => 'La cotización volvió a quedar con financiación Sí.']);
+          $this->recordRequestHistory((int) $credit['id'], $actor, true);
           $this->notifyRequested((int) $credit['id']);
         }
       } elseif ($financing === 'no' && $credit !== null && $credit['status'] === 'pendiente') {
         $this->setStatus((int) $credit['id'], 'anulado', ['closed_at' => time()]);
         $this->event((int) $credit['id'], 'anulado', $actor, ['motivo' => 'La cotización quedó sin financiación.']);
+        $this->recordHistories($credit, 'Crédito anulado', 'Crédito #' . $credit['id'] . ' anulado: la cotización #' . (int) $credit['quote_id'] . ' quedó sin financiación.', $actor);
       }
     } catch (\Throwable $error) {
       error_log('[owner-credit-sync] ' . $error->getMessage());
@@ -417,7 +419,20 @@ final class OwnerCreditService
     ]);
     $id = (int) $this->db->lastInsertId();
     $this->event($id, 'solicitado', $actor, ['cotizacion' => $quoteId, 'valor' => $amount]);
+    $this->recordRequestHistory($id, $actor, false);
     return $id;
+  }
+
+  /** La solicitud (o su reapertura) también queda en los historiales del caso, del contrato y del inmueble. */
+  private function recordRequestHistory(int $id, array $actor, bool $reopened): void
+  {
+    $credit = $this->find($id);
+    if ($credit === null) return;
+    $message = 'Crédito #' . $id . ($reopened ? ' reabierto' : ' solicitado') . ' por el propietario ' . $credit['owner_name'] . ': $'
+      . number_format((float) $credit['requested_amount'], 0, ',', '.')
+      . ((int) $credit['quote_id'] > 0 ? ' para la cotización #' . (int) $credit['quote_id'] : '')
+      . '. Pendiente de evaluar en el liquidador.';
+    $this->recordHistories($credit, 'Solicitud de crédito', $message, $actor);
   }
 
   /**

@@ -49,6 +49,12 @@
         '<button type="button" class="scm-cia-modal-close" data-owner-credit-dismiss aria-label="Cerrar">&times;</button></header>' +
         '<div data-owner-credit-body style="display:contents"></div></section>';
       root.appendChild(modal);
+      // Si el popup de cotizaciones del caso (SweetAlert) sigue abierto detrás, sus atajos de teclado
+      // (Tab, Escape) no deben recibir lo que se escribe aquí: Escape cierra solo el liquidador.
+      modal.addEventListener("keydown", function (event) {
+        event.stopPropagation();
+        if (event.key === "Escape") closeModal();
+      });
       return modal;
     }
 

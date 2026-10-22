@@ -47,3 +47,5 @@
   #scm-app .scm-owner-credit-form { padding: 14px 16px 20px; }
   #scm-app .scm-owner-credits-head { padding: 14px 16px; }
 }
+/* El liquidador se abre también desde el popup de cotizaciones del caso (SweetAlert, z-index 1000000). */
+#scm-app .scm-cia-modal[data-owner-credit-modal] { z-index: 2147483000; }
