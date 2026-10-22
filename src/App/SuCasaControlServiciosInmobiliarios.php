@@ -13,6 +13,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesCorrectiveReviewActions;
   use \SCM\App\Concerns\HandlesPreventiveReviewActions;
   use \SCM\App\Concerns\HandlesMaintenanceActions;
+  use \SCM\App\Concerns\HandlesOwnerCredits;
   use \SCM\App\Concerns\HandlesMaintenanceOrdersPanel;
   use \SCM\App\Concerns\HandlesLeaseContracts;
   use \SCM\App\Concerns\HandlesPublicPqrActions;
@@ -161,7 +162,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
-  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel'];
+  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure'];
   /** Acciones que existían antes del catálogo ampliado; las demás heredan permisos hasta guardar (applyNewDashboardActionDefaults). */
   const LEGACY_DASHBOARD_ACTION_KEYS = [
     'case_followup', 'case_schedule', 'case_note', 'case_postpone', 'case_respond', 'contract_history_manage', 'case_transfer',
@@ -357,6 +358,7 @@ final class SuCasaControlServiciosInmobiliarios
       'metricas_desocupaciones' => 'Desocupaciones',
       'metricas_ocupaciones_vs' => 'Ocupaciones vs Desocupaciones',
       'metricas_crecimiento' => 'Crecimiento de la empresa',
+      'metricas_creditos' => 'Créditos a propietarios',
     ];
   }
 
@@ -364,7 +366,7 @@ final class SuCasaControlServiciosInmobiliarios
   private const DERIVED_DASHBOARD_TABS = [
     'calendario_actividades' => ['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble'],
     'actividades_contractuales' => ['contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga'],
-    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento'],
+    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento', 'metricas_creditos'],
     // Panel compartido de ocupaciones y desocupaciones (una consulta para sus tres vistas).
     'metricas_contratos' => ['metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs'],
   ];
@@ -530,6 +532,21 @@ final class SuCasaControlServiciosInmobiliarios
           'anexos_contrato_arrendamiento' => [
             'label' => 'Envío de anexos del contrato de arrendamiento',
             'description' => 'Resumen con las actas de bienvenida cuando se envían los anexos al propietario, arrendatario y codeudores desde Contratos de arrendamiento.',
+            'channel' => 'Email interno en cola',
+          ],
+        ],
+      ],
+      'creditos_propietarios' => [
+        'label' => 'Créditos a propietarios',
+        'items' => [
+          'credito_propietario_solicitado' => [
+            'label' => 'Solicitud de crédito',
+            'description' => 'Cuando una cotización queda con financiación Sí (respuesta del propietario o cambio desde el panel) o se crea un crédito manual. Avisa para revisarlo en el liquidador.',
+            'channel' => 'Email interno en cola',
+          ],
+          'credito_propietario_decidido' => [
+            'label' => 'Crédito aprobado o rechazado',
+            'description' => 'Cuando un funcionario aprueba o rechaza un crédito desde el liquidador, con las condiciones y la justificación si se aprobó fuera de política.',
             'channel' => 'Email interno en cola',
           ],
         ],
@@ -841,6 +858,14 @@ final class SuCasaControlServiciosInmobiliarios
           'public_services_review_save' => 'Guardar revisión de servicios públicos',
           'public_services_liquidation_generate' => 'Generar liquidación de servicios públicos',
           'rent_increase_letter_create' => 'Generar cartas de aumento',
+        ],
+      ],
+      'creditos' => [
+        'label' => 'Créditos a propietarios',
+        'items' => [
+          'owner_credit_decide' => 'Aprobar o rechazar créditos (liquidador)',
+          'owner_credit_manage' => 'Crear créditos manuales, marcarlos como pagados o anularlos',
+          'owner_credit_configure' => 'Configurar variables y avisos de créditos',
         ],
       ],
       'cartera' => [

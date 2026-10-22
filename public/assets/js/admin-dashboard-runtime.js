@@ -25501,6 +25501,7 @@
         activePanel.id !== "scm-panel-metricas-preventivas" &&
         activePanel.id !== "scm-panel-metricas-servicios-publicos" &&
         activePanel.id !== "scm-panel-metricas-crecimiento" &&
+        activePanel.id !== "scm-panel-metricas-creditos" &&
         !dashboardFilterOptionsLoaded &&
         !skipFilterOptions
       ) {
@@ -25536,6 +25537,13 @@
       }
       if (activePanel.id === "scm-panel-metricas-preventivas" || activePanel.id === "scm-panel-metricas-servicios-publicos" || activePanel.id === "scm-panel-metricas-crecimiento") {
         return loadMaintenanceMetrics(activePanel.querySelector("[data-maint-metrics]"), false);
+      }
+      if (activePanel.id === "scm-panel-metricas-creditos") {
+        var creditsModule = activePanel.querySelector("[data-scm-owner-credits]");
+        if (creditsModule) {
+          creditsModule.dispatchEvent(new CustomEvent("scm:load-owner-credits"));
+        }
+        return Promise.resolve();
       }
       if (activePanel.id === "scm-panel-funcionario-contratos") {
         var ownersModule = activePanel.querySelector("[data-scm-contract-owners]");

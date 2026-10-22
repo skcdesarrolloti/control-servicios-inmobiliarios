@@ -173,6 +173,9 @@ trait RendersDashboard
       'metricas_crecimiento' => 'scm-panel-metricas-crecimiento',
       'crecimiento' => 'scm-panel-metricas-crecimiento',
       'scm-panel-metricas-crecimiento' => 'scm-panel-metricas-crecimiento',
+      'metricas_creditos' => 'scm-panel-metricas-creditos',
+      'creditos' => 'scm-panel-metricas-creditos',
+      'scm-panel-metricas-creditos' => 'scm-panel-metricas-creditos',
       'ocupaciones' => 'scm-panel-movimientos-contratos',
       'desocupaciones' => 'scm-panel-movimientos-contratos',
       'ocupaciones_vs_desocupaciones' => 'scm-panel-movimientos-contratos',
@@ -336,7 +339,7 @@ trait RendersDashboard
     $canAccessAdministrativeCalendar = in_array('calendario_actividades', $dashboardAllowedTabs, true);
     $canAccessContractActivities = in_array('actividades_contractuales', $dashboardAllowedTabs, true);
     $firstMetricsPanel = 'scm-panel-metricas-casos';
-    foreach (['metricas_casos' => 'scm-panel-metricas-casos', 'metricas_cotizaciones' => 'scm-panel-metricas-cotizaciones', 'metricas_preventivas' => 'scm-panel-metricas-preventivas', 'metricas_servicios_publicos' => 'scm-panel-metricas-servicios-publicos', 'metricas_contratos' => 'scm-panel-movimientos-contratos', 'metricas_crecimiento' => 'scm-panel-metricas-crecimiento'] as $metricTab => $metricPanel) {
+    foreach (['metricas_casos' => 'scm-panel-metricas-casos', 'metricas_cotizaciones' => 'scm-panel-metricas-cotizaciones', 'metricas_preventivas' => 'scm-panel-metricas-preventivas', 'metricas_servicios_publicos' => 'scm-panel-metricas-servicios-publicos', 'metricas_contratos' => 'scm-panel-movimientos-contratos', 'metricas_crecimiento' => 'scm-panel-metricas-crecimiento', 'metricas_creditos' => 'scm-panel-metricas-creditos'] as $metricTab => $metricPanel) {
       if (in_array($metricTab, $dashboardAllowedTabs, true)) {
         $firstMetricsPanel = $metricPanel;
         break;
@@ -382,6 +385,7 @@ trait RendersDashboard
       'scm-panel-metricas-preventivas' => 'metricas_preventivas',
       'scm-panel-metricas-servicios-publicos' => 'metricas_servicios_publicos',
       'scm-panel-metricas-crecimiento' => 'metricas_crecimiento',
+      'scm-panel-metricas-creditos' => 'metricas_creditos',
       'scm-panel-movimientos-contratos' => 'metricas_contratos',
       'scm-panel-funcionario-contratos' => 'funcionario_contratos',
     ];
@@ -818,6 +822,7 @@ trait RendersDashboard
             if ($panelId === 'scm-panel-metricas-preventivas') $tabLabel = 'Métricas de revisión preventiva';
             if ($panelId === 'scm-panel-metricas-servicios-publicos') $tabLabel = 'Métricas de servicios públicos';
             if ($panelId === 'scm-panel-metricas-crecimiento') $tabLabel = 'Crecimiento de la empresa';
+            if ($panelId === 'scm-panel-metricas-creditos') $tabLabel = 'Créditos a propietarios';
             if ($panelId === 'scm-panel-funcionario-contratos') $tabLabel = 'Funcionario de contratos';
             if ($panelId === 'scm-panel-inicio') $tabLabel = 'Calendario';
           }
@@ -1393,6 +1398,11 @@ trait RendersDashboard
           <?php echo $maintenanceMetricsView->shell('crecimiento'); ?>
         </div>
         <?php endif; ?>
+        <?php if (in_array('metricas_creditos', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas-creditos' ? ' active' : ''; ?>" id="scm-panel-metricas-creditos" data-permission-tab="metricas_creditos" data-scm-loaded="0">
+          <?php echo (new \SCM\Modules\OwnerCredits\OwnerCreditView())->shell($this->canUseDashboardAction('owner_credit_manage'), $this->canUseDashboardAction('owner_credit_configure')); ?>
+        </div>
+        <?php endif; ?>
       <?php endif; ?>
 
       <?php echo \SCM\Views\GuideModalView::render(); ?>
@@ -1441,6 +1451,7 @@ trait RendersDashboard
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-config-modals.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-config-modals.js'))); ?>" defer></script>
     <script src="<?php echo $collectionManagementJsUrl; ?>" defer></script>
     <script src="<?php echo $canonInsuranceAuditJsUrl; ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-owner-credits.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-owner-credits.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-movements.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-movements.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-case-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-case-metrics.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-quote-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-quote-metrics.js'))); ?>" defer></script>
@@ -1839,6 +1850,7 @@ trait RendersDashboard
         'metricas_desocupaciones' => '',
         'metricas_ocupaciones_vs' => '',
         'metricas_crecimiento' => '',
+        'metricas_creditos' => '',
       ]],
     ];
     $tabGroups = [];
@@ -4957,6 +4969,11 @@ trait RendersDashboard
     $financingHtml = $canManageMaintenanceQuote && $this->canUseDashboardAction('quote_financing')
       ? '<button type="button" class="scm-case-work-btn scm-cotizacion-financing-action" data-scm-save-quote-financing data-financiacion="' . esc_attr($financing) . '">Configurar financiamiento · ' . esc_html($financingLabel) . '</button>'
       : '<span class="scm-cotizacion-pill">Financiamiento: ' . esc_html($financingLabel) . '</span>';
+    // Con financiación "Sí" la cotización abre el liquidador de créditos (crea la solicitud si aún no existe).
+    if ($financing === 'Si' && $id !== '' && ($this->canUseDashboardAction('quote_financing') || $this->canAccessDashboardTab('metricas_creditos'))) {
+      $creditStatus = (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db))->statusesForQuotes([(int) $id])[(int) $id] ?? '';
+      $financingHtml .= '<button type="button" class="scm-case-work-btn scm-primary-action" data-owner-credit-open data-quote-id="' . esc_attr($id) . '">Liquidador de crédito · ' . esc_html(\SCM\Modules\OwnerCredits\OwnerCreditService::STATUSES[$creditStatus] ?? 'Sin evaluar') . '</button>';
+    }
 
     return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '" data-cot-fecha-envio="' . esc_attr((string) $fechaEnvioTs) . '" data-cot-dias-calendario="' . esc_attr((string) $diasCalendarioSinRespuesta) . '" data-cot-seguimiento-reparaciones-disponible="' . esc_attr($seguimientoReparacionesDisponible ? '1' : '0') . '">'
       . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Caso <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : 'Sin estado') . '</span></div></div>'

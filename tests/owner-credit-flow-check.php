@@ -1,0 +1,131 @@
+<?php
+
+declare(strict_types=1);
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+use SCM\Core\Database;
+use SCM\Core\Settings;
+use SCM\Modules\OwnerCredits\OwnerCreditService;
+
+$check = static function (bool $condition, string $message): void {
+  if (!$condition) {
+    fwrite(STDERR, "FAIL: {$message}\n");
+    exit(1);
+  }
+  echo "OK: {$message}\n";
+};
+
+final class OwnerCreditTestPdo extends PDO
+{
+  public function __construct()
+  {
+    parent::__construct('sqlite::memory:');
+    $this->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+  }
+
+  public function prepare(string $query, array $options = []): PDOStatement|false
+  {
+    if (str_contains($query, 'information_schema.TABLES')) $query = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1";
+    if (preg_match('/^DESCRIBE `([^`]+)`/', $query, $m)) $query = "SELECT name FROM pragma_table_info('{$m[1]}')";
+    return parent::prepare(str_replace(' FOR UPDATE', '', $query), $options);
+  }
+
+  public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false
+  {
+    $stmt = $this->prepare($query);
+    $stmt->execute();
+    if ($fetchMode !== null) $stmt->setFetchMode($fetchMode, ...$fetchModeArgs);
+    return $stmt;
+  }
+
+  /** El DDL de MySQL de ensureSchema() se omite: las tablas se crean abajo en SQLite. */
+  public function exec(string $statement): int|false
+  {
+    return str_contains($statement, 'ENGINE=InnoDB') ? 0 : parent::exec($statement);
+  }
+}
+
+$pdo = new OwnerCreditTestPdo();
+$db = new Database($pdo, 'wp_');
+$pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema(_ID INTEGER PRIMARY KEY, funcion TEXT, valor TEXT)');
+$pdo->exec('CREATE TABLE wp_scm_owner_credits(id INTEGER PRIMARY KEY AUTOINCREMENT, quote_id INTEGER UNIQUE, ticket_id TEXT DEFAULT "", contract_id INTEGER DEFAULT 0, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", address TEXT DEFAULT "", owner_id TEXT DEFAULT "", owner_name TEXT DEFAULT "", owner_email TEXT DEFAULT "", owner_phone TEXT DEFAULT "", purpose TEXT DEFAULT "", status TEXT DEFAULT "pendiente", requested_amount REAL DEFAULT 0, requested_term INTEGER DEFAULT 0, vacancy TEXT DEFAULT "Baja", gross_income REAL DEFAULT 0, deductions_json TEXT, net_income REAL DEFAULT 0, max_amount REAL DEFAULT 0, max_months INTEGER DEFAULT 0, approved_amount REAL, approved_term INTEGER, approved_rate REAL, monthly_payment REAL, total_interest REAL, first_payment_ts INTEGER, policy_json TEXT, evaluation_json TEXT, policy_override INTEGER DEFAULT 0, decision_note TEXT, decided_by_id TEXT DEFAULT "", decided_by_name TEXT DEFAULT "", decided_at INTEGER, closed_at INTEGER, created_by_id TEXT DEFAULT "", created_by_name TEXT DEFAULT "", created_at INTEGER, updated_at INTEGER)');
+$pdo->exec('CREATE TABLE wp_scm_owner_credit_events(id INTEGER PRIMARY KEY AUTOINCREMENT, credit_id INTEGER, action TEXT, actor_id TEXT, actor_name TEXT, details_json TEXT, created_at INTEGER)');
+$pdo->exec('CREATE TABLE wp_jet_cct_contratos_arrendamiento(_ID INTEGER PRIMARY KEY, contrato TEXT, estado TEXT, inmueble TEXT, id_inmueble TEXT, id_inmueble_data TEXT, direccion TEXT, propietario TEXT, id_propietario TEXT, correo_propietario TEXT, celular_propietario TEXT, indicativo_propietario TEXT, valor_canon TEXT, valor_administracion TEXT, tasa_administracion TEXT, aseguradora TEXT, asegurado TEXT, inicio_contrato TEXT, fin_contrato TEXT, esta_sinestrado TEXT, id_contrato_mandato TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_contrato_mandato(_ID INTEGER PRIMARY KEY, total_comision TEXT, incluye_garantia TEXT, precio_mes_garantia TEXT, incluye_garantia_servicios TEXT, precio_mes_servicios TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_cotizacion_mantenimiento(_ID INTEGER PRIMARY KEY, id_ticket TEXT, contrato TEXT, id_contrato TEXT, total TEXT, financiacion TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_historial_del_ticket(_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id TEXT, id_empleado TEXT, cct_created TEXT, cct_modified TEXT, fecha INTEGER, id_ticket TEXT, id_cotizacion_mantenimiento TEXT, nombre TEXT, respuesta TEXT, respuesta_cct_ticket TEXT, fue_editada TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_historial_contrato_arrendamiento(_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT, id_empleado TEXT, funcionario TEXT, id_contrato TEXT, contrato TEXT, inmueble TEXT, id_inmueble TEXT, id_inmueble_data TEXT, fecha INTEGER, tipo_reporte TEXT, observacion TEXT)');
+
+$end = (string) strtotime('+14 months');
+$db->insert('wp_jet_cct_contrato_mandato', ['_ID' => 30, 'total_comision' => '142.800', 'incluye_garantia' => 'Si', 'precio_mes_garantia' => '29.400', 'incluye_garantia_servicios' => 'Si', 'precio_mes_servicios' => '52.661,669']);
+$db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 7, 'contrato' => '817', 'estado' => 'Entregado', 'inmueble' => '10420', 'id_inmueble' => '10420', 'direccion' => 'Calle 1', 'propietario' => 'Ana Dueña', 'id_propietario' => '956', 'correo_propietario' => 'ana@example.invalid', 'celular_propietario' => '3001234567', 'indicativo_propietario' => '57', 'valor_canon' => '1.075.000', 'valor_administracion' => '125.000', 'inicio_contrato' => (string) strtotime('-2 years'), 'fin_contrato' => $end, 'esta_sinestrado' => 'No', 'id_contrato_mandato' => '30']);
+$db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 8, 'contrato' => '900', 'estado' => 'Entregado', 'inmueble' => '10500', 'propietario' => 'Ana Dueña', 'id_propietario' => '956', 'valor_canon' => '2.000.000', 'valor_administracion' => '0', 'tasa_administracion' => '10', 'fin_contrato' => (string) strtotime('+2 months'), 'esta_sinestrado' => 'Si']);
+$db->insert('wp_jet_cct_cotizacion_mantenimiento', ['_ID' => 574, 'id_ticket' => '10821', 'contrato' => '817', 'id_contrato' => '7', 'total' => '893723', 'financiacion' => 'Si']);
+$db->insert('wp_jet_cct_cotizacion_mantenimiento', ['_ID' => 575, 'id_ticket' => '10822', 'contrato' => '900', 'id_contrato' => '8', 'total' => '2500000', 'financiacion' => 'Si']);
+
+$service = new OwnerCreditService($db, new Settings($db));
+$actor = ['employee_id' => '2999', 'name' => 'Analista QA'];
+
+$service->syncFromQuote(574, 'Si', $actor);
+$credit = $service->byQuote(574);
+$check($credit !== null && $credit['status'] === 'pendiente' && (float) $credit['requested_amount'] === 893723.0, 'financing "Sí" creates a pending request for the quote total');
+$check($credit['owner_id'] === '956' && $credit['ticket_id'] === '10821' && $credit['owner_phone'] === '573001234567', 'request keeps owner, case and phone with country code');
+$service->syncFromQuote(574, 'Si', $actor);
+$check(count($db->getResults('SELECT id FROM wp_scm_owner_credits')) === 1, 'repeating financing "Sí" does not duplicate the request');
+
+$work = $service->workspace((int) $credit['id']);
+$check($work['evaluation']['gross'] === 1075000.0 && abs($work['evaluation']['deductions_total'] - (142800 + 29400 + 52661.669)) < 0.01, 'income uses canon and mandate commission, guarantee and utilities policy');
+$check($work['evaluation']['max_months'] >= 13 && $work['policies_ok'], 'a healthy contract passes every policy with the suggested conditions');
+
+try {
+  $service->decide((int) $credit['id'], 'aprobado', ['amount' => '$5.000.000', 'term' => '12', 'rate' => '2,3'], $actor);
+  $check(false, 'approving above the cap without justification must fail');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'justificación'), 'approving outside policy requires a justification');
+}
+$result = $service->decide((int) $credit['id'], 'aprobado', ['amount' => '$3.000.000', 'term' => '12', 'rate' => '2,3', 'note' => 'Propietario con 10 años sin mora, se aprueba excepción.'], $actor);
+$approved = $result['credit'];
+$check($approved['status'] === 'aprobado' && (int) $approved['policy_override'] === 1 && (float) $approved['approved_amount'] === 3000000.0 && (int) $approved['approved_term'] === 12, 'approved outside policy with conditions and override flag');
+$check(abs((float) $approved['monthly_payment'] - 288931.18) < 1 && abs((float) $approved['approved_rate'] - 0.023) < 1e-9, 'monthly payment is recalculated on the server');
+$check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_ticket WHERE id_ticket = ?', ['10821'])) === 1, 'decision is written to the case history');
+$contractHistory = $db->getResults('SELECT * FROM wp_jet_cct_historial_contrato_arrendamiento WHERE id_contrato = ?', ['7']);
+$check(count($contractHistory) === 1 && $contractHistory[0]['tipo_reporte'] === 'Crédito aprobado' && str_contains($contractHistory[0]['observacion'], 'fuera de política'), 'decision is written to the contract history');
+try {
+  $service->decide((int) $credit['id'], 'rechazado', ['note' => 'Intento repetido de decisión.'], $actor);
+  $check(false, 'a decided credit cannot be decided again');
+} catch (DomainException) {
+  $check(true, 'a decided credit cannot be decided again');
+}
+
+$service->syncFromQuote(575, 'Si', $actor);
+$second = $service->byQuote(575);
+$secondWork = $service->workspace((int) $second['id']);
+$failed = array_column(array_filter($secondWork['policies'], static fn(array $p): bool => !$p['ok']), 'key');
+$check(in_array('prestamos', $failed, true) && in_array('siniestro', $failed, true) && in_array('vigencia', $failed, true), 'second request flags active loan, siniestro and contract about to expire');
+$check(str_contains($secondWork['income_source'], 'Estimado') && abs($secondWork['evaluation']['deductions']['comision'] - 238000) < 1, 'without mandate the commission is estimated with IVA');
+try {
+  $service->decide((int) $second['id'], 'rechazado', ['note' => 'corto'], $actor);
+  $check(false, 'rejecting needs a reason');
+} catch (DomainException) {
+  $check(true, 'rejecting needs a reason');
+}
+$service->decide((int) $second['id'], 'rechazado', ['note' => 'Contrato siniestrado y con crédito vigente.'], $actor);
+$check($service->find((int) $second['id'])['status'] === 'rechazado', 'request is rejected');
+
+$service->changeStatus((int) $credit['id'], 'pagado', 'Se descontó la última cuota en el giro.', $actor);
+$check($service->find((int) $credit['id'])['status'] === 'pagado', 'approved credit can be marked as paid');
+$check(!in_array('prestamos', array_column(array_filter($service->workspace((int) $second['id'])['policies'], static fn(array $p): bool => !$p['ok']), 'key'), true), 'a paid credit no longer counts as an active loan');
+
+$db->insert('wp_jet_cct_cotizacion_mantenimiento', ['_ID' => 576, 'id_ticket' => '10823', 'contrato' => '817', 'id_contrato' => '7', 'total' => '100000', 'financiacion' => 'Si']);
+$service->syncFromQuote(576, 'Si', $actor);
+$service->syncFromQuote(576, 'No', $actor);
+$check($service->byQuote(576)['status'] === 'anulado', 'financing "No" annuls the pending request');
+$service->syncFromQuote(576, 'Si', $actor);
+$check($service->byQuote(576)['status'] === 'pendiente', 'financing "Sí" again reopens the annulled request');
+
+$report = $service->report([]);
+$check($report['totals']['count'] === 3 && $report['totals']['pagado'] === 1 && $report['totals']['rechazado'] === 1 && $report['totals']['approval_rate'] === 0.5, 'report counts credits by status and approval rate');
+$check(count($report['rows']) === 3 && $service->statusesForQuotes([574, 575, 999]) === [574 => 'pagado', 575 => 'rechazado'], 'quote cards read the credit status');
+
+echo "Owner credit flow checks passed.\n";

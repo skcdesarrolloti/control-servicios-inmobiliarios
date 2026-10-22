@@ -1213,6 +1213,13 @@ trait WorkflowCommandsConcern
       $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => $ticketPk]);
     }
     \SCM\Support\CurrentQuote::syncTicket($this->db, $ticketPk);
+    // Financiación "Sí" abre la solicitud en el liquidador de créditos; "No" anula la pendiente.
+    if ($updated > 0 && in_array(strtolower(trim($financiacion)), ['si', 'no'], true)) {
+      $credits = new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db, null, $this->schema);
+      foreach ($cotIds as $cotId) {
+        $credits->syncFromQuote((int) $cotId, $financiacion, ['employee_id' => (string) $employeeId, 'name' => $userName]);
+      }
+    }
 
     $ticketHistorySaved = $writeTicketHistory
       ? $this->insertCotizacionResponseTicketHistory($ticket, $ticketPk, $cotIds, $estado, $observacion, $motivo, $financiacion, $userId, $employeeId, $userName, $nowTs, $nowMysql)

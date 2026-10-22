@@ -38,5 +38,8 @@ final class QuotationFinancingService
       }
       $pdo->commit();
     } catch (\Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+    if ($old !== $value) {
+      (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db, null, $this->schema))->syncFromQuote($id, $value, $actor);
+    }
   }
 }

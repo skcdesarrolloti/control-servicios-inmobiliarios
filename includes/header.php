@@ -307,6 +307,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'metricas_servicios_publicos';
   } elseif (in_array($tabParam, ['metricas_crecimiento', 'crecimiento', 'scm-panel-metricas-crecimiento'], true)) {
     $current_page = 'metricas_crecimiento';
+  } elseif (in_array($tabParam, ['metricas_creditos', 'creditos', 'scm-panel-metricas-creditos'], true)) {
+    $current_page = 'metricas_creditos';
   } else {
     $current_page = empty($tabParam) ? 'inicio' : 'abiertos';
   }
@@ -641,6 +643,16 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=metricas_cotizaciones',
         'icon' => 'request_quote',
         'perms' => ['metricas_cotizaciones'],
+      ],
+      'metricas_creditos' => [
+        'key' => 'metricas_creditos',
+        'group' => 'Mantenimiento',
+        'group_icon' => 'build',
+        'label' => 'Créditos a propietarios',
+        'panel_id' => 'scm-panel-metricas-creditos',
+        'url' => $baseUrl . '/index.php?tab=metricas_creditos',
+        'icon' => 'payments',
+        'perms' => ['metricas_creditos'],
       ],
       'metricas_preventivas' => [
         'key' => 'metricas_preventivas',
