@@ -9877,15 +9877,21 @@
         // Algunas vistas no envían el bucket, así que el estado del caso también cuenta como cerrado.
         var isClosedCase =
           statusBucket === "cerrados" ||
-          ["cerrado", "cerrada", "finalizado", "finalizada"].indexOf(
+          ["cerrado", "cerrada", "finalizado", "finalizada", "resuelto", "resuelta"].indexOf(
             normalizeCaseActionState(btn.dataset.estado || ""),
+          ) !== -1;
+        // Estos temas no tienen una solución en sitio que firmar.
+        var tabWithoutCompletionAct =
+          ["entrega", "recibo", "contractual", "contable", "certificaciones"].indexOf(
+            normalizeCaseActionState(btn.dataset.tabKey || ""),
           ) !== -1;
 
         if (!isPublicPqr) {
           if (
             canUseDashboardAction("case_completion_act") &&
             !hasApprovedCaseQuote &&
-            !isClosedCase
+            !isClosedCase &&
+            !tabWithoutCompletionAct
           ) {
             complementaryActionButtons.push(
               '<button type="button" class="scm-case-work-btn" data-scm-open-ticket-acta>Acta de solución y firma</button>',
