@@ -150,9 +150,22 @@
         });
     }
 
-    function formatMoneyInput(input) {
-      var digits = String(input.value || "").replace(/[^\d]/g, "");
-      input.value = digits === "" ? "" : "$" + moneyFormat.format(Number(digits));
+    // Pesos colombianos: $1.250.000 (sin decimales). Al escribir se conserva el cursor contando dígitos.
+    function formatMoneyInput(input, keepCaret) {
+      var raw = String(input.value || "");
+      var caret = keepCaret && typeof input.selectionStart === "number" ? input.selectionStart : raw.length;
+      var digitsBefore = raw.slice(0, caret).replace(/[^\d]/g, "").length;
+      var digits = raw.replace(/[^\d]/g, "").replace(/^0+(?=\d)/, "");
+      var formatted = digits === "" ? "" : "$" + moneyFormat.format(Number(digits));
+      if (formatted === raw) return;
+      input.value = formatted;
+      if (!keepCaret) return;
+      var position = 0;
+      for (var seen = 0; position < formatted.length && seen < digitsBefore; position++) {
+        if (/\d/.test(formatted.charAt(position))) seen++;
+      }
+      if (digitsBefore === 0) position = formatted.charAt(0) === "$" ? 1 : 0;
+      input.setSelectionRange(position, position);
     }
 
     function loadReport(force) {
@@ -348,6 +361,7 @@
     });
 
     root.addEventListener("input", function (event) {
+      if (event.target.matches && event.target.matches("[data-owner-credit-money]:not([readonly])")) formatMoneyInput(event.target, true);
       var newCredit = event.target.closest && event.target.closest("[data-owner-credit-new-form]");
       if (newCredit && (event.target.name === "contract_end" || event.target.name === "term")) updateTermHint(newCredit);
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");

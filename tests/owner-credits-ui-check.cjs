@@ -43,16 +43,21 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   await page.waitForSelector('[data-sim]');
   calls = await page.evaluate(() => window.calls);
   const sim = calls.find(c => c.action === 'scm_owner_credit_simulate');
-  assert.equal(sim.credit_id, '12'); assert.equal(sim.amount, '1000000');
+  assert.equal(sim.credit_id, '12'); assert.equal(sim.amount, '$1.000.000');
   console.log('OK edits are simulated on the server with the credit id');
 
   await page.fill('[name="contract_end"]', '2028-05-31');
   await page.waitForFunction(() => window.calls.some(c => c.action === 'scm_owner_credit_simulate' && c.contract_end === '2028-05-31'));
   console.log('OK the contract end date is simulated before saving');
 
-  await page.locator('[name="amount"]').blur();
-  assert.equal(await page.inputValue('[name="amount"]'), '$1.000.000');
-  console.log('OK money inputs are formatted on blur');
+  await page.fill('[name="gross"]', '');
+  await page.type('[name="gross"]', '1250000');
+  assert.equal(await page.inputValue('[name="gross"]'), '$1.250.000');
+  await page.evaluate(() => { const i = document.querySelector('[name="gross"]'); i.setSelectionRange(2, 2); });
+  await page.keyboard.type('9');
+  assert.equal(await page.inputValue('[name="gross"]'), '$19.250.000');
+  assert.equal(await page.evaluate(() => document.querySelector('[name="gross"]').selectionStart), 3);
+  console.log('OK money inputs are formatted as Colombian pesos while typing and keep the caret');
 
   await page.fill('[name="note"]', 'Justificación de prueba suficiente.');
   await page.click('[data-owner-credit-decide="aprobado"]');
