@@ -20,7 +20,7 @@ use SCM\Support\SmsQueue;
  * interno `credito_propietario_solicitado`. El funcionario abre el liquidador, revisa las políticas (contrato
  * vigente, siniestro, préstamos activos, tope por ingreso neto, usura) y aprueba o rechaza; si aprueba
  * incumpliendo alguna política debe justificarlo. La decisión queda en el historial del crédito, del caso y
- * del contrato, se avisa al propietario según la configuración y al evento `credito_propietario_decidido`.
+ * del contrato y del inmueble, se avisa al propietario según la configuración y al evento `credito_propietario_decidido`.
  * Un crédito aprobado se marca después como pagado o se anula.
  */
 final class OwnerCreditService
@@ -511,7 +511,7 @@ final class OwnerCreditService
       . ((int) $credit['policy_override'] === 1 ? ' Aprobado fuera de política: ' . $credit['decision_note'] : ((string) $credit['decision_note'] !== '' ? ' ' . $credit['decision_note'] : ''));
   }
 
-  /** Historial del caso (si viene de una cotización) y del contrato. */
+  /** Historial del caso (si viene de una cotización), del contrato y del inmueble. */
   private function recordHistories(array $credit, string $type, string $message, array $actor): void
   {
     $employee = (string) ($actor['employee_id'] ?? '');
@@ -537,6 +537,19 @@ final class OwnerCreditService
           'fecha' => time(), 'tipo_reporte' => $type, 'observacion' => $message,
         ]);
         if ($row !== []) $this->db->insert($contractTable, $row);
+      }
+      // La misma gestión queda en el historial del inmueble, indicando el contrato.
+      $propertyTable = $this->db->table('jet_cct_historial_del_inmueble');
+      if ($contract !== null && $this->schema->tableExists($propertyTable)) {
+        $note = 'Contrato #' . trim((string) ($contract['contrato'] ?? $credit['contract_code'])) . ': ' . $message;
+        $row = $this->schema->filterTableData($propertyTable, [
+          'cct_status' => 'publish', 'cct_author_id' => $employee, 'cct_created' => $now, 'cct_modified' => $now,
+          'id_empleado' => $employee, 'funcionario' => (string) ($actor['name'] ?? ''), 'nombre_empleado' => (string) ($actor['name'] ?? ''),
+          'id_contrato' => (string) $contract['_ID'], 'contrato' => (string) ($contract['contrato'] ?? ''), 'inmueble' => (string) ($contract['inmueble'] ?? ''),
+          'id_inmueble' => (string) ($contract['id_inmueble'] ?? ''), 'id_inmueble_data' => (string) ($contract['id_inmueble_data'] ?? ''),
+          'fecha' => time(), 'tipo_reporte' => $type, 'tipo_de_reporte_his' => $type, 'observacion' => $note, 'observacion_his' => $note,
+        ]);
+        if ($row !== []) $this->db->insert($propertyTable, $row);
       }
     } catch (\Throwable $error) {
       error_log('[owner-credit-history] ' . $error->getMessage());
