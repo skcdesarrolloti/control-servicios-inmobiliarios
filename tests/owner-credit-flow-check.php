@@ -136,7 +136,7 @@ $check($report['totals']['count'] === 3 && $report['totals']['pagado'] === 1 && 
 $check(count($report['rows']) === 3 && $service->statusesForQuotes([574, 575, 999]) === [574 => 'pagado', 575 => 'rechazado'], 'quote cards read the credit status');
 
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
-$template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-funcionario-template.json'), true);
+$template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-funcionario-v2-template.json'), true);
 $check(str_contains($source, "'" . $template['name'] . "'") && substr_count($template['components'][0]['text'], '{{') === 6, 'staff template name and its six variables match the code');
 
 echo "Owner credit flow checks passed.\n";

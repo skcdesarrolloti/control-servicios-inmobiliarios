@@ -1,11 +1,11 @@
 {
-  "name": "scm_credito_propietario_funcionario_v1",
+  "name": "scm_credito_propietario_funcionario_v2",
   "language": "es_CO",
   "category": "UTILITY",
   "components": [
     {
       "type": "BODY",
-      "text": "Hola, {{1}}. Te escribimos desde el panel de SKC SuCasa Inmobiliaria con una novedad de créditos a propietarios.\n\nNovedad: {{2}} (crédito número {{3}}).\nContrato de arrendamiento: {{4}}.\nPropietario del inmueble: {{5}}.\nDetalle de la gestión: {{6}}.\n\nIngresa al panel desde el botón para revisar el liquidador, las políticas y la tabla de amortización del crédito.",
+      "text": "Hola, {{1}}. Hay una actualización en una solicitud registrada en el panel de servicios inmobiliarios.\n\nEstado: {{2}}.\nSolicitud número: {{3}}.\nContrato de arrendamiento: {{4}}.\nPropietario: {{5}}.\nDetalle: {{6}}.\n\nRevisa la solicitud desde el botón para continuar la gestión.",
       "example": {
         "body_text": [
           [

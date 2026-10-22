@@ -634,7 +634,7 @@ final class OwnerCreditService
   }
 
   /**
-   * WhatsApp a los funcionarios del evento interno (plantilla scm_credito_propietario_funcionario_v1),
+   * WhatsApp a los funcionarios del evento interno (plantilla scm_credito_propietario_funcionario_v2),
    * activable en la configuración de créditos. Un mensaje por celular.
    */
   private function notifyStaffWhatsapp(string $action, array $credit, string $event, string $detail): int
@@ -652,7 +652,7 @@ final class OwnerCreditService
         $values = [$clean($contact['name'] ?? 'Funcionario', 80), $clean($event, 60), (string) (int) $credit['id'], $clean($credit['contract_code'], 40), $clean($credit['owner_name'], 120), $clean($detail, 400)];
         $ok = $sms->enqueue((string) $contact['phone'], (string) ($contact['name'] ?? ''), $event . ' #' . $credit['id'] . ': ' . $detail, [
           'source_module' => $action, 'dedupe_key' => 'owner-credit-staff-wa:' . $action . ':' . $credit['id'] . ':' . $credit['status'] . ':' . $phone,
-          'template_name' => 'scm_credito_propietario_funcionario_v1', 'template_language' => 'es_CO',
+          'template_name' => 'scm_credito_propietario_funcionario_v2', 'template_language' => 'es_CO',
           'template_components' => [
             ['type' => 'body', 'parameters' => array_map(static fn(string $text): array => ['type' => 'text', 'text' => $text], $values)],
             ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $suffix]]],

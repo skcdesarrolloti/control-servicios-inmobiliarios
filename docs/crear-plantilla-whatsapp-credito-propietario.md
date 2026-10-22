@@ -45,24 +45,27 @@ Envía la plantilla a revisión y espera a que aparezca **Aprobada**. Después a
 
 Se envía a los **funcionarios elegidos en Notificaciones internas › Créditos a propietarios** en dos momentos: cuando llega una **solicitud de crédito** y cuando un crédito se **aprueba o rechaza**. El celular es el registrado para cada funcionario. Solo se envía si en **Configuración** de créditos está activo **WhatsApp al solicitar y al decidir**. El correo interno sale siempre.
 
-- Nombre exacto: `scm_credito_propietario_funcionario_v1`.
+- Nombre exacto: `scm_credito_propietario_funcionario_v2`.
 - Categoría: **Utilidad** (`UTILITY`).
-- Idioma: **Español (Colombia)** (`es_CO`).
+- Idioma: **Español (COL)** (`es_CO`). No uses English.
 - Variables: **numéricas**.
 - Encabezado: ninguno.
 - Pie de página: `SKC SuCasa Inmobiliaria`.
 
+La v1 fue reclasificada por Meta como **marketing** y ya no se usa. La v2 describe la actualización de una solicitud asignada en el panel, sin lenguaje de oferta ni promoción; no le agregues frases como "aprovecha", "oferta", "crédito preaprobado" o similares.
+
 ### Cuerpo para copiar
 
 ```text
-Hola, {{1}}. Te escribimos desde el panel de SKC SuCasa Inmobiliaria con una novedad de créditos a propietarios.
+Hola, {{1}}. Hay una actualización en una solicitud registrada en el panel de servicios inmobiliarios.
 
-Novedad: {{2}} (crédito número {{3}}).
+Estado: {{2}}.
+Solicitud número: {{3}}.
 Contrato de arrendamiento: {{4}}.
-Propietario del inmueble: {{5}}.
-Detalle de la gestión: {{6}}.
+Propietario: {{5}}.
+Detalle: {{6}}.
 
-Ingresa al panel desde el botón para revisar el liquidador, las políticas y la tabla de amortización del crédito.
+Revisa la solicitud desde el botón para continuar la gestión.
 ```
 
 ### Variables
@@ -85,4 +88,4 @@ Agrega un botón **Visitar sitio web** con:
 - URL: `https://sucasainmobiliaria.com.co/{{1}}`.
 - Ejemplo del sufijo: `control-servicios-inmobiliarios/public/index.php?tab=metricas_creditos`.
 
-Cuando Meta la marque como **Aprobada**, activa la opción en Configuración. La definición para la API está en `whatsapp-credito-propietario-funcionario-template.json`.
+Cuando Meta la marque como **Aprobada**, activa la opción en Configuración. La definición para la API está en `whatsapp-credito-propietario-funcionario-v2-template.json`.
