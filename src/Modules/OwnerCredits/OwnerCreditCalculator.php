@@ -75,7 +75,7 @@ final class OwnerCreditCalculator
     $requestedTerm = max(0, (int) $input['requested_term']);
     $usuryMonthly = (float) $settings['usury_annual'] / 12;
     $policyRate = (float) $settings['reference_rate'] * (1 - (float) $settings['policy_discount']);
-    $maxMonths = self::monthsUntil((int) $input['request_ts'], (int) $input['contract_end_ts']);
+    $maxMonths = max(0, self::monthsUntil((int) $input['request_ts'], (int) $input['contract_end_ts']));
     $maxAmount = $net * (int) $settings['income_months'];
     $exceedMonths = $maxMonths - $requestedTerm;
     $exceedAmount = $maxAmount - $requested;

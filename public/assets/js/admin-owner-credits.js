@@ -316,15 +316,6 @@
         });
         return;
       }
-      var saveEnd = form && target.closest("[data-owner-credit-save-end]");
-      if (saveEnd) {
-        var endValue = form.elements.contract_end ? form.elements.contract_end.value : "";
-        if (!endValue) { setStatus(form, "Indica la fecha fin del contrato.", "error"); return; }
-        askConfirm(saveEnd, "Se cambiará la fecha fin del contrato a " + endValue.split("-").reverse().join("/") + ". Queda en el historial del contrato y del inmueble.", function () {
-          runAction(form, "scm_owner_credit_contract_end", { contract_end: endValue });
-        });
-        return;
-      }
       var newForm = target.closest("[data-owner-credit-new-form]");
       if (newForm && target.closest("[data-owner-credit-search]")) { searchContracts(newForm); return; }
       var pick = newForm && target.closest("[data-owner-credit-pick]");
@@ -332,7 +323,7 @@
       if (newForm && target.closest("[data-owner-credit-unpick]")) { pickContract(newForm, null); return; }
       if (target.closest("[data-owner-credit-new]")) {
         post("scm_owner_credit_new_form", {})
-          .then(function (data) { showModal("Nuevo crédito", "Crédito sin cotización, a partir del contrato.", data.html || ""); })
+          .then(function (data) { showModal("Nueva solicitud de crédito", "Registra lo que pide el propietario; luego se evalúa y se aprueba o rechaza en el liquidador.", data.html || ""); })
           .catch(function (error) { window.alert(error.message); });
         return;
       }
@@ -366,7 +357,8 @@
     });
     root.addEventListener("change", function (event) {
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
-      if (form && event.target.tagName === "SELECT") simulate(form);
+      // Selects y fecha fin recalculan al cambiar (algunos navegadores no emiten "input" en fechas).
+      if (form && (event.target.tagName === "SELECT" || event.target.type === "date")) simulate(form);
     });
     root.addEventListener("focusout", function (event) {
       if (event.target.matches && event.target.matches("[data-owner-credit-money]:not([readonly])")) formatMoneyInput(event.target);

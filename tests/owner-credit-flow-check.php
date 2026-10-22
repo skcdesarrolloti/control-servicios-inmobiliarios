@@ -155,8 +155,9 @@ $newEnd = date('Y-m-d', strtotime('+3 years'));
 $simulated = $service->workspace((int) $pending['id'], ['requested_term' => '30', 'contract_end' => $newEnd]);
 $check($simulated['term_error'] === '' && $simulated['contract']['fin_ts'] !== $simulated['contract']['fin_saved_ts'], 'a corrected end date is simulated before saving');
 $check($db->getRow('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 7')['fin_contrato'] === $end, 'simulating does not touch the contract');
-$service->updateContractEnd((int) $pending['id'], $newEnd, $actor);
-$check($db->getRow('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 7')['fin_contrato'] === (string) strtotime($newEnd . ' 00:00:00'), 'the corrected end date is saved in the contract at midnight');
+$check(!method_exists($service, 'updateContractEnd'), 'the end date is no longer saved with a separate button');
+$service->decide((int) $pending['id'], 'rechazado', ['requested_term' => '30', 'contract_end' => $newEnd, 'note' => 'Se rechaza tras corregir la fecha fin.'], $actor);
+$check($db->getRow('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 7')['fin_contrato'] === (string) strtotime($newEnd . ' 00:00:00'), 'the corrected end date is saved in the contract at midnight when deciding');
 $endHistory = $db->getResults("SELECT observacion FROM wp_jet_cct_historial_contrato_arrendamiento WHERE tipo_reporte = 'Actualización de fecha fin'");
 $check(count($endHistory) === 1 && str_contains($endHistory[0]['observacion'], ' → ' . date('d/m/Y', strtotime($newEnd))), 'the end date change is written to the contract history with old and new dates');
 try {

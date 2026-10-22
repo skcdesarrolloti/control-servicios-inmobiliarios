@@ -379,20 +379,9 @@ final class OwnerCreditService
   }
 
   /**
-   * Corrige la fecha fin del contrato desde el liquidador (contratos renovados con la fecha desactualizada).
-   * Solo mientras el crédito está pendiente; queda en el historial del crédito, del caso, del contrato y del inmueble.
+   * Guarda en el contrato la fecha fin corregida en el liquidador; se llama al aprobar o rechazar (y al crear
+   * un crédito manual). Queda en el historial del crédito, del caso, del contrato y del inmueble.
    */
-  public function updateContractEnd(int $id, string $date, array $actor): int
-  {
-    $credit = $this->find($id);
-    if ($credit === null) throw new \DomainException('El crédito ya no existe.');
-    if ($credit['status'] !== 'pendiente') throw new \DomainException('La fecha fin solo se corrige mientras el crédito está pendiente.');
-    $ts = self::dateInput($date);
-    if ($ts <= 0) throw new \DomainException('Indica una fecha fin válida.');
-    $this->saveContractEnd($credit, $ts, $actor);
-    return $ts;
-  }
-
   private function saveContractEnd(array $credit, int $ts, array $actor): void
   {
     $contract = $this->contractById((int) $credit['contract_id']);
@@ -503,6 +492,12 @@ final class OwnerCreditService
   public function defaultIncome(array $contract): array
   {
     $canon = self::money($contract['valor_canon'] ?? '');
+    $letterCanon = $this->increasedCanon($contract);
+    $canonNote = '';
+    if ($letterCanon > $canon) {
+      $canonNote = ' Canon con el aumento de la carta #' . (int) $contract['id_carta_aumento_canon'] . ' ($' . number_format($letterCanon, 0, ',', '.') . '; el contrato dice $' . number_format($canon, 0, ',', '.') . ').';
+      $canon = $letterCanon;
+    }
     $deductions = array_fill_keys(array_keys(self::DEDUCTIONS), 0.0);
     $mandateId = (int) ($contract['id_contrato_mandato'] ?? 0);
     $mandateTable = $this->db->table('jet_cct_contrato_mandato');
@@ -513,12 +508,21 @@ final class OwnerCreditService
       $deductions['comision'] = self::money($mandate['total_comision'] ?? '');
       $deductions['garantia'] = self::isYes($mandate['incluye_garantia'] ?? '') ? self::money($mandate['precio_mes_garantia'] ?? '') : 0.0;
       $deductions['poliza_servicios'] = self::isYes($mandate['incluye_garantia_servicios'] ?? '') ? self::money($mandate['precio_mes_servicios'] ?? '') : 0.0;
-      return ['gross' => $canon, 'deductions' => $deductions, 'source' => 'Contrato de mandato #' . $mandateId];
+      return ['gross' => $canon, 'deductions' => $deductions, 'source' => 'Contrato de mandato #' . $mandateId . '.' . $canonNote];
     }
     // Sin mandato (o sin comisión registrada) se descuenta un porcentaje fijo del canon, configurable (15 % por defecto).
     $percent = (float) $this->config()['no_mandate_deduction'];
     $deductions['otros'] = round($canon * $percent);
-    return ['gross' => $canon, 'deductions' => $deductions, 'source' => 'Estimado: el contrato no tiene mandato con comisión registrada; se descuenta el ' . rtrim(rtrim(number_format($percent * 100, 2, ',', ''), '0'), ',') . ' % del canon. Corrige los descuentos si conoces los valores reales.'];
+    return ['gross' => $canon, 'deductions' => $deductions, 'source' => 'Estimado: el contrato no tiene mandato con comisión registrada; se descuenta el ' . rtrim(rtrim(number_format($percent * 100, 2, ',', ''), '0'), ',') . ' % del canon. Corrige los descuentos si conoces los valores reales.' . $canonNote];
+  }
+
+  /** Canon de la última carta de aumento de canon del contrato (0 si no hay). */
+  private function increasedCanon(array $contract): float
+  {
+    $letterId = (int) ($contract['id_carta_aumento_canon'] ?? 0);
+    $table = $this->db->table('jet_cct_cartas_aumento');
+    if ($letterId <= 0 || !$this->schema->tableExists($table) || !$this->schema->columnExists($table, 'canon')) return 0.0;
+    return self::money($this->db->getVar("SELECT `canon` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$letterId]) ?? '');
   }
 
   /** @return list<array{key:string,label:string,ok:bool,detail:string}> */

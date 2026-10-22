@@ -8,7 +8,7 @@ use SCM\Modules\Pending\PublicServicesUi as UI;
 
 /**
  * HTML del liquidador de créditos, de Métricas › Créditos a propietarios y de su configuración, con las
- * primitivas Tailwind del panel (PublicServicesUi). "Nuevo crédito" y "Configuración" se abren desde el
+ * primitivas Tailwind del panel (PublicServicesUi). "Solicitud de crédito" y "Configuración" se abren desde el
  * encabezado del panel.
  */
 final class OwnerCreditView
@@ -43,7 +43,7 @@ final class OwnerCreditView
       . '<div><h2 class="!sp-m-0 !sp-text-xl !sp-font-bold !sp-text-service-navy">Créditos a propietarios</h2><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">Solicitudes de financiación · Decisiones del liquidador · Cartera vigente por contrato</p></div></div>'
       . '<div class="!sp-text-right !sp-border-y-0 !sp-border-r-0 !sp-border-l !sp-border-solid !sp-border-slate-200 !sp-pl-4"><strong class="!sp-text-xl" data-owner-credit-count>0</strong><p class="!sp-m-0 !sp-text-[9px] !sp-uppercase !sp-text-service-muted">Créditos filtrados</p></div>'
       . '</header>'
-      . '<div class="' . $ui::CARD . ' !sp-p-5"><div class="!sp-flex !sp-flex-wrap !sp-justify-between !sp-items-center !sp-gap-2 !sp-pb-3 !sp-mb-4 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><h3 class="!sp-m-0 !sp-flex !sp-gap-2 !sp-items-center !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide">' . $ui::icon('filter') . 'Filtros · Créditos</h3><span class="!sp-text-[10px] !sp-text-service-muted">"Nuevo crédito" y su configuración están en el encabezado del panel</span></div>'
+      . '<div class="' . $ui::CARD . ' !sp-p-5"><div class="!sp-flex !sp-flex-wrap !sp-justify-between !sp-items-center !sp-gap-2 !sp-pb-3 !sp-mb-4 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><h3 class="!sp-m-0 !sp-flex !sp-gap-2 !sp-items-center !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide">' . $ui::icon('filter') . 'Filtros · Créditos</h3><span class="!sp-text-[10px] !sp-text-service-muted">"Solicitud de crédito" y su configuración están en el encabezado del panel</span></div>'
       . '<form data-owner-credit-filters autocomplete="off"><div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-4 !sp-gap-4">'
       . $field('Estado', '<select class="' . $ui::INPUT . '" name="status">' . $status . '</select>')
       . $field('Solicitado desde', '<input class="' . $ui::INPUT . '" type="date" name="from">')
@@ -105,7 +105,8 @@ final class OwnerCreditView
     $c = $work['conditions'];
     $editable = $credit['status'] === 'pendiente' && $canDecide;
     $lock = $editable ? '' : ' readonly';
-    $inputClass = $ui::INPUT . ($editable ? '' : ' ' . self::READONLY);
+    // Editables en blanco; de solo lectura en gris.
+    $inputClass = $editable ? UI::field('!sp-bg-white') : $ui::INPUT . ' ' . self::READONLY;
     $field = static fn(string $label, string $control, string $class = ''): string => '<label class="!sp-block' . ($class !== '' ? ' ' . $class : '') . '"><span class="' . $ui::LABEL . '">' . self::e($label) . '</span>' . $control . '</label>';
     $money = static fn(string $name, float $value): string => '<input class="' . $inputClass . '" name="' . $name . '" inputmode="numeric" data-owner-credit-money value="' . self::e(self::money($value)) . '"' . $lock . '>';
     $select = static fn(string $name, string $options): string => '<select class="' . $inputClass . '" name="' . $name . '"' . ($editable ? '' : ' disabled') . '>' . $options . '</select>';
@@ -115,7 +116,7 @@ final class OwnerCreditView
     $endTile = $editable
       ? '<div class="!sp-rounded-lg !sp-border !sp-border-solid !sp-border-service-yellow !sp-bg-amber-50/40 !sp-p-3"><span class="!sp-block !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted !sp-mb-1.5">Fin del contrato</span>'
         . '<input class="' . $ui::INPUT . ' !sp-h-8 !sp-bg-white" type="date" name="contract_end" value="' . ($contract['fin_ts'] > 0 ? date('Y-m-d', $contract['fin_ts']) : '') . '" aria-label="Fin del contrato">'
-        . '<button type="button" class="!sp-mt-1.5 !sp-p-0 !sp-bg-transparent !sp-border-0 !sp-text-[10px] !sp-font-semibold !sp-text-service-blue !sp-underline !sp-cursor-pointer" data-owner-credit-save-end>Guardar en el contrato</button></div>'
+        . '<span class="!sp-block !sp-mt-1.5 !sp-text-[10px] !sp-text-service-muted">Si la cambias, se guarda en el contrato al aprobar o rechazar.</span></div>'
       : self::tile('Fin del contrato', $contract['fin_ts'] > 0 ? date('d/m/Y', $contract['fin_ts']) : '—');
 
     $deductions = '';
@@ -140,7 +141,8 @@ final class OwnerCreditView
       . '</div></section>'
 
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('cash') . 'Ingreso del propietario</h4><p class="' . self::NOTE . ' !sp-mb-3">' . self::e($work['income_source']) . '</p>'
-      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">' . $field('Ingreso bruto (canon)', $money('gross', $ev['gross'])) . $deductions . '</div></section>'
+      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">' . $field('Ingreso bruto (canon)', $money('gross', $ev['gross'])) . $deductions . '</div>'
+      . ($editable ? '<p class="' . self::NOTE . ' !sp-mt-3">Puedes ajustar el canon (por ejemplo, si ya tuvo aumento) y los descuentos: solo cambian este crédito, no el contrato.</p>' : '') . '</section>'
 
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . $ui::icon('document') . 'Información de la solicitud</h4><div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">'
       . $field('Fecha de solicitud', '<input class="' . $ui::INPUT . ' ' . self::READONLY . '" value="' . date('d/m/Y', (int) $credit['created_at']) . '" readonly>')
@@ -183,7 +185,7 @@ final class OwnerCreditView
         . '<span class="!sp-min-w-0"><b class="!sp-block !sp-text-[11px] ' . ($policy['ok'] ? '!sp-text-service-navy' : '!sp-text-red-700') . '">' . self::e($policy['label']) . '</b><span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e($policy['detail']) . '</span></span></li>';
     }
     return ($termError !== '' ? self::alert($termError, 'bad') : '')
-      . ($endChanged ? self::alert('Estás simulando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Usa "Guardar en el contrato" o se guardará al decidir el crédito.', 'info') : '')
+      . ($endChanged ? self::alert('Estás calculando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Se guardará en el contrato al aprobar o rechazar el crédito.', 'info') : '')
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('chart') . 'Política de créditos</h4><div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">'
       . self::tile('Ingreso neto (INO)', self::money($ev['net_income']), 'key')
       . self::tile('Valor máximo a prestar', self::money($ev['max_amount']), 'key')
@@ -342,7 +344,7 @@ final class OwnerCreditView
       . $field('Destinación', '<select class="' . $ui::INPUT . '" name="purpose">' . $options . '</select>')
       . '</div><p class="' . self::NOTE . ' !sp-mt-3">El plazo no puede superar los meses que faltan para el fin del contrato. Si la fecha fin está desactualizada, corrígela aquí: se guardará en el contrato.</p>'
       . '<p class="!sp-m-0 !sp-mt-1 !sp-text-[11px] !sp-font-semibold" data-owner-credit-term-hint></p></section>'
-      . '<div class="!sp-flex !sp-items-center !sp-justify-end !sp-gap-3"><p class="!sp-m-0 !sp-text-[11px]" data-owner-credit-status role="status" aria-live="polite"></p><button type="submit" class="' . $ui::PRIMARY . '">' . $ui::icon('check', '!sp-w-3.5 !sp-h-3.5') . 'Crear y abrir liquidador</button></div></form>';
+      . '<div class="!sp-flex !sp-items-center !sp-justify-end !sp-gap-3"><p class="!sp-m-0 !sp-text-[11px]" data-owner-credit-status role="status" aria-live="polite"></p><button type="submit" class="' . $ui::PRIMARY . '">' . $ui::icon('check', '!sp-w-3.5 !sp-h-3.5') . 'Registrar solicitud y evaluar</button></div></form>';
   }
 
   public static function status(string $status): string

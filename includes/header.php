@@ -952,11 +952,11 @@ foreach ($rawNavItems as $k => $item) {
             type="button"
             id="btn-global-nuevo-credito"
             data-owner-credit-new
-            title="Nuevo crédito a propietario"
+            title="Registrar una solicitud de crédito de un propietario"
             class="scm-header-note-btn flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all active:scale-[0.98]"
           >
             <span class="material-symbols-outlined text-[18px]">payments</span>
-            <span class="hidden md:inline">Nuevo crédito</span>
+            <span class="hidden md:inline">Solicitud de crédito</span>
           </button>
 
           <!-- Menú Desplegable Configuración Operativa -->

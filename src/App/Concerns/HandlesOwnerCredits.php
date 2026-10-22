@@ -103,20 +103,7 @@ trait HandlesOwnerCredits
     }
   }
 
-  /** Guarda en el contrato la fecha fin corregida en el liquidador. */
-  public function ajax_handler_owner_credit_contract_end(): void
-  {
-    $this->verifyCsrf();
-    $this->requireDashboardAction('owner_credit_decide', 'Tu cargo no tiene permiso para corregir la fecha fin desde el liquidador.');
-    try {
-      $ts = $this->ownerCreditService()->updateContractEnd((int) ($_POST['credit_id'] ?? 0), sanitize_text_field(wp_unslash((string) ($_POST['contract_end'] ?? ''))), $this->ticketCompletionActor());
-      $this->jsonOk(['message' => 'Fecha fin del contrato actualizada a ' . date('d/m/Y', $ts) . '.']);
-    } catch (\Throwable $error) {
-      $this->ownerCreditFail($error, 'No se pudo actualizar la fecha fin.');
-    }
-  }
-
-  /** Búsqueda de contratos para "Nuevo crédito" (misma búsqueda de Crear caso). */
+  /** Búsqueda de contratos para "Solicitud de crédito" (misma búsqueda de Crear caso). */
   public function ajax_handler_owner_credit_contracts(): void
   {
     $this->verifyCsrf();
@@ -168,7 +155,7 @@ trait HandlesOwnerCredits
         $this->ticketCompletionActor(),
         sanitize_text_field(wp_unslash((string) ($_POST['contract_end'] ?? '')))
       );
-      $this->jsonOk(['credit_id' => $id, 'message' => 'Solicitud creada.']);
+      $this->jsonOk(['credit_id' => $id, 'message' => 'Solicitud registrada.']);
     } catch (\Throwable $error) {
       $this->ownerCreditFail($error, 'No se pudo crear el crédito.');
     }
@@ -198,7 +185,7 @@ trait HandlesOwnerCredits
     }
   }
 
-  /** Formulario de "Nuevo crédito" (no requiere permiso de configuración). */
+  /** Formulario de "Solicitud de crédito" (no requiere permiso de configuración). */
   public function ajax_handler_owner_credit_new_form(): void
   {
     $this->verifyCsrf();
