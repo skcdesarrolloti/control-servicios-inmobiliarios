@@ -14,8 +14,72 @@ const password = process.env.PDF_SERVICE_PASSWORD || '';
 // Actas can contain up to 12 verified photographs embedded as data URIs.
 const maxHtmlBytes = Math.max(8, Math.min(48, Number(process.env.PDF_MAX_HTML_MB) || 32)) * 1024 * 1024;
 const maxActiveJobs = 2;
+// Las peticiones que llegan con los 2 trabajos ocupados esperan turno en vez de fallar (el panel
+// reintentaba y los usuarios volvían a pulsar, multiplicando trabajos).
+const queueTimeoutMs = 25000;
+// Chromium se cierra tras este tiempo sin trabajo: sus procesos (navegador, GPU, red, renderizadores)
+// dejan de contar en el límite de procesos del hosting mientras no se generan PDF.
+const idleCloseMs = Math.max(15, Number(process.env.PDF_BROWSER_IDLE_SECONDS) || 60) * 1000;
+// Se reinicia cada cierto número de PDF para no acumular memoria ni procesos huérfanos.
+const recycleAfterPages = 50;
 let browser;
+// Lanzamiento en curso: dos PDF simultáneos sin navegador abrían dos Chromium y uno quedaba huérfano.
+let launching = null;
+let browserPages = 0;
+let idleTimer = null;
 let activeJobs = 0;
+const waiting = [];
+
+function acquireSlot() {
+  if (activeJobs < maxActiveJobs) {
+    activeJobs++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const entry = { resolve, timer: null };
+    entry.timer = setTimeout(() => {
+      const index = waiting.indexOf(entry);
+      if (index !== -1) waiting.splice(index, 1);
+      reject(new Error('Generador ocupado'));
+    }, queueTimeoutMs);
+    waiting.push(entry);
+  });
+}
+
+function releaseSlot() {
+  const next = waiting.shift();
+  if (next) {
+    clearTimeout(next.timer);
+    next.resolve();
+    return;
+  }
+  activeJobs--;
+  if (activeJobs !== 0) return;
+  // Reciclar solo sin trabajos en curso, para no cerrar un navegador que otro PDF está usando.
+  if (browserPages >= recycleAfterPages) closeBrowser('reciclado');
+  else scheduleIdleClose();
+}
+
+function scheduleIdleClose() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => { closeBrowser('inactivo'); }, idleCloseMs);
+}
+
+// Cierra el navegador y, si no responde, mata su proceso para no dejar hijos huérfanos.
+async function closeBrowser(reason) {
+  const current = browser;
+  browser = undefined;
+  browserPages = 0;
+  if (!current) return;
+  const child = current.process();
+  try {
+    await Promise.race([current.close(), new Promise((resolve) => setTimeout(resolve, 5000))]);
+  } catch {}
+  if (child && child.exitCode === null && !child.killed) {
+    try { child.kill('SIGKILL'); } catch {}
+  }
+  console.log(`Chromium cerrado (${reason}).`);
+}
 
 function errorDetails(error) {
   return error?.stack || error?.message || inspect(error, { depth: 4 });
@@ -40,7 +104,16 @@ function response(res, status, message) {
 }
 
 async function getBrowser() {
+  clearTimeout(idleTimer);
   if (browser && browser.connected) return browser;
+  if (!launching) {
+    launching = launchBrowser().finally(() => { launching = null; });
+  }
+  return launching;
+}
+
+async function launchBrowser() {
+  if (browser) await closeBrowser('desconectado');
   const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || await puppeteer.executablePath();
   if (process.platform === 'linux' && !process.env.PUPPETEER_EXECUTABLE_PATH) {
     for (const path of [executablePath, join(dirname(executablePath), 'chrome_crashpad_handler'), join(dirname(executablePath), 'chrome_sandbox')]) {
@@ -58,8 +131,15 @@ async function getBrowser() {
     // Avoid a localhost WebSocket: some hosted runtimes reject that connection.
     pipe: true,
     dumpio: process.env.PDF_BROWSER_DEBUG !== '0',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    // Menos procesos auxiliares: sin zygote, GPU, informes de fallos ni procesos por sitio.
+    args: [
+      '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--no-zygote', '--disable-gpu',
+      '--disable-extensions', '--disable-background-networking', '--disable-breakpad', '--disable-crash-reporter',
+      '--disable-component-update', '--no-first-run', '--renderer-process-limit=2',
+      '--disable-features=site-per-process,Translate,BackForwardCache,MediaRouter',
+    ],
   });
+  browser.on('disconnected', () => { if (browser && !browser.connected) closeBrowser('desconectado'); });
   return browser;
 }
 
@@ -100,8 +180,9 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
     try {
       const instance = await getBrowser();
+      if (activeJobs === 0) scheduleIdleClose();
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-      res.end(JSON.stringify({ ok: instance.connected }));
+      res.end(JSON.stringify({ ok: instance.connected, activeJobs, waiting: waiting.length }));
     } catch (error) {
       console.error(`Chromium no inició: ${errorDetails(error)}`);
       response(res, 503, 'Chromium no disponible');
@@ -117,15 +198,17 @@ const server = http.createServer(async (req, res) => {
     response(res, 401, 'No autorizado');
     return;
   }
-  if (activeJobs >= maxActiveJobs) {
+  try {
+    await acquireSlot();
+  } catch {
     response(res, 503, 'Generador ocupado');
     return;
   }
-  activeJobs++;
   let page;
   try {
     const html = await readHtml(req);
     page = await (await getBrowser()).newPage();
+    browserPages++;
     await page.setContent(html, { waitUntil: 'networkidle2', timeout: 20000 });
     await page.emulateMediaType('print');
     const pdf = await page.pdf({ format: 'A4', printBackground: true, preferCSSPageSize: true, displayHeaderFooter: false, timeout: 30000 });
@@ -136,7 +219,7 @@ const server = http.createServer(async (req, res) => {
     if (!res.headersSent) response(res, 500, 'No se pudo generar el PDF');
   } finally {
     if (page) await page.close().catch(() => {});
-    activeJobs--;
+    releaseSlot();
   }
 });
 
@@ -150,7 +233,7 @@ server.listen(port, '0.0.0.0', () => console.log(`SKC PDF renderer listening on 
 for (const signal of ['SIGTERM', 'SIGINT']) {
   process.on(signal, async () => {
     server.close();
-    if (browser) await browser.close().catch(() => {});
+    await closeBrowser(signal);
     process.exit(0);
   });
 }

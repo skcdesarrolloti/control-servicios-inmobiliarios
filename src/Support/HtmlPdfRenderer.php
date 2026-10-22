@@ -47,17 +47,35 @@ final class HtmlPdfRenderer
         return $fallback();
       }
       if ($remoteUrl !== '') {
-        $remotePdf = self::renderWithGotenberg($htmlPath, $remoteUrl);
-        if ($remotePdf !== null) {
-          return $remotePdf;
+        // El servicio remoto responde 503 cuando su cola está llena: se reintenta antes de usar Chromium local.
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+          $remotePdf = self::renderWithGotenberg($htmlPath, $remoteUrl, $remoteStatus);
+          if ($remotePdf !== null) {
+            return $remotePdf;
+          }
+          if ($remoteStatus !== 503) break;
+          sleep(3);
         }
       }
       if ($browser === null || !function_exists('proc_open')) {
         return $fallback();
       }
+      // Un solo Chromium local a la vez por servidor: cada uno abre varios procesos y en el hosting
+      // cuentan contra el límite de procesos. Los demás esperan su turno (hasta ~40 s).
+      $lock = @fopen(sys_get_temp_dir() . '/scm-chromium-render.lock', 'c');
+      $locked = false;
+      if ($lock !== false) {
+        for ($waited = 0; $waited < 40 && !($locked = flock($lock, LOCK_EX | LOCK_NB)); $waited++) sleep(1);
+      }
+      if (!$locked) {
+        if ($lock !== false) fclose($lock);
+        return $fallback();
+      }
       $command = [
-        $browser, '--headless', '--disable-gpu', '--no-sandbox', '--no-first-run',
-        '--disable-extensions', '--allow-file-access-from-files', '--no-pdf-header-footer',
+        $browser, '--headless', '--disable-gpu', '--no-sandbox', '--no-first-run', '--no-zygote',
+        '--disable-extensions', '--disable-background-networking', '--disable-breakpad', '--disable-crash-reporter',
+        '--renderer-process-limit=1', '--disable-features=site-per-process,Translate,MediaRouter',
+        '--allow-file-access-from-files', '--no-pdf-header-footer',
         '--virtual-time-budget=10000', '--user-data-dir=' . $directory . '/profile',
         '--print-to-pdf=' . $pdfPath, 'file:///' . str_replace('\\', '/', ltrim($htmlPath, '/')),
       ];
@@ -77,7 +95,8 @@ final class HtmlPdfRenderer
         usleep(100000);
       } while (microtime(true) < $deadline);
       if ($status['running']) {
-        proc_terminate($process);
+        // SIGKILL: un SIGTERM puede dejar vivos a los procesos hijos de Chromium.
+        proc_terminate($process, defined('SIGKILL') ? SIGKILL : 9);
       }
       stream_get_contents($pipes[1]);
       stream_get_contents($pipes[2]);
@@ -87,6 +106,10 @@ final class HtmlPdfRenderer
       $bytes = is_file($pdfPath) ? file_get_contents($pdfPath) : false;
       return is_string($bytes) && str_starts_with($bytes, '%PDF-') ? $bytes : $fallback();
     } finally {
+      if (isset($lock) && $lock !== false) {
+        if (!empty($locked)) flock($lock, LOCK_UN);
+        fclose($lock);
+      }
       if (is_dir($directory . '/profile')) {
         $files = new \RecursiveIteratorIterator(
           new \RecursiveDirectoryIterator($directory . '/profile', \FilesystemIterator::SKIP_DOTS),
@@ -103,8 +126,9 @@ final class HtmlPdfRenderer
     }
   }
 
-  private static function renderWithGotenberg(string $htmlPath, string $baseUrl): ?string
+  private static function renderWithGotenberg(string $htmlPath, string $baseUrl, ?int &$status = null): ?string
   {
+    $status = 0;
     if (!str_starts_with($baseUrl, 'https://') || !function_exists('curl_init')) {
       return null;
     }
@@ -125,7 +149,7 @@ final class HtmlPdfRenderer
       CURLOPT_RETURNTRANSFER => true,
       CURLOPT_FOLLOWLOCATION => false,
       CURLOPT_CONNECTTIMEOUT => 10,
-      CURLOPT_TIMEOUT => 55,
+      CURLOPT_TIMEOUT => 75,
       CURLOPT_HTTPHEADER => ['Accept: application/pdf'],
     ];
     if ($username !== '' && $password !== '') {
