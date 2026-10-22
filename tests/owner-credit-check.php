@@ -90,3 +90,15 @@ $assert(str_contains($html, 'Propietario &lt;b&gt;') && !str_contains($html, 'Pr
 $assert(str_contains($html, 'data-owner-credit-decide="aprobado"') && str_contains($html, 'justificación') && str_contains($html, 'Siniestrado'), 'liquidator shows decision buttons, failed policies and the siniestro flag');
 $readOnly = (new OwnerCreditView())->workspace($work, false, false);
 $assert(!str_contains($readOnly, 'data-owner-credit-decide') && str_contains($readOnly, ' readonly'), 'without permission the liquidator is read-only');
+
+// PDF interno: mismas secciones y estilos de las actas, con decisión y tabla de amortización.
+$pdfWork = $work;
+$pdfWork['credit'] += ['ticket_id' => '10821', 'address' => 'CL 31C 70-05', 'policy_override' => 0];
+$pdfWork['credit']['status'] = 'aprobado';
+$pdfWork['credit']['decided_by_name'] = 'Analista QA';
+$pdfWork['credit']['decided_at'] = strtotime('2026-10-22');
+$pdfHtml = \SCM\Modules\OwnerCredits\OwnerCreditPdf::html($pdfWork, 'Funcionario');
+$assert(\SCM\Modules\OwnerCredits\OwnerCreditPdf::title($pdfWork) === 'Crédito aprobado #9' && str_contains($pdfHtml, 'Documento interno para funcionarios'), 'credit PDF is titled by status and marked as internal');
+$assert(str_contains($pdfHtml, 'scm-acta-receipt-data') && str_contains($pdfHtml, 'Condiciones aprobadas') && str_contains($pdfHtml, 'Tabla de amortización') && substr_count($pdfHtml, '<tr><td>') >= 12, 'credit PDF uses the acta tables and lists every amortization row');
+$assert(str_contains($pdfHtml, 'Analista QA') && str_contains($pdfHtml, 'Propietario &lt;b&gt;'), 'credit PDF signs with the deciding employee and escapes data');
+$assert(is_readable(dirname(__DIR__) . '/public/assets/css/owner-credit-document.css'), 'credit PDF stylesheet exists');

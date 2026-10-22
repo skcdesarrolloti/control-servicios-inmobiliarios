@@ -76,6 +76,28 @@ trait HandlesOwnerCredits
     }
   }
 
+  /** PDF interno del crédito (solicitud, evaluación y decisión); solo funcionarios, no se envía al propietario. */
+  public function ajax_handler_owner_credit_pdf(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canViewOwnerCredits()) $this->jsonFail('No tienes permiso para ver créditos.');
+    try {
+      $id = (int) ($_POST['credit_id'] ?? 0);
+      $work = $this->ownerCreditService()->workspace($id);
+      $bytes = \SCM\Modules\OwnerCredits\OwnerCreditPdf::bytes($work, (string) ($this->ticketCompletionActor()['name'] ?? ''));
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo generar el PDF del crédito.');
+    }
+    if (ob_get_level() > 0) ob_end_clean();
+    header_remove('Content-Type');
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="credito-propietario-' . $id . '.pdf"');
+    header('Content-Length: ' . (string) strlen($bytes));
+    header('Cache-Control: private, max-age=0, must-revalidate');
+    echo $bytes;
+    exit;
+  }
+
   public function ajax_handler_owner_credit_simulate(): void
   {
     $this->verifyCsrf();

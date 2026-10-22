@@ -281,6 +281,38 @@
         });
     }
 
+    // PDF interno: se pide por POST (CSRF) y se muestra en un visor dentro del mismo popup.
+    function showPdf(form) {
+      var box = ensureModal();
+      var body = new FormData();
+      body.set("action", "scm_owner_credit_pdf");
+      body.set("nonce", runtime.nonce || "");
+      body.set("credit_id", form.getAttribute("data-credit-id") || "");
+      setStatus(form, "Generando PDF…", "");
+      return fetch(runtime.ajaxUrl || "", { method: "POST", body: body, credentials: "same-origin" })
+        .then(function (response) {
+          if ((response.headers.get("Content-Type") || "").indexOf("application/pdf") === -1) {
+            return response.json().then(function (json) { throw new Error((json && json.data && json.data.message) || "No se pudo generar el PDF."); });
+          }
+          return response.blob();
+        })
+        .then(function (blob) {
+          setStatus(form, "");
+          var url = URL.createObjectURL(blob);
+          var viewer = document.createElement("div");
+          viewer.className = "!sp-absolute !sp-inset-0 !sp-z-20 !sp-flex !sp-flex-col !sp-bg-white !sp-rounded-2xl !sp-overflow-hidden";
+          viewer.setAttribute("data-owner-credit-pdf-viewer", "");
+          viewer.innerHTML = '<div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-3 !sp-px-4 !sp-py-3 !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200 !sp-font-sans">' +
+            '<strong class="!sp-text-sm !sp-text-service-navy">PDF interno del crédito #' + escapeHtml(form.getAttribute("data-credit-id")) + "</strong>" +
+            '<div class="!sp-flex !sp-gap-2"><a class="' + UI.secondary + '" href="' + url + '" download="credito-propietario-' + escapeHtml(form.getAttribute("data-credit-id")) + '.pdf">Descargar</a>' +
+            '<button type="button" class="' + UI.primary + '" data-owner-credit-pdf-close>Volver al liquidador</button></div></div>' +
+            '<iframe class="!sp-flex-1 !sp-w-full !sp-border-0" title="PDF del crédito" src="' + url + '"></iframe>';
+          box.querySelector("[role=dialog]").appendChild(viewer);
+          viewer.querySelector("[data-owner-credit-pdf-close]").addEventListener("click", function () { viewer.remove(); URL.revokeObjectURL(url); });
+        })
+        .catch(function (error) { setStatus(form, error.message, "error"); window.alert(error.message); });
+    }
+
     // Las tarjetas muestran el estado del crédito en el botón; tras decidir se recargan los listados.
     function refreshQuoteButtons() {
       var panel = root.querySelector("#scm-panel-cotizaciones-mantenimiento");
@@ -313,6 +345,7 @@
         simulate(form);
         return;
       }
+      if (form && target.closest("[data-owner-credit-pdf]")) { showPdf(form); return; }
       var decide = form && target.closest("[data-owner-credit-decide]");
       if (decide) {
         var decision = decide.getAttribute("data-owner-credit-decide");

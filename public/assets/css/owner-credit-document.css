@@ -1,0 +1,16 @@
+/* PDF interno del crédito a propietario: complementa los estilos de las actas (public-services-document.css). */
+.scm-owner-credit-document .scm-owner-credit-policies td.is-ok{color:#176b43;font-weight:700;white-space:nowrap}
+.scm-owner-credit-document .scm-owner-credit-policies td.is-bad{color:#a61b1b;font-weight:700;white-space:nowrap}
+.scm-owner-credit-document .scm-owner-credit-policies th{text-align:left;width:32%}
+.scm-owner-credit-schedule{width:100%;border-collapse:collapse;font-size:12px}
+.scm-owner-credit-schedule th,.scm-owner-credit-schedule td{padding:6px 8px;border:1px solid #d7dde6;text-align:right}
+.scm-owner-credit-schedule th:first-child,.scm-owner-credit-schedule td:first-child{text-align:left}
+.scm-owner-credit-schedule thead th{background:#10264a;color:#fff;font-size:11px}
+.scm-owner-credit-schedule tbody tr:nth-child(even) td{background:#f6f8fa}
+.scm-owner-credit-keep{break-inside:avoid;page-break-inside:avoid}
+@media print{
+  .scm-owner-credit-schedule{font-size:9.5px}
+  .scm-owner-credit-schedule th,.scm-owner-credit-schedule td{padding:3px 6px}
+  .scm-owner-credit-schedule thead{display:table-header-group}
+  .scm-owner-credit-schedule tr{break-inside:avoid;page-break-inside:avoid}
+}
