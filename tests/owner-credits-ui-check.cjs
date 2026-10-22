@@ -25,6 +25,9 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
     window.fetch = (url, opts) => {
       const body = Object.fromEntries(opts.body.entries());
       window.calls.push(body);
+      if (body.action === 'scm_owner_credit_pdf') {
+        return new Promise(r => setTimeout(() => r({ headers: { get: () => 'application/pdf' }, blob: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })) }), 400));
+      }
       const data = body.action === 'scm_owner_credit_open' ? { title: 'Crédito #12 · Pendiente', html: workspace }
         : body.action === 'scm_owner_credit_simulate' ? { results_html: '<p data-sim>recalculado ' + body.amount + '</p>', schedule_html: '<p>tabla</p>' }
         : body.action === 'scm_owner_credit_decide' ? { message: 'Crédito aprobado.' } : {};
@@ -58,6 +61,15 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   assert.equal(await page.inputValue('[name="gross"]'), '$19.250.000');
   assert.equal(await page.evaluate(() => document.querySelector('[name="gross"]').selectionStart), 3);
   console.log('OK money inputs are formatted as Colombian pesos while typing and keep the caret');
+
+  await page.click('[data-owner-credit-pdf]');
+  await page.waitForSelector('[data-owner-credit-pdf-viewer]');
+  assert.match(await page.textContent('[data-owner-credit-pdf-viewer]'), /Generando PDF/);
+  assert.equal(await page.isDisabled('[data-owner-credit-pdf]'), true);
+  await page.waitForSelector('[data-owner-credit-pdf-viewer] iframe');
+  assert.equal(await page.isDisabled('[data-owner-credit-pdf]'), false);
+  await page.click('[data-owner-credit-pdf-close]');
+  console.log('OK Ver PDF shows "Generando PDF…" until the PDF arrives');
 
   await page.fill('[name="note"]', 'Justificación de prueba suficiente.');
   await page.click('[data-owner-credit-decide="aprobado"]');

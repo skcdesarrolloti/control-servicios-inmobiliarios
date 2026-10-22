@@ -8,7 +8,7 @@ La vista pública y el PDF usan `CompletionDocument`. El diseño sigue la refere
 - El renderer recibe las mismas hojas de estilo que la vista pública. Las fotografías se verifican contra su SHA-256 y se incluyen como imágenes embebidas; las fuentes del cuerpo y de la firma también se incluyen en el HTML enviado a Chromium. Esto evita letras en cuadrados en servidores sin fuentes del sistema. Este ajuste de fuentes se despliega con el panel PHP, sin cambios adicionales en la app Node.
 - Si la conversión falla, la transacción de firma/cierre se revierte. No se guarda una versión con diseño alternativo.
 - Los PDFs firmados originales se siguen validando con hash/HMAC y se devuelven sin regenerar, tanto al destinatario como al funcionario. El diseño nuevo aplica a las nuevas firmas.
-- Si se usa la app Node incluida en `pdf-renderer-node`, volver a desplegarla para aplicar el límite de HTML de 32 MiB, necesario para las fotografías embebidas de actas grandes. `PDF_MAX_HTML_MB` permite configurar entre 8 y 48 MiB. Conserva las credenciales existentes. Gotenberg debe aceptar un tamaño equivalente.
+- El servicio de PDF del VPS (`deploy/pdf-vps`) acepta HTML de hasta 64 MB (límite de Caddy; Gotenberg no limita), suficiente para las fotografías embebidas de actas grandes (probado con 30 MB).
 
 ## Mensajes
 

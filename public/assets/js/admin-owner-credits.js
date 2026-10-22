@@ -304,35 +304,70 @@
     }
 
     // PDF interno: se pide por POST (CSRF) y se muestra en un visor dentro del mismo popup.
-    function showPdf(form) {
+    // PDF interno: se pide por POST (CSRF) y se muestra en un visor dentro del mismo popup. El visor se abre
+    // de inmediato con "Generando PDF…" para que se note que está trabajando.
+    function showPdf(form, button) {
       var box = ensureModal();
+      var creditId = form.getAttribute("data-credit-id") || "";
+      var label = button ? button.innerHTML : "";
+      if (button) {
+        if (button.disabled) return;
+        button.disabled = true;
+        button.innerHTML = spinner() + "Generando PDF…";
+      }
+      var viewer = document.createElement("div");
+      viewer.className = "!sp-absolute !sp-inset-0 !sp-z-20 !sp-flex !sp-flex-col !sp-bg-white !sp-rounded-2xl !sp-overflow-hidden";
+      viewer.setAttribute("data-owner-credit-pdf-viewer", "");
+      viewer.innerHTML = '<div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-3 !sp-px-4 !sp-py-3 !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200 !sp-font-sans">' +
+        '<strong class="!sp-text-sm !sp-text-service-navy">PDF interno del crédito #' + escapeHtml(creditId) + "</strong>" +
+        '<div class="!sp-flex !sp-gap-2" data-owner-credit-pdf-actions><button type="button" class="' + UI.secondary + '" data-owner-credit-pdf-close>Volver al liquidador</button></div></div>' +
+        '<div class="!sp-flex-1 !sp-flex !sp-flex-col !sp-items-center !sp-justify-center !sp-gap-3 !sp-font-sans !sp-text-service-navy" data-owner-credit-pdf-body role="status" aria-live="polite">' +
+        spinner("!sp-w-8 !sp-h-8") + '<strong class="!sp-text-sm">Generando PDF…</strong><span class="' + UI.note + '">Suele tardar unos segundos.</span></div>';
+      box.querySelector("[role=dialog]").appendChild(viewer);
+      var url = "";
+      var closed = false;
+      var restore = function () {
+        if (!button) return;
+        button.disabled = false;
+        button.innerHTML = label;
+      };
+      viewer.querySelector("[data-owner-credit-pdf-close]").addEventListener("click", function () {
+        closed = true;
+        viewer.remove();
+        if (url) URL.revokeObjectURL(url);
+        restore();
+      });
       var body = new FormData();
       body.set("action", "scm_owner_credit_pdf");
       body.set("nonce", runtime.nonce || "");
-      body.set("credit_id", form.getAttribute("data-credit-id") || "");
-      setStatus(form, "Generando PDF…", "");
+      body.set("credit_id", creditId);
       return fetch(runtime.ajaxUrl || "", { method: "POST", body: body, credentials: "same-origin" })
         .then(function (response) {
           if ((response.headers.get("Content-Type") || "").indexOf("application/pdf") === -1) {
-            return response.json().then(function (json) { throw new Error((json && json.data && json.data.message) || "No se pudo generar el PDF."); });
+            return response.json().catch(function () { return null; }).then(function (json) { throw new Error((json && json.data && json.data.message) || "No se pudo generar el PDF."); });
           }
           return response.blob();
         })
         .then(function (blob) {
-          setStatus(form, "");
-          var url = URL.createObjectURL(blob);
-          var viewer = document.createElement("div");
-          viewer.className = "!sp-absolute !sp-inset-0 !sp-z-20 !sp-flex !sp-flex-col !sp-bg-white !sp-rounded-2xl !sp-overflow-hidden";
-          viewer.setAttribute("data-owner-credit-pdf-viewer", "");
-          viewer.innerHTML = '<div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-3 !sp-px-4 !sp-py-3 !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200 !sp-font-sans">' +
-            '<strong class="!sp-text-sm !sp-text-service-navy">PDF interno del crédito #' + escapeHtml(form.getAttribute("data-credit-id")) + "</strong>" +
-            '<div class="!sp-flex !sp-gap-2"><a class="' + UI.secondary + '" href="' + url + '" download="credito-propietario-' + escapeHtml(form.getAttribute("data-credit-id")) + '.pdf">Descargar</a>' +
-            '<button type="button" class="' + UI.primary + '" data-owner-credit-pdf-close>Volver al liquidador</button></div></div>' +
-            '<iframe class="!sp-flex-1 !sp-w-full !sp-border-0" title="PDF del crédito" src="' + url + '"></iframe>';
-          box.querySelector("[role=dialog]").appendChild(viewer);
-          viewer.querySelector("[data-owner-credit-pdf-close]").addEventListener("click", function () { viewer.remove(); URL.revokeObjectURL(url); });
+          restore();
+          if (closed) return;
+          url = URL.createObjectURL(blob);
+          viewer.querySelector("[data-owner-credit-pdf-actions]").insertAdjacentHTML("afterbegin", '<a class="' + UI.secondary + '" href="' + url + '" download="credito-propietario-' + escapeHtml(creditId) + '.pdf">Descargar</a>');
+          var area = viewer.querySelector("[data-owner-credit-pdf-body]");
+          area.className = "!sp-flex-1 !sp-flex";
+          area.removeAttribute("role");
+          area.innerHTML = '<iframe class="!sp-flex-1 !sp-w-full !sp-border-0" title="PDF del crédito" src="' + url + '"></iframe>';
         })
-        .catch(function (error) { setStatus(form, error.message, "error"); window.alert(error.message); });
+        .catch(function (error) {
+          restore();
+          if (closed) return;
+          var area = viewer.querySelector("[data-owner-credit-pdf-body]");
+          area.innerHTML = '<strong class="!sp-text-sm !sp-text-red-700">No se pudo generar el PDF</strong><span class="' + UI.note + '">' + escapeHtml(error.message) + "</span>";
+        });
+    }
+
+    function spinner(size) {
+      return '<svg class="' + (size || "!sp-w-3.5 !sp-h-3.5") + ' !sp-animate-spin" aria-hidden="true" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity=".25"></circle><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>';
     }
 
     // Las tarjetas muestran el estado del crédito en el botón; tras decidir se recargan los listados.
@@ -367,7 +402,7 @@
         simulate(form);
         return;
       }
-      if (form && target.closest("[data-owner-credit-pdf]")) { showPdf(form); return; }
+      if (form && target.closest("[data-owner-credit-pdf]")) { showPdf(form, target.closest("[data-owner-credit-pdf]")); return; }
       var decide = form && target.closest("[data-owner-credit-decide]");
       if (decide) {
         var decision = decide.getAttribute("data-owner-credit-decide");

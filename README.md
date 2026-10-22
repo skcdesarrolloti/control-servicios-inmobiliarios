@@ -29,9 +29,7 @@ Aplicación PHP para administrar tickets, mantenimientos, PQR, revisiones preven
 El PDF de cotización de mantenimiento se genera localmente aunque el servidor no tenga un navegador. Para conservar exactamente el diseño de la vista HTML, hay dos opciones:
 
 - En un servidor propio o VPS, instala Chromium, Google Chrome o Microsoft Edge. Si el ejecutable no está en una ruta estándar, configura `SCM_CHROMIUM_BIN` con su ruta absoluta.
-- En Hostinger Cloud, usa un servicio Gotenberg privado con Chromium en otro servidor. Configura `SCM_GOTENBERG_URL` con su dirección HTTPS, y `SCM_GOTENBERG_USERNAME` y `SCM_GOTENBERG_PASSWORD` si usa autenticación básica. La extensión PHP cURL debe estar habilitada.
-
-También puedes desplegar el [renderizador Node privado](pdf-renderer-node/README.md) en una aplicación web separada de Hostinger Cloud. Expone la misma ruta esperada por `SCM_GOTENBERG_URL` y verifica Chromium en `/health`.
+- En producción los PDF se generan en el VPS con Gotenberg (Chromium) detrás de Caddy con HTTPS: `https://pdfvps.sucasainmobiliaria.com.co`. Así los procesos de Chromium no cuentan en el límite del hosting compartido. Configura `SCM_GOTENBERG_URL`, `SCM_GOTENBERG_USERNAME` y `SCM_GOTENBERG_PASSWORD` en el `.env` (la extensión PHP cURL debe estar habilitada) y verifica con `php bin/check-pdf-service.php`. Instalación y operación: [deploy/pdf-vps](deploy/pdf-vps/README.md).
 
 Si Chromium o Gotenberg no están disponibles, la aplicación genera un PDF local con los datos, tablas y soportes JPG/PNG almacenados por el panel. No uses un servidor Gotenberg público para cotizaciones con datos de clientes.
 
