@@ -1,0 +1,40 @@
+{
+  "name": "scm_credito_propietario_funcionario_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola, {{1}}.\n\n{{2}} #{{3}}.\nContrato: {{4}}.\nPropietario: {{5}}.\nDetalle: {{6}}.\n\nPuedes revisarlo en el panel desde el botón.",
+      "example": {
+        "body_text": [
+          [
+            "Royner Guardo",
+            "Nueva solicitud de crédito",
+            "12",
+            "817",
+            "David Esquivia Polo",
+            "Solicita $893.723 para la cotización #574. Revísala en el liquidador"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Abrir créditos",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "control-servicios-inmobiliarios/public/index.php?tab=metricas_creditos"
+          ]
+        }
+      ]
+    }
+  ]
+}

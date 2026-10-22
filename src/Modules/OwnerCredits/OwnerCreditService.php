@@ -552,17 +552,25 @@ final class OwnerCreditService
       'El propietario ' . $credit['owner_name'] . ' solicitó financiar ' . $money . ' (contrato ' . $credit['contract_code'] . ', inmueble ' . $credit['property'] . ')'
       . ((int) $credit['quote_id'] > 0 ? ' para la cotización #' . $credit['quote_id'] . '.' : '.') . ' Revísalo en el liquidador de créditos.',
       'solicitado:' . $id);
+    $this->notifyStaffWhatsapp(self::EVENT_REQUESTED, $credit, 'Nueva solicitud de crédito',
+      'Solicita ' . $money . ((int) $credit['quote_id'] > 0 ? ' para la cotización #' . $credit['quote_id'] : '') . '. Revísala en el liquidador');
   }
 
-  /** @return array{email:int,whatsapp:int,internal:int} */
+  /** @return array{email:int,whatsapp:int,internal:int,internal_whatsapp:int} */
   private function notifyDecision(array $credit): array
   {
     $settings = $this->config();
     $approved = $credit['status'] === 'aprobado';
     $title = $approved ? 'Crédito aprobado' : 'Solicitud de crédito no aprobada';
     $summary = $this->decisionSummary($credit);
-    $queued = ['email' => 0, 'whatsapp' => 0, 'internal' => 0];
+    $queued = ['email' => 0, 'whatsapp' => 0, 'internal' => 0, 'internal_whatsapp' => 0];
     $queued['internal'] = $this->notifyInternal(self::EVENT_DECIDED, $title . ' #' . $credit['id'] . ' · contrato ' . $credit['contract_code'], $summary . ' Decidió: ' . $credit['decided_by_name'] . '.', 'decidido:' . $credit['id']);
+    $money = static fn($value): string => '$' . number_format((float) $value, 0, ',', '.');
+    $queued['internal_whatsapp'] = $this->notifyStaffWhatsapp(self::EVENT_DECIDED, $credit, $approved ? 'Crédito aprobado' : 'Crédito no aprobado',
+      ($approved
+        ? $money($credit['approved_amount']) . ' a ' . $credit['approved_term'] . ' meses, cuota ' . $money($credit['monthly_payment']) . ((int) $credit['policy_override'] === 1 ? ', fuera de política' : '')
+        : 'Motivo: ' . trim((string) $credit['decision_note']))
+      . '. Decidió ' . ($credit['decided_by_name'] ?: 'el panel'));
     try {
       if ($settings['notify_owner_email'] && filter_var($credit['owner_email'], FILTER_VALIDATE_EMAIL)) {
         $queued['email'] = (new EmailQueue($this->db))->enqueue([$credit['owner_email']], $title . ' · Contrato ' . $credit['contract_code'], EmailTemplate::render($title, $this->ownerEmailBody($credit)), [
@@ -621,6 +629,41 @@ final class OwnerCreditService
       ]);
     } catch (\Throwable $error) {
       error_log('[owner-credit-internal:' . $action . '] ' . $error->getMessage());
+      return 0;
+    }
+  }
+
+  /**
+   * WhatsApp a los funcionarios del evento interno (plantilla scm_credito_propietario_funcionario_v1),
+   * activable en la configuración de créditos. Un mensaje por celular.
+   */
+  private function notifyStaffWhatsapp(string $action, array $credit, string $event, string $detail): int
+  {
+    try {
+      if (!$this->config()['notify_staff_whatsapp']) return 0;
+      $base = parse_url((defined('SCM_BASE_URL') ? (string) SCM_BASE_URL : '') . '/index.php?tab=metricas_creditos');
+      $suffix = ltrim((string) ($base['path'] ?? ''), '/') . (isset($base['query']) ? '?' . $base['query'] : '');
+      $clean = static fn($value, int $limit): string => mb_substr(preg_replace('/\s+/u', ' ', trim((string) $value)) ?: 'Sin dato', 0, $limit);
+      $sms = new SmsQueue($this->db);
+      $sent = [];
+      foreach (InternalNotificationRecipients::contactsForAction($this->db, $action) as $contact) {
+        $phone = preg_replace('/\D+/', '', (string) ($contact['phone'] ?? '')) ?? '';
+        if ($phone === '' || isset($sent[$phone])) continue;
+        $values = [$clean($contact['name'] ?? 'Funcionario', 80), $clean($event, 60), (string) (int) $credit['id'], $clean($credit['contract_code'], 40), $clean($credit['owner_name'], 120), $clean($detail, 400)];
+        $ok = $sms->enqueue((string) $contact['phone'], (string) ($contact['name'] ?? ''), $event . ' #' . $credit['id'] . ': ' . $detail, [
+          'source_module' => $action, 'dedupe_key' => 'owner-credit-staff-wa:' . $action . ':' . $credit['id'] . ':' . $credit['status'] . ':' . $phone,
+          'template_name' => 'scm_credito_propietario_funcionario_v1', 'template_language' => 'es_CO',
+          'template_components' => [
+            ['type' => 'body', 'parameters' => array_map(static fn(string $text): array => ['type' => 'text', 'text' => $text], $values)],
+            ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $suffix]]],
+          ],
+          'credit_id' => (int) $credit['id'],
+        ]);
+        if ($ok) $sent[$phone] = true;
+      }
+      return count($sent);
+    } catch (\Throwable $error) {
+      error_log('[owner-credit-staff-wa:' . $action . '] ' . $error->getMessage());
       return 0;
     }
   }

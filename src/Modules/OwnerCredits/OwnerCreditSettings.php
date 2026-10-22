@@ -41,6 +41,7 @@ final class OwnerCreditSettings
       'default_term' => 12,
       'notify_owner_email' => true,
       'notify_owner_whatsapp' => false,
+      'notify_staff_whatsapp' => false,
     ];
   }
 
@@ -88,6 +89,7 @@ final class OwnerCreditSettings
       'default_term' => $int($input['default_term'] ?? null, $defaults['default_term'], 1, 60),
       'notify_owner_email' => $bool($input['notify_owner_email'] ?? null, $defaults['notify_owner_email']),
       'notify_owner_whatsapp' => $bool($input['notify_owner_whatsapp'] ?? null, $defaults['notify_owner_whatsapp']),
+      'notify_staff_whatsapp' => $bool($input['notify_staff_whatsapp'] ?? null, $defaults['notify_staff_whatsapp']),
     ];
   }
 

@@ -243,7 +243,9 @@ final class OwnerCreditView
       . '</div></section><section class="scm-maint-quote-section"><h4>Avisos al propietario al decidir</h4><div class="scm-maint-quote-grid">'
       . $field('Correo con condiciones y tabla', '<select name="notify_owner_email"><option value="1"' . ($settings['notify_owner_email'] ? ' selected' : '') . '>Sí</option><option value="0"' . ($settings['notify_owner_email'] ? '' : ' selected') . '>No</option></select>')
       . $field('WhatsApp', '<select name="notify_owner_whatsapp"><option value="1"' . ($settings['notify_owner_whatsapp'] ? ' selected' : '') . '>Sí</option><option value="0"' . ($settings['notify_owner_whatsapp'] ? '' : ' selected') . '>No</option></select>', 'Actívalo cuando Meta apruebe la plantilla scm_credito_propietario_decision_v1.')
-      . '</div><p class="scm-owner-credit-note">Los funcionarios que reciben aviso interno se configuran en Notificaciones internas › Créditos a propietarios.</p></section>'
+      . '</div></section><section class="scm-maint-quote-section"><h4>Avisos a funcionarios</h4><div class="scm-maint-quote-grid">'
+      . $field('WhatsApp al solicitar y al decidir', '<select name="notify_staff_whatsapp"><option value="1"' . ($settings['notify_staff_whatsapp'] ? ' selected' : '') . '>Sí</option><option value="0"' . ($settings['notify_staff_whatsapp'] ? '' : ' selected') . '>No</option></select>', 'Actívalo cuando Meta apruebe la plantilla scm_credito_propietario_funcionario_v1.')
+      . '</div><p class="scm-owner-credit-note">El correo interno siempre se envía. Los funcionarios que reciben correo y WhatsApp se eligen en Notificaciones internas › Créditos a propietarios.</p></section>'
       . '<div class="scm-cia-modal-status" data-owner-credit-status role="status" aria-live="polite"></div>'
       . '<div class="scm-public-services-review-actions"><button type="submit" class="scm-btn-primary">Guardar configuración</button></div></form>';
   }

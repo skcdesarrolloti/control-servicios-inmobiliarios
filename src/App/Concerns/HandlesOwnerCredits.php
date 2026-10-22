@@ -97,7 +97,7 @@ trait HandlesOwnerCredits
       $decision = sanitize_key((string) ($_POST['decision'] ?? ''));
       $result = $this->ownerCreditService()->decide((int) ($_POST['credit_id'] ?? 0), $decision, $this->ownerCreditInput(), $this->ticketCompletionActor());
       $q = $result['queued'];
-      $this->jsonOk(['message' => ($decision === 'aprobado' ? 'Crédito aprobado.' : 'Crédito rechazado.') . ' Correos al propietario: ' . $q['email'] . ', WhatsApp: ' . $q['whatsapp'] . ', internos: ' . $q['internal'] . '.']);
+      $this->jsonOk(['message' => ($decision === 'aprobado' ? 'Crédito aprobado.' : 'Crédito rechazado.') . ' Propietario: ' . $q['email'] . ' correo(s), ' . $q['whatsapp'] . ' WhatsApp. Funcionarios: ' . $q['internal'] . ' correo(s), ' . $q['internal_whatsapp'] . ' WhatsApp.']);
     } catch (\Throwable $error) {
       $this->ownerCreditFail($error, 'No se pudo guardar la decisión.');
     }
@@ -144,7 +144,7 @@ trait HandlesOwnerCredits
       if ($mode === 'save') {
         // Se parte de lo guardado para no perder los datos de la última sincronización.
         $input = OwnerCreditSettings::read(App::settings());
-        foreach (['usury_auto', 'usury_annual', 'usury_updated_at', 'reference_rate', 'policy_discount', 'no_mandate_deduction', 'income_months', 'min_remaining_months', 'default_term', 'notify_owner_email', 'notify_owner_whatsapp'] as $key) {
+        foreach (['usury_auto', 'usury_annual', 'usury_updated_at', 'reference_rate', 'policy_discount', 'no_mandate_deduction', 'income_months', 'min_remaining_months', 'default_term', 'notify_owner_email', 'notify_owner_whatsapp', 'notify_staff_whatsapp'] as $key) {
           if (isset($_POST[$key])) $input[$key] = sanitize_text_field(wp_unslash((string) $_POST[$key]));
         }
         $saved = OwnerCreditSettings::save(App::settings(), $input, Auth::userId());
