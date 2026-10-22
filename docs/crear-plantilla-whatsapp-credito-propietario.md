@@ -19,13 +19,13 @@ Selecciona el idioma **Español (COL)**, no English: el panel envía `es_CO`. Me
 ### Cuerpo para copiar
 
 ```text
-Buen día, {{1}}. Le escribimos de SKC SuCasa Inmobiliaria sobre la solicitud de crédito que realizó como propietario.
+Buen día, {{1}}.
 
-Su solicitud de crédito asociada al contrato de arrendamiento número {{3}} fue {{2}}.
+Su solicitud de crédito asociada al contrato #{{3}} fue {{2}}.
 
-Detalle: {{4}}.
+{{4}}.
 
-Le enviamos el detalle completo al correo registrado. Si tiene preguntas, puede responder este mensaje o comunicarse con nuestro equipo.
+El detalle completo llegó a su correo.
 ```
 
 ### Variables
