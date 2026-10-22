@@ -3,6 +3,10 @@ use SCM\Modules\Pending\PublicServicesUi as UI;
 use SCM\Modules\Pending\PublicServicesWorkspace;
 $e = [SCM\Modules\Pending\PublicServicesDocument::class, 'e'];
 $months = [1=>'Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+$currentYear = (int) date('Y');
+$selectedYear = (int) ($filters['anio'] ?? $currentYear);
+$years = range($currentYear - 2, $currentYear + 2);
+if ($selectedYear > 0 && !in_array($selectedYear, $years, true)) { $years[] = $selectedYear; sort($years); }
 ?>
 <div class="!sp-font-sans !sp-text-service-navy !sp-bg-service-background !sp-p-3 sm:!sp-p-5 !sp-space-y-5" data-services-ui>
   <header class="<?= UI::CARD ?> !sp-p-5 !sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-4">
@@ -15,8 +19,9 @@ $months = [1=>'Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto',
     <div class="<?= UI::CARD ?> !sp-p-5">
       <div class="!sp-flex !sp-justify-between !sp-items-center !sp-pb-3 !sp-mb-4 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><h3 class="!sp-m-0 !sp-flex !sp-gap-2 !sp-items-center !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide"><?= UI::icon('filter') ?>Filtros de búsqueda avanzada</h3><span class="!sp-text-[10px] !sp-text-service-muted" data-services-filter-count><?= $e($count) ?> contratos encontrados</span></div>
       <form method="post" autocomplete="off" id="rsp_form">
-        <div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-5 !sp-gap-4">
+        <div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-6 !sp-gap-4">
           <label><span class="<?= UI::LABEL ?>">Mes de vencimiento</span><select class="<?= UI::INPUT ?>" id="rsp_mes" name="rsp_mes"><option value="0">Todos</option><?php foreach($months as $m=>$name): ?><option value="<?= $m ?>" <?= (int)($filters['mes']??0)===$m?'selected':'' ?>><?= $name ?></option><?php endforeach ?></select></label>
+          <label><span class="<?= UI::LABEL ?>">Año de vencimiento</span><select class="<?= UI::INPUT ?>" id="rsp_anio" name="rsp_anio" data-default="<?= $currentYear ?>"><option value="0" <?= $selectedYear===0?'selected':'' ?>>Todos</option><?php foreach($years as $y): ?><option value="<?= $y ?>" <?= $selectedYear===$y?'selected':'' ?>><?= $y ?></option><?php endforeach ?></select></label>
           <?php foreach(['inmueble'=>['Inmueble','Ej: 10156'],'propietario'=>['Propietario','Buscar por nombre...'],'arrendatario'=>['Arrendatario','Buscar por nombre...'],'contrato'=>['Contrato','Código contrato...']] as $key=>$field): ?>
           <label><span class="<?= UI::LABEL ?>"><?= $field[0] ?></span><input type="text" class="<?= UI::INPUT ?>" id="rsp_<?= $key ?>" name="rsp_<?= $key ?>" value="<?= $e($filters[$key]??'') ?>" placeholder="<?= $field[1] ?>"></label>
           <?php endforeach ?>

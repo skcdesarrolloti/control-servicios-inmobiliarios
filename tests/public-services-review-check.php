@@ -76,7 +76,7 @@ $assert((int) $contract['ultima_revision_servicios'] === 1700000000 && (int) $co
 $assert((int) $db->getVar("SELECT COUNT(*) FROM `{$reviewTable}`") === 0 && (int) $db->getVar("SELECT COUNT(*) FROM `{$queueTable}`") === 0, 'configuration creates neither reviews nor emails');
 $history = $db->getRow("SELECT * FROM `{$historyTable}` ORDER BY `_ID` DESC LIMIT 1");
 $assert($history['id_empleado'] === '94001' && $history['funcionario'] === 'Funcionario autenticado QA', 'configuration history ignores forged actor fields');
-$listing = $controller->buildServiciosPublicosPayload([]);
+$listing = $controller->buildServiciosPublicosPayload(['rsp_anio'=>'0']);
 $assert($listing['count'] === 1 && count($listing['configuration_items']) === 1, 'configured contract moves into review list');
 $assert(empty($service->saveServiciosPublicosConfiguration(90001, [])['ok']), 'stale form cannot silently clear configuration');
 $assert(empty($service->saveServiciosPublicosConfiguration(90001, array_replace($input, ['servicios_configurados' => ['invalid']]))['ok']), 'unknown configured service rejected');

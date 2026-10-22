@@ -279,7 +279,8 @@
                   i.value = '';
                 });
                 form.querySelectorAll('select').forEach(function(s) {
-                  s.selectedIndex = 0;
+                  if (s.hasAttribute('data-default')) s.value = s.getAttribute('data-default');
+                  else s.selectedIndex = 0;
                 });
                 var pageInput = form.querySelector('input[name="' + prefix + 'page"]');
                 if (pageInput) pageInput.value = '1';

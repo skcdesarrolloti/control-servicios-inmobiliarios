@@ -5986,6 +5986,7 @@ trait RendersDashboard
 
     return [
       'mes' => $clean($input[$prefix . 'mes'] ?? ''),
+      'anio' => $clean($input[$prefix . 'anio'] ?? date('Y')),
       'empleado' => $clean($input[$prefix . 'id_empleado'] ?? ''),
       'tuvo' => $clean($input[$prefix . 'tuvo_preventiva'] ?? ''),
       'inmueble' => $clean($input[$prefix . 'inmueble'] ?? ''),

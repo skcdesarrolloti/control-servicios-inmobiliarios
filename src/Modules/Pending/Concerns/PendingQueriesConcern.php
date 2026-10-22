@@ -163,6 +163,7 @@ trait PendingQueriesConcern
     $nowTs = time();
     $year = (int) date('Y', $nowTs);
     $fMes = max(0, min(12, (int) ($filters['mes'] ?? 0)));
+    $fAnio = max(0, (int) ($filters['anio'] ?? 0));
 
     $items = [];
     $configurationItems = [];
@@ -200,6 +201,9 @@ trait PendingQueriesConcern
       if ($fMes > 0 && $fMes !== $dueMonth) {
         continue;
       }
+      if ($fAnio > 0 && ($dueTs <= 0 || $fAnio !== (int) date('Y', $dueTs))) {
+        continue;
+      }
 
       $items[] = [
         'row' => $row,
@@ -228,7 +232,7 @@ trait PendingQueriesConcern
       $items = array_map($decorate, $items);
       $configurationItems = array_map($decorate, $configurationItems);
     }
-    $corte = (string) $year . ($fMes > 0 ? (' — ' . ($months[$fMes] ?? (string) $fMes)) : '');
+    $corte = ($fAnio > 0 ? (string) $fAnio : 'Todos los años') . ($fMes > 0 ? (' — ' . ($months[$fMes] ?? (string) $fMes)) : '');
 
     return [
       'items' => $items,
