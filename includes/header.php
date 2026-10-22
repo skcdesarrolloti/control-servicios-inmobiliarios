@@ -947,6 +947,18 @@ foreach ($rawNavItems as $k => $item) {
             <span class="hidden md:inline">Añadir nota al contrato</span>
           </button>
 
+          <!-- Crédito a propietario sin cotización (liquidador de créditos); se oculta sin el permiso owner_credit_manage -->
+          <button
+            type="button"
+            id="btn-global-nuevo-credito"
+            data-owner-credit-new
+            title="Nuevo crédito a propietario"
+            class="scm-header-note-btn flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all active:scale-[0.98]"
+          >
+            <span class="material-symbols-outlined text-[18px]">payments</span>
+            <span class="hidden md:inline">Nuevo crédito</span>
+          </button>
+
           <!-- Menú Desplegable Configuración Operativa -->
           <div class="relative" id="global-config-menu-container">
             <button
@@ -1023,6 +1035,16 @@ foreach ($rawNavItems as $k => $item) {
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">shield_person</span>
                   <span>Configuración de Guardian</span>
+                </button>
+                <button
+                  type="button"
+                  data-scm-config-action="owner-credit-settings"
+                  data-owner-credit-settings
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">payments</span>
+                  <span>Créditos a propietarios</span>
                 </button>
                 <button
                   type="button"

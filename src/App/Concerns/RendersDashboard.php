@@ -1400,7 +1400,7 @@ trait RendersDashboard
         <?php endif; ?>
         <?php if (in_array('metricas_creditos', $dashboardAllowedTabs, true)): ?>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-metricas-creditos' ? ' active' : ''; ?>" id="scm-panel-metricas-creditos" data-permission-tab="metricas_creditos" data-scm-loaded="0">
-          <?php echo (new \SCM\Modules\OwnerCredits\OwnerCreditView())->shell($this->canUseDashboardAction('owner_credit_manage'), $this->canUseDashboardAction('owner_credit_configure')); ?>
+          <?php echo (new \SCM\Modules\OwnerCredits\OwnerCreditView())->shell(); ?>
         </div>
         <?php endif; ?>
       <?php endif; ?>

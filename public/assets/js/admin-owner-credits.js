@@ -5,6 +5,13 @@
   // listado con totales, nuevo crédito manual y configuración. Todos los cálculos se hacen en el
   // servidor (scm_owner_credit_simulate); aquí solo se envía el formulario y se pinta el HTML.
   var moneyFormat = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
+  // Mismas primitivas Tailwind del panel (PublicServicesUi); este archivo está en tailwind.services.config.js.
+  var UI = {
+    primary: "!sp-inline-flex !sp-items-center !sp-justify-center !sp-gap-2 !sp-px-4 !sp-py-2.5 !sp-rounded-lg !sp-bg-service-yellow !sp-text-service-navy !sp-border !sp-border-solid !sp-border-service-yellow !sp-text-xs !sp-font-semibold !sp-font-sans !sp-cursor-pointer hover:!sp-bg-amber-300",
+    secondary: "!sp-inline-flex !sp-items-center !sp-justify-center !sp-gap-2 !sp-px-3 !sp-py-2 !sp-rounded-lg !sp-bg-white !sp-text-service-navy !sp-border !sp-border-solid !sp-border-slate-300 !sp-text-xs !sp-font-medium !sp-font-sans !sp-cursor-pointer hover:!sp-bg-slate-50",
+    note: "!sp-m-0 !sp-text-[11px] !sp-text-service-muted",
+    tones: { error: " !sp-text-red-700 !sp-font-semibold", success: " !sp-text-emerald-700 !sp-font-semibold", "": "" },
+  };
 
   function init(root) {
     var core = window.SCMAdminCore;
@@ -43,11 +50,15 @@
       modal.setAttribute("data-owner-credit-modal", "");
       modal.innerHTML =
         '<div class="scm-cia-modal-backdrop" data-owner-credit-dismiss></div>' +
-        '<section class="scm-cia-modal-panel" role="dialog" aria-modal="true" aria-labelledby="scm-owner-credit-title">' +
-        '<header><div><span class="scm-eyebrow">Liquidador de créditos</span><h3 id="scm-owner-credit-title" data-owner-credit-title>Crédito</h3>' +
-        '<p data-owner-credit-subtitle>Simulador de créditos a propietarios.</p></div>' +
-        '<button type="button" class="scm-cia-modal-close" data-owner-credit-dismiss aria-label="Cerrar">&times;</button></header>' +
-        '<div data-owner-credit-body style="display:contents"></div></section>';
+        '<section tabindex="-1" class="!sp-relative !sp-outline-none !sp-flex !sp-flex-col !sp-w-[min(1240px,calc(100vw-24px))] !sp-max-h-[94vh] !sp-overflow-hidden !sp-rounded-2xl !sp-bg-service-background !sp-border !sp-border-solid !sp-border-slate-200 !sp-shadow-2xl !sp-font-sans" role="dialog" aria-modal="true" aria-labelledby="scm-owner-credit-title">' +
+        '<header class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-4 !sp-px-4 sm:!sp-px-6 !sp-py-4 !sp-bg-white !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200">' +
+        '<div class="!sp-flex !sp-items-center !sp-gap-3 !sp-min-w-0"><span class="!sp-p-2.5 !sp-bg-amber-50 !sp-rounded-xl !sp-border !sp-border-solid !sp-border-amber-200 !sp-text-service-navy">' +
+        '<svg class="!sp-w-5 !sp-h-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v10H3V7zm9 2.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 1 0 0-5zM6 10v4m12-4v4"></path></svg></span>' +
+        '<div class="!sp-min-w-0"><p class="!sp-m-0 !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Liquidador de créditos</p>' +
+        '<h3 id="scm-owner-credit-title" class="!sp-m-0 !sp-text-lg !sp-font-bold !sp-text-service-navy" data-owner-credit-title>Crédito</h3>' +
+        '<p class="!sp-m-0 !sp-text-[11px] !sp-text-service-muted" data-owner-credit-subtitle>Simulador de créditos a propietarios.</p></div></div>' +
+        '<button type="button" class="!sp-flex !sp-items-center !sp-justify-center !sp-w-9 !sp-h-9 !sp-rounded-full !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-service-navy !sp-text-lg !sp-cursor-pointer hover:!sp-bg-slate-50" data-owner-credit-dismiss aria-label="Cerrar">&times;</button></header>' +
+        '<div class="!sp-flex !sp-flex-col !sp-flex-1 !sp-min-h-0" data-owner-credit-body></div></section>';
       root.appendChild(modal);
       // Si el popup de cotizaciones del caso (SweetAlert) sigue abierto detrás, sus atajos de teclado
       // (Tab, Escape) no deben recibir lo que se escribe aquí: Escape cierra solo el liquidador.
@@ -69,8 +80,8 @@
       box.querySelector("[data-owner-credit-body]").innerHTML = html;
       box.hidden = false;
       document.body.classList.add("scm-cia-modal-open");
-      var first = box.querySelector("input:not([readonly]), select:not([disabled]), textarea, button");
-      if (first) first.focus();
+      // El foco va al diálogo (no al botón cerrar): Tab recorre el formulario desde el inicio.
+      box.querySelector("[role=dialog]").focus();
     }
 
     function closeModal() {
@@ -82,18 +93,27 @@
     function setStatus(form, message, tone) {
       var status = form && form.querySelector("[data-owner-credit-status]");
       if (!status) return;
+      if (!status.hasAttribute("data-base-class")) status.setAttribute("data-base-class", status.className);
       status.textContent = message || "";
-      status.className = "scm-cia-modal-status" + (tone ? " is-" + tone : "");
+      status.className = status.getAttribute("data-base-class") + (UI.tones[tone || ""] || "");
+    }
+
+    function message(text, tone) {
+      return '<p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs ' + (tone === "error" ? "!sp-text-red-700 !sp-font-semibold" : "!sp-text-service-muted") + '">' + escapeHtml(text) + "</p>";
+    }
+
+    function setLoading(element, loading) {
+      if (element) element.style.opacity = loading ? "0.55" : "";
     }
 
     function openCredit(params) {
-      showModal("Cargando…", "Preparando el liquidador.", '<p class="scm-owner-credit-note" style="padding:24px">Cargando crédito…</p>');
+      showModal("Cargando…", "Preparando el liquidador.", message("Cargando crédito…"));
       return post("scm_owner_credit_open", params)
         .then(function (data) {
           showModal(data.title || "Crédito", "Datos del contrato, políticas, condiciones y tabla de amortización.", data.html || "");
         })
         .catch(function (error) {
-          showModal("No se pudo abrir", "", '<p class="scm-owner-credit-note is-bad" style="padding:24px">' + escapeHtml(error.message) + "</p>");
+          showModal("No se pudo abrir", "", message(error.message, "error"));
         });
     }
 
@@ -113,8 +133,8 @@
       var seq = ++simulateSeq;
       var results = form.querySelector("[data-owner-credit-results]");
       var schedule = form.querySelector("[data-owner-credit-schedule]");
-      if (results) results.classList.add("is-loading");
-      if (schedule) schedule.classList.add("is-loading");
+      setLoading(results, true);
+      setLoading(schedule, true);
       post("scm_owner_credit_simulate", formData(form))
         .then(function (data) {
           if (seq !== simulateSeq) return;
@@ -125,8 +145,8 @@
         .catch(function (error) { if (seq === simulateSeq) setStatus(form, error.message, "error"); })
         .then(function () {
           if (seq !== simulateSeq) return;
-          if (results) results.classList.remove("is-loading");
-          if (schedule) schedule.classList.remove("is-loading");
+          setLoading(results, false);
+          setLoading(schedule, false);
         });
     }
 
@@ -141,14 +161,20 @@
       var target = reportModule.querySelector("[data-owner-credit-report]");
       var filters = reportModule.querySelector("[data-owner-credit-filters]");
       reportModule.setAttribute("data-scm-loaded", "1");
-      if (target) target.classList.add("is-loading");
+      setLoading(target, true);
       post("scm_owner_credit_report", filters ? new FormData(filters) : {})
-        .then(function (data) { if (target) target.innerHTML = data.html || ""; })
+        .then(function (data) {
+          if (!target) return;
+          target.innerHTML = data.html || "";
+          var total = target.querySelector("[data-owner-credit-total]");
+          var count = reportModule.querySelector("[data-owner-credit-count]");
+          if (count && total) count.textContent = total.getAttribute("data-owner-credit-total");
+        })
         .catch(function (error) {
           reportModule.setAttribute("data-scm-loaded", "0");
-          if (target) target.innerHTML = '<p class="scm-owner-credits-empty">' + escapeHtml(error.message) + "</p>";
+          if (target) target.innerHTML = message(error.message, "error");
         })
-        .then(function () { if (target) target.classList.remove("is-loading"); });
+        .then(function () { setLoading(target, false); });
     }
 
     // Nuevo crédito sin cotización: se busca el contrato (como en Crear caso) y luego se piden los datos.
@@ -164,8 +190,8 @@
           var contracts = data.contracts || [];
           status.textContent = contracts.length ? contracts.length + " resultado(s). Selecciona el contrato." : "No se encontraron contratos. Revisa el dato o cambia el tipo de búsqueda.";
           results.innerHTML = contracts.map(function (c) {
-            return '<button type="button" class="scm-owner-credit-result" data-owner-credit-pick data-contract="' + escapeHtml(JSON.stringify(c)) + '">' +
-              "<strong>Contrato " + escapeHtml(c.contrato) + " · SIMI " + escapeHtml(c.inmueble) + "</strong>" +
+            return '<button type="button" class="!sp-grid !sp-gap-0.5 !sp-w-full !sp-p-3 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-left !sp-font-sans !sp-text-[11px] !sp-text-service-muted !sp-cursor-pointer hover:!sp-border-service-yellow hover:!sp-bg-amber-50/40 focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow" data-owner-credit-pick data-contract="' + escapeHtml(JSON.stringify(c)) + '">' +
+              '<strong class="!sp-text-xs !sp-text-service-navy">Contrato ' + escapeHtml(c.contrato) + " · SIMI " + escapeHtml(c.inmueble) + "</strong>" +
               "<span>" + escapeHtml(c.direccion) + " · " + escapeHtml(c.estado) + (c.fin ? " · Fin " + escapeHtml(c.fin) : "") + "</span>" +
               "<span>Propietario: " + escapeHtml(c.propietario) + " · Arrendatario: " + escapeHtml(c.arrendatario) + "</span></button>";
           }).join("");
@@ -182,7 +208,7 @@
       request.hidden = !contract;
       if (!contract) return;
       picked.innerHTML = "<span><b>Contrato " + escapeHtml(contract.contrato) + "</b> · " + escapeHtml(contract.propietario) + " · " + escapeHtml(contract.direccion) + "</span>" +
-        '<button type="button" class="scm-owner-credit-link" data-owner-credit-unpick>Cambiar contrato</button>';
+        '<button type="button" class="!sp-p-0 !sp-bg-transparent !sp-border-0 !sp-text-[11px] !sp-font-semibold !sp-text-service-blue !sp-underline !sp-cursor-pointer" data-owner-credit-unpick>Cambiar contrato</button>';
       form.elements.contract_end.value = contract.fin_iso || "";
       form.elements.term.value = String(Math.max(1, Math.min(12, contract.max_months || 1)));
       updateTermHint(form);
@@ -199,20 +225,20 @@
       var max = Math.floor(Math.floor((new Date(end + "T00:00:00") - today) / 86400000) / 30);
       form.elements.term.max = String(Math.max(1, max));
       hint.textContent = max < 1 ? "El contrato ya terminó o termina este mes: corrige la fecha fin si fue renovado." : "Plazo máximo: " + max + " meses.";
-      hint.className = "scm-owner-credit-note" + (max < 1 || Number(form.elements.term.value) > max ? " is-bad" : "");
+      hint.className = "!sp-m-0 !sp-mt-1 !sp-text-[11px] !sp-font-semibold " + (max < 1 || Number(form.elements.term.value) > max ? "!sp-text-red-700" : "!sp-text-emerald-700");
     }
 
     // Confirmación dentro del mismo popup (los diálogos externos quedarían detrás del modal).
     function askConfirm(button, text, onConfirm) {
-      var actions = button.closest(".scm-public-services-review-actions") || button.closest(".scm-maint-quote-section");
+      var actions = button.closest("[data-owner-credit-actions]") || button.closest("section") || button.parentNode;
       if (!actions) return;
       var old = actions.parentNode.querySelector("[data-owner-credit-confirm]");
       if (old) old.remove();
       var bar = document.createElement("div");
-      bar.className = "scm-owner-credit-note is-bad";
+      bar.className = "!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-end !sp-gap-3 !sp-mt-3 !sp-p-3 !sp-rounded-lg !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200 !sp-text-[11px] !sp-font-semibold !sp-text-service-navy";
       bar.setAttribute("data-owner-credit-confirm", "");
       bar.setAttribute("role", "alertdialog");
-      bar.innerHTML = '<span>' + escapeHtml(text) + '</span> <button type="button" class="scm-btn-secondary" data-owner-credit-confirm-no>Cancelar</button> <button type="button" class="scm-btn-primary" data-owner-credit-confirm-yes>Sí, continuar</button>';
+      bar.innerHTML = '<span class="!sp-flex-1 !sp-min-w-[200px]">' + escapeHtml(text) + '</span><button type="button" class="' + UI.secondary + '" data-owner-credit-confirm-no>Cancelar</button><button type="button" class="' + UI.primary + '" data-owner-credit-confirm-yes>Sí, continuar</button>';
       actions.parentNode.insertBefore(bar, actions.nextSibling);
       bar.querySelector("[data-owner-credit-confirm-no]").addEventListener("click", function () { bar.remove(); });
       bar.querySelector("[data-owner-credit-confirm-yes]").addEventListener("click", function () { bar.remove(); onConfirm(); });
@@ -344,6 +370,10 @@
     });
     root.addEventListener("focusout", function (event) {
       if (event.target.matches && event.target.matches("[data-owner-credit-money]:not([readonly])")) formatMoneyInput(event.target);
+    });
+
+    root.addEventListener("reset", function (event) {
+      if (event.target.matches && event.target.matches("[data-owner-credit-filters]")) window.setTimeout(function () { loadReport(true); }, 0);
     });
 
     root.addEventListener("submit", function (event) {
