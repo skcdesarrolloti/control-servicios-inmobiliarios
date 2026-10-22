@@ -5156,7 +5156,7 @@ trait HandlesTicketWorkflowActions
       '_ID', 'estado', 'contrato', 'id_contrato', 'id_contrato_arrendamiento', 'inmueble', 'id_inmueble',
       'codigo_inmueble_web', 'id_inmueble_data', 'direccion', 'barrio', 'ciudad', 'propietario', 'arrendatario',
       'correo_propietario', 'correo_arrendatario', 'celular_propietario', 'celular_arrendatario',
-      'id_propietario', 'id_arrendatario', 'inicio_contrato', 'fin_contrato', 'valor_canon', 'destinacion_inmueble',
+      'id_propietario', 'id_arrendatario', 'inicio_contrato', 'fin_contrato', 'valor_canon', 'id_carta_aumento_canon', 'destinacion_inmueble',
       'valor_administracion', 'id_empleado', 'id_funcionario', 'id_asesor', 'id_comercial',
       'id_captador', 'funcionario_creador', 'id_funcionario_creador', 'cct_author_id',
     ];
@@ -5212,7 +5212,9 @@ trait HandlesTicketWorkflowActions
 
     $renewal = (new ContractRenewalService($this->db))->get((int) $contractPk, $endTs);
     $receiptConfig = \SCM\Modules\Contracts\ContractReceiptSettings::read($this->db);
-    $canon = ContractRenewalService::canon($row['valor_canon'] ?? '');
+    $baseCanon = ContractRenewalService::canon($row['valor_canon'] ?? '');
+    $increase = $this->contractEndingCanonIncrease($row, $baseCanon);
+    $canon = $increase !== null ? $increase['canon'] : $baseCanon;
     $probability = isset($renewal['probability']) ? (float) $renewal['probability'] : null;
     $propertyRow = $this->contractRetentionProperty($row);
     $propertyDetails = [];
@@ -5233,6 +5235,8 @@ trait HandlesTicketWorkflowActions
       'receipt_default_employee_id' => (string) $receiptConfig['employee_id'],
       'probability' => $probability,
       'canon' => $canon,
+      'canon_base' => $baseCanon,
+      'canon_increase_letter_id' => $increase !== null ? $increase['letter_id'] : null,
       'weighted_value' => $canon !== null && $probability !== null ? round($canon * $probability / 100, 2) : null,
       'contract_pk' => $contractPk,
       'contrato' => $contractCode,
@@ -5250,6 +5254,26 @@ trait HandlesTicketWorkflowActions
       'existing_retention_ticket_url' => $existingTicket !== '' ? $this->contractTicketWhatsappUrl($existingTicket) : '',
       'retention_ticket' => $this->contractRetentionTicketUiData($row),
     ];
+  }
+
+  /**
+   * Canon con la última carta de aumento: la carta no modifica `valor_canon`, así que el valor
+   * ponderado toma el canon incrementado cuando la carta supera el canon del contrato.
+   * @param array<string,mixed> $row
+   * @return array{canon:float,letter_id:int}|null
+   */
+  private function contractEndingCanonIncrease(array $row, ?float $baseCanon): ?array
+  {
+    $letterId = (int) ($row['id_carta_aumento_canon'] ?? 0);
+    $table = $this->db->table('jet_cct_cartas_aumento');
+    if ($letterId <= 0 || !$this->table_exists($table) || !$this->column_exists($table, 'canon')) {
+      return null;
+    }
+    $letterCanon = ContractRenewalService::canon($this->db->getVar("SELECT `canon` FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$letterId]) ?? '');
+    if ($letterCanon === null || $letterCanon <= (float) ($baseCanon ?? 0)) {
+      return null;
+    }
+    return ['canon' => $letterCanon, 'letter_id' => $letterId];
   }
 
   private function contractEndingDateLabel($value): string

@@ -71,8 +71,9 @@ final class RentIncreaseService
     try {
       $pdo->beginTransaction();
       $letterId = $this->insertLetter($type, $context, $document);
-      $this->updateContract($contractId, $type, $fechaTs, $amount, $letterId, (string) $document['url'], $context);
+      $this->updateContract($contractId, $type, $fechaTs, $letterId, (string) $document['url'], $context);
       $this->insertPropertyHistory($type, $context);
+      $this->insertContractHistory($type, $context);
       $pdo->commit();
     } catch (\Throwable $exception) {
       if ($pdo->inTransaction()) {
@@ -431,6 +432,8 @@ final class RentIncreaseService
     $contractualCoordinator = $this->contractualCoordinator();
     $legalRepresentative = $this->generalManagerRepresentative();
     $ctx = array_merge($contract, [
+      'canon_anterior' => $this->money((string) ($contract['valor_canon'] ?? '0')),
+      'administracion_anterior' => $this->money((string) ($contract['valor_administracion'] ?? '0')),
       'fecha_ts' => $fechaTs,
       'fecha' => date('Y-m-d', $fechaTs),
       'tipo_carta' => $type === 'canon' ? 'Aumento de canon' : 'Aumento de administracion',
@@ -493,7 +496,9 @@ final class RentIncreaseService
       'incremento' => (string) ($context['incremento'] ?? ''),
       'canon' => (string) ($context['canon'] ?? ''),
       'canon_letras' => (string) ($context['canon_letras'] ?? ''),
+      'canon_anterior' => (string) ($context['canon_anterior'] ?? ''),
       'administracion' => (string) ($context['administracion'] ?? ''),
+      'administracion_anterior' => (string) ($context['administracion_anterior'] ?? ''),
       'administracion__letras' => (string) ($context['administracion_letras'] ?? ''),
       'vigencia_administracion' => (int) ($context['vigencia_ts'] ?? 0),
       'texto_retroactivos' => (string) ($context['texto_retroactivos'] ?? ''),
@@ -512,12 +517,16 @@ final class RentIncreaseService
     return (int) $this->db->lastInsertId();
   }
 
-  /** @param array<string,mixed> $context */
-  private function updateContract(int $contractId, string $type, int $fechaTs, float $amount, int $letterId, string $url, array $context): void
+  /**
+   * Enlaza la carta al contrato. `valor_canon` y `valor_administracion` no se tocan: son los valores
+   * oficiales que se auditan contra SIMI; el valor anterior y el nuevo quedan en la carta y en los historiales.
+   * @param array<string,mixed> $context
+   */
+  private function updateContract(int $contractId, string $type, int $fechaTs, int $letterId, string $url, array $context): void
   {
     $data = $type === 'canon'
-      ? ['id_carta_aumento_canon' => $letterId, 'carta_aumento_canon' => $url, 'fecha_incremento_canon' => $fechaTs, 'porcentaje_incremento_canon' => (string) ($context['incremento'] ?? ''), 'valor_canon' => $amount]
-      : ['id_carta_aumento_admin' => $letterId, 'carta_aumento_admin' => $url, 'fecha_incremento_admin' => $fechaTs, 'porcentaje_incremento_admin' => (string) ($context['incremento'] ?? ''), 'valor_administracion' => $amount];
+      ? ['id_carta_aumento_canon' => $letterId, 'carta_aumento_canon' => $url, 'fecha_incremento_canon' => $fechaTs, 'porcentaje_incremento_canon' => (string) ($context['incremento'] ?? '')]
+      : ['id_carta_aumento_admin' => $letterId, 'carta_aumento_admin' => $url, 'fecha_incremento_admin' => $fechaTs, 'porcentaje_incremento_admin' => (string) ($context['incremento'] ?? '')];
     $data['cct_modified'] = date('Y-m-d H:i:s');
     $table = $this->db->table('jet_cct_contratos_arrendamiento');
     $data = $this->schema->filterTableData($table, $data);
@@ -543,12 +552,61 @@ final class RentIncreaseService
       'funcionario' => (string) ($context['contractual'] ?? ''),
       'fecha' => (int) ($context['fecha_ts'] ?? time()),
       'tipo_reporte' => $type === 'canon' ? 'Aumento de canon' : 'Aumento de administracion',
-      'observacion' => $type === 'canon' ? 'Se aumentó el precio del canon de su inmueble.' : 'Se aumentó la cuota de administración de su inmueble.',
+      'observacion' => $this->historyObservation($type, $context),
     ];
     $payload = $this->schema->filterTableData($table, $payload);
     if ($payload !== []) {
       $this->db->insert($table, $payload);
     }
+  }
+
+  /** @param array<string,mixed> $context */
+  private function insertContractHistory(string $type, array $context): void
+  {
+    $table = $this->db->table('jet_cct_historial_contrato_arrendamiento');
+    if (!$this->schema->tableExists($table)) {
+      return;
+    }
+    $now = date('Y-m-d H:i:s');
+    $payload = $this->schema->filterTableData($table, [
+      'cct_status' => 'publish',
+      'cct_author_id' => (string) ($context['id_empleado'] ?? ''),
+      'cct_created' => $now,
+      'cct_modified' => $now,
+      'id_empleado' => (string) ($context['id_empleado'] ?? ''),
+      'funcionario' => (string) ($context['creador'] ?? ''),
+      'id_contrato' => (string) ($context['_ID'] ?? ''),
+      'contrato' => (string) ($context['contrato'] ?? ''),
+      'inmueble' => (string) ($context['inmueble'] ?? ''),
+      'id_inmueble' => (string) ($context['id_inmueble'] ?? ''),
+      'id_inmueble_data' => (string) ($context['id_inmueble_data'] ?? ''),
+      'fecha' => (int) ($context['fecha_ts'] ?? time()),
+      'tipo_reporte' => $type === 'canon' ? 'Aumento de canon' : 'Aumento de administracion',
+      'observacion' => $this->historyObservation($type, $context),
+    ]);
+    if ($payload !== []) {
+      $this->db->insert($table, $payload);
+    }
+  }
+
+  /** Ej.: "Carta de aumento de canon: $1.200.000 → $1.261.200 (5,1 %), vigente desde 01/11/2026." @param array<string,mixed> $context */
+  private function historyObservation(string $type, array $context): string
+  {
+    $label = $type === 'canon' ? 'canon' : 'administración';
+    $previous = (float) ($context[$type === 'canon' ? 'canon_anterior' : 'administracion_anterior'] ?? 0);
+    $next = (float) ($context[$type === 'canon' ? 'canon' : 'administracion'] ?? 0);
+    $money = static fn(float $value): string => '$' . number_format($value, 0, ',', '.');
+    $text = 'Carta de aumento de ' . $label . ': ' . ($previous > 0 ? $money($previous) . ' → ' : 'nuevo valor ') . $money($next);
+    $percent = trim((string) ($context['incremento'] ?? ''));
+    if ($percent !== '') {
+      $text .= ' (' . rtrim($percent, '% ') . ' %)';
+    }
+    $vigencia = (int) ($context['vigencia_ts'] ?? 0);
+    if ($type === 'administracion' && $vigencia > 0) {
+      $text .= ', vigente desde ' . date('d/m/Y', $vigencia);
+    }
+    $retroactive = trim((string) ($context['texto_retroactivos'] ?? ''));
+    return $text . '.' . ($retroactive !== '' ? ' ' . $retroactive : '');
   }
 
   /** @param array<string,mixed> $context @param array<string,string> $document @return array{email:int,whatsapp:int,internal:int} */

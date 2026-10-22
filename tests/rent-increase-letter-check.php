@@ -87,3 +87,21 @@ $assert(
   $normalizedUploadUrl === 'https://sucasainmobiliaria.com.co/wp-content/uploads/jet-form-builder/572f60a71fb8edf421a6f0f4d5d93fbf/3d268d1ef2c2d2b47e0a97194edf7116/2026/08/Carta-de-aumento-de-canon-CULTURA-CARIBE-SAS.pdf',
   'server upload paths are converted to public WordPress upload URLs'
 );
+
+$historyMethod = new ReflectionMethod($service, 'historyObservation');
+$historyMethod->setAccessible(true);
+$assert(
+  (string) $historyMethod->invoke($service, 'canon', ['canon_anterior' => 1200000.0, 'canon' => 1261200.0, 'incremento' => '5,1%']) === 'Carta de aumento de canon: $1.200.000 → $1.261.200 (5,1 %).',
+  'history records previous and new canon with the increment'
+);
+$assert(
+  str_contains((string) $historyMethod->invoke($service, 'administracion', ['administracion_anterior' => 160000.0, 'administracion' => 195000.0, 'vigencia_ts' => strtotime('2026-11-01')]), '$160.000 → $195.000, vigente desde 01/11/2026'),
+  'history records previous and new administration with its validity date'
+);
+
+$updateSource = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/RentIncrease/RentIncreaseService.php');
+preg_match('/private function updateContract\(.*?\n  \}/s', $updateSource, $updateMatch);
+$assert(
+  isset($updateMatch[0]) && !str_contains($updateMatch[0], "'valor_canon'") && !str_contains($updateMatch[0], "'valor_administracion'"),
+  'creating a letter keeps the contract canon and administration values'
+);

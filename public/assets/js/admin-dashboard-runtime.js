@@ -17691,7 +17691,7 @@
       var help = panel.querySelector('[data-contracts-ending-help]');
       if (help) help.innerHTML = {
         ending:'Contratos con fecha fin en el mes consultado.',
-        renewal:contractsEndingIcon('info') + '<p>Registra la probabilidad de renovación desde Por terminar. <b>Valor ponderado = canon mensual × probabilidad.</b> Al 100 % no se crea retención ni recibo automático.</p>',
+        renewal:contractsEndingIcon('info') + '<p>Registra la probabilidad de renovación desde Por terminar. <b>Valor ponderado = canon mensual × probabilidad.</b> Si hay carta de aumento de canon, se usa el canon incrementado. Al 100 % no se crea retención ni recibo automático.</p>',
         'no-exit':'Registra reportes de no salida y programa recordatorios internos antes de la fecha fin. Puedes consultar todos los contratos o solo los reportados.',
         receipt:contractsEndingIcon('info') + '<p><b>Regla operativa:</b> Se crea un caso de recibo 15 días antes de la fecha fin. Requiere responsable activo; se omite renovación al 100 % y no salida reportada.</p>'
       }[contractsEndingView];
@@ -17743,7 +17743,7 @@
         if (contractsEndingView === 'receipt') items = items.filter(function(row) { return row.receipt_in_scope === true; });
         if (contractsEndingView === 'renewal') {
           return '<section class="scm-contracts-ending-month scm-ending-report"><div class="scm-ending-report-title"><b>Probabilidad y valor</b><span>•</span>' + escHtml(group.label || '') + '</div><div class="scm-contract-renewal-table-wrap"><table class="scm-contract-renewal-table"><thead><tr><th scope="col">Contrato / inmueble</th><th scope="col">Probabilidad de renovación</th><th scope="col">Canon mensual</th><th scope="col">Valor ponderado mensual</th><th scope="col">Historial</th></tr></thead><tbody>' + items.map(function(row) {
-            return '<tr><td><b>Contrato #' + escHtml(row.contrato || row.contract_pk) + '</b><small class="scm-ending-tenant">' + escHtml(row.arrendatario || '') + '</small><small>' + escHtml(row.inmueble || '') + ' · ' + escHtml(row.direccion || '') + '</small></td><td><span class="scm-ending-probability-pill">' + (row.probability == null ? 'Sin registrar' : escHtml(row.probability) + ' %') + '</span>' + (Number(row.probability) === 100 ? '<small>Sin nueva acción</small>' : '') + '</td><td>' + escHtml(money(row.canon)) + '</td><td>' + (row.weighted_value == null ? '<em>Sin dato</em>' : '<b>' + escHtml(money(row.weighted_value)) + '</b>') + '</td><td>' + historyButton(row.contract_pk) + '</td></tr>';
+            return '<tr><td><b>Contrato #' + escHtml(row.contrato || row.contract_pk) + '</b><small class="scm-ending-tenant">' + escHtml(row.arrendatario || '') + '</small><small>' + escHtml(row.inmueble || '') + ' · ' + escHtml(row.direccion || '') + '</small></td><td><span class="scm-ending-probability-pill">' + (row.probability == null ? 'Sin registrar' : escHtml(row.probability) + ' %') + '</span>' + (Number(row.probability) === 100 ? '<small>Sin nueva acción</small>' : '') + '</td><td>' + escHtml(money(row.canon)) + (row.canon_increase_letter_id ? '<small>Incluye aumento · carta #' + escHtml(row.canon_increase_letter_id) + ' (canon contrato ' + escHtml(money(row.canon_base)) + ')</small>' : '') + '</td><td>' + (row.weighted_value == null ? '<em>Sin dato</em>' : '<b>' + escHtml(money(row.weighted_value)) + '</b>') + '</td><td>' + historyButton(row.contract_pk) + '</td></tr>';
           }).join('') + '</tbody></table></div></section>';
         }
         var empty = '';
@@ -18051,7 +18051,7 @@
         },
         html: '<form data-contract-renewal-form class="scm-ending-dialog-form">' +
           (probabilityMode ? '<label>Probabilidad de renovación (%)<div class="scm-ending-probability-input"><input name="probability" type="number" min="0" max="100" step="0.01" placeholder="Sin registrar" value="' + escHtml(row.probability == null ? '' : row.probability) + '"><span>%</span></div></label>' +
-          '<div class="scm-ending-probability-presets"><span>Sugeridos:</span>' + [25,50,75,100].map(function(value) { return '<button type="button" data-ending-probability-preset="' + value + '">' + value + '%</button>'; }).join('') + '</div><div class="scm-ending-dialog-notice">' + contractsEndingIcon('info') + '<p>Al 100 % se omiten nuevas retenciones y el recibo automático. El valor ponderado usa el canon mensual.</p></div>' : '') +
+          '<div class="scm-ending-probability-presets"><span>Sugeridos:</span>' + [25,50,75,100].map(function(value) { return '<button type="button" data-ending-probability-preset="' + value + '">' + value + '%</button>'; }).join('') + '</div><div class="scm-ending-dialog-notice">' + contractsEndingIcon('info') + '<p>Al 100 % se omiten nuevas retenciones y el recibo automático. El valor ponderado usa el canon mensual, con el aumento de la última carta si aplica.</p></div>' : '') +
           (!probabilityMode ?
           '<label class="scm-ending-dialog-check"><input type="checkbox" name="no_exit" ' + (Number(state.no_exit) || mode === 'no-exit' ? 'checked' : '') + '><span>El arrendatario no realizará la salida del inmueble</span></label>' +
           '<label>Recordatorios: días antes de la fecha fin<input name="reminder_days" value="' + escHtml(state.reminder_days || '30,7,0') + '"></label>' +
