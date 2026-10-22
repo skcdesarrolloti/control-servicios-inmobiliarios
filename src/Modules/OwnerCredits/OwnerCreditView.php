@@ -134,26 +134,46 @@ final class OwnerCreditView
       . '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-12 !sp-gap-5 !sp-items-start">'
       // Columna de datos y entradas.
       . '<div class="lg:!sp-col-span-7 !sp-space-y-5">'
-      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('building') . 'Contrato de arriendo vigente</h4><div class="!sp-grid !sp-grid-cols-2 sm:!sp-grid-cols-3 !sp-gap-3">'
+      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('building') . 'Contrato de arriendo vigente</h4>' . self::guide('contrato', [
+        'Fin del contrato' => 'Define cuántos meses se puede prestar: se cuentan los meses completos (de 30 días) que faltan hasta esa fecha. Si el contrato fue renovado y la fecha está desactualizada, corrígela aquí; se guarda en el contrato al aprobar o rechazar.',
+        'Años arrendados' => 'Tiempo entre el inicio y el fin del contrato. Un historial largo da más confianza.',
+        'Siniestro' => 'Lo marca Cartera cuando el contrato fue reportado a la aseguradora por mora. Un contrato siniestrado incumple la política.',
+      ]) . '<div class="!sp-grid !sp-grid-cols-2 sm:!sp-grid-cols-3 !sp-gap-3">'
       . self::tile('Inicio del contrato', $contract['inicio_ts'] > 0 ? date('d/m/Y', $contract['inicio_ts']) : '—') . $endTile . self::tile('Años arrendados', $years)
       . self::tile('Estado', self::e($contract['estado'] ?: '—')) . self::tile('Aseguradora', self::e($contract['aseguradora'] ?: '—'))
       . self::tile('Siniestro', $contract['siniestrado'] ? 'Siniestrado' : 'No', $contract['siniestrado'] ? 'bad' : '')
       . '</div></section>'
 
-      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('cash') . 'Ingreso del propietario</h4><p class="' . self::NOTE . ' !sp-mb-3">' . self::e($work['income_source']) . '</p>'
+      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('cash') . 'Ingreso del propietario</h4>' . self::guide('ingreso', [
+        'Ingreso bruto (canon)' => 'Lo que paga el arrendatario cada mes. Si ya tuvo aumento, ajústalo: solo cambia este crédito, no el contrato.',
+        'Descuentos' => 'Lo que se le descuenta al propietario cada mes antes de girarle: comisión de administración con IVA, garantía inmobiliaria (seguro de arrendamiento) y póliza de servicios públicos. Salen del contrato de mandato; sin mandato se estima un porcentaje del canon (Configuración).',
+        'Ingreso neto (INO)' => 'Canon menos descuentos: lo que realmente recibe el propietario y con lo que paga la cuota.',
+      ]) . '<p class="' . self::NOTE . ' !sp-mb-3">' . self::e($work['income_source']) . '</p>'
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">' . $field('Ingreso bruto (canon)', $money('gross', $ev['gross'])) . $deductions . '</div>'
       . ($editable ? '<p class="' . self::NOTE . ' !sp-mt-3">Puedes ajustar el canon (por ejemplo, si ya tuvo aumento) y los descuentos: solo cambian este crédito, no el contrato.</p>' : '') . '</section>'
 
-      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . $ui::icon('document') . 'Información de la solicitud</h4><div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">'
+      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . $ui::icon('document') . 'Información de la solicitud</h4>' . self::guide('solicitud', [
+        'Valor solicitado' => 'Lo que pide el propietario. Si viene de una cotización, es el total de la cotización.',
+        'Plazo solicitado' => 'Meses en que quiere pagar. Escríbelo según lo que pidió; no puede superar los meses que faltan para el fin del contrato, porque las cuotas se descuentan del canon.',
+        'Destinación' => 'Para qué usará el dinero.',
+        'Probabilidad de que desocupen' => 'Tu criterio sobre el riesgo de que el arrendatario se vaya antes. Baja: se respeta lo pedido con la tasa de política. Media: plazo hasta el fin del contrato con la tasa de referencia. Alta: máximo 3 meses con la tasa de riesgo.',
+      ]) . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">'
       . $field('Fecha de solicitud', '<input class="' . $ui::INPUT . ' ' . self::READONLY . '" value="' . date('d/m/Y', (int) $credit['created_at']) . '" readonly>')
       . $field('Valor solicitado', $money('requested_amount', (float) ($credit['requested_amount'] ?? 0)))
-      . $field('Plazo solicitado (meses)', '<input class="' . $inputClass . '" name="requested_term" type="number" min="1" max="60" value="' . (int) ($credit['requested_term'] ?: $work['settings']['default_term']) . '"' . $lock . '>')
+      . $field('Plazo solicitado (meses)', '<input class="' . $inputClass . '" name="requested_term" type="number" min="1" max="60" placeholder="Escribe los meses" value="' . ((int) $credit['requested_term'] > 0 ? (int) $credit['requested_term'] : '') . '"' . $lock . '>')
       . $field('Destinación del crédito', $select('purpose', $purposeOptions))
       . $field('Probabilidad de que desocupen', $select('vacancy', $vacancyOptions), 'sm:!sp-col-span-2')
       . '</div></section>'
 
       . '<section class="' . self::SECTION . ' !sp-border-service-yellow"><div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-3"><h4 class="' . self::H4 . ' !sp-mb-0">' . $ui::icon('edit') . 'Condiciones según el analista</h4>'
       . ($editable ? '<button type="button" class="' . $ui::SECONDARY . ' !sp-text-[10px]" data-owner-credit-use-suggested>' . $ui::icon('refresh', '!sp-w-3 !sp-h-3') . 'Usar condición sugerida</button>' : '') . '</div>'
+      . self::guide('analista', [
+        'Qué son' => 'Las condiciones que realmente se aprueban. Arrancan con la condición sugerida y las puedes ajustar.',
+        'Valor a colocar' => 'El dinero que se presta.',
+        'Plazo' => 'Número de cuotas mensuales.',
+        'Tasa N.M.V' => 'Tasa nominal mes vencido: el interés de cada mes sobre el saldo. Debe quedar por debajo de la usura (Configuración).',
+        'Cuota' => 'Fija, calculada como la función PAGO de Excel; se descuenta de los giros del canon.',
+      ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-4">'
       . $field('Valor a colocar', $money('amount', $c['amount']))
       . $field('Plazo (meses)', '<input class="' . $inputClass . '" name="term" type="number" min="1" max="60" value="' . (int) $c['term'] . '"' . $lock . '>')
@@ -186,7 +206,14 @@ final class OwnerCreditView
     }
     return ($termError !== '' ? self::alert($termError, 'bad') : '')
       . ($endChanged ? self::alert('Estás calculando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Se guardará en el contrato al aprobar o rechazar el crédito.', 'info') : '')
-      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('chart') . 'Política de créditos</h4><div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">'
+      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('chart') . 'Política de créditos</h4>' . self::guide('politica', [
+        'Valor máximo a prestar' => 'Tope = ingreso neto × los meses de política (Configuración, hoy ' . (int) $work['settings']['income_months'] . ').',
+        'Meses máximos' => 'Meses completos que faltan para el fin del contrato.',
+        'Tasa ajustada' => 'Tasa de referencia menos el descuento de política.',
+        'Cuota de política' => 'La cuota si se prestara el valor máximo al plazo máximo.',
+        'Meses / valor que excede' => 'Diferencia entre la política y lo pedido; en rojo cuando lo pedido la supera.',
+        'Tasa para el riesgo' => 'Tasa que compensa el exceso: cobra la usura mensual sobre la parte que supera el tope.',
+      ]) . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">'
       . self::tile('Ingreso neto (INO)', self::money($ev['net_income']), 'key')
       . self::tile('Valor máximo a prestar', self::money($ev['max_amount']), 'key')
       . self::tile('Meses máximos', (string) $ev['max_months'])
@@ -197,12 +224,19 @@ final class OwnerCreditView
       . self::tile('Valor que excede', self::money($ev['exceed_amount'], true), $ev['exceed_amount'] < 0 ? 'bad' : '')
       . '</div></section>'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('target') . 'Condición sugerida · probabilidad ' . self::e($ev['vacancy']) . '</h4>'
+      . self::guide('sugerida', [
+        'Qué es' => 'La propuesta automática del simulador según la probabilidad de desocupación elegida. Úsala con "Usar condición sugerida" o ajusta las condiciones del analista.',
+      ])
       . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3" data-owner-credit-suggested data-amount="' . round((float) $s['amount']) . '" data-term="' . (int) $s['term'] . '" data-rate="' . self::e(number_format($s['rate'] * 100, 4, ',', '')) . '">'
       . self::tile('Plazo', $s['term'] . ' meses') . self::tile('Tasa', self::percent($s['rate']))
       . self::tile('Valor a colocar', self::money($s['amount'])) . self::tile('Cuota mensual', self::money($s['payment']), 'key')
       . '</div></section>'
       . '<section class="' . self::SECTION . '"><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Políticas</h4>'
       . ($work['policies_ok'] ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Cumple todas</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-red-700">Incumple políticas</span>') . '</div>'
+      . self::guide('politicas', [
+        'Requisitos' => 'Contrato activo y no próximo a vencer, plazo dentro de la vigencia, sin siniestro, sin otros créditos vigentes del propietario, valor dentro del tope, tasa bajo la usura y cuota cubierta por el ingreso neto.',
+        'Si alguna está en rojo' => 'Puedes aprobar igual, pero con justificación: el crédito queda marcado "Fuera de política" y la razón queda en el historial.',
+      ])
       . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $policies . '</ul>'
       . ($work['policies_ok'] ? '' : '<p class="' . self::NOTE . ' !sp-mt-2">Para aprobar fuera de política escribe la justificación al final; quedará en el historial.</p>')
       . '</section>';
@@ -225,6 +259,9 @@ final class OwnerCreditView
       . '<span class="!sp-px-2.5 !sp-py-1 !sp-rounded-full !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200 !sp-text-[10px]">Cuota <b>' . self::money($c['payment']) . '</b></span>'
       . '<span class="!sp-px-2.5 !sp-py-1 !sp-rounded-full !sp-bg-slate-100 !sp-text-[10px]">Intereses <b>' . self::money($c['total_interest']) . '</b></span>'
       . '<span class="!sp-px-2.5 !sp-py-1 !sp-rounded-full !sp-bg-slate-100 !sp-text-[10px]">Total a pagar <b>' . self::money($c['amount'] + $c['total_interest']) . '</b></span></div></div>'
+      . self::guide('tabla', [
+        'Cómo leerla' => 'Cada fila es un mes. La cuota se divide en intereses (saldo × tasa) y abono a capital; el saldo baja hasta $0. La cuota se descuenta del giro del canon al propietario.',
+      ])
       . ($rows === '' ? '<p class="' . self::NOTE . '">Indica valor y plazo para ver la tabla.</p>' : '<div class="!sp-overflow-x-auto !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200"><table class="!sp-w-full !sp-border-collapse !sp-text-[11px] !sp-text-service-navy !sp-min-w-[560px]"><thead class="!sp-bg-slate-50"><tr>' . $head . '</tr></thead><tbody>' . $rows . '</tbody></table></div>')
       . '</section>';
   }
@@ -309,7 +346,6 @@ final class OwnerCreditView
       . $field('Descuento sin mandato (% del canon)', $input('no_mandate_deduction', $pct($settings['no_mandate_deduction'], 1), ' inputmode="decimal"'), 'Cuando el contrato no tiene mandato con comisión registrada.')
       . $field('Meses de ingreso neto a prestar', '<input class="' . $ui::INPUT . '" type="number" name="income_months" min="1" max="24" value="' . (int) $settings['income_months'] . '">', 'Tope = ingreso neto × estos meses.')
       . $field('Meses mínimos de contrato restantes', '<input class="' . $ui::INPUT . '" type="number" name="min_remaining_months" min="0" max="60" value="' . (int) $settings['min_remaining_months'] . '">', 'Por debajo se alerta "contrato próximo a vencer".')
-      . $field('Plazo sugerido (meses)', '<input class="' . $ui::INPUT . '" type="number" name="default_term" min="1" max="60" value="' . (int) $settings['default_term'] . '">')
       . '</div></section>'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . UI::icon('bolt') . 'Avisos</h4><div class="' . $grid . '">'
       . $field('Correo al propietario al decidir', $yesNo('notify_owner_email', (bool) $settings['notify_owner_email']), 'Condiciones y tabla de amortización.')
@@ -330,6 +366,9 @@ final class OwnerCreditView
     // Como en "Crear caso": primero se busca y elige el contrato, luego se completan los datos de la solicitud.
     return '<form class="!sp-font-sans !sp-text-service-navy !sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-5" data-owner-credit-new-form autocomplete="off"><input type="hidden" name="contract_id" value="">'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . $step('1') . 'Busca el contrato</h4>'
+      . self::guide('nuevo-contrato', [
+        'Por qué un contrato' => 'El crédito siempre queda ligado a un contrato de arrendamiento, porque las cuotas se descuentan de su canon. Busca por número de contrato, inmueble SIMI, propietario o arrendatario.',
+      ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[180px_minmax(0,1fr)_auto] !sp-gap-3 !sp-items-end">'
       . $field('Buscar por', '<select class="' . $ui::INPUT . '" data-owner-credit-search-by><option value="contrato">Contrato</option><option value="inmueble">Inmueble SIMI</option><option value="propietario">Propietario</option><option value="arrendatario">Arrendatario</option></select>')
       . $field('Dato a buscar', '<input class="' . $ui::INPUT . '" data-owner-credit-search-query placeholder="Ej. 817, 10420 o nombre">')
@@ -337,10 +376,15 @@ final class OwnerCreditView
       . '<p class="' . self::NOTE . ' !sp-mt-3" data-owner-credit-search-status></p><div class="!sp-grid !sp-gap-2 !sp-max-h-72 !sp-overflow-y-auto !sp-mt-2" data-owner-credit-search-results></div>'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2 !sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-service-yellow !sp-bg-amber-50/40 !sp-text-xs" data-owner-credit-picked hidden></div></section>'
       . '<section class="' . self::SECTION . '" data-owner-credit-request hidden><h4 class="' . self::H4 . '">' . $step('2') . 'Datos de la solicitud</h4>'
+      . self::guide('nuevo-datos', [
+        'Qué pasa al registrar' => 'Solo se registra lo que pide el propietario: todavía no se aprueba nada. Se abre el liquidador para evaluarlo y ahí se aprueba o rechaza.',
+        'Plazo solicitado' => 'Escribe los meses que pidió el propietario. No puede superar los meses que faltan para el fin del contrato.',
+        'Fin del contrato' => 'Si el contrato fue renovado y la fecha está desactualizada, corrígela: se guarda en el contrato.',
+      ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">'
       . $field('Valor solicitado' . $required, '<input class="' . $ui::INPUT . '" name="amount" inputmode="numeric" data-owner-credit-money required>')
       . $field('Fin del contrato', '<input class="' . $ui::INPUT . '" type="date" name="contract_end">')
-      . $field('Plazo solicitado (meses)' . $required, '<input class="' . $ui::INPUT . '" name="term" type="number" min="1" max="60" required>')
+      . $field('Plazo solicitado (meses)' . $required, '<input class="' . $ui::INPUT . '" name="term" type="number" min="1" max="60" placeholder="Escribe los meses" required>')
       . $field('Destinación', '<select class="' . $ui::INPUT . '" name="purpose">' . $options . '</select>')
       . '</div><p class="' . self::NOTE . ' !sp-mt-3">El plazo no puede superar los meses que faltan para el fin del contrato. Si la fecha fin está desactualizada, corrígela aquí: se guardará en el contrato.</p>'
       . '<p class="!sp-m-0 !sp-mt-1 !sp-text-[11px] !sp-font-semibold" data-owner-credit-term-hint></p></section>'
@@ -350,6 +394,20 @@ final class OwnerCreditView
   public static function status(string $status): string
   {
     return '<span class="!sp-inline-flex !sp-items-center !sp-px-2.5 !sp-py-1 !sp-rounded-full !sp-border !sp-border-solid !sp-text-[10px] !sp-font-bold ' . (self::STATUS_TONES[$status] ?? self::STATUS_TONES['anulado']) . '">' . self::e(OwnerCreditService::STATUSES[$status] ?? $status) . '</span>';
+  }
+
+  /**
+   * Guía desplegable "¿Qué es esto?" de una sección. @param array<string,string> $items término => explicación
+   */
+  private static function guide(string $key, array $items): string
+  {
+    $rows = '';
+    foreach ($items as $term => $text) {
+      $rows .= '<li class="!sp-py-1"><b class="!sp-text-service-navy">' . self::e($term) . ':</b> ' . self::e($text) . '</li>';
+    }
+    return '<details class="!sp-mb-3 !sp-rounded-lg !sp-bg-service-lilac !sp-border !sp-border-solid !sp-border-indigo-100" data-owner-credit-guide="' . self::e($key) . '">'
+      . '<summary class="!sp-flex !sp-items-center !sp-gap-1.5 !sp-px-3 !sp-py-2 !sp-cursor-pointer !sp-text-[10px] !sp-font-semibold !sp-text-service-blue">' . self::icon('info', '!sp-w-3.5 !sp-h-3.5') . 'Guía: ¿qué significa cada dato?</summary>'
+      . '<ul class="!sp-m-0 !sp-px-3 !sp-pb-3 !sp-pl-7 !sp-list-disc !sp-text-[11px] !sp-leading-relaxed !sp-text-service-muted">' . $rows . '</ul></details>';
   }
 
   private static function tile(string $label, string $value, string $tone = ''): string
@@ -372,6 +430,7 @@ final class OwnerCreditView
       'chart' => 'M4 20V10m6 10V4m6 16v-7m4 7H2',
       'shield' => 'M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3zm-3 9 2 2 4-4',
       'target' => 'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18zm0 4a5 5 0 1 0 0 10 5 5 0 1 0 0-10zm0 4a1 1 0 1 0 0 2 1 1 0 1 0 0-2z',
+      'info' => 'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18zM12 11v5m0-8h.01',
     ];
     if (!isset($paths[$name])) return UI::icon($name, $classes);
     return '<svg class="' . $classes . ' !sp-shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' . $paths[$name] . '"></path></svg>';

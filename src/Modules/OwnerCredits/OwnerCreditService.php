@@ -185,7 +185,7 @@ final class OwnerCreditService
     }
     $gross = array_key_exists('gross', $input) ? self::money($input['gross']) : ((float) $credit['gross_income'] > 0 ? (float) $credit['gross_income'] : $defaults['gross']);
     $requested = array_key_exists('requested_amount', $input) ? self::money($input['requested_amount']) : (float) $credit['requested_amount'];
-    $requestedTerm = array_key_exists('requested_term', $input) ? max(0, (int) $input['requested_term']) : ((int) $credit['requested_term'] ?: (int) $settings['default_term']);
+    $requestedTerm = array_key_exists('requested_term', $input) ? max(0, (int) $input['requested_term']) : (int) $credit['requested_term'];
     $vacancy = (string) ($input['vacancy'] ?? $credit['vacancy'] ?? 'Baja');
     $requestTs = (int) $credit['created_at'];
     $storedEndTs = self::timestamp($contract['fin_contrato'] ?? '');
@@ -205,7 +205,7 @@ final class OwnerCreditService
     $schedule = OwnerCreditCalculator::schedule($rate, $term, $amount);
     $policies = $this->policies($credit, $contract, $evaluation, $settings, $amount, $term, $rate, $payment, $endTs);
     // El plazo solicitado nunca puede pasar de los meses que faltan entre la solicitud y el fin del contrato.
-    $termError = $requestedTerm <= 0 ? 'Indica el plazo solicitado en meses.' : ($requestedTerm > $evaluation['max_months'] ? self::termMessage($requestedTerm, $evaluation['max_months']) : '');
+    $termError = $requestedTerm <= 0 ? 'Escribe el plazo solicitado (meses) para evaluar el crédito.' : ($requestedTerm > $evaluation['max_months'] ? self::termMessage($requestedTerm, $evaluation['max_months']) : '');
 
     return [
       'credit' => $credit,
@@ -445,10 +445,7 @@ final class OwnerCreditService
 
   private function insertCredit(array $contract, ?int $quoteId, string $ticketId, float $amount, string $purpose, array $actor, int $term = 0): int
   {
-    $settings = $this->config();
-    // Plazo inicial: el pedido, o el sugerido sin pasar de los meses que le quedan al contrato.
-    $maxMonths = OwnerCreditCalculator::monthsUntil(time(), self::timestamp($contract['fin_contrato'] ?? ''));
-    $term = $term > 0 ? $term : max(1, min((int) $settings['default_term'], $maxMonths));
+    // Sin plazo por defecto ($term = 0): lo escribe el funcionario según lo que pidió el propietario.
     $income = $this->defaultIncome($contract);
     $now = time();
     $phone = trim((string) ($contract['celular_propietario'] ?? ''));

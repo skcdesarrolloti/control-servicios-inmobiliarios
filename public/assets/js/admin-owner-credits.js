@@ -138,8 +138,11 @@
       post("scm_owner_credit_simulate", formData(form))
         .then(function (data) {
           if (seq !== simulateSeq) return;
+          // Las guías abiertas siguen abiertas tras recalcular.
+          var open = Array.prototype.map.call(form.querySelectorAll("[data-owner-credit-guide][open]"), function (el) { return el.getAttribute("data-owner-credit-guide"); });
           if (results) results.innerHTML = data.results_html || "";
           if (schedule) schedule.innerHTML = data.schedule_html || "";
+          open.forEach(function (key) { var guide = form.querySelector('[data-owner-credit-guide="' + key + '"]'); if (guide) guide.open = true; });
           setStatus(form, "");
         })
         .catch(function (error) { if (seq === simulateSeq) setStatus(form, error.message, "error"); })
@@ -223,7 +226,6 @@
       picked.innerHTML = "<span><b>Contrato " + escapeHtml(contract.contrato) + "</b> · " + escapeHtml(contract.propietario) + " · " + escapeHtml(contract.direccion) + "</span>" +
         '<button type="button" class="!sp-p-0 !sp-bg-transparent !sp-border-0 !sp-text-[11px] !sp-font-semibold !sp-text-service-blue !sp-underline !sp-cursor-pointer" data-owner-credit-unpick>Cambiar contrato</button>';
       form.elements.contract_end.value = contract.fin_iso || "";
-      form.elements.term.value = String(Math.max(1, Math.min(12, contract.max_months || 1)));
       updateTermHint(form);
       form.elements.amount.focus();
     }

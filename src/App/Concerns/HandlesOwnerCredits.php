@@ -171,7 +171,7 @@ trait HandlesOwnerCredits
       if ($mode === 'save') {
         // Se parte de lo guardado para no perder los datos de la última sincronización.
         $input = OwnerCreditSettings::read(App::settings());
-        foreach (['usury_auto', 'usury_annual', 'usury_updated_at', 'reference_rate', 'policy_discount', 'no_mandate_deduction', 'income_months', 'min_remaining_months', 'default_term', 'notify_owner_email', 'notify_owner_whatsapp', 'notify_staff_whatsapp'] as $key) {
+        foreach (['usury_auto', 'usury_annual', 'usury_updated_at', 'reference_rate', 'policy_discount', 'no_mandate_deduction', 'income_months', 'min_remaining_months', 'notify_owner_email', 'notify_owner_whatsapp', 'notify_staff_whatsapp'] as $key) {
           if (isset($_POST[$key])) $input[$key] = sanitize_text_field(wp_unslash((string) $_POST[$key]));
         }
         $saved = OwnerCreditSettings::save(App::settings(), $input, Auth::userId());

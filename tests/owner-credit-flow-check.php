@@ -77,17 +77,17 @@ $check($credit['owner_id'] === '956' && $credit['ticket_id'] === '10821' && $cre
 $service->syncFromQuote(574, 'Si', $actor);
 $check(count($db->getResults('SELECT id FROM wp_scm_owner_credits')) === 1, 'repeating financing "Sí" does not duplicate the request');
 
-$work = $service->workspace((int) $credit['id']);
+$work = $service->workspace((int) $credit['id'], ['requested_term' => '12']);
 $check($work['evaluation']['gross'] === 1075000.0 && abs($work['evaluation']['deductions_total'] - (142800 + 29400 + 52661.669)) < 0.01, 'income uses canon and mandate commission, guarantee and utilities policy');
 $check($work['evaluation']['max_months'] >= 13 && $work['policies_ok'], 'a healthy contract passes every policy with the suggested conditions');
 
 try {
-  $service->decide((int) $credit['id'], 'aprobado', ['amount' => '$5.000.000', 'term' => '12', 'rate' => '2,3'], $actor);
+  $service->decide((int) $credit['id'], 'aprobado', ['requested_term' => '12', 'amount' => '$5.000.000', 'term' => '12', 'rate' => '2,3'], $actor);
   $check(false, 'approving above the cap without justification must fail');
 } catch (DomainException $error) {
   $check(str_contains($error->getMessage(), 'justificación'), 'approving outside policy requires a justification');
 }
-$result = $service->decide((int) $credit['id'], 'aprobado', ['amount' => '$3.000.000', 'term' => '12', 'rate' => '2,3', 'note' => 'Propietario con 10 años sin mora, se aprueba excepción.'], $actor);
+$result = $service->decide((int) $credit['id'], 'aprobado', ['requested_term' => '12', 'amount' => '$3.000.000', 'term' => '12', 'rate' => '2,3', 'note' => 'Propietario con 10 años sin mora, se aprueba excepción.'], $actor);
 $approved = $result['credit'];
 $check(array_key_exists('internal_whatsapp', $result['queued']), 'staff WhatsApp is attempted on decisions without breaking them when no staff is configured');
 $check($approved['status'] === 'aprobado' && (int) $approved['policy_override'] === 1 && (float) $approved['approved_amount'] === 3000000.0 && (int) $approved['approved_term'] === 12, 'approved outside policy with conditions and override flag');
@@ -142,7 +142,7 @@ $check(count($report['rows']) === 3 && $service->statusesForQuotes([574, 575, 99
 
 // Plazo solicitado limitado por la fecha fin, fecha fin editable desde el liquidador y crédito manual por contrato.
 $pending = $service->byQuote(576);
-$check((int) $pending['requested_term'] === 12, 'new requests start with the suggested term within the contract');
+$check((int) $pending['requested_term'] === 0 && str_contains($service->workspace((int) $pending['id'])['term_error'], 'Escribe el plazo'), 'new requests start without a requested term until someone types it');
 $tooLong = $service->workspace((int) $pending['id'], ['requested_term' => '30']);
 $check(str_contains($tooLong['term_error'], 'no puede superar'), 'requested term longer than the months left is an error');
 try {
