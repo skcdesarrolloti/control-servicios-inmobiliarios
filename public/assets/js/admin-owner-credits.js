@@ -235,6 +235,19 @@
           .catch(function (error) { window.alert(error.message); });
         return;
       }
+      var refresh = target.closest("[data-owner-credit-usury-refresh]");
+      if (refresh) {
+        var settingsForm = refresh.closest("[data-owner-credit-settings-form]");
+        refresh.disabled = true;
+        setStatus(settingsForm, "Consultando datos.gov.co…", "");
+        post("scm_owner_credit_settings", { mode: "refresh" })
+          .then(function (data) {
+            showModal("Configuración de créditos", "Variables de entrada del simulador y avisos.", data.html || "");
+            setStatus(modal.querySelector("[data-owner-credit-settings-form]"), data.message || "", "success");
+          })
+          .catch(function (error) { refresh.disabled = false; setStatus(settingsForm, error.message, "error"); });
+        return;
+      }
       if (target.closest("[data-owner-credit-settings]")) {
         post("scm_owner_credit_settings", {})
           .then(function (data) { showModal("Configuración de créditos", "Variables de entrada del simulador y avisos.", data.html || ""); })
@@ -269,7 +282,10 @@
         settings.set("mode", "save");
         setStatus(form, "Guardando…", "");
         post("scm_owner_credit_settings", settings)
-          .then(function (data) { setStatus(form, data.message || "Guardado.", "success"); })
+          .then(function (data) {
+            if (data.html) showModal("Configuración de créditos", "Variables de entrada del simulador y avisos.", data.html);
+            setStatus(modal.querySelector("[data-owner-credit-settings-form]"), data.message || "Guardado.", "success");
+          })
           .catch(function (error) { setStatus(form, error.message, "error"); });
         return;
       }

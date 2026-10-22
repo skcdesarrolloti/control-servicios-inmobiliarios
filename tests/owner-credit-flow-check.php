@@ -49,6 +49,8 @@ final class OwnerCreditTestPdo extends PDO
 $pdo = new OwnerCreditTestPdo();
 $db = new Database($pdo, 'wp_');
 $pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema(_ID INTEGER PRIMARY KEY, funcion TEXT, valor TEXT)');
+// Usura manual (sin red) y una tasa de referencia por debajo de la usura vigente.
+$pdo->exec("INSERT INTO wp_jet_cct_confi_sistema(funcion, valor) VALUES ('control_servicios_config', '" . json_encode(['owner_credit_settings' => ['usury_auto' => false, 'usury_annual' => 0.2859, 'reference_rate' => 0.019]]) . "')");
 $pdo->exec('CREATE TABLE wp_scm_owner_credits(id INTEGER PRIMARY KEY AUTOINCREMENT, quote_id INTEGER UNIQUE, ticket_id TEXT DEFAULT "", contract_id INTEGER DEFAULT 0, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", address TEXT DEFAULT "", owner_id TEXT DEFAULT "", owner_name TEXT DEFAULT "", owner_email TEXT DEFAULT "", owner_phone TEXT DEFAULT "", purpose TEXT DEFAULT "", status TEXT DEFAULT "pendiente", requested_amount REAL DEFAULT 0, requested_term INTEGER DEFAULT 0, vacancy TEXT DEFAULT "Baja", gross_income REAL DEFAULT 0, deductions_json TEXT, net_income REAL DEFAULT 0, max_amount REAL DEFAULT 0, max_months INTEGER DEFAULT 0, approved_amount REAL, approved_term INTEGER, approved_rate REAL, monthly_payment REAL, total_interest REAL, first_payment_ts INTEGER, policy_json TEXT, evaluation_json TEXT, policy_override INTEGER DEFAULT 0, decision_note TEXT, decided_by_id TEXT DEFAULT "", decided_by_name TEXT DEFAULT "", decided_at INTEGER, closed_at INTEGER, created_by_id TEXT DEFAULT "", created_by_name TEXT DEFAULT "", created_at INTEGER, updated_at INTEGER)');
 $pdo->exec('CREATE TABLE wp_scm_owner_credit_events(id INTEGER PRIMARY KEY AUTOINCREMENT, credit_id INTEGER, action TEXT, actor_id TEXT, actor_name TEXT, details_json TEXT, created_at INTEGER)');
 $pdo->exec('CREATE TABLE wp_jet_cct_contratos_arrendamiento(_ID INTEGER PRIMARY KEY, contrato TEXT, estado TEXT, inmueble TEXT, id_inmueble TEXT, id_inmueble_data TEXT, direccion TEXT, propietario TEXT, id_propietario TEXT, correo_propietario TEXT, celular_propietario TEXT, indicativo_propietario TEXT, valor_canon TEXT, valor_administracion TEXT, tasa_administracion TEXT, aseguradora TEXT, asegurado TEXT, inicio_contrato TEXT, fin_contrato TEXT, esta_sinestrado TEXT, id_contrato_mandato TEXT)');
@@ -103,7 +105,11 @@ $second = $service->byQuote(575);
 $secondWork = $service->workspace((int) $second['id']);
 $failed = array_column(array_filter($secondWork['policies'], static fn(array $p): bool => !$p['ok']), 'key');
 $check(in_array('prestamos', $failed, true) && in_array('siniestro', $failed, true) && in_array('vigencia', $failed, true), 'second request flags active loan, siniestro and contract about to expire');
-$check(str_contains($secondWork['income_source'], 'Estimado') && abs($secondWork['evaluation']['deductions']['comision'] - 238000) < 1, 'without mandate the commission is estimated with IVA');
+$usury = array_values(array_filter($secondWork['policies'], static fn(array $p): bool => $p['key'] === 'usura'))[0];
+$check($usury['ok'] && str_contains($usury['detail'], '28,59 % E.A.'), 'usury policy compares against the effective annual rate');
+$high = $service->workspace((int) $second['id'], ['rate' => '2,2']);
+$check(!array_values(array_filter($high['policies'], static fn(array $p): bool => $p['key'] === 'usura'))[0]['ok'], '2,2 % monthly (29,8 % E.A.) is above the 28,59 % E.A. usury even though 28,59/12 = 2,38 %');
+$check(str_contains($secondWork['income_source'], '15 %') && $secondWork['evaluation']['deductions']['otros'] === 300000.0 && $secondWork['evaluation']['deductions']['comision'] === 0.0, 'without mandate 15 % of the canon is deducted');
 try {
   $service->decide((int) $second['id'], 'rechazado', ['note' => 'corto'], $actor);
   $check(false, 'rejecting needs a reason');

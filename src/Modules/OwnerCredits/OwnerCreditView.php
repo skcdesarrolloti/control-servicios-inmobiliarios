@@ -216,11 +216,27 @@ final class OwnerCreditView
   {
     $field = static fn(string $label, string $control, string $hint = ''): string => '<label class="scm-cotizacion-dialog-field"><span>' . self::e($label) . '</span>' . $control . ($hint !== '' ? '<small>' . self::e($hint) . '</small>' : '') . '</label>';
     $pct = static fn(float $value, int $decimals = 2): string => number_format($value * 100, $decimals, ',', '');
-    return '<form class="scm-owner-credit-form" data-owner-credit-settings-form autocomplete="off"><section class="scm-maint-quote-section"><h4>Variables de entrada</h4><div class="scm-maint-quote-grid">'
-      . $field('Tasa de usura crédito de consumo (anual, %)', '<input name="usury_annual" inputmode="decimal" value="' . $pct($settings['usury_annual']) . '">', 'Consúltala en la Superfinanciera; se usa dividida en 12.')
-      . $field('Fecha de actualización de la usura', '<input type="date" name="usury_updated_at" value="' . self::e($settings['usury_updated_at']) . '">')
+    $auto = (bool) $settings['usury_auto'];
+    $lock = $auto ? ' readonly' : '';
+    $source = $auto
+      ? 'Automática desde datos.gov.co (Superfinanciera): interés bancario corriente de consumo y ordinario '
+        . $pct((float) $settings['usury_bank_rate']) . ' % × 1,5'
+        . ((string) $settings['usury_resolution'] !== '' ? ', resolución ' . $settings['usury_resolution'] : '')
+        . ((string) $settings['usury_valid_until'] !== '' ? ', vigente hasta ' . date('d/m/Y', (int) strtotime((string) $settings['usury_valid_until'])) : '') . '.'
+        . ((int) $settings['usury_synced_at'] > 0 ? ' Última consulta: ' . date('d/m/Y g:i a', (int) $settings['usury_synced_at']) . '.' : '')
+      : 'Manual: se usa la tasa escrita aquí.';
+    return '<form class="scm-owner-credit-form" data-owner-credit-settings-form autocomplete="off"><section class="scm-maint-quote-section"><h4>Tasa de usura</h4>'
+      . '<p class="scm-owner-credit-note">' . self::e($source) . '</p>'
+      . ((string) $settings['usury_sync_error'] !== '' ? '<p class="scm-owner-credit-note is-bad">No se pudo actualizar: ' . self::e($settings['usury_sync_error']) . ' Se conserva la última tasa.</p>' : '')
+      . '<div class="scm-maint-quote-grid">'
+      . $field('Origen de la tasa', '<select name="usury_auto"><option value="1"' . ($auto ? ' selected' : '') . '>Automática (datos.gov.co)</option><option value="0"' . ($auto ? '' : ' selected') . '>Manual</option></select>')
+      . $field('Tasa de usura (efectiva anual, %)', '<input name="usury_annual" inputmode="decimal" value="' . $pct($settings['usury_annual']) . '"' . $lock . '>', 'Límite legal: la tasa mensual del crédito no puede superar su equivalente mes vencido.')
+      . $field('Vigente desde', '<input type="date" name="usury_updated_at" value="' . self::e($settings['usury_updated_at']) . '"' . $lock . '>')
+      . '</div>' . ($auto ? '<button type="button" class="scm-btn-secondary" data-owner-credit-usury-refresh>Actualizar ahora desde datos.gov.co</button>' : '')
+      . '</section><section class="scm-maint-quote-section"><h4>Variables de entrada</h4><div class="scm-maint-quote-grid">'
       . $field('Tasa de referencia N.M.V (%)', '<input name="reference_rate" inputmode="decimal" value="' . $pct($settings['reference_rate']) . '">', 'Tasa normal de crédito de consumo de referencia.')
       . $field('Descuento por política (%)', '<input name="policy_discount" inputmode="decimal" value="' . $pct($settings['policy_discount'], 1) . '">')
+      . $field('Descuento sin contrato de mandato (% del canon)', '<input name="no_mandate_deduction" inputmode="decimal" value="' . $pct($settings['no_mandate_deduction'], 1) . '">', 'Se usa cuando el contrato no tiene mandato con comisión registrada.')
       . $field('Meses de ingreso neto a prestar', '<input type="number" name="income_months" min="1" max="24" value="' . (int) $settings['income_months'] . '">', 'Tope = ingreso neto × estos meses.')
       . $field('Meses mínimos de contrato restantes', '<input type="number" name="min_remaining_months" min="0" max="60" value="' . (int) $settings['min_remaining_months'] . '">', 'Por debajo se alerta "contrato próximo a vencer".')
       . $field('Plazo sugerido de la solicitud (meses)', '<input type="number" name="default_term" min="1" max="60" value="' . (int) $settings['default_term'] . '">')

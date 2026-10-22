@@ -8,6 +8,7 @@ use SCM\Core\App;
 use SCM\Modules\OwnerCredits\OwnerCreditCalculator;
 use SCM\Modules\OwnerCredits\OwnerCreditService;
 use SCM\Modules\OwnerCredits\OwnerCreditSettings;
+use SCM\Modules\OwnerCredits\OwnerCreditUsuryRate;
 use SCM\Modules\OwnerCredits\OwnerCreditView;
 
 $assert = static function (bool $condition, string $message): void {
@@ -48,6 +49,20 @@ $assert($near(OwnerCreditCalculator::payment(0.028, 12, 14000000), 1389730.21092
 $schedule = OwnerCreditCalculator::schedule(0.028, 12, 14000000);
 $assert(count($schedule) === 12 && $near($schedule[0]['interes'], 392000) && $near($schedule[0]['abono'], 997730.2109234515) && $near($schedule[1]['saldo'], 11976603.13224724), 'amortization rows match the workbook');
 $assert($near($schedule[11]['saldo'], 0.0) && $near(array_sum(array_column($schedule, 'abono')), 14000000), 'amortization closes the balance exactly');
+
+// Usura desde datos.gov.co (pare-7x5i): fila vigente de consumo y ordinario × 1,5.
+$rows = [
+  ['resolucion' => '1472', 'vigencia_desde' => '2026-10-01T00:00:00.000', 'vigencia_hasta' => '2026-10-31T00:00:00.000', 'interes_bancario_corriente' => '19.06%', 'modalidad' => 'CONSUMO Y ORDINARIO'],
+  ['resolucion' => '1472', 'vigencia_desde' => '2026-10-01T00:00:00.000', 'vigencia_hasta' => '2026-10-31T00:00:00.000', 'interes_bancario_corriente' => '44.44%', 'modalidad' => 'CONSUMO BAJO MONTO'],
+  ['resolucion' => '1260', 'vigencia_desde' => '2026-09-01T00:00:00.000', 'vigencia_hasta' => '2026-09-30T00:00:00.000', 'interes_bancario_corriente' => '19.49%', 'modalidad' => 'CONSUMO Y ORDINARIO'],
+  ['resolucion' => '1600', 'vigencia_desde' => '2026-11-01T00:00:00.000', 'vigencia_hasta' => '2026-11-30T00:00:00.000', 'interes_bancario_corriente' => '18.00%', 'modalidad' => 'CONSUMO Y ORDINARIO'],
+];
+$usury = OwnerCreditUsuryRate::fromRows($rows, '2026-10-22');
+$assert($usury !== null && $near($usury['usury_annual'], 0.2859, 1e-9) && $usury['usury_resolution'] === '1472' && $usury['usury_valid_until'] === '2026-10-31', 'usury = 1.5 × current consumer bank rate, ignoring other modalities and future months');
+$assert(OwnerCreditUsuryRate::fromRows([], '2026-10-22') === null, 'no rows keeps the stored rate');
+$legal = OwnerCreditCalculator::evaluate(['gross' => 1, 'deductions' => [], 'requested_amount' => 1, 'requested_term' => 1, 'request_ts' => time(), 'contract_end_ts' => time(), 'vacancy' => 'Baja'], ['usury_annual' => 0.2859] + $settings);
+$assert($near($legal['usury_monthly_legal'], 0.021176, 1e-6), 'legal monthly usury = (1 + E.A.)^(1/12) − 1');
+$assert($near(OwnerCreditSettings::normalize(['no_mandate_deduction' => '15'])['no_mandate_deduction'], 0.15, 1e-9), 'no-mandate deduction is configurable as a percentage');
 
 $assert($near(OwnerCreditService::money('52.661,669'), 52661.669) && $near(OwnerCreditService::money('1.075.000'), 1075000) && $near(OwnerCreditService::money('$ 893723.00'), 893723), 'money parser handles mandate and quote formats');
 $assert($near(OwnerCreditService::rate('2,8'), 0.028, 1e-12), 'rate inputs are N.M.V percentages');

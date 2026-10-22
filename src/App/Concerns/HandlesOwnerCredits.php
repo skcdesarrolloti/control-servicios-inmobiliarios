@@ -8,6 +8,7 @@ use SCM\Core\App;
 use SCM\Core\Auth;
 use SCM\Modules\OwnerCredits\OwnerCreditService;
 use SCM\Modules\OwnerCredits\OwnerCreditSettings;
+use SCM\Modules\OwnerCredits\OwnerCreditUsuryRate;
 use SCM\Modules\OwnerCredits\OwnerCreditView;
 
 /** Liquidador de créditos a propietarios (desde la cotización) y Métricas › Créditos. */
@@ -59,6 +60,7 @@ trait HandlesOwnerCredits
     $this->verifyCsrf();
     if (!$this->canViewOwnerCredits()) $this->jsonFail('No tienes permiso para ver créditos.');
     try {
+      OwnerCreditUsuryRate::sync(App::settings());
       $service = $this->ownerCreditService();
       $service->ensureSchema();
       $id = (int) ($_POST['credit_id'] ?? 0);
@@ -138,15 +140,19 @@ trait HandlesOwnerCredits
     $this->requireDashboardAction('owner_credit_configure', 'Tu cargo no tiene permiso para configurar créditos.');
     try {
       $view = new OwnerCreditView();
-      if (($_POST['mode'] ?? '') === 'save') {
-        $input = [];
-        foreach (array_keys(OwnerCreditSettings::defaults()) as $key) {
+      $mode = (string) ($_POST['mode'] ?? '');
+      if ($mode === 'save') {
+        // Se parte de lo guardado para no perder los datos de la última sincronización.
+        $input = OwnerCreditSettings::read(App::settings());
+        foreach (['usury_auto', 'usury_annual', 'usury_updated_at', 'reference_rate', 'policy_discount', 'no_mandate_deduction', 'income_months', 'min_remaining_months', 'default_term', 'notify_owner_email', 'notify_owner_whatsapp'] as $key) {
           if (isset($_POST[$key])) $input[$key] = sanitize_text_field(wp_unslash((string) $_POST[$key]));
         }
-        OwnerCreditSettings::save(App::settings(), $input, Auth::userId());
-        $this->jsonOk(['message' => 'Configuración de créditos guardada.']);
+        $saved = OwnerCreditSettings::save(App::settings(), $input, Auth::userId());
+        if ($saved['usury_auto']) OwnerCreditUsuryRate::sync(App::settings(), true);
+        $this->jsonOk(['message' => 'Configuración de créditos guardada.', 'html' => $view->settingsForm(OwnerCreditSettings::read(App::settings()))]);
       }
-      $this->jsonOk(['html' => $view->settingsForm(OwnerCreditSettings::read(App::settings()))]);
+      $settings = OwnerCreditUsuryRate::sync(App::settings(), $mode === 'refresh');
+      $this->jsonOk(['html' => $view->settingsForm($settings), 'message' => $mode === 'refresh' ? ((string) $settings['usury_sync_error'] === '' ? 'Tasa de usura actualizada.' : 'No se pudo actualizar la tasa.') : '']);
     } catch (\Throwable $error) {
       $this->ownerCreditFail($error, 'No se pudo guardar la configuración.');
     }

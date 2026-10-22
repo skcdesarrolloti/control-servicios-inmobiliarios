@@ -25,8 +25,15 @@ final class OwnerCreditSettings
   public static function defaults(): array
   {
     return [
-      'usury_annual' => 0.333,
-      'usury_updated_at' => '2024-03-20',
+      'usury_auto' => true,
+      'usury_annual' => 0.2859,
+      'usury_updated_at' => '2026-10-01',
+      'usury_valid_until' => '2026-10-31',
+      'usury_bank_rate' => 0.1906,
+      'usury_resolution' => '1472',
+      'usury_synced_at' => 0,
+      'usury_sync_error' => '',
+      'no_mandate_deduction' => 0.15,
       'reference_rate' => 0.0242,
       'policy_discount' => 0.05,
       'income_months' => 3,
@@ -63,9 +70,17 @@ final class OwnerCreditSettings
     $int = static fn($value, int $default, int $min, int $max): int => is_numeric($value) ? max($min, min($max, (int) $value)) : $default;
     $bool = static fn($value, bool $default): bool => $value === null ? $default : in_array(strtolower(trim((string) $value)), ['1', 'true', 'si', 'sí', 'on', 'yes'], true);
     $date = trim((string) ($input['usury_updated_at'] ?? ''));
+    $until = trim((string) ($input['usury_valid_until'] ?? ''));
     return [
+      'usury_auto' => $bool($input['usury_auto'] ?? null, $defaults['usury_auto']),
       'usury_annual' => $rate($input['usury_annual'] ?? null, $defaults['usury_annual'], 1.0),
       'usury_updated_at' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1 ? $date : $defaults['usury_updated_at'],
+      'usury_valid_until' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $until) === 1 ? $until : '',
+      'usury_bank_rate' => $rate($input['usury_bank_rate'] ?? null, 0.0, 1.0),
+      'usury_resolution' => mb_substr(trim((string) ($input['usury_resolution'] ?? '')), 0, 20),
+      'usury_synced_at' => max(0, (int) ($input['usury_synced_at'] ?? 0)),
+      'usury_sync_error' => mb_substr(trim((string) ($input['usury_sync_error'] ?? '')), 0, 200),
+      'no_mandate_deduction' => $rate($input['no_mandate_deduction'] ?? null, $defaults['no_mandate_deduction'], 1.0),
       'reference_rate' => $rate($input['reference_rate'] ?? null, $defaults['reference_rate'], 0.2),
       'policy_discount' => $rate($input['policy_discount'] ?? null, $defaults['policy_discount'], 1.0),
       'income_months' => $int($input['income_months'] ?? null, $defaults['income_months'], 1, 24),

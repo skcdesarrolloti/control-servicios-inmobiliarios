@@ -422,14 +422,13 @@ final class OwnerCreditService
 
   /**
    * Ingreso del propietario: canon del contrato y descuentos del contrato de mandato (comisión con IVA,
-   * garantía y póliza de servicios públicos). Sin mandato se estiman con la tasa de administración y la
-   * tasa de garantía de la aseguradora; el funcionario puede corregirlos en el liquidador.
+   * garantía y póliza de servicios públicos). Sin mandato se descuenta el porcentaje configurado del canon;
+   * el funcionario puede corregirlos en el liquidador.
    * @return array{gross:float,deductions:array<string,float>,source:string}
    */
   public function defaultIncome(array $contract): array
   {
     $canon = self::money($contract['valor_canon'] ?? '');
-    $admin = self::money($contract['valor_administracion'] ?? '');
     $deductions = array_fill_keys(array_keys(self::DEDUCTIONS), 0.0);
     $mandateId = (int) ($contract['id_contrato_mandato'] ?? 0);
     $mandateTable = $this->db->table('jet_cct_contrato_mandato');
@@ -442,15 +441,10 @@ final class OwnerCreditService
       $deductions['poliza_servicios'] = self::isYes($mandate['incluye_garantia_servicios'] ?? '') ? self::money($mandate['precio_mes_servicios'] ?? '') : 0.0;
       return ['gross' => $canon, 'deductions' => $deductions, 'source' => 'Contrato de mandato #' . $mandateId];
     }
-    $base = $canon + $admin;
-    $deductions['comision'] = round($base * self::money($contract['tasa_administracion'] ?? '') / 100 * 1.19);
-    $insurerTable = $this->db->table('jet_cct_aseguradoras');
-    $insurer = trim((string) ($contract['aseguradora'] ?? ''));
-    if ($insurer !== '' && self::isYes($contract['asegurado'] ?? 'Si') && $this->schema->tableExists($insurerTable)) {
-      $rate = (float) str_replace(',', '.', (string) $this->db->getVar("SELECT `garantia` FROM `{$insurerTable}` WHERE LOWER(TRIM(`nombre`)) = LOWER(?) LIMIT 1", [$insurer]));
-      $deductions['garantia'] = round($base * $rate / 100);
-    }
-    return ['gross' => $canon, 'deductions' => $deductions, 'source' => 'Estimado: el contrato no tiene mandato vinculado; revisa los descuentos.'];
+    // Sin mandato (o sin comisión registrada) se descuenta un porcentaje fijo del canon, configurable (15 % por defecto).
+    $percent = (float) $this->config()['no_mandate_deduction'];
+    $deductions['otros'] = round($canon * $percent);
+    return ['gross' => $canon, 'deductions' => $deductions, 'source' => 'Estimado: el contrato no tiene mandato con comisión registrada; se descuenta el ' . rtrim(rtrim(number_format($percent * 100, 2, ',', ''), '0'), ',') . ' % del canon. Corrige los descuentos si conoces los valores reales.'];
   }
 
   /** @return list<array{key:string,label:string,ok:bool,detail:string}> */
@@ -468,7 +462,7 @@ final class OwnerCreditService
       ['key' => 'siniestro', 'label' => 'Contrato no siniestrado', 'ok' => !self::isYes($contract['esta_sinestrado'] ?? ''), 'detail' => self::isYes($contract['esta_sinestrado'] ?? '') ? 'Cartera marcó el contrato como siniestrado.' : 'Sin siniestro registrado en cartera.'],
       ['key' => 'prestamos', 'label' => 'Sin otros créditos vigentes', 'ok' => $others === [], 'detail' => $others === [] ? 'El propietario no tiene créditos aprobados vigentes.' : 'Créditos vigentes: ' . implode(', ', array_map(static fn(array $row): string => '#' . $row['id'] . ' (contrato ' . $row['contract_code'] . ')', $others)) . '.'],
       ['key' => 'monto', 'label' => 'Valor dentro del tope', 'ok' => $amount > 0 && $amount <= $evaluation['max_amount'] + 0.5, 'detail' => $money($amount) . ' de un tope de ' . $money($evaluation['max_amount']) . ' (' . (int) $settings['income_months'] . ' × ingreso neto).'],
-      ['key' => 'usura', 'label' => 'Tasa por debajo de la usura', 'ok' => $rate <= $evaluation['usury_monthly'] + 1e-9, 'detail' => 'Tasa ' . $percent($rate) . ' N.M.V; usura mensual ' . $percent($evaluation['usury_monthly']) . '.'],
+      ['key' => 'usura', 'label' => 'Tasa por debajo de la usura', 'ok' => $rate <= $evaluation['usury_monthly_legal'] + 1e-9, 'detail' => 'Tasa ' . $percent($rate) . ' mes vencido (' . $percent((1 + $rate) ** 12 - 1) . ' E.A.); usura ' . $percent((float) $settings['usury_annual']) . ' E.A. = ' . $percent($evaluation['usury_monthly_legal']) . ' mensual' . ((string) $settings['usury_updated_at'] !== '' ? ', vigente desde ' . date('d/m/Y', (int) strtotime((string) $settings['usury_updated_at'])) : '') . '.'],
       ['key' => 'cuota', 'label' => 'Cuota cubierta por el ingreso neto', 'ok' => $payment > 0 && $payment <= $evaluation['net_income'], 'detail' => 'Cuota ' . $money($payment) . ' frente a ingreso neto de ' . $money($evaluation['net_income']) . '.'],
     ];
   }

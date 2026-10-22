@@ -10,7 +10,8 @@ namespace SCM\Modules\OwnerCredits;
  * - Ingreso neto (INO) = canon − comisión con IVA − garantía inmobiliaria − póliza de servicios públicos − otros.
  * - Política: monto máximo = INO × meses de política; plazo máximo = meses completos (30 días) hasta el fin del contrato;
  *   tasa de colocación = tasa de referencia N.M.V × (1 − descuento).
- * - Tasa de riesgo (cuando se supera la política) = (monto máx × tasa política + |exceso| × usura mensual) / valor solicitado.
+ * - Tasa de riesgo (cuando se supera la política) = (monto máx × tasa política + |exceso| × usura/12) / valor solicitado,
+ *   como en el Excel; el control legal compara contra la usura efectiva anual llevada a mes vencido.
  * - Condición sugerida por probabilidad de desocupación: Alta = 3 meses, tasa de riesgo, monto máximo;
  *   Media = plazo máximo, tasa de referencia, monto máximo; Baja = plazo y valor solicitados con la tasa de política.
  */
@@ -94,6 +95,8 @@ final class OwnerCreditCalculator
       'deductions_total' => array_sum($deductions),
       'net_income' => $net,
       'usury_monthly' => $usuryMonthly,
+      // Tope legal: la usura es efectiva anual; su equivalente mes vencido es (1 + E.A.)^(1/12) − 1.
+      'usury_monthly_legal' => (1 + (float) $settings['usury_annual']) ** (1 / 12) - 1,
       'policy_rate' => $policyRate,
       'max_months' => $maxMonths,
       'max_amount' => $maxAmount,
