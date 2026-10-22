@@ -5,7 +5,7 @@
   "components": [
     {
       "type": "BODY",
-      "text": "Hola, {{1}}.\n\n{{2}} #{{3}}.\nContrato: {{4}}.\nPropietario: {{5}}.\nDetalle: {{6}}.\n\nPuedes revisarlo en el panel desde el botón.",
+      "text": "Hola, {{1}}. Te escribimos desde el panel de SKC SuCasa Inmobiliaria con una novedad de créditos a propietarios.\n\nNovedad: {{2}} (crédito número {{3}}).\nContrato de arrendamiento: {{4}}.\nPropietario del inmueble: {{5}}.\nDetalle de la gestión: {{6}}.\n\nIngresa al panel desde el botón para revisar el liquidador, las políticas y la tabla de amortización del crédito.",
       "example": {
         "body_text": [
           [

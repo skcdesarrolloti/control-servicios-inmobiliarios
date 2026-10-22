@@ -6,6 +6,8 @@ Se envía al **propietario del contrato** cuando un funcionario aprueba o rechaz
 
 En Meta Business Suite abre **Administrador de WhatsApp → Plantillas de mensajes → Crear plantilla**. Usa la misma cuenta de WhatsApp que usa el panel.
 
+Selecciona el idioma **Español (COL)**, no English: el panel envía `es_CO`. Meta rechaza cuerpos con muchas variables y poco texto fijo ("demasiadas variables en relación con su longitud"); por eso los cuerpos llevan frases fijas alrededor de las variables.
+
 - Nombre exacto: `scm_credito_propietario_decision_v1`.
 - Categoría: **Utilidad** (`UTILITY`): informa el resultado de una solicitud que hizo el propietario.
 - Idioma: **Español (Colombia)** (`es_CO`).
@@ -17,13 +19,13 @@ En Meta Business Suite abre **Administrador de WhatsApp → Plantillas de mensaj
 ### Cuerpo para copiar
 
 ```text
-Buen día, {{1}}.
+Buen día, {{1}}. Le escribimos de SKC SuCasa Inmobiliaria sobre la solicitud de crédito que realizó como propietario.
 
-Su solicitud de crédito asociada al contrato #{{3}} fue {{2}}.
+Su solicitud de crédito asociada al contrato de arrendamiento número {{3}} fue {{2}}.
 
-{{4}}.
+Detalle: {{4}}.
 
-El detalle completo llegó a su correo.
+Le enviamos el detalle completo al correo registrado. Si tiene preguntas, puede responder este mensaje o comunicarse con nuestro equipo.
 ```
 
 ### Variables
@@ -53,14 +55,14 @@ Se envía a los **funcionarios elegidos en Notificaciones internas › Créditos
 ### Cuerpo para copiar
 
 ```text
-Hola, {{1}}.
+Hola, {{1}}. Te escribimos desde el panel de SKC SuCasa Inmobiliaria con una novedad de créditos a propietarios.
 
-{{2}} #{{3}}.
-Contrato: {{4}}.
-Propietario: {{5}}.
-Detalle: {{6}}.
+Novedad: {{2}} (crédito número {{3}}).
+Contrato de arrendamiento: {{4}}.
+Propietario del inmueble: {{5}}.
+Detalle de la gestión: {{6}}.
 
-Puedes revisarlo en el panel desde el botón.
+Ingresa al panel desde el botón para revisar el liquidador, las políticas y la tabla de amortización del crédito.
 ```
 
 ### Variables
