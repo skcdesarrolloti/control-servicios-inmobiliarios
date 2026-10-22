@@ -170,6 +170,25 @@ $manual = $service->find($service->createManual(8, 1000000, 6, 'Libre Destinaci�
 $check($manual['status'] === 'pendiente' && $manual['quote_id'] === null && (int) $manual['requested_term'] === 6, 'manual credit is created from the selected contract');
 $check($db->getRow('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 8')['fin_contrato'] === (string) strtotime(date('Y-m-d', strtotime('+1 year')) . ' 00:00:00'), 'manual credit saves the corrected contract end date');
 
+// Mandato con dos propietarios: se elige a quién se le hace el crédito.
+foreach (['propietarios', 'tipo_1', 'nombre_1', 'documento_1', 'correo_1', 'celular_1', 'indicativo_1', 'empresa_1', 'nit_1', 'id_propietario_nuevo_1', 'tipo_2', 'nombre_2', 'documento_2', 'correo_2', 'celular_2', 'indicativo_2', 'empresa_2', 'nit_2', 'id_propietario_nuevo_2'] as $column) {
+  $pdo->exec("ALTER TABLE wp_jet_cct_contrato_mandato ADD COLUMN {$column} TEXT");
+}
+$db->insert('wp_jet_cct_contrato_mandato', ['_ID' => 31, 'total_comision' => '100.000', 'incluye_garantia' => 'No', 'incluye_garantia_servicios' => 'No', 'propietarios' => '2',
+  'tipo_1' => 'Natural', 'nombre_1' => 'Primer Dueño', 'documento_1' => '111', 'celular_1' => '3001110000', 'indicativo_1' => '+57', 'id_propietario_nuevo_1' => '960',
+  'tipo_2' => 'Natural', 'nombre_2' => 'Segunda Dueña', 'documento_2' => '222', 'correo_2' => 'segunda@example.invalid', 'celular_2' => '+1 (813) 389-8958', 'indicativo_2' => '+57']);
+$db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 9, 'contrato' => '950', 'estado' => 'Entregado', 'inmueble' => '10600', 'propietario' => 'Primer Dueño', 'id_propietario' => '960', 'valor_canon' => '1.500.000', 'fin_contrato' => (string) strtotime('+2 years'), 'esta_sinestrado' => 'No', 'id_contrato_mandato' => '31']);
+$owners = $service->contractOwners(9);
+$check(count($owners) === 2 && $owners[1]['name'] === 'Segunda Dueña' && $owners[1]['phone'] === '18133898958' && $owners[0]['phone'] === '573001110000', 'mandate owners are offered as beneficiaries with normalized phones');
+try {
+  $service->createManual(9, 800000, 6, 'Libre Destinación', $actor);
+  $check(false, 'with several owners the beneficiary must be chosen');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'a quién se le hace el crédito'), 'with several owners the beneficiary must be chosen');
+}
+$chosen = $service->find($service->createManual(9, 800000, 6, 'Libre Destinación', $actor, '', 'mandato_2'));
+$check($chosen['owner_name'] === 'Segunda Dueña' && $chosen['owner_document'] === '222' && $chosen['owner_email'] === 'segunda@example.invalid' && $chosen['owner_id'] === 'doc:222', 'the credit is registered to the chosen owner');
+
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
 $template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-funcionario-v2-template.json'), true);
 $check(str_contains($source, "'" . $template['name'] . "'") && substr_count($template['components'][0]['text'], '{{') === 6, 'staff template name and its six variables match the code');

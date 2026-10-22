@@ -125,6 +125,19 @@ trait HandlesOwnerCredits
     }
   }
 
+  /** Propietarios del contrato elegido: a quién se le puede hacer el crédito. */
+  public function ajax_handler_owner_credit_owners(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('owner_credit_manage', 'Tu cargo no tiene permiso para crear créditos.');
+    try {
+      $owners = array_map(static fn(array $owner): array => array_intersect_key($owner, array_flip(['key', 'name', 'document', 'email', 'phone'])), $this->ownerCreditService()->contractOwners((int) ($_POST['contract_id'] ?? 0)));
+      $this->jsonOk(['owners' => $owners]);
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudieron cargar los propietarios del contrato.');
+    }
+  }
+
   /** Búsqueda de contratos para "Solicitud de crédito" (misma búsqueda de Crear caso). */
   public function ajax_handler_owner_credit_contracts(): void
   {
@@ -175,7 +188,8 @@ trait HandlesOwnerCredits
         (int) ($_POST['term'] ?? 0),
         sanitize_text_field(wp_unslash((string) ($_POST['purpose'] ?? ''))),
         $this->ticketCompletionActor(),
-        sanitize_text_field(wp_unslash((string) ($_POST['contract_end'] ?? '')))
+        sanitize_text_field(wp_unslash((string) ($_POST['contract_end'] ?? ''))),
+        sanitize_key((string) ($_POST['owner_key'] ?? ''))
       );
       $this->jsonOk(['credit_id' => $id, 'message' => 'Solicitud registrada.']);
     } catch (\Throwable $error) {

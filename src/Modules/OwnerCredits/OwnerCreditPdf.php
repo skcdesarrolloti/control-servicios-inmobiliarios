@@ -81,7 +81,7 @@ final class OwnerCreditPdf
     $html = '<article class="scm-acta-receipt scm-services-document scm-owner-credit-document">' . $letterhead . Doc::header(self::title($work), false)
       . '<p class="scm-acta-receipt-date">Cartagena de Indias, ' . date('d/m/Y') . ' · Documento interno para funcionarios</p>'
       . '<section class="scm-acta-receipt-section"><h2>1. Propietario y contrato</h2>' . Doc::table([
-        'Propietario' => (string) $credit['owner_name'],
+        'Propietario (beneficiario)' => (string) $credit['owner_name'] . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · Documento ' . $credit['owner_document'] : ''),
         'Contrato / Inmueble SIMI' => '#' . $contract['code'] . ' · ' . $credit['property'],
         'Dirección' => (string) $credit['address'],
         'Origen' => (int) $credit['quote_id'] > 0 ? 'Cotización #' . (int) $credit['quote_id'] . ((string) $credit['ticket_id'] !== '' ? ' · Caso #' . $credit['ticket_id'] : '') : 'Solicitud registrada en el panel',

@@ -128,7 +128,7 @@ final class OwnerCreditView
 
     return '<form class="!sp-font-sans !sp-text-service-navy !sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-5" data-owner-credit-form data-credit-id="' . (int) $credit['id'] . '" autocomplete="off">'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2">' . self::status((string) $credit['status'])
-      . $chip('Contrato', '#' . self::e($contract['code'])) . $chip('Propietario', self::e($credit['owner_name'])) . $chip('Inmueble', self::e($credit['property']))
+      . $chip('Contrato', '#' . self::e($contract['code'])) . $chip('Propietario', self::e($credit['owner_name']) . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · ' . self::e($credit['owner_document']) : '')) . $chip('Inmueble', self::e($credit['property']))
       . ((int) $credit['quote_id'] > 0 ? $chip('Cotización', '#' . (int) $credit['quote_id']) : $chip('Origen', 'Manual'))
       . '<button type="button" class="' . $ui::NAVY . ' !sp-ml-auto" data-owner-credit-pdf title="Documento interno para funcionarios">' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Ver PDF</button></div>'
 
@@ -376,7 +376,13 @@ final class OwnerCreditView
       . '<button type="button" class="' . $ui::NAVY . ' !sp-h-10 !sp-text-xs !sp-px-4" data-owner-credit-search>' . $ui::icon('filter', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Buscar</button></div>'
       . '<p class="' . self::NOTE . ' !sp-mt-3" data-owner-credit-search-status></p><div class="!sp-grid !sp-gap-2 !sp-max-h-72 !sp-overflow-y-auto !sp-mt-2" data-owner-credit-search-results></div>'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2 !sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-service-yellow !sp-bg-amber-50/40 !sp-text-xs" data-owner-credit-picked hidden></div></section>'
-      . '<section class="' . self::SECTION . '" data-owner-credit-request hidden><h4 class="' . self::H4 . '">' . $step('2') . 'Datos de la solicitud</h4>'
+      . '<section class="' . self::SECTION . '" data-owner-credit-owner-step hidden><h4 class="' . self::H4 . '">' . $step('2') . '¿A quién se le hace el crédito?</h4>'
+      . self::guide('nuevo-beneficiario', [
+        'Quiénes aparecen' => 'Los propietarios registrados en el contrato de mandato del inmueble (pueden ser varios). Si el contrato no tiene mandato, aparece el propietario del contrato de arrendamiento.',
+        'Para qué sirve' => 'El crédito, sus avisos y la revisión de otros créditos vigentes quedan a nombre de esa persona.',
+      ])
+      . '<div class="!sp-grid !sp-gap-2" data-owner-credit-owners role="radiogroup" aria-label="Propietario beneficiario"></div></section>'
+      . '<section class="' . self::SECTION . '" data-owner-credit-request hidden><h4 class="' . self::H4 . '">' . $step('3') . 'Datos de la solicitud</h4>'
       . self::guide('nuevo-datos', [
         'Qué pasa al registrar' => 'Solo se registra lo que pide el propietario: todavía no se aprueba nada. Se abre el liquidador para evaluarlo y ahí se aprueba o rechaza.',
         'Plazo solicitado' => 'Escribe los meses que pidió el propietario. No puede superar los meses que faltan para el fin del contrato.',

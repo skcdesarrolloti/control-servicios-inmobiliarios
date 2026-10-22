@@ -218,16 +218,38 @@
     function pickContract(form, contract) {
       var picked = form.querySelector("[data-owner-credit-picked]");
       var request = form.querySelector("[data-owner-credit-request]");
+      var ownerStep = form.querySelector("[data-owner-credit-owner-step]");
       form.elements.contract_id.value = contract ? String(contract.id) : "";
       form.querySelector("[data-owner-credit-search-results]").hidden = !!contract;
       picked.hidden = !contract;
       request.hidden = !contract;
+      ownerStep.hidden = !contract;
       if (!contract) return;
+      loadOwners(form, contract.id);
       picked.innerHTML = "<span><b>Contrato " + escapeHtml(contract.contrato) + "</b> · " + escapeHtml(contract.propietario) + " · " + escapeHtml(contract.direccion) + "</span>" +
         '<button type="button" class="!sp-p-0 !sp-bg-transparent !sp-border-0 !sp-text-[11px] !sp-font-semibold !sp-text-service-blue !sp-underline !sp-cursor-pointer" data-owner-credit-unpick>Cambiar contrato</button>';
       form.elements.contract_end.value = contract.fin_iso || "";
       updateTermHint(form);
       form.elements.amount.focus();
+    }
+
+    // Propietarios del contrato (mandato): a quién se le hace el crédito. Con uno solo queda elegido.
+    function loadOwners(form, contractId) {
+      var list = form.querySelector("[data-owner-credit-owners]");
+      list.innerHTML = '<p class="' + UI.note + '">Cargando propietarios…</p>';
+      post("scm_owner_credit_owners", { contract_id: contractId })
+        .then(function (data) {
+          var owners = data.owners || [];
+          if (!owners.length) { list.innerHTML = '<p class="' + UI.note + '">El contrato no tiene propietario registrado.</p>'; return; }
+          list.innerHTML = owners.map(function (owner, index) {
+            var detail = [owner.document ? "Documento " + owner.document : "", owner.phone ? "Cel. " + owner.phone : "", owner.email || ""].filter(Boolean).join(" · ");
+            return '<label class="!sp-flex !sp-items-start !sp-gap-3 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-white !sp-cursor-pointer hover:!sp-border-service-yellow">' +
+              '<input type="radio" name="owner_key" value="' + escapeHtml(owner.key) + '"' + (owners.length === 1 ? " checked" : "") + ' required class="!sp-mt-1">' +
+              '<span><strong class="!sp-block !sp-text-xs !sp-text-service-navy">' + escapeHtml(owner.name) + "</strong>" +
+              '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">' + escapeHtml(detail || "Sin datos de contacto") + "</span></span></label>";
+          }).join("");
+        })
+        .catch(function (error) { list.innerHTML = '<p class="' + UI.note + '">' + escapeHtml(error.message) + "</p>"; });
     }
 
     // Mismo cálculo del servidor: meses completos de 30 días entre hoy y la fecha fin.
@@ -440,6 +462,7 @@
       if (form.matches("[data-owner-credit-new-form]")) {
         event.preventDefault();
         if (!form.elements.contract_id.value) { setStatus(form, "Busca y selecciona el contrato.", "error"); return; }
+        if (!form.querySelector('[name="owner_key"]:checked')) { setStatus(form, "Selecciona a quién se le hace el crédito.", "error"); return; }
         setStatus(form, "Creando…", "");
         post("scm_owner_credit_create", new FormData(form))
           .then(function (data) { loadReport(true); return openCredit({ credit_id: data.credit_id }); })

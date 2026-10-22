@@ -72,7 +72,7 @@ final class OwnerCreditService
       contract_id BIGINT UNSIGNED NOT NULL DEFAULT 0, contract_code VARCHAR(60) NOT NULL DEFAULT '',
       property VARCHAR(60) NOT NULL DEFAULT '', address VARCHAR(255) NOT NULL DEFAULT '',
       owner_id VARCHAR(60) NOT NULL DEFAULT '', owner_name VARCHAR(190) NOT NULL DEFAULT '',
-      owner_email VARCHAR(190) NOT NULL DEFAULT '', owner_phone VARCHAR(40) NOT NULL DEFAULT '',
+      owner_email VARCHAR(190) NOT NULL DEFAULT '', owner_phone VARCHAR(40) NOT NULL DEFAULT '', owner_document VARCHAR(40) NOT NULL DEFAULT '',
       purpose VARCHAR(120) NOT NULL DEFAULT '', status VARCHAR(20) NOT NULL DEFAULT 'pendiente',
       requested_amount DECIMAL(14,2) NOT NULL DEFAULT 0, requested_term INT NOT NULL DEFAULT 0,
       vacancy VARCHAR(10) NOT NULL DEFAULT 'Baja', gross_income DECIMAL(14,2) NOT NULL DEFAULT 0,
@@ -92,6 +92,11 @@ final class OwnerCreditService
       action VARCHAR(40) NOT NULL, actor_id VARCHAR(40) NOT NULL DEFAULT '', actor_name VARCHAR(190) NOT NULL DEFAULT '',
       details_json MEDIUMTEXT NOT NULL, created_at BIGINT NOT NULL, KEY idx_credit (credit_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    if (!$this->schema->columnExists($this->table(), 'owner_document')) {
+      $this->db->pdo()->exec("ALTER TABLE `{$this->table()}` ADD COLUMN owner_document VARCHAR(40) NOT NULL DEFAULT ''");
+      // El inspector guarda las columnas en caché: uno nuevo ya ve la columna agregada.
+      $this->schema = new SchemaInspector($this->db);
+    }
   }
 
   /**
@@ -137,18 +142,25 @@ final class OwnerCreditService
   }
 
   /** Crédito sin cotización, a partir del número de contrato. */
-  public function createManual(int $contractId, float $amount, int $term, string $purpose, array $actor, string $contractEnd = ''): int
+  public function createManual(int $contractId, float $amount, int $term, string $purpose, array $actor, string $contractEnd = '', string $ownerKey = ''): int
   {
     $this->ensureSchema();
     $contract = $this->contractById($contractId);
     if ($contract === null) throw new \DomainException('Selecciona un contrato de la búsqueda.');
+    $owners = $this->contractOwners($contractId);
+    $owner = null;
+    foreach ($owners as $candidate) if ($candidate['key'] === $ownerKey) $owner = $candidate;
+    if ($owner === null) {
+      if (count($owners) > 1) throw new \DomainException('Selecciona a quién se le hace el crédito.');
+      $owner = $owners[0] ?? null;
+    }
     if ($amount <= 0) throw new \DomainException('Indica el valor solicitado.');
     $storedEnd = self::timestamp($contract['fin_contrato'] ?? '');
     $endTs = self::dateInput($contractEnd) ?: $storedEnd;
     $maxMonths = OwnerCreditCalculator::monthsUntil(time(), $endTs);
     if ($term <= 0) throw new \DomainException('Indica el plazo solicitado en meses.');
     if ($term > $maxMonths) throw new \DomainException(self::termMessage($term, $maxMonths));
-    $id = $this->insertCredit($contract, null, '', $amount, $purpose, $actor, $term);
+    $id = $this->insertCredit($contract, null, '', $amount, $purpose, $actor, $term, $owner);
     // La fecha fin corregida en el formulario se guarda en el contrato (con historial).
     if ($endTs !== $storedEnd) $this->saveContractEnd($this->find($id) ?? [], $endTs, $actor);
     $this->notifyRequested($id);
@@ -443,25 +455,27 @@ final class OwnerCreditService
     return $this->insertCredit($contract, $quoteId, (string) ($quote['id_ticket'] ?? ''), self::money($quote['total'] ?? ''), 'Para Mejoras y/o Reparaciones al Inmueble', $actor);
   }
 
-  private function insertCredit(array $contract, ?int $quoteId, string $ticketId, float $amount, string $purpose, array $actor, int $term = 0): int
+  /** @param array<string,string>|null $owner beneficiario elegido (contractOwners); sin él, el propietario del contrato */
+  private function insertCredit(array $contract, ?int $quoteId, string $ticketId, float $amount, string $purpose, array $actor, int $term = 0, ?array $owner = null): int
   {
+    $owner ??= $this->contractOwners((int) ($contract['_ID'] ?? 0))[0] ?? null;
     // Sin plazo por defecto ($term = 0): lo escribe el funcionario según lo que pidió el propietario.
     $income = $this->defaultIncome($contract);
     $now = time();
-    $phone = trim((string) ($contract['celular_propietario'] ?? ''));
-    $prefix = preg_replace('/\D/', '', (string) ($contract['indicativo_propietario'] ?? '')) ?? '';
-    $this->db->insert($this->table(), [
+    $phone = $owner !== null ? $owner['phone'] : self::phone((string) ($contract['celular_propietario'] ?? ''), (string) ($contract['indicativo_propietario'] ?? ''));
+    $this->db->insert($this->table(), $this->schema->filterTableData($this->table(), [
       'quote_id' => $quoteId, 'ticket_id' => $ticketId,
       'contract_id' => (int) ($contract['_ID'] ?? 0), 'contract_code' => (string) ($contract['contrato'] ?? ''),
       'property' => (string) ($contract['inmueble'] ?? $contract['id_inmueble'] ?? ''), 'address' => mb_substr((string) ($contract['direccion'] ?? ''), 0, 255),
-      'owner_id' => (string) ($contract['id_propietario'] ?? ''), 'owner_name' => mb_substr((string) ($contract['propietario'] ?? ''), 0, 190),
-      'owner_email' => mb_substr(trim((string) ($contract['correo_propietario'] ?? '')), 0, 190),
-      'owner_phone' => $phone !== '' && $prefix !== '' && !str_starts_with(preg_replace('/\D/', '', $phone) ?? '', $prefix) ? $prefix . $phone : $phone,
+      'owner_id' => $owner !== null ? $owner['owner_id'] : (string) ($contract['id_propietario'] ?? ''),
+      'owner_name' => mb_substr($owner !== null ? $owner['name'] : (string) ($contract['propietario'] ?? ''), 0, 190),
+      'owner_email' => mb_substr($owner !== null ? $owner['email'] : trim((string) ($contract['correo_propietario'] ?? '')), 0, 190),
+      'owner_phone' => mb_substr($phone, 0, 40), 'owner_document' => mb_substr($owner !== null ? $owner['document'] : '', 0, 40),
       'purpose' => $purpose, 'status' => 'pendiente', 'requested_amount' => round($amount, 2), 'requested_term' => $term,
       'vacancy' => 'Baja', 'gross_income' => $income['gross'], 'deductions_json' => json_encode($income['deductions'], JSON_THROW_ON_ERROR),
       'created_by_id' => (string) ($actor['employee_id'] ?? ''), 'created_by_name' => (string) ($actor['name'] ?? ''),
       'created_at' => $now, 'updated_at' => $now,
-    ]);
+    ]));
     $id = (int) $this->db->lastInsertId();
     $this->event($id, 'solicitado', $actor, ['cotizacion' => $quoteId, 'valor' => $amount]);
     $this->recordRequestHistory($id, $actor, false);
@@ -753,6 +767,57 @@ final class OwnerCreditService
       error_log('[owner-credit-staff-wa:' . $action . '] ' . $error->getMessage());
       return 0;
     }
+  }
+
+  /**
+   * Personas a las que se les puede hacer el crédito: los propietarios del contrato de mandato (1 a 6) o,
+   * sin mandato, el propietario del contrato de arrendamiento.
+   * @return list<array{key:string,name:string,document:string,email:string,phone:string,owner_id:string}>
+   */
+  public function contractOwners(int $contractId): array
+  {
+    $contract = $this->contractById($contractId);
+    if ($contract === null) return [];
+    $owners = [];
+    $mandateTable = $this->db->table('jet_cct_contrato_mandato');
+    $mandateId = (int) ($contract['id_contrato_mandato'] ?? 0);
+    $mandate = $mandateId > 0 && $this->schema->tableExists($mandateTable) ? $this->db->getRow("SELECT * FROM `{$mandateTable}` WHERE `_ID` = ? LIMIT 1", [$mandateId]) : null;
+    if (is_array($mandate)) {
+      $count = max(1, min(6, (int) ($mandate['propietarios'] ?? 1)));
+      for ($i = 1; $i <= $count; $i++) {
+        $company = strcasecmp(trim((string) ($mandate['tipo_' . $i] ?? '')), 'Natural') !== 0 && trim((string) ($mandate['empresa_' . $i] ?? '')) !== '';
+        $name = trim((string) ($company ? $mandate['empresa_' . $i] : ($mandate['nombre_' . $i] ?? '')));
+        if ($name === '') continue;
+        $document = trim((string) ($company ? ($mandate['nit_' . $i] ?? '') : ($mandate['documento_' . $i] ?? '')));
+        $ownerId = trim((string) ($mandate['id_propietario_nuevo_' . $i] ?? ''));
+        if ($ownerId === '') $ownerId = $i === 1 ? (string) ($contract['id_propietario'] ?? '') : 'doc:' . $document;
+        $owners[] = [
+          'key' => 'mandato_' . $i, 'name' => $name, 'document' => $document,
+          'email' => trim((string) ($mandate['correo_' . $i] ?? '')),
+          'phone' => self::phone((string) ($mandate['celular_' . $i] ?? ''), (string) ($mandate['indicativo_' . $i] ?? '')),
+          'owner_id' => $ownerId,
+        ];
+      }
+    }
+    if ($owners === []) {
+      $owners[] = [
+        'key' => 'contrato', 'name' => trim((string) ($contract['propietario'] ?? '')), 'document' => '',
+        'email' => trim((string) ($contract['correo_propietario'] ?? '')),
+        'phone' => self::phone((string) ($contract['celular_propietario'] ?? ''), (string) ($contract['indicativo_propietario'] ?? '')),
+        'owner_id' => (string) ($contract['id_propietario'] ?? ''),
+      ];
+    }
+    return $owners;
+  }
+
+  /** Celular con indicativo en dígitos (+57 314 5106244 → 573145106244). */
+  private static function phone(string $phone, string $prefix): string
+  {
+    $digits = preg_replace('/\D/', '', $phone) ?? '';
+    $prefixDigits = preg_replace('/\D/', '', $prefix) ?? '';
+    if ($digits === '') return '';
+    if (str_starts_with(trim($phone), '+') || $prefixDigits === '' || str_starts_with($digits, $prefixDigits)) return $digits;
+    return $prefixDigits . $digits;
   }
 
   /** @return array<string,mixed>|null */
