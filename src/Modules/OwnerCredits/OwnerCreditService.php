@@ -712,7 +712,7 @@ final class OwnerCreditService
     try {
       $copies = InternalNotificationRecipients::emailsForAction($this->db, $action);
       if ($copies === []) return 0;
-      $url = (defined('SCM_BASE_URL') ? SCM_BASE_URL : '') . '/index.php?tab=metricas_creditos';
+      $url = (defined('SCM_BASE_URL') ? SCM_BASE_URL : '') . '/index.php?tab=credito_propietario';
       return (new EmailQueue($this->db))->enqueue($copies, $title, EmailTemplate::render($title, '<p>' . EmailTemplate::e($details) . '</p>', ['buttons' => [['url' => $url, 'label' => 'Abrir créditos']]]), [
         'source_module' => $action, 'internal_action' => $action, 'internal_cc' => $copies,
         'dedupe_key' => 'internal-admin:' . $action . ':' . $reference, 'meta' => ['event' => $action],
@@ -731,7 +731,7 @@ final class OwnerCreditService
   {
     try {
       if (!$this->config()['notify_staff_whatsapp']) return 0;
-      $base = parse_url((defined('SCM_BASE_URL') ? (string) SCM_BASE_URL : '') . '/index.php?tab=metricas_creditos');
+      $base = parse_url((defined('SCM_BASE_URL') ? (string) SCM_BASE_URL : '') . '/index.php?tab=credito_propietario');
       $suffix = ltrim((string) ($base['path'] ?? ''), '/') . (isset($base['query']) ? '?' . $base['query'] : '');
       $clean = static fn($value, int $limit): string => mb_substr(preg_replace('/\s+/u', ' ', trim((string) $value)) ?: 'Sin dato', 0, $limit);
       $sms = new SmsQueue($this->db);

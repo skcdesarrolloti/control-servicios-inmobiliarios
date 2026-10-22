@@ -31,7 +31,7 @@
           "text": "Abrir créditos",
           "url": "https://sucasainmobiliaria.com.co/{{1}}",
           "example": [
-            "control-servicios-inmobiliarios/public/index.php?tab=metricas_creditos"
+            "control-servicios-inmobiliarios/public/index.php?tab=credito_propietario"
           ]
         }
       ]

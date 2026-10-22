@@ -25503,7 +25503,7 @@
         activePanel.id !== "scm-panel-metricas-preventivas" &&
         activePanel.id !== "scm-panel-metricas-servicios-publicos" &&
         activePanel.id !== "scm-panel-metricas-crecimiento" &&
-        activePanel.id !== "scm-panel-metricas-creditos" &&
+        activePanel.id !== "scm-panel-credito-propietario" &&
         !dashboardFilterOptionsLoaded &&
         !skipFilterOptions
       ) {
@@ -25540,7 +25540,7 @@
       if (activePanel.id === "scm-panel-metricas-preventivas" || activePanel.id === "scm-panel-metricas-servicios-publicos" || activePanel.id === "scm-panel-metricas-crecimiento") {
         return loadMaintenanceMetrics(activePanel.querySelector("[data-maint-metrics]"), false);
       }
-      if (activePanel.id === "scm-panel-metricas-creditos") {
+      if (activePanel.id === "scm-panel-credito-propietario") {
         var creditsModule = activePanel.querySelector("[data-scm-owner-credits]");
         if (creditsModule) {
           creditsModule.dispatchEvent(new CustomEvent("scm:load-owner-credits"));

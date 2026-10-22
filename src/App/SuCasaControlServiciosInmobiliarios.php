@@ -358,7 +358,7 @@ final class SuCasaControlServiciosInmobiliarios
       'metricas_desocupaciones' => 'Desocupaciones',
       'metricas_ocupaciones_vs' => 'Ocupaciones vs Desocupaciones',
       'metricas_crecimiento' => 'Crecimiento de la empresa',
-      'metricas_creditos' => 'Créditos a propietarios',
+      'credito_propietario' => 'Créditos a propietarios',
     ];
   }
 
@@ -366,7 +366,7 @@ final class SuCasaControlServiciosInmobiliarios
   private const DERIVED_DASHBOARD_TABS = [
     'calendario_actividades' => ['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble'],
     'actividades_contractuales' => ['contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga'],
-    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento', 'metricas_creditos'],
+    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento', 'credito_propietario'],
     // Panel compartido de ocupaciones y desocupaciones (una consulta para sus tres vistas).
     'metricas_contratos' => ['metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs'],
   ];
@@ -761,6 +761,10 @@ final class SuCasaControlServiciosInmobiliarios
     foreach ($raw as $cargo => $tabs) {
       if (in_array('metricas_contratos', (array) $tabs, true)) {
         $raw[$cargo] = array_merge((array) $tabs, self::DERIVED_DASHBOARD_TABS['metricas_contratos']);
+      }
+      // Créditos a propietarios se guardó primero como "metricas_creditos".
+      if (in_array('metricas_creditos', (array) $raw[$cargo], true)) {
+        $raw[$cargo] = array_merge((array) $raw[$cargo], ['credito_propietario']);
       }
     }
     return $this->sanitizeDashboardPermissions($raw);

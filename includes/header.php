@@ -307,8 +307,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'metricas_servicios_publicos';
   } elseif (in_array($tabParam, ['metricas_crecimiento', 'crecimiento', 'scm-panel-metricas-crecimiento'], true)) {
     $current_page = 'metricas_crecimiento';
-  } elseif (in_array($tabParam, ['metricas_creditos', 'creditos', 'scm-panel-metricas-creditos'], true)) {
-    $current_page = 'metricas_creditos';
+  } elseif (in_array($tabParam, ['credito_propietario', 'metricas_creditos', 'creditos', 'scm-panel-credito-propietario'], true)) {
+    $current_page = 'credito_propietario';
   } else {
     $current_page = empty($tabParam) ? 'inicio' : 'abiertos';
   }
@@ -644,16 +644,6 @@ $rawNavItems = [
         'icon' => 'request_quote',
         'perms' => ['metricas_cotizaciones'],
       ],
-      'metricas_creditos' => [
-        'key' => 'metricas_creditos',
-        'group' => 'Mantenimiento',
-        'group_icon' => 'build',
-        'label' => 'Créditos a propietarios',
-        'panel_id' => 'scm-panel-metricas-creditos',
-        'url' => $baseUrl . '/index.php?tab=metricas_creditos',
-        'icon' => 'payments',
-        'perms' => ['metricas_creditos'],
-      ],
       'metricas_preventivas' => [
         'key' => 'metricas_preventivas',
         'group' => 'Mantenimiento',
@@ -716,6 +706,17 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=metricas_crecimiento',
         'icon' => 'trending_up',
         'perms' => ['metricas_crecimiento'],
+      ],
+      // Grupo Créditos: hoy solo propietarios; otros actores (arrendatarios, proveedores…) serán opciones hermanas.
+      'credito_propietario' => [
+        'key' => 'credito_propietario',
+        'group' => 'Créditos',
+        'group_icon' => 'payments',
+        'label' => 'Propietarios',
+        'panel_id' => 'scm-panel-credito-propietario',
+        'url' => $baseUrl . '/index.php?tab=credito_propietario',
+        'icon' => 'real_estate_agent',
+        'perms' => ['credito_propietario'],
       ],
     ],
   ],

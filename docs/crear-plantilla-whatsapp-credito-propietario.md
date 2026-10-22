@@ -86,6 +86,6 @@ Agrega un botón **Visitar sitio web** con:
 - Texto: `Abrir créditos`.
 - Tipo de URL: **Dinámica**.
 - URL: `https://sucasainmobiliaria.com.co/{{1}}`.
-- Ejemplo del sufijo: `control-servicios-inmobiliarios/public/index.php?tab=metricas_creditos`.
+- Ejemplo del sufijo: `control-servicios-inmobiliarios/public/index.php?tab=credito_propietario`.
 
 Cuando Meta la marque como **Aprobada**, activa la opción en Configuración. La definición para la API está en `whatsapp-credito-propietario-funcionario-v2-template.json`.

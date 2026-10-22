@@ -22,7 +22,7 @@ trait HandlesOwnerCredits
   /** Ver el liquidador: quien ve créditos en métricas o puede gestionar el financiamiento de la cotización. */
   private function canViewOwnerCredits(): bool
   {
-    return $this->canAccessDashboardTab('metricas_creditos') || $this->canUseDashboardAction('quote_financing');
+    return $this->canAccessDashboardTab('credito_propietario') || $this->canUseDashboardAction('quote_financing');
   }
 
   /** @return array<string,string> */
@@ -45,7 +45,7 @@ trait HandlesOwnerCredits
   public function ajax_handler_owner_credit_report(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('metricas_creditos')) $this->jsonFail('No tienes permiso para ver créditos.');
+    if (!$this->canAccessDashboardTab('credito_propietario')) $this->jsonFail('No tienes permiso para ver créditos.');
     try {
       $filters = [];
       foreach (['status', 'from', 'to', 'search'] as $key) $filters[$key] = trim(sanitize_text_field(wp_unslash((string) ($_POST[$key] ?? ''))));
@@ -145,7 +145,7 @@ trait HandlesOwnerCredits
   {
     $this->verifyCsrf();
     $this->requireDashboardAction('owner_credit_manage', 'Tu cargo no tiene permiso para crear créditos.');
-    if (!$this->canAccessDashboardTab('metricas_creditos')) $this->jsonFail('No tienes permiso para ver créditos.');
+    if (!$this->canAccessDashboardTab('credito_propietario')) $this->jsonFail('No tienes permiso para ver créditos.');
     try {
       $id = $this->ownerCreditService()->createManual(
         (int) ($_POST['contract_id'] ?? 0),
