@@ -137,13 +137,20 @@ final class OwnerCreditService
   }
 
   /** Crédito sin cotización, a partir del número de contrato. */
-  public function createManual(string $contractRef, float $amount, string $purpose, array $actor): int
+  public function createManual(int $contractId, float $amount, int $term, string $purpose, array $actor, string $contractEnd = ''): int
   {
     $this->ensureSchema();
-    $contract = $this->contractByRef($contractRef);
-    if ($contract === null) throw new \DomainException('No se encontró el contrato ' . $contractRef . '.');
+    $contract = $this->contractById($contractId);
+    if ($contract === null) throw new \DomainException('Selecciona un contrato de la búsqueda.');
     if ($amount <= 0) throw new \DomainException('Indica el valor solicitado.');
-    $id = $this->insertCredit($contract, null, '', $amount, $purpose, $actor);
+    $storedEnd = self::timestamp($contract['fin_contrato'] ?? '');
+    $endTs = self::dateInput($contractEnd) ?: $storedEnd;
+    $maxMonths = OwnerCreditCalculator::monthsUntil(time(), $endTs);
+    if ($term <= 0) throw new \DomainException('Indica el plazo solicitado en meses.');
+    if ($term > $maxMonths) throw new \DomainException(self::termMessage($term, $maxMonths));
+    $id = $this->insertCredit($contract, null, '', $amount, $purpose, $actor, $term);
+    // La fecha fin corregida en el formulario se guarda en el contrato (con historial).
+    if ($endTs !== $storedEnd) $this->saveContractEnd($this->find($id) ?? [], $endTs, $actor);
     $this->notifyRequested($id);
     return $id;
   }
@@ -181,7 +188,9 @@ final class OwnerCreditService
     $requestedTerm = array_key_exists('requested_term', $input) ? max(0, (int) $input['requested_term']) : ((int) $credit['requested_term'] ?: (int) $settings['default_term']);
     $vacancy = (string) ($input['vacancy'] ?? $credit['vacancy'] ?? 'Baja');
     $requestTs = (int) $credit['created_at'];
-    $endTs = self::timestamp($contract['fin_contrato'] ?? '');
+    $storedEndTs = self::timestamp($contract['fin_contrato'] ?? '');
+    $inputEndTs = self::dateInput($input['contract_end'] ?? '');
+    $endTs = $inputEndTs > 0 ? $inputEndTs : $storedEndTs;
     $evaluation = OwnerCreditCalculator::evaluate([
       'gross' => $gross, 'deductions' => $deductions, 'requested_amount' => $requested, 'requested_term' => $requestedTerm,
       'request_ts' => $credit['status'] === 'pendiente' ? time() : $requestTs, 'contract_end_ts' => $endTs, 'vacancy' => $vacancy,
@@ -194,17 +203,20 @@ final class OwnerCreditService
     $rate = array_key_exists('rate', $input) ? self::rate($input['rate']) : ($decided ? (float) $credit['approved_rate'] : round((float) $suggested['rate'], 6));
     $payment = OwnerCreditCalculator::payment($rate, $term, $amount);
     $schedule = OwnerCreditCalculator::schedule($rate, $term, $amount);
-    $policies = $this->policies($credit, $contract, $evaluation, $settings, $amount, $term, $rate, $payment);
+    $policies = $this->policies($credit, $contract, $evaluation, $settings, $amount, $term, $rate, $payment, $endTs);
+    // El plazo solicitado nunca puede pasar de los meses que faltan entre la solicitud y el fin del contrato.
+    $termError = $requestedTerm <= 0 ? 'Indica el plazo solicitado en meses.' : ($requestedTerm > $evaluation['max_months'] ? self::termMessage($requestedTerm, $evaluation['max_months']) : '');
 
     return [
       'credit' => $credit,
       'contract' => [
         'id' => (int) ($contract['_ID'] ?? 0), 'code' => (string) ($contract['contrato'] ?? $credit['contract_code']),
         'estado' => (string) ($contract['estado'] ?? ''), 'inicio_ts' => self::timestamp($contract['inicio_contrato'] ?? ''),
-        'fin_ts' => $endTs, 'canon' => self::money($contract['valor_canon'] ?? ''), 'siniestrado' => self::isYes($contract['esta_sinestrado'] ?? ''),
+        'fin_ts' => $endTs, 'fin_saved_ts' => $storedEndTs, 'canon' => self::money($contract['valor_canon'] ?? ''), 'siniestrado' => self::isYes($contract['esta_sinestrado'] ?? ''),
         'aseguradora' => (string) ($contract['aseguradora'] ?? ''),
       ],
       'income_source' => $defaults['source'],
+      'term_error' => $termError,
       'settings' => $settings,
       'evaluation' => $evaluation,
       'conditions' => ['amount' => $amount, 'term' => $term, 'rate' => $rate, 'payment' => $payment, 'total_interest' => array_sum(array_column($schedule, 'interes'))],
@@ -233,6 +245,8 @@ final class OwnerCreditService
       if (!is_array($locked)) throw new \DomainException('El crédito ya no existe.');
       if ($locked['status'] !== 'pendiente') throw new \DomainException('Este crédito ya fue ' . strtolower(self::STATUSES[$locked['status']] ?? $locked['status']) . '.');
       $work = $this->workspace($id, $input);
+      if ($decision === 'aprobado' && $work['term_error'] !== '') throw new \DomainException($work['term_error']);
+      if ($work['contract']['fin_ts'] !== $work['contract']['fin_saved_ts']) $this->saveContractEnd($locked, $work['contract']['fin_ts'], $actor);
       $conditions = $work['conditions'];
       $evaluation = $work['evaluation'];
       if ($decision === 'rechazado' && mb_strlen($note) < self::MIN_NOTE) throw new \DomainException('Escribe el motivo del rechazo (mínimo ' . self::MIN_NOTE . ' caracteres).');
@@ -364,6 +378,48 @@ final class OwnerCreditService
     return $paid >= count($schedule) ? 0.0 : (float) $schedule[$paid - 1]['saldo'];
   }
 
+  /**
+   * Corrige la fecha fin del contrato desde el liquidador (contratos renovados con la fecha desactualizada).
+   * Solo mientras el crédito está pendiente; queda en el historial del crédito, del caso, del contrato y del inmueble.
+   */
+  public function updateContractEnd(int $id, string $date, array $actor): int
+  {
+    $credit = $this->find($id);
+    if ($credit === null) throw new \DomainException('El crédito ya no existe.');
+    if ($credit['status'] !== 'pendiente') throw new \DomainException('La fecha fin solo se corrige mientras el crédito está pendiente.');
+    $ts = self::dateInput($date);
+    if ($ts <= 0) throw new \DomainException('Indica una fecha fin válida.');
+    $this->saveContractEnd($credit, $ts, $actor);
+    return $ts;
+  }
+
+  private function saveContractEnd(array $credit, int $ts, array $actor): void
+  {
+    $contract = $this->contractById((int) $credit['contract_id']);
+    if ($contract === null) throw new \DomainException('El crédito no tiene contrato vinculado.');
+    $previous = self::timestamp($contract['fin_contrato'] ?? '');
+    $start = self::timestamp($contract['inicio_contrato'] ?? '');
+    if ($start > 0 && $ts <= $start) throw new \DomainException('La fecha fin debe ser posterior al inicio del contrato (' . date('d/m/Y', $start) . ').');
+    if ($previous === $ts) return;
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    $this->db->update($table, $this->schema->filterTableData($table, ['fin_contrato' => (string) $ts, 'cct_modified' => date('Y-m-d H:i:s')]), ['_ID' => (int) $contract['_ID']]);
+    $change = ($previous > 0 ? date('d/m/Y', $previous) : 'sin fecha') . ' → ' . date('d/m/Y', $ts);
+    $this->event((int) $credit['id'], 'fecha_fin', $actor, ['nota' => 'Fecha fin del contrato: ' . $change]);
+    $this->recordHistories($credit, 'Actualización de fecha fin', 'Fecha fin del contrato #' . ($contract['contrato'] ?? $credit['contract_code']) . ' actualizada desde el liquidador de créditos (crédito #' . $credit['id'] . '): ' . $change . '.', $actor);
+  }
+
+  private static function termMessage(int $term, int $maxMonths): string
+  {
+    return 'El plazo solicitado (' . $term . ' meses) no puede superar los ' . $maxMonths . ' meses que faltan para el fin del contrato. Corrige el plazo o la fecha fin.';
+  }
+
+  /** Fecha del formulario (AAAA-MM-DD) a la medianoche, como se guarda fin_contrato. */
+  private static function dateInput($value): int
+  {
+    $text = trim((string) $value);
+    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $text) === 1 ? (int) (strtotime($text . ' 00:00:00') ?: 0) : 0;
+  }
+
   /** @return array<string,mixed>|null */
   public function byQuote(int $quoteId): ?array
   {
@@ -398,9 +454,12 @@ final class OwnerCreditService
     return $this->insertCredit($contract, $quoteId, (string) ($quote['id_ticket'] ?? ''), self::money($quote['total'] ?? ''), 'Para Mejoras y/o Reparaciones al Inmueble', $actor);
   }
 
-  private function insertCredit(array $contract, ?int $quoteId, string $ticketId, float $amount, string $purpose, array $actor): int
+  private function insertCredit(array $contract, ?int $quoteId, string $ticketId, float $amount, string $purpose, array $actor, int $term = 0): int
   {
     $settings = $this->config();
+    // Plazo inicial: el pedido, o el sugerido sin pasar de los meses que le quedan al contrato.
+    $maxMonths = OwnerCreditCalculator::monthsUntil(time(), self::timestamp($contract['fin_contrato'] ?? ''));
+    $term = $term > 0 ? $term : max(1, min((int) $settings['default_term'], $maxMonths));
     $income = $this->defaultIncome($contract);
     $now = time();
     $phone = trim((string) ($contract['celular_propietario'] ?? ''));
@@ -412,7 +471,7 @@ final class OwnerCreditService
       'owner_id' => (string) ($contract['id_propietario'] ?? ''), 'owner_name' => mb_substr((string) ($contract['propietario'] ?? ''), 0, 190),
       'owner_email' => mb_substr(trim((string) ($contract['correo_propietario'] ?? '')), 0, 190),
       'owner_phone' => $phone !== '' && $prefix !== '' && !str_starts_with(preg_replace('/\D/', '', $phone) ?? '', $prefix) ? $prefix . $phone : $phone,
-      'purpose' => $purpose, 'status' => 'pendiente', 'requested_amount' => round($amount, 2), 'requested_term' => (int) $settings['default_term'],
+      'purpose' => $purpose, 'status' => 'pendiente', 'requested_amount' => round($amount, 2), 'requested_term' => $term,
       'vacancy' => 'Baja', 'gross_income' => $income['gross'], 'deductions_json' => json_encode($income['deductions'], JSON_THROW_ON_ERROR),
       'created_by_id' => (string) ($actor['employee_id'] ?? ''), 'created_by_name' => (string) ($actor['name'] ?? ''),
       'created_at' => $now, 'updated_at' => $now,
@@ -463,9 +522,8 @@ final class OwnerCreditService
   }
 
   /** @return list<array{key:string,label:string,ok:bool,detail:string}> */
-  private function policies(array $credit, array $contract, array $evaluation, array $settings, float $amount, int $term, float $rate, float $payment): array
+  private function policies(array $credit, array $contract, array $evaluation, array $settings, float $amount, int $term, float $rate, float $payment, int $endTs): array
   {
-    $endTs = self::timestamp($contract['fin_contrato'] ?? '');
     $minMonths = (int) $settings['min_remaining_months'];
     $others = array_filter($this->ownerCredits($credit), static fn(array $row): bool => $row['status'] === 'aprobado');
     $money = static fn(float $value): string => '$' . number_format($value, 0, ',', '.');

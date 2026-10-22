@@ -140,6 +140,35 @@ $report = $service->report([]);
 $check($report['totals']['count'] === 3 && $report['totals']['pagado'] === 1 && $report['totals']['rechazado'] === 1 && $report['totals']['approval_rate'] === 0.5, 'report counts credits by status and approval rate');
 $check(count($report['rows']) === 3 && $service->statusesForQuotes([574, 575, 999]) === [574 => 'pagado', 575 => 'rechazado'], 'quote cards read the credit status');
 
+// Plazo solicitado limitado por la fecha fin, fecha fin editable desde el liquidador y crédito manual por contrato.
+$pending = $service->byQuote(576);
+$check((int) $pending['requested_term'] === 12, 'new requests start with the suggested term within the contract');
+$tooLong = $service->workspace((int) $pending['id'], ['requested_term' => '30']);
+$check(str_contains($tooLong['term_error'], 'no puede superar'), 'requested term longer than the months left is an error');
+try {
+  $service->decide((int) $pending['id'], 'aprobado', ['requested_term' => '30', 'note' => 'Intento con plazo inválido.'], $actor);
+  $check(false, 'approval with an invalid requested term must fail');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'no puede superar'), 'approval is blocked while the requested term exceeds the contract');
+}
+$newEnd = date('Y-m-d', strtotime('+3 years'));
+$simulated = $service->workspace((int) $pending['id'], ['requested_term' => '30', 'contract_end' => $newEnd]);
+$check($simulated['term_error'] === '' && $simulated['contract']['fin_ts'] !== $simulated['contract']['fin_saved_ts'], 'a corrected end date is simulated before saving');
+$check($db->getRow('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 7')['fin_contrato'] === $end, 'simulating does not touch the contract');
+$service->updateContractEnd((int) $pending['id'], $newEnd, $actor);
+$check($db->getRow('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 7')['fin_contrato'] === (string) strtotime($newEnd . ' 00:00:00'), 'the corrected end date is saved in the contract at midnight');
+$endHistory = $db->getResults("SELECT observacion FROM wp_jet_cct_historial_contrato_arrendamiento WHERE tipo_reporte = 'Actualización de fecha fin'");
+$check(count($endHistory) === 1 && str_contains($endHistory[0]['observacion'], ' → ' . date('d/m/Y', strtotime($newEnd))), 'the end date change is written to the contract history with old and new dates');
+try {
+  $service->createManual(8, 1000000, 6, 'Libre Destinación', $actor);
+  $check(false, 'manual credit longer than the contract must fail');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'no puede superar'), 'manual credit validates the requested term against the contract end');
+}
+$manual = $service->find($service->createManual(8, 1000000, 6, 'Libre Destinación', $actor, date('Y-m-d', strtotime('+1 year'))));
+$check($manual['status'] === 'pendiente' && $manual['quote_id'] === null && (int) $manual['requested_term'] === 6, 'manual credit is created from the selected contract');
+$check($db->getRow('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 8')['fin_contrato'] === (string) strtotime(date('Y-m-d', strtotime('+1 year')) . ' 00:00:00'), 'manual credit saves the corrected contract end date');
+
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
 $template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-funcionario-v2-template.json'), true);
 $check(str_contains($source, "'" . $template['name'] . "'") && substr_count($template['components'][0]['text'], '{{') === 6, 'staff template name and its six variables match the code');

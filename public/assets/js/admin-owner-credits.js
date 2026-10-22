@@ -54,6 +54,10 @@
       modal.addEventListener("keydown", function (event) {
         event.stopPropagation();
         if (event.key === "Escape") closeModal();
+        if (event.key === "Enter" && event.target.matches && event.target.matches("[data-owner-credit-search-query]")) {
+          event.preventDefault();
+          searchContracts(event.target.closest("[data-owner-credit-new-form]"));
+        }
       });
       return modal;
     }
@@ -147,9 +151,60 @@
         .then(function () { if (target) target.classList.remove("is-loading"); });
     }
 
+    // Nuevo crédito sin cotización: se busca el contrato (como en Crear caso) y luego se piden los datos.
+    function searchContracts(form) {
+      var query = form.querySelector("[data-owner-credit-search-query]").value.trim();
+      var status = form.querySelector("[data-owner-credit-search-status]");
+      var results = form.querySelector("[data-owner-credit-search-results]");
+      if (query.length < 2) { status.textContent = "Escribe al menos 2 caracteres."; return; }
+      status.textContent = "Buscando contratos…";
+      results.innerHTML = "";
+      post("scm_owner_credit_contracts", { query: query, by: form.querySelector("[data-owner-credit-search-by]").value })
+        .then(function (data) {
+          var contracts = data.contracts || [];
+          status.textContent = contracts.length ? contracts.length + " resultado(s). Selecciona el contrato." : "No se encontraron contratos. Revisa el dato o cambia el tipo de búsqueda.";
+          results.innerHTML = contracts.map(function (c) {
+            return '<button type="button" class="scm-owner-credit-result" data-owner-credit-pick data-contract="' + escapeHtml(JSON.stringify(c)) + '">' +
+              "<strong>Contrato " + escapeHtml(c.contrato) + " · SIMI " + escapeHtml(c.inmueble) + "</strong>" +
+              "<span>" + escapeHtml(c.direccion) + " · " + escapeHtml(c.estado) + (c.fin ? " · Fin " + escapeHtml(c.fin) : "") + "</span>" +
+              "<span>Propietario: " + escapeHtml(c.propietario) + " · Arrendatario: " + escapeHtml(c.arrendatario) + "</span></button>";
+          }).join("");
+        })
+        .catch(function (error) { status.textContent = error.message; });
+    }
+
+    function pickContract(form, contract) {
+      var picked = form.querySelector("[data-owner-credit-picked]");
+      var request = form.querySelector("[data-owner-credit-request]");
+      form.elements.contract_id.value = contract ? String(contract.id) : "";
+      form.querySelector("[data-owner-credit-search-results]").hidden = !!contract;
+      picked.hidden = !contract;
+      request.hidden = !contract;
+      if (!contract) return;
+      picked.innerHTML = "<span><b>Contrato " + escapeHtml(contract.contrato) + "</b> · " + escapeHtml(contract.propietario) + " · " + escapeHtml(contract.direccion) + "</span>" +
+        '<button type="button" class="scm-owner-credit-link" data-owner-credit-unpick>Cambiar contrato</button>';
+      form.elements.contract_end.value = contract.fin_iso || "";
+      form.elements.term.value = String(Math.max(1, Math.min(12, contract.max_months || 1)));
+      updateTermHint(form);
+      form.elements.amount.focus();
+    }
+
+    // Mismo cálculo del servidor: meses completos de 30 días entre hoy y la fecha fin.
+    function updateTermHint(form) {
+      var hint = form.querySelector("[data-owner-credit-term-hint]");
+      var end = form.elements.contract_end.value;
+      if (!hint) return;
+      if (!end) { hint.textContent = "El contrato no tiene fecha fin: indícala para calcular el plazo máximo."; return; }
+      var today = new Date(); today.setHours(0, 0, 0, 0);
+      var max = Math.floor(Math.floor((new Date(end + "T00:00:00") - today) / 86400000) / 30);
+      form.elements.term.max = String(Math.max(1, max));
+      hint.textContent = max < 1 ? "El contrato ya terminó o termina este mes: corrige la fecha fin si fue renovado." : "Plazo máximo: " + max + " meses.";
+      hint.className = "scm-owner-credit-note" + (max < 1 || Number(form.elements.term.value) > max ? " is-bad" : "");
+    }
+
     // Confirmación dentro del mismo popup (los diálogos externos quedarían detrás del modal).
     function askConfirm(button, text, onConfirm) {
-      var actions = button.closest(".scm-public-services-review-actions");
+      var actions = button.closest(".scm-public-services-review-actions") || button.closest(".scm-maint-quote-section");
       if (!actions) return;
       var old = actions.parentNode.querySelector("[data-owner-credit-confirm]");
       if (old) old.remove();
@@ -235,6 +290,20 @@
         });
         return;
       }
+      var saveEnd = form && target.closest("[data-owner-credit-save-end]");
+      if (saveEnd) {
+        var endValue = form.elements.contract_end ? form.elements.contract_end.value : "";
+        if (!endValue) { setStatus(form, "Indica la fecha fin del contrato.", "error"); return; }
+        askConfirm(saveEnd, "Se cambiará la fecha fin del contrato a " + endValue.split("-").reverse().join("/") + ". Queda en el historial del contrato y del inmueble.", function () {
+          runAction(form, "scm_owner_credit_contract_end", { contract_end: endValue });
+        });
+        return;
+      }
+      var newForm = target.closest("[data-owner-credit-new-form]");
+      if (newForm && target.closest("[data-owner-credit-search]")) { searchContracts(newForm); return; }
+      var pick = newForm && target.closest("[data-owner-credit-pick]");
+      if (pick) { pickContract(newForm, JSON.parse(pick.getAttribute("data-contract") || "{}")); return; }
+      if (newForm && target.closest("[data-owner-credit-unpick]")) { pickContract(newForm, null); return; }
       if (target.closest("[data-owner-credit-new]")) {
         post("scm_owner_credit_new_form", {})
           .then(function (data) { showModal("Nuevo crédito", "Crédito sin cotización, a partir del contrato.", data.html || ""); })
@@ -262,6 +331,8 @@
     });
 
     root.addEventListener("input", function (event) {
+      var newCredit = event.target.closest && event.target.closest("[data-owner-credit-new-form]");
+      if (newCredit && (event.target.name === "contract_end" || event.target.name === "term")) updateTermHint(newCredit);
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
       if (!form || event.target.name === "note") return;
       window.clearTimeout(simulateTimer);
@@ -297,6 +368,7 @@
       }
       if (form.matches("[data-owner-credit-new-form]")) {
         event.preventDefault();
+        if (!form.elements.contract_id.value) { setStatus(form, "Busca y selecciona el contrato.", "error"); return; }
         setStatus(form, "Creando…", "");
         post("scm_owner_credit_create", new FormData(form))
           .then(function (data) { loadReport(true); return openCredit({ credit_id: data.credit_id }); })

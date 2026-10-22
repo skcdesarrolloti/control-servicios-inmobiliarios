@@ -52,6 +52,8 @@ final class AuthenticatedActionRouter
       'scm_owner_credit_simulate' => 'ajax_handler_owner_credit_simulate',
       'scm_owner_credit_decide' => 'ajax_handler_owner_credit_decide',
       'scm_owner_credit_close' => 'ajax_handler_owner_credit_close',
+      'scm_owner_credit_contract_end' => 'ajax_handler_owner_credit_contract_end',
+      'scm_owner_credit_contracts' => 'ajax_handler_owner_credit_contracts',
       'scm_owner_credit_create' => 'ajax_handler_owner_credit_create',
       'scm_owner_credit_new_form' => 'ajax_handler_owner_credit_new_form',
       'scm_owner_credit_settings' => 'ajax_handler_owner_credit_settings',

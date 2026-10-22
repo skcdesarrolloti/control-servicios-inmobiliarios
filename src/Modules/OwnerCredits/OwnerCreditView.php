@@ -85,7 +85,10 @@ final class OwnerCreditView
 
       . '<section class="scm-maint-quote-section"><h4>Datos del contrato de arriendo vigente</h4><div class="scm-owner-credit-statics">'
       . $static('Inicio del contrato', $contract['inicio_ts'] > 0 ? date('d/m/Y', $contract['inicio_ts']) : '—')
-      . $static('Fin del contrato', $contract['fin_ts'] > 0 ? date('d/m/Y', $contract['fin_ts']) : '—')
+      . ($editable
+        ? '<div class="scm-owner-credit-static scm-owner-credit-end"><span>Fin del contrato</span><input type="date" name="contract_end" value="' . ($contract['fin_ts'] > 0 ? date('Y-m-d', $contract['fin_ts']) : '') . '" aria-label="Fin del contrato">'
+          . '<button type="button" class="scm-owner-credit-link" data-owner-credit-save-end>Guardar en el contrato</button></div>'
+        : $static('Fin del contrato', $contract['fin_ts'] > 0 ? date('d/m/Y', $contract['fin_ts']) : '—'))
       . $static('Años arrendados', $years)
       . $static('Estado', self::e($contract['estado'] ?: '—'))
       . $static('Aseguradora', self::e($contract['aseguradora'] ?: '—'))
@@ -134,7 +137,10 @@ final class OwnerCreditView
     foreach ($work['policies'] as $policy) {
       $policies .= '<li class="' . ($policy['ok'] ? 'is-ok' : 'is-bad') . '"><b>' . ($policy['ok'] ? '✓' : '✕') . ' ' . self::e($policy['label']) . '</b><span>' . self::e($policy['detail']) . '</span></li>';
     }
-    return '<section class="scm-maint-quote-section"><h4>Política de créditos de la inmobiliaria</h4><div class="scm-owner-credit-statics">'
+    $endChanged = (int) ($work['contract']['fin_saved_ts'] ?? 0) !== (int) ($work['contract']['fin_ts'] ?? 0);
+    return (($work['term_error'] ?? '') !== '' ? '<p class="scm-owner-credit-alert" role="alert">' . self::e($work['term_error']) . '</p>' : '')
+      . ($endChanged ? '<p class="scm-owner-credit-alert is-info">Estás simulando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Usa "Guardar en el contrato" o se guardará al decidir el crédito.</p>' : '')
+      . '<section class="scm-maint-quote-section"><h4>Política de créditos de la inmobiliaria</h4><div class="scm-owner-credit-statics">'
       . $row('Ingreso neto (INO)', self::money($ev['net_income']), 'is-key')
       . $row('Meses máximos a prestar', (string) $ev['max_months'])
       . $row('Tasa ajustada de colocación', self::percent($ev['policy_rate']))
@@ -254,11 +260,21 @@ final class OwnerCreditView
   {
     $options = '';
     foreach (OwnerCreditSettings::PURPOSES as $purpose) $options .= '<option>' . self::e($purpose) . '</option>';
-    return '<form class="scm-owner-credit-form" data-owner-credit-new-form autocomplete="off"><section class="scm-maint-quote-section"><h4>Nueva solicitud de crédito</h4><div class="scm-maint-quote-grid">'
-      . '<label class="scm-cotizacion-dialog-field"><span>Número de contrato <em>*</em></span><input name="contract" required placeholder="Ej. 817"></label>'
+    // Como en "Crear caso": primero se busca y elige el contrato, luego se completan los datos de la solicitud.
+    return '<form class="scm-owner-credit-form" data-owner-credit-new-form autocomplete="off"><input type="hidden" name="contract_id" value="">'
+      . '<section class="scm-maint-quote-section"><h4>1. Busca el contrato</h4><div class="scm-owner-credit-search">'
+      . '<label class="scm-cotizacion-dialog-field"><span>Buscar por</span><select data-owner-credit-search-by><option value="contrato">Contrato</option><option value="inmueble">Inmueble SIMI</option><option value="propietario">Propietario</option><option value="arrendatario">Arrendatario</option></select></label>'
+      . '<label class="scm-cotizacion-dialog-field"><span>Dato a buscar</span><input data-owner-credit-search-query placeholder="Ej. 817, 10420 o nombre"></label>'
+      . '<button type="button" class="scm-btn-secondary" data-owner-credit-search>Buscar</button></div>'
+      . '<p class="scm-owner-credit-note" data-owner-credit-search-status></p><div class="scm-owner-credit-results" data-owner-credit-search-results></div>'
+      . '<div class="scm-owner-credit-picked" data-owner-credit-picked hidden></div></section>'
+      . '<section class="scm-maint-quote-section" data-owner-credit-request hidden><h4>2. Datos de la solicitud</h4><div class="scm-maint-quote-grid">'
       . '<label class="scm-cotizacion-dialog-field"><span>Valor solicitado <em>*</em></span><input name="amount" inputmode="numeric" data-owner-credit-money required></label>'
+      . '<label class="scm-cotizacion-dialog-field"><span>Fin del contrato</span><input type="date" name="contract_end"></label>'
+      . '<label class="scm-cotizacion-dialog-field"><span>Plazo solicitado (meses) <em>*</em></span><input name="term" type="number" min="1" max="60" required></label>'
       . '<label class="scm-cotizacion-dialog-field"><span>Destinación</span><select name="purpose">' . $options . '</select></label>'
-      . '</div></section><div class="scm-cia-modal-status" data-owner-credit-status role="status" aria-live="polite"></div>'
+      . '</div><p class="scm-owner-credit-note">El plazo no puede superar los meses que faltan para el fin del contrato. Si la fecha fin está desactualizada, corrígela aquí: se guardará en el contrato.</p><p class="scm-owner-credit-note" data-owner-credit-term-hint></p></section>'
+      . '<div class="scm-cia-modal-status" data-owner-credit-status role="status" aria-live="polite"></div>'
       . '<div class="scm-public-services-review-actions"><button type="submit" class="scm-btn-primary">Crear y abrir liquidador</button></div></form>';
   }
 

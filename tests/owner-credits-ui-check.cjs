@@ -46,6 +46,10 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   assert.equal(sim.credit_id, '12'); assert.equal(sim.amount, '1000000');
   console.log('OK edits are simulated on the server with the credit id');
 
+  await page.fill('[name="contract_end"]', '2028-05-31');
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'scm_owner_credit_simulate' && c.contract_end === '2028-05-31'));
+  console.log('OK the contract end date is simulated before saving');
+
   await page.locator('[name="amount"]').blur();
   assert.equal(await page.inputValue('[name="amount"]'), '$1.000.000');
   console.log('OK money inputs are formatted on blur');

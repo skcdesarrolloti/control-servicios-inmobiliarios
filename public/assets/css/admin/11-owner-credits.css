@@ -49,3 +49,15 @@
 }
 /* El liquidador se abre también desde el popup de cotizaciones del caso (SweetAlert, z-index 1000000). */
 #scm-app .scm-cia-modal[data-owner-credit-modal] { z-index: 2147483000; }
+#scm-app .scm-owner-credit-end input { padding: 4px 6px; border: 1px solid #c8d8ea; border-radius: 8px; font: inherit; font-size: 13px; color: #102a43; }
+#scm-app .scm-owner-credit-link { justify-self: start; padding: 0; border: 0; background: none; color: #1d4f9c; font-size: 11px; font-weight: 700; text-decoration: underline; cursor: pointer; }
+#scm-app .scm-owner-credit-alert { margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: #fdeeee; color: #a61b1b; font-size: 12px; font-weight: 700; }
+#scm-app .scm-owner-credit-alert.is-info { background: #e5efff; color: #1d4f9c; }
+#scm-app .scm-owner-credit-search { display: grid; grid-template-columns: minmax(140px, 200px) minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+#scm-app .scm-owner-credit-results { display: grid; gap: 8px; max-height: 280px; overflow-y: auto; }
+#scm-app .scm-owner-credit-result { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid #d9e6f4; border-radius: 12px; background: #fff; text-align: left; font: inherit; font-size: 12px; color: #3e5166; cursor: pointer; }
+#scm-app .scm-owner-credit-result strong { color: #102a43; font-size: 13px; }
+#scm-app .scm-owner-credit-result:hover, #scm-app .scm-owner-credit-result:focus-visible { border-color: #f2c94c; background: #fffbea; }
+#scm-app .scm-owner-credit-picked { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border: 1px solid #f2c94c; border-radius: 12px; background: #fffbea; font-size: 12px; color: #102a43; }
+@media (max-width: 640px) { #scm-app .scm-owner-credit-search { grid-template-columns: minmax(0, 1fr); } }
+#scm-app [data-owner-credit-new-form] [hidden] { display: none !important; }

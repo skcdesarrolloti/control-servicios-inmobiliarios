@@ -29,7 +29,7 @@ trait HandlesOwnerCredits
   private function ownerCreditInput(): array
   {
     $input = [];
-    foreach (['gross', 'ded_comision', 'ded_garantia', 'ded_poliza_servicios', 'ded_otros', 'requested_amount', 'requested_term', 'purpose', 'vacancy', 'amount', 'term', 'rate', 'note'] as $key) {
+    foreach (['contract_end', 'gross', 'ded_comision', 'ded_garantia', 'ded_poliza_servicios', 'ded_otros', 'requested_amount', 'requested_term', 'purpose', 'vacancy', 'amount', 'term', 'rate', 'note'] as $key) {
       if (isset($_POST[$key])) $input[$key] = trim(sanitize_textarea_field(wp_unslash((string) $_POST[$key])));
     }
     return $input;
@@ -103,6 +103,44 @@ trait HandlesOwnerCredits
     }
   }
 
+  /** Guarda en el contrato la fecha fin corregida en el liquidador. */
+  public function ajax_handler_owner_credit_contract_end(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('owner_credit_decide', 'Tu cargo no tiene permiso para corregir la fecha fin desde el liquidador.');
+    try {
+      $ts = $this->ownerCreditService()->updateContractEnd((int) ($_POST['credit_id'] ?? 0), sanitize_text_field(wp_unslash((string) ($_POST['contract_end'] ?? ''))), $this->ticketCompletionActor());
+      $this->jsonOk(['message' => 'Fecha fin del contrato actualizada a ' . date('d/m/Y', $ts) . '.']);
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo actualizar la fecha fin.');
+    }
+  }
+
+  /** Búsqueda de contratos para "Nuevo crédito" (misma búsqueda de Crear caso). */
+  public function ajax_handler_owner_credit_contracts(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('owner_credit_manage', 'Tu cargo no tiene permiso para crear créditos.');
+    try {
+      $contracts = $this->panelCaseService()->searchPanelContracts(trim(sanitize_text_field(wp_unslash((string) ($_POST['query'] ?? '')))), sanitize_key((string) ($_POST['by'] ?? '')));
+      $rows = [];
+      foreach ($contracts as $contract) {
+        $end = OwnerCreditService::timestamp($contract['fin_contrato'] ?? '');
+        $rows[] = [
+          'id' => (int) ($contract['_ID'] ?? 0), 'contrato' => (string) ($contract['contrato'] ?? ''), 'inmueble' => (string) ($contract['inmueble'] ?? ''),
+          'direccion' => (string) ($contract['direccion'] ?? ''), 'estado' => (string) ($contract['estado'] ?? ''),
+          'propietario' => (string) ($contract['propietario'] ?? ''), 'arrendatario' => (string) ($contract['arrendatario'] ?? ''),
+          'fin' => $end > 0 ? date('d/m/Y', $end) : '', 'fin_iso' => $end > 0 ? date('Y-m-d', $end) : '', 'max_months' => \SCM\Modules\OwnerCredits\OwnerCreditCalculator::monthsUntil(time(), $end),
+        ];
+      }
+      $this->jsonOk(['contracts' => $rows]);
+    } catch (\InvalidArgumentException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo buscar contratos.');
+    }
+  }
+
   public function ajax_handler_owner_credit_close(): void
   {
     $this->verifyCsrf();
@@ -123,10 +161,12 @@ trait HandlesOwnerCredits
     if (!$this->canAccessDashboardTab('metricas_creditos')) $this->jsonFail('No tienes permiso para ver créditos.');
     try {
       $id = $this->ownerCreditService()->createManual(
-        sanitize_text_field(wp_unslash((string) ($_POST['contract'] ?? ''))),
+        (int) ($_POST['contract_id'] ?? 0),
         OwnerCreditService::money(sanitize_text_field(wp_unslash((string) ($_POST['amount'] ?? '')))),
+        (int) ($_POST['term'] ?? 0),
         sanitize_text_field(wp_unslash((string) ($_POST['purpose'] ?? ''))),
-        $this->ticketCompletionActor()
+        $this->ticketCompletionActor(),
+        sanitize_text_field(wp_unslash((string) ($_POST['contract_end'] ?? '')))
       );
       $this->jsonOk(['credit_id' => $id, 'message' => 'Solicitud creada.']);
     } catch (\Throwable $error) {
