@@ -4973,7 +4973,7 @@ trait RendersDashboard
     // Con financiación "Sí" la cotización abre el liquidador de créditos (crea la solicitud si aún no existe).
     if ($financing === 'Si' && $id !== '' && ($this->canUseDashboardAction('quote_financing') || $this->canAccessDashboardTab('credito_propietario'))) {
       $creditStatus = (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db))->statusesForQuotes([(int) $id])[(int) $id] ?? '';
-      $financingHtml .= '<button type="button" class="scm-case-work-btn scm-primary-action" data-owner-credit-open data-quote-id="' . esc_attr($id) . '">Liquidador de crédito · ' . esc_html(\SCM\Modules\OwnerCredits\OwnerCreditService::STATUSES[$creditStatus] ?? 'Sin evaluar') . '</button>';
+      $financingHtml .= '<button type="button" class="scm-case-work-btn scm-primary-action" data-owner-credit-open data-quote-id="' . esc_attr($id) . '">Solicitar crédito · ' . esc_html(\SCM\Modules\OwnerCredits\OwnerCreditService::STATUSES[$creditStatus] ?? 'Sin evaluar') . '</button>';
     }
 
     return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '" data-cot-fecha-envio="' . esc_attr((string) $fechaEnvioTs) . '" data-cot-dias-calendario="' . esc_attr((string) $diasCalendarioSinRespuesta) . '" data-cot-seguimiento-reparaciones-disponible="' . esc_attr($seguimientoReparacionesDisponible ? '1' : '0') . '">'
