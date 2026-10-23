@@ -21430,7 +21430,34 @@
 
     function setMaintenanceQuoteField(form, name, value) {
       var field = form ? form.querySelector('[name="' + name + '"]') : null;
-      if (field) field.value = value == null ? "" : String(value);
+      if (!field) return;
+      value = value == null ? "" : String(value);
+      if (name === "indicativo_destinarario") value = quoteIndicativoDigits(value);
+      if (field.tagName === "SELECT" && value && !Array.prototype.some.call(field.options, function (option) { return option.value === value; })) {
+        field.insertAdjacentHTML("afterbegin", '<option value="' + escHtml(value) + '">+' + escHtml(value) + "</option>");
+      }
+      field.value = value;
+    }
+
+    // El indicativo se guarda sin "+" (ej. 57), igual que en JetEngine.
+    function quoteIndicativoDigits(value) {
+      return String(value == null ? "" : value).replace(/\D+/g, "") || "57";
+    }
+
+    function quoteIndicativoOptionsHtml(value) {
+      var current = quoteIndicativoDigits(value);
+      var list = runtime && Array.isArray(runtime.indicativos) ? runtime.indicativos : [];
+      var options = list.map(function (item) {
+        var code = String(item && item.codigo || "").replace(/\D+/g, "");
+        return code ? { value: code, label: "+" + code + (item.pais ? " " + item.pais : "") } : null;
+      }).filter(Boolean);
+      if (!options.length) options.push({ value: "57", label: "+57 Colombia" });
+      if (!options.some(function (option) { return option.value === current; })) {
+        options.unshift({ value: current, label: "+" + current });
+      }
+      return options.map(function (option) {
+        return '<option value="' + escHtml(option.value) + '"' + (option.value === current ? " selected" : "") + ">" + escHtml(option.label) + "</option>";
+      }).join("");
     }
 
     function syncMaintenanceQuoteRecipient(form, context) {
@@ -21844,7 +21871,7 @@
         '<label class="scm-cotizacion-dialog-field"><span>¿Quién aprobará la cotización? <em>*</em></span><select name="ejecutado" required><option value="">Elige una opción</option>' + cotizacionFormOptionHtml(context.executor_options, d.ejecutado) + '</select></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Destinatario <em>*</em></span><input name="destinatario" value="' + escHtml(d.destinatario || "") + '" required></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Email</span><input type="email" name="email_destinatario" value="' + escHtml(d.email_destinatario || "") + '"></label>' +
-        '<label class="scm-cotizacion-dialog-field"><span>Indicativo</span><input name="indicativo_destinarario" value="' + escHtml(d.indicativo_destinarario || "57") + '"></label>' +
+        '<label class="scm-cotizacion-dialog-field"><span>Indicativo</span><select name="indicativo_destinarario">' + quoteIndicativoOptionsHtml(d.indicativo_destinarario) + '</select></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Celular</span><input type="tel" name="celular_destinatario" value="' + escHtml(d.celular_destinatario || "") + '"></label>' +
         '</div></section></div>' +
         '<div class="scm-maint-quote-step" data-quote-step="mano" hidden>' +
@@ -24215,7 +24242,7 @@
           '<div class="scm-cotizacion-dialog-field"><span>Total a enviar</span><strong id="swal-send-cot-total">' + escHtml(total || "-") + '</strong></div>' +
           '<label class="scm-cotizacion-dialog-field"><span>Destinatario <em>*</em></span><input id="swal-send-cot-destinatario" type="text" value="' + escHtml(destinatario) + '" placeholder="Nombre del destinatario"></label>' +
           '<label class="scm-cotizacion-dialog-field"><span>Correo <em>*</em></span><input id="swal-send-cot-email" type="email" value="' + escHtml(email) + '" placeholder="correo@dominio.com"></label>' +
-          '<label class="scm-cotizacion-dialog-field"><span>Indicativo</span><input id="swal-send-cot-indicativo" type="text" value="' + escHtml(indicativo || "57") + '" placeholder="57"></label>' +
+          '<label class="scm-cotizacion-dialog-field"><span>Indicativo</span><select id="swal-send-cot-indicativo">' + quoteIndicativoOptionsHtml(indicativo) + '</select></label>' +
           '<label class="scm-cotizacion-dialog-field"><span>Celular WhatsApp <em>*</em></span><input id="swal-send-cot-celular" type="tel" value="' + escHtml(celular) + '" placeholder="3001234567"></label>' +
           '</div></div>',
         width: "min(760px, 94vw)",
