@@ -415,13 +415,9 @@ final class CompletionRepository
     if (!$act) {
       return '';
     }
-    $currentAdminState = (string) ($repo->ticket($ticketId)['estado_administrativo'] ?? '');
-    $keepsAdminState = in_array($adminState, ['', '__keep__', $currentAdminState], true);
-    // Cierre manual confirmado: el acta sigue vigente y, si el destinatario firma, el caso se cierra con ella.
-    if ($act['status'] === 'pending' && $close && $confirmedPendingClose) {
-      return '';
-    }
-    if ($act['status'] === 'pending' && ($close || !$keepsAdminState)) {
+    // Con acta pendiente se puede cambiar el estado administrativo; cerrar el caso exige confirmación.
+    // En ambos casos el acta sigue vigente y, si el destinatario firma, el caso se cierra con ella.
+    if ($act['status'] === 'pending' && $close && !$confirmedPendingClose) {
       return 'Este caso tiene un acta pendiente de firma. Solo se cerrará cuando firme el destinatario. Para cambiar el proceso, anula primero el acta.';
     }
     if (!$allowReopen && $act['status'] === 'signed' && strcasecmp((string) $repo->ticket($ticketId)['estado'], 'Cerrado') === 0) {

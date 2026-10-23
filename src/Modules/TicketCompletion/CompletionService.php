@@ -1421,17 +1421,9 @@ final class CompletionService
       if ($act['status'] === 'signed') {
         return $act; // Repeated submits cannot duplicate the report or audit trail.
       }
-      // Acts created before execution states were adopted remain signable while
-      // their ticket still carries the former waiting value.
-      $expectedAdminState = (string) ($payload['pending_admin_state'] ?? CompletionPolicy::WAITING);
-      $currentAdminState = (string) ($ticket['estado_administrativo'] ?? '');
-      // Actas con el estado anterior "En ejecucion por …" siguen siendo firmables tras migrar el caso a "En ejecucion".
-      $adminStateMatches = $currentAdminState === $expectedAdminState
-        || (str_starts_with($expectedAdminState, CompletionPolicy::LEGACY_EXECUTION_PREFIX) && $currentAdminState === CompletionPolicy::EXECUTION_STATE);
-      // Un caso cerrado a mano con el acta pendiente sigue aceptando la firma, aunque se haya cambiado su estado
-      // administrativo; al firmar se vuelve a cerrar con el acta. Un caso reabierto con otro estado no la acepta.
-      $closedWithPendingAct = strcasecmp((string) $ticket['estado'], 'Cerrado') === 0;
-      if ($act['status'] !== 'pending' || (int) $act['active_slot'] !== 1 || (!$adminStateMatches && !$closedWithPendingAct)) {
+      // El acta activa se puede firmar aunque el caso se haya cerrado o cambiado de estado administrativo;
+      // al firmar el caso queda cerrado con el acta. Solo un acta anulada, archivada o reemplazada se rechaza.
+      if ($act['status'] !== 'pending' || (int) $act['active_slot'] !== 1) {
         throw new \DomainException('El estado del caso cambió. Contacta a la inmobiliaria antes de firmar.');
       }
       if (!hash_equals((string) $act['payload_hash'], (string) ($input['document_hash'] ?? ''))) {

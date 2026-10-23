@@ -220,11 +220,10 @@ $assert($notifications[0]['to'] === 'ana@example.invalid' && $notifications[0]['
 $assert($notifications[0]['options']['ticket_number'] === '9001' && $notifications[0]['options']['act_url'] === $service->viewUrl((int) $act['id']) . '&token=' . $token, 'invitation supplies exact structured ticket number and signing link');
 $rejects(static fn() => $service->create(1, $input, $actor), 'double create rejected');
 $assert(Repository::workflowError($db, $repo->schema, 1, true) !== '', 'manual close blocked while pending');
-$assert(Repository::workflowError($db, $repo->schema, 1, false, 'Finalizado') !== '', 'administrative completion bypass blocked');
+$assert(Repository::workflowError($db, $repo->schema, 1, false, 'Finalizado') === '', 'administrative state can change while act is pending');
 $assert(Repository::workflowError($db, $repo->schema, 1, false) === '', 'ordinary followups remain available');
 $assert(Repository::workflowError($db, $repo->schema, 1, true, '__keep__', false, true) === '', 'confirmed manual close allowed while pending');
 $assert(Repository::workflowError($db, $repo->schema, 1, true, 'Finalizado', false, true) === '', 'confirmed close may also change administrative state');
-$assert(Repository::workflowError($db, $repo->schema, 1, false, 'Finalizado', false, true) !== '', 'administrative state change without closing stays blocked');
 $assert(Repository::pendingActForClose($db, $repo->schema, 1) !== null, 'pending act detected for close confirmation');
 $rejects(static fn() => $service->publicAct((int) $act['id'], str_repeat('0', 64)), 'invalid bearer token rejected');
 $rejects(static fn() => $service->sign((int) $act['id'], $token, array_replace($signInput($act), ['accepted' => '0']), '', ''), 'missing consent rejected without changing ticket');
