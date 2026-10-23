@@ -643,7 +643,8 @@ final class LeaseAnnexesService
       $html = EmailTemplate::render($subject, $this->emailBody($actor, $contract, $signature, (string) $context['razon_social']), ['buttons' => $buttons]);
       $queued['email'] += $emailQueue->enqueue($actor['email'], $subject, $html, [
         'source_module' => 'anexos_contrato_arrendamiento',
-        'internal_cc' => [],
+        // Copia a los funcionarios del evento en cada correo; además reciben el resumen de abajo.
+        'internal_action' => self::INTERNAL_ACTION,
         'destination_name' => $actor['name'],
         'dedupe_key' => $dedupe . '_' . $key,
         'payload' => ['attachments' => $attachments, 'reply_to' => (string) ($context['correo_contractual'] ?? '')],

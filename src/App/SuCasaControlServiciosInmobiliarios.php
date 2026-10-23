@@ -531,7 +531,7 @@ final class SuCasaControlServiciosInmobiliarios
           ],
           'anexos_contrato_arrendamiento' => [
             'label' => 'Envío de anexos del contrato de arrendamiento',
-            'description' => 'Resumen con las actas de bienvenida cuando se envían los anexos al propietario, arrendatario y codeudores desde Contratos de arrendamiento.',
+            'description' => 'Copia de cada correo enviado al propietario, arrendatario y codeudores con sus anexos desde Contratos de arrendamiento, y un resumen con todas las actas de bienvenida.',
             'channel' => 'Email interno en cola',
           ],
         ],
