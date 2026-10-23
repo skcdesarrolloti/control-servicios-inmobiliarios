@@ -21502,9 +21502,9 @@
           ],
         },
         materiales_soporte: {
-          title: "Imagen de cotización material",
-          add: "Agregar ítem a imagen",
-          help: "Diligencia la tabla y genera una oferta: el sistema creará el material con proveedor, total e imagen de soporte automáticamente.",
+          title: "Materiales",
+          add: "Agregar otro material",
+          help: "Arma una oferta por cada proveedor: 1) escribe el proveedor, 2) agrega los materiales con unidad, cantidad y valor unitario, 3) pulsa «Generar oferta». La oferta queda abajo en la lista de materiales generados y el formulario se limpia para el siguiente proveedor.",
           showTotal: false,
           supportBuilder: true,
           fields: [
@@ -21744,7 +21744,7 @@
         renderCotizacionHiddenRepeaterRows("materiales", q.items_materiales, context.unit_options) +
         renderCotizacionRepeaterRows("materiales_soporte", maintenanceQuoteMaterialSupportItems(q.items_materiales), context.material_unit_options || context.unit_options) +
         '<section class="scm-maint-quote-section scm-maint-quote-generated-materials"><h4>Materiales generados</h4><div class="scm-maint-quote-generated-offers" data-material-generated-offers><p>No hay ofertas generadas desde la tabla de materiales.</p></div></section>' +
-        '<section class="scm-maint-quote-section scm-maint-quote-offers"><h4>Ofertas de materiales</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field"><span>Subir mejores ofertas adicionales</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Opcional. Solo usa este campo si tienes imágenes externas. Actuales: ' + escHtml(String((media.mejor_oferta || []).length)) + '</small></label><label class="scm-cotizacion-dialog-field"><span>Subir otras ofertas adicionales</span><input type="file" name="otras_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Opcional. Actuales: ' + escHtml(String((media.otras_oferta || []).length)) + '</small></label></div><div class="scm-maint-quote-auto-offers"><strong>Mejores ofertas generadas por el sistema</strong><div data-material-generated-offer-attachments><p>No has generado imágenes desde la tabla de materiales.</p></div></div><p class="scm-maint-quote-help">Las ofertas generadas desde la tabla no aparecen dentro del selector de archivos por seguridad del navegador, pero se guardarán automáticamente como mejores ofertas. También puedes subir imágenes adicionales si ya las tienes.</p></section>' +
+        '<section class="scm-maint-quote-section scm-maint-quote-offers"><h4>Ofertas de materiales</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field is-wide"><span>Subir mejores ofertas adicionales</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Opcional. Úsalo solo si ya tienes la cotización del proveedor en imagen (foto o captura).</small></label></div><div class="scm-maint-quote-auto-offers"><strong>Mejores ofertas generadas por el sistema</strong><div data-material-generated-offer-attachments><p>No has generado imágenes desde la tabla de materiales.</p></div></div><p class="scm-maint-quote-help">No necesitas subir las ofertas que generaste arriba: se guardarán automáticamente como mejores ofertas. Usa «Quitar» para retirar una imagen que ya no aplique; el cambio se aplica al guardar.</p></section>' +
         renderCotizacionRepeaterRows("equipos", q.items_otros_equi, context.unit_options) +
         renderCotizacionRepeaterRows("otros", q.items_otros_costos, context.unit_options) +
         maintenanceQuotePerturbationHtml(context) +
@@ -21991,7 +21991,7 @@
         }).join("");
       }
       wrap.innerHTML += saved.map(function (item, index) {
-        return '<article class="scm-maint-quote-auto-offer-card"><button type="button" class="scm-maint-quote-image-thumb" data-view-saved-best-offer="' + index + '" aria-label="Ver oferta guardada ' + (index + 1) + '"><img src="' + escHtml(item.url) + '" alt="Oferta de materiales guardada"></button><div><span>Mejor oferta guardada</span><strong>' + escHtml(savedProvider(item) || item.title || ("Oferta " + (index + 1))) + '</strong></div><div class="scm-maint-quote-auto-offer-actions"><button type="button" class="scm-maint-quote-view-image" data-view-saved-best-offer="' + index + '">Ver imagen</button></div></article>';
+        return '<article class="scm-maint-quote-auto-offer-card"><button type="button" class="scm-maint-quote-image-thumb" data-view-saved-best-offer="' + index + '" aria-label="Ver oferta guardada ' + (index + 1) + '"><img src="' + escHtml(item.url) + '" alt="Oferta de materiales guardada"></button><div><span>Mejor oferta guardada</span><strong>' + escHtml(savedProvider(item) || item.title || ("Oferta " + (index + 1))) + '</strong></div><div class="scm-maint-quote-auto-offer-actions"><button type="button" class="scm-maint-quote-view-image" data-view-saved-best-offer="' + index + '">Ver imagen</button><button type="button" class="scm-maint-quote-remove" data-remove-saved-best-offer="' + index + '">Quitar</button></div></article>';
       }).join("");
     }
 
@@ -22584,6 +22584,18 @@
           var savedIndex = parseInt(viewSavedOfferBtn.getAttribute("data-view-saved-best-offer") || "-1", 10);
           var savedOffer = (form._savedBestOffers || [])[savedIndex];
           if (savedOffer && savedOffer.url) showMaintenanceQuoteMaterialImagePreview(savedOffer.url, savedOffer.title || "Oferta de materiales guardada");
+          return;
+        }
+        var removeSavedOfferBtn = event.target && event.target.closest ? event.target.closest("[data-remove-saved-best-offer]") : null;
+        if (removeSavedOfferBtn) {
+          event.preventDefault();
+          var removeIndex = parseInt(removeSavedOfferBtn.getAttribute("data-remove-saved-best-offer") || "-1", 10);
+          var removedOffer = (form._savedBestOffers || [])[removeIndex];
+          if (removedOffer) {
+            form._savedBestOffers.splice(removeIndex, 1);
+            removeMaintenanceQuoteSavedOffer(form, removedOffer.id || removedOffer.title || "");
+          }
+          renderMaintenanceQuoteGeneratedMaterialOffers(form);
           return;
         }
         var removeMaterialRowBtn = event.target && event.target.closest ? event.target.closest("[data-remove-material-row-index]") : null;
