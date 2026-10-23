@@ -21539,7 +21539,7 @@
       var conf = configs[type];
       var rows = cotizacionFormItems(items, {});
       var totalHtml = conf.showTotal === false ? "" : '<span data-quote-total="' + escHtml(type) + '">$0</span>';
-      var html = '<section class="scm-maint-quote-section" data-quote-repeater="' + escHtml(type) + '"><div class="scm-maint-quote-section-head"><div><h4>' + escHtml(conf.title) + '</h4>' + totalHtml + '</div><button type="button" class="scm-maint-quote-add" data-quote-add-row="' + escHtml(type) + '">' + escHtml(conf.add) + '</button></div>';
+      var html = '<section class="scm-maint-quote-section" data-quote-repeater="' + escHtml(type) + '"><div class="scm-maint-quote-section-head"><div><h4>' + escHtml(conf.title) + '</h4>' + totalHtml + '</div></div>';
       if (conf.help) {
         html += '<p class="scm-maint-quote-help">' + escHtml(conf.help) + '</p>';
       }
@@ -21572,9 +21572,12 @@
           }
           html += "</label>";
         });
+        if (type === "materiales") {
+          html += '<input type="hidden" data-quote-field="imagen_materiales" value="' + escHtml(row && row.imagen_materiales != null ? String(row.imagen_materiales) : "") + '">';
+        }
         html += '<button type="button" class="scm-maint-quote-remove" data-quote-remove-row aria-label="Quitar fila">Quitar</button></div>';
       });
-      html += "</div></section>";
+      html += '</div><button type="button" class="scm-maint-quote-add" data-quote-add-row="' + escHtml(type) + '">' + escHtml(conf.add) + '</button></section>';
       return html;
     }
 
@@ -21914,11 +21917,65 @@
       if (closeButton && closeButton.focus) closeButton.focus();
     }
 
+    function maintenanceQuoteMediaRefMatches(ref, name) {
+      ref = String(ref || "").trim();
+      name = String(name || "").trim();
+      if (!ref || !name) return false;
+      return ref === name || ref.slice(-(name.length + 1)) === "/" + name;
+    }
+
+    function maintenanceQuoteSavedOfferIndex(form, ref) {
+      var saved = Array.isArray(form && form._savedBestOffers) ? form._savedBestOffers : [];
+      for (var i = 0; i < saved.length; i++) {
+        if (saved[i] && (maintenanceQuoteMediaRefMatches(saved[i].title, ref) || maintenanceQuoteMediaRefMatches(saved[i].url, ref))) return i;
+      }
+      return -1;
+    }
+
+    function removeMaintenanceQuoteSavedOffer(form, ref) {
+      if (!form || !String(ref || "").trim()) return;
+      form._savedBestOffers = (form._savedBestOffers || []).filter(function (item) {
+        return !(item && (maintenanceQuoteMediaRefMatches(item.title, ref) || maintenanceQuoteMediaRefMatches(item.url, ref)));
+      });
+      var input = form.querySelector('[name="mejor_oferta_existing"]');
+      if (input) {
+        input.value = String(input.value || "").split(",").filter(function (item) {
+          return item.trim() && !maintenanceQuoteMediaRefMatches(item, ref);
+        }).join(",");
+      }
+    }
+
+    function removeMaintenanceQuoteMaterialRow(form, row) {
+      if (!form || !row) return;
+      var key = row.getAttribute("data-generated-material-offer-row") || "";
+      var ref = quoteRowToObject(row).imagen_materiales || "";
+      row.remove();
+      if (key) {
+        setMaintenanceQuoteGeneratedMaterialOffers(form, maintenanceQuoteGeneratedMaterialOffers(form).filter(function (offer) {
+          return offer.key !== key;
+        }));
+      }
+      removeMaintenanceQuoteSavedOffer(form, ref);
+      resetMaterialSupportBuilderIfNoSavedMaterials(form);
+    }
+
     function renderMaintenanceQuoteGeneratedOfferAttachments(form) {
       var wrap = form ? form.querySelector("[data-material-generated-offer-attachments]") : null;
       if (!wrap) return;
       var offers = maintenanceQuoteGeneratedMaterialOffers(form);
       var saved = Array.isArray(form._savedBestOffers) ? form._savedBestOffers.filter(function (item) { return item && item.url; }) : [];
+      var providerByRef = {};
+      collectQuoteRows(form, "materiales").forEach(function (row) {
+        var ref = String(row.imagen_materiales || "").trim();
+        if (ref) providerByRef[ref] = String(row.provedor_materiales || row.proveedor_materiales || "").trim();
+      });
+      function savedProvider(item) {
+        var found = "";
+        Object.keys(providerByRef).forEach(function (ref) {
+          if (!found && (maintenanceQuoteMediaRefMatches(item.title, ref) || maintenanceQuoteMediaRefMatches(item.url, ref))) found = providerByRef[ref];
+        });
+        return found;
+      }
       if (!offers.length) {
         wrap.innerHTML = saved.length ? "" : "<p>No has generado imágenes desde la tabla de materiales.</p>";
       } else {
@@ -21934,7 +21991,7 @@
         }).join("");
       }
       wrap.innerHTML += saved.map(function (item, index) {
-        return '<article class="scm-maint-quote-auto-offer-card"><button type="button" class="scm-maint-quote-image-thumb" data-view-saved-best-offer="' + index + '" aria-label="Ver oferta guardada ' + (index + 1) + '"><img src="' + escHtml(item.url) + '" alt="Oferta de materiales guardada"></button><div><span>Mejor oferta guardada</span><strong>' + escHtml(item.title || ("Oferta " + (index + 1))) + '</strong></div><div class="scm-maint-quote-auto-offer-actions"><button type="button" class="scm-maint-quote-view-image" data-view-saved-best-offer="' + index + '">Ver imagen</button></div></article>';
+        return '<article class="scm-maint-quote-auto-offer-card"><button type="button" class="scm-maint-quote-image-thumb" data-view-saved-best-offer="' + index + '" aria-label="Ver oferta guardada ' + (index + 1) + '"><img src="' + escHtml(item.url) + '" alt="Oferta de materiales guardada"></button><div><span>Mejor oferta guardada</span><strong>' + escHtml(savedProvider(item) || item.title || ("Oferta " + (index + 1))) + '</strong></div><div class="scm-maint-quote-auto-offer-actions"><button type="button" class="scm-maint-quote-view-image" data-view-saved-best-offer="' + index + '">Ver imagen</button></div></article>';
       }).join("");
     }
 
@@ -21949,17 +22006,23 @@
         var provider = String(data.provedor_materiales || data.proveedor_materiales || "").trim();
         var total = parseCotizacionOrderMoney(data.valor_materiales || 0);
         var key = row.getAttribute("data-generated-material-offer-row") || "";
-        return { row: row, index: index, provider: provider, total: total, key: key, image: key && imageByKey[key] ? imageByKey[key].image : "" };
+        return { row: row, index: index, provider: provider, total: total, key: key, image: key && imageByKey[key] ? imageByKey[key].image : "", imageRef: String(data.imagen_materiales || "").trim() };
       }).filter(function (item) {
         return item.provider || item.total > 0 || item.image;
       });
+      var hasLinkedImages = rows.some(function (item) { return item.imageRef; });
       if (!rows.length) {
         wrap.innerHTML = "<p>No hay ofertas generadas desde la tabla de materiales.</p>";
         renderMaintenanceQuoteGeneratedOfferAttachments(form);
         return;
       }
       wrap.innerHTML = rows.map(function (item) {
-        var savedIndex = !item.image && savedOffers.length === 1 && rows.length === 1 ? 0 : -1;
+        var savedIndex = -1;
+        if (!item.image && item.imageRef) {
+          savedIndex = maintenanceQuoteSavedOfferIndex(form, item.imageRef);
+        } else if (!item.image && !hasLinkedImages && savedOffers.length === 1 && rows.length === 1) {
+          savedIndex = 0;
+        }
         var savedImage = savedIndex >= 0 && savedOffers[savedIndex] ? savedOffers[savedIndex].url : "";
         var imageHtml = item.image
           ? '<button type="button" class="scm-maint-quote-image-thumb" data-view-generated-material-offer="' + escHtml(item.key) + '" aria-label="Ver imagen de cotización material de ' + escHtml(item.provider || ("oferta " + (item.index + 1))) + '"><img src="' + escHtml(item.image) + '" alt="Imagen de cotización material de ' + escHtml(item.provider || ("oferta " + (item.index + 1))) + '"></button>'
@@ -22529,14 +22592,7 @@
           var rowIndex = parseInt(removeMaterialRowBtn.getAttribute("data-remove-material-row-index") || "-1", 10);
           var materialRows = Array.prototype.slice.call(form.querySelectorAll('[data-quote-row="materiales"]'));
           if (rowIndex >= 0 && materialRows[rowIndex]) {
-            var materialKey = materialRows[rowIndex].getAttribute("data-generated-material-offer-row") || "";
-            materialRows[rowIndex].remove();
-            if (materialKey) {
-              setMaintenanceQuoteGeneratedMaterialOffers(form, maintenanceQuoteGeneratedMaterialOffers(form).filter(function (offer) {
-                return offer.key !== materialKey;
-              }));
-            }
-            resetMaterialSupportBuilderIfNoSavedMaterials(form);
+            removeMaintenanceQuoteMaterialRow(form, materialRows[rowIndex]);
           }
           renderMaintenanceQuoteGeneratedMaterialOffers(form);
           syncMaintenanceQuoteTotals(form);
@@ -22562,13 +22618,8 @@
           event.preventDefault();
           var rowsWrap = removeBtn.closest(".scm-maint-quote-rows");
           var row = removeBtn.closest("[data-quote-row]");
-          var generatedKey = row ? (row.getAttribute("data-generated-material-offer-row") || "") : "";
-          if (generatedKey) {
-            row.remove();
-            setMaintenanceQuoteGeneratedMaterialOffers(form, maintenanceQuoteGeneratedMaterialOffers(form).filter(function (offer) {
-              return offer.key !== generatedKey;
-            }));
-            resetMaterialSupportBuilderIfNoSavedMaterials(form);
+          if (row && row.getAttribute("data-quote-row") === "materiales") {
+            removeMaintenanceQuoteMaterialRow(form, row);
             renderMaintenanceQuoteGeneratedMaterialOffers(form);
             syncMaintenanceQuoteTotals(form);
             return;

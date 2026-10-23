@@ -11906,6 +11906,11 @@
     box-shadow 160ms ease;
 }
 
+.swal2-popup.scm-maint-quote-swal .scm-maint-quote-rows + .scm-maint-quote-add,
+.scm-maint-quote-rows + .scm-maint-quote-add {
+  margin-top: 12px;
+}
+
 .swal2-popup.scm-maint-quote-swal .scm-maint-quote-add::before,
 .scm-maint-quote-add::before {
   content: "+";

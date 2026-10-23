@@ -461,7 +461,7 @@ trait HandlesMaintenanceActions
       [$now, $nowSql] = $this->maintenance_quote_now_pair();
 
       $itemsMano = $this->maintenance_quote_repeater_items('items_mano_json', ['descripcion_mano', 'unidad_mano', 'cantidad_mano', 'valor_mano']);
-      $itemsMateriales = $this->maintenance_quote_repeater_items('items_materiales_json', ['item_materiales', 'descripcion_materiales', 'unidad_materiales', 'cantidad_materiales', 'valor_unitario_materiales', 'valor_materiales', 'valor_total_materiales', 'provedor_materiales', 'proveedor_materiales']);
+      $itemsMateriales = $this->maintenance_quote_repeater_items('items_materiales_json', ['item_materiales', 'descripcion_materiales', 'unidad_materiales', 'cantidad_materiales', 'valor_unitario_materiales', 'valor_materiales', 'valor_total_materiales', 'provedor_materiales', 'proveedor_materiales', 'imagen_materiales']);
       $itemsMateriales = $this->maintenance_quote_merge_generated_material_rows($itemsMateriales, $this->maintenance_quote_generated_material_offer_rows('materiales_oferta_image'));
       $itemsEquipos = $this->maintenance_quote_repeater_items('items_otros_equi_json', ['descipcion_otros_equi', 'unidad_otros_equi', 'cantidad_otros_equi', 'valor_otros_equi']);
       $itemsOtros = $this->maintenance_quote_repeater_items('items_otros_costos_json', ['descipcion_otros_costos', 'unidad_otros_costos', 'cantidad_otros_costos', 'valor_otros_costos']);
@@ -485,8 +485,8 @@ trait HandlesMaintenanceActions
         throw new \DomainException('Completa el destinatario de la cotización.');
       }
 
-      $mejorOferta = $this->maintenance_quote_existing_media('mejor_oferta_existing', $sourceQuote['mejor_oferta'] ?? '');
-      $otrasOferta = $this->maintenance_quote_existing_media('otras_oferta_existing', $sourceQuote['otras_oferta'] ?? '');
+      $mejorOferta = $this->maintenance_quote_existing_media('mejor_oferta_existing', $sourceQuote['mejor_oferta'] ?? '', $mode === 'edit');
+      $otrasOferta = $this->maintenance_quote_existing_media('otras_oferta_existing', $sourceQuote['otras_oferta'] ?? '', $mode === 'edit');
       $newMejor = $this->maintenance_quote_store_media('mejor_oferta', 10);
       $newOtras = $this->maintenance_quote_store_media('otras_oferta', 10);
       $storedPhotos = array_merge($storedPhotos, $newMejor, $newOtras);
@@ -497,6 +497,7 @@ trait HandlesMaintenanceActions
       }
       $mejorOferta = array_merge($mejorOferta, $this->maintenance_quote_stored_media_refs($newMejor));
       $otrasOferta = array_merge($otrasOferta, $this->maintenance_quote_stored_media_refs($newOtras));
+      $itemsMateriales = $this->maintenance_quote_link_generated_material_images($itemsMateriales, $materialesOfertaImages, $mejorOferta);
 
       $tipoMantenimiento = $this->maintenance_quote_clean($_POST['tipo_mantenimiento'] ?? ($context['tipo_mantenimiento'] ?? 'Correctiva'));
       $tipoMantenimiento = stripos($tipoMantenimiento, 'prevent') !== false ? 'Preventiva' : 'Correctiva';
@@ -1319,7 +1320,7 @@ trait HandlesMaintenanceActions
         $value = in_array($field, ['cantidad_mano', 'valor_mano', 'cantidad_materiales', 'valor_unitario_materiales', 'valor_materiales', 'valor_total_materiales', 'cantidad_otros_equi', 'valor_otros_equi', 'cantidad_otros_costos', 'valor_otros_costos'], true)
           ? (string) (int) round($this->maintenance_quote_number($row[$field] ?? 0))
           : $this->maintenance_quote_clean($row[$field] ?? '');
-        if ($field !== 'item_materiales' && trim($value) !== '' && trim($value) !== '0') {
+        if ($field !== 'item_materiales' && $field !== 'imagen_materiales' && trim($value) !== '' && trim($value) !== '0') {
           $hasValue = true;
         }
         $clean[$field] = $value;
@@ -1565,9 +1566,12 @@ trait HandlesMaintenanceActions
   }
 
   /** @return array<int,string> */
-  private function maintenance_quote_existing_media(string $field, $current): array
+  private function maintenance_quote_existing_media(string $field, $current, bool $postedIsAuthoritative = false): array
   {
     $posted = $this->maintenance_quote_media_list($_POST[$field] ?? '');
+    if ($posted === [] && $postedIsAuthoritative && isset($_POST[$field])) {
+      return [];
+    }
     return $posted !== [] ? $posted : $this->maintenance_quote_media_list($current);
   }
 
@@ -1592,7 +1596,7 @@ trait HandlesMaintenanceActions
     return $stored;
   }
 
-  /** @return array<int,array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string}> */
+  /** @return array<int,array{name:string,url:string,mime:string,width:int,height:int,bytes:int,sha256:string,offer_provider:string,offer_total:int}> */
   private function maintenance_quote_store_generated_materials_images(string $field): array
   {
     $raw = trim((string) ($_POST[$field] ?? ''));
@@ -1601,14 +1605,18 @@ trait HandlesMaintenanceActions
     }
     $dataUris = [];
     if (str_starts_with($raw, 'data:image/')) {
-      $dataUris[] = $raw;
+      $dataUris[] = ['image' => $raw, 'provider' => '', 'total' => 0];
     } else {
       $decoded = json_decode(wp_unslash($raw), true);
       if (is_array($decoded)) {
         foreach ($decoded as $item) {
           $image = is_array($item) ? trim((string) ($item['image'] ?? '')) : trim((string) $item);
           if (str_starts_with($image, 'data:image/')) {
-            $dataUris[] = $image;
+            $dataUris[] = [
+              'image' => $image,
+              'provider' => is_array($item) ? $this->maintenance_quote_clean($item['provider'] ?? '') : '',
+              'total' => is_array($item) ? (int) round($this->maintenance_quote_number($item['total'] ?? 0)) : 0,
+            ];
           }
         }
       }
@@ -1617,8 +1625,8 @@ trait HandlesMaintenanceActions
       return [];
     }
     $storedImages = [];
-    foreach (array_slice($dataUris, 0, 10) as $dataUri) {
-      $stored = $this->storedFiles()->storeImageDataUri($dataUri);
+    foreach (array_slice($dataUris, 0, 10) as $offer) {
+      $stored = $this->storedFiles()->storeImageDataUri($offer['image']);
       if (!is_array($stored)) {
         $this->storedFiles()->deleteStoredImages($storedImages);
         throw new \DomainException('No fue posible generar la imagen de la cotización de materiales.');
@@ -1634,9 +1642,66 @@ trait HandlesMaintenanceActions
         $this->storedFiles()->deleteStoredImages(array_merge($storedImages, [$stored]));
         throw new \DomainException('La imagen generada de materiales supera 2000px.');
       }
+      $stored['offer_provider'] = $offer['provider'];
+      $stored['offer_total'] = $offer['total'];
       $storedImages[] = $stored;
     }
     return $storedImages;
+  }
+
+  /**
+   * Guarda en cada fila de materiales la referencia de su imagen generada para
+   * poder mostrarla y quitarla junto al proveedor al editar la cotización.
+   *
+   * @param array<int,array<string,string>> $items
+   * @param array<int,array<string,mixed>> $generatedImages
+   * @param array<int,string> $mejorOferta
+   * @return array<int,array<string,string>>
+   */
+  private function maintenance_quote_link_generated_material_images(array $items, array $generatedImages, array $mejorOferta): array
+  {
+    $available = [];
+    foreach ($generatedImages as $image) {
+      $refs = $this->maintenance_quote_stored_media_refs([$image]);
+      if ($refs === []) {
+        continue;
+      }
+      $available[] = [
+        'ref' => $refs[0],
+        'key' => mb_strtolower(trim((string) ($image['offer_provider'] ?? '')), 'UTF-8') . '|' . (string) (int) ($image['offer_total'] ?? 0),
+      ];
+    }
+    foreach ($items as $index => $item) {
+      $ref = trim((string) ($item['imagen_materiales'] ?? ''));
+      if ($ref !== '') {
+        $stillSaved = false;
+        foreach ($mejorOferta as $savedRef) {
+          $savedRef = trim((string) $savedRef);
+          if ($savedRef === $ref || str_ends_with($savedRef, '/' . $ref)) {
+            $stillSaved = true;
+            break;
+          }
+        }
+        if (!$stillSaved) {
+          $ref = '';
+        }
+      }
+      if ($ref === '') {
+        $provider = $this->maintenance_quote_first([$item['provedor_materiales'] ?? '', $item['proveedor_materiales'] ?? '']);
+        $key = mb_strtolower($provider, 'UTF-8') . '|' . (string) $this->maintenance_quote_material_row_total($item);
+        foreach ($available as $availableIndex => $candidate) {
+          if ($candidate['key'] === $key) {
+            $ref = $candidate['ref'];
+            unset($available[$availableIndex]);
+            break;
+          }
+        }
+      }
+      if ($ref !== '' || array_key_exists('imagen_materiales', $item)) {
+        $items[$index]['imagen_materiales'] = $ref;
+      }
+    }
+    return $items;
   }
 
   /**
