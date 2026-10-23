@@ -25612,6 +25612,12 @@
           activeAdministrativePanel &&
           administrativeKey === "reportes_administrativos_pendientes"
         ) {
+          var adminReportsModule = activeAdministrativePanel.querySelector(
+            "[data-scm-admin-reports]",
+          );
+          if (adminReportsModule) {
+            adminReportsModule.dispatchEvent(new CustomEvent("scm:load-admin-reports"));
+          }
           return loadPendingFormOnce(activeAdministrativePanel, "#sra_form");
         }
         if (

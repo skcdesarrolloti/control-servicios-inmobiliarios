@@ -14,6 +14,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesPreventiveReviewActions;
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   use \SCM\App\Concerns\HandlesOwnerCredits;
+  use \SCM\App\Concerns\HandlesAdministrativeReports;
   use \SCM\App\Concerns\HandlesMaintenanceOrdersPanel;
   use \SCM\App\Concerns\HandlesLeaseContracts;
   use \SCM\App\Concerns\HandlesPublicPqrActions;
@@ -162,7 +163,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
-  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure'];
+  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts'];
   /** Acciones que existían antes del catálogo ampliado; las demás heredan permisos hasta guardar (applyNewDashboardActionDefaults). */
   const LEGACY_DASHBOARD_ACTION_KEYS = [
     'case_followup', 'case_schedule', 'case_note', 'case_postpone', 'case_respond', 'contract_history_manage', 'case_transfer',
@@ -859,6 +860,11 @@ final class SuCasaControlServiciosInmobiliarios
         'items' => [
           'admin_case_create' => 'Crear caso administrativo o preventivo (contratos y vencimientos)',
           'admin_report_review' => 'Aprobar o desaprobar reportes administrativos',
+          'admin_report_pending_view' => 'Reportes administrativos: ver la pestaña Por aprobar',
+          'admin_report_own' => 'Reportes administrativos: ver mis reportes y crear mis cuentas de cobro',
+          'admin_report_manage' => 'Reportes administrativos: crear reportes desde un caso, editar valores y ver reportes de otros funcionarios',
+          'admin_report_payments' => 'Reportes administrativos: consolidado de pagos (marcar reportes como pagados)',
+          'admin_report_accounts' => 'Reportes administrativos: ver todas las cuentas de cobro y marcarlas como pagadas',
           'public_services_review_save' => 'Guardar revisión de servicios públicos',
           'public_services_liquidation_generate' => 'Generar liquidación de servicios públicos',
           'rent_increase_letter_create' => 'Generar cartas de aumento',

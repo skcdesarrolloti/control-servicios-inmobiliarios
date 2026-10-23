@@ -25,7 +25,7 @@ final class PendingView
     <div class="scm-pending-wrap" id="sra_panel">
       <div class="scm-pending-header scm-pending-header--brand">
         <div>
-          <h2>Reportes Administrativos Pendientes</h2>
+          <h2>Reportes por aprobar</h2>
           <p>Reportes con estado <strong>Pendiente</strong> antes de pasar al consolidado administrativo</p>
         </div>
         <div>

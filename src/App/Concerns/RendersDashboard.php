@@ -124,7 +124,9 @@ trait RendersDashboard
     $pendingController = $this->get_pending_controller();
     $preventivasPendientesHtml = $this->render_pending_preventivas_shell($_GET);
     $serviciosPublicosPendientesHtml = $this->render_pending_servicios_publicos_shell($_GET);
-    $reportesAdministrativosPendientesHtml = $pendingController->renderReportesAdministrativosShell($filterOptions);
+    $reportesAdministrativosPendientesHtml = in_array('reportes_administrativos_pendientes', $this->currentDashboardAllowedTabs(), true)
+      ? $this->renderAdministrativeReportsPanel($pendingController->renderReportesAdministrativosShell($filterOptions))
+      : '';
     $actasSatisfaccionHtml = $this->render_ticket_completion_acts_shell($_GET);
     $contratosArrendamientoHtml = $this->renderLeaseContractsPanel();
     $cartasAumentoHtml = '';
@@ -1453,6 +1455,7 @@ trait RendersDashboard
     <script src="<?php echo $collectionManagementJsUrl; ?>" defer></script>
     <script src="<?php echo $canonInsuranceAuditJsUrl; ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-owner-credits.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-owner-credits.js'))); ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-administrative-reports.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-administrative-reports.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-movements.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-movements.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-case-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-case-metrics.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-quote-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-quote-metrics.js'))); ?>" defer></script>
