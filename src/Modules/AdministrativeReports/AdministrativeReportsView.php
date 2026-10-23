@@ -50,7 +50,8 @@ final class AdministrativeReportsView
       . '<div class="!sp-flex !sp-flex-col md:!sp-flex-row md:!sp-items-end !sp-justify-between !sp-gap-3 !sp-pb-3 !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200">'
       . '<div><p class="!sp-m-0 !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Actividades administrativas</p>'
       . '<h2 class="!sp-m-0 !sp-text-xl !sp-font-bold">Reportes Administrativos</h2>'
-      . '<p class="!sp-m-0 !sp-text-xs !sp-text-service-muted">Aprobación de reportes, cuentas de cobro de los funcionarios y control de pagos.</p></div></div>'
+      . '<p class="!sp-m-0 !sp-text-xs !sp-text-service-muted">Aprobación de reportes, cuentas de cobro de los funcionarios y control de pagos.</p></div>'
+      . (!empty($can['manage']) ? $this->newReportActions($funcionarios, $employeeId) : '') . '</div>'
       . '<div class="!sp-flex !sp-items-center !sp-gap-2 !sp-overflow-x-auto !sp-pb-1" role="tablist" aria-label="Reportes administrativos">';
     foreach ($tabs as $tab) {
       $active = $tab === $first;
@@ -112,14 +113,37 @@ final class AdministrativeReportsView
       'arrendatario' => ['Arrendatario', 'Nombre', 'text'],
       'ticket' => ['Caso', 'Ej: 9665', 'text'],
     ], $extra, '<input type="hidden" name="state" value="no_exportados">');
-    if (!empty($can['manage'])) {
-      $html .= '<div class="' . UI::CARD . ' !sp-p-4 !sp-mt-4 !sp-flex !sp-flex-wrap !sp-items-end !sp-gap-3" data-ar-new-report>'
-        . '<label class="!sp-block !sp-w-48"><span class="' . UI::LABEL . '">Caso para el nuevo reporte</span><input class="' . UI::INPUT . '" type="text" inputmode="numeric" placeholder="Ej: 9665" data-ar-new-ticket></label>'
-        . '<button type="button" class="' . UI::NAVY . ' !sp-h-10" data-ar-open-report="proceso">' . UI::icon('document') . 'Crear reporte administrativo</button>'
-        . '<button type="button" class="' . UI::SECONDARY . ' !sp-h-10" data-ar-open-report="transporte">' . UI::icon('building') . 'Añadir transporte por visita</button>'
-        . '<p class="!sp-m-0 !sp-text-[11px] !sp-text-service-muted !sp-basis-full">El reporte queda a nombre del funcionario seleccionado en los filtros.</p></div>';
-    }
     return $html . '<div class="!sp-mt-4" data-ar-results="own">' . $this->loading() . '</div>';
+  }
+
+  /**
+   * Botones del encabezado para crear reportes. Abren un popup que primero pide el caso (y el funcionario
+   * del reporte); la plantilla lleva las opciones de funcionario para ese primer paso.
+   * @param array<int,array<string,string>> $funcionarios
+   */
+  private function newReportActions(array $funcionarios, string $employeeId): string
+  {
+    $options = '';
+    foreach ($funcionarios as $funcionario) {
+      $id = (string) ($funcionario['id'] ?? '');
+      if ($id !== '') $options .= '<option value="' . self::e($id) . '"' . ($id === $employeeId ? ' selected' : '') . '>' . self::e($funcionario['label'] ?? $id) . '</option>';
+    }
+    return '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2">'
+      . '<button type="button" class="' . UI::SECONDARY . '" data-ar-open-report="transporte">' . UI::icon('building') . 'Añadir transporte por visita</button>'
+      . '<button type="button" class="' . UI::NAVY . ' !sp-text-xs !sp-px-4 !sp-py-2.5" data-ar-open-report="proceso">' . UI::icon('document') . 'Crear reporte administrativo</button>'
+      . '<template data-ar-ticket-step-template>' . self::ticketStep($options) . '</template></div>';
+  }
+
+  /** Primer paso del popup: número del caso y funcionario a cuyo nombre queda el reporte. */
+  private static function ticketStep(string $staffOptions): string
+  {
+    return '<form class="!sp-p-4 sm:!sp-p-6 !sp-flex !sp-flex-col !sp-gap-4" data-ar-ticket-step autocomplete="off">'
+      . '<p class="!sp-m-0 !sp-text-xs !sp-text-service-muted">Escribe el número del caso para cargar sus datos (contrato, inmueble, solicitud y arrendatario).</p>'
+      . '<div class="!sp-grid !sp-grid-cols-1 md:!sp-grid-cols-2 !sp-gap-3">'
+      . '<label class="!sp-block"><span class="' . UI::LABEL . '">Número del caso</span><input class="' . UI::INPUT . '" name="id_ticket" inputmode="numeric" required placeholder="Ej: 9665" data-ar-ticket-input></label>'
+      . ($staffOptions !== '' ? '<label class="!sp-block"><span class="' . UI::LABEL . '">Funcionario del reporte</span><select class="' . UI::INPUT . '" name="employee">' . $staffOptions . '</select></label>' : '')
+      . '</div><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-3"><p class="!sp-m-0 !sp-text-[11px] !sp-font-semibold !sp-text-red-700" data-ar-form-status></p>'
+      . '<div class="!sp-flex !sp-gap-2"><button type="button" class="' . UI::SECONDARY . '" data-ar-modal-close>Cancelar</button><button type="submit" class="' . UI::PRIMARY . '">Continuar</button></div></div></form>';
   }
 
   /** @param array<int,array<string,string>> $funcionarios */
@@ -415,14 +439,21 @@ final class AdministrativeReportsView
     foreach (['Caso' => '#' . $ticket['id_ticket'], 'Contrato' => $ticket['contrato'], 'Inmueble' => $ticket['inmueble'], 'Solicitud' => $ticket['numero_solicitud'], 'Arrendatario' => $ticket['arrendatario'], 'Funcionario del reporte' => $employeeName ?: $employeeId] as $label => $value) {
       $card .= '<div><p class="!sp-m-0 !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">' . self::e($label) . '</p><p class="!sp-m-0 !sp-mt-0.5 !sp-text-xs !sp-font-semibold">' . self::e($value !== '' ? $value : '-') . '</p></div>';
     }
-    $options = '';
-    foreach ($categories as $category) $options .= '<option value="' . self::e($category) . '"></option>';
+    // Solo tipos existentes; el transporte por visita propone el primer tipo que hable de transporte.
+    $preset = '';
+    if ($transport) {
+      foreach ($categories as $category) {
+        if (stripos($category, 'transporte') !== false) { $preset = $category; break; }
+      }
+    }
+    $options = '<option value=""' . ($preset === '' ? ' selected' : '') . ' disabled>Selecciona el tipo de reporte</option>';
+    foreach ($categories as $category) $options .= '<option value="' . self::e($category) . '"' . ($category === $preset ? ' selected' : '') . '>' . self::e($category) . '</option>';
     $money = static fn(int $value): string => number_format($value, 0, ',', '.');
     return '<form class="!sp-p-4 sm:!sp-p-6 !sp-flex !sp-flex-col !sp-gap-4 !sp-overflow-y-auto" data-ar-report-form>'
       . '<input type="hidden" name="form" value="' . self::e($mode) . '"><input type="hidden" name="id_ticket" value="' . self::e($ticket['id_ticket']) . '"><input type="hidden" name="employee" value="' . self::e($employeeId) . '">'
       . '<div class="' . UI::CARD . ' !sp-p-4 !sp-grid !sp-grid-cols-2 md:!sp-grid-cols-3 !sp-gap-3">' . $card . '</div>'
       . '<div class="!sp-grid !sp-grid-cols-1 md:!sp-grid-cols-4 !sp-gap-3">'
-      . '<label class="!sp-block md:!sp-col-span-2"><span class="' . UI::LABEL . '">Tipo de reporte</span><input class="' . UI::INPUT . '" name="categoria" list="ar-report-categories" required value="' . ($transport ? 'Transporte por visita administrativa' : '') . '" placeholder="Ej: Revision preventiva"><datalist id="ar-report-categories">' . $options . '</datalist></label>'
+      . '<label class="!sp-block md:!sp-col-span-2"><span class="' . UI::LABEL . '">Tipo de reporte</span><select class="' . UI::INPUT . '" name="categoria" required>' . $options . '</select></label>'
       . ($transport ? '' : '<label class="!sp-block"><span class="' . UI::LABEL . '">Valor servicio</span><input class="' . UI::INPUT . '" name="servicio" inputmode="numeric" data-ar-form-money value="' . $money($suggested['servicio']) . '"></label>')
       . '<label class="!sp-block"><span class="' . UI::LABEL . '">Transporte</span><input class="' . UI::INPUT . '" name="transporte" inputmode="numeric" data-ar-form-money value="' . ($transport ? $money($suggested['transporte']) : '0') . '"></label>'
       . ($transport ? '' : '<label class="!sp-block"><span class="' . UI::LABEL . '">Cerrar caso</span><select class="' . UI::INPUT . '" name="cerrar_ticket"><option value="No">No</option><option value="Si">Sí, cerrar y finalizar</option></select></label>')

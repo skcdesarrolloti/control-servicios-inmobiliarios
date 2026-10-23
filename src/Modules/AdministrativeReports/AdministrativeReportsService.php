@@ -554,6 +554,7 @@ final class AdministrativeReportsService
 
     if ($employeeId === '') throw new \DomainException('Selecciona el funcionario del reporte.');
     if ($category === '') throw new \DomainException('El tipo de reporte es obligatorio.');
+    if (!in_array($category, $this->categories(), true)) throw new \DomainException('Selecciona un tipo de reporte de la lista.');
     if ($description === '') throw new \DomainException('La evidencia escrita es obligatoria.');
     if ($service + $transport <= 0) throw new \DomainException('Ingresa el valor del servicio o del transporte.');
     $ticket = $this->ticket($ticketId);

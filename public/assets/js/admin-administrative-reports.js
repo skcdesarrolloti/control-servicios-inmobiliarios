@@ -371,23 +371,39 @@
         .catch(function (error) { notify("error", error.message); done(); });
     }
 
-    function openReportForm(mode, button) {
-      var input = module.querySelector("[data-ar-new-ticket]");
-      var ticket = input ? input.value.replace(/[^\d]/g, "") : "";
+    var REPORT_TITLES = { proceso: "Crear reporte administrativo", transporte: "Añadir transporte por visita" };
+
+    // Paso 1: el popup pide el caso (y el funcionario del reporte); paso 2: el formulario con los datos del caso.
+    function openReportForm(mode) {
+      var template = module.querySelector("[data-ar-ticket-step-template]");
+      if (!template) return;
+      var box = showModal(REPORT_TITLES[mode] || "Nuevo reporte", template.innerHTML);
+      var step = box.querySelector("[data-ar-ticket-step]");
+      step.setAttribute("data-mode", mode);
+      var input = step.querySelector("[data-ar-ticket-input]");
+      if (input) input.focus();
+    }
+
+    function submitTicketStep(step) {
+      var mode = step.getAttribute("data-mode") || "proceso";
+      var status = step.querySelector("[data-ar-form-status]");
+      var ticket = String(step.elements.id_ticket.value || "").replace(/[^\d]/g, "");
       if (!ticket) {
-        notify("warning", "Escribe el número del caso para cargar su información.");
-        if (input) input.focus();
+        if (status) status.textContent = "Escribe el número del caso.";
         return;
       }
-      var employee = form("own").elements.employee;
-      var done = busy(button, "Cargando…");
+      var employee = step.elements.employee;
+      var done = busy(step.querySelector('[type="submit"]'), "Buscando caso…");
+      if (status) status.textContent = "";
       post("scm_admin_reports_report_form", { id_ticket: ticket, form: mode, employee: employee ? employee.value : "" })
         .then(function (data) {
-          var box = showModal(data.title || "Nuevo reporte", data.html || "");
+          var box = showModal(data.title || REPORT_TITLES[mode], data.html || "");
           updateFormTotal(box.querySelector("[data-ar-report-form]"));
         })
-        .catch(function (error) { notify("error", error.message); })
-        .then(done);
+        .catch(function (error) {
+          if (status) status.textContent = error.message;
+          done();
+        });
     }
 
     function updateFormTotal(reportForm) {
@@ -409,10 +425,10 @@
         .then(function (result) {
           closeModal();
           notify("success", result.message || "Reporte creado.");
-          var input = module.querySelector("[data-ar-new-ticket]");
-          if (input) input.value = "";
-          setField("own", "state", "no_exportados");
-          load("own");
+          if (form("own")) {
+            setField("own", "state", "no_exportados");
+            load("own");
+          }
         })
         .catch(function (error) {
           if (status) {
@@ -455,7 +471,7 @@
       if ((el = target.closest("[data-ar-pay-account]"))) { payAccounts([el.getAttribute("data-ar-pay-account")], el); return; }
       if ((el = target.closest("[data-ar-backfill]"))) { backfill(el); return; }
       if ((el = target.closest("[data-ar-save-values]"))) { saveValues(el.closest("[data-ar-row]"), el); return; }
-      if ((el = target.closest("[data-ar-open-report]"))) { openReportForm(el.getAttribute("data-ar-open-report"), el); return; }
+      if ((el = target.closest("[data-ar-open-report]"))) { openReportForm(el.getAttribute("data-ar-open-report")); return; }
       if ((el = target.closest("[data-ar-account-pdf]"))) { showPdf(el.getAttribute("data-ar-account-pdf"), el.getAttribute("data-number") || ""); return; }
       if ((el = target.closest("[data-ar-account-excel]"))) { downloadExcel(el.getAttribute("data-ar-account-excel"), el.getAttribute("data-number") || "", el); return; }
       if ((el = target.closest("[data-ar-account]"))) {
@@ -514,6 +530,11 @@
         load(target.getAttribute("data-ar-filters"));
         return;
       }
+      if (target.matches("[data-ar-ticket-step]")) {
+        event.preventDefault();
+        submitTicketStep(target);
+        return;
+      }
       if (target.matches("[data-ar-report-form]")) {
         event.preventDefault();
         submitReport(target);
@@ -535,14 +556,6 @@
         setField(filters.getAttribute("data-ar-filters"), "page", "1");
         load(filters.getAttribute("data-ar-filters"));
       }, 0);
-    });
-    module.querySelectorAll("[data-ar-new-ticket]").forEach(function (input) {
-      input.addEventListener("keydown", function (event) {
-        if (event.key !== "Enter") return;
-        event.preventDefault();
-        var first = module.querySelector('[data-ar-open-report="proceso"]');
-        if (first) openReportForm("proceso", first);
-      });
     });
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && modal && !modal.hidden) closeModal();
