@@ -21571,7 +21571,7 @@
         html += '<p class="scm-maint-quote-help">' + escHtml(conf.help) + '</p>';
       }
       if (conf.supportBuilder) {
-        html += '<div class="scm-maint-quote-support-head"><label class="scm-cotizacion-dialog-field"><span>Proveedor de esta oferta</span><input type="text" data-material-support-provider placeholder="Proveedor o almacén"></label><div class="scm-maint-quote-support-total"><span>Total de la imagen</span><strong data-material-support-total>$0</strong></div><button type="button" class="scm-maint-quote-generate" data-generate-material-offer>Generar oferta</button></div>';
+        html += '<div class="scm-maint-quote-support-head"><label class="scm-cotizacion-dialog-field"><span>Proveedor de esta oferta</span><input type="text" data-material-support-provider placeholder="Proveedor o almacén"></label><div class="scm-maint-quote-support-total"><span>Total de la imagen</span><strong data-material-support-total>$0</strong></div><div class="scm-maint-quote-support-actions"><button type="button" class="scm-maint-quote-generate" data-generate-material-offer>Generar oferta</button><button type="button" class="scm-maint-quote-cancel-provider" data-material-cancel-provider hidden>Cancelar</button></div></div>';
       }
       html += '<div class="scm-maint-quote-rows">';
       rows.forEach(function (row, index) {
@@ -22164,6 +22164,8 @@
       var open = !!form._materialBuilderOpen || !providers.length || maintenanceQuoteMaterialSupportRows(form).length > 0;
       builder.hidden = !open;
       prompt.hidden = open;
+      var cancelBtn = builder.querySelector("[data-material-cancel-provider]");
+      if (cancelBtn) cancelBtn.hidden = !providers.length;
       if (open) return;
       var total = providers.reduce(function (sum, row) { return sum + parseCotizacionOrderMoney(row.valor_materiales || 0); }, 0);
       var last = form._lastMaterialOffer;
@@ -22757,6 +22759,15 @@
           syncMaterialBuilderState(form);
           var providerField = form.querySelector("[data-material-support-provider]");
           if (providerField && providerField.focus) providerField.focus();
+          return;
+        }
+        var cancelProviderBtn = event.target && event.target.closest ? event.target.closest("[data-material-cancel-provider]") : null;
+        if (cancelProviderBtn) {
+          event.preventDefault();
+          resetMaterialSupportBuilder(form);
+          form._materialBuilderOpen = false;
+          syncMaintenanceQuoteTotals(form);
+          syncMaterialBuilderState(form);
           return;
         }
         var materialsDoneBtn = event.target && event.target.closest ? event.target.closest("[data-material-done]") : null;

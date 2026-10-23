@@ -12215,6 +12215,44 @@
   font-size: 15px;
 }
 
+.scm-maint-quote-support-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.swal2-popup.scm-maint-quote-swal .scm-maint-quote-cancel-provider,
+.scm-maint-quote-cancel-provider {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.swal2-popup.scm-maint-quote-swal .scm-maint-quote-cancel-provider:hover,
+.swal2-popup.scm-maint-quote-swal .scm-maint-quote-cancel-provider:focus-visible {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.scm-maint-quote-cancel-provider[hidden] {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .scm-maint-quote-support-actions {
+    flex-direction: column;
+  }
+
+  .scm-maint-quote-support-actions button {
+    width: 100%;
+  }
+}
+
 .swal2-popup.scm-maint-quote-swal .scm-maint-quote-generate,
 .scm-maint-quote-generate {
   min-height: 44px;
