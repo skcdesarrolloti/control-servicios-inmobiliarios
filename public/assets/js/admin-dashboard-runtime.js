@@ -21710,6 +21710,107 @@
       return [{}];
     }
 
+    var MAINTENANCE_QUOTE_STEPS = [
+      ["datos", "Destinatario"],
+      ["mano", "Mano de obra"],
+      ["materiales", "Materiales"],
+      ["otros", "Equipos y otros"],
+      ["perturbacion", "Perturbación"],
+      ["resumen", "Resumen"],
+    ];
+
+    function maintenanceQuoteStepIntro(title, help) {
+      return '<header class="scm-maint-quote-step-intro"><h4>' + escHtml(title) + '</h4><p>' + escHtml(help) + '</p></header>';
+    }
+
+    function maintenanceQuoteStepIndex(form) {
+      var steps = Array.prototype.slice.call(form.querySelectorAll("[data-quote-step]"));
+      var current = steps.findIndex(function (step) { return !step.hidden; });
+      return current < 0 ? 0 : current;
+    }
+
+    // Revisa solo los campos obligatorios visibles del paso antes de avanzar.
+    function maintenanceQuoteStepIsValid(form, index) {
+      var step = form.querySelectorAll("[data-quote-step]")[index];
+      if (!step) return true;
+      if (step.getAttribute("data-quote-step") === "materiales" && maintenanceQuoteMaterialSupportRows(form).length) {
+        if (!generateMaterialOfferFromSupport(form, false)) return false;
+      }
+      var invalid = Array.prototype.find.call(step.querySelectorAll("input, select, textarea"), function (field) {
+        return !field.disabled && field.offsetParent !== null && typeof field.checkValidity === "function" && !field.checkValidity();
+      });
+      if (invalid) {
+        if (typeof invalid.reportValidity === "function") invalid.reportValidity();
+        return false;
+      }
+      return true;
+    }
+
+    function showMaintenanceQuoteStep(form, index) {
+      if (!form) return;
+      var steps = Array.prototype.slice.call(form.querySelectorAll("[data-quote-step]"));
+      index = Math.max(0, Math.min(steps.length - 1, index));
+      steps.forEach(function (step, i) { step.hidden = i !== index; });
+      form.querySelectorAll("[data-quote-goto]").forEach(function (button, i) {
+        if (i === index) button.setAttribute("aria-current", "step");
+        else button.removeAttribute("aria-current");
+        button.classList.toggle("is-done", i < index);
+      });
+      var progress = form.querySelector("[data-quote-progress]");
+      if (progress) progress.style.width = Math.round(((index + 1) / steps.length) * 100) + "%";
+      var isLast = index === steps.length - 1;
+      var popup = window.Swal && window.Swal.getPopup ? window.Swal.getPopup() : null;
+      if (popup) {
+        var back = popup.querySelector("[data-quote-step-back]");
+        var next = popup.querySelector("[data-quote-step-next]");
+        var confirm = window.Swal.getConfirmButton ? window.Swal.getConfirmButton() : null;
+        if (back) back.hidden = index === 0;
+        if (next) next.hidden = isLast;
+        if (confirm) confirm.style.display = isLast ? "" : "none";
+        var body = popup.querySelector(".swal2-html-container");
+        if (body) body.scrollTop = 0;
+      }
+    }
+
+    function showMaintenanceQuoteStepByKey(form, key) {
+      var steps = Array.prototype.slice.call(form.querySelectorAll("[data-quote-step]"));
+      var index = steps.findIndex(function (step) { return step.getAttribute("data-quote-step") === key; });
+      if (index >= 0) showMaintenanceQuoteStep(form, index);
+    }
+
+    function wireMaintenanceQuoteSteps(form) {
+      var actions = window.Swal && window.Swal.getActions ? window.Swal.getActions() : null;
+      if (!form || !actions) return;
+      var back = document.createElement("button");
+      back.type = "button";
+      back.className = "scm-cotizacion-dialog-cancel scm-maint-quote-step-back";
+      back.setAttribute("data-quote-step-back", "1");
+      back.textContent = "Anterior";
+      var next = document.createElement("button");
+      next.type = "button";
+      next.className = "scm-cotizacion-dialog-confirm scm-maint-quote-step-next";
+      next.setAttribute("data-quote-step-next", "1");
+      next.textContent = "Siguiente";
+      actions.insertBefore(back, actions.firstChild);
+      actions.insertBefore(next, window.Swal.getConfirmButton ? window.Swal.getConfirmButton() : null);
+      back.addEventListener("click", function () {
+        showMaintenanceQuoteStep(form, maintenanceQuoteStepIndex(form) - 1);
+      });
+      next.addEventListener("click", function () {
+        var index = maintenanceQuoteStepIndex(form);
+        if (window.Swal.resetValidationMessage) window.Swal.resetValidationMessage();
+        if (!maintenanceQuoteStepIsValid(form, index)) return;
+        showMaintenanceQuoteStep(form, index + 1);
+      });
+      form.addEventListener("click", function (event) {
+        var goto = event.target && event.target.closest ? event.target.closest("[data-quote-goto]") : null;
+        if (!goto) return;
+        event.preventDefault();
+        showMaintenanceQuoteStepByKey(form, goto.getAttribute("data-quote-goto") || "");
+      });
+      showMaintenanceQuoteStep(form, 0);
+    }
+
     function buildMaintenanceQuoteFormHtml(context) {
       context = context || {};
       var d = context.defaults || {};
@@ -21732,6 +21833,12 @@
         '<input type="hidden" name="mejor_oferta_existing" value="' + escHtml((media.mejor_oferta || []).join(",")) + '">' +
         '<input type="hidden" name="otras_oferta_existing" value="' + escHtml((media.otras_oferta || []).join(",")) + '">' +
         '<input type="hidden" name="materiales_oferta_image" value="">' +
+        '<ol class="scm-maint-quote-steps" data-quote-steps>' + MAINTENANCE_QUOTE_STEPS.map(function (step, index) {
+          return '<li><button type="button" data-quote-goto="' + step[0] + '"' + (index === 0 ? ' aria-current="step"' : '') + '><span>' + (index + 1) + '</span>' + escHtml(step[1]) + '</button></li>';
+        }).join("") + '</ol>' +
+        '<div class="scm-maint-quote-progress" aria-hidden="true"><span data-quote-progress></span></div>' +
+        '<div class="scm-maint-quote-step" data-quote-step="datos">' +
+        maintenanceQuoteStepIntro("¿Quién recibe la cotización?", "Elige quién la aprueba y confirma los datos de contacto del destinatario.") +
         maintenanceQuoteWarningHtml(context) +
         '<section class="scm-maint-quote-section"><h4>Datos de la cotización</h4><div class="scm-maint-quote-grid">' +
         '<label class="scm-cotizacion-dialog-field"><span>¿Quién aprobará la cotización? <em>*</em></span><select name="ejecutado" required><option value="">Elige una opción</option>' + cotizacionFormOptionHtml(context.executor_options, d.ejecutado) + '</select></label>' +
@@ -21739,16 +21846,38 @@
         '<label class="scm-cotizacion-dialog-field"><span>Email</span><input type="email" name="email_destinatario" value="' + escHtml(d.email_destinatario || "") + '"></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Indicativo</span><input name="indicativo_destinarario" value="' + escHtml(d.indicativo_destinarario || "57") + '"></label>' +
         '<label class="scm-cotizacion-dialog-field"><span>Celular</span><input type="tel" name="celular_destinatario" value="' + escHtml(d.celular_destinatario || "") + '"></label>' +
-        '</div></section>' +
+        '</div></section></div>' +
+        '<div class="scm-maint-quote-step" data-quote-step="mano" hidden>' +
+        maintenanceQuoteStepIntro("Mano de obra", "Describe cada actividad con su unidad, cantidad y valor. Si no aplica, deja la fila vacía y continúa.") +
         renderCotizacionRepeaterRows("mano", q.items_mano, context.unit_options) +
+        '</div>' +
+        '<div class="scm-maint-quote-step" data-quote-step="materiales" hidden>' +
+        maintenanceQuoteStepIntro("Materiales", "Arma una oferta por proveedor y pulsa «Generar oferta». Si no hay materiales, continúa al siguiente paso.") +
         renderCotizacionHiddenRepeaterRows("materiales", q.items_materiales, context.unit_options) +
         renderCotizacionRepeaterRows("materiales_soporte", maintenanceQuoteMaterialSupportItems(q.items_materiales), context.material_unit_options || context.unit_options) +
         '<section class="scm-maint-quote-section scm-maint-quote-generated-materials"><h4>Materiales generados</h4><div class="scm-maint-quote-generated-offers" data-material-generated-offers><p>No hay ofertas generadas desde la tabla de materiales.</p></div></section>' +
         '<section class="scm-maint-quote-section scm-maint-quote-offers"><h4>Ofertas de materiales</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field is-wide"><span>Subir mejores ofertas adicionales</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Opcional. Úsalo solo si ya tienes la cotización del proveedor en imagen (foto o captura).</small></label></div><div class="scm-maint-quote-auto-offers"><strong>Mejores ofertas generadas por el sistema</strong><div data-material-generated-offer-attachments><p>No has generado imágenes desde la tabla de materiales.</p></div></div><p class="scm-maint-quote-help">No necesitas subir las ofertas que generaste arriba: se guardarán automáticamente como mejores ofertas. Usa «Quitar» para retirar una imagen que ya no aplique; el cambio se aplica al guardar.</p></section>' +
+        '</div>' +
+        '<div class="scm-maint-quote-step" data-quote-step="otros" hidden>' +
+        maintenanceQuoteStepIntro("Equipos y otros costos", "Agrega maquinaria, transporte, aseo, escombros u otros cobros. Ambos son opcionales.") +
         renderCotizacionRepeaterRows("equipos", q.items_otros_equi, context.unit_options) +
         renderCotizacionRepeaterRows("otros", q.items_otros_costos, context.unit_options) +
+        '</div>' +
+        '<div class="scm-maint-quote-step" data-quote-step="perturbacion" hidden>' +
+        maintenanceQuoteStepIntro("Perturbación del inmueble", "Indica la duración del trabajo y valora los criterios; el sistema calcula la bonificación sugerida.") +
         maintenanceQuotePerturbationHtml(context) +
+        '</div>' +
+        '<div class="scm-maint-quote-step" data-quote-step="resumen" hidden>' +
+        maintenanceQuoteStepIntro("Revisa y guarda", "Confirma los valores. Puedes volver a cualquier paso desde la barra superior.") +
+        '<div class="scm-maint-quote-summary">' +
+        '<div><span>Mano de obra</span><strong data-quote-total="mano">$0</strong></div>' +
+        '<div><span>Materiales</span><strong data-quote-total="materiales">$0</strong></div>' +
+        '<div><span>Maquinarias y equipos</span><strong data-quote-total="equipos">$0</strong></div>' +
+        '<div><span>Otros costos</span><strong data-quote-total="otros">$0</strong></div>' +
+        '<div class="is-total"><span>Total cotización</span><strong data-quote-summary-total>$0</strong></div>' +
+        '</div>' +
         '<section class="scm-maint-quote-section scm-maint-quote-bottom-section"><h4>Observaciones</h4><label class="scm-cotizacion-dialog-field is-wide"><span>Observaciones</span><textarea name="observaciones" rows="4">' + escHtml(d.observaciones || "") + '</textarea></label></section>' +
+        '</div>' +
         '</form>'
       );
     }
@@ -22505,8 +22634,12 @@
         totals.otros += Math.max(1, parseCotizacionOrderMoney(row.cantidad_otros_costos || 1)) * parseCotizacionOrderMoney(row.valor_otros_costos);
       });
       Object.keys(totals).forEach(function (key) {
-        var label = form.querySelector('[data-quote-total="' + key + '"]');
-        if (label) label.textContent = formatCotizacionOrderCurrency(totals[key]);
+        form.querySelectorAll('[data-quote-total="' + key + '"]').forEach(function (label) {
+          label.textContent = formatCotizacionOrderCurrency(totals[key]);
+        });
+      });
+      form.querySelectorAll("[data-quote-summary-total]").forEach(function (label) {
+        label.textContent = formatCotizacionOrderCurrency(totals.mano + totals.materiales + totals.equipos + totals.otros);
       });
       var grand = form.querySelector("[data-quote-grand-total]");
       if (grand) grand.textContent = formatCotizacionOrderCurrency(totals.mano + totals.materiales + totals.equipos + totals.otros);
@@ -22742,6 +22875,7 @@
               var form = window.Swal.getPopup().querySelector("[data-maint-quote-form]");
               wireMaintenanceQuoteForm(form, context);
               wireMaintenanceQuoteDraft(form, context, draftKey);
+              wireMaintenanceQuoteSteps(form);
             },
             preConfirm: function () {
               var popup = window.Swal.getPopup();
@@ -22752,7 +22886,18 @@
               }
               return form._scmQuoteDraft.ready.then(function(){
               syncMaintenanceQuotePerturbation(form, context || {});
+              var missingField = Array.prototype.find.call(form.querySelectorAll("[data-quote-step] [required]"), function (field) {
+                return !field.disabled && !field.closest("[hidden]:not([data-quote-step])") && !field.checkValidity();
+              });
+              if (missingField) {
+                var missingStep = missingField.closest("[data-quote-step]");
+                showMaintenanceQuoteStepByKey(form, missingStep ? missingStep.getAttribute("data-quote-step") : "datos");
+                if (missingField.reportValidity) missingField.reportValidity();
+                window.Swal.showValidationMessage("Completa los campos obligatorios de este paso.");
+                return false;
+              }
               if (maintenanceQuoteMaterialSupportRows(form).length && !generateMaterialOfferFromSupport(form, true)) {
+                showMaintenanceQuoteStepByKey(form, "materiales");
                 return false;
               }
               syncMaintenanceQuoteGeneratedMaterialRows(form);
@@ -22766,6 +22911,7 @@
                 formData.set("materiales_oferta_image", JSON.stringify(generatedMaterialOffers));
               }
               if (!String(formData.get("destinatario") || "").trim()) {
+                showMaintenanceQuoteStepByKey(form, "datos");
                 window.Swal.showValidationMessage("Completa el destinatario.");
                 return false;
               }
