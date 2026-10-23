@@ -21855,6 +21855,7 @@
         maintenanceQuoteStepIntro("Materiales", "Arma una oferta por proveedor y pulsa «Generar oferta». Si no hay materiales, continúa al siguiente paso.") +
         renderCotizacionHiddenRepeaterRows("materiales", q.items_materiales, context.unit_options) +
         renderCotizacionRepeaterRows("materiales_soporte", maintenanceQuoteMaterialSupportItems(q.items_materiales), context.material_unit_options || context.unit_options) +
+        '<div class="scm-maint-quote-next-prompt" data-material-next-prompt hidden></div>' +
         '<section class="scm-maint-quote-section scm-maint-quote-generated-materials"><h4>Materiales generados</h4><div class="scm-maint-quote-generated-offers" data-material-generated-offers><p>No hay ofertas generadas desde la tabla de materiales.</p></div></section>' +
         '<section class="scm-maint-quote-section scm-maint-quote-offers"><h4>Ofertas de materiales</h4><div class="scm-maint-quote-grid"><label class="scm-cotizacion-dialog-field is-wide"><span>Subir mejores ofertas adicionales</span><input type="file" name="mejor_oferta[]" accept="image/jpeg,image/png,image/webp" multiple><small>Opcional. Úsalo solo si ya tienes la cotización del proveedor en imagen (foto o captura).</small></label></div><div class="scm-maint-quote-auto-offers"><strong>Mejores ofertas generadas por el sistema</strong><div data-material-generated-offer-attachments><p>No has generado imágenes desde la tabla de materiales.</p></div></div><p class="scm-maint-quote-help">No necesitas subir las ofertas que generaste arriba: se guardarán automáticamente como mejores ofertas. Usa «Quitar» para retirar una imagen que ya no aplique; el cambio se aplica al guardar.</p></section>' +
         '</div>' +
@@ -22124,6 +22125,30 @@
       }).join("");
     }
 
+    // Tras generar una oferta pliega el armado y pregunta si sigue otro proveedor o termina materiales.
+    function syncMaterialBuilderState(form) {
+      if (!form) return;
+      var builder = form.querySelector('[data-quote-repeater="materiales_soporte"]');
+      var prompt = form.querySelector("[data-material-next-prompt]");
+      if (!builder || !prompt) return;
+      var providers = collectQuoteRows(form, "materiales").filter(function (row) {
+        return String(row.provedor_materiales || row.proveedor_materiales || "").trim() || parseCotizacionOrderMoney(row.valor_materiales || 0) > 0;
+      });
+      var open = !!form._materialBuilderOpen || !providers.length || maintenanceQuoteMaterialSupportRows(form).length > 0;
+      builder.hidden = !open;
+      prompt.hidden = open;
+      if (open) return;
+      var total = providers.reduce(function (sum, row) { return sum + parseCotizacionOrderMoney(row.valor_materiales || 0); }, 0);
+      var last = form._lastMaterialOffer;
+      var title = last
+        ? '<strong>Oferta de ' + escHtml(last.provider || "proveedor") + ' agregada</strong><b>' + escHtml(formatCotizacionOrderCurrency(last.total || 0)) + '</b>'
+        : '<strong>Materiales listos</strong>';
+      prompt.innerHTML =
+        '<div class="scm-maint-quote-next-prompt__text"><span class="scm-maint-quote-next-prompt__check" aria-hidden="true">✓</span><div>' + title +
+        '<p>Llevas ' + providers.length + (providers.length === 1 ? ' proveedor' : ' proveedores') + ' · Total materiales ' + escHtml(formatCotizacionOrderCurrency(total)) + '. ¿Qué sigue?</p></div></div>' +
+        '<div class="scm-maint-quote-next-prompt__actions"><button type="button" class="scm-maint-quote-add" data-material-add-provider>Agregar otro proveedor</button><button type="button" class="scm-maint-quote-generate" data-material-done>Terminé con materiales →</button></div>';
+    }
+
     function renderMaintenanceQuoteGeneratedMaterialOffers(form) {
       var wrap = form ? form.querySelector("[data-material-generated-offers]") : null;
       if (!wrap) return;
@@ -22143,6 +22168,7 @@
       if (!rows.length) {
         wrap.innerHTML = "<p>No hay ofertas generadas desde la tabla de materiales.</p>";
         renderMaintenanceQuoteGeneratedOfferAttachments(form);
+        syncMaterialBuilderState(form);
         return;
       }
       wrap.innerHTML = rows.map(function (item) {
@@ -22166,6 +22192,7 @@
           '</article>';
       }).join("");
       renderMaintenanceQuoteGeneratedOfferAttachments(form);
+      syncMaterialBuilderState(form);
     }
 
     function maintenanceQuoteHasSavedMaterialRows(form) {
@@ -22685,7 +22712,30 @@
         var generateMaterialBtn = event.target && event.target.closest ? event.target.closest("[data-generate-material-offer]") : null;
         if (generateMaterialBtn) {
           event.preventDefault();
-          generateMaterialOfferFromSupport(form, false);
+          var builderProvider = form.querySelector("[data-material-support-provider]");
+          var pendingOffer = { provider: builderProvider ? String(builderProvider.value || "").trim() : "", total: maintenanceQuoteMaterialSupportTotal(form) };
+          if (generateMaterialOfferFromSupport(form, false)) {
+            form._lastMaterialOffer = pendingOffer;
+            form._materialBuilderOpen = false;
+            syncMaterialBuilderState(form);
+            var promptBox = form.querySelector("[data-material-next-prompt]");
+            if (promptBox && typeof promptBox.scrollIntoView === "function") promptBox.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          }
+          return;
+        }
+        var addProviderBtn = event.target && event.target.closest ? event.target.closest("[data-material-add-provider]") : null;
+        if (addProviderBtn) {
+          event.preventDefault();
+          form._materialBuilderOpen = true;
+          syncMaterialBuilderState(form);
+          var providerField = form.querySelector("[data-material-support-provider]");
+          if (providerField && providerField.focus) providerField.focus();
+          return;
+        }
+        var materialsDoneBtn = event.target && event.target.closest ? event.target.closest("[data-material-done]") : null;
+        if (materialsDoneBtn) {
+          event.preventDefault();
+          showMaintenanceQuoteStep(form, maintenanceQuoteStepIndex(form) + 1);
           return;
         }
         var removeGeneratedBtn = event.target && event.target.closest ? event.target.closest("[data-remove-generated-material-offer]") : null;

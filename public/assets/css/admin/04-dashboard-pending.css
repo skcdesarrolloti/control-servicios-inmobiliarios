@@ -11859,7 +11859,8 @@
   background: #fff;
 }
 
-.scm-maint-quote-hidden-repeater {
+.scm-maint-quote-hidden-repeater,
+.scm-maint-quote-section[hidden] {
   display: none !important;
 }
 
@@ -12031,6 +12032,72 @@
 .scm-maint-quote-summary > .is-total strong {
   color: #9a3412;
   font-size: 18px;
+}
+
+.scm-maint-quote-next-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 16px 18px;
+  border: 1px solid #a7f3d0;
+  border-radius: 16px;
+  background: #ecfdf5;
+}
+
+.scm-maint-quote-next-prompt[hidden] {
+  display: none;
+}
+
+.scm-maint-quote-next-prompt__text {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.scm-maint-quote-next-prompt__check {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: #10b981;
+  color: #fff;
+  font-weight: 800;
+}
+
+.scm-maint-quote-next-prompt__text strong {
+  margin-right: 8px;
+  color: #064e3b;
+  font-size: 15px;
+}
+
+.scm-maint-quote-next-prompt__text b {
+  color: #0f766e;
+  font-variant-numeric: tabular-nums;
+}
+
+.scm-maint-quote-next-prompt__text p {
+  margin: 4px 0 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.scm-maint-quote-next-prompt__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .scm-maint-quote-next-prompt__actions,
+  .scm-maint-quote-next-prompt__actions button {
+    width: 100%;
+  }
 }
 
 .swal2-popup.scm-maint-quote-swal .scm-maint-quote-step-back[hidden],
