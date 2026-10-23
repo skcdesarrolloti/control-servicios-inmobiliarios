@@ -43,6 +43,10 @@ final class OwnerCreditService
     'externo' => 'Externo',
     'funcionario' => 'Funcionario',
   ];
+  /** Tipos que ya tienen flujo; los demás se muestran en la pregunta como "Próximamente". */
+  public const AVAILABLE_BENEFICIARY_TYPES = ['propietario'];
+  /** En la cotización el crédito sale del contrato del caso: no aplica a funcionarios. */
+  public const QUOTE_BENEFICIARY_TYPES = ['propietario', 'arrendatario', 'codeudor', 'externo'];
   public const DEDUCTIONS = [
     'comision' => 'Comisión de administración + IVA',
     'garantia' => 'Garantía inmobiliaria',
@@ -160,9 +164,11 @@ final class OwnerCreditService
   }
 
   /** Crédito sin cotización, a partir del número de contrato. */
-  public function createManual(int $contractId, float $amount, int $term, string $purpose, array $actor, string $contractEnd = '', string $ownerKey = ''): int
+  public function createManual(int $contractId, float $amount, int $term, string $purpose, array $actor, string $contractEnd = '', string $ownerKey = '', string $beneficiaryType = 'propietario'): int
   {
     $this->ensureSchema();
+    if (!isset(self::BENEFICIARY_TYPES[$beneficiaryType])) throw new \DomainException('Indica para quién es el crédito.');
+    if (!in_array($beneficiaryType, self::AVAILABLE_BENEFICIARY_TYPES, true)) throw new \DomainException('Los créditos a ' . strtolower(self::BENEFICIARY_TYPES[$beneficiaryType]) . ' todavía no están disponibles.');
     $contract = $this->contractById($contractId);
     if ($contract === null) throw new \DomainException('Selecciona un contrato de la búsqueda.');
     $owners = $this->contractOwners($contractId);
@@ -178,7 +184,7 @@ final class OwnerCreditService
     $maxMonths = OwnerCreditCalculator::monthsUntil(time(), $endTs);
     if ($term <= 0) throw new \DomainException('Indica el plazo solicitado en meses.');
     if ($term > $maxMonths) throw new \DomainException(self::termMessage($term, $maxMonths));
-    $id = $this->insertCredit($contract, null, '', $amount, $purpose, $actor, $term, $owner);
+    $id = $this->insertCredit($contract, null, '', $amount, $purpose, $actor, $term, $owner, $beneficiaryType);
     // La fecha fin corregida en el formulario se guarda en el contrato (con historial).
     if ($endTs !== $storedEnd) $this->saveContractEnd($this->find($id) ?? [], $endTs, $actor);
     $this->notifyRequested($id);
@@ -476,7 +482,7 @@ final class OwnerCreditService
   }
 
   /** @param array<string,string>|null $owner beneficiario elegido (contractOwners); sin él, el propietario del contrato */
-  private function insertCredit(array $contract, ?int $quoteId, string $ticketId, float $amount, string $purpose, array $actor, int $term = 0, ?array $owner = null): int
+  private function insertCredit(array $contract, ?int $quoteId, string $ticketId, float $amount, string $purpose, array $actor, int $term = 0, ?array $owner = null, string $beneficiaryType = 'propietario'): int
   {
     $owner ??= $this->contractOwners((int) ($contract['_ID'] ?? 0))[0] ?? null;
     // Sin plazo por defecto ($term = 0): lo escribe el funcionario según lo que pidió el propietario.
@@ -491,7 +497,7 @@ final class OwnerCreditService
       'owner_name' => mb_substr($owner !== null ? $owner['name'] : (string) ($contract['propietario'] ?? ''), 0, 190),
       'owner_email' => mb_substr($owner !== null ? $owner['email'] : trim((string) ($contract['correo_propietario'] ?? '')), 0, 190),
       'owner_phone' => mb_substr($phone, 0, 40), 'owner_document' => mb_substr($owner !== null ? $owner['document'] : '', 0, 40),
-      'beneficiary_type' => 'propietario',
+      'beneficiary_type' => $beneficiaryType,
       'purpose' => $purpose, 'status' => 'pendiente', 'requested_amount' => round($amount, 2), 'requested_term' => $term,
       'vacancy' => 'Baja', 'gross_income' => $income['gross'], 'deductions_json' => json_encode($income['deductions'], JSON_THROW_ON_ERROR),
       'created_by_id' => (string) ($actor['employee_id'] ?? ''), 'created_by_name' => (string) ($actor['name'] ?? ''),

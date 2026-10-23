@@ -189,7 +189,8 @@ trait HandlesOwnerCredits
         sanitize_text_field(wp_unslash((string) ($_POST['purpose'] ?? ''))),
         $this->ticketCompletionActor(),
         sanitize_text_field(wp_unslash((string) ($_POST['contract_end'] ?? ''))),
-        sanitize_key((string) ($_POST['owner_key'] ?? ''))
+        sanitize_key((string) ($_POST['owner_key'] ?? '')),
+        sanitize_key((string) ($_POST['beneficiary_type'] ?? 'propietario'))
       );
       $this->jsonOk(['credit_id' => $id, 'message' => 'Solicitud registrada.']);
     } catch (\Throwable $error) {

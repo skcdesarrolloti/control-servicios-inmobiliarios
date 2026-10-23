@@ -190,6 +190,12 @@ try {
 $chosen = $service->find($service->createManual(9, 800000, 6, 'Libre Destinación', $actor, '', 'mandato_2'));
 $check($chosen['owner_name'] === 'Segunda Dueña' && $chosen['owner_document'] === '222' && $chosen['owner_email'] === 'segunda@example.invalid' && $chosen['owner_id'] === 'doc:222', 'the credit is registered to the chosen owner');
 $check($chosen['beneficiary_type'] === 'propietario', 'manual credits are categorized as owner credits');
+try {
+  $service->createManual(9, 800000, 6, 'Libre Destinación', $actor, '', 'mandato_2', 'funcionario');
+  $check(false, 'beneficiary types without a flow are rejected');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'todavía no están disponibles'), 'beneficiary types without a flow are rejected');
+}
 
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
 $template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-funcionario-v2-template.json'), true);
