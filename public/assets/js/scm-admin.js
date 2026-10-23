@@ -7722,6 +7722,27 @@
     return value.charAt(0) === "+" ? value : "+" + value.replace(/^\++/, "");
   }
 
+  // Cierre manual con acta pendiente (p. ej. el arrendatario no quiere firmar): el acta sigue vigente.
+  function confirmPendingActClose(message, actId) {
+    var text = (message || "Este caso tiene un acta pendiente de firma.") +
+      " Si lo cierras, el acta" + (actId ? " #" + actId : "") + " seguirá vigente: si el destinatario la firma después, el caso quedará cerrado con el acta. Quedará registrado en el historial.";
+    if (window.Swal && typeof window.Swal.fire === "function") {
+      return window.Swal.fire({
+        icon: "warning",
+        title: "¿Seguro que deseas cerrar el caso?",
+        text: text,
+        showCancelButton: true,
+        confirmButtonText: "Sí, cerrar caso",
+        cancelButtonText: "No, volver",
+        confirmButtonColor: "#b42318",
+        focusCancel: true,
+      }).then(function (result) {
+        return !!(result && result.isConfirmed);
+      });
+    }
+    return Promise.resolve(window.confirm("¿Seguro que deseas cerrar el caso?\n\n" + text));
+  }
+
   function indicativoFieldHtml(name, value, options) {
     value = normalizeIndicativo(value || "+57");
     options = Array.isArray(options) ? options : [];
@@ -9368,6 +9389,17 @@
             return r.json();
           })
           .then(function (json) {
+            // Acta pendiente: confirmar el cierre manual y reenviar la misma respuesta.
+            if (json && !json.success && json.data && json.data.code === "pending_act_close") {
+              return confirmPendingActClose(json.data.message, json.data.act_id).then(function (confirmed) {
+                if (!confirmed) throw new Error("__pending_act_close_cancelled__");
+                fd.set("confirm_close_pending_act", "1");
+                return fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" }).then(function (r) { return r.json(); });
+              });
+            }
+            return json;
+          })
+          .then(function (json) {
             if (!json || !json.success) {
               var errText =
                 (json && json.data ? json.data.message || json.data : null) ||
@@ -9411,6 +9443,7 @@
             }
           })
           .catch(function (err) {
+            if (err && err.message === "__pending_act_close_cancelled__") return;
             var msg = err && err.message ? err.message : "Error al guardar.";
             if (typeof scmNotify === "function") {
               scmNotify("error", msg);

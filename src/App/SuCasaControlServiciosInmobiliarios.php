@@ -1497,13 +1497,13 @@ final class SuCasaControlServiciosInmobiliarios
     exit;
   }
 
-  private function jsonFail(string $message): void
+  private function jsonFail(string $message, array $extra = []): void
   {
     if (ob_get_level() > 0) {
       ob_end_clean();
     }
     header('Content-Type: application/json; charset=UTF-8');
-    echo json_encode(['success' => false, 'data' => ['message' => $message]], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => false, 'data' => ['message' => $message] + $extra], JSON_UNESCAPED_UNICODE);
     exit;
   }
 

@@ -145,11 +145,22 @@ trait WorkflowCommandsConcern
   /**
    * @return array<string,string>
    */
-  public function saveTicketResponse(int $ticketPk, string $respuesta, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $imagenes = '', array $documentos = [], string $estadoCotizacion = '__keep__', string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = '', bool $generarActaNoAccesoPreventiva = false, int $targetCotizacionId = 0, array $additionalEmails = []): array
+  public function saveTicketResponse(int $ticketPk, string $respuesta, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $imagenes = '', array $documentos = [], string $estadoCotizacion = '__keep__', string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = '', bool $generarActaNoAccesoPreventiva = false, int $targetCotizacionId = 0, array $additionalEmails = [], bool $confirmedPendingActClose = false): array
   {
     try { $additionalEmails = \SCM\Support\AdditionalEmailRecipients::parse($additionalEmails); }
     catch (\InvalidArgumentException $error) { return ['ok'=>'0','message'=>$error->getMessage()]; }
-    $actError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($this->db, $this->schema, $ticketPk, $cerrarTicket, $estadoAdministrativo);
+    $pendingAct = $cerrarTicket && in_array($estadoAdministrativo, ['', '__keep__'], true)
+      ? \SCM\Modules\TicketCompletion\CompletionRepository::pendingActForClose($this->db, $this->schema, $ticketPk)
+      : null;
+    if ($pendingAct && !$confirmedPendingActClose) {
+      return [
+        'ok' => '0',
+        'code' => 'pending_act_close',
+        'act_id' => (string) (int) $pendingAct['id'],
+        'message' => 'Este caso tiene el acta #' . (int) $pendingAct['id'] . ' pendiente de firma.',
+      ];
+    }
+    $actError = \SCM\Modules\TicketCompletion\CompletionRepository::workflowError($this->db, $this->schema, $ticketPk, $cerrarTicket, $estadoAdministrativo, false, $pendingAct !== null && $confirmedPendingActClose);
     if ($actError !== '') {
       return ['ok' => '0', 'message' => $actError];
     }
@@ -273,6 +284,14 @@ trait WorkflowCommandsConcern
     $ticketUpdate = $this->schema->filterTableData($ticketsTable, $ticketUpdate);
     if (!empty($ticketUpdate)) {
       $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => $ticketPk]);
+    }
+    if ($pendingAct && $cerrarTicket) {
+      (new \SCM\Modules\TicketCompletion\CompletionRepository($this->db, $this->schema))->audit(
+        $ticketPk,
+        'Caso cerrado manualmente con el acta #' . (int) $pendingAct['id'] . ' pendiente de firma. El acta sigue vigente: si el destinatario la firma, el caso quedará cerrado con el acta.',
+        $userName,
+        (string) $employeeId
+      );
     }
 
     $sent = $generatedNoAccessNotice === null

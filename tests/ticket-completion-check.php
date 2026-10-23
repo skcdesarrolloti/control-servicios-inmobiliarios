@@ -222,6 +222,9 @@ $rejects(static fn() => $service->create(1, $input, $actor), 'double create reje
 $assert(Repository::workflowError($db, $repo->schema, 1, true) !== '', 'manual close blocked while pending');
 $assert(Repository::workflowError($db, $repo->schema, 1, false, 'Finalizado') !== '', 'administrative completion bypass blocked');
 $assert(Repository::workflowError($db, $repo->schema, 1, false) === '', 'ordinary followups remain available');
+$assert(Repository::workflowError($db, $repo->schema, 1, true, '__keep__', false, true) === '', 'confirmed manual close allowed while pending');
+$assert(Repository::workflowError($db, $repo->schema, 1, true, 'Finalizado', false, true) !== '', 'confirmed close still cannot change administrative state');
+$assert(Repository::pendingActForClose($db, $repo->schema, 1) !== null, 'pending act detected for close confirmation');
 $rejects(static fn() => $service->publicAct((int) $act['id'], str_repeat('0', 64)), 'invalid bearer token rejected');
 $rejects(static fn() => $service->sign((int) $act['id'], $token, array_replace($signInput($act), ['accepted' => '0']), '', ''), 'missing consent rejected without changing ticket');
 $rejects(static fn() => $service->sign((int) $act['id'], $token, array_replace($signInput($act), ['document_hash' => str_repeat('0', 64)]), '', ''), 'wrong document version rejected');

@@ -405,7 +405,7 @@ final class CompletionRepository
     });
   }
 
-  public static function workflowError(Database $db, SchemaInspector $schema, int $ticketId, bool $close, string $adminState = '__keep__', bool $allowReopen = false): string
+  public static function workflowError(Database $db, SchemaInspector $schema, int $ticketId, bool $close, string $adminState = '__keep__', bool $allowReopen = false, bool $confirmedPendingClose = false): string
   {
     $repo = new self($db, $schema);
     if (!$schema->tableExists($repo->table())) {
@@ -416,12 +416,28 @@ final class CompletionRepository
       return '';
     }
     $currentAdminState = (string) ($repo->ticket($ticketId)['estado_administrativo'] ?? '');
-    if ($act['status'] === 'pending' && ($close || !in_array($adminState, ['', '__keep__', $currentAdminState], true))) {
+    $keepsAdminState = in_array($adminState, ['', '__keep__', $currentAdminState], true);
+    // Cierre manual confirmado: el acta sigue vigente y, si el destinatario firma, el caso se cierra con ella.
+    if ($act['status'] === 'pending' && $close && $confirmedPendingClose && $keepsAdminState) {
+      return '';
+    }
+    if ($act['status'] === 'pending' && ($close || !$keepsAdminState)) {
       return 'Este caso tiene un acta pendiente de firma. Solo se cerrará cuando firme el destinatario. Para cambiar el proceso, anula primero el acta.';
     }
     if (!$allowReopen && $act['status'] === 'signed' && strcasecmp((string) $repo->ticket($ticketId)['estado'], 'Cerrado') === 0) {
       return 'El caso ya fue cerrado con un acta firmada. Actívalo expresamente antes de registrar nuevas respuestas.';
     }
     return '';
+  }
+
+  /** Acta pendiente que un cierre manual confirmado debe dejar vigente, o null. */
+  public static function pendingActForClose(Database $db, SchemaInspector $schema, int $ticketId): ?array
+  {
+    $repo = new self($db, $schema);
+    if (!$schema->tableExists($repo->table())) {
+      return null;
+    }
+    $act = $repo->active($ticketId);
+    return $act && $act['status'] === 'pending' ? $act : null;
   }
 }

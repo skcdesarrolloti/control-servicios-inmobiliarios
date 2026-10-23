@@ -871,8 +871,11 @@ trait HandlesTicketWorkflowActions
     $imagenes = $this->handleImageUploads('imagen', 10);
     $documentTitles = isset($_POST['documento_nombre']) && is_array($_POST['documento_nombre']) ? $_POST['documento_nombre'] : [];
     $documentos = $this->handleDocumentUploads('documento', $documentTitles, 10);
-    $result = $service->saveTicketResponse($ticketPk, $respuesta, $estadoAdministrativo, $cerrarTicket, $notifyRecipients, $imagenes, $documentos, $estadoCotizacion, $observacionCotizacion, $motivoCotizacion, $financiacionCotizacion, $generarActaNoAccesoPreventiva, $targetCotizacionId, $additionalEmails);
+    $result = $service->saveTicketResponse($ticketPk, $respuesta, $estadoAdministrativo, $cerrarTicket, $notifyRecipients, $imagenes, $documentos, $estadoCotizacion, $observacionCotizacion, $motivoCotizacion, $financiacionCotizacion, $generarActaNoAccesoPreventiva, $targetCotizacionId, $additionalEmails, (string) ($_POST['confirm_close_pending_act'] ?? '') === '1');
     if (($result['ok'] ?? '0') !== '1') {
+      if (($result['code'] ?? '') === 'pending_act_close') {
+        $this->jsonFail((string) $result['message'], ['code' => 'pending_act_close', 'act_id' => (string) ($result['act_id'] ?? '')]);
+      }
       $this->jsonFail((string) ($result['message'] ?? 'No se pudo guardar la respuesta.'));
     }
     // Después de guardar: si la respuesta también aprobó una cotización, prevalece lo elegido aquí.
