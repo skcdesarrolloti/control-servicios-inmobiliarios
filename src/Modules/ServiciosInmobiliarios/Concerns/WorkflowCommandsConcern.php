@@ -149,8 +149,8 @@ trait WorkflowCommandsConcern
   {
     try { $additionalEmails = \SCM\Support\AdditionalEmailRecipients::parse($additionalEmails); }
     catch (\InvalidArgumentException $error) { return ['ok'=>'0','message'=>$error->getMessage()]; }
-    $pendingAct = $cerrarTicket && in_array($estadoAdministrativo, ['', '__keep__'], true)
-      ? \SCM\Modules\TicketCompletion\CompletionRepository::pendingActForClose($this->db, $this->schema, $ticketPk)
+    $pendingAct = $cerrarTicket
+      ?\SCM\Modules\TicketCompletion\CompletionRepository::pendingActForClose($this->db, $this->schema, $ticketPk)
       : null;
     if ($pendingAct && !$confirmedPendingActClose) {
       return [
