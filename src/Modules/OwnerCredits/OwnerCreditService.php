@@ -32,6 +32,17 @@ final class OwnerCreditService
     'pagado' => 'Pagado',
     'anulado' => 'Anulado',
   ];
+  /**
+   * A quién se le hace el crédito. Hoy el flujo solo crea créditos a propietarios (la evaluación usa el canon
+   * y la cuota se descuenta del giro); los demás tipos quedan listos en la tabla para cuando tengan su flujo.
+   */
+  public const BENEFICIARY_TYPES = [
+    'propietario' => 'Propietario',
+    'arrendatario' => 'Arrendatario',
+    'codeudor' => 'Codeudor',
+    'externo' => 'Externo',
+    'funcionario' => 'Funcionario',
+  ];
   public const DEDUCTIONS = [
     'comision' => 'Comisión de administración + IVA',
     'garantia' => 'Garantía inmobiliaria',
@@ -73,6 +84,7 @@ final class OwnerCreditService
       property VARCHAR(60) NOT NULL DEFAULT '', address VARCHAR(255) NOT NULL DEFAULT '',
       owner_id VARCHAR(60) NOT NULL DEFAULT '', owner_name VARCHAR(190) NOT NULL DEFAULT '',
       owner_email VARCHAR(190) NOT NULL DEFAULT '', owner_phone VARCHAR(40) NOT NULL DEFAULT '', owner_document VARCHAR(40) NOT NULL DEFAULT '',
+      beneficiary_type VARCHAR(20) NOT NULL DEFAULT 'propietario',
       purpose VARCHAR(120) NOT NULL DEFAULT '', status VARCHAR(20) NOT NULL DEFAULT 'pendiente',
       requested_amount DECIMAL(14,2) NOT NULL DEFAULT 0, requested_term INT NOT NULL DEFAULT 0,
       vacancy VARCHAR(10) NOT NULL DEFAULT 'Baja', gross_income DECIMAL(14,2) NOT NULL DEFAULT 0,
@@ -85,7 +97,7 @@ final class OwnerCreditService
       decided_at BIGINT NULL, closed_at BIGINT NULL,
       created_by_id VARCHAR(40) NOT NULL DEFAULT '', created_by_name VARCHAR(190) NOT NULL DEFAULT '',
       created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL,
-      UNIQUE KEY uniq_quote (quote_id), KEY idx_status (status), KEY idx_owner (owner_id), KEY idx_contract (contract_id)
+      UNIQUE KEY uniq_quote (quote_id), KEY idx_status (status), KEY idx_owner (owner_id), KEY idx_contract (contract_id), KEY idx_beneficiary_type (beneficiary_type)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     $this->db->pdo()->exec("CREATE TABLE IF NOT EXISTS `{$this->eventsTable()}` (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, credit_id BIGINT UNSIGNED NOT NULL,
@@ -95,6 +107,12 @@ final class OwnerCreditService
     if (!$this->schema->columnExists($this->table(), 'owner_document')) {
       $this->db->pdo()->exec("ALTER TABLE `{$this->table()}` ADD COLUMN owner_document VARCHAR(40) NOT NULL DEFAULT ''");
       // El inspector guarda las columnas en caché: uno nuevo ya ve la columna agregada.
+      $this->schema = new SchemaInspector($this->db);
+    }
+    // Los créditos existentes quedan como "propietario" por el valor por defecto.
+    if (!$this->schema->columnExists($this->table(), 'beneficiary_type')) {
+      $this->db->pdo()->exec("ALTER TABLE `{$this->table()}` ADD COLUMN beneficiary_type VARCHAR(20) NOT NULL DEFAULT 'propietario'");
+      $this->db->pdo()->exec("CREATE INDEX idx_beneficiary_type ON `{$this->table()}` (beneficiary_type)");
       $this->schema = new SchemaInspector($this->db);
     }
   }
@@ -338,6 +356,8 @@ final class OwnerCreditService
     $args = [];
     $status = (string) ($filters['status'] ?? '');
     if (isset(self::STATUSES[$status])) { $where[] = '`status` = ?'; $args[] = $status; }
+    $type = (string) ($filters['beneficiary_type'] ?? '');
+    if (isset(self::BENEFICIARY_TYPES[$type]) && $this->schema->columnExists($this->table(), 'beneficiary_type')) { $where[] = '`beneficiary_type` = ?'; $args[] = $type; }
     foreach (['from' => '>=', 'to' => '<='] as $key => $op) {
       $ts = self::timestamp($filters[$key] ?? '');
       if ($ts > 0) { $where[] = "`created_at` {$op} ?"; $args[] = $key === 'to' ? $ts + 86399 : $ts; }
@@ -471,6 +491,7 @@ final class OwnerCreditService
       'owner_name' => mb_substr($owner !== null ? $owner['name'] : (string) ($contract['propietario'] ?? ''), 0, 190),
       'owner_email' => mb_substr($owner !== null ? $owner['email'] : trim((string) ($contract['correo_propietario'] ?? '')), 0, 190),
       'owner_phone' => mb_substr($phone, 0, 40), 'owner_document' => mb_substr($owner !== null ? $owner['document'] : '', 0, 40),
+      'beneficiary_type' => 'propietario',
       'purpose' => $purpose, 'status' => 'pendiente', 'requested_amount' => round($amount, 2), 'requested_term' => $term,
       'vacancy' => 'Baja', 'gross_income' => $income['gross'], 'deductions_json' => json_encode($income['deductions'], JSON_THROW_ON_ERROR),
       'created_by_id' => (string) ($actor['employee_id'] ?? ''), 'created_by_name' => (string) ($actor['name'] ?? ''),
@@ -835,6 +856,11 @@ final class OwnerCreditService
     if ($ref === '' || strcasecmp($ref, 'No asignado') === 0) return null;
     $row = $this->db->getRow("SELECT * FROM `{$this->db->table('jet_cct_contratos_arrendamiento')}` WHERE TRIM(`contrato`) = ? ORDER BY CASE WHEN LOWER(TRIM(`estado`)) = 'entregado' THEN 0 ELSE 1 END, `_ID` DESC LIMIT 1", [$ref]);
     return is_array($row) ? $row : null;
+  }
+
+  public static function beneficiaryLabel(array $credit): string
+  {
+    return self::BENEFICIARY_TYPES[(string) ($credit['beneficiary_type'] ?? '')] ?? self::BENEFICIARY_TYPES['propietario'];
   }
 
   public static function money($value): float

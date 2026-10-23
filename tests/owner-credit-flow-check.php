@@ -73,6 +73,7 @@ $actor = ['employee_id' => '2999', 'name' => 'Analista QA'];
 $service->syncFromQuote(574, 'Si', $actor);
 $credit = $service->byQuote(574);
 $check($credit !== null && $credit['status'] === 'pendiente' && (float) $credit['requested_amount'] === 893723.0, 'financing "Sí" creates a pending request for the quote total');
+$check($credit['beneficiary_type'] === 'propietario' && OwnerCreditService::beneficiaryLabel($credit) === 'Propietario', 'quote credits are categorized as owner credits');
 $check($credit['owner_id'] === '956' && $credit['ticket_id'] === '10821' && $credit['owner_phone'] === '573001234567', 'request keeps owner, case and phone with country code');
 $service->syncFromQuote(574, 'Si', $actor);
 $check(count($db->getResults('SELECT id FROM wp_scm_owner_credits')) === 1, 'repeating financing "Sí" does not duplicate the request');
@@ -188,6 +189,7 @@ try {
 }
 $chosen = $service->find($service->createManual(9, 800000, 6, 'Libre Destinación', $actor, '', 'mandato_2'));
 $check($chosen['owner_name'] === 'Segunda Dueña' && $chosen['owner_document'] === '222' && $chosen['owner_email'] === 'segunda@example.invalid' && $chosen['owner_id'] === 'doc:222', 'the credit is registered to the chosen owner');
+$check($chosen['beneficiary_type'] === 'propietario', 'manual credits are categorized as owner credits');
 
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
 $template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-funcionario-v2-template.json'), true);

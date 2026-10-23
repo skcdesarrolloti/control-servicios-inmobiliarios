@@ -128,7 +128,7 @@ final class OwnerCreditView
 
     return '<form class="!sp-font-sans !sp-text-service-navy !sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-5" data-owner-credit-form data-credit-id="' . (int) $credit['id'] . '" autocomplete="off">'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2">' . self::status((string) $credit['status'])
-      . $chip('Contrato', '#' . self::e($contract['code'])) . $chip('Propietario', self::e($credit['owner_name']) . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · ' . self::e($credit['owner_document']) : '')) . $chip('Inmueble', self::e($credit['property']))
+      . $chip('Contrato', '#' . self::e($contract['code'])) . $chip(OwnerCreditService::beneficiaryLabel($credit), self::e($credit['owner_name']) . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · ' . self::e($credit['owner_document']) : '')) . $chip('Inmueble', self::e($credit['property']))
       . ((int) $credit['quote_id'] > 0 ? $chip('Cotización', '#' . (int) $credit['quote_id']) : $chip('Origen', 'Manual'))
       . '<button type="button" class="' . $ui::NAVY . ' !sp-ml-auto" data-owner-credit-pdf title="Documento interno para funcionarios">' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Ver PDF</button></div>'
 
