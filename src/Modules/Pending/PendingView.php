@@ -20,74 +20,54 @@ final class PendingView
 
   public function renderReportesAdministrativosPanel(array $filters, array $funcionarios, array $items, int $count): string
   {
+    $ui = PublicServicesUi::class;
+    $text = static function (string $name, string $label, string $key, string $placeholder) use ($ui, $filters): string {
+      return '<label class="!sp-block"><span class="' . $ui::LABEL . '">' . $label . '</span><input class="' . $ui::INPUT . '" id="' . $name . '" name="' . $name . '" type="text" value="' . esc_attr((string) ($filters[$key] ?? '')) . '" placeholder="' . esc_attr($placeholder) . '"></label>';
+    };
+    $estado = (string) ($filters['estado'] ?? 'Pendiente');
     ob_start();
 ?>
-    <div class="scm-pending-wrap" id="sra_panel">
-      <div class="scm-pending-header scm-pending-header--brand">
+    <div class="!sp-flex !sp-flex-col !sp-gap-4 !sp-font-sans !sp-text-service-navy" id="sra_panel">
+      <div class="<?php echo $ui::CARD; ?> !sp-p-4 !sp-flex !sp-items-center !sp-justify-between !sp-gap-4">
         <div>
-          <h2>Reportes por aprobar</h2>
-          <p>Reportes con estado <strong>Pendiente</strong> antes de pasar al consolidado administrativo</p>
+          <h3 class="!sp-m-0 !sp-text-base !sp-font-bold">Reportes por aprobar</h3>
+          <p class="!sp-m-0 !sp-text-xs !sp-text-service-muted">Reportes en estado <strong>Pendiente</strong> antes de pasar al consolidado administrativo.</p>
         </div>
-        <div>
-          <div class="scm-pending-count" id="sra-kpi-count"><?php echo esc_html((string) $count); ?></div>
-          <div class="scm-pending-count-label">reportes pendientes</div>
+        <div class="!sp-text-right">
+          <p class="!sp-m-0 !sp-text-2xl !sp-font-bold" id="sra-kpi-count"><?php echo esc_html((string) $count); ?></p>
+          <p class="!sp-m-0 !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">reportes</p>
         </div>
       </div>
 
-      <div class="scm-filter-card">
-        <h3>Filtros</h3>
-        <form method="post" autocomplete="off" id="sra_form">
-          <div class="scm-grid" style="grid-template-columns:repeat(7,minmax(0,1fr));">
-            <div class="scm-field">
-              <label for="sra_estado">Estado</label>
-              <select id="sra_estado" name="sra_estado">
-                <option value="Pendiente" <?php selected((string) ($filters['estado'] ?? 'Pendiente'), 'Pendiente'); ?>>Pendiente</option>
-                <option value="Todos" <?php selected((string) ($filters['estado'] ?? ''), 'Todos'); ?>>Todos</option>
-                <option value="Aprobado" <?php selected((string) ($filters['estado'] ?? ''), 'Aprobado'); ?>>Aprobado</option>
-                <option value="Desaprobado" <?php selected((string) ($filters['estado'] ?? ''), 'Desaprobado'); ?>>No Aprobado</option>
-              </select>
-            </div>
-            <div class="scm-field">
-              <label for="sra_id_empleado">Funcionario</label>
-              <select id="sra_id_empleado" name="sra_id_empleado">
-                <option value="">Todos</option>
-                <?php foreach ($funcionarios as $func) : ?>
-                  <option value="<?php echo esc_attr((string) ($func['id'] ?? '')); ?>" <?php selected((string) ($filters['id_empleado'] ?? ''), (string) ($func['id'] ?? '')); ?>><?php echo esc_html((string) ($func['label'] ?? '')); ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-            <div class="scm-field">
-              <label for="sra_arrendatario">Arrendatario</label>
-              <input id="sra_arrendatario" name="sra_arrendatario" type="text" value="<?php echo esc_attr((string) ($filters['arrendatario'] ?? '')); ?>" placeholder="Nombre">
-            </div>
-            <div class="scm-field">
-              <label for="sra_inmueble">Inmueble</label>
-              <input id="sra_inmueble" name="sra_inmueble" type="text" value="<?php echo esc_attr((string) ($filters['inmueble'] ?? '')); ?>" placeholder="# inmueble">
-            </div>
-            <div class="scm-field">
-              <label for="sra_categoria">Categoria</label>
-              <input id="sra_categoria" name="sra_categoria" type="text" value="<?php echo esc_attr((string) ($filters['categoria'] ?? '')); ?>" placeholder="Categoria">
-            </div>
-            <div class="scm-field">
-              <label for="sra_ticket"># caso</label>
-              <input id="sra_ticket" name="sra_ticket" type="text" value="<?php echo esc_attr((string) ($filters['id_ticket'] ?? '')); ?>" placeholder="ID caso">
-            </div>
-            <div class="scm-field">
-              <label for="sra_contrato">Contrato</label>
-              <input id="sra_contrato" name="sra_contrato" type="text" value="<?php echo esc_attr((string) ($filters['contrato'] ?? '')); ?>" placeholder="Contrato">
-            </div>
-          </div>
-          <div class="scm-actions">
-            <button class="scm-btn-primary-cyan" type="submit">Filtrar</button>
-            <button class="scm-btn-secondary" type="button" data-pending-clear="sra_">Limpiar</button>
-            <span class="scm-spinner" id="sra_spinner">
-              <span class="scm-spinner-dot"></span>
-              <span class="scm-spinner-dot"></span>
-              <span class="scm-spinner-dot"></span>
-            </span>
-          </div>
-        </form>
-      </div>
+      <form class="<?php echo $ui::CARD; ?> !sp-p-4" method="post" autocomplete="off" id="sra_form">
+        <div class="!sp-grid !sp-grid-cols-2 md:!sp-grid-cols-4 xl:!sp-grid-cols-7 !sp-gap-3 !sp-items-end">
+          <label class="!sp-block"><span class="<?php echo $ui::LABEL; ?>">Estado</span>
+            <select class="<?php echo $ui::INPUT; ?>" id="sra_estado" name="sra_estado">
+              <?php foreach (['Pendiente' => 'Pendiente', 'Todos' => 'Todos', 'Aprobado' => 'Aprobado', 'Desaprobado' => 'No aprobado'] as $value => $label) : ?>
+                <option value="<?php echo esc_attr($value); ?>" <?php selected($estado, $value); ?>><?php echo esc_html($label); ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <label class="!sp-block"><span class="<?php echo $ui::LABEL; ?>">Funcionario</span>
+            <select class="<?php echo $ui::INPUT; ?>" id="sra_id_empleado" name="sra_id_empleado">
+              <option value="">Todos</option>
+              <?php foreach ($funcionarios as $func) : ?>
+                <option value="<?php echo esc_attr((string) ($func['id'] ?? '')); ?>" <?php selected((string) ($filters['id_empleado'] ?? ''), (string) ($func['id'] ?? '')); ?>><?php echo esc_html((string) ($func['label'] ?? '')); ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <?php echo $text('sra_arrendatario', 'Arrendatario', 'arrendatario', 'Nombre'); ?>
+          <?php echo $text('sra_inmueble', 'Inmueble', 'inmueble', '# inmueble'); ?>
+          <?php echo $text('sra_categoria', 'Categoría', 'categoria', 'Categoría'); ?>
+          <?php echo $text('sra_ticket', 'Caso', 'id_ticket', 'ID caso'); ?>
+          <?php echo $text('sra_contrato', 'Contrato', 'contrato', 'Contrato'); ?>
+        </div>
+        <div class="!sp-flex !sp-items-center !sp-justify-end !sp-gap-2 !sp-mt-3">
+          <span class="scm-spinner" id="sra_spinner"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
+          <button class="<?php echo $ui::SECONDARY; ?>" type="button" data-pending-clear="sra_">Limpiar</button>
+          <button class="<?php echo $ui::NAVY; ?> !sp-text-xs !sp-px-4" type="submit"><?php echo $ui::icon('filter', '!sp-w-3.5 !sp-h-3.5'); ?>Filtrar</button>
+        </div>
+      </form>
 
       <div id="sra_table">
         <?php echo $this->renderReportesAdministrativosTable($items); ?>
@@ -228,16 +208,19 @@ final class PendingView
 
   public function renderReportesAdministrativosTable(array $items): string
   {
+    $ui = PublicServicesUi::class;
     if (empty($items)) {
-      return '<div class="scm-table-wrap"><p style="padding:32px;text-align:center;color:var(--scm-text-muted);">No hay reportes administrativos para los filtros actuales.</p></div>';
+      return '<div class="' . $ui::CARD . ' !sp-font-sans"><p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">No hay reportes administrativos para los filtros actuales.</p></div>';
     }
 
-    $html = '<div class="scm-table-wrap">'
-      . '<table class="scm-table scm-table-prev">'
-      . '<thead><tr>'
-      . '<th>ID</th><th>Fecha</th><th>Categoria</th><th>Descripcion</th>'
-      . '<th>Valor</th><th>Inmueble</th><th>Contrato</th><th>Funcionario</th><th>Arrendatario</th><th>Caso</th><th>Acciones</th>'
-      . '</tr></thead><tbody>';
+    $th = '!sp-text-left !sp-text-[10px] !sp-uppercase !sp-tracking-wide !sp-font-bold !sp-text-service-muted !sp-px-3 !sp-py-3 !sp-whitespace-nowrap !sp-border-x-0 !sp-border-y !sp-border-solid !sp-border-slate-200';
+    $td = '!sp-border-x-0 !sp-border-y-0 !sp-px-3 !sp-py-3 !sp-align-top';
+    $html = '<div class="' . $ui::CARD . ' !sp-font-sans !sp-text-service-navy"><div class="!sp-overflow-x-auto">'
+      . '<table class="!sp-w-full !sp-border-collapse !sp-text-xs !sp-min-w-[1100px]"><thead class="!sp-bg-slate-50"><tr>';
+    foreach (['ID', 'Fecha', 'Categoría', 'Descripción', 'Valor', 'Inmueble', 'Contrato', 'Funcionario', 'Arrendatario', 'Caso', 'Acciones'] as $label) {
+      $html .= '<th class="' . $th . '">' . $label . '</th>';
+    }
+    $html .= '</tr></thead><tbody>';
 
     foreach ($items as $item) {
       $row = (array) ($item['row'] ?? []);
@@ -247,30 +230,32 @@ final class PendingView
       $valor = (int) ($row['valor'] ?? 0);
       $estado = strtolower(trim((string) ($row['estado'] ?? '')));
 
-      $html .= '<tr>';
-      $html .= '<td><span class="scm-ticket-badge">' . esc_html((string) $preId) . '</span></td>';
-      $html .= '<td class="scm-date-cell">' . esc_html($this->fmt($this->ts($row['fecha'] ?? null))) . '</td>';
-      $html .= '<td>' . esc_html((string) ($row['categoria'] ?? '-')) . '</td>';
-      $html .= '<td style="max-width:280px;">' . esc_html((string) ($row['descripcion'] ?? '-')) . '</td>';
-      $html .= '<td>$' . esc_html(number_format($valor, 0, ',', '.')) . '</td>';
-      $html .= '<td><span class="scm-inmueble-badge">' . esc_html((string) ($row['inmueble'] ?? '-')) . '</span></td>';
-      $html .= '<td>' . esc_html((string) ($row['contrato'] ?? '-')) . '</td>';
-      $html .= '<td>' . esc_html((string) ($row['creador'] ?? $row['id_empleado'] ?? '-')) . '</td>';
-      $html .= '<td>' . esc_html((string) ($row['arrendatario'] ?? '-')) . '</td>';
-      $html .= '<td>' . esc_html($ticketRef !== '' ? $ticketRef : '-') . '</td>';
-      $html .= '<td class="scm-pending-action-cell" style="display:flex;gap:8px;flex-wrap:wrap;">';
+      $html .= '<tr class="!sp-bg-white hover:!sp-bg-slate-50 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100">';
+      $html .= '<td class="' . $td . ' !sp-font-bold">#' . esc_html((string) $preId) . '</td>';
+      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap">' . esc_html($this->fmt($this->ts($row['fecha'] ?? null))) . '</td>';
+      $html .= '<td class="' . $td . '">' . esc_html((string) ($row['categoria'] ?? '-')) . '</td>';
+      $html .= '<td class="' . $td . ' !sp-max-w-[300px] !sp-leading-relaxed">' . esc_html(trim(strip_tags((string) ($row['descripcion'] ?? ''))) ?: '-') . '</td>';
+      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap !sp-font-bold">$' . esc_html(number_format($valor, 0, ',', '.')) . '</td>';
+      $html .= '<td class="' . $td . '"><span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-bg-emerald-50 !sp-text-emerald-700 !sp-font-semibold">' . esc_html((string) ($row['inmueble'] ?? '-')) . '</span></td>';
+      $html .= '<td class="' . $td . '">' . esc_html((string) ($row['contrato'] ?? '-')) . '</td>';
+      $html .= '<td class="' . $td . ' !sp-max-w-[160px]">' . esc_html((string) ($row['creador'] ?? $row['id_empleado'] ?? '-')) . '</td>';
+      $html .= '<td class="' . $td . ' !sp-max-w-[180px]">' . esc_html((string) ($row['arrendatario'] ?? '-')) . '</td>';
+      $html .= '<td class="' . $td . '">' . ($ticketRef !== '' ? '<span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-bg-blue-50 !sp-text-service-blue !sp-font-semibold">#' . esc_html($ticketRef) . '</span>' : '-') . '</td>';
+      $html .= '<td class="' . $td . '"><div class="!sp-flex !sp-flex-wrap !sp-gap-1.5">';
       if ($ticketUrl !== '') {
-        $html .= '<button type="button" class="scm-pending-action-btn" data-scm-open-iframe data-iframe-url="' . esc_attr($ticketUrl) . '" data-iframe-title="Ver caso">Ver caso</button>';
+        $html .= '<button type="button" class="' . $ui::SECONDARY . '" data-scm-open-iframe data-iframe-url="' . esc_attr($ticketUrl) . '" data-iframe-title="Ver caso">Ver caso</button>';
       }
       if ($estado === 'pendiente') {
-        $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" style="color:#fff;" data-sra-action="approve" data-sra-id="' . esc_attr((string) $preId) . '">Aprobar</button>';
-        $html .= '<button type="button" class="scm-pending-action-btn" data-sra-action="reject" data-sra-id="' . esc_attr((string) $preId) . '">No Aprobar</button>';
+        $html .= '<button type="button" class="' . $ui::NAVY . '" data-sra-action="approve" data-sra-id="' . esc_attr((string) $preId) . '">Aprobar</button>';
+        $html .= '<button type="button" class="' . $ui::SECONDARY . '" data-sra-action="reject" data-sra-id="' . esc_attr((string) $preId) . '">No aprobar</button>';
+      } else {
+        $approved = $estado === 'aprobado';
+        $html .= '<span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-font-semibold ' . ($approved ? '!sp-bg-emerald-50 !sp-text-emerald-700' : '!sp-bg-rose-50 !sp-text-rose-700') . '">' . ($approved ? 'Aprobado' : 'No aprobado') . '</span>';
       }
-      $html .= '</td>';
-      $html .= '</tr>';
+      $html .= '</div></td></tr>';
     }
 
-    return $html . '</tbody></table></div>';
+    return $html . '</tbody></table></div></div>';
   }
 
   // Table fragments ------------------------------------------------------------

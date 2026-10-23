@@ -115,7 +115,7 @@
       modal.setAttribute("data-admin-reports-modal", "");
       modal.innerHTML =
         '<div class="scm-cia-modal-backdrop" data-ar-modal-close></div>' +
-        '<section tabindex="-1" class="!sp-relative !sp-outline-none !sp-flex !sp-flex-col !sp-w-[min(1100px,calc(100vw-24px))] !sp-max-h-[94vh] !sp-overflow-hidden !sp-rounded-2xl !sp-bg-service-background !sp-border !sp-border-solid !sp-border-slate-200 !sp-shadow-2xl !sp-font-sans !sp-text-service-navy" role="dialog" aria-modal="true" aria-labelledby="scm-ar-modal-title">' +
+        '<section tabindex="-1" style="width:min(1180px,calc(100vw - 24px));max-height:94vh" class="!sp-relative !sp-outline-none !sp-flex !sp-flex-col !sp-overflow-hidden !sp-rounded-2xl !sp-bg-service-background !sp-border !sp-border-solid !sp-border-slate-200 !sp-shadow-2xl !sp-font-sans !sp-text-service-navy" role="dialog" aria-modal="true" aria-labelledby="scm-ar-modal-title">' +
         '<header class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-4 !sp-px-4 sm:!sp-px-6 !sp-py-4 !sp-bg-white !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200">' +
         '<div class="!sp-min-w-0"><p class="!sp-m-0 !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Reportes administrativos</p>' +
         '<h3 id="scm-ar-modal-title" class="!sp-m-0 !sp-text-lg !sp-font-bold" data-ar-modal-title></h3></div>' +
@@ -170,7 +170,7 @@
             '<div class="!sp-flex !sp-justify-end !sp-gap-2 !sp-px-4 !sp-py-3 !sp-bg-white !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200">' +
             '<button type="button" class="' + UI.secondary + '" data-ar-account-excel="' + escapeHtml(id) + '" data-number="' + escapeHtml(number) + '">Descargar Excel</button>' +
             '<a class="' + UI.secondary + '" href="' + url + '" download="cuenta_cobro_' + escapeHtml(number) + '.pdf">Descargar PDF</a></div>' +
-            '<iframe class="!sp-w-full !sp-h-[75vh] !sp-border-0 !sp-bg-white" title="PDF de la cuenta de cobro" src="' + url + '"></iframe>';
+            '<iframe style="display:block;width:100%;height:78vh;border:0;background:#fff" title="PDF de la cuenta de cobro" src="' + url + '"></iframe>';
         })
         .catch(function (error) {
           if (!box.hidden) box.querySelector("[data-ar-modal-body]").innerHTML = message(error.message, "error");

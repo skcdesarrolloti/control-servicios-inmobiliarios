@@ -762,9 +762,12 @@ foreach ($rawNavItems as $k => $item) {
   <?php
   $tailwindCssPath = dirname(__DIR__) . '/public/assets/css/tailwind-admin.css';
   $tailwindCssVer = (defined('SCM_VERSION') ? SCM_VERSION : '2.0.0') . '-' . (file_exists($tailwindCssPath) ? (string) filemtime($tailwindCssPath) : '0');
+  // Las utilidades sp- se recompilan con cada pantalla nueva: la versión sigue al archivo para no servir uno viejo en caché.
+  $servicesCssPath = dirname(__DIR__) . '/public/assets/css/tailwind-services.css';
+  $servicesCssVer = (defined('SCM_VERSION') ? SCM_VERSION : '2.0.0') . '-' . (file_exists($servicesCssPath) ? (string) filemtime($servicesCssPath) : '0');
   ?>
   <link rel="stylesheet" href="<?php echo htmlspecialchars($baseUrl . '/assets/css/tailwind-admin.css?v=' . $tailwindCssVer, ENT_QUOTES, 'UTF-8'); ?>">
-  <link rel="stylesheet" href="<?php echo htmlspecialchars($baseUrl . '/assets/css/tailwind-services.css?v=' . SCM_VERSION, ENT_QUOTES, 'UTF-8'); ?>">
+  <link rel="stylesheet" href="<?php echo htmlspecialchars($baseUrl . '/assets/css/tailwind-services.css?v=' . $servicesCssVer, ENT_QUOTES, 'UTF-8'); ?>">
   <link rel="stylesheet" href="<?php echo htmlspecialchars($baseUrl . '/assets/css/property-history-report.css?v=' . SCM_VERSION, ENT_QUOTES, 'UTF-8'); ?>">
 
   <style>

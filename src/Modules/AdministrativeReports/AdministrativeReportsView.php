@@ -13,10 +13,10 @@ use SCM\Modules\Pending\PublicServicesUi as UI;
  */
 final class AdministrativeReportsView
 {
-  private const TH = '!sp-text-left !sp-text-[9px] !sp-uppercase !sp-tracking-wide !sp-font-bold !sp-px-3 !sp-py-3 !sp-whitespace-nowrap !sp-border-x-0 !sp-border-y !sp-border-solid !sp-border-slate-200';
+  private const TH = '!sp-text-left !sp-text-[10px] !sp-uppercase !sp-tracking-wide !sp-font-bold !sp-px-3 !sp-py-3 !sp-text-service-muted !sp-whitespace-nowrap !sp-border-x-0 !sp-border-y !sp-border-solid !sp-border-slate-200';
   private const TD = '!sp-border-x-0 !sp-border-y-0 !sp-px-3 !sp-py-3 !sp-align-top';
   private const TR = '!sp-bg-white hover:!sp-bg-slate-50 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100';
-  private const BADGE = '!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-font-semibold !sp-text-[10px] !sp-whitespace-nowrap ';
+  private const BADGE = '!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-font-semibold !sp-text-[11px] !sp-whitespace-nowrap ';
 
   public const TABS = [
     'pendientes' => 'Por aprobar',
@@ -195,7 +195,7 @@ final class AdministrativeReportsView
   {
     $links = [];
     $text = preg_replace_callback('/<a\s[^>]*href\s*=\s*([\'"])(https?:\/\/[^\'"]+)\1[^>]*>(.*?)<\/a>/is', static function (array $m) use (&$links): string {
-      $links[] = '<button type="button" class="!sp-p-0 !sp-bg-transparent !sp-border-0 !sp-text-service-blue !sp-underline !sp-cursor-pointer !sp-text-[10px]" data-ar-open-url="' . self::e(html_entity_decode($m[2], ENT_QUOTES, 'UTF-8')) . '">'
+      $links[] = '<button type="button" class="!sp-p-0 !sp-bg-transparent !sp-border-0 !sp-text-service-blue !sp-underline !sp-cursor-pointer !sp-text-xs" data-ar-open-url="' . self::e(html_entity_decode($m[2], ENT_QUOTES, 'UTF-8')) . '">'
         . self::e(trim(strip_tags($m[3])) ?: 'Ver evidencia') . '</button>';
       return ' [[link' . (count($links) - 1) . ']] ';
     }, $html) ?? $html;
@@ -234,7 +234,7 @@ final class AdministrativeReportsView
       $html .= '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-3 !sp-mb-3"><button type="button" class="' . UI::PRIMARY . '" data-ar-create-account disabled>' . UI::icon('document') . 'Crear cuenta de cobro</button>'
         . '<span class="!sp-text-[11px] !sp-text-service-muted">Selecciona los reportes: se registra la cuenta, se genera el PDF y se descarga el Excel.</span></div>';
     }
-    $html .= '<div class="' . UI::CARD . '"><div class="!sp-overflow-x-auto"><table class="!sp-w-full !sp-border-collapse !sp-text-[10px] !sp-min-w-[1100px]" data-ar-table><thead class="!sp-bg-slate-50"><tr>'
+    $html .= '<div class="' . UI::CARD . '"><div class="!sp-overflow-x-auto"><table class="!sp-w-full !sp-border-collapse !sp-text-xs !sp-min-w-[1100px]" data-ar-table><thead class="!sp-bg-slate-50"><tr>'
       . ($selectable ? '<th class="' . self::TH . '"><input type="checkbox" data-ar-check-all aria-label="Seleccionar todos"></th>' : '');
     foreach (['Consecutivo', 'Fecha', 'Tipo', 'Servicio', 'Transporte', 'Total', 'Contrato', 'Inmueble', 'Arrendatario', 'Caso', 'Observación'] as $label) $html .= '<th class="' . self::TH . '">' . $label . '</th>';
     $html .= ($editable ? '<th class="' . self::TH . '">Valores</th>' : '') . '</tr></thead><tbody>';
@@ -281,7 +281,7 @@ final class AdministrativeReportsView
       . ($selectable ? '<button type="button" class="' . UI::PRIMARY . '" data-ar-pay-reports disabled>' . UI::icon('check') . 'Marcar seleccionados como pagados</button>' : '')
       . '<button type="button" class="' . UI::SECONDARY . '" data-ar-backfill data-pending="' . $backfillPending . '">' . UI::icon('refresh') . 'Completar contrato/solicitud/arrendatario' . ($backfillPending > 0 ? ' (' . $backfillPending . ')' : '') . '</button></div>';
 
-    $html .= '<div class="' . UI::CARD . '"><div class="!sp-overflow-x-auto"><table class="!sp-w-full !sp-border-collapse !sp-text-[10px] !sp-min-w-[1200px]" data-ar-table><thead class="!sp-bg-slate-50"><tr>'
+    $html .= '<div class="' . UI::CARD . '"><div class="!sp-overflow-x-auto"><table class="!sp-w-full !sp-border-collapse !sp-text-xs !sp-min-w-[1200px]" data-ar-table><thead class="!sp-bg-slate-50"><tr>'
       . ($selectable ? '<th class="' . self::TH . '"><input type="checkbox" data-ar-check-all aria-label="Seleccionar todos"></th>' : '');
     foreach (['Consecutivo', 'Fecha', 'Categoría', 'Caso', 'Contrato', 'Solicitud', 'Funcionario', 'Inmueble', 'Arrendatario', 'Servicio', 'Transporte', 'Total', 'Acciones'] as $label) $html .= '<th class="' . self::TH . '">' . $label . '</th>';
     $html .= '</tr></thead><tbody>';
@@ -333,7 +333,7 @@ final class AdministrativeReportsView
   /** @param array<int,array<string,mixed>> $accounts */
   private function accountsTable(array $accounts, bool $canPay): string
   {
-    $html = '<div class="' . UI::CARD . '"><div class="!sp-overflow-x-auto"><table class="!sp-w-full !sp-border-collapse !sp-text-[10px] !sp-min-w-[1000px]" data-ar-table><thead class="!sp-bg-slate-50"><tr>'
+    $html = '<div class="' . UI::CARD . '"><div class="!sp-overflow-x-auto"><table class="!sp-w-full !sp-border-collapse !sp-text-xs !sp-min-w-[1000px]" data-ar-table><thead class="!sp-bg-slate-50"><tr>'
       . ($canPay ? '<th class="' . self::TH . '"><input type="checkbox" data-ar-check-all aria-label="Seleccionar todas"></th>' : '');
     foreach (['Fecha', 'N° cuenta', 'Funcionario', 'Período', 'Reportes', 'Servicio', 'Transporte', 'Total', 'Estado', 'Acciones'] as $label) $html .= '<th class="' . self::TH . '">' . $label . '</th>';
     $html .= '</tr></thead><tbody>';
@@ -379,7 +379,7 @@ final class AdministrativeReportsView
     ] as $label => $value) {
       $html .= '<div class="' . UI::CARD . ' !sp-p-3"><p class="!sp-m-0 !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">' . self::e($label) . '</p><p class="!sp-m-0 !sp-mt-1 !sp-text-sm !sp-font-bold">' . self::e($value) . '</p></div>';
     }
-    $html .= '</div><div class="' . UI::CARD . '"><div class="!sp-overflow-x-auto"><table class="!sp-w-full !sp-border-collapse !sp-text-[10px] !sp-min-w-[900px]"><thead class="!sp-bg-slate-50"><tr>';
+    $html .= '</div><div class="' . UI::CARD . '"><div class="!sp-overflow-x-auto"><table class="!sp-w-full !sp-border-collapse !sp-text-xs !sp-min-w-[900px]"><thead class="!sp-bg-slate-50"><tr>';
     foreach (['Consecutivo', 'Fecha', 'Categoría', 'Caso', 'Contrato', 'Inmueble', 'Arrendatario', 'Servicio', 'Transporte', 'Total', 'Estado'] as $label) $html .= '<th class="' . self::TH . '">' . $label . '</th>';
     $html .= '</tr></thead><tbody>';
     if (!$account['reportes']) $html .= $this->empty('Esta cuenta no tiene reportes asociados.');
