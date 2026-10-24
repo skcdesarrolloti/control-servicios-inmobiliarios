@@ -152,6 +152,31 @@ trait HandlesTools
     ]);
   }
 
+  /** Ficha del inmueble del panel (la misma de Contratos de arrendamiento) para la tabla de control. */
+  public function ajax_handler_tools_market_property(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('herramienta_mercado') || !$this->canSeeMarketStatsAdmin()) $this->jsonFail('No tienes permiso para ver la ficha del inmueble.');
+    $property = (new \SCM\Modules\LeaseContracts\LeaseAnnexesService($this->db))->propertyById((int) ($_POST['property_id'] ?? 0));
+    if ($property === []) $this->jsonFail('No se encontró el inmueble.');
+    $code = trim((string) ($property['codigo'] ?? ''));
+    $this->jsonOk([
+      'title' => 'Inmueble ' . ($code !== '' ? '#' . $code : '_ID ' . (int) $property['_ID']) . ' · ' . trim((string) ($property['direccion'] ?? $property['barrio'] ?? '')),
+      'html' => (new \SCM\Modules\LeaseContracts\LeaseContractsView())->renderProperty([], $property),
+    ]);
+  }
+
+  /** Membrete institucional (el de las actas) para los PDF que se arman en el navegador. */
+  public function ajax_handler_tools_letterhead(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('herramienta_mora')) $this->jsonFail('No tienes permiso para usar la calculadora de mora.');
+    $path = dirname(__DIR__, 3) . '/resources/assets/membrete-sucasa-header.jpg';
+    $size = @getimagesize($path);
+    if (!is_file($path) || $size === false) $this->jsonFail('No se encontró el membrete.');
+    $this->jsonOk(['header' => 'data:image/jpeg;base64,' . base64_encode((string) file_get_contents($path)), 'width' => (int) $size[0], 'height' => (int) $size[1]]);
+  }
+
   /** Costos, márgenes, utilidades y los PDF internos de la calculadora de aseo. */
   private function canSeeCleaningInternal(): bool
   {

@@ -78,6 +78,8 @@ final class AuthenticatedActionRouter
       'scm_tools_mora_calculate' => 'ajax_handler_tools_mora_calculate',
       'scm_tools_market_options' => 'ajax_handler_tools_market_options',
       'scm_tools_market_analyze' => 'ajax_handler_tools_market_analyze',
+      'scm_tools_market_property' => 'ajax_handler_tools_market_property',
+      'scm_tools_letterhead' => 'ajax_handler_tools_letterhead',
       'scm_tools_cleaning_calculate' => 'ajax_handler_tools_cleaning_calculate',
       'scm_tools_cleaning_pdf' => 'ajax_handler_tools_cleaning_pdf',
       'scm_tools_cleaning_settings' => 'ajax_handler_tools_cleaning_settings',

@@ -31,6 +31,46 @@
     return scriptLoads[url];
   }
 
+  // Modal de las herramientas (mismas clases que créditos y configuración): título, subtítulo y cuerpo HTML.
+  function createToolModal(root, kicker) {
+    var modal = null;
+    function ensure() {
+      if (modal) return modal;
+      modal = document.createElement("div");
+      modal.className = "scm-cia-modal";
+      modal.hidden = true;
+      modal.innerHTML =
+        '<div class="scm-cia-modal-backdrop" data-tool-modal-close></div>' +
+        '<section tabindex="-1" class="!sp-relative !sp-outline-none !sp-flex !sp-flex-col !sp-w-[min(1100px,calc(100vw-24px))] !sp-max-h-[92vh] !sp-overflow-hidden !sp-rounded-2xl !sp-bg-service-background !sp-border !sp-border-solid !sp-border-slate-200 !sp-shadow-2xl !sp-font-sans" role="dialog" aria-modal="true">' +
+        '<header class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-4 !sp-px-4 sm:!sp-px-6 !sp-py-4 !sp-bg-white !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200">' +
+        '<div class="!sp-min-w-0"><p class="!sp-m-0 !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">' + escapeHtml(kicker) + '</p><h3 class="!sp-m-0 !sp-text-lg !sp-font-bold !sp-text-service-navy !sp-truncate" data-tool-modal-title></h3></div>' +
+        '<button type="button" class="!sp-flex !sp-items-center !sp-justify-center !sp-w-9 !sp-h-9 !sp-shrink-0 !sp-rounded-full !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-service-navy !sp-text-lg !sp-cursor-pointer hover:!sp-bg-slate-50" data-tool-modal-close aria-label="Cerrar">&times;</button></header>' +
+        '<div class="!sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6" data-tool-modal-body></div></section>';
+      root.appendChild(modal);
+      modal.addEventListener("click", function (event) {
+        if (event.target.closest("[data-tool-modal-close]")) close();
+      });
+      modal.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") close();
+      });
+      return modal;
+    }
+    function show(title, html) {
+      var box = ensure();
+      box.querySelector("[data-tool-modal-title]").textContent = title;
+      box.querySelector("[data-tool-modal-body]").innerHTML = html;
+      box.hidden = false;
+      document.body.classList.add("scm-cia-modal-open");
+      box.querySelector("section").focus();
+    }
+    function close() {
+      if (!modal) return;
+      modal.hidden = true;
+      document.body.classList.remove("scm-cia-modal-open");
+    }
+    return { show: show, close: close };
+  }
+
   function init(root) {
     var core = window.SCMAdminCore;
     if (!core || root.dataset.toolsInit === "1") return;
@@ -64,7 +104,7 @@
     var mora = root.querySelector('[data-scm-tool="mora"]');
     if (mora) initMora(mora, post);
     var market = root.querySelector('[data-scm-tool="market"]');
-    if (market) initMarket(market, core, post);
+    if (market) initMarket(market, post, createToolModal(root, "Ficha del inmueble"));
     var cleaning = root.querySelector('[data-scm-tool="cleaning"]');
     if (cleaning) initCleaning(cleaning, request, post);
     initCleaningSettings(root, post);
@@ -243,8 +283,6 @@
     var latestCalculationData = null;
     var latestSuperfinData = null;
     var pdfLogo = null;
-
-    var skcLogoUrl = "https://sucasainmobiliaria.com.co/wp-content/uploads/2022/06/logo-skc-registrado-2048x790.png";
 
     var currency = new Intl.NumberFormat("es-CO", {
       style: "currency",
@@ -457,43 +495,38 @@
       var clientDescription = (clientDescriptionInput.value || "").trim();
       var titleName = clientName || "Cliente";
 
-      var colorDark = [62, 65, 69];
-      var colorYellow = [252, 208, 76];
-      var colorOrange = [245, 145, 37];
       var colorLight = [249, 249, 249];
 
-      doc.setFillColor(colorDark[0], colorDark[1], colorDark[2]);
-      doc.rect(0, 0, pageWidth, 86, "F");
-      doc.setFillColor(colorYellow[0], colorYellow[1], colorYellow[2]);
-      doc.rect(0, 82, pageWidth, 2, "F");
-      doc.setFillColor(colorOrange[0], colorOrange[1], colorOrange[2]);
-      doc.rect(0, 84, pageWidth, 2, "F");
-
-      return getPdfLogo().then(function (logo) {
-        if (logo) {
-          if (logo.wide) {
-            doc.addImage(logo.data, "PNG", pageWidth - 218, 14, 182, 54);
-          } else {
-            doc.addImage(logo.data, "PNG", pageWidth - 90, 14, 54, 54);
-          }
+      // Encabezado con el membrete institucional de las actas del panel (antes banda oscura con el logo anterior).
+      return getPdfLetterhead().then(function (letterhead) {
+        var headerBottom = 20;
+        if (letterhead) {
+          var logoW = 360;
+          var logoH = logoW * (letterhead.height / letterhead.width);
+          doc.addImage(letterhead.data, "JPEG", 36, 14, logoW, logoH);
+          headerBottom = 14 + logoH;
         } else {
-          setStatus("No se pudo cargar el logo para el PDF. Se generó sin logo.", "warn");
+          setStatus("No se pudo cargar el membrete para el PDF. Se generó sin membrete.", "warn");
         }
 
-        doc.setTextColor(255, 255, 255);
+        doc.setDrawColor(245, 145, 37);
+        doc.setLineWidth(1.2);
+        doc.line(36, headerBottom + 6, pageWidth - 36, headerBottom + 6);
+        doc.setTextColor(23, 37, 63);
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(18);
-        doc.text(isAdmin ? "Soporte de Cobro - Administrador" : "Soporte de Cobro - " + titleName, 36, 34);
+        doc.setFontSize(17);
+        doc.text(isAdmin ? "Soporte de Cobro - Administrador" : "Soporte de Cobro - " + titleName, 36, headerBottom + 26);
 
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.text("Fecha de emision: " + dateFormat.format(generatedAt), 36, 56);
-        doc.text(isAdmin ? "Documento interno con detalle de opciones" : "Documento para presentacion al cliente", 36, 72);
+        doc.setFontSize(9.5);
+        doc.setTextColor(95, 111, 137);
+        doc.text("SKC SuCasa Inmobiliaria · Fecha de emision: " + dateFormat.format(generatedAt) + " · " + (isAdmin ? "Documento interno con detalle de opciones" : "Documento para presentacion al cliente"), 36, headerBottom + 41);
+        doc.setLineWidth(0.6);
 
         var leftX = 36;
         var gapX = 16;
         var boxW = (pageWidth - leftX * 2 - gapX) / 2;
-        var boxY = 100;
+        var boxY = headerBottom + 54;
         var boxH = isAdmin ? 104 : 132;
 
         doc.setDrawColor(209, 222, 244);
@@ -1436,37 +1469,15 @@
       return normalizeInstallmentType(type, concept || "") === "servicios_publicos" ? "Servicios publicos" : "Canon";
     }
 
-    // Logo horizontal de la web; si no se puede descargar (CORS o red) se usa el isologo del panel.
-    function getPdfLogo() {
+    // Membrete de las actas (resources/assets/membrete-sucasa-header.jpg), servido por el panel.
+    function getPdfLetterhead() {
       if (pdfLogo) return Promise.resolve(pdfLogo);
-      var localLogo = (document.querySelector('script[src*="admin-tools.js"]') || {}).src || "";
-      localLogo = localLogo ? localLogo.replace(/js\/admin-tools\.js.*$/, "img/cropped-ISOLOGO-WEB.png") : "";
-      return fetchDataUrl(skcLogoUrl)
-        .then(function (data) { return { data: data, wide: true }; })
-        .catch(function () {
-          if (!localLogo) return null;
-          return fetchDataUrl(localLogo).then(function (data) { return { data: data, wide: false }; }).catch(function () { return null; });
+      return post("scm_tools_letterhead", {})
+        .then(function (data) {
+          pdfLogo = data.header ? { data: data.header, width: data.width || 1131, height: data.height || 235 } : null;
+          return pdfLogo;
         })
-        .then(function (logo) {
-          pdfLogo = logo;
-          return logo;
-        });
-    }
-
-    function fetchDataUrl(url) {
-      return fetch(url, { cache: "force-cache" })
-        .then(function (res) {
-          if (!res.ok) throw new Error("No se pudo descargar el logo (" + res.status + ").");
-          return res.blob();
-        })
-        .then(function (blob) {
-          return new Promise(function (resolve, reject) {
-            var reader = new FileReader();
-            reader.onload = function () { resolve(String(reader.result || "")); };
-            reader.onerror = function () { reject(new Error("No se pudo leer el logo.")); };
-            reader.readAsDataURL(blob);
-          });
-        });
+        .catch(function () { return null; });
     }
 
     function safeNum(value) {
@@ -1583,7 +1594,7 @@
     };
   }
 
-  function initMarket(module, core, post) {
+  function initMarket(module, post, fichaModal) {
     var form = module.querySelector("[data-market-form]");
     var status = module.querySelector("[data-market-status]");
     var optionsStatus = module.querySelector("[data-market-options-status]");
@@ -1705,7 +1716,7 @@
           '<td class="' + td + ' !sp-text-right !sp-whitespace-nowrap">' + money.format(item.precio) + "</td>" +
           '<td class="' + td + ' !sp-text-right !sp-whitespace-nowrap">' + number.format(item.area) + " m²</td>" +
           '<td class="' + td + ' !sp-text-right !sp-whitespace-nowrap !sp-font-bold">' + money.format(item.m2) + "</td>" +
-          '<td class="' + td + '"><button type="button" class="' + MARKET_BUTTON + ' !sp-py-1" data-market-ficha="' + escapeHtml(item.codigo || String(item.id)) + '">Ver ficha</button></td>' +
+          '<td class="' + td + '"><button type="button" class="' + MARKET_BUTTON + ' !sp-py-1" data-market-ficha="' + item.id + '">Ver ficha</button></td>' +
           "</tr>";
       }).join("");
       tableBox.innerHTML = '<section class="' + MARKET_CARD + ' !sp-overflow-hidden">' +
@@ -1801,9 +1812,14 @@
         render();
       }
       if (event.target.closest("[data-market-export]")) exportCsv();
+      // Ficha del panel (fotos y datos); el enlace a la web queda dentro de la ficha como "Ver inmueble en web".
       var ficha = event.target.closest("[data-market-ficha]");
-      if (ficha && typeof core.openIframeModal === "function") {
-        core.openIframeModal("https://sucasainmobiliaria.com.co/inmueble/?id_inmueble=" + encodeURIComponent(ficha.getAttribute("data-market-ficha") || ""), "Ficha del inmueble");
+      if (ficha) {
+        ficha.disabled = true;
+        post("scm_tools_market_property", { property_id: ficha.getAttribute("data-market-ficha") || "" })
+          .then(function (data) { fichaModal.show(data.title || "Inmueble", data.html || ""); })
+          .catch(function (error) { window.alert(error.message); })
+          .finally(function () { ficha.disabled = false; });
       }
     });
 

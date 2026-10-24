@@ -290,6 +290,23 @@ final class LeaseAnnexesService
     return $property;
   }
 
+  /** Ficha por _ID del inmueble (Calculadora de mercado), con las mismas fotos que property(). @return array<string,mixed> */
+  public function propertyById(int $id): array
+  {
+    $table = $this->db->table('jet_cct_inmuebles');
+    if ($id <= 0 || !$this->schema->tableExists($table)) {
+      return [];
+    }
+    $property = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$id]) ?? [];
+    if ($property !== []) {
+      $property['_photos'] = $this->attachmentUrls(array_merge(
+        [(string) ($property['foto_portada'] ?? '')],
+        explode(',', (string) ($property['galeria'] ?? ''))
+      ));
+    }
+    return $property;
+  }
+
   /** La portada y la galería guardan IDs de adjuntos de WordPress. @param string[] $refs @return string[] */
   private function attachmentUrls(array $refs): array
   {
