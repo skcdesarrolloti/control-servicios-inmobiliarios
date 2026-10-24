@@ -94,12 +94,23 @@ try {
 }
 $assert($threw, 'missing dates name the period');
 
+// Fechas sugeridas: días de la última generación llevados al mes actual; fin de mes se conserva como fin de mes.
+$today = new DateTimeImmutable('2026-02-10');
+$suggested = PsePaymentFile::suggested(['p1_pay1' => '2025-10-15', 'p1_pay2' => '2025-10-20', 'p1_published' => '2025-10-01', 'p2_pay1' => '2025-10-26', 'p2_pay2' => '2025-10-31', 'p2_published' => '2025-10-02', 'p1_pct1' => '0,5', 'p2_pct2' => 'x'], $today);
+$assert($suggested['p1_pay1'] === '2026-02-15' && $suggested['p2_pay1'] === '2026-02-26' && $suggested['p2_pay2'] === '2026-02-28', 'last generation days move to the current month (31 -> end of February)');
+$assert($suggested['p1_pct1'] === '0,5' && $suggested['p2_pct2'] === '3' && $suggested['p1_pct2'] === '1', 'last percentages are kept; invalid or missing ones use 0, 1, 2, 3');
+$fresh = PsePaymentFile::suggested([], $today);
+$assert($fresh['p1_published'] === '2026-02-01' && $fresh['p1_pay1'] === '2026-02-15' && $fresh['p1_pay2'] === '2026-02-20' && $fresh['p2_published'] === '2026-02-02' && $fresh['p2_pay1'] === '2026-02-25' && $fresh['p2_pay2'] === '2026-02-28', 'without history the archive pattern (1/15/20 and 2/25/end) is suggested');
+
 $dir = sys_get_temp_dir() . '/scm-pse-archive-' . bin2hex(random_bytes(3));
 $archive = new PseArchive($dir);
-$archive->save('20231001_1Periodo.txt', $expected1);
-$archive->save('20231001_1Periodo.txt', $expected1 . "02,x\r\n");
+$archive->save('20231001_1Periodo.txt', $expected1, ['origin' => 'historico', 'at' => 1696136400]);
+$archive->save('20231001_1Periodo.txt', $expected1 . "02,x\r\n", ['actor_id' => '45', 'actor_name' => 'Funcionario QA', 'records' => 3]);
 $files = $archive->files();
 $assert(count($files) === 1 && $files[0]['records'] === 3, 'same name replaces the archived file');
+$assert($files[0]['actor_name'] === 'Funcionario QA' && $files[0]['origin'] === 'panel' && $files[0]['versions'] === 2, 'history keeps who generated each version');
+$history = $archive->history();
+$assert($history['20231001_1Periodo.txt'][0]['origin'] === 'historico' && $history['20231001_1Periodo.txt'][1]['actor_id'] === '45', 'history lists every version in order');
 $assert($archive->read('20231001_1Periodo.txt') === $expected1 . "02,x\r\n", 'archive returns the saved bytes');
 foreach (['../config.php', 'a/b.txt', '20231001_1Periodo.php'] as $bad) {
   $rejected = false;
@@ -111,6 +122,7 @@ foreach (['../config.php', 'a/b.txt', '20231001_1Periodo.php'] as $bad) {
   $assert($rejected, 'archive rejects unsafe name ' . $bad);
 }
 array_map('unlink', glob($dir . '/*') ?: []);
+@unlink($dir . '/history.json');
 @rmdir($dir);
 
 echo "OK tools PSE generator and archive\n";

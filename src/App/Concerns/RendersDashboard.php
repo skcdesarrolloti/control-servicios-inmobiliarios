@@ -1418,7 +1418,7 @@ trait RendersDashboard
         <?php endif; ?>
         <?php if (in_array('herramienta_pse', $dashboardAllowedTabs, true)): ?>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-herramienta-pse' ? ' active' : ''; ?>" id="scm-panel-herramienta-pse" data-permission-tab="herramienta_pse" data-scm-loaded="0">
-          <?php echo (new \SCM\Modules\Tools\ToolsView())->pse(); ?>
+          <?php echo (new \SCM\Modules\Tools\ToolsView())->pse($this->toolsPseFormValues()); ?>
         </div>
         <?php endif; ?>
         <?php if (in_array('herramienta_mora', $dashboardAllowedTabs, true)): ?>

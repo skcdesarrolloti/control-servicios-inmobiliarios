@@ -88,6 +88,40 @@ final class PsePaymentFile
     return ['records' => $lineCount - 1, 'annulled' => $annulled, 'without_value' => $withoutValue, 'files' => $files];
   }
 
+  /** Días habituales del archivador (cargarpse/descargas) cuando aún no hay una generación previa; 0 = último día. */
+  private const DEFAULT_DAYS = ['p1_published' => 1, 'p1_pay1' => 15, 'p1_pay2' => 20, 'p2_published' => 2, 'p2_pay1' => 25, 'p2_pay2' => 0];
+  private const DEFAULT_PERCENTS = ['p1_pct1' => '0', 'p1_pct2' => '1', 'p2_pct1' => '2', 'p2_pct2' => '3'];
+
+  /**
+   * Valores sugeridos del formulario: los días y porcentajes de la última generación llevados al mes de $today
+   * (si la fecha anterior era fin de mes, se usa el fin del mes actual).
+   * @param array<string,string> $last campos del formulario guardados en la última generación
+   * @return array<string,string>
+   */
+  public static function suggested(array $last, \DateTimeImmutable $today): array
+  {
+    $monthEnd = (int) $today->format('t');
+    $out = [];
+    foreach (self::DEFAULT_DAYS as $key => $defaultDay) {
+      $day = $defaultDay;
+      $previous = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) ($last[$key] ?? ''));
+      if ($previous instanceof \DateTimeImmutable) {
+        $day = (int) $previous->format('j') === (int) $previous->format('t') ? 0 : (int) $previous->format('j');
+      }
+      $out[$key] = $today->format('Y-m-') . str_pad((string) ($day === 0 ? $monthEnd : min($day, $monthEnd)), 2, '0', STR_PAD_LEFT);
+    }
+    foreach (self::DEFAULT_PERCENTS as $key => $default) {
+      $value = trim((string) ($last[$key] ?? ''));
+      $out[$key] = $value !== '' && self::percentValid($value) ? $value : $default;
+    }
+    return $out;
+  }
+
+  private static function percentValid(string $value): bool
+  {
+    return is_numeric(str_replace(',', '.', str_replace(['%', ' '], '', $value)));
+  }
+
   /** Fecha "Y-m-d" o "Ymd" del formulario a "Ymd". */
   public static function ymd(string $value): string
   {

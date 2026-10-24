@@ -12,7 +12,7 @@ use Throwable;
 /**
  * Herramientas › Calculadora de mora: compara, por cada canon vencido, el interés de mora (1,5 × tasa
  * efectiva anual de consumo y ordinario certificada por la SFC) con la cláusula penal y recomienda el mayor.
- * Copia fiel de herramientas/cal-mora/lib/Calculator.php.
+ * Basada en herramientas/cal-mora/lib/Calculator.php; acepta montos y tasas con formato colombiano.
  */
 final class LateFeeCalculator
 {
@@ -211,18 +211,23 @@ final class LateFeeCalculator
     }
 
     if (is_string($value)) {
-      $clean = trim($value);
+      // Formato colombiano: punto de miles y coma decimal ("1.500.000", "1.500.000,50", "19,06", "$ 80.000").
+      $clean = str_replace(['$', ' ', "\u{00A0}", '%'], '', trim($value));
       if ($clean === '') {
         return 0.0;
       }
-      $clean = str_replace(' ', '', $clean);
-      if (strpos($clean, ',') !== false) {
-        $clean = str_replace('.', '', $clean);
+      $lastComma = strrpos($clean, ',');
+      $lastDot = strrpos($clean, '.');
+      if ($lastComma !== false && $lastDot !== false) {
+        $decimal = $lastComma > $lastDot ? ',' : '.';
+        $clean = str_replace($decimal === ',' ? '.' : ',', '', $clean);
         $clean = str_replace(',', '.', $clean);
-      } else {
-        $clean = str_replace(',', '', $clean);
+      } elseif ($lastComma !== false) {
+        $clean = substr_count($clean, ',') > 1 ? str_replace(',', '', $clean) : str_replace(',', '.', $clean);
+      } elseif ($lastDot !== false && (substr_count($clean, '.') > 1 || preg_match('/^-?\d{1,3}\.\d{3}$/', $clean) === 1)) {
+        $clean = str_replace('.', '', $clean);
       }
-      return (float) $clean;
+      return is_numeric($clean) ? (float) $clean : 0.0;
     }
 
     return 0.0;

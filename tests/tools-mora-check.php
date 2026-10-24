@@ -41,6 +41,11 @@ $assert($energy['installment_type'] === 'servicios_publicos' && $energy['recomme
 $assert($october['days_late'] === 0 && $october['recommended_charge'] === 0.0, 'not yet due charges nothing');
 $assert($result['summary']['total_recommended_charge'] === 113300.0 && $result['summary']['by_type']['servicios_publicos']['total_capital'] === 180000.0, 'summary totals');
 
+// Valores escritos con formato colombiano dan lo mismo que sin separadores.
+$plain = LateFeeCalculator::run(['annual_effective_rate_percent' => 19.06, 'global_penalty_percent' => 4, 'installments' => [['amount' => 1500000, 'paid_amount' => 250000.5, 'due_date' => '2026-08-05', 'payment_date' => '2026-10-24']]]);
+$typed = LateFeeCalculator::run(['annual_effective_rate_percent' => '19,06', 'global_penalty_percent' => '4%', 'installments' => [['amount' => '1.500.000', 'paid_amount' => '$ 250.000,50', 'due_date' => '2026-08-05', 'payment_date' => '2026-10-24']]]);
+$assert($plain === $typed, 'Colombian formats (1.500.000 / 19,06 / $ 250.000,50) parse like plain numbers');
+
 foreach ([
   [[], 'La tasa efectiva anual debe ser mayor a cero.'],
   [['annual_effective_rate_percent' => 1], 'Debes registrar al menos un canon.'],

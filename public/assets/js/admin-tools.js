@@ -76,10 +76,24 @@
     var status = module.querySelector("[data-pse-status]");
     var submit = module.querySelector("[data-pse-submit]");
     var notify = typeof core.scmNotify === "function" ? core.scmNotify : function () {};
+    var filter = module.querySelector("[data-pse-archive-filter]");
+
+    function applyFilter() {
+      var term = String((filter && filter.value) || "").trim().toLowerCase();
+      archive.querySelectorAll("[data-pse-archive-item]").forEach(function (item) {
+        var hide = term !== "" && String(item.getAttribute("data-pse-archive-item") || "").toLowerCase().indexOf(term) === -1;
+        // Las filas usan !sp-flex (display con !important): ocultarlas también con prioridad.
+        if (hide) item.style.setProperty("display", "none", "important");
+        else item.style.removeProperty("display");
+      });
+    }
 
     function loadArchive() {
       return post("scm_tools_pse_archive", {})
-        .then(function (data) { archive.innerHTML = data.html || ""; })
+        .then(function (data) {
+          archive.innerHTML = data.html || "";
+          applyFilter();
+        })
         .catch(function (error) {
           archive.innerHTML = '<p class="!sp-m-0 !sp-p-6 !sp-text-center !sp-text-xs !sp-text-red-700">' + escapeHtml(error.message) + "</p>";
         });
@@ -116,6 +130,7 @@
       module.dataset.scmLoaded = "1";
       loadArchive();
     });
+    if (filter) filter.addEventListener("input", applyFilter);
 
     module.addEventListener("click", function (event) {
       var refresh = event.target.closest("[data-pse-archive-refresh]");
@@ -144,6 +159,7 @@
         .then(function (data) {
           result.innerHTML = data.result_html || "";
           archive.innerHTML = data.archive_html || archive.innerHTML;
+          applyFilter();
           status.textContent = "";
           notify("success", data.message || "Archivos PSE generados.", "Generar PSE");
         })
@@ -274,11 +290,11 @@
         '<option value="canon"' + (installmentType === "canon" ? " selected" : "") + ">Canon</option>" +
         '<option value="servicios_publicos"' + (installmentType === "servicios_publicos" ? " selected" : "") + ">Servicios públicos</option>" +
         "</select></td>" +
-        '<td class="' + CELL + ' !sp-min-w-[110px]"><input type="number" min="0" step="0.01" class="' + CELL_INPUT + ' amount !sp-text-right" value="' + safeNum(data.amount) + '"></td>' +
-        '<td class="' + CELL + ' !sp-min-w-[110px]"><input type="number" min="0" step="0.01" class="' + CELL_INPUT + ' amount-paid !sp-text-right" value="' + safeNum(data.paid_amount) + '"></td>' +
+        '<td class="' + CELL + ' !sp-min-w-[110px]"><input type="text" inputmode="decimal" autocomplete="off" class="' + CELL_INPUT + ' amount !sp-text-right" value="' + safeNum(data.amount) + '"></td>' +
+        '<td class="' + CELL + ' !sp-min-w-[110px]"><input type="text" inputmode="decimal" autocomplete="off" class="' + CELL_INPUT + ' amount-paid !sp-text-right" value="' + safeNum(data.paid_amount) + '"></td>' +
         '<td class="' + CELL + ' !sp-min-w-[130px]"><input type="date" class="' + CELL_INPUT + ' due-date" value="' + safeDate(data.due_date) + '"></td>' +
         '<td class="' + CELL + ' !sp-min-w-[130px]"><input type="date" class="' + CELL_INPUT + ' pay-date" value="' + safeDate(data.payment_date) + '"></td>' +
-        '<td class="' + CELL + ' !sp-min-w-[70px]"><input type="number" min="0" step="0.01" class="' + CELL_INPUT + ' penalty-pct !sp-text-right" value="' + safeNum(data.penalty_percent) + '" placeholder="' + safeNum(globalPenaltyInput.value) + '"></td>' +
+        '<td class="' + CELL + ' !sp-min-w-[70px]"><input type="text" inputmode="decimal" autocomplete="off" class="' + CELL_INPUT + ' penalty-pct !sp-text-right" value="' + safeNum(data.penalty_percent) + '" placeholder="' + safeNum(globalPenaltyInput.value) + '"></td>' +
         '<td class="' + CELL + ' !sp-text-right out-days">0</td>' +
         '<td class="' + CELL + ' !sp-text-right out-months">0.00</td>' +
         '<td class="' + CELL + ' !sp-text-right !sp-whitespace-nowrap out-interest">' + currency.format(0) + "</td>" +
@@ -1071,11 +1087,22 @@
     function parseExcelNumber(value) {
       if (value === null || value === undefined || value === "") return null;
       if (typeof value === "number") return Number.isFinite(value) ? value : null;
-      var clean = String(value).replace(/\s+/g, "");
-      if (clean.indexOf(",") !== -1) {
-        clean = clean.replace(/\./g, "").replace(/,/g, ".");
-      } else {
-        clean = clean.replace(/,/g, "");
+      return parseLocaleNumber(String(value));
+    }
+
+    // Formato colombiano: punto de miles y coma decimal ("1.500.000", "1.500.000,50", "19,06", "$ 80.000").
+    // Misma regla que LateFeeCalculator::num en el servidor.
+    function parseLocaleNumber(text) {
+      var clean = String(text).replace(/[\s$% ]/g, "");
+      if (clean === "") return null;
+      var lastComma = clean.lastIndexOf(",");
+      var lastDot = clean.lastIndexOf(".");
+      if (lastComma !== -1 && lastDot !== -1) {
+        clean = lastComma > lastDot ? clean.replace(/\./g, "").replace(",", ".") : clean.replace(/,/g, "");
+      } else if (lastComma !== -1) {
+        clean = (clean.match(/,/g) || []).length > 1 ? clean.replace(/,/g, "") : clean.replace(",", ".");
+      } else if (lastDot !== -1 && ((clean.match(/\./g) || []).length > 1 || /^-?\d{1,3}\.\d{3}$/.test(clean))) {
+        clean = clean.replace(/\./g, "");
       }
       var num = Number(clean);
       return Number.isFinite(num) ? num : null;
@@ -1120,11 +1147,8 @@
     function asNumber(value) {
       if (typeof value === "number") return Number.isFinite(value) ? value : 0;
       if (typeof value !== "string") return 0;
-      var clean = value.trim();
-      if (clean === "") return 0;
-      var normalized = clean.indexOf(",") !== -1 ? clean.replace(/\./g, "").replace(/,/g, ".") : clean.replace(/,/g, "");
-      var parsed = Number(normalized);
-      return Number.isFinite(parsed) ? parsed : 0;
+      var parsed = parseLocaleNumber(value);
+      return parsed === null ? 0 : parsed;
     }
 
     function formatPercent(value, decimals) {
@@ -1388,14 +1412,14 @@
 
     function normalizeInstallmentType(value, concept) {
       var raw = normalizeKey(value);
-      if (raw.indexOf("servicio") !== -1 || raw.indexOf("publico") !== -1 || raw.indexOf("acueducto") !== -1 || raw.indexOf("energia") !== -1 || raw.indexOf("gas") !== -1) {
+      if (raw.indexOf("servicio") !== -1 || raw.indexOf("publico") !== -1 || raw.indexOf("acueducto") !== -1 || raw.indexOf("energia") !== -1 || raw.indexOf("gas") !== -1 || /\bluz\b/.test(raw)) {
         return "servicios_publicos";
       }
       if (raw.indexOf("canon") !== -1 || raw.indexOf("arriendo") !== -1) {
         return "canon";
       }
       var conceptRaw = normalizeKey(concept || "");
-      if (conceptRaw.indexOf("servicio") !== -1 || conceptRaw.indexOf("publico") !== -1 || conceptRaw.indexOf("acueducto") !== -1 || conceptRaw.indexOf("energia") !== -1 || conceptRaw.indexOf("gas") !== -1) {
+      if (conceptRaw.indexOf("servicio") !== -1 || conceptRaw.indexOf("publico") !== -1 || conceptRaw.indexOf("acueducto") !== -1 || conceptRaw.indexOf("energia") !== -1 || conceptRaw.indexOf("gas") !== -1 || /\bluz\b/.test(conceptRaw)) {
         return "servicios_publicos";
       }
       return "canon";
@@ -1477,10 +1501,26 @@
       annualRateInput.addEventListener("input", setReadonlyRateFields);
       rowsBody.addEventListener("input", function (event) {
         var target = event.target;
-        if (!(target instanceof HTMLElement) || !target.classList.contains("amount-paid")) {
+        if (!(target instanceof HTMLElement)) {
           return;
         }
-        syncPaidAmountsFromTable();
+        // El tipo sigue al concepto ("Servicio de energía" → Servicios públicos) hasta que se elija a mano.
+        if (target.classList.contains("concept")) {
+          var typeSelect = target.closest("tr") && target.closest("tr").querySelector(".installment-type");
+          if (typeSelect && typeSelect.dataset.manual !== "1") {
+            typeSelect.value = normalizeInstallmentType("", target.value);
+          }
+          return;
+        }
+        if (target.classList.contains("amount-paid")) {
+          syncPaidAmountsFromTable();
+        }
+      });
+      rowsBody.addEventListener("change", function (event) {
+        var target = event.target;
+        if (target instanceof HTMLElement && target.classList.contains("installment-type")) {
+          target.dataset.manual = "1";
+        }
       });
     }
 

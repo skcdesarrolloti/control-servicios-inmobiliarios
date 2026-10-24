@@ -14,8 +14,10 @@ final class ToolsView
   private const SECTION_HEAD = '!sp-flex !sp-flex-wrap !sp-justify-between !sp-items-center !sp-gap-2 !sp-pb-3 !sp-mb-4 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100';
   private const READONLY = '!sp-block !sp-box-border !sp-w-full !sp-h-10 !sp-px-3 !sp-border !sp-border-solid !sp-border-slate-200 !sp-rounded-lg !sp-bg-slate-100 !sp-text-service-navy !sp-text-xs !sp-font-semibold !sp-font-sans';
 
-  public function pse(): string
+  /** @param array<string,string> $values valores sugeridos (PsePaymentFile::suggested) */
+  public function pse(array $values = []): string
   {
+    $value = static fn(string $key, string $fallback = ''): string => self::e((string) ($values[$key] ?? $fallback));
     $periods = [
       1 => ['title' => 'Primer periodo del mes', 'payments' => ['Primer pago del mes', 'Segundo pago del mes'], 'pct' => ['0', '1']],
       2 => ['title' => 'Segundo periodo del mes', 'payments' => ['Tercer pago del mes', 'Cuarto pago del mes'], 'pct' => ['2', '3']],
@@ -26,11 +28,11 @@ final class ToolsView
       foreach ($period['payments'] as $index => $label) {
         $slot = $index + 1;
         $rows .= '<div class="!sp-grid !sp-grid-cols-[minmax(0,1fr)_96px] !sp-gap-3">'
-          . $this->field($label, '<input class="' . UI::INPUT . '" type="date" name="p' . $number . '_pay' . $slot . '" required>')
-          . $this->field('% recargo', '<input class="' . UI::INPUT . ' !sp-text-right" type="text" inputmode="decimal" name="p' . $number . '_pct' . $slot . '" value="' . $period['pct'][$index] . '" required>')
+          . $this->field($label, '<input class="' . UI::INPUT . '" type="date" name="p' . $number . '_pay' . $slot . '" value="' . $value('p' . $number . '_pay' . $slot) . '" required>')
+          . $this->field('% recargo', '<input class="' . UI::INPUT . ' !sp-text-right" type="text" inputmode="decimal" name="p' . $number . '_pct' . $slot . '" value="' . $value('p' . $number . '_pct' . $slot, $period['pct'][$index]) . '" required>')
           . '</div>';
       }
-      $rows .= $this->field('Fecha de publicación', '<input class="' . UI::INPUT . '" type="date" name="p' . $number . '_published" required>');
+      $rows .= $this->field('Fecha de publicación', '<input class="' . UI::INPUT . '" type="date" name="p' . $number . '_published" value="' . $value('p' . $number . '_published') . '" required>');
       $cards .= '<fieldset class="!sp-m-0 !sp-min-w-0 !sp-p-4 !sp-rounded-xl !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-slate-50/60 !sp-space-y-3">'
         . '<legend class="!sp-px-1 !sp-text-xs !sp-font-bold !sp-text-service-navy"><span class="!sp-inline-flex !sp-items-center !sp-justify-center !sp-w-5 !sp-h-5 !sp-mr-1 !sp-rounded-full !sp-bg-service-navy !sp-text-service-yellow !sp-text-[10px]">' . $number . '</span>' . $period['title'] . '</legend>'
         . $rows . '<p class="!sp-m-0 !sp-text-[10px] !sp-text-service-muted">Archivo: <strong>&lt;fecha de publicación&gt;_' . $number . 'Periodo.txt</strong></p></fieldset>';
@@ -40,7 +42,7 @@ final class ToolsView
       . $this->header('payments', 'Generar PSE', 'Archivos planos de recaudo PSE · Primer y segundo periodo del mes · Convenio 48686')
       . '<div class="!sp-grid !sp-grid-cols-1 xl:!sp-grid-cols-12 !sp-gap-5 !sp-items-start">'
       . '<form class="' . UI::CARD . ' !sp-p-5 xl:!sp-col-span-7 !sp-space-y-5" data-pse-form autocomplete="off" novalidate>'
-      . '<div class="' . self::SECTION_HEAD . ' !sp-mb-0"><h3 class="' . self::SECTION_TITLE . '"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">event</span>Fechas y recargos</h3><span class="!sp-text-[10px] !sp-text-service-muted">El % se suma al valor de cada factura en ese pago</span></div>'
+      . '<div class="' . self::SECTION_HEAD . ' !sp-mb-0"><h3 class="' . self::SECTION_TITLE . '"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">event</span>Fechas y recargos</h3><span class="!sp-text-[10px] !sp-text-service-muted">Sugeridas con los días y % de la última generación, llevados al mes actual</span></div>'
       . '<div class="!sp-grid !sp-grid-cols-1 md:!sp-grid-cols-2 !sp-gap-4">' . $cards . '</div>'
       . '<div class="!sp-space-y-2">' . $this->field('Excel de facturación (.xls o .xlsx)', '<input class="' . UI::INPUT . ' !sp-h-auto !sp-py-2 file:!sp-mr-3 file:!sp-px-3 file:!sp-py-1.5 file:!sp-rounded-md file:!sp-border-0 file:!sp-bg-service-navy file:!sp-text-white file:!sp-text-[11px] file:!sp-font-semibold" type="file" name="archivo" accept=".xls,.xlsx" required>')
       . '<p class="!sp-m-0 !sp-text-[10px] !sp-text-service-muted !sp-leading-relaxed">Primera hoja, encabezados en la fila 1. Columnas: <strong>A</strong> Anulada (solo se toman las facturas en "False"), <strong>B</strong> No. factura, <strong>E</strong> Valor, <strong>F</strong> IVA, <strong>G</strong> Retención, <strong>H</strong> ReteIVA, <strong>I</strong> ReteICA y <strong>J</strong> Admin PH.</p></div>'
@@ -51,6 +53,7 @@ final class ToolsView
       . '<section class="' . UI::CARD . ' !sp-p-5 xl:!sp-col-span-5">'
       . '<div class="' . self::SECTION_HEAD . '"><h3 class="' . self::SECTION_TITLE . '"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">inventory_2</span>Archivador</h3>'
       . '<button type="button" class="' . UI::SECONDARY . ' !sp-text-[11px]" data-pse-archive-refresh>' . UI::icon('refresh', '!sp-w-3.5 !sp-h-3.5') . 'Actualizar</button></div>'
+      . '<input class="' . UI::INPUT . ' !sp-mb-3" type="search" placeholder="Buscar por fecha, p. ej. 202510" aria-label="Buscar en el archivador" data-pse-archive-filter>'
       . '<div data-pse-archive><p class="!sp-m-0 !sp-p-6 !sp-text-center !sp-text-xs !sp-text-service-muted">Cargando archivos…</p></div>'
       . '</section></div></section>';
   }
@@ -63,12 +66,24 @@ final class ToolsView
     }
     $html = '<ul class="!sp-m-0 !sp-p-0 !sp-list-none !sp-divide-y !sp-divide-slate-100 !sp-max-h-[520px] !sp-overflow-y-auto">';
     foreach ($files as $file) {
-      $html .= '<li class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-3 !sp-py-2.5">'
+      $html .= '<li class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-3 !sp-py-2.5" data-pse-archive-item="' . self::e($file['name']) . '">'
         . '<div class="!sp-min-w-0"><strong class="!sp-block !sp-truncate !sp-text-xs">' . self::e($file['name']) . '</strong>'
-        . '<span class="!sp-text-[10px] !sp-text-service-muted">' . self::e(date('d/m/Y H:i', $file['modified'])) . ' · ' . (int) $file['records'] . ' factura(s) · ' . self::e(number_format($file['size'] / 1024, 1, ',', '.')) . ' KB</span></div>'
+        . '<span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e(date(($file['origin'] ?? '') === 'historico' ? 'd/m/Y' : 'd/m/Y H:i', $file['modified'])) . ' · ' . (int) $file['records'] . ' factura(s) · ' . self::e(number_format($file['size'] / 1024, 1, ',', '.')) . ' KB</span>'
+        . '<span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e(self::archiveOrigin($file)) . '</span></div>'
         . '<button type="button" class="' . UI::SECONDARY . ' !sp-text-[11px] !sp-shrink-0" data-pse-download="' . self::e($file['name']) . '">' . UI::icon('download', '!sp-w-3.5 !sp-h-3.5') . 'Descargar</button></li>';
     }
     return $html . '</ul>';
+  }
+
+  /** @param array{actor_name?:string,origin?:string,versions?:int} $file */
+  private static function archiveOrigin(array $file): string
+  {
+    $origin = (string) ($file['origin'] ?? '');
+    if ($origin === 'historico') return 'Archivo histórico (cargarpse)';
+    $actor = trim((string) ($file['actor_name'] ?? ''));
+    $versions = (int) ($file['versions'] ?? 0);
+    $text = $actor !== '' ? 'Generado por ' . $actor : 'Generado desde el panel';
+    return $versions > 1 ? $text . ' · ' . $versions . ' versiones' : $text;
   }
 
   /** @param array{records:int,annulled:int,without_value:int,files:list<array{name:string,period:int,published:string,total_first:int,total_second:int}>} $result */
@@ -110,8 +125,8 @@ final class ToolsView
       . '<div class="xl:!sp-col-span-4 !sp-space-y-5">'
       . '<section class="' . UI::CARD . ' !sp-p-5"><div class="' . self::SECTION_HEAD . '"><h3 class="' . self::SECTION_TITLE . '"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">tune</span>Parámetros</h3></div>'
       . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-4">'
-      . '<div class="!sp-col-span-2">' . $this->field('Tasa efectiva anual consumo y ordinario (%)', '<input class="' . $input . '" data-mora="annualRate" type="number" min="0" step="0.0001" placeholder="17.01">') . '</div>'
-      . '<div class="!sp-col-span-2">' . $this->field('Cláusula penal global por cuota (%)', '<input class="' . $input . '" data-mora="globalPenaltyPct" type="number" min="0" step="0.01" value="4">') . '</div>'
+      . '<div class="!sp-col-span-2">' . $this->field('Tasa efectiva anual consumo y ordinario (%)', '<input class="' . $input . '" data-mora="annualRate" type="text" inputmode="decimal" autocomplete="off" placeholder="19,06">') . '</div>'
+      . '<div class="!sp-col-span-2">' . $this->field('Cláusula penal global por cuota (%)', '<input class="' . $input . '" data-mora="globalPenaltyPct" type="text" inputmode="decimal" autocomplete="off" value="4">') . '</div>'
       . '<div class="!sp-col-span-2"><span class="' . UI::LABEL . '">Fecha de pago global (opcional)</span><div class="!sp-flex !sp-gap-2"><input class="' . $input . '" data-mora="globalPaymentDate" type="date" aria-label="Fecha de pago global">' . $button(UI::SECONDARY . ' !sp-shrink-0', 'applyGlobalDate', 'event_available', 'Aplicar') . '</div></div>'
       . '<div class="!sp-col-span-2">' . $this->field('Nombre del cliente', '<input class="' . $input . '" data-mora="clientName" type="text" placeholder="Nombre completo">') . '</div>'
       . '<div class="!sp-col-span-2">' . $this->field('Cédula', '<input class="' . $input . '" data-mora="clientDocument" type="text" placeholder="Número de cédula">') . '</div>'

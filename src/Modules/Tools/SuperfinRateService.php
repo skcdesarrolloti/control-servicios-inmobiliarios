@@ -14,15 +14,18 @@ use Throwable;
 use ZipArchive;
 
 /**
- * Tasa vigente de interés bancario corriente (consumo y ordinario) y resolución de la Superfinanciera,
- * leída del tablero PowerBI, la publicación mensual y su comunicado .docx. Copia de
- * herramientas/cal-mora/lib/SuperfinService.php con la caché en storage/data.
+ * Tasa vigente de interés bancario corriente (consumo y ordinario) y resolución de la Superfinanciera.
+ * Fuente principal: datos abiertos de la SFC en datos.gov.co (pare-7x5i, JSON estable). La página de la
+ * SFC (PowerBI, publicación mensual y comunicado .docx, como en herramientas/cal-mora) se consulta solo
+ * para los enlaces al acto y al comunicado, y como respaldo completo si la API no responde.
  */
 final class SuperfinRateService
 {
   private const BASE_URL = 'https://www.superfinanciera.gov.co';
   private const POWERBI_URL = 'https://www.superfinanciera.gov.co/powerbi/reportes/513/';
   private const DEFAULT_PUBLICATION = 'https://www.superfinanciera.gov.co/publicacion/10829';
+  private const OPEN_DATA_URL = 'https://www.datos.gov.co/resource/pare-7x5i.json';
+  private const OPEN_DATA_MODALITY = 'CONSUMO Y ORDINARIO';
 
   private SuperfinHttpClient $http;
   private string $cacheFile;
@@ -83,6 +86,91 @@ final class SuperfinRateService
    * @return array<string, mixed>
    */
   private function fetchLatest(): array
+  {
+    try {
+      $latest = $this->fetchFromOpenData();
+    } catch (Throwable $e) {
+      $fallback = $this->fetchFromSfc();
+      $fallback['warnings'][] = 'datos.gov.co no respondió (' . $e->getMessage() . '); se usó la página de la Superfinanciera.';
+      return $fallback;
+    }
+    try {
+      $sfc = $this->fetchFromSfc();
+      // El acto solo se enlaza si es la misma resolución; la publicación y el comunicado son los del mes vigente.
+      $sameResolution = (string) ($sfc['resolution_number'] ?? '') === (string) $latest['resolution_number'];
+      foreach (['publication_url', 'bulletin_url', 'resolution_url'] as $key) {
+        if (!empty($sfc[$key]) && ($key !== 'resolution_url' || $sameResolution)) $latest[$key] = $sfc[$key];
+      }
+    } catch (Throwable $e) {
+      // Los enlaces son opcionales; la tasa y la resolución ya vienen de datos abiertos.
+    }
+    return $latest;
+  }
+
+  /**
+   * @return array<string, mixed>
+   */
+  private function fetchFromOpenData(): array
+  {
+    $url = self::OPEN_DATA_URL . '?' . http_build_query([
+      '$where' => "modalidad = '" . self::OPEN_DATA_MODALITY . "'",
+      '$order' => 'vigencia_desde DESC',
+      '$limit' => 3,
+    ]);
+    $rows = json_decode($this->http->get($url), true);
+    if (!is_array($rows)) {
+      throw new RuntimeException('respuesta no valida');
+    }
+    $tz = new DateTimeZone('America/Bogota');
+    $today = (new DateTimeImmutable('today', $tz))->format('Y-m-d');
+    $best = null;
+    foreach ($rows as $row) {
+      if (!is_array($row) || strtoupper(trim((string) ($row['modalidad'] ?? ''))) !== self::OPEN_DATA_MODALITY) continue;
+      $from = substr((string) ($row['vigencia_desde'] ?? ''), 0, 10);
+      $rate = (float) str_replace([',', '%'], ['.', ''], (string) ($row['interes_bancario_corriente'] ?? ''));
+      if ($from === '' || $from > $today || $rate <= 0) continue;
+      if ($best === null || $from > $best['from']) {
+        $best = ['from' => $from, 'to' => substr((string) ($row['vigencia_hasta'] ?? ''), 0, 10), 'rate' => $rate, 'number' => trim((string) ($row['resolucion'] ?? '')), 'year' => (int) substr((string) ($row['fecha_resolucion'] ?? $from), 0, 4)];
+      }
+    }
+    if ($best === null) {
+      throw new RuntimeException('sin tasa vigente de consumo y ordinario');
+    }
+    $months = [1 => 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    $fromDate = new DateTimeImmutable($best['from'], $tz);
+    $toDate = $best['to'] !== '' ? new DateTimeImmutable($best['to'], $tz) : $fromDate->modify('last day of this month');
+    $vigencia = $fromDate->format('Y-m') === $toDate->format('Y-m')
+      ? sprintf('%d y el %d de %s de %d', (int) $fromDate->format('j'), (int) $toDate->format('j'), $months[(int) $toDate->format('n')], (int) $toDate->format('Y'))
+      : $fromDate->format('d/m/Y') . ' - ' . $toDate->format('d/m/Y');
+    $number = $best['number'] !== '' ? $best['number'] : null;
+    $year = $best['year'] > 0 ? $best['year'] : null;
+
+    return [
+      'source' => 'Superintendencia Financiera de Colombia',
+      'source_detail' => 'datos.gov.co · Tasa de interés bancario corriente (consumo y ordinario)',
+      'fetched_at' => (new DateTimeImmutable('now', $tz))->format(DateTimeInterface::ATOM),
+      'powerbi_url' => self::POWERBI_URL,
+      'publication_url' => self::DEFAULT_PUBLICATION,
+      'bulletin_url' => null,
+      'resolution_url' => null,
+      'resolution_number' => $number,
+      'resolution_year' => $year,
+      'resolution_label' => $number !== null && $year !== null ? sprintf('Resolucion %s de %s', $number, $year) : null,
+      'vigencia_text' => $vigencia,
+      'vigencia_desde' => $fromDate->format('Y-m-d'),
+      'vigencia_hasta' => $toDate->format('Y-m-d'),
+      'annual_effective_rate_percent' => round($best['rate'], 4),
+      'annual_effective_rate_decimal' => $best['rate'] / 100.0,
+      'mora_annual_rate_percent' => round($best['rate'] * 1.5, 4),
+      'mora_monthly_rate_percent' => round($best['rate'] * 1.5 / 12.0, 6),
+      'warnings' => [],
+    ];
+  }
+
+  /**
+   * @return array<string, mixed>
+   */
+  private function fetchFromSfc(): array
   {
     $warnings = [];
     $powerbiHtml = $this->http->get(self::POWERBI_URL);

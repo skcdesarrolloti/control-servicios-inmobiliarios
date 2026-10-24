@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SCM\App\Concerns;
 
+use SCM\Core\App;
+use SCM\Core\Auth;
 use SCM\Modules\CanonInsuranceAudit\SpreadsheetReader;
 use SCM\Modules\Tools\LateFeeCalculator;
 use SCM\Modules\Tools\PseArchive;
@@ -14,6 +16,13 @@ use SCM\Modules\Tools\ToolsView;
 /** Herramientas del encabezado: Generar PSE y Calculadora de mora. */
 trait HandlesTools
 {
+  /** Formulario de Generar PSE prellenado con la última generación llevada al mes actual. */
+  private function toolsPseFormValues(): array
+  {
+    $last = App::settings()->get('tools_pse_last_params', []);
+    return PsePaymentFile::suggested(is_array($last) ? $last : [], new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota')));
+  }
+
   public function ajax_handler_tools_pse_generate(): void
   {
     $this->verifyCsrf();
@@ -34,9 +43,22 @@ trait HandlesTools
       $rows = (new SpreadsheetReader())->read($tmp, (string) ($file['name'] ?? ''));
       $result = PsePaymentFile::build($rows, ['first' => $period(1), 'second' => $period(2)]);
       $archive = PseArchive::default();
+      $actor = $this->ticketCompletionActor();
       foreach ($result['files'] as $generated) {
-        $archive->save($generated['name'], $generated['content']);
+        $archive->save($generated['name'], $generated['content'], [
+          'actor_id' => (string) ($actor['employee_id'] ?? ''),
+          'actor_name' => (string) ($actor['name'] ?? ''),
+          'records' => $result['records'],
+        ]);
       }
+      $last = [];
+      foreach ([1, 2] as $number) {
+        foreach (['pay1', 'pay2', 'published', 'pct1', 'pct2'] as $field) {
+          $value = $period($number)[$field];
+          $last['p' . $number . '_' . $field] = in_array($field, ['pct1', 'pct2'], true) ? $value : (\DateTimeImmutable::createFromFormat('!Ymd', PsePaymentFile::ymd($value)) ?: new \DateTimeImmutable())->format('Y-m-d');
+        }
+      }
+      App::settings()->set('tools_pse_last_params', $last, Auth::userId());
       $view = new ToolsView();
       $this->jsonOk([
         'result_html' => $view->pseResult($result),
