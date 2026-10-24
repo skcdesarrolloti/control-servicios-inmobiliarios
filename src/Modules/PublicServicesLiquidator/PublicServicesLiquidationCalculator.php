@@ -86,6 +86,37 @@ final class PublicServicesLiquidationCalculator
     ];
   }
 
+  /**
+   * Campos sin los que el prorrateo no puede calcularse.
+   * @param array<string,mixed> $input @return array<int,string> etiquetas de los campos vacíos o inválidos
+   */
+  public function missingFields(array $input): array
+  {
+    $required = [
+      'fecha_lectura_anterior' => ['Fecha lectura anterior', 'date'],
+      'lectura_anterior' => ['Lectura anterior', 'number'],
+      'fecha_entrega' => ['Fecha entrega inmueble', 'date'],
+      'lectura_inicial' => ['Lectura entrega llaves', 'number'],
+      'fecha_lectura_actual' => ['Fecha lectura actual', 'date'],
+      'lectura_actual' => ['Lectura actual factura', 'number'],
+      'valor_consumo_facturado' => ['Valor consumo facturado', 'money'],
+      'total_factura' => ['Total factura liquidada', 'money'],
+    ];
+    $missing = [];
+    foreach ($required as $field => [$label, $kind]) {
+      $value = $input[$field] ?? null;
+      $ok = match ($kind) {
+        'date' => $this->dateTs((string) $value) !== null,
+        'money' => $this->money($value) > 0,
+        default => $this->number($value) !== null,
+      };
+      if (!$ok) {
+        $missing[] = $label;
+      }
+    }
+    return $missing;
+  }
+
   /** @param mixed $value */
   private function number($value): ?float
   {
@@ -96,12 +127,18 @@ final class PublicServicesLiquidationCalculator
     if ($raw === '') {
       return null;
     }
-    $normalized = str_replace(['$', ' ', "\u{00A0}"], '', $raw);
-    if (strpos($normalized, ',') !== false && strpos($normalized, '.') !== false) {
+    // Formato colombiano: punto de miles y coma decimal ("1.250.000", "1.250,5", "80.000").
+    $normalized = str_replace(['$', ' ', "\u{00A0}", 'COP', 'cop'], '', $raw);
+    $lastComma = strrpos($normalized, ',');
+    $lastDot = strrpos($normalized, '.');
+    if ($lastComma !== false && $lastDot !== false) {
+      $decimal = $lastComma > $lastDot ? ',' : '.';
+      $normalized = str_replace($decimal === ',' ? '.' : ',', '', $normalized);
+      $normalized = str_replace(',', '.', $normalized);
+    } elseif ($lastComma !== false) {
+      $normalized = substr_count($normalized, ',') > 1 ? str_replace(',', '', $normalized) : str_replace(',', '.', $normalized);
+    } elseif ($lastDot !== false && (substr_count($normalized, '.') > 1 || preg_match('/^\d{1,3}\.\d{3}$/', $normalized) === 1)) {
       $normalized = str_replace('.', '', $normalized);
-      $normalized = str_replace(',', '.', $normalized);
-    } else {
-      $normalized = str_replace(',', '.', $normalized);
     }
     return is_numeric($normalized) ? (float) $normalized : null;
   }

@@ -84,6 +84,19 @@ final class PublicServicesLiquidatorService
       throw new \InvalidArgumentException('Selecciona al menos un servicio para liquidar.');
     }
 
+    // Un servicio marcado sin datos se calculaba en $0; se avisa qué falta en cada uno.
+    $missing = [];
+    foreach ($services as $key => $service) {
+      $serviceInput = is_array($input['services'][$key] ?? null) ? $input['services'][$key] : [];
+      $fields = $this->calculator->missingFields($serviceInput);
+      if ($fields !== []) {
+        $missing[] = $service['label'] . ': ' . implode(', ', $fields);
+      }
+    }
+    if ($missing !== []) {
+      throw new \InvalidArgumentException('Completa los datos de la factura antes de calcular (o desmarca el servicio que no se liquida). ' . implode(' · ', $missing) . '.');
+    }
+
     $results = [];
     foreach ($services as $key => $service) {
       $serviceInput = is_array($input['services'][$key] ?? null) ? $input['services'][$key] : [];

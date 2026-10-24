@@ -523,7 +523,7 @@ final class PublicServicesLiquidatorView
             </div>
             <div>
               <label class="text-[11px] text-slate-600 block mb-0.5">Lectura anterior</label>
-              <input name="services[<?php echo esc_attr($key); ?>][lectura_anterior]" type="number" step="0.01" min="0" placeholder="0.00" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-[#0b1c30] focus:ring-2 focus:ring-[#0f1e36] focus:outline-none">
+              <input name="services[<?php echo esc_attr($key); ?>][lectura_anterior]" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-[#0b1c30] focus:ring-2 focus:ring-[#0f1e36] focus:outline-none">
             </div>
           </div>
 
@@ -539,7 +539,7 @@ final class PublicServicesLiquidatorView
             </div>
             <div>
               <label class="text-[11px] text-slate-600 block mb-0.5">Lectura entrega llaves</label>
-              <input name="services[<?php echo esc_attr($key); ?>][lectura_inicial]" type="number" step="0.01" min="0" placeholder="0.00" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-[#0b1c30] focus:ring-2 focus:ring-[#0f1e36] focus:outline-none">
+              <input name="services[<?php echo esc_attr($key); ?>][lectura_inicial]" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-[#0b1c30] focus:ring-2 focus:ring-[#0f1e36] focus:outline-none">
             </div>
           </div>
 
@@ -552,7 +552,7 @@ final class PublicServicesLiquidatorView
             </div>
             <div>
               <label class="text-[11px] text-slate-600 block mb-0.5">Lectura actual factura</label>
-              <input name="services[<?php echo esc_attr($key); ?>][lectura_actual]" type="number" step="0.01" min="0" placeholder="0.00" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-[#0b1c30] focus:ring-2 focus:ring-[#0f1e36] focus:outline-none">
+              <input name="services[<?php echo esc_attr($key); ?>][lectura_actual]" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-[#0b1c30] focus:ring-2 focus:ring-[#0f1e36] focus:outline-none">
             </div>
           </div>
         </div>
@@ -563,19 +563,19 @@ final class PublicServicesLiquidatorView
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-200/70">
               <label class="text-[11px] font-semibold text-slate-600 block mb-1">Valor consumo facturado</label>
-              <input name="services[<?php echo esc_attr($key); ?>][valor_consumo_facturado]" type="number" step="0.01" min="0" placeholder="$ 0" class="w-full p-1.5 bg-white border border-slate-200 rounded text-xs font-semibold text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0f1e36]">
+              <input name="services[<?php echo esc_attr($key); ?>][valor_consumo_facturado]" type="text" inputmode="decimal" autocomplete="off" placeholder="$ 0" class="w-full p-1.5 bg-white border border-slate-200 rounded text-xs font-semibold text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0f1e36]">
             </div>
             <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-200/70">
               <label class="text-[11px] font-semibold text-slate-600 block mb-1">Total factura liquidada</label>
-              <input name="services[<?php echo esc_attr($key); ?>][total_factura]" type="number" step="0.01" min="0" placeholder="$ 0" class="w-full p-1.5 bg-white border border-slate-200 rounded text-xs font-semibold text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0f1e36]">
+              <input name="services[<?php echo esc_attr($key); ?>][total_factura]" type="text" inputmode="decimal" autocomplete="off" placeholder="$ 0" class="w-full p-1.5 bg-white border border-slate-200 rounded text-xs font-semibold text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0f1e36]">
             </div>
             <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-200/70">
               <label class="text-[11px] font-semibold text-slate-600 block mb-1">Otros cargos inquilino</label>
-              <input name="services[<?php echo esc_attr($key); ?>][otros_cargos_inquilino]" type="number" step="0.01" min="0" placeholder="$ 0" class="w-full p-1.5 bg-white border border-slate-200 rounded text-xs font-semibold text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0f1e36]">
+              <input name="services[<?php echo esc_attr($key); ?>][otros_cargos_inquilino]" type="text" inputmode="decimal" autocomplete="off" placeholder="$ 0" class="w-full p-1.5 bg-white border border-slate-200 rounded text-xs font-semibold text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0f1e36]">
             </div>
             <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-200/70">
               <label class="text-[11px] font-semibold text-slate-600 block mb-1">Otros cargos no inquilino</label>
-              <input name="services[<?php echo esc_attr($key); ?>][otros_cargos_no_inquilino]" type="number" step="0.01" min="0" placeholder="$ 0" class="w-full p-1.5 bg-white border border-slate-200 rounded text-xs font-semibold text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0f1e36]">
+              <input name="services[<?php echo esc_attr($key); ?>][otros_cargos_no_inquilino]" type="text" inputmode="decimal" autocomplete="off" placeholder="$ 0" class="w-full p-1.5 bg-white border border-slate-200 rounded text-xs font-semibold text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0f1e36]">
             </div>
           </div>
         </div>
@@ -587,7 +587,7 @@ final class PublicServicesLiquidatorView
             <?php for ($i = 1; $i <= 8; $i++): ?>
               <div>
                 <label class="text-[10px] text-slate-500 block mb-0.5">Cargo <?php echo esc_html((string) $i); ?></label>
-                <input name="services[<?php echo esc_attr($key); ?>][cargos_fijos][]" type="number" step="0.01" min="0" placeholder="$ 0" class="w-full p-1.5 bg-white border border-slate-200 rounded text-xs font-medium text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0f1e36]">
+                <input name="services[<?php echo esc_attr($key); ?>][cargos_fijos][]" type="text" inputmode="decimal" autocomplete="off" placeholder="$ 0" class="w-full p-1.5 bg-white border border-slate-200 rounded text-xs font-medium text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0f1e36]">
               </div>
             <?php endfor; ?>
           </div>
