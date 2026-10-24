@@ -187,6 +187,10 @@ trait RendersDashboard
       'calculadora_mora' => 'scm-panel-herramienta-mora',
       'mora' => 'scm-panel-herramienta-mora',
       'scm-panel-herramienta-mora' => 'scm-panel-herramienta-mora',
+      'herramienta_mercado' => 'scm-panel-herramienta-mercado',
+      'calculadora_mercado' => 'scm-panel-herramienta-mercado',
+      'mercado' => 'scm-panel-herramienta-mercado',
+      'scm-panel-herramienta-mercado' => 'scm-panel-herramienta-mercado',
       'ocupaciones' => 'scm-panel-movimientos-contratos',
       'desocupaciones' => 'scm-panel-movimientos-contratos',
       'ocupaciones_vs_desocupaciones' => 'scm-panel-movimientos-contratos',
@@ -401,6 +405,7 @@ trait RendersDashboard
       'scm-panel-funcionario-contratos' => 'funcionario_contratos',
       'scm-panel-herramienta-pse' => 'herramienta_pse',
       'scm-panel-herramienta-mora' => 'herramienta_mora',
+      'scm-panel-herramienta-mercado' => 'herramienta_mercado',
     ];
     if ($initialTab !== '') {
       $initialTabPermissionKey = $dashboardPanelToTab[$initialTab] ?? '';
@@ -1426,6 +1431,11 @@ trait RendersDashboard
           <?php echo (new \SCM\Modules\Tools\ToolsView())->mora(); ?>
         </div>
         <?php endif; ?>
+        <?php if (in_array('herramienta_mercado', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-herramienta-mercado' ? ' active' : ''; ?>" id="scm-panel-herramienta-mercado" data-permission-tab="herramienta_mercado" data-scm-loaded="0">
+          <?php echo (new \SCM\Modules\Tools\ToolsView())->market($this->canSeeMarketStatsAdmin()); ?>
+        </div>
+        <?php endif; ?>
       <?php endif; ?>
 
       <?php echo \SCM\Views\GuideModalView::render(); ?>
@@ -1869,6 +1879,7 @@ trait RendersDashboard
       ['label' => 'Herramientas', 'tabs' => [
         'herramienta_pse' => '',
         'herramienta_mora' => '',
+        'herramienta_mercado' => '',
       ]],
       ['label' => 'Métricas', 'tabs' => [
         'metricas_casos' => '',

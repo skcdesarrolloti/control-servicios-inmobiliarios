@@ -164,7 +164,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
-  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts'];
+  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin'];
   /** Acciones que existían antes del catálogo ampliado; las demás heredan permisos hasta guardar (applyNewDashboardActionDefaults). */
   const LEGACY_DASHBOARD_ACTION_KEYS = [
     'case_followup', 'case_schedule', 'case_note', 'case_postpone', 'case_respond', 'contract_history_manage', 'case_transfer',
@@ -363,6 +363,7 @@ final class SuCasaControlServiciosInmobiliarios
       'credito_propietario' => 'Créditos a propietarios',
       'herramienta_pse' => 'Generar PSE',
       'herramienta_mora' => 'Calculadora de mora',
+      'herramienta_mercado' => 'Calculadora de mercado',
     ];
   }
 
@@ -879,6 +880,12 @@ final class SuCasaControlServiciosInmobiliarios
           'owner_credit_decide' => 'Aprobar o rechazar créditos (liquidador)',
           'owner_credit_manage' => 'Crear créditos manuales, marcarlos como pagados o anularlos',
           'owner_credit_configure' => 'Configurar variables y avisos de créditos',
+        ],
+      ],
+      'herramientas' => [
+        'label' => 'Herramientas',
+        'items' => [
+          'market_stats_admin' => 'Calculadora de mercado: estadística completa y tabla de control de inmuebles',
         ],
       ],
       'cartera' => [

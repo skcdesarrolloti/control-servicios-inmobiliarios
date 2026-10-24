@@ -8,12 +8,13 @@ use SCM\Core\App;
 use SCM\Core\Auth;
 use SCM\Modules\CanonInsuranceAudit\SpreadsheetReader;
 use SCM\Modules\Tools\LateFeeCalculator;
+use SCM\Modules\Tools\MarketStatsService;
 use SCM\Modules\Tools\PseArchive;
 use SCM\Modules\Tools\PsePaymentFile;
 use SCM\Modules\Tools\SuperfinRateService;
 use SCM\Modules\Tools\ToolsView;
 
-/** Herramientas del encabezado: Generar PSE y Calculadora de mora. */
+/** Herramientas del encabezado: Generar PSE, Calculadora de mora y Calculadora de mercado. */
 trait HandlesTools
 {
   /** Formulario de Generar PSE prellenado con la última generación llevada al mes actual. */
@@ -85,6 +86,7 @@ trait HandlesTools
     $this->verifyCsrf();
     if (!$this->canAccessDashboardTab('herramienta_pse')) $this->jsonFail('No tienes permiso para descargar archivos PSE.');
     $name = basename(sanitize_text_field(wp_unslash((string) ($_POST['name'] ?? ''))));
+    $content = '';
     try {
       $content = PseArchive::default()->read($name);
     } catch (\Throwable $error) {
@@ -98,6 +100,53 @@ trait HandlesTools
     header('Cache-Control: private, max-age=0, must-revalidate');
     echo $content;
     exit;
+  }
+
+  /** Estadística completa y tabla de inmuebles (antes "vista de administrador" del shortcode). */
+  private function canSeeMarketStatsAdmin(): bool
+  {
+    return $this->canUseDashboardAction('market_stats_admin') || $this->canManageDashboardPermissions();
+  }
+
+  public function ajax_handler_tools_market_options(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('herramienta_mercado')) $this->jsonFail('No tienes permiso para usar la calculadora de mercado.');
+    try {
+      $this->jsonOk(['options' => (new MarketStatsService($this->db))->options(), 'admin' => $this->canSeeMarketStatsAdmin()]);
+    } catch (\Throwable $error) {
+      error_log('[tools-market] ' . $error->getMessage());
+      $this->jsonFail('No se pudieron cargar los filtros de la calculadora de mercado.');
+    }
+  }
+
+  public function ajax_handler_tools_market_analyze(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('herramienta_mercado')) $this->jsonFail('No tienes permiso para usar la calculadora de mercado.');
+    $text = static fn(string $key): string => trim(sanitize_text_field(wp_unslash((string) ($_POST[$key] ?? ''))));
+    $filters = ['estados' => array_map(static fn($value): string => trim(sanitize_text_field(wp_unslash((string) $value))), (array) ($_POST['estados'] ?? []))];
+    foreach (['ruta', 'barrio', 'estrato', 'tipo_inmueble', 'categoria', 'destinacion', 'habitaciones', 'edad', 'parqueadero', 'deposito', 'vigilancia'] as $key) {
+      $filters[$key] = $text($key);
+    }
+    if ($filters['estados'] === []) $this->jsonFail('Selecciona al menos un estado del inmueble.');
+    $result = ['venta' => [], 'arriendo' => [], 'items' => [], 'without_area' => 0];
+    try {
+      $result = (new MarketStatsService($this->db))->analyze($filters);
+    } catch (\Throwable $error) {
+      error_log('[tools-market] ' . $error->getMessage());
+      $this->jsonFail('No se pudo calcular la estadística de mercado.');
+    }
+    $admin = $this->canSeeMarketStatsAdmin();
+    $round = static fn(array $values): array => array_map(static fn(float $value): float => round($value, 2), $values);
+    $this->jsonOk([
+      'admin' => $admin,
+      'venta' => $round($result['venta']),
+      'arriendo' => $round($result['arriendo']),
+      'without_area' => $result['without_area'],
+      // El listado de inmuebles (códigos y barrios) solo viaja a quien tiene la vista completa.
+      'items' => $admin ? array_map(static fn(array $item): array => ['precio' => round($item['precio'], 2), 'area' => round($item['area'], 2), 'm2' => round($item['m2'], 2)] + $item, $result['items']) : [],
+    ]);
   }
 
   public function ajax_handler_tools_mora_rate(): void

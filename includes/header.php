@@ -313,6 +313,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'herramienta_pse';
   } elseif (in_array($tabParam, ['herramienta_mora', 'calculadora_mora', 'mora', 'scm-panel-herramienta-mora'], true)) {
     $current_page = 'herramienta_mora';
+  } elseif (in_array($tabParam, ['herramienta_mercado', 'calculadora_mercado', 'mercado', 'scm-panel-herramienta-mercado'], true)) {
+    $current_page = 'herramienta_mercado';
   } else {
     $current_page = empty($tabParam) ? 'inicio' : 'abiertos';
   }
@@ -339,7 +341,7 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 // 3. Actividades Administrativas (Dropdown: Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
 // 4. Actividades contractuales (Dropdown: Contratos por terminar, Terminación, No prórroga, Funcionario de contratos)
 // 5. Notificaciones
-// 6. Herramientas (Dropdown: Generar PSE, Calculadora de mora)
+// 6. Herramientas (Dropdown: Generar PSE, Calculadora de mora, Calculadora de mercado)
 // 7. Métricas (Dropdown: Casos · Mantenimiento › Cotizaciones · Contratos › Ocupaciones, Desocupaciones, Ocupaciones vs Desocupaciones)
 $rawNavItems = [
   'inicio' => [
@@ -645,6 +647,14 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=herramienta_mora',
         'icon' => 'gavel',
         'perms' => ['herramienta_mora'],
+      ],
+      'herramienta_mercado' => [
+        'key' => 'herramienta_mercado',
+        'label' => 'Calculadora de mercado',
+        'panel_id' => 'scm-panel-herramienta-mercado',
+        'url' => $baseUrl . '/index.php?tab=herramienta_mercado',
+        'icon' => 'query_stats',
+        'perms' => ['herramienta_mercado'],
       ],
     ],
   ],

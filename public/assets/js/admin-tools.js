@@ -2,6 +2,7 @@
   "use strict";
 
   // Herramientas del encabezado (src/Modules/Tools/ToolsView.php):
+  // - Calculadora de mercado: estadística del precio por m² de la tabla de inmuebles.
   // - Generar PSE: sube el Excel de facturación al servidor, que arma los dos .txt y los guarda en el archivador.
   // - Calculadora de mora: copia de herramientas/cal-mora/assets/js/app.js; el cálculo y la tasa SFC se piden
   //   al servidor y el Excel y los PDF se resuelven en el navegador (SheetJS y jsPDF, mismas versiones).
@@ -61,8 +62,10 @@
     if (pse) initPse(pse, core, request, post);
     var mora = root.querySelector('[data-scm-tool="mora"]');
     if (mora) initMora(mora, post);
+    var market = root.querySelector('[data-scm-tool="market"]');
+    if (market) initMarket(market, core, post);
     // Si la página abrió directo en una herramienta, el runtime pudo pedir la carga antes de este script.
-    [pse, mora].forEach(function (module) {
+    [pse, mora, market].forEach(function (module) {
       var panel = module && module.closest(".scm-tab-panel");
       if (panel && panel.classList.contains("active")) module.dispatchEvent(new CustomEvent("scm:load-tool"));
     });
@@ -1536,6 +1539,274 @@
       if (module.dataset.scmLoaded === "1") return;
       module.dataset.scmLoaded = "1";
       syncSuperfin(false);
+    });
+  }
+
+  // ── Calculadora de mercado (antes shortcode [calculadora_estadistica_inmuebles]) ────────────────
+  // El servidor filtra la tabla de inmuebles y devuelve los valores por m²; la estadística se calcula aquí
+  // para poder excluir atípicos sin volver a consultar. El listado de inmuebles solo llega con la vista completa.
+  var MARKET_MODES = [
+    { key: "venta", mode: "Venta", title: "Análisis de ventas", tone: "!sp-text-blue-700", accent: "!sp-border-l-blue-600", badge: "!sp-bg-blue-50 !sp-text-blue-800 !sp-border-blue-200" },
+    { key: "arriendo", mode: "Arriendo", title: "Análisis de arriendos", tone: "!sp-text-emerald-700", accent: "!sp-border-l-emerald-600", badge: "!sp-bg-emerald-50 !sp-text-emerald-800 !sp-border-emerald-200" },
+  ];
+  var MARKET_CARD = "!sp-bg-white !sp-rounded-xl !sp-border !sp-border-solid !sp-border-slate-200 !sp-shadow-card";
+  var MARKET_BUTTON = "!sp-inline-flex !sp-items-center !sp-justify-center !sp-gap-1.5 !sp-px-3 !sp-py-2 !sp-rounded-lg !sp-bg-white !sp-text-service-navy !sp-border !sp-border-solid !sp-border-slate-300 !sp-text-[11px] !sp-font-semibold !sp-font-sans !sp-cursor-pointer hover:!sp-bg-slate-50 disabled:!sp-opacity-50";
+  var MIN_SAMPLE = 5;
+
+  function marketStats(values) {
+    var sorted = values.slice().sort(function (a, b) { return a - b; });
+    var n = sorted.length;
+    var mean = sorted.reduce(function (a, b) { return a + b; }, 0) / n;
+    var std = Math.sqrt(sorted.reduce(function (a, b) { return a + Math.pow(b - mean, 2); }, 0) / n);
+    function quantile(q) {
+      var pos = (n - 1) * q;
+      var base = Math.floor(pos);
+      var next = sorted[base + 1] === undefined ? sorted[base] : sorted[base + 1];
+      return sorted[base] + (pos - base) * (next - sorted[base]);
+    }
+    return {
+      n: n,
+      mean: mean,
+      std: std,
+      median: quantile(0.5),
+      p25: quantile(0.25),
+      p75: quantile(0.75),
+      min: sorted[0],
+      max: sorted[n - 1],
+      cv: mean > 0 ? (std / mean) * 100 : 0,
+      upper: mean + std,
+      lower: Math.max(0, mean - std),
+    };
+  }
+
+  function initMarket(module, core, post) {
+    var form = module.querySelector("[data-market-form]");
+    var status = module.querySelector("[data-market-status]");
+    var optionsStatus = module.querySelector("[data-market-options-status]");
+    var results = module.querySelector("[data-market-results]");
+    var tableBox = module.querySelector("[data-market-table]");
+    var routeInfo = module.querySelector("[data-market-route-info]");
+    var statesBox = module.querySelector("[data-market-states]");
+    var submit = module.querySelector("[data-market-submit]");
+    var field = function (name) { return form.querySelector('[data-market-field="' + name + '"]'); };
+    var options = null;
+    var state = null;
+    var money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+    var number = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 2 });
+
+    function fillSelect(select, values, first) {
+      var current = select.value;
+      select.innerHTML = '<option value="">' + escapeHtml(first) + "</option>" + values.map(function (value) {
+        return '<option value="' + escapeHtml(value) + '">' + escapeHtml(value) + "</option>";
+      }).join("");
+      if (values.indexOf(current) !== -1) select.value = current;
+    }
+
+    function fillBarrios() {
+      var ruta = field("ruta").value;
+      var list = options.barrios.filter(function (item) { return !ruta || item.ruta === ruta; }).map(function (item) { return item.barrio; });
+      fillSelect(field("barrio"), list, "Todos");
+      var included = ruta ? options.rutas[ruta] || [] : [];
+      routeInfo.innerHTML = included.length ? "<strong>Incluye:</strong> " + escapeHtml(included.join(", ")) : "";
+      routeInfo.classList.toggle("!sp-hidden", included.length === 0);
+    }
+
+    function renderStates() {
+      statesBox.innerHTML = options.estados.map(function (item) {
+        return '<label class="!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-text-xs !sp-text-service-navy !sp-cursor-pointer"><input type="checkbox" name="estados[]" value="' + escapeHtml(item.value) + '"' + (item.default ? " checked" : "") + ' class="!sp-w-4 !sp-h-4 !sp-accent-service-navy">' + escapeHtml(item.value) + ' <span class="!sp-text-[10px] !sp-text-service-muted">(' + item.count + ")</span></label>";
+      }).join("");
+    }
+
+    function loadOptions() {
+      return post("scm_tools_market_options", {})
+        .then(function (data) {
+          options = data.options || { rutas: {}, barrios: [], tipos: [], destinaciones: [], estratos: [], estados: [] };
+          fillSelect(field("ruta"), Object.keys(options.rutas), "Todas las rutas");
+          fillSelect(field("tipo_inmueble"), options.tipos, "Todos");
+          fillSelect(field("destinacion"), options.destinaciones, "Todos");
+          fillSelect(field("estrato"), options.estratos, "Todos");
+          fillBarrios();
+          renderStates();
+          optionsStatus.textContent = options.barrios.length + " barrios · " + Object.keys(options.rutas).length + " rutas";
+        })
+        .catch(function (error) { optionsStatus.textContent = error.message; });
+    }
+
+    function card(label, value, note, classes) {
+      return '<div class="' + MARKET_CARD + " !sp-p-4 " + (classes || "") + '"><p class="!sp-m-0 !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">' + label + '</p><p class="!sp-m-0 !sp-mt-1 !sp-text-lg !sp-font-extrabold">' + value + "</p>" + (note ? '<p class="!sp-m-0 !sp-mt-0.5 !sp-text-[10px] !sp-text-service-muted">' + note + "</p>" : "") + "</div>";
+    }
+
+    function valuesFor(mode) {
+      if (!state.admin) return state[mode.key] || [];
+      return state.items.filter(function (item, index) { return item.modo === mode.mode && !state.excluded[index]; }).map(function (item) { return item.m2; });
+    }
+
+    function renderResults() {
+      var html = "";
+      MARKET_MODES.forEach(function (mode) {
+        var values = valuesFor(mode);
+        if (!values.length) return;
+        var s = marketStats(values);
+        html += '<section class="' + MARKET_CARD + ' !sp-p-5 !sp-border-l-4 ' + mode.accent + '">' +
+          '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-4"><h3 class="!sp-m-0 !sp-flex !sp-items-center !sp-gap-2 !sp-text-sm !sp-font-bold ' + mode.tone + '"><span class="material-symbols-outlined !sp-text-[18px]" aria-hidden="true">monitoring</span>' + mode.title + "</h3>" +
+          '<span class="!sp-text-[11px] !sp-text-service-muted">Muestra: <strong class="!sp-text-service-navy">' + s.n + "</strong> inmueble(s)</span></div>" +
+          (s.n < MIN_SAMPLE ? '<p class="!sp-m-0 !sp-mb-3 !sp-p-2.5 !sp-rounded-lg !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200 !sp-text-[11px] !sp-text-amber-900">Muestra pequeña: con menos de ' + MIN_SAMPLE + " inmuebles el promedio es poco confiable. Amplía los filtros.</p>" : "") +
+          '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-4 !sp-gap-3">' +
+          card("Precio promedio m²", '<span class="' + mode.tone + '">' + money.format(s.mean) + "</span>") +
+          card("Mediana m²", money.format(s.median), "Valor central, menos sensible a atípicos") +
+          card("Límite superior", money.format(s.upper), "+1 desviación") +
+          card("Límite inferior", money.format(s.lower), "−1 desviación") +
+          "</div>";
+        if (state.admin) {
+          html += '<div class="!sp-grid !sp-grid-cols-2 md:!sp-grid-cols-4 xl:!sp-grid-cols-7 !sp-gap-3 !sp-mt-3 !sp-pt-3 !sp-border-0 !sp-border-t !sp-border-dashed !sp-border-slate-200">' +
+            card("Coef. variación", number.format(s.cv) + "%", s.cv > 30 ? "Dispersión alta" : "Dispersión aceptable", "!sp-bg-slate-50") +
+            card("Desviación estándar", money.format(s.std), "", "!sp-bg-slate-50") +
+            card("Percentil 25", money.format(s.p25), "", "!sp-bg-slate-50") +
+            card("Percentil 75", money.format(s.p75), "", "!sp-bg-slate-50") +
+            card("Mínimo", money.format(s.min), "", "!sp-bg-slate-50") +
+            card("Máximo", money.format(s.max), "", "!sp-bg-slate-50") +
+            card("Muestra", String(s.n), "", "!sp-bg-slate-50") +
+            "</div>";
+        }
+        html += "</section>";
+      });
+      if (!html) {
+        html = '<div class="' + MARKET_CARD + ' !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">No se encontraron inmuebles con precio y área para estos filtros.</div>';
+      }
+      results.innerHTML = html;
+    }
+
+    function renderTable() {
+      if (!state.admin) {
+        tableBox.innerHTML = "";
+        return;
+      }
+      var order = state.items.map(function (item, index) { return index; }).sort(function (a, b) {
+        var x = state.items[a];
+        var y = state.items[b];
+        return x.modo === y.modo ? y.m2 - x.m2 : x.modo < y.modo ? 1 : -1;
+      });
+      var excludedCount = Object.keys(state.excluded).filter(function (key) { return state.excluded[key]; }).length;
+      var th = "!sp-px-3 !sp-py-2.5 !sp-text-left !sp-text-[9px] !sp-uppercase !sp-tracking-wide !sp-font-bold !sp-text-service-muted !sp-whitespace-nowrap";
+      var td = "!sp-px-3 !sp-py-2 !sp-align-middle !sp-border-0 !sp-border-t !sp-border-solid !sp-border-slate-100";
+      var rows = order.map(function (index) {
+        var item = state.items[index];
+        var mode = MARKET_MODES[item.modo === "Venta" ? 0 : 1];
+        var off = !!state.excluded[index];
+        return '<tr class="' + (off ? "!sp-opacity-40 !sp-bg-slate-50" : "!sp-bg-white") + '">' +
+          '<td class="' + td + '"><input type="checkbox" class="!sp-w-4 !sp-h-4 !sp-accent-service-navy" data-market-include="' + index + '"' + (off ? "" : " checked") + ' aria-label="Incluir en el cálculo"></td>' +
+          '<td class="' + td + ' !sp-font-mono !sp-text-[10px] !sp-text-service-muted">#' + item.id + (item.codigo ? "<br>" + escapeHtml(item.codigo) : "") + "</td>" +
+          '<td class="' + td + ' !sp-font-semibold">' + escapeHtml(item.barrio || "-") + '<span class="!sp-block !sp-text-[10px] !sp-font-normal !sp-text-service-muted">' + escapeHtml(item.tipo) + " · " + escapeHtml(item.estado) + "</span></td>" +
+          '<td class="' + td + '"><span class="!sp-inline-flex !sp-px-2 !sp-py-0.5 !sp-rounded-full !sp-border !sp-border-solid !sp-text-[10px] !sp-font-semibold ' + mode.badge + '">' + item.modo + "</span></td>" +
+          '<td class="' + td + ' !sp-text-right !sp-whitespace-nowrap">' + money.format(item.precio) + "</td>" +
+          '<td class="' + td + ' !sp-text-right !sp-whitespace-nowrap">' + number.format(item.area) + " m²</td>" +
+          '<td class="' + td + ' !sp-text-right !sp-whitespace-nowrap !sp-font-bold">' + money.format(item.m2) + "</td>" +
+          '<td class="' + td + '"><button type="button" class="' + MARKET_BUTTON + ' !sp-py-1" data-market-ficha="' + escapeHtml(item.codigo || String(item.id)) + '">Ver ficha</button></td>' +
+          "</tr>";
+      }).join("");
+      tableBox.innerHTML = '<section class="' + MARKET_CARD + ' !sp-overflow-hidden">' +
+        '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-3 !sp-p-4 !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100">' +
+        '<div><h3 class="!sp-m-0 !sp-text-sm !sp-font-bold">Tabla de control · Exclusión de atípicos</h3><p class="!sp-m-0 !sp-mt-0.5 !sp-text-[10px] !sp-text-service-muted">' + state.items.length + " registro(s) · " + excludedCount + " excluido(s) · Desmarca un inmueble para sacarlo del cálculo" + (state.without_area ? " · " + state.without_area + " sin área no entran" : "") + "</p></div>" +
+        '<div class="!sp-flex !sp-flex-wrap !sp-gap-2"><button type="button" class="' + MARKET_BUTTON + '" data-market-outliers title="Excluye los valores fuera de 1,5 rangos intercuartiles, por venta y por arriendo"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">filter_alt_off</span>Excluir atípicos</button>' +
+        '<button type="button" class="' + MARKET_BUTTON + '" data-market-restore' + (excludedCount ? "" : " disabled") + '><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">restart_alt</span>Restablecer</button>' +
+        '<button type="button" class="' + MARKET_BUTTON + '" data-market-export><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">download</span>Exportar CSV</button></div></div>' +
+        '<div class="!sp-max-h-[480px] !sp-overflow-auto"><table class="!sp-w-full !sp-min-w-[860px] !sp-border-collapse !sp-text-[11px]"><thead class="!sp-sticky !sp-top-0 !sp-bg-slate-50"><tr>' +
+        '<th class="' + th + '">Incluir</th><th class="' + th + '">ID</th><th class="' + th + '">Barrio</th><th class="' + th + '">Modo</th><th class="' + th + ' !sp-text-right">Precio</th><th class="' + th + ' !sp-text-right">Área</th><th class="' + th + ' !sp-text-right">Valor m²</th><th class="' + th + '"></th>' +
+        "</tr></thead><tbody>" + (rows || '<tr><td colspan="8" class="!sp-p-6 !sp-text-center !sp-text-service-muted">Sin datos.</td></tr>') + "</tbody></table></div></section>";
+    }
+
+    function render() {
+      renderResults();
+      renderTable();
+    }
+
+    function excludeOutliers() {
+      MARKET_MODES.forEach(function (mode) {
+        var values = valuesFor(mode);
+        if (values.length < 4) return;
+        var s = marketStats(values);
+        var iqr = s.p75 - s.p25;
+        var low = s.p25 - 1.5 * iqr;
+        var high = s.p75 + 1.5 * iqr;
+        state.items.forEach(function (item, index) {
+          if (item.modo === mode.mode && !state.excluded[index] && (item.m2 < low || item.m2 > high)) state.excluded[index] = true;
+        });
+      });
+      render();
+    }
+
+    function exportCsv() {
+      var header = ["ID", "Codigo", "Barrio", "Tipo", "Estado", "Modo", "Precio", "Area m2", "Valor m2", "Incluido"];
+      var lines = [header.join(";")].concat(state.items.map(function (item, index) {
+        return [item.id, item.codigo, item.barrio, item.tipo, item.estado, item.modo, Math.round(item.precio), String(item.area).replace(".", ","), Math.round(item.m2), state.excluded[index] ? "No" : "Si"]
+          .map(function (value) { return '"' + String(value == null ? "" : value).replace(/"/g, '""') + '"'; }).join(";");
+      }));
+      var link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+      link.download = "calculadora-mercado-" + new Date().toISOString().slice(0, 10) + ".csv";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(function () { URL.revokeObjectURL(link.href); }, 1000);
+    }
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var data = new FormData(form);
+      if (!data.getAll("estados[]").length) {
+        status.textContent = "Selecciona al menos un estado del inmueble.";
+        return;
+      }
+      submit.disabled = true;
+      status.textContent = "Procesando datos…";
+      post("scm_tools_market_analyze", data)
+        .then(function (response) {
+          state = { admin: !!response.admin, venta: response.venta || [], arriendo: response.arriendo || [], items: response.items || [], without_area: response.without_area || 0, excluded: {} };
+          status.textContent = "";
+          render();
+        })
+        .catch(function (error) { status.textContent = error.message; })
+        .finally(function () { submit.disabled = false; });
+    });
+
+    form.addEventListener("reset", function () {
+      window.setTimeout(function () {
+        if (!options) return;
+        fillBarrios();
+        renderStates();
+      }, 0);
+    });
+
+    field("ruta").addEventListener("change", function () {
+      field("barrio").value = "";
+      fillBarrios();
+    });
+
+    module.addEventListener("change", function (event) {
+      var include = event.target.closest && event.target.closest("[data-market-include]");
+      if (!include || !state) return;
+      state.excluded[include.getAttribute("data-market-include")] = !include.checked;
+      render();
+    });
+
+    module.addEventListener("click", function (event) {
+      if (!state) return;
+      if (event.target.closest("[data-market-outliers]")) excludeOutliers();
+      if (event.target.closest("[data-market-restore]")) {
+        state.excluded = {};
+        render();
+      }
+      if (event.target.closest("[data-market-export]")) exportCsv();
+      var ficha = event.target.closest("[data-market-ficha]");
+      if (ficha && typeof core.openIframeModal === "function") {
+        core.openIframeModal("https://sucasainmobiliaria.com.co/inmueble/?id_inmueble=" + encodeURIComponent(ficha.getAttribute("data-market-ficha") || ""), "Ficha del inmueble");
+      }
+    });
+
+    module.addEventListener("scm:load-tool", function () {
+      if (module.dataset.scmLoaded === "1") return;
+      module.dataset.scmLoaded = "1";
+      loadOptions();
     });
   }
 

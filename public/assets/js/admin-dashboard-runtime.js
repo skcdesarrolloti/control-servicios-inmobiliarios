@@ -25896,6 +25896,7 @@
         activePanel.id !== "scm-panel-credito-propietario" &&
         activePanel.id !== "scm-panel-herramienta-pse" &&
         activePanel.id !== "scm-panel-herramienta-mora" &&
+        activePanel.id !== "scm-panel-herramienta-mercado" &&
         !dashboardFilterOptionsLoaded &&
         !skipFilterOptions
       ) {
@@ -25933,7 +25934,7 @@
         return loadMaintenanceMetrics(activePanel.querySelector("[data-maint-metrics]"), false);
       }
       // Herramientas: admin-tools.js carga el archivador PSE y la tasa SFC al abrir cada panel.
-      if (activePanel.id === "scm-panel-herramienta-pse" || activePanel.id === "scm-panel-herramienta-mora") {
+      if (activePanel.id === "scm-panel-herramienta-pse" || activePanel.id === "scm-panel-herramienta-mora" || activePanel.id === "scm-panel-herramienta-mercado") {
         var toolModule = activePanel.querySelector("[data-scm-tool]");
         if (toolModule) {
           toolModule.dispatchEvent(new CustomEvent("scm:load-tool"));

@@ -168,6 +168,46 @@ final class ToolsView
       . '</div></div></section>';
   }
 
+  /** Calculadora de mercado; los filtros se llenan con los valores reales de la tabla (scm_tools_market_options). */
+  public function market(bool $admin): string
+  {
+    $select = static fn(string $name, string $first = 'Todos', string $options = ''): string => '<select class="' . UI::INPUT . '" name="' . $name . '" data-market-field="' . $name . '"><option value="">' . $first . '</option>' . $options . '</select>';
+    $rooms = '';
+    for ($i = 1; $i <= 30; $i++) $rooms .= '<option value="' . $i . '">' . $i . '</option>';
+    $yesNo = '<option value="Si">Sí</option><option value="No">No</option>';
+    $badge = $admin
+      ? '<span class="!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-3 !sp-py-1.5 !sp-rounded-full !sp-bg-service-navy !sp-text-service-yellow !sp-text-[11px] !sp-font-semibold"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">lock_open</span>Vista completa de estadística</span>'
+      : '';
+
+    return '<section class="!sp-font-sans !sp-text-service-navy !sp-bg-service-background !sp-p-3 sm:!sp-p-5 !sp-space-y-5" data-scm-tool="market" data-scm-loaded="0">'
+      . $this->header('query_stats', 'Calculadora de mercado', 'Precio por m² de venta y de arriendo según los inmuebles registrados · Análisis estadístico inmobiliario', $badge)
+      . '<form class="' . UI::CARD . ' !sp-p-5" data-market-form autocomplete="off">'
+      . '<div class="' . self::SECTION_HEAD . '"><h3 class="' . self::SECTION_TITLE . '">' . UI::icon('filter') . 'Filtros</h3><span class="!sp-text-[10px] !sp-text-service-muted" data-market-options-status>Cargando opciones…</span></div>'
+      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-4 !sp-gap-4">'
+      . '<div>' . $this->field('Ruta', $select('ruta', 'Todas las rutas')) . '<p class="!sp-hidden !sp-m-0 !sp-mt-2 !sp-max-h-20 !sp-overflow-y-auto !sp-p-2 !sp-rounded-md !sp-bg-amber-50 !sp-border-0 !sp-border-l-4 !sp-border-solid !sp-border-service-yellow !sp-text-[10px] !sp-leading-relaxed !sp-text-service-navy" data-market-route-info></p></div>'
+      . $this->field('Barrio', $select('barrio'))
+      . $this->field('Estrato', $select('estrato'))
+      . $this->field('Tipo de inmueble', $select('tipo_inmueble'))
+      . $this->field('Categoría', $select('categoria', 'Venta y arriendo', '<option value="Venta">Venta</option><option value="Arriendo">Arriendo</option>'))
+      . $this->field('Destinación', $select('destinacion'))
+      . $this->field('Habitaciones', $select('habitaciones', 'Todas', $rooms))
+      . $this->field('Edad máxima (años)', '<input class="' . UI::INPUT . '" type="text" inputmode="numeric" name="edad" placeholder="Ej: 5 (hasta 5 años)">')
+      . '<div class="sm:!sp-col-span-2 !sp-grid !sp-grid-cols-3 !sp-gap-3">'
+      . $this->field('Parqueadero', $select('parqueadero', '—', $yesNo))
+      . $this->field('Depósito', $select('deposito', '—', $yesNo))
+      . $this->field('Vigilancia', $select('vigilancia', '—', $yesNo))
+      . '</div>'
+      . '<fieldset class="sm:!sp-col-span-2 !sp-m-0 !sp-min-w-0 !sp-p-0 !sp-border-0"><legend class="' . UI::LABEL . '">Estado del inmueble</legend><div class="!sp-flex !sp-flex-wrap !sp-gap-x-4 !sp-gap-y-2" data-market-states></div></fieldset>'
+      . '</div>'
+      . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-3 !sp-mt-5"><button class="' . UI::PRIMARY . '" type="submit" data-market-submit><span class="material-symbols-outlined !sp-text-[18px]" aria-hidden="true">query_stats</span>Generar estadística</button>'
+      . '<button class="!sp-bg-transparent !sp-border-0 !sp-text-service-muted !sp-text-xs !sp-cursor-pointer" type="reset" data-market-clear>Limpiar filtros</button>'
+      . '<span class="!sp-text-[11px] !sp-text-service-muted" role="status" data-market-status></span></div>'
+      . '</form>'
+      . '<div class="!sp-space-y-5" data-market-results></div>'
+      . '<div data-market-table></div>'
+      . '</section>';
+  }
+
   private function header(string $icon, string $title, string $subtitle, string $aside = ''): string
   {
     return '<header class="' . UI::CARD . ' !sp-p-5 !sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-4">'

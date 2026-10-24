@@ -76,6 +76,8 @@ final class AuthenticatedActionRouter
       'scm_tools_pse_download' => 'ajax_handler_tools_pse_download',
       'scm_tools_mora_rate' => 'ajax_handler_tools_mora_rate',
       'scm_tools_mora_calculate' => 'ajax_handler_tools_mora_calculate',
+      'scm_tools_market_options' => 'ajax_handler_tools_market_options',
+      'scm_tools_market_analyze' => 'ajax_handler_tools_market_analyze',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_ORDER_CONTEXT => 'ajax_handler_cotizacion_order_context',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_ORDER_SAVE => 'ajax_handler_cotizacion_order_save',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_BANK_SAVE => 'ajax_handler_cotizacion_bank_save',
