@@ -15,7 +15,7 @@ if ($selectedYear > 0 && !in_array($selectedYear, $years, true)) { $years[] = $s
   </header>
   <?= PublicServicesWorkspace::tabs($count) ?>
   <section data-services-section="pending" class="!sp-space-y-5">
-    <div id="rsp_kpis" class="!sp-grid !sp-grid-cols-2 lg:!sp-grid-cols-5 !sp-gap-4"><?= $view->renderServiciosPublicosKpis($count,$corte,$items,$configurationItems,$overdue) ?></div>
+    <div id="rsp_kpis" class="!sp-grid !sp-grid-cols-2 lg:!sp-grid-cols-5 !sp-gap-4"><?= $view->renderServiciosPublicosKpis($count,$corte,$items,$configurationItems,$pendingToDate) ?></div>
     <div class="<?= UI::CARD ?> !sp-p-5">
       <div class="!sp-flex !sp-justify-between !sp-items-center !sp-pb-3 !sp-mb-4 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><h3 class="!sp-m-0 !sp-flex !sp-gap-2 !sp-items-center !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide"><?= UI::icon('filter') ?>Filtros de búsqueda avanzada</h3><span class="!sp-text-[10px] !sp-text-service-muted" data-services-filter-count><?= $e($count) ?> contratos encontrados</span></div>
       <form method="post" autocomplete="off" id="rsp_form">

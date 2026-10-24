@@ -1877,7 +1877,7 @@ trait HandlesTicketWorkflowActions
     $controller = $this->get_pending_controller();
     $payload = $controller->buildServiciosPublicosPayload($_POST);
     $view = new \SCM\Modules\Pending\PendingView();
-    $kpis = $view->renderServiciosPublicosKpis((int)($payload['count'] ?? 0), (string)($payload['corte'] ?? ''), (array)($payload['items'] ?? []), (array)($payload['configuration_items'] ?? []), (int)($payload['overdue_count'] ?? 0));
+    $kpis = $view->renderServiciosPublicosKpis((int)($payload['count'] ?? 0), (string)($payload['corte'] ?? ''), (array)($payload['items'] ?? []), (array)($payload['configuration_items'] ?? []), (int)($payload['pending_to_date'] ?? 0));
     $table = $view->renderServiciosPublicosTable((array)($payload['items'] ?? []), (array) ($payload['configuration_items'] ?? []));
     $this->jsonOk([
       'kpis_html' => $kpis,
@@ -2253,7 +2253,8 @@ trait HandlesTicketWorkflowActions
         'servicios_publicos_pendientes',
         'Servicios públicos pendientes',
         'servicios_publicos_pendientes',
-        $this->adminDueServiciosPublicosItems($fromTs, $toTs)
+        $this->adminDueServiciosPublicosItems($fromTs, $toTs),
+        true
       );
     }
 
@@ -2261,7 +2262,8 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<int,array<string,mixed>> $items @return array<string,mixed> */
-  private function adminDueCalendarSummaryGroup(string $type, string $label, string $targetTab, array $items): array
+  /** $countPending: el grupo suma al total todas sus tareas pendientes del periodo, no solo las vencidas. */
+  private function adminDueCalendarSummaryGroup(string $type, string $label, string $targetTab, array $items, bool $countPending = false): array
   {
     $today = date('Y-m-d');
     $vencidos = 0;
@@ -2282,6 +2284,7 @@ trait HandlesTicketWorkflowActions
       'count' => count($items),
       'vencidos' => $vencidos,
       'hoy' => $hoy,
+      'count_pending' => $countPending,
     ];
   }
 

@@ -51,7 +51,7 @@ final class PendingController
       (int) ($payload['count'] ?? 0),
       (string) ($payload['corte'] ?? ''),
       (array) ($payload['configuration_items'] ?? []),
-      (int) ($payload['overdue_count'] ?? 0)
+      (int) ($payload['pending_to_date'] ?? 0)
     );
   }
 
@@ -175,7 +175,7 @@ final class PendingController
       'filters' => $filters,
       'items' => (array) ($data['items'] ?? []),
       'configuration_items' => (array) ($data['configuration_items'] ?? []),
-      'overdue_count' => (int) ($data['overdue_count'] ?? 0),
+      'pending_to_date' => (int) ($data['pending_to_date'] ?? 0),
       'funcionarios' => (array) ($data['funcionarios'] ?? []),
       'count' => count((array) ($data['items'] ?? [])),
       'corte' => (string) ($data['corte'] ?? ''),

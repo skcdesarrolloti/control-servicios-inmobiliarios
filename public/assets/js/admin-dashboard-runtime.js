@@ -629,12 +629,18 @@
       return stats;
     }
 
+    // Lo que un grupo resumen aporta al total en control: sus vencidos, o todo lo pendiente si el grupo lo pide (servicios públicos).
+    function dashboardDueGroupControlled(group) {
+      var key = group && group.count_pending ? "count" : "vencidos";
+      return Math.max(0, Number(group && group[key] ? group[key] : 0));
+    }
+
     // El total en control solo cuenta obligaciones ya vencidas; lo que vence hoy o más adelante se informa aparte.
     function dashboardDueTotal(rows, summaryGroups) {
       rows = Array.isArray(rows) ? rows : [];
       summaryGroups = Array.isArray(summaryGroups) ? summaryGroups : [];
       return dashboardDueStats(rows).vencidos + summaryGroups.reduce(function (total, group) {
-        return total + Math.max(0, Number(group && group.vencidos ? group.vencidos : 0));
+        return total + dashboardDueGroupControlled(group);
       }, 0);
     }
 
@@ -959,14 +965,14 @@
       summaryGroups.forEach(function (group) {
         var type = String(group && group.type ? group.type : "");
         var count = Math.max(0, Number(group && group.count ? group.count : 0));
-        var vencidos = Math.max(0, Number(group && group.vencidos ? group.vencidos : 0));
+        var controlled = dashboardDueGroupControlled(group);
         if (!type) return;
         summaryByType[type] = group || {};
-        groups[type] = vencidos;
-        upcomingByType[type] = Math.max(0, count - vencidos);
+        groups[type] = controlled;
+        upcomingByType[type] = Math.max(0, count - controlled);
         stats.total += count;
-        stats.vencidos += vencidos;
-        stats.hoy += Math.max(0, Number(group && group.hoy ? group.hoy : 0));
+        stats.vencidos += controlled;
+        if (!group.count_pending) stats.hoy += Math.max(0, Number(group && group.hoy ? group.hoy : 0));
       });
       var upcomingCount = Math.max(0, stats.total - stats.vencidos - stats.hoy);
       var groupOrder = [
@@ -1019,11 +1025,11 @@
       return '<div class="scm-due-entry-popup">' +
         '<div class="scm-due-entry-head"><div class="scm-due-entry-head-icon"><span class="material-symbols-outlined">schedule</span><i></i></div><div><h3>Vencimientos administrativos</h3><p>Control preventivo de tareas operativas.</p></div><strong>Urgente</strong></div>' +
         '<div class="scm-due-entry-kpis">' +
-        '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--late"><div><span>Total en control</span><strong>' + escHtml(String(stats.vencidos || 0)) + "</strong><small>Vencidos a la fecha</small></div><i class=\"material-symbols-outlined\">warning</i></div>" +
+        '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--late"><div><span>Total en control</span><strong>' + escHtml(String(stats.vencidos || 0)) + "</strong><small>Vencidos y revisiones pendientes</small></div><i class=\"material-symbols-outlined\">warning</i></div>" +
         '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--today"><div><span>Vencen hoy</span><strong>' + escHtml(String(stats.hoy || 0)) + "</strong><small>Atención inmediata prioritaria</small></div><i class=\"material-symbols-outlined\">schedule</i></div>" +
         '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--total"><div><span>Próximos este mes</span><strong>' + escHtml(String(upcomingCount)) + "</strong><small>Aún dentro del plazo</small></div><i class=\"material-symbols-outlined\">assignment</i></div>" +
         "</div>" +
-        '<h4 class="scm-due-entry-section-title">Vencidos por tipo de tarea pendiente</h4>' +
+        '<h4 class="scm-due-entry-section-title">En control por tipo de tarea pendiente</h4>' +
         '<div class="scm-due-entry-groups">' + groupHtml + "</div>" +
         '<div class="scm-due-entry-list-head"><div><h4>Casos con mayor tiempo de atraso</h4><p>Ordenados cronológicamente por antigüedad de vencimiento</p></div><span>Mostrando ' + escHtml(String(Math.min(rows.length, 18))) + " de " + escHtml(String(stats.vencidos || 0)) + " casos vencidos</span></div>" +
         '<div class="scm-due-entry-list">' + detailRows + "</div>" +
