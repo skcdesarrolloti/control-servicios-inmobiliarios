@@ -1911,6 +1911,8 @@ trait HandlesTicketWorkflowActions
       && !$this->canAccessDashboardTab('servicios_publicos_pendientes')
       && !$this->canAccessDashboardTab('contractual')
       && !$this->canAccessDashboardTab('vencimientos')
+      && !$this->canAccessDashboardTab('ordenes_mantenimiento')
+      && !$this->canAccessDashboardTab('contratos_arrendamiento')
       && !$this->canUseDashboardAction('case_respond')
     ) {
       $this->jsonFail('No tienes permiso para ver vencimientos administrativos.');
@@ -1943,6 +1945,8 @@ trait HandlesTicketWorkflowActions
       && !$this->canAccessDashboardTab('servicios_publicos_pendientes')
       && !$this->canAccessDashboardTab('contractual')
       && !$this->canAccessDashboardTab('vencimientos')
+      && !$this->canAccessDashboardTab('ordenes_mantenimiento')
+      && !$this->canAccessDashboardTab('contratos_arrendamiento')
       && !$this->canUseDashboardAction('case_respond')
     ) {
       $this->jsonFail('No tienes permiso para ver vencimientos administrativos.');
@@ -2028,6 +2032,8 @@ trait HandlesTicketWorkflowActions
       'cotizaciones_enviadas_sin_respuesta_dias' => $this->adminDueDaysFromPost('cotizaciones_enviadas_sin_respuesta_dias', 10, 1, 180),
       'terminacion_contrato_dias' => $this->adminDueDaysFromPost('terminacion_contrato_dias', 3, 1, 120),
       'no_prorroga_contrato_dias' => $this->adminDueDaysFromPost('no_prorroga_contrato_dias', 3, 1, 120),
+      'ordenes_sin_respuesta_dias' => $this->adminDueDaysFromPost('ordenes_sin_respuesta_dias', 3, 1, 120),
+      'contratos_anexos_sin_enviar_dias' => $this->adminDueDaysFromPost('contratos_anexos_sin_enviar_dias', 3, 1, 120),
     ];
 
     try {
@@ -2054,6 +2060,8 @@ trait HandlesTicketWorkflowActions
       'cotizaciones_enviadas_sin_respuesta_dias' => 10,
       'terminacion_contrato_dias' => 3,
       'no_prorroga_contrato_dias' => 3,
+      'ordenes_sin_respuesta_dias' => 3,
+      'contratos_anexos_sin_enviar_dias' => 3,
     ];
 
     try {
@@ -2074,6 +2082,8 @@ trait HandlesTicketWorkflowActions
       'cotizaciones_enviadas_sin_respuesta_dias' => $this->adminDueClampDays($stored['cotizaciones_enviadas_sin_respuesta_dias'] ?? $defaults['cotizaciones_enviadas_sin_respuesta_dias'], 1, 180, $defaults['cotizaciones_enviadas_sin_respuesta_dias']),
       'terminacion_contrato_dias' => $this->adminDueClampDays($stored['terminacion_contrato_dias'] ?? $defaults['terminacion_contrato_dias'], 1, 120, $defaults['terminacion_contrato_dias']),
       'no_prorroga_contrato_dias' => $this->adminDueClampDays($stored['no_prorroga_contrato_dias'] ?? $defaults['no_prorroga_contrato_dias'], 1, 120, $defaults['no_prorroga_contrato_dias']),
+      'ordenes_sin_respuesta_dias' => $this->adminDueClampDays($stored['ordenes_sin_respuesta_dias'] ?? $defaults['ordenes_sin_respuesta_dias'], 1, 120, $defaults['ordenes_sin_respuesta_dias']),
+      'contratos_anexos_sin_enviar_dias' => $this->adminDueClampDays($stored['contratos_anexos_sin_enviar_dias'] ?? $defaults['contratos_anexos_sin_enviar_dias'], 1, 120, $defaults['contratos_anexos_sin_enviar_dias']),
     ];
   }
 
@@ -2142,6 +2152,12 @@ trait HandlesTicketWorkflowActions
     }
     if ($this->canAccessDashboardTab('contractual') || $this->canUseDashboardAction('case_respond')) {
       $items = array_merge($items, $this->adminDueContractRequestItems($settings, $fromTs, $toTs));
+    }
+    if ($this->canAccessDashboardTab('ordenes_mantenimiento')) {
+      $items = array_merge($items, $this->adminDueMaintenanceOrderItems($settings, $fromTs, $toTs));
+    }
+    if ($this->canAccessDashboardTab('contratos_arrendamiento')) {
+      $items = array_merge($items, $this->adminDueLeaseAnnexItems($settings, $fromTs, $toTs));
     }
 
     usort($items, static function (array $a, array $b): int {
@@ -2339,6 +2355,90 @@ trait HandlesTicketWorkflowActions
         'calendar_ts' => $calendarTs,
         'days_limit' => $days,
         'case' => $this->adminDueLightCaseDataFromQuote($row, $sent),
+      ]);
+    }
+    return $items;
+  }
+
+  /** Órdenes de mantenimiento esperando aprobación; vencen N días después de crearse. @param array<string,int> $settings @return array<int,array<string,mixed>> */
+  private function adminDueMaintenanceOrderItems(array $settings, int $fromTs, int $toTs): array
+  {
+    $table = $this->db->table('jet_cct_ordenes');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+
+    $rows = $this->db->getResults(
+      "SELECT * FROM `{$table}` WHERE LOWER(TRIM(COALESCE(`estado`, ''))) IN ('', 'esperando respuesta') ORDER BY `_ID` DESC LIMIT 2000"
+    );
+    $days = (int) $settings['ordenes_sin_respuesta_dias'];
+    $items = [];
+    foreach ($rows as $row) {
+      $baseTs = $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
+      if ($baseTs <= 0) {
+        continue;
+      }
+      $dueTs = strtotime('+' . $days . ' days', strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs);
+      $calendarTs = $dueTs !== false ? $this->adminDueCalendarPlacementTimestamp((int) $dueTs, $fromTs, $toTs) : 0;
+      if ($dueTs === false || $calendarTs <= 0) {
+        continue;
+      }
+      $orderId = trim((string) ($row['_ID'] ?? '-'));
+      $ticket = trim((string) ($row['id_ticket'] ?? ''));
+      $items[] = $this->adminDueEvent([
+        'id' => 'orden-' . $orderId,
+        'type' => 'orden_mantenimiento_sin_respuesta',
+        'group' => 'Órdenes de mantenimiento sin respuesta',
+        'title' => 'Orden #' . $orderId . ' sin respuesta' . ($ticket !== '' ? ' · Caso #' . $ticket : ''),
+        'description' => 'Orden esperando aprobación. Vence ' . $days . ' día(s) después de su creación.',
+        'color' => '#ea580c',
+        'base_ts' => $baseTs,
+        'due_ts' => (int) $dueTs,
+        'calendar_ts' => $calendarTs,
+        'days_limit' => $days,
+      ]);
+    }
+    return $items;
+  }
+
+  /** Contratos entregados sin envío de anexos; vencen N días después de la entrega. @param array<string,int> $settings @return array<int,array<string,mixed>> */
+  private function adminDueLeaseAnnexItems(array $settings, int $fromTs, int $toTs): array
+  {
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    if (!$this->table_exists($table)) {
+      return [];
+    }
+
+    // Misma regla que la sub-pestaña "Anexos pendientes" de Contratos de arrendamiento.
+    $rows = $this->db->getResults(
+      "SELECT * FROM `{$table}` WHERE LOWER(TRIM(COALESCE(`estado`, ''))) = 'entregado' AND LOWER(TRIM(COALESCE(`se_envio`, ''))) <> 'si' ORDER BY `_ID` DESC LIMIT 2000"
+    );
+    $days = (int) $settings['contratos_anexos_sin_enviar_dias'];
+    $items = [];
+    foreach ($rows as $row) {
+      $baseTs = $this->adminDueFirstTimestamp($row, ['fecha_entrega', 'inicio_contrato', 'cct_created']);
+      if ($baseTs <= 0) {
+        continue;
+      }
+      $dueTs = strtotime('+' . $days . ' days', strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs);
+      $calendarTs = $dueTs !== false ? $this->adminDueCalendarPlacementTimestamp((int) $dueTs, $fromTs, $toTs) : 0;
+      if ($dueTs === false || $calendarTs <= 0) {
+        continue;
+      }
+      $contractId = trim((string) ($row['_ID'] ?? '-'));
+      $code = trim((string) ($row['contrato'] ?? '')) ?: $contractId;
+      $address = trim((string) ($row['direccion'] ?? ''));
+      $items[] = $this->adminDueEvent([
+        'id' => 'contrato-anexos-' . $contractId,
+        'type' => 'contrato_anexos_sin_enviar',
+        'group' => 'Contratos de arrendamiento sin enviar',
+        'title' => 'Contrato #' . $code . ' sin envío de anexos' . ($address !== '' ? ' · ' . $address : ''),
+        'description' => 'Contrato entregado sin envío de anexos. Vence ' . $days . ' día(s) después de la entrega.',
+        'color' => '#0d9488',
+        'base_ts' => $baseTs,
+        'due_ts' => (int) $dueTs,
+        'calendar_ts' => $calendarTs,
+        'days_limit' => $days,
       ]);
     }
     return $items;
@@ -2928,6 +3028,8 @@ trait HandlesTicketWorkflowActions
       'preventiva_cita_sin_realizar' => 0,
       'servicios_publicos_pendientes' => 0,
       'terminacion_contrato_pendiente' => 0,
+      'orden_mantenimiento_sin_respuesta' => 0,
+      'contrato_anexos_sin_enviar' => 0,
     ];
     foreach ($items as $item) {
       $type = (string) ($item['tipo_vencimiento'] ?? '');

@@ -2771,6 +2771,8 @@ trait RendersDashboard
             <label class="scm-calendar-due-chip scm-calendar-due-chip--cotizacion-enviada-sin-respuesta"><input type="checkbox" name="due_type" value="cotizacion_enviada_sin_respuesta" checked><span class="material-symbols-outlined" aria-hidden="true">mark_email_unread</span><strong>Cotizaciones sin respuesta</strong></label>
             <label class="scm-calendar-due-chip scm-calendar-due-chip--terminacion-contrato"><input type="checkbox" name="due_type" value="terminacion_contrato_pendiente" checked><span class="material-symbols-outlined" aria-hidden="true">contract_edit</span><strong>Terminación de contrato</strong></label>
             <label class="scm-calendar-due-chip scm-calendar-due-chip--no-prorroga-contrato"><input type="checkbox" name="due_type" value="no_prorroga_contrato_pendiente" checked><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><strong>No prórroga de contrato</strong></label>
+            <label class="scm-calendar-due-chip scm-calendar-due-chip--cotizacion-sin-enviar"><input type="checkbox" name="due_type" value="orden_mantenimiento_sin_respuesta" checked><span class="material-symbols-outlined" aria-hidden="true">engineering</span><strong>Órdenes sin respuesta</strong></label>
+            <label class="scm-calendar-due-chip scm-calendar-due-chip--ticket-preventiva-sin-cita"><input type="checkbox" name="due_type" value="contrato_anexos_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">forward_to_inbox</span><strong>Contratos sin enviar</strong></label>
           </form>
         </section>
       <?php endif; ?>

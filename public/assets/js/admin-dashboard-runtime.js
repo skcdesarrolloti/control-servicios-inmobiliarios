@@ -611,6 +611,8 @@
       if (type === "no_prorroga_contrato_pendiente") return "No prórroga de contrato";
       if (type === "cotizacion_sin_enviar") return "Cotizaciones sin enviar";
       if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
+      if (type === "orden_mantenimiento_sin_respuesta") return "Órdenes de mantenimiento sin respuesta";
+      if (type === "contrato_anexos_sin_enviar") return "Contratos de arrendamiento sin enviar";
       return type || "Vencimientos";
     }
 
@@ -866,6 +868,10 @@
         openContractNonRenewalTab();
         return;
       }
+      if (key === "contrato_anexos_sin_enviar") {
+        openLeaseAnnexesPendingTab();
+        return;
+      }
       if (key === "notificaciones") {
         var notificationsTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-admin-notificaciones"]');
         if (notificationsTab) {
@@ -882,6 +888,7 @@
         preventiva_sin_enviar: ["preventivas_pendientes", '[data-preventive-tab="sin_enviar"]'],
         cotizacion_sin_enviar: ["cotizaciones_mantenimiento", '.scm-cotizacion-state-tab[data-cotizacion-sent="no"]'],
         cotizacion_enviada_sin_respuesta: ["cotizaciones_mantenimiento", '.scm-cotizacion-state-tab[data-cotizacion-state="Esperando respuesta"]'],
+        orden_mantenimiento_sin_respuesta: ["ordenes_mantenimiento", '[data-maintenance-orders-tab="pendientes"]'],
       }[key];
       if (subTab) key = subTab[0];
       dashboardDuePopupShown.administrative = true;
@@ -910,6 +917,20 @@
           activityTab.click();
           activityTab.focus({ preventScroll: true });
         }
+      }, 160);
+    }
+
+    // Contratos de arrendamiento es un panel propio; abre su sub-pestaña "Anexos pendientes".
+    function openLeaseAnnexesPendingTab() {
+      dashboardDuePopupShown.administrative = true;
+      var contractsTab = root.querySelector('.scm-tab[data-tab="scm-panel-contratos-arrendamiento"]');
+      if (contractsTab) {
+        contractsTab.click();
+        contractsTab.focus({ preventScroll: true });
+      }
+      window.setTimeout(function () {
+        var annexesTab = root.querySelector('.scm-contract-tab[data-contract-bucket="anexos_pendientes"]');
+        if (annexesTab) annexesTab.click();
       }, 160);
     }
 
@@ -996,12 +1017,14 @@
         "no_prorroga_contrato_pendiente",
         "cotizacion_sin_enviar",
         "cotizacion_enviada_sin_respuesta",
+        "orden_mantenimiento_sin_respuesta",
+        "contrato_anexos_sin_enviar",
       ];
       Object.keys(groups).forEach(function (type) {
         if (groupOrder.indexOf(type) === -1) groupOrder.push(type);
       });
       // Tipos que abren su pestaña o sub-pestaña desde openAdministrativeActivityTab.
-      var tabTypes = ["servicios_publicos_critico", "ticket_preventiva_sin_cita", "preventiva_cita_sin_realizar", "preventiva_sin_enviar", "cotizacion_sin_enviar", "cotizacion_enviada_sin_respuesta"];
+      var tabTypes = ["servicios_publicos_critico", "ticket_preventiva_sin_cita", "preventiva_cita_sin_realizar", "preventiva_sin_enviar", "cotizacion_sin_enviar", "cotizacion_enviada_sin_respuesta", "orden_mantenimiento_sin_respuesta", "contrato_anexos_sin_enviar"];
       var groupHtml = groupOrder.map(function (type) {
         var summaryGroup = summaryByType[type] || {};
         var count = Number(groups[type] || 0);
@@ -1038,7 +1061,9 @@
               ? '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-open-services data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + ">Ver revisión</button>"
               : sourceHtml
                 ? '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-open-case data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + ">Ver caso</button>"
-                : '<button type="button" class="' + ui.secondary + '" disabled>Sin caso</button>';
+                : tabTypes.indexOf(String(row.tipo_vencimiento || "")) !== -1
+                  ? '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-open-admin-tab="' + dueType + '">Ver pestaña</button>'
+                  : '<button type="button" class="' + ui.secondary + '" disabled>Sin caso</button>';
         return '<div data-scm-due-row class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[110px_minmax(0,1fr)_auto_auto] !sp-items-center !sp-gap-3 !sp-px-4 !sp-py-3 !sp-m-0 !sp-bg-white !sp-rounded-none !sp-shadow-none !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0">' +
           '<strong class="!sp-inline-flex !sp-justify-center !sp-rounded-lg !sp-bg-slate-50 !sp-border !sp-border-solid !sp-border-slate-200 !sp-px-2 !sp-py-1.5 !sp-text-[11px] !sp-font-semibold !sp-text-service-navy !sp-whitespace-nowrap">' + escHtml(formatDuePopupDate(row.fecha_vencimiento || "-") + (row.fecha_vencimiento_hora ? " · " + row.fecha_vencimiento_hora : "")) + "</strong>" +
           '<span class="!sp-min-w-0 !sp-truncate !sp-text-xs !sp-font-semibold !sp-text-service-navy">' + escHtml(row.titulo || "Vencimiento") + "</span>" +
@@ -1115,6 +1140,10 @@
       { title: "Contratos", icon: "contract", fields: [
         { name: "terminacion_contrato_dias", label: "Solicitud de terminación", note: "Días calendario desde la solicitud para responderla.", min: 1, max: 120, fallback: 3 },
         { name: "no_prorroga_contrato_dias", label: "Solicitud de no prórroga", note: "Días calendario desde la solicitud para responderla.", min: 1, max: 120, fallback: 3 },
+        { name: "contratos_anexos_sin_enviar_dias", label: "Contratos sin enviar", note: "Días calendario desde la entrega para enviar los anexos.", min: 1, max: 120, fallback: 3 },
+      ] },
+      { title: "Órdenes de mantenimiento", icon: "engineering", fields: [
+        { name: "ordenes_sin_respuesta_dias", label: "Órdenes sin respuesta", note: "Días calendario desde la creación de la orden para aprobarla o desaprobarla.", min: 1, max: 120, fallback: 3 },
       ] },
     ];
 
@@ -2060,6 +2089,8 @@
           servicios_publicos_pendientes: { color: "#0284c7", bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" },
           terminacion_contrato_pendiente: { color: "#be123c", bg: "#fff1f2", text: "#9f1239", border: "#fecdd3" },
           no_prorroga_contrato_pendiente: { color: "#7c3aed", bg: "#f5f3ff", text: "#6d28d9", border: "#ddd6fe" },
+          orden_mantenimiento_sin_respuesta: { color: "#ea580c", bg: "#fff7ed", text: "#c2410c", border: "#fed7aa" },
+          contrato_anexos_sin_enviar: { color: "#0d9488", bg: "#f0fdfa", text: "#0f766e", border: "#99f6e4" },
         };
         var theme = themes[key] || { color: "#475569", bg: "#f8fafc", text: "#334155", border: "#cbd5e1" };
         if (typeof rowOrType !== "string" && rowOrType && rowOrType.color) {
@@ -3624,6 +3655,8 @@
           no_prorroga_contrato_pendiente: 0,
           cotizacion_sin_enviar: 0,
           cotizacion_enviada_sin_respuesta: 0,
+          orden_mantenimiento_sin_respuesta: 0,
+          contrato_anexos_sin_enviar: 0,
         };
         rows.forEach(function (row) {
           var type = String(row.tipo_vencimiento || "");
@@ -3645,6 +3678,8 @@
         if (type === "no_prorroga_contrato_pendiente") return "No prórroga de contrato";
         if (type === "cotizacion_sin_enviar") return "Cotizaciones sin enviar";
         if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
+        if (type === "orden_mantenimiento_sin_respuesta") return "Órdenes de mantenimiento sin respuesta";
+        if (type === "contrato_anexos_sin_enviar") return "Contratos de arrendamiento sin enviar";
         return type || "Vencimientos";
       }
 
