@@ -13,9 +13,9 @@ final class PendingView
 
   // Servicios Publicos ---------------------------------------------------------
 
-  public function renderServiciosPublicosPanel(array $filters, array $items, int $count, string $corte, array $configurationItems = []): string
+  public function renderServiciosPublicosPanel(array $filters, array $items, int $count, string $corte, array $configurationItems = [], int $overdue = 0): string
   {
-    return PublicServicesUi::render('panel', compact('filters','items','count','corte','configurationItems') + ['view'=>$this]);
+    return PublicServicesUi::render('panel', compact('filters','items','count','corte','configurationItems','overdue') + ['view'=>$this]);
   }
 
   public function renderReportesAdministrativosPanel(array $filters, array $funcionarios, array $items, int $count): string
@@ -201,9 +201,9 @@ final class PendingView
     return PreventiveWorkspace::render('kpis', compact('count', 'corte', 'items'));
   }
 
-  public function renderServiciosPublicosKpis(int $count, string $corte, array $items = [], array $configurationItems = []): string
+  public function renderServiciosPublicosKpis(int $count, string $corte, array $items = [], array $configurationItems = [], int $overdue = 0): string
   {
-    return PublicServicesUi::render('kpis', compact('count','corte','items','configurationItems'));
+    return PublicServicesUi::render('kpis', compact('count','corte','items','configurationItems','overdue'));
   }
 
   public function renderReportesAdministrativosTable(array $items): string

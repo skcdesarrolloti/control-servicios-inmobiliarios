@@ -1877,7 +1877,7 @@ trait HandlesTicketWorkflowActions
     $controller = $this->get_pending_controller();
     $payload = $controller->buildServiciosPublicosPayload($_POST);
     $view = new \SCM\Modules\Pending\PendingView();
-    $kpis = $view->renderServiciosPublicosKpis((int)($payload['count'] ?? 0), (string)($payload['corte'] ?? ''), (array)($payload['items'] ?? []), (array)($payload['configuration_items'] ?? []));
+    $kpis = $view->renderServiciosPublicosKpis((int)($payload['count'] ?? 0), (string)($payload['corte'] ?? ''), (array)($payload['items'] ?? []), (array)($payload['configuration_items'] ?? []), (int)($payload['overdue_count'] ?? 0));
     $table = $view->renderServiciosPublicosTable((array)($payload['items'] ?? []), (array) ($payload['configuration_items'] ?? []));
     $this->jsonOk([
       'kpis_html' => $kpis,
@@ -2509,7 +2509,8 @@ trait HandlesTicketWorkflowActions
       $item = (array) $item;
       $row = (array) ($item['row'] ?? []);
       $dueTs = (int) ($item['due'] ?? 0);
-      if ($dueTs <= 0) {
+      // Con caso preventivo activo, el contrato ya se controla en sus etapas (sin cita, cita sin realizar, sin enviar).
+      if ($dueTs <= 0 || is_array($item['ticket'] ?? null)) {
         continue;
       }
       $calendarTs = $this->adminDueCalendarPlacementTimestamp($dueTs, $fromTs, $toTs);
@@ -2518,21 +2519,18 @@ trait HandlesTicketWorkflowActions
       }
       $contractPk = trim((string) ($row['_ID'] ?? ''));
       $contractCode = trim((string) ($row['contrato'] ?? $contractPk));
-      $ticket = is_array($item['ticket'] ?? null) ? (array) $item['ticket'] : [];
       $items[] = $this->adminDueEvent([
         'id' => 'prev-pendiente-' . ($contractPk !== '' ? $contractPk : md5((string) json_encode($row))),
         'type' => 'preventiva_pendiente',
         'group' => 'Preventivas pendientes',
         'title' => 'Preventiva pendiente contrato #' . ($contractCode !== '' ? $contractCode : '-'),
-        'description' => empty($ticket) ? 'Contrato pendiente para crear caso preventivo.' : 'Contrato con caso preventivo activo.',
+        'description' => 'Contrato pendiente para crear caso preventivo.',
         'color' => '#14b8a6',
         'base_ts' => (int) ($item['ultima'] ?? 0),
         'due_ts' => $dueTs,
         'calendar_ts' => $calendarTs,
         'days_limit' => 0,
-        'case' => !empty($ticket)
-          ? $this->adminDueLightCaseDataFromPreventivaTicket($ticket, 'preventiva_pendiente')
-          : $this->adminDueLightCreatePreventivaTicketData($row, $item),
+        'case' => $this->adminDueLightCreatePreventivaTicketData($row, $item),
       ]);
     }
     return $items;

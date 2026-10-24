@@ -50,7 +50,8 @@ final class PendingController
       (array) ($payload['items'] ?? []),
       (int) ($payload['count'] ?? 0),
       (string) ($payload['corte'] ?? ''),
-      (array) ($payload['configuration_items'] ?? [])
+      (array) ($payload['configuration_items'] ?? []),
+      (int) ($payload['overdue_count'] ?? 0)
     );
   }
 
@@ -174,6 +175,7 @@ final class PendingController
       'filters' => $filters,
       'items' => (array) ($data['items'] ?? []),
       'configuration_items' => (array) ($data['configuration_items'] ?? []),
+      'overdue_count' => (int) ($data['overdue_count'] ?? 0),
       'funcionarios' => (array) ($data['funcionarios'] ?? []),
       'count' => count((array) ($data['items'] ?? [])),
       'corte' => (string) ($data['corte'] ?? ''),

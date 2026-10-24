@@ -167,6 +167,10 @@ trait PendingQueriesConcern
 
     $items = [];
     $configurationItems = [];
+    // Pendientes hasta la fecha: misma regla que Vencimientos administrativos (desde enero, antes de hoy), sin filtro de mes/año.
+    $overdueFromTs = mktime(0, 0, 0, 1, 1, $year);
+    $todayTs = strtotime(date('Y-m-d 00:00:00', $nowTs)) ?: $nowTs;
+    $overdueCount = 0;
     foreach ($rows as $row) {
       if (empty($this->availablePublicServices($row))) {
         $configurationItems[] = ['row' => $row, 'ultima' => 0, 'due' => 0, 'needs_service_configuration' => true];
@@ -197,6 +201,9 @@ trait PendingQueriesConcern
       $manualDue = $this->parseTs($row['proxima_revision_servicios'] ?? null);
       if ($manualDue > 0) { $dueTs = $manualDue; }
       $dueMonth = $dueTs > 0 ? (int) date('n', $dueTs) : 0;
+      if ($dueTs >= $overdueFromTs && $dueTs < $todayTs) {
+        $overdueCount++;
+      }
 
       if ($fMes > 0 && $fMes !== $dueMonth) {
         continue;
@@ -237,6 +244,7 @@ trait PendingQueriesConcern
     return [
       'items' => $items,
       'configuration_items' => $configurationItems,
+      'overdue_count' => $overdueCount,
       'funcionarios' => $funcionarios,
       'corte' => $corte,
     ];

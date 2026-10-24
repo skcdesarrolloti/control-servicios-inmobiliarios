@@ -629,11 +629,12 @@
       return stats;
     }
 
+    // El total en control solo cuenta obligaciones ya vencidas; lo que vence hoy o más adelante se informa aparte.
     function dashboardDueTotal(rows, summaryGroups) {
       rows = Array.isArray(rows) ? rows : [];
       summaryGroups = Array.isArray(summaryGroups) ? summaryGroups : [];
-      return rows.length + summaryGroups.reduce(function (total, group) {
-        return total + Math.max(0, Number(group && group.count ? group.count : 0));
+      return dashboardDueStats(rows).vencidos + summaryGroups.reduce(function (total, group) {
+        return total + Math.max(0, Number(group && group.vencidos ? group.vencidos : 0));
       }, 0);
     }
 
@@ -946,22 +947,28 @@
       });
       var stats = dashboardDueStats(rows);
       var groups = {};
+      var upcomingByType = {};
       var summaryByType = {};
       rows.forEach(function (row) {
         var type = String(row.tipo_vencimiento || "otros");
         if (!groups[type]) groups[type] = 0;
-        groups[type] += 1;
+        if (!upcomingByType[type]) upcomingByType[type] = 0;
+        if (String(row.estado || "").toLowerCase() === "vencido") groups[type] += 1;
+        else upcomingByType[type] += 1;
       });
       summaryGroups.forEach(function (group) {
         var type = String(group && group.type ? group.type : "");
         var count = Math.max(0, Number(group && group.count ? group.count : 0));
+        var vencidos = Math.max(0, Number(group && group.vencidos ? group.vencidos : 0));
         if (!type) return;
         summaryByType[type] = group || {};
-        groups[type] = count;
+        groups[type] = vencidos;
+        upcomingByType[type] = Math.max(0, count - vencidos);
         stats.total += count;
-        stats.vencidos += Math.max(0, Number(group && group.vencidos ? group.vencidos : 0));
+        stats.vencidos += vencidos;
         stats.hoy += Math.max(0, Number(group && group.hoy ? group.hoy : 0));
       });
+      var upcomingCount = Math.max(0, stats.total - stats.vencidos - stats.hoy);
       var groupOrder = [
         "preventiva_pendiente",
         "ticket_preventiva_sin_cita",
@@ -982,7 +989,7 @@
         var buttonHtml = targetTab
           ? '<button type="button" class="scm-due-entry-group-link" data-scm-dashboard-due-open-admin-tab="' + escHtml(targetTab) + '">Ver pestaña <span class="material-symbols-outlined">chevron_right</span></button>'
           : "";
-        return '<div class="scm-due-entry-group-card scm-due-entry-group-card--' + escHtml(type) + '"><div><span>' + escHtml(dashboardDueTypeLabel(type)) + '</span><strong>' + escHtml(String(groups[type] || 0)) + '</strong></div>' + buttonHtml + '</div>';
+        return '<div class="scm-due-entry-group-card scm-due-entry-group-card--' + escHtml(type) + '"><div><span>' + escHtml(dashboardDueTypeLabel(type)) + '</span><strong>' + escHtml(String(groups[type] || 0)) + '</strong>' + (upcomingByType[type] ? '<small>+' + escHtml(String(upcomingByType[type])) + ' por vencer este mes</small>' : '') + '</div>' + buttonHtml + '</div>';
       }).join("");
       function formatDuePopupDate(value) {
         var raw = String(value || "").slice(0, 10);
@@ -1012,11 +1019,11 @@
       return '<div class="scm-due-entry-popup">' +
         '<div class="scm-due-entry-head"><div class="scm-due-entry-head-icon"><span class="material-symbols-outlined">schedule</span><i></i></div><div><h3>Vencimientos administrativos</h3><p>Control preventivo de tareas operativas.</p></div><strong>Urgente</strong></div>' +
         '<div class="scm-due-entry-kpis">' +
-        '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--total"><div><span>Total en control</span><strong>' + escHtml(String(stats.total || 0)) + "</strong><small>Obligaciones asignadas</small></div><i class=\"material-symbols-outlined\">assignment</i></div>" +
-        '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--late"><div><span>Vencidos</span><strong>' + escHtml(String(stats.vencidos || 0)) + "</strong><small>Superaron el tiempo máximo</small></div><i class=\"material-symbols-outlined\">warning</i></div>" +
+        '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--late"><div><span>Total en control</span><strong>' + escHtml(String(stats.vencidos || 0)) + "</strong><small>Vencidos a la fecha</small></div><i class=\"material-symbols-outlined\">warning</i></div>" +
         '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--today"><div><span>Vencen hoy</span><strong>' + escHtml(String(stats.hoy || 0)) + "</strong><small>Atención inmediata prioritaria</small></div><i class=\"material-symbols-outlined\">schedule</i></div>" +
+        '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--total"><div><span>Próximos este mes</span><strong>' + escHtml(String(upcomingCount)) + "</strong><small>Aún dentro del plazo</small></div><i class=\"material-symbols-outlined\">assignment</i></div>" +
         "</div>" +
-        '<h4 class="scm-due-entry-section-title">Desglose por tipo de tarea pendiente</h4>' +
+        '<h4 class="scm-due-entry-section-title">Vencidos por tipo de tarea pendiente</h4>' +
         '<div class="scm-due-entry-groups">' + groupHtml + "</div>" +
         '<div class="scm-due-entry-list-head"><div><h4>Casos con mayor tiempo de atraso</h4><p>Ordenados cronológicamente por antigüedad de vencimiento</p></div><span>Mostrando ' + escHtml(String(Math.min(rows.length, 18))) + " de " + escHtml(String(stats.vencidos || 0)) + " casos vencidos</span></div>" +
         '<div class="scm-due-entry-list">' + detailRows + "</div>" +
