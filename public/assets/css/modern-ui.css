@@ -2290,6 +2290,13 @@ body,
 
 #scm-app .scm-psl {
   font-family: 'Poppins', sans-serif !important;
+  padding: 20px 24px;
+}
+
+@media (max-width: 640px) {
+  #scm-app .scm-psl {
+    padding: 12px;
+  }
 }
 
 #scm-app .scm-psl-selected {
