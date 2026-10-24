@@ -7,6 +7,9 @@ namespace SCM\App\Concerns;
 use SCM\Core\App;
 use SCM\Core\Auth;
 use SCM\Modules\CanonInsuranceAudit\SpreadsheetReader;
+use SCM\Modules\Tools\CleaningCalculator;
+use SCM\Modules\Tools\CleaningQuotePdf;
+use SCM\Modules\Tools\CleaningSettings;
 use SCM\Modules\Tools\LateFeeCalculator;
 use SCM\Modules\Tools\MarketStatsService;
 use SCM\Modules\Tools\PseArchive;
@@ -14,7 +17,7 @@ use SCM\Modules\Tools\PsePaymentFile;
 use SCM\Modules\Tools\SuperfinRateService;
 use SCM\Modules\Tools\ToolsView;
 
-/** Herramientas del encabezado: Generar PSE, Calculadora de mora y Calculadora de mercado. */
+/** Herramientas del encabezado: Generar PSE, Calculadora de mora, Calculadora de mercado y Calculadora de aseo. */
 trait HandlesTools
 {
   /** Formulario de Generar PSE prellenado con la última generación llevada al mes actual. */
@@ -147,6 +150,92 @@ trait HandlesTools
       // El listado de inmuebles (códigos y barrios) solo viaja a quien tiene la vista completa.
       'items' => $admin ? array_map(static fn(array $item): array => ['precio' => round($item['precio'], 2), 'area' => round($item['area'], 2), 'm2' => round($item['m2'], 2)] + $item, $result['items']) : [],
     ]);
+  }
+
+  /** Costos, márgenes, utilidades y los PDF internos de la calculadora de aseo. */
+  private function canSeeCleaningInternal(): bool
+  {
+    return $this->canUseDashboardAction('cleaning_internal_view') || $this->canManageDashboardPermissions();
+  }
+
+  /** @return array<string,string> */
+  private function cleaningInput(): array
+  {
+    $input = [];
+    foreach (['m2', 'jornada', 'distancia', 'dificultad', 'trabajador', 'cliente', 'direccion'] as $key) {
+      $input[$key] = trim(sanitize_text_field(wp_unslash((string) ($_POST[$key] ?? ''))));
+    }
+    return $input;
+  }
+
+  public function ajax_handler_tools_cleaning_calculate(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('herramienta_aseo')) $this->jsonFail('No tienes permiso para usar la calculadora de aseo.');
+    $result = [];
+    try {
+      $result = CleaningCalculator::calculate((new CleaningSettings($this->db))->read(), $this->cleaningInput());
+    } catch (\InvalidArgumentException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      error_log('[tools-cleaning] ' . $error->getMessage());
+      $this->jsonFail('No se pudo calcular el servicio de aseo.');
+    }
+    $internal = $this->canSeeCleaningInternal();
+    $public = ['input', 'horas', 'protocolo', 'base', 'iva', 'total', 'cliente'];
+    // Costos, márgenes y utilidades solo viajan a quien tiene la vista interna.
+    $this->jsonOk(['internal' => $internal, 'result' => $internal ? $result : array_intersect_key($result, array_flip($public))]);
+  }
+
+  public function ajax_handler_tools_cleaning_pdf(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('herramienta_aseo')) $this->jsonFail('No tienes permiso para usar la calculadora de aseo.');
+    $mode = sanitize_key((string) ($_POST['mode'] ?? 'cliente'));
+    if (!isset(CleaningQuotePdf::MODES[$mode])) $this->jsonFail('Tipo de PDF no válido.');
+    if (in_array($mode, CleaningQuotePdf::INTERNAL_MODES, true) && !$this->canSeeCleaningInternal()) $this->jsonFail('Tu cargo no tiene permiso para los reportes internos de aseo.');
+    $bytes = '';
+    try {
+      $config = (new CleaningSettings($this->db))->read();
+      $input = $this->cleaningInput();
+      $result = CleaningCalculator::calculate($config, $input);
+      $bytes = CleaningQuotePdf::bytes($mode, $result, $config, ['cliente' => $input['cliente'], 'direccion' => $input['direccion']], (string) ($this->ticketCompletionActor()['name'] ?? ''));
+    } catch (\InvalidArgumentException | \DomainException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      error_log('[tools-cleaning-pdf] ' . $error->getMessage());
+      $this->jsonFail('No se pudo generar el PDF.');
+    }
+    if (ob_get_level() > 0) ob_end_clean();
+    header_remove('Content-Type');
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="aseo-' . $mode . '-' . date('Y-m-d') . '.pdf"');
+    header('Content-Length: ' . (string) strlen($bytes));
+    header('Cache-Control: private, max-age=0, must-revalidate');
+    echo $bytes;
+    exit;
+  }
+
+  public function ajax_handler_tools_cleaning_settings(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('cleaning_configure', 'Tu cargo no tiene permiso para configurar la calculadora de aseo.');
+    $settings = new CleaningSettings($this->db);
+    $view = new ToolsView();
+    try {
+      if (($_POST['mode'] ?? '') === 'save') {
+        $input = json_decode(wp_unslash((string) ($_POST['settings'] ?? '')), true);
+        if (!is_array($input)) throw new \InvalidArgumentException('No se recibió la configuración.');
+        $saved = $settings->save($input, (string) ($this->ticketCompletionActor()['employee_id'] ?? ''));
+        $this->jsonOk(['html' => $view->cleaningSettingsForm($saved), 'message' => 'Configuración de aseo guardada. Recarga la calculadora para usar los nuevos valores.']);
+      }
+      $this->jsonOk(['html' => $view->cleaningSettingsForm($settings->read())]);
+    } catch (\InvalidArgumentException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      error_log('[tools-cleaning-settings] ' . $error->getMessage());
+      $this->jsonFail('No se pudo guardar la configuración de aseo.');
+    }
   }
 
   public function ajax_handler_tools_mora_rate(): void

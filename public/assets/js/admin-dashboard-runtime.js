@@ -151,6 +151,7 @@
         rent_increase_letter_create: "[data-rent-increase-open]",
         owner_credit_manage: "[data-owner-credit-new]",
         owner_credit_configure: "[data-owner-credit-settings]",
+        cleaning_configure: "[data-cleaning-settings]",
         collection_import: "[data-scm-portfolio-import]",
         collection_action: "[data-scm-portfolio-management], [data-scm-portfolio-letter], [data-scm-portfolio-bulkbar], [data-scm-portfolio-bulk-check], [data-scm-portfolio-reset]",
         canon_audit_import: "[data-cia-upload-form], [data-cia-upload-button]",
@@ -25897,6 +25898,7 @@
         activePanel.id !== "scm-panel-herramienta-pse" &&
         activePanel.id !== "scm-panel-herramienta-mora" &&
         activePanel.id !== "scm-panel-herramienta-mercado" &&
+        activePanel.id !== "scm-panel-herramienta-aseo" &&
         !dashboardFilterOptionsLoaded &&
         !skipFilterOptions
       ) {

@@ -191,6 +191,10 @@ trait RendersDashboard
       'calculadora_mercado' => 'scm-panel-herramienta-mercado',
       'mercado' => 'scm-panel-herramienta-mercado',
       'scm-panel-herramienta-mercado' => 'scm-panel-herramienta-mercado',
+      'herramienta_aseo' => 'scm-panel-herramienta-aseo',
+      'calculadora_aseo' => 'scm-panel-herramienta-aseo',
+      'aseo' => 'scm-panel-herramienta-aseo',
+      'scm-panel-herramienta-aseo' => 'scm-panel-herramienta-aseo',
       'ocupaciones' => 'scm-panel-movimientos-contratos',
       'desocupaciones' => 'scm-panel-movimientos-contratos',
       'ocupaciones_vs_desocupaciones' => 'scm-panel-movimientos-contratos',
@@ -406,6 +410,7 @@ trait RendersDashboard
       'scm-panel-herramienta-pse' => 'herramienta_pse',
       'scm-panel-herramienta-mora' => 'herramienta_mora',
       'scm-panel-herramienta-mercado' => 'herramienta_mercado',
+      'scm-panel-herramienta-aseo' => 'herramienta_aseo',
     ];
     if ($initialTab !== '') {
       $initialTabPermissionKey = $dashboardPanelToTab[$initialTab] ?? '';
@@ -1436,6 +1441,11 @@ trait RendersDashboard
           <?php echo (new \SCM\Modules\Tools\ToolsView())->market($this->canSeeMarketStatsAdmin()); ?>
         </div>
         <?php endif; ?>
+        <?php if (in_array('herramienta_aseo', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-herramienta-aseo' ? ' active' : ''; ?>" id="scm-panel-herramienta-aseo" data-permission-tab="herramienta_aseo" data-scm-loaded="0">
+          <?php echo (new \SCM\Modules\Tools\ToolsView())->cleaning($this->canSeeCleaningInternal(), (new \SCM\Modules\Tools\CleaningSettings($this->db))->read()); ?>
+        </div>
+        <?php endif; ?>
       <?php endif; ?>
 
       <?php echo \SCM\Views\GuideModalView::render(); ?>
@@ -1880,6 +1890,7 @@ trait RendersDashboard
         'herramienta_pse' => '',
         'herramienta_mora' => '',
         'herramienta_mercado' => '',
+        'herramienta_aseo' => '',
       ]],
       ['label' => 'Métricas', 'tabs' => [
         'metricas_casos' => '',

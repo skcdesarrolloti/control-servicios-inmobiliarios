@@ -3,6 +3,7 @@
 
   // Herramientas del encabezado (src/Modules/Tools/ToolsView.php):
   // - Calculadora de mercado: estadística del precio por m² de la tabla de inmuebles.
+  // - Calculadora de aseo: cotización por m², jornada, distancia y dificultad; su configuración va en el encabezado.
   // - Generar PSE: sube el Excel de facturación al servidor, que arma los dos .txt y los guarda en el archivador.
   // - Calculadora de mora: copia de herramientas/cal-mora/assets/js/app.js; el cálculo y la tasa SFC se piden
   //   al servidor y el Excel y los PDF se resuelven en el navegador (SheetJS y jsPDF, mismas versiones).
@@ -64,6 +65,9 @@
     if (mora) initMora(mora, post);
     var market = root.querySelector('[data-scm-tool="market"]');
     if (market) initMarket(market, core, post);
+    var cleaning = root.querySelector('[data-scm-tool="cleaning"]');
+    if (cleaning) initCleaning(cleaning, request, post);
+    initCleaningSettings(root, post);
     // Si la página abrió directo en una herramienta, el runtime pudo pedir la carga antes de este script.
     [pse, mora, market].forEach(function (module) {
       var panel = module && module.closest(".scm-tab-panel");
@@ -1807,6 +1811,208 @@
       if (module.dataset.scmLoaded === "1") return;
       module.dataset.scmLoaded = "1";
       loadOptions();
+    });
+  }
+
+  // ── Calculadora de aseo (antes plugin "Calculadora de Aseo Universal") ─────────────────────────
+  // El cálculo y los PDF se hacen en el servidor (CleaningCalculator / CleaningQuotePdf); los costos y
+  // utilidades solo llegan con el permiso de vista interna.
+  function initCleaning(module, request, post) {
+    var form = module.querySelector("[data-cleaning-form]");
+    var result = module.querySelector("[data-cleaning-result]");
+    var status = module.querySelector("[data-cleaning-status]");
+    var protocol = module.querySelector("[data-cleaning-protocol]");
+    var level = module.querySelector("[data-cleaning-level]");
+    var submit = module.querySelector("[data-cleaning-submit]");
+    var money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+    var calculated = false;
+
+    function toggleProtocol() {
+      protocol.classList.toggle("!sp-hidden", Number(level.value) < 4);
+    }
+
+    function setPdfEnabled(enabled) {
+      module.querySelectorAll("[data-cleaning-pdf]").forEach(function (button) { button.disabled = !enabled; });
+    }
+
+    function row(label, value, classes) {
+      return '<tr class="!sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0 ' + (classes || "") + '"><th class="!sp-py-2 !sp-pr-3 !sp-text-left !sp-text-xs !sp-font-medium">' + label + '</th><td class="!sp-py-2 !sp-text-right !sp-text-xs !sp-font-semibold !sp-whitespace-nowrap">' + value + "</td></tr>";
+    }
+
+    function block(title, rows, tone) {
+      return '<div class="!sp-p-4 !sp-rounded-xl !sp-border !sp-border-solid ' + (tone || "!sp-bg-slate-50 !sp-border-slate-200") + '"><h4 class="!sp-m-0 !sp-mb-2 !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide">' + title + '</h4><table class="!sp-w-full !sp-border-collapse"><tbody>' + rows + "</tbody></table></div>";
+    }
+
+    function render(data) {
+      var r = data.result;
+      var lines = r.cliente;
+      var html = '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-3">' +
+        '<div class="!sp-p-4 !sp-rounded-xl !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200"><p class="!sp-m-0 !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-text-service-muted">Subtotal (sin IVA)</p><p class="!sp-m-0 !sp-mt-1 !sp-text-lg !sp-font-extrabold">' + money.format(r.base) + "</p></div>" +
+        '<div class="!sp-p-4 !sp-rounded-xl !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200"><p class="!sp-m-0 !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-text-service-muted">IVA</p><p class="!sp-m-0 !sp-mt-1 !sp-text-lg !sp-font-extrabold">' + money.format(r.iva) + "</p></div>" +
+        '<div class="!sp-p-4 !sp-rounded-xl !sp-bg-service-navy"><p class="!sp-m-0 !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-text-service-yellow">Total cliente</p><p class="!sp-m-0 !sp-mt-1 !sp-text-lg !sp-font-extrabold !sp-text-white">' + money.format(r.total) + "</p></div></div>" +
+        '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-2 !sp-gap-3">' +
+        block("Lo que ve el cliente", row("Servicio de limpieza", money.format(lines.servicio)) + row("Transporte", money.format(lines.transporte)) + row("Insumos profesionales", money.format(lines.insumos)) + row("Subtotal", money.format(r.base), "!sp-font-bold") + row("IVA", money.format(r.iva)) + row("Total a pagar", money.format(r.total), "!sp-font-bold"));
+      if (data.internal) {
+        html += block("Costos y márgenes", row("Mano de obra (" + String(r.horas).replace(".", ",") + " h)", money.format(r.mano_obra)) + row("Transporte", money.format(r.transporte)) + row("Insumos", money.format(r.insumos)) + row("Costo directo", money.format(r.costo_directo), "!sp-font-bold") + row("Precio contratista", money.format(r.precio_contratista)) + row("Utilidad inmobiliaria", money.format(r.utilidad_inmobiliaria), "!sp-text-emerald-800"), "!sp-bg-white !sp-border-slate-200") +
+          "</div>" +
+          block(r.input.trabajador === "contratista" ? "Costos reales contratista" : "Utilidad real (funcionario)", row("Costo mano de obra real", money.format(r.real_mano_obra)) + row("Auxilio de transporte real", money.format(r.real_transporte)) + row("Insumos", money.format(r.insumos)) + row("Utilidad real del servicio", money.format(r.utilidad_real), "!sp-font-bold !sp-text-emerald-800"), "!sp-bg-amber-50 !sp-border-amber-200");
+      } else {
+        html += "</div>";
+      }
+      result.innerHTML = '<div class="!sp-space-y-3">' + html + "</div>";
+    }
+
+    function requestPdf(mode, button) {
+      var data = new FormData(form);
+      data.append("mode", mode);
+      button.disabled = true;
+      status.textContent = "Generando PDF…";
+      request("scm_tools_cleaning_pdf", data)
+        .then(function (response) {
+          var type = response.headers.get("Content-Type") || "";
+          if (type.indexOf("application/json") !== -1) {
+            return response.json().then(function (json) { throw new Error((json && json.data && json.data.message) || "No se pudo generar el PDF."); });
+          }
+          if (!response.ok) throw new Error("No se pudo generar el PDF.");
+          return response.blob();
+        })
+        .then(function (blob) {
+          var link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = "aseo-" + mode + "-" + new Date().toISOString().slice(0, 10) + ".pdf";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.setTimeout(function () { URL.revokeObjectURL(link.href); }, 1000);
+          status.textContent = "";
+        })
+        .catch(function (error) { status.textContent = error.message; })
+        .finally(function () { button.disabled = false; });
+    }
+
+    level.addEventListener("change", toggleProtocol);
+    // Si cambia un dato después de calcular, el PDF quedaría desactualizado: se pide calcular de nuevo.
+    form.addEventListener("input", function () {
+      if (!calculated) return;
+      calculated = false;
+      setPdfEnabled(false);
+      status.textContent = "Cambiaste los datos: calcula de nuevo para generar los PDF.";
+    });
+    form.addEventListener("change", function (event) {
+      if (event.target === level || !calculated) return;
+      calculated = false;
+      setPdfEnabled(false);
+      status.textContent = "Cambiaste los datos: calcula de nuevo para generar los PDF.";
+    });
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      toggleProtocol();
+      submit.disabled = true;
+      status.textContent = "Calculando…";
+      post("scm_tools_cleaning_calculate", new FormData(form))
+        .then(function (data) {
+          render(data);
+          calculated = true;
+          setPdfEnabled(true);
+          status.textContent = "";
+        })
+        .catch(function (error) {
+          status.textContent = error.message;
+          setPdfEnabled(false);
+        })
+        .finally(function () { submit.disabled = false; });
+    });
+    module.addEventListener("click", function (event) {
+      var pdf = event.target.closest("[data-cleaning-pdf]");
+      if (pdf && calculated) requestPdf(pdf.getAttribute("data-cleaning-pdf"), pdf);
+    });
+    toggleProtocol();
+  }
+
+  // Configuración › Calculadora de aseo (menú del encabezado; se oculta sin la acción cleaning_configure).
+  function initCleaningSettings(root, post) {
+    var modal = null;
+
+    function ensureModal() {
+      if (modal) return modal;
+      modal = document.createElement("div");
+      modal.className = "scm-cia-modal";
+      modal.hidden = true;
+      modal.innerHTML =
+        '<div class="scm-cia-modal-backdrop" data-cleaning-settings-close></div>' +
+        '<section tabindex="-1" class="!sp-relative !sp-outline-none !sp-flex !sp-flex-col !sp-w-[min(1100px,calc(100vw-24px))] !sp-max-h-[92vh] !sp-overflow-hidden !sp-rounded-2xl !sp-bg-service-background !sp-border !sp-border-solid !sp-border-slate-200 !sp-shadow-2xl !sp-font-sans" role="dialog" aria-modal="true" aria-labelledby="scm-cleaning-settings-title">' +
+        '<header class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-4 !sp-px-4 sm:!sp-px-6 !sp-py-4 !sp-bg-white !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200">' +
+        '<div><p class="!sp-m-0 !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Configuración</p><h3 id="scm-cleaning-settings-title" class="!sp-m-0 !sp-text-lg !sp-font-bold !sp-text-service-navy">Calculadora de aseo</h3></div>' +
+        '<button type="button" class="!sp-flex !sp-items-center !sp-justify-center !sp-w-9 !sp-h-9 !sp-rounded-full !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-service-navy !sp-text-lg !sp-cursor-pointer hover:!sp-bg-slate-50" data-cleaning-settings-close aria-label="Cerrar">&times;</button></header>' +
+        '<div class="!sp-flex !sp-flex-col !sp-flex-1 !sp-min-h-0" data-cleaning-settings-body></div></section>';
+      root.appendChild(modal);
+      modal.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") close();
+      });
+      modal.addEventListener("click", function (event) {
+        if (event.target.closest("[data-cleaning-settings-close]")) {
+          close();
+          return;
+        }
+        if (event.target.closest("[data-cleaning-add-row]")) {
+          var table = event.target.closest("[data-cleaning-table]");
+          var template = table.querySelector("[data-cleaning-row-template]");
+          table.querySelector("tbody").insertAdjacentHTML("beforeend", template.innerHTML);
+          return;
+        }
+        var remove = event.target.closest("[data-cleaning-remove-row]");
+        if (remove) remove.closest("tr").remove();
+      });
+      modal.addEventListener("submit", function (event) {
+        var form = event.target.closest("[data-cleaning-settings-form]");
+        if (!form) return;
+        event.preventDefault();
+        var settings = {};
+        form.querySelectorAll("[data-cleaning-global]").forEach(function (input) { settings[input.name] = input.value; });
+        form.querySelectorAll("[data-cleaning-table]").forEach(function (table) {
+          settings[table.getAttribute("data-cleaning-table")] = Array.prototype.map.call(table.querySelectorAll("tbody [data-cleaning-row]"), function (tr) {
+            var item = {};
+            tr.querySelectorAll("[data-field]").forEach(function (input) { item[input.getAttribute("data-field")] = input.value; });
+            return item;
+          });
+        });
+        var statusNode = form.querySelector("[data-cleaning-settings-status]");
+        statusNode.textContent = "Guardando…";
+        post("scm_tools_cleaning_settings", { mode: "save", settings: JSON.stringify(settings) })
+          .then(function (data) {
+            show(data.html || "");
+            var saved = modal.querySelector("[data-cleaning-settings-status]");
+            saved.textContent = data.message || "Guardado.";
+            saved.classList.add("!sp-text-emerald-700", "!sp-font-semibold");
+          })
+          .catch(function (error) {
+            statusNode.textContent = error.message;
+            statusNode.classList.add("!sp-text-red-700", "!sp-font-semibold");
+          });
+      });
+      return modal;
+    }
+
+    function show(html) {
+      var box = ensureModal();
+      box.querySelector("[data-cleaning-settings-body]").innerHTML = html;
+      box.hidden = false;
+      document.body.classList.add("scm-cia-modal-open");
+      box.querySelector("section").focus();
+    }
+
+    function close() {
+      if (!modal) return;
+      modal.hidden = true;
+      document.body.classList.remove("scm-cia-modal-open");
+    }
+
+    document.addEventListener("click", function (event) {
+      if (!event.target.closest || !event.target.closest("[data-cleaning-settings]")) return;
+      event.preventDefault();
+      post("scm_tools_cleaning_settings", {})
+        .then(function (data) { show(data.html || ""); })
+        .catch(function (error) { window.alert(error.message); });
     });
   }
 

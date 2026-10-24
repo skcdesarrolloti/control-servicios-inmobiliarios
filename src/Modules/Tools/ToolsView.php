@@ -208,6 +208,118 @@ final class ToolsView
       . '</section>';
   }
 
+  /** Grados de dificultad: recargo y criterio de la guía del plugin. */
+  private const CLEANING_LEVELS = [
+    0 => ['Muy bajo', 'Limpieza de mantenimiento, superficies lisas.'],
+    1 => ['Bajo', 'Polvo y uso normal, poca acumulación.'],
+    2 => ['Medio', 'Suciedad moderada, niños, grasa de cocina.'],
+    3 => ['Medio alto', 'Acumulación visible en cocina y baños.'],
+    4 => ['Alto', 'Suciedad fuerte o post-obra · requiere visita técnica.'],
+    5 => ['Muy alto', 'Abandono prolongado; insumos ×1,5 · requiere visita técnica.'],
+    6 => ['Extremo', 'Riesgo biológico; insumos ×1,5 · requiere visita y acta.'],
+  ];
+
+  /** @param array<string,mixed> $config CleaningSettings::read */
+  public function cleaning(bool $internal, array $config): string
+  {
+    $percent = static fn(float $value): string => rtrim(rtrim(number_format($value * 100, 2, ',', '.'), '0'), ',') . ' %';
+    $jornadas = '';
+    foreach (CleaningCalculator::JORNADAS as $name => $rate) $jornadas .= '<option value="' . self::e($name) . '">' . self::e($name) . ($rate > 0 ? ' (+' . $percent($rate) . ')' : '') . '</option>';
+    $distances = '';
+    foreach ($config['transporte'] as $row) $distances .= '<option value="' . self::e((string) $row['rango']) . '">' . self::e((string) $row['rango']) . ' km</option>';
+    $levels = '';
+    $guide = '';
+    foreach (self::CLEANING_LEVELS as $level => [$name, $detail]) {
+      $levels .= '<option value="' . $level . '"' . ($level === 2 ? ' selected' : '') . '>' . $level . ' · ' . $name . ' (+' . $percent(CleaningCalculator::DIFICULTAD[$level]) . ')</option>';
+      $guide .= '<tr><td class="!sp-py-1.5 !sp-pr-3 !sp-font-bold !sp-whitespace-nowrap">' . $level . ' · ' . $name . '</td><td class="!sp-py-1.5 !sp-pr-3 !sp-whitespace-nowrap">+' . $percent(CleaningCalculator::DIFICULTAD[$level]) . '</td><td class="!sp-py-1.5">' . self::e($detail) . '</td></tr>';
+    }
+    $workers = '';
+    foreach (CleaningCalculator::WORKERS as $key => $label) $workers .= '<option value="' . $key . '">' . self::e($label) . '</option>';
+    $pdf = static fn(string $mode, string $icon, string $label, string $class): string => '<button type="button" class="' . $class . '" data-cleaning-pdf="' . $mode . '" disabled><span class="material-symbols-outlined !sp-text-[17px]" aria-hidden="true">' . $icon . '</span>' . $label . '</button>';
+    $badge = $internal
+      ? '<span class="!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-3 !sp-py-1.5 !sp-rounded-full !sp-bg-service-navy !sp-text-service-yellow !sp-text-[11px] !sp-font-semibold"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">lock_open</span>Vista interna: costos y utilidades</span>'
+      : '';
+
+    return '<section class="!sp-font-sans !sp-text-service-navy !sp-bg-service-background !sp-p-3 sm:!sp-p-5 !sp-space-y-5" data-scm-tool="cleaning" data-scm-loaded="0">'
+      . $this->header('cleaning_services', 'Calculadora de aseo', 'Cotiza el servicio de aseo por m², jornada, distancia y dificultad · Tarifas y márgenes en Configuración › Calculadora de aseo', $badge)
+      . '<div class="!sp-grid !sp-grid-cols-1 xl:!sp-grid-cols-12 !sp-gap-5 !sp-items-start">'
+      . '<form class="' . UI::CARD . ' !sp-p-5 xl:!sp-col-span-5 !sp-space-y-4" data-cleaning-form autocomplete="off">'
+      . '<div class="' . self::SECTION_HEAD . ' !sp-mb-0"><h3 class="' . self::SECTION_TITLE . '"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">tune</span>Datos del servicio</h3></div>'
+      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">'
+      . $this->field('Metros cuadrados (m²)', '<input class="' . UI::INPUT . '" type="text" inputmode="decimal" name="m2" value="60" required>')
+      . $this->field('Jornada', '<select class="' . UI::INPUT . '" name="jornada">' . $jornadas . '</select>')
+      . $this->field('Distancia', '<select class="' . UI::INPUT . '" name="distancia">' . $distances . '</select>')
+      . $this->field('Grado de dificultad', '<select class="' . UI::INPUT . '" name="dificultad" data-cleaning-level>' . $levels . '</select>')
+      . '<div class="sm:!sp-col-span-2">' . $this->field('Tipo de trabajador', '<select class="' . UI::INPUT . '" name="trabajador">' . $workers . '</select>') . '</div>'
+      . $this->field('Cliente (opcional, sale en el PDF)', '<input class="' . UI::INPUT . '" type="text" name="cliente" maxlength="120" placeholder="Nombre del cliente">')
+      . $this->field('Inmueble / dirección (opcional)', '<input class="' . UI::INPUT . '" type="text" name="direccion" maxlength="160" placeholder="Dirección del servicio">')
+      . '</div>'
+      . '<p class="!sp-hidden !sp-m-0 !sp-p-3 !sp-rounded-lg !sp-bg-red-50 !sp-border !sp-border-solid !sp-border-red-200 !sp-text-[11px] !sp-text-red-800" data-cleaning-protocol role="alert"><strong>Protocolo de seguridad:</strong> los grados 4, 5 y 6 requieren visita técnica previa o registro fotográfico detallado antes de confirmar el servicio.</p>'
+      . '<details class="!sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-slate-50 !sp-p-3"><summary class="!sp-cursor-pointer !sp-text-xs !sp-font-semibold">Guía de grados de dificultad</summary><table class="!sp-w-full !sp-mt-2 !sp-border-collapse !sp-text-[11px]"><tbody>' . $guide . '</tbody></table></details>'
+      . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-3"><button class="' . UI::PRIMARY . '" type="submit" data-cleaning-submit><span class="material-symbols-outlined !sp-text-[18px]" aria-hidden="true">calculate</span>Calcular costo</button>'
+      . '<span class="!sp-text-[11px] !sp-text-service-muted" role="status" data-cleaning-status></span></div>'
+      . '</form>'
+      . '<section class="' . UI::CARD . ' !sp-p-5 xl:!sp-col-span-7 !sp-space-y-4">'
+      . '<div class="' . self::SECTION_HEAD . ' !sp-mb-0"><h3 class="' . self::SECTION_TITLE . '"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">receipt_long</span>Resultado</h3>'
+      . '<div class="!sp-flex !sp-flex-wrap !sp-gap-2">' . $pdf('cliente', 'picture_as_pdf', 'PDF cliente', UI::NAVY . ' !sp-text-xs disabled:!sp-opacity-50')
+      . ($internal ? $pdf('inmobiliaria', 'analytics', 'PDF inmobiliaria', UI::SECONDARY . ' disabled:!sp-opacity-50') . $pdf('funcionario', 'badge', 'PDF funcionario', UI::SECONDARY . ' disabled:!sp-opacity-50') : '')
+      . '</div></div>'
+      . '<div data-cleaning-result><p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">Ingresa los datos y calcula para ver el valor del servicio.</p></div>'
+      . '</section></div></section>';
+  }
+
+  /** @param array<string,mixed> $config CleaningSettings::read */
+  public function cleaningSettingsForm(array $config): string
+  {
+    $fields = '';
+    foreach (CleaningSettings::GLOBALS as $key => [$label, , $percent]) {
+      $value = (float) ($config[$key] ?? 0);
+      $shown = $percent ? rtrim(rtrim(number_format($value * 100, 4, ',', ''), '0'), ',') : rtrim(rtrim(number_format($value, 4, ',', ''), '0'), ',');
+      $hint = match ($key) {
+        'salario' => 'Valor compartido: también lo usan actas de cierre, reportes administrativos y revisiones.',
+        'factor_prestacional' => 'Divide la mano de obra para el costo real del funcionario.',
+        'valor_pasaje_trans' => 'El auxilio del trabajador es el 50 % de dos pasajes.',
+        default => $percent ? 'En porcentaje (19 = 19 %).' : '',
+      };
+      $fields .= '<label class="!sp-block"><span class="' . UI::LABEL . '">' . self::e($label) . ($percent ? ' (%)' : '') . '</span><input class="' . UI::INPUT . '" type="text" inputmode="decimal" name="' . $key . '" value="' . self::e($shown) . '" data-cleaning-global>'
+        . ($hint !== '' ? '<span class="!sp-block !sp-mt-1 !sp-text-[10px] !sp-text-service-muted">' . self::e($hint) . '</span>' : '') . '</label>';
+    }
+    $table = function (string $key, string $title, string $note, array $columns) use ($config): string {
+      $head = '';
+      foreach ($columns as [$label]) $head .= '<th class="!sp-px-2 !sp-py-2 !sp-text-left !sp-text-[9px] !sp-uppercase !sp-tracking-wide !sp-font-bold !sp-text-service-muted">' . $label . '</th>';
+      $template = '<tr data-cleaning-row>';
+      foreach ($columns as [, $field, $mode]) $template .= '<td class="!sp-px-2 !sp-py-1.5"><input class="' . UI::INPUT . ' !sp-h-8" type="text"' . ($mode === 'number' ? ' inputmode="decimal"' : '') . ' data-field="' . $field . '" value="{' . $field . '}"></td>';
+      $template .= '<td class="!sp-px-2 !sp-py-1.5 !sp-text-right"><button type="button" class="!sp-inline-flex !sp-items-center !sp-justify-center !sp-w-8 !sp-h-8 !sp-rounded-md !sp-bg-white !sp-border !sp-border-solid !sp-border-red-200 !sp-text-red-700 !sp-cursor-pointer hover:!sp-bg-red-50" data-cleaning-remove-row aria-label="Quitar fila"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">delete</span></button></td></tr>';
+      $rows = '';
+      foreach ((array) ($config[$key] ?? []) as $row) {
+        $line = $template;
+        foreach ($columns as [, $field, $mode]) {
+          $value = $row[$field] ?? '';
+          $shown = $mode === 'number' ? rtrim(rtrim(number_format((float) $value, 4, ',', ''), '0'), ',') : (string) $value;
+          $line = str_replace('{' . $field . '}', self::e($shown), $line);
+        }
+        $rows .= $line;
+      }
+      $empty = preg_replace('/value="\{[a-z]+\}"/', 'value=""', $template) ?? $template;
+      return '<section class="!sp-space-y-2" data-cleaning-table="' . $key . '"><div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2"><div><h4 class="!sp-m-0 !sp-text-xs !sp-font-bold">' . $title . '</h4><p class="!sp-m-0 !sp-text-[10px] !sp-text-service-muted">' . $note . '</p></div>'
+        . '<button type="button" class="' . UI::SECONDARY . ' !sp-text-[11px]" data-cleaning-add-row><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">add</span>Agregar fila</button></div>'
+        . '<div class="!sp-overflow-x-auto !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200"><table class="!sp-w-full !sp-border-collapse"><thead class="!sp-bg-slate-50"><tr>' . $head . '<th></th></tr></thead><tbody>' . $rows . '</tbody></table></div>'
+        . '<template data-cleaning-row-template>' . $empty . '</template></section>';
+    };
+
+    return '<form class="!sp-flex !sp-flex-col !sp-min-h-0 !sp-font-sans !sp-text-service-navy" data-cleaning-settings-form autocomplete="off">'
+      . '<div class="!sp-flex-1 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-6">'
+      . '<section class="!sp-space-y-3"><h4 class="!sp-m-0 !sp-text-xs !sp-font-bold">Variables globales</h4><div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-4 !sp-gap-4">' . $fields . '</div></section>'
+      . $table('insumos', 'Insumos', 'Costo por unidad y consumo por m².', [['Nombre', 'nombre', 'text'], ['Unidad', 'unidad', 'text'], ['Costo', 'costo', 'number'], ['Consumo / m²', 'consumo', 'number']])
+      . $table('transporte', 'Tarifas de transporte', 'Valor por trayecto: el cálculo con funcionario cobra ida y regreso (×2).', [['Rango (km)', 'rango', 'text'], ['Valor por trayecto', 'valor', 'number']])
+      . $table('tramos', 'Tramos de m² y horas', 'Cada área usa el primer tramo cuyo "hasta" la cubre; por encima del último se suma 1 hora cada 50 m².', [['Desde (m²)', 'desde', 'number'], ['Hasta (m²)', 'hasta', 'number'], ['Horas', 'horas', 'number']])
+      . '</div>'
+      . '<footer class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-3 !sp-px-4 sm:!sp-px-6 !sp-py-3 !sp-bg-white !sp-border-0 !sp-border-t !sp-border-solid !sp-border-slate-200">'
+      . '<span class="!sp-text-[11px] !sp-text-service-muted" role="status" data-cleaning-settings-status>Se guarda en la misma configuración que usa el plugin de WordPress.</span>'
+      . '<button type="submit" class="' . UI::PRIMARY . '"><span class="material-symbols-outlined !sp-text-[18px]" aria-hidden="true">save</span>Guardar configuración</button></footer>'
+      . '</form>';
+  }
+
   private function header(string $icon, string $title, string $subtitle, string $aside = ''): string
   {
     return '<header class="' . UI::CARD . ' !sp-p-5 !sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-4">'

@@ -315,6 +315,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'herramienta_mora';
   } elseif (in_array($tabParam, ['herramienta_mercado', 'calculadora_mercado', 'mercado', 'scm-panel-herramienta-mercado'], true)) {
     $current_page = 'herramienta_mercado';
+  } elseif (in_array($tabParam, ['herramienta_aseo', 'calculadora_aseo', 'aseo', 'scm-panel-herramienta-aseo'], true)) {
+    $current_page = 'herramienta_aseo';
   } else {
     $current_page = empty($tabParam) ? 'inicio' : 'abiertos';
   }
@@ -341,7 +343,7 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 // 3. Actividades Administrativas (Dropdown: Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
 // 4. Actividades contractuales (Dropdown: Contratos por terminar, Terminación, No prórroga, Funcionario de contratos)
 // 5. Notificaciones
-// 6. Herramientas (Dropdown: Generar PSE, Calculadora de mora, Calculadora de mercado)
+// 6. Herramientas (Dropdown: Generar PSE, Calculadora de mora, Calculadora de mercado, Calculadora de aseo)
 // 7. Métricas (Dropdown: Casos · Mantenimiento › Cotizaciones · Contratos › Ocupaciones, Desocupaciones, Ocupaciones vs Desocupaciones)
 $rawNavItems = [
   'inicio' => [
@@ -655,6 +657,14 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=herramienta_mercado',
         'icon' => 'query_stats',
         'perms' => ['herramienta_mercado'],
+      ],
+      'herramienta_aseo' => [
+        'key' => 'herramienta_aseo',
+        'label' => 'Calculadora de aseo',
+        'panel_id' => 'scm-panel-herramienta-aseo',
+        'url' => $baseUrl . '/index.php?tab=herramienta_aseo',
+        'icon' => 'cleaning_services',
+        'perms' => ['herramienta_aseo'],
       ],
     ],
   ],
@@ -1088,6 +1098,17 @@ foreach ($rawNavItems as $k => $item) {
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">payments</span>
                   <span>Créditos a propietarios</span>
+                </button>
+                <!-- Calculadora de aseo: salario, márgenes, insumos, transporte y tramos; se oculta sin cleaning_configure -->
+                <button
+                  type="button"
+                  data-scm-config-action="cleaning-settings"
+                  data-cleaning-settings
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">cleaning_services</span>
+                  <span>Calculadora de aseo</span>
                 </button>
                 <button
                   type="button"
