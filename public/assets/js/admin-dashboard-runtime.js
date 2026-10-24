@@ -759,7 +759,7 @@
     }
 
     function dashboardDueCaseSourceHtml(button) {
-      var card = button && button.closest ? button.closest(".scm-ticket-card") : null;
+      var card = button && button.closest ? button.closest(".scm-ticket-card, [data-scm-due-row]") : null;
       var source = card ? card.querySelector(".scm-case-source") : null;
       return source ? String(source.innerHTML || "").trim() : "";
     }
@@ -880,6 +880,8 @@
         ticket_preventiva_sin_cita: ["preventivas_pendientes", '[data-preventive-tab="sin_cita"]'],
         preventiva_cita_sin_realizar: ["preventivas_pendientes", '[data-preventive-tab="cita_sin_realizar"]'],
         preventiva_sin_enviar: ["preventivas_pendientes", '[data-preventive-tab="sin_enviar"]'],
+        cotizacion_sin_enviar: ["cotizaciones_mantenimiento", '.scm-cotizacion-state-tab[data-cotizacion-sent="no"]'],
+        cotizacion_enviada_sin_respuesta: ["cotizaciones_mantenimiento", '.scm-cotizacion-state-tab[data-cotizacion-state="Esperando respuesta"]'],
       }[key];
       if (subTab) key = subTab[0];
       dashboardDuePopupShown.administrative = true;
@@ -943,7 +945,16 @@
       }, 160);
     }
 
+    // Popup en el sistema visual de servicios (Tailwind sp-); se monta dentro de #scm-app para que apliquen las utilidades.
+    var DUE_POPUP_UI = {
+      card: "!sp-bg-white !sp-rounded-xl !sp-border !sp-border-solid !sp-border-slate-200 !sp-shadow-card",
+      primary: "!sp-inline-flex !sp-items-center !sp-justify-center !sp-gap-2 !sp-px-4 !sp-py-2.5 !sp-rounded-lg !sp-bg-service-yellow !sp-text-service-navy !sp-border !sp-border-solid !sp-border-service-yellow !sp-text-xs !sp-font-semibold !sp-font-sans !sp-cursor-pointer hover:!sp-bg-amber-300 focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-blue",
+      secondary: "!sp-inline-flex !sp-items-center !sp-justify-center !sp-gap-1 !sp-px-3 !sp-py-2 !sp-rounded-lg !sp-bg-white !sp-text-service-navy !sp-border !sp-border-solid !sp-border-slate-300 !sp-text-[11px] !sp-font-semibold !sp-font-sans !sp-cursor-pointer !sp-whitespace-nowrap hover:!sp-bg-slate-50 focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow disabled:!sp-opacity-50 disabled:!sp-cursor-not-allowed",
+      label: "!sp-block !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide",
+    };
+
     function dashboardDueEntryPopupHtml(rows, summaryGroups) {
+      var ui = DUE_POPUP_UI;
       rows = Array.isArray(rows) ? rows.slice() : [];
       summaryGroups = Array.isArray(summaryGroups) ? summaryGroups : [];
       rows.sort(function (a, b) {
@@ -989,13 +1000,20 @@
       Object.keys(groups).forEach(function (type) {
         if (groupOrder.indexOf(type) === -1) groupOrder.push(type);
       });
+      // Tipos que abren su pestaña o sub-pestaña desde openAdministrativeActivityTab.
+      var tabTypes = ["servicios_publicos_critico", "ticket_preventiva_sin_cita", "preventiva_cita_sin_realizar", "preventiva_sin_enviar", "cotizacion_sin_enviar", "cotizacion_enviada_sin_respuesta"];
       var groupHtml = groupOrder.map(function (type) {
         var summaryGroup = summaryByType[type] || {};
-        var targetTab = String(summaryGroup.target_tab || (type === "terminacion_contrato_pendiente" ? "contract_termination" : type === "no_prorroga_contrato_pendiente" ? "contract_non_renewal" : ["servicios_publicos_critico", "ticket_preventiva_sin_cita", "preventiva_cita_sin_realizar", "preventiva_sin_enviar"].indexOf(type) !== -1 ? type : ""));
+        var count = Number(groups[type] || 0);
+        var targetTab = String(summaryGroup.target_tab || (type === "terminacion_contrato_pendiente" ? "contract_termination" : type === "no_prorroga_contrato_pendiente" ? "contract_non_renewal" : tabTypes.indexOf(type) !== -1 ? type : ""));
         var buttonHtml = targetTab
-          ? '<button type="button" class="scm-due-entry-group-link" data-scm-dashboard-due-open-admin-tab="' + escHtml(targetTab) + '">Ver pestaña <span class="material-symbols-outlined">chevron_right</span></button>'
+          ? '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-open-admin-tab="' + escHtml(targetTab) + '">Ver <span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">chevron_right</span></button>'
           : "";
-        return '<div class="scm-due-entry-group-card scm-due-entry-group-card--' + escHtml(type) + '"><div><span>' + escHtml(dashboardDueTypeLabel(type)) + '</span><strong>' + escHtml(String(groups[type] || 0)) + '</strong>' + (upcomingByType[type] ? '<small>+' + escHtml(String(upcomingByType[type])) + ' por vencer este mes</small>' : '') + '</div>' + buttonHtml + '</div>';
+        return '<div class="' + ui.card + ' !sp-p-4 !sp-flex !sp-items-start !sp-justify-between !sp-gap-3">' +
+          '<div class="!sp-min-w-0"><span class="' + ui.label + ' !sp-text-service-muted">' + escHtml(dashboardDueTypeLabel(type)) + "</span>" +
+          '<strong class="!sp-block !sp-mt-2 !sp-text-2xl !sp-font-extrabold ' + (count > 0 ? "!sp-text-service-navy" : "!sp-text-slate-300") + '">' + escHtml(String(count)) + "</strong>" +
+          (upcomingByType[type] ? '<small class="!sp-block !sp-mt-1 !sp-text-[10px] !sp-text-service-muted">+' + escHtml(String(upcomingByType[type])) + " por vencer este mes</small>" : "") +
+          "</div>" + buttonHtml + "</div>";
       }).join("");
       function formatDuePopupDate(value) {
         var raw = String(value || "").slice(0, 10);
@@ -1010,30 +1028,60 @@
         var sourceHtml = String(caseData.case_source_html || "").trim();
         var isCreateTicket = String(caseData.admin_ticket_create || "") === "1";
         var isPublicServices = String(caseData.public_services_review || "") === "1";
-        return '<div class="scm-due-entry-row scm-ticket-card">' +
-          '<strong>' + escHtml(formatDuePopupDate(row.fecha_vencimiento || "-") + (row.fecha_vencimiento_hora ? " · " + row.fecha_vencimiento_hora : "")) + "</strong>" +
-          '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
-          '<em>' + escHtml(row.estado || "Pendiente") + (Number(row.dias_vencido || 0) > 0 ? " • " + escHtml(String(row.dias_vencido)) + " día(s)" : "") + "</em>" +
-          (caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Ver caso · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-create-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Crear caso</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-services data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (sourceHtml ? '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" data-scm-dashboard-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dashboardDueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn scm-due-entry-case-btn" disabled>Sin caso</button>'))) +
+        var daysLate = Number(row.dias_vencido || 0);
+        var dueType = escHtml(row.tipo_vencimiento || "");
+        var actionHtml = caseData.critical_review_id
+          ? '<button type="button" class="' + ui.secondary + '" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Ver caso · 72 horas</button>'
+          : isCreateTicket
+            ? '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-create-ticket data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + ">Crear caso</button>"
+            : isPublicServices
+              ? '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-open-services data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + ">Ver revisión</button>"
+              : sourceHtml
+                ? '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-open-case data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + ">Ver caso</button>"
+                : '<button type="button" class="' + ui.secondary + '" disabled>Sin caso</button>';
+        return '<div data-scm-due-row class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[110px_minmax(0,1fr)_auto_auto] !sp-items-center !sp-gap-3 !sp-px-4 !sp-py-3 !sp-m-0 !sp-bg-white !sp-rounded-none !sp-shadow-none !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0">' +
+          '<strong class="!sp-inline-flex !sp-justify-center !sp-rounded-lg !sp-bg-slate-50 !sp-border !sp-border-solid !sp-border-slate-200 !sp-px-2 !sp-py-1.5 !sp-text-[11px] !sp-font-semibold !sp-text-service-navy !sp-whitespace-nowrap">' + escHtml(formatDuePopupDate(row.fecha_vencimiento || "-") + (row.fecha_vencimiento_hora ? " · " + row.fecha_vencimiento_hora : "")) + "</strong>" +
+          '<span class="!sp-min-w-0 !sp-truncate !sp-text-xs !sp-font-semibold !sp-text-service-navy">' + escHtml(row.titulo || "Vencimiento") + "</span>" +
+          '<em class="!sp-not-italic !sp-justify-self-start !sp-rounded-full !sp-px-2.5 !sp-py-1 !sp-text-[10px] !sp-font-semibold !sp-whitespace-nowrap ' + (daysLate > 0 ? "!sp-bg-rose-50 !sp-text-rose-700" : "!sp-bg-amber-50 !sp-text-amber-900") + '">' + escHtml(row.estado || "Pendiente") + (daysLate > 0 ? " · " + escHtml(String(daysLate)) + " día(s)" : "") + "</em>" +
+          actionHtml +
           '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div>" +
           "</div>";
       }).join("");
       if (!detailRows) {
-        detailRows = '<div class="scm-empty scm-empty-cards">Usa los accesos del resumen para revisar las pestañas correspondientes.</div>';
+        detailRows = '<p class="!sp-m-0 !sp-p-6 !sp-text-center !sp-text-xs !sp-text-service-muted">Usa los accesos del resumen para revisar las pestañas correspondientes.</p>';
       }
-      var more = rows.length > 18 ? '<p class="scm-due-entry-more">+' + escHtml(String(rows.length - 18)) + " vencimiento(s) adicionales en el calendario.</p>" : "";
-      return '<div class="scm-due-entry-popup">' +
-        '<div class="scm-due-entry-head"><div class="scm-due-entry-head-icon"><span class="material-symbols-outlined">schedule</span><i></i></div><div><h3>Vencimientos administrativos</h3><p>Control preventivo de tareas operativas.</p></div><strong>Urgente</strong></div>' +
-        '<div class="scm-due-entry-kpis">' +
-        '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--late"><div><span>Total en control</span><strong>' + escHtml(String(stats.vencidos || 0)) + "</strong><small>Vencidos y revisiones pendientes</small></div><i class=\"material-symbols-outlined\">warning</i></div>" +
-        '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--today"><div><span>Vencen hoy</span><strong>' + escHtml(String(stats.hoy || 0)) + "</strong><small>Atención inmediata prioritaria</small></div><i class=\"material-symbols-outlined\">schedule</i></div>" +
-        '<div class="scm-due-entry-kpi-card scm-due-entry-kpi-card--total"><div><span>Próximos este mes</span><strong>' + escHtml(String(upcomingCount)) + "</strong><small>Aún dentro del plazo</small></div><i class=\"material-symbols-outlined\">assignment</i></div>" +
+      var more = rows.length > 18 ? '<p class="!sp-m-0 !sp-text-[11px] !sp-font-semibold !sp-text-amber-700">+' + escHtml(String(rows.length - 18)) + " vencimiento(s) adicionales en el calendario.</p>" : "";
+      var kpi = function (label, value, note, icon, tone) {
+        return '<div class="' + ui.card + ' !sp-p-4 !sp-flex !sp-items-start !sp-justify-between !sp-gap-3">' +
+          '<div><span class="' + ui.label + " " + tone.text + '">' + label + '</span><strong class="!sp-block !sp-mt-2 !sp-text-3xl !sp-font-extrabold ' + tone.text + '">' + escHtml(String(value || 0)) + '</strong><small class="!sp-block !sp-mt-1 !sp-text-[10px] !sp-text-service-muted">' + note + "</small></div>" +
+          '<span class="material-symbols-outlined !sp-p-2 !sp-rounded-lg ' + tone.icon + '" aria-hidden="true">' + icon + "</span></div>";
+      };
+      return '<div class="!sp-font-sans !sp-text-service-navy !sp-text-left">' +
+        '<header class="!sp-bg-service-navy !sp-text-white !sp-px-5 !sp-py-5 sm:!sp-px-6 !sp-flex !sp-items-start !sp-justify-between !sp-gap-3">' +
+        '<div class="!sp-flex !sp-items-start !sp-gap-3"><span class="material-symbols-outlined !sp-p-2.5 !sp-rounded-xl !sp-bg-service-yellow/20 !sp-text-service-yellow" aria-hidden="true">schedule</span>' +
+        '<div><span class="!sp-inline-flex !sp-rounded-full !sp-bg-service-yellow/20 !sp-text-service-yellow !sp-px-3 !sp-py-1 !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide">Control preventivo · SKC SuCasa Inmobiliaria</span>' +
+        '<h3 class="!sp-m-0 !sp-mt-2 !sp-text-xl sm:!sp-text-2xl !sp-font-bold !sp-text-white">Vencimientos administrativos</h3>' +
+        '<p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-blue-100">Tareas operativas fuera de plazo y revisiones pendientes del periodo.</p></div></div>' +
+        '<button type="button" class="!sp-w-9 !sp-h-9 !sp-shrink-0 !sp-rounded-lg !sp-border-0 !sp-bg-white/10 !sp-text-white !sp-text-xl !sp-cursor-pointer hover:!sp-bg-white/20 focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow" data-scm-dashboard-due-close aria-label="Cerrar">&times;</button>' +
+        "</header>" +
+        '<div class="!sp-bg-service-background !sp-p-4 sm:!sp-p-6 !sp-space-y-5 !sp-overflow-y-auto !sp-max-h-[calc(100vh-300px)] sm:!sp-max-h-[calc(100vh-220px)]">' +
+        '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-3">' +
+        kpi("Total en control", stats.vencidos, "Vencidos y revisiones pendientes", "assignment_late", { text: "!sp-text-rose-600", icon: "!sp-bg-rose-50 !sp-text-rose-600" }) +
+        kpi("Vencen hoy", stats.hoy, "Atención inmediata prioritaria", "today", { text: "!sp-text-amber-600", icon: "!sp-bg-amber-50 !sp-text-amber-600" }) +
+        kpi("Próximos este mes", upcomingCount, "Aún dentro del plazo", "event_upcoming", { text: "!sp-text-service-navy", icon: "!sp-bg-slate-50 !sp-text-service-navy" }) +
         "</div>" +
-        '<h4 class="scm-due-entry-section-title">En control por tipo de tarea pendiente</h4>' +
-        '<div class="scm-due-entry-groups">' + groupHtml + "</div>" +
-        '<div class="scm-due-entry-list-head"><div><h4>Casos con mayor tiempo de atraso</h4><p>Ordenados cronológicamente por antigüedad de vencimiento</p></div><span>Mostrando ' + escHtml(String(Math.min(rows.length, 18))) + " de " + escHtml(String(stats.vencidos || 0)) + " casos vencidos</span></div>" +
-        '<div class="scm-due-entry-list">' + detailRows + "</div>" +
+        '<section><h4 class="!sp-m-0 !sp-mb-3 !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">En control por tipo de tarea pendiente</h4>' +
+        '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-3 !sp-gap-3">' + groupHtml + "</div></section>" +
+        '<section class="' + ui.card + ' !sp-overflow-hidden">' +
+        '<div class="!sp-flex !sp-flex-wrap !sp-items-end !sp-justify-between !sp-gap-2 !sp-px-4 !sp-py-3 !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><div><h4 class="!sp-m-0 !sp-text-sm !sp-font-bold">Casos con mayor tiempo de atraso</h4><p class="!sp-m-0 !sp-mt-0.5 !sp-text-[10px] !sp-text-service-muted">Ordenados por antigüedad de vencimiento</p></div>' +
+        '<span class="!sp-rounded-full !sp-bg-slate-50 !sp-border !sp-border-solid !sp-border-slate-200 !sp-px-3 !sp-py-1 !sp-text-[10px] !sp-font-semibold !sp-text-service-muted">Mostrando ' + escHtml(String(Math.min(rows.length, 18))) + " de " + escHtml(String(rows.length)) + "</span></div>" +
+        '<div class="!sp-max-h-[292px] !sp-overflow-y-auto">' + detailRows + "</div></section>" +
         more +
+        "</div>" +
+        '<footer class="!sp-bg-white !sp-px-5 !sp-py-4 sm:!sp-px-6 !sp-flex !sp-flex-wrap !sp-justify-end !sp-gap-2 !sp-border-0 !sp-border-t !sp-border-solid !sp-border-slate-200">' +
+        '<button type="button" class="' + ui.secondary + ' !sp-px-4 !sp-py-2.5 !sp-text-xs" data-scm-dashboard-due-close>Cerrar</button>' +
+        '<button type="button" class="' + ui.primary + '" data-scm-dashboard-due-open-calendar><span class="material-symbols-outlined !sp-text-[18px]" aria-hidden="true">event</span> Ver calendario</button>' +
+        "</footer>" +
         "</div>";
     }
 
@@ -1214,15 +1262,15 @@
           return window.Swal.fire({
             title: "",
             html: dashboardDueEntryPopupHtml(rows, summaryGroups),
+            target: root,
             width: "min(1024px, 96vw)",
-            showCloseButton: true,
+            padding: 0,
+            showCloseButton: false,
             showConfirmButton: false,
             showCancelButton: false,
             buttonsStyling: false,
-            footer: '<div class="scm-due-entry-footer-actions"><button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--primary" data-scm-dashboard-due-open-calendar><span class="material-symbols-outlined">event</span> Ver calendario</button><button type="button" class="scm-due-entry-footer-btn scm-due-entry-footer-btn--secondary" data-scm-dashboard-due-close>Cerrar</button></div>',
             customClass: {
-              popup: "scm-calendar-swal-popup scm-due-entry-swal",
-              closeButton: "scm-swal-close-round scm-due-entry-close",
+              popup: "scm-due-entry-swal",
             },
             didOpen: function () {
               var popup = window.Swal.getPopup();
@@ -1260,27 +1308,24 @@
                 window.Swal.close();
                 openAdministrativeActivityTab(adminTabBtn.getAttribute("data-scm-dashboard-due-open-admin-tab") || "");
               });
-              var footer = popup.querySelector(".swal2-footer");
-              if (footer) {
-                footer.addEventListener("click", function (event) {
-                  var calendarBtn = event.target && event.target.closest
-                    ? event.target.closest("[data-scm-dashboard-due-open-calendar]")
-                    : null;
-                  if (calendarBtn && footer.contains(calendarBtn)) {
-                    event.preventDefault();
-                    window.Swal.close();
-                    openDashboardDueCalendar();
-                    return;
-                  }
-                  var closeBtn = event.target && event.target.closest
-                    ? event.target.closest("[data-scm-dashboard-due-close]")
-                    : null;
-                  if (closeBtn && footer.contains(closeBtn)) {
-                    event.preventDefault();
-                    window.Swal.close();
-                  }
-                });
-              }
+              popup.addEventListener("click", function (event) {
+                var calendarBtn = event.target && event.target.closest
+                  ? event.target.closest("[data-scm-dashboard-due-open-calendar]")
+                  : null;
+                if (calendarBtn && popup.contains(calendarBtn)) {
+                  event.preventDefault();
+                  window.Swal.close();
+                  openDashboardDueCalendar();
+                  return;
+                }
+                var closeBtn = event.target && event.target.closest
+                  ? event.target.closest("[data-scm-dashboard-due-close]")
+                  : null;
+                if (closeBtn && popup.contains(closeBtn)) {
+                  event.preventDefault();
+                  window.Swal.close();
+                }
+              });
             },
           });
         })

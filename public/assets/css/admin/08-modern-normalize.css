@@ -21,7 +21,7 @@
 }
 
 #scm-app :is(.scm-btn-primary, .scm-btn-secondary, .scm-primary-action, .scm-case-work-btn, .scm-btn-case, .scm-page-btn, .scm-status-topic-tab, .scm-calendar-filter-btn, .scm-calendar-day-create, .scm-filter-collapse-btn),
-.swal2-popup[class*="scm-"]:not(.scm-contract-response-swal):not(.scm-ending-import-swal):not(.scm-ending-dialog-swal):not(.scm-gc-swal) :is(.swal2-confirm, .swal2-cancel, .scm-btn-primary, .scm-btn-secondary, .scm-case-work-btn, .scm-calendar-full-agenda-btn, .scm-due-entry-footer-btn) {
+.swal2-popup[class*="scm-"]:not(.scm-contract-response-swal):not(.scm-ending-import-swal):not(.scm-ending-dialog-swal):not(.scm-gc-swal) :is(.swal2-confirm, .swal2-cancel, .scm-btn-primary, .scm-btn-secondary, .scm-case-work-btn, .scm-calendar-full-agenda-btn) {
   border-radius: 10px !important;
   font-weight: 600 !important;
   letter-spacing: 0 !important;
@@ -29,7 +29,7 @@
 }
 
 #scm-app :is(.scm-btn-primary, .scm-primary-action, .scm-case-work-btn.scm-primary-action, .scm-calendar-filter-btn--primary, .scm-calendar-create-action, .scm-calendar-day-create),
-.swal2-popup[class*="scm-"]:not(.scm-contract-response-swal):not(.scm-ending-import-swal):not(.scm-ending-dialog-swal):not(.scm-gc-swal) :is(.swal2-confirm, .scm-btn-primary, .scm-due-entry-footer-btn--primary) {
+.swal2-popup[class*="scm-"]:not(.scm-contract-response-swal):not(.scm-ending-import-swal):not(.scm-ending-dialog-swal):not(.scm-gc-swal) :is(.swal2-confirm, .scm-btn-primary) {
   background: #f97316 !important;
   border-color: #f97316 !important;
   box-shadow: 0 10px 20px rgba(249, 115, 22, 0.2) !important;
@@ -37,7 +37,7 @@
 }
 
 #scm-app :is(.scm-btn-secondary, .scm-case-work-btn, .scm-calendar-filter-btn--ghost),
-.swal2-popup[class*="scm-"]:not(.scm-contract-response-swal):not(.scm-ending-import-swal):not(.scm-ending-dialog-swal):not(.scm-gc-swal) :is(.swal2-cancel, .scm-case-work-btn, .scm-calendar-full-agenda-btn, .scm-due-entry-footer-btn--secondary) {
+.swal2-popup[class*="scm-"]:not(.scm-contract-response-swal):not(.scm-ending-import-swal):not(.scm-ending-dialog-swal):not(.scm-gc-swal) :is(.swal2-cancel, .scm-case-work-btn, .scm-calendar-full-agenda-btn) {
   background: #ffffff !important;
   border-color: #dbe6f2 !important;
   color: #1f334f !important;
