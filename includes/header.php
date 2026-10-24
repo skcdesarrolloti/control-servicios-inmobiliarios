@@ -309,6 +309,10 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'metricas_crecimiento';
   } elseif (in_array($tabParam, ['credito_propietario', 'metricas_creditos', 'creditos', 'scm-panel-credito-propietario'], true)) {
     $current_page = 'credito_propietario';
+  } elseif (in_array($tabParam, ['herramienta_pse', 'generar_pse', 'pse', 'scm-panel-herramienta-pse'], true)) {
+    $current_page = 'herramienta_pse';
+  } elseif (in_array($tabParam, ['herramienta_mora', 'calculadora_mora', 'mora', 'scm-panel-herramienta-mora'], true)) {
+    $current_page = 'herramienta_mora';
   } else {
     $current_page = empty($tabParam) ? 'inicio' : 'abiertos';
   }
@@ -335,7 +339,8 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 // 3. Actividades Administrativas (Dropdown: Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
 // 4. Actividades contractuales (Dropdown: Contratos por terminar, Terminación, No prórroga, Funcionario de contratos)
 // 5. Notificaciones
-// 6. Métricas (Dropdown: Casos · Mantenimiento › Cotizaciones · Contratos › Ocupaciones, Desocupaciones, Ocupaciones vs Desocupaciones)
+// 6. Herramientas (Dropdown: Generar PSE, Calculadora de mora)
+// 7. Métricas (Dropdown: Casos · Mantenimiento › Cotizaciones · Contratos › Ocupaciones, Desocupaciones, Ocupaciones vs Desocupaciones)
 $rawNavItems = [
   'inicio' => [
     'type' => 'dropdown',
@@ -618,6 +623,30 @@ $rawNavItems = [
     'url' => $baseUrl . '/index.php?tab=notificaciones',
     'icon' => 'notifications',
     'perms' => ['notificaciones'],
+  ],
+  'herramientas' => [
+    'type' => 'dropdown',
+    'key' => 'herramientas',
+    'label' => 'Herramientas',
+    'icon' => 'construction',
+    'children' => [
+      'herramienta_pse' => [
+        'key' => 'herramienta_pse',
+        'label' => 'Generar PSE',
+        'panel_id' => 'scm-panel-herramienta-pse',
+        'url' => $baseUrl . '/index.php?tab=herramienta_pse',
+        'icon' => 'payments',
+        'perms' => ['herramienta_pse'],
+      ],
+      'herramienta_mora' => [
+        'key' => 'herramienta_mora',
+        'label' => 'Calculadora de mora',
+        'panel_id' => 'scm-panel-herramienta-mora',
+        'url' => $baseUrl . '/index.php?tab=herramienta_mora',
+        'icon' => 'gavel',
+        'perms' => ['herramienta_mora'],
+      ],
+    ],
   ],
   'metricas' => [
     'type' => 'dropdown',

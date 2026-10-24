@@ -179,6 +179,14 @@ trait RendersDashboard
       'metricas_creditos' => 'scm-panel-credito-propietario',
       'creditos' => 'scm-panel-credito-propietario',
       'scm-panel-credito-propietario' => 'scm-panel-credito-propietario',
+      'herramienta_pse' => 'scm-panel-herramienta-pse',
+      'generar_pse' => 'scm-panel-herramienta-pse',
+      'pse' => 'scm-panel-herramienta-pse',
+      'scm-panel-herramienta-pse' => 'scm-panel-herramienta-pse',
+      'herramienta_mora' => 'scm-panel-herramienta-mora',
+      'calculadora_mora' => 'scm-panel-herramienta-mora',
+      'mora' => 'scm-panel-herramienta-mora',
+      'scm-panel-herramienta-mora' => 'scm-panel-herramienta-mora',
       'ocupaciones' => 'scm-panel-movimientos-contratos',
       'desocupaciones' => 'scm-panel-movimientos-contratos',
       'ocupaciones_vs_desocupaciones' => 'scm-panel-movimientos-contratos',
@@ -391,6 +399,8 @@ trait RendersDashboard
       'scm-panel-credito-propietario' => 'credito_propietario',
       'scm-panel-movimientos-contratos' => 'metricas_contratos',
       'scm-panel-funcionario-contratos' => 'funcionario_contratos',
+      'scm-panel-herramienta-pse' => 'herramienta_pse',
+      'scm-panel-herramienta-mora' => 'herramienta_mora',
     ];
     if ($initialTab !== '') {
       $initialTabPermissionKey = $dashboardPanelToTab[$initialTab] ?? '';
@@ -1406,6 +1416,16 @@ trait RendersDashboard
           <?php echo (new \SCM\Modules\OwnerCredits\OwnerCreditView())->shell(); ?>
         </div>
         <?php endif; ?>
+        <?php if (in_array('herramienta_pse', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-herramienta-pse' ? ' active' : ''; ?>" id="scm-panel-herramienta-pse" data-permission-tab="herramienta_pse" data-scm-loaded="0">
+          <?php echo (new \SCM\Modules\Tools\ToolsView())->pse(); ?>
+        </div>
+        <?php endif; ?>
+        <?php if (in_array('herramienta_mora', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-herramienta-mora' ? ' active' : ''; ?>" id="scm-panel-herramienta-mora" data-permission-tab="herramienta_mora" data-scm-loaded="0">
+          <?php echo (new \SCM\Modules\Tools\ToolsView())->mora(); ?>
+        </div>
+        <?php endif; ?>
       <?php endif; ?>
 
       <?php echo \SCM\Views\GuideModalView::render(); ?>
@@ -1455,6 +1475,7 @@ trait RendersDashboard
     <script src="<?php echo $collectionManagementJsUrl; ?>" defer></script>
     <script src="<?php echo $canonInsuranceAuditJsUrl; ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-owner-credits.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-owner-credits.js'))); ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-tools.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-tools.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-administrative-reports.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-administrative-reports.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-movements.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-movements.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-case-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-case-metrics.js'))); ?>" defer></script>
@@ -1845,6 +1866,10 @@ trait RendersDashboard
         'funcionario_contratos' => '',
       ]],
       ['label' => 'Notificaciones', 'tabs' => ['notificaciones' => '']],
+      ['label' => 'Herramientas', 'tabs' => [
+        'herramienta_pse' => '',
+        'herramienta_mora' => '',
+      ]],
       ['label' => 'Métricas', 'tabs' => [
         'metricas_casos' => '',
         'metricas_cotizaciones' => '',

@@ -14,6 +14,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesPreventiveReviewActions;
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   use \SCM\App\Concerns\HandlesOwnerCredits;
+  use \SCM\App\Concerns\HandlesTools;
   use \SCM\App\Concerns\HandlesAdministrativeReports;
   use \SCM\App\Concerns\HandlesMaintenanceOrdersPanel;
   use \SCM\App\Concerns\HandlesLeaseContracts;
@@ -360,6 +361,8 @@ final class SuCasaControlServiciosInmobiliarios
       'metricas_ocupaciones_vs' => 'Ocupaciones vs Desocupaciones',
       'metricas_crecimiento' => 'Crecimiento de la empresa',
       'credito_propietario' => 'Créditos a propietarios',
+      'herramienta_pse' => 'Generar PSE',
+      'herramienta_mora' => 'Calculadora de mora',
     ];
   }
 

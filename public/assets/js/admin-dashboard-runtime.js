@@ -25894,6 +25894,8 @@
         activePanel.id !== "scm-panel-metricas-servicios-publicos" &&
         activePanel.id !== "scm-panel-metricas-crecimiento" &&
         activePanel.id !== "scm-panel-credito-propietario" &&
+        activePanel.id !== "scm-panel-herramienta-pse" &&
+        activePanel.id !== "scm-panel-herramienta-mora" &&
         !dashboardFilterOptionsLoaded &&
         !skipFilterOptions
       ) {
@@ -25929,6 +25931,14 @@
       }
       if (activePanel.id === "scm-panel-metricas-preventivas" || activePanel.id === "scm-panel-metricas-servicios-publicos" || activePanel.id === "scm-panel-metricas-crecimiento") {
         return loadMaintenanceMetrics(activePanel.querySelector("[data-maint-metrics]"), false);
+      }
+      // Herramientas: admin-tools.js carga el archivador PSE y la tasa SFC al abrir cada panel.
+      if (activePanel.id === "scm-panel-herramienta-pse" || activePanel.id === "scm-panel-herramienta-mora") {
+        var toolModule = activePanel.querySelector("[data-scm-tool]");
+        if (toolModule) {
+          toolModule.dispatchEvent(new CustomEvent("scm:load-tool"));
+        }
+        return Promise.resolve();
       }
       if (activePanel.id === "scm-panel-credito-propietario") {
         var creditsModule = activePanel.querySelector("[data-scm-owner-credits]");
