@@ -38,7 +38,8 @@ $assert($near($ev['policy_payment'], 2230047.8271367345), 'policy payment = PMT(
 $assert($ev['exceed_months'] === -6 && $near($ev['exceed_amount'], -801372), 'exceeding months and amount (B27, B28)');
 $assert($near($ev['risk_rate'], 0.023279687226889677, 1e-12), 'risk rate (B29)');
 $assert($near($ev['risk_payment'], 1270352.6211058223), 'risk payment (B30)');
-$assert($ev['suggested']['term'] === 12 && $near($ev['suggested']['amount'], 13167756) && $near($ev['suggested']['payment'], 1268114.5586934178), 'low vacancy suggests requested term and amount at policy rate (B35-B38)');
+// A diferencia del Excel (B35-B38), el descuento de tasa lo aplica el analista: la sugerencia usa la tasa de referencia.
+$assert($ev['suggested']['term'] === 12 && $near($ev['suggested']['amount'], 13167756) && $near($ev['suggested']['rate'], 0.0242, 1e-12) && $near($ev['suggested']['payment'], OwnerCreditCalculator::payment(0.0242, 12, 13167756)), 'low vacancy suggests the requested term and amount at the reference rate');
 
 $alta = OwnerCreditCalculator::evaluate(['vacancy' => 'Alta'] + ['gross' => 6232674, 'deductions' => ['comision' => 2110546], 'requested_amount' => 13167756, 'requested_term' => 12, 'request_ts' => strtotime('2024-03-26'), 'contract_end_ts' => strtotime('2024-09-25')], $settings);
 $assert($alta['suggested']['term'] === 3 && $near($alta['suggested']['rate'], $alta['risk_rate'], 1e-12) && $near($alta['suggested']['amount'], 12366384), 'high vacancy suggests 3 months at the risk rate');
@@ -106,8 +107,8 @@ $assert($riskCapped['risk_rate'] > $riskCapped['usury_monthly_legal'] && $near($
 $assert($ev['risk_applies'] === true && $riskCapped['risk_applies'] === true, 'the risk rate applies when the request exceeds the cap');
 $below = OwnerCreditCalculator::evaluate(['gross' => 15000000, 'deductions' => [], 'requested_amount' => 3000000, 'requested_term' => 6, 'request_ts' => time(), 'contract_end_ts' => strtotime('+14 months'), 'vacancy' => 'Alta'], ['usury_annual' => 0.2859] + $settings);
 $assert($below['risk_applies'] === false && $below['risk_rate'] === 0.0 && $near($below['suggested']['amount'], 3000000) && $near($below['suggested']['rate'], min(0.0242, $below['usury_monthly_legal']), 1e-12), 'below the cap there is no risk rate and high vacancy keeps the request at the reference rate');
-$warning = \SCM\Modules\OwnerCredits\OwnerCreditView::usuryWarning($settings, 0.02299, 0.0211757);
-$assert(str_contains($warning, 'supera la usura') && str_contains($warning, 'máximo 2,22 %') && \SCM\Modules\OwnerCredits\OwnerCreditView::usuryWarning($settings, 0.02, 0.0211757) === '', 'a policy rate above the usury warns how far to lower the reference rate');
+$warning = \SCM\Modules\OwnerCredits\OwnerCreditView::usuryWarning(0.0242, 0.0211757);
+$assert(str_contains($warning, 'supera la usura') && str_contains($warning, 'máximo 2,11 %') && \SCM\Modules\OwnerCredits\OwnerCreditView::usuryWarning(0.02, 0.0211757) === '', 'a reference rate above the usury warns how far to lower it');
 $assert(str_contains((string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php'), "La tasa supera la usura"), 'approving above the usury is blocked even with justification');
 $assert($near(OwnerCreditSettings::normalize(['no_mandate_deduction' => '15'])['no_mandate_deduction'], 0.15, 1e-9), 'no-mandate deduction is configurable as a percentage');
 

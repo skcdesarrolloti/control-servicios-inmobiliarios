@@ -259,9 +259,11 @@ $check($service->settleFinished() === 0, 'an automatically paid credit is not cl
 
 // Cambios frente al sistema: se ven en vivo, exigen justificación al aprobar y quedan guardados con la decisión.
 $adjusted = (int) $service->createManual(9, 500000, 6, 'Libre Destinación', $actor, '', 'mandato_2');
-$edits = ['requested_term' => '6', 'gross' => '$1.600.000', 'amount' => '$500.000', 'term' => '6', 'rate' => '1,5', 'vacancy' => 'Baja', 'siniestro' => 'no', 'has_credits' => 'no'];
+$edits = ['requested_term' => '6', 'gross' => '$1.600.000', 'amount' => '$500.000', 'term' => '6', 'rate' => '1,85', 'vacancy' => 'Baja', 'siniestro' => 'no', 'has_credits' => 'no'];
 $live = $service->workspace($adjusted, $edits);
 $keys = array_column($live['adjustments'], 'note', 'key');
+$rateCheck = static fn(array $work): bool => array_column($work['policies'], 'ok', 'key')['tasa_minima'];
+$check($live['evaluation']['suggested']['rate'] === 0.019 && $rateCheck($live) && !$rateCheck($service->workspace($adjusted, ['rate' => '1,7'] + $edits)), 'the system suggests the reference rate and a discount beyond the maximum is outside policy');
 $check(isset($keys['canon'], $keys['tasa']) && $keys['canon'] && $keys['tasa'] && !isset($keys['valor']), 'the liquidator lists the changes against the system while editing');
 try {
   $service->decide($adjusted, 'aprobado', $edits + ['note' => ''], $actor);

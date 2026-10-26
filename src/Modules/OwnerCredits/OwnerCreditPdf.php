@@ -129,7 +129,8 @@ final class OwnerCreditPdf
         'Meses máximos' => $ev['max_months'] . ' (' . OwnerCreditService::termBasis($ev) . ')',
       ] + ($simulation ? [] : [
         // Tasas de trabajo del analista: no van en la simulación que puede ver el propietario.
-        'Tasa ajustada de colocación' => $percent($ev['policy_rate']) . ' N.M.V',
+        'Tasa de referencia' => $percent((float) $work['settings']['reference_rate']) . ' N.M.V',
+        'Tasa mínima (descuento máximo)' => $percent($ev['policy_rate']) . ' N.M.V',
         'Tasa para el riesgo' => ($ev['risk_applies'] ?? true) ? $percent($ev['risk_rate']) . ' N.M.V' : 'No aplica (lo pedido no supera el valor máximo)',
       ]) + [
         'Tasa de usura vigente' => $percent((float) $work['settings']['usury_annual']) . ' E.A. (' . $percent((float) $ev['usury_monthly_legal']) . ' mensual)',

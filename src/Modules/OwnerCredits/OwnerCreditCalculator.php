@@ -169,7 +169,8 @@ final class OwnerCreditCalculator
       // Sin exceso, el riesgo alto se cubre con la tasa de referencia sobre lo pedido.
       'Alta' => $riskApplies ? ['term' => 3, 'rate' => $riskRate, 'amount' => $maxAmount] : ['term' => 3, 'rate' => (float) $settings['reference_rate'], 'amount' => $requested],
       'Media' => ['term' => $maxMonths, 'rate' => (float) $settings['reference_rate'], 'amount' => $maxAmount],
-      default => ['term' => $requestedTerm, 'rate' => $policyRate, 'amount' => $requested],
+      // El descuento de tasa lo decide el analista (hasta el máximo de Configuración): se sugiere la referencia.
+      default => ['term' => $requestedTerm, 'rate' => (float) $settings['reference_rate'], 'amount' => $requested],
     };
     // Tope legal: la usura es efectiva anual; su equivalente mes vencido es (1 + E.A.)^(1/12) − 1.
     $usuryLegal = (1 + (float) $settings['usury_annual']) ** (1 / 12) - 1;

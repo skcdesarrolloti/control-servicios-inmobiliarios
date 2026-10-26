@@ -164,7 +164,7 @@ final class OwnerCreditView
         'Plazo solicitado' => 'Meses en que quiere pagar. Escríbelo según lo que pidió; no puede superar los meses que faltan para el fin del contrato, porque las cuotas se descuentan del canon.',
         'Destinación' => 'Para qué usará el dinero.',
         '¿Tiene créditos vigentes?' => 'El sistema propone Sí cuando tiene créditos aprobados aquí. Con Sí, su saldo se resta del cupo; si son créditos por fuera del sistema, aprobar exige justificación. Con No, el cupo no descuenta nada.',
-        'Probabilidad de que desocupen' => 'La sugiere el sistema con el seguimiento de renovación del contrato principal: no prórroga o terminación respondida dentro del término (renovación 0 %) o renovación menor de 50 % = Alta; de 50 % a 79 % = Media; 80 % o más, o "no salida" reportada = Baja. Puedes cambiarla según tu criterio. Baja: se respeta lo pedido con la tasa de política. Media: plazo hasta el fin del contrato con la tasa de referencia. Alta: máximo 3 meses con la tasa de riesgo.',
+        'Probabilidad de que desocupen' => 'La sugiere el sistema con el seguimiento de renovación del contrato principal: no prórroga o terminación respondida dentro del término (renovación 0 %) o renovación menor de 50 % = Alta; de 50 % a 79 % = Media; 80 % o más, o "no salida" reportada = Baja. Puedes cambiarla según tu criterio. Baja: se respeta lo pedido con la tasa de referencia. Media: plazo hasta el fin del contrato con la tasa de referencia. Alta: máximo 3 meses con la tasa de riesgo.',
       ]) . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">'
       . $field('Fecha de solicitud', '<input class="' . $ui::INPUT . ' ' . self::READONLY . '" value="' . date('d/m/Y', (int) $credit['created_at']) . '" readonly>')
       . $field('Valor solicitado', $money('requested_amount', (float) ($credit['requested_amount'] ?? 0)))
@@ -180,7 +180,7 @@ final class OwnerCreditView
         'Qué son' => 'Las condiciones que realmente se aprueban. Arrancan con la condición sugerida y las puedes ajustar.',
         'Valor a colocar' => 'El dinero que se presta.',
         'Plazo' => 'Número de cuotas mensuales.',
-        'Tasa N.M.V' => 'Tasa nominal mes vencido: el interés de cada mes sobre el saldo. No se puede aprobar por encima de la usura (Configuración).',
+        'Tasa N.M.V' => 'Tasa nominal mes vencido: el interés de cada mes sobre el saldo. Se sugiere la tasa de referencia; puedes aplicar un descuento hasta el descuento máximo de Configuración (con justificación). Más abajo queda fuera de política; por encima de la usura no se puede aprobar.',
         'Cuota' => 'Fija, calculada como la función PAGO de Excel; se descuenta de los giros del canon.',
         'Fecha de desembolso' => 'Día en que se entrega el dinero. La primera cuota se descuenta un mes después y el crédito queda pagado solo cuando vence la última.',
       ])
@@ -217,13 +217,13 @@ final class OwnerCreditView
         . '<span class="!sp-min-w-0"><b class="!sp-block !sp-text-[11px] ' . ($policy['ok'] ? '!sp-text-service-navy' : '!sp-text-red-700') . '">' . self::e($policy['label']) . '</b><span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e($policy['detail']) . '</span></span></li>';
     }
     return ($termError !== '' ? self::alert($termError, 'bad') : '')
-      . (($usury = self::usuryWarning($work['settings'], (float) $ev['policy_rate'], (float) $ev['usury_monthly_legal'])) !== '' ? self::alert($usury, 'bad') : '')
+      . (($usury = self::usuryWarning((float) $work['settings']['reference_rate'], (float) $ev['usury_monthly_legal'])) !== '' ? self::alert($usury, 'bad') : '')
       . self::preapproval($work)
       . ($endChanged ? self::alert('Estás calculando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Se guardará en el contrato al aprobar o rechazar el crédito.', 'info') : '')
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('chart') . 'Política de créditos</h4>' . self::guide('politica', [
         'Valor máximo a prestar' => 'Tope = ingreso neto de todos los contratos del propietario × los meses de política (Configuración, hoy ' . (int) $work['settings']['income_months'] . ').',
         'Meses máximos' => 'Meses completos que faltan para el fin del contrato con la vigencia más larga del propietario, menos los meses de margen, sin pasar del plazo máximo de un crédito (Configuración, hoy ' . (int) ($work['settings']['max_term_months'] ?? 12) . ').',
-        'Tasa ajustada' => 'Tasa de referencia menos el descuento de política.',
+        'Tasa mínima' => 'Tasa de referencia menos el descuento máximo de Configuración: lo más bajo que puedes aprobar dentro de política.',
         'Cuota de política' => 'La cuota si se prestara el valor máximo al plazo máximo.',
         'Meses / valor que excede' => 'Diferencia entre la política y lo pedido; en rojo cuando lo pedido la supera.',
         'Tasa para el riesgo' => 'Solo cuando lo pedido supera el valor máximo: cobra la usura mensual sobre la parte que excede. Si lo pedido cabe en el tope, no aplica.',
@@ -232,7 +232,7 @@ final class OwnerCreditView
       . ($others !== [] ? self::tile('Ingreso neto total (' . (count($others) + 1) . ' contratos)', self::money($ev['total_net_income']), 'key') : '')
       . self::tile('Valor máximo a prestar', self::money($ev['max_amount']), 'key')
       . self::tile('Meses máximos', (string) $ev['max_months'])
-      . self::tile('Tasa ajustada', self::percent($ev['policy_rate']))
+      . self::tile('Tasa mínima (descuento máximo)', self::percent($ev['policy_rate']))
       . self::tile('Cuota de política', self::money($ev['policy_payment']))
       . self::tile('Tasa para el riesgo', ($ev['risk_applies'] ?? true) ? self::percent($ev['risk_rate']) : 'No aplica')
       . self::tile('Meses que excede', (string) $ev['exceed_months'], $ev['exceed_months'] < 0 ? 'bad' : '')
@@ -405,10 +405,10 @@ final class OwnerCreditView
       . $field('Vigente desde', '<input class="' . $ui::INPUT . '" type="date" name="usury_updated_at" value="' . self::e($settings['usury_updated_at']) . '"' . $lock . '>')
       . '</div>' . ($auto ? '<button type="button" class="' . $ui::SECONDARY . ' !sp-mt-4" data-owner-credit-usury-refresh>' . $ui::icon('refresh', '!sp-w-3.5 !sp-h-3.5') . 'Actualizar ahora desde datos.gov.co</button>' : '') . '</section>'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('cash') . 'Variables de entrada</h4>'
-      . (($usury = self::usuryWarning($settings, (float) $settings['reference_rate'] * (1 - (float) $settings['policy_discount']), (1 + (float) $settings['usury_annual']) ** (1 / 12) - 1)) !== '' ? '<div class="!sp-mb-4">' . self::alert($usury, 'bad') . '</div>' : '')
+      . (($usury = self::usuryWarning((float) $settings['reference_rate'], (1 + (float) $settings['usury_annual']) ** (1 / 12) - 1)) !== '' ? '<div class="!sp-mb-4">' . self::alert($usury, 'bad') . '</div>' : '')
       . '<div class="' . $grid . '">'
       . $field('Tasa de referencia N.M.V (%)', $input('reference_rate', $pct($settings['reference_rate']), ' inputmode="decimal"'), 'Tasa normal de crédito de consumo de referencia.')
-      . $field('Descuento por política (%)', $input('policy_discount', $pct($settings['policy_discount'], 1), ' inputmode="decimal"'))
+      . $field('Descuento máximo de tasa (%)', $input('policy_discount', $pct($settings['policy_discount'], 1), ' inputmode="decimal"'), 'El analista puede bajar la tasa de referencia hasta este porcentaje al aprobar; más abajo queda fuera de política. La simulación usa la tasa de referencia, sin descuento.')
       . $field('Descuento sin mandato (% del canon)', $input('no_mandate_deduction', $pct($settings['no_mandate_deduction'], 1), ' inputmode="decimal"'), 'Cuando el contrato no tiene mandato con comisión registrada.')
       . $field('Meses de ingreso neto a prestar', '<input class="' . $ui::INPUT . '" type="number" name="income_months" min="1" max="24" value="' . (int) $settings['income_months'] . '">', 'Tope = ingreso neto × estos meses.')
       . $field('Meses mínimos de contrato restantes', '<input class="' . $ui::INPUT . '" type="number" name="min_remaining_months" min="0" max="60" value="' . (int) $settings['min_remaining_months'] . '">', 'Por debajo se alerta "contrato próximo a vencer".')
@@ -521,15 +521,15 @@ final class OwnerCreditView
   }
 
   /**
-   * La tasa ajustada (referencia − descuento de política) no puede superar la usura: el crédito se recorta a la usura,
-   * pero la tasa de referencia de Configuración está desactualizada. Indica hasta cuánto bajarla.
-   * @param array<string,mixed> $settings
+   * La tasa de referencia (la que se sugiere y se simula) no puede superar la usura: el crédito se recorta a la usura,
+   * pero la referencia de Configuración está desactualizada. Indica hasta cuánto bajarla.
    */
-  public static function usuryWarning(array $settings, float $policyRate, float $usuryMonthly): string
+  public static function usuryWarning(float $referenceRate, float $usuryMonthly): string
   {
-    if ($policyRate <= $usuryMonthly + 1e-9) return '';
-    $maxReference = $usuryMonthly / max(1e-9, 1 - (float) $settings['policy_discount']);
-    return 'La tasa ajustada (' . self::percent($policyRate) . ' mensual) supera la usura (' . self::percent($usuryMonthly) . ' mensual): los créditos se recortan a la usura. Baja la tasa de referencia en Configuración a máximo ' . number_format(floor($maxReference * 10000) / 100, 2, ',', '.') . ' %.';
+    if ($referenceRate <= $usuryMonthly + 1e-9) return '';
+    // Con 4 decimales: la diferencia puede ser de milésimas (2,1200 % frente a 2,1176 %).
+    $fine = static fn(float $value): string => number_format($value * 100, 4, ',', '.') . ' %';
+    return 'La tasa de referencia (' . $fine($referenceRate) . ' mensual) supera la usura (' . $fine($usuryMonthly) . ' mensual): los créditos se recortan a la usura. Baja la tasa de referencia en Configuración a máximo ' . number_format(floor($usuryMonthly * 10000) / 100, 2, ',', '.') . ' %.';
   }
 
   /** Por qué el sistema sugiere esa probabilidad de desocupación y avisos de los demás contratos. @param array<string,mixed> $ev */
