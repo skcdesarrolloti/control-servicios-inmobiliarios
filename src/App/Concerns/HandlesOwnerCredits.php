@@ -98,6 +98,44 @@ trait HandlesOwnerCredits
     exit;
   }
 
+  /**
+   * PDF de simulación desde "Nueva solicitud", sin registrar la solicitud. La simulación queda en el historial de
+   * los contratos del propietario y de sus inmuebles.
+   */
+  public function ajax_handler_owner_credit_simulation_pdf(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('owner_credit_manage', 'Tu cargo no tiene permiso para crear créditos.');
+    try {
+      OwnerCreditUsuryRate::sync(App::settings());
+      $service = $this->ownerCreditService();
+      $actor = $this->ticketCompletionActor();
+      $work = $service->simulation(
+        sanitize_text_field(wp_unslash((string) ($_POST['document'] ?? ''))),
+        (int) ($_POST['contract_id'] ?? 0),
+        OwnerCreditService::money(sanitize_text_field(wp_unslash((string) ($_POST['amount'] ?? '')))),
+        (int) ($_POST['term'] ?? 0),
+        sanitize_text_field(wp_unslash((string) ($_POST['purpose'] ?? ''))),
+        sanitize_key((string) ($_POST['owner_key'] ?? '')),
+        $actor
+      );
+      $bytes = \SCM\Modules\OwnerCredits\OwnerCreditPdf::bytes($work, (string) ($actor['name'] ?? ''));
+      $service->recordSimulation($work, $actor);
+    } catch (\InvalidArgumentException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo generar la simulación.');
+    }
+    if (ob_get_level() > 0) ob_end_clean();
+    header_remove('Content-Type');
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="simulacion-credito-' . preg_replace('/[^0-9A-Za-z-]/', '', (string) $work['credit']['contract_code']) . '.pdf"');
+    header('Content-Length: ' . (string) strlen($bytes));
+    header('Cache-Control: private, max-age=0, must-revalidate');
+    echo $bytes;
+    exit;
+  }
+
   public function ajax_handler_owner_credit_simulate(): void
   {
     $this->verifyCsrf();
@@ -131,19 +169,8 @@ trait HandlesOwnerCredits
     $this->verifyCsrf();
     $this->requireDashboardAction('owner_credit_manage', 'Tu cargo no tiene permiso para crear créditos.');
     try {
-      $rows = [];
-      $service = $this->ownerCreditService();
-      foreach ($service->contractsByOwnerDocument(sanitize_text_field(wp_unslash((string) ($_POST['document'] ?? '')))) as ['contract' => $contract, 'owner' => $owner]) {
-        $end = OwnerCreditService::timestamp($contract['fin_contrato'] ?? '');
-        $income = $service->defaultIncome($contract);
-        $rows[] = [
-          'id' => (int) ($contract['_ID'] ?? 0), 'contrato' => (string) ($contract['contrato'] ?? ''), 'inmueble' => (string) ($contract['inmueble'] ?? ''),
-          'direccion' => (string) ($contract['direccion'] ?? ''), 'estado' => (string) ($contract['estado'] ?? ''), 'arrendatario' => (string) ($contract['arrendatario'] ?? ''),
-          'fin' => $end > 0 ? date('d/m/Y', $end) : '', 'max_months' => \SCM\Modules\OwnerCredits\OwnerCreditCalculator::monthsUntil(time(), $end),
-          'canon' => $income['gross'], 'deductions' => array_sum($income['deductions']), 'net_income' => max(0.0, $income['gross'] - array_sum($income['deductions'])),
-          'owner' => $owner,
-        ];
-      }
+      // El primero es el de vigencia más larga: el formulario lo preselecciona.
+      $rows = $this->ownerCreditService()->ownerPortfolio(sanitize_text_field(wp_unslash((string) ($_POST['document'] ?? ''))));
       // Cupo preaprobado con todos los contratos de la persona (no solo el que se elige para descontar).
       $preapproval = \SCM\Modules\OwnerCredits\OwnerCreditCalculator::preapproval($rows, OwnerCreditSettings::read(App::settings()));
       $this->jsonOk(['contracts' => $rows, 'preapproval' => $preapproval]);

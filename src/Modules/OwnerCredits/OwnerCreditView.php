@@ -199,6 +199,7 @@ final class OwnerCreditView
     $s = $ev['suggested'];
     $endChanged = (int) ($work['contract']['fin_saved_ts'] ?? 0) !== (int) ($work['contract']['fin_ts'] ?? 0);
     $termError = (string) ($work['term_error'] ?? '');
+    $others = $ev['other_contracts'] ?? [];
     $policies = '';
     foreach ($work['policies'] as $policy) {
       $policies .= '<li class="!sp-flex !sp-gap-2.5 !sp-items-start !sp-py-2.5 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0">'
@@ -208,14 +209,15 @@ final class OwnerCreditView
     return ($termError !== '' ? self::alert($termError, 'bad') : '')
       . ($endChanged ? self::alert('Estás calculando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Se guardará en el contrato al aprobar o rechazar el crédito.', 'info') : '')
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('chart') . 'Política de créditos</h4>' . self::guide('politica', [
-        'Valor máximo a prestar' => 'Tope = ingreso neto × los meses de política (Configuración, hoy ' . (int) $work['settings']['income_months'] . ').',
-        'Meses máximos' => 'Meses completos que faltan para el fin del contrato.',
+        'Valor máximo a prestar' => 'Tope = ingreso neto de todos los contratos del propietario × los meses de política (Configuración, hoy ' . (int) $work['settings']['income_months'] . ').',
+        'Meses máximos' => 'Meses completos que faltan para el fin del contrato con la vigencia más larga del propietario, menos los meses de margen (Configuración).',
         'Tasa ajustada' => 'Tasa de referencia menos el descuento de política.',
         'Cuota de política' => 'La cuota si se prestara el valor máximo al plazo máximo.',
         'Meses / valor que excede' => 'Diferencia entre la política y lo pedido; en rojo cuando lo pedido la supera.',
         'Tasa para el riesgo' => 'Tasa que compensa el exceso: cobra la usura mensual sobre la parte que supera el tope.',
       ]) . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">'
-      . self::tile('Ingreso neto (INO)', self::money($ev['net_income']), 'key')
+      . self::tile($others !== [] ? 'Ingreso neto de este contrato' : 'Ingreso neto (INO)', self::money($ev['net_income']), 'key')
+      . ($others !== [] ? self::tile('Ingreso neto total (' . (count($others) + 1) . ' contratos)', self::money($ev['total_net_income']), 'key') : '')
       . self::tile('Valor máximo a prestar', self::money($ev['max_amount']), 'key')
       . self::tile('Meses máximos', (string) $ev['max_months'])
       . self::tile('Tasa ajustada', self::percent($ev['policy_rate']))
@@ -223,7 +225,9 @@ final class OwnerCreditView
       . self::tile('Tasa para el riesgo', self::percent($ev['risk_rate']))
       . self::tile('Meses que excede', (string) $ev['exceed_months'], $ev['exceed_months'] < 0 ? 'bad' : '')
       . self::tile('Valor que excede', self::money($ev['exceed_amount'], true), $ev['exceed_amount'] < 0 ? 'bad' : '')
-      . '</div></section>'
+      . '</div><p class="' . self::NOTE . ' !sp-mt-3">Meses máximos: ' . self::e(OwnerCreditService::termBasis($ev)) . '.</p>'
+      . ($others !== [] ? '<ul class="!sp-m-0 !sp-mt-2 !sp-pl-4 !sp-text-[10px] !sp-text-service-muted">' . implode('', array_map(static fn(array $row): string => '<li>Contrato #' . self::e($row['contrato']) . ' · SIMI ' . self::e($row['inmueble']) . ' · ingreso neto ' . self::money((float) $row['net_income']) . ' · ' . (int) $row['max_months'] . ' meses de vigencia</li>', $others)) . '</ul>' : '')
+      . '</section>'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('target') . 'Condición sugerida · probabilidad ' . self::e($ev['vacancy']) . '</h4>'
       . self::guide('sugerida', [
         'Qué es' => 'La propuesta automática del simulador según la probabilidad de desocupación elegida. Úsala con "Usar condición sugerida" o ajusta las condiciones del analista.',
@@ -380,7 +384,7 @@ final class OwnerCreditView
         'Cupo preaprobado' => 'Suma del ingreso neto (canon − descuentos) de todos sus contratos × los meses de política. Las cuotas máximas salen del contrato con la vigencia más larga, menos el margen de Configuración.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[minmax(0,1fr)_auto] !sp-gap-3 !sp-items-end">'
-      . $field('Cédula o NIT' . $required, '<input class="' . $ui::INPUT . '" data-owner-credit-search-query inputmode="numeric" placeholder="Ej. 1143415938">')
+      . $field('Cédula o NIT' . $required, '<input class="' . $ui::INPUT . '" name="document" data-owner-credit-search-query inputmode="numeric" placeholder="Ej. 1143415938">')
       . '<button type="button" class="' . $ui::NAVY . ' !sp-h-10" data-owner-credit-search>' . $ui::icon('filter', '!sp-w-3.5 !sp-h-3.5') . 'Buscar</button></div>'
       . '<p class="' . self::NOTE . ' !sp-mt-2" data-owner-credit-search-status></p>'
       . '<div class="!sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200" data-owner-credit-person hidden></div>'
@@ -390,13 +394,16 @@ final class OwnerCreditView
       . self::guide('nuevo-datos', [
         'Qué pasa al registrar' => 'Solo se registra lo que pide el propietario: todavía no se aprueba nada. El analista lo evalúa en el liquidador y ahí se aprueba o rechaza.',
         'Plazo solicitado' => 'Los meses que pidió el propietario. Si superan la vigencia del contrato, regístralo igual: el analista revisa la fecha fin en el liquidador.',
+        'Simular y ver PDF' => 'Calcula la cuota y la tabla de amortización con la tasa de política sin registrar la solicitud. Sin valor o plazo se simula con el cupo preaprobado y el plazo máximo. La simulación queda en el historial de los contratos y de los inmuebles del propietario.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-3">'
       . $field('Valor solicitado' . $required, '<input class="' . $ui::INPUT . '" name="amount" inputmode="numeric" data-owner-credit-money required>')
       . $field('Plazo solicitado (meses)' . $required, '<input class="' . $ui::INPUT . '" name="term" type="number" min="1" max="60" placeholder="Escribe los meses" required>')
       . $field('Destinación', '<select class="' . $ui::INPUT . '" name="purpose">' . $options . '</select>')
       . '</div><p class="' . self::NOTE . ' !sp-mt-2" data-owner-credit-term-hint></p></section>'
-      . '<div class="!sp-flex !sp-items-center !sp-justify-end !sp-gap-3"><p class="!sp-m-0 !sp-text-[11px]" data-owner-credit-status role="status" aria-live="polite"></p><button type="submit" class="' . $ui::PRIMARY . '">' . $ui::icon('check', '!sp-w-3.5 !sp-h-3.5') . 'Registrar solicitud y evaluar</button></div></form>';
+      . '<div class="!sp-flex !sp-items-center !sp-justify-end !sp-gap-3"><p class="!sp-m-0 !sp-text-[11px]" data-owner-credit-status role="status" aria-live="polite"></p>'
+      . '<button type="button" class="' . $ui::NAVY . ' !sp-text-xs !sp-px-4 !sp-py-2.5" data-owner-credit-simulate-pdf>' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Simular y ver PDF</button>'
+      . '<button type="submit" class="' . $ui::PRIMARY . '">' . $ui::icon('check', '!sp-w-3.5 !sp-h-3.5') . 'Registrar solicitud y evaluar</button></div></form>';
   }
 
   /**

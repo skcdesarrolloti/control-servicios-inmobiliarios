@@ -88,7 +88,8 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   assert.equal(await page.evaluate(() => document.querySelector('[data-owner-credit-modal]').hidden), true);
   console.log('OK Escape closes the popup');
 
-  // Nueva solicitud: se busca al propietario por documento; con varios contratos se elige uno, sin fecha fin.
+  // Nueva solicitud: se busca al propietario por documento; queda elegido el contrato de vigencia más larga (el
+  // servidor lo envía primero) y se puede cambiar. Sin fecha fin. Se puede simular y ver el PDF sin registrar.
   const newForm = execFileSync('php', ['-r', String.raw`require 'vendor/autoload.php'; echo (new SCM\Modules\OwnerCredits\OwnerCreditView())->newForm();`], { cwd: root, encoding: 'utf8' });
   await page.evaluate((newForm) => {
     const button = document.createElement('button');
@@ -101,8 +102,12 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
       const data = body.action === 'scm_owner_credit_new_form' ? { html: newForm }
         : body.action === 'scm_owner_credit_contracts' ? { contracts: [
           { id: 9, contrato: '950', inmueble: '10600', direccion: 'Calle 1', estado: 'Entregado', arrendatario: 'Inquilino', fin: '15/01/2027', max_months: 2, owner },
-          { id: 10, contrato: '951', inmueble: '10601', direccion: 'Calle 2', estado: 'Entregado', arrendatario: '', fin: '', max_months: 0, owner }] }
+          { id: 10, contrato: '951', inmueble: '10601', direccion: 'Calle 2', estado: 'Entregado', arrendatario: '', fin: '', max_months: 0, owner }],
+          preapproval: { contracts: 2, net_income: 3440000, income_months: 3, amount: 10320000, longest_months: 2, margin_months: 2, max_term: 0 } }
         : body.action === 'scm_owner_credit_create' ? { credit_id: 40 } : {};
+      if (body.action === 'scm_owner_credit_simulation_pdf') {
+        return Promise.resolve({ headers: { get: () => 'application/pdf' }, blob: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })) });
+      }
       return Promise.resolve({ json: () => Promise.resolve({ success: true, data }) });
     };
   }, newForm);
@@ -115,9 +120,25 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   calls = await page.evaluate(() => window.calls);
   assert.equal(calls.find(c => c.action === 'scm_owner_credit_contracts').document, '22.233.344');
   assert.match(await page.textContent('[data-owner-credit-person]'), /Segunda Dueña/);
-  assert.equal(await page.isVisible('[data-owner-credit-request]'), false, 'with two contracts one must be chosen');
+  assert.match(await page.textContent('[data-owner-credit-preapproval]'), /\$10\.320\.000/);
+  assert.equal(await page.isVisible('[data-owner-credit-request]'), true, 'the longest contract is preselected');
+  assert.equal(await page.isChecked('[data-owner-credit-pick][value="0"]'), true);
+  assert.equal(await page.isVisible('[data-owner-credit-pick][value="1"]'), false, 'the other contracts stay hidden');
+  await page.click('[data-owner-credit-change-contract]');
+  assert.equal(await page.isVisible('[data-owner-credit-pick][value="1"]'), true, '"Cambiar contrato" shows every contract');
+  await page.click('[data-owner-credit-pick][value="1"]');
+  assert.equal(await page.isVisible('[data-owner-credit-pick][value="0"]'), false);
+  await page.click('[data-owner-credit-change-contract]');
   await page.click('[data-owner-credit-pick][value="0"]');
-  assert.equal(await page.isVisible('[data-owner-credit-request]'), true);
+  console.log('OK the longest contract is preselected and can be changed');
+  await page.click('[data-owner-credit-simulate-pdf]');
+  await page.waitForSelector('[data-owner-credit-pdf-viewer] iframe');
+  calls = await page.evaluate(() => window.calls);
+  const simulation = calls.find(c => c.action === 'scm_owner_credit_simulation_pdf');
+  assert.equal(simulation.document, '22.233.344'); assert.equal(simulation.contract_id, '9'); assert.equal(simulation.owner_key, 'mandato_2');
+  assert.match(await page.textContent('[data-owner-credit-pdf-viewer]'), /Simulación de crédito · Contrato 950/);
+  await page.click('[data-owner-credit-pdf-close]');
+  console.log('OK the request can be simulated and shown as a PDF without registering it');
   await page.fill('[name="term"]', '12');
   assert.match(await page.textContent('[data-owner-credit-term-hint]'), /Puedes registrar la solicitud/);
   await page.fill('[name="amount"]', '2000000');

@@ -21,7 +21,8 @@ $assert = static function (bool $condition, string $message): void {
 $near = static fn(float $a, float $b, float $tolerance = 0.01): bool => abs($a - $b) <= $tolerance;
 
 // Valores de "Simuladore de Creditos a Propietarios Version 2.xlsx" (contrato 890).
-$settings = OwnerCreditSettings::normalize(['usury_annual' => '0.333', 'reference_rate' => '0.0242', 'policy_discount' => '0.05', 'income_months' => 3]);
+// Sin margen de meses, como el Excel (el margen del preaprobado se prueba aparte).
+$settings = OwnerCreditSettings::normalize(['usury_annual' => '0.333', 'reference_rate' => '0.0242', 'policy_discount' => '0.05', 'income_months' => 3, 'preapproval_margin_months' => 0]);
 $assert($near($settings['usury_annual'], 0.333, 1e-9) && $near($settings['reference_rate'], 0.0242, 1e-9), 'settings keep decimal rates');
 $assert($near(OwnerCreditSettings::normalize(['usury_annual' => '33,3', 'reference_rate' => '2,42'])['reference_rate'], 0.0242, 1e-9), 'settings accept rates typed as percentages');
 
@@ -49,8 +50,20 @@ $pre = OwnerCreditCalculator::preapproval([
   ['net_income' => 800000, 'max_months' => 3], ['net_income' => 400000, 'max_months' => 7], ['net_income' => 2240000, 'max_months' => 12],
 ], $settings);
 $assert($near($pre['net_income'], 3440000) && $near($pre['amount'], 10320000), 'preapproval = sum of net incomes × 3');
-$assert($pre['longest_months'] === 12 && $pre['max_term'] === 10 && $pre['contracts'] === 3, 'preapproval term = longest contract term − 2 months of margin');
+$assert($pre['longest_months'] === 12 && $pre['max_term'] === 12 && $pre['contracts'] === 3, 'preapproval term without margin = longest contract term');
 $assert(OwnerCreditCalculator::preapproval([], $settings)['max_term'] === 0, 'preapproval without contracts is empty');
+$withMargin = OwnerCreditSettings::normalize(['preapproval_margin_months' => 2] + $settings);
+$pre = OwnerCreditCalculator::preapproval([
+  ['net_income' => 800000, 'max_months' => 3], ['net_income' => 400000, 'max_months' => 7], ['net_income' => 2240000, 'max_months' => 12],
+], $withMargin);
+$assert($pre['longest_months'] === 12 && $pre['max_term'] === 10 && $pre['contracts'] === 3, 'preapproval term = longest contract term − 2 months of margin');
+$consolidated = OwnerCreditCalculator::evaluate([
+  'gross' => 1000000, 'deductions' => ['comision' => 200000], 'requested_amount' => 5000000, 'requested_term' => 10,
+  'request_ts' => strtotime('2026-01-01'), 'contract_end_ts' => strtotime('2026-04-15'), 'vacancy' => 'Baja',
+  'other_net_income' => 2640000, 'longest_months' => 12,
+], $withMargin);
+$assert($near($consolidated['total_net_income'], 3440000) && $near($consolidated['max_amount'], 10320000), 'liquidator cap uses the net income of all the owner contracts');
+$assert($consolidated['contract_months'] === 3 && $consolidated['max_months'] === 10, 'liquidator term uses the longest contract minus the margin');
 
 // Analista: 14.000.000 a 12 meses al 2,8 % (B41-B44 y hoja Tabla de Amortización).
 $assert($near(OwnerCreditCalculator::payment(0.028, 12, 14000000), 1389730.2109234515), 'analyst payment = PMT(2.8 %, 12, 14.000.000) (B44)');

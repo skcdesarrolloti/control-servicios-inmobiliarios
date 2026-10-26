@@ -35,8 +35,9 @@ final class OwnerCreditPdf
       'rechazado' => 'Crédito no aprobado',
       'pagado' => 'Crédito pagado',
       'anulado' => 'Crédito anulado',
+      'simulacion' => 'Simulación de crédito',
       default => 'Solicitud de crédito',
-    } . ' #' . (int) $credit['id'];
+    } . ((int) $credit['id'] > 0 ? ' #' . (int) $credit['id'] : ' · Contrato ' . $credit['contract_code']);
   }
 
   /** @param array<string,mixed> $work */
@@ -51,6 +52,7 @@ final class OwnerCreditPdf
     $date = static fn(int $ts): string => $ts > 0 ? date('d/m/Y', $ts) : '';
     $decided = in_array($credit['status'], ['aprobado', 'pagado', 'rechazado'], true);
     $approved = in_array($credit['status'], ['aprobado', 'pagado'], true);
+    $simulation = $credit['status'] === 'simulacion';
 
     $letterhead = $footerImage = '';
     if ($pdf) {
@@ -64,6 +66,13 @@ final class OwnerCreditPdf
     $deductions = [];
     foreach (OwnerCreditService::DEDUCTIONS as $key => $label) $deductions['(−) ' . $label] = $money($ev['deductions'][$key] ?? 0);
 
+    // Demás contratos del propietario que suman al tope y al plazo máximo.
+    $others = [];
+    foreach ($ev['other_contracts'] ?? [] as $row) {
+      $others['Contrato #' . $row['contrato'] . ' · SIMI ' . $row['inmueble']] = $money($row['net_income']) . ' de ingreso neto · ' . (int) $row['max_months'] . ' meses de vigencia' . ((string) $row['fin'] !== '' ? ' (fin ' . $row['fin'] . ')' : '');
+    }
+    if ($others !== []) $others['Ingreso neto total (' . (count($others) + 1) . ' contratos)'] = $money($ev['total_net_income']);
+
     $policies = '';
     foreach ($work['policies'] as $policy) {
       $policies .= '<tr><td class="' . ($policy['ok'] ? 'is-ok' : 'is-bad') . '">' . ($policy['ok'] ? 'Cumple' : 'No cumple') . '</td><th scope="row">' . Doc::e($policy['label']) . '</th><td>' . Doc::e($policy['detail']) . '</td></tr>';
@@ -73,10 +82,12 @@ final class OwnerCreditPdf
       $schedule .= '<tr><td>' . (int) $line['mes'] . '</td><td>' . Doc::e($money($line['saldo_inicial'])) . '</td><td>' . Doc::e($money($line['cuota'])) . '</td><td>' . Doc::e($money($line['interes'])) . '</td><td>' . Doc::e($money($line['abono'])) . '</td><td>' . Doc::e($money($line['saldo'])) . '</td></tr>';
     }
 
-    $decision = $decided
+    $decision = $simulation
+      ? ['Estado' => 'Simulación', 'Observación' => 'Simulación generada desde la solicitud de crédito: no es una aprobación. Las condiciones son las de la política al momento de generarla y quedan sujetas a la evaluación del analista.']
+      : ($decided
       ? ['Estado' => OwnerCreditService::STATUSES[$credit['status']] ?? (string) $credit['status'], 'Decidido por' => (string) $credit['decided_by_name'], 'Fecha de decisión' => $date((int) $credit['decided_at']),
         'Fuera de política' => (int) $credit['policy_override'] === 1 ? 'Sí' : 'No', 'Observación / justificación' => trim((string) $credit['decision_note'])]
-      : ['Estado' => 'Pendiente de evaluación', 'Observación' => 'Documento de trabajo: las condiciones son las propuestas en el liquidador al momento de generarlo.'];
+      : ['Estado' => 'Pendiente de evaluación', 'Observación' => 'Documento de trabajo: las condiciones son las propuestas en el liquidador al momento de generarlo.']);
 
     $html = '<article class="scm-acta-receipt scm-services-document scm-owner-credit-document">' . $letterhead . Doc::header(self::title($work), false)
       . '<p class="scm-acta-receipt-date">Cartagena de Indias, ' . date('d/m/Y') . ' · Documento interno para funcionarios</p>'
@@ -84,28 +95,29 @@ final class OwnerCreditPdf
         OwnerCreditService::beneficiaryLabel($credit) . ' (beneficiario)' => (string) $credit['owner_name'] . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · Documento ' . $credit['owner_document'] : ''),
         'Contrato / Inmueble SIMI' => '#' . $contract['code'] . ' · ' . $credit['property'],
         'Dirección' => (string) $credit['address'],
-        'Origen' => (int) $credit['quote_id'] > 0 ? 'Cotización #' . (int) $credit['quote_id'] . ((string) $credit['ticket_id'] !== '' ? ' · Caso #' . $credit['ticket_id'] : '') : 'Solicitud registrada en el panel',
+        'Origen' => $simulation ? 'Simulación desde la solicitud de crédito (sin registrar)' : ((int) $credit['quote_id'] > 0 ? 'Cotización #' . (int) $credit['quote_id'] . ((string) $credit['ticket_id'] !== '' ? ' · Caso #' . $credit['ticket_id'] : '') : 'Solicitud registrada en el panel'),
         'Inicio / fin del contrato' => $date((int) $contract['inicio_ts']) . ' – ' . $date((int) $contract['fin_ts']),
         'Estado del contrato' => (string) $contract['estado'],
         'Aseguradora' => (string) $contract['aseguradora'],
         'Siniestro' => $contract['siniestrado'] ? 'Siniestrado' : 'Por verificar',
       ]) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>2. Ingreso del propietario</h2>' . Doc::table(['Ingreso bruto (canon)' => $money($ev['gross'])] + $deductions + ['Ingreso neto (INO)' => $money($ev['net_income'])]) . '</section>'
+      . ($others !== [] ? '<section class="scm-acta-receipt-section"><h2>2.1 Otros contratos del propietario</h2>' . Doc::table($others) . '</section>' : '')
       . '<section class="scm-acta-receipt-section"><h2>3. Solicitud</h2>' . Doc::table([
-        'Fecha de solicitud' => $date((int) $credit['created_at']),
+        ($simulation ? 'Fecha de simulación' : 'Fecha de solicitud') => $date((int) $credit['created_at']),
         'Valor solicitado' => $money($credit['requested_amount']),
         'Plazo solicitado' => (int) $credit['requested_term'] > 0 ? (int) $credit['requested_term'] . ' meses' : '',
         'Destinación' => (string) $credit['purpose'],
         'Probabilidad de desocupación' => (string) $ev['vacancy'],
       ]) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>4. Política de créditos</h2>' . Doc::table([
-        'Valor máximo a prestar' => $money($ev['max_amount']) . ' (' . (int) $work['settings']['income_months'] . ' × ingreso neto)',
-        'Meses máximos (hasta el fin del contrato)' => (string) $ev['max_months'],
+        'Valor máximo a prestar' => $money($ev['max_amount']) . ' (' . (int) $work['settings']['income_months'] . ' × ingreso neto' . ($others !== [] ? ' total' : '') . ')',
+        'Meses máximos' => $ev['max_months'] . ' (' . OwnerCreditService::termBasis($ev) . ')',
         'Tasa ajustada de colocación' => $percent($ev['policy_rate']) . ' N.M.V',
         'Tasa para el riesgo' => $percent($ev['risk_rate']) . ' N.M.V',
         'Tasa de usura vigente' => $percent((float) $work['settings']['usury_annual']) . ' E.A. (' . $percent((float) $ev['usury_monthly_legal']) . ' mensual)',
       ]) . '</section>'
-      . '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>5. ' . ($approved ? 'Condiciones aprobadas' : 'Condiciones propuestas') . '</h2>' . Doc::table([
+      . '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>5. ' . ($approved ? 'Condiciones aprobadas' : ($simulation ? 'Condiciones simuladas' : 'Condiciones propuestas')) . '</h2>' . Doc::table([
         'Valor del crédito' => $money($c['amount']),
         'Plazo' => (int) $c['term'] . ' meses',
         'Tasa' => $percent($c['rate']) . ' N.M.V (' . $percent((1 + $c['rate']) ** 12 - 1) . ' E.A.)',
@@ -114,11 +126,11 @@ final class OwnerCreditPdf
         'Total a pagar' => $money($c['amount'] + $c['total_interest']),
       ]) . '</section>'
       . '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>6. Políticas evaluadas</h2><table class="scm-acta-receipt-data scm-owner-credit-policies"><tbody>' . $policies . '</tbody></table></section>'
-      . '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>7. Decisión</h2>' . Doc::table($decision) . '</section>'
+      . '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>7. ' . ($simulation ? 'Alcance' : 'Decisión') . '</h2>' . Doc::table($decision) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>8. Tabla de amortización</h2>'
       . ($schedule === '' ? '<p>Sin valor o plazo para calcular la tabla.</p>' : '<table class="scm-owner-credit-schedule"><thead><tr><th>Mes</th><th>Saldo de capital</th><th>Cuota</th><th>Intereses</th><th>Abono a capital</th><th>Saldo</th></tr></thead><tbody>' . $schedule . '</tbody></table>')
       . '</section>'
-      . Doc::footer(['realizado_por' => $decided && (string) $credit['decided_by_name'] !== '' ? (string) $credit['decided_by_name'] : $generatedBy, 'realizado_por_cargo' => $decided ? 'Decisión del liquidador de créditos' : 'Generado desde el liquidador de créditos'])
+      . Doc::footer(['realizado_por' => $decided && (string) $credit['decided_by_name'] !== '' ? (string) $credit['decided_by_name'] : $generatedBy, 'realizado_por_cargo' => $decided ? 'Decisión del liquidador de créditos' : ($simulation ? 'Simulación desde la solicitud de crédito' : 'Generado desde el liquidador de créditos')])
       . $footerImage . '</article>';
     return $html;
   }

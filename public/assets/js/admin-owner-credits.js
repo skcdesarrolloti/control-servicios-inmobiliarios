@@ -219,9 +219,9 @@
             '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">' + escapeHtml(detail || "Sin datos de contacto") + "</span>";
           person.hidden = false;
           renderPreapproval(preapproval, data.preapproval);
-          status.textContent = contracts.length === 1 ? "Es propietario en 1 contrato." : "Es propietario en " + contracts.length + " contratos. Elige del que se descontarán las cuotas.";
+          status.textContent = contracts.length === 1 ? "Es propietario en 1 contrato." : "Es propietario en " + contracts.length + " contratos. Las cuotas se descuentan del de vigencia más larga; puedes cambiarlo.";
           results.innerHTML = contracts.map(function (c, index) {
-            return '<label class="!sp-flex !sp-items-start !sp-gap-3 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-white !sp-cursor-pointer hover:!sp-border-service-yellow !sp-text-[11px] !sp-text-service-muted">' +
+            return '<label data-owner-credit-contract-card class="!sp-flex !sp-items-start !sp-gap-3 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-white !sp-cursor-pointer hover:!sp-border-service-yellow !sp-text-[11px] !sp-text-service-muted">' +
               '<input type="radio" name="contract_pick" value="' + index + '" class="!sp-mt-1" data-owner-credit-pick>' +
               '<span class="!sp-min-w-0"><strong class="!sp-block !sp-text-xs !sp-text-service-navy">Contrato ' + escapeHtml(c.contrato) + " · SIMI " + escapeHtml(c.inmueble) + "</strong>" +
               '<span class="!sp-block">' + escapeHtml(c.direccion) + " · " + escapeHtml(c.estado) + (c.fin ? " · Vence " + escapeHtml(c.fin) : "") + "</span>" +
@@ -229,10 +229,9 @@
               '<span class="!sp-block">Canon ' + money(c.canon) + " − descuentos " + money(c.deductions) + " = ingreso neto <strong class=\"!sp-text-service-navy\">" + money(c.net_income) + "</strong>" + (c.fin ? " · " + escapeHtml(c.max_months) + " meses de vigencia" : "") + "</span></span></label>";
           }).join("");
           results._contracts = contracts;
-          if (contracts.length === 1) {
-            results.querySelector("[data-owner-credit-pick]").checked = true;
-            pickContract(form, contracts[0]);
-          }
+          // El servidor los ordena con el de vigencia más larga primero: ese queda elegido.
+          results.querySelector("[data-owner-credit-pick]").checked = true;
+          pickContract(form, contracts[0]);
         })
         .catch(function (error) { status.textContent = error.message; });
     }
@@ -251,7 +250,24 @@
         '<strong class="!sp-block !sp-text-base !sp-text-service-navy">' + money(p.amount) + "</strong>" +
         '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">Ingreso neto de ' + (p.contracts === 1 ? "1 contrato" : p.contracts + " contratos") + " " + money(p.net_income) + " × " + p.income_months + " meses. " + escapeHtml(term) + "</span>" +
         '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">Es una referencia: el analista confirma el valor y el plazo en el liquidador.</span>';
+      box.className = box.className.replace(/!sp-(bg|border)-(amber|red)-(50|200)/g, "") + (p.max_term > 0 ? " !sp-bg-amber-50 !sp-border-amber-200" : " !sp-bg-red-50 !sp-border-red-200");
       box.hidden = false;
+    }
+
+    // Con varios contratos solo se ve el elegido; "Cambiar contrato" muestra todos.
+    function collapseContracts(form, collapsed) {
+      var results = form.querySelector("[data-owner-credit-search-results]");
+      var cards = results.querySelectorAll("[data-owner-credit-contract-card]");
+      var toggle = results.querySelector("[data-owner-credit-change-contract]");
+      if (toggle) toggle.remove();
+      Array.prototype.forEach.call(cards, function (card) {
+        // Las tarjetas usan !sp-flex (!important): el atributo hidden no bastaría.
+        if (collapsed && !card.querySelector("[data-owner-credit-pick]").checked) card.style.setProperty("display", "none", "important");
+        else card.style.removeProperty("display");
+      });
+      if (collapsed && cards.length > 1) {
+        results.insertAdjacentHTML("beforeend", '<button type="button" class="' + UI.secondary + ' !sp-justify-self-start" data-owner-credit-change-contract>Cambiar contrato (' + cards.length + ")</button>");
+      }
     }
 
     function pickContract(form, contract) {
@@ -261,6 +277,7 @@
       request.hidden = !contract;
       form._contract = contract;
       if (!contract) return;
+      collapseContracts(form, true);
       updateTermHint(form);
       form.elements.amount.focus();
     }
@@ -320,12 +337,10 @@
         });
     }
 
-    // PDF interno: se pide por POST (CSRF) y se muestra en un visor dentro del mismo popup.
-    // PDF interno: se pide por POST (CSRF) y se muestra en un visor dentro del mismo popup. El visor se abre
-    // de inmediato con "Generando PDF…" para que se note que está trabajando.
-    function showPdf(form, button) {
+    // PDF interno del crédito o simulación de la solicitud: se pide por POST (CSRF) y se muestra en un visor dentro
+    // del mismo popup. El visor se abre de inmediato con "Generando PDF…" para que se note que está trabajando.
+    function showPdf(button, options) {
       var box = ensureModal();
-      var creditId = form.getAttribute("data-credit-id") || "";
       var label = button ? button.innerHTML : "";
       if (button) {
         if (button.disabled) return;
@@ -336,8 +351,8 @@
       viewer.className = "!sp-absolute !sp-inset-0 !sp-z-20 !sp-flex !sp-flex-col !sp-bg-white !sp-rounded-2xl !sp-overflow-hidden";
       viewer.setAttribute("data-owner-credit-pdf-viewer", "");
       viewer.innerHTML = '<div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-3 !sp-px-4 !sp-py-3 !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200 !sp-font-sans">' +
-        '<strong class="!sp-text-sm !sp-text-service-navy">PDF interno del crédito #' + escapeHtml(creditId) + "</strong>" +
-        '<div class="!sp-flex !sp-gap-2" data-owner-credit-pdf-actions><button type="button" class="' + UI.secondary + '" data-owner-credit-pdf-close>Volver al liquidador</button></div></div>' +
+        '<strong class="!sp-text-sm !sp-text-service-navy">' + escapeHtml(options.title) + "</strong>" +
+        '<div class="!sp-flex !sp-gap-2" data-owner-credit-pdf-actions><button type="button" class="' + UI.secondary + '" data-owner-credit-pdf-close>' + escapeHtml(options.back) + "</button></div></div>" +
         '<div class="!sp-flex-1 !sp-flex !sp-flex-col !sp-items-center !sp-justify-center !sp-gap-3 !sp-font-sans !sp-text-service-navy" data-owner-credit-pdf-body role="status" aria-live="polite">' +
         spinner("!sp-w-8 !sp-h-8") + '<strong class="!sp-text-sm">Generando PDF…</strong><span class="' + UI.note + '">Suele tardar unos segundos.</span></div>';
       box.querySelector("[role=dialog]").appendChild(viewer);
@@ -354,10 +369,9 @@
         if (url) URL.revokeObjectURL(url);
         restore();
       });
-      var body = new FormData();
-      body.set("action", "scm_owner_credit_pdf");
+      var body = options.data;
+      body.set("action", options.action);
       body.set("nonce", runtime.nonce || "");
-      body.set("credit_id", creditId);
       return fetch(runtime.ajaxUrl || "", { method: "POST", body: body, credentials: "same-origin" })
         .then(function (response) {
           if ((response.headers.get("Content-Type") || "").indexOf("application/pdf") === -1) {
@@ -369,7 +383,7 @@
           restore();
           if (closed) return;
           url = URL.createObjectURL(blob);
-          viewer.querySelector("[data-owner-credit-pdf-actions]").insertAdjacentHTML("afterbegin", '<a class="' + UI.secondary + '" href="' + url + '" download="credito-propietario-' + escapeHtml(creditId) + '.pdf">Descargar</a>');
+          viewer.querySelector("[data-owner-credit-pdf-actions]").insertAdjacentHTML("afterbegin", '<a class="' + UI.secondary + '" href="' + url + '" download="' + escapeHtml(options.filename) + '">Descargar</a>');
           var area = viewer.querySelector("[data-owner-credit-pdf-body]");
           area.className = "!sp-flex-1 !sp-flex";
           area.removeAttribute("role");
@@ -419,7 +433,13 @@
         simulate(form);
         return;
       }
-      if (form && target.closest("[data-owner-credit-pdf]")) { showPdf(form, target.closest("[data-owner-credit-pdf]")); return; }
+      if (form && target.closest("[data-owner-credit-pdf]")) {
+        var creditId = form.getAttribute("data-credit-id") || "";
+        var pdfData = new FormData();
+        pdfData.set("credit_id", creditId);
+        showPdf(target.closest("[data-owner-credit-pdf]"), { title: "PDF interno del crédito #" + creditId, back: "Volver al liquidador", action: "scm_owner_credit_pdf", data: pdfData, filename: "credito-propietario-" + creditId + ".pdf" });
+        return;
+      }
       var decide = form && target.closest("[data-owner-credit-decide]");
       if (decide) {
         var decision = decide.getAttribute("data-owner-credit-decide");
@@ -440,6 +460,13 @@
       }
       var newForm = target.closest("[data-owner-credit-new-form]");
       if (newForm && target.closest("[data-owner-credit-search]")) { searchContracts(newForm); return; }
+      if (newForm && target.closest("[data-owner-credit-change-contract]")) { collapseContracts(newForm, false); return; }
+      if (newForm && target.closest("[data-owner-credit-simulate-pdf]")) {
+        if (!newForm.elements.contract_id.value) { setStatus(newForm, "Busca al propietario por documento y elige el contrato.", "error"); return; }
+        setStatus(newForm, "");
+        showPdf(target.closest("[data-owner-credit-simulate-pdf]"), { title: "Simulación de crédito · Contrato " + (newForm._contract ? newForm._contract.contrato : ""), back: "Volver a la solicitud", action: "scm_owner_credit_simulation_pdf", data: new FormData(newForm), filename: "simulacion-credito-" + (newForm._contract ? newForm._contract.contrato : "") + ".pdf" });
+        return;
+      }
       var pick = newForm && target.closest("[data-owner-credit-pick]");
       if (pick) { pickContract(newForm, (newForm.querySelector("[data-owner-credit-search-results]")._contracts || [])[Number(pick.value)] || null); return; }
       if (target.closest("[data-owner-credit-new]")) {

@@ -192,6 +192,49 @@ final class OwnerCreditService
   }
 
   /**
+   * Simulación desde "Nueva solicitud", sin registrar la solicitud: el mismo cálculo del liquidador con el contrato
+   * elegido y los demás contratos del propietario. Sin valor o sin plazo se simula con el cupo preaprobado y el
+   * plazo máximo.
+   * @return array<string,mixed> workspace con estado "simulacion", más preapproval y portfolio
+   */
+  public function simulation(string $document, int $contractId, float $amount, int $term, string $purpose, string $ownerKey, array $actor): array
+  {
+    $this->ensureSchema();
+    $portfolio = $this->ownerPortfolio($document);
+    $row = null;
+    foreach ($portfolio as $candidate) if ($candidate['id'] === $contractId) $row = $candidate;
+    $contract = $row !== null ? $this->contractById($contractId) : null;
+    if ($row === null || $contract === null) throw new \DomainException('Busca al propietario por documento y elige el contrato.');
+    $owner = null;
+    foreach ($this->contractOwners($contractId) as $candidate) if ($candidate['key'] === ($ownerKey !== '' ? $ownerKey : $row['owner']['key'])) $owner = $candidate;
+    if ($owner !== null && $owner['document'] === '') $owner['document'] = (string) $row['owner']['document'];
+    $preapproval = OwnerCreditCalculator::preapproval($portfolio, $this->config());
+    if ($amount <= 0) $amount = round($preapproval['amount']);
+    if ($term <= 0) $term = $preapproval['max_term'];
+    if (!in_array($purpose, OwnerCreditSettings::PURPOSES, true)) $purpose = OwnerCreditSettings::PURPOSES[0];
+    $credit = ['id' => 0, 'status' => 'simulacion', 'evaluation_json' => null, 'policy_override' => 0, 'decision_note' => '', 'decided_by_name' => '', 'decided_at' => 0]
+      + $this->creditRow($contract, null, '', $amount, $purpose, $actor, $term, $owner, 'propietario');
+    $credit['status'] = 'simulacion';
+    return $this->workspaceFor($credit) + ['preapproval' => $preapproval, 'portfolio' => $portfolio];
+  }
+
+  /** La simulación generada queda en el historial de cada contrato del propietario y de su inmueble. @param array<string,mixed> $work simulation() */
+  public function recordSimulation(array $work, array $actor): void
+  {
+    $credit = $work['credit'];
+    $c = $work['conditions'];
+    $pre = $work['preapproval'];
+    $money = static fn($value): string => '$' . number_format((float) $value, 0, ',', '.');
+    $message = 'Simulación de crédito para el propietario ' . $credit['owner_name'] . ((string) $credit['owner_document'] !== '' ? ' (documento ' . $credit['owner_document'] . ')' : '') . ': '
+      . $money($c['amount']) . ' a ' . (int) $c['term'] . ' meses, tasa ' . number_format($c['rate'] * 100, 2, ',', '.') . ' % N.M.V, cuota ' . $money($c['payment']) . '. '
+      . 'Cupo preaprobado ' . $money($pre['amount']) . ' con ' . $pre['contracts'] . ' contrato(s), hasta ' . $pre['max_term'] . ' cuotas. '
+      . 'Cuotas a descontar del contrato #' . $credit['contract_code'] . '. Es una simulación: no se registró solicitud.';
+    foreach ($work['portfolio'] as $row) {
+      $this->recordHistories(['id' => 0, 'quote_id' => 0, 'ticket_id' => '', 'contract_id' => $row['id'], 'contract_code' => $row['contrato']], 'Simulación de crédito', $message, $actor);
+    }
+  }
+
+  /**
    * "Nueva solicitud": contratos Entregado o Por entregar donde el documento (cédula o NIT) es de un propietario, con esa persona ya
    * resuelta como beneficiaria. Busca el documento exacto (sin puntos ni espacios) en los propietarios del
    * mandato, en documento_propietario del contrato y en la ficha del propietario.
@@ -239,6 +282,57 @@ final class OwnerCreditService
     return $results;
   }
 
+  /**
+   * Contratos del propietario con su ingreso neto y vigencia, ordenados para preseleccionar: primero el de vigencia
+   * más larga (en empate, Entregado). Con ellos se calcula el cupo preaprobado y el plazo máximo.
+   * @return list<array<string,mixed>>
+   */
+  public function ownerPortfolio(string $document, int $fromTs = 0): array
+  {
+    $rows = [];
+    foreach ($this->contractsByOwnerDocument($document) as $index => ['contract' => $contract, 'owner' => $owner]) {
+      $end = self::timestamp($contract['fin_contrato'] ?? '');
+      $income = $this->defaultIncome($contract);
+      $deductions = array_sum($income['deductions']);
+      $rows[] = [
+        'id' => (int) ($contract['_ID'] ?? 0), 'contrato' => (string) ($contract['contrato'] ?? ''), 'inmueble' => (string) ($contract['inmueble'] ?? ''),
+        'direccion' => (string) ($contract['direccion'] ?? ''), 'estado' => (string) ($contract['estado'] ?? ''), 'arrendatario' => (string) ($contract['arrendatario'] ?? ''),
+        'fin' => $end > 0 ? date('d/m/Y', $end) : '', 'max_months' => OwnerCreditCalculator::monthsUntil($fromTs ?: time(), $end),
+        'canon' => $income['gross'], 'deductions' => $deductions, 'net_income' => max(0.0, $income['gross'] - $deductions),
+        'owner' => $owner, 'order' => $index,
+      ];
+    }
+    usort($rows, static fn(array $a, array $b): int => [$b['max_months'], $a['order']] <=> [$a['max_months'], $b['order']]);
+    return array_map(static function (array $row): array { unset($row['order']); return $row; }, $rows);
+  }
+
+  /**
+   * Demás contratos del propietario del crédito (por su documento), para el tope y el plazo consolidados. Un
+   * crédito ya decidido usa los que quedaron guardados en su evaluación.
+   * @return list<array<string,mixed>>
+   */
+  private function otherContracts(array $credit, int $fromTs): array
+  {
+    if (!in_array($credit['status'], ['pendiente', 'simulacion'], true)) {
+      $stored = json_decode((string) ($credit['evaluation_json'] ?? ''), true);
+      // Los decididos antes de consolidar contratos no tienen la lista: se evaluaron solo con su contrato.
+      return is_array($stored) && isset($stored['other_contracts']) && is_array($stored['other_contracts']) ? $stored['other_contracts'] : [];
+    }
+    $document = trim((string) ($credit['owner_document'] ?? ''));
+    if ($document === '') return [];
+    try {
+      $rows = $this->ownerPortfolio($document, $fromTs);
+    } catch (\InvalidArgumentException) {
+      return [];
+    }
+    $others = [];
+    foreach ($rows as $row) {
+      if ($row['id'] === (int) $credit['contract_id']) continue;
+      $others[] = array_intersect_key($row, array_flip(['id', 'contrato', 'inmueble', 'estado', 'fin', 'max_months', 'canon', 'deductions', 'net_income']));
+    }
+    return $others;
+  }
+
   private static function document(string $value): string
   {
     return strtoupper(preg_replace('/[\s.]+/', '', trim($value)) ?? '');
@@ -262,6 +356,13 @@ final class OwnerCreditService
   {
     $credit = $this->find($id);
     if ($credit === null) throw new \DomainException('El crédito ya no existe.');
+    return $this->workspaceFor($credit, $input);
+  }
+
+  /** @param array<string,mixed> $credit fila guardada o simulación sin guardar @param array<string,mixed> $input */
+  private function workspaceFor(array $credit, array $input = []): array
+  {
+    $id = (int) $credit['id'];
     $contract = $this->contractById((int) $credit['contract_id']) ?? [];
     $settings = $this->config();
     $stored = json_decode((string) ($credit['deductions_json'] ?? ''), true);
@@ -280,10 +381,16 @@ final class OwnerCreditService
     $storedEndTs = self::timestamp($contract['fin_contrato'] ?? '');
     $inputEndTs = self::dateInput($input['contract_end'] ?? '');
     $endTs = $inputEndTs > 0 ? $inputEndTs : $storedEndTs;
+    $evaluationTs = in_array($credit['status'], ['pendiente', 'simulacion'], true) ? time() : $requestTs;
+    // Tope y plazo con todos los contratos del propietario, no solo con el que se descuentan las cuotas.
+    $others = $this->otherContracts($credit, $evaluationTs);
     $evaluation = OwnerCreditCalculator::evaluate([
       'gross' => $gross, 'deductions' => $deductions, 'requested_amount' => $requested, 'requested_term' => $requestedTerm,
-      'request_ts' => $credit['status'] === 'pendiente' ? time() : $requestTs, 'contract_end_ts' => $endTs, 'vacancy' => $vacancy,
+      'request_ts' => $evaluationTs, 'contract_end_ts' => $endTs, 'vacancy' => $vacancy,
+      'other_net_income' => array_sum(array_map(static fn(array $row): float => (float) $row['net_income'], $others)),
+      'longest_months' => $others === [] ? 0 : max(array_map(static fn(array $row): int => (int) $row['max_months'], $others)),
     ], $settings);
+    $evaluation['other_contracts'] = $others;
 
     $decided = in_array($credit['status'], ['aprobado', 'pagado'], true);
     $suggested = $evaluation['suggested'];
@@ -294,7 +401,7 @@ final class OwnerCreditService
     $schedule = OwnerCreditCalculator::schedule($rate, $term, $amount);
     $policies = $this->policies($credit, $contract, $evaluation, $settings, $amount, $term, $rate, $payment, $endTs);
     // El plazo solicitado nunca puede pasar de los meses que faltan entre la solicitud y el fin del contrato.
-    $termError = $requestedTerm <= 0 ? 'Escribe el plazo solicitado (meses) para evaluar el crédito.' : ($requestedTerm > $evaluation['max_months'] ? self::termMessage($requestedTerm, $evaluation['max_months']) : '');
+    $termError = $requestedTerm <= 0 ? 'Escribe el plazo solicitado (meses) para evaluar el crédito.' : ($requestedTerm > $evaluation['max_months'] ? self::termMessage($requestedTerm, $evaluation) : '');
 
     return [
       'credit' => $credit,
@@ -313,7 +420,7 @@ final class OwnerCreditService
       'policies' => $policies,
       'policies_ok' => !in_array(false, array_column($policies, 'ok'), true),
       'other_credits' => $this->ownerCredits($credit),
-      'events' => $this->events($id),
+      'events' => $id > 0 ? $this->events($id) : [],
     ];
   }
 
@@ -492,9 +599,16 @@ final class OwnerCreditService
     $this->recordHistories($credit, 'Actualización de fecha fin', 'Fecha fin del contrato #' . ($contract['contrato'] ?? $credit['contract_code']) . ' actualizada desde el liquidador de créditos (crédito #' . $credit['id'] . '): ' . $change . '.', $actor);
   }
 
-  private static function termMessage(int $term, int $maxMonths): string
+  /** @param array<string,mixed> $evaluation */
+  private static function termMessage(int $term, array $evaluation): string
   {
-    return 'El plazo solicitado (' . $term . ' meses) no puede superar los ' . $maxMonths . ' meses que faltan para el fin del contrato. Corrige el plazo o la fecha fin.';
+    return 'El plazo solicitado (' . $term . ' meses) no puede superar el máximo de ' . $evaluation['max_months'] . ' meses (' . self::termBasis($evaluation) . '). Corrige el plazo o la fecha fin.';
+  }
+
+  /** "12 meses de vigencia del contrato más largo − 2 de margen". @param array<string,mixed> $evaluation */
+  public static function termBasis(array $evaluation): string
+  {
+    return (int) $evaluation['longest_months'] . ' meses de vigencia ' . (($evaluation['other_contracts'] ?? []) !== [] ? 'del contrato más largo' : 'del contrato') . ((int) $evaluation['margin_months'] > 0 ? ' − ' . (int) $evaluation['margin_months'] . ' de margen' : '');
   }
 
   /** Fecha del formulario (AAAA-MM-DD) a la medianoche, como se guarda fin_contrato. */
@@ -541,12 +655,22 @@ final class OwnerCreditService
   /** @param array<string,string>|null $owner beneficiario elegido (contractOwners); sin él, el propietario del contrato */
   private function insertCredit(array $contract, ?int $quoteId, string $ticketId, float $amount, string $purpose, array $actor, int $term = 0, ?array $owner = null, string $beneficiaryType = 'propietario'): int
   {
+    $this->db->insert($this->table(), $this->schema->filterTableData($this->table(), $this->creditRow($contract, $quoteId, $ticketId, $amount, $purpose, $actor, $term, $owner, $beneficiaryType)));
+    $id = (int) $this->db->lastInsertId();
+    $this->event($id, 'solicitado', $actor, ['cotizacion' => $quoteId, 'valor' => $amount]);
+    $this->recordRequestHistory($id, $actor, false);
+    return $id;
+  }
+
+  /** Fila de una solicitud nueva (también la de una simulación, que no se guarda). @return array<string,mixed> */
+  private function creditRow(array $contract, ?int $quoteId, string $ticketId, float $amount, string $purpose, array $actor, int $term, ?array $owner, string $beneficiaryType): array
+  {
     $owner ??= $this->contractOwners((int) ($contract['_ID'] ?? 0))[0] ?? null;
     // Sin plazo por defecto ($term = 0): lo escribe el funcionario según lo que pidió el propietario.
     $income = $this->defaultIncome($contract);
     $now = time();
     $phone = $owner !== null ? $owner['phone'] : self::phone((string) ($contract['celular_propietario'] ?? ''), (string) ($contract['indicativo_propietario'] ?? ''));
-    $this->db->insert($this->table(), $this->schema->filterTableData($this->table(), [
+    return [
       'quote_id' => $quoteId, 'ticket_id' => $ticketId,
       'contract_id' => (int) ($contract['_ID'] ?? 0), 'contract_code' => (string) ($contract['contrato'] ?? ''),
       'property' => (string) ($contract['inmueble'] ?? $contract['id_inmueble'] ?? ''), 'address' => mb_substr((string) ($contract['direccion'] ?? ''), 0, 255),
@@ -559,11 +683,7 @@ final class OwnerCreditService
       'vacancy' => 'Baja', 'gross_income' => $income['gross'], 'deductions_json' => json_encode($income['deductions'], JSON_THROW_ON_ERROR),
       'created_by_id' => (string) ($actor['employee_id'] ?? ''), 'created_by_name' => (string) ($actor['name'] ?? ''),
       'created_at' => $now, 'updated_at' => $now,
-    ]));
-    $id = (int) $this->db->lastInsertId();
-    $this->event($id, 'solicitado', $actor, ['cotizacion' => $quoteId, 'valor' => $amount]);
-    $this->recordRequestHistory($id, $actor, false);
-    return $id;
+    ];
   }
 
   /** La solicitud (o su reapertura) también queda en los historiales del caso, del contrato y del inmueble. */
@@ -629,11 +749,11 @@ final class OwnerCreditService
     $percent = static fn(float $value): string => number_format($value * 100, 2, ',', '.') . ' %';
     return [
       ['key' => 'contrato_activo', 'label' => 'Contrato activo', 'ok' => strtolower(trim((string) ($contract['estado'] ?? ''))) === 'entregado', 'detail' => 'Estado del contrato: ' . ((string) ($contract['estado'] ?? '') ?: 'sin contrato') . '.'],
-      ['key' => 'vigencia', 'label' => 'Contrato no próximo a vencer', 'ok' => $endTs > 0 && $evaluation['max_months'] >= $minMonths, 'detail' => $endTs > 0 ? $evaluation['max_months'] . ' meses hasta el fin (' . date('d/m/Y', $endTs) . '). Mínimo: ' . $minMonths . '.' : 'El contrato no tiene fecha fin.'],
-      ['key' => 'plazo', 'label' => 'Plazo dentro de la vigencia', 'ok' => $term > 0 && $term <= $evaluation['max_months'], 'detail' => 'Plazo ' . $term . ' meses; máximo ' . $evaluation['max_months'] . '.'],
+      ['key' => 'vigencia', 'label' => 'Contrato no próximo a vencer', 'ok' => $endTs > 0 && $evaluation['contract_months'] >= $minMonths, 'detail' => $endTs > 0 ? $evaluation['contract_months'] . ' meses hasta el fin (' . date('d/m/Y', $endTs) . '). Mínimo: ' . $minMonths . '.' : 'El contrato no tiene fecha fin.'],
+      ['key' => 'plazo', 'label' => 'Plazo dentro de la vigencia', 'ok' => $term > 0 && $term <= $evaluation['max_months'], 'detail' => 'Plazo ' . $term . ' meses; máximo ' . $evaluation['max_months'] . ' (' . self::termBasis($evaluation) . ').'],
       ['key' => 'siniestro', 'label' => 'Contrato no siniestrado', 'ok' => !self::isYes($contract['esta_sinestrado'] ?? ''), 'detail' => self::isYes($contract['esta_sinestrado'] ?? '') ? 'Cartera marcó el contrato como siniestrado.' : 'Sin siniestro registrado en cartera; por verificar con Cartera.'],
       ['key' => 'prestamos', 'label' => 'Sin otros créditos vigentes', 'ok' => $others === [], 'detail' => $others === [] ? 'El propietario no tiene créditos aprobados vigentes.' : 'Créditos vigentes: ' . implode(', ', array_map(static fn(array $row): string => '#' . $row['id'] . ' (contrato ' . $row['contract_code'] . ')', $others)) . '.'],
-      ['key' => 'monto', 'label' => 'Valor dentro del tope', 'ok' => $amount > 0 && $amount <= $evaluation['max_amount'] + 0.5, 'detail' => $money($amount) . ' de un tope de ' . $money($evaluation['max_amount']) . ' (' . (int) $settings['income_months'] . ' × ingreso neto).'],
+      ['key' => 'monto', 'label' => 'Valor dentro del tope', 'ok' => $amount > 0 && $amount <= $evaluation['max_amount'] + 0.5, 'detail' => $money($amount) . ' de un tope de ' . $money($evaluation['max_amount']) . ' (' . (int) $settings['income_months'] . ' × ingreso neto' . (($evaluation['other_contracts'] ?? []) !== [] ? ' de ' . (count($evaluation['other_contracts']) + 1) . ' contratos, ' . $money($evaluation['total_net_income']) : '') . ').'],
       ['key' => 'usura', 'label' => 'Tasa por debajo de la usura', 'ok' => $rate <= $evaluation['usury_monthly_legal'] + 1e-9, 'detail' => 'Tasa ' . $percent($rate) . ' mes vencido (' . $percent((1 + $rate) ** 12 - 1) . ' E.A.); usura ' . $percent((float) $settings['usury_annual']) . ' E.A. = ' . $percent($evaluation['usury_monthly_legal']) . ' mensual' . ((string) $settings['usury_updated_at'] !== '' ? ', vigente desde ' . date('d/m/Y', (int) strtotime((string) $settings['usury_updated_at'])) : '') . '.'],
       ['key' => 'cuota', 'label' => 'Cuota cubierta por el ingreso neto', 'ok' => $payment > 0 && $payment <= $evaluation['net_income'], 'detail' => 'Cuota ' . $money($payment) . ' frente a ingreso neto de ' . $money($evaluation['net_income']) . '.'],
     ];

@@ -80,7 +80,7 @@ $check(count($db->getResults('SELECT id FROM wp_scm_owner_credits')) === 1, 'rep
 
 $work = $service->workspace((int) $credit['id'], ['requested_term' => '12']);
 $check($work['evaluation']['gross'] === 1075000.0 && abs($work['evaluation']['deductions_total'] - (142800 + 29400 + 52661.669)) < 0.01, 'income uses canon and mandate commission, guarantee and utilities policy');
-$check($work['evaluation']['max_months'] >= 13 && $work['policies_ok'], 'a healthy contract passes every policy with the suggested conditions');
+$check($work['evaluation']['contract_months'] >= 13 && $work['evaluation']['max_months'] === $work['evaluation']['contract_months'] - 2 && $work['policies_ok'], 'a healthy contract passes every policy with the suggested conditions');
 
 try {
   $service->decide((int) $credit['id'], 'aprobado', ['requested_term' => '12', 'amount' => '$5.000.000', 'term' => '12', 'rate' => '2,1'], $actor);
@@ -214,6 +214,28 @@ try {
   $check(false, 'beneficiary types without a flow are rejected');
 } catch (DomainException $error) {
   $check(str_contains($error->getMessage(), 'todavía no están disponibles'), 'beneficiary types without a flow are rejected');
+}
+
+// Varios contratos del mismo propietario: el de vigencia más larga va primero y suma al tope del liquidador.
+$db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 14, 'contrato' => '954', 'estado' => 'Entregado', 'inmueble' => '10601', 'propietario' => 'Primer Dueño', 'id_propietario' => '960', 'valor_canon' => '2.000.000', 'fin_contrato' => (string) strtotime('+3 years'), 'esta_sinestrado' => 'No', 'id_contrato_mandato' => '31']);
+$portfolio = $service->ownerPortfolio('22233344');
+$check(array_column($portfolio, 'id') === [14, 9] && $portfolio[0]['net_income'] == 1900000.0, 'the owner portfolio lists the longest contract first, with its net income');
+$work = $service->workspace((int) $chosen['id']);
+$ev = $work['evaluation'];
+$check(count($ev['other_contracts']) === 1 && abs($ev['total_net_income'] - 3300000) < 0.01 && abs($ev['max_amount'] - 9900000) < 0.01, 'the liquidator adds the other contracts to the cap');
+$check($ev['longest_months'] === $portfolio[0]['max_months'] && $ev['max_months'] === $portfolio[0]['max_months'] - 2, 'the liquidator term is the longest contract minus the margin');
+$simulation = $service->simulation(' 22.233.344 ', 9, 0, 0, 'Libre Destinación', 'mandato_2', $actor);
+$check($simulation['credit']['status'] === 'simulacion' && $simulation['credit']['owner_name'] === 'Segunda Dueña' && abs($simulation['conditions']['amount'] - 9900000) < 0.01 && $simulation['conditions']['term'] === $ev['max_months'], 'an empty simulation uses the pre-approved amount and the maximum term');
+$credits = (int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credits');
+$service->recordSimulation($simulation, $actor);
+$check((int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credits') === $credits && (int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble WHERE tipo_reporte = 'Simulación de crédito'") === 2, 'a simulation is not saved as a credit and goes to the history of every owner property');
+$simulationHtml = \SCM\Modules\OwnerCredits\OwnerCreditPdf::html($simulation, 'Funcionario QA');
+$check(str_contains($simulationHtml, 'Simulación de crédito · Contrato 950') && str_contains($simulationHtml, 'Otros contratos del propietario') && str_contains($simulationHtml, 'no es una aprobación'), 'the simulation PDF lists the other contracts and says it is not an approval');
+try {
+  $service->simulation('22233344', 12345, 0, 0, '', '', $actor);
+  $check(false, 'a simulation needs a contract of the owner');
+} catch (DomainException) {
+  $check(true, 'a simulation needs a contract of the owner');
 }
 
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');

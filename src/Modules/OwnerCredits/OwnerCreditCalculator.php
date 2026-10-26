@@ -8,8 +8,9 @@ namespace SCM\Modules\OwnerCredits;
  * Cálculos del "Simulador de créditos a propietarios" (Excel versión 2), sin acceso a base de datos.
  *
  * - Ingreso neto (INO) = canon − comisión con IVA − garantía inmobiliaria − póliza de servicios públicos − otros.
- * - Política: monto máximo = INO × meses de política; plazo máximo = meses completos (30 días) hasta el fin del contrato;
- *   tasa de colocación = tasa de referencia N.M.V × (1 − descuento).
+ * - Política: monto máximo = INO de todos los contratos del propietario × meses de política; plazo máximo = meses completos
+ *   (30 días) hasta el fin del contrato con la vigencia más larga − meses de margen; tasa de colocación = tasa de referencia
+ *   N.M.V × (1 − descuento).
  * - Tasa de riesgo (cuando se supera la política) = (monto máx × tasa política + |exceso| × usura/12) / valor solicitado,
  *   como en el Excel; el control legal compara contra la usura efectiva anual llevada a mes vencido.
  * - Condición sugerida por probabilidad de desocupación: Alta = 3 meses, tasa de riesgo, monto máximo;
@@ -86,7 +87,8 @@ final class OwnerCreditCalculator
   }
 
   /**
-   * @param array{gross:float,deductions:array<string,float>,requested_amount:float,requested_term:int,request_ts:int,contract_end_ts:int,vacancy:string} $input
+   * other_net_income y longest_months vienen de los demás contratos del propietario (opcionales).
+   * @param array{gross:float,deductions:array<string,float>,requested_amount:float,requested_term:int,request_ts:int,contract_end_ts:int,vacancy:string,other_net_income?:float,longest_months?:int} $input
    * @param array<string,mixed> $settings OwnerCreditSettings::read()
    * @return array<string,mixed>
    */
@@ -99,8 +101,12 @@ final class OwnerCreditCalculator
     $requestedTerm = max(0, (int) $input['requested_term']);
     $usuryMonthly = (float) $settings['usury_annual'] / 12;
     $policyRate = (float) $settings['reference_rate'] * (1 - (float) $settings['policy_discount']);
-    $maxMonths = max(0, self::monthsUntil((int) $input['request_ts'], (int) $input['contract_end_ts']));
-    $maxAmount = $net * (int) $settings['income_months'];
+    $contractMonths = max(0, self::monthsUntil((int) $input['request_ts'], (int) $input['contract_end_ts']));
+    $longestMonths = max($contractMonths, (int) ($input['longest_months'] ?? 0));
+    $margin = max(0, (int) $settings['preapproval_margin_months']);
+    $maxMonths = max(0, $longestMonths - $margin);
+    $otherNet = max(0.0, (float) ($input['other_net_income'] ?? 0));
+    $maxAmount = ($net + $otherNet) * (int) $settings['income_months'];
     $exceedMonths = $maxMonths - $requestedTerm;
     $exceedAmount = $maxAmount - $requested;
     $riskRate = $requested > 0 ? (($maxAmount * $policyRate) + (abs($exceedAmount) * $usuryMonthly)) / $requested : 0.0;
@@ -122,9 +128,14 @@ final class OwnerCreditCalculator
       'deductions' => $deductions,
       'deductions_total' => array_sum($deductions),
       'net_income' => $net,
+      'other_net_income' => $otherNet,
+      'total_net_income' => $net + $otherNet,
       'usury_monthly' => $usuryMonthly,
       'usury_monthly_legal' => $usuryLegal,
       'policy_rate' => $policyRate,
+      'contract_months' => $contractMonths,
+      'longest_months' => $longestMonths,
+      'margin_months' => $margin,
       'max_months' => $maxMonths,
       'max_amount' => $maxAmount,
       'policy_payment' => self::payment($policyRate, $maxMonths, $maxAmount),
