@@ -331,6 +331,16 @@
         hint.textContent = "Máximo " + limit + " cuotas (" + basis + ").";
       }
       hint.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] " + (term > limit ? "!sp-font-semibold !sp-text-red-700" : (Number(p.max_term) > 0 ? "!sp-text-service-muted" : "!sp-font-semibold !sp-text-amber-800"));
+      // Mientras se escribe: campo en rojo y sin simular hasta corregir (el borde del input usa !important).
+      var over = term > limit;
+      form.elements.term.setAttribute("aria-invalid", over ? "true" : "false");
+      if (over) form.elements.term.style.setProperty("border-color", "#dc2626", "important");
+      else form.elements.term.style.removeProperty("border-color");
+      var simulateButton = form.querySelector("[data-owner-credit-simulate-pdf]");
+      if (simulateButton) {
+        simulateButton.disabled = over;
+        simulateButton.title = over ? "Corrige el plazo: máximo " + limit + " cuotas." : "";
+      }
     }
 
     // Confirmación dentro del mismo popup (los diálogos externos quedarían detrás del modal).
