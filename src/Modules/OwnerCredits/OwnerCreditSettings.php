@@ -17,6 +17,8 @@ final class OwnerCreditSettings
     'Educación',
     'Libre Destinación',
     'Pago Expensas',
+    'Pago Administración',
+    'Pago de Servicios Públicos',
     'Compra de Electrodomésticos',
     'Equipos de Oficina',
   ];
