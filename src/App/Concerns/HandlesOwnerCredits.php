@@ -125,34 +125,20 @@ trait HandlesOwnerCredits
     }
   }
 
-  /** Propietarios del contrato elegido: a quién se le puede hacer el crédito. */
-  public function ajax_handler_owner_credit_owners(): void
-  {
-    $this->verifyCsrf();
-    $this->requireDashboardAction('owner_credit_manage', 'Tu cargo no tiene permiso para crear créditos.');
-    try {
-      $owners = array_map(static fn(array $owner): array => array_intersect_key($owner, array_flip(['key', 'name', 'document', 'email', 'phone'])), $this->ownerCreditService()->contractOwners((int) ($_POST['contract_id'] ?? 0)));
-      $this->jsonOk(['owners' => $owners]);
-    } catch (\Throwable $error) {
-      $this->ownerCreditFail($error, 'No se pudieron cargar los propietarios del contrato.');
-    }
-  }
-
-  /** Búsqueda de contratos para "Solicitud de crédito" (misma búsqueda de Crear caso). */
+  /** "Nueva solicitud": contratos donde el documento es de un propietario, con esa persona como beneficiaria. */
   public function ajax_handler_owner_credit_contracts(): void
   {
     $this->verifyCsrf();
     $this->requireDashboardAction('owner_credit_manage', 'Tu cargo no tiene permiso para crear créditos.');
     try {
-      $contracts = $this->panelCaseService()->searchPanelContracts(trim(sanitize_text_field(wp_unslash((string) ($_POST['query'] ?? '')))), sanitize_key((string) ($_POST['by'] ?? '')));
       $rows = [];
-      foreach ($contracts as $contract) {
+      foreach ($this->ownerCreditService()->contractsByOwnerDocument(sanitize_text_field(wp_unslash((string) ($_POST['document'] ?? '')))) as ['contract' => $contract, 'owner' => $owner]) {
         $end = OwnerCreditService::timestamp($contract['fin_contrato'] ?? '');
         $rows[] = [
           'id' => (int) ($contract['_ID'] ?? 0), 'contrato' => (string) ($contract['contrato'] ?? ''), 'inmueble' => (string) ($contract['inmueble'] ?? ''),
-          'direccion' => (string) ($contract['direccion'] ?? ''), 'estado' => (string) ($contract['estado'] ?? ''),
-          'propietario' => (string) ($contract['propietario'] ?? ''), 'arrendatario' => (string) ($contract['arrendatario'] ?? ''),
-          'fin' => $end > 0 ? date('d/m/Y', $end) : '', 'fin_iso' => $end > 0 ? date('Y-m-d', $end) : '', 'max_months' => \SCM\Modules\OwnerCredits\OwnerCreditCalculator::monthsUntil(time(), $end),
+          'direccion' => (string) ($contract['direccion'] ?? ''), 'estado' => (string) ($contract['estado'] ?? ''), 'arrendatario' => (string) ($contract['arrendatario'] ?? ''),
+          'fin' => $end > 0 ? date('d/m/Y', $end) : '', 'max_months' => \SCM\Modules\OwnerCredits\OwnerCreditCalculator::monthsUntil(time(), $end),
+          'owner' => $owner,
         ];
       }
       $this->jsonOk(['contracts' => $rows]);
@@ -188,7 +174,7 @@ trait HandlesOwnerCredits
         (int) ($_POST['term'] ?? 0),
         sanitize_text_field(wp_unslash((string) ($_POST['purpose'] ?? ''))),
         $this->ticketCompletionActor(),
-        sanitize_text_field(wp_unslash((string) ($_POST['contract_end'] ?? ''))),
+        '',
         sanitize_key((string) ($_POST['owner_key'] ?? '')),
         sanitize_key((string) ($_POST['beneficiary_type'] ?? 'propietario'))
       );

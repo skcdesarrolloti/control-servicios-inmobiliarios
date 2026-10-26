@@ -181,14 +181,66 @@ final class OwnerCreditService
     if ($amount <= 0) throw new \DomainException('Indica el valor solicitado.');
     $storedEnd = self::timestamp($contract['fin_contrato'] ?? '');
     $endTs = self::dateInput($contractEnd) ?: $storedEnd;
-    $maxMonths = OwnerCreditCalculator::monthsUntil(time(), $endTs);
     if ($term <= 0) throw new \DomainException('Indica el plazo solicitado en meses.');
-    if ($term > $maxMonths) throw new \DomainException(self::termMessage($term, $maxMonths));
+    // El plazo frente a la fecha fin no se valida aquí: la solicitud la registran consultores que no conocen esa
+    // fecha. Si el plazo la supera, el liquidador lo marca y el analista corrige la fecha fin o el plazo.
     $id = $this->insertCredit($contract, null, '', $amount, $purpose, $actor, $term, $owner, $beneficiaryType);
     // La fecha fin corregida en el formulario se guarda en el contrato (con historial).
     if ($endTs !== $storedEnd) $this->saveContractEnd($this->find($id) ?? [], $endTs, $actor);
     $this->notifyRequested($id);
     return $id;
+  }
+
+  /**
+   * "Nueva solicitud": contratos donde el documento (cédula o NIT) es de un propietario, con esa persona ya
+   * resuelta como beneficiaria. Busca el documento exacto (sin puntos ni espacios) en los propietarios del
+   * mandato, en documento_propietario del contrato y en la ficha del propietario.
+   * @return list<array{contract:array<string,mixed>,owner:array{key:string,name:string,document:string,email:string,phone:string}}>
+   */
+  public function contractsByOwnerDocument(string $document): array
+  {
+    $document = self::document($document);
+    if (preg_match('/^[0-9A-Z-]{4,20}$/', $document) !== 1) throw new \InvalidArgumentException('Escribe el documento o NIT del propietario (mínimo 4 caracteres).');
+    $clean = static fn(string $column): string => "UPPER(REPLACE(REPLACE({$column}, '.', ''), ' ', '')) = ?";
+    $contracts = $this->db->table('jet_cct_contratos_arrendamiento');
+    $where = [];
+    $args = [];
+    if ($this->schema->columnExists($contracts, 'documento_propietario')) {
+      $where[] = $clean('`documento_propietario`');
+      $args[] = $document;
+    }
+    $mandates = $this->db->table('jet_cct_contrato_mandato');
+    $owners = $this->db->table('jet_cct_propietarios');
+    foreach ([['id_contrato_mandato', $mandates, ['documento_1', 'nit_1', 'documento_2', 'nit_2', 'documento_3', 'nit_3', 'documento_4', 'nit_4', 'documento_5', 'nit_5', 'documento_6', 'nit_6'], ['_ID']], ['id_propietario', $owners, ['documento', 'documento_juridico'], ['_ID', 'id_propietario']]] as [$link, $source, $documentColumns, $idColumns]) {
+      if (!$this->schema->columnExists($contracts, $link) || !$this->schema->tableExists($source)) continue;
+      $documentColumns = array_values(array_filter($documentColumns, fn(string $column): bool => $this->schema->columnExists($source, $column)));
+      $idColumns = array_values(array_filter($idColumns, fn(string $column): bool => $this->schema->columnExists($source, $column)));
+      if ($documentColumns === [] || $idColumns === []) continue;
+      $ids = [];
+      $rows = $this->db->getResults('SELECT `' . implode('`, `', $idColumns) . "` FROM `{$source}` WHERE " . implode(' OR ', array_map(static fn(string $column): string => $clean("`{$column}`"), $documentColumns)) . ' LIMIT 100', array_fill(0, count($documentColumns), $document));
+      foreach ($rows as $row) foreach ($idColumns as $column) if (trim((string) ($row[$column] ?? '')) !== '') $ids[trim((string) $row[$column])] = true;
+      if ($ids === []) continue;
+      $where[] = "`{$link}` IN (" . implode(',', array_fill(0, count($ids), '?')) . ')';
+      array_push($args, ...array_map('strval', array_keys($ids)));
+    }
+    if ($where === []) return [];
+    $results = [];
+    foreach ($this->db->getResults("SELECT * FROM `{$contracts}` WHERE (" . implode(' OR ', $where) . ") ORDER BY (LOWER(TRIM(`estado`)) = 'entregado') DESC, `_ID` DESC LIMIT 30", $args) as $contract) {
+      $candidates = $this->contractOwners((int) $contract['_ID']);
+      $owner = null;
+      foreach ($candidates as $candidate) if (self::document($candidate['document']) === $document) $owner = $candidate;
+      // El documento estaba en el contrato o en la ficha del propietario: es el propietario principal.
+      if ($owner === null) $owner = $candidates[0] ?? null;
+      if ($owner === null) continue;
+      if ($owner['document'] === '') $owner['document'] = $document;
+      $results[] = ['contract' => $contract, 'owner' => array_intersect_key($owner, array_flip(['key', 'name', 'document', 'email', 'phone']))];
+    }
+    return $results;
+  }
+
+  private static function document(string $value): string
+  {
+    return strtoupper(preg_replace('/[\s.]+/', '', trim($value)) ?? '');
   }
 
   /** @return array<string,mixed>|null */

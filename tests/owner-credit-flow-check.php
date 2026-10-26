@@ -167,12 +167,9 @@ $service->decide((int) $pending['id'], 'rechazado', ['requested_term' => '30', '
 $check($db->getRow('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 7')['fin_contrato'] === (string) strtotime($newEnd . ' 00:00:00'), 'the corrected end date is saved in the contract at midnight when deciding');
 $endHistory = $db->getResults("SELECT observacion FROM wp_jet_cct_historial_contrato_arrendamiento WHERE tipo_reporte = 'Actualización de fecha fin'");
 $check(count($endHistory) === 1 && str_contains($endHistory[0]['observacion'], ' → ' . date('d/m/Y', strtotime($newEnd))), 'the end date change is written to the contract history with old and new dates');
-try {
-  $service->createManual(8, 1000000, 6, 'Libre Destinación', $actor);
-  $check(false, 'manual credit longer than the contract must fail');
-} catch (DomainException $error) {
-  $check(str_contains($error->getMessage(), 'no puede superar'), 'manual credit validates the requested term against the contract end');
-}
+// El consultor no conoce la fecha fin: la solicitud se registra y el liquidador marca el plazo para el analista.
+$longTerm = $service->createManual(8, 1000000, 6, 'Libre Destinación', $actor);
+$check(str_contains($service->workspace($longTerm)['term_error'], 'no puede superar'), 'a request longer than the contract is registered and flagged in the liquidator');
 $manual = $service->find($service->createManual(8, 1000000, 6, 'Libre Destinación', $actor, date('Y-m-d', strtotime('+1 year'))));
 $check($manual['status'] === 'pendiente' && $manual['quote_id'] === null && (int) $manual['requested_term'] === 6, 'manual credit is created from the selected contract');
 $check($db->getRow('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 8')['fin_contrato'] === (string) strtotime(date('Y-m-d', strtotime('+1 year')) . ' 00:00:00'), 'manual credit saves the corrected contract end date');
@@ -183,9 +180,19 @@ foreach (['propietarios', 'tipo_1', 'nombre_1', 'documento_1', 'correo_1', 'celu
 }
 $db->insert('wp_jet_cct_contrato_mandato', ['_ID' => 31, 'total_comision' => '100.000', 'incluye_garantia' => 'No', 'incluye_garantia_servicios' => 'No', 'propietarios' => '2',
   'tipo_1' => 'Natural', 'nombre_1' => 'Primer Dueño', 'documento_1' => '111', 'celular_1' => '3001110000', 'indicativo_1' => '+57', 'id_propietario_nuevo_1' => '960',
-  'tipo_2' => 'Natural', 'nombre_2' => 'Segunda Dueña', 'documento_2' => '222', 'correo_2' => 'segunda@example.invalid', 'celular_2' => '+1 (813) 389-8958', 'indicativo_2' => '+57']);
+  'tipo_2' => 'Natural', 'nombre_2' => 'Segunda Dueña', 'documento_2' => '22233344', 'correo_2' => 'segunda@example.invalid', 'celular_2' => '+1 (813) 389-8958', 'indicativo_2' => '+57']);
 $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 9, 'contrato' => '950', 'estado' => 'Entregado', 'inmueble' => '10600', 'propietario' => 'Primer Dueño', 'id_propietario' => '960', 'valor_canon' => '1.500.000', 'fin_contrato' => (string) strtotime('+2 years'), 'esta_sinestrado' => 'No', 'id_contrato_mandato' => '31']);
 $owners = $service->contractOwners(9);
+$byDocument = $service->contractsByOwnerDocument('2223');
+$check(count($byDocument) === 0, 'document search is exact, not partial');
+$byDocument = $service->contractsByOwnerDocument(' 22.233.344 ');
+$check(count($byDocument) === 1 && (int) $byDocument[0]['contract']['_ID'] === 9 && $byDocument[0]['owner']['key'] === 'mandato_2' && $byDocument[0]['owner']['name'] === 'Segunda Dueña', 'a mandate co-owner is found by document and resolved as the beneficiary');
+try {
+  $service->contractsByOwnerDocument('12');
+  $check(false, 'short documents are rejected');
+} catch (InvalidArgumentException) {
+  $check(true, 'short documents are rejected');
+}
 $check(count($owners) === 2 && $owners[1]['name'] === 'Segunda Dueña' && $owners[1]['phone'] === '18133898958' && $owners[0]['phone'] === '573001110000', 'mandate owners are offered as beneficiaries with normalized phones');
 try {
   $service->createManual(9, 800000, 6, 'Libre Destinación', $actor);
@@ -194,7 +201,7 @@ try {
   $check(str_contains($error->getMessage(), 'a quién se le hace el crédito'), 'with several owners the beneficiary must be chosen');
 }
 $chosen = $service->find($service->createManual(9, 800000, 6, 'Libre Destinación', $actor, '', 'mandato_2'));
-$check($chosen['owner_name'] === 'Segunda Dueña' && $chosen['owner_document'] === '222' && $chosen['owner_email'] === 'segunda@example.invalid' && $chosen['owner_id'] === 'doc:222', 'the credit is registered to the chosen owner');
+$check($chosen['owner_name'] === 'Segunda Dueña' && $chosen['owner_document'] === '22233344' && $chosen['owner_email'] === 'segunda@example.invalid' && $chosen['owner_id'] === 'doc:22233344', 'the credit is registered to the chosen owner');
 $check($chosen['beneficiary_type'] === 'propietario', 'manual credits are categorized as owner credits');
 try {
   $service->createManual(9, 800000, 6, 'Libre Destinación', $actor, '', 'mandato_2', 'funcionario');

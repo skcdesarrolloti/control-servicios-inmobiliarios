@@ -110,4 +110,4 @@ $assert(str_contains($pdfHtml, 'scm-acta-receipt-data') && str_contains($pdfHtml
 $assert(str_contains($pdfHtml, 'Analista QA') && str_contains($pdfHtml, 'Propietario &lt;b&gt;'), 'credit PDF signs with the deciding employee and escapes data');
 $assert(is_readable(dirname(__DIR__) . '/public/assets/css/owner-credit-document.css'), 'credit PDF stylesheet exists');
 $newForm = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->newForm();
-$assert(str_contains($newForm, '<option value="documento" selected>Documento (cédula o NIT)</option>') && str_contains((string) file_get_contents(dirname(__DIR__) . '/src/Modules/PublicTickets/Concerns/PanelTicketCreationConcern.php'), "if (\$by === 'documento') return \$this->searchPanelContractsByDocument(\$query);"), 'new credit searches by document first (owner, tenant, co-signers and mandate owners)');
+$assert(str_contains($newForm, 'Documento del propietario') && str_contains($newForm, 'name="owner_key"') && !str_contains($newForm, 'name="contract_end"') && !str_contains($newForm, '¿Cuál propietario?'), 'new credit asks for the owner document, without the owner step or the contract end date');

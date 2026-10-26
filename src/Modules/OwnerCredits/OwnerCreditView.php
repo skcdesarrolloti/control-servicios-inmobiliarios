@@ -364,42 +364,35 @@ final class OwnerCreditView
     $field = static fn(string $label, string $control): string => '<label class="!sp-block"><span class="' . $ui::LABEL . '">' . $label . '</span>' . $control . '</label>';
     $step = static fn(string $n): string => '<span class="!sp-flex !sp-items-center !sp-justify-center !sp-w-5 !sp-h-5 !sp-rounded-full !sp-bg-service-navy !sp-text-white !sp-text-[10px]">' . $n . '</span>';
     $required = ' <em class="!sp-not-italic !sp-text-red-600">*</em>';
-    // Como en "Crear caso": primero se busca y elige el contrato, luego se completan los datos de la solicitud.
-    return '<form class="!sp-font-sans !sp-text-service-navy !sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-5" data-owner-credit-new-form autocomplete="off"><input type="hidden" name="contract_id" value="">'
+    // El solicitante se identifica por su documento: así ya se sabe quién es y en qué contratos es propietario.
+    return '<form class="!sp-font-sans !sp-text-service-navy !sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-5" data-owner-credit-new-form autocomplete="off"><input type="hidden" name="contract_id" value=""><input type="hidden" name="owner_key" value="">'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . $step('1') . '¿Para quién es el crédito?</h4>'
       . self::guide('nuevo-tipo', [
         'Tipos' => 'Propietario, arrendatario, codeudor, externo o funcionario. Por ahora solo está habilitado el crédito a propietarios; los demás se habilitarán con su propia evaluación.',
       ])
       . self::beneficiaryTypes(array_keys(OwnerCreditService::BENEFICIARY_TYPES), 'propietario') . '</section>'
-      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . $step('2') . 'Busca el contrato</h4>'
-      . self::guide('nuevo-contrato', [
-        'Por qué un contrato' => 'El crédito siempre queda ligado a un contrato de arrendamiento, porque las cuotas se descuentan de su canon. Busca por documento (cédula o NIT del propietario, arrendatario, codeudor o de los propietarios del mandato), número de contrato, inmueble SIMI, propietario o arrendatario.',
+      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . $step('2') . 'Documento del propietario</h4>'
+      . self::guide('nuevo-documento', [
+        'Qué escribir' => 'La cédula o el NIT de quien pide el crédito, con o sin puntos.',
+        'Qué encuentra' => 'Los contratos de arrendamiento donde esa persona es propietaria (en el contrato, en su ficha o en el contrato de mandato, aunque sean varios propietarios).',
+        'Por qué un contrato' => 'Las cuotas se descuentan del canon de ese contrato. Si la persona tiene varios inmuebles, elige el contrato del que se descontará.',
       ])
-      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[180px_minmax(0,1fr)_auto] !sp-gap-3 !sp-items-end">'
-      . $field('Buscar por', '<select class="' . $ui::INPUT . '" data-owner-credit-search-by><option value="documento" selected>Documento (cédula o NIT)</option><option value="contrato">Contrato</option><option value="inmueble">Inmueble SIMI</option><option value="propietario">Propietario</option><option value="arrendatario">Arrendatario</option></select>')
-      . $field('Dato a buscar', '<input class="' . $ui::INPUT . '" data-owner-credit-search-query placeholder="Ej. 1047455289, 817 o nombre">')
-      . '<button type="button" class="' . $ui::NAVY . ' !sp-h-10 !sp-text-xs !sp-px-4" data-owner-credit-search>' . $ui::icon('filter', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Buscar</button></div>'
-      . '<p class="' . self::NOTE . ' !sp-mt-3" data-owner-credit-search-status></p><div class="!sp-grid !sp-gap-2 !sp-max-h-72 !sp-overflow-y-auto !sp-mt-2" data-owner-credit-search-results></div>'
-      . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2 !sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-service-yellow !sp-bg-amber-50/40 !sp-text-xs" data-owner-credit-picked hidden></div></section>'
-      . '<section class="' . self::SECTION . '" data-owner-credit-owner-step hidden><h4 class="' . self::H4 . '">' . $step('3') . '¿Cuál propietario?</h4>'
-      . self::guide('nuevo-beneficiario', [
-        'Quiénes aparecen' => 'Los propietarios registrados en el contrato de mandato del inmueble (pueden ser varios). Si el contrato no tiene mandato, aparece el propietario del contrato de arrendamiento.',
-        'Para qué sirve' => 'El crédito, sus avisos y la revisión de otros créditos vigentes quedan a nombre de esa persona.',
-      ])
-      . '<div class="!sp-grid !sp-gap-2" data-owner-credit-owners role="radiogroup" aria-label="Propietario beneficiario"></div></section>'
-      . '<section class="' . self::SECTION . '" data-owner-credit-request hidden><h4 class="' . self::H4 . '">' . $step('4') . 'Datos de la solicitud</h4>'
+      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[minmax(0,1fr)_auto] !sp-gap-3 !sp-items-end">'
+      . $field('Cédula o NIT' . $required, '<input class="' . $ui::INPUT . '" data-owner-credit-search-query inputmode="numeric" placeholder="Ej. 1143415938">')
+      . '<button type="button" class="' . $ui::NAVY . ' !sp-h-10" data-owner-credit-search>' . $ui::icon('filter', '!sp-w-3.5 !sp-h-3.5') . 'Buscar</button></div>'
+      . '<p class="' . self::NOTE . ' !sp-mt-2" data-owner-credit-search-status></p>'
+      . '<div class="!sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200" data-owner-credit-person hidden></div>'
+      . '<div class="!sp-grid !sp-gap-2 !sp-mt-2" data-owner-credit-search-results role="radiogroup" aria-label="Contrato del que se descuenta"></div></section>'
+      . '<section class="' . self::SECTION . '" data-owner-credit-request hidden><h4 class="' . self::H4 . '">' . $step('3') . 'Datos de la solicitud</h4>'
       . self::guide('nuevo-datos', [
-        'Qué pasa al registrar' => 'Solo se registra lo que pide el propietario: todavía no se aprueba nada. Se abre el liquidador para evaluarlo y ahí se aprueba o rechaza.',
-        'Plazo solicitado' => 'Escribe los meses que pidió el propietario. No puede superar los meses que faltan para el fin del contrato.',
-        'Fin del contrato' => 'Si el contrato fue renovado y la fecha está desactualizada, corrígela: se guarda en el contrato.',
+        'Qué pasa al registrar' => 'Solo se registra lo que pide el propietario: todavía no se aprueba nada. El analista lo evalúa en el liquidador y ahí se aprueba o rechaza.',
+        'Plazo solicitado' => 'Los meses que pidió el propietario. Si superan la vigencia del contrato, regístralo igual: el analista revisa la fecha fin en el liquidador.',
       ])
-      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">'
+      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-3">'
       . $field('Valor solicitado' . $required, '<input class="' . $ui::INPUT . '" name="amount" inputmode="numeric" data-owner-credit-money required>')
-      . $field('Fin del contrato', '<input class="' . $ui::INPUT . '" type="date" name="contract_end">')
       . $field('Plazo solicitado (meses)' . $required, '<input class="' . $ui::INPUT . '" name="term" type="number" min="1" max="60" placeholder="Escribe los meses" required>')
       . $field('Destinación', '<select class="' . $ui::INPUT . '" name="purpose">' . $options . '</select>')
-      . '</div><p class="' . self::NOTE . ' !sp-mt-3">El plazo no puede superar los meses que faltan para el fin del contrato. Si la fecha fin está desactualizada, corrígela aquí: se guardará en el contrato.</p>'
-      . '<p class="!sp-m-0 !sp-mt-1 !sp-text-[11px] !sp-font-semibold" data-owner-credit-term-hint></p></section>'
+      . '</div><p class="' . self::NOTE . ' !sp-mt-2" data-owner-credit-term-hint></p></section>'
       . '<div class="!sp-flex !sp-items-center !sp-justify-end !sp-gap-3"><p class="!sp-m-0 !sp-text-[11px]" data-owner-credit-status role="status" aria-live="polite"></p><button type="submit" class="' . $ui::PRIMARY . '">' . $ui::icon('check', '!sp-w-3.5 !sp-h-3.5') . 'Registrar solicitud y evaluar</button></div></form>';
   }
 

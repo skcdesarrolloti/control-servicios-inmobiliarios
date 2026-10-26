@@ -87,6 +87,46 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   await page.keyboard.press('Escape');
   assert.equal(await page.evaluate(() => document.querySelector('[data-owner-credit-modal]').hidden), true);
   console.log('OK Escape closes the popup');
+
+  // Nueva solicitud: se busca al propietario por documento; con varios contratos se elige uno, sin fecha fin.
+  const newForm = execFileSync('php', ['-r', String.raw`require 'vendor/autoload.php'; echo (new SCM\Modules\OwnerCredits\OwnerCreditView())->newForm();`], { cwd: root, encoding: 'utf8' });
+  await page.evaluate((newForm) => {
+    const button = document.createElement('button');
+    button.setAttribute('data-owner-credit-new', '');
+    document.getElementById('scm-app').appendChild(button);
+    const owner = { key: 'mandato_2', name: 'Segunda Dueña', document: '22233344', email: 'segunda@example.invalid', phone: '573001110000' };
+    window.fetch = (url, opts) => {
+      const body = Object.fromEntries(opts.body.entries());
+      window.calls.push(body);
+      const data = body.action === 'scm_owner_credit_new_form' ? { html: newForm }
+        : body.action === 'scm_owner_credit_contracts' ? { contracts: [
+          { id: 9, contrato: '950', inmueble: '10600', direccion: 'Calle 1', estado: 'Entregado', arrendatario: 'Inquilino', fin: '15/01/2027', max_months: 2, owner },
+          { id: 10, contrato: '951', inmueble: '10601', direccion: 'Calle 2', estado: 'Entregado', arrendatario: '', fin: '', max_months: 0, owner }] }
+        : body.action === 'scm_owner_credit_create' ? { credit_id: 40 } : {};
+      return Promise.resolve({ json: () => Promise.resolve({ success: true, data }) });
+    };
+  }, newForm);
+  await page.click('[data-owner-credit-new]');
+  await page.waitForSelector('[data-owner-credit-new-form]');
+  assert.equal(await page.$('[data-owner-credit-new-form] [name="contract_end"]'), null);
+  await page.fill('[data-owner-credit-search-query]', '22.233.344');
+  await page.press('[data-owner-credit-search-query]', 'Enter');
+  await page.waitForSelector('[data-owner-credit-pick]');
+  calls = await page.evaluate(() => window.calls);
+  assert.equal(calls.find(c => c.action === 'scm_owner_credit_contracts').document, '22.233.344');
+  assert.match(await page.textContent('[data-owner-credit-person]'), /Segunda Dueña/);
+  assert.equal(await page.isVisible('[data-owner-credit-request]'), false, 'with two contracts one must be chosen');
+  await page.click('[data-owner-credit-pick][value="0"]');
+  assert.equal(await page.isVisible('[data-owner-credit-request]'), true);
+  await page.fill('[name="term"]', '12');
+  assert.match(await page.textContent('[data-owner-credit-term-hint]'), /Puedes registrar la solicitud/);
+  await page.fill('[name="amount"]', '2000000');
+  await page.click('[data-owner-credit-new-form] [type="submit"]');
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'scm_owner_credit_create'));
+  calls = await page.evaluate(() => window.calls);
+  const create = calls.find(c => c.action === 'scm_owner_credit_create');
+  assert.equal(create.contract_id, '9'); assert.equal(create.owner_key, 'mandato_2'); assert.equal(create.term, '12'); assert.equal(create.contract_end, undefined);
+  console.log('OK new request: owner found by document, contract chosen, long term only warns, no end date field');
   await browser.close();
   console.log('Owner credit UI checks passed.');
 })().catch((e) => { console.error('FAIL', e.message); process.exit(1); });

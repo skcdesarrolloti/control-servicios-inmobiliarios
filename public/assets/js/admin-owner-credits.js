@@ -193,76 +193,72 @@
         .then(function () { setLoading(target, false); });
     }
 
-    // Nuevo crédito sin cotización: se busca el contrato (como en Crear caso) y luego se piden los datos.
+    // Nuevo crédito sin cotización: se busca al propietario por documento y se elige el contrato del que se descuenta.
     function searchContracts(form) {
       var query = form.querySelector("[data-owner-credit-search-query]").value.trim();
       var status = form.querySelector("[data-owner-credit-search-status]");
       var results = form.querySelector("[data-owner-credit-search-results]");
-      if (query.length < 2) { status.textContent = "Escribe al menos 2 caracteres."; return; }
-      status.textContent = "Buscando contratos…";
+      var person = form.querySelector("[data-owner-credit-person]");
+      pickContract(form, null);
       results.innerHTML = "";
-      post("scm_owner_credit_contracts", { query: query, by: form.querySelector("[data-owner-credit-search-by]").value })
+      person.hidden = true;
+      if (query.replace(/[\s.]/g, "").length < 4) { status.textContent = "Escribe la cédula o el NIT (mínimo 4 caracteres)."; return; }
+      status.textContent = "Buscando…";
+      post("scm_owner_credit_contracts", { document: query })
         .then(function (data) {
           var contracts = data.contracts || [];
-          status.textContent = contracts.length ? contracts.length + " resultado(s). Selecciona el contrato." : "No se encontraron contratos. Revisa el dato o cambia el tipo de búsqueda.";
-          results.innerHTML = contracts.map(function (c) {
-            return '<button type="button" class="!sp-grid !sp-gap-0.5 !sp-w-full !sp-p-3 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-left !sp-font-sans !sp-text-[11px] !sp-text-service-muted !sp-cursor-pointer hover:!sp-border-service-yellow hover:!sp-bg-amber-50/40 focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow" data-owner-credit-pick data-contract="' + escapeHtml(JSON.stringify(c)) + '">' +
-              '<strong class="!sp-text-xs !sp-text-service-navy">Contrato ' + escapeHtml(c.contrato) + " · SIMI " + escapeHtml(c.inmueble) + "</strong>" +
-              "<span>" + escapeHtml(c.direccion) + " · " + escapeHtml(c.estado) + (c.fin ? " · Fin " + escapeHtml(c.fin) : "") + "</span>" +
-              "<span>Propietario: " + escapeHtml(c.propietario) + " · Arrendatario: " + escapeHtml(c.arrendatario) + "</span></button>";
+          if (!contracts.length) {
+            status.textContent = "No encontramos contratos donde este documento sea de un propietario. Revisa el número.";
+            return;
+          }
+          var owner = contracts[0].owner || {};
+          var detail = [owner.document ? "Documento " + owner.document : "", owner.phone ? "Cel. " + owner.phone : "", owner.email || ""].filter(Boolean).join(" · ");
+          person.innerHTML = '<strong class="!sp-block !sp-text-xs !sp-text-service-navy">' + escapeHtml(owner.name || "Propietario") + "</strong>" +
+            '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">' + escapeHtml(detail || "Sin datos de contacto") + "</span>";
+          person.hidden = false;
+          status.textContent = contracts.length === 1 ? "Es propietario en 1 contrato." : "Es propietario en " + contracts.length + " contratos. Elige del que se descontarán las cuotas.";
+          results.innerHTML = contracts.map(function (c, index) {
+            return '<label class="!sp-flex !sp-items-start !sp-gap-3 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-white !sp-cursor-pointer hover:!sp-border-service-yellow !sp-text-[11px] !sp-text-service-muted">' +
+              '<input type="radio" name="contract_pick" value="' + index + '" class="!sp-mt-1" data-owner-credit-pick>' +
+              '<span class="!sp-min-w-0"><strong class="!sp-block !sp-text-xs !sp-text-service-navy">Contrato ' + escapeHtml(c.contrato) + " · SIMI " + escapeHtml(c.inmueble) + "</strong>" +
+              '<span class="!sp-block">' + escapeHtml(c.direccion) + " · " + escapeHtml(c.estado) + (c.fin ? " · Vence " + escapeHtml(c.fin) : "") + "</span>" +
+              (c.arrendatario ? '<span class="!sp-block">Arrendatario: ' + escapeHtml(c.arrendatario) + "</span>" : "") + "</span></label>";
           }).join("");
+          results._contracts = contracts;
+          if (contracts.length === 1) {
+            results.querySelector("[data-owner-credit-pick]").checked = true;
+            pickContract(form, contracts[0]);
+          }
         })
         .catch(function (error) { status.textContent = error.message; });
     }
 
     function pickContract(form, contract) {
-      var picked = form.querySelector("[data-owner-credit-picked]");
       var request = form.querySelector("[data-owner-credit-request]");
-      var ownerStep = form.querySelector("[data-owner-credit-owner-step]");
       form.elements.contract_id.value = contract ? String(contract.id) : "";
-      form.querySelector("[data-owner-credit-search-results]").hidden = !!contract;
-      picked.hidden = !contract;
+      form.elements.owner_key.value = contract && contract.owner ? contract.owner.key : "";
       request.hidden = !contract;
-      ownerStep.hidden = !contract;
+      form._contract = contract;
       if (!contract) return;
-      loadOwners(form, contract.id);
-      picked.innerHTML = "<span><b>Contrato " + escapeHtml(contract.contrato) + "</b> · " + escapeHtml(contract.propietario) + " · " + escapeHtml(contract.direccion) + "</span>" +
-        '<button type="button" class="!sp-p-0 !sp-bg-transparent !sp-border-0 !sp-text-[11px] !sp-font-semibold !sp-text-service-blue !sp-underline !sp-cursor-pointer" data-owner-credit-unpick>Cambiar contrato</button>';
-      form.elements.contract_end.value = contract.fin_iso || "";
       updateTermHint(form);
       form.elements.amount.focus();
     }
 
-    // Propietarios del contrato (mandato): a quién se le hace el crédito. Con uno solo queda elegido.
-    function loadOwners(form, contractId) {
-      var list = form.querySelector("[data-owner-credit-owners]");
-      list.innerHTML = '<p class="' + UI.note + '">Cargando propietarios…</p>';
-      post("scm_owner_credit_owners", { contract_id: contractId })
-        .then(function (data) {
-          var owners = data.owners || [];
-          if (!owners.length) { list.innerHTML = '<p class="' + UI.note + '">El contrato no tiene propietario registrado.</p>'; return; }
-          list.innerHTML = owners.map(function (owner, index) {
-            var detail = [owner.document ? "Documento " + owner.document : "", owner.phone ? "Cel. " + owner.phone : "", owner.email || ""].filter(Boolean).join(" · ");
-            return '<label class="!sp-flex !sp-items-start !sp-gap-3 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-white !sp-cursor-pointer hover:!sp-border-service-yellow">' +
-              '<input type="radio" name="owner_key" value="' + escapeHtml(owner.key) + '"' + (owners.length === 1 ? " checked" : "") + ' required class="!sp-mt-1">' +
-              '<span><strong class="!sp-block !sp-text-xs !sp-text-service-navy">' + escapeHtml(owner.name) + "</strong>" +
-              '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">' + escapeHtml(detail || "Sin datos de contacto") + "</span></span></label>";
-          }).join("");
-        })
-        .catch(function (error) { list.innerHTML = '<p class="' + UI.note + '">' + escapeHtml(error.message) + "</p>"; });
-    }
-
-    // Mismo cálculo del servidor: meses completos de 30 días entre hoy y la fecha fin.
+    // Solo informa: el consultor no conoce la fecha fin; si el plazo la supera, el analista la revisa en el liquidador.
     function updateTermHint(form) {
       var hint = form.querySelector("[data-owner-credit-term-hint]");
-      var end = form.elements.contract_end.value;
-      if (!hint) return;
-      if (!end) { hint.textContent = "El contrato no tiene fecha fin: indícala para calcular el plazo máximo."; return; }
-      var today = new Date(); today.setHours(0, 0, 0, 0);
-      var max = Math.floor(Math.floor((new Date(end + "T00:00:00") - today) / 86400000) / 30);
-      form.elements.term.max = String(Math.max(1, max));
-      hint.textContent = max < 1 ? "El contrato ya terminó o termina este mes: corrige la fecha fin si fue renovado." : "Plazo máximo: " + max + " meses.";
-      hint.className = "!sp-m-0 !sp-mt-1 !sp-text-[11px] !sp-font-semibold " + (max < 1 || Number(form.elements.term.value) > max ? "!sp-text-red-700" : "!sp-text-emerald-700");
+      var contract = form._contract;
+      if (!hint || !contract) return;
+      var term = Number(form.elements.term.value) || 0;
+      var max = Number(contract.max_months) || 0;
+      if (!contract.fin) {
+        hint.textContent = "El contrato no tiene fecha fin registrada; el analista la revisará en el liquidador.";
+      } else if (term > max) {
+        hint.textContent = "Según el sistema el contrato vence el " + contract.fin + " (quedan " + max + " meses). Puedes registrar la solicitud: el analista revisará la fecha o el plazo.";
+      } else {
+        hint.textContent = "El contrato vence el " + contract.fin + " (quedan " + max + " meses).";
+      }
+      hint.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] " + (term > max || !contract.fin ? "!sp-font-semibold !sp-text-amber-800" : "!sp-text-service-muted");
     }
 
     // Confirmación dentro del mismo popup (los diálogos externos quedarían detrás del modal).
@@ -424,8 +420,7 @@
       var newForm = target.closest("[data-owner-credit-new-form]");
       if (newForm && target.closest("[data-owner-credit-search]")) { searchContracts(newForm); return; }
       var pick = newForm && target.closest("[data-owner-credit-pick]");
-      if (pick) { pickContract(newForm, JSON.parse(pick.getAttribute("data-contract") || "{}")); return; }
-      if (newForm && target.closest("[data-owner-credit-unpick]")) { pickContract(newForm, null); return; }
+      if (pick) { pickContract(newForm, (newForm.querySelector("[data-owner-credit-search-results]")._contracts || [])[Number(pick.value)] || null); return; }
       if (target.closest("[data-owner-credit-new]")) {
         post("scm_owner_credit_new_form", {})
           .then(function (data) { showModal("Nueva solicitud de crédito", "Registra lo que pide el propietario; luego se evalúa y se aprueba o rechaza en el liquidador.", data.html || ""); })
@@ -455,7 +450,7 @@
     root.addEventListener("input", function (event) {
       if (event.target.matches && event.target.matches("[data-owner-credit-money]:not([readonly])")) formatMoneyInput(event.target, true);
       var newCredit = event.target.closest && event.target.closest("[data-owner-credit-new-form]");
-      if (newCredit && (event.target.name === "contract_end" || event.target.name === "term")) updateTermHint(newCredit);
+      if (newCredit && event.target.name === "term") updateTermHint(newCredit);
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
       if (!form || event.target.name === "note") return;
       window.clearTimeout(simulateTimer);
@@ -496,8 +491,7 @@
       }
       if (form.matches("[data-owner-credit-new-form]")) {
         event.preventDefault();
-        if (!form.elements.contract_id.value) { setStatus(form, "Busca y selecciona el contrato.", "error"); return; }
-        if (!form.querySelector('[name="owner_key"]:checked')) { setStatus(form, "Selecciona a quién se le hace el crédito.", "error"); return; }
+        if (!form.elements.contract_id.value) { setStatus(form, "Busca al propietario por documento y elige el contrato.", "error"); return; }
         setStatus(form, "Creando…", "");
         post("scm_owner_credit_create", new FormData(form))
           .then(function (data) { loadReport(true); return openCredit({ credit_id: data.credit_id }); })
