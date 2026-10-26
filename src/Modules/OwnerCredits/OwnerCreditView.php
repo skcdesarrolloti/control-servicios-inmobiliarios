@@ -434,6 +434,7 @@ final class OwnerCreditView
       . '<div class="!sp-grid !sp-gap-2 !sp-mt-2" data-owner-credit-search-results aria-label="Contratos del propietario"></div></section>'
       . '<section class="' . self::SECTION . '" data-owner-credit-request hidden><h4 class="' . self::H4 . '">' . $step('3') . 'Datos de la solicitud</h4>'
       . self::guide('nuevo-datos', [
+        'Primero simula' => 'Con "Simular y ver PDF" revisas con el propietario la cuota y la tabla de amortización. Si está de acuerdo, aparece "Registrar solicitud". Si cambias el valor, el plazo o la destinación, vuelve a simular.',
         'Qué pasa al registrar' => 'Solo se registra lo que pide el propietario: todavía no se aprueba nada. El analista lo evalúa en el liquidador y ahí se aprueba o rechaza.',
         'Plazo solicitado' => 'Los meses que pidió el propietario. Si superan la vigencia del contrato, regístralo igual: el analista revisa la fecha fin en el liquidador.',
         'Simular y ver PDF' => 'Calcula la cuota y la tabla de amortización con la tasa de política sin registrar la solicitud. Sin valor o plazo se simula con el cupo preaprobado y el plazo máximo. La simulación queda en el historial de los contratos y de los inmuebles del propietario.',
@@ -443,9 +444,11 @@ final class OwnerCreditView
       . $field('Plazo solicitado (meses)' . $required, '<input class="' . $ui::INPUT . '" name="term" type="number" min="1" max="60" placeholder="Escribe los meses" required>')
       . $field('Destinación', '<select class="' . $ui::INPUT . '" name="purpose">' . $options . '</select>')
       . '</div><p class="' . self::NOTE . ' !sp-mt-2" data-owner-credit-term-hint></p></section>'
-      . '<div class="!sp-flex !sp-items-center !sp-justify-end !sp-gap-3"><p class="!sp-m-0 !sp-text-[11px]" data-owner-credit-status role="status" aria-live="polite"></p>'
+      . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-end !sp-gap-3"><p class="!sp-m-0 !sp-text-[11px]" data-owner-credit-status role="status" aria-live="polite"></p>'
+      . '<p class="' . self::NOTE . ' !sp-m-0" data-owner-credit-register-hint>Primero simula y revisa el PDF con el propietario; si está de acuerdo, registra la solicitud.</p>'
       . '<button type="button" class="' . $ui::NAVY . ' !sp-text-xs !sp-px-4 !sp-py-2.5" data-owner-credit-simulate-pdf>' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Simular y ver PDF</button>'
-      . '<button type="submit" class="' . $ui::PRIMARY . '">' . $ui::icon('check', '!sp-w-3.5 !sp-h-3.5') . 'Registrar solicitud y evaluar</button></div></form>';
+      // Solo aparece después de ver la simulación con los datos actuales.
+      . '<button type="submit" class="' . $ui::PRIMARY . '" data-owner-credit-register style="display:none !important">' . $ui::icon('check', '!sp-w-3.5 !sp-h-3.5') . 'Registrar solicitud</button></div></form>';
   }
 
   /**

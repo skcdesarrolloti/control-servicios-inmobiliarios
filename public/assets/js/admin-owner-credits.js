@@ -271,8 +271,24 @@
       box.hidden = false;
     }
 
+    // "Registrar solicitud" solo aparece después de ver la simulación con los datos actuales (valor, plazo,
+    // destinación y contrato); si cambian, hay que volver a simular.
+    function requestKey(form) {
+      return ["contract_id", "owner_key", "amount", "term", "purpose"].map(function (name) { return form.elements[name] ? form.elements[name].value : ""; }).join("|");
+    }
+
+    function setRegistrable(form, simulated) {
+      form._simulatedKey = simulated ? requestKey(form) : "";
+      var button = form.querySelector("[data-owner-credit-register]");
+      var hint = form.querySelector("[data-owner-credit-register-hint]");
+      // El botón usa !sp-inline-flex (!important): ocultarlo también necesita !important.
+      if (button) { if (simulated) button.style.removeProperty("display"); else button.style.setProperty("display", "none", "important"); }
+      if (hint) hint.textContent = simulated ? "Simulación revisada: si el propietario está de acuerdo, registra la solicitud." : "Primero simula y revisa el PDF con el propietario; si está de acuerdo, registra la solicitud.";
+    }
+
     function pickContract(form, contract) {
       var request = form.querySelector("[data-owner-credit-request]");
+      setRegistrable(form, false);
       form.elements.contract_id.value = contract ? String(contract.id) : "";
       form.elements.owner_key.value = contract && contract.owner ? contract.owner.key : "";
       request.hidden = !contract;
@@ -388,6 +404,7 @@
           area.className = "!sp-flex-1 !sp-flex";
           area.removeAttribute("role");
           area.innerHTML = '<iframe class="!sp-flex-1 !sp-w-full !sp-border-0" title="PDF del crédito" src="' + url + '"></iframe>';
+          if (options.onReady) options.onReady(viewer);
         })
         .catch(function (error) {
           restore();
@@ -463,7 +480,22 @@
       if (newForm && target.closest("[data-owner-credit-simulate-pdf]")) {
         if (!newForm.elements.contract_id.value) { setStatus(newForm, "Busca al propietario por documento.", "error"); return; }
         setStatus(newForm, "");
-        showPdf(target.closest("[data-owner-credit-simulate-pdf]"), { title: "Simulación de crédito · Contrato " + (newForm._contract ? newForm._contract.contrato : ""), back: "Volver a la solicitud", action: "scm_owner_credit_simulation_pdf", data: new FormData(newForm), filename: "simulacion-credito-" + (newForm._contract ? newForm._contract.contrato : "") + ".pdf" });
+        var key = requestKey(newForm);
+        showPdf(target.closest("[data-owner-credit-simulate-pdf]"), {
+          title: "Simulación de crédito · Contrato " + (newForm._contract ? newForm._contract.contrato : ""), back: "Volver a la solicitud", action: "scm_owner_credit_simulation_pdf",
+          data: new FormData(newForm), filename: "simulacion-credito-" + (newForm._contract ? newForm._contract.contrato : "") + ".pdf",
+          onReady: function (viewer) {
+            if (requestKey(newForm) !== key) return;
+            setRegistrable(newForm, true);
+            // Con valor y plazo escritos se puede registrar desde el mismo visor.
+            if (!newForm.elements.amount.value || !newForm.elements.term.value) return;
+            viewer.querySelector("[data-owner-credit-pdf-actions]").insertAdjacentHTML("beforeend", '<button type="button" class="' + UI.primary + '" data-owner-credit-pdf-register>Registrar solicitud</button>');
+            viewer.querySelector("[data-owner-credit-pdf-register]").addEventListener("click", function () {
+              viewer.querySelector("[data-owner-credit-pdf-close]").click();
+              newForm.requestSubmit();
+            });
+          },
+        });
         return;
       }
       if (target.closest("[data-owner-credit-new]")) {
@@ -496,12 +528,15 @@
       if (event.target.matches && event.target.matches("[data-owner-credit-money]:not([readonly])")) formatMoneyInput(event.target, true);
       var newCredit = event.target.closest && event.target.closest("[data-owner-credit-new-form]");
       if (newCredit && event.target.name === "term") updateTermHint(newCredit);
+      if (newCredit && newCredit._simulatedKey && newCredit._simulatedKey !== requestKey(newCredit)) setRegistrable(newCredit, false);
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
       if (!form || ["note", "owner_key", "main_contract_id"].indexOf(event.target.name) >= 0) return;
       window.clearTimeout(simulateTimer);
       simulateTimer = window.setTimeout(function () { simulate(form); }, 350);
     });
     root.addEventListener("change", function (event) {
+      var newRequest = event.target.closest && event.target.closest("[data-owner-credit-new-form]");
+      if (newRequest && newRequest._simulatedKey && newRequest._simulatedKey !== requestKey(newRequest)) setRegistrable(newRequest, false);
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
       // Cambiar a quién es el crédito o su contrato principal se guarda y recarga el liquidador.
       var owner = form && event.target.matches("[data-owner-credit-owner]");
@@ -550,7 +585,8 @@
       if (form.matches("[data-owner-credit-new-form]")) {
         event.preventDefault();
         if (!form.elements.contract_id.value) { setStatus(form, "Busca al propietario por documento.", "error"); return; }
-        setStatus(form, "Creando…", "");
+        if (!form._simulatedKey || form._simulatedKey !== requestKey(form)) { setRegistrable(form, false); setStatus(form, "Primero simula y revisa el PDF con los datos actuales.", "error"); return; }
+        setStatus(form, "Registrando…", "");
         post("scm_owner_credit_create", new FormData(form))
           .then(function (data) { loadReport(true); return openCredit({ credit_id: data.credit_id }); })
           .catch(function (error) { setStatus(form, error.message, "error"); });
