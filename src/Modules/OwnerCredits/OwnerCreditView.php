@@ -128,7 +128,7 @@ final class OwnerCreditView
 
     return '<form class="!sp-font-sans !sp-text-service-navy !sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-5" data-owner-credit-form data-credit-id="' . (int) $credit['id'] . '" autocomplete="off">'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2">' . self::status((string) $credit['status'])
-      . $chip('Contrato', '#' . self::e($contract['code'])) . ((int) $credit['quote_id'] > 0 && $editable ? self::beneficiarySelect($credit) : '') . $chip(OwnerCreditService::beneficiaryLabel($credit), self::e($credit['owner_name']) . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · ' . self::e($credit['owner_document']) : '')) . $chip('Inmueble', self::e($credit['property']))
+      . $chip('Contrato principal', '#' . self::e($contract['code'])) . ((int) $credit['quote_id'] > 0 && $editable ? self::beneficiarySelect($credit) : '') . $chip(OwnerCreditService::beneficiaryLabel($credit), self::e($credit['owner_name']) . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · ' . self::e($credit['owner_document']) : '')) . $chip('Inmueble', self::e($credit['property']))
       . ((int) $credit['quote_id'] > 0 ? $chip('Cotización', '#' . (int) $credit['quote_id']) : $chip('Origen', 'Manual'))
       . '<button type="button" class="' . $ui::NAVY . ' !sp-ml-auto" data-owner-credit-pdf title="Documento interno para funcionarios">' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Ver PDF</button></div>'
 
@@ -174,11 +174,13 @@ final class OwnerCreditView
         'Plazo' => 'Número de cuotas mensuales.',
         'Tasa N.M.V' => 'Tasa nominal mes vencido: el interés de cada mes sobre el saldo. No se puede aprobar por encima de la usura (Configuración).',
         'Cuota' => 'Fija, calculada como la función PAGO de Excel; se descuenta de los giros del canon.',
+        'Fecha de desembolso' => 'Día en que se entrega el dinero. La primera cuota se descuenta un mes después y el crédito queda pagado solo cuando vence la última.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-4">'
       . $field('Valor a colocar', $money('amount', $c['amount']))
       . $field('Plazo (meses)', '<input class="' . $inputClass . '" name="term" type="number" min="1" max="60" value="' . (int) $c['term'] . '"' . $lock . '>')
       . $field('Tasa N.M.V (%)', '<input class="' . $inputClass . '" name="rate" inputmode="decimal" value="' . self::e(number_format($c['rate'] * 100, 4, ',', '')) . '"' . $lock . '>')
+      . $field('Fecha de desembolso', '<input class="' . $inputClass . '" type="date" name="disbursed_at" value="' . date('Y-m-d', (int) ($work['disbursed_ts'] ?? 0) ?: time()) . '"' . $lock . '>')
       . '</div></section>'
       . '</div>'
       // Columna de resultados (se refresca al editar).
@@ -236,15 +238,43 @@ final class OwnerCreditView
       . self::tile('Plazo', $s['term'] . ' meses') . self::tile('Tasa', self::percent($s['rate']))
       . self::tile('Valor a colocar', self::money($s['amount'])) . self::tile('Cuota mensual', self::money($s['payment']), 'key')
       . '</div>' . (!empty($s['rate_capped']) ? '<p class="' . self::NOTE . ' !sp-mt-2">La tasa de esta condición superaba la usura; se sugiere la usura mes vencido (' . self::percent($ev['usury_monthly_legal']) . ').</p>' : '') . '</section>'
+      . self::discountPlan($work)
       . '<section class="' . self::SECTION . '"><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Políticas</h4>'
       . ($work['policies_ok'] ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Cumple todas</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-red-700">Incumple políticas</span>') . '</div>'
       . self::guide('politicas', [
-        'Requisitos' => 'Contrato activo y no próximo a vencer, plazo dentro de la vigencia, sin siniestro, sin otros créditos vigentes del propietario, valor dentro del tope, tasa bajo la usura y cuota cubierta por el ingreso neto.',
+        'Requisitos' => 'Contrato activo y no próximo a vencer, plazo dentro de la vigencia, sin siniestro, valor dentro del cupo disponible (tope menos el saldo de sus créditos vigentes), valor dentro del tope, tasa bajo la usura y cuota cubierta por sus contratos.',
         'Si alguna está en rojo' => 'Puedes aprobar igual, pero con justificación: el crédito queda marcado "Fuera de política" y la razón queda en el historial.',
       ])
       . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $policies . '</ul>'
       . ($work['policies_ok'] ? '' : '<p class="' . self::NOTE . ' !sp-mt-2">Para aprobar fuera de política escribe la justificación al final; quedará en el historial.</p>')
       . '</section>';
+  }
+
+  /**
+   * De qué contrato se descuenta cada cuota. El crédito es de la persona: si un contrato termina, su parte pasa a los
+   * demás; lo que ninguno cubre lo paga el propietario directo.
+   * @param array<string,mixed> $work
+   */
+  private static function discountPlan(array $work): string
+  {
+    $plan = $work['discount_plan'] ?? [];
+    if ($plan === []) return '';
+    $money = static fn(float $value): string => self::money($value);
+    $rows = '';
+    foreach ($plan as $segment) {
+      $range = $segment['from'] === $segment['to'] ? 'Cuota ' . $segment['from'] : 'Cuotas ' . $segment['from'] . '–' . $segment['to'];
+      $parts = implode('', array_map(static fn(array $part): string => '<span class="!sp-block">Contrato #' . self::e($part['contrato']) . ' <b class="!sp-text-service-navy">' . $money((float) $part['amount']) . '</b></span>', $segment['parts']));
+      if ($segment['direct'] >= 0.5) $parts .= '<span class="!sp-block !sp-font-semibold !sp-text-red-700">Pago directo del propietario ' . $money((float) $segment['direct']) . '</span>';
+      $rows .= '<li class="!sp-flex !sp-gap-3 !sp-justify-between !sp-py-2 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0 !sp-text-[11px]"><b class="!sp-whitespace-nowrap">' . $range . '</b><span class="!sp-text-right !sp-text-service-muted">' . $parts . '</span></li>';
+    }
+    $dates = 'Desembolso ' . date('d/m/Y', (int) $work['disbursed_ts']) . ' · primera cuota ' . date('d/m/Y', (int) $work['first_payment_ts']) . ((int) $work['last_payment_ts'] > 0 ? ' · última cuota ' . date('d/m/Y', (int) $work['last_payment_ts']) : '') . '.';
+    return '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('building') . 'Plan de descuento por contrato</h4>'
+      . self::guide('plan', [
+        'Qué es' => 'De qué giro se descuenta cada cuota. Se prefiere un solo contrato; si ninguno alcanza solo, la cuota se reparte en proporción al ingreso neto de cada contrato.',
+        'Si un contrato termina' => 'Deja de cubrir cuotas y su parte pasa a los demás contratos. Si ninguno queda vigente, el propietario paga directo.',
+        'Fin del crédito' => 'Queda pagado automáticamente cuando vence la última cuota.',
+      ])
+      . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $rows . '</ul><p class="' . self::NOTE . ' !sp-mt-2">' . self::e($dates) . '</p></section>';
   }
 
   /** @param array<string,mixed> $work */
@@ -255,10 +285,10 @@ final class OwnerCreditView
     $td = '!sp-text-right !sp-px-3 !sp-py-2.5 !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-100 first:!sp-text-left';
     $rows = '';
     foreach ($work['schedule'] as $line) {
-      $rows .= '<tr><td class="' . $td . ' !sp-font-semibold">' . $line['mes'] . '</td><td class="' . $td . '">' . self::money($line['saldo_inicial']) . '</td><td class="' . $td . ' !sp-font-semibold">' . self::money($line['cuota']) . '</td><td class="' . $td . '">' . self::money($line['interes']) . '</td><td class="' . $td . '">' . self::money($line['abono']) . '</td><td class="' . $td . '">' . self::money($line['saldo']) . '</td></tr>';
+      $rows .= '<tr><td class="' . $td . ' !sp-font-semibold">' . $line['mes'] . '</td><td class="' . $td . '">' . ((int) ($line['fecha'] ?? 0) > 0 ? date('d/m/Y', (int) $line['fecha']) : '') . '</td><td class="' . $td . '">' . self::money($line['saldo_inicial']) . '</td><td class="' . $td . ' !sp-font-semibold">' . self::money($line['cuota']) . '</td><td class="' . $td . '">' . self::money($line['interes']) . '</td><td class="' . $td . '">' . self::money($line['abono']) . '</td><td class="' . $td . '">' . self::money($line['saldo']) . '</td></tr>';
     }
     $head = '';
-    foreach (['Mes', 'Saldo de capital', 'Cuota', 'Intereses', 'Abono a capital', 'Saldo'] as $label) $head .= '<th class="' . $th . '">' . $label . '</th>';
+    foreach (['Mes', 'Fecha', 'Saldo de capital', 'Cuota', 'Intereses', 'Abono a capital', 'Saldo'] as $label) $head .= '<th class="' . $th . '">' . $label . '</th>';
     return '<section class="' . self::SECTION . '"><div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-3 !sp-mb-3"><h4 class="' . self::H4 . ' !sp-mb-0">' . UI::icon('calendar') . 'Tabla de amortización</h4>'
       . '<div class="!sp-flex !sp-flex-wrap !sp-gap-2">'
       . '<span class="!sp-px-2.5 !sp-py-1 !sp-rounded-full !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200 !sp-text-[10px]">Cuota <b>' . self::money($c['payment']) . '</b></span>'

@@ -29,7 +29,7 @@ trait HandlesOwnerCredits
   private function ownerCreditInput(): array
   {
     $input = [];
-    foreach (['contract_end', 'gross', 'ded_comision', 'ded_garantia', 'ded_poliza_servicios', 'ded_otros', 'requested_amount', 'requested_term', 'purpose', 'vacancy', 'amount', 'term', 'rate', 'note'] as $key) {
+    foreach (['contract_end', 'gross', 'ded_comision', 'ded_garantia', 'ded_poliza_servicios', 'ded_otros', 'requested_amount', 'requested_term', 'purpose', 'vacancy', 'amount', 'term', 'rate', 'disbursed_at', 'note'] as $key) {
       if (isset($_POST[$key])) $input[$key] = trim(sanitize_textarea_field(wp_unslash((string) $_POST[$key])));
     }
     return $input;
@@ -170,9 +170,13 @@ trait HandlesOwnerCredits
     $this->requireDashboardAction('owner_credit_manage', 'Tu cargo no tiene permiso para crear créditos.');
     try {
       // El primero es el de vigencia más larga: el formulario lo preselecciona.
-      $rows = $this->ownerCreditService()->ownerPortfolio(sanitize_text_field(wp_unslash((string) ($_POST['document'] ?? ''))));
-      // Cupo preaprobado con todos los contratos de la persona (no solo el que se elige para descontar).
+      $service = $this->ownerCreditService();
+      $document = sanitize_text_field(wp_unslash((string) ($_POST['document'] ?? '')));
+      $rows = $service->ownerPortfolio($document);
+      // Cupo preaprobado con todos los contratos de la persona, menos el saldo de sus créditos vigentes.
       $preapproval = \SCM\Modules\OwnerCredits\OwnerCreditCalculator::preapproval($rows, OwnerCreditSettings::read(App::settings()));
+      $preapproval['outstanding'] = $rows === [] ? 0.0 : $service->outstandingByDocument($document);
+      $preapproval['available'] = max(0.0, $preapproval['amount'] - $preapproval['outstanding']);
       $this->jsonOk(['contracts' => $rows, 'preapproval' => $preapproval]);
     } catch (\InvalidArgumentException $error) {
       $this->jsonFail($error->getMessage());

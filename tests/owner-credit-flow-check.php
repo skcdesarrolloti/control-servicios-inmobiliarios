@@ -52,6 +52,7 @@ $pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema(_ID INTEGER PRIMARY KEY, funci
 // Usura manual (sin red) y una tasa de referencia por debajo de la usura vigente.
 $pdo->exec("INSERT INTO wp_jet_cct_confi_sistema(funcion, valor) VALUES ('control_servicios_config', '" . json_encode(['owner_credit_settings' => ['usury_auto' => false, 'usury_annual' => 0.2859, 'reference_rate' => 0.019, 'notify_staff_whatsapp' => true]]) . "')");
 $pdo->exec('CREATE TABLE wp_scm_owner_credits(id INTEGER PRIMARY KEY AUTOINCREMENT, quote_id INTEGER UNIQUE, ticket_id TEXT DEFAULT "", contract_id INTEGER DEFAULT 0, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", address TEXT DEFAULT "", owner_id TEXT DEFAULT "", owner_name TEXT DEFAULT "", owner_email TEXT DEFAULT "", owner_phone TEXT DEFAULT "", purpose TEXT DEFAULT "", status TEXT DEFAULT "pendiente", requested_amount REAL DEFAULT 0, requested_term INTEGER DEFAULT 0, vacancy TEXT DEFAULT "Baja", gross_income REAL DEFAULT 0, deductions_json TEXT, net_income REAL DEFAULT 0, max_amount REAL DEFAULT 0, max_months INTEGER DEFAULT 0, approved_amount REAL, approved_term INTEGER, approved_rate REAL, monthly_payment REAL, total_interest REAL, first_payment_ts INTEGER, policy_json TEXT, evaluation_json TEXT, policy_override INTEGER DEFAULT 0, decision_note TEXT, decided_by_id TEXT DEFAULT "", decided_by_name TEXT DEFAULT "", decided_at INTEGER, closed_at INTEGER, created_by_id TEXT DEFAULT "", created_by_name TEXT DEFAULT "", created_at INTEGER, updated_at INTEGER)');
+$pdo->exec('CREATE TABLE wp_scm_owner_credit_sources(id INTEGER PRIMARY KEY AUTOINCREMENT, credit_id INTEGER, contract_id INTEGER, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", net_income REAL DEFAULT 0, end_ts INTEGER, is_primary INTEGER DEFAULT 0, created_at INTEGER)');
 $pdo->exec('CREATE TABLE wp_scm_owner_credit_events(id INTEGER PRIMARY KEY AUTOINCREMENT, credit_id INTEGER, action TEXT, actor_id TEXT, actor_name TEXT, details_json TEXT, created_at INTEGER)');
 $pdo->exec('CREATE TABLE wp_jet_cct_contratos_arrendamiento(_ID INTEGER PRIMARY KEY, contrato TEXT, estado TEXT, inmueble TEXT, id_inmueble TEXT, id_inmueble_data TEXT, direccion TEXT, propietario TEXT, id_propietario TEXT, correo_propietario TEXT, celular_propietario TEXT, indicativo_propietario TEXT, valor_canon TEXT, valor_administracion TEXT, tasa_administracion TEXT, aseguradora TEXT, asegurado TEXT, inicio_contrato TEXT, fin_contrato TEXT, esta_sinestrado TEXT, id_contrato_mandato TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_contrato_mandato(_ID INTEGER PRIMARY KEY, total_comision TEXT, incluye_garantia TEXT, precio_mes_garantia TEXT, incluye_garantia_servicios TEXT, precio_mes_servicios TEXT)');
@@ -98,6 +99,9 @@ $result = $service->decide((int) $credit['id'], 'aprobado', ['requested_term' =>
 $approved = $result['credit'];
 $check(array_key_exists('internal_whatsapp', $result['queued']), 'staff WhatsApp is attempted on decisions without breaking them when no staff is configured');
 $check($approved['status'] === 'aprobado' && (int) $approved['policy_override'] === 1 && (float) $approved['approved_amount'] === 3000000.0 && (int) $approved['approved_term'] === 12, 'approved outside policy with conditions and override flag');
+$approvedWork = $service->workspace((int) $approved['id']);
+$check($approvedWork['credit']['status'] === 'aprobado' && (int) $approved['disbursed_at'] === (int) strtotime('today') && (int) $approved['first_payment_ts'] === (int) strtotime('+1 month', strtotime('today')) && $approvedWork['schedule'][0]['fecha'] === (int) $approved['first_payment_ts'], 'approval stores the disbursement date and the first instalment one month later');
+$check(count($db->getResults('SELECT * FROM wp_scm_owner_credit_sources WHERE credit_id = ?', [(int) $approved['id']])) === 1, 'approval stores the contracts that back the credit');
 $check(abs((float) $approved['monthly_payment'] - 285423.85) < 1 && abs((float) $approved['approved_rate'] - 0.021) < 1e-9, 'monthly payment is recalculated on the server');
 $check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_ticket WHERE id_ticket = ?', ['10821'])) === 2, 'request and decision are written to the case history');
 $contractHistory = $db->getResults('SELECT * FROM wp_jet_cct_historial_contrato_arrendamiento WHERE id_contrato = ?', ['7']);
@@ -231,6 +235,14 @@ $service->recordSimulation($simulation, $actor);
 $check((int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credits') === $credits && (int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble WHERE tipo_reporte = 'Simulación de crédito'") === 2, 'a simulation is not saved as a credit and goes to the history of every owner property');
 $simulationHtml = \SCM\Modules\OwnerCredits\OwnerCreditPdf::html($simulation, 'Funcionario QA');
 $check(str_contains($simulationHtml, 'Simulación de crédito · Contrato 950') && str_contains($simulationHtml, 'Otros contratos del propietario') && str_contains($simulationHtml, 'no es una aprobación'), 'the simulation PDF lists the other contracts and says it is not an approval');
+// Aprobado con varios contratos: quedan como respaldo y en su historial; al vencer la última cuota queda pagado solo.
+$service->decide((int) $chosen['id'], 'aprobado', ['requested_term' => '3', 'amount' => '$800.000', 'term' => '3', 'rate' => '1,9', 'disbursed_at' => date('Y-m-d', strtotime('-1 year')), 'note' => 'Desembolsado hace un año, prueba de cierre automático.'], $actor);
+$check(count($db->getResults('SELECT * FROM wp_scm_owner_credit_sources WHERE credit_id = ?', [(int) $chosen['id']])) === 2, 'every contract of the owner backs the approved credit');
+$check((int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble WHERE tipo_reporte = 'Crédito aprobado' AND observacion LIKE 'Contrato #954:%respalda el crédito%'") === 1, 'the approval is written to the history of the other backing contracts');
+$settled = $service->workspace((int) $chosen['id']);
+$check($settled['credit']['status'] === 'pagado' && str_contains((string) $settled['credit']['decision_note'], 'Pagado automáticamente') && $settled['events'][0]['actor_name'] === 'Sistema', 'a credit whose last instalment is past is marked as paid automatically');
+$check($service->settleFinished() === 0, 'an automatically paid credit is not closed twice');
+
 try {
   $service->simulation('22233344', 12345, 0, 0, '', '', $actor);
   $check(false, 'a simulation needs a contract of the owner');

@@ -64,6 +64,46 @@ final class OwnerCreditCalculator
   }
 
   /**
+   * Plan de descuento de la cuota entre los contratos que respaldan el crédito, cuota por cuota. Un contrato cubre
+   * las cuotas que vencen antes de su fin (covers). Se prefiere descontar todo de un solo contrato: primero uno que
+   * cubra todo el plazo, luego el principal, luego el de vigencia más larga, siempre que su ingreso neto alcance. Si
+   * ninguno alcanza solo, la cuota se reparte en proporción al ingreso neto; lo que no cubren los contratos (por
+   * ejemplo, cuando ya terminaron) lo paga el propietario directo.
+   * @param list<array{id:int,contrato:string,net_income:float,covers:int}> $contracts
+   * @return list<array{from:int,to:int,parts:list<array{id:int,contrato:string,amount:float}>,direct:float}>
+   */
+  public static function discountPlan(array $contracts, float $payment, int $term, int $primaryId = 0): array
+  {
+    $rank = static fn(array $c): array => [(int) $c['covers'] >= $term ? 1 : 0, (int) $c['id'] === $primaryId ? 1 : 0, (int) $c['covers'], (float) $c['net_income']];
+    usort($contracts, static fn(array $a, array $b): int => $rank($b) <=> $rank($a));
+    $segments = [];
+    for ($month = 1; $month <= $term && $payment > 0; $month++) {
+      $eligible = array_values(array_filter($contracts, static fn(array $c): bool => (int) $c['covers'] >= $month && (float) $c['net_income'] > 0));
+      $single = null;
+      foreach ($eligible as $contract) {
+        if ((float) $contract['net_income'] + 0.5 >= $payment) { $single = $contract; break; }
+      }
+      $parts = [];
+      $direct = 0.0;
+      if ($single !== null) {
+        $parts[] = ['id' => (int) $single['id'], 'contrato' => (string) $single['contrato'], 'amount' => $payment];
+      } else {
+        $total = array_sum(array_map(static fn(array $c): float => (float) $c['net_income'], $eligible));
+        $covered = min($payment, $total);
+        foreach ($eligible as $contract) $parts[] = ['id' => (int) $contract['id'], 'contrato' => (string) $contract['contrato'], 'amount' => $covered * (float) $contract['net_income'] / $total];
+        $direct = $payment - $covered;
+      }
+      $last = count($segments) - 1;
+      if ($last >= 0 && $segments[$last]['parts'] == $parts && abs($segments[$last]['direct'] - $direct) < 0.005) {
+        $segments[$last]['to'] = $month;
+      } else {
+        $segments[] = ['from' => $month, 'to' => $month, 'parts' => $parts, 'direct' => $direct];
+      }
+    }
+    return $segments;
+  }
+
+  /**
    * Cupo preaprobado del solicitante con todos sus contratos: (suma de ingresos netos) × meses de política. El
    * plazo máximo es la vigencia más larga entre esos contratos menos los meses de margen configurados.
    * @param list<array{net_income:float,max_months:int}> $contracts

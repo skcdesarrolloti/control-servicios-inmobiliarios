@@ -73,13 +73,21 @@ final class OwnerCreditPdf
     }
     if ($others !== []) $others['Ingreso neto total (' . (count($others) + 1) . ' contratos)'] = $money($ev['total_net_income']);
 
+    // De qué contrato se descuenta cada cuota.
+    $plan = [];
+    foreach ($work['discount_plan'] ?? [] as $segment) {
+      $parts = array_map(static fn(array $part): string => 'Contrato #' . $part['contrato'] . ' ' . $money($part['amount']), $segment['parts']);
+      if ($segment['direct'] >= 0.5) $parts[] = 'Pago directo del propietario ' . $money($segment['direct']);
+      $plan[$segment['from'] === $segment['to'] ? 'Cuota ' . $segment['from'] : 'Cuotas ' . $segment['from'] . '–' . $segment['to']] = implode(' + ', $parts);
+    }
+
     $policies = '';
     foreach ($work['policies'] as $policy) {
       $policies .= '<tr><td class="' . ($policy['ok'] ? 'is-ok' : 'is-bad') . '">' . ($policy['ok'] ? 'Cumple' : 'No cumple') . '</td><th scope="row">' . Doc::e($policy['label']) . '</th><td>' . Doc::e($policy['detail']) . '</td></tr>';
     }
     $schedule = '';
     foreach ($work['schedule'] as $line) {
-      $schedule .= '<tr><td>' . (int) $line['mes'] . '</td><td>' . Doc::e($money($line['saldo_inicial'])) . '</td><td>' . Doc::e($money($line['cuota'])) . '</td><td>' . Doc::e($money($line['interes'])) . '</td><td>' . Doc::e($money($line['abono'])) . '</td><td>' . Doc::e($money($line['saldo'])) . '</td></tr>';
+      $schedule .= '<tr><td>' . (int) $line['mes'] . '</td><td>' . Doc::e($date((int) ($line['fecha'] ?? 0))) . '</td><td>' . Doc::e($money($line['saldo_inicial'])) . '</td><td>' . Doc::e($money($line['cuota'])) . '</td><td>' . Doc::e($money($line['interes'])) . '</td><td>' . Doc::e($money($line['abono'])) . '</td><td>' . Doc::e($money($line['saldo'])) . '</td></tr>';
     }
 
     $decision = $simulation
@@ -124,11 +132,14 @@ final class OwnerCreditPdf
         'Cuota mensual' => $money($c['payment']),
         'Total intereses' => $money($c['total_interest']),
         'Total a pagar' => $money($c['amount'] + $c['total_interest']),
+        'Fecha de desembolso' => $date((int) ($work['disbursed_ts'] ?? 0)),
+        'Primera / última cuota' => $date((int) ($work['first_payment_ts'] ?? 0)) . ' – ' . $date((int) ($work['last_payment_ts'] ?? 0)),
       ]) . '</section>'
+      . ($plan !== [] ? '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>5.1 Plan de descuento por contrato</h2>' . Doc::table($plan) . '</section>' : '')
       . '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>6. Políticas evaluadas</h2><table class="scm-acta-receipt-data scm-owner-credit-policies"><tbody>' . $policies . '</tbody></table></section>'
       . '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>7. ' . ($simulation ? 'Alcance' : 'Decisión') . '</h2>' . Doc::table($decision) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>8. Tabla de amortización</h2>'
-      . ($schedule === '' ? '<p>Sin valor o plazo para calcular la tabla.</p>' : '<table class="scm-owner-credit-schedule"><thead><tr><th>Mes</th><th>Saldo de capital</th><th>Cuota</th><th>Intereses</th><th>Abono a capital</th><th>Saldo</th></tr></thead><tbody>' . $schedule . '</tbody></table>')
+      . ($schedule === '' ? '<p>Sin valor o plazo para calcular la tabla.</p>' : '<table class="scm-owner-credit-schedule"><thead><tr><th>Mes</th><th>Fecha</th><th>Saldo de capital</th><th>Cuota</th><th>Intereses</th><th>Abono a capital</th><th>Saldo</th></tr></thead><tbody>' . $schedule . '</tbody></table>')
       . '</section>'
       . Doc::footer(['realizado_por' => $decided && (string) $credit['decided_by_name'] !== '' ? (string) $credit['decided_by_name'] : $generatedBy, 'realizado_por_cargo' => $decided ? 'Decisión del liquidador de créditos' : ($simulation ? 'Simulación desde la solicitud de crédito' : 'Generado desde el liquidador de créditos')])
       . $footerImage . '</article>';

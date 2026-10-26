@@ -65,6 +65,16 @@ $consolidated = OwnerCreditCalculator::evaluate([
 $assert($near($consolidated['total_net_income'], 3440000) && $near($consolidated['max_amount'], 10320000), 'liquidator cap uses the net income of all the owner contracts');
 $assert($consolidated['contract_months'] === 3 && $consolidated['max_months'] === 10, 'liquidator term uses the longest contract minus the margin');
 
+// Plan de descuento: un solo contrato si alcanza; si no, se reparte; si un contrato termina, su parte pasa a otros.
+$plan = OwnerCreditCalculator::discountPlan([
+  ['id' => 1, 'contrato' => 'C1', 'net_income' => 800000, 'covers' => 3], ['id' => 2, 'contrato' => 'C2', 'net_income' => 400000, 'covers' => 7], ['id' => 3, 'contrato' => 'C3', 'net_income' => 2240000, 'covers' => 12],
+], 1170000, 10, 1);
+$assert(count($plan) === 1 && $plan[0]['from'] === 1 && $plan[0]['to'] === 10 && $plan[0]['parts'][0]['contrato'] === 'C3' && $plan[0]['direct'] === 0.0, 'the whole instalment comes from the one contract that covers the term');
+$plan = OwnerCreditCalculator::discountPlan([['id' => 1, 'contrato' => 'A', 'net_income' => 2000000, 'covers' => 10], ['id' => 2, 'contrato' => 'B', 'net_income' => 1500000, 'covers' => 10]], 3000000, 10, 1);
+$assert(count($plan) === 1 && count($plan[0]['parts']) === 2 && $near($plan[0]['parts'][0]['amount'], 3000000 * 2 / 3.5) && $near($plan[0]['parts'][1]['amount'], 3000000 * 1.5 / 3.5), 'an instalment larger than any canon is split by net income');
+$plan = OwnerCreditCalculator::discountPlan([['id' => 1, 'contrato' => 'A', 'net_income' => 2000000, 'covers' => 4], ['id' => 2, 'contrato' => 'B', 'net_income' => 500000, 'covers' => 10]], 1000000, 10, 1);
+$assert(count($plan) === 2 && $plan[0]['to'] === 4 && $plan[0]['parts'][0]['contrato'] === 'A' && $plan[1]['from'] === 5 && $plan[1]['parts'][0]['contrato'] === 'B' && $near($plan[1]['direct'], 500000), 'when a contract ends its share moves to the others and the rest is paid directly');
+
 // Analista: 14.000.000 a 12 meses al 2,8 % (B41-B44 y hoja Tabla de Amortización).
 $assert($near(OwnerCreditCalculator::payment(0.028, 12, 14000000), 1389730.2109234515), 'analyst payment = PMT(2.8 %, 12, 14.000.000) (B44)');
 $schedule = OwnerCreditCalculator::schedule(0.028, 12, 14000000);

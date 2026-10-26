@@ -247,8 +247,9 @@
         ? "Hasta " + p.max_term + " cuotas (vigencia más larga " + p.longest_months + " meses − " + p.margin_months + " de margen)."
         : "Sin cuotas disponibles: ningún contrato tiene vigencia suficiente (" + p.longest_months + " meses, margen " + p.margin_months + ").";
       box.innerHTML = '<span class="!sp-block !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Cupo preaprobado máximo</span>' +
-        '<strong class="!sp-block !sp-text-base !sp-text-service-navy">' + money(p.amount) + "</strong>" +
-        '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">Ingreso neto de ' + (p.contracts === 1 ? "1 contrato" : p.contracts + " contratos") + " " + money(p.net_income) + " × " + p.income_months + " meses. " + escapeHtml(term) + "</span>" +
+        '<strong class="!sp-block !sp-text-base !sp-text-service-navy">' + money(p.outstanding > 0 ? p.available : p.amount) + "</strong>" +
+        '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">Ingreso neto de ' + (p.contracts === 1 ? "1 contrato" : p.contracts + " contratos") + " " + money(p.net_income) + " × " + p.income_months + " meses = " + money(p.amount) + ". " + escapeHtml(term) + "</span>" +
+        (p.outstanding > 0 ? '<span class="!sp-block !sp-text-[11px] !sp-font-semibold !sp-text-amber-800">Debe ' + money(p.outstanding) + " de créditos vigentes: queda disponible " + money(p.available) + ".</span>" : "") +
         '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">Es una referencia: el analista confirma el valor y el plazo en el liquidador.</span>';
       box.className = box.className.replace(/!sp-(bg|border)-(amber|red)-(50|200)/g, "") + (p.max_term > 0 ? " !sp-bg-amber-50 !sp-border-amber-200" : " !sp-bg-red-50 !sp-border-red-200");
       box.hidden = false;
