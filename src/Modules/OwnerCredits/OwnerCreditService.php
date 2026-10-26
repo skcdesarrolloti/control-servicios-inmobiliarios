@@ -226,7 +226,7 @@ final class OwnerCreditService
     $credit = ['id' => 0, 'status' => 'simulacion', 'evaluation_json' => null, 'policy_override' => 0, 'decision_note' => '', 'decided_by_name' => '', 'decided_at' => 0]
       + $this->creditRow($contract, null, '', $amount, $purpose, $actor, $term, $owner, 'propietario');
     $credit['status'] = 'simulacion';
-    return $this->workspaceFor($credit) + ['preapproval' => $preapproval, 'portfolio' => $portfolio];
+    return $this->workspaceFor($credit, ['amount' => $amount, 'term' => $term]) + ['preapproval' => $preapproval, 'portfolio' => $portfolio];
   }
 
   /** La simulación generada queda en el historial de cada contrato del propietario y de su inmueble. @param array<string,mixed> $work simulation() */
@@ -389,7 +389,7 @@ final class OwnerCreditService
     $gross = array_key_exists('gross', $input) ? self::money($input['gross']) : ((float) $credit['gross_income'] > 0 ? (float) $credit['gross_income'] : $defaults['gross']);
     $requested = array_key_exists('requested_amount', $input) ? self::money($input['requested_amount']) : (float) $credit['requested_amount'];
     $requestedTerm = array_key_exists('requested_term', $input) ? max(0, (int) $input['requested_term']) : (int) $credit['requested_term'];
-    $vacancy = (string) ($input['vacancy'] ?? $credit['vacancy'] ?? 'Baja');
+    $pending = in_array($credit['status'], ['pendiente', 'simulacion'], true);
     $requestTs = (int) $credit['created_at'];
     $storedEndTs = self::timestamp($contract['fin_contrato'] ?? '');
     $inputEndTs = self::dateInput($input['contract_end'] ?? '');
@@ -397,6 +397,8 @@ final class OwnerCreditService
     $evaluationTs = in_array($credit['status'], ['pendiente', 'simulacion'], true) ? time() : $requestTs;
     // Tope y plazo con todos los contratos del propietario, no solo con el que se descuentan las cuotas.
     $others = $this->otherContracts($credit, $evaluationTs);
+    $vacancySignal = $this->vacancySignal(array_merge([['id' => (int) $credit['contract_id'], 'contrato' => (string) ($contract['contrato'] ?? $credit['contract_code']), 'end_ts' => $storedEndTs]], $others));
+    $vacancy = in_array($input['vacancy'] ?? null, ['Alta', 'Media', 'Baja'], true) ? (string) $input['vacancy'] : ($pending ? $vacancySignal['level'] : ((string) ($credit['vacancy'] ?? '') ?: 'Baja'));
     $evaluation = OwnerCreditCalculator::evaluate([
       'gross' => $gross, 'deductions' => $deductions, 'requested_amount' => $requested, 'requested_term' => $requestedTerm,
       'request_ts' => $evaluationTs, 'contract_end_ts' => $endTs, 'vacancy' => $vacancy,
@@ -404,6 +406,7 @@ final class OwnerCreditService
       'longest_months' => $others === [] ? 0 : max(array_map(static fn(array $row): int => (int) $row['max_months'], $others)),
     ], $settings);
     $evaluation['other_contracts'] = $others;
+    $evaluation['vacancy_signal'] = $vacancySignal;
 
     $decided = in_array($credit['status'], ['aprobado', 'pagado'], true);
     $suggested = $evaluation['suggested'];
@@ -439,6 +442,7 @@ final class OwnerCreditService
     };
     $siniestrados = array_values(array_map(static fn(array $row): string => '#' . $row['contrato'], array_filter($all, static fn(array $row): bool => !empty($row['siniestrado']))));
     $evaluation['analyst'] = ['siniestro' => $choice('siniestro', $siniestrados !== []), 'siniestrados' => $siniestrados, 'has_credits' => $choice('has_credits', $approved !== [])];
+    if ($pending && $evaluation['vacancy'] !== $vacancySignal['level']) $overrides[] = 'vacancy';
     $evaluation['analyst']['overrides'] = $overrides;
     // Cupo preaprobado de la persona con todos sus contratos, menos el saldo de sus créditos aprobados.
     $counted = $evaluation['analyst']['has_credits'] ? $outstanding : 0.0;
@@ -740,6 +744,59 @@ final class OwnerCreditService
   }
 
   /**
+   * Probabilidad de desocupación sugerida con el seguimiento de renovación de los contratos: una no prórroga o
+   * terminación respondida dentro del término deja la renovación en 0 % (desocupación del 100 %). Decide el contrato
+   * principal (el primero); los demás en riesgo alto se avisan. Renovación < 50 % → Alta, < 80 % → Media, ≥ 80 % o
+   * "no salida" reportada → Baja. Sin seguimiento del ciclo vigente se sugiere Baja.
+   * @param list<array<string,mixed>> $contracts id, contrato, end_ts
+   * @return array{level:string,reason:string,alerts:list<string>}
+   */
+  public function vacancySignal(array $contracts): array
+  {
+    $result = ['level' => 'Baja', 'reason' => 'Sin seguimiento de renovación del contrato principal: se sugiere Baja.', 'alerts' => []];
+    $table = $this->db->table('scm_contract_renewal');
+    $ids = array_values(array_filter(array_map(static fn(array $row): int => (int) $row['id'], $contracts)));
+    if ($ids === [] || !$this->schema->tableExists($table)) return $result;
+    $states = [];
+    foreach ($this->db->getResults("SELECT `contract_id`, `end_ts`, `probability`, `no_exit` FROM `{$table}` WHERE `contract_id` IN (" . implode(',', array_fill(0, count($ids), '?')) . ')', $ids) as $row) $states[(int) $row['contract_id']] = $row;
+    foreach (array_values($contracts) as $index => $contract) {
+      $state = $states[(int) $contract['id']] ?? null;
+      // La probabilidad es del ciclo de la fecha fin vigente: la de un ciclo anterior ya no cuenta.
+      if ($state === null || (int) $state['end_ts'] !== (int) ($contract['end_ts'] ?? 0)) continue;
+      $probability = $state['probability'] === null || $state['probability'] === '' ? null : (float) $state['probability'];
+      if ((int) $state['no_exit'] === 1) {
+        [$level, $why] = ['Baja', 'el arrendatario reportó que no sale'];
+      } elseif ($probability === null) {
+        continue;
+      } else {
+        $percent = rtrim(rtrim(number_format($probability, 2, ',', ''), '0'), ',') . ' %';
+        $case = $probability <= 0 ? $this->withinTermCase((int) $contract['id']) : '';
+        $level = $probability < 50 ? 'Alta' : ($probability < 80 ? 'Media' : 'Baja');
+        $why = 'renovación ' . $percent . ($case !== '' ? ' (no prórroga o terminación respondida dentro del término, caso #' . $case . ')' : '');
+      }
+      if ($index === 0) {
+        $result['level'] = $level;
+        $result['reason'] = $level . ': contrato #' . $contract['contrato'] . ' con ' . $why . '.';
+      } elseif ($level === 'Alta') {
+        $result['alerts'][] = 'Contrato #' . $contract['contrato'] . ' con ' . $why . ': su parte de la cuota deja de descontarse en su fecha fin.';
+      }
+    }
+    return $result;
+  }
+
+  /** Caso de la última respuesta dentro del término que dejó la renovación del contrato en 0 %. */
+  private function withinTermCase(int $contractId): string
+  {
+    $table = $this->db->table('scm_contract_renewal_events');
+    if (!$this->schema->tableExists($table)) return '';
+    foreach ($this->db->getResults("SELECT `details_json` FROM `{$table}` WHERE `contract_id` = ? AND `action` = 'renewal_saved' ORDER BY `id` DESC LIMIT 10", [$contractId]) as $row) {
+      $details = json_decode((string) $row['details_json'], true);
+      if (is_array($details) && ($details['term'] ?? '') === 'dentro') return (string) ($details['case_number'] ?? '');
+    }
+    return '';
+  }
+
+  /**
    * Revisión previa que ve quien registra la solicitud: las reglas del liquidador que no dependen del valor pedido.
    * @param list<array<string,mixed>> $rows ownerPortfolio() @param array<string,mixed> $preapproval
    * @return list<array{label:string,ok:bool,detail:string}>
@@ -753,12 +810,14 @@ final class OwnerCreditService
     $siniestrados = array_map(static fn(array $row): string => '#' . $row['contrato'], array_filter($rows, static fn(array $row): bool => !empty($row['siniestrado'])));
     $longest = $rows[0];
     $outstanding = (float) ($preapproval['outstanding'] ?? 0);
+    $vacancy = $this->vacancySignal($rows);
     return [
       ['label' => 'Contrato activo', 'ok' => $active !== [], 'detail' => count($active) . ' de ' . count($rows) . ' contrato' . (count($rows) === 1 ? '' : 's') . ' Entregado.'],
       ['label' => 'Contrato no próximo a vencer', 'ok' => (int) $longest['max_months'] >= $minMonths && (int) $longest['max_months'] > 0, 'detail' => 'El más largo (#' . $longest['contrato'] . ') tiene ' . (int) $longest['max_months'] . ' meses de vigencia. Mínimo: ' . $minMonths . '.'],
       ['label' => 'Sin siniestro', 'ok' => $siniestrados === [], 'detail' => $siniestrados === [] ? 'Ningún contrato marcado como siniestrado por Cartera.' : 'Cartera marcó como siniestrado: ' . implode(', ', $siniestrados) . '.'],
       ['label' => 'Sin créditos vigentes', 'ok' => $outstanding < 0.5, 'detail' => $outstanding < 0.5 ? 'No tiene créditos aprobados en el sistema.' : 'Debe ' . $money($outstanding) . ' de créditos vigentes; queda disponible ' . $money((float) ($preapproval['available'] ?? 0)) . '.'],
       ['label' => 'Plazo disponible', 'ok' => (int) ($preapproval['max_term'] ?? 0) > 0, 'detail' => 'Hasta ' . (int) ($preapproval['max_term'] ?? 0) . ' cuotas.'],
+      ['label' => 'Probabilidad de desocupación', 'ok' => $vacancy['level'] !== 'Alta' && $vacancy['alerts'] === [], 'detail' => trim($vacancy['reason'] . ' ' . implode(' ', $vacancy['alerts']))],
     ];
   }
 

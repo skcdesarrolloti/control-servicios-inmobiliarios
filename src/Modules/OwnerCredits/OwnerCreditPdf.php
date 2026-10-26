@@ -118,7 +118,8 @@ final class OwnerCreditPdf
         'Valor solicitado' => $money($credit['requested_amount']),
         'Plazo solicitado' => (int) $credit['requested_term'] > 0 ? (int) $credit['requested_term'] . ' meses' : '',
         'Destinación' => (string) $credit['purpose'],
-      ] + ($simulation ? [] : ['Probabilidad de desocupación' => (string) $ev['vacancy']])) . '</section>'
+        'Probabilidad de desocupación' => (string) $ev['vacancy'] . (isset($ev['vacancy_signal']) ? ($ev['vacancy_signal']['level'] === $ev['vacancy'] ? ' · ' . $ev['vacancy_signal']['reason'] : ' (elegida por el analista; el sistema sugería ' . $ev['vacancy_signal']['reason'] . ')') : ''),
+      ] + (($ev['vacancy_signal']['alerts'] ?? []) !== [] ? ['Avisos de desocupación' => implode(' ', $ev['vacancy_signal']['alerts'])] : [])) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>4. Política de créditos</h2>' . Doc::table([
         'Valor máximo a prestar' => $money($ev['max_amount']) . ' (' . (int) $work['settings']['income_months'] . ' × ingreso neto' . ($others !== [] ? ' total' : '') . ')',
         'Meses máximos' => $ev['max_months'] . ' (' . OwnerCreditService::termBasis($ev) . ')',

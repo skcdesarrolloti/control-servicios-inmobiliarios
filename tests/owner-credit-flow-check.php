@@ -60,6 +60,8 @@ $pdo->exec('CREATE TABLE wp_jet_cct_cotizacion_mantenimiento(_ID INTEGER PRIMARY
 $pdo->exec('CREATE TABLE wp_jet_cct_historial_del_ticket(_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id TEXT, id_empleado TEXT, cct_created TEXT, cct_modified TEXT, fecha INTEGER, id_ticket TEXT, id_cotizacion_mantenimiento TEXT, nombre TEXT, respuesta TEXT, respuesta_cct_ticket TEXT, fue_editada TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_historial_del_inmueble(_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT, id_empleado TEXT, nombre_empleado TEXT, funcionario TEXT, id_inmueble TEXT, id_inmueble_data TEXT, fecha INTEGER, tipo_reporte TEXT, observacion TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_historial_contrato_arrendamiento(_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT, id_empleado TEXT, funcionario TEXT, id_contrato TEXT, contrato TEXT, inmueble TEXT, id_inmueble TEXT, id_inmueble_data TEXT, fecha INTEGER, tipo_reporte TEXT, observacion TEXT)');
+$pdo->exec('CREATE TABLE wp_scm_contract_renewal(contract_id INTEGER PRIMARY KEY, end_ts INTEGER, probability REAL, no_exit INTEGER DEFAULT 0)');
+$pdo->exec('CREATE TABLE wp_scm_contract_renewal_events(id INTEGER PRIMARY KEY AUTOINCREMENT, contract_id INTEGER, action TEXT, actor TEXT, details_json TEXT, created_at INTEGER)');
 $pdo->exec('CREATE TABLE wp_jet_cct_propietarios(_ID INTEGER PRIMARY KEY, id_propietario TEXT, nombre TEXT, documento TEXT, documento_juridico TEXT)');
 
 $end = (string) strtotime('+14 months');
@@ -238,7 +240,7 @@ $credits = (int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credits');
 $service->recordSimulation($simulation, $actor);
 $check((int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credits') === $credits && (int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble WHERE tipo_reporte = 'Simulación de crédito'") === 2, 'a simulation is not saved as a credit and goes to the history of every owner property');
 $simulationHtml = \SCM\Modules\OwnerCredits\OwnerCreditPdf::html($simulation, 'Funcionario QA');
-$check(str_contains($simulationHtml, 'Simulación de crédito · Contrato 950') && str_contains($simulationHtml, 'Ingreso neto total (2 contratos)') && str_contains($simulationHtml, '(principal)') && !str_contains($simulationHtml, 'Probabilidad de desocupación') && str_contains($simulationHtml, 'no es una aprobación'), 'the simulation PDF has one income table for all the contracts, no vacancy and says it is not an approval');
+$check(str_contains($simulationHtml, 'Simulación de crédito · Contrato 950') && str_contains($simulationHtml, 'Ingreso neto total (2 contratos)') && str_contains($simulationHtml, '(principal)') && str_contains($simulationHtml, 'Baja · Sin seguimiento de renovación') && str_contains($simulationHtml, 'no es una aprobación'), 'the simulation PDF has one income table for all the contracts, the suggested vacancy and says it is not an approval');
 // Aprobado con varios contratos: quedan como respaldo y en su historial; al vencer la última cuota queda pagado solo.
 $service->decide((int) $chosen['id'], 'aprobado', ['requested_term' => '3', 'amount' => '$800.000', 'term' => '3', 'rate' => '1,9', 'disbursed_at' => date('Y-m-d', strtotime('-1 year')), 'note' => 'Desembolsado hace un año, prueba de cierre automático.'], $actor);
 $check(count($db->getResults('SELECT * FROM wp_scm_owner_credit_sources WHERE credit_id = ?', [(int) $chosen['id']])) === 2, 'every contract of the owner backs the approved credit');
@@ -287,6 +289,29 @@ try {
   $check(true, 'the main contract must be a contract of the owner');
 }
 $db->update('wp_jet_cct_contratos_arrendamiento', ['esta_sinestrado' => 'No'], ['_ID' => 14]);
+
+// Probabilidad de desocupación sugerida con el seguimiento de renovación (no prórroga / terminación).
+$end14 = (int) $db->getVar('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 14');
+$end9 = (int) $db->getVar('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 9');
+$check($service->workspace((int) $moved['id'])['evaluation']['vacancy'] === 'Baja', 'without renewal follow-up the vacancy suggestion is low');
+$db->insert('wp_scm_contract_renewal', ['contract_id' => 14, 'end_ts' => $end14, 'probability' => 0, 'no_exit' => 0]);
+$db->insert('wp_scm_contract_renewal_events', ['contract_id' => 14, 'action' => 'renewal_saved', 'actor' => '10', 'details_json' => json_encode(['term' => 'dentro', 'case_number' => '777', 'source' => 'no prórroga']), 'created_at' => time()]);
+$db->insert('wp_scm_contract_renewal', ['contract_id' => 9, 'end_ts' => $end9, 'probability' => 30, 'no_exit' => 0]);
+$vacant = $service->workspace((int) $moved['id']);
+$check($vacant['evaluation']['vacancy'] === 'Alta' && str_contains($vacant['evaluation']['vacancy_signal']['reason'], 'dentro del término, caso #777') && $vacant['evaluation']['suggested']['term'] === 3, 'a no-renewal answered within the term suggests high vacancy on the main contract');
+$check(count($vacant['evaluation']['vacancy_signal']['alerts']) === 1 && str_contains($vacant['evaluation']['vacancy_signal']['alerts'][0], '#950 con renovación 30 %'), 'another contract at high risk is shown as an alert');
+$chosenVacancy = $service->workspace((int) $moved['id'], ['vacancy' => 'Baja']);
+$check($chosenVacancy['evaluation']['vacancy'] === 'Baja' && in_array('vacancy', $chosenVacancy['evaluation']['analyst']['overrides'], true), 'the analyst can change the suggested vacancy and it is kept as an override');
+$vacancyChecks = array_column($service->requestChecks($service->ownerPortfolio('22233344'), ['outstanding' => 0, 'available' => 1, 'max_term' => 3]), null, 'label');
+$check($vacancyChecks['Probabilidad de desocupación']['ok'] === false && str_contains($vacancyChecks['Probabilidad de desocupación']['detail'], 'caso #777'), 'the request pre-check shows the vacancy risk');
+$db->update('wp_scm_contract_renewal', ['end_ts' => $end14 - 86400 * 365], ['contract_id' => 14]);
+$check($service->workspace((int) $moved['id'])['evaluation']['vacancy'] === 'Baja', 'a renewal probability from a previous end-date cycle is ignored');
+$db->update('wp_scm_contract_renewal', ['end_ts' => $end14, 'probability' => 65], ['contract_id' => 14]);
+$check($service->workspace((int) $moved['id'])['evaluation']['vacancy'] === 'Media', 'a renewal between 50 % and 79 % suggests medium vacancy');
+$db->update('wp_scm_contract_renewal', ['no_exit' => 1, 'probability' => 10], ['contract_id' => 14]);
+$check($service->workspace((int) $moved['id'])['evaluation']['vacancy'] === 'Baja', 'a reported "no salida" suggests low vacancy');
+$db->delete('wp_scm_contract_renewal', ['contract_id' => 14]);
+$db->delete('wp_scm_contract_renewal', ['contract_id' => 9]);
 
 // Contrato sin mandato: el documento sale de la ficha del propietario y el saldo se encuentra también por la ficha.
 $db->insert('wp_jet_cct_propietarios', ['_ID' => 970, 'id_propietario' => '970', 'nombre' => 'Sin Mandato', 'documento' => '55.555.555']);

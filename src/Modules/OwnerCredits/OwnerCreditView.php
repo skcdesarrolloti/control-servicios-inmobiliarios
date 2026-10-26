@@ -164,7 +164,7 @@ final class OwnerCreditView
         'Plazo solicitado' => 'Meses en que quiere pagar. Escríbelo según lo que pidió; no puede superar los meses que faltan para el fin del contrato, porque las cuotas se descuentan del canon.',
         'Destinación' => 'Para qué usará el dinero.',
         '¿Tiene créditos vigentes?' => 'El sistema propone Sí cuando tiene créditos aprobados aquí. Con Sí, su saldo se resta del cupo; si son créditos por fuera del sistema, aprobar exige justificación. Con No, el cupo no descuenta nada.',
-        'Probabilidad de que desocupen' => 'Tu criterio sobre el riesgo de que el arrendatario se vaya antes. Baja: se respeta lo pedido con la tasa de política. Media: plazo hasta el fin del contrato con la tasa de referencia. Alta: máximo 3 meses con la tasa de riesgo.',
+        'Probabilidad de que desocupen' => 'La sugiere el sistema con el seguimiento de renovación del contrato principal: no prórroga o terminación respondida dentro del término (renovación 0 %) o renovación menor de 50 % = Alta; de 50 % a 79 % = Media; 80 % o más, o "no salida" reportada = Baja. Puedes cambiarla según tu criterio. Baja: se respeta lo pedido con la tasa de política. Media: plazo hasta el fin del contrato con la tasa de referencia. Alta: máximo 3 meses con la tasa de riesgo.',
       ]) . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">'
       . $field('Fecha de solicitud', '<input class="' . $ui::INPUT . ' ' . self::READONLY . '" value="' . date('d/m/Y', (int) $credit['created_at']) . '" readonly>')
       . $field('Valor solicitado', $money('requested_amount', (float) ($credit['requested_amount'] ?? 0)))
@@ -172,7 +172,7 @@ final class OwnerCreditView
       . $field('Destinación del crédito', $select('purpose', $purposeOptions))
       . $field('Probabilidad de que desocupen', $select('vacancy', $vacancyOptions))
       . $field('¿Tiene créditos vigentes?', $yesNo('has_credits', (bool) $analyst['has_credits'], '¿Tiene créditos vigentes?'))
-      . '</div></section>'
+      . '</div>' . self::vacancyNote($ev) . '</section>'
 
       . '<section class="' . self::SECTION . ' !sp-border-service-yellow"><div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-3"><h4 class="' . self::H4 . ' !sp-mb-0">' . $ui::icon('edit') . 'Condiciones según el analista</h4>'
       . ($editable ? '<button type="button" class="' . $ui::SECONDARY . ' !sp-text-[10px]" data-owner-credit-use-suggested>' . $ui::icon('refresh', '!sp-w-3 !sp-h-3') . 'Usar condición sugerida</button>' : '') . '</div>'
@@ -509,6 +509,16 @@ final class OwnerCreditView
     if ($policyRate <= $usuryMonthly + 1e-9) return '';
     $maxReference = $usuryMonthly / max(1e-9, 1 - (float) $settings['policy_discount']);
     return 'La tasa ajustada (' . self::percent($policyRate) . ' mensual) supera la usura (' . self::percent($usuryMonthly) . ' mensual): los créditos se recortan a la usura. Baja la tasa de referencia en Configuración a máximo ' . number_format(floor($maxReference * 10000) / 100, 2, ',', '.') . ' %.';
+  }
+
+  /** Por qué el sistema sugiere esa probabilidad de desocupación y avisos de los demás contratos. @param array<string,mixed> $ev */
+  private static function vacancyNote(array $ev): string
+  {
+    $signal = $ev['vacancy_signal'] ?? null;
+    if (!is_array($signal)) return '';
+    $differs = $signal['level'] !== $ev['vacancy'];
+    return '<p class="' . self::NOTE . ' !sp-mt-3" data-owner-credit-vacancy-note>Probabilidad sugerida por el sistema: <b>' . self::e($signal['reason']) . '</b>' . ($differs ? ' Elegiste ' . self::e($ev['vacancy']) . '.' : '') . '</p>'
+      . implode('', array_map(static fn(string $alert): string => self::alert($alert, 'bad'), $signal['alerts']));
   }
 
   /** @param array<string,mixed> $contract @param list<array<string,mixed>> $others */
