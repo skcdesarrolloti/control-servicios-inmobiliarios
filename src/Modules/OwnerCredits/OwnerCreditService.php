@@ -192,7 +192,7 @@ final class OwnerCreditService
   }
 
   /**
-   * "Nueva solicitud": contratos donde el documento (cédula o NIT) es de un propietario, con esa persona ya
+   * "Nueva solicitud": contratos Entregado o Por entregar donde el documento (cédula o NIT) es de un propietario, con esa persona ya
    * resuelta como beneficiaria. Busca el documento exacto (sin puntos ni espacios) en los propietarios del
    * mandato, en documento_propietario del contrato y en la ficha del propietario.
    * @return list<array{contract:array<string,mixed>,owner:array{key:string,name:string,document:string,email:string,phone:string}}>
@@ -225,7 +225,8 @@ final class OwnerCreditService
     }
     if ($where === []) return [];
     $results = [];
-    foreach ($this->db->getResults("SELECT * FROM `{$contracts}` WHERE (" . implode(' OR ', $where) . ") ORDER BY (LOWER(TRIM(`estado`)) = 'entregado') DESC, `_ID` DESC LIMIT 30", $args) as $contract) {
+    // Solo contratos vigentes o por iniciar: de los demás no hay canon del cual descontar.
+    foreach ($this->db->getResults("SELECT * FROM `{$contracts}` WHERE (" . implode(' OR ', $where) . ") AND LOWER(TRIM(`estado`)) IN ('entregado', 'por entregar') ORDER BY (LOWER(TRIM(`estado`)) = 'entregado') DESC, `_ID` DESC LIMIT 30", $args) as $contract) {
       $candidates = $this->contractOwners((int) $contract['_ID']);
       $owner = null;
       foreach ($candidates as $candidate) if (self::document($candidate['document']) === $document) $owner = $candidate;

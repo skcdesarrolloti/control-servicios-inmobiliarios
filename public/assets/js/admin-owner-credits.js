@@ -208,7 +208,7 @@
         .then(function (data) {
           var contracts = data.contracts || [];
           if (!contracts.length) {
-            status.textContent = "No encontramos contratos donde este documento sea de un propietario. Revisa el número.";
+            status.textContent = "No encontramos contratos Entregado o Por entregar donde este documento sea de un propietario. Revisa el número.";
             return;
           }
           var owner = contracts[0].owner || {};

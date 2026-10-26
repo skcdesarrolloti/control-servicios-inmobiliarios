@@ -185,6 +185,12 @@ $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 9, 'contrato' => '95
 $owners = $service->contractOwners(9);
 $byDocument = $service->contractsByOwnerDocument('2223');
 $check(count($byDocument) === 0, 'document search is exact, not partial');
+foreach ([11 => 'Por entregar', 12 => 'Terminado', 13 => 'Desocupado'] as $contractId => $estado) {
+  $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => $contractId, 'contrato' => (string) (940 + $contractId), 'estado' => $estado, 'inmueble' => '10600', 'propietario' => 'Primer Dueño', 'id_propietario' => '960', 'valor_canon' => '1.500.000', 'fin_contrato' => (string) strtotime('+2 years'), 'esta_sinestrado' => 'No', 'id_contrato_mandato' => '31']);
+}
+$byDocument = $service->contractsByOwnerDocument(' 22.233.344 ');
+$check(array_map(static fn(array $row): string => (string) $row['contract']['estado'], $byDocument) === ['Entregado', 'Por entregar'], 'only Entregado and Por entregar contracts are offered, Entregado first');
+$pdo->exec('DELETE FROM wp_jet_cct_contratos_arrendamiento WHERE _ID IN (11, 12, 13)');
 $byDocument = $service->contractsByOwnerDocument(' 22.233.344 ');
 $check(count($byDocument) === 1 && (int) $byDocument[0]['contract']['_ID'] === 9 && $byDocument[0]['owner']['key'] === 'mandato_2' && $byDocument[0]['owner']['name'] === 'Segunda Dueña', 'a mandate co-owner is found by document and resolved as the beneficiary');
 try {
