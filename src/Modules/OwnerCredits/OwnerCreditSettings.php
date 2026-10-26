@@ -41,7 +41,7 @@ final class OwnerCreditSettings
       'default_term' => 12,
       'notify_owner_email' => true,
       'notify_owner_whatsapp' => false,
-      'notify_staff_whatsapp' => false,
+      'notify_staff_whatsapp' => true,
     ];
   }
 
