@@ -70,6 +70,7 @@ final class CompletionService
       'branch_contact' => $this->branchContact($ticket),
       'source_flow' => $sourceFlow,
       'suggested_items' => $this->suggestedItemsForTicket($ticket),
+      'has_corrective_review' => $this->linkedRowsByIds('jet_cct_revision_correctiva', (string) ($ticket['id_revision_correctiva'] ?? '')) !== [],
     ];
   }
 
@@ -806,7 +807,11 @@ final class CompletionService
     unset($item);
     if ($pending === []) { return $items; }
     $rows = $this->linkedRowsByIds('jet_cct_revision_correctiva', (string) ($ticket['id_revision_correctiva'] ?? ''));
-    if ($rows === []) throw new \DomainException('Este caso no tiene revisión correctiva. Guarda primero la revisión antes de agregar daños desde el acta.');
+    if ($rows === []) {
+      // Preventive or legacy cases have no corrective review to sync; keep the acta damages as typed.
+      foreach (array_keys($pending) as $index) unset($items[$index]['corrective'], $items[$index]['corrective_sync_id']);
+      return $items;
+    }
     $storedByReview = [];
     foreach ($rows as $review) $storedByReview[(string) $review['_ID']] = $this->decodeStoredItems($review['evaluacion_de_danos'] ?? '');
     $changed = [];
