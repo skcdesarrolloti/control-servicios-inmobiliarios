@@ -136,38 +136,6 @@ trait HandlesOwnerCredits
     exit;
   }
 
-  /** "Descuentos del mes": qué descontar de cada giro por los créditos aprobados (popup de Métricas › Créditos). */
-  public function ajax_handler_owner_credit_discounts(): void
-  {
-    $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('credito_propietario')) $this->jsonFail('No tienes permiso para ver créditos.');
-    try {
-      $report = $this->ownerCreditService()->monthlyDiscounts(sanitize_text_field(wp_unslash((string) ($_POST['month'] ?? ''))));
-      $this->jsonOk(['html' => (new OwnerCreditView())->discounts($report), 'title' => 'Descuentos de ' . OwnerCreditView::monthLabel((int) $report['from'])]);
-    } catch (\Throwable $error) {
-      $this->ownerCreditFail($error, 'No se pudieron calcular los descuentos del mes.');
-    }
-  }
-
-  public function ajax_handler_owner_credit_discounts_excel(): void
-  {
-    $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('credito_propietario')) $this->jsonFail('No tienes permiso para ver créditos.');
-    try {
-      $report = $this->ownerCreditService()->monthlyDiscounts(sanitize_text_field(wp_unslash((string) ($_POST['month'] ?? ''))));
-      $content = OwnerCreditView::discountsExcel($report);
-    } catch (\Throwable $error) {
-      $this->ownerCreditFail($error, 'No se pudo exportar el reporte.');
-    }
-    if (ob_get_level() > 0) ob_end_clean();
-    header_remove('Content-Type');
-    header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="descuentos-creditos-' . $report['month'] . '.xls"');
-    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-    echo $content;
-    exit;
-  }
-
   public function ajax_handler_owner_credit_simulate(): void
   {
     $this->verifyCsrf();

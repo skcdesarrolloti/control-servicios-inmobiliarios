@@ -398,45 +398,6 @@
         });
     }
 
-    // "Descuentos del mes": cuotas que vencen en el mes, por contrato, para hacer los giros.
-    function openDiscounts(month) {
-      if (!modal || modal.hidden) showModal("Descuentos del mes", "Cargando…", message("Calculando descuentos…"));
-      return post("scm_owner_credit_discounts", { month: month })
-        .then(function (data) { showModal(data.title || "Descuentos del mes", "Qué descontar de cada giro por los créditos aprobados.", data.html || ""); })
-        .catch(function (error) { showModal("No se pudo calcular", "", message(error.message, "error")); });
-    }
-
-    function downloadDiscounts(button) {
-      var form = button.closest("[data-owner-credit-discounts-form]");
-      var month = form.elements.month.value;
-      var body = new FormData();
-      body.set("action", "scm_owner_credit_discounts_excel");
-      body.set("nonce", runtime.nonce || "");
-      body.set("month", month);
-      button.disabled = true;
-      setStatus(form, "Generando Excel…", "");
-      fetch(runtime.ajaxUrl || "", { method: "POST", body: body, credentials: "same-origin" })
-        .then(function (response) {
-          if ((response.headers.get("Content-Type") || "").indexOf("application/vnd.ms-excel") === -1) {
-            return response.json().catch(function () { return null; }).then(function (json) { throw new Error((json && json.data && json.data.message) || "No se pudo exportar el reporte."); });
-          }
-          return response.blob();
-        })
-        .then(function (blob) {
-          var url = URL.createObjectURL(blob);
-          var link = document.createElement("a");
-          link.href = url;
-          link.download = "descuentos-creditos-" + month + ".xls";
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-          setStatus(form, "Excel descargado.", "success");
-        })
-        .catch(function (error) { setStatus(form, error.message, "error"); })
-        .then(function () { button.disabled = false; });
-    }
-
     function spinner(size) {
       return '<svg class="' + (size || "!sp-w-3.5 !sp-h-3.5") + ' !sp-animate-spin" aria-hidden="true" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity=".25"></circle><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path></svg>';
     }
@@ -528,9 +489,6 @@
           .catch(function (error) { refresh.disabled = false; setStatus(settingsForm, error.message, "error"); });
         return;
       }
-      if (target.closest("[data-owner-credit-discounts]")) { openDiscounts(""); return; }
-      var excel = target.closest("[data-owner-credit-discounts-excel]");
-      if (excel) { downloadDiscounts(excel); return; }
       if (target.closest("[data-owner-credit-settings]")) {
         post("scm_owner_credit_settings", {})
           .then(function (data) { showModal("Configuración de créditos", "Variables de entrada del simulador y avisos.", data.html || ""); })
@@ -548,7 +506,6 @@
       simulateTimer = window.setTimeout(function () { simulate(form); }, 350);
     });
     root.addEventListener("change", function (event) {
-      if (event.target.name === "month" && event.target.closest("[data-owner-credit-discounts-form]")) { openDiscounts(event.target.value); return; }
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
       // Selects y fecha fin recalculan al cambiar (algunos navegadores no emiten "input" en fechas).
       if (form && (event.target.tagName === "SELECT" || event.target.type === "date")) simulate(form);

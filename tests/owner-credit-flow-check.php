@@ -242,14 +242,6 @@ $check((int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble
 $settled = $service->workspace((int) $chosen['id']);
 $check($settled['credit']['status'] === 'pagado' && str_contains((string) $settled['credit']['decision_note'], 'Pagado automáticamente') && $settled['events'][0]['actor_name'] === 'Sistema', 'a credit whose last instalment is past is marked as paid automatically');
 $check($service->settleFinished() === 0, 'an automatically paid credit is not closed twice');
-$paid = $service->find((int) $chosen['id']);
-$secondMonth = date('Y-m', OwnerCreditService::installmentTs((int) $paid['first_payment_ts'], 2));
-$discounts = $service->monthlyDiscounts($secondMonth);
-$mine = array_values(array_filter($discounts['rows'], static fn(array $row): bool => $row['credit_id'] === (int) $chosen['id']));
-$check(count($mine) === 1 && $mine[0]['contract_code'] === '950' && $mine[0]['number'] === 2 && !$mine[0]['direct'] && abs($mine[0]['amount'] - round((float) $paid['monthly_payment'])) < 1, 'the monthly report lists the instalment under the contract it is discounted from');
-$check($service->monthlyDiscounts(date('Y-m', strtotime('+2 years')))['rows'] === [], 'months without instalments are empty');
-$excel = \SCM\Modules\OwnerCredits\OwnerCreditView::discountsExcel($discounts);
-$check(str_contains($excel, 'SKC SuCasa Inmobiliaria') && str_contains($excel, 'TOTAL A DESCONTAR DE GIROS') && str_contains($excel, '<td>950</td>'), 'the monthly report exports to Excel with its total');
 
 try {
   $service->simulation('22233344', 12345, 0, 0, '', '', $actor);
