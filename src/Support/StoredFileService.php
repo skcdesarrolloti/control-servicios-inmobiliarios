@@ -130,6 +130,17 @@ final class StoredFileService
     if (!is_int($bytes) || $bytes < 1 || $bytes > $this->maxBytes || !$this->ensureDirectory() || !extension_loaded('gd')) {
       return null;
     }
+    $hash = @hash_file('sha256', $realPath);
+    $modifiedAt = @filemtime($realPath);
+    if (!is_string($hash) || !is_int($modifiedAt)) {
+      return null;
+    }
+    $name = substr($hash, 0, 24) . '_' . $modifiedAt . '.jpg';
+    $target = $this->directory . '/' . $name;
+    // Already converted: skip decoding and resampling the full-size original again.
+    if (is_file($target)) {
+      return $this->storedImageDetails($name);
+    }
     $mime = $this->detectMime($realPath);
     $source = match ($mime) {
       'image/jpeg' => @imagecreatefromjpeg($realPath),
@@ -162,15 +173,7 @@ final class StoredFileService
     imagecopyresampled($canvas, $source, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
     imagedestroy($source);
 
-    $hash = @hash_file('sha256', $realPath);
-    $modifiedAt = @filemtime($realPath);
-    if (!is_string($hash) || !is_int($modifiedAt)) {
-      imagedestroy($canvas);
-      return null;
-    }
-    $name = substr($hash, 0, 24) . '_' . $modifiedAt . '.jpg';
-    $target = $this->directory . '/' . $name;
-    if (!is_file($target) && !imagejpeg($canvas, $target, 78)) {
+    if (!imagejpeg($canvas, $target, 78)) {
       imagedestroy($canvas);
       return null;
     }

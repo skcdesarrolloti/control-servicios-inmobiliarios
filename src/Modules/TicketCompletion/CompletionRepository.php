@@ -169,7 +169,7 @@ final class CompletionRepository
       $name = (string) ($photo['name'] ?? '');
       if ($name === '' || basename($name) !== $name) return false;
       $needle = '%' . $this->db->escapeLike($name) . '%';
-      foreach (['scm_ticket_completion_acts'=>['payload_json'], 'jet_cct_actas_de_satisfaccion'=>['registro_fotografico'], 'jet_cct_revision_correctiva'=>['evaluacion_de_danos','registro_foto_dano']] as $tableName=>$columns) {
+      foreach (['scm_ticket_completion_acts'=>['payload_json'], 'jet_cct_actas_de_satisfaccion'=>['registro_fotografico'], 'jet_cct_revision_correctiva'=>['evaluacion_de_danos','registro_foto_dano'], 'jet_cct_revision_preventiva'=>['evaluacion_de_danos']] as $tableName=>$columns) {
         $table = $this->db->table($tableName);
         if (!$this->schema->tableExists($table)) continue;
         foreach ($columns as $column) {

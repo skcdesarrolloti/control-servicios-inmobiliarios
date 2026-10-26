@@ -70,14 +70,32 @@ final class CompletionService
       'branch_contact' => $this->branchContact($ticket),
       'source_flow' => $sourceFlow,
       'suggested_items' => $this->suggestedItemsForTicket($ticket),
-      'has_corrective_review' => $this->linkedRowsByIds('jet_cct_revision_correctiva', (string) ($ticket['id_revision_correctiva'] ?? '')) !== [],
+      'damage_review' => $this->damageReviewSource($ticket)['label'],
     ];
+  }
+
+  /**
+   * Review whose evaluacion_de_danos receives the damages added or edited from the acta:
+   * the corrective review when the case has one, otherwise the preventive review.
+   * @return array{table:string,label:string,rows:array<int,array<string,mixed>>}
+   */
+  private function damageReviewSource(array $ticket): array
+  {
+    foreach ([
+      'jet_cct_revision_correctiva' => ['id_revision_correctiva', 'correctiva'],
+      'jet_cct_revision_preventiva' => ['id_revision_preventiva', 'preventiva'],
+    ] as $table => [$field, $label]) {
+      $rows = $this->linkedRowsByIds($table, (string) ($ticket[$field] ?? ''));
+      if ($rows !== []) return ['table' => $table, 'label' => $label, 'rows' => $rows];
+    }
+    return ['table' => '', 'label' => '', 'rows' => []];
   }
 
   /** @return array<int,array{damage:string,solution:string,damage_photos?:array<int,array{name:string,mime:string,width:int,height:int,bytes:int,sha256:string}>}> */
   private function suggestedItemsForTicket(array $ticket): array
   {
-    $items = $this->suggestedItemsFromCorrectiveReview((string) ($ticket['id_revision_correctiva'] ?? ''));
+    $source = $this->damageReviewSource($ticket);
+    $items = $this->suggestedItemsFromReviewRows($source['rows'], $source['label'] === 'correctiva');
     if ($items !== []) {
       return $items;
     }
@@ -93,7 +111,16 @@ final class CompletionService
   /** @return array<int,array{damage:string,solution:string,damage_photos?:array<int,array{name:string,mime:string,width:int,height:int,bytes:int,sha256:string}>}> */
   private function suggestedItemsFromCorrectiveReview(string $rawIds): array
   {
-    $rows = $this->linkedRowsByIds('jet_cct_revision_correctiva', $rawIds);
+    return $this->suggestedItemsFromReviewRows($this->linkedRowsByIds('jet_cct_revision_correctiva', $rawIds));
+  }
+
+  /**
+   * Structured damages stored in evaluacion_de_danos (corrective and preventive reviews share the format).
+   * @param array<int,array<string,mixed>> $rows
+   * @return array<int,array<string,mixed>>
+   */
+  private function suggestedItemsFromReviewRows(array $rows, bool $legacyColumns = true): array
+  {
     $items = [];
     foreach ($rows as $row) {
       $stored = $this->decodeStoredItems($row['evaluacion_de_danos'] ?? null);
@@ -112,7 +139,7 @@ final class CompletionService
           ];
         }
       }
-      if ($stored === []) {
+      if ($stored === [] && $legacyColumns) {
         $damage = $this->linkedRecordDamageText($row, [
           'descripcion_dano',
           'descripcion_daño',
@@ -771,15 +798,16 @@ final class CompletionService
   /** @param array<int,array<string,mixed>> $items @param array<int,array<string,mixed>> $previousItems */
   private function syncCorrectiveDamages(array $ticket, array $items, array $actor, array $previousItems = []): array
   {
+    $source = $this->damageReviewSource($ticket);
     $known = [];
-    foreach (array_merge($this->suggestedItemsFromCorrectiveReview((string) ($ticket['id_revision_correctiva'] ?? '')), $previousItems) as $oldItem) {
+    foreach (array_merge($this->suggestedItemsFromReviewRows($source['rows'], false), $previousItems) as $oldItem) {
       $id = (string) ($oldItem['corrective_sync_id'] ?? '');
       if (preg_match('/^[a-f0-9]{32}$/D', $id)) { $known[$id] = $oldItem; }
     }
     $pending = [];
     foreach ($items as $index => &$item) {
       $id = (string) ($item['corrective_sync_id'] ?? '');
-      if ($id !== '' && !isset($known[$id])) throw new \DomainException('El daño cambió en la revisión correctiva. Recarga el acta antes de guardar.');
+      if ($id !== '' && !isset($known[$id])) throw new \DomainException('El daño cambió en la revisión ' . ($source['label'] ?: 'correctiva') . '. Recarga el acta antes de guardar.');
       if ($id !== '' && empty($item['corrective'])) { $item['corrective'] = $known[$id]['corrective'] ?? []; }
       if (!is_array($item['corrective'] ?? null) || $item['corrective'] === []) { continue; }
       $raw = $item['corrective'];
@@ -806,9 +834,9 @@ final class CompletionService
     }
     unset($item);
     if ($pending === []) { return $items; }
-    $rows = $this->linkedRowsByIds('jet_cct_revision_correctiva', (string) ($ticket['id_revision_correctiva'] ?? ''));
+    $rows = $source['rows'];
     if ($rows === []) {
-      // Preventive or legacy cases have no corrective review to sync; keep the acta damages as typed.
+      // Cases without a corrective or preventive review have nowhere to sync; keep the acta damages as typed.
       foreach (array_keys($pending) as $index) unset($items[$index]['corrective'], $items[$index]['corrective_sync_id']);
       return $items;
     }
@@ -826,7 +854,7 @@ final class CompletionService
             if (!is_array($storedDamage)) continue;
             $storedId = (string) ($storedDamage['_scm_acta_sync_id'] ?? md5($reviewId . ':' . $offset . ':' . $this->correctiveDamageText($storedDamage)));
             if ($storedId === $syncId && $this->correctiveDamageText($storedDamage) !== $this->correctiveDamageText((array) ($previous['corrective'] ?? []))) {
-              throw new \DomainException('El daño fue editado en la revisión correctiva. Recarga el acta para conservar esos cambios.');
+              throw new \DomainException('El daño fue editado en la revisión ' . $source['label'] . '. Recarga el acta para conservar esos cambios.');
             }
             if ($storedId === $syncId || ($this->correctiveDamageText($storedDamage) === $this->correctiveDamageText((array) ($previous['corrective'] ?? [])))) $matches[] = [$reviewId, $offset];
           }
@@ -843,7 +871,7 @@ final class CompletionService
         $storedByReview[$reviewId][$offset] = array_replace($storedByReview[$reviewId][$offset], $damage, ['_scm_acta_sync_id' => $syncId]);
       } else {
         $reviewId = (string) $rows[0]['_ID'];
-        if (count($storedByReview[$reviewId]) >= 30) throw new \DomainException('La revisión correctiva admite máximo 30 daños.');
+        if (count($storedByReview[$reviewId]) >= 30) throw new \DomainException('La revisión ' . $source['label'] . ' admite máximo 30 daños.');
         $syncId = bin2hex(random_bytes(16));
         $storedByReview[$reviewId][] = $damage + ['_scm_acta_sync_id' => $syncId];
         $items[$index]['corrective_sync_id'] = $syncId;
@@ -857,16 +885,16 @@ final class CompletionService
         $area = trim((string) ($damage[$key] ?? ''));
         if ($area !== '') $areas[$area] = $area;
       }
-      $table = $this->repo->db->table('jet_cct_revision_correctiva');
+      $table = $this->repo->db->table($source['table']);
       $update = $this->repo->schema->filterTableData($table, [
         'evaluacion_de_danos' => serialize($stored),
         'area_afectada' => implode(', ', $areas),
         'cct_modified' => date('Y-m-d H:i:s'),
         'cct_author_id' => (string) ($actor['employee_id'] ?? ''),
         'id_empleado' => (string) ($actor['employee_id'] ?? ''),
-      ]);
+      ] + ($source['label'] === 'preventiva' ? ['encontro_danos' => 'Si'] : []));
       $this->repo->db->update($table, $update, ['_ID' => (int) $reviewId]);
-      $this->repo->audit((int) $ticket['_ID'], 'Daños de la revisión correctiva #' . $reviewId . ' actualizados desde el acta de satisfacción, conservando los demás daños.', (string) ($actor['name'] ?? ''), (string) ($actor['employee_id'] ?? ''));
+      $this->repo->audit((int) $ticket['_ID'], 'Daños de la revisión ' . $source['label'] . ' #' . $reviewId . ' actualizados desde el acta de satisfacción, conservando los demás daños.', (string) ($actor['name'] ?? ''), (string) ($actor['employee_id'] ?? ''));
     }
     return $items;
   }

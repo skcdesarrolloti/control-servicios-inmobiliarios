@@ -420,10 +420,11 @@
   function submit(retried) {
     if (busy) return;
     busy = true;
-    message("Comprimiendo fotos y generando acta…", false);
-    refreshNonce(false).then(function () {
+    message("Comprimiendo fotos…", false);
+    refreshNonce(true).then(function () {
       return compressedFormData();
     }).then(function (data) {
+      message("Guardando el acta y enviando la solicitud de firma…", false);
       data.set("action", root.dataset.action || "scm_ticket_acta");
       data.set("nonce", root.dataset.nonce || "");
       data.set("ticket_pk", root.dataset.ticketPk || "");

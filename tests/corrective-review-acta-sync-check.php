@@ -12,6 +12,8 @@ use SCM\Support\SchemaInspector;
 
 $pdo = new PDO('sqlite::memory:');
 $pdo->exec('CREATE TABLE wp_jet_cct_revision_correctiva (_ID INTEGER PRIMARY KEY, evaluacion_de_danos TEXT, area_afectada TEXT, cct_modified TEXT, cct_author_id TEXT, id_empleado TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_revision_preventiva (_ID INTEGER PRIMARY KEY, evaluacion_de_danos TEXT, encontro_danos TEXT, cct_modified TEXT, cct_author_id TEXT, id_empleado TEXT)');
+$pdo->exec("INSERT INTO wp_jet_cct_revision_preventiva (_ID, evaluacion_de_danos, encontro_danos) VALUES (9, '" . serialize([]) . "', 'No')");
 $pdo->exec('CREATE TABLE wp_jet_cct_historial_del_ticket (_ID INTEGER PRIMARY KEY AUTOINCREMENT, id_ticket INTEGER, respuesta TEXT, nombre TEXT, id_empleado TEXT, cct_author_id TEXT)');
 $original = ['indice' => 'Elementos arquitectónicos', 'area_afectada_1' => 'Muros', 'descripcion_dano' => 'Fisura antigua', 'consecuencia'=>'Filtración', 'nivel_dano'=>'Moderado', 'tiempo_atencion'=>'2 dias'];
 $statement = $pdo->prepare('INSERT INTO wp_jet_cct_revision_correctiva (_ID, evaluacion_de_danos) VALUES (?, ?)');
@@ -21,11 +23,13 @@ $schema = new SchemaInspector($db);
 $tableExistsCache = new ReflectionProperty($schema, 'tableExistsCache');
 $tableExistsCache->setValue($schema, [
   'wp_jet_cct_revision_correctiva' => true,
+  'wp_jet_cct_revision_preventiva' => true,
   'wp_jet_cct_historial_del_ticket' => true,
 ]);
 $tableColumnsCache = new ReflectionProperty($schema, 'tableColumnsCache');
 $tableColumnsCache->setValue($schema, [
   'wp_jet_cct_revision_correctiva' => ['_ID', 'evaluacion_de_danos', 'area_afectada', 'cct_modified', 'cct_author_id', 'id_empleado'],
+  'wp_jet_cct_revision_preventiva' => ['_ID', 'evaluacion_de_danos', 'encontro_danos', 'cct_modified', 'cct_author_id', 'id_empleado'],
   'wp_jet_cct_historial_del_ticket' => ['_ID', 'id_ticket', 'respuesta', 'nombre', 'id_empleado', 'cct_author_id'],
 ]);
 $service = new CompletionService(new CompletionRepository($db, $schema), str_repeat('x', 32), 'https://example.test');
@@ -77,4 +81,14 @@ try {
   $method->invoke($service, $ticket, $stale, $actor, $saved);
   throw new RuntimeException('Una edición antigua sobrescribió cambios de correctiva.');
 } catch (DomainException $expected) {}
+$preventiveTicket = ['_ID' => 22, 'id_revision_preventiva' => '9'];
+$preventiveSaved = $method->invoke($service, $preventiveTicket, [['damage' => 'Fisura nueva', 'solution' => 'Se selló', 'corrective' => $damage]], $actor);
+$preventive = unserialize((string) $db->getVar('SELECT evaluacion_de_danos FROM wp_jet_cct_revision_preventiva WHERE _ID = 9'), ['allowed_classes' => false]);
+if (count($preventive) !== 1 || $preventive[0]['descripcion_dano'] !== 'Fisura nueva' || (string) $db->getVar('SELECT encontro_danos FROM wp_jet_cct_revision_preventiva WHERE _ID = 9') !== 'Si') throw new RuntimeException('El daño del acta no quedó en la revisión preventiva.');
+$suggestedForTicket = (new ReflectionMethod($service, 'suggestedItemsForTicket'))->invoke($service, $preventiveTicket);
+if (($suggestedForTicket[0]['corrective_sync_id'] ?? '') !== $preventiveSaved[0]['corrective_sync_id']) throw new RuntimeException('La precarga no recuperó el daño estructurado de la preventiva.');
+$method->invoke($service, $preventiveTicket, $suggestedForTicket, $actor);
+if (count(unserialize((string) $db->getVar('SELECT evaluacion_de_danos FROM wp_jet_cct_revision_preventiva WHERE _ID = 9'), ['allowed_classes' => false])) !== 1) throw new RuntimeException('La precarga duplicó daños de la preventiva.');
+$plain = $method->invoke($service, ['_ID' => 23], [['damage' => 'Sin revisión', 'solution' => 'Ok', 'corrective' => $damage]], $actor);
+if (isset($plain[0]['corrective'])) throw new RuntimeException('Un caso sin revisión debería guardar el daño tal como se escribió.');
 echo "Corrective review act sync checks passed: append, photos, stable edit, preserved siblings and author, structured preload.\n";

@@ -6,7 +6,7 @@ namespace SCM\Modules\TicketCompletion;
 
 final class CompletionView
 {
-  private bool $correctiveEnabled = true;
+  private string $damageReview = 'correctiva';
 
   public function __construct(private ?\Closure $correctiveItem = null) {}
 
@@ -23,8 +23,8 @@ final class CompletionView
   public function panel(array $context, CompletionService $service, int $editActId = 0, bool $showHistory = true, bool $canDeleteAny = false): string
   {
     $ticket = $context['ticket'];
-    // Preventive cases have no corrective review where acta damages could be synced.
-    $this->correctiveEnabled = (bool) ($context['has_corrective_review'] ?? true);
+    // Review (corrective or preventive) where acta damages are synced; empty when the case has none.
+    $this->damageReview = (string) ($context['damage_review'] ?? 'correctiva');
     $active = false;
     $activeAct = null;
     $editAct = null;
@@ -169,8 +169,8 @@ final class CompletionView
   {
     $hasCorrective = is_array($values['corrective'] ?? null) && $values['corrective'] !== [];
     $syncId = trim((string) ($values['corrective_sync_id'] ?? ''));
-    $correctiveHtml = $this->correctiveItem !== null && $this->correctiveEnabled ?($this->correctiveItem)($index, $hasCorrective ? $values['corrective'] : []) : '';
-    $correctiveBlock = $correctiveHtml === '' ? '' : '<div data-acta-corrective-wrap' . ($hasCorrective ? '' : ' hidden') . '><fieldset data-acta-corrective-fields' . ($hasCorrective ? '' : ' disabled') . '><legend>Detalle para la revisión correctiva</legend>' . $correctiveHtml . '</fieldset></div>';
+    $correctiveHtml = $this->correctiveItem !== null && $this->damageReview !== '' ? ($this->correctiveItem)($index, $hasCorrective ? $values['corrective'] : []) : '';
+    $correctiveBlock = $correctiveHtml === '' ? '' : '<div data-acta-corrective-wrap' . ($hasCorrective ? '' : ' hidden') . '><fieldset data-acta-corrective-fields' . ($hasCorrective ? '' : ' disabled') . '><legend>Detalle para la revisión ' . self::e($this->damageReview) . '</legend>' . $correctiveHtml . '</fieldset></div>';
     $syncField = $syncId !== '' ? '<input type="hidden" name="items[' . $index . '][corrective_sync_id]" value="' . self::e($syncId) . '">' : '';
     $helpId = 'acta-photo-help-' . $index;
     $damagePhotosHtml = '';

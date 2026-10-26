@@ -3542,6 +3542,7 @@
             .then(function (data) {
               var operation = form.dataset.actaOperation || "create";
               if (operation === "update") data.set("act_id", form.dataset.actaId || "");
+              message("Guardando el acta y enviando la solicitud de firma…", false);
               return request(operation, data);
             })
             .catch(function (error) {
