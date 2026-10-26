@@ -127,8 +127,11 @@ final class OwnerCreditPdf
       . '<section class="scm-acta-receipt-section"><h2>4. Política de créditos</h2>' . Doc::table([
         'Valor máximo a prestar' => $money($ev['max_amount']) . ' (' . (int) $work['settings']['income_months'] . ' × ingreso neto' . ($others !== [] ? ' total' : '') . ')',
         'Meses máximos' => $ev['max_months'] . ' (' . OwnerCreditService::termBasis($ev) . ')',
+      ] + ($simulation ? [] : [
+        // Tasas de trabajo del analista: no van en la simulación que puede ver el propietario.
         'Tasa ajustada de colocación' => $percent($ev['policy_rate']) . ' N.M.V',
         'Tasa para el riesgo' => ($ev['risk_applies'] ?? true) ? $percent($ev['risk_rate']) . ' N.M.V' : 'No aplica (lo pedido no supera el valor máximo)',
+      ]) + [
         'Tasa de usura vigente' => $percent((float) $work['settings']['usury_annual']) . ' E.A. (' . $percent((float) $ev['usury_monthly_legal']) . ' mensual)',
       ]) . '</section>'
       . '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>5. ' . ($approved ? 'Condiciones aprobadas' : ($simulation ? 'Condiciones simuladas' : 'Condiciones propuestas')) . '</h2>' . Doc::table([
