@@ -63,6 +63,29 @@ final class OwnerCreditCalculator
   }
 
   /**
+   * Cupo preaprobado del solicitante con todos sus contratos: (suma de ingresos netos) × meses de política. El
+   * plazo máximo es la vigencia más larga entre esos contratos menos los meses de margen configurados.
+   * @param list<array{net_income:float,max_months:int}> $contracts
+   * @param array<string,mixed> $settings OwnerCreditSettings::read()
+   * @return array{contracts:int,net_income:float,income_months:int,amount:float,longest_months:int,margin_months:int,max_term:int}
+   */
+  public static function preapproval(array $contracts, array $settings): array
+  {
+    $net = array_sum(array_map(static fn(array $row): float => max(0.0, (float) $row['net_income']), $contracts));
+    $longest = $contracts === [] ? 0 : max(0, ...array_map(static fn(array $row): int => (int) $row['max_months'], $contracts));
+    $margin = max(0, (int) $settings['preapproval_margin_months']);
+    return [
+      'contracts' => count($contracts),
+      'net_income' => $net,
+      'income_months' => (int) $settings['income_months'],
+      'amount' => $net * (int) $settings['income_months'],
+      'longest_months' => $longest,
+      'margin_months' => $margin,
+      'max_term' => max(0, $longest - $margin),
+    ];
+  }
+
+  /**
    * @param array{gross:float,deductions:array<string,float>,requested_amount:float,requested_term:int,request_ts:int,contract_end_ts:int,vacancy:string} $input
    * @param array<string,mixed> $settings OwnerCreditSettings::read()
    * @return array<string,mixed>

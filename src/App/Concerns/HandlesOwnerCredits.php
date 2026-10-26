@@ -132,16 +132,21 @@ trait HandlesOwnerCredits
     $this->requireDashboardAction('owner_credit_manage', 'Tu cargo no tiene permiso para crear créditos.');
     try {
       $rows = [];
-      foreach ($this->ownerCreditService()->contractsByOwnerDocument(sanitize_text_field(wp_unslash((string) ($_POST['document'] ?? '')))) as ['contract' => $contract, 'owner' => $owner]) {
+      $service = $this->ownerCreditService();
+      foreach ($service->contractsByOwnerDocument(sanitize_text_field(wp_unslash((string) ($_POST['document'] ?? '')))) as ['contract' => $contract, 'owner' => $owner]) {
         $end = OwnerCreditService::timestamp($contract['fin_contrato'] ?? '');
+        $income = $service->defaultIncome($contract);
         $rows[] = [
           'id' => (int) ($contract['_ID'] ?? 0), 'contrato' => (string) ($contract['contrato'] ?? ''), 'inmueble' => (string) ($contract['inmueble'] ?? ''),
           'direccion' => (string) ($contract['direccion'] ?? ''), 'estado' => (string) ($contract['estado'] ?? ''), 'arrendatario' => (string) ($contract['arrendatario'] ?? ''),
           'fin' => $end > 0 ? date('d/m/Y', $end) : '', 'max_months' => \SCM\Modules\OwnerCredits\OwnerCreditCalculator::monthsUntil(time(), $end),
+          'canon' => $income['gross'], 'deductions' => array_sum($income['deductions']), 'net_income' => max(0.0, $income['gross'] - array_sum($income['deductions'])),
           'owner' => $owner,
         ];
       }
-      $this->jsonOk(['contracts' => $rows]);
+      // Cupo preaprobado con todos los contratos de la persona (no solo el que se elige para descontar).
+      $preapproval = \SCM\Modules\OwnerCredits\OwnerCreditCalculator::preapproval($rows, OwnerCreditSettings::read(App::settings()));
+      $this->jsonOk(['contracts' => $rows, 'preapproval' => $preapproval]);
     } catch (\InvalidArgumentException $error) {
       $this->jsonFail($error->getMessage());
     } catch (\Throwable $error) {
@@ -194,7 +199,7 @@ trait HandlesOwnerCredits
       if ($mode === 'save') {
         // Se parte de lo guardado para no perder los datos de la última sincronización.
         $input = OwnerCreditSettings::read(App::settings());
-        foreach (['usury_auto', 'usury_annual', 'usury_updated_at', 'reference_rate', 'policy_discount', 'no_mandate_deduction', 'income_months', 'min_remaining_months', 'notify_owner_email', 'notify_owner_whatsapp', 'notify_staff_whatsapp'] as $key) {
+        foreach (['usury_auto', 'usury_annual', 'usury_updated_at', 'reference_rate', 'policy_discount', 'no_mandate_deduction', 'income_months', 'min_remaining_months', 'preapproval_margin_months', 'notify_owner_email', 'notify_owner_whatsapp', 'notify_staff_whatsapp'] as $key) {
           if (isset($_POST[$key])) $input[$key] = sanitize_text_field(wp_unslash((string) $_POST[$key]));
         }
         $saved = OwnerCreditSettings::save(App::settings(), $input, Auth::userId());

@@ -44,6 +44,14 @@ $assert($alta['suggested']['term'] === 3 && $near($alta['suggested']['rate'], $a
 $media = OwnerCreditCalculator::evaluate(['vacancy' => 'Media'] + ['gross' => 6232674, 'deductions' => ['comision' => 2110546], 'requested_amount' => 13167756, 'requested_term' => 12, 'request_ts' => strtotime('2024-03-26'), 'contract_end_ts' => strtotime('2024-09-25')], $settings);
 $assert($media['suggested']['term'] === 6 && $near($media['suggested']['rate'], 0.0242, 1e-12), 'medium vacancy suggests max months at the reference rate');
 
+// Cupo preaprobado con varios contratos (ejemplo de Cartera): canon 1.000.000 + 500.000 + 2.800.000 − 860.000 de descuentos.
+$pre = OwnerCreditCalculator::preapproval([
+  ['net_income' => 800000, 'max_months' => 3], ['net_income' => 400000, 'max_months' => 7], ['net_income' => 2240000, 'max_months' => 12],
+], $settings);
+$assert($near($pre['net_income'], 3440000) && $near($pre['amount'], 10320000), 'preapproval = sum of net incomes × 3');
+$assert($pre['longest_months'] === 12 && $pre['max_term'] === 10 && $pre['contracts'] === 3, 'preapproval term = longest contract term − 2 months of margin');
+$assert(OwnerCreditCalculator::preapproval([], $settings)['max_term'] === 0, 'preapproval without contracts is empty');
+
 // Analista: 14.000.000 a 12 meses al 2,8 % (B41-B44 y hoja Tabla de Amortización).
 $assert($near(OwnerCreditCalculator::payment(0.028, 12, 14000000), 1389730.2109234515), 'analyst payment = PMT(2.8 %, 12, 14.000.000) (B44)');
 $schedule = OwnerCreditCalculator::schedule(0.028, 12, 14000000);

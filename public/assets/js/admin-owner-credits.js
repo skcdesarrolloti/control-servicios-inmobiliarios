@@ -199,9 +199,11 @@
       var status = form.querySelector("[data-owner-credit-search-status]");
       var results = form.querySelector("[data-owner-credit-search-results]");
       var person = form.querySelector("[data-owner-credit-person]");
+      var preapproval = form.querySelector("[data-owner-credit-preapproval]");
       pickContract(form, null);
       results.innerHTML = "";
       person.hidden = true;
+      preapproval.hidden = true;
       if (query.replace(/[\s.]/g, "").length < 4) { status.textContent = "Escribe la cédula o el NIT (mínimo 4 caracteres)."; return; }
       status.textContent = "Buscando…";
       post("scm_owner_credit_contracts", { document: query })
@@ -216,13 +218,15 @@
           person.innerHTML = '<strong class="!sp-block !sp-text-xs !sp-text-service-navy">' + escapeHtml(owner.name || "Propietario") + "</strong>" +
             '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">' + escapeHtml(detail || "Sin datos de contacto") + "</span>";
           person.hidden = false;
+          renderPreapproval(preapproval, data.preapproval);
           status.textContent = contracts.length === 1 ? "Es propietario en 1 contrato." : "Es propietario en " + contracts.length + " contratos. Elige del que se descontarán las cuotas.";
           results.innerHTML = contracts.map(function (c, index) {
             return '<label class="!sp-flex !sp-items-start !sp-gap-3 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-white !sp-cursor-pointer hover:!sp-border-service-yellow !sp-text-[11px] !sp-text-service-muted">' +
               '<input type="radio" name="contract_pick" value="' + index + '" class="!sp-mt-1" data-owner-credit-pick>' +
               '<span class="!sp-min-w-0"><strong class="!sp-block !sp-text-xs !sp-text-service-navy">Contrato ' + escapeHtml(c.contrato) + " · SIMI " + escapeHtml(c.inmueble) + "</strong>" +
               '<span class="!sp-block">' + escapeHtml(c.direccion) + " · " + escapeHtml(c.estado) + (c.fin ? " · Vence " + escapeHtml(c.fin) : "") + "</span>" +
-              (c.arrendatario ? '<span class="!sp-block">Arrendatario: ' + escapeHtml(c.arrendatario) + "</span>" : "") + "</span></label>";
+              (c.arrendatario ? '<span class="!sp-block">Arrendatario: ' + escapeHtml(c.arrendatario) + "</span>" : "") +
+              '<span class="!sp-block">Canon ' + money(c.canon) + " − descuentos " + money(c.deductions) + " = ingreso neto <strong class=\"!sp-text-service-navy\">" + money(c.net_income) + "</strong>" + (c.fin ? " · " + escapeHtml(c.max_months) + " meses de vigencia" : "") + "</span></span></label>";
           }).join("");
           results._contracts = contracts;
           if (contracts.length === 1) {
@@ -231,6 +235,23 @@
           }
         })
         .catch(function (error) { status.textContent = error.message; });
+    }
+
+    function money(value) {
+      return "$" + moneyFormat.format(Math.round(Number(value) || 0));
+    }
+
+    // Cupo con todos los contratos de la persona: Σ ingreso neto × meses de política; cuotas = vigencia más larga − margen.
+    function renderPreapproval(box, p) {
+      if (!box || !p || !p.contracts) return;
+      var term = p.max_term > 0
+        ? "Hasta " + p.max_term + " cuotas (vigencia más larga " + p.longest_months + " meses − " + p.margin_months + " de margen)."
+        : "Sin cuotas disponibles: ningún contrato tiene vigencia suficiente (" + p.longest_months + " meses, margen " + p.margin_months + ").";
+      box.innerHTML = '<span class="!sp-block !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Cupo preaprobado máximo</span>' +
+        '<strong class="!sp-block !sp-text-base !sp-text-service-navy">' + money(p.amount) + "</strong>" +
+        '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">Ingreso neto de ' + (p.contracts === 1 ? "1 contrato" : p.contracts + " contratos") + " " + money(p.net_income) + " × " + p.income_months + " meses. " + escapeHtml(term) + "</span>" +
+        '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">Es una referencia: el analista confirma el valor y el plazo en el liquidador.</span>';
+      box.hidden = false;
     }
 
     function pickContract(form, contract) {

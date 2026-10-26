@@ -347,6 +347,7 @@ final class OwnerCreditView
       . $field('Descuento sin mandato (% del canon)', $input('no_mandate_deduction', $pct($settings['no_mandate_deduction'], 1), ' inputmode="decimal"'), 'Cuando el contrato no tiene mandato con comisión registrada.')
       . $field('Meses de ingreso neto a prestar', '<input class="' . $ui::INPUT . '" type="number" name="income_months" min="1" max="24" value="' . (int) $settings['income_months'] . '">', 'Tope = ingreso neto × estos meses.')
       . $field('Meses mínimos de contrato restantes', '<input class="' . $ui::INPUT . '" type="number" name="min_remaining_months" min="0" max="60" value="' . (int) $settings['min_remaining_months'] . '">', 'Por debajo se alerta "contrato próximo a vencer".')
+      . $field('Meses de margen del preaprobado', '<input class="' . $ui::INPUT . '" type="number" name="preapproval_margin_months" min="0" max="24" value="' . (int) $settings['preapproval_margin_months'] . '">', 'Plazo máximo preaprobado = vigencia más larga de sus contratos − estos meses.')
       . '</div></section>'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . UI::icon('bolt') . 'Avisos</h4><div class="' . $grid . '">'
       . $field('Correo al propietario al decidir', $yesNo('notify_owner_email', (bool) $settings['notify_owner_email']), 'Condiciones y tabla de amortización.')
@@ -376,12 +377,14 @@ final class OwnerCreditView
         'Qué escribir' => 'La cédula o el NIT de quien pide el crédito, con o sin puntos.',
         'Qué encuentra' => 'Los contratos de arrendamiento donde esa persona es propietaria (en el contrato, en su ficha o en el contrato de mandato, aunque sean varios propietarios).',
         'Por qué un contrato' => 'Las cuotas se descuentan del canon de ese contrato. Si la persona tiene varios inmuebles, elige el contrato del que se descontará.',
+        'Cupo preaprobado' => 'Suma del ingreso neto (canon − descuentos) de todos sus contratos × los meses de política. Las cuotas máximas salen del contrato con la vigencia más larga, menos el margen de Configuración.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[minmax(0,1fr)_auto] !sp-gap-3 !sp-items-end">'
       . $field('Cédula o NIT' . $required, '<input class="' . $ui::INPUT . '" data-owner-credit-search-query inputmode="numeric" placeholder="Ej. 1143415938">')
       . '<button type="button" class="' . $ui::NAVY . ' !sp-h-10" data-owner-credit-search>' . $ui::icon('filter', '!sp-w-3.5 !sp-h-3.5') . 'Buscar</button></div>'
       . '<p class="' . self::NOTE . ' !sp-mt-2" data-owner-credit-search-status></p>'
       . '<div class="!sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200" data-owner-credit-person hidden></div>'
+      . '<div class="!sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200" data-owner-credit-preapproval hidden></div>'
       . '<div class="!sp-grid !sp-gap-2 !sp-mt-2" data-owner-credit-search-results role="radiogroup" aria-label="Contrato del que se descuenta"></div></section>'
       . '<section class="' . self::SECTION . '" data-owner-credit-request hidden><h4 class="' . self::H4 . '">' . $step('3') . 'Datos de la solicitud</h4>'
       . self::guide('nuevo-datos', [
