@@ -29,7 +29,7 @@ trait HandlesOwnerCredits
   private function ownerCreditInput(): array
   {
     $input = [];
-    foreach (['contract_end', 'gross', 'ded_comision', 'ded_garantia', 'ded_poliza_servicios', 'ded_otros', 'requested_amount', 'requested_term', 'purpose', 'vacancy', 'amount', 'term', 'rate', 'disbursed_at', 'note'] as $key) {
+    foreach (['contract_end', 'gross', 'ded_comision', 'ded_garantia', 'ded_poliza_servicios', 'ded_otros', 'requested_amount', 'requested_term', 'purpose', 'vacancy', 'amount', 'term', 'rate', 'disbursed_at', 'siniestro', 'has_credits', 'note'] as $key) {
       if (isset($_POST[$key])) $input[$key] = trim(sanitize_textarea_field(wp_unslash((string) $_POST[$key])));
     }
     return $input;
@@ -163,6 +163,19 @@ trait HandlesOwnerCredits
     }
   }
 
+  /** Cambia el contrato principal de una solicitud pendiente por otro contrato de la persona. */
+  public function ajax_handler_owner_credit_contract(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('owner_credit_decide', 'Tu cargo no tiene permiso para cambiar el contrato principal del crédito.');
+    try {
+      $credit = $this->ownerCreditService()->changeContract((int) ($_POST['credit_id'] ?? 0), (int) ($_POST['contract_id'] ?? 0), $this->ticketCompletionActor());
+      $this->jsonOk(['credit_id' => (int) $credit['id'], 'message' => 'Contrato principal: #' . $credit['contract_code'] . '.']);
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo cambiar el contrato principal.');
+    }
+  }
+
   /** Cambia a quién es una solicitud pendiente, entre los propietarios del contrato principal. */
   public function ajax_handler_owner_credit_owner(): void
   {
@@ -190,7 +203,7 @@ trait HandlesOwnerCredits
       $preapproval = \SCM\Modules\OwnerCredits\OwnerCreditCalculator::preapproval($rows, OwnerCreditSettings::read(App::settings()));
       $preapproval['outstanding'] = $rows === [] ? 0.0 : $service->outstandingByDocument($document, array_map(static fn(array $row): string => (string) ($row['owner']['owner_id'] ?? ''), $rows));
       $preapproval['available'] = max(0.0, $preapproval['amount'] - $preapproval['outstanding']);
-      $this->jsonOk(['contracts' => $rows, 'preapproval' => $preapproval]);
+      $this->jsonOk(['contracts' => $rows, 'preapproval' => $preapproval, 'checks' => $service->requestChecks($rows, $preapproval)]);
     } catch (\InvalidArgumentException $error) {
       $this->jsonFail($error->getMessage());
     } catch (\Throwable $error) {

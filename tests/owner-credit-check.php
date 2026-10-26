@@ -142,5 +142,5 @@ $assert(str_contains($pdfHtml, 'Analista QA') && str_contains($pdfHtml, 'Propiet
 $assert(is_readable(dirname(__DIR__) . '/public/assets/css/owner-credit-document.css'), 'credit PDF stylesheet exists');
 $newForm = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->newForm();
 $assert(str_contains($newForm, 'Documento del propietario') && str_contains($newForm, 'name="owner_key"') && !str_contains($newForm, 'name="contract_end"') && !str_contains($newForm, '¿Cuál propietario?'), 'new credit asks for the owner document, without the owner step or the contract end date');
-$healthy = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace(array_replace_recursive($pdfWork, ['contract' => ['siniestrado' => false]]), true, true);
-$assert(str_contains($healthy, 'Por verificar') && !str_contains($healthy, '>No</strong>'), 'a contract without a siniestro mark shows "Por verificar"');
+$healthy = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace(array_replace_recursive($work, ['contract' => ['siniestrado' => false]]), true, true);
+$assert(str_contains($healthy, 'name="siniestro"') && str_contains($healthy, '<option value="no" selected>No</option>') && str_contains($healthy, 'Cartera no marcó ninguno de sus contratos'), 'a contract without a siniestro mark proposes "No" and the analyst can change it');

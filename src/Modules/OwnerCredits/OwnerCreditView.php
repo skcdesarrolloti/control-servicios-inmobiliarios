@@ -111,6 +111,12 @@ final class OwnerCreditView
     $money = static fn(string $name, float $value): string => '<input class="' . $inputClass . '" name="' . $name . '" inputmode="numeric" data-owner-credit-money value="' . self::e(self::money($value)) . '"' . $lock . '>';
     $select = static fn(string $name, string $options): string => '<select class="' . $inputClass . '" name="' . $name . '"' . ($editable ? '' : ' disabled') . '>' . $options . '</select>';
     $chip = static fn(string $label, string $value): string => '<span class="!sp-inline-flex !sp-items-center !sp-gap-1 !sp-px-2.5 !sp-py-1 !sp-rounded-full !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-[10px] !sp-text-service-muted">' . self::e($label) . ' <b class="!sp-text-service-navy">' . $value . '</b></span>';
+    $analyst = $ev['analyst'] ?? ['siniestro' => $contract['siniestrado'], 'siniestrados' => [], 'has_credits' => false];
+    $yesNo = static fn(string $name, bool $value, string $label): string => '<select class="' . $inputClass . '" name="' . $name . '" aria-label="' . self::e($label) . '"' . ($editable ? '' : ' disabled') . '><option value="no"' . ($value ? '' : ' selected') . '>No</option><option value="si"' . ($value ? ' selected' : '') . '>Sí</option></select>';
+    $siniestroTile = $editable
+      ? '<div class="!sp-rounded-lg !sp-border !sp-border-solid ' . ($analyst['siniestro'] ? '!sp-border-red-200 !sp-bg-red-50/60' : '!sp-border-service-yellow !sp-bg-amber-50/40') . ' !sp-p-3"><span class="!sp-block !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted !sp-mb-1.5">¿Siniestrado?</span>' . $yesNo('siniestro', (bool) $analyst['siniestro'], '¿Algún contrato siniestrado?')
+        . '<span class="!sp-block !sp-mt-1.5 !sp-text-[10px] !sp-text-service-muted">' . self::e($analyst['siniestrados'] !== [] ? 'Cartera: ' . implode(', ', $analyst['siniestrados']) . '.' : 'Cartera no marcó ninguno de sus contratos.') . '</span></div>'
+      : self::tile('Siniestro', $analyst['siniestro'] ? 'Siniestrado' : 'No', $analyst['siniestro'] ? 'bad' : 'key');
     $years = $contract['inicio_ts'] > 0 && $contract['fin_ts'] > 0 ? number_format(($contract['fin_ts'] - $contract['inicio_ts']) / 86400 / 365, 1, ',', '.') : '—';
 
     $endTile = $editable
@@ -128,7 +134,7 @@ final class OwnerCreditView
 
     return '<form class="!sp-font-sans !sp-text-service-navy !sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-5" data-owner-credit-form data-credit-id="' . (int) $credit['id'] . '" autocomplete="off">'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2">' . self::status((string) $credit['status'])
-      . $chip('Contrato principal', '#' . self::e($contract['code'])) . ((int) $credit['quote_id'] > 0 && $editable ? self::beneficiarySelect($credit) : '') . ($editable && count($work['owners'] ?? []) > 1 ? self::ownerSelect($credit, $work['owners']) : $chip(OwnerCreditService::beneficiaryLabel($credit), self::e($credit['owner_name']) . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · ' . self::e($credit['owner_document']) : ''))) . $chip('Inmueble', self::e($credit['property']))
+      . ($editable && ($ev['other_contracts'] ?? []) !== [] ? self::mainContractSelect($contract, $ev['other_contracts']) : $chip('Contrato principal', '#' . self::e($contract['code']))) . ((int) $credit['quote_id'] > 0 && $editable ? self::beneficiarySelect($credit) : '') . ($editable && count($work['owners'] ?? []) > 1 ? self::ownerSelect($credit, $work['owners']) : $chip(OwnerCreditService::beneficiaryLabel($credit), self::e($credit['owner_name']) . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · ' . self::e($credit['owner_document']) : ''))) . $chip('Inmueble', self::e($credit['property']))
       . ((int) $credit['quote_id'] > 0 ? $chip('Cotización', '#' . (int) $credit['quote_id']) : $chip('Origen', 'Manual'))
       . '<button type="button" class="' . $ui::NAVY . ' !sp-ml-auto" data-owner-credit-pdf title="Documento interno para funcionarios">' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Ver PDF</button></div>'
 
@@ -138,11 +144,11 @@ final class OwnerCreditView
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('building') . 'Contrato de arriendo vigente</h4>' . self::guide('contrato', [
         'Fin del contrato' => 'Define cuántos meses se puede prestar: se cuentan los meses completos (de 30 días) que faltan hasta esa fecha. Si el contrato fue renovado y la fecha está desactualizada, corrígela aquí; se guarda en el contrato al aprobar o rechazar.',
         'Años arrendados' => 'Tiempo entre el inicio y el fin del contrato. Un historial largo da más confianza.',
-        'Siniestro' => 'Lo marca Cartera cuando el contrato fue reportado a la aseguradora por mora. Un contrato siniestrado incumple la política. "Por verificar" significa que Cartera no lo ha marcado: confírmalo con Cartera antes de aprobar.',
+        'Siniestro' => 'Lo marca Cartera cuando un contrato fue reportado a la aseguradora por mora. Se revisan todos los contratos del propietario: si alguno está siniestrado, incumple la política. Confírmalo con Cartera y corrígelo con Sí o No si el sistema no está al día.',
       ]) . '<div class="!sp-grid !sp-grid-cols-2 sm:!sp-grid-cols-3 !sp-gap-3">'
       . self::tile('Inicio del contrato', $contract['inicio_ts'] > 0 ? date('d/m/Y', $contract['inicio_ts']) : '—') . $endTile . self::tile('Años arrendados', $years)
       . self::tile('Estado', self::e($contract['estado'] ?: '—')) . self::tile('Aseguradora', self::e($contract['aseguradora'] ?: '—'))
-      . self::tile('Siniestro', $contract['siniestrado'] ? 'Siniestrado' : 'Por verificar', $contract['siniestrado'] ? 'bad' : 'key')
+      . $siniestroTile
       . '</div></section>'
 
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('cash') . 'Ingreso del propietario</h4>' . self::guide('ingreso', [
@@ -157,13 +163,15 @@ final class OwnerCreditView
         'Valor solicitado' => 'Lo que pide el propietario. Si viene de una cotización, es el total de la cotización.',
         'Plazo solicitado' => 'Meses en que quiere pagar. Escríbelo según lo que pidió; no puede superar los meses que faltan para el fin del contrato, porque las cuotas se descuentan del canon.',
         'Destinación' => 'Para qué usará el dinero.',
+        '¿Tiene créditos vigentes?' => 'El sistema propone Sí cuando tiene créditos aprobados aquí. Con Sí, su saldo se resta del cupo; si son créditos por fuera del sistema, aprobar exige justificación. Con No, el cupo no descuenta nada.',
         'Probabilidad de que desocupen' => 'Tu criterio sobre el riesgo de que el arrendatario se vaya antes. Baja: se respeta lo pedido con la tasa de política. Media: plazo hasta el fin del contrato con la tasa de referencia. Alta: máximo 3 meses con la tasa de riesgo.',
       ]) . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">'
       . $field('Fecha de solicitud', '<input class="' . $ui::INPUT . ' ' . self::READONLY . '" value="' . date('d/m/Y', (int) $credit['created_at']) . '" readonly>')
       . $field('Valor solicitado', $money('requested_amount', (float) ($credit['requested_amount'] ?? 0)))
       . $field('Plazo solicitado (meses)', '<input class="' . $inputClass . '" name="requested_term" type="number" min="1" max="60" placeholder="Escribe los meses" value="' . ((int) $credit['requested_term'] > 0 ? (int) $credit['requested_term'] : '') . '"' . $lock . '>')
       . $field('Destinación del crédito', $select('purpose', $purposeOptions))
-      . $field('Probabilidad de que desocupen', $select('vacancy', $vacancyOptions), 'sm:!sp-col-span-2')
+      . $field('Probabilidad de que desocupen', $select('vacancy', $vacancyOptions))
+      . $field('¿Tiene créditos vigentes?', $yesNo('has_credits', (bool) $analyst['has_credits'], '¿Tiene créditos vigentes?'))
       . '</div></section>'
 
       . '<section class="' . self::SECTION . ' !sp-border-service-yellow"><div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-3"><h4 class="' . self::H4 . ' !sp-mb-0">' . $ui::icon('edit') . 'Condiciones según el analista</h4>'
@@ -411,7 +419,8 @@ final class OwnerCreditView
       . self::guide('nuevo-documento', [
         'Qué escribir' => 'La cédula o el NIT de quien pide el crédito, con o sin puntos.',
         'Qué encuentra' => 'Los contratos de arrendamiento donde esa persona es propietaria (en el contrato, en su ficha o en el contrato de mandato, aunque sean varios propietarios).',
-        'Por qué un contrato' => 'Las cuotas se descuentan del canon de ese contrato. Si la persona tiene varios inmuebles, elige el contrato del que se descontará.',
+        'Contrato principal' => 'No se elige: el sistema toma el contrato de vigencia más larga, que es el que da el plazo máximo, y de él se descuenta primero la cuota. Si hace falta, el analista lo cambia en el liquidador.',
+        'Revisión previa' => 'Las políticas que no dependen del valor (contrato activo, vigencia, siniestro, créditos vigentes) revisadas sobre todos sus contratos. Es informativa: la solicitud se puede registrar igual y el analista decide.',
         'Cupo preaprobado' => 'Suma del ingreso neto (canon − descuentos) de todos sus contratos × los meses de política. Las cuotas máximas salen del contrato con la vigencia más larga, menos el margen de Configuración.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[minmax(0,1fr)_auto] !sp-gap-3 !sp-items-end">'
@@ -420,7 +429,8 @@ final class OwnerCreditView
       . '<p class="' . self::NOTE . ' !sp-mt-2" data-owner-credit-search-status></p>'
       . '<div class="!sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200" data-owner-credit-person hidden></div>'
       . '<div class="!sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200" data-owner-credit-preapproval hidden></div>'
-      . '<div class="!sp-grid !sp-gap-2 !sp-mt-2" data-owner-credit-search-results role="radiogroup" aria-label="Contrato del que se descuenta"></div></section>'
+      . '<div class="!sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200" data-owner-credit-checks hidden></div>'
+      . '<div class="!sp-grid !sp-gap-2 !sp-mt-2" data-owner-credit-search-results aria-label="Contratos del propietario"></div></section>'
       . '<section class="' . self::SECTION . '" data-owner-credit-request hidden><h4 class="' . self::H4 . '">' . $step('3') . 'Datos de la solicitud</h4>'
       . self::guide('nuevo-datos', [
         'Qué pasa al registrar' => 'Solo se registra lo que pide el propietario: todavía no se aprueba nada. El analista lo evalúa en el liquidador y ahí se aprueba o rechaza.',
@@ -480,6 +490,15 @@ final class OwnerCreditView
       . self::tile('Disponible', self::money((float) $p['available']), (float) $p['available'] < 0.5 ? 'bad' : 'key')
       . self::tile('Plazo máximo', (int) $p['max_term'] . ' meses', (int) $p['max_term'] <= 0 ? 'bad' : '')
       . '</div><p class="' . self::NOTE . ' !sp-mt-3' . ($fits ? '' : ' !sp-text-red-700 !sp-font-semibold') . '">' . self::e($note) . '</p></section>';
+  }
+
+  /** @param array<string,mixed> $contract @param list<array<string,mixed>> $others */
+  private static function mainContractSelect(array $contract, array $others): string
+  {
+    $options = '<option value="' . (int) $contract['id'] . '" selected>#' . self::e($contract['code']) . '</option>';
+    foreach ($others as $row) $options .= '<option value="' . (int) $row['id'] . '">#' . self::e($row['contrato']) . ' · ' . (int) $row['max_months'] . ' meses</option>';
+    return '<label class="!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-2.5 !sp-py-0.5 !sp-rounded-full !sp-bg-white !sp-border !sp-border-solid !sp-border-service-yellow !sp-text-[10px] !sp-text-service-muted" title="La cuota se descuenta primero de este contrato">Contrato principal'
+      . '<select class="!sp-h-6 !sp-py-0 !sp-pl-1 !sp-pr-6 !sp-rounded !sp-border-0 !sp-bg-transparent !sp-text-[10px] !sp-font-bold !sp-text-service-navy" name="main_contract_id" data-owner-credit-main-contract aria-label="Contrato principal">' . $options . '</select></label>';
   }
 
   /** @param list<array{key:string,name:string,document:string,current:bool}> $owners */

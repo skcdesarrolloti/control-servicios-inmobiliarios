@@ -10,8 +10,9 @@ const fixture = String.raw`require 'vendor/autoload.php';
 use SCM\Modules\OwnerCredits\{OwnerCreditCalculator, OwnerCreditSettings, OwnerCreditView};
 $s = OwnerCreditSettings::defaults();
 $ev = OwnerCreditCalculator::evaluate(['gross'=>1075000,'deductions'=>['comision'=>142800],'requested_amount'=>893723,'requested_term'=>12,'request_ts'=>time(),'contract_end_ts'=>strtotime('+14 months'),'vacancy'=>'Baja'], $s);
+$ev['other_contracts'] = [['id'=>99,'contrato'=>'818','inmueble'=>'10421','net_income'=>900000,'max_months'=>20]];
 $w = ['credit'=>['id'=>12,'status'=>'pendiente','quote_id'=>574,'owner_name'=>'Propietario','property'=>'10420','purpose'=>'','requested_amount'=>893723,'requested_term'=>12,'created_at'=>time(),'decision_note'=>'','decided_by_name'=>'','decided_at'=>0],
-'contract'=>['code'=>'817','estado'=>'Entregado','inicio_ts'=>0,'fin_ts'=>0,'aseguradora'=>'','siniestrado'=>false],'income_source'=>'','settings'=>$s,'evaluation'=>$ev,
+'contract'=>['id'=>7,'code'=>'817','estado'=>'Entregado','inicio_ts'=>0,'fin_ts'=>0,'aseguradora'=>'','siniestrado'=>false],'income_source'=>'','settings'=>$s,'evaluation'=>$ev,
 'conditions'=>['amount'=>893723,'term'=>12,'rate'=>0.023,'payment'=>86070,'total_interest'=>139117],'schedule'=>[],'policies'=>[],'policies_ok'=>true,'other_credits'=>[],'events'=>[],
 'owners'=>[['key'=>'mandato_1','name'=>'Primer Dueño','document'=>'111','current'=>false],['key'=>'mandato_2','name'=>'Segunda Dueña','document'=>'222','current'=>true]]];
 echo (new OwnerCreditView())->workspace($w, true, true);`;
@@ -66,6 +67,18 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   await page.waitForSelector('[data-owner-credit-form]');
   console.log('OK the owner of a pending credit is changed and the liquidator reloads');
 
+  await page.selectOption('[name="main_contract_id"]', '99');
+  await page.waitForFunction(() => window.calls.filter(c => c.action === 'scm_owner_credit_open').length === 3);
+  calls = await page.evaluate(() => window.calls);
+  const mainChange = calls.find(c => c.action === 'scm_owner_credit_contract');
+  assert.equal(mainChange.credit_id, '12'); assert.equal(mainChange.contract_id, '99');
+  assert.equal(calls.filter(c => c.action === 'scm_owner_credit_simulate').length, simsBefore, 'changing the main contract does not simulate');
+  await page.waitForSelector('[data-owner-credit-form]');
+  assert.equal(await page.inputValue('[name="siniestro"]'), 'no');
+  await page.selectOption('[name="siniestro"]', 'si');
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'scm_owner_credit_simulate' && c.siniestro === 'si'));
+  console.log('OK the main contract is changed in the liquidator and the siniestro Sí/No is simulated');
+
   await page.fill('[name="gross"]', '');
   await page.type('[name="gross"]', '1250000');
   assert.equal(await page.inputValue('[name="gross"]'), '$1.250.000');
@@ -116,7 +129,8 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
         : body.action === 'scm_owner_credit_contracts' ? { contracts: [
           { id: 9, contrato: '950', inmueble: '10600', direccion: 'Calle 1', estado: 'Entregado', arrendatario: 'Inquilino', fin: '15/01/2027', max_months: 2, owner },
           { id: 10, contrato: '951', inmueble: '10601', direccion: 'Calle 2', estado: 'Entregado', arrendatario: '', fin: '', max_months: 0, owner }],
-          preapproval: { contracts: 2, net_income: 3440000, income_months: 3, amount: 10320000, longest_months: 2, margin_months: 2, max_term: 0 } }
+          preapproval: { contracts: 2, net_income: 3440000, income_months: 3, amount: 10320000, longest_months: 2, margin_months: 2, max_term: 0 },
+          checks: [{ label: 'Contrato activo', ok: true, detail: '2 de 2 contratos Entregado.' }, { label: 'Sin siniestro', ok: false, detail: 'Cartera marcó como siniestrado: #951.' }] }
         : body.action === 'scm_owner_credit_create' ? { credit_id: 40 } : {};
       if (body.action === 'scm_owner_credit_simulation_pdf') {
         return Promise.resolve({ headers: { get: () => 'application/pdf' }, blob: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })) });
@@ -129,21 +143,20 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   assert.equal(await page.$('[data-owner-credit-new-form] [name="contract_end"]'), null);
   await page.fill('[data-owner-credit-search-query]', '22.233.344');
   await page.press('[data-owner-credit-search-query]', 'Enter');
-  await page.waitForSelector('[data-owner-credit-pick]');
+  await page.waitForSelector('[data-owner-credit-contract-card]');
   calls = await page.evaluate(() => window.calls);
   assert.equal(calls.find(c => c.action === 'scm_owner_credit_contracts').document, '22.233.344');
   assert.match(await page.textContent('[data-owner-credit-person]'), /Segunda Dueña/);
   assert.match(await page.textContent('[data-owner-credit-preapproval]'), /\$10\.320\.000/);
-  assert.equal(await page.isVisible('[data-owner-credit-request]'), true, 'the longest contract is preselected');
-  assert.equal(await page.isChecked('[data-owner-credit-pick][value="0"]'), true);
-  assert.equal(await page.isVisible('[data-owner-credit-pick][value="1"]'), false, 'the other contracts stay hidden');
-  await page.click('[data-owner-credit-change-contract]');
-  assert.equal(await page.isVisible('[data-owner-credit-pick][value="1"]'), true, '"Cambiar contrato" shows every contract');
-  await page.click('[data-owner-credit-pick][value="1"]');
-  assert.equal(await page.isVisible('[data-owner-credit-pick][value="0"]'), false);
-  await page.click('[data-owner-credit-change-contract]');
-  await page.click('[data-owner-credit-pick][value="0"]');
-  console.log('OK the longest contract is preselected and can be changed');
+  assert.equal(await page.isVisible('[data-owner-credit-request]'), true, 'the request opens without choosing a contract');
+  assert.equal(await page.$('[data-owner-credit-pick]'), null, 'there is nothing to choose');
+  assert.equal(await page.$$eval('[data-owner-credit-contract-card]', cards => cards.filter(card => card.offsetParent !== null).length), 2, 'every contract is listed');
+  assert.match(await page.textContent('[data-owner-credit-contract-card]:first-child'), /950.*Principal/);
+  assert.equal(await page.inputValue('[data-owner-credit-new-form] [name="contract_id"]'), '9');
+  assert.equal(await page.isVisible('[data-owner-credit-checks]'), true);
+  assert.equal(await page.$$eval('[data-owner-credit-check="bad"]', items => items.length), 1);
+  assert.match(await page.textContent('[data-owner-credit-checks]'), /Sin siniestro:.*#951/);
+  console.log('OK the longest contract is the main one without choosing, and the policy pre-check is shown');
   await page.click('[data-owner-credit-simulate-pdf]');
   await page.waitForSelector('[data-owner-credit-pdf-viewer] iframe');
   calls = await page.evaluate(() => window.calls);

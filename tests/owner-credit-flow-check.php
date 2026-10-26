@@ -261,6 +261,30 @@ try {
   $check(true, 'the owner of a decided credit cannot be changed');
 }
 
+// Políticas sobre todos los contratos de la persona; el analista corrige siniestro y créditos con Sí/No.
+$db->update('wp_jet_cct_contratos_arrendamiento', ['esta_sinestrado' => 'Si'], ['_ID' => 14]);
+$policy = static fn(array $work, string $key): array => array_values(array_filter($work['policies'], static fn(array $p): bool => $p['key'] === $key))[0];
+// El documento "111" es muy corto para buscar contratos: se vuelve a la copropietaria.
+$changed = $service->changeOwner((int) $changed['id'], 'mandato_2', $actor);
+$all = $service->workspace((int) $changed['id']);
+$check(!$policy($all, 'siniestro')['ok'] && str_contains($policy($all, 'siniestro')['detail'], '#954') && $all['evaluation']['analyst']['siniestro'] === true, 'a siniestro on another contract of the owner fails the policy');
+$check($policy($all, 'contrato_activo')['ok'] && str_contains($policy($all, 'contrato_activo')['detail'], 'de 2 contratos Entregado'), 'the active contract policy looks at every contract');
+$cleared = $service->workspace((int) $changed['id'], ['siniestro' => 'no', 'has_credits' => 'si']);
+$check($policy($cleared, 'siniestro')['ok'] && str_contains($policy($cleared, 'siniestro')['detail'], 'el analista indicó que no'), 'the analyst can clear the siniestro after checking with Cartera');
+$check(!$policy($cleared, 'prestamos')['ok'] && str_contains($policy($cleared, 'prestamos')['detail'], 'por fuera del sistema') && $cleared['evaluation']['analyst']['overrides'] === ['siniestro', 'has_credits'], 'credits outside the system marked by the analyst need a justification');
+$checks = $service->requestChecks($service->ownerPortfolio('22233344'), ['outstanding' => 0, 'available' => 1, 'max_term' => 3]);
+$check(array_column($checks, 'ok', 'label')['Sin siniestro'] === false && array_column($checks, 'ok', 'label')['Sin créditos vigentes'] === true, 'the request form shows the policy pre-check over every contract');
+$moved = $service->changeContract((int) $changed['id'], 14, $actor);
+$check((int) $moved['contract_id'] === 14 && $moved['contract_code'] === '954' && (float) $moved['gross_income'] === 2000000.0, 'the analyst can change the main contract to another contract of the owner');
+$check((int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'contrato_principal'", [(int) $moved['id']]) === 1 && (int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_contrato_arrendamiento WHERE tipo_reporte = 'Cambio de contrato principal del crédito'") === 1, 'the main contract change is traced');
+try {
+  $service->changeContract((int) $moved['id'], 7, $actor);
+  $check(false, 'the main contract must be a contract of the owner');
+} catch (DomainException) {
+  $check(true, 'the main contract must be a contract of the owner');
+}
+$db->update('wp_jet_cct_contratos_arrendamiento', ['esta_sinestrado' => 'No'], ['_ID' => 14]);
+
 // Contrato sin mandato: el documento sale de la ficha del propietario y el saldo se encuentra también por la ficha.
 $db->insert('wp_jet_cct_propietarios', ['_ID' => 970, 'id_propietario' => '970', 'nombre' => 'Sin Mandato', 'documento' => '55.555.555']);
 $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 20, 'contrato' => '980', 'estado' => 'Entregado', 'inmueble' => '10700', 'propietario' => 'Sin Mandato', 'id_propietario' => '970', 'valor_canon' => '1.000.000', 'fin_contrato' => (string) strtotime('+2 years'), 'esta_sinestrado' => 'No']);
