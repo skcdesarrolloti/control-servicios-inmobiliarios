@@ -10591,6 +10591,18 @@
   line-height: 1.45;
 }
 
+.scm-cotizacion-dialog-link {
+  padding: 0;
+  margin-left: 6px;
+  border: 0;
+  background: none;
+  color: #b45309;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .scm-cotizacion-order-form {
   text-align: left;
 }

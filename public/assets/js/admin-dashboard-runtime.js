@@ -152,6 +152,7 @@
         owner_credit_manage: "[data-owner-credit-new]",
         owner_credit_configure: "[data-owner-credit-settings]",
         cleaning_configure: "[data-cleaning-settings]",
+        quote_fee_configure: "[data-quote-fee-settings]",
         collection_import: "[data-scm-portfolio-import]",
         collection_action: "[data-scm-portfolio-management], [data-scm-portfolio-letter], [data-scm-portfolio-bulkbar], [data-scm-portfolio-bulk-check], [data-scm-portfolio-reset]",
         canon_audit_import: "[data-cia-upload-form], [data-cia-upload-button]",
@@ -24327,7 +24328,9 @@
       if (subtotal <= 0) {
         subtotal = parseCotizacionSendNumber(total);
       }
-      var porcentajeAdmon = button ? button.getAttribute("data-porcentaje-admon") || "10" : "10";
+      // % sugerido por Configuración › Honorarios de cotización; un % ya guardado en la cotización tiene prioridad.
+      var porcentajeSugerido = button ? button.getAttribute("data-porcentaje-sugerido") || "" : "";
+      var porcentajeAdmon = (button ? button.getAttribute("data-porcentaje-admon") || "" : "") || porcentajeSugerido || "10";
       var ivaCotizacion = button ? button.getAttribute("data-iva-cotizacion") || "19" : "19";
       if (!ajaxUrl || !actionSendCotizacion || !cotizacionId || !window.Swal) {
         showToast("error", "No se pudo abrir el envío de la cotización.");
@@ -24340,7 +24343,9 @@
           '<div class="scm-cotizacion-response-form"><p class="scm-cotizacion-dialog-intro">Se encolará el correo con el PDF adjunto y un WhatsApp con el PDF y botón seguro para ver y responder la cotización.</p>' +
           '<div class="scm-cotizacion-response-grid">' +
           '<div class="scm-cotizacion-dialog-field"><span>Subtotal trabajos</span><strong id="swal-send-cot-subtotal">' + escHtml(formatCotizacionOrderCurrency(subtotal)) + '</strong></div>' +
-          '<label class="scm-cotizacion-dialog-field"><span>% Administración <em>*</em></span><input id="swal-send-cot-porcentaje-admon" type="number" inputmode="decimal" min="0" max="100" step="0.01" value="' + escHtml(porcentajeAdmon || "10") + '"></label>' +
+          '<label class="scm-cotizacion-dialog-field"><span>% Administración <em>*</em></span><input id="swal-send-cot-porcentaje-admon" type="number" inputmode="decimal" min="0" max="100" step="0.01" value="' + escHtml(porcentajeAdmon || "10") + '">' +
+          (porcentajeSugerido ? '<small class="scm-cotizacion-dialog-hint" id="swal-send-cot-sugerido">Sugerido: <strong>' + escHtml(porcentajeSugerido) + ' %</strong> <button type="button" class="scm-cotizacion-dialog-link" id="swal-send-cot-usar-sugerido">Usar sugerido</button></small>' : '') +
+          '</label>' +
           '<label class="scm-cotizacion-dialog-field"><span>IVA administración <em>*</em></span><input id="swal-send-cot-iva" type="number" inputmode="decimal" min="0" max="100" step="0.01" value="' + escHtml(ivaCotizacion || "19") + '"></label>' +
           '<div class="scm-cotizacion-dialog-field"><span>VR Administración</span><strong id="swal-send-cot-total-admon">$0</strong></div>' +
           '<div class="scm-cotizacion-dialog-field"><span>VR IVA administración</span><strong id="swal-send-cot-iva-admon">$0</strong></div>' +
@@ -24382,8 +24387,20 @@
             if (ivaEl) ivaEl.textContent = formatCotizacionOrderCurrency(calculated.ivaAdmon);
             if (totalEl) totalEl.textContent = formatCotizacionOrderCurrency(calculated.total);
           };
-          if (pct) pct.addEventListener("input", syncTotals);
+          var useSuggested = document.getElementById("swal-send-cot-usar-sugerido");
+          var syncSuggested = function () {
+            if (useSuggested) useSuggested.hidden = !pct || parseCotizacionSendNumber(pct.value) === parseCotizacionSendNumber(porcentajeSugerido);
+          };
+          if (useSuggested) {
+            useSuggested.addEventListener("click", function () {
+              if (pct) pct.value = porcentajeSugerido;
+              syncTotals();
+              syncSuggested();
+            });
+          }
+          if (pct) pct.addEventListener("input", function () { syncTotals(); syncSuggested(); });
           if (iva) iva.addEventListener("input", syncTotals);
+          syncSuggested();
           syncTotals();
           if (first) first.focus();
         },

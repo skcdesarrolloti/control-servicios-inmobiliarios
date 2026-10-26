@@ -1110,6 +1110,17 @@ foreach ($rawNavItems as $k => $item) {
                   <span class="material-symbols-outlined text-[18px] text-slate-500">cleaning_services</span>
                   <span>Calculadora de aseo</span>
                 </button>
+                <!-- Honorarios de cotización: variables del % de administración sugerido; se oculta sin quote_fee_configure -->
+                <button
+                  type="button"
+                  data-scm-config-action="quote-fee-settings"
+                  data-quote-fee-settings
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">percent</span>
+                  <span>Honorarios de cotización</span>
+                </button>
                 <button
                   type="button"
                   data-scm-config-action="actas-guide"

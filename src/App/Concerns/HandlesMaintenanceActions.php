@@ -22,6 +22,33 @@ trait HandlesMaintenanceActions
     catch (\Throwable $error) { error_log('[cotizacion_financing] ' . $error->getMessage()); $this->jsonFail('No se pudo actualizar el financiamiento.'); }
   }
 
+  /** Configuración › Honorarios de cotización: variables del % de administración sugerido. */
+  public function ajax_handler_quote_fee_settings(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('quote_fee_configure', 'Tu cargo no tiene permiso para configurar los honorarios de cotización.');
+    $settings = new \SCM\Modules\QuoteFee\QuoteFeeSettings($this->db);
+    $mode = (string) ($_POST['mode'] ?? '');
+    try {
+      if ($mode === 'save' || $mode === 'preview') {
+        $input = json_decode(wp_unslash((string) ($_POST['settings'] ?? '')), true);
+        if (!is_array($input)) throw new \InvalidArgumentException('No se recibió la configuración.');
+        $config = \SCM\Modules\QuoteFee\QuoteFeeSettings::fromInput($input);
+        if ($mode === 'preview') {
+          $this->jsonOk(['html' => \SCM\Modules\QuoteFee\QuoteFeeView::form($config, true), 'message' => 'Vista previa: aún no se ha guardado.']);
+        }
+        $saved = $settings->save($config, (string) ($this->ticketCompletionActor()['employee_id'] ?? ''));
+        $this->jsonOk(['html' => \SCM\Modules\QuoteFee\QuoteFeeView::form($saved), 'message' => 'Configuración guardada. Las cotizaciones que se abran desde ahora usan los nuevos valores.']);
+      }
+      $this->jsonOk(['html' => \SCM\Modules\QuoteFee\QuoteFeeView::form($settings->read())]);
+    } catch (\InvalidArgumentException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      error_log('[quote-fee-settings] ' . $error->getMessage());
+      $this->jsonFail('No se pudo guardar la configuración de honorarios.');
+    }
+  }
+
   private function myTicketsStatusBucket($value): string
   {
     $bucket = is_string($value) ? strtolower(trim($value)) : '';
@@ -1492,7 +1519,9 @@ trait HandlesMaintenanceActions
       $ivaText = trim((string) ($quote['iva'] ?? ''));
     }
 
-    $porcentaje = $porcentajeText === '' ? 10.0 : $this->maintenance_quote_number($porcentajeText);
+    $porcentaje = $porcentajeText === ''
+      ? (\SCM\Modules\QuoteFee\QuoteFeeSettings::suggestedPercent($this->quoteFeeConfig(), $subtotal) ?? 10.0)
+      : $this->maintenance_quote_number($porcentajeText);
     $iva = $ivaText === '' ? 19.0 : $this->maintenance_quote_number($ivaText);
     $porcentaje = max(0.0, min(100.0, $porcentaje));
     $iva = max(0.0, min(100.0, $iva));

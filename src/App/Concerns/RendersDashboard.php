@@ -4937,6 +4937,7 @@ trait RendersDashboard
       + $this->cotizacion_money_value($row, ['total_maquinarias'])
       + $this->cotizacion_money_value($row, ['total_otros_costos']);
     $porcentajeAdmon = trim((string) ($row['porcentaje_admon'] ?? ''));
+    $porcentajeSugerido = \SCM\Modules\QuoteFee\QuoteFeeSettings::suggestedPercent($this->quoteFeeConfig(), $subtotalCotizacionValue);
     $ivaAdmonPct = trim((string) ($row['iva'] ?? ''));
     $totalAdmonValue = $this->cotizacion_money_value($row, ['total_admon']);
     $ivaAdmonValue = $this->cotizacion_money_value($row, ['iva_admon']);
@@ -5042,7 +5043,7 @@ trait RendersDashboard
       // Mismo enlace firmado que recibe el destinatario por correo/WhatsApp (vigente 180 días desde que se copia).
       . ($enviada && $cotUrl !== '' ? '<button type="button" class="scm-case-work-btn scm-cotizacion-copy-link-action" data-scm-copy-quote-link data-quote-url="' . esc_attr($cotUrl) . '">Copiar enlace directo</button>' : '')
       . ($id !== '' && $canQuoteEdit && $cotizacionEditable ? '<button type="button" class="scm-case-work-btn" data-scm-edit-cotizacion data-cotizacion-mode="edit" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Editar cotizaci&oacute;n</button>' : '')
-      . ($cotizacionPuedeEnviarse ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-send-cotizacion data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '" data-destinatario="' . esc_attr($destinatario !== '-' ? $destinatario : '') . '" data-email-destinatario="' . esc_attr($emailDestinatario) . '" data-celular-destinatario="' . esc_attr($contacto !== '-' ? $contacto : '') . '" data-indicativo-destinatario="' . esc_attr($indicativoDestinatario !== '' ? $indicativoDestinatario : '57') . '" data-subtotal-cotizacion="' . esc_attr((string) (int) round($subtotalCotizacionValue)) . '" data-total-cotizacion="' . esc_attr($totalCotizacion) . '" data-porcentaje-admon="' . esc_attr($porcentajeAdmon !== '' ? $porcentajeAdmon : '10') . '" data-iva-cotizacion="' . esc_attr($ivaAdmonPct !== '' ? $ivaAdmonPct : '19') . '" data-total-admon="' . esc_attr((string) (int) round($totalAdmonValue)) . '" data-iva-admon-valor="' . esc_attr((string) (int) round($ivaAdmonValue)) . '" data-total-admon-iva="' . esc_attr((string) (int) round($totalAdmonMasIvaValue)) . '">Enviar cotizaci&oacute;n</button>' : '')
+      . ($cotizacionPuedeEnviarse ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-send-cotizacion data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '" data-destinatario="' . esc_attr($destinatario !== '-' ? $destinatario : '') . '" data-email-destinatario="' . esc_attr($emailDestinatario) . '" data-celular-destinatario="' . esc_attr($contacto !== '-' ? $contacto : '') . '" data-indicativo-destinatario="' . esc_attr($indicativoDestinatario !== '' ? $indicativoDestinatario : '57') . '" data-subtotal-cotizacion="' . esc_attr((string) (int) round($subtotalCotizacionValue)) . '" data-total-cotizacion="' . esc_attr($totalCotizacion) . '" data-porcentaje-admon="' . esc_attr($porcentajeAdmon) . '" data-porcentaje-sugerido="' . esc_attr($porcentajeSugerido !== null ? (string) $porcentajeSugerido : '') . '" data-iva-cotizacion="' . esc_attr($ivaAdmonPct !== '' ? $ivaAdmonPct : '19') . '" data-total-admon="' . esc_attr((string) (int) round($totalAdmonValue)) . '" data-iva-admon-valor="' . esc_attr((string) (int) round($ivaAdmonValue)) . '" data-total-admon-iva="' . esc_attr((string) (int) round($totalAdmonMasIvaValue)) . '">Enviar cotizaci&oacute;n</button>' : '')
       . $ticketCaseButton
       . ($cotizacionAprobada && $canQuoteOrderView ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-view-cotizacion-orders>Ver &oacute;rdenes <span class="scm-action-count">' . esc_html((string) count($orders)) . '</span></button>' : '')
       . ($cotizacionPuedeResponder && $canQuoteRespond ? '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-response-standalone data-ticket-pk="' . esc_attr($ticket) . '" data-ticket="' . esc_attr($ticket) . '" data-cotizacion-id="' . esc_attr($id) . '">Responder cotizaci&oacute;n</button>' : '')
@@ -5981,6 +5982,13 @@ trait RendersDashboard
   }
 
   /** @param array<string,mixed> $row @param array<int,string> $keys */
+  /** Variables del % de administración sugerido (una lectura por petición). */
+  private function quoteFeeConfig(): array
+  {
+    static $config = null;
+    return $config ??= (new \SCM\Modules\QuoteFee\QuoteFeeSettings($this->db))->read();
+  }
+
   private function cotizacion_money_value(array $row, array $keys): float
   {
     foreach ($keys as $key) {

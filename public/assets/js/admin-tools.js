@@ -108,6 +108,7 @@
     var cleaning = root.querySelector('[data-scm-tool="cleaning"]');
     if (cleaning) initCleaning(cleaning, request, post);
     initCleaningSettings(root, post);
+    initQuoteFeeSettings(root, post);
     // Si la página abrió directo en una herramienta, el runtime pudo pedir la carga antes de este script.
     [pse, mora, market].forEach(function (module) {
       var panel = module && module.closest(".scm-tab-panel");
@@ -2027,6 +2028,96 @@
       if (!event.target.closest || !event.target.closest("[data-cleaning-settings]")) return;
       event.preventDefault();
       post("scm_tools_cleaning_settings", {})
+        .then(function (data) { show(data.html || ""); })
+        .catch(function (error) { window.alert(error.message); });
+    });
+  }
+
+  // Configuración › Honorarios de cotización (src/Modules/QuoteFee; se oculta sin la acción quote_fee_configure).
+  function initQuoteFeeSettings(root, post) {
+    var modal = null;
+
+    function ensureModal() {
+      if (modal) return modal;
+      modal = document.createElement("div");
+      modal.className = "scm-cia-modal";
+      modal.hidden = true;
+      modal.innerHTML =
+        '<div class="scm-cia-modal-backdrop" data-quote-fee-close></div>' +
+        '<section tabindex="-1" class="!sp-relative !sp-outline-none !sp-flex !sp-flex-col !sp-w-[min(820px,calc(100vw-24px))] !sp-max-h-[92vh] !sp-overflow-hidden !sp-rounded-2xl !sp-bg-service-background !sp-border !sp-border-solid !sp-border-slate-200 !sp-shadow-2xl !sp-font-sans" role="dialog" aria-modal="true" aria-labelledby="scm-quote-fee-title">' +
+        '<header class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-4 !sp-px-4 sm:!sp-px-6 !sp-py-4 !sp-bg-white !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200">' +
+        '<div><p class="!sp-m-0 !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Configuración</p><h3 id="scm-quote-fee-title" class="!sp-m-0 !sp-text-lg !sp-font-bold !sp-text-service-navy">Honorarios de cotización</h3></div>' +
+        '<button type="button" class="!sp-flex !sp-items-center !sp-justify-center !sp-w-9 !sp-h-9 !sp-rounded-full !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-service-navy !sp-text-lg !sp-cursor-pointer hover:!sp-bg-slate-50" data-quote-fee-close aria-label="Cerrar">&times;</button></header>' +
+        '<div class="!sp-flex !sp-flex-col !sp-flex-1 !sp-min-h-0" data-quote-fee-body></div></section>';
+      root.appendChild(modal);
+      modal.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") close();
+      });
+      modal.addEventListener("click", function (event) {
+        if (event.target.closest("[data-quote-fee-close]")) close();
+      });
+      // F se guarda en SMLMV: al cambiar el salario, F se reescala para conservar esa proporción.
+      modal.addEventListener("focusin", function (event) {
+        if (event.target.matches("[data-quote-fee-salary]")) event.target.dataset.previous = event.target.value;
+      });
+      modal.addEventListener("change", function (event) {
+        var salary = event.target.closest("[data-quote-fee-salary]");
+        if (!salary) return;
+        var before = toNumber(salary.dataset.previous);
+        var after = toNumber(salary.value);
+        var f = modal.querySelector("[data-quote-fee-f]");
+        if (f && before > 0 && after > 0) f.value = String(Math.round(toNumber(f.value) * after / before));
+        salary.dataset.previous = salary.value;
+      });
+      modal.addEventListener("submit", function (event) {
+        var form = event.target.closest("[data-quote-fee-form]");
+        if (!form) return;
+        event.preventDefault();
+        var mode = event.submitter && event.submitter.value === "preview" ? "preview" : "save";
+        var settings = {};
+        form.querySelectorAll("[data-quote-fee-field]").forEach(function (input) { settings[input.name] = input.value; });
+        var statusNode = form.querySelector("[data-quote-fee-status]");
+        statusNode.textContent = mode === "save" ? "Guardando…" : "Calculando…";
+        post("scm_quote_fee_settings", { mode: mode, settings: JSON.stringify(settings) })
+          .then(function (data) {
+            show(data.html || "");
+            var done = modal.querySelector("[data-quote-fee-status]");
+            done.textContent = data.message || "";
+            done.classList.add(mode === "save" ? "!sp-text-emerald-700" : "!sp-text-amber-800", "!sp-font-semibold");
+          })
+          .catch(function (error) {
+            statusNode.textContent = error.message;
+            statusNode.classList.add("!sp-text-red-700", "!sp-font-semibold");
+          });
+      });
+      return modal;
+    }
+
+    function toNumber(value) {
+      var text = String(value || "").replace(/[$\s]/g, "");
+      text = /^\d{1,3}(\.\d{3})+$/.test(text) ? text.replace(/\./g, "") : text.replace(",", ".");
+      var number = Number(text);
+      return isFinite(number) ? number : 0;
+    }
+
+    function show(html) {
+      var box = ensureModal();
+      box.querySelector("[data-quote-fee-body]").innerHTML = html;
+      box.hidden = false;
+      document.body.classList.add("scm-cia-modal-open");
+      box.querySelector("section").focus();
+    }
+
+    function close() {
+      if (!modal) return;
+      modal.hidden = true;
+      document.body.classList.remove("scm-cia-modal-open");
+    }
+
+    document.addEventListener("click", function (event) {
+      if (!event.target.closest || !event.target.closest("[data-quote-fee-settings]")) return;
+      event.preventDefault();
+      post("scm_quote_fee_settings", {})
         .then(function (data) { show(data.html || ""); })
         .catch(function (error) { window.alert(error.message); });
     });
