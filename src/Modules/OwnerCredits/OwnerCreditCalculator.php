@@ -159,11 +159,15 @@ final class OwnerCreditCalculator
     $maxAmount = ($net + $otherNet) * (int) $settings['income_months'];
     $exceedMonths = $maxMonths - $requestedTerm;
     $exceedAmount = $maxAmount - $requested;
-    $riskRate = $requested > 0 ? (($maxAmount * $policyRate) + (abs($exceedAmount) * $usuryMonthly)) / $requested : 0.0;
+    // La tasa para el riesgo (Excel B29) compensa lo que se pide por encima del tope cobrando la usura sobre ese
+    // exceso. Si lo pedido cabe en el tope no hay exceso y no aplica.
+    $riskApplies = $requested > 0 && $exceedAmount < 0;
+    $riskRate = $riskApplies ? (($maxAmount * $policyRate) + (abs($exceedAmount) * $usuryMonthly)) / $requested : 0.0;
 
     $vacancy = in_array($input['vacancy'], ['Alta', 'Media', 'Baja'], true) ? $input['vacancy'] : 'Baja';
     $suggested = match ($vacancy) {
-      'Alta' => ['term' => 3, 'rate' => $riskRate, 'amount' => $maxAmount],
+      // Sin exceso, el riesgo alto se cubre con la tasa de referencia sobre lo pedido.
+      'Alta' => $riskApplies ? ['term' => 3, 'rate' => $riskRate, 'amount' => $maxAmount] : ['term' => 3, 'rate' => (float) $settings['reference_rate'], 'amount' => $requested],
       'Media' => ['term' => $maxMonths, 'rate' => (float) $settings['reference_rate'], 'amount' => $maxAmount],
       default => ['term' => $requestedTerm, 'rate' => $policyRate, 'amount' => $requested],
     };
@@ -192,6 +196,7 @@ final class OwnerCreditCalculator
       'policy_payment' => self::payment($policyRate, $maxMonths, $maxAmount),
       'exceed_months' => $exceedMonths,
       'exceed_amount' => $exceedAmount,
+      'risk_applies' => $riskApplies,
       'risk_rate' => $riskRate,
       'risk_payment' => self::payment($riskRate, $requestedTerm, $requested),
       'vacancy' => $vacancy,

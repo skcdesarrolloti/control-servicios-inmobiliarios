@@ -103,6 +103,11 @@ $assert($capped['suggested']['rate_capped'] && $near($capped['suggested']['rate'
 $assert($near($capped['suggested']['payment'], OwnerCreditCalculator::payment($capped['usury_monthly_legal'], 12, 4000000)), 'suggested payment uses the capped rate');
 $riskCapped = OwnerCreditCalculator::evaluate(['gross' => 1000000, 'deductions' => [], 'requested_amount' => 9000000, 'requested_term' => 6, 'request_ts' => time(), 'contract_end_ts' => strtotime('+14 months'), 'vacancy' => 'Alta'], ['usury_annual' => 0.2859] + $settings);
 $assert($riskCapped['risk_rate'] > $riskCapped['usury_monthly_legal'] && $near($riskCapped['suggested']['rate'], $riskCapped['usury_monthly_legal'], 1e-12), 'high vacancy risk rate is capped too');
+$assert($ev['risk_applies'] === true && $riskCapped['risk_applies'] === true, 'the risk rate applies when the request exceeds the cap');
+$below = OwnerCreditCalculator::evaluate(['gross' => 15000000, 'deductions' => [], 'requested_amount' => 3000000, 'requested_term' => 6, 'request_ts' => time(), 'contract_end_ts' => strtotime('+14 months'), 'vacancy' => 'Alta'], ['usury_annual' => 0.2859] + $settings);
+$assert($below['risk_applies'] === false && $below['risk_rate'] === 0.0 && $near($below['suggested']['amount'], 3000000) && $near($below['suggested']['rate'], min(0.0242, $below['usury_monthly_legal']), 1e-12), 'below the cap there is no risk rate and high vacancy keeps the request at the reference rate');
+$warning = \SCM\Modules\OwnerCredits\OwnerCreditView::usuryWarning($settings, 0.02299, 0.0211757);
+$assert(str_contains($warning, 'supera la usura') && str_contains($warning, 'máximo 2,22 %') && \SCM\Modules\OwnerCredits\OwnerCreditView::usuryWarning($settings, 0.02, 0.0211757) === '', 'a policy rate above the usury warns how far to lower the reference rate');
 $assert(str_contains((string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php'), "La tasa supera la usura"), 'approving above the usury is blocked even with justification');
 $assert($near(OwnerCreditSettings::normalize(['no_mandate_deduction' => '15'])['no_mandate_deduction'], 0.15, 1e-9), 'no-mandate deduction is configurable as a percentage');
 

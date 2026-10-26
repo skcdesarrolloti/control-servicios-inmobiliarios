@@ -66,12 +66,15 @@ final class OwnerCreditPdf
     $deductions = [];
     foreach (OwnerCreditService::DEDUCTIONS as $key => $label) $deductions['(−) ' . $label] = $money($ev['deductions'][$key] ?? 0);
 
-    // Demás contratos del propietario que suman al tope y al plazo máximo.
-    $others = [];
-    foreach ($ev['other_contracts'] ?? [] as $row) {
-      $others['Contrato #' . $row['contrato'] . ' · SIMI ' . $row['inmueble']] = $money($row['net_income']) . ' de ingreso neto · ' . (int) $row['max_months'] . ' meses de vigencia' . ((string) $row['fin'] !== '' ? ' (fin ' . $row['fin'] . ')' : '');
+    // Ingreso de todos los contratos del propietario (suman al tope); con uno solo, el detalle de sus descuentos.
+    $others = $ev['other_contracts'] ?? [];
+    $income = ['Ingreso bruto (canon)' => $money($ev['gross'])] + $deductions + ['Ingreso neto (INO)' => $money($ev['net_income'])];
+    if ($others !== []) {
+      $line = static fn(float $canon, float $less, float $net, int $months, string $end): string => $money($canon) . ' − ' . $money($less) . ' = ' . $money($net) . ' · ' . $months . ' meses de vigencia' . ($end !== '' ? ' (fin ' . $end . ')' : '');
+      $income = ['Contrato #' . $contract['code'] . ' · SIMI ' . $credit['property'] . ' (principal)' => $line((float) $ev['gross'], (float) $ev['deductions_total'], (float) $ev['net_income'], (int) $ev['contract_months'], $contract['fin_ts'] > 0 ? date('d/m/Y', (int) $contract['fin_ts']) : '')];
+      foreach ($others as $row) $income['Contrato #' . $row['contrato'] . ' · SIMI ' . $row['inmueble']] = $line((float) ($row['canon'] ?? 0), (float) ($row['deductions'] ?? 0), (float) $row['net_income'], (int) $row['max_months'], (string) ($row['fin'] ?? ''));
+      $income['Ingreso neto total (' . (count($others) + 1) . ' contratos)'] = $money($ev['total_net_income']);
     }
-    if ($others !== []) $others['Ingreso neto total (' . (count($others) + 1) . ' contratos)'] = $money($ev['total_net_income']);
 
     // De qué contrato se descuenta cada cuota.
     $plan = [];
@@ -107,22 +110,20 @@ final class OwnerCreditPdf
         'Inicio / fin del contrato' => $date((int) $contract['inicio_ts']) . ' – ' . $date((int) $contract['fin_ts']),
         'Estado del contrato' => (string) $contract['estado'],
         'Aseguradora' => (string) $contract['aseguradora'],
-        'Siniestro' => $contract['siniestrado'] ? 'Siniestrado' : 'Por verificar',
+        'Siniestro' => isset($ev['analyst']) ? ($ev['analyst']['siniestro'] ? 'Siniestrado' . ($ev['analyst']['siniestrados'] !== [] ? ' (' . implode(', ', $ev['analyst']['siniestrados']) . ')' : '') : 'No') : ($contract['siniestrado'] ? 'Siniestrado' : 'Por verificar'),
       ]) . '</section>'
-      . '<section class="scm-acta-receipt-section"><h2>2. Ingreso del propietario</h2>' . Doc::table(['Ingreso bruto (canon)' => $money($ev['gross'])] + $deductions + ['Ingreso neto (INO)' => $money($ev['net_income'])]) . '</section>'
-      . ($others !== [] ? '<section class="scm-acta-receipt-section"><h2>2.1 Otros contratos del propietario</h2>' . Doc::table($others) . '</section>' : '')
+      . '<section class="scm-acta-receipt-section"><h2>2. Ingreso del propietario</h2>' . ($others !== [] ? '<p>Canon − descuentos (comisión, garantía y póliza) = ingreso neto de cada contrato.</p>' : '') . Doc::table($income) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>3. Solicitud</h2>' . Doc::table([
         ($simulation ? 'Fecha de simulación' : 'Fecha de solicitud') => $date((int) $credit['created_at']),
         'Valor solicitado' => $money($credit['requested_amount']),
         'Plazo solicitado' => (int) $credit['requested_term'] > 0 ? (int) $credit['requested_term'] . ' meses' : '',
         'Destinación' => (string) $credit['purpose'],
-        'Probabilidad de desocupación' => (string) $ev['vacancy'],
-      ]) . '</section>'
+      ] + ($simulation ? [] : ['Probabilidad de desocupación' => (string) $ev['vacancy']])) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>4. Política de créditos</h2>' . Doc::table([
         'Valor máximo a prestar' => $money($ev['max_amount']) . ' (' . (int) $work['settings']['income_months'] . ' × ingreso neto' . ($others !== [] ? ' total' : '') . ')',
         'Meses máximos' => $ev['max_months'] . ' (' . OwnerCreditService::termBasis($ev) . ')',
         'Tasa ajustada de colocación' => $percent($ev['policy_rate']) . ' N.M.V',
-        'Tasa para el riesgo' => $percent($ev['risk_rate']) . ' N.M.V',
+        'Tasa para el riesgo' => ($ev['risk_applies'] ?? true) ? $percent($ev['risk_rate']) . ' N.M.V' : 'No aplica (lo pedido no supera el valor máximo)',
         'Tasa de usura vigente' => $percent((float) $work['settings']['usury_annual']) . ' E.A. (' . $percent((float) $ev['usury_monthly_legal']) . ' mensual)',
       ]) . '</section>'
       . '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>5. ' . ($approved ? 'Condiciones aprobadas' : ($simulation ? 'Condiciones simuladas' : 'Condiciones propuestas')) . '</h2>' . Doc::table([

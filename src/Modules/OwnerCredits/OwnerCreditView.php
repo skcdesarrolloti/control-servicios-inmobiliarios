@@ -217,6 +217,7 @@ final class OwnerCreditView
         . '<span class="!sp-min-w-0"><b class="!sp-block !sp-text-[11px] ' . ($policy['ok'] ? '!sp-text-service-navy' : '!sp-text-red-700') . '">' . self::e($policy['label']) . '</b><span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e($policy['detail']) . '</span></span></li>';
     }
     return ($termError !== '' ? self::alert($termError, 'bad') : '')
+      . (($usury = self::usuryWarning($work['settings'], (float) $ev['policy_rate'], (float) $ev['usury_monthly_legal'])) !== '' ? self::alert($usury, 'bad') : '')
       . self::preapproval($work)
       . ($endChanged ? self::alert('Estás calculando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Se guardará en el contrato al aprobar o rechazar el crédito.', 'info') : '')
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('chart') . 'Política de créditos</h4>' . self::guide('politica', [
@@ -225,7 +226,7 @@ final class OwnerCreditView
         'Tasa ajustada' => 'Tasa de referencia menos el descuento de política.',
         'Cuota de política' => 'La cuota si se prestara el valor máximo al plazo máximo.',
         'Meses / valor que excede' => 'Diferencia entre la política y lo pedido; en rojo cuando lo pedido la supera.',
-        'Tasa para el riesgo' => 'Tasa que compensa el exceso: cobra la usura mensual sobre la parte que supera el tope.',
+        'Tasa para el riesgo' => 'Solo cuando lo pedido supera el valor máximo: cobra la usura mensual sobre la parte que excede. Si lo pedido cabe en el tope, no aplica.',
       ]) . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">'
       . self::tile($others !== [] ? 'Ingreso neto de este contrato' : 'Ingreso neto (INO)', self::money($ev['net_income']), 'key')
       . ($others !== [] ? self::tile('Ingreso neto total (' . (count($others) + 1) . ' contratos)', self::money($ev['total_net_income']), 'key') : '')
@@ -233,7 +234,7 @@ final class OwnerCreditView
       . self::tile('Meses máximos', (string) $ev['max_months'])
       . self::tile('Tasa ajustada', self::percent($ev['policy_rate']))
       . self::tile('Cuota de política', self::money($ev['policy_payment']))
-      . self::tile('Tasa para el riesgo', self::percent($ev['risk_rate']))
+      . self::tile('Tasa para el riesgo', ($ev['risk_applies'] ?? true) ? self::percent($ev['risk_rate']) : 'No aplica')
       . self::tile('Meses que excede', (string) $ev['exceed_months'], $ev['exceed_months'] < 0 ? 'bad' : '')
       . self::tile('Valor que excede', self::money($ev['exceed_amount'], true), $ev['exceed_amount'] < 0 ? 'bad' : '')
       . '</div><p class="' . self::NOTE . ' !sp-mt-3">Meses máximos: ' . self::e(OwnerCreditService::termBasis($ev)) . '.</p>'
@@ -384,7 +385,9 @@ final class OwnerCreditView
       . $field('Tasa de usura (E.A., %)', $input('usury_annual', $pct($settings['usury_annual']), ' inputmode="decimal"' . $lock), 'La tasa mensual del crédito no puede superar su equivalente mes vencido.')
       . $field('Vigente desde', '<input class="' . $ui::INPUT . '" type="date" name="usury_updated_at" value="' . self::e($settings['usury_updated_at']) . '"' . $lock . '>')
       . '</div>' . ($auto ? '<button type="button" class="' . $ui::SECONDARY . ' !sp-mt-4" data-owner-credit-usury-refresh>' . $ui::icon('refresh', '!sp-w-3.5 !sp-h-3.5') . 'Actualizar ahora desde datos.gov.co</button>' : '') . '</section>'
-      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('cash') . 'Variables de entrada</h4><div class="' . $grid . '">'
+      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('cash') . 'Variables de entrada</h4>'
+      . (($usury = self::usuryWarning($settings, (float) $settings['reference_rate'] * (1 - (float) $settings['policy_discount']), (1 + (float) $settings['usury_annual']) ** (1 / 12) - 1)) !== '' ? '<div class="!sp-mb-4">' . self::alert($usury, 'bad') . '</div>' : '')
+      . '<div class="' . $grid . '">'
       . $field('Tasa de referencia N.M.V (%)', $input('reference_rate', $pct($settings['reference_rate']), ' inputmode="decimal"'), 'Tasa normal de crédito de consumo de referencia.')
       . $field('Descuento por política (%)', $input('policy_discount', $pct($settings['policy_discount'], 1), ' inputmode="decimal"'))
       . $field('Descuento sin mandato (% del canon)', $input('no_mandate_deduction', $pct($settings['no_mandate_deduction'], 1), ' inputmode="decimal"'), 'Cuando el contrato no tiene mandato con comisión registrada.')
@@ -494,6 +497,18 @@ final class OwnerCreditView
       . self::tile('Disponible', self::money((float) $p['available']), (float) $p['available'] < 0.5 ? 'bad' : 'key')
       . self::tile('Plazo máximo', (int) $p['max_term'] . ' meses', (int) $p['max_term'] <= 0 ? 'bad' : '')
       . '</div><p class="' . self::NOTE . ' !sp-mt-3' . ($fits ? '' : ' !sp-text-red-700 !sp-font-semibold') . '">' . self::e($note) . '</p></section>';
+  }
+
+  /**
+   * La tasa ajustada (referencia − descuento de política) no puede superar la usura: el crédito se recorta a la usura,
+   * pero la tasa de referencia de Configuración está desactualizada. Indica hasta cuánto bajarla.
+   * @param array<string,mixed> $settings
+   */
+  public static function usuryWarning(array $settings, float $policyRate, float $usuryMonthly): string
+  {
+    if ($policyRate <= $usuryMonthly + 1e-9) return '';
+    $maxReference = $usuryMonthly / max(1e-9, 1 - (float) $settings['policy_discount']);
+    return 'La tasa ajustada (' . self::percent($policyRate) . ' mensual) supera la usura (' . self::percent($usuryMonthly) . ' mensual): los créditos se recortan a la usura. Baja la tasa de referencia en Configuración a máximo ' . number_format(floor($maxReference * 10000) / 100, 2, ',', '.') . ' %.';
   }
 
   /** @param array<string,mixed> $contract @param list<array<string,mixed>> $others */
