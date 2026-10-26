@@ -148,6 +148,8 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   assert.equal(calls.find(c => c.action === 'scm_owner_credit_contracts').document, '22.233.344');
   assert.match(await page.textContent('[data-owner-credit-person]'), /Segunda Dueña/);
   assert.match(await page.textContent('[data-owner-credit-preapproval]'), /\$10\.320\.000/);
+  assert.match(await page.textContent('[data-owner-credit-preapproval] [data-owner-credit-disclaimer]'), /términos y condiciones/);
+  assert.match(await page.textContent('[data-owner-credit-request] [data-owner-credit-disclaimer]'), /No constituyen una aprobación/);
   assert.equal(await page.isVisible('[data-owner-credit-request]'), true, 'the request opens without choosing a contract');
   assert.equal(await page.$('[data-owner-credit-pick]'), null, 'there is nothing to choose');
   assert.equal(await page.$$eval('[data-owner-credit-contract-card]', cards => cards.filter(card => card.offsetParent !== null).length), 2, 'every contract is listed');

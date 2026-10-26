@@ -25,6 +25,9 @@ use SCM\Support\SmsQueue;
  */
 final class OwnerCreditService
 {
+  /** Aviso en todo valor que no es una aprobación (cupo, simulación): no genera promesas ni expectativas. */
+  public const DISCLAIMER = 'Valores de referencia sujetos a las políticas de crédito y a los términos y condiciones de SKC SuCasa Inmobiliaria. No constituyen una aprobación ni un compromiso de desembolso: el crédito queda sujeto a estudio, verificación y aprobación.';
+
   public const STATUSES = [
     'pendiente' => 'Pendiente',
     'aprobado' => 'Aprobado',

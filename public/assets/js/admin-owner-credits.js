@@ -223,7 +223,7 @@
             '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">' + escapeHtml(detail || "Sin datos de contacto") + "</span>";
           person.hidden = false;
           form._preapproval = data.preapproval || null;
-          renderPreapproval(preapproval, data.preapproval);
+          renderPreapproval(preapproval, data.preapproval, data.disclaimer);
           renderChecks(checks, data.checks);
           status.textContent = contracts.length === 1 ? "Es propietario en 1 contrato." : "Es propietario en " + contracts.length + " contratos. El de vigencia más larga queda como contrato principal; el analista puede cambiarlo en el liquidador.";
           results.innerHTML = contracts.map(function (c, index) {
@@ -245,7 +245,7 @@
 
     // Cupo con todos los contratos de la persona: Σ ingreso neto × meses de política; cuotas = vigencia más larga −
     // margen, sin pasar del plazo máximo de un crédito (tope de política).
-    function renderPreapproval(box, p) {
+    function renderPreapproval(box, p, disclaimer) {
       if (!box || !p || !p.contracts) return;
       var byTerm = p.longest_months - p.margin_months;
       var term = p.max_term > 0 && p.max_term_cap && byTerm > p.max_term_cap
@@ -257,7 +257,7 @@
         '<strong class="!sp-block !sp-text-base !sp-text-service-navy">' + money(p.outstanding > 0 ? p.available : p.amount) + "</strong>" +
         '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">Ingreso neto de ' + (p.contracts === 1 ? "1 contrato" : p.contracts + " contratos") + " " + money(p.net_income) + " × " + p.income_months + " meses = " + money(p.amount) + ". " + escapeHtml(term) + "</span>" +
         (p.outstanding > 0 ? '<span class="!sp-block !sp-text-[11px] !sp-font-semibold !sp-text-amber-800">Debe ' + money(p.outstanding) + " de créditos vigentes: queda disponible " + money(p.available) + ".</span>" : "") +
-        '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">Es una referencia: el analista confirma el valor y el plazo en el liquidador.</span>';
+        '<span class="!sp-block !sp-mt-1 !sp-text-[11px] !sp-font-semibold !sp-text-service-navy" data-owner-credit-disclaimer>' + escapeHtml(disclaimer || "Valores de referencia sujetos a las políticas de crédito y a los términos y condiciones de la empresa: no constituyen una aprobación.") + "</span>";
       box.className = box.className.replace(/!sp-(bg|border)-(amber|red)-(50|200)/g, "") + (p.max_term > 0 ? " !sp-bg-amber-50 !sp-border-amber-200" : " !sp-bg-red-50 !sp-border-red-200");
       box.hidden = false;
     }

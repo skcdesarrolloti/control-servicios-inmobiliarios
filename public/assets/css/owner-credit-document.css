@@ -8,6 +8,7 @@
 .scm-owner-credit-schedule thead th{background:#10264a;color:#fff;font-size:11px}
 .scm-owner-credit-schedule tbody tr:nth-child(even) td{background:#f6f8fa}
 .scm-owner-credit-keep{break-inside:avoid;page-break-inside:avoid}
+.scm-owner-credit-disclaimer{margin:0 0 14px;padding:8px 12px;border:1px solid #e8c547;border-radius:6px;background:#fff8dc;color:#10264a;font-size:11.5px;line-height:1.5;break-inside:avoid;page-break-inside:avoid}
 @media print{
   .scm-owner-credit-schedule{font-size:9.5px}
   .scm-owner-credit-schedule th,.scm-owner-credit-schedule td{padding:3px 6px}

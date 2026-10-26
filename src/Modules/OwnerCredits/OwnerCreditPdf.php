@@ -94,7 +94,7 @@ final class OwnerCreditPdf
     }
 
     $decision = $simulation
-      ? ['Estado' => 'Simulación', 'Observación' => 'Simulación generada desde la solicitud de crédito: no es una aprobación. Las condiciones son las de la política al momento de generarla y quedan sujetas a la evaluación del analista.']
+      ? ['Estado' => 'Simulación', 'Observación' => 'Simulación generada desde la solicitud de crédito: no es una aprobación. Las condiciones son las de la política al momento de generarla y quedan sujetas a la evaluación del analista.', 'Términos' => OwnerCreditService::DISCLAIMER]
       : ($decided
       ? ['Estado' => OwnerCreditService::STATUSES[$credit['status']] ?? (string) $credit['status'], 'Decidido por' => (string) $credit['decided_by_name'], 'Fecha de decisión' => $date((int) $credit['decided_at']),
         'Fuera de política' => (int) $credit['policy_override'] === 1 ? 'Sí' : 'No', 'Observación / justificación' => trim((string) $credit['decision_note'])]
@@ -102,6 +102,8 @@ final class OwnerCreditPdf
 
     $html = '<article class="scm-acta-receipt scm-services-document scm-owner-credit-document">' . $letterhead . Doc::header(self::title($work), false)
       . '<p class="scm-acta-receipt-date">Cartagena de Indias, ' . date('d/m/Y') . ' · Documento interno para funcionarios</p>'
+      // La simulación se puede mostrar al propietario: el aviso va arriba, antes de cualquier valor.
+      . ($simulation || !$decided ? '<p class="scm-owner-credit-disclaimer"><strong>Importante:</strong> ' . Doc::e(OwnerCreditService::DISCLAIMER) . '</p>' : '')
       . '<section class="scm-acta-receipt-section"><h2>1. Propietario y contrato</h2>' . Doc::table([
         OwnerCreditService::beneficiaryLabel($credit) . ' (beneficiario)' => (string) $credit['owner_name'] . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · Documento ' . $credit['owner_document'] : ''),
         'Contrato / Inmueble SIMI' => '#' . $contract['code'] . ' · ' . $credit['property'],

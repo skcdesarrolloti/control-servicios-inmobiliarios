@@ -203,7 +203,7 @@ trait HandlesOwnerCredits
       $preapproval = \SCM\Modules\OwnerCredits\OwnerCreditCalculator::preapproval($rows, OwnerCreditSettings::read(App::settings()));
       $preapproval['outstanding'] = $rows === [] ? 0.0 : $service->outstandingByDocument($document, array_map(static fn(array $row): string => (string) ($row['owner']['owner_id'] ?? ''), $rows));
       $preapproval['available'] = max(0.0, $preapproval['amount'] - $preapproval['outstanding']);
-      $this->jsonOk(['contracts' => $rows, 'preapproval' => $preapproval, 'checks' => $service->requestChecks($rows, $preapproval)]);
+      $this->jsonOk(['contracts' => $rows, 'preapproval' => $preapproval, 'checks' => $service->requestChecks($rows, $preapproval), 'disclaimer' => OwnerCreditService::DISCLAIMER]);
     } catch (\InvalidArgumentException $error) {
       $this->jsonFail($error->getMessage());
     } catch (\Throwable $error) {
