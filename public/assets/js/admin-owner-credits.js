@@ -206,6 +206,7 @@
       results.innerHTML = "";
       person.hidden = true;
       preapproval.hidden = true;
+      form._preapproval = null;
       checks.hidden = true;
       if (query.replace(/[\s.]/g, "").length < 4) { status.textContent = "Escribe la cédula o el NIT (mínimo 4 caracteres)."; return; }
       status.textContent = "Buscando…";
@@ -221,6 +222,7 @@
           person.innerHTML = '<strong class="!sp-block !sp-text-xs !sp-text-service-navy">' + escapeHtml(owner.name || "Propietario") + "</strong>" +
             '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">' + escapeHtml(detail || "Sin datos de contacto") + "</span>";
           person.hidden = false;
+          form._preapproval = data.preapproval || null;
           renderPreapproval(preapproval, data.preapproval);
           renderChecks(checks, data.checks);
           status.textContent = contracts.length === 1 ? "Es propietario en 1 contrato." : "Es propietario en " + contracts.length + " contratos. El de vigencia más larga queda como contrato principal; el analista puede cambiarlo en el liquidador.";
@@ -299,20 +301,36 @@
     }
 
     // Solo informa: el consultor no conoce la fecha fin; si el plazo la supera, el analista la revisa en el liquidador.
+    // Plazo máximo de la solicitud: el del preaprobado (vigencia más larga − margen, sin pasar del tope). Si sus
+    // contratos no dan cuotas se permite hasta el tope, para que el analista revise la fecha fin en el liquidador.
+    function termLimit(form) {
+      var p = form._preapproval || {};
+      return Number(p.max_term) > 0 ? Number(p.max_term) : (Number(p.max_term_cap) || 12);
+    }
+
+    function termFits(form) {
+      return (Number(form.elements.term.value) || 0) <= termLimit(form);
+    }
+
     function updateTermHint(form) {
       var hint = form.querySelector("[data-owner-credit-term-hint]");
-      var contract = form._contract;
-      if (!hint || !contract) return;
+      var p = form._preapproval;
+      if (!hint || !form._contract || !p) return;
+      var limit = termLimit(form);
       var term = Number(form.elements.term.value) || 0;
-      var max = Number(contract.max_months) || 0;
-      if (!contract.fin) {
-        hint.textContent = "El contrato no tiene fecha fin registrada; el analista la revisará en el liquidador.";
-      } else if (term > max) {
-        hint.textContent = "Según el sistema el contrato vence el " + contract.fin + " (quedan " + max + " meses). Puedes registrar la solicitud: el analista revisará la fecha o el plazo.";
+      var byTerm = p.longest_months - p.margin_months;
+      var basis = p.max_term_cap && byTerm > p.max_term_cap
+        ? "tope de política; la vigencia más larga, " + p.longest_months + " meses − " + p.margin_months + " de margen, daría " + byTerm
+        : "vigencia más larga " + p.longest_months + " meses − " + p.margin_months + " de margen";
+      form.elements.term.max = String(limit);
+      if (!(Number(p.max_term) > 0)) {
+        hint.textContent = "Sus contratos no dan cuotas (" + basis + "). Puedes registrar hasta " + limit + " meses: el analista revisará la fecha fin en el liquidador.";
+      } else if (term > limit) {
+        hint.textContent = "El plazo máximo es de " + limit + " cuotas (" + basis + "). Corrige el plazo.";
       } else {
-        hint.textContent = "El contrato vence el " + contract.fin + " (quedan " + max + " meses).";
+        hint.textContent = "Máximo " + limit + " cuotas (" + basis + ").";
       }
-      hint.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] " + (term > max || !contract.fin ? "!sp-font-semibold !sp-text-amber-800" : "!sp-text-service-muted");
+      hint.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] " + (term > limit ? "!sp-font-semibold !sp-text-red-700" : (Number(p.max_term) > 0 ? "!sp-text-service-muted" : "!sp-font-semibold !sp-text-amber-800"));
     }
 
     // Confirmación dentro del mismo popup (los diálogos externos quedarían detrás del modal).
@@ -479,6 +497,7 @@
       if (newForm && target.closest("[data-owner-credit-search]")) { searchContracts(newForm); return; }
       if (newForm && target.closest("[data-owner-credit-simulate-pdf]")) {
         if (!newForm.elements.contract_id.value) { setStatus(newForm, "Busca al propietario por documento.", "error"); return; }
+        if (!termFits(newForm)) { setStatus(newForm, "El plazo supera el máximo de " + termLimit(newForm) + " cuotas.", "error"); return; }
         setStatus(newForm, "");
         var key = requestKey(newForm);
         showPdf(target.closest("[data-owner-credit-simulate-pdf]"), {
@@ -585,6 +604,7 @@
       if (form.matches("[data-owner-credit-new-form]")) {
         event.preventDefault();
         if (!form.elements.contract_id.value) { setStatus(form, "Busca al propietario por documento.", "error"); return; }
+        if (!termFits(form)) { setStatus(form, "El plazo supera el máximo de " + termLimit(form) + " cuotas.", "error"); return; }
         if (!form._simulatedKey || form._simulatedKey !== requestKey(form)) { setRegistrable(form, false); setStatus(form, "Primero simula y revisa el PDF con los datos actuales.", "error"); return; }
         setStatus(form, "Registrando…", "");
         post("scm_owner_credit_create", new FormData(form))

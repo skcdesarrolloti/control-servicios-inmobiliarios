@@ -193,8 +193,7 @@ final class OwnerCreditService
     $storedEnd = self::timestamp($contract['fin_contrato'] ?? '');
     $endTs = self::dateInput($contractEnd) ?: $storedEnd;
     if ($term <= 0) throw new \DomainException('Indica el plazo solicitado en meses.');
-    // El plazo frente a la fecha fin no se valida aquí: la solicitud la registran consultores que no conocen esa
-    // fecha. Si el plazo la supera, el liquidador lo marca y el analista corrige la fecha fin o el plazo.
+    $this->assertRequestTerm($term, $this->ownerDocument($owner, $contract));
     $id = $this->insertCredit($contract, null, '', $amount, $purpose, $actor, $term, $owner, $beneficiaryType);
     // La fecha fin corregida en el formulario se guarda en el contrato (con historial).
     if ($endTs !== $storedEnd) $this->saveContractEnd($this->find($id) ?? [], $endTs, $actor);
@@ -222,6 +221,7 @@ final class OwnerCreditService
     $preapproval = OwnerCreditCalculator::preapproval($portfolio, $this->config());
     if ($amount <= 0) $amount = round($preapproval['amount']);
     if ($term <= 0) $term = $preapproval['max_term'];
+    $this->assertRequestTerm($term, $document);
     if (!in_array($purpose, OwnerCreditSettings::PURPOSES, true)) $purpose = OwnerCreditSettings::PURPOSES[0];
     $credit = ['id' => 0, 'status' => 'simulacion', 'evaluation_json' => null, 'policy_override' => 0, 'decision_note' => '', 'decided_by_name' => '', 'decided_at' => 0]
       + $this->creditRow($contract, null, '', $amount, $purpose, $actor, $term, $owner, 'propietario');
@@ -741,6 +741,27 @@ final class OwnerCreditService
     $updated = $this->find($id) ?? $credit;
     $this->recordHistories($updated, 'Cambio de contrato principal del crédito', 'Crédito #' . $id . ': contrato principal cambiado de ' . $change . '; la cuota se descontará primero de este contrato.', $actor);
     return $updated;
+  }
+
+  /**
+   * Plazo de una solicitud manual: hasta el plazo máximo del preaprobado (vigencia más larga − margen, sin pasar del
+   * tope). Si sus contratos no dan cuotas se permite hasta el tope, para que el analista revise la fecha fin.
+   */
+  public function requestTermLimit(array $preapproval): int
+  {
+    return (int) $preapproval['max_term'] > 0 ? (int) $preapproval['max_term'] : (int) ($preapproval['max_term_cap'] ?? OwnerCreditCalculator::termCap($this->config()));
+  }
+
+  private function assertRequestTerm(int $term, string $document): void
+  {
+    try {
+      $portfolio = $this->ownerPortfolio($document);
+    } catch (\InvalidArgumentException) {
+      return;
+    }
+    if ($portfolio === []) return;
+    $limit = $this->requestTermLimit(OwnerCreditCalculator::preapproval($portfolio, $this->config()));
+    if ($term > $limit) throw new \DomainException('El plazo solicitado (' . $term . ' meses) supera el máximo de ' . $limit . ' cuotas del propietario. Corrige el plazo.');
   }
 
   /**

@@ -439,7 +439,7 @@ final class OwnerCreditView
       . self::guide('nuevo-datos', [
         'Primero simula' => 'Con "Simular y ver PDF" revisas con el propietario la cuota y la tabla de amortización. Si está de acuerdo, aparece "Registrar solicitud". Si cambias el valor, el plazo o la destinación, vuelve a simular.',
         'Qué pasa al registrar' => 'Solo se registra lo que pide el propietario: todavía no se aprueba nada. El analista lo evalúa en el liquidador y ahí se aprueba o rechaza.',
-        'Plazo solicitado' => 'Los meses que pidió el propietario. Si superan la vigencia del contrato, regístralo igual: el analista revisa la fecha fin en el liquidador.',
+        'Plazo solicitado' => 'Los meses que pidió el propietario, hasta el plazo máximo del cupo preaprobado: vigencia más larga de sus contratos − margen, sin pasar del plazo máximo de un crédito (Configuración). Si el contrato fue renovado y la fecha no está al día, regístralo con el máximo: el analista corrige la fecha fin en el liquidador.',
         'Simular y ver PDF' => 'Calcula la cuota y la tabla de amortización con la tasa de política sin registrar la solicitud. Sin valor o plazo se simula con el cupo preaprobado y el plazo máximo. La simulación queda en el historial de los contratos y de los inmuebles del propietario.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-3">'

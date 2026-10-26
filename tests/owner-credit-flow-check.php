@@ -236,6 +236,14 @@ $check(count($ev['other_contracts']) === 1 && abs($ev['total_net_income'] - 3300
 $check($ev['longest_months'] === $portfolio[0]['max_months'] && $ev['max_months'] === min(12, $portfolio[0]['max_months'] - 2), 'the liquidator term is the longest contract minus the margin, capped at 12');
 $simulation = $service->simulation(' 22.233.344 ', 9, 0, 0, 'Libre Destinación', 'mandato_2', $actor);
 $check($simulation['credit']['status'] === 'simulacion' && $simulation['credit']['owner_name'] === 'Segunda Dueña' && abs($simulation['conditions']['amount'] - 9900000) < 0.01 && $simulation['conditions']['term'] === $ev['max_months'], 'an empty simulation uses the pre-approved amount and the maximum term');
+foreach (['createManual' => static fn() => $service->createManual(9, 800000, $ev['max_months'] + 1, 'Libre Destinación', $actor, '', 'mandato_2'), 'simulation' => static fn() => $service->simulation('22233344', 9, 800000, $ev['max_months'] + 1, 'Libre Destinación', 'mandato_2', $actor)] as $name => $call) {
+  try {
+    $call();
+    $check(false, $name . ' rejects a term above the pre-approved maximum');
+  } catch (DomainException $error) {
+    $check(str_contains($error->getMessage(), 'supera el máximo de ' . $ev['max_months'] . ' cuotas'), $name . ' rejects a term above the pre-approved maximum');
+  }
+}
 $credits = (int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credits');
 $service->recordSimulation($simulation, $actor);
 $check((int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credits') === $credits && (int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble WHERE tipo_reporte = 'Simulación de crédito'") === 2, 'a simulation is not saved as a credit and goes to the history of every owner property');
