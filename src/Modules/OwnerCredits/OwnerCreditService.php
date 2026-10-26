@@ -633,6 +633,62 @@ final class OwnerCreditService
     return $closed;
   }
 
+  /**
+   * "Descuentos de créditos por contrato" de un mes (AAAA-MM), para hacer los giros: una fila por contrato y cuota
+   * que vence en el mes, según el plan de descuento; lo que ningún contrato cubre sale como pago directo. Incluye los
+   * créditos ya pagados automáticamente para poder consultar meses anteriores; los cerrados antes de la cuota no.
+   * @return array{month:string,from:int,to:int,rows:list<array<string,mixed>>,total:float,direct:float,contracts:int,credits:int}
+   */
+  public function monthlyDiscounts(string $month): array
+  {
+    $this->settleFinished();
+    if (preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month) !== 1) $month = date('Y-m');
+    $from = (int) strtotime($month . '-01 00:00:00');
+    $to = (int) strtotime('+1 month', $from) - 1;
+    $rows = [];
+    foreach ($this->db->getResults("SELECT * FROM `{$this->table()}` WHERE `status` IN ('aprobado', 'pagado') AND `first_payment_ts` > 0 AND `approved_term` > 0 ORDER BY `id`") as $credit) {
+      $term = (int) $credit['approved_term'];
+      $first = (int) $credit['first_payment_ts'];
+      $closed = (int) ($credit['closed_at'] ?? 0);
+      $schedule = OwnerCreditCalculator::schedule((float) $credit['approved_rate'], $term, (float) $credit['approved_amount']);
+      $payment = (float) $credit['monthly_payment'] ?: OwnerCreditCalculator::payment((float) $credit['approved_rate'], $term, (float) $credit['approved_amount']);
+      $plan = null;
+      for ($number = 1; $number <= $term; $number++) {
+        $due = self::installmentTs($first, $number);
+        if ($due < $from || $due > $to) continue;
+        // Pagado a mano antes de esta cuota (pago anticipado): ya no se descuenta.
+        if ($credit['status'] === 'pagado' && $closed > 0 && $closed < $due && !str_contains((string) $credit['decision_note'], 'Pagado automáticamente')) continue;
+        if ($plan === null) {
+          $contract = $this->contractById((int) $credit['contract_id']) ?? [];
+          $sources = $this->discountSources($credit, $contract, ['net_income' => (float) $credit['net_income'], 'other_contracts' => []], self::timestamp($contract['fin_contrato'] ?? ''));
+          $plan = OwnerCreditCalculator::discountPlan(array_map(fn(array $source): array => $source + ['covers' => $this->coveredInstallments($source, $first, $term)], $sources), $payment, $term, (int) $credit['contract_id']);
+          $properties = array_column($sources, 'inmueble', 'id');
+        }
+        $line = $schedule[$number - 1];
+        // La última cuota puede diferir unos pesos de la fija: se reparte en la misma proporción del plan.
+        $scale = $payment > 0 ? (float) $line['cuota'] / $payment : 1.0;
+        foreach ($plan as $segment) {
+          if ($number < $segment['from'] || $number > $segment['to']) continue;
+          $base = ['credit_id' => (int) $credit['id'], 'owner_name' => (string) $credit['owner_name'], 'owner_document' => (string) ($credit['owner_document'] ?? ''),
+            'number' => $number, 'term' => $term, 'due_ts' => $due, 'balance' => (float) $line['saldo'], 'shared' => count($segment['parts']) > 1];
+          foreach ($segment['parts'] as $part) {
+            $rows[] = $base + ['contract_id' => (int) $part['id'], 'contract_code' => (string) $part['contrato'], 'property' => (string) ($properties[$part['id']] ?? ''), 'amount' => round($part['amount'] * $scale), 'direct' => false];
+          }
+          if ($segment['direct'] >= 0.5) $rows[] = $base + ['contract_id' => 0, 'contract_code' => '', 'property' => '', 'amount' => round($segment['direct'] * $scale), 'direct' => true];
+        }
+      }
+    }
+    usort($rows, static fn(array $a, array $b): int => [$a['direct'], $a['contract_code'], $a['credit_id']] <=> [$b['direct'], $b['contract_code'], $b['credit_id']]);
+    $charged = array_filter($rows, static fn(array $row): bool => !$row['direct']);
+    return [
+      'month' => $month, 'from' => $from, 'to' => $to, 'rows' => $rows,
+      'total' => array_sum(array_column($charged, 'amount')),
+      'direct' => array_sum(array_column(array_filter($rows, static fn(array $row): bool => $row['direct']), 'amount')),
+      'contracts' => count(array_unique(array_column($charged, 'contract_id'))),
+      'credits' => count(array_unique(array_column($rows, 'credit_id'))),
+    ];
+  }
+
   /** Saldo de capital de los créditos aprobados de la persona (por documento). */
   public function outstandingByDocument(string $document): float
   {

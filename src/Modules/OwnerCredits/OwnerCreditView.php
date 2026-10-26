@@ -41,7 +41,8 @@ final class OwnerCreditView
       . '<header class="' . $ui::CARD . ' !sp-p-5 !sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-4">'
       . '<div class="!sp-flex !sp-items-center !sp-gap-3"><span class="!sp-p-2.5 !sp-bg-amber-50 !sp-rounded-xl !sp-border !sp-border-solid !sp-border-amber-200">' . self::icon('cash', '!sp-w-6 !sp-h-6') . '</span>'
       . '<div><h2 class="!sp-m-0 !sp-text-xl !sp-font-bold !sp-text-service-navy">Créditos a propietarios</h2><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">Solicitudes de financiación · Decisiones del liquidador · Cartera vigente por contrato</p></div></div>'
-      . '<div class="!sp-text-right !sp-border-y-0 !sp-border-r-0 !sp-border-l !sp-border-solid !sp-border-slate-200 !sp-pl-4"><strong class="!sp-text-xl" data-owner-credit-count>0</strong><p class="!sp-m-0 !sp-text-[9px] !sp-uppercase !sp-text-service-muted">Créditos filtrados</p></div>'
+      . '<div class="!sp-flex !sp-items-center !sp-gap-4"><button type="button" class="' . $ui::NAVY . ' !sp-text-xs !sp-px-4 !sp-py-2.5" data-owner-credit-discounts>' . $ui::icon('calendar', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Descuentos del mes</button>'
+      . '<div class="!sp-text-right !sp-border-y-0 !sp-border-r-0 !sp-border-l !sp-border-solid !sp-border-slate-200 !sp-pl-4"><strong class="!sp-text-xl" data-owner-credit-count>0</strong><p class="!sp-m-0 !sp-text-[9px] !sp-uppercase !sp-text-service-muted">Créditos filtrados</p></div></div>'
       . '</header>'
       . '<div class="' . $ui::CARD . ' !sp-p-5"><div class="!sp-flex !sp-flex-wrap !sp-justify-between !sp-items-center !sp-gap-2 !sp-pb-3 !sp-mb-4 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><h3 class="!sp-m-0 !sp-flex !sp-gap-2 !sp-items-center !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide">' . $ui::icon('filter') . 'Filtros · Créditos</h3><span class="!sp-text-[10px] !sp-text-service-muted">"Solicitud de crédito" y su configuración están en el encabezado del panel</span></div>'
       . '<form data-owner-credit-filters autocomplete="off"><div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-4 !sp-gap-4">'
@@ -52,6 +53,73 @@ final class OwnerCreditView
       . '</div><div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-3 !sp-mt-5"><button class="' . $ui::PRIMARY . '" type="submit">' . $ui::icon('filter') . 'Filtrar</button>'
       . '<button class="!sp-bg-transparent !sp-border-0 !sp-text-service-muted !sp-text-xs !sp-cursor-pointer" type="reset" data-owner-credit-clear>Limpiar filtros</button></div></form></div>'
       . '<div data-owner-credit-report><p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">Cargando créditos…</p></div></section>';
+  }
+
+  private const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+  /** "octubre de 2026". */
+  public static function monthLabel(int $ts): string
+  {
+    return self::MONTHS[(int) date('n', $ts) - 1] . ' de ' . date('Y', $ts);
+  }
+
+  /**
+   * Popup "Descuentos del mes": qué descontar de cada giro por los créditos aprobados.
+   * @param array<string,mixed> $report OwnerCreditService::monthlyDiscounts()
+   */
+  public function discounts(array $report): string
+  {
+    $ui = UI::class;
+    $th = '!sp-text-left !sp-text-[9px] !sp-uppercase !sp-tracking-wide !sp-font-bold !sp-text-service-muted !sp-px-3 !sp-py-3 !sp-border-x-0 !sp-border-y !sp-border-solid !sp-border-slate-200';
+    $td = '!sp-px-3 !sp-py-2.5 !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-100 !sp-align-top';
+    $rows = '';
+    foreach ($report['rows'] as $row) {
+      $rows .= '<tr class="' . ($row['direct'] ? '!sp-bg-red-50' : '!sp-bg-white') . '">'
+        . '<td class="' . $td . ' !sp-font-semibold">' . ($row['direct'] ? '<span class="!sp-text-red-700">Pago directo</span>' : '#' . self::e($row['contract_code']) . '<small class="!sp-block !sp-font-normal !sp-text-[10px] !sp-text-service-muted">SIMI ' . self::e($row['property']) . '</small>') . '</td>'
+        . '<td class="' . $td . '">' . self::e($row['owner_name']) . ($row['owner_document'] !== '' ? '<small class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e($row['owner_document']) . '</small>' : '') . '</td>'
+        . '<td class="' . $td . '"><button type="button" class="!sp-bg-transparent !sp-border-0 !sp-p-0 !sp-text-service-blue !sp-font-semibold !sp-cursor-pointer !sp-underline" data-owner-credit-open data-credit-id="' . (int) $row['credit_id'] . '">#' . (int) $row['credit_id'] . '</button></td>'
+        . '<td class="' . $td . ' !sp-whitespace-nowrap">' . (int) $row['number'] . ' de ' . (int) $row['term'] . '<small class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . date('d/m/Y', (int) $row['due_ts']) . '</small></td>'
+        . '<td class="' . $td . ' !sp-text-right !sp-whitespace-nowrap !sp-font-semibold">' . self::money((float) $row['amount']) . ($row['shared'] ? '<small class="!sp-block !sp-font-normal !sp-text-[10px] !sp-text-service-muted">Cuota repartida</small>' : '') . '</td>'
+        . '<td class="' . $td . ' !sp-text-right !sp-whitespace-nowrap">' . self::money((float) $row['balance']) . '</td></tr>';
+    }
+    $head = '';
+    foreach (['Contrato', 'Propietario', 'Crédito', 'Cuota', 'Descontar', 'Saldo después'] as $index => $label) $head .= '<th class="' . $th . ($index >= 4 ? ' !sp-text-right' : '') . '">' . $label . '</th>';
+    $chip = static fn(string $label, string $value): string => '<span class="!sp-px-2.5 !sp-py-1 !sp-rounded-full !sp-bg-slate-100 !sp-text-[10px]">' . $label . ' <b>' . $value . '</b></span>';
+    return '<form class="!sp-font-sans !sp-text-service-navy !sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-5" data-owner-credit-discounts-form autocomplete="off">'
+      . '<section class="' . self::SECTION . '"><div class="!sp-flex !sp-flex-wrap !sp-items-end !sp-gap-3">'
+      . '<label class="!sp-block"><span class="' . $ui::LABEL . '">Mes del giro</span><input class="' . $ui::INPUT . '" type="month" name="month" value="' . self::e($report['month']) . '"></label>'
+      . '<button type="button" class="' . $ui::NAVY . ' !sp-h-10" data-owner-credit-discounts-excel>' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Exportar a Excel</button>'
+      . '<p class="' . self::NOTE . ' !sp-flex-1 !sp-min-w-[220px]">Cuotas de los créditos aprobados que vencen en ' . self::e(self::monthLabel((int) $report['from'])) . ', por contrato. Si un contrato terminó, su parte ya pasó a los demás; lo que ninguno cubre sale como pago directo del propietario.</p></div>'
+      . '<div class="!sp-flex !sp-flex-wrap !sp-gap-2 !sp-mt-4">' . $chip('A descontar', self::money((float) $report['total'])) . $chip('Contratos', (string) $report['contracts']) . $chip('Créditos', (string) $report['credits'])
+      . ((float) $report['direct'] >= 0.5 ? '<span class="!sp-px-2.5 !sp-py-1 !sp-rounded-full !sp-bg-red-50 !sp-text-red-700 !sp-text-[10px]">Pago directo <b>' . self::money((float) $report['direct']) . '</b></span>' : '') . '</div></section>'
+      . '<section class="' . self::SECTION . ' !sp-p-0 sm:!sp-p-0 !sp-overflow-hidden">'
+      . ($rows === '' ? '<p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">No hay cuotas de créditos que venzan en este mes.</p>'
+        : '<div class="!sp-overflow-x-auto"><table class="!sp-w-full !sp-border-collapse !sp-text-[11px] !sp-min-w-[720px]"><thead class="!sp-bg-slate-50"><tr>' . $head . '</tr></thead><tbody>' . $rows . '</tbody></table></div>')
+      . '</section><p class="!sp-m-0 !sp-text-[11px]" data-owner-credit-status role="status" aria-live="polite"></p></form>';
+  }
+
+  /** Excel (HTML .xls, como la cuenta de cobro) del reporte de descuentos. @param array<string,mixed> $report */
+  public static function discountsExcel(array $report): string
+  {
+    $cell = static function ($value): string {
+      $text = trim((string) preg_replace('/\s+/u', ' ', (string) $value));
+      if ($text !== '' && preg_match('/^[=+\-@]/', $text) === 1) $text = "'" . $text;
+      return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    };
+    $number = static fn(float $value): string => '<td style="mso-number-format:\'#,##0\'">' . (int) round($value) . '</td>';
+    $out = "\xEF\xBB\xBF" . '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>table{border-collapse:collapse}th,td{border:1px solid #b7b7b7;padding:6px;mso-number-format:"\@";}</style></head><body>'
+      . '<table><tr><th colspan="11">SKC SuCasa Inmobiliaria · Descuentos de créditos por contrato · ' . $cell(self::monthLabel((int) $report['from'])) . '</th></tr><tr>';
+    foreach (['Contrato', 'Inmueble SIMI', 'Propietario', 'Documento', 'Crédito', 'Cuota', 'De', 'Fecha de la cuota', 'Valor a descontar', 'Saldo después', 'Observación'] as $heading) $out .= '<th>' . $heading . '</th>';
+    $out .= '</tr>';
+    foreach ($report['rows'] as $row) {
+      $out .= '<tr><td>' . $cell($row['direct'] ? 'Pago directo' : $row['contract_code']) . '</td><td>' . $cell($row['property']) . '</td><td>' . $cell($row['owner_name']) . '</td><td>' . $cell($row['owner_document']) . '</td>'
+        . '<td>' . (int) $row['credit_id'] . '</td><td>' . (int) $row['number'] . '</td><td>' . (int) $row['term'] . '</td><td>' . date('d/m/Y', (int) $row['due_ts']) . '</td>'
+        . $number((float) $row['amount']) . $number((float) $row['balance'])
+        . '<td>' . $cell($row['direct'] ? 'Ningún contrato vigente cubre esta parte: la paga el propietario.' : ($row['shared'] ? 'Cuota repartida entre varios contratos.' : '')) . '</td></tr>';
+    }
+    $out .= '<tr><th colspan="8">TOTAL A DESCONTAR DE GIROS</th>' . $number((float) $report['total']) . '<td colspan="2"></td></tr>';
+    if ((float) $report['direct'] >= 0.5) $out .= '<tr><th colspan="8">PAGO DIRECTO DE PROPIETARIOS</th>' . $number((float) $report['direct']) . '<td colspan="2"></td></tr>';
+    return $out . '</table></body></html>';
   }
 
   /** @param array<string,mixed> $report */

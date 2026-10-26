@@ -148,6 +148,37 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   const create = calls.find(c => c.action === 'scm_owner_credit_create');
   assert.equal(create.contract_id, '9'); assert.equal(create.owner_key, 'mandato_2'); assert.equal(create.term, '12'); assert.equal(create.contract_end, undefined);
   console.log('OK new request: owner found by document, contract chosen, long term only warns, no end date field');
+  // Descuentos del mes: popup con la tabla por contrato, cambio de mes y descarga del Excel.
+  const discountsHtml = execFileSync('php', ['-r', String.raw`require 'vendor/autoload.php'; echo (new SCM\Modules\OwnerCredits\OwnerCreditView())->discounts(['month' => '2026-11', 'from' => strtotime('2026-11-01'), 'to' => strtotime('2026-11-30'), 'total' => 1170000, 'direct' => 0, 'contracts' => 1, 'credits' => 1, 'rows' => [['credit_id' => 7, 'owner_name' => 'Segunda Dueña', 'owner_document' => '22233344', 'number' => 2, 'term' => 10, 'due_ts' => strtotime('2026-11-26'), 'balance' => 8000000, 'shared' => false, 'contract_id' => 14, 'contract_code' => '954', 'property' => '10601', 'amount' => 1170000, 'direct' => false]]]);`], { cwd: root, encoding: 'utf8' });
+  await page.evaluate((discountsHtml) => {
+    const button = document.createElement('button');
+    button.setAttribute('data-owner-credit-discounts', '');
+    document.getElementById('scm-app').appendChild(button);
+    window.downloads = [];
+    const original = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () { if (this.download) window.downloads.push(this.download); else original.call(this); };
+    window.fetch = (url, opts) => {
+      const body = Object.fromEntries(opts.body.entries());
+      window.calls.push(body);
+      if (body.action === 'scm_owner_credit_discounts_excel') {
+        return Promise.resolve({ headers: { get: () => 'application/vnd.ms-excel; charset=UTF-8' }, blob: () => Promise.resolve(new Blob(['<table></table>'])) });
+      }
+      return Promise.resolve({ json: () => Promise.resolve({ success: true, data: { html: discountsHtml, title: 'Descuentos de noviembre de 2026' } }) });
+    };
+  }, discountsHtml);
+  await page.click('[data-owner-credit-discounts]');
+  await page.waitForSelector('[data-owner-credit-discounts-form]');
+  assert.match(await page.textContent('[data-owner-credit-title]'), /Descuentos de noviembre de 2026/);
+  assert.match(await page.textContent('[data-owner-credit-discounts-form]'), /#954[\s\S]*\$1\.170\.000/);
+  await page.fill('[data-owner-credit-discounts-form] [name="month"]', '2026-12');
+  await page.dispatchEvent('[data-owner-credit-discounts-form] [name="month"]', 'change');
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'scm_owner_credit_discounts' && c.month === '2026-12'));
+  await page.waitForSelector('[data-owner-credit-discounts-excel]');
+  await page.click('[data-owner-credit-discounts-excel]');
+  await page.waitForFunction(() => window.downloads.length === 1);
+  assert.equal(await page.evaluate(() => window.downloads[0]), 'descuentos-creditos-2026-11.xls');
+  console.log('OK monthly discounts open in a popup, change month and download the Excel');
+
   await browser.close();
   console.log('Owner credit UI checks passed.');
 })().catch((e) => { console.error('FAIL', e.message); process.exit(1); });
