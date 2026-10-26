@@ -770,7 +770,7 @@
         }).join("") + "</tbody></table></div>";
     }
 
-    function exportCsv() {
+    function exportExcel() {
       if (!state.data) return;
       var lines;
       var name;
@@ -794,15 +794,17 @@
         });
         name = state.view + "-" + year + (state.month ? "-" + String(state.month).padStart(2, "0") : "");
       }
-      var csv = "﻿" + lines.map(function (line) {
-        return line.map(function (cell) {
-          var text = String(cell == null ? "" : cell);
-          return /[";\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
-        }).join(";");
-      }).join("\r\n");
+      // Excel (.xls en HTML, como la auditoría SIMI): números como valores y el resto como texto para conservar ceros iniciales.
+      var cell = function (value) {
+        if (typeof value === "number" && isFinite(value)) return "<td>" + value + "</td>";
+        return '<td style="mso-number-format:\'\\@\';">' + esc(value == null ? "" : value) + "</td>";
+      };
+      var html = '<html><head><meta charset="UTF-8"><style>td,th{border:1px solid #b7b7b7;padding:6px;vertical-align:top}th{background:#0f1e36;color:#fff}</style></head><body><table><thead><tr>' +
+        lines[0].map(function (title) { return "<th>" + esc(title) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+        lines.slice(1).map(function (line) { return "<tr>" + line.map(cell).join("") + "</tr>"; }).join("") + "</tbody></table></body></html>";
       var link = document.createElement("a");
-      link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-      link.download = name + ".csv";
+      link.href = URL.createObjectURL(new Blob(["\ufeff" + html], { type: "application/vnd.ms-excel;charset=utf-8" }));
+      link.download = name + ".xls";
       document.body.appendChild(link);
       link.click();
       setTimeout(function () {
@@ -868,7 +870,7 @@
         return;
       }
       if (event.target.closest("[data-scm-cm-export]")) {
-        exportCsv();
+        exportExcel();
         return;
       }
       var simiButton = event.target.closest("[data-scm-cm-simi]");

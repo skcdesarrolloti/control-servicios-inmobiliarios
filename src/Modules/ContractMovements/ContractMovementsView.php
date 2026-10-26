@@ -41,7 +41,7 @@ final class ContractMovementsView
           <span class="scm-cm-updated" data-scm-cm-updated></span>
           <button type="button" class="scm-cm-btn" data-scm-cm-export disabled>
             <span class="material-symbols-outlined" aria-hidden="true">download</span>
-            <span>Exportar CSV</span>
+            <span>Exportar Excel</span>
           </button>
           <button type="button" class="scm-cm-btn" data-scm-cm-refresh title="Volver a consultar los contratos">
             <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
