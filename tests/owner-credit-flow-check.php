@@ -164,8 +164,11 @@ try {
   $check(str_contains($error->getMessage(), 'no puede superar'), 'approval is blocked while the requested term exceeds the contract');
 }
 $newEnd = date('Y-m-d', strtotime('+3 years'));
-$simulated = $service->workspace((int) $pending['id'], ['requested_term' => '30', 'contract_end' => $newEnd]);
+$simulated = $service->workspace((int) $pending['id'], ['requested_term' => '10', 'contract_end' => $newEnd]);
 $check($simulated['term_error'] === '' && $simulated['contract']['fin_ts'] !== $simulated['contract']['fin_saved_ts'], 'a corrected end date is simulated before saving');
+// Con vigencia de sobra (36 meses − 2) el plazo no pasa del tope de política de 12 meses.
+$capped = $service->workspace((int) $pending['id'], ['requested_term' => '30', 'contract_end' => $newEnd]);
+$check($capped['evaluation']['max_months'] === 12 && str_contains($capped['term_error'], 'tope de política de 12 meses'), 'the maximum term never exceeds the 12-month policy cap');
 $check($db->getRow('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 7')['fin_contrato'] === $end, 'simulating does not touch the contract');
 $check(!method_exists($service, 'updateContractEnd'), 'the end date is no longer saved with a separate button');
 $service->decide((int) $pending['id'], 'rechazado', ['requested_term' => '30', 'contract_end' => $newEnd, 'note' => 'Se rechaza tras corregir la fecha fin.'], $actor);
@@ -228,7 +231,7 @@ $check(array_column($portfolio, 'id') === [14, 9] && $portfolio[0]['net_income']
 $work = $service->workspace((int) $chosen['id']);
 $ev = $work['evaluation'];
 $check(count($ev['other_contracts']) === 1 && abs($ev['total_net_income'] - 3300000) < 0.01 && abs($ev['max_amount'] - 9900000) < 0.01, 'the liquidator adds the other contracts to the cap');
-$check($ev['longest_months'] === $portfolio[0]['max_months'] && $ev['max_months'] === $portfolio[0]['max_months'] - 2, 'the liquidator term is the longest contract minus the margin');
+$check($ev['longest_months'] === $portfolio[0]['max_months'] && $ev['max_months'] === min(12, $portfolio[0]['max_months'] - 2), 'the liquidator term is the longest contract minus the margin, capped at 12');
 $simulation = $service->simulation(' 22.233.344 ', 9, 0, 0, 'Libre Destinación', 'mandato_2', $actor);
 $check($simulation['credit']['status'] === 'simulacion' && $simulation['credit']['owner_name'] === 'Segunda Dueña' && abs($simulation['conditions']['amount'] - 9900000) < 0.01 && $simulation['conditions']['term'] === $ev['max_months'], 'an empty simulation uses the pre-approved amount and the maximum term');
 $credits = (int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credits');

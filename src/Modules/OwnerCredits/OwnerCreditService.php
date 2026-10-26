@@ -902,7 +902,10 @@ final class OwnerCreditService
   /** "12 meses de vigencia del contrato más largo − 2 de margen". @param array<string,mixed> $evaluation */
   public static function termBasis(array $evaluation): string
   {
-    return (int) $evaluation['longest_months'] . ' meses de vigencia ' . (($evaluation['other_contracts'] ?? []) !== [] ? 'del contrato más largo' : 'del contrato') . ((int) $evaluation['margin_months'] > 0 ? ' − ' . (int) $evaluation['margin_months'] . ' de margen' : '');
+    $basis = (int) $evaluation['longest_months'] . ' meses de vigencia ' . (($evaluation['other_contracts'] ?? []) !== [] ? 'del contrato más largo' : 'del contrato') . ((int) $evaluation['margin_months'] > 0 ? ' − ' . (int) $evaluation['margin_months'] . ' de margen' : '');
+    // Con vigencia de sobra manda el tope de plazo de política.
+    $cap = (int) ($evaluation['max_term_cap'] ?? 0);
+    return $cap > 0 && (int) $evaluation['longest_months'] - (int) $evaluation['margin_months'] > $cap ? 'tope de política de ' . $cap . ' meses; ' . $basis . ' daría ' . ((int) $evaluation['longest_months'] - (int) $evaluation['margin_months']) : $basis;
   }
 
   /** Fecha del formulario (AAAA-MM-DD) a la medianoche, como se guarda fin_contrato. */

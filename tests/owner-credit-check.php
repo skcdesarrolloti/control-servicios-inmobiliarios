@@ -57,6 +57,10 @@ $pre = OwnerCreditCalculator::preapproval([
   ['net_income' => 800000, 'max_months' => 3], ['net_income' => 400000, 'max_months' => 7], ['net_income' => 2240000, 'max_months' => 12],
 ], $withMargin);
 $assert($pre['longest_months'] === 12 && $pre['max_term'] === 10 && $pre['contracts'] === 3, 'preapproval term = longest contract term − 2 months of margin');
+$long = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 25], ['net_income' => 400000, 'max_months' => 6]], $withMargin);
+$assert($long['max_term'] === 12 && $long['max_term_cap'] === 12, 'a long contract (25 − 2 = 23) is capped at the 12-month policy term');
+$cap18 = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 25]], OwnerCreditSettings::normalize(['max_term_months' => 18] + $withMargin));
+$assert($cap18['max_term'] === 18, 'the policy term cap is configurable');
 $consolidated = OwnerCreditCalculator::evaluate([
   'gross' => 1000000, 'deductions' => ['comision' => 200000], 'requested_amount' => 5000000, 'requested_term' => 10,
   'request_ts' => strtotime('2026-01-01'), 'contract_end_ts' => strtotime('2026-04-15'), 'vacancy' => 'Baja',

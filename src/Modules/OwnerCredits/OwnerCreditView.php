@@ -221,7 +221,7 @@ final class OwnerCreditView
       . ($endChanged ? self::alert('Estás calculando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Se guardará en el contrato al aprobar o rechazar el crédito.', 'info') : '')
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('chart') . 'Política de créditos</h4>' . self::guide('politica', [
         'Valor máximo a prestar' => 'Tope = ingreso neto de todos los contratos del propietario × los meses de política (Configuración, hoy ' . (int) $work['settings']['income_months'] . ').',
-        'Meses máximos' => 'Meses completos que faltan para el fin del contrato con la vigencia más larga del propietario, menos los meses de margen (Configuración).',
+        'Meses máximos' => 'Meses completos que faltan para el fin del contrato con la vigencia más larga del propietario, menos los meses de margen, sin pasar del plazo máximo de un crédito (Configuración, hoy ' . (int) ($work['settings']['max_term_months'] ?? 12) . ').',
         'Tasa ajustada' => 'Tasa de referencia menos el descuento de política.',
         'Cuota de política' => 'La cuota si se prestara el valor máximo al plazo máximo.',
         'Meses / valor que excede' => 'Diferencia entre la política y lo pedido; en rojo cuando lo pedido la supera.',
@@ -391,6 +391,7 @@ final class OwnerCreditView
       . $field('Meses de ingreso neto a prestar', '<input class="' . $ui::INPUT . '" type="number" name="income_months" min="1" max="24" value="' . (int) $settings['income_months'] . '">', 'Tope = ingreso neto × estos meses.')
       . $field('Meses mínimos de contrato restantes', '<input class="' . $ui::INPUT . '" type="number" name="min_remaining_months" min="0" max="60" value="' . (int) $settings['min_remaining_months'] . '">', 'Por debajo se alerta "contrato próximo a vencer".')
       . $field('Meses de margen del preaprobado', '<input class="' . $ui::INPUT . '" type="number" name="preapproval_margin_months" min="0" max="24" value="' . (int) $settings['preapproval_margin_months'] . '">', 'Plazo máximo preaprobado = vigencia más larga de sus contratos − estos meses.')
+      . $field('Plazo máximo de un crédito (meses)', '<input class="' . $ui::INPUT . '" type="number" name="max_term_months" min="1" max="60" value="' . (int) $settings['max_term_months'] . '">', 'Tope de plazo: aunque la vigencia dé para más, ningún crédito pasa de estos meses.')
       . '</div></section>'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . UI::icon('bolt') . 'Avisos</h4><div class="' . $grid . '">'
       . $field('Correo al propietario al decidir', $yesNo('notify_owner_email', (bool) $settings['notify_owner_email']), 'Condiciones y tabla de amortización.')
@@ -421,7 +422,7 @@ final class OwnerCreditView
         'Qué encuentra' => 'Los contratos de arrendamiento donde esa persona es propietaria (en el contrato, en su ficha o en el contrato de mandato, aunque sean varios propietarios).',
         'Contrato principal' => 'No se elige: el sistema toma el contrato de vigencia más larga, que es el que da el plazo máximo, y de él se descuenta primero la cuota. Si hace falta, el analista lo cambia en el liquidador.',
         'Revisión previa' => 'Las políticas que no dependen del valor (contrato activo, vigencia, siniestro, créditos vigentes) revisadas sobre todos sus contratos. Es informativa: la solicitud se puede registrar igual y el analista decide.',
-        'Cupo preaprobado' => 'Suma del ingreso neto (canon − descuentos) de todos sus contratos × los meses de política. Las cuotas máximas salen del contrato con la vigencia más larga, menos el margen de Configuración.',
+        'Cupo preaprobado' => 'Suma del ingreso neto (canon − descuentos) de todos sus contratos × los meses de política. Las cuotas máximas salen del contrato con la vigencia más larga, menos el margen de Configuración, sin pasar del plazo máximo de un crédito.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[minmax(0,1fr)_auto] !sp-gap-3 !sp-items-end">'
       . $field('Cédula o NIT' . $required, '<input class="' . $ui::INPUT . '" name="document" data-owner-credit-search-query inputmode="numeric" placeholder="Ej. 1143415938">')
@@ -482,7 +483,7 @@ final class OwnerCreditView
       . self::guide('cupo', [
         'Cupo preaprobado' => 'Ingreso neto de todos sus contratos Entregado o Por entregar × los meses de política (Configuración).',
         'Saldo de créditos vigentes' => 'Lo que todavía debe de sus créditos aprobados; se resta del cupo.',
-        'Plazo máximo' => 'Vigencia del contrato más largo menos los meses de margen.',
+        'Plazo máximo' => 'Vigencia del contrato más largo menos los meses de margen, sin pasar del plazo máximo de un crédito (Configuración).',
       ])
       . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">'
       . self::tile('Cupo (' . (int) $p['contracts'] . ' contrato' . ((int) $p['contracts'] === 1 ? '' : 's') . ')', self::money((float) $p['amount']), 'key')

@@ -241,10 +241,14 @@
       return "$" + moneyFormat.format(Math.round(Number(value) || 0));
     }
 
-    // Cupo con todos los contratos de la persona: Σ ingreso neto × meses de política; cuotas = vigencia más larga − margen.
+    // Cupo con todos los contratos de la persona: Σ ingreso neto × meses de política; cuotas = vigencia más larga −
+    // margen, sin pasar del plazo máximo de un crédito (tope de política).
     function renderPreapproval(box, p) {
       if (!box || !p || !p.contracts) return;
-      var term = p.max_term > 0
+      var byTerm = p.longest_months - p.margin_months;
+      var term = p.max_term > 0 && p.max_term_cap && byTerm > p.max_term_cap
+        ? "Hasta " + p.max_term + " cuotas (tope de política; la vigencia más larga, " + p.longest_months + " meses − " + p.margin_months + " de margen, daría " + byTerm + ")."
+        : p.max_term > 0
         ? "Hasta " + p.max_term + " cuotas (vigencia más larga " + p.longest_months + " meses − " + p.margin_months + " de margen)."
         : "Sin cuotas disponibles: ningún contrato tiene vigencia suficiente (" + p.longest_months + " meses, margen " + p.margin_months + ").";
       box.innerHTML = '<span class="!sp-block !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Cupo preaprobado máximo</span>' +

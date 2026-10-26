@@ -105,16 +105,18 @@ final class OwnerCreditCalculator
 
   /**
    * Cupo preaprobado del solicitante con todos sus contratos: (suma de ingresos netos) × meses de política. El
-   * plazo máximo es la vigencia más larga entre esos contratos menos los meses de margen configurados.
+   * plazo máximo es la vigencia más larga entre esos contratos menos los meses de margen, sin pasar del tope de
+   * plazo configurado (12 por defecto).
    * @param list<array{net_income:float,max_months:int}> $contracts
    * @param array<string,mixed> $settings OwnerCreditSettings::read()
-   * @return array{contracts:int,net_income:float,income_months:int,amount:float,longest_months:int,margin_months:int,max_term:int}
+   * @return array{contracts:int,net_income:float,income_months:int,amount:float,longest_months:int,margin_months:int,max_term_cap:int,max_term:int}
    */
   public static function preapproval(array $contracts, array $settings): array
   {
     $net = array_sum(array_map(static fn(array $row): float => max(0.0, (float) $row['net_income']), $contracts));
     $longest = $contracts === [] ? 0 : max(0, ...array_map(static fn(array $row): int => (int) $row['max_months'], $contracts));
     $margin = max(0, (int) $settings['preapproval_margin_months']);
+    $cap = self::termCap($settings);
     return [
       'contracts' => count($contracts),
       'net_income' => $net,
@@ -122,8 +124,15 @@ final class OwnerCreditCalculator
       'amount' => $net * (int) $settings['income_months'],
       'longest_months' => $longest,
       'margin_months' => $margin,
-      'max_term' => max(0, $longest - $margin),
+      'max_term_cap' => $cap,
+      'max_term' => min($cap, max(0, $longest - $margin)),
     ];
+  }
+
+  /** Tope de plazo de política: ningún crédito pasa de estos meses aunque la vigencia dé para más. */
+  public static function termCap(array $settings): int
+  {
+    return max(1, (int) ($settings['max_term_months'] ?? 12));
   }
 
   /**
@@ -144,7 +153,8 @@ final class OwnerCreditCalculator
     $contractMonths = max(0, self::monthsUntil((int) $input['request_ts'], (int) $input['contract_end_ts']));
     $longestMonths = max($contractMonths, (int) ($input['longest_months'] ?? 0));
     $margin = max(0, (int) $settings['preapproval_margin_months']);
-    $maxMonths = max(0, $longestMonths - $margin);
+    $termCap = self::termCap($settings);
+    $maxMonths = min($termCap, max(0, $longestMonths - $margin));
     $otherNet = max(0.0, (float) ($input['other_net_income'] ?? 0));
     $maxAmount = ($net + $otherNet) * (int) $settings['income_months'];
     $exceedMonths = $maxMonths - $requestedTerm;
@@ -176,6 +186,7 @@ final class OwnerCreditCalculator
       'contract_months' => $contractMonths,
       'longest_months' => $longestMonths,
       'margin_months' => $margin,
+      'max_term_cap' => $termCap,
       'max_months' => $maxMonths,
       'max_amount' => $maxAmount,
       'policy_payment' => self::payment($policyRate, $maxMonths, $maxAmount),
