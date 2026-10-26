@@ -97,7 +97,9 @@ final class OwnerCreditPdf
       ? ['Estado' => 'Simulación', 'Observación' => 'Simulación generada desde la solicitud de crédito: no es una aprobación. Las condiciones son las de la política al momento de generarla y quedan sujetas a la evaluación del analista.', 'Términos' => OwnerCreditService::DISCLAIMER]
       : ($decided
       ? ['Estado' => OwnerCreditService::STATUSES[$credit['status']] ?? (string) $credit['status'], 'Decidido por' => (string) $credit['decided_by_name'], 'Fecha de decisión' => $date((int) $credit['decided_at']),
-        'Fuera de política' => (int) $credit['policy_override'] === 1 ? 'Sí' : 'No', 'Observación / justificación' => trim((string) $credit['decision_note'])]
+        'Fuera de política' => (int) $credit['policy_override'] === 1 ? 'Sí' : 'No',
+        'Cambios frente al sistema' => ($work['adjustments'] ?? []) === [] ? 'Ninguno' : implode(' · ', array_map(static fn(array $item): string => $item['label'] . ': ' . $item['detail'], $work['adjustments'])),
+        'Observación / justificación' => trim((string) $credit['decision_note'])]
       : ['Estado' => 'Pendiente de evaluación', 'Observación' => 'Documento de trabajo: las condiciones son las propuestas en el liquidador al momento de generarlo.']);
 
     $html = '<article class="scm-acta-receipt scm-services-document scm-owner-credit-document">' . $letterhead . Doc::header(self::title($work), false)

@@ -481,6 +481,9 @@ final class OwnerCreditService
       'owners' => $credit['status'] === 'pendiente' ? $this->ownerChoices($credit) : [],
       'policies' => $policies,
       'policies_ok' => !in_array(false, array_column($policies, 'ok'), true),
+      // Decidido: lo que quedó guardado con la decisión; pendiente: se recalcula con lo que está editando.
+      'adjustments' => $pending ? $this->adjustments($evaluation, $defaults, $policies, ['amount' => $amount, 'term' => $term, 'rate' => $rate], $storedEndTs, $endTs)
+        : array_values((array) (json_decode((string) ($credit['evaluation_json'] ?? ''), true)['adjustments'] ?? [])),
       'other_credits' => $this->ownerCredits($credit),
       'events' => $id > 0 ? $this->events($id) : [],
     ];
@@ -515,6 +518,8 @@ final class OwnerCreditService
       if ($decision === 'aprobado') {
         if ($conditions['amount'] <= 0 || $conditions['term'] <= 0) throw new \DomainException('Indica el valor y el plazo a aprobar.');
         if (!$work['policies_ok'] && mb_strlen($note) < self::MIN_NOTE) throw new \DomainException('La solicitud incumple políticas: escribe la justificación de la aprobación (mínimo ' . self::MIN_NOTE . ' caracteres).');
+        $justify = array_values(array_filter($work['adjustments'], static fn(array $item): bool => $item['note'] && $item['key'] !== 'politicas'));
+        if ($justify !== [] && mb_strlen($note) < self::MIN_NOTE) throw new \DomainException('Cambiaste datos o condiciones frente a lo que propone el sistema (' . implode(', ', array_column($justify, 'label')) . '): escribe la justificación de la aprobación (mínimo ' . self::MIN_NOTE . ' caracteres).');
       }
       $now = time();
       $data = [
@@ -529,7 +534,7 @@ final class OwnerCreditService
         'max_amount' => $evaluation['max_amount'],
         'max_months' => $evaluation['max_months'],
         'policy_json' => json_encode($work['policies'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
-        'evaluation_json' => json_encode($evaluation + ['settings' => $work['settings']], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+        'evaluation_json' => json_encode($evaluation + ['settings' => $work['settings'], 'adjustments' => $work['adjustments']], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
         'policy_override' => $decision === 'aprobado' && !$work['policies_ok'] ? 1 : 0,
         'decision_note' => $note,
         'decided_by_id' => (string) ($actor['employee_id'] ?? ''),
@@ -546,7 +551,7 @@ final class OwnerCreditService
       }
       $this->db->update($this->table(), $this->schema->filterTableData($this->table(), $data), ['id' => $id]);
       if ($decision === 'aprobado') $this->saveSources($id, (int) $locked['contract_id'], $work['sources']);
-      $this->event($id, $decision, $actor, ['nota' => $note, 'condiciones' => $decision === 'aprobado' ? $conditions : null, 'incumple' => array_values(array_map(static fn(array $p): string => $p['label'], array_filter($work['policies'], static fn(array $p): bool => !$p['ok'])))]);
+      $this->event($id, $decision, $actor, ['nota' => $note, 'condiciones' => $decision === 'aprobado' ? $conditions : null, 'incumple' => array_values(array_map(static fn(array $p): string => $p['label'], array_filter($work['policies'], static fn(array $p): bool => !$p['ok']))), 'ajustes' => array_map(static fn(array $item): string => $item['label'] . ': ' . $item['detail'], $work['adjustments'])]);
       $pdo->commit();
     } catch (\Throwable $error) {
       if ($pdo->inTransaction()) $pdo->rollBack();
@@ -744,6 +749,41 @@ final class OwnerCreditService
     $updated = $this->find($id) ?? $credit;
     $this->recordHistories($updated, 'Cambio de contrato principal del crédito', 'Crédito #' . $id . ': contrato principal cambiado de ' . $change . '; la cuota se descontará primero de este contrato.', $actor);
     return $updated;
+  }
+
+  /**
+   * Lo que el analista cambió frente a lo que propone el sistema (o lo que incumple), para guardarlo con la decisión.
+   * "note" marca lo que exige justificación al aprobar: políticas, ingreso, siniestro, créditos, probabilidad y tasa.
+   * Un valor o plazo distinto del sugerido solo se registra.
+   * @param array<string,mixed> $evaluation @param array<string,mixed> $defaults defaultIncome()
+   * @param list<array<string,mixed>> $policies @param array{amount:float,term:int,rate:float} $conditions
+   * @return list<array{key:string,label:string,detail:string,note:bool}>
+   */
+  private function adjustments(array $evaluation, array $defaults, array $policies, array $conditions, int $storedEndTs, int $endTs): array
+  {
+    $money = static fn(float $value): string => '$' . number_format($value, 0, ',', '.');
+    $percent = static fn(float $value): string => number_format($value * 100, 2, ',', '.') . ' %';
+    $yes = static fn(bool $value): string => $value ? 'Sí' : 'No';
+    $items = [];
+    $failed = array_values(array_filter($policies, static fn(array $policy): bool => !$policy['ok']));
+    if ($failed !== []) $items[] = ['key' => 'politicas', 'label' => 'Políticas incumplidas', 'detail' => implode(', ', array_column($failed, 'label')), 'note' => true];
+    if (abs((float) $evaluation['gross'] - (float) $defaults['gross']) >= 1) $items[] = ['key' => 'canon', 'label' => 'Canon', 'detail' => $money((float) $defaults['gross']) . ' → ' . $money((float) $evaluation['gross']), 'note' => true];
+    foreach (self::DEDUCTIONS as $key => $label) {
+      $from = (float) ($defaults['deductions'][$key] ?? 0);
+      $to = (float) ($evaluation['deductions'][$key] ?? 0);
+      if (abs($to - $from) >= 1) $items[] = ['key' => 'ded_' . $key, 'label' => $label, 'detail' => $money($from) . ' → ' . $money($to), 'note' => true];
+    }
+    $analyst = $evaluation['analyst'] ?? [];
+    $overrides = (array) ($analyst['overrides'] ?? []);
+    if (in_array('siniestro', $overrides, true)) $items[] = ['key' => 'siniestro', 'label' => 'Siniestro', 'detail' => 'sistema ' . $yes(!$analyst['siniestro']) . ' → analista ' . $yes((bool) $analyst['siniestro']), 'note' => true];
+    if (in_array('has_credits', $overrides, true)) $items[] = ['key' => 'has_credits', 'label' => 'Créditos vigentes', 'detail' => 'sistema ' . $yes(!$analyst['has_credits']) . ' → analista ' . $yes((bool) $analyst['has_credits']), 'note' => true];
+    if (in_array('vacancy', $overrides, true)) $items[] = ['key' => 'vacancy', 'label' => 'Probabilidad de desocupación', 'detail' => 'sistema ' . $evaluation['vacancy_signal']['level'] . ' → analista ' . $evaluation['vacancy'], 'note' => true];
+    $suggested = $evaluation['suggested'];
+    if (abs((float) $conditions['rate'] - (float) $suggested['rate']) > 1e-7) $items[] = ['key' => 'tasa', 'label' => 'Tasa', 'detail' => 'sugerida ' . $percent((float) $suggested['rate']) . ' → ' . $percent((float) $conditions['rate']) . ' mensual', 'note' => true];
+    if (abs((float) $conditions['amount'] - (float) $suggested['amount']) >= 1) $items[] = ['key' => 'valor', 'label' => 'Valor', 'detail' => 'sugerido ' . $money((float) $suggested['amount']) . ' → ' . $money((float) $conditions['amount']), 'note' => false];
+    if ((int) $conditions['term'] !== (int) $suggested['term']) $items[] = ['key' => 'plazo', 'label' => 'Plazo', 'detail' => 'sugerido ' . (int) $suggested['term'] . ' → ' . (int) $conditions['term'] . ' meses', 'note' => false];
+    if ($endTs !== $storedEndTs) $items[] = ['key' => 'fecha_fin', 'label' => 'Fecha fin del contrato', 'detail' => ($storedEndTs > 0 ? date('d/m/Y', $storedEndTs) : 'sin fecha') . ' → ' . ($endTs > 0 ? date('d/m/Y', $endTs) : 'sin fecha'), 'note' => false];
+    return $items;
   }
 
   /**

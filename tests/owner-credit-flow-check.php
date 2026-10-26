@@ -257,6 +257,26 @@ $settled = $service->workspace((int) $chosen['id']);
 $check($settled['credit']['status'] === 'pagado' && str_contains((string) $settled['credit']['decision_note'], 'Pagado automáticamente') && $settled['events'][0]['actor_name'] === 'Sistema', 'a credit whose last instalment is past is marked as paid automatically');
 $check($service->settleFinished() === 0, 'an automatically paid credit is not closed twice');
 
+// Cambios frente al sistema: se ven en vivo, exigen justificación al aprobar y quedan guardados con la decisión.
+$adjusted = (int) $service->createManual(9, 500000, 6, 'Libre Destinación', $actor, '', 'mandato_2');
+$edits = ['requested_term' => '6', 'gross' => '$1.600.000', 'amount' => '$500.000', 'term' => '6', 'rate' => '1,5', 'vacancy' => 'Baja', 'siniestro' => 'no', 'has_credits' => 'no'];
+$live = $service->workspace($adjusted, $edits);
+$keys = array_column($live['adjustments'], 'note', 'key');
+$check(isset($keys['canon'], $keys['tasa']) && $keys['canon'] && $keys['tasa'] && !isset($keys['valor']), 'the liquidator lists the changes against the system while editing');
+try {
+  $service->decide($adjusted, 'aprobado', $edits + ['note' => ''], $actor);
+  $check(false, 'approving with changes against the system needs a justification');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'Canon') && str_contains($error->getMessage(), 'Tasa'), 'approving with changes against the system needs a justification');
+}
+$service->decide($adjusted, 'aprobado', $edits + ['note' => 'Canon actualizado con la carta de aumento; tasa preferencial autorizada.'], $actor);
+$stored = json_decode((string) $service->find($adjusted)['evaluation_json'], true)['adjustments'];
+$event = $db->getRow("SELECT details_json FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'aprobado'", [$adjusted]);
+$check(in_array('canon', array_column($stored, 'key'), true) && str_contains((string) $event['details_json'], 'Canon: $1.500.000 → $1.600.000'), 'the approved changes are saved with the decision and in its event');
+$decidedWork = $service->workspace($adjusted);
+$check(array_column($decidedWork['adjustments'], 'key') === array_column($stored, 'key') && str_contains((new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($decidedWork, true, true), 'Cambios aprobados frente al sistema') && str_contains(\SCM\Modules\OwnerCredits\OwnerCreditPdf::html($decidedWork, 'QA'), 'Canon: $1.500.000 → $1.600.000'), 'a decided credit shows the saved changes in the liquidator and the PDF');
+$service->changeStatus($adjusted, 'anulado', 'Crédito de prueba de cambios frente al sistema.', $actor);
+
 // Cupo preaprobado en el liquidador y cambio de beneficiario mientras está pendiente.
 $pending = $service->workspace($service->createManual(9, 12000000, 6, 'Libre Destinación', $actor, '', 'mandato_2'));
 $p = $pending['preapproval'];

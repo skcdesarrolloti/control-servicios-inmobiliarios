@@ -197,7 +197,7 @@ final class OwnerCreditView
 
       . '<div data-owner-credit-schedule>' . $this->schedule($work) . '</div>'
       . $this->history($work)
-      . $this->actions($credit, $canDecide, $canManage)
+      . $this->actions($credit, $canDecide, $canManage, $work['adjustments'] ?? [])
       . '</form>';
   }
 
@@ -249,6 +249,7 @@ final class OwnerCreditView
       . self::tile('Valor a colocar', self::money($s['amount'])) . self::tile('Cuota mensual', self::money($s['payment']), 'key')
       . '</div>' . (!empty($s['rate_capped']) ? '<p class="' . self::NOTE . ' !sp-mt-2">La tasa de esta condición superaba la usura; se sugiere la usura mes vencido (' . self::percent($ev['usury_monthly_legal']) . ').</p>' : '') . '</section>'
       . self::discountPlan($work)
+      . ($work['credit']['status'] === 'pendiente' ? self::adjustments($work['adjustments'] ?? [], true) : '')
       . '<section class="' . self::SECTION . '"><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Políticas</h4>'
       . ($work['policies_ok'] ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Cumple todas</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-red-700">Incumple políticas</span>') . '</div>'
       . self::guide('politicas', [
@@ -319,11 +320,13 @@ final class OwnerCreditView
     foreach ($work['other_credits'] as $row) {
       $others .= '<li class="' . $item . ' !sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2"><b>#' . (int) $row['id'] . '</b> Contrato ' . self::e($row['contract_code']) . ' ' . self::status((string) $row['status']) . ' <span class="!sp-text-service-muted">' . self::money((float) ($row['approved_amount'] ?? 0) ?: (float) $row['requested_amount']) . ' · ' . date('d/m/Y', (int) $row['created_at']) . '</span></li>';
     }
-    $labels = ['solicitado' => 'Solicitud registrada', 'reabierto' => 'Solicitud reabierta', 'aprobado' => 'Aprobado', 'rechazado' => 'Rechazado', 'pagado' => 'Marcado como pagado', 'anulado' => 'Anulado', 'fecha_fin' => 'Fecha fin del contrato corregida'];
+    $labels = ['solicitado' => 'Solicitud registrada', 'reabierto' => 'Solicitud reabierta', 'aprobado' => 'Aprobado', 'rechazado' => 'Rechazado', 'pagado' => 'Marcado como pagado', 'anulado' => 'Anulado', 'fecha_fin' => 'Fecha fin del contrato corregida', 'beneficiario' => 'Beneficiario cambiado', 'contrato_principal' => 'Contrato principal cambiado'];
     $events = '';
     foreach ($work['events'] as $event) {
       $detail = trim((string) ($event['details']['nota'] ?? $event['details']['motivo'] ?? ''));
-      $events .= '<li class="' . $item . '"><b>' . self::e($labels[$event['action']] ?? $event['action']) . '</b> <span class="!sp-text-service-muted">· ' . date('d/m/Y g:i a', (int) $event['created_at']) . ($event['actor_name'] !== '' ? ' · ' . self::e($event['actor_name']) : '') . '</span>' . ($detail !== '' ? '<span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e($detail) . '</span>' : '') . '</li>';
+      $changes = array_values(array_filter((array) ($event['details']['ajustes'] ?? []), 'is_string'));
+      $events .= '<li class="' . $item . '"><b>' . self::e($labels[$event['action']] ?? $event['action']) . '</b> <span class="!sp-text-service-muted">· ' . date('d/m/Y g:i a', (int) $event['created_at']) . ($event['actor_name'] !== '' ? ' · ' . self::e($event['actor_name']) : '') . '</span>' . ($detail !== '' ? '<span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e($detail) . '</span>' : '')
+        . ($changes !== [] ? '<span class="!sp-block !sp-text-[10px] !sp-text-service-muted">Cambios frente al sistema: ' . self::e(implode(' · ', $changes)) . '</span>' : '') . '</li>';
     }
     return '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-2 !sp-gap-5">'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . UI::icon('user') . 'Otros créditos del propietario</h4>' . ($others !== '' ? '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $others . '</ul>' : '<p class="' . self::NOTE . '">Sin otros créditos registrados.</p>') . '</section>'
@@ -332,7 +335,8 @@ final class OwnerCreditView
   }
 
   /** @param array<string,mixed> $credit */
-  private function actions(array $credit, bool $canDecide, bool $canManage): string
+  /** @param list<array<string,mixed>> $adjustments */
+  private function actions(array $credit, bool $canDecide, bool $canManage, array $adjustments = []): string
   {
     $ui = UI::class;
     $status = (string) $credit['status'];
@@ -351,13 +355,28 @@ final class OwnerCreditView
     $note = (string) ($credit['decision_note'] ?? '');
     $decision = $status !== 'pendiente'
       ? '<div class="!sp-rounded-lg !sp-bg-slate-50 !sp-p-3 !sp-mb-3 !sp-text-[11px]"><b>Decisión:</b> ' . self::status($status) . ((string) $credit['decided_by_name'] !== '' ? ' por ' . self::e($credit['decided_by_name']) : '') . ((int) $credit['decided_at'] > 0 ? ' el ' . date('d/m/Y', (int) $credit['decided_at']) : '') . ($note !== '' ? '<p class="' . self::NOTE . ' !sp-mt-1.5">' . nl2br(self::e($note)) . '</p>' : '') . '</div>'
+      . self::adjustments($adjustments, false)
       : '';
     if ($buttons === '') return $decision !== '' ? '<section class="' . self::SECTION . '">' . $decision . '</section>' : '';
     return '<section class="' . self::SECTION . '">' . $decision
       . '<label class="!sp-block"><span class="' . $ui::LABEL . '">' . ($status === 'pendiente' ? 'Observación / justificación' : 'Observación') . '</span>'
-      . '<textarea class="' . $ui::INPUT . ' !sp-h-20 !sp-py-2 !sp-resize-y" name="note" rows="3" maxlength="2000" placeholder="Obligatoria para rechazar, para aprobar fuera de política, para marcar pagado o anular."></textarea></label>'
+      . '<textarea class="' . $ui::INPUT . ' !sp-h-20 !sp-py-2 !sp-resize-y" name="note" rows="3" maxlength="2000" placeholder="Obligatoria para rechazar, para aprobar fuera de política o con cambios frente al sistema, para marcar pagado o anular."></textarea></label>'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-end !sp-gap-3 !sp-mt-4" data-owner-credit-actions>' . $buttons . '</div>'
       . '<p class="!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-text-right" data-owner-credit-status role="status" aria-live="polite"></p></section>';
+  }
+
+  /**
+   * Cambios frente a lo que propone el sistema: en vivo mientras está pendiente y, decidido, los que quedaron guardados.
+   * @param list<array<string,mixed>> $items
+   */
+  private static function adjustments(array $items, bool $live): string
+  {
+    if ($items === []) return $live ? '<section class="' . self::SECTION . '" data-owner-credit-adjustments><h4 class="' . self::H4 . '">' . self::icon('edit') . 'Cambios frente al sistema</h4><p class="' . self::NOTE . '">Sin cambios: apruebas lo que propone el sistema.</p></section>' : '';
+    $rows = implode('', array_map(static fn(array $item): string => '<li class="!sp-flex !sp-gap-2 !sp-justify-between !sp-py-1.5 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0 !sp-text-[11px]"><span><b class="!sp-text-service-navy">' . self::e($item['label']) . ':</b> ' . self::e($item['detail']) . '</span>'
+      . ($live && $item['note'] ? '<span class="!sp-whitespace-nowrap !sp-text-[10px] !sp-font-semibold !sp-text-amber-800">Requiere justificación</span>' : '') . '</li>', $items));
+    return '<section class="' . self::SECTION . '" data-owner-credit-adjustments><h4 class="' . self::H4 . '">' . self::icon('edit') . ($live ? 'Cambios frente al sistema' : 'Cambios aprobados frente al sistema') . '</h4>'
+      . ($live ? self::guide('cambios', ['Qué es' => 'Lo que cambiaste frente a lo que calcula o propone el sistema. Queda guardado con la decisión, con tu nombre y la justificación. Cambiar canon, descuentos, siniestro, créditos vigentes, probabilidad de desocupación o la tasa exige justificación; un valor o plazo distinto del sugerido solo se registra.']) : '')
+      . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $rows . '</ul></section>';
   }
 
   /** @param array<string,mixed> $settings */
