@@ -41,6 +41,7 @@ trait PanelTicketCreationConcern
       'propietario' => ['propietario', 'id_propietario', 'documento_propietario'],
       'arrendatario' => ['arrendatario', 'id_arrendatario', 'documento_arrendatario'],
     ];
+    if ($by === 'documento') return $this->searchPanelContractsByDocument($query);
     if (!isset($columnsByType[$by]) || mb_strlen(trim($query)) < 2 || mb_strlen($query) > 100) {
       throw new \InvalidArgumentException('Selecciona el tipo de búsqueda y escribe entre 2 y 100 caracteres.');
     }
@@ -72,6 +73,60 @@ trait PanelTicketCreationConcern
           foreach ($documents as $_document) $args[] = '%' . $this->db->escapeLike(trim($query)) . '%';
         }
       }
+    }
+    if ($where === []) return [];
+    $select = ['_ID'];
+    foreach (['contrato', 'inmueble', 'direccion', 'propietario', 'arrendatario', 'estado', 'fin_contrato'] as $column) {
+      if ($this->schema->columnExists($table, $column)) $select[] = $column;
+    }
+    return $this->db->getResults('SELECT `' . implode('`, `', $select) . "` FROM `{$table}` WHERE (" . implode(' OR ', $where) . ') ORDER BY `_ID` DESC LIMIT 30', $args);
+  }
+
+  /**
+   * Contratos donde el documento (cédula o NIT, sin puntos ni espacios) es del propietario, arrendatario o
+   * codeudores del contrato, de sus fichas de propietario/arrendatario o de uno de los propietarios del mandato.
+   * @return list<array<string,mixed>>
+   */
+  private function searchPanelContractsByDocument(string $query): array
+  {
+    $document = preg_replace('/[\s.]+/', '', trim($query)) ?? '';
+    if (preg_match('/^[0-9A-Za-z-]{4,20}$/', $document) !== 1) {
+      throw new \InvalidArgumentException('Escribe el documento o NIT (mínimo 4 caracteres, sin letras extrañas).');
+    }
+    $like = '%' . $this->db->escapeLike($document) . '%';
+    $clean = static fn(string $column): string => "REPLACE(REPLACE({$column}, '.', ''), ' ', '') LIKE ?";
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    $where = [];
+    $args = [];
+    foreach (['documento_propietario', 'documento_arrendatario', 'documento_codeudor_1', 'documento_codeudor_2', 'documento_codeudor_3', 'documento_codeudor_4'] as $column) {
+      if ($this->schema->columnExists($table, $column)) {
+        $where[] = $clean("`{$column}`");
+        $args[] = $like;
+      }
+    }
+    // Primero los ids que coinciden en fichas y mandatos (una consulta por tabla), luego los contratos que los usan.
+    $matchingIds = function (string $source, array $documentColumns, array $idColumns) use ($clean, $like): array {
+      $documentColumns = array_values(array_filter($documentColumns, fn(string $column): bool => $this->schema->columnExists($source, $column)));
+      $idColumns = array_values(array_filter($idColumns, fn(string $column): bool => $this->schema->columnExists($source, $column)));
+      if ($documentColumns === [] || $idColumns === []) return [];
+      $rows = $this->db->getResults('SELECT `' . implode('`, `', $idColumns) . "` FROM `{$source}` WHERE " . implode(' OR ', array_map(static fn(string $column): string => $clean("`{$column}`"), $documentColumns)) . ' LIMIT 200', array_fill(0, count($documentColumns), $like));
+      $ids = [];
+      foreach ($rows as $row) foreach ($idColumns as $column) if (trim((string) ($row[$column] ?? '')) !== '') $ids[trim((string) $row[$column])] = true;
+      return array_keys($ids);
+    };
+    $mandateColumns = [];
+    for ($i = 1; $i <= 6; $i++) array_push($mandateColumns, 'documento_' . $i, 'nit_' . $i);
+    $links = [
+      'id_propietario' => [$this->db->table('jet_cct_propietarios'), ['documento', 'documento_juridico'], ['_ID', 'id_propietario']],
+      'id_arrendatario' => [$this->db->table('jet_cct_arrendatarios'), ['documento', 'documento_juridico'], ['_ID', 'id_arrendatario']],
+      'id_contrato_mandato' => [$this->db->table('jet_cct_contrato_mandato'), $mandateColumns, ['_ID']],
+    ];
+    foreach ($links as $column => [$source, $documentColumns, $idColumns]) {
+      if (!$this->schema->columnExists($table, $column) || !$this->schema->tableExists($source)) continue;
+      $ids = $matchingIds($source, $documentColumns, $idColumns);
+      if ($ids === []) continue;
+      $where[] = "`{$column}` IN (" . implode(',', array_fill(0, count($ids), '?')) . ')';
+      array_push($args, ...array_map('strval', $ids));
     }
     if ($where === []) return [];
     $select = ['_ID'];

@@ -83,16 +83,22 @@ $check($work['evaluation']['gross'] === 1075000.0 && abs($work['evaluation']['de
 $check($work['evaluation']['max_months'] >= 13 && $work['policies_ok'], 'a healthy contract passes every policy with the suggested conditions');
 
 try {
-  $service->decide((int) $credit['id'], 'aprobado', ['requested_term' => '12', 'amount' => '$5.000.000', 'term' => '12', 'rate' => '2,3'], $actor);
+  $service->decide((int) $credit['id'], 'aprobado', ['requested_term' => '12', 'amount' => '$5.000.000', 'term' => '12', 'rate' => '2,1'], $actor);
   $check(false, 'approving above the cap without justification must fail');
 } catch (DomainException $error) {
   $check(str_contains($error->getMessage(), 'justificación'), 'approving outside policy requires a justification');
 }
-$result = $service->decide((int) $credit['id'], 'aprobado', ['requested_term' => '12', 'amount' => '$3.000.000', 'term' => '12', 'rate' => '2,3', 'note' => 'Propietario con 10 años sin mora, se aprueba excepción.'], $actor);
+try {
+  $service->decide((int) $credit['id'], 'aprobado', ['requested_term' => '12', 'amount' => '$3.000.000', 'term' => '12', 'rate' => '2,3', 'note' => 'Propietario con 10 años sin mora, se aprueba excepción.'], $actor);
+  $check(false, 'approving above the usury must fail even with justification');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'usura'), 'approving above the usury fails even with justification');
+}
+$result = $service->decide((int) $credit['id'], 'aprobado', ['requested_term' => '12', 'amount' => '$3.000.000', 'term' => '12', 'rate' => '2,1', 'note' => 'Propietario con 10 años sin mora, se aprueba excepción.'], $actor);
 $approved = $result['credit'];
 $check(array_key_exists('internal_whatsapp', $result['queued']), 'staff WhatsApp is attempted on decisions without breaking them when no staff is configured');
 $check($approved['status'] === 'aprobado' && (int) $approved['policy_override'] === 1 && (float) $approved['approved_amount'] === 3000000.0 && (int) $approved['approved_term'] === 12, 'approved outside policy with conditions and override flag');
-$check(abs((float) $approved['monthly_payment'] - 288931.18) < 1 && abs((float) $approved['approved_rate'] - 0.023) < 1e-9, 'monthly payment is recalculated on the server');
+$check(abs((float) $approved['monthly_payment'] - 285423.85) < 1 && abs((float) $approved['approved_rate'] - 0.021) < 1e-9, 'monthly payment is recalculated on the server');
 $check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_ticket WHERE id_ticket = ?', ['10821'])) === 2, 'request and decision are written to the case history');
 $contractHistory = $db->getResults('SELECT * FROM wp_jet_cct_historial_contrato_arrendamiento WHERE id_contrato = ?', ['7']);
 $check(count($contractHistory) === 2 && $contractHistory[0]['tipo_reporte'] === 'Solicitud de crédito' && str_contains($contractHistory[0]['observacion'], 'solicitado por el propietario Ana Dueña: $893.723 para la cotización #574') && $contractHistory[1]['tipo_reporte'] === 'Crédito aprobado' && str_contains($contractHistory[1]['observacion'], 'fuera de política'), 'request and decision are written to the contract history');

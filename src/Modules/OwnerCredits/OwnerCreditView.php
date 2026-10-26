@@ -172,7 +172,7 @@ final class OwnerCreditView
         'Qué son' => 'Las condiciones que realmente se aprueban. Arrancan con la condición sugerida y las puedes ajustar.',
         'Valor a colocar' => 'El dinero que se presta.',
         'Plazo' => 'Número de cuotas mensuales.',
-        'Tasa N.M.V' => 'Tasa nominal mes vencido: el interés de cada mes sobre el saldo. Debe quedar por debajo de la usura (Configuración).',
+        'Tasa N.M.V' => 'Tasa nominal mes vencido: el interés de cada mes sobre el saldo. No se puede aprobar por encima de la usura (Configuración).',
         'Cuota' => 'Fija, calculada como la función PAGO de Excel; se descuenta de los giros del canon.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-4">'
@@ -231,7 +231,7 @@ final class OwnerCreditView
       . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3" data-owner-credit-suggested data-amount="' . round((float) $s['amount']) . '" data-term="' . (int) $s['term'] . '" data-rate="' . self::e(number_format($s['rate'] * 100, 4, ',', '')) . '">'
       . self::tile('Plazo', $s['term'] . ' meses') . self::tile('Tasa', self::percent($s['rate']))
       . self::tile('Valor a colocar', self::money($s['amount'])) . self::tile('Cuota mensual', self::money($s['payment']), 'key')
-      . '</div></section>'
+      . '</div>' . (!empty($s['rate_capped']) ? '<p class="' . self::NOTE . ' !sp-mt-2">La tasa de esta condición superaba la usura; se sugiere la usura mes vencido (' . self::percent($ev['usury_monthly_legal']) . ').</p>' : '') . '</section>'
       . '<section class="' . self::SECTION . '"><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Políticas</h4>'
       . ($work['policies_ok'] ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Cumple todas</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-red-700">Incumple políticas</span>') . '</div>'
       . self::guide('politicas', [
@@ -373,11 +373,11 @@ final class OwnerCreditView
       . self::beneficiaryTypes(array_keys(OwnerCreditService::BENEFICIARY_TYPES), 'propietario') . '</section>'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . $step('2') . 'Busca el contrato</h4>'
       . self::guide('nuevo-contrato', [
-        'Por qué un contrato' => 'El crédito siempre queda ligado a un contrato de arrendamiento, porque las cuotas se descuentan de su canon. Busca por número de contrato, inmueble SIMI, propietario o arrendatario.',
+        'Por qué un contrato' => 'El crédito siempre queda ligado a un contrato de arrendamiento, porque las cuotas se descuentan de su canon. Busca por documento (cédula o NIT del propietario, arrendatario, codeudor o de los propietarios del mandato), número de contrato, inmueble SIMI, propietario o arrendatario.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[180px_minmax(0,1fr)_auto] !sp-gap-3 !sp-items-end">'
-      . $field('Buscar por', '<select class="' . $ui::INPUT . '" data-owner-credit-search-by><option value="contrato">Contrato</option><option value="inmueble">Inmueble SIMI</option><option value="propietario">Propietario</option><option value="arrendatario">Arrendatario</option></select>')
-      . $field('Dato a buscar', '<input class="' . $ui::INPUT . '" data-owner-credit-search-query placeholder="Ej. 817, 10420 o nombre">')
+      . $field('Buscar por', '<select class="' . $ui::INPUT . '" data-owner-credit-search-by><option value="documento" selected>Documento (cédula o NIT)</option><option value="contrato">Contrato</option><option value="inmueble">Inmueble SIMI</option><option value="propietario">Propietario</option><option value="arrendatario">Arrendatario</option></select>')
+      . $field('Dato a buscar', '<input class="' . $ui::INPUT . '" data-owner-credit-search-query placeholder="Ej. 1047455289, 817 o nombre">')
       . '<button type="button" class="' . $ui::NAVY . ' !sp-h-10 !sp-text-xs !sp-px-4" data-owner-credit-search>' . $ui::icon('filter', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Buscar</button></div>'
       . '<p class="' . self::NOTE . ' !sp-mt-3" data-owner-credit-search-status></p><div class="!sp-grid !sp-gap-2 !sp-max-h-72 !sp-overflow-y-auto !sp-mt-2" data-owner-credit-search-results></div>'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2 !sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-service-yellow !sp-bg-amber-50/40 !sp-text-xs" data-owner-credit-picked hidden></div></section>'

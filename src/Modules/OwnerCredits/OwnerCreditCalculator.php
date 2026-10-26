@@ -14,6 +14,7 @@ namespace SCM\Modules\OwnerCredits;
  *   como en el Excel; el control legal compara contra la usura efectiva anual llevada a mes vencido.
  * - Condición sugerida por probabilidad de desocupación: Alta = 3 meses, tasa de riesgo, monto máximo;
  *   Media = plazo máximo, tasa de referencia, monto máximo; Baja = plazo y valor solicitados con la tasa de política.
+ *   La tasa sugerida nunca supera la usura legal mes vencido: si la de la condición es mayor, se sugiere la usura.
  */
 final class OwnerCreditCalculator
 {
@@ -87,6 +88,10 @@ final class OwnerCreditCalculator
       'Media' => ['term' => $maxMonths, 'rate' => (float) $settings['reference_rate'], 'amount' => $maxAmount],
       default => ['term' => $requestedTerm, 'rate' => $policyRate, 'amount' => $requested],
     };
+    // Tope legal: la usura es efectiva anual; su equivalente mes vencido es (1 + E.A.)^(1/12) − 1.
+    $usuryLegal = (1 + (float) $settings['usury_annual']) ** (1 / 12) - 1;
+    $suggested['rate_capped'] = $suggested['rate'] > $usuryLegal;
+    $suggested['rate'] = min($suggested['rate'], $usuryLegal);
     $suggested['payment'] = self::payment($suggested['rate'], $suggested['term'], $suggested['amount']);
 
     return [
@@ -95,8 +100,7 @@ final class OwnerCreditCalculator
       'deductions_total' => array_sum($deductions),
       'net_income' => $net,
       'usury_monthly' => $usuryMonthly,
-      // Tope legal: la usura es efectiva anual; su equivalente mes vencido es (1 + E.A.)^(1/12) − 1.
-      'usury_monthly_legal' => (1 + (float) $settings['usury_annual']) ** (1 / 12) - 1,
+      'usury_monthly_legal' => $usuryLegal,
       'policy_rate' => $policyRate,
       'max_months' => $maxMonths,
       'max_amount' => $maxAmount,

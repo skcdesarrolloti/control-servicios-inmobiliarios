@@ -62,6 +62,13 @@ $assert($usury !== null && $near($usury['usury_annual'], 0.2859, 1e-9) && $usury
 $assert(OwnerCreditUsuryRate::fromRows([], '2026-10-22') === null, 'no rows keeps the stored rate');
 $legal = OwnerCreditCalculator::evaluate(['gross' => 1, 'deductions' => [], 'requested_amount' => 1, 'requested_term' => 1, 'request_ts' => time(), 'contract_end_ts' => time(), 'vacancy' => 'Baja'], ['usury_annual' => 0.2859] + $settings);
 $assert($near($legal['usury_monthly_legal'], 0.021176, 1e-6), 'legal monthly usury = (1 + E.A.)^(1/12) − 1');
+// Política 2,42 % × 0,95 = 2,299 % supera la usura 28,59 % E.A. (2,1176 % mensual): se sugiere la usura.
+$capped = OwnerCreditCalculator::evaluate(['gross' => 2000000, 'deductions' => ['otros' => 300000], 'requested_amount' => 4000000, 'requested_term' => 12, 'request_ts' => time(), 'contract_end_ts' => strtotime('+14 months'), 'vacancy' => 'Baja'], ['usury_annual' => 0.2859] + $settings);
+$assert($capped['suggested']['rate_capped'] && $near($capped['suggested']['rate'], $capped['usury_monthly_legal'], 1e-12) && $near($capped['policy_rate'], 0.02299, 1e-12), 'suggested rate never exceeds the legal usury');
+$assert($near($capped['suggested']['payment'], OwnerCreditCalculator::payment($capped['usury_monthly_legal'], 12, 4000000)), 'suggested payment uses the capped rate');
+$riskCapped = OwnerCreditCalculator::evaluate(['gross' => 1000000, 'deductions' => [], 'requested_amount' => 9000000, 'requested_term' => 6, 'request_ts' => time(), 'contract_end_ts' => strtotime('+14 months'), 'vacancy' => 'Alta'], ['usury_annual' => 0.2859] + $settings);
+$assert($riskCapped['risk_rate'] > $riskCapped['usury_monthly_legal'] && $near($riskCapped['suggested']['rate'], $riskCapped['usury_monthly_legal'], 1e-12), 'high vacancy risk rate is capped too');
+$assert(str_contains((string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php'), "La tasa supera la usura"), 'approving above the usury is blocked even with justification');
 $assert($near(OwnerCreditSettings::normalize(['no_mandate_deduction' => '15'])['no_mandate_deduction'], 0.15, 1e-9), 'no-mandate deduction is configurable as a percentage');
 
 $assert($near(OwnerCreditService::money('52.661,669'), 52661.669) && $near(OwnerCreditService::money('1.075.000'), 1075000) && $near(OwnerCreditService::money('$ 893723.00'), 893723), 'money parser handles mandate and quote formats');
@@ -102,3 +109,5 @@ $assert(\SCM\Modules\OwnerCredits\OwnerCreditPdf::title($pdfWork) === 'Crédito 
 $assert(str_contains($pdfHtml, 'scm-acta-receipt-data') && str_contains($pdfHtml, 'Condiciones aprobadas') && str_contains($pdfHtml, 'Tabla de amortización') && substr_count($pdfHtml, '<tr><td>') >= 12, 'credit PDF uses the acta tables and lists every amortization row');
 $assert(str_contains($pdfHtml, 'Analista QA') && str_contains($pdfHtml, 'Propietario &lt;b&gt;'), 'credit PDF signs with the deciding employee and escapes data');
 $assert(is_readable(dirname(__DIR__) . '/public/assets/css/owner-credit-document.css'), 'credit PDF stylesheet exists');
+$newForm = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->newForm();
+$assert(str_contains($newForm, '<option value="documento" selected>Documento (cédula o NIT)</option>') && str_contains((string) file_get_contents(dirname(__DIR__) . '/src/Modules/PublicTickets/Concerns/PanelTicketCreationConcern.php'), "if (\$by === 'documento') return \$this->searchPanelContractsByDocument(\$query);"), 'new credit searches by document first (owner, tenant, co-signers and mandate owners)');

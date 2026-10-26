@@ -282,6 +282,10 @@ final class OwnerCreditService
       if ($locked['status'] !== 'pendiente') throw new \DomainException('Este crédito ya fue ' . strtolower(self::STATUSES[$locked['status']] ?? $locked['status']) . '.');
       $work = $this->workspace($id, $input);
       if ($decision === 'aprobado' && $work['term_error'] !== '') throw new \DomainException($work['term_error']);
+      // La usura es un tope legal: no se puede aprobar por encima ni con justificación.
+      if ($decision === 'aprobado' && $work['conditions']['rate'] > $work['evaluation']['usury_monthly_legal'] + 1e-9) {
+        throw new \DomainException('La tasa supera la usura (' . number_format($work['evaluation']['usury_monthly_legal'] * 100, 4, ',', '.') . ' % mensual). Bájala para poder aprobar.');
+      }
       if ($work['contract']['fin_ts'] !== $work['contract']['fin_saved_ts']) $this->saveContractEnd($locked, $work['contract']['fin_ts'], $actor);
       $conditions = $work['conditions'];
       $evaluation = $work['evaluation'];
