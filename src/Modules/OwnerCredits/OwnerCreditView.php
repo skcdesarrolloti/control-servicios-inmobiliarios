@@ -138,11 +138,11 @@ final class OwnerCreditView
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('building') . 'Contrato de arriendo vigente</h4>' . self::guide('contrato', [
         'Fin del contrato' => 'Define cuántos meses se puede prestar: se cuentan los meses completos (de 30 días) que faltan hasta esa fecha. Si el contrato fue renovado y la fecha está desactualizada, corrígela aquí; se guarda en el contrato al aprobar o rechazar.',
         'Años arrendados' => 'Tiempo entre el inicio y el fin del contrato. Un historial largo da más confianza.',
-        'Siniestro' => 'Lo marca Cartera cuando el contrato fue reportado a la aseguradora por mora. Un contrato siniestrado incumple la política.',
+        'Siniestro' => 'Lo marca Cartera cuando el contrato fue reportado a la aseguradora por mora. Un contrato siniestrado incumple la política. "Por verificar" significa que Cartera no lo ha marcado: confírmalo con Cartera antes de aprobar.',
       ]) . '<div class="!sp-grid !sp-grid-cols-2 sm:!sp-grid-cols-3 !sp-gap-3">'
       . self::tile('Inicio del contrato', $contract['inicio_ts'] > 0 ? date('d/m/Y', $contract['inicio_ts']) : '—') . $endTile . self::tile('Años arrendados', $years)
       . self::tile('Estado', self::e($contract['estado'] ?: '—')) . self::tile('Aseguradora', self::e($contract['aseguradora'] ?: '—'))
-      . self::tile('Siniestro', $contract['siniestrado'] ? 'Siniestrado' : 'No', $contract['siniestrado'] ? 'bad' : '')
+      . self::tile('Siniestro', $contract['siniestrado'] ? 'Siniestrado' : 'Por verificar', $contract['siniestrado'] ? 'bad' : 'key')
       . '</div></section>'
 
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('cash') . 'Ingreso del propietario</h4>' . self::guide('ingreso', [

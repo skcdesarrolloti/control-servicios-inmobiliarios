@@ -88,7 +88,7 @@ final class OwnerCreditPdf
         'Inicio / fin del contrato' => $date((int) $contract['inicio_ts']) . ' – ' . $date((int) $contract['fin_ts']),
         'Estado del contrato' => (string) $contract['estado'],
         'Aseguradora' => (string) $contract['aseguradora'],
-        'Siniestro' => $contract['siniestrado'] ? 'Siniestrado' : 'No',
+        'Siniestro' => $contract['siniestrado'] ? 'Siniestrado' : 'Por verificar',
       ]) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>2. Ingreso del propietario</h2>' . Doc::table(['Ingreso bruto (canon)' => $money($ev['gross'])] + $deductions + ['Ingreso neto (INO)' => $money($ev['net_income'])]) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>3. Solicitud</h2>' . Doc::table([
