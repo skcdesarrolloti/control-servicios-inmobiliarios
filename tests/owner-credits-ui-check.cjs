@@ -12,7 +12,8 @@ $s = OwnerCreditSettings::defaults();
 $ev = OwnerCreditCalculator::evaluate(['gross'=>1075000,'deductions'=>['comision'=>142800],'requested_amount'=>893723,'requested_term'=>12,'request_ts'=>time(),'contract_end_ts'=>strtotime('+14 months'),'vacancy'=>'Baja'], $s);
 $w = ['credit'=>['id'=>12,'status'=>'pendiente','quote_id'=>574,'owner_name'=>'Propietario','property'=>'10420','purpose'=>'','requested_amount'=>893723,'requested_term'=>12,'created_at'=>time(),'decision_note'=>'','decided_by_name'=>'','decided_at'=>0],
 'contract'=>['code'=>'817','estado'=>'Entregado','inicio_ts'=>0,'fin_ts'=>0,'aseguradora'=>'','siniestrado'=>false],'income_source'=>'','settings'=>$s,'evaluation'=>$ev,
-'conditions'=>['amount'=>893723,'term'=>12,'rate'=>0.023,'payment'=>86070,'total_interest'=>139117],'schedule'=>[],'policies'=>[],'policies_ok'=>true,'other_credits'=>[],'events'=>[]];
+'conditions'=>['amount'=>893723,'term'=>12,'rate'=>0.023,'payment'=>86070,'total_interest'=>139117],'schedule'=>[],'policies'=>[],'policies_ok'=>true,'other_credits'=>[],'events'=>[],
+'owners'=>[['key'=>'mandato_1','name'=>'Primer Dueño','document'=>'111','current'=>false],['key'=>'mandato_2','name'=>'Segunda Dueña','document'=>'222','current'=>true]]];
 echo (new OwnerCreditView())->workspace($w, true, true);`;
 (async () => {
   const workspace = execFileSync('php', ['-r', fixture], { cwd: root, encoding: 'utf8' });
@@ -52,6 +53,18 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   await page.fill('[name="contract_end"]', '2028-05-31');
   await page.waitForFunction(() => window.calls.some(c => c.action === 'scm_owner_credit_simulate' && c.contract_end === '2028-05-31'));
   console.log('OK the contract end date is simulated before saving');
+
+  const simsBefore = (await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_simulate').length;
+  assert.equal(await page.inputValue('[name="owner_key"]'), 'mandato_2');
+  await page.selectOption('[name="owner_key"]', 'mandato_1');
+  await page.waitForFunction(() => window.calls.filter(c => c.action === 'scm_owner_credit_open').length === 2);
+  calls = await page.evaluate(() => window.calls);
+  const ownerChange = calls.find(c => c.action === 'scm_owner_credit_owner');
+  assert.equal(ownerChange.credit_id, '12'); assert.equal(ownerChange.owner_key, 'mandato_1');
+  assert.equal(calls.filter(c => c.action === 'scm_owner_credit_simulate').length, simsBefore, 'changing the owner does not simulate');
+  assert.equal(calls[calls.length - 1].credit_id, '12');
+  await page.waitForSelector('[data-owner-credit-form]');
+  console.log('OK the owner of a pending credit is changed and the liquidator reloads');
 
   await page.fill('[name="gross"]', '');
   await page.type('[name="gross"]', '1250000');

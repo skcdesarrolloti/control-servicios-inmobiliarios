@@ -163,6 +163,19 @@ trait HandlesOwnerCredits
     }
   }
 
+  /** Cambia a quién es una solicitud pendiente, entre los propietarios del contrato principal. */
+  public function ajax_handler_owner_credit_owner(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('owner_credit_decide', 'Tu cargo no tiene permiso para cambiar el beneficiario del crédito.');
+    try {
+      $credit = $this->ownerCreditService()->changeOwner((int) ($_POST['credit_id'] ?? 0), sanitize_key((string) ($_POST['owner_key'] ?? '')), $this->ticketCompletionActor());
+      $this->jsonOk(['credit_id' => (int) $credit['id'], 'message' => 'Beneficiario actualizado: ' . $credit['owner_name'] . '.']);
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo cambiar el beneficiario.');
+    }
+  }
+
   /** "Nueva solicitud": contratos donde el documento es de un propietario, con esa persona como beneficiaria. */
   public function ajax_handler_owner_credit_contracts(): void
   {
@@ -175,7 +188,7 @@ trait HandlesOwnerCredits
       $rows = $service->ownerPortfolio($document);
       // Cupo preaprobado con todos los contratos de la persona, menos el saldo de sus créditos vigentes.
       $preapproval = \SCM\Modules\OwnerCredits\OwnerCreditCalculator::preapproval($rows, OwnerCreditSettings::read(App::settings()));
-      $preapproval['outstanding'] = $rows === [] ? 0.0 : $service->outstandingByDocument($document);
+      $preapproval['outstanding'] = $rows === [] ? 0.0 : $service->outstandingByDocument($document, array_map(static fn(array $row): string => (string) ($row['owner']['owner_id'] ?? ''), $rows));
       $preapproval['available'] = max(0.0, $preapproval['amount'] - $preapproval['outstanding']);
       $this->jsonOk(['contracts' => $rows, 'preapproval' => $preapproval]);
     } catch (\InvalidArgumentException $error) {

@@ -501,12 +501,21 @@
       var newCredit = event.target.closest && event.target.closest("[data-owner-credit-new-form]");
       if (newCredit && event.target.name === "term") updateTermHint(newCredit);
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
-      if (!form || event.target.name === "note") return;
+      if (!form || event.target.name === "note" || event.target.name === "owner_key") return;
       window.clearTimeout(simulateTimer);
       simulateTimer = window.setTimeout(function () { simulate(form); }, 350);
     });
     root.addEventListener("change", function (event) {
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
+      // Cambiar a quién es el crédito se guarda y recarga el liquidador (cambian sus contratos y su cupo).
+      if (form && event.target.matches("[data-owner-credit-owner]")) {
+        var creditId = form.getAttribute("data-credit-id");
+        event.target.disabled = true;
+        post("scm_owner_credit_owner", { credit_id: creditId, owner_key: event.target.value })
+          .then(function () { loadReport(true); return openCredit({ credit_id: creditId }); })
+          .catch(function (error) { event.target.disabled = false; window.alert(error.message); });
+        return;
+      }
       // Selects y fecha fin recalculan al cambiar (algunos navegadores no emiten "input" en fechas).
       if (form && (event.target.tagName === "SELECT" || event.target.type === "date")) simulate(form);
     });

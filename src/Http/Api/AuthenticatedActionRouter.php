@@ -62,6 +62,7 @@ final class AuthenticatedActionRouter
       'scm_admin_reports_account_pdf' => 'ajax_handler_admin_reports_account_pdf',
       'scm_admin_reports_account_excel' => 'ajax_handler_admin_reports_account_excel',
       'scm_owner_credit_open' => 'ajax_handler_owner_credit_open',
+      'scm_owner_credit_owner' => 'ajax_handler_owner_credit_owner',
       'scm_owner_credit_simulate' => 'ajax_handler_owner_credit_simulate',
       'scm_owner_credit_pdf' => 'ajax_handler_owner_credit_pdf',
       'scm_owner_credit_simulation_pdf' => 'ajax_handler_owner_credit_simulation_pdf',

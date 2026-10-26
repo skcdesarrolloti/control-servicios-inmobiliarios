@@ -288,7 +288,7 @@ final class OwnerCreditService
       if ($owner === null) $owner = $candidates[0] ?? null;
       if ($owner === null) continue;
       if ($owner['document'] === '') $owner['document'] = $document;
-      $results[] = ['contract' => $contract, 'owner' => array_intersect_key($owner, array_flip(['key', 'name', 'document', 'email', 'phone']))];
+      $results[] = ['contract' => $contract, 'owner' => array_intersect_key($owner, array_flip(['key', 'name', 'document', 'email', 'phone', 'owner_id']))];
     }
     return $results;
   }
@@ -368,6 +368,7 @@ final class OwnerCreditService
     $this->settleFinished($id);
     $credit = $this->find($id);
     if ($credit === null) throw new \DomainException('El crédito ya no existe.');
+    if ($credit['status'] === 'pendiente' && trim((string) ($credit['owner_document'] ?? '')) === '') $credit = $this->fillOwnerDocument($credit);
     return $this->workspaceFor($credit, $input);
   }
 
@@ -419,7 +420,15 @@ final class OwnerCreditService
     foreach ($schedule as $index => $line) $schedule[$index]['fecha'] = self::installmentTs($firstPaymentTs, $index + 1);
     $sources = $this->discountSources($credit, $contract, $evaluation, $endTs);
     $plan = OwnerCreditCalculator::discountPlan(array_map(fn(array $source): array => $source + ['covers' => $this->coveredInstallments($source, $firstPaymentTs, $term)], $sources), $payment, $term, (int) $credit['contract_id']);
-    $policies = $this->policies($credit, $contract, $evaluation, $settings, $amount, $term, $rate, $payment, $endTs, $plan);
+    // Cupo preaprobado de la persona con todos sus contratos, menos el saldo de sus créditos aprobados.
+    $approved = array_values(array_filter($this->ownerCredits($credit), static fn(array $row): bool => $row['status'] === 'aprobado'));
+    $outstanding = array_sum(array_map(fn(array $row): float => $this->balance($row), $approved));
+    $preapproval = [
+      'amount' => (float) $evaluation['max_amount'], 'contracts' => count($others) + 1, 'net_income' => (float) $evaluation['total_net_income'],
+      'outstanding' => $outstanding, 'available' => max(0.0, (float) $evaluation['max_amount'] - $outstanding), 'max_term' => (int) $evaluation['max_months'],
+      'credits' => array_map(static fn(array $row): int => (int) $row['id'], $approved), 'requested' => $requested,
+    ];
+    $policies = $this->policies($contract, $evaluation, $settings, $amount, $term, $rate, $payment, $endTs, $plan, $preapproval);
     // El plazo solicitado nunca puede pasar de los meses que faltan entre la solicitud y el fin del contrato.
     $termError = $requestedTerm <= 0 ? 'Escribe el plazo solicitado (meses) para evaluar el crédito.' : ($requestedTerm > $evaluation['max_months'] ? self::termMessage($requestedTerm, $evaluation) : '');
 
@@ -442,6 +451,8 @@ final class OwnerCreditService
       'last_payment_ts' => $term > 0 ? self::installmentTs($firstPaymentTs, $term) : 0,
       'sources' => $sources,
       'discount_plan' => $plan,
+      'preapproval' => $preapproval,
+      'owners' => $credit['status'] === 'pendiente' ? $this->ownerChoices($credit) : [],
       'policies' => $policies,
       'policies_ok' => !in_array(false, array_column($policies, 'ok'), true),
       'other_credits' => $this->ownerCredits($credit),
@@ -633,16 +644,94 @@ final class OwnerCreditService
     return $closed;
   }
 
-  /** Saldo de capital de los créditos aprobados de la persona (por documento). */
-  public function outstandingByDocument(string $document): float
+  /**
+   * Saldo de capital de los créditos aprobados de la persona: por documento o por cualquiera de sus fichas de
+   * propietario (un crédito guardado sin documento se encuentra por la ficha).
+   * @param list<string> $ownerIds
+   */
+  public function outstandingByDocument(string $document, array $ownerIds = []): float
   {
     $this->ensureSchema();
     $document = self::document($document);
-    if ($document === '') return 0.0;
+    $ownerIds = array_values(array_unique(array_filter(array_map(static fn($id): string => trim((string) $id), $ownerIds), static fn(string $id): bool => $id !== '' && !str_starts_with($id, 'doc:'))));
+    $where = [];
+    $args = [];
+    if ($document !== '') { $where[] = "UPPER(REPLACE(REPLACE(`owner_document`, '.', ''), ' ', '')) = ?"; $args[] = $document; }
+    if ($ownerIds !== []) { $where[] = '`owner_id` IN (' . implode(',', array_fill(0, count($ownerIds), '?')) . ')'; array_push($args, ...$ownerIds); }
+    if ($where === []) return 0.0;
     $this->settleFinished();
     $total = 0.0;
-    foreach ($this->db->getResults("SELECT * FROM `{$this->table()}` WHERE `status` = 'aprobado' AND UPPER(REPLACE(REPLACE(`owner_document`, '.', ''), ' ', '')) = ?", [$document]) as $credit) $total += $this->balance($credit);
+    foreach ($this->db->getResults("SELECT * FROM `{$this->table()}` WHERE `status` = 'aprobado' AND (" . implode(' OR ', $where) . ')', $args) as $credit) $total += $this->balance($credit);
     return $total;
+  }
+
+  /**
+   * Cambia a quién es el crédito, entre los propietarios del contrato principal, mientras está pendiente (en las
+   * solicitudes de cotización se toma el primero del mandato). Queda en el historial.
+   * @return array<string,mixed>
+   */
+  public function changeOwner(int $id, string $ownerKey, array $actor): array
+  {
+    $credit = $this->find($id);
+    if ($credit === null) throw new \DomainException('El crédito ya no existe.');
+    if ($credit['status'] !== 'pendiente') throw new \DomainException('Solo se puede cambiar a quién es el crédito mientras está pendiente.');
+    $owner = null;
+    foreach ($this->contractOwners((int) $credit['contract_id']) as $candidate) if ($candidate['key'] === $ownerKey) $owner = $candidate;
+    if ($owner === null) throw new \DomainException('Selecciona uno de los propietarios del contrato.');
+    $document = $this->ownerDocument($owner, $this->contractById((int) $credit['contract_id']) ?? []);
+    if ($owner['owner_id'] === (string) $credit['owner_id'] && self::document($document) === self::document((string) $credit['owner_document'])) return $credit;
+    $this->db->update($this->table(), $this->schema->filterTableData($this->table(), [
+      'owner_id' => $owner['owner_id'], 'owner_name' => mb_substr($owner['name'], 0, 190), 'owner_email' => mb_substr($owner['email'], 0, 190),
+      'owner_phone' => mb_substr($owner['phone'], 0, 40), 'owner_document' => mb_substr($document, 0, 40), 'updated_at' => time(),
+    ]), ['id' => $id]);
+    $label = static fn(string $name, string $doc): string => $name . ($doc !== '' ? ' (' . $doc . ')' : '');
+    $change = $label((string) $credit['owner_name'], (string) $credit['owner_document']) . ' → ' . $label($owner['name'], $document);
+    $this->event($id, 'beneficiario', $actor, ['nota' => 'Beneficiario: ' . $change]);
+    $updated = $this->find($id) ?? $credit;
+    $this->recordHistories($updated, 'Cambio de beneficiario del crédito', 'Crédito #' . $id . ': beneficiario cambiado de ' . $change . '.', $actor);
+    return $updated;
+  }
+
+  /** Propietarios del contrato principal para elegir a quién es el crédito, marcando el actual. @return list<array<string,mixed>> */
+  private function ownerChoices(array $credit): array
+  {
+    $document = self::document((string) ($credit['owner_document'] ?? ''));
+    $owners = $this->contractOwners((int) $credit['contract_id']);
+    $current = '';
+    foreach ($owners as $owner) if ($document !== '' && self::document($owner['document']) === $document) $current = $owner['key'];
+    if ($current === '') foreach ($owners as $owner) if ($owner['owner_id'] === (string) $credit['owner_id'] && $owner['name'] === (string) $credit['owner_name']) $current = $owner['key'];
+    return array_map(static fn(array $owner): array => array_intersect_key($owner, array_flip(['key', 'name', 'document'])) + ['current' => $owner['key'] === $current], $owners);
+  }
+
+  /** Solicitud pendiente guardada sin documento (contrato sin mandato): se completa desde la ficha del propietario. */
+  private function fillOwnerDocument(array $credit): array
+  {
+    $document = $this->ownerDocument(['owner_id' => (string) $credit['owner_id'], 'document' => ''], $this->contractById((int) $credit['contract_id']) ?? []);
+    if ($document === '') return $credit;
+    $this->db->update($this->table(), $this->schema->filterTableData($this->table(), ['owner_document' => mb_substr($document, 0, 40)]), ['id' => (int) $credit['id']]);
+    return ['owner_document' => $document] + $credit;
+  }
+
+  /**
+   * Documento del beneficiario: el del mandato o, si falta, el de su ficha de propietario o (si es el propietario
+   * principal) el del contrato. Sin documento el crédito no se restaría del cupo de la persona.
+   * @param array<string,string>|null $owner
+   */
+  private function ownerDocument(?array $owner, array $contract): string
+  {
+    $document = trim((string) ($owner['document'] ?? ''));
+    if ($document !== '') return $document;
+    $ownerId = trim((string) ($owner['owner_id'] ?? ($contract['id_propietario'] ?? '')));
+    $table = $this->db->table('jet_cct_propietarios');
+    if ($ownerId !== '' && !str_starts_with($ownerId, 'doc:') && $this->schema->tableExists($table)) {
+      $columns = array_values(array_filter(['documento', 'documento_juridico'], fn(string $column): bool => $this->schema->columnExists($table, $column)));
+      $ids = array_values(array_filter(['_ID', 'id_propietario'], fn(string $column): bool => $this->schema->columnExists($table, $column)));
+      if ($columns !== [] && $ids !== []) {
+        $row = $this->db->getRow('SELECT `' . implode('`, `', $columns) . "` FROM `{$table}` WHERE " . implode(' OR ', array_map(static fn(string $column): string => "`{$column}` = ?", $ids)) . ' LIMIT 1', array_fill(0, count($ids), $ownerId));
+        foreach ($columns as $column) if (is_array($row) && trim((string) ($row[$column] ?? '')) !== '') return trim((string) $row[$column]);
+      }
+    }
+    return $ownerId === '' || $ownerId === (string) ($contract['id_propietario'] ?? '') ? trim((string) ($contract['documento_propietario'] ?? '')) : '';
   }
 
   /**
@@ -812,7 +901,7 @@ final class OwnerCreditService
       'owner_id' => $owner !== null ? $owner['owner_id'] : (string) ($contract['id_propietario'] ?? ''),
       'owner_name' => mb_substr($owner !== null ? $owner['name'] : (string) ($contract['propietario'] ?? ''), 0, 190),
       'owner_email' => mb_substr($owner !== null ? $owner['email'] : trim((string) ($contract['correo_propietario'] ?? '')), 0, 190),
-      'owner_phone' => mb_substr($phone, 0, 40), 'owner_document' => mb_substr($owner !== null ? $owner['document'] : '', 0, 40),
+      'owner_phone' => mb_substr($phone, 0, 40), 'owner_document' => mb_substr($this->ownerDocument($owner, $contract), 0, 40),
       'beneficiary_type' => $beneficiaryType,
       'purpose' => $purpose, 'status' => 'pendiente', 'requested_amount' => round($amount, 2), 'requested_term' => $term,
       'vacancy' => 'Baja', 'gross_income' => $income['gross'], 'deductions_json' => json_encode($income['deductions'], JSON_THROW_ON_ERROR),
@@ -877,14 +966,14 @@ final class OwnerCreditService
 
   /** @return list<array{key:string,label:string,ok:bool,detail:string}> */
   /** @param list<array{from:int,to:int,parts:list<array<string,mixed>>,direct:float}> $plan */
-  private function policies(array $credit, array $contract, array $evaluation, array $settings, float $amount, int $term, float $rate, float $payment, int $endTs, array $plan): array
+  /** @param array<string,mixed> $preapproval cupo disponible = tope − saldo de los créditos vigentes de la persona */
+  private function policies(array $contract, array $evaluation, array $settings, float $amount, int $term, float $rate, float $payment, int $endTs, array $plan, array $preapproval): array
   {
     $minMonths = (int) $settings['min_remaining_months'];
-    $others = array_filter($this->ownerCredits($credit), static fn(array $row): bool => $row['status'] === 'aprobado');
     $money = static fn(float $value): string => '$' . number_format($value, 0, ',', '.');
-    // Cupo disponible = tope − saldo de los créditos vigentes de la persona.
-    $outstanding = array_sum(array_map(fn(array $row): float => $this->balance($row), $others));
-    $available = max(0.0, $evaluation['max_amount'] - $outstanding);
+    $outstanding = (float) $preapproval['outstanding'];
+    $available = (float) $preapproval['available'];
+    $others = $preapproval['credits'];
     $direct = array_values(array_filter($plan, static fn(array $segment): bool => $segment['direct'] >= 0.5));
     $contractsUsed = [];
     foreach ($plan as $segment) foreach ($segment['parts'] as $part) $contractsUsed['#' . $part['contrato']] = true;
@@ -894,7 +983,7 @@ final class OwnerCreditService
       ['key' => 'vigencia', 'label' => 'Contrato no próximo a vencer', 'ok' => $endTs > 0 && $evaluation['contract_months'] >= $minMonths, 'detail' => $endTs > 0 ? $evaluation['contract_months'] . ' meses hasta el fin (' . date('d/m/Y', $endTs) . '). Mínimo: ' . $minMonths . '.' : 'El contrato no tiene fecha fin.'],
       ['key' => 'plazo', 'label' => 'Plazo dentro de la vigencia', 'ok' => $term > 0 && $term <= $evaluation['max_months'], 'detail' => 'Plazo ' . $term . ' meses; máximo ' . $evaluation['max_months'] . ' (' . self::termBasis($evaluation) . ').'],
       ['key' => 'siniestro', 'label' => 'Contrato no siniestrado', 'ok' => !self::isYes($contract['esta_sinestrado'] ?? ''), 'detail' => self::isYes($contract['esta_sinestrado'] ?? '') ? 'Cartera marcó el contrato como siniestrado.' : 'Sin siniestro registrado en cartera; por verificar con Cartera.'],
-      ['key' => 'prestamos', 'label' => 'Valor dentro del cupo disponible', 'ok' => $amount <= $available + 0.5, 'detail' => $others === [] ? 'Sin créditos vigentes: cupo disponible ' . $money($available) . '.' : 'Saldo de créditos vigentes ' . $money($outstanding) . ' (' . implode(', ', array_map(static fn(array $row): string => '#' . $row['id'], $others)) . '); cupo disponible ' . $money($available) . '.'],
+      ['key' => 'prestamos', 'label' => 'Valor dentro del cupo disponible', 'ok' => $amount <= $available + 0.5, 'detail' => $others === [] ? 'Sin créditos vigentes: cupo disponible ' . $money($available) . '.' : 'Saldo de créditos vigentes ' . $money($outstanding) . ' (' . implode(', ', array_map(static fn(int $id): string => '#' . $id, $others)) . '); cupo disponible ' . $money($available) . '.'],
       ['key' => 'monto', 'label' => 'Valor dentro del tope', 'ok' => $amount > 0 && $amount <= $evaluation['max_amount'] + 0.5, 'detail' => $money($amount) . ' de un tope de ' . $money($evaluation['max_amount']) . ' (' . (int) $settings['income_months'] . ' × ingreso neto' . (($evaluation['other_contracts'] ?? []) !== [] ? ' de ' . (count($evaluation['other_contracts']) + 1) . ' contratos, ' . $money($evaluation['total_net_income']) : '') . ').'],
       ['key' => 'usura', 'label' => 'Tasa por debajo de la usura', 'ok' => $rate <= $evaluation['usury_monthly_legal'] + 1e-9, 'detail' => 'Tasa ' . $percent($rate) . ' mes vencido (' . $percent((1 + $rate) ** 12 - 1) . ' E.A.); usura ' . $percent((float) $settings['usury_annual']) . ' E.A. = ' . $percent($evaluation['usury_monthly_legal']) . ' mensual' . ((string) $settings['usury_updated_at'] !== '' ? ', vigente desde ' . date('d/m/Y', (int) strtotime((string) $settings['usury_updated_at'])) : '') . '.'],
       ['key' => 'cuota', 'label' => 'Cuota cubierta por los contratos', 'ok' => $payment > 0 && $direct === [], 'detail' => $payment <= 0 ? 'Sin cuota.' : ($direct === []

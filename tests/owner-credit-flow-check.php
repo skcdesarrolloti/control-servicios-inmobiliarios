@@ -60,6 +60,7 @@ $pdo->exec('CREATE TABLE wp_jet_cct_cotizacion_mantenimiento(_ID INTEGER PRIMARY
 $pdo->exec('CREATE TABLE wp_jet_cct_historial_del_ticket(_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id TEXT, id_empleado TEXT, cct_created TEXT, cct_modified TEXT, fecha INTEGER, id_ticket TEXT, id_cotizacion_mantenimiento TEXT, nombre TEXT, respuesta TEXT, respuesta_cct_ticket TEXT, fue_editada TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_historial_del_inmueble(_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT, id_empleado TEXT, nombre_empleado TEXT, funcionario TEXT, id_inmueble TEXT, id_inmueble_data TEXT, fecha INTEGER, tipo_reporte TEXT, observacion TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_historial_contrato_arrendamiento(_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT, id_empleado TEXT, funcionario TEXT, id_contrato TEXT, contrato TEXT, inmueble TEXT, id_inmueble TEXT, id_inmueble_data TEXT, fecha INTEGER, tipo_reporte TEXT, observacion TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_propietarios(_ID INTEGER PRIMARY KEY, id_propietario TEXT, nombre TEXT, documento TEXT, documento_juridico TEXT)');
 
 $end = (string) strtotime('+14 months');
 $db->insert('wp_jet_cct_contrato_mandato', ['_ID' => 30, 'total_comision' => '142.800', 'incluye_garantia' => 'Si', 'precio_mes_garantia' => '29.400', 'incluye_garantia_servicios' => 'Si', 'precio_mes_servicios' => '52.661,669']);
@@ -242,6 +243,36 @@ $check((int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble
 $settled = $service->workspace((int) $chosen['id']);
 $check($settled['credit']['status'] === 'pagado' && str_contains((string) $settled['credit']['decision_note'], 'Pagado automáticamente') && $settled['events'][0]['actor_name'] === 'Sistema', 'a credit whose last instalment is past is marked as paid automatically');
 $check($service->settleFinished() === 0, 'an automatically paid credit is not closed twice');
+
+// Cupo preaprobado en el liquidador y cambio de beneficiario mientras está pendiente.
+$pending = $service->workspace($service->createManual(9, 12000000, 6, 'Libre Destinación', $actor, '', 'mandato_2'));
+$p = $pending['preapproval'];
+$check(abs($p['amount'] - 9900000) < 0.01 && $p['contracts'] === 2 && $p['outstanding'] == 0.0 && abs($p['requested'] - 12000000) < 0.01, 'the liquidator shows the pre-approved amount of all the owner contracts');
+$pendingHtml = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($pending, true, true);
+$check(str_contains($pendingHtml, 'Cupo preaprobado del propietario') && str_contains($pendingHtml, 'supera el cupo disponible') && str_contains($pendingHtml, 'name="owner_key"'), 'the liquidator shows the cupo, warns when the request exceeds it and lets the owner be changed');
+$check(array_column(array_filter($pending['owners'], static fn(array $o): bool => $o['current']), 'key') === ['mandato_2'], 'the current beneficiary is preselected among the contract owners');
+$changed = $service->changeOwner((int) $pending['credit']['id'], 'mandato_1', $actor);
+$check($changed['owner_name'] === 'Primer Dueño' && $changed['owner_document'] === '111' && $changed['owner_id'] === '960', 'a pending credit can be moved to another owner of the contract');
+$check((int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'beneficiario'", [(int) $changed['id']]) === 1 && (int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_contrato_arrendamiento WHERE tipo_reporte = 'Cambio de beneficiario del crédito'") === 1, 'the owner change is traced in the credit and contract histories');
+try {
+  $service->changeOwner((int) $chosen['id'], 'mandato_1', $actor);
+  $check(false, 'the owner of a decided credit cannot be changed');
+} catch (DomainException) {
+  $check(true, 'the owner of a decided credit cannot be changed');
+}
+
+// Contrato sin mandato: el documento sale de la ficha del propietario y el saldo se encuentra también por la ficha.
+$db->insert('wp_jet_cct_propietarios', ['_ID' => 970, 'id_propietario' => '970', 'nombre' => 'Sin Mandato', 'documento' => '55.555.555']);
+$db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 20, 'contrato' => '980', 'estado' => 'Entregado', 'inmueble' => '10700', 'propietario' => 'Sin Mandato', 'id_propietario' => '970', 'valor_canon' => '1.000.000', 'fin_contrato' => (string) strtotime('+2 years'), 'esta_sinestrado' => 'No']);
+$db->insert('wp_jet_cct_cotizacion_mantenimiento', ['_ID' => 590, 'id_ticket' => '10900', 'contrato' => '980', 'id_contrato' => '20', 'total' => '400000', 'financiacion' => 'Si']);
+$service->syncFromQuote(590, 'Si', $actor);
+$check($service->byQuote(590)['owner_document'] === '55.555.555', 'a quote credit on a contract without mandate takes the document from the owner record');
+$db->insert('wp_scm_owner_credits', ['contract_id' => 20, 'contract_code' => '980', 'owner_id' => '970', 'owner_name' => 'Sin Mandato', 'owner_document' => '', 'status' => 'pendiente', 'requested_amount' => 300000, 'created_at' => time(), 'updated_at' => time()]);
+$legacy = (int) $db->lastInsertId();
+$service->workspace($legacy);
+$check($service->find($legacy)['owner_document'] === '55.555.555', 'opening a pending credit saved without document completes it');
+$db->insert('wp_scm_owner_credits', ['contract_id' => 20, 'contract_code' => '980', 'owner_id' => '970', 'owner_name' => 'Sin Mandato', 'owner_document' => '', 'status' => 'aprobado', 'approved_amount' => 1000000, 'approved_term' => 10, 'approved_rate' => 0.02, 'first_payment_ts' => strtotime('+1 month'), 'created_at' => time(), 'updated_at' => time()]);
+$check(abs($service->outstandingByDocument('55555555') - 0) < 0.01 && abs($service->outstandingByDocument('55555555', ['970']) - 1000000) < 0.01, 'the outstanding balance also finds approved credits by owner record');
 
 try {
   $service->simulation('22233344', 12345, 0, 0, '', '', $actor);

@@ -128,7 +128,7 @@ final class OwnerCreditView
 
     return '<form class="!sp-font-sans !sp-text-service-navy !sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-5" data-owner-credit-form data-credit-id="' . (int) $credit['id'] . '" autocomplete="off">'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2">' . self::status((string) $credit['status'])
-      . $chip('Contrato principal', '#' . self::e($contract['code'])) . ((int) $credit['quote_id'] > 0 && $editable ? self::beneficiarySelect($credit) : '') . $chip(OwnerCreditService::beneficiaryLabel($credit), self::e($credit['owner_name']) . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · ' . self::e($credit['owner_document']) : '')) . $chip('Inmueble', self::e($credit['property']))
+      . $chip('Contrato principal', '#' . self::e($contract['code'])) . ((int) $credit['quote_id'] > 0 && $editable ? self::beneficiarySelect($credit) : '') . ($editable && count($work['owners'] ?? []) > 1 ? self::ownerSelect($credit, $work['owners']) : $chip(OwnerCreditService::beneficiaryLabel($credit), self::e($credit['owner_name']) . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · ' . self::e($credit['owner_document']) : ''))) . $chip('Inmueble', self::e($credit['property']))
       . ((int) $credit['quote_id'] > 0 ? $chip('Cotización', '#' . (int) $credit['quote_id']) : $chip('Origen', 'Manual'))
       . '<button type="button" class="' . $ui::NAVY . ' !sp-ml-auto" data-owner-credit-pdf title="Documento interno para funcionarios">' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Ver PDF</button></div>'
 
@@ -209,6 +209,7 @@ final class OwnerCreditView
         . '<span class="!sp-min-w-0"><b class="!sp-block !sp-text-[11px] ' . ($policy['ok'] ? '!sp-text-service-navy' : '!sp-text-red-700') . '">' . self::e($policy['label']) . '</b><span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e($policy['detail']) . '</span></span></li>';
     }
     return ($termError !== '' ? self::alert($termError, 'bad') : '')
+      . self::preapproval($work)
       . ($endChanged ? self::alert('Estás calculando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Se guardará en el contrato al aprobar o rechazar el crédito.', 'info') : '')
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('chart') . 'Política de créditos</h4>' . self::guide('politica', [
         'Valor máximo a prestar' => 'Tope = ingreso neto de todos los contratos del propietario × los meses de política (Configuración, hoy ' . (int) $work['settings']['income_months'] . ').',
@@ -451,6 +452,43 @@ final class OwnerCreditView
         . ($available ? '' : '<span class="!sp-block !sp-text-[10px]">Próximamente</span>') . '</span></label>';
     }
     return '<div class="!sp-grid !sp-grid-cols-2 sm:!sp-grid-cols-5 !sp-gap-2" role="radiogroup" aria-label="Para quién es el crédito">' . $html . '</div>';
+  }
+
+  /**
+   * Cupo preaprobado de la persona con todos sus contratos, también en las solicitudes que vienen de una cotización.
+   * Solo mientras está pendiente: decidido, el cupo de hoy ya incluye este crédito.
+   * @param array<string,mixed> $work
+   */
+  private static function preapproval(array $work): string
+  {
+    $p = $work['preapproval'] ?? null;
+    if (!is_array($p) || !in_array($work['credit']['status'], ['pendiente', 'simulacion'], true)) return '';
+    $requested = (float) $p['requested'];
+    $fits = $requested <= (float) $p['available'] + 0.5;
+    $note = $requested > 0
+      ? ((int) $work['credit']['quote_id'] > 0 ? 'La cotización pide ' : 'Se solicitan ') . self::money($requested) . ($fits ? ': está dentro del cupo disponible.' : ': supera el cupo disponible en ' . self::money($requested - (float) $p['available']) . '.')
+      : 'Escribe el valor solicitado para compararlo con el cupo.';
+    return '<section class="' . self::SECTION . ' !sp-border-service-yellow" data-owner-credit-preapproval-summary><h4 class="' . self::H4 . '">' . self::icon('cash') . 'Cupo preaprobado del propietario</h4>'
+      . self::guide('cupo', [
+        'Cupo preaprobado' => 'Ingreso neto de todos sus contratos Entregado o Por entregar × los meses de política (Configuración).',
+        'Saldo de créditos vigentes' => 'Lo que todavía debe de sus créditos aprobados; se resta del cupo.',
+        'Plazo máximo' => 'Vigencia del contrato más largo menos los meses de margen.',
+      ])
+      . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">'
+      . self::tile('Cupo (' . (int) $p['contracts'] . ' contrato' . ((int) $p['contracts'] === 1 ? '' : 's') . ')', self::money((float) $p['amount']), 'key')
+      . self::tile('Saldo de créditos vigentes', self::money((float) $p['outstanding']))
+      . self::tile('Disponible', self::money((float) $p['available']), (float) $p['available'] < 0.5 ? 'bad' : 'key')
+      . self::tile('Plazo máximo', (int) $p['max_term'] . ' meses', (int) $p['max_term'] <= 0 ? 'bad' : '')
+      . '</div><p class="' . self::NOTE . ' !sp-mt-3' . ($fits ? '' : ' !sp-text-red-700 !sp-font-semibold') . '">' . self::e($note) . '</p></section>';
+  }
+
+  /** @param list<array{key:string,name:string,document:string,current:bool}> $owners */
+  private static function ownerSelect(array $credit, array $owners): string
+  {
+    $options = '';
+    foreach ($owners as $owner) $options .= '<option value="' . self::e($owner['key']) . '"' . ($owner['current'] ? ' selected' : '') . '>' . self::e($owner['name'] . ($owner['document'] !== '' ? ' · ' . $owner['document'] : '')) . '</option>';
+    return '<label class="!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-2.5 !sp-py-0.5 !sp-rounded-full !sp-bg-white !sp-border !sp-border-solid !sp-border-service-yellow !sp-text-[10px] !sp-text-service-muted">' . self::e(OwnerCreditService::beneficiaryLabel($credit))
+      . '<select class="!sp-h-6 !sp-py-0 !sp-pl-1 !sp-pr-6 !sp-rounded !sp-border-0 !sp-bg-transparent !sp-text-[10px] !sp-font-bold !sp-text-service-navy" name="owner_key" data-owner-credit-owner aria-label="A quién es el crédito">' . $options . '</select></label>';
   }
 
   /** En el liquidador de una cotización: para quién es el crédito (sin funcionario; solo propietario habilitado por ahora). */
