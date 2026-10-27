@@ -1793,6 +1793,36 @@ trait RendersDashboard
     };
 
     $groupsHtml = '';
+    // Filtros: elegir una acción para ver quién la recibe, o un funcionario para ver qué acciones tiene.
+    $actionOptions = '';
+    foreach ($catalog as $groupKey => $group) {
+      $actionOptions .= '<optgroup label="' . esc_attr((string) ($group['label'] ?? $groupKey)) . '">';
+      foreach ((array) ($group['items'] ?? []) as $actionKey => $item) {
+        $action = trim((string) $actionKey);
+        if ($action === '') {
+          continue;
+        }
+        $label = (string) ($item['label'] ?? $action);
+        $actionOptions .= '<option value="' . esc_attr($action) . '" data-label="' . esc_attr($label) . '">' . esc_html($label) . '</option>';
+      }
+      $actionOptions .= '</optgroup>';
+    }
+    $people = [];
+    foreach (array_merge($funcionarios, $allActiveFuncionarios) as $funcionario) {
+      $id = trim((string) ($funcionario['id'] ?? ''));
+      if ($id !== '') $people[$id] = trim((string) ($funcionario['label'] ?? $id));
+    }
+    asort($people, SORT_NATURAL | SORT_FLAG_CASE);
+    $peopleOptions = '';
+    foreach ($people as $id => $label) {
+      $peopleOptions .= '<option value="' . esc_attr((string) $id) . '">' . esc_html($label) . '</option>';
+    }
+    $filterHtml = '<div class="scm-internal-notif-filter" data-internal-notif-filter>'
+      . '<label><span>Acción</span><select class="select select-bordered select-sm" data-internal-notif-filter-action><option value="">Todas las acciones</option>' . $actionOptions . '</select></label>'
+      . '<label><span>Funcionario</span><select class="select select-bordered select-sm" data-internal-notif-filter-person><option value="">Todos los funcionarios</option>' . $peopleOptions . '</select></label>'
+      . '<button type="button" class="btn btn-ghost btn-sm" data-internal-notif-filter-clear>Limpiar</button>'
+      . '<small data-internal-notif-filter-status aria-live="polite"></small>'
+      . '</div>';
     foreach ($catalog as $groupKey => $group) {
       $groupsHtml .= '<section class="scm-internal-notif-group" data-internal-notif-group="' . esc_attr((string) $groupKey) . '">';
       $groupsHtml .= '<h4>' . esc_html((string) ($group['label'] ?? $groupKey)) . '</h4>';
@@ -1802,7 +1832,7 @@ trait RendersDashboard
           continue;
         }
         $selectedIds = is_array($settings[$action] ?? null) ? $settings[$action] : [];
-        $groupsHtml .= '<div class="scm-internal-notif-action">';
+        $groupsHtml .= '<div class="scm-internal-notif-action" data-internal-notif-action="' . esc_attr($action) . '">';
         $groupsHtml .= '<div class="scm-internal-notif-action-head">';
         $groupsHtml .= '<strong>' . esc_html((string) ($item['label'] ?? $action)) . '</strong>';
         $groupsHtml .= '<span>' . esc_html(str_replace(['Email interno en cola','Email interno'],['CC por correo','CC por correo'],(string) ($item['channel'] ?? 'CC por correo'))) . '</span>';
@@ -1833,6 +1863,7 @@ trait RendersDashboard
           <section class="scm-pqr-settings-section">
             <h4>Acciones y destinatarios internos</h4>
             <p>Selecciona uno o varios funcionarios por acción. Sus correos reciben CC; dejar una acción vacía desactiva sus copias internas.</p>
+            <?php echo $filterHtml; ?>
             <div class="scm-internal-notif-grid"><?php echo $groupsHtml; ?></div>
           </section>
           </div>

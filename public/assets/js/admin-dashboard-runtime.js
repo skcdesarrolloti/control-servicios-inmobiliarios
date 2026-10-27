@@ -12161,6 +12161,63 @@
         return settings;
       }
 
+      // Filtro por acción o por funcionario: solo oculta tarjetas; el guardado sigue leyendo todos los selects.
+      var filterAction = modal.querySelector("[data-internal-notif-filter-action]");
+      var filterPerson = modal.querySelector("[data-internal-notif-filter-person]");
+      var filterStatus = modal.querySelector("[data-internal-notif-filter-status]");
+
+      function cardSelect(card) {
+        return card.querySelector('select[name^="settings["]');
+      }
+
+      function selectedIds(card) {
+        var select = cardSelect(card);
+        return select ? Array.prototype.slice.call(select.selectedOptions || []).map(function (option) { return option.value; }) : [];
+      }
+
+      function refreshActionCounts() {
+        if (!filterAction) return;
+        modal.querySelectorAll("[data-internal-notif-action]").forEach(function (card) {
+          var option = filterAction.querySelector('option[value="' + card.getAttribute("data-internal-notif-action") + '"]');
+          if (!option) return;
+          var count = selectedIds(card).length;
+          option.textContent = option.getAttribute("data-label") + " · " + (count ? count + (count === 1 ? " funcionario" : " funcionarios") : "sin destinatarios");
+        });
+      }
+
+      function applyFilter() {
+        var action = filterAction ? filterAction.value : "";
+        var person = filterPerson ? filterPerson.value : "";
+        var shown = 0;
+        modal.querySelectorAll("[data-internal-notif-action]").forEach(function (card) {
+          var visible = (!action || card.getAttribute("data-internal-notif-action") === action) && (!person || selectedIds(card).indexOf(person) !== -1);
+          card.hidden = !visible;
+          if (visible) shown++;
+        });
+        modal.querySelectorAll("[data-internal-notif-group]").forEach(function (group) {
+          group.hidden = !group.querySelector("[data-internal-notif-action]:not([hidden])");
+        });
+        if (filterStatus) {
+          var personName = person && filterPerson.selectedOptions[0] ? filterPerson.selectedOptions[0].textContent : "";
+          filterStatus.textContent = !action && !person ? "" : (person && !shown ? personName + " no recibe ninguna acción." : shown + (shown === 1 ? " acción" : " acciones") + (personName ? " de " + personName : "") + ".");
+        }
+      }
+
+      if (filterAction) filterAction.addEventListener("change", applyFilter);
+      if (filterPerson) filterPerson.addEventListener("change", applyFilter);
+      var clearFilter = modal.querySelector("[data-internal-notif-filter-clear]");
+      if (clearFilter) clearFilter.addEventListener("click", function () {
+        if (filterAction) filterAction.value = "";
+        if (filterPerson) filterPerson.value = "";
+        applyFilter();
+      });
+      // Select2 avisa los cambios por jQuery; sin él, por el evento nativo.
+      modal.querySelectorAll('select[name^="settings["]').forEach(function (select) {
+        select.addEventListener("change", refreshActionCounts);
+        if (window.jQuery) window.jQuery(select).on("change", refreshActionCounts);
+      });
+      refreshActionCounts();
+
       openBtn.addEventListener("click", openModal);
       if (closeBtn) {
         closeBtn.addEventListener("click", closeModal);

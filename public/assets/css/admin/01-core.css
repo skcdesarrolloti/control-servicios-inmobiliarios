@@ -5855,3 +5855,54 @@ body.scm-image-lightbox-open {
     transform: none;
   }
 }
+
+/* Filtro por acción o funcionario en Notificaciones internas. */
+#scm-app #scm-internal-notifications-modal .scm-internal-notif-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid #e5edf7;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+#scm-app #scm-internal-notifications-modal .scm-internal-notif-filter label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 240px;
+  min-width: 0;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #475569;
+}
+
+#scm-app #scm-internal-notifications-modal .scm-internal-notif-filter select {
+  width: 100%;
+  max-width: 100%;
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+#scm-app #scm-internal-notifications-modal .scm-internal-notif-filter small {
+  flex: 1 1 100%;
+  color: #061d49;
+  font-size: 12px;
+}
+
+#scm-app #scm-internal-notifications-modal .scm-internal-notif-filter small:empty {
+  display: none;
+}
+
+#scm-app #scm-internal-notifications-modal [data-internal-notif-action][hidden],
+#scm-app #scm-internal-notifications-modal [data-internal-notif-group][hidden] {
+  display: none !important;
+}
