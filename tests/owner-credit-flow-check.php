@@ -169,9 +169,9 @@ try {
 $newEnd = date('Y-m-d', strtotime('+3 years'));
 $simulated = $service->workspace((int) $pending['id'], ['requested_term' => '10', 'contract_end' => $newEnd]);
 $check($simulated['term_error'] === '' && $simulated['contract']['fin_ts'] !== $simulated['contract']['fin_saved_ts'], 'a corrected end date is simulated before saving');
-// Con vigencia de sobra (36 meses − 2) el plazo no pasa del tope de política de 12 meses.
-$capped = $service->workspace((int) $pending['id'], ['requested_term' => '30', 'contract_end' => $newEnd]);
-$check($capped['evaluation']['max_months'] === 12 && str_contains($capped['term_error'], 'tope de política de 12 meses'), 'the maximum term never exceeds the 12-month policy cap');
+// Con vigencia de 36 meses el plazo máximo es n − 2, sin tope de 12.
+$capped = $service->workspace((int) $pending['id'], ['requested_term' => '40', 'contract_end' => $newEnd]);
+$check($capped['evaluation']['term_limit'] === $capped['evaluation']['longest_months'] - 2 && $capped['evaluation']['term_limit'] > 12 && str_contains($capped['term_error'], '− 2 de margen'), 'the maximum term is the months left minus 2, without the 12-month cap');
 $check($db->getRow('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 7')['fin_contrato'] === $end, 'simulating does not touch the contract');
 $check(!method_exists($service, 'updateContractEnd'), 'the end date is no longer saved with a separate button');
 $service->decide((int) $pending['id'], 'rechazado', ['requested_term' => '30', 'contract_end' => $newEnd, 'note' => 'Se rechaza tras corregir la fecha fin.'], $actor);
@@ -230,11 +230,14 @@ try {
 // Varios contratos del mismo propietario: el de vigencia más larga va primero y suma al tope del liquidador.
 $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 14, 'contrato' => '954', 'estado' => 'Entregado', 'inmueble' => '10601', 'propietario' => 'Primer Dueño', 'id_propietario' => '960', 'valor_canon' => '2.000.000', 'fin_contrato' => (string) strtotime('+3 years'), 'esta_sinestrado' => 'No', 'id_contrato_mandato' => '31']);
 $portfolio = $service->ownerPortfolio('22233344');
+$people = $service->ownersByName('  SEGUNDA ');
+$check(count($people) === 1 && $people[0]['document'] === '22233344' && $people[0]['name'] === 'Segunda Dueña', 'the new request finds the owner by name and returns their document');
+$check($service->ownersByName('Nadie Inexistente') === [], 'a name with no owner returns nobody');
 $check(array_column($portfolio, 'id') === [14, 9] && $portfolio[0]['net_income'] == 1900000.0, 'the owner portfolio lists the longest contract first, with its net income');
 $work = $service->workspace((int) $chosen['id']);
 $ev = $work['evaluation'];
 $check(count($ev['other_contracts']) === 1 && abs($ev['total_net_income'] - 3300000) < 0.01 && abs($ev['max_amount'] - 9900000) < 0.01, 'the liquidator adds the other contracts to the cap');
-$check($ev['longest_months'] === $portfolio[0]['max_months'] && $ev['max_months'] === min(12, $portfolio[0]['max_months'] - 2), 'the liquidator term is the longest contract minus the margin, capped at 12');
+$check($ev['longest_months'] === $portfolio[0]['max_months'] && $ev['term_limit'] === $portfolio[0]['max_months'] - 2, 'the liquidator term is the longest contract minus the margin');
 foreach ([[0, $ev['max_months'], 'valor'], [9900000, 0, 'plazo']] as [$amount, $term, $missing]) {
   try {
     $service->simulation('22233344', 9, $amount, $term, 'Libre Destinación', 'mandato_2', $actor);
@@ -257,7 +260,7 @@ $credits = (int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credits');
 $service->recordSimulation($simulation, $actor);
 $check((int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credits') === $credits && (int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble WHERE tipo_reporte = 'Simulación de crédito'") === 2, 'a simulation is not saved as a credit and goes to the history of every owner property');
 $simulationHtml = \SCM\Modules\OwnerCredits\OwnerCreditPdf::html($simulation, 'Funcionario QA');
-$check(str_contains($simulationHtml, 'Simulación de crédito · Contrato 950') && str_contains($simulationHtml, 'Ingreso neto total (2 contratos)') && str_contains($simulationHtml, '(principal)') && str_contains($simulationHtml, 'Baja · Sin seguimiento de renovación') && str_contains($simulationHtml, 'no es una aprobación') && substr_count($simulationHtml, 'términos y condiciones de SKC SuCasa Inmobiliaria') === 2 && !str_contains($simulationHtml, 'Tasa ajustada de colocación') && !str_contains($simulationHtml, 'Tasa para el riesgo') && str_contains($simulationHtml, 'Tasa de usura vigente'), 'the simulation PDF warns it is subject to company policies and terms (top and scope), has one income table for all the contracts, the suggested vacancy and says it is not an approval');
+$check(str_contains($simulationHtml, 'Simulación de crédito · Contrato 950') && str_contains($simulationHtml, 'Ingreso neto total (2 contratos)') && str_contains($simulationHtml, '(principal)') && !str_contains($simulationHtml, 'Probabilidad de desocupación') && !str_contains($simulationHtml, 'Total intereses') && !str_contains($simulationHtml, 'Total a pagar') && str_contains($simulationHtml, '<th scope="row">Documento</th><td>22233344</td>') && str_contains($simulationHtml, 'no es una aprobación') && substr_count($simulationHtml, 'términos y condiciones de SKC SuCasa Inmobiliaria') === 2 && !str_contains($simulationHtml, 'Tasa ajustada de colocación') && !str_contains($simulationHtml, 'Tasa para el riesgo') && str_contains($simulationHtml, 'Tasa de usura vigente'), 'the simulation PDF warns it is subject to company policies and terms (top and scope), has one income table for all the contracts, the document apart, no vacancy or interest totals, and says it is not an approval');
 // Aprobado con varios contratos: quedan como respaldo y en su historial; al vencer la última cuota queda pagado solo.
 $service->decide((int) $chosen['id'], 'aprobado', ['requested_term' => '3', 'amount' => '$800.000', 'term' => '3', 'rate' => '1,9', 'disbursed_at' => date('Y-m-d', strtotime('-1 year')), 'note' => 'Desembolsado hace un año, prueba de cierre automático.'], $actor);
 $check(count($db->getResults('SELECT * FROM wp_scm_owner_credit_sources WHERE credit_id = ?', [(int) $chosen['id']])) === 2, 'every contract of the owner backs the approved credit');

@@ -40,7 +40,8 @@ final class OwnerCreditSettings
       'policy_discount' => 0.05,
       'income_months' => 3,
       'min_remaining_months' => 3,
-      'max_term_months' => 12,
+      // Plazo máximo = cuotas que vencen antes del fin del contrato más largo menos este margen (n − 2).
+      'term_margin_months' => 2,
       // Cobertura de pago: % del ingreso neto de cada contrato que se puede usar para la cuota y cuántas veces debe
       // alcanzar el disponible a la cuota (1 = alcanza exacto). Los define la empresa.
       'usable_income_factor' => 1.0,
@@ -110,7 +111,7 @@ final class OwnerCreditSettings
       'min_remaining_months' => $int($input['min_remaining_months'] ?? null, $defaults['min_remaining_months'], 0, 60),
       'usable_income_factor' => $share($input['usable_income_factor'] ?? null, $defaults['usable_income_factor']),
       'min_coverage' => $coverage($input['min_coverage'] ?? null, $defaults['min_coverage']),
-      'max_term_months' => $int($input['max_term_months'] ?? null, $defaults['max_term_months'], 1, 60),
+      'term_margin_months' => $int($input['term_margin_months'] ?? null, $defaults['term_margin_months'], 0, 12),
       'default_term' => $int($input['default_term'] ?? null, $defaults['default_term'], 1, 60),
       'require_promissory' => $bool($input['require_promissory'] ?? null, $defaults['require_promissory']),
       'notify_owner_email' => $bool($input['notify_owner_email'] ?? null, $defaults['notify_owner_email']),

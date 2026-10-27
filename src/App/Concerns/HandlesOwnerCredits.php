@@ -289,6 +289,11 @@ trait HandlesOwnerCredits
       // El primero es el de vigencia más larga: el formulario lo preselecciona.
       $service = $this->ownerCreditService();
       $document = sanitize_text_field(wp_unslash((string) ($_POST['document'] ?? '')));
+      // Con letras se busca por nombre: se devuelven las personas para elegir y luego se busca por su documento.
+      if (preg_match('/\p{L}{2,}/u', $document) === 1) {
+        $people = $service->ownersByName($document);
+        if ($people !== [] || preg_match('/^[0-9A-Z-]{4,20}$/', strtoupper(preg_replace('/[\s.]+/', '', $document) ?? '')) !== 1) $this->jsonOk(['people' => $people]);
+      }
       $rows = $service->ownerPortfolio($document);
       // Cupo preaprobado con todos los contratos de la persona, menos el saldo de sus créditos vigentes.
       $preapproval = \SCM\Modules\OwnerCredits\OwnerCreditCalculator::preapproval($rows, OwnerCreditSettings::read(App::settings()));
@@ -359,7 +364,7 @@ trait HandlesOwnerCredits
       if ($mode === 'save') {
         // Se parte de lo guardado para no perder los datos de la última sincronización.
         $input = OwnerCreditSettings::read(App::settings());
-        foreach (['usury_auto', 'usury_annual', 'usury_updated_at', 'reference_rate', 'policy_discount', 'no_mandate_deduction', 'income_months', 'min_remaining_months', 'max_term_months', 'usable_income_factor', 'min_coverage', 'require_promissory', 'notify_owner_email', 'notify_owner_whatsapp', 'notify_staff_whatsapp'] as $key) {
+        foreach (['usury_auto', 'usury_annual', 'usury_updated_at', 'reference_rate', 'policy_discount', 'no_mandate_deduction', 'income_months', 'min_remaining_months', 'term_margin_months', 'usable_income_factor', 'min_coverage', 'require_promissory', 'notify_owner_email', 'notify_owner_whatsapp', 'notify_staff_whatsapp'] as $key) {
           if (isset($_POST[$key])) $input[$key] = sanitize_text_field(wp_unslash((string) $_POST[$key]));
         }
         $saved = OwnerCreditSettings::save(App::settings(), $input, Auth::userId());

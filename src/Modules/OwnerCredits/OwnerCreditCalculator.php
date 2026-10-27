@@ -118,7 +118,7 @@ final class OwnerCreditCalculator
     $net = array_sum(array_map(static fn(array $row): float => max(0.0, (float) $row['net_income']), $contracts));
     $longest = $contracts === [] ? 0 : max(0, ...array_map(static fn(array $row): int => (int) $row['max_months'], $contracts));
     $longestEnd = $contracts === [] ? 0 : max(0, ...array_map(static fn(array $row): int => (int) ($row['end_ts'] ?? 0), $contracts));
-    $cap = self::termCap($settings);
+    $margin = self::termMargin($settings);
     $firstDue = OwnerCreditCoverage::firstDueTs($disbursedTs ?: (int) strtotime('today'));
     $byDates = OwnerCreditCoverage::duesUntil($firstDue, $longestEnd, 600);
     return [
@@ -129,25 +129,26 @@ final class OwnerCreditCalculator
       'longest_months' => $longest,
       'longest_end_ts' => $longestEnd,
       'first_due_ts' => $firstDue,
-      'max_term_cap' => $cap,
-      'max_term' => min($cap, $byDates),
-      'term_basis' => self::termBasisText($byDates, $cap, $longestEnd, count($contracts) > 1),
+      'term_margin' => $margin,
+      'max_term' => max(0, $longest - $margin),
+      // Sin cuotas por vigencia (fecha fin vieja) se deja registrar hasta el plazo por defecto: el analista la corrige.
+      'fallback_term' => max(1, (int) ($settings['default_term'] ?? 12)),
+      'term_basis' => self::termBasisText($longest, $margin, $longestEnd, count($contracts) > 1),
     ];
   }
 
-  /** Tope de plazo de política: ningún crédito pasa de estos meses aunque la vigencia dé para más. */
-  public static function termCap(array $settings): int
+  /** Meses de margen antes del fin del contrato: el plazo máximo es n − margen (Configuración). */
+  public static function termMargin(array $settings): int
   {
-    return max(1, (int) ($settings['max_term_months'] ?? 12));
+    return max(0, (int) ($settings['term_margin_months'] ?? 2));
   }
 
-  /** "9 cuotas vencen antes del fin del contrato más largo, el 30/09/2027", o el tope de política si es menor. */
-  public static function termBasisText(int $byDates, int $cap, int $longestEnd, bool $several): string
+  /** "24 meses de vigencia del contrato más largo (fin 14/11/2028) − 2 de margen". */
+  public static function termBasisText(int $months, int $margin, int $longestEnd, bool $several): string
   {
     $contract = $several ? 'del contrato más largo' : 'del contrato';
     if ($longestEnd <= 0) return 'sin fecha fin ' . $contract;
-    $dates = $byDates . ' cuota' . ($byDates === 1 ? '' : 's') . ' vence' . ($byDates === 1 ? '' : 'n') . ' antes del fin ' . $contract . ', el ' . date('d/m/Y', $longestEnd);
-    return $byDates > $cap ? 'tope de política de ' . $cap . ' meses; ' . $dates : $dates;
+    return $months . ' mes' . ($months === 1 ? '' : 'es') . ' de vigencia ' . $contract . ' (fin ' . date('d/m/Y', $longestEnd) . ')' . ($margin > 0 ? ' − ' . $margin . ' de margen' : '');
   }
 
   /**
@@ -172,12 +173,12 @@ final class OwnerCreditCalculator
     $policyRate = $referenceRate * (1 - (float) $settings['policy_discount']);
     $contractMonths = max(0, self::monthsUntil((int) $input['request_ts'], (int) $input['contract_end_ts']));
     $longestMonths = max($contractMonths, (int) ($input['longest_months'] ?? 0));
-    $termCap = self::termCap($settings);
+    $margin = self::termMargin($settings);
     $coverage = isset($input['coverage']) && is_array($input['coverage']) ? $input['coverage'] : null;
     $slots = $coverage !== null ? array_values((array) $coverage['availability']) : [];
     $minCoverage = $coverage !== null ? max(1.0, (float) $coverage['min_coverage']) : 1.0;
     // Plazo máximo por vigencia (límite superior); la cobertura lo puede bajar según el valor.
-    $termLimit = $coverage !== null ? min($termCap, max(0, (int) $coverage['term_limit'])) : min($termCap, $longestMonths);
+    $termLimit = $coverage !== null ? max(0, (int) $coverage['term_limit']) : max(0, $longestMonths - $margin);
     // Mayor plazo con cobertura para $amount a $rate, probando desde $from hasta 1 (0 si ninguno).
     $covered = static fn(float $amount, float $rate, int $from): int => $coverage === null || $amount <= 0 ? $from
       : OwnerCreditCoverage::bestTerm($amount, min($rate, $usuryLegal), $from, $slots, $minCoverage)['term'];
@@ -221,7 +222,7 @@ final class OwnerCreditCalculator
       'policy_rate' => $policyRate,
       'contract_months' => $contractMonths,
       'longest_months' => $longestMonths,
-      'max_term_cap' => $termCap,
+      'term_margin' => $margin,
       'term_limit' => $termLimit,
       'max_months' => $maxMonths,
       'max_amount' => $maxAmount,

@@ -231,7 +231,7 @@ final class OwnerCreditView
       . ($endChanged ? self::alert('Estás calculando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Se guardará en el contrato al aprobar o rechazar el crédito.', 'info') : '')
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('chart') . 'Política de créditos</h4>' . self::guide('politica', [
         'Valor máximo a prestar' => 'Tope = ingreso neto de todos los contratos del propietario × los meses de política (Configuración, hoy ' . (int) $work['settings']['income_months'] . ').',
-        'Plazo máximo por vigencia' => 'Cuotas del calendario (día 30) que vencen antes del fin del contrato más largo del propietario, sin pasar del plazo máximo de un crédito (Configuración, hoy ' . (int) ($work['settings']['max_term_months'] ?? 12) . '). Es un límite: la cobertura de pago decide cuántas se pueden pagar.',
+        'Plazo máximo por vigencia' => 'Meses de vigencia que le quedan al contrato más largo del propietario menos el margen de Configuración (hoy ' . (int) ($work['settings']['term_margin_months'] ?? 2) . ' meses): n − 2. Es un límite: la cobertura de pago decide cuántas se pueden pagar.',
         'Mayor plazo con cobertura' => 'El plazo más largo, hasta el máximo por vigencia, en el que todas las cuotas del valor solicitado (a la tasa de referencia) tienen ingreso disponible.',
         'Tasa mínima' => 'Tasa de referencia menos el descuento máximo de Configuración: lo más bajo que puedes aprobar dentro de política.',
         'Cuota de política' => 'La cuota si se prestara el valor máximo al plazo máximo.',
@@ -622,7 +622,7 @@ final class OwnerCreditView
       . $field('Meses mínimos de contrato restantes', '<input class="' . $ui::INPUT . '" type="number" name="min_remaining_months" min="0" max="60" value="' . (int) $settings['min_remaining_months'] . '">', 'Por debajo se alerta "contrato próximo a vencer".')
       . $field('Ingreso utilizable para la cuota (%)', $input('usable_income_factor', $pct($settings['usable_income_factor'], 1), ' inputmode="decimal"'), 'Porción del ingreso neto de cada contrato (canon − descuentos) que se puede comprometer con la cuota. 100 % = todo.')
       . $field('Cobertura mínima (veces la cuota)', $input('min_coverage', number_format((float) $settings['min_coverage'], 2, ',', ''), ' inputmode="decimal"'), 'En cada fecha de pago el ingreso disponible debe ser al menos la cuota por este número. 1,00 = alcanza exacto; 1,20 exige 20 % de margen.')
-      . $field('Plazo máximo de un crédito (meses)', '<input class="' . $ui::INPUT . '" type="number" name="max_term_months" min="1" max="60" value="' . (int) $settings['max_term_months'] . '">', 'Tope de plazo: se prueban todos los plazos hasta este y se toma el mayor con cobertura en todas sus cuotas.')
+      . $field('Meses de margen antes del fin del contrato', '<input class="' . $ui::INPUT . '" type="number" name="term_margin_months" min="0" max="12" value="' . (int) $settings['term_margin_months'] . '">', 'Plazo máximo = meses de vigencia que le quedan al contrato más largo menos estos meses (n − 2). Aplica a la solicitud, a la cotización y al liquidador.')
       . '</div></section>'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . UI::icon('bolt') . 'Avisos</h4><div class="' . $grid . '">'
       . $field('Exigir pagaré firmado para aprobar', $yesNo('require_promissory', (bool) ($settings['require_promissory'] ?? true)), 'Pagaré en blanco y carta de instrucciones firmados por quienes elija el analista. Cada persona lo firma una vez y sirve para todos sus créditos.')
@@ -648,16 +648,16 @@ final class OwnerCreditView
         'Tipos' => 'Propietario, arrendatario, codeudor, externo o funcionario. Por ahora solo está habilitado el crédito a propietarios; los demás se habilitarán con su propia evaluación.',
       ])
       . self::beneficiaryTypes(array_keys(OwnerCreditService::BENEFICIARY_TYPES), 'propietario') . '</section>'
-      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . $step('2') . 'Documento del propietario</h4>'
+      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . $step('2') . 'Documento o nombre del propietario</h4>'
       . self::guide('nuevo-documento', [
-        'Qué escribir' => 'La cédula o el NIT de quien pide el crédito, con o sin puntos.',
+        'Qué escribir' => 'La cédula o el NIT de quien pide el crédito, con o sin puntos, o su nombre. Por nombre aparecen las personas que coinciden: elige una y se buscan sus contratos por su documento.',
         'Qué encuentra' => 'Los contratos de arrendamiento donde esa persona es propietaria (en el contrato, en su ficha o en el contrato de mandato, aunque sean varios propietarios).',
         'Contrato principal' => 'No se elige: el sistema toma el contrato de vigencia más larga, que es el que da el plazo máximo, y de él se descuenta primero la cuota. Si hace falta, el analista lo cambia en el liquidador.',
         'Revisión previa' => 'Las políticas que no dependen del valor (contrato activo, vigencia, siniestro, créditos vigentes) revisadas sobre todos sus contratos. Es informativa: la solicitud se puede registrar igual y el analista decide.',
-        'Cupo preaprobado' => 'Suma del ingreso neto (canon − descuentos) de todos sus contratos × los meses de política. Las cuotas máximas son las que vencen (día 30) antes del fin del contrato más largo, sin pasar del plazo máximo de un crédito; con el valor, la cobertura de pago puede bajarlas.',
+        'Cupo preaprobado' => 'Suma del ingreso neto (canon − descuentos) de todos sus contratos × los meses de política. Las cuotas máximas son los meses de vigencia que le quedan al contrato más largo menos el margen de Configuración (n − 2); con el valor, la cobertura de pago puede bajarlas.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[minmax(0,1fr)_auto] !sp-gap-3 !sp-items-end">'
-      . $field('Cédula o NIT' . $required, '<input class="' . $ui::INPUT . '" name="document" data-owner-credit-search-query inputmode="numeric" placeholder="Ej. 1143415938">')
+      . $field('Cédula, NIT o nombre' . $required, '<input class="' . $ui::INPUT . '" name="document" data-owner-credit-search-query placeholder="Ej. 1143415938 o Royner Guardo">')
       . '<button type="button" class="' . $ui::NAVY . ' !sp-h-10" data-owner-credit-search>' . $ui::icon('filter', '!sp-w-3.5 !sp-h-3.5') . 'Buscar</button></div>'
       . '<p class="' . self::NOTE . ' !sp-mt-2" data-owner-credit-search-status></p>'
       . '<div class="!sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200" data-owner-credit-person hidden></div>'
@@ -668,7 +668,7 @@ final class OwnerCreditView
       . self::guide('nuevo-datos', [
         'Primero simula' => 'Con "Simular y ver PDF" revisas con el propietario la cuota y la tabla de amortización. Si está de acuerdo, aparece "Registrar solicitud". Si cambias el valor, el plazo o la destinación, vuelve a simular.',
         'Qué pasa al registrar' => 'Solo se registra lo que pide el propietario: todavía no se aprueba nada. El analista lo evalúa en el liquidador y ahí se aprueba o rechaza.',
-        'Plazo solicitado' => 'Los meses que pidió el propietario, hasta el plazo máximo del cupo preaprobado: cuotas que vencen antes del fin del contrato más largo, sin pasar del plazo máximo de un crédito (Configuración). La simulación revisa la cobertura de todas las cuotas. Si el contrato fue renovado y la fecha no está al día, regístralo con el máximo: el analista corrige la fecha fin en el liquidador.',
+        'Plazo solicitado' => 'Los meses que pidió el propietario, hasta el plazo máximo del cupo preaprobado: meses de vigencia del contrato más largo menos el margen de Configuración (n − 2). La simulación revisa la cobertura de todas las cuotas. Si el contrato fue renovado y la fecha no está al día, regístralo con el máximo: el analista corrige la fecha fin en el liquidador.',
         'Simular y ver PDF' => 'Calcula la cuota y la tabla de amortización con la tasa de política sin registrar la solicitud. Primero escribe el valor y el plazo: sin ellos no se simula. La simulación queda en el historial de los contratos y de los inmuebles del propietario.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-3">'
@@ -719,7 +719,7 @@ final class OwnerCreditView
       . self::guide('cupo', [
         'Cupo preaprobado' => 'Ingreso neto de todos sus contratos Entregado o Por entregar × los meses de política (Configuración).',
         'Saldo de créditos vigentes' => 'Lo que todavía debe de sus créditos aprobados; se resta del cupo.',
-        'Plazo máximo' => 'Cuotas del calendario (día 30) que vencen antes del fin del contrato más largo, sin pasar del plazo máximo de un crédito (Configuración). Con el valor pedido, la cobertura de pago puede bajarlo.',
+        'Plazo máximo' => 'Meses de vigencia del contrato más largo menos el margen de Configuración (n − 2). Con el valor pedido, la cobertura de pago puede bajarlo.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">'
       . self::tile('Cupo (' . (int) $p['contracts'] . ' contrato' . ((int) $p['contracts'] === 1 ? '' : 's') . ')', self::money((float) $p['amount']), 'key')

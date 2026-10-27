@@ -145,7 +145,8 @@ final class OwnerCreditPdf
       // La simulación se puede mostrar al propietario: el aviso va arriba, antes de cualquier valor.
       . ($simulation || !$decided ? '<p class="scm-owner-credit-disclaimer"><strong>Importante:</strong> ' . Doc::e(OwnerCreditService::DISCLAIMER) . '</p>' : '')
       . '<section class="scm-acta-receipt-section"><h2>1. Propietario y contrato</h2>' . Doc::table([
-        OwnerCreditService::beneficiaryLabel($credit) . ' (beneficiario)' => (string) $credit['owner_name'] . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · Documento ' . $credit['owner_document'] : ''),
+        OwnerCreditService::beneficiaryLabel($credit) . ' (beneficiario)' => (string) $credit['owner_name'],
+        'Documento' => (string) ($credit['owner_document'] ?? ''),
         'Contrato / Inmueble SIMI' => '#' . $contract['code'] . ' · ' . $credit['property'],
         'Dirección' => (string) $credit['address'],
         'Origen' => $simulation ? 'Simulación desde la solicitud de crédito (sin registrar)' : ((int) $credit['quote_id'] > 0 ? 'Cotización #' . (int) $credit['quote_id'] . ((string) $credit['ticket_id'] !== '' ? ' · Caso #' . $credit['ticket_id'] : '') : 'Solicitud registrada en el panel'),
@@ -160,8 +161,10 @@ final class OwnerCreditPdf
         'Valor solicitado' => $money($credit['requested_amount']),
         'Plazo solicitado' => (int) $credit['requested_term'] > 0 ? (int) $credit['requested_term'] . ' meses' : '',
         'Destinación' => (string) $credit['purpose'],
+      ] + ($simulation ? [] : [
+        // La desocupación es análisis interno del analista: no va en la simulación que ve el propietario.
         'Probabilidad de desocupación' => (string) $ev['vacancy'] . (isset($ev['vacancy_signal']) ? ($ev['vacancy_signal']['level'] === $ev['vacancy'] ? ' · ' . $ev['vacancy_signal']['reason'] : ' (elegida por el analista; el sistema sugería ' . $ev['vacancy_signal']['reason'] . ')') : ''),
-      ] + (($ev['vacancy_signal']['alerts'] ?? []) !== [] ? ['Avisos de desocupación' => implode(' ', $ev['vacancy_signal']['alerts'])] : [])) . '</section>'
+      ] + (($ev['vacancy_signal']['alerts'] ?? []) !== [] ? ['Avisos de desocupación' => implode(' ', $ev['vacancy_signal']['alerts'])] : []))) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>4. Política de créditos</h2>' . Doc::table([
         'Valor máximo a prestar' => $money($ev['max_amount']) . ' (' . (int) $work['settings']['income_months'] . ' × ingreso neto' . ($others !== [] ? ' total' : '') . ')',
         'Plazo máximo por vigencia' => (int) ($ev['term_limit'] ?? $ev['max_months']) . ' meses (' . OwnerCreditService::termBasis($ev) . ')',
@@ -179,8 +182,10 @@ final class OwnerCreditPdf
         'Plazo' => (int) $c['term'] . ' meses',
         'Tasa' => $percent($c['rate']) . ' N.M.V (' . $percent((1 + $c['rate']) ** 12 - 1) . ' E.A.)',
         'Cuota mensual' => $money($c['payment']),
+      ] + ($simulation ? [] : [
         'Total intereses' => $money($c['total_interest']),
         'Total a pagar' => $money($c['amount'] + $c['total_interest']),
+      ]) + [
         'Fecha de desembolso' => $date((int) ($work['disbursed_ts'] ?? 0)),
         'Primera / última cuota' => $date((int) ($work['first_payment_ts'] ?? 0)) . ' – ' . $date((int) ($work['last_payment_ts'] ?? 0)),
       ]) . '</section>'

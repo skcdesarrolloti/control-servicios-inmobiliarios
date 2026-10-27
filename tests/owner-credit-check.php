@@ -22,7 +22,7 @@ $near = static fn(float $a, float $b, float $tolerance = 0.01): bool => abs($a -
 
 // Valores de "Simuladore de Creditos a Propietarios Version 2.xlsx" (contrato 890).
 // Sin margen de meses, como el Excel (el margen del preaprobado se prueba aparte).
-$settings = OwnerCreditSettings::normalize(['usury_annual' => '0.333', 'reference_rate' => '0.0242', 'policy_discount' => '0.05', 'income_months' => 3, 'preapproval_margin_months' => 0]);
+$settings = OwnerCreditSettings::normalize(['usury_annual' => '0.333', 'reference_rate' => '0.0242', 'policy_discount' => '0.05', 'income_months' => 3, 'term_margin_months' => 0]);
 $assert($near($settings['usury_annual'], 0.333, 1e-9) && $near($settings['reference_rate'], 0.0242, 1e-9), 'settings keep decimal rates');
 $assert($near(OwnerCreditSettings::normalize(['usury_annual' => '33,3', 'reference_rate' => '2,42'])['reference_rate'], 0.0242, 1e-9), 'settings accept rates typed as percentages');
 
@@ -47,20 +47,19 @@ $media = OwnerCreditCalculator::evaluate(['vacancy' => 'Media'] + ['gross' => 62
 $assert($media['suggested']['term'] === 6 && $near($media['suggested']['rate'], 0.0242, 1e-12), 'medium vacancy suggests max months at the reference rate');
 
 // Cupo preaprobado con varios contratos (ejemplo de Cartera): canon 1.000.000 + 500.000 + 2.800.000 − 860.000 de descuentos.
-// Plazo del preaprobado: cuotas del calendario (día 30) que vencen antes del fin del contrato más largo, sin margen.
+// Plazo del preaprobado: meses de vigencia del contrato más largo menos el margen (aquí 0; por defecto 2).
 $disbursed = (int) strtotime('2026-10-26');
 $pre = OwnerCreditCalculator::preapproval([
   ['net_income' => 800000, 'max_months' => 3, 'end_ts' => strtotime('2027-01-31')], ['net_income' => 400000, 'max_months' => 7, 'end_ts' => strtotime('2027-05-31')], ['net_income' => 2240000, 'max_months' => 12, 'end_ts' => strtotime('2027-10-31')],
 ], $settings, $disbursed);
 $assert($near($pre['net_income'], 3440000) && $near($pre['amount'], 10320000), 'preapproval = sum of net incomes × 3');
-$assert($pre['max_term'] === 12 && $pre['contracts'] === 3 && date('Y-m-d', $pre['first_due_ts']) === '2026-11-30', 'preapproval term = installments due (30th) before the longest contract ends');
+$assert($pre['max_term'] === 12 && $pre['contracts'] === 3 && date('Y-m-d', $pre['first_due_ts']) === '2026-11-30', 'preapproval term = months left of the longest contract');
 $assert(OwnerCreditCalculator::preapproval([], $settings)['max_term'] === 0, 'preapproval without contracts is empty');
 $short = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 7, 'end_ts' => strtotime('2027-05-31')]], $settings, $disbursed);
-$assert($short['max_term'] === 7 && str_contains($short['term_basis'], '7 cuotas vencen antes del fin del contrato, el 31/05/2027'), 'a contract ending in May leaves 7 installments (Nov–May)');
-$long = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 25, 'end_ts' => strtotime('2028-12-31')], ['net_income' => 400000, 'max_months' => 6, 'end_ts' => strtotime('2027-04-30')]], $settings, $disbursed);
-$assert($long['max_term'] === 12 && $long['max_term_cap'] === 12 && str_contains($long['term_basis'], 'tope de política de 12 meses'), 'a long contract is capped at the 12-month policy term');
-$cap18 = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 25, 'end_ts' => strtotime('2028-12-31')]], OwnerCreditSettings::normalize(['max_term_months' => 18] + $settings), $disbursed);
-$assert($cap18['max_term'] === 18, 'the policy term cap is configurable');
+$assert($short['max_term'] === 7 && str_contains($short['term_basis'], '7 meses de vigencia del contrato (fin 31/05/2027)'), 'a contract with 7 months left gives 7 installments without margin');
+$long = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 25, 'end_ts' => strtotime('2028-12-31')], ['net_income' => 400000, 'max_months' => 6, 'end_ts' => strtotime('2027-04-30')]], OwnerCreditSettings::normalize(['term_margin_months' => 2] + $settings), $disbursed);
+$assert($long['max_term'] === 23 && str_contains($long['term_basis'], '25 meses de vigencia del contrato más largo') && str_contains($long['term_basis'], '− 2 de margen'), 'the maximum term is n − 2 with no 12-month cap');
+$assert(OwnerCreditSettings::normalize([])['term_margin_months'] === 2 && OwnerCreditSettings::normalize(['term_margin_months' => 3])['term_margin_months'] === 3 && !array_key_exists('max_term_months', OwnerCreditSettings::normalize([])), 'the margin is configurable (2 by default) and there is no term cap');
 $assert(OwnerCreditSettings::normalize(['usable_income_factor' => '70', 'min_coverage' => '1,2'])['usable_income_factor'] === 0.7 && OwnerCreditSettings::normalize(['min_coverage' => '1,2'])['min_coverage'] === 1.2, 'usable income (%) and minimum coverage (times the installment) are configurable');
 $assert(OwnerCreditSettings::normalize(OwnerCreditSettings::normalize([]))['usable_income_factor'] === 1.0 && OwnerCreditSettings::normalize(['min_coverage' => '0,5'])['min_coverage'] === 1.0, '100 % stays 100 % when read back and the minimum coverage is at least 1');
 $consolidated = OwnerCreditCalculator::evaluate([
@@ -174,6 +173,6 @@ $assert(str_contains($otherHtml, 'Contrato principal no siniestrado · Otros con
 $mainSiniestro = \SCM\Modules\OwnerCredits\OwnerCreditPdf::html(array_replace_recursive($otherSiniestro, ['contract' => ['siniestrado' => true], 'evaluation' => ['analyst' => ['siniestrados' => ['#890']]]]), 'Funcionario');
 $assert(str_contains($mainSiniestro, '<td>Siniestrado</td>') || str_contains($mainSiniestro, '>Siniestrado<'), 'a siniestro on the main contract is shown as siniestrado');
 $newForm = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->newForm();
-$assert(str_contains($newForm, 'Documento del propietario') && str_contains($newForm, 'name="owner_key"') && !str_contains($newForm, 'name="contract_end"') && !str_contains($newForm, '¿Cuál propietario?'), 'new credit asks for the owner document, without the owner step or the contract end date');
+$assert(str_contains($newForm, 'Documento o nombre del propietario') && str_contains($newForm, 'Cédula, NIT o nombre') && str_contains($newForm, 'name="owner_key"') && !str_contains($newForm, 'name="contract_end"') && !str_contains($newForm, '¿Cuál propietario?'), 'new credit asks for the owner document, without the owner step or the contract end date');
 $healthy = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace(array_replace_recursive($work, ['contract' => ['siniestrado' => false]]), true, true);
 $assert(str_contains($healthy, 'name="siniestro"') && str_contains($healthy, '<option value="no" selected>No</option>') && str_contains($healthy, 'Cartera no marcó ninguno de sus contratos'), 'a contract without a siniestro mark proposes "No" and the analyst can change it');

@@ -262,10 +262,23 @@
       preapproval.hidden = true;
       form._preapproval = null;
       checks.hidden = true;
-      if (query.replace(/[\s.]/g, "").length < 4) { status.textContent = "Escribe la cédula o el NIT (mínimo 4 caracteres)."; return; }
+      var byName = /[A-Za-zÁÉÍÓÚÑáéíóúñ]{2,}/.test(query);
+      if (byName ? query.length < 3 : query.replace(/[\s.]/g, "").length < 4) { status.textContent = "Escribe la cédula, el NIT o el nombre del propietario (mínimo 4 números o 3 letras)."; return; }
       status.textContent = "Buscando…";
       post("scm_owner_credit_contracts", { document: query })
         .then(function (data) {
+          // Búsqueda por nombre: se elige la persona y se busca por su documento.
+          if (data.people) {
+            var people = data.people;
+            if (people.length === 1) { pickPerson(form, people[0].document); return; }
+            status.textContent = people.length ? "Encontramos " + people.length + " propietarios con ese nombre: elige uno." : "No encontramos propietarios con ese nombre en contratos Entregado o Por entregar.";
+            results.innerHTML = people.map(function (p) {
+              return '<button type="button" class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-3 !sp-w-full !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-white !sp-text-left !sp-text-[11px] !sp-text-service-muted !sp-cursor-pointer hover:!sp-border-service-yellow" data-owner-credit-pick-person="' + escapeHtml(p.document) + '">' +
+                '<span><strong class="!sp-block !sp-text-xs !sp-text-service-navy">' + escapeHtml(p.name) + "</strong>Documento " + escapeHtml(p.document) + "</span>" +
+                "<span>" + escapeHtml(p.contracts) + (Number(p.contracts) === 1 ? " contrato" : " contratos") + "</span></button>";
+            }).join("");
+            return;
+          }
           var contracts = data.contracts || [];
           if (!contracts.length) {
             status.textContent = "No encontramos contratos Entregado o Por entregar donde este documento sea de un propietario. Revisa el número.";
@@ -291,6 +304,11 @@
           pickContract(form, contracts[0]);
         })
         .catch(function (error) { status.textContent = error.message; });
+    }
+
+    function pickPerson(form, documentNumber) {
+      form.querySelector("[data-owner-credit-search-query]").value = documentNumber;
+      searchContracts(form);
     }
 
     function money(value) {
@@ -356,7 +374,7 @@
     // contratos no dan cuotas se permite hasta el tope, para que el analista revise la fecha fin en el liquidador.
     function termLimit(form) {
       var p = form._preapproval || {};
-      return Number(p.max_term) > 0 ? Number(p.max_term) : (Number(p.max_term_cap) || 12);
+      return Number(p.max_term) > 0 ? Number(p.max_term) : (Number(p.fallback_term) || 12);
     }
 
     function termFits(form) {
@@ -624,6 +642,8 @@
       }
       var newForm = target.closest("[data-owner-credit-new-form]");
       if (newForm && target.closest("[data-owner-credit-search]")) { searchContracts(newForm); return; }
+      var personButton = newForm && target.closest("[data-owner-credit-pick-person]");
+      if (personButton) { pickPerson(newForm, personButton.getAttribute("data-owner-credit-pick-person")); return; }
       if (newForm && target.closest("[data-owner-credit-simulate-pdf]")) {
         if (!newForm.elements.contract_id.value) { setStatus(newForm, "Busca al propietario por documento.", "error"); return; }
         // Sin valor o sin plazo la simulación queda incompleta: se piden antes de generar el PDF.

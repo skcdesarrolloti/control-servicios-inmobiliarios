@@ -389,6 +389,57 @@ final class OwnerCreditService
   }
 
   /**
+   * "Nueva solicitud" por nombre: propietarios de contratos Entregado o Por entregar cuyo nombre (o razón social)
+   * contiene todas las palabras escritas. Se agrupan por documento; luego se busca por ese documento.
+   * @return list<array{name:string,document:string,contracts:int}>
+   */
+  public function ownersByName(string $name): array
+  {
+    $words = array_values(array_filter(preg_split('/\s+/u', self::fold($name)) ?: [], static fn(string $word): bool => mb_strlen($word) >= 2));
+    if ($words === []) throw new \InvalidArgumentException('Escribe el nombre del propietario (mínimo 3 letras).');
+    $contracts = $this->db->table('jet_cct_contratos_arrendamiento');
+    $mandates = $this->db->table('jet_cct_contrato_mandato');
+    $like = static fn(string $column): string => '(' . implode(' AND ', array_fill(0, count($words), "{$column} LIKE ?")) . ')';
+    $likeArgs = array_map(fn(string $word): string => '%' . $this->db->escapeLike($word) . '%', $words);
+    $where = [];
+    $args = [];
+    if ($this->schema->columnExists($contracts, 'propietario')) {
+      $where[] = $like('c.`propietario`');
+      array_push($args, ...$likeArgs);
+    }
+    $join = '';
+    if ($this->schema->columnExists($contracts, 'id_contrato_mandato') && $this->schema->tableExists($mandates)) {
+      $join = " LEFT JOIN `{$mandates}` m ON m.`_ID` = c.`id_contrato_mandato`";
+      for ($i = 1; $i <= 6; $i++) {
+        foreach (['nombre_', 'empresa_'] as $prefix) {
+          if (!$this->schema->columnExists($mandates, $prefix . $i)) continue;
+          $where[] = $like('m.`' . $prefix . $i . '`');
+          array_push($args, ...$likeArgs);
+        }
+      }
+    }
+    if ($where === []) return [];
+    $people = [];
+    foreach ($this->db->getResults("SELECT c.* FROM `{$contracts}` c{$join} WHERE (" . implode(' OR ', $where) . ") AND LOWER(TRIM(c.`estado`)) IN ('entregado', 'por entregar') ORDER BY c.`_ID` DESC LIMIT 60", $args) as $contract) {
+      foreach ($this->contractOwners((int) $contract['_ID']) as $owner) {
+        $folded = self::fold($owner['name']);
+        foreach ($words as $word) if (!str_contains($folded, $word)) continue 2;
+        $document = self::document($this->ownerDocument($owner, $contract));
+        if ($document === '') continue;
+        $people[$document] ??= ['name' => $owner['name'], 'document' => $document, 'contracts' => 0];
+        $people[$document]['contracts']++;
+      }
+    }
+    return array_slice(array_values($people), 0, 20);
+  }
+
+  /** Minúsculas sin tildes, para comparar nombres. */
+  private static function fold(string $value): string
+  {
+    return strtr(mb_strtolower(trim($value)), ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u', 'ñ' => 'n']);
+  }
+
+  /**
    * Contratos del propietario con su ingreso neto y vigencia, ordenados para preseleccionar: primero el de vigencia
    * más larga (en empate, Entregado). Con ellos se calcula el cupo preaprobado y el plazo máximo.
    * @return list<array<string,mixed>>
@@ -519,7 +570,7 @@ final class OwnerCreditService
 
     // Cobertura de pago: ingreso utilizable de cada contrato en cada vencimiento, menos las cuotas de sus otros
     // créditos vigentes (si el analista confirma que los tiene) y las otras obligaciones que indique.
-    $cap = OwnerCreditCalculator::termCap($settings);
+    $margin = OwnerCreditCalculator::termMargin($settings);
     $mainActive = in_array(strtolower(trim((string) ($contract['estado'] ?? ''))), ['entregado', 'por entregar'], true);
     $coverageContracts = array_merge([[
       'id' => (int) $credit['contract_id'], 'contrato' => (string) ($contract['contrato'] ?? $credit['contract_code']), 'inmueble' => (string) $credit['property'],
@@ -528,11 +579,14 @@ final class OwnerCreditService
       'id' => (int) $row['id'], 'contrato' => (string) $row['contrato'], 'inmueble' => (string) ($row['inmueble'] ?? ''), 'net_income' => (float) $row['net_income'],
       'start_ts' => (int) ($row['start_ts'] ?? 0), 'end_ts' => (int) ($row['end_ts'] ?? 0) ?: self::timestamp(str_replace('/', '-', (string) ($row['fin'] ?? ''))), 'active' => true,
     ], $others));
-    $dueDates = OwnerCreditCoverage::dueDates($firstPaymentTs, $cap);
+    // Plazo máximo: meses de vigencia del contrato más largo menos el margen (n − 2). La cobertura revisa cada cuota
+    // del calendario hasta el fin del contrato (o hasta el plazo pedido, si es mayor).
+    $longestEnd = max(0, ...array_map(static fn(array $row): int => (int) $row['end_ts'], $coverageContracts));
+    $longestMonths = max(OwnerCreditCalculator::monthsUntil($evaluationTs, $endTs), ...array_map(static fn(array $row): int => (int) $row['max_months'], $others ?: [['max_months' => 0]]));
+    $termLimit = max(0, $longestMonths - $margin);
+    $dueDates = OwnerCreditCoverage::dueDates($firstPaymentTs, max(1, OwnerCreditCoverage::duesUntil($firstPaymentTs, $longestEnd, 600), $termLimit, $requestedTerm));
     $obligations = array_map(fn(int $date): float => $extraObligations + ($hasCredits ? $this->creditPaymentsDue($approved, $date) : 0.0), $dueDates);
     $slots = OwnerCreditCoverage::availability($dueDates, $coverageContracts, (float) $settings['usable_income_factor'], $obligations);
-    $longestEnd = max(0, ...array_map(static fn(array $row): int => (int) $row['end_ts'], $coverageContracts));
-    $termLimit = OwnerCreditCoverage::duesUntil($firstPaymentTs, $longestEnd, $cap);
     $minCoverage = (float) $settings['min_coverage'];
 
     $evaluation = OwnerCreditCalculator::evaluate([
@@ -544,7 +598,7 @@ final class OwnerCreditService
     ], $settings);
     $evaluation['other_contracts'] = $others;
     $evaluation['vacancy_signal'] = $vacancySignal;
-    $evaluation['term_basis'] = OwnerCreditCalculator::termBasisText(OwnerCreditCoverage::duesUntil($firstPaymentTs, $longestEnd, 600), $cap, $longestEnd, $others !== []);
+    $evaluation['term_basis'] = OwnerCreditCalculator::termBasisText($longestMonths, $margin, $longestEnd, $others !== []);
 
     $suggested = $evaluation['suggested'];
     $amount = array_key_exists('amount', $input) ? self::money($input['amount']) : ($decided ? (float) $credit['approved_amount'] : (float) $suggested['amount']);
@@ -1025,7 +1079,7 @@ final class OwnerCreditService
    */
   public function requestTermLimit(array $preapproval): int
   {
-    return (int) $preapproval['max_term'] > 0 ? (int) $preapproval['max_term'] : (int) ($preapproval['max_term_cap'] ?? OwnerCreditCalculator::termCap($this->config()));
+    return (int) $preapproval['max_term'] > 0 ? (int) $preapproval['max_term'] : (int) ($preapproval['fallback_term'] ?? $this->config()['default_term']);
   }
 
   private function assertRequestTerm(int $term, string $document): void
@@ -1306,7 +1360,14 @@ final class OwnerCreditService
     if (!is_array($quote)) return 0;
     $contract = $this->contractById((int) ($quote['id_contrato'] ?? 0)) ?? $this->contractByRef((string) ($quote['contrato'] ?? ''));
     if ($contract === null) return 0;
-    return $this->insertCredit($contract, $quoteId, (string) ($quote['id_ticket'] ?? ''), self::money($quote['total'] ?? ''), 'Para Mejoras y/o Reparaciones al Inmueble', $actor);
+    // Plazo de la cotización: el máximo del propietario (cuotas antes del fin de su contrato más largo − margen).
+    $term = 0;
+    try {
+      $portfolio = $this->ownerPortfolio($this->ownerDocument($this->contractOwners((int) $contract['_ID'])[0] ?? null, $contract));
+      if ($portfolio !== []) $term = (int) OwnerCreditCalculator::preapproval($portfolio, $this->config())['max_term'];
+    } catch (\InvalidArgumentException) {
+    }
+    return $this->insertCredit($contract, $quoteId, (string) ($quote['id_ticket'] ?? ''), self::money($quote['total'] ?? ''), 'Para Mejoras y/o Reparaciones al Inmueble', $actor, $term);
   }
 
   /** @param array<string,string>|null $owner beneficiario elegido (contractOwners); sin él, el propietario del contrato */
@@ -1323,7 +1384,7 @@ final class OwnerCreditService
   private function creditRow(array $contract, ?int $quoteId, string $ticketId, float $amount, string $purpose, array $actor, int $term, ?array $owner, string $beneficiaryType): array
   {
     $owner ??= $this->contractOwners((int) ($contract['_ID'] ?? 0))[0] ?? null;
-    // Sin plazo por defecto ($term = 0): lo escribe el funcionario según lo que pidió el propietario.
+    // Plazo: el que escribió el funcionario o, desde una cotización, el máximo del propietario (0 si no se pudo calcular).
     $income = $this->defaultIncome($contract);
     $now = time();
     $phone = $owner !== null ? $owner['phone'] : self::phone((string) ($contract['celular_propietario'] ?? ''), (string) ($contract['indicativo_propietario'] ?? ''));
