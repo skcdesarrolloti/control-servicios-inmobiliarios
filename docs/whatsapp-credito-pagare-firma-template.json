@@ -5,7 +5,7 @@
   "components": [
     {
       "type": "BODY",
-      "text": "Hola {{1}}.\n\nTe enviamos el pagaré No. {{2}} y su carta de instrucciones para que los revises y firmes electrónicamente. Se firman una sola vez y respaldan los créditos que tomes con el Pasaporte SuCasa.\n\nPara firmar necesitas tu nombre, tu número de documento y un código que te enviaremos al abrir el enlace.\n\nRevisar y firmar: {{3}}\n\nEste enlace es personal. No lo compartas.",
+      "text": "Hola {{1}}.\n\nTe enviamos el pagaré No. {{2}} y su carta de instrucciones para que los revises y firmes electrónicamente. Se firman una sola vez y respaldan los créditos que tomes con el Pasaporte SuCasa.\n\nRevisar y firmar: {{3}}\n\nEste enlace es personal. No lo compartas.",
       "example": {
         "body_text": [["María Pérez", "PS-000012", "https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/credito-pagare.php?id=12&token=EJEMPLO_NO_VALIDO"]]
       }

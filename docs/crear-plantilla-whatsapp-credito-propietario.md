@@ -98,6 +98,8 @@ Para el código de 6 dígitos se reutiliza la plantilla de autenticación del ac
 
 ### Invitación a firmar
 
+No menciones el código de verificación en el cuerpo: Meta la reclasifica como **Autenticación** y la rechaza. El código lo envía la plantilla del acta.
+
 - Nombre exacto: `scm_credito_pagare_firma_v1` (se puede cambiar con la variable de entorno `SCM_PAGARE_WHATSAPP_INVITATION_TEMPLATE`).
 - Categoría: **Utilidad** (`UTILITY`).
 - Idioma: **Español (Colombia)** (`es_CO`).
@@ -110,8 +112,6 @@ Para el código de 6 dígitos se reutiliza la plantilla de autenticación del ac
 Hola {{1}}.
 
 Te enviamos el pagaré No. {{2}} y su carta de instrucciones para que los revises y firmes electrónicamente. Se firman una sola vez y respaldan los créditos que tomes con el Pasaporte SuCasa.
-
-Para firmar necesitas tu nombre, tu número de documento y un código que te enviaremos al abrir el enlace.
 
 Revisar y firmar: {{3}}
 
