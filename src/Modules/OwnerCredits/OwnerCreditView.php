@@ -160,7 +160,8 @@ final class OwnerCreditView
         'Ingreso neto (INO)' => 'Canon menos descuentos: lo que realmente recibe el propietario y con lo que paga la cuota.',
       ]) . '<p class="' . self::NOTE . ' !sp-mb-3">' . self::e($work['income_source']) . '</p>'
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">' . $field('Ingreso bruto (canon)', $money('gross', $ev['gross'])) . $deductions . '</div>'
-      . ($editable ? '<p class="' . self::NOTE . ' !sp-mt-3">Puedes ajustar el canon (por ejemplo, si ya tuvo aumento) y los descuentos: solo cambian este crédito, no el contrato.</p>' : '') . '</section>'
+      . ($editable ? '<p class="' . self::NOTE . ' !sp-mt-3">Puedes ajustar el canon (por ejemplo, si ya tuvo aumento) y los descuentos: solo cambian este crédito, no el contrato.</p>' : '')
+      . self::otherIncome($ev) . '</section>'
 
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . $ui::icon('document') . 'Información de la solicitud</h4>' . self::guide('solicitud', [
         'Valor solicitado' => 'Lo que pide el propietario. Si viene de una cotización, es el total de la cotización.',
@@ -339,6 +340,25 @@ final class OwnerCreditView
 
   /** @param array<string,mixed> $credit */
   /** @param list<array<string,mixed>> $adjustments */
+  /**
+   * Los demás contratos del propietario que suman al ingreso (tope y cupo). Sin ellos, aclara por qué solo hay uno:
+   * solo cuentan los contratos Entregado o Por entregar, de los que hay canon para descontar.
+   * @param array<string,mixed> $ev
+   */
+  private static function otherIncome(array $ev): string
+  {
+    $others = (array) ($ev['other_contracts'] ?? []);
+    if ($others === []) return '<p class="' . self::NOTE . ' !sp-mt-3" data-owner-credit-other-income>Es el único contrato vigente del propietario: solo suman los contratos Entregado o Por entregar (los recibidos o terminados no tienen canon del cual descontar).</p>';
+    $td = '!sp-px-2 !sp-py-1.5 !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-100';
+    $rows = '';
+    foreach ($others as $row) $rows .= '<tr><td class="' . $td . '">#' . self::e((string) $row['contrato']) . ((string) ($row['inmueble'] ?? '') !== '' ? ' · Inm. ' . self::e((string) $row['inmueble']) : '') . ((string) ($row['estado'] ?? '') !== '' ? ' · ' . self::e((string) $row['estado']) : '') . '</td><td class="' . $td . ' !sp-text-right">' . self::money($row['net_income']) . '</td></tr>';
+    // Los valores de arriba (principal) se recalculan al escribir; estos se toman tal como están en el sistema.
+    return '<div class="!sp-mt-4" data-owner-credit-other-income><p class="' . UI::LABEL . '">Otros contratos del propietario (ingreso neto)</p>'
+      . '<table class="!sp-w-full !sp-border-collapse !sp-text-[11px] !sp-text-service-navy">' . $rows
+      . '<tr><td class="!sp-px-2 !sp-py-1.5 !sp-font-bold">Total otros contratos</td><td class="!sp-px-2 !sp-py-1.5 !sp-text-right !sp-font-bold">' . self::money(array_sum(array_map(static fn(array $row): float => (float) $row['net_income'], $others))) . '</td></tr></table>'
+      . '<p class="' . self::NOTE . ' !sp-mt-2">Se suman al ingreso neto del contrato principal (arriba) para el tope y el cupo preaprobado; el total aparece en Políticas. Solo el principal se puede ajustar aquí.</p></div>';
+  }
+
   /** Aprobar exige justificación: incumple políticas o el analista cambió algo que la requiere. */
   private static function needsNote(array $work): bool
   {

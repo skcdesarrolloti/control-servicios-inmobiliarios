@@ -284,6 +284,9 @@ $pending = $service->workspace($service->createManual(9, 12000000, 6, 'Libre Des
 $p = $pending['preapproval'];
 $check(abs($p['amount'] - 9900000) < 0.01 && $p['contracts'] === 2 && $p['outstanding'] == 0.0 && abs($p['requested'] - 12000000) < 0.01, 'the liquidator shows the pre-approved amount of all the owner contracts');
 $pendingHtml = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($pending, true, true);
+$check(str_contains($pendingHtml, 'Otros contratos del propietario (ingreso neto)') && count($pending['evaluation']['other_contracts']) === 1, 'the income section lists the other contracts that add to the cap');
+$single = $service->workspace((int) $manual['id']);
+$check($single['evaluation']['other_contracts'] !== [] || str_contains((new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($single, true, true), 'Es el único contrato vigente'), 'a single active contract says why only one income shows');
 $check(!$pending['policies_ok'] && str_contains($pendingHtml, 'data-owner-credit-needs-note') && preg_match('/<label class="!sp-block" data-owner-credit-note-box>/', $pendingHtml) === 1, 'the note is shown when approving needs a justification');
 $check(str_contains($pendingHtml, 'data-owner-credit-disclaimer') && str_contains(\SCM\Modules\OwnerCredits\OwnerCreditPdf::html($pending, 'QA'), 'Importante:</strong> Valores de referencia') && !str_contains(\SCM\Modules\OwnerCredits\OwnerCreditPdf::html(array_replace_recursive($pending, ['credit' => ['status' => 'aprobado', 'decided_at' => time()]]), 'QA'), 'Importante:</strong>'), 'the liquidator cupo and pending PDFs say values are subject to the company terms; approved ones do not');
 $check(str_contains($pendingHtml, 'Cupo preaprobado del propietario') && str_contains($pendingHtml, 'supera el cupo disponible') && str_contains($pendingHtml, 'name="owner_key"'), 'the liquidator shows the cupo, warns when the request exceeds it and lets the owner be changed');
