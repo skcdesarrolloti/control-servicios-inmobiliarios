@@ -340,7 +340,7 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 // Orden solicitado:
 // 1. Inicio (Dropdown: Resumen, Mi Calendario, Calendario Equipo, Vencimientos, Historial Inmueble)
 // 2. Gestión de Casos & Tickets (Dropdown: Tickets Abiertos, Mis Tickets, Tickets Postergados, Tickets Cerrados)
-// 3. Actividades Administrativas (Dropdown: Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento)
+// 3. Actividades Administrativas (Dropdown: Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento, Créditos › Propietarios)
 // 4. Actividades contractuales (Dropdown: Contratos por terminar, Terminación, No prórroga, Funcionario de contratos)
 // 5. Notificaciones
 // 6. Herramientas (Dropdown: Generar PSE, Calculadora de mora, Calculadora de mercado, Calculadora de aseo)
@@ -536,6 +536,17 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=cartas_aumento',
         'icon' => 'mail',
         'perms' => ['cartas_aumento'],
+      ],
+      // Grupo Créditos: hoy solo propietarios; otros actores (arrendatarios, proveedores…) serán opciones hermanas.
+      'credito_propietario' => [
+        'key' => 'credito_propietario',
+        'group' => 'Créditos',
+        'group_icon' => 'payments',
+        'label' => 'Propietarios',
+        'panel_id' => 'scm-panel-credito-propietario',
+        'url' => $baseUrl . '/index.php?tab=credito_propietario',
+        'icon' => 'real_estate_agent',
+        'perms' => ['credito_propietario'],
       ],
     ],
   ],
@@ -755,17 +766,6 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=metricas_crecimiento',
         'icon' => 'trending_up',
         'perms' => ['metricas_crecimiento'],
-      ],
-      // Grupo Créditos: hoy solo propietarios; otros actores (arrendatarios, proveedores…) serán opciones hermanas.
-      'credito_propietario' => [
-        'key' => 'credito_propietario',
-        'group' => 'Créditos',
-        'group_icon' => 'payments',
-        'label' => 'Propietarios',
-        'panel_id' => 'scm-panel-credito-propietario',
-        'url' => $baseUrl . '/index.php?tab=credito_propietario',
-        'icon' => 'real_estate_agent',
-        'perms' => ['credito_propietario'],
       ],
     ],
   ],

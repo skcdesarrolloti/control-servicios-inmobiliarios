@@ -117,6 +117,19 @@
         });
     }
 
+    // Quien registra ve la confirmación; la revisión y la decisión se hacen después en el liquidador.
+    function showRegistered(data) {
+      var id = String(data.credit_id || "");
+      showModal("Solicitud registrada", "La solicitud quedó pendiente de revisión.",
+        '<div class="!sp-p-6 !sp-text-center" data-owner-credit-registered>' +
+          '<p class="!sp-m-0 !sp-text-base !sp-font-bold !sp-text-emerald-700">' + escapeHtml(data.message || "Solicitud registrada.") + "</p>" +
+          '<p class="!sp-mt-2 !sp-mb-0 !sp-text-xs !sp-text-service-muted">Crédito #' + escapeHtml(id) + ": queda en estado pendiente hasta que el analista la revise y decida en el liquidador.</p>" +
+          '<div class="!sp-flex !sp-flex-wrap !sp-justify-center !sp-gap-2 !sp-mt-5">' +
+            '<button type="button" class="!sp-px-4 !sp-py-2 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-xs !sp-font-semibold !sp-text-service-navy !sp-cursor-pointer hover:!sp-bg-slate-50" data-owner-credit-open data-credit-id="' + escapeHtml(id) + '">Ver solicitud</button>' +
+            '<button type="button" class="!sp-px-4 !sp-py-2 !sp-rounded-lg !sp-bg-service-navy !sp-border-0 !sp-text-xs !sp-font-semibold !sp-text-white !sp-cursor-pointer" data-owner-credit-dismiss>Cerrar</button>' +
+          "</div></div>");
+    }
+
     function escapeHtml(value) {
       return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
         return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
@@ -618,7 +631,7 @@
         if (!form._simulatedKey || form._simulatedKey !== requestKey(form)) { setRegistrable(form, false); setStatus(form, "Primero simula y revisa el PDF con los datos actuales.", "error"); return; }
         setStatus(form, "Registrando…", "");
         post("scm_owner_credit_create", new FormData(form))
-          .then(function (data) { loadReport(true); return openCredit({ credit_id: data.credit_id }); })
+          .then(function (data) { loadReport(true); showRegistered(data); })
           .catch(function (error) { setStatus(form, error.message, "error"); });
         return;
       }

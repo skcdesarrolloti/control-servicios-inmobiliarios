@@ -131,7 +131,7 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
           { id: 10, contrato: '951', inmueble: '10601', direccion: 'Calle 2', estado: 'Entregado', arrendatario: '', fin: '', max_months: 0, owner }],
           preapproval: { contracts: 2, net_income: 3440000, income_months: 3, amount: 10320000, longest_months: 2, margin_months: 2, max_term: 0 },
           checks: [{ label: 'Contrato activo', ok: true, detail: '2 de 2 contratos Entregado.' }, { label: 'Sin siniestro', ok: false, detail: 'Cartera marcó como siniestrado: #951.' }] }
-        : body.action === 'scm_owner_credit_create' ? { credit_id: 40 } : {};
+        : body.action === 'scm_owner_credit_create' ? { credit_id: 40, message: 'Solicitud registrada.' } : {};
       if (body.action === 'scm_owner_credit_simulation_pdf') {
         return Promise.resolve({ headers: { get: () => 'application/pdf' }, blob: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })) });
       }
@@ -189,6 +189,10 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   calls = await page.evaluate(() => window.calls);
   const create = calls.find(c => c.action === 'scm_owner_credit_create');
   assert.equal(create.contract_id, '9'); assert.equal(create.owner_key, 'mandato_2'); assert.equal(create.term, '12'); assert.equal(create.contract_end, undefined);
+  await page.waitForSelector('[data-owner-credit-registered]');
+  assert.equal((await page.textContent('[data-owner-credit-title]')).trim(), 'Solicitud registrada', 'registering confirms instead of opening the liquidator');
+  const afterCreate = (await page.evaluate(() => window.calls)).slice(calls.indexOf(create));
+  assert.ok(!afterCreate.some(c => c.action === 'scm_owner_credit_open'), 'the liquidator is not opened after registering');
   console.log('OK new request: simulate and see the PDF first, then "Registrar solicitud" from the viewer; long term only warns');
   await browser.close();
   console.log('Owner credit UI checks passed.');

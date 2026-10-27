@@ -358,7 +358,7 @@ trait RendersDashboard
     $canAccessAdministrativeCalendar = in_array('calendario_actividades', $dashboardAllowedTabs, true);
     $canAccessContractActivities = in_array('actividades_contractuales', $dashboardAllowedTabs, true);
     $firstMetricsPanel = 'scm-panel-metricas-casos';
-    foreach (['metricas_casos' => 'scm-panel-metricas-casos', 'metricas_cotizaciones' => 'scm-panel-metricas-cotizaciones', 'metricas_preventivas' => 'scm-panel-metricas-preventivas', 'metricas_servicios_publicos' => 'scm-panel-metricas-servicios-publicos', 'metricas_contratos' => 'scm-panel-movimientos-contratos', 'metricas_crecimiento' => 'scm-panel-metricas-crecimiento', 'credito_propietario' => 'scm-panel-credito-propietario'] as $metricTab => $metricPanel) {
+    foreach (['metricas_casos' => 'scm-panel-metricas-casos', 'metricas_cotizaciones' => 'scm-panel-metricas-cotizaciones', 'metricas_preventivas' => 'scm-panel-metricas-preventivas', 'metricas_servicios_publicos' => 'scm-panel-metricas-servicios-publicos', 'metricas_contratos' => 'scm-panel-movimientos-contratos', 'metricas_crecimiento' => 'scm-panel-metricas-crecimiento'] as $metricTab => $metricPanel) {
       if (in_array($metricTab, $dashboardAllowedTabs, true)) {
         $firstMetricsPanel = $metricPanel;
         break;
@@ -1421,11 +1421,6 @@ trait RendersDashboard
           <?php echo $maintenanceMetricsView->shell('crecimiento'); ?>
         </div>
         <?php endif; ?>
-        <?php if (in_array('credito_propietario', $dashboardAllowedTabs, true)): ?>
-        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-credito-propietario' ? ' active' : ''; ?>" id="scm-panel-credito-propietario" data-permission-tab="credito_propietario" data-scm-loaded="0">
-          <?php echo (new \SCM\Modules\OwnerCredits\OwnerCreditView())->shell(); ?>
-        </div>
-        <?php endif; ?>
         <?php if (in_array('herramienta_pse', $dashboardAllowedTabs, true)): ?>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-herramienta-pse' ? ' active' : ''; ?>" id="scm-panel-herramienta-pse" data-permission-tab="herramienta_pse" data-scm-loaded="0">
           <?php echo (new \SCM\Modules\Tools\ToolsView())->pse($this->toolsPseFormValues()); ?>
@@ -1446,6 +1441,13 @@ trait RendersDashboard
           <?php echo (new \SCM\Modules\Tools\ToolsView())->cleaning($this->canSeeCleaningInternal(), (new \SCM\Modules\Tools\CleaningSettings($this->db))->read()); ?>
         </div>
         <?php endif; ?>
+      <?php endif; ?>
+
+      <?php // Créditos (Actividades Administrativas): panel propio, no depende de Métricas. ?>
+      <?php if (in_array('credito_propietario', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-credito-propietario' ? ' active' : ''; ?>" id="scm-panel-credito-propietario" data-permission-tab="credito_propietario" data-scm-loaded="0">
+          <?php echo (new \SCM\Modules\OwnerCredits\OwnerCreditView())->shell(); ?>
+        </div>
       <?php endif; ?>
 
       <?php echo \SCM\Views\GuideModalView::render(); ?>
@@ -1874,6 +1876,9 @@ trait RendersDashboard
         'reportes_administrativos_pendientes' => '',
         'cartas_aumento' => '',
       ]],
+      ['label' => 'Actividades administrativas', 'hint' => 'Créditos', 'tabs' => [
+        'credito_propietario' => '',
+      ]],
       ['label' => 'Actividades de cartera', 'tabs' => [
         'gestiones_cobro' => '',
         'auditoria_canon_aseguradoras' => '',
@@ -1901,7 +1906,6 @@ trait RendersDashboard
         'metricas_desocupaciones' => '',
         'metricas_ocupaciones_vs' => '',
         'metricas_crecimiento' => '',
-        'credito_propietario' => '',
       ]],
     ];
     $tabGroups = [];

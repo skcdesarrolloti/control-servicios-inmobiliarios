@@ -372,7 +372,7 @@ final class SuCasaControlServiciosInmobiliarios
   private const DERIVED_DASHBOARD_TABS = [
     'calendario_actividades' => ['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble'],
     'actividades_contractuales' => ['contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga'],
-    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento', 'credito_propietario'],
+    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento'],
     // Panel compartido de ocupaciones y desocupaciones (una consulta para sus tres vistas).
     'metricas_contratos' => ['metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs'],
   ];
