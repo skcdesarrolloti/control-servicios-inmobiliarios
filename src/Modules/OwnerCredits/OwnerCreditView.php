@@ -167,7 +167,7 @@ final class OwnerCreditView
         'Valor solicitado' => 'Lo que pide el propietario. Si viene de una cotización, es el total de la cotización.',
         'Plazo solicitado' => 'Meses en que quiere pagar. Escríbelo según lo que pidió; no puede superar los meses que faltan para el fin del contrato, porque las cuotas se descuentan del canon.',
         'Destinación' => 'Para qué usará el dinero.',
-        '¿Tiene créditos vigentes?' => 'El sistema propone Sí cuando tiene créditos aprobados aquí. Con Sí, su saldo se resta del cupo; si son créditos por fuera del sistema, aprobar exige justificación. Con No, el cupo no descuenta nada.',
+        '¿Tiene créditos vigentes?' => 'El sistema propone Sí cuando tiene créditos aprobados aquí. Con Sí, su saldo se resta del cupo. Con No, el cupo no descuenta nada.',
         'Probabilidad de que desocupen' => 'La sugiere el sistema con el seguimiento de renovación del contrato principal: no prórroga o terminación respondida dentro del término (renovación 0 %) o renovación menor de 50 % = Alta; de 50 % a 79 % = Media; 80 % o más, o "no salida" reportada = Baja. Puedes cambiarla según tu criterio. Baja: se respeta lo pedido con la tasa de referencia. Media: plazo hasta el fin del contrato con la tasa de referencia. Alta: máximo 3 meses con la tasa de riesgo.',
       ]) . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">'
       . $field('Fecha de solicitud', '<input class="' . $ui::INPUT . ' ' . self::READONLY . '" value="' . date('d/m/Y', (int) $credit['created_at']) . '" readonly>')
@@ -184,7 +184,7 @@ final class OwnerCreditView
         'Qué son' => 'Las condiciones que realmente se aprueban. Arrancan con la condición sugerida y las puedes ajustar.',
         'Valor a colocar' => 'El dinero que se presta.',
         'Plazo' => 'Número de cuotas mensuales.',
-        'Tasa N.M.V' => 'Tasa nominal mes vencido: el interés de cada mes sobre el saldo. Se sugiere la tasa de referencia; puedes aplicar un descuento hasta el descuento máximo de Configuración (con justificación). Más abajo queda fuera de política; por encima de la usura no se puede aprobar.',
+        'Tasa N.M.V' => 'Tasa nominal mes vencido: el interés de cada mes sobre el saldo. Se sugiere la tasa de referencia; puedes aplicar un descuento hasta el descuento máximo de Configuración. Más abajo queda fuera de política; por encima de la usura no se puede aprobar.',
         'Cuota' => 'Fija, calculada como la función PAGO de Excel; se descuenta de los giros del canon.',
         'Fecha de desembolso' => 'Día en que se entrega el dinero. La primera cuota se descuenta un mes después y el crédito queda pagado solo cuando vence la última.',
       ])
@@ -359,12 +359,10 @@ final class OwnerCreditView
       . '<p class="' . self::NOTE . ' !sp-mt-2">Se suman al ingreso neto del contrato principal (arriba) para el tope y el cupo preaprobado; el total aparece en Políticas. Solo el principal se puede ajustar aquí.</p></div>';
   }
 
-  /** Aprobar exige justificación: incumple políticas o el analista cambió algo que la requiere. */
+  /** Aprobar exige justificación solo cuando incumple alguna política. */
   private static function needsNote(array $work): bool
   {
-    if (!($work['policies_ok'] ?? true)) return true;
-    foreach ((array) ($work['adjustments'] ?? []) as $item) if (!empty($item['note'])) return true;
-    return false;
+    return !($work['policies_ok'] ?? true);
   }
 
   private function actions(array $credit, bool $canDecide, bool $canManage, array $adjustments = [], array $work = []): string
@@ -389,11 +387,9 @@ final class OwnerCreditView
       . self::adjustments($adjustments, false)
       : '';
     if ($buttons === '') return $decision !== '' ? '<section class="' . self::SECTION . '">' . $decision . '</section>' : '';
-    // La observación solo se muestra cuando hace falta: al aprobar con incumplimientos o cambios, o al pulsar
-    // Rechazar, Marcar como pagado o Anular (el JS la abre y la vuelve a ocultar al recalcular).
-    $hidden = $status !== 'pendiente' || !self::needsNote($work);
+    // La observación aparece al pulsar Rechazar, Marcar como pagado o Anular, y al pulsar Aprobar solo si incumple políticas.
     return '<section class="' . self::SECTION . '">' . $decision
-      . '<label class="!sp-block"' . ($hidden ? ' style="display:none !important"' : '') . ' data-owner-credit-note-box><span class="' . $ui::LABEL . '">' . ($status === 'pendiente' ? 'Observación / justificación' : 'Observación') . '</span>'
+      . '<label class="!sp-block" style="display:none !important" data-owner-credit-note-box><span class="' . $ui::LABEL . '">' . ($status === 'pendiente' ? 'Observación / justificación' : 'Observación') . '</span>'
       . '<textarea class="' . $ui::INPUT . ' !sp-h-20 !sp-py-2 !sp-resize-y" name="note" rows="3" maxlength="2000" placeholder="Explica el motivo (mínimo 10 caracteres); queda guardado con la decisión."></textarea></label>'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-end !sp-gap-3 !sp-mt-4" data-owner-credit-actions>' . $buttons . '</div>'
       . '<p class="!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-text-right" data-owner-credit-status role="status" aria-live="polite"></p></section>';
@@ -407,9 +403,9 @@ final class OwnerCreditView
   {
     if ($items === []) return $live ? '<section class="' . self::SECTION . '" data-owner-credit-adjustments><h4 class="' . self::H4 . '">' . self::icon('edit') . 'Cambios frente al sistema</h4><p class="' . self::NOTE . '">Sin cambios: apruebas lo que propone el sistema.</p></section>' : '';
     $rows = implode('', array_map(static fn(array $item): string => '<li class="!sp-flex !sp-gap-2 !sp-justify-between !sp-py-1.5 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0 !sp-text-[11px]"><span><b class="!sp-text-service-navy">' . self::e($item['label']) . ':</b> ' . self::e($item['detail']) . '</span>'
-      . ($live && $item['note'] ? '<span class="!sp-whitespace-nowrap !sp-text-[10px] !sp-font-semibold !sp-text-amber-800">Requiere justificación</span>' : '') . '</li>', $items));
+      . ($live && $item['key'] === 'politicas' ? '<span class="!sp-whitespace-nowrap !sp-text-[10px] !sp-font-semibold !sp-text-amber-800">Requiere justificación</span>' : '') . '</li>', $items));
     return '<section class="' . self::SECTION . '" data-owner-credit-adjustments><h4 class="' . self::H4 . '">' . self::icon('edit') . ($live ? 'Cambios frente al sistema' : 'Cambios aprobados frente al sistema') . '</h4>'
-      . ($live ? self::guide('cambios', ['Qué es' => 'Lo que cambiaste frente a lo que calcula o propone el sistema. Queda guardado con la decisión, con tu nombre y la justificación. Cambiar canon, descuentos, siniestro, créditos vigentes, probabilidad de desocupación o la tasa exige justificación; un valor o plazo distinto del sugerido solo se registra.']) : '')
+      . ($live ? self::guide('cambios', ['Qué es' => 'Lo que cambiaste frente a lo que calcula o propone el sistema. Queda guardado con la decisión, con tu nombre y la justificación. Solo se registra: la justificación se pide únicamente si la solicitud incumple alguna política.']) : '')
       . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $rows . '</ul></section>';
   }
 

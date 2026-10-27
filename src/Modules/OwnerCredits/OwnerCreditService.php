@@ -518,8 +518,6 @@ final class OwnerCreditService
       if ($decision === 'aprobado') {
         if ($conditions['amount'] <= 0 || $conditions['term'] <= 0) throw new \DomainException('Indica el valor y el plazo a aprobar.');
         if (!$work['policies_ok'] && mb_strlen($note) < self::MIN_NOTE) throw new \DomainException('La solicitud incumple políticas: escribe la justificación de la aprobación (mínimo ' . self::MIN_NOTE . ' caracteres).');
-        $justify = array_values(array_filter($work['adjustments'], static fn(array $item): bool => $item['note'] && $item['key'] !== 'politicas'));
-        if ($justify !== [] && mb_strlen($note) < self::MIN_NOTE) throw new \DomainException('Cambiaste datos o condiciones frente a lo que propone el sistema (' . implode(', ', array_column($justify, 'label')) . '): escribe la justificación de la aprobación (mínimo ' . self::MIN_NOTE . ' caracteres).');
       }
       $now = time();
       $data = [
@@ -766,8 +764,7 @@ final class OwnerCreditService
 
   /**
    * Lo que el analista cambió frente a lo que propone el sistema (o lo que incumple), para guardarlo con la decisión.
-   * "note" marca lo que exige justificación al aprobar: políticas, ingreso, siniestro, créditos, probabilidad y tasa.
-   * Un valor o plazo distinto del sugerido solo se registra.
+   * Solo se registran (con la decisión); aprobar exige justificación únicamente cuando incumple políticas.
    * @param array<string,mixed> $evaluation @param array<string,mixed> $defaults defaultIncome()
    * @param list<array<string,mixed>> $policies @param array{amount:float,term:int,rate:float} $conditions
    * @return list<array{key:string,label:string,detail:string,note:bool}>

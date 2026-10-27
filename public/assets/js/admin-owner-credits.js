@@ -142,15 +142,15 @@
       return data;
     }
 
-    // La observación se ve solo si aprobar la exige (incumplimientos o cambios) o si se pidió una acción que la requiere.
+    // La observación se ve cuando se pulsó una acción que la pide (o ya tiene texto).
     function syncNote(form) {
       var box = form.querySelector("[data-owner-credit-note-box]");
       if (!box) return;
-      var show = !!form.querySelector("[data-owner-credit-needs-note]") || !!form._noteRequested || box.querySelector("textarea").value.trim() !== "";
+      var show = !!form._noteRequested || box.querySelector("textarea").value.trim() !== "";
       if (show) box.style.removeProperty("display"); else box.style.setProperty("display", "none", "important");
     }
 
-    // Rechazar, pagado y anular piden la observación: el primer clic la abre y el siguiente confirma.
+    // Rechazar, pagado, anular y aprobar fuera de política piden la observación: el primer clic la abre y el siguiente confirma.
     function requireNote(form, label) {
       var note = form.elements.note;
       if (!note || note.value.trim().length >= 10) return true;
@@ -533,6 +533,7 @@
       if (decide) {
         var decision = decide.getAttribute("data-owner-credit-decide");
         if (decision === "rechazado" && !requireNote(form, "Rechazar")) return;
+        if (decision === "aprobado" && form.querySelector("[data-owner-credit-needs-note]") && !requireNote(form, "Aprobar crédito")) return;
         askConfirm(decide, decision === "aprobado"
           ? "Se aprobará el crédito con las condiciones del analista y se avisará al propietario."
           : "Se rechazará la solicitud y se avisará al propietario.", function () {

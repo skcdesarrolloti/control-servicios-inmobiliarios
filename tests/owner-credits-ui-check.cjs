@@ -102,6 +102,15 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   console.log('OK Ver documento del crédito shows "Generando PDF…" until the PDF arrives');
 
   assert.equal(await page.isVisible('[name="note"]'), false, 'the note is hidden while every policy is met and nothing changed');
+  await page.click('[data-owner-credit-decide="aprobado"]');
+  await page.waitForSelector('[data-owner-credit-confirm]');
+  assert.equal(await page.isVisible('[name="note"]'), false, 'approving within policy goes straight to the confirmation');
+  await page.click('[data-owner-credit-confirm-no]');
+  await page.evaluate(() => document.querySelector('[data-owner-credit-results] section, [data-owner-credit-form] section').setAttribute('data-owner-credit-needs-note', ''));
+  await page.click('[data-owner-credit-decide="aprobado"]');
+  assert.equal(await page.isVisible('[name="note"]'), true, 'approving outside policy asks for the note first');
+  assert.equal(await page.$('[data-owner-credit-confirm]'), null);
+  await page.evaluate(() => document.querySelector('[data-owner-credit-needs-note]').removeAttribute('data-owner-credit-needs-note'));
   await page.click('[data-owner-credit-decide="rechazado"]');
   assert.equal(await page.isVisible('[name="note"]'), true, 'rejecting asks for the note first');
   assert.equal(await page.$('[data-owner-credit-confirm]'), null, 'no confirmation until the note is written');

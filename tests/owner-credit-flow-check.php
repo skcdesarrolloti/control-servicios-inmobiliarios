@@ -265,13 +265,9 @@ $keys = array_column($live['adjustments'], 'note', 'key');
 $rateCheck = static fn(array $work): bool => array_column($work['policies'], 'ok', 'key')['tasa_minima'];
 $check($live['evaluation']['suggested']['rate'] === 0.019 && $rateCheck($live) && !$rateCheck($service->workspace($adjusted, ['rate' => '1,7'] + $edits)), 'the system suggests the reference rate and a discount beyond the maximum is outside policy');
 $check(isset($keys['canon'], $keys['tasa']) && $keys['canon'] && $keys['tasa'] && !isset($keys['valor']), 'the liquidator lists the changes against the system while editing');
-try {
-  $service->decide($adjusted, 'aprobado', $edits + ['note' => ''], $actor);
-  $check(false, 'approving with changes against the system needs a justification');
-} catch (DomainException $error) {
-  $check(str_contains($error->getMessage(), 'Canon') && str_contains($error->getMessage(), 'Tasa'), 'approving with changes against the system needs a justification');
-}
-$service->decide($adjusted, 'aprobado', $edits + ['note' => 'Canon actualizado con la carta de aumento; tasa preferencial autorizada.'], $actor);
+// Dentro de política, los cambios solo se registran: aprobar no exige justificación.
+$service->decide($adjusted, 'aprobado', $edits + ['note' => ''], $actor);
+$check($service->find($adjusted)['status'] === 'aprobado', 'approving with changes within policy needs no justification');
 $stored = json_decode((string) $service->find($adjusted)['evaluation_json'], true)['adjustments'];
 $event = $db->getRow("SELECT details_json FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'aprobado'", [$adjusted]);
 $check(in_array('canon', array_column($stored, 'key'), true) && str_contains((string) $event['details_json'], 'Canon: $1.500.000 → $1.600.000'), 'the approved changes are saved with the decision and in its event');
@@ -287,7 +283,7 @@ $pendingHtml = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($pen
 $check(str_contains($pendingHtml, 'Otros contratos del propietario (ingreso neto)') && count($pending['evaluation']['other_contracts']) === 1, 'the income section lists the other contracts that add to the cap');
 $single = $service->workspace((int) $manual['id']);
 $check($single['evaluation']['other_contracts'] !== [] || str_contains((new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($single, true, true), 'Es el único contrato vigente'), 'a single active contract says why only one income shows');
-$check(!$pending['policies_ok'] && str_contains($pendingHtml, 'data-owner-credit-needs-note') && preg_match('/<label class="!sp-block" data-owner-credit-note-box>/', $pendingHtml) === 1, 'the note is shown when approving needs a justification');
+$check(!$pending['policies_ok'] && str_contains($pendingHtml, 'data-owner-credit-needs-note') && str_contains($pendingHtml, 'style="display:none !important" data-owner-credit-note-box'), 'the note stays hidden until Aprobar is pressed, and the policies mark that it is needed');
 $check(str_contains($pendingHtml, 'data-owner-credit-disclaimer') && str_contains(\SCM\Modules\OwnerCredits\OwnerCreditPdf::html($pending, 'QA'), 'Importante:</strong> Valores de referencia') && !str_contains(\SCM\Modules\OwnerCredits\OwnerCreditPdf::html(array_replace_recursive($pending, ['credit' => ['status' => 'aprobado', 'decided_at' => time()]]), 'QA'), 'Importante:</strong>'), 'the liquidator cupo and pending PDFs say values are subject to the company terms; approved ones do not');
 $check(str_contains($pendingHtml, 'Cupo preaprobado del propietario') && str_contains($pendingHtml, 'supera el cupo disponible') && str_contains($pendingHtml, 'name="owner_key"'), 'the liquidator shows the cupo, warns when the request exceeds it and lets the owner be changed');
 $check(array_column(array_filter($pending['owners'], static fn(array $o): bool => $o['current']), 'key') === ['mandato_2'], 'the current beneficiary is preselected among the contract owners');
