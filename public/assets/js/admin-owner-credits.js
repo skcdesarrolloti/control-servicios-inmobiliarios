@@ -142,6 +142,25 @@
       return data;
     }
 
+    // La observación se ve solo si aprobar la exige (incumplimientos o cambios) o si se pidió una acción que la requiere.
+    function syncNote(form) {
+      var box = form.querySelector("[data-owner-credit-note-box]");
+      if (!box) return;
+      var show = !!form.querySelector("[data-owner-credit-needs-note]") || !!form._noteRequested || box.querySelector("textarea").value.trim() !== "";
+      if (show) box.style.removeProperty("display"); else box.style.setProperty("display", "none", "important");
+    }
+
+    // Rechazar, pagado y anular piden la observación: el primer clic la abre y el siguiente confirma.
+    function requireNote(form, label) {
+      var note = form.elements.note;
+      if (!note || note.value.trim().length >= 10) return true;
+      form._noteRequested = true;
+      syncNote(form);
+      note.focus();
+      setStatus(form, "Escribe la observación (mínimo 10 caracteres) y vuelve a pulsar " + label + ".", "error");
+      return false;
+    }
+
     function simulate(form) {
       var seq = ++simulateSeq;
       var results = form.querySelector("[data-owner-credit-results]");
@@ -156,6 +175,7 @@
           if (results) results.innerHTML = data.results_html || "";
           if (schedule) schedule.innerHTML = data.schedule_html || "";
           open.forEach(function (key) { var guide = form.querySelector('[data-owner-credit-guide="' + key + '"]'); if (guide) guide.open = true; });
+          syncNote(form);
           setStatus(form, "");
         })
         .catch(function (error) { if (seq === simulateSeq) setStatus(form, error.message, "error"); })
@@ -513,6 +533,7 @@
       var decide = form && target.closest("[data-owner-credit-decide]");
       if (decide) {
         var decision = decide.getAttribute("data-owner-credit-decide");
+        if (decision === "rechazado" && !requireNote(form, "Rechazar")) return;
         askConfirm(decide, decision === "aprobado"
           ? "Se aprobará el crédito con las condiciones del analista y se avisará al propietario."
           : "Se rechazará la solicitud y se avisará al propietario.", function () {
@@ -523,6 +544,7 @@
       var close = form && target.closest("[data-owner-credit-close]");
       if (close) {
         var status = close.getAttribute("data-owner-credit-close");
+        if (!requireNote(form, status === "pagado" ? "Marcar como pagado" : "Anular")) return;
         askConfirm(close, status === "pagado" ? "El crédito quedará como pagado y dejará de contar como vigente." : "El crédito quedará anulado. Esta acción queda en el historial.", function () {
           runAction(form, "scm_owner_credit_close", { status: status });
         });

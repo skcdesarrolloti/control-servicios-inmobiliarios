@@ -97,6 +97,10 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   await page.click('[data-owner-credit-pdf-close]');
   console.log('OK Ver PDF shows "Generando PDF…" until the PDF arrives');
 
+  assert.equal(await page.isVisible('[name="note"]'), false, 'the note is hidden while every policy is met and nothing changed');
+  await page.click('[data-owner-credit-decide="rechazado"]');
+  assert.equal(await page.isVisible('[name="note"]'), true, 'rejecting asks for the note first');
+  assert.equal(await page.$('[data-owner-credit-confirm]'), null, 'no confirmation until the note is written');
   await page.fill('[name="note"]', 'Justificación de prueba suficiente.');
   await page.click('[data-owner-credit-decide="aprobado"]');
   await page.waitForSelector('[data-owner-credit-confirm]');

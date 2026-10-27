@@ -200,7 +200,7 @@ final class OwnerCreditView
 
       . '<div data-owner-credit-schedule>' . $this->schedule($work) . '</div>'
       . $this->history($work)
-      . $this->actions($credit, $canDecide, $canManage, $work['adjustments'] ?? [])
+      . $this->actions($credit, $canDecide, $canManage, $work['adjustments'] ?? [], $work)
       . '</form>';
   }
 
@@ -253,7 +253,7 @@ final class OwnerCreditView
       . '</div>' . (!empty($s['rate_capped']) ? '<p class="' . self::NOTE . ' !sp-mt-2">La tasa de esta condición superaba la usura; se sugiere la usura mes vencido (' . self::percent($ev['usury_monthly_legal']) . ').</p>' : '') . '</section>'
       . self::discountPlan($work)
       . ($work['credit']['status'] === 'pendiente' ? self::adjustments($work['adjustments'] ?? [], true) : '')
-      . '<section class="' . self::SECTION . '"><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Políticas</h4>'
+      . '<section class="' . self::SECTION . '"' . (self::needsNote($work) ? ' data-owner-credit-needs-note' : '') . '><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Políticas</h4>'
       . ($work['policies_ok'] ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Cumple todas</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-red-700">Incumple políticas</span>') . '</div>'
       . self::guide('politicas', [
         'Requisitos' => 'Contrato activo y no próximo a vencer, plazo dentro de la vigencia, sin siniestro, valor dentro del cupo disponible (tope menos el saldo de sus créditos vigentes), valor dentro del tope, tasa bajo la usura y cuota cubierta por sus contratos.',
@@ -339,7 +339,15 @@ final class OwnerCreditView
 
   /** @param array<string,mixed> $credit */
   /** @param list<array<string,mixed>> $adjustments */
-  private function actions(array $credit, bool $canDecide, bool $canManage, array $adjustments = []): string
+  /** Aprobar exige justificación: incumple políticas o el analista cambió algo que la requiere. */
+  private static function needsNote(array $work): bool
+  {
+    if (!($work['policies_ok'] ?? true)) return true;
+    foreach ((array) ($work['adjustments'] ?? []) as $item) if (!empty($item['note'])) return true;
+    return false;
+  }
+
+  private function actions(array $credit, bool $canDecide, bool $canManage, array $adjustments = [], array $work = []): string
   {
     $ui = UI::class;
     $status = (string) $credit['status'];
@@ -361,9 +369,12 @@ final class OwnerCreditView
       . self::adjustments($adjustments, false)
       : '';
     if ($buttons === '') return $decision !== '' ? '<section class="' . self::SECTION . '">' . $decision . '</section>' : '';
+    // La observación solo se muestra cuando hace falta: al aprobar con incumplimientos o cambios, o al pulsar
+    // Rechazar, Marcar como pagado o Anular (el JS la abre y la vuelve a ocultar al recalcular).
+    $hidden = $status !== 'pendiente' || !self::needsNote($work);
     return '<section class="' . self::SECTION . '">' . $decision
-      . '<label class="!sp-block"><span class="' . $ui::LABEL . '">' . ($status === 'pendiente' ? 'Observación / justificación' : 'Observación') . '</span>'
-      . '<textarea class="' . $ui::INPUT . ' !sp-h-20 !sp-py-2 !sp-resize-y" name="note" rows="3" maxlength="2000" placeholder="Obligatoria para rechazar, para aprobar fuera de política o con cambios frente al sistema, para marcar pagado o anular."></textarea></label>'
+      . '<label class="!sp-block"' . ($hidden ? ' style="display:none !important"' : '') . ' data-owner-credit-note-box><span class="' . $ui::LABEL . '">' . ($status === 'pendiente' ? 'Observación / justificación' : 'Observación') . '</span>'
+      . '<textarea class="' . $ui::INPUT . ' !sp-h-20 !sp-py-2 !sp-resize-y" name="note" rows="3" maxlength="2000" placeholder="Explica el motivo (mínimo 10 caracteres); queda guardado con la decisión."></textarea></label>'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-end !sp-gap-3 !sp-mt-4" data-owner-credit-actions>' . $buttons . '</div>'
       . '<p class="!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-text-right" data-owner-credit-status role="status" aria-live="polite"></p></section>';
   }
