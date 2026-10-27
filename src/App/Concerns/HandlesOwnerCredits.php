@@ -83,7 +83,8 @@ trait HandlesOwnerCredits
     if (!$this->canViewOwnerCredits()) $this->jsonFail('No tienes permiso para ver créditos.');
     try {
       $id = (int) ($_POST['credit_id'] ?? 0);
-      $work = $this->ownerCreditService()->workspace($id);
+      // Con lo que el analista tiene en pantalla, para que el documento coincida con el liquidador.
+      $work = $this->ownerCreditService()->workspace($id, $this->ownerCreditInput());
       $bytes = \SCM\Modules\OwnerCredits\OwnerCreditPdf::bytes($work, (string) ($this->ticketCompletionActor()['name'] ?? ''));
     } catch (\Throwable $error) {
       $this->ownerCreditFail($error, 'No se pudo generar el PDF del crédito.');

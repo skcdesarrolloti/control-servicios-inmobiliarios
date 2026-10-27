@@ -139,7 +139,7 @@ final class OwnerCreditView
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2">' . self::status((string) $credit['status'])
       . ($editable && ($ev['other_contracts'] ?? []) !== [] ? self::mainContractSelect($contract, $ev['other_contracts']) : $chip('Contrato principal', '#' . self::e($contract['code']))) . ((int) $credit['quote_id'] > 0 && $editable ? self::beneficiarySelect($credit) : '') . ($editable && count($work['owners'] ?? []) > 1 ? self::ownerSelect($credit, $work['owners']) : $chip(OwnerCreditService::beneficiaryLabel($credit), self::e($credit['owner_name']) . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · ' . self::e($credit['owner_document']) : ''))) . $chip('Inmueble', self::e($credit['property']))
       . ((int) $credit['quote_id'] > 0 ? $chip('Cotización', '#' . (int) $credit['quote_id']) : $chip('Origen', 'Manual'))
-      . '<button type="button" class="' . $ui::NAVY . ' !sp-ml-auto" data-owner-credit-pdf title="Documento interno para funcionarios">' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Ver PDF</button></div>'
+      . '<button type="button" class="' . $ui::NAVY . ' !sp-ml-auto" data-owner-credit-pdf title="Documento interno para funcionarios">' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Ver documento del crédito</button></div>'
 
       . '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-12 !sp-gap-5 !sp-items-start">'
       // Columna de datos y entradas.

@@ -525,9 +525,8 @@
       }
       if (form && target.closest("[data-owner-credit-pdf]")) {
         var creditId = form.getAttribute("data-credit-id") || "";
-        var pdfData = new FormData();
-        pdfData.set("credit_id", creditId);
-        showPdf(target.closest("[data-owner-credit-pdf]"), { title: "PDF interno del crédito #" + creditId, back: "Volver al liquidador", action: "scm_owner_credit_pdf", data: pdfData, filename: "credito-propietario-" + creditId + ".pdf" });
+        // El documento sale con lo que está en pantalla (canon, fecha fin, condiciones…), igual que el recálculo.
+        showPdf(target.closest("[data-owner-credit-pdf]"), { title: "Documento del crédito #" + creditId, back: "Volver al liquidador", action: "scm_owner_credit_pdf", data: formData(form), filename: "credito-propietario-" + creditId + ".pdf" });
         return;
       }
       var decide = form && target.closest("[data-owner-credit-decide]");

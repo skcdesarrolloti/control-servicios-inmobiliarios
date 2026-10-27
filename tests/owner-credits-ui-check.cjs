@@ -94,8 +94,12 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   assert.equal(await page.isDisabled('[data-owner-credit-pdf]'), true);
   await page.waitForSelector('[data-owner-credit-pdf-viewer] iframe');
   assert.equal(await page.isDisabled('[data-owner-credit-pdf]'), false);
+  const pdfCall = (await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_pdf').pop();
+  assert.equal(pdfCall.gross, '$19.250.000', 'the document is generated with what is on screen');
+  assert.equal(pdfCall.credit_id, '12');
   await page.click('[data-owner-credit-pdf-close]');
-  console.log('OK Ver PDF shows "Generando PDF…" until the PDF arrives');
+  assert.match(await page.textContent('[data-owner-credit-pdf]'), /Ver documento del crédito/);
+  console.log('OK Ver documento del crédito shows "Generando PDF…" until the PDF arrives');
 
   assert.equal(await page.isVisible('[name="note"]'), false, 'the note is hidden while every policy is met and nothing changed');
   await page.click('[data-owner-credit-decide="rechazado"]');
