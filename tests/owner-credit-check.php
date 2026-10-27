@@ -167,6 +167,12 @@ $assert(\SCM\Modules\OwnerCredits\OwnerCreditPdf::title($pdfWork) === 'Crédito 
 $assert(str_contains($pdfHtml, 'scm-acta-receipt-data') && str_contains($pdfHtml, 'Condiciones aprobadas') && str_contains($pdfHtml, 'Tabla de amortización') && substr_count($pdfHtml, '<tr><td>') >= 12, 'credit PDF uses the acta tables and lists every amortization row');
 $assert(str_contains($pdfHtml, 'Analista QA') && str_contains($pdfHtml, 'Propietario &lt;b&gt;'), 'credit PDF signs with the deciding employee and escapes data');
 $assert(is_readable(dirname(__DIR__) . '/public/assets/css/owner-credit-document.css'), 'credit PDF stylesheet exists');
+// Siniestro: el del contrato principal; los demás contratos marcados por Cartera se nombran aparte.
+$otherSiniestro = array_replace_recursive($pdfWork, ['contract' => ['siniestrado' => false], 'evaluation' => ['analyst' => ['siniestro' => true, 'siniestrados' => ['#2000'], 'has_credits' => false]]]);
+$otherHtml = \SCM\Modules\OwnerCredits\OwnerCreditPdf::html($otherSiniestro, 'Funcionario');
+$assert(str_contains($otherHtml, 'Contrato principal no siniestrado · Otros contratos siniestrados: #2000'), 'a siniestro on another contract is not shown as the main contract siniestro');
+$mainSiniestro = \SCM\Modules\OwnerCredits\OwnerCreditPdf::html(array_replace_recursive($otherSiniestro, ['contract' => ['siniestrado' => true], 'evaluation' => ['analyst' => ['siniestrados' => ['#890']]]]), 'Funcionario');
+$assert(str_contains($mainSiniestro, '<td>Siniestrado</td>') || str_contains($mainSiniestro, '>Siniestrado<'), 'a siniestro on the main contract is shown as siniestrado');
 $newForm = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->newForm();
 $assert(str_contains($newForm, 'Documento del propietario') && str_contains($newForm, 'name="owner_key"') && !str_contains($newForm, 'name="contract_end"') && !str_contains($newForm, '¿Cuál propietario?'), 'new credit asks for the owner document, without the owner step or the contract end date');
 $healthy = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace(array_replace_recursive($work, ['contract' => ['siniestrado' => false]]), true, true);

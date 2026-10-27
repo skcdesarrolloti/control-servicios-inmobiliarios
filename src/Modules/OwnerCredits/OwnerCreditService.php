@@ -298,8 +298,7 @@ final class OwnerCreditService
 
   /**
    * Simulación desde "Nueva solicitud", sin registrar la solicitud: el mismo cálculo del liquidador con el contrato
-   * elegido y los demás contratos del propietario. Sin valor o sin plazo se simula con el cupo preaprobado y el
-   * plazo máximo.
+   * elegido y los demás contratos del propietario. Exige valor y plazo.
    * @return array<string,mixed> workspace con estado "simulacion", más preapproval y portfolio
    */
   public function simulation(string $document, int $contractId, float $amount, int $term, string $purpose, string $ownerKey, array $actor): array
@@ -313,9 +312,10 @@ final class OwnerCreditService
     $owner = null;
     foreach ($this->contractOwners($contractId) as $candidate) if ($candidate['key'] === ($ownerKey !== '' ? $ownerKey : $row['owner']['key'])) $owner = $candidate;
     if ($owner !== null && $owner['document'] === '') $owner['document'] = (string) $row['owner']['document'];
+    // La simulación es la que se revisa con el propietario antes de registrar: sin valor o sin plazo no se genera.
+    if ($amount <= 0) throw new \DomainException('Escribe el valor solicitado para simular.');
+    if ($term <= 0) throw new \DomainException('Escribe el plazo solicitado en meses para simular.');
     $preapproval = OwnerCreditCalculator::preapproval($portfolio, $this->config());
-    if ($amount <= 0) $amount = round($preapproval['amount']);
-    if ($term <= 0) $term = $preapproval['max_term'];
     $this->assertRequestTerm($term, $document);
     if (!in_array($purpose, OwnerCreditSettings::PURPOSES, true)) $purpose = OwnerCreditSettings::PURPOSES[0];
     $credit = ['id' => 0, 'status' => 'simulacion', 'evaluation_json' => null, 'policy_override' => 0, 'decision_note' => '', 'decided_by_name' => '', 'decided_at' => 0]

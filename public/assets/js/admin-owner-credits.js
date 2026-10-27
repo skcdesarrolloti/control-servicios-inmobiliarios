@@ -626,6 +626,9 @@
       if (newForm && target.closest("[data-owner-credit-search]")) { searchContracts(newForm); return; }
       if (newForm && target.closest("[data-owner-credit-simulate-pdf]")) {
         if (!newForm.elements.contract_id.value) { setStatus(newForm, "Busca al propietario por documento.", "error"); return; }
+        // Sin valor o sin plazo la simulación queda incompleta: se piden antes de generar el PDF.
+        if (!(Number(String(newForm.elements.amount.value).replace(/\D/g, "")) > 0)) { setStatus(newForm, "Escribe el valor solicitado para simular.", "error"); newForm.elements.amount.focus(); return; }
+        if (!(Number(newForm.elements.term.value) > 0)) { setStatus(newForm, "Escribe el plazo solicitado en meses para simular.", "error"); newForm.elements.term.focus(); return; }
         if (!termFits(newForm)) { setStatus(newForm, "El plazo supera el máximo de " + termLimit(newForm) + " cuotas.", "error"); return; }
         setStatus(newForm, "");
         var key = requestKey(newForm);
@@ -635,8 +638,7 @@
           onReady: function (viewer) {
             if (requestKey(newForm) !== key) return;
             setRegistrable(newForm, true);
-            // Con valor y plazo escritos se puede registrar desde el mismo visor.
-            if (!newForm.elements.amount.value || !newForm.elements.term.value) return;
+            // Se puede registrar desde el mismo visor.
             viewer.querySelector("[data-owner-credit-pdf-actions]").insertAdjacentHTML("beforeend", '<button type="button" class="' + UI.primary + '" data-owner-credit-pdf-register>Registrar solicitud</button>');
             viewer.querySelector("[data-owner-credit-pdf-register]").addEventListener("click", function () {
               viewer.querySelector("[data-owner-credit-pdf-close]").click();

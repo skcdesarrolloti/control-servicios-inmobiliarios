@@ -235,8 +235,16 @@ $work = $service->workspace((int) $chosen['id']);
 $ev = $work['evaluation'];
 $check(count($ev['other_contracts']) === 1 && abs($ev['total_net_income'] - 3300000) < 0.01 && abs($ev['max_amount'] - 9900000) < 0.01, 'the liquidator adds the other contracts to the cap');
 $check($ev['longest_months'] === $portfolio[0]['max_months'] && $ev['max_months'] === min(12, $portfolio[0]['max_months'] - 2), 'the liquidator term is the longest contract minus the margin, capped at 12');
-$simulation = $service->simulation(' 22.233.344 ', 9, 0, 0, 'Libre Destinación', 'mandato_2', $actor);
-$check($simulation['credit']['status'] === 'simulacion' && $simulation['credit']['owner_name'] === 'Segunda Dueña' && abs($simulation['conditions']['amount'] - 9900000) < 0.01 && $simulation['conditions']['term'] === $ev['max_months'], 'an empty simulation uses the pre-approved amount and the maximum term');
+foreach ([[0, $ev['max_months'], 'valor'], [9900000, 0, 'plazo']] as [$amount, $term, $missing]) {
+  try {
+    $service->simulation('22233344', 9, $amount, $term, 'Libre Destinación', 'mandato_2', $actor);
+    $check(false, 'a simulation without ' . $missing . ' is rejected');
+  } catch (DomainException $error) {
+    $check(str_contains($error->getMessage(), $missing), 'a simulation without ' . $missing . ' is rejected');
+  }
+}
+$simulation = $service->simulation(' 22.233.344 ', 9, 9900000, $ev['max_months'], 'Libre Destinación', 'mandato_2', $actor);
+$check($simulation['credit']['status'] === 'simulacion' && $simulation['credit']['owner_name'] === 'Segunda Dueña' && abs($simulation['conditions']['amount'] - 9900000) < 0.01 && $simulation['conditions']['term'] === $ev['max_months'], 'a simulation uses the requested amount and term');
 foreach (['createManual' => static fn() => $service->createManual(9, 800000, $ev['max_months'] + 1, 'Libre Destinación', $actor, '', 'mandato_2'), 'simulation' => static fn() => $service->simulation('22233344', 9, 800000, $ev['max_months'] + 1, 'Libre Destinación', 'mandato_2', $actor)] as $name => $call) {
   try {
     $call();

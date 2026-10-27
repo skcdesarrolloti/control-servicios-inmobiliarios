@@ -63,6 +63,22 @@ final class OwnerCreditPdf
     return '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>5.2 Cobertura de pago</h2>' . Doc::table($rows) . '</section>';
   }
 
+  /**
+   * Siniestro del bloque "Propietario y contrato": el del contrato principal, y aparte los demás contratos que Cartera
+   * marcó (no se debe leer como si el principal estuviera siniestrado).
+   * @param array<string,mixed>|null $analyst @param array<string,mixed> $contract
+   */
+  private static function siniestro(?array $analyst, array $contract): string
+  {
+    $main = !empty($contract['siniestrado']);
+    if ($analyst === null) return $main ? 'Siniestrado' : 'Por verificar';
+    $code = '#' . $contract['code'];
+    $others = array_values(array_diff((array) $analyst['siniestrados'], [$code]));
+    if (!$analyst['siniestro']) return 'No' . ($analyst['siniestrados'] !== [] ? ' (Cartera marcó ' . implode(', ', $analyst['siniestrados']) . '; el analista indicó que no)' : '');
+    if ($analyst['siniestrados'] === []) return 'Siniestrado (indicado por el analista)';
+    return ($main ? 'Siniestrado' : 'Contrato principal no siniestrado') . ($others !== [] ? ' · Otros contratos siniestrados: ' . implode(', ', $others) : '');
+  }
+
   public static function html(array $work, string $generatedBy, bool $pdf = false): string
   {
     $credit = $work['credit'];
@@ -92,9 +108,9 @@ final class OwnerCreditPdf
     $others = $ev['other_contracts'] ?? [];
     $income = ['Ingreso bruto (canon)' => $money($ev['gross'])] + $deductions + ['Ingreso neto (INO)' => $money($ev['net_income'])];
     if ($others !== []) {
-      $line = static fn(float $canon, float $less, float $net, int $months, string $end): string => $money($canon) . ' − ' . $money($less) . ' = ' . $money($net) . ' · ' . $months . ' meses de vigencia' . ($end !== '' ? ' (fin ' . $end . ')' : '');
-      $income = ['Contrato #' . $contract['code'] . ' · SIMI ' . $credit['property'] . ' (principal)' => $line((float) $ev['gross'], (float) $ev['deductions_total'], (float) $ev['net_income'], (int) $ev['contract_months'], $contract['fin_ts'] > 0 ? date('d/m/Y', (int) $contract['fin_ts']) : '')];
-      foreach ($others as $row) $income['Contrato #' . $row['contrato'] . ' · SIMI ' . $row['inmueble']] = $line((float) ($row['canon'] ?? 0), (float) ($row['deductions'] ?? 0), (float) $row['net_income'], (int) $row['max_months'], (string) ($row['fin'] ?? ''));
+      $line = static fn(float $canon, float $less, float $net, int $months, string $end, bool $siniestrado): string => $money($canon) . ' − ' . $money($less) . ' = ' . $money($net) . ' · ' . $months . ' meses de vigencia' . ($end !== '' ? ' (fin ' . $end . ')' : '') . ($siniestrado ? ' · Siniestrado' : '');
+      $income = ['Contrato #' . $contract['code'] . ' · SIMI ' . $credit['property'] . ' (principal)' => $line((float) $ev['gross'], (float) $ev['deductions_total'], (float) $ev['net_income'], (int) $ev['contract_months'], $contract['fin_ts'] > 0 ? date('d/m/Y', (int) $contract['fin_ts']) : '', !empty($contract['siniestrado']))];
+      foreach ($others as $row) $income['Contrato #' . $row['contrato'] . ' · SIMI ' . $row['inmueble']] = $line((float) ($row['canon'] ?? 0), (float) ($row['deductions'] ?? 0), (float) $row['net_income'], (int) $row['max_months'], (string) ($row['fin'] ?? ''), !empty($row['siniestrado']));
       $income['Ingreso neto total (' . (count($others) + 1) . ' contratos)'] = $money($ev['total_net_income']);
     }
 
@@ -136,7 +152,7 @@ final class OwnerCreditPdf
         'Inicio / fin del contrato' => $date((int) $contract['inicio_ts']) . ' – ' . $date((int) $contract['fin_ts']),
         'Estado del contrato' => (string) $contract['estado'],
         'Aseguradora' => (string) $contract['aseguradora'],
-        'Siniestro' => isset($ev['analyst']) ? ($ev['analyst']['siniestro'] ? 'Siniestrado' . ($ev['analyst']['siniestrados'] !== [] ? ' (' . implode(', ', $ev['analyst']['siniestrados']) . ')' : '') : 'No') : ($contract['siniestrado'] ? 'Siniestrado' : 'Por verificar'),
+        'Siniestro' => self::siniestro($ev['analyst'] ?? null, $contract),
       ]) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>2. Ingreso del propietario</h2>' . ($others !== [] ? '<p>Canon − descuentos (comisión, garantía y póliza) = ingreso neto de cada contrato.</p>' : '') . Doc::table($income) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>3. Solicitud</h2>' . Doc::table([
