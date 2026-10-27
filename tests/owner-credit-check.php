@@ -47,28 +47,45 @@ $media = OwnerCreditCalculator::evaluate(['vacancy' => 'Media'] + ['gross' => 62
 $assert($media['suggested']['term'] === 6 && $near($media['suggested']['rate'], 0.0242, 1e-12), 'medium vacancy suggests max months at the reference rate');
 
 // Cupo preaprobado con varios contratos (ejemplo de Cartera): canon 1.000.000 + 500.000 + 2.800.000 − 860.000 de descuentos.
+// Plazo del preaprobado: cuotas del calendario (día 30) que vencen antes del fin del contrato más largo, sin margen.
+$disbursed = (int) strtotime('2026-10-26');
 $pre = OwnerCreditCalculator::preapproval([
-  ['net_income' => 800000, 'max_months' => 3], ['net_income' => 400000, 'max_months' => 7], ['net_income' => 2240000, 'max_months' => 12],
-], $settings);
+  ['net_income' => 800000, 'max_months' => 3, 'end_ts' => strtotime('2027-01-31')], ['net_income' => 400000, 'max_months' => 7, 'end_ts' => strtotime('2027-05-31')], ['net_income' => 2240000, 'max_months' => 12, 'end_ts' => strtotime('2027-10-31')],
+], $settings, $disbursed);
 $assert($near($pre['net_income'], 3440000) && $near($pre['amount'], 10320000), 'preapproval = sum of net incomes × 3');
-$assert($pre['longest_months'] === 12 && $pre['max_term'] === 12 && $pre['contracts'] === 3, 'preapproval term without margin = longest contract term');
+$assert($pre['max_term'] === 12 && $pre['contracts'] === 3 && date('Y-m-d', $pre['first_due_ts']) === '2026-11-30', 'preapproval term = installments due (30th) before the longest contract ends');
 $assert(OwnerCreditCalculator::preapproval([], $settings)['max_term'] === 0, 'preapproval without contracts is empty');
-$withMargin = OwnerCreditSettings::normalize(['preapproval_margin_months' => 2] + $settings);
-$pre = OwnerCreditCalculator::preapproval([
-  ['net_income' => 800000, 'max_months' => 3], ['net_income' => 400000, 'max_months' => 7], ['net_income' => 2240000, 'max_months' => 12],
-], $withMargin);
-$assert($pre['longest_months'] === 12 && $pre['max_term'] === 10 && $pre['contracts'] === 3, 'preapproval term = longest contract term − 2 months of margin');
-$long = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 25], ['net_income' => 400000, 'max_months' => 6]], $withMargin);
-$assert($long['max_term'] === 12 && $long['max_term_cap'] === 12, 'a long contract (25 − 2 = 23) is capped at the 12-month policy term');
-$cap18 = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 25]], OwnerCreditSettings::normalize(['max_term_months' => 18] + $withMargin));
+$short = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 7, 'end_ts' => strtotime('2027-05-31')]], $settings, $disbursed);
+$assert($short['max_term'] === 7 && str_contains($short['term_basis'], '7 cuotas vencen antes del fin del contrato, el 31/05/2027'), 'a contract ending in May leaves 7 installments (Nov–May)');
+$long = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 25, 'end_ts' => strtotime('2028-12-31')], ['net_income' => 400000, 'max_months' => 6, 'end_ts' => strtotime('2027-04-30')]], $settings, $disbursed);
+$assert($long['max_term'] === 12 && $long['max_term_cap'] === 12 && str_contains($long['term_basis'], 'tope de política de 12 meses'), 'a long contract is capped at the 12-month policy term');
+$cap18 = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 25, 'end_ts' => strtotime('2028-12-31')]], OwnerCreditSettings::normalize(['max_term_months' => 18] + $settings), $disbursed);
 $assert($cap18['max_term'] === 18, 'the policy term cap is configurable');
+$assert(OwnerCreditSettings::normalize(['usable_income_factor' => '70', 'min_coverage' => '1,2'])['usable_income_factor'] === 0.7 && OwnerCreditSettings::normalize(['min_coverage' => '1,2'])['min_coverage'] === 1.2, 'usable income (%) and minimum coverage (times the installment) are configurable');
+$assert(OwnerCreditSettings::normalize(OwnerCreditSettings::normalize([]))['usable_income_factor'] === 1.0 && OwnerCreditSettings::normalize(['min_coverage' => '0,5'])['min_coverage'] === 1.0, '100 % stays 100 % when read back and the minimum coverage is at least 1');
 $consolidated = OwnerCreditCalculator::evaluate([
   'gross' => 1000000, 'deductions' => ['comision' => 200000], 'requested_amount' => 5000000, 'requested_term' => 10,
   'request_ts' => strtotime('2026-01-01'), 'contract_end_ts' => strtotime('2026-04-15'), 'vacancy' => 'Baja',
   'other_net_income' => 2640000, 'longest_months' => 12,
-], $withMargin);
+], $settings);
 $assert($near($consolidated['total_net_income'], 3440000) && $near($consolidated['max_amount'], 10320000), 'liquidator cap uses the net income of all the owner contracts');
-$assert($consolidated['contract_months'] === 3 && $consolidated['max_months'] === 10, 'liquidator term uses the longest contract minus the margin');
+$assert($consolidated['contract_months'] === 3 && $consolidated['max_months'] === 12, 'without coverage data the term is the longest contract (Excel), capped');
+
+// Con cobertura: el plazo máximo es el mayor con ingreso en todas las cuotas y la sugerencia nunca pasa de lo pedido.
+$first = \SCM\Modules\OwnerCredits\OwnerCreditCoverage::firstDueTs((int) strtotime('2026-10-26'));
+$slots = \SCM\Modules\OwnerCredits\OwnerCreditCoverage::availability(\SCM\Modules\OwnerCredits\OwnerCreditCoverage::dueDates($first, 12), [
+  ['id' => 1, 'contrato' => 'C1', 'inmueble' => 'I1', 'net_income' => 1500000.0, 'start_ts' => 0, 'end_ts' => strtotime('2027-01-31'), 'active' => true],
+  ['id' => 2, 'contrato' => 'C2', 'inmueble' => 'I2', 'net_income' => 400000.0, 'start_ts' => 0, 'end_ts' => strtotime('2027-09-30'), 'active' => true],
+  ['id' => 3, 'contrato' => 'cr', 'inmueble' => 'I3', 'net_income' => 600000.0, 'start_ts' => 0, 'end_ts' => strtotime('2027-04-30'), 'active' => true],
+], 1.0, array_fill(0, 12, 0.0));
+$covered = OwnerCreditCalculator::evaluate([
+  'gross' => 1500000, 'deductions' => [], 'requested_amount' => 4000000, 'requested_term' => 9, 'request_ts' => strtotime('2026-10-26'), 'contract_end_ts' => strtotime('2027-01-31'), 'vacancy' => 'Baja',
+  'other_net_income' => 1000000, 'longest_months' => 11, 'coverage' => ['availability' => $slots, 'term_limit' => 11, 'min_coverage' => 1.0],
+], OwnerCreditSettings::normalize(['reference_rate' => '0.022', 'usury_annual' => '0.33'] + $settings));
+$assert($covered['term_limit'] === 11 && $covered['max_months'] === 6, 'with coverage the max term is the longest one covered in every installment (11 by dates → 6)');
+$assert($covered['suggested']['term'] === 6 && abs($covered['suggested']['payment'] - 718930.64) < 0.001 && !$covered['suggested']['uncovered'], 'the suggestion lowers the requested 9 months to the covered 6, at the cents installment');
+$none = OwnerCreditCalculator::evaluate(['requested_amount' => 40000000, 'coverage' => ['availability' => $slots, 'term_limit' => 11, 'min_coverage' => 1.0]] + $covered + ['gross' => 1500000, 'deductions' => [], 'requested_term' => 9, 'request_ts' => strtotime('2026-10-26'), 'contract_end_ts' => strtotime('2027-01-31'), 'vacancy' => 'Baja'], OwnerCreditSettings::normalize(['reference_rate' => '0.022', 'usury_annual' => '0.33'] + $settings));
+$assert($none['max_months'] === 0 && $none['suggested']['uncovered'], 'an amount no term can cover is flagged');
 
 // Plan de descuento: un solo contrato si alcanza; si no, se reparte; si un contrato termina, su parte pasa a otros.
 $plan = OwnerCreditCalculator::discountPlan([

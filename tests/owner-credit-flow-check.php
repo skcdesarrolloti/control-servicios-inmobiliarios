@@ -103,7 +103,7 @@ $approved = $result['credit'];
 $check(array_key_exists('internal_whatsapp', $result['queued']), 'staff WhatsApp is attempted on decisions without breaking them when no staff is configured');
 $check($approved['status'] === 'aprobado' && (int) $approved['policy_override'] === 1 && (float) $approved['approved_amount'] === 3000000.0 && (int) $approved['approved_term'] === 12, 'approved outside policy with conditions and override flag');
 $approvedWork = $service->workspace((int) $approved['id']);
-$check($approvedWork['credit']['status'] === 'aprobado' && (int) $approved['disbursed_at'] === (int) strtotime('today') && (int) $approved['first_payment_ts'] === (int) strtotime('+1 month', strtotime('today')) && $approvedWork['schedule'][0]['fecha'] === (int) $approved['first_payment_ts'], 'approval stores the disbursement date and the first instalment one month later');
+$check($approvedWork['credit']['status'] === 'aprobado' && (int) $approved['disbursed_at'] === (int) strtotime('today') && (int) $approved['first_payment_ts'] === \SCM\Modules\OwnerCredits\OwnerCreditCoverage::firstDueTs((int) strtotime('today')) && $approvedWork['schedule'][0]['fecha'] === (int) $approved['first_payment_ts'] && in_array((int) date('j', (int) $approved['first_payment_ts']), [28, 29, 30], true), 'approval stores the disbursement date and the first installment on the agreed calendar (day 30, 15/16 cut-off)');
 $check(count($db->getResults('SELECT * FROM wp_scm_owner_credit_sources WHERE credit_id = ?', [(int) $approved['id']])) === 1, 'approval stores the contracts that back the credit');
 $check(abs((float) $approved['monthly_payment'] - 285423.85) < 1 && abs((float) $approved['approved_rate'] - 0.021) < 1e-9, 'monthly payment is recalculated on the server');
 $check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_ticket WHERE id_ticket = ?', ['10821'])) === 2, 'request and decision are written to the case history');
@@ -307,7 +307,7 @@ $check(!$policy($all, 'siniestro')['ok'] && str_contains($policy($all, 'siniestr
 $check($policy($all, 'contrato_activo')['ok'] && str_contains($policy($all, 'contrato_activo')['detail'], 'de 2 contratos Entregado'), 'the active contract policy looks at every contract');
 $cleared = $service->workspace((int) $changed['id'], ['siniestro' => 'no', 'has_credits' => 'si']);
 $check($policy($cleared, 'siniestro')['ok'] && str_contains($policy($cleared, 'siniestro')['detail'], 'el analista indicó que no'), 'the analyst can clear the siniestro after checking with Cartera');
-$check(!$policy($cleared, 'prestamos')['ok'] && str_contains($policy($cleared, 'prestamos')['detail'], 'por fuera del sistema') && $cleared['evaluation']['analyst']['overrides'] === ['siniestro', 'has_credits'], 'credits outside the system marked by the analyst need a justification');
+$check(!$policy($cleared, 'prestamos')['ok'] && str_contains($policy($cleared, 'prestamos')['detail'], 'por fuera del sistema') && array_values(array_intersect(['siniestro', 'has_credits'], $cleared['evaluation']['analyst']['overrides'])) === ['siniestro', 'has_credits'] && count($cleared['evaluation']['analyst']['overrides']) === 2, 'credits outside the system marked by the analyst need a justification');
 $checks = $service->requestChecks($service->ownerPortfolio('22233344'), ['outstanding' => 0, 'available' => 1, 'max_term' => 3]);
 $check(array_column($checks, 'ok', 'label')['Sin siniestro'] === false && array_column($checks, 'ok', 'label')['Sin créditos vigentes'] === true, 'the request form shows the policy pre-check over every contract');
 $moved = $service->changeContract((int) $changed['id'], 14, $actor);
@@ -375,6 +375,36 @@ $listing = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->report($service->r
 $check(str_contains($listing, 'Ver solicitud') && !str_contains($listing, 'Abrir liquidador') && str_contains($listing, 'data-owner-credit-void'), 'the list shows "Ver solicitud" and "Anular" for pending requests');
 $check(!str_contains((new \SCM\Modules\OwnerCredits\OwnerCreditView())->report($service->report([]), true, false), 'data-owner-credit-void'), 'without the manage permission there is no "Anular"');
 try { $service->voidRequest($voided); $check(false, 'only pending requests can be voided'); } catch (\DomainException $e) {}
+
+// Cobertura de pago en el liquidador: se muestra, se guarda con la decisión y sin plazo con cobertura no se aprueba.
+$coverageCredit = (int) $service->createManual(9, 800000, 6, 'Libre Destinación', $actor, '', 'mandato_2');
+$cw = $service->workspace($coverageCredit);
+$cc = $cw['evaluation']['coverage'];
+$check($cc['rule'] === \SCM\Modules\OwnerCredits\OwnerCreditCoverage::RULE && $cc['checked'] && count($cc['rows']) === (int) $cw['conditions']['term'] && $cc['factor'] === 1.0 && $cc['min_coverage'] === 1.0, 'the liquidator checks the coverage of every installment with the configured parameters');
+$cwHtml = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($cw, true, true);
+$check(str_contains($cwHtml, 'data-owner-credit-coverage') && str_contains($cwHtml, 'Mayor plazo con cobertura') && str_contains($cwHtml, 'name="other_obligations"'), 'the liquidator shows the coverage section and the other obligations field');
+$check(abs(array_sum(array_column($cw['schedule'], 'abono')) - $cw['conditions']['amount']) < 0.001 && end($cw['schedule'])['saldo'] == 0.0, 'the amortization table is in cents and the last installment leaves no balance');
+$check((int) date('j', (int) $cw['schedule'][1]['fecha']) >= 28, 'installments fall on the 30th (or the end of February)');
+// Otras obligaciones que se comen todo el ingreso: ningún plazo cubre y aprobar queda bloqueado aun con justificación.
+$heavy = $service->workspace($coverageCredit, ['other_obligations' => '$900.000.000']);
+$check(!$heavy['evaluation']['coverage']['ok'] && $heavy['evaluation']['coverage']['best_term'] === 0 && !array_column($heavy['policies'], 'ok', 'key')['cuota'], 'other obligations above the income leave no covered term');
+try {
+  $service->decide($coverageCredit, 'aprobado', ['other_obligations' => '$900.000.000', 'note' => 'Intento de aprobar sin cobertura de pago.'], $actor);
+  $check(false, 'without a covered term the credit cannot be approved');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'Ningún plazo tiene cobertura'), 'without a covered term the credit cannot be approved, even with a justification');
+}
+// Un plazo sin cobertura con otro que sí cubre: falla la política (con justificación) y dice el mayor plazo.
+$tight = $service->workspace($coverageCredit, ['other_obligations' => '$' . number_format(max(0, $cc['rows'][0]['ingreso'] - $cc['payment'] + 1), 0, '', '.')]);
+$tc = $tight['evaluation']['coverage'];
+$check(!$tc['ok'] && is_array($tc['shortfall']) && str_contains(array_column($tight['policies'], 'detail', 'key')['cuota'], 'disponibles frente a una cuota'), 'an installment short by one peso fails the coverage policy and shows the first shortfall');
+$service->decide($coverageCredit, 'aprobado', ['note' => ''], $actor);
+$savedCoverage = json_decode((string) $service->find($coverageCredit)['evaluation_json'], true)['coverage'];
+$check($savedCoverage['rule'] === \SCM\Modules\OwnerCredits\OwnerCreditCoverage::RULE && $savedCoverage['ok'] && isset($savedCoverage['max_capital']), 'the coverage result, parameters and rule are saved with the decision');
+// Con ese crédito aprobado, sus cuotas se restan del disponible de una nueva solicitud del mismo propietario.
+$next = $service->workspace((int) $service->createManual(9, 800000, 6, 'Libre Destinación', $actor, '', 'mandato_2'));
+$check($next['evaluation']['analyst']['has_credits'] && in_array($coverageCredit, $next['evaluation']['coverage']['credits'], true) && $next['evaluation']['coverage']['rows'][0]['obligaciones'] > 0, 'the installments of the owner approved credits are subtracted from the available income');
+$service->changeStatus($coverageCredit, 'anulado', 'Crédito de prueba de cobertura de pago.', $actor);
 
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
 $template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-funcionario-v2-template.json'), true);

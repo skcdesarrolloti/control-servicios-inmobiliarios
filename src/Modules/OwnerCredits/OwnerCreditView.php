@@ -167,7 +167,8 @@ final class OwnerCreditView
         'Valor solicitado' => 'Lo que pide el propietario. Si viene de una cotización, es el total de la cotización.',
         'Plazo solicitado' => 'Meses en que quiere pagar. Escríbelo según lo que pidió; no puede superar los meses que faltan para el fin del contrato, porque las cuotas se descuentan del canon.',
         'Destinación' => 'Para qué usará el dinero.',
-        '¿Tiene créditos vigentes?' => 'El sistema propone Sí cuando tiene créditos aprobados aquí. Con Sí, su saldo se resta del cupo. Con No, el cupo no descuenta nada.',
+        '¿Tiene créditos vigentes?' => 'El sistema propone Sí cuando tiene créditos aprobados aquí. Con Sí, su saldo se resta del cupo y sus cuotas se restan del ingreso disponible en cada fecha de pago. Con No, no descuenta nada.',
+        'Otras obligaciones mensuales' => 'Lo que el propietario ya tiene comprometido cada mes y que no está en los descuentos del contrato ni en créditos de este sistema. Se resta del ingreso disponible para la cuota; no repitas descuentos.',
         'Probabilidad de que desocupen' => 'La sugiere el sistema con el seguimiento de renovación del contrato principal: no prórroga o terminación respondida dentro del término (renovación 0 %) o renovación menor de 50 % = Alta; de 50 % a 79 % = Media; 80 % o más, o "no salida" reportada = Baja. Puedes cambiarla según tu criterio. Baja: se respeta lo pedido con la tasa de referencia. Media: plazo hasta el fin del contrato con la tasa de referencia. Alta: máximo 3 meses con la tasa de riesgo.',
       ]) . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">'
       . $field('Fecha de solicitud', '<input class="' . $ui::INPUT . ' ' . self::READONLY . '" value="' . date('d/m/Y', (int) $credit['created_at']) . '" readonly>')
@@ -176,6 +177,7 @@ final class OwnerCreditView
       . $field('Destinación del crédito', $select('purpose', $purposeOptions))
       . $field('Probabilidad de que desocupen', $select('vacancy', $vacancyOptions))
       . $field('¿Tiene créditos vigentes?', $yesNo('has_credits', (bool) $analyst['has_credits'], '¿Tiene créditos vigentes?'))
+      . $field('Otras obligaciones mensuales', $money('other_obligations', (float) ($analyst['other_obligations'] ?? 0)))
       . '</div>' . self::vacancyNote($ev) . '</section>'
 
       . '<section class="' . self::SECTION . ' !sp-border-service-yellow"><div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-3"><h4 class="' . self::H4 . ' !sp-mb-0">' . $ui::icon('edit') . 'Condiciones según el analista</h4>'
@@ -226,7 +228,8 @@ final class OwnerCreditView
       . ($endChanged ? self::alert('Estás calculando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Se guardará en el contrato al aprobar o rechazar el crédito.', 'info') : '')
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('chart') . 'Política de créditos</h4>' . self::guide('politica', [
         'Valor máximo a prestar' => 'Tope = ingreso neto de todos los contratos del propietario × los meses de política (Configuración, hoy ' . (int) $work['settings']['income_months'] . ').',
-        'Meses máximos' => 'Meses completos que faltan para el fin del contrato con la vigencia más larga del propietario, menos los meses de margen, sin pasar del plazo máximo de un crédito (Configuración, hoy ' . (int) ($work['settings']['max_term_months'] ?? 12) . ').',
+        'Plazo máximo por vigencia' => 'Cuotas del calendario (día 30) que vencen antes del fin del contrato más largo del propietario, sin pasar del plazo máximo de un crédito (Configuración, hoy ' . (int) ($work['settings']['max_term_months'] ?? 12) . '). Es un límite: la cobertura de pago decide cuántas se pueden pagar.',
+        'Mayor plazo con cobertura' => 'El plazo más largo, hasta el máximo por vigencia, en el que todas las cuotas del valor solicitado (a la tasa de referencia) tienen ingreso disponible.',
         'Tasa mínima' => 'Tasa de referencia menos el descuento máximo de Configuración: lo más bajo que puedes aprobar dentro de política.',
         'Cuota de política' => 'La cuota si se prestara el valor máximo al plazo máximo.',
         'Meses / valor que excede' => 'Diferencia entre la política y lo pedido; en rojo cuando lo pedido la supera.',
@@ -235,13 +238,14 @@ final class OwnerCreditView
       . self::tile($others !== [] ? 'Ingreso neto de este contrato' : 'Ingreso neto (INO)', self::money($ev['net_income']), 'key')
       . ($others !== [] ? self::tile('Ingreso neto total (' . (count($others) + 1) . ' contratos)', self::money($ev['total_net_income']), 'key') : '')
       . self::tile('Valor máximo a prestar', self::money($ev['max_amount']), 'key')
-      . self::tile('Meses máximos', (string) $ev['max_months'])
+      . self::tile('Plazo máximo por vigencia', (int) ($ev['term_limit'] ?? $ev['max_months']) . ' meses')
+      . self::tile('Mayor plazo con cobertura', (int) $ev['max_months'] > 0 ? (int) $ev['max_months'] . ' meses' : 'Ninguno', (int) $ev['max_months'] > 0 ? '' : 'bad')
       . self::tile('Tasa mínima (descuento máximo)', self::percent($ev['policy_rate']))
       . self::tile('Cuota de política', self::money($ev['policy_payment']))
       . self::tile('Tasa para el riesgo', ($ev['risk_applies'] ?? true) ? self::percent($ev['risk_rate']) : 'No aplica')
       . self::tile('Meses que excede', (string) $ev['exceed_months'], $ev['exceed_months'] < 0 ? 'bad' : '')
       . self::tile('Valor que excede', self::money($ev['exceed_amount'], true), $ev['exceed_amount'] < 0 ? 'bad' : '')
-      . '</div><p class="' . self::NOTE . ' !sp-mt-3">Meses máximos: ' . self::e(OwnerCreditService::termBasis($ev)) . '.</p>'
+      . '</div><p class="' . self::NOTE . ' !sp-mt-3">Plazo máximo por vigencia: ' . self::e(OwnerCreditService::termBasis($ev)) . '.</p>'
       . ($others !== [] ? '<ul class="!sp-m-0 !sp-mt-2 !sp-pl-4 !sp-text-[10px] !sp-text-service-muted">' . implode('', array_map(static fn(array $row): string => '<li>Contrato #' . self::e($row['contrato']) . ' · SIMI ' . self::e($row['inmueble']) . ' · ingreso neto ' . self::money((float) $row['net_income']) . ' · ' . (int) $row['max_months'] . ' meses de vigencia</li>', $others)) . '</ul>' : '')
       . '</section>'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('target') . 'Condición sugerida · probabilidad ' . self::e($ev['vacancy']) . '</h4>'
@@ -251,13 +255,16 @@ final class OwnerCreditView
       . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3" data-owner-credit-suggested data-amount="' . round((float) $s['amount']) . '" data-term="' . (int) $s['term'] . '" data-rate="' . self::e(number_format($s['rate'] * 100, 4, ',', '')) . '">'
       . self::tile('Plazo', $s['term'] . ' meses') . self::tile('Tasa', self::percent($s['rate']))
       . self::tile('Valor a colocar', self::money($s['amount'])) . self::tile('Cuota mensual', self::money($s['payment']), 'key')
-      . '</div>' . (!empty($s['rate_capped']) ? '<p class="' . self::NOTE . ' !sp-mt-2">La tasa de esta condición superaba la usura; se sugiere la usura mes vencido (' . self::percent($ev['usury_monthly_legal']) . ').</p>' : '') . '</section>'
+      . '</div>' . (!empty($s['rate_capped']) ? '<p class="' . self::NOTE . ' !sp-mt-2">La tasa de esta condición superaba la usura; se sugiere la usura mes vencido (' . self::percent($ev['usury_monthly_legal']) . ').</p>' : '')
+      . (!empty($s['uncovered']) ? '<p class="' . self::NOTE . ' !sp-mt-2 !sp-text-red-700">Con este valor ningún plazo tiene cobertura en todas sus cuotas: baja el valor.</p>' : '') . '</section>'
+      . self::coverage($work)
       . self::discountPlan($work)
       . ($work['credit']['status'] === 'pendiente' ? self::adjustments($work['adjustments'] ?? [], true) : '')
       . '<section class="' . self::SECTION . '"' . (self::needsNote($work) ? ' data-owner-credit-needs-note' : '') . '><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Políticas</h4>'
       . ($work['policies_ok'] ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Cumple todas</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-red-700">Incumple políticas</span>') . '</div>'
       . self::guide('politicas', [
-        'Requisitos' => 'Contrato activo y no próximo a vencer, plazo dentro de la vigencia, sin siniestro, valor dentro del cupo disponible (tope menos el saldo de sus créditos vigentes), valor dentro del tope, tasa bajo la usura y cuota cubierta por sus contratos.',
+        'Requisitos' => 'Contrato activo y no próximo a vencer, plazo dentro de la vigencia, sin siniestro, valor dentro del cupo disponible (tope menos el saldo de sus créditos vigentes), valor dentro del tope, tasa bajo la usura y cuota con cobertura en todas las fechas.',
+        'Cobertura' => 'Si ningún plazo cubre todas las cuotas con el valor, no se puede aprobar ni con justificación: hay que bajar el valor.',
         'Si alguna está en rojo' => 'Puedes aprobar igual, pero con justificación: el crédito queda marcado "Fuera de política" y la razón queda en el historial.',
       ])
       . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $policies . '</ul>'
@@ -359,6 +366,43 @@ final class OwnerCreditView
       . '<p class="' . self::NOTE . ' !sp-mt-2">Se suman al ingreso neto del contrato principal (arriba) para el tope y el cupo preaprobado; el total aparece en Políticas. Solo el principal se puede ajustar aquí.</p></div>';
   }
 
+  /**
+   * Cobertura de pago de las condiciones: ingreso disponible frente a la cuota en cada fecha, primera fecha con
+   * faltante, mayor plazo con cobertura y capital máximo para conservar el plazo.
+   * @param array<string,mixed> $work
+   */
+  private static function coverage(array $work): string
+  {
+    $c = $work['evaluation']['coverage'] ?? null;
+    if (!is_array($c) || (float) ($work['conditions']['amount'] ?? 0) <= 0 || (int) ($work['conditions']['term'] ?? 0) <= 0) return '';
+    $ok = (bool) $c['ok'];
+    $status = $ok ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Con cobertura</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-red-700">Sin cobertura</span>';
+    $gap = $c['shortfall'] ?? null;
+    $rows = '';
+    $td = '!sp-px-2 !sp-py-1.5 !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-100';
+    foreach ((array) $c['rows'] as $row) {
+      $rows .= '<tr class="' . ($row['ok'] ? '' : '!sp-bg-red-50 !sp-text-red-800') . '"><td class="' . $td . '">' . (int) $row['mes'] . '</td><td class="' . $td . '">' . date('d/m/Y', (int) $row['fecha']) . '</td>'
+        . '<td class="' . $td . ' !sp-text-right">' . self::money($row['disponible']) . '</td><td class="' . $td . ' !sp-text-right">' . self::money($row['cuota']) . '</td>'
+        . '<td class="' . $td . ' !sp-text-right">' . ($row['ratio'] === null ? '—' : number_format((float) $row['ratio'], 2, ',', '.')) . '</td></tr>';
+    }
+    $percent = number_format((float) $c['factor'] * 100, 0, ',', '.') . ' %';
+    return '<section class="' . self::SECTION . '" data-owner-credit-coverage><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Cobertura de pago</h4>' . $status . '</div>'
+      . self::guide('cobertura', [
+        'Qué revisa' => 'En cada fecha de pago suma el ingreso neto de los contratos vigentes ese día (× el % utilizable de Configuración) y le resta las cuotas de sus otros créditos y las otras obligaciones. Un contrato que termina antes de la fecha deja de aportar: no se supone que se renueva.',
+        'Cuándo cumple' => 'Solo si en todas las cuotas el disponible es al menos la cuota × la cobertura mínima. Acortar el plazo sube la cuota, por eso se prueban todos los plazos.',
+        'Valor máximo' => 'El mayor valor que se puede prestar conservando el plazo con cobertura en todas sus cuotas.',
+      ])
+      . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">'
+      . self::tile('Valor y plazo de las condiciones', $ok ? 'Con cobertura' : 'Sin cobertura', $ok ? 'key' : 'bad')
+      . self::tile('Mayor plazo con cobertura', (int) $c['best_term'] > 0 ? (int) $c['best_term'] . ' meses · ' . self::money($c['best_payment']) : 'Ninguno', (int) $c['best_term'] > 0 ? '' : 'bad')
+      . self::tile('Primera fecha con faltante', is_array($gap) ? date('d/m/Y', (int) $gap['fecha']) . ' · faltan ' . self::money((float) $gap['faltante_pago'] > 0 ? $gap['faltante_pago'] : $gap['faltante_cobertura']) : 'Ninguna', is_array($gap) ? 'bad' : '')
+      . self::tile('Valor máximo para ' . (int) $c['max_capital_term'] . ' meses', self::money($c['max_capital']))
+      . '</div>'
+      . '<p class="' . self::NOTE . ' !sp-mt-3">Ingreso utilizable ' . $percent . ' · cobertura mínima ' . number_format((float) $c['min_coverage'], 2, ',', '.') . ((float) $c['other_obligations'] > 0 ? ' · otras obligaciones ' . self::money($c['other_obligations']) : '') . ((array) $c['credits'] !== [] ? ' · cuotas de los créditos ' . implode(', ', array_map(static fn(int $id): string => '#' . $id, (array) $c['credits'])) : '') . '.</p>'
+      . ($rows !== '' ? '<details class="!sp-mt-2"><summary class="!sp-cursor-pointer !sp-text-[10px] !sp-font-semibold !sp-text-service-blue">Ver disponible por fecha</summary><table class="!sp-w-full !sp-mt-2 !sp-border-collapse !sp-text-[10px] !sp-text-service-navy"><thead><tr class="!sp-text-left !sp-text-service-muted"><th class="' . $td . '">Cuota</th><th class="' . $td . '">Fecha</th><th class="' . $td . ' !sp-text-right">Disponible</th><th class="' . $td . ' !sp-text-right">Cuota</th><th class="' . $td . ' !sp-text-right">Cobertura</th></tr></thead><tbody>' . $rows . '</tbody></table></details>' : '')
+      . '</section>';
+  }
+
   /** Aprobar exige justificación solo cuando incumple alguna política. */
   private static function needsNote(array $work): bool
   {
@@ -442,8 +486,9 @@ final class OwnerCreditView
       . $field('Descuento sin mandato (% del canon)', $input('no_mandate_deduction', $pct($settings['no_mandate_deduction'], 1), ' inputmode="decimal"'), 'Cuando el contrato no tiene mandato con comisión registrada.')
       . $field('Meses de ingreso neto a prestar', '<input class="' . $ui::INPUT . '" type="number" name="income_months" min="1" max="24" value="' . (int) $settings['income_months'] . '">', 'Tope = ingreso neto × estos meses.')
       . $field('Meses mínimos de contrato restantes', '<input class="' . $ui::INPUT . '" type="number" name="min_remaining_months" min="0" max="60" value="' . (int) $settings['min_remaining_months'] . '">', 'Por debajo se alerta "contrato próximo a vencer".')
-      . $field('Meses de margen del preaprobado', '<input class="' . $ui::INPUT . '" type="number" name="preapproval_margin_months" min="0" max="24" value="' . (int) $settings['preapproval_margin_months'] . '">', 'Plazo máximo preaprobado = vigencia más larga de sus contratos − estos meses.')
-      . $field('Plazo máximo de un crédito (meses)', '<input class="' . $ui::INPUT . '" type="number" name="max_term_months" min="1" max="60" value="' . (int) $settings['max_term_months'] . '">', 'Tope de plazo: aunque la vigencia dé para más, ningún crédito pasa de estos meses.')
+      . $field('Ingreso utilizable para la cuota (%)', $input('usable_income_factor', $pct($settings['usable_income_factor'], 1), ' inputmode="decimal"'), 'Porción del ingreso neto de cada contrato (canon − descuentos) que se puede comprometer con la cuota. 100 % = todo.')
+      . $field('Cobertura mínima (veces la cuota)', $input('min_coverage', number_format((float) $settings['min_coverage'], 2, ',', ''), ' inputmode="decimal"'), 'En cada fecha de pago el ingreso disponible debe ser al menos la cuota por este número. 1,00 = alcanza exacto; 1,20 exige 20 % de margen.')
+      . $field('Plazo máximo de un crédito (meses)', '<input class="' . $ui::INPUT . '" type="number" name="max_term_months" min="1" max="60" value="' . (int) $settings['max_term_months'] . '">', 'Tope de plazo: se prueban todos los plazos hasta este y se toma el mayor con cobertura en todas sus cuotas.')
       . '</div></section>'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . UI::icon('bolt') . 'Avisos</h4><div class="' . $grid . '">'
       . $field('Correo al propietario al decidir', $yesNo('notify_owner_email', (bool) $settings['notify_owner_email']), 'Condiciones y tabla de amortización.')
@@ -474,7 +519,7 @@ final class OwnerCreditView
         'Qué encuentra' => 'Los contratos de arrendamiento donde esa persona es propietaria (en el contrato, en su ficha o en el contrato de mandato, aunque sean varios propietarios).',
         'Contrato principal' => 'No se elige: el sistema toma el contrato de vigencia más larga, que es el que da el plazo máximo, y de él se descuenta primero la cuota. Si hace falta, el analista lo cambia en el liquidador.',
         'Revisión previa' => 'Las políticas que no dependen del valor (contrato activo, vigencia, siniestro, créditos vigentes) revisadas sobre todos sus contratos. Es informativa: la solicitud se puede registrar igual y el analista decide.',
-        'Cupo preaprobado' => 'Suma del ingreso neto (canon − descuentos) de todos sus contratos × los meses de política. Las cuotas máximas salen del contrato con la vigencia más larga, menos el margen de Configuración, sin pasar del plazo máximo de un crédito.',
+        'Cupo preaprobado' => 'Suma del ingreso neto (canon − descuentos) de todos sus contratos × los meses de política. Las cuotas máximas son las que vencen (día 30) antes del fin del contrato más largo, sin pasar del plazo máximo de un crédito; con el valor, la cobertura de pago puede bajarlas.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[minmax(0,1fr)_auto] !sp-gap-3 !sp-items-end">'
       . $field('Cédula o NIT' . $required, '<input class="' . $ui::INPUT . '" name="document" data-owner-credit-search-query inputmode="numeric" placeholder="Ej. 1143415938">')
@@ -488,7 +533,7 @@ final class OwnerCreditView
       . self::guide('nuevo-datos', [
         'Primero simula' => 'Con "Simular y ver PDF" revisas con el propietario la cuota y la tabla de amortización. Si está de acuerdo, aparece "Registrar solicitud". Si cambias el valor, el plazo o la destinación, vuelve a simular.',
         'Qué pasa al registrar' => 'Solo se registra lo que pide el propietario: todavía no se aprueba nada. El analista lo evalúa en el liquidador y ahí se aprueba o rechaza.',
-        'Plazo solicitado' => 'Los meses que pidió el propietario, hasta el plazo máximo del cupo preaprobado: vigencia más larga de sus contratos − margen, sin pasar del plazo máximo de un crédito (Configuración). Si el contrato fue renovado y la fecha no está al día, regístralo con el máximo: el analista corrige la fecha fin en el liquidador.',
+        'Plazo solicitado' => 'Los meses que pidió el propietario, hasta el plazo máximo del cupo preaprobado: cuotas que vencen antes del fin del contrato más largo, sin pasar del plazo máximo de un crédito (Configuración). La simulación revisa la cobertura de todas las cuotas. Si el contrato fue renovado y la fecha no está al día, regístralo con el máximo: el analista corrige la fecha fin en el liquidador.',
         'Simular y ver PDF' => 'Calcula la cuota y la tabla de amortización con la tasa de política sin registrar la solicitud. Sin valor o plazo se simula con el cupo preaprobado y el plazo máximo. La simulación queda en el historial de los contratos y de los inmuebles del propietario.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-3">'
@@ -539,7 +584,7 @@ final class OwnerCreditView
       . self::guide('cupo', [
         'Cupo preaprobado' => 'Ingreso neto de todos sus contratos Entregado o Por entregar × los meses de política (Configuración).',
         'Saldo de créditos vigentes' => 'Lo que todavía debe de sus créditos aprobados; se resta del cupo.',
-        'Plazo máximo' => 'Vigencia del contrato más largo menos los meses de margen, sin pasar del plazo máximo de un crédito (Configuración).',
+        'Plazo máximo' => 'Cuotas del calendario (día 30) que vencen antes del fin del contrato más largo, sin pasar del plazo máximo de un crédito (Configuración). Con el valor pedido, la cobertura de pago puede bajarlo.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">'
       . self::tile('Cupo (' . (int) $p['contracts'] . ' contrato' . ((int) $p['contracts'] === 1 ? '' : 's') . ')', self::money((float) $p['amount']), 'key')

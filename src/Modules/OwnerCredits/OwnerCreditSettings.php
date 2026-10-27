@@ -40,8 +40,11 @@ final class OwnerCreditSettings
       'policy_discount' => 0.05,
       'income_months' => 3,
       'min_remaining_months' => 3,
-      'preapproval_margin_months' => 2,
       'max_term_months' => 12,
+      // Cobertura de pago: % del ingreso neto de cada contrato que se puede usar para la cuota y cuántas veces debe
+      // alcanzar el disponible a la cuota (1 = alcanza exacto). Los define la empresa.
+      'usable_income_factor' => 1.0,
+      'min_coverage' => 1.0,
       'default_term' => 12,
       'notify_owner_email' => true,
       'notify_owner_whatsapp' => false,
@@ -72,6 +75,19 @@ final class OwnerCreditSettings
       }
       return max(0.0, min($max, $number));
     };
+    // Porción de 0 a 1: "100" o "100 %" es todo el ingreso; 1 (o 1,0 guardado) también es el 100 %.
+    $share = static function ($value, float $default): float {
+      $text = str_replace(',', '.', trim((string) $value));
+      if ($text === '' || !is_numeric(rtrim($text, '%'))) return $default;
+      $number = (float) rtrim($text, '%');
+      if (str_ends_with($text, '%') || $number > 1) $number /= 100;
+      return max(0.0, min(1.0, $number));
+    };
+    // Veces la cuota (1,00 a 5,00), no porcentaje.
+    $coverage = static function ($value, float $default): float {
+      $text = str_replace(',', '.', trim((string) $value));
+      return $text === '' || !is_numeric($text) ? $default : max(1.0, min(5.0, round((float) $text, 2)));
+    };
     $int = static fn($value, int $default, int $min, int $max): int => is_numeric($value) ? max($min, min($max, (int) $value)) : $default;
     $bool = static fn($value, bool $default): bool => $value === null ? $default : in_array(strtolower(trim((string) $value)), ['1', 'true', 'si', 'sí', 'on', 'yes'], true);
     $date = trim((string) ($input['usury_updated_at'] ?? ''));
@@ -90,7 +106,8 @@ final class OwnerCreditSettings
       'policy_discount' => $rate($input['policy_discount'] ?? null, $defaults['policy_discount'], 1.0),
       'income_months' => $int($input['income_months'] ?? null, $defaults['income_months'], 1, 24),
       'min_remaining_months' => $int($input['min_remaining_months'] ?? null, $defaults['min_remaining_months'], 0, 60),
-      'preapproval_margin_months' => $int($input['preapproval_margin_months'] ?? null, $defaults['preapproval_margin_months'], 0, 24),
+      'usable_income_factor' => $share($input['usable_income_factor'] ?? null, $defaults['usable_income_factor']),
+      'min_coverage' => $coverage($input['min_coverage'] ?? null, $defaults['min_coverage']),
       'max_term_months' => $int($input['max_term_months'] ?? null, $defaults['max_term_months'], 1, 60),
       'default_term' => $int($input['default_term'] ?? null, $defaults['default_term'], 1, 60),
       'notify_owner_email' => $bool($input['notify_owner_email'] ?? null, $defaults['notify_owner_email']),

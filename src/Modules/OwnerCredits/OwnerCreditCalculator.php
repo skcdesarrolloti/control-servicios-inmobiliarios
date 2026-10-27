@@ -9,7 +9,8 @@ namespace SCM\Modules\OwnerCredits;
  *
  * - Ingreso neto (INO) = canon − comisión con IVA − garantía inmobiliaria − póliza de servicios públicos − otros.
  * - Política: monto máximo = INO de todos los contratos del propietario × meses de política; plazo máximo = meses completos
- *   (30 días) hasta el fin del contrato con la vigencia más larga − meses de margen; tasa de colocación = tasa de referencia
+ *   (30 días) hasta el fin del contrato con la vigencia más larga, que la cobertura de pago (OwnerCreditCoverage) puede
+ *   bajar; tasa de colocación = tasa de referencia
  *   N.M.V × (1 − descuento).
  * - Tasa de riesgo (cuando se supera la política) = (monto máx × tasa política + |exceso| × usura/12) / valor solicitado,
  *   como en el Excel; el control legal compara contra la usura efectiva anual llevada a mes vencido.
@@ -105,27 +106,32 @@ final class OwnerCreditCalculator
 
   /**
    * Cupo preaprobado del solicitante con todos sus contratos: (suma de ingresos netos) × meses de política. El
-   * plazo máximo es la vigencia más larga entre esos contratos menos los meses de margen, sin pasar del tope de
-   * plazo configurado (12 por defecto).
-   * @param list<array{net_income:float,max_months:int}> $contracts
+   * plazo máximo por vigencia son los vencimientos del calendario (día 30) que caen antes del fin del contrato más
+   * largo, sin pasar del tope de plazo configurado. Es un límite superior: con el valor pedido, la cobertura de pago
+   * decide cuántas de esas cuotas se pueden pagar.
+   * @param list<array{net_income:float,max_months:int,end_ts?:int}> $contracts
    * @param array<string,mixed> $settings OwnerCreditSettings::read()
-   * @return array{contracts:int,net_income:float,income_months:int,amount:float,longest_months:int,margin_months:int,max_term_cap:int,max_term:int}
+   * @return array<string,mixed>
    */
-  public static function preapproval(array $contracts, array $settings): array
+  public static function preapproval(array $contracts, array $settings, int $disbursedTs = 0): array
   {
     $net = array_sum(array_map(static fn(array $row): float => max(0.0, (float) $row['net_income']), $contracts));
     $longest = $contracts === [] ? 0 : max(0, ...array_map(static fn(array $row): int => (int) $row['max_months'], $contracts));
-    $margin = max(0, (int) $settings['preapproval_margin_months']);
+    $longestEnd = $contracts === [] ? 0 : max(0, ...array_map(static fn(array $row): int => (int) ($row['end_ts'] ?? 0), $contracts));
     $cap = self::termCap($settings);
+    $firstDue = OwnerCreditCoverage::firstDueTs($disbursedTs ?: (int) strtotime('today'));
+    $byDates = OwnerCreditCoverage::duesUntil($firstDue, $longestEnd, 600);
     return [
       'contracts' => count($contracts),
       'net_income' => $net,
       'income_months' => (int) $settings['income_months'],
       'amount' => $net * (int) $settings['income_months'],
       'longest_months' => $longest,
-      'margin_months' => $margin,
+      'longest_end_ts' => $longestEnd,
+      'first_due_ts' => $firstDue,
       'max_term_cap' => $cap,
-      'max_term' => min($cap, max(0, $longest - $margin)),
+      'max_term' => min($cap, $byDates),
+      'term_basis' => self::termBasisText($byDates, $cap, $longestEnd, count($contracts) > 1),
     ];
   }
 
@@ -135,9 +141,20 @@ final class OwnerCreditCalculator
     return max(1, (int) ($settings['max_term_months'] ?? 12));
   }
 
+  /** "9 cuotas vencen antes del fin del contrato más largo, el 30/09/2027", o el tope de política si es menor. */
+  public static function termBasisText(int $byDates, int $cap, int $longestEnd, bool $several): string
+  {
+    $contract = $several ? 'del contrato más largo' : 'del contrato';
+    if ($longestEnd <= 0) return 'sin fecha fin ' . $contract;
+    $dates = $byDates . ' cuota' . ($byDates === 1 ? '' : 's') . ' vence' . ($byDates === 1 ? '' : 'n') . ' antes del fin ' . $contract . ', el ' . date('d/m/Y', $longestEnd);
+    return $byDates > $cap ? 'tope de política de ' . $cap . ' meses; ' . $dates : $dates;
+  }
+
   /**
-   * other_net_income y longest_months vienen de los demás contratos del propietario (opcionales).
-   * @param array{gross:float,deductions:array<string,float>,requested_amount:float,requested_term:int,request_ts:int,contract_end_ts:int,vacancy:string,other_net_income?:float,longest_months?:int} $input
+   * other_net_income y longest_months vienen de los demás contratos del propietario (opcionales). Con "coverage"
+   * (availability y term_limit de OwnerCreditCoverage) el plazo máximo es el mayor con cobertura en todas sus
+   * cuotas; sin ella (cálculo del Excel), la vigencia más larga sin pasar del tope.
+   * @param array<string,mixed> $input gross, deductions, requested_amount, requested_term, request_ts, contract_end_ts, vacancy, other_net_income?, longest_months?, coverage?
    * @param array<string,mixed> $settings OwnerCreditSettings::read()
    * @return array<string,mixed>
    */
@@ -149,12 +166,22 @@ final class OwnerCreditCalculator
     $requested = max(0.0, (float) $input['requested_amount']);
     $requestedTerm = max(0, (int) $input['requested_term']);
     $usuryMonthly = (float) $settings['usury_annual'] / 12;
-    $policyRate = (float) $settings['reference_rate'] * (1 - (float) $settings['policy_discount']);
+    // Tope legal: la usura es efectiva anual; su equivalente mes vencido es (1 + E.A.)^(1/12) − 1.
+    $usuryLegal = (1 + (float) $settings['usury_annual']) ** (1 / 12) - 1;
+    $referenceRate = (float) $settings['reference_rate'];
+    $policyRate = $referenceRate * (1 - (float) $settings['policy_discount']);
     $contractMonths = max(0, self::monthsUntil((int) $input['request_ts'], (int) $input['contract_end_ts']));
     $longestMonths = max($contractMonths, (int) ($input['longest_months'] ?? 0));
-    $margin = max(0, (int) $settings['preapproval_margin_months']);
     $termCap = self::termCap($settings);
-    $maxMonths = min($termCap, max(0, $longestMonths - $margin));
+    $coverage = isset($input['coverage']) && is_array($input['coverage']) ? $input['coverage'] : null;
+    $slots = $coverage !== null ? array_values((array) $coverage['availability']) : [];
+    $minCoverage = $coverage !== null ? max(1.0, (float) $coverage['min_coverage']) : 1.0;
+    // Plazo máximo por vigencia (límite superior); la cobertura lo puede bajar según el valor.
+    $termLimit = $coverage !== null ? min($termCap, max(0, (int) $coverage['term_limit'])) : min($termCap, $longestMonths);
+    // Mayor plazo con cobertura para $amount a $rate, probando desde $from hasta 1 (0 si ninguno).
+    $covered = static fn(float $amount, float $rate, int $from): int => $coverage === null || $amount <= 0 ? $from
+      : OwnerCreditCoverage::bestTerm($amount, min($rate, $usuryLegal), $from, $slots, $minCoverage)['term'];
+    $maxMonths = $covered($requested, $referenceRate, $termLimit);
     $otherNet = max(0.0, (float) ($input['other_net_income'] ?? 0));
     $maxAmount = ($net + $otherNet) * (int) $settings['income_months'];
     $exceedMonths = $maxMonths - $requestedTerm;
@@ -167,16 +194,20 @@ final class OwnerCreditCalculator
     $vacancy = in_array($input['vacancy'], ['Alta', 'Media', 'Baja'], true) ? $input['vacancy'] : 'Baja';
     $suggested = match ($vacancy) {
       // Sin exceso, el riesgo alto se cubre con la tasa de referencia sobre lo pedido.
-      'Alta' => $riskApplies ? ['term' => 3, 'rate' => $riskRate, 'amount' => $maxAmount] : ['term' => 3, 'rate' => (float) $settings['reference_rate'], 'amount' => $requested],
-      'Media' => ['term' => $maxMonths, 'rate' => (float) $settings['reference_rate'], 'amount' => $maxAmount],
+      'Alta' => $riskApplies ? ['term' => 3, 'rate' => $riskRate, 'amount' => $maxAmount] : ['term' => 3, 'rate' => $referenceRate, 'amount' => $requested],
+      'Media' => ['term' => $termLimit, 'rate' => $referenceRate, 'amount' => $maxAmount],
       // El descuento de tasa lo decide el analista (hasta el máximo de Configuración): se sugiere la referencia.
-      default => ['term' => $requestedTerm, 'rate' => (float) $settings['reference_rate'], 'amount' => $requested],
+      default => ['term' => $requestedTerm, 'rate' => $referenceRate, 'amount' => $requested],
     };
-    // Tope legal: la usura es efectiva anual; su equivalente mes vencido es (1 + E.A.)^(1/12) − 1.
-    $usuryLegal = (1 + (float) $settings['usury_annual']) ** (1 / 12) - 1;
     $suggested['rate_capped'] = $suggested['rate'] > $usuryLegal;
     $suggested['rate'] = min($suggested['rate'], $usuryLegal);
-    $suggested['payment'] = self::payment($suggested['rate'], $suggested['term'], $suggested['amount']);
+    // Con cobertura, el plazo sugerido es el mayor que se puede pagar sin pasar del de la condición (nunca lo sube).
+    $suggestedFrom = $coverage !== null && $termLimit > 0 ? min((int) $suggested['term'], $termLimit) : (int) $suggested['term'];
+    $suggestedTerm = $covered((float) $suggested['amount'], (float) $suggested['rate'], $suggestedFrom);
+    $suggested['uncovered'] = $coverage !== null && $suggested['amount'] > 0 && $suggestedFrom > 0 && $suggestedTerm === 0;
+    $suggested['term'] = $suggestedTerm > 0 ? $suggestedTerm : $suggestedFrom;
+    $suggested['payment'] = $coverage !== null ? OwnerCreditCoverage::payment((float) $suggested['amount'], (float) $suggested['rate'], (int) $suggested['term'])
+      : self::payment($suggested['rate'], $suggested['term'], $suggested['amount']);
 
     return [
       'gross' => $gross,
@@ -190,8 +221,8 @@ final class OwnerCreditCalculator
       'policy_rate' => $policyRate,
       'contract_months' => $contractMonths,
       'longest_months' => $longestMonths,
-      'margin_months' => $margin,
       'max_term_cap' => $termCap,
+      'term_limit' => $termLimit,
       'max_months' => $maxMonths,
       'max_amount' => $maxAmount,
       'policy_payment' => self::payment($policyRate, $maxMonths, $maxAmount),

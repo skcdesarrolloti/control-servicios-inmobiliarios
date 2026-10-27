@@ -146,7 +146,7 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
         : body.action === 'scm_owner_credit_contracts' ? { contracts: [
           { id: 9, contrato: '950', inmueble: '10600', direccion: 'Calle 1', estado: 'Entregado', arrendatario: 'Inquilino', fin: '15/01/2027', max_months: 2, owner },
           { id: 10, contrato: '951', inmueble: '10601', direccion: 'Calle 2', estado: 'Entregado', arrendatario: '', fin: '', max_months: 0, owner }],
-          preapproval: { contracts: 2, net_income: 3440000, income_months: 3, amount: 10320000, longest_months: 2, margin_months: 2, max_term: 0 },
+          preapproval: { contracts: 2, net_income: 3440000, income_months: 3, amount: 10320000, longest_months: 2, max_term: 0, term_basis: '0 cuotas vencen antes del fin del contrato más largo, el 20/12/2026' },
           checks: [{ label: 'Contrato activo', ok: true, detail: '2 de 2 contratos Entregado.' }, { label: 'Sin siniestro', ok: false, detail: 'Cartera marcó como siniestrado: #951.' }] }
         : body.action === 'scm_owner_credit_create' ? { credit_id: 40, message: 'Solicitud registrada.' } : {};
       if (body.action === 'scm_owner_credit_simulation_pdf') {
@@ -188,6 +188,7 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   console.log('OK the request can be simulated and shown as a PDF without registering it');
   await page.fill('[name="term"]', '13');
   assert.match(await page.textContent('[data-owner-credit-term-hint]'), /Puedes registrar hasta 12 meses/);
+  assert.match(await page.textContent('[data-owner-credit-term-hint]'), /0 cuotas vencen antes del fin del contrato más largo/, 'the term hint explains the limit with the payment calendar');
   assert.equal(await page.getAttribute('[name="term"]', 'max'), '12');
   assert.equal(await page.getAttribute('[name="term"]', 'aria-invalid'), 'true', 'the term field turns invalid while typing');
   assert.equal(await page.isDisabled('[data-owner-credit-simulate-pdf]'), true, 'a term above the maximum cannot be simulated');

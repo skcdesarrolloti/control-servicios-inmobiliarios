@@ -276,16 +276,13 @@
       return "$" + moneyFormat.format(Math.round(Number(value) || 0));
     }
 
-    // Cupo con todos los contratos de la persona: Σ ingreso neto × meses de política; cuotas = vigencia más larga −
-    // margen, sin pasar del plazo máximo de un crédito (tope de política).
+    // Cupo con todos los contratos de la persona: Σ ingreso neto × meses de política; cuotas = las que vencen antes
+    // del fin del contrato más largo, sin pasar del tope. Con el valor, la simulación revisa la cobertura de cada cuota.
     function renderPreapproval(box, p, disclaimer) {
       if (!box || !p || !p.contracts) return;
-      var byTerm = p.longest_months - p.margin_months;
-      var term = p.max_term > 0 && p.max_term_cap && byTerm > p.max_term_cap
-        ? "Hasta " + p.max_term + " cuotas (tope de política; la vigencia más larga, " + p.longest_months + " meses − " + p.margin_months + " de margen, daría " + byTerm + ")."
-        : p.max_term > 0
-        ? "Hasta " + p.max_term + " cuotas (vigencia más larga " + p.longest_months + " meses − " + p.margin_months + " de margen)."
-        : "Sin cuotas disponibles: ningún contrato tiene vigencia suficiente (" + p.longest_months + " meses, margen " + p.margin_months + ").";
+      var term = p.max_term > 0
+        ? "Hasta " + p.max_term + " cuotas (" + (p.term_basis || "") + "); la simulación revisa la cobertura de cada cuota."
+        : "Sin cuotas disponibles: ningún contrato tiene vigencia suficiente (" + (p.term_basis || "") + ").";
       box.innerHTML = '<span class="!sp-block !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Cupo preaprobado máximo</span>' +
         '<strong class="!sp-block !sp-text-base !sp-text-service-navy">' + money(p.outstanding > 0 ? p.available : p.amount) + "</strong>" +
         '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">Ingreso neto de ' + (p.contracts === 1 ? "1 contrato" : p.contracts + " contratos") + " " + money(p.net_income) + " × " + p.income_months + " meses = " + money(p.amount) + ". " + escapeHtml(term) + "</span>" +
@@ -334,7 +331,7 @@
     }
 
     // Solo informa: el consultor no conoce la fecha fin; si el plazo la supera, el analista la revisa en el liquidador.
-    // Plazo máximo de la solicitud: el del preaprobado (vigencia más larga − margen, sin pasar del tope). Si sus
+    // Plazo máximo de la solicitud: el del preaprobado (cuotas antes del fin del contrato más largo, sin pasar del tope). Si sus
     // contratos no dan cuotas se permite hasta el tope, para que el analista revise la fecha fin en el liquidador.
     function termLimit(form) {
       var p = form._preapproval || {};
@@ -351,10 +348,7 @@
       if (!hint || !form._contract || !p) return;
       var limit = termLimit(form);
       var term = Number(form.elements.term.value) || 0;
-      var byTerm = p.longest_months - p.margin_months;
-      var basis = p.max_term_cap && byTerm > p.max_term_cap
-        ? "tope de política; la vigencia más larga, " + p.longest_months + " meses − " + p.margin_months + " de margen, daría " + byTerm
-        : "vigencia más larga " + p.longest_months + " meses − " + p.margin_months + " de margen";
+      var basis = p.term_basis || "";
       form.elements.term.max = String(limit);
       if (!(Number(p.max_term) > 0)) {
         hint.textContent = "Sus contratos no dan cuotas (" + basis + "). Puedes registrar hasta " + limit + " meses: el analista revisará la fecha fin en el liquidador.";

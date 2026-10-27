@@ -311,7 +311,7 @@ final class OwnerCreditService
       $rows[] = [
         'id' => (int) ($contract['_ID'] ?? 0), 'contrato' => (string) ($contract['contrato'] ?? ''), 'inmueble' => (string) ($contract['inmueble'] ?? ''),
         'direccion' => (string) ($contract['direccion'] ?? ''), 'estado' => (string) ($contract['estado'] ?? ''), 'arrendatario' => (string) ($contract['arrendatario'] ?? ''),
-        'fin' => $end > 0 ? date('d/m/Y', $end) : '', 'end_ts' => $end, 'max_months' => OwnerCreditCalculator::monthsUntil($fromTs ?: time(), $end),
+        'fin' => $end > 0 ? date('d/m/Y', $end) : '', 'end_ts' => $end, 'start_ts' => self::timestamp($contract['inicio_contrato'] ?? ''), 'max_months' => OwnerCreditCalculator::monthsUntil($fromTs ?: time(), $end),
         'canon' => $income['gross'], 'deductions' => $deductions, 'net_income' => max(0.0, $income['gross'] - $deductions),
         'siniestrado' => self::isYes($contract['esta_sinestrado'] ?? ''), 'owner' => $owner, 'order' => $index,
       ];
@@ -342,7 +342,7 @@ final class OwnerCreditService
     $others = [];
     foreach ($rows as $row) {
       if ($row['id'] === (int) $credit['contract_id']) continue;
-      $others[] = array_intersect_key($row, array_flip(['id', 'contrato', 'inmueble', 'estado', 'fin', 'end_ts', 'max_months', 'canon', 'deductions', 'net_income', 'siniestrado']));
+      $others[] = array_intersect_key($row, array_flip(['id', 'contrato', 'inmueble', 'estado', 'fin', 'end_ts', 'start_ts', 'max_months', 'canon', 'deductions', 'net_income', 'siniestrado']));
     }
     return $others;
   }
@@ -402,35 +402,14 @@ final class OwnerCreditService
     $others = $this->otherContracts($credit, $evaluationTs);
     $vacancySignal = $this->vacancySignal(array_merge([['id' => (int) $credit['contract_id'], 'contrato' => (string) ($contract['contrato'] ?? $credit['contract_code']), 'end_ts' => $storedEndTs]], $others));
     $vacancy = in_array($input['vacancy'] ?? null, ['Alta', 'Media', 'Baja'], true) ? (string) $input['vacancy'] : ($pending ? $vacancySignal['level'] : ((string) ($credit['vacancy'] ?? '') ?: 'Baja'));
-    $evaluation = OwnerCreditCalculator::evaluate([
-      'gross' => $gross, 'deductions' => $deductions, 'requested_amount' => $requested, 'requested_term' => $requestedTerm,
-      'request_ts' => $evaluationTs, 'contract_end_ts' => $endTs, 'vacancy' => $vacancy,
-      'other_net_income' => array_sum(array_map(static fn(array $row): float => (float) $row['net_income'], $others)),
-      'longest_months' => $others === [] ? 0 : max(array_map(static fn(array $row): int => (int) $row['max_months'], $others)),
-    ], $settings);
-    $evaluation['other_contracts'] = $others;
-    $evaluation['vacancy_signal'] = $vacancySignal;
 
     $decided = in_array($credit['status'], ['aprobado', 'pagado'], true);
-    $suggested = $evaluation['suggested'];
-    $amount = array_key_exists('amount', $input) ? self::money($input['amount']) : ($decided ? (float) $credit['approved_amount'] : (float) $suggested['amount']);
-    $term = array_key_exists('term', $input) ? max(0, (int) $input['term']) : ($decided ? (int) $credit['approved_term'] : (int) $suggested['term']);
-    $rate = array_key_exists('rate', $input) ? self::rate($input['rate']) : ($decided ? (float) $credit['approved_rate'] : round((float) $suggested['rate'], 6));
-    $payment = OwnerCreditCalculator::payment($rate, $term, $amount);
-    $schedule = OwnerCreditCalculator::schedule($rate, $term, $amount);
-    // La primera cuota se descuenta un mes después del desembolso; el crédito se da por pagado al vencer la última.
+    // Calendario acordado: corte 15/16 desde el desembolso y vencimientos el día 30 (fin de febrero).
     $disbursedTs = $decided
       ? ((int) ($credit['disbursed_at'] ?? 0) ?: (int) strtotime(date('Y-m-d', (int) $credit['decided_at'])))
       : (self::dateInput($input['disbursed_at'] ?? '') ?: (int) strtotime('today'));
-    $firstPaymentTs = $decided && (int) ($credit['first_payment_ts'] ?? 0) > 0 ? (int) $credit['first_payment_ts'] : (int) strtotime('+1 month', $disbursedTs);
-    foreach ($schedule as $index => $line) $schedule[$index]['fecha'] = self::installmentTs($firstPaymentTs, $index + 1);
-    $sources = $this->discountSources($credit, $contract, $evaluation, $endTs);
-    $plan = OwnerCreditCalculator::discountPlan(array_map(fn(array $source): array => $source + ['covers' => $this->coveredInstallments($source, $firstPaymentTs, $term)], $sources), $payment, $term, (int) $credit['contract_id']);
-    // Todos los contratos de la persona: las políticas de estado, vigencia y siniestro se revisan sobre todos.
-    $all = array_merge([[
-      'id' => (int) $credit['contract_id'], 'contrato' => (string) ($contract['contrato'] ?? $credit['contract_code']), 'estado' => (string) ($contract['estado'] ?? ''),
-      'siniestrado' => self::isYes($contract['esta_sinestrado'] ?? ''), 'max_months' => (int) $evaluation['contract_months'], 'fin' => $endTs > 0 ? date('d/m/Y', $endTs) : '',
-    ]], $others);
+    $firstPaymentTs = $decided && (int) ($credit['first_payment_ts'] ?? 0) > 0 ? (int) $credit['first_payment_ts'] : OwnerCreditCoverage::firstDueTs($disbursedTs);
+
     $approved = array_values(array_filter($this->ownerCredits($credit), static fn(array $row): bool => $row['status'] === 'aprobado'));
     $outstanding = array_sum(array_map(fn(array $row): float => $this->balance($row), $approved));
     // Siniestro y créditos vigentes los propone el sistema; el analista los corrige (Sí/No) tras verificar con Cartera.
@@ -443,20 +422,69 @@ final class OwnerCreditService
       if ($value !== $system) $overrides[] = $key;
       return $value;
     };
+    $hasCredits = $choice('has_credits', $approved !== []);
+    $extraObligations = array_key_exists('other_obligations', $input) ? self::money($input['other_obligations']) : (float) ($stored['other_obligations'] ?? 0);
+
+    // Cobertura de pago: ingreso utilizable de cada contrato en cada vencimiento, menos las cuotas de sus otros
+    // créditos vigentes (si el analista confirma que los tiene) y las otras obligaciones que indique.
+    $cap = OwnerCreditCalculator::termCap($settings);
+    $mainActive = in_array(strtolower(trim((string) ($contract['estado'] ?? ''))), ['entregado', 'por entregar'], true);
+    $coverageContracts = array_merge([[
+      'id' => (int) $credit['contract_id'], 'contrato' => (string) ($contract['contrato'] ?? $credit['contract_code']), 'inmueble' => (string) $credit['property'],
+      'net_income' => max(0.0, $gross - array_sum($deductions)), 'start_ts' => self::timestamp($contract['inicio_contrato'] ?? ''), 'end_ts' => $endTs, 'active' => $mainActive,
+    ]], array_map(static fn(array $row): array => [
+      'id' => (int) $row['id'], 'contrato' => (string) $row['contrato'], 'inmueble' => (string) ($row['inmueble'] ?? ''), 'net_income' => (float) $row['net_income'],
+      'start_ts' => (int) ($row['start_ts'] ?? 0), 'end_ts' => (int) ($row['end_ts'] ?? 0) ?: self::timestamp(str_replace('/', '-', (string) ($row['fin'] ?? ''))), 'active' => true,
+    ], $others));
+    $dueDates = OwnerCreditCoverage::dueDates($firstPaymentTs, $cap);
+    $obligations = array_map(fn(int $date): float => $extraObligations + ($hasCredits ? $this->creditPaymentsDue($approved, $date) : 0.0), $dueDates);
+    $slots = OwnerCreditCoverage::availability($dueDates, $coverageContracts, (float) $settings['usable_income_factor'], $obligations);
+    $longestEnd = max(0, ...array_map(static fn(array $row): int => (int) $row['end_ts'], $coverageContracts));
+    $termLimit = OwnerCreditCoverage::duesUntil($firstPaymentTs, $longestEnd, $cap);
+    $minCoverage = (float) $settings['min_coverage'];
+
+    $evaluation = OwnerCreditCalculator::evaluate([
+      'gross' => $gross, 'deductions' => $deductions, 'requested_amount' => $requested, 'requested_term' => $requestedTerm,
+      'request_ts' => $evaluationTs, 'contract_end_ts' => $endTs, 'vacancy' => $vacancy,
+      'other_net_income' => array_sum(array_map(static fn(array $row): float => (float) $row['net_income'], $others)),
+      'longest_months' => $others === [] ? 0 : max(array_map(static fn(array $row): int => (int) $row['max_months'], $others)),
+      'coverage' => ['availability' => $slots, 'term_limit' => $termLimit, 'min_coverage' => $minCoverage],
+    ], $settings);
+    $evaluation['other_contracts'] = $others;
+    $evaluation['vacancy_signal'] = $vacancySignal;
+    $evaluation['term_basis'] = OwnerCreditCalculator::termBasisText(OwnerCreditCoverage::duesUntil($firstPaymentTs, $longestEnd, 600), $cap, $longestEnd, $others !== []);
+
+    $suggested = $evaluation['suggested'];
+    $amount = array_key_exists('amount', $input) ? self::money($input['amount']) : ($decided ? (float) $credit['approved_amount'] : (float) $suggested['amount']);
+    $term = array_key_exists('term', $input) ? max(0, (int) $input['term']) : ($decided ? (int) $credit['approved_term'] : (int) $suggested['term']);
+    $rate = array_key_exists('rate', $input) ? self::rate($input['rate']) : ($decided ? (float) $credit['approved_rate'] : round((float) $suggested['rate'], 6));
+    // Plan a centavos: la última cuota se ajusta para dejar el saldo en cero.
+    $amortization = OwnerCreditCoverage::plan($amount, $rate, $term);
+    $payment = $amortization['payment'];
+    $schedule = $amortization['rows'];
+    foreach ($schedule as $index => $line) $schedule[$index]['fecha'] = self::installmentTs($firstPaymentTs, $index + 1);
+    $evaluation['coverage'] = $this->coverageSummary($amount, $rate, $term, $requestedTerm, $slots, $termLimit, $minCoverage, $settings, $extraObligations, $hasCredits ? $approved : []);
+    $sources = $this->discountSources($credit, $contract, $evaluation, $endTs);
+    $plan = OwnerCreditCalculator::discountPlan(array_map(fn(array $source): array => $source + ['covers' => $this->coveredInstallments($source, $firstPaymentTs, $term)], $sources), $payment, $term, (int) $credit['contract_id']);
+    // Todos los contratos de la persona: las políticas de estado, vigencia y siniestro se revisan sobre todos.
+    $all = array_merge([[
+      'id' => (int) $credit['contract_id'], 'contrato' => (string) ($contract['contrato'] ?? $credit['contract_code']), 'estado' => (string) ($contract['estado'] ?? ''),
+      'siniestrado' => self::isYes($contract['esta_sinestrado'] ?? ''), 'max_months' => (int) $evaluation['contract_months'], 'fin' => $endTs > 0 ? date('d/m/Y', $endTs) : '',
+    ]], $others);
     $siniestrados = array_values(array_map(static fn(array $row): string => '#' . $row['contrato'], array_filter($all, static fn(array $row): bool => !empty($row['siniestrado']))));
-    $evaluation['analyst'] = ['siniestro' => $choice('siniestro', $siniestrados !== []), 'siniestrados' => $siniestrados, 'has_credits' => $choice('has_credits', $approved !== [])];
+    $evaluation['analyst'] = ['siniestro' => $choice('siniestro', $siniestrados !== []), 'siniestrados' => $siniestrados, 'has_credits' => $hasCredits, 'other_obligations' => $extraObligations];
     if ($pending && $evaluation['vacancy'] !== $vacancySignal['level']) $overrides[] = 'vacancy';
     $evaluation['analyst']['overrides'] = $overrides;
     // Cupo preaprobado de la persona con todos sus contratos, menos el saldo de sus créditos aprobados.
     $counted = $evaluation['analyst']['has_credits'] ? $outstanding : 0.0;
     $preapproval = [
       'amount' => (float) $evaluation['max_amount'], 'contracts' => count($all), 'net_income' => (float) $evaluation['total_net_income'],
-      'outstanding' => $counted, 'system_outstanding' => $outstanding, 'available' => max(0.0, (float) $evaluation['max_amount'] - $counted), 'max_term' => (int) $evaluation['max_months'],
+      'outstanding' => $counted, 'system_outstanding' => $outstanding, 'available' => max(0.0, (float) $evaluation['max_amount'] - $counted), 'max_term' => (int) $evaluation['term_limit'],
       'credits' => array_map(static fn(array $row): int => (int) $row['id'], $approved), 'requested' => $requested,
     ];
     $policies = $this->policies($all, $evaluation, $settings, $amount, $term, $rate, $payment, $plan, $preapproval);
-    // El plazo solicitado nunca puede pasar de los meses que faltan entre la solicitud y el fin del contrato.
-    $termError = $requestedTerm <= 0 ? 'Escribe el plazo solicitado (meses) para evaluar el crédito.' : ($requestedTerm > $evaluation['max_months'] ? self::termMessage($requestedTerm, $evaluation) : '');
+    // El plazo solicitado nunca puede pasar de las cuotas que vencen antes del fin del contrato más largo.
+    $termError = $requestedTerm <= 0 ? 'Escribe el plazo solicitado (meses) para evaluar el crédito.' : ($requestedTerm > $evaluation['term_limit'] ? self::termMessage($requestedTerm, $evaluation) : '');
 
     return [
       'credit' => $credit,
@@ -510,6 +538,13 @@ final class OwnerCreditService
       // La usura es un tope legal: no se puede aprobar por encima ni con justificación.
       if ($decision === 'aprobado' && $work['conditions']['rate'] > $work['evaluation']['usury_monthly_legal'] + 1e-9) {
         throw new \DomainException('La tasa supera la usura (' . number_format($work['evaluation']['usury_monthly_legal'] * 100, 4, ',', '.') . ' % mensual). Bájala para poder aprobar.');
+      }
+      // Cobertura: se recalcula con los contratos y parámetros vigentes justo antes del desembolso. Si ningún plazo
+      // cubre todas las cuotas con este valor y esta fuente de pago, no se aprueba (ni con justificación).
+      $coverage = $work['evaluation']['coverage'] ?? [];
+      if ($decision === 'aprobado' && !($coverage['ok'] ?? false) && (int) ($coverage['best_term'] ?? 0) === 0) {
+        throw new \DomainException('Ningún plazo tiene cobertura en todas sus cuotas con ' . self::formatMoney((float) $work['conditions']['amount']) . ' y los contratos del propietario'
+          . ((float) ($coverage['max_capital'] ?? 0) > 0 ? '. Con ' . (int) $coverage['max_capital_term'] . ' meses el valor máximo es ' . self::formatMoney((float) $coverage['max_capital']) : '') . '. Baja el valor para poder aprobar.');
       }
       if ($work['contract']['fin_ts'] !== $work['contract']['fin_saved_ts']) $this->saveContractEnd($locked, $work['contract']['fin_ts'], $actor);
       $conditions = $work['conditions'];
@@ -659,7 +694,53 @@ final class OwnerCreditService
   /** Fecha de la cuota $number (1 = primera). */
   public static function installmentTs(int $firstPaymentTs, int $number): int
   {
-    return $firstPaymentTs > 0 ? (int) strtotime('+' . max(0, $number - 1) . ' month', $firstPaymentTs) : 0;
+    return OwnerCreditCoverage::installmentTs($firstPaymentTs, $number);
+  }
+
+  /** Cuotas de los otros créditos aprobados de la persona que vencen en esa fecha (desde su primera hasta su última). */
+  private function creditPaymentsDue(array $credits, int $date): float
+  {
+    $total = 0.0;
+    foreach ($credits as $row) {
+      $first = (int) ($row['first_payment_ts'] ?? 0);
+      $last = $first > 0 ? self::installmentTs($first, (int) $row['approved_term']) : 0;
+      if ($first > 0 && ($date < $first || $date > $last)) continue;
+      $total += (float) ($row['monthly_payment'] ?? 0) ?: OwnerCreditCoverage::payment((float) $row['approved_amount'], (float) $row['approved_rate'], (int) $row['approved_term']);
+    }
+    return $total;
+  }
+
+  /**
+   * Resultado de la cobertura que se muestra y se guarda con la decisión: si las condiciones tienen cobertura, el
+   * mayor plazo que sí la tiene con su cuota, la primera fecha con faltante, el capital máximo para conservar el
+   * plazo y los parámetros usados (regla, % utilizable, cobertura mínima, obligaciones).
+   * @param list<array<string,mixed>> $slots OwnerCreditCoverage::availability()
+   * @return array<string,mixed>
+   */
+  private function coverageSummary(float $amount, float $rate, int $term, int $requestedTerm, array $slots, int $termLimit, float $minCoverage, array $settings, float $extra, array $credits): array
+  {
+    $check = $term > 0 && $amount > 0 && $term <= count($slots) ? OwnerCreditCoverage::check($amount, $rate, $term, $slots, $minCoverage) : null;
+    $best = $amount > 0 && $termLimit > 0 ? OwnerCreditCoverage::bestTerm($amount, $rate, $termLimit, $slots, $minCoverage) : ['term' => 0, 'payment' => 0.0, 'last_ts' => 0];
+    $keep = $term > 0 ? $term : $requestedTerm;
+    return [
+      'rule' => OwnerCreditCoverage::RULE,
+      'factor' => (float) $settings['usable_income_factor'],
+      'min_coverage' => $minCoverage,
+      'other_obligations' => $extra,
+      'credits' => array_map(static fn(array $row): int => (int) $row['id'], $credits),
+      'term_limit' => $termLimit,
+      'term' => $term,
+      'checked' => $check !== null,
+      'ok' => $check !== null && $check['ok'],
+      'payment' => $check['payment'] ?? 0.0,
+      'shortfall' => $check['shortfall'] ?? null,
+      'rows' => $check['rows'] ?? [],
+      'best_term' => (int) $best['term'],
+      'best_payment' => (float) $best['payment'],
+      'best_last_ts' => (int) $best['last_ts'],
+      'max_capital_term' => $keep,
+      'max_capital' => $keep > 0 && $keep <= count($slots) ? OwnerCreditCoverage::maxCapital($rate, $keep, $slots, $minCoverage) : 0.0,
+    ];
   }
 
   /**
@@ -797,7 +878,7 @@ final class OwnerCreditService
   }
 
   /**
-   * Plazo de una solicitud manual: hasta el plazo máximo del preaprobado (vigencia más larga − margen, sin pasar del
+   * Plazo de una solicitud manual: hasta el plazo máximo del preaprobado (cuotas antes del fin del contrato más largo, sin pasar del
    * tope). Si sus contratos no dan cuotas se permite hasta el tope, para que el analista revise la fecha fin.
    */
   public function requestTermLimit(array $preapproval): int
@@ -999,11 +1080,11 @@ final class OwnerCreditService
   /** Saldo de capital estimado según las cuotas vencidas desde la primera fecha de pago. */
   public function balance(array $credit): float
   {
-    $schedule = OwnerCreditCalculator::schedule((float) $credit['approved_rate'], (int) $credit['approved_term'], (float) $credit['approved_amount']);
+    $schedule = OwnerCreditCoverage::plan((float) $credit['approved_amount'], (float) $credit['approved_rate'], (int) $credit['approved_term'])['rows'];
     $first = (int) ($credit['first_payment_ts'] ?? 0);
     if ($first <= 0 || time() < $first) return (float) $credit['approved_amount'];
     $paid = 0;
-    for ($ts = $first; $ts <= time() && $paid < count($schedule); $ts = (int) strtotime('+1 month', $ts)) $paid++;
+    while ($paid < count($schedule) && self::installmentTs($first, $paid + 1) <= time()) $paid++;
     return $paid >= count($schedule) ? 0.0 : (float) $schedule[$paid - 1]['saldo'];
   }
 
@@ -1029,16 +1110,19 @@ final class OwnerCreditService
   /** @param array<string,mixed> $evaluation */
   private static function termMessage(int $term, array $evaluation): string
   {
-    return 'El plazo solicitado (' . $term . ' meses) no puede superar el máximo de ' . $evaluation['max_months'] . ' meses (' . self::termBasis($evaluation) . '). Corrige el plazo o la fecha fin.';
+    return 'El plazo solicitado (' . $term . ' meses) no puede superar el máximo de ' . $evaluation['term_limit'] . ' meses (' . self::termBasis($evaluation) . '). Corrige el plazo o la fecha fin.';
   }
 
-  /** "12 meses de vigencia del contrato más largo − 2 de margen". @param array<string,mixed> $evaluation */
+  /** "9 cuotas vencen antes del fin del contrato más largo, el 30/09/2027". @param array<string,mixed> $evaluation */
   public static function termBasis(array $evaluation): string
   {
-    $basis = (int) $evaluation['longest_months'] . ' meses de vigencia ' . (($evaluation['other_contracts'] ?? []) !== [] ? 'del contrato más largo' : 'del contrato') . ((int) $evaluation['margin_months'] > 0 ? ' − ' . (int) $evaluation['margin_months'] . ' de margen' : '');
-    // Con vigencia de sobra manda el tope de plazo de política.
-    $cap = (int) ($evaluation['max_term_cap'] ?? 0);
-    return $cap > 0 && (int) $evaluation['longest_months'] - (int) $evaluation['margin_months'] > $cap ? 'tope de política de ' . $cap . ' meses; ' . $basis . ' daría ' . ((int) $evaluation['longest_months'] - (int) $evaluation['margin_months']) : $basis;
+    // Los créditos decididos antes del calendario de cobertura no guardaron la base: se describe con sus meses.
+    return (string) ($evaluation['term_basis'] ?? ((int) ($evaluation['longest_months'] ?? 0) . ' meses de vigencia del contrato'));
+  }
+
+  private static function formatMoney(float $value): string
+  {
+    return '$' . number_format($value, 0, ',', '.');
   }
 
   /** Fecha del formulario (AAAA-MM-DD) a la medianoche, como se guarda fin_contrato. */
@@ -1204,16 +1288,41 @@ final class OwnerCreditService
     return [
       ['key' => 'contrato_activo', 'label' => 'Contrato activo', 'ok' => $active !== [], 'detail' => count($all) === 1 ? 'Estado del contrato: ' . ((string) $all[0]['estado'] ?: 'sin contrato') . '.' : count($active) . ' de ' . count($all) . ' contratos Entregado (' . implode(', ', array_map(static fn(array $row): string => '#' . $row['contrato'] . ' ' . ($row['estado'] ?: 'sin estado'), $all)) . ').'],
       ['key' => 'vigencia', 'label' => 'Contrato no próximo a vencer', 'ok' => (int) $evaluation['longest_months'] >= $minMonths && (int) $evaluation['longest_months'] > 0, 'detail' => (int) $evaluation['longest_months'] > 0 ? $evaluation['longest_months'] . ' meses hasta el fin del contrato ' . (count($all) > 1 ? 'más largo, #' . $longest['contrato'] . ' ' : '') . '(' . ($longest['fin'] ?: 'sin fecha') . '). Mínimo: ' . $minMonths . '.' : 'Ningún contrato tiene meses de vigencia.'],
-      ['key' => 'plazo', 'label' => 'Plazo dentro de la vigencia', 'ok' => $term > 0 && $term <= $evaluation['max_months'], 'detail' => 'Plazo ' . $term . ' meses; máximo ' . $evaluation['max_months'] . ' (' . self::termBasis($evaluation) . ').'],
+      ['key' => 'plazo', 'label' => 'Plazo dentro de la vigencia', 'ok' => $term > 0 && $term <= (int) ($evaluation['term_limit'] ?? $evaluation['max_months']), 'detail' => 'Plazo ' . $term . ' meses; máximo ' . (int) ($evaluation['term_limit'] ?? $evaluation['max_months']) . ' (' . self::termBasis($evaluation) . ').'],
       ['key' => 'siniestro', 'label' => 'Contrato no siniestrado', 'ok' => !$analyst['siniestro'], 'detail' => $siniestroDetail],
       ['key' => 'prestamos', 'label' => 'Valor dentro del cupo disponible', 'ok' => $amount <= $available + 0.5 && !($analyst['has_credits'] && $others === []), 'detail' => $creditsDetail],
       ['key' => 'monto', 'label' => 'Valor dentro del tope', 'ok' => $amount > 0 && $amount <= $evaluation['max_amount'] + 0.5, 'detail' => $money($amount) . ' de un tope de ' . $money($evaluation['max_amount']) . ' (' . (int) $settings['income_months'] . ' × ingreso neto' . (($evaluation['other_contracts'] ?? []) !== [] ? ' de ' . (count($evaluation['other_contracts']) + 1) . ' contratos, ' . $money($evaluation['total_net_income']) : '') . ').'],
       ['key' => 'tasa_minima', 'label' => 'Tasa dentro del descuento máximo', 'ok' => $rate >= (float) $evaluation['policy_rate'] - 1e-9, 'detail' => 'Tasa ' . $percent($rate) . ' mensual; referencia ' . $percent((float) $settings['reference_rate']) . ' con descuento máximo de ' . $percent((float) $settings['policy_discount']) . ' = mínimo ' . $percent((float) $evaluation['policy_rate']) . '.'],
       ['key' => 'usura', 'label' => 'Tasa por debajo de la usura', 'ok' => $rate <= $evaluation['usury_monthly_legal'] + 1e-9, 'detail' => 'Tasa ' . $percent($rate) . ' mes vencido (' . $percent((1 + $rate) ** 12 - 1) . ' E.A.); usura ' . $percent((float) $settings['usury_annual']) . ' E.A. = ' . $percent($evaluation['usury_monthly_legal']) . ' mensual' . ((string) $settings['usury_updated_at'] !== '' ? ', vigente desde ' . date('d/m/Y', (int) strtotime((string) $settings['usury_updated_at'])) : '') . '.'],
-      ['key' => 'cuota', 'label' => 'Cuota cubierta por los contratos', 'ok' => $payment > 0 && $direct === [], 'detail' => $payment <= 0 ? 'Sin cuota.' : ($direct === []
-        ? 'Cuota ' . $money($payment) . ' descontada ' . (count($contractsUsed) === 1 ? 'del contrato ' : 'de los contratos ') . implode(', ', array_keys($contractsUsed)) . '.'
-        : 'Los contratos no alcanzan a cubrir ' . implode('; ', array_map(static fn(array $segment): string => $money($segment['direct']) . ' en las cuotas ' . $segment['from'] . '–' . $segment['to'], $direct)) . ': esa parte la pagaría el propietario directo.')],
+      self::coveragePolicy($evaluation['coverage'] ?? null, $payment, $direct === [] ? array_keys($contractsUsed) : []),
     ];
+  }
+
+  /**
+   * Cobertura de pago (regla de la empresa): en cada vencimiento el ingreso disponible debe alcanzar la cuota por la
+   * cobertura mínima. Si no, dice la primera fecha con faltante, qué contrato vence y el mayor plazo que sí cubre.
+   * @param array<string,mixed>|null $coverage coverageSummary() @param list<string> $contracts de los que se descuenta
+   * @return array{key:string,label:string,ok:bool,detail:string}
+   */
+  public static function coveragePolicy(?array $coverage, float $payment, array $contracts = []): array
+  {
+    $money = static fn(float $value): string => '$' . number_format($value, 0, ',', '.');
+    $policy = ['key' => 'cuota', 'label' => 'Cuota con cobertura en todas las fechas'];
+    if ($payment <= 0) return $policy + ['ok' => false, 'detail' => 'Sin cuota.'];
+    if ($coverage === null || empty($coverage['checked'])) return $policy + ['ok' => false, 'detail' => 'El plazo supera las cuotas del calendario que se pueden revisar.'];
+    $basis = (float) $coverage['factor'] < 1 || (float) $coverage['min_coverage'] > 1
+      ? ' (' . number_format((float) $coverage['factor'] * 100, 0, ',', '.') . ' % del ingreso neto, cobertura mínima ' . number_format((float) $coverage['min_coverage'], 2, ',', '.') . ')' : '';
+    if ($coverage['ok']) {
+      return $policy + ['ok' => true, 'detail' => 'Las ' . (int) $coverage['term'] . ' cuotas tienen ingreso disponible' . $basis . ($contracts !== [] ? '; se descuentan ' . (count($contracts) === 1 ? 'del contrato ' : 'de los contratos ') . implode(', ', $contracts) : '') . '.'];
+    }
+    $gap = $coverage['shortfall'];
+    $ended = implode(', ', array_map(static fn(array $row): string => '#' . $row['contrato'] . ' (vence ' . date('d/m/Y', (int) $row['end_ts']) . ')', (array) ($gap['bajas'] ?? [])));
+    $missing = (float) $gap['faltante_pago'] > 0 ? 'faltan ' . $money((float) $gap['faltante_pago']) . ' para pagarla' : 'la paga, pero faltan ' . $money((float) $gap['faltante_cobertura']) . ' para la cobertura mínima';
+    $best = (int) $coverage['best_term'] > 0
+      ? 'El mayor plazo con cobertura es ' . (int) $coverage['best_term'] . ' meses, cuota ' . $money((float) $coverage['best_payment']) . '.'
+      : 'Ningún plazo cubre todas las cuotas con este valor y estos contratos: no se puede aprobar.';
+    return $policy + ['ok' => false, 'detail' => 'El ' . date('d/m/Y', (int) $gap['fecha']) . ' habría ' . $money((float) $gap['disponible']) . ' disponibles frente a una cuota de ' . $money((float) $gap['cuota']) . ': ' . $missing
+      . ($ended !== '' ? ' (deja de aportar ' . $ended . ')' : '') . $basis . '. ' . $best];
   }
 
   /** Otros créditos de la misma persona (documento o id de propietario; sin ninguno, del mismo contrato). @return list<array<string,mixed>> */
@@ -1227,7 +1336,7 @@ final class OwnerCreditService
     if ($owner !== '') { $where[] = '`owner_id` = ?'; $args[] = $owner; }
     if ($where === []) { $where[] = '`contract_id` = ?'; $args[] = (int) $credit['contract_id']; }
     $args[] = (int) $credit['id'];
-    return array_values($this->db->getResults("SELECT `id`, `status`, `contract_code`, `approved_amount`, `approved_term`, `approved_rate`, `first_payment_ts`, `requested_amount`, `created_at` FROM `{$this->table()}` WHERE (" . implode(' OR ', $where) . ') AND `id` <> ? ORDER BY `id` DESC', $args));
+    return array_values($this->db->getResults("SELECT `id`, `status`, `contract_code`, `approved_amount`, `approved_term`, `approved_rate`, `monthly_payment`, `first_payment_ts`, `requested_amount`, `created_at` FROM `{$this->table()}` WHERE (" . implode(' OR ', $where) . ') AND `id` <> ? ORDER BY `id` DESC', $args));
   }
 
   /** @return list<array<string,mixed>> */
@@ -1373,7 +1482,7 @@ final class OwnerCreditService
         . '<p style="margin:0;line-height:1.65;">Si desea conocer el detalle o revisar alternativas, comuníquese con nosotros.</p>';
     }
     $rows = '';
-    foreach (OwnerCreditCalculator::schedule((float) $credit['approved_rate'], (int) $credit['approved_term'], (float) $credit['approved_amount']) as $row) {
+    foreach (OwnerCreditCoverage::plan((float) $credit['approved_amount'], (float) $credit['approved_rate'], (int) $credit['approved_term'])['rows'] as $row) {
       $rows .= '<tr><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;">' . $row['mes'] . '</td><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' . $e($money($row['cuota'])) . '</td><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' . $e($money($row['interes'])) . '</td><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' . $e($money($row['abono'])) . '</td><td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' . $e($money($row['saldo'])) . '</td></tr>';
     }
     return $html . '<p style="margin:0 0 14px;line-height:1.65;">Su solicitud de crédito asociada al contrato <b>#' . $e($credit['contract_code']) . '</b> fue <b>aprobada</b> con las siguientes condiciones:</p>'

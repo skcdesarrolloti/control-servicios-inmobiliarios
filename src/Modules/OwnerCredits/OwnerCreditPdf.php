@@ -41,6 +41,28 @@ final class OwnerCreditPdf
   }
 
   /** @param array<string,mixed> $work */
+  /**
+   * 5.2 Cobertura de pago de las condiciones (regla, parámetros y resultado), para dejar el rastro del ajuste.
+   * @param array<string,mixed>|null $c OwnerCreditService::coverageSummary()
+   */
+  private static function coverage(?array $c, callable $money, callable $date, bool $simulation = false): string
+  {
+    if (!is_array($c) || (int) ($c['term'] ?? 0) <= 0) return '';
+    $gap = $c['shortfall'] ?? null;
+    $rows = [
+      'Resultado' => !empty($c['ok']) ? 'Todas las cuotas tienen ingreso disponible' : 'Hay cuotas sin ingreso disponible suficiente',
+      'Primera fecha con faltante' => is_array($gap) ? $date((int) $gap['fecha']) . ': disponible ' . $money($gap['disponible']) . ' frente a una cuota de ' . $money($gap['cuota']) . ' (faltan ' . $money((float) $gap['faltante_pago'] > 0 ? $gap['faltante_pago'] : $gap['faltante_cobertura']) . ')' : 'Ninguna',
+      'Mayor plazo con cobertura' => (int) $c['best_term'] > 0 ? (int) $c['best_term'] . ' meses, cuota ' . $money($c['best_payment']) : 'Ninguno con este valor',
+      'Valor máximo para ' . (int) $c['max_capital_term'] . ' meses' => $money($c['max_capital']),
+      'Parámetros' => 'Ingreso utilizable ' . number_format((float) $c['factor'] * 100, 0, ',', '.') . ' % · cobertura mínima ' . number_format((float) $c['min_coverage'], 2, ',', '.')
+        . ((float) $c['other_obligations'] > 0 ? ' · otras obligaciones ' . $money($c['other_obligations']) : '') . ((array) ($c['credits'] ?? []) !== [] ? ' · cuotas de los créditos ' . implode(', ', array_map(static fn($id): string => '#' . (int) $id, (array) $c['credits'])) : '')
+        . ' · regla ' . (string) $c['rule'],
+    ];
+    // Los parámetros de la política son internos: no van en la simulación que puede ver el propietario.
+    if ($simulation) unset($rows['Parámetros']);
+    return '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>5.2 Cobertura de pago</h2>' . Doc::table($rows) . '</section>';
+  }
+
   public static function html(array $work, string $generatedBy, bool $pdf = false): string
   {
     $credit = $work['credit'];
@@ -126,7 +148,8 @@ final class OwnerCreditPdf
       ] + (($ev['vacancy_signal']['alerts'] ?? []) !== [] ? ['Avisos de desocupación' => implode(' ', $ev['vacancy_signal']['alerts'])] : [])) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>4. Política de créditos</h2>' . Doc::table([
         'Valor máximo a prestar' => $money($ev['max_amount']) . ' (' . (int) $work['settings']['income_months'] . ' × ingreso neto' . ($others !== [] ? ' total' : '') . ')',
-        'Meses máximos' => $ev['max_months'] . ' (' . OwnerCreditService::termBasis($ev) . ')',
+        'Plazo máximo por vigencia' => (int) ($ev['term_limit'] ?? $ev['max_months']) . ' meses (' . OwnerCreditService::termBasis($ev) . ')',
+        'Mayor plazo con cobertura' => (int) $ev['max_months'] > 0 ? (int) $ev['max_months'] . ' meses para el valor solicitado' : 'Ninguno para el valor solicitado',
       ] + ($simulation ? [] : [
         // Tasas de trabajo del analista: no van en la simulación que puede ver el propietario.
         'Tasa de referencia' => $percent((float) $work['settings']['reference_rate']) . ' N.M.V',
@@ -146,6 +169,7 @@ final class OwnerCreditPdf
         'Primera / última cuota' => $date((int) ($work['first_payment_ts'] ?? 0)) . ' – ' . $date((int) ($work['last_payment_ts'] ?? 0)),
       ]) . '</section>'
       . ($plan !== [] ? '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>5.1 Plan de descuento por contrato</h2>' . Doc::table($plan) . '</section>' : '')
+      . self::coverage($ev['coverage'] ?? null, $money, $date, $simulation)
       . '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>6. Políticas evaluadas</h2><table class="scm-acta-receipt-data scm-owner-credit-policies"><tbody>' . $policies . '</tbody></table></section>'
       . '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>7. ' . ($simulation ? 'Alcance' : 'Decisión') . '</h2>' . Doc::table($decision) . '</section>'
       . '<section class="scm-acta-receipt-section"><h2>8. Tabla de amortización</h2>'
