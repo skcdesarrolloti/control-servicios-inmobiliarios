@@ -142,6 +142,25 @@
       return data;
     }
 
+    // Acciones del pagaré: muestran el resultado en la sección y recargan el liquidador para ver el estado nuevo.
+    function promissoryAction(box, action, data, creditId) {
+      var status = box.querySelector("[data-owner-credit-promissory-status]");
+      box.querySelectorAll("button, input").forEach(function (el) { el.disabled = true; });
+      if (status) { status.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px]"; status.textContent = "Guardando…"; }
+      return post(action, data)
+        .then(function (result) {
+          loadReport(true);
+          return openCredit({ credit_id: creditId }).then(function () {
+            var fresh = modal && modal.querySelector("[data-owner-credit-promissory-status]");
+            if (fresh) { fresh.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-font-semibold !sp-text-emerald-700"; fresh.textContent = result.message || "Listo."; }
+          });
+        })
+        .catch(function (error) {
+          box.querySelectorAll("button, input").forEach(function (el) { el.disabled = false; });
+          if (status) { status.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-font-semibold !sp-text-red-700"; status.textContent = error.message; }
+        });
+    }
+
     // La observación se ve cuando se pulsó una acción que la pide (o ya tiene texto).
     function syncNote(form) {
       var box = form.querySelector("[data-owner-credit-note-box]");
@@ -523,6 +542,50 @@
         showPdf(target.closest("[data-owner-credit-pdf]"), { title: "Documento del crédito #" + creditId, back: "Volver al liquidador", action: "scm_owner_credit_pdf", data: formData(form), filename: "credito-propietario-" + creditId + ".pdf" });
         return;
       }
+      var promissoryBox = form && target.closest("[data-owner-credit-promissory]");
+      if (promissoryBox && target.closest("[data-owner-credit-promissory-send]")) {
+        var sendData = new FormData();
+        sendData.set("credit_id", form.getAttribute("data-credit-id"));
+        promissoryBox.querySelectorAll('[name="promissory_channels[]"]:checked').forEach(function (input) { sendData.append("channels[]", input.value); });
+        if (!sendData.getAll("channels[]").length) {
+          var sendStatus = promissoryBox.querySelector("[data-owner-credit-promissory-status]");
+          if (sendStatus) { sendStatus.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-font-semibold !sp-text-red-700"; sendStatus.textContent = "Elige correo, WhatsApp o ambos."; }
+          return;
+        }
+        askConfirm(target.closest("[data-owner-credit-promissory-send]"), "Se enviará el enlace personal para firmar el pagaré y la carta de instrucciones a quienes aún no lo han firmado.", function () {
+          promissoryAction(promissoryBox, "scm_owner_credit_promissory_send", sendData, form.getAttribute("data-credit-id"));
+        });
+        return;
+      }
+      var promissoryPdf = promissoryBox && target.closest("[data-owner-credit-promissory-pdf]");
+      if (promissoryPdf) {
+        var pdfRequest = new FormData();
+        pdfRequest.set("promissory_id", promissoryPdf.getAttribute("data-owner-credit-promissory-pdf"));
+        showPdf(promissoryPdf, { title: "Pagaré " + promissoryPdf.getAttribute("data-number") + " firmado", back: "Volver al liquidador", action: "scm_owner_credit_promissory_pdf", data: pdfRequest, filename: "pagare-" + promissoryPdf.getAttribute("data-number") + "-firmado.pdf" });
+        return;
+      }
+      var voidPromissory = promissoryBox && target.closest("[data-owner-credit-promissory-void]");
+      if (voidPromissory) {
+        // Anular un pagaré pide el motivo dentro de la sección (queda en el historial del crédito).
+        var bar = promissoryBox.querySelector("[data-owner-credit-promissory-void-bar]");
+        if (bar) bar.remove();
+        bar = document.createElement("div");
+        bar.setAttribute("data-owner-credit-promissory-void-bar", "");
+        bar.className = "!sp-mt-3 !sp-p-3 !sp-rounded-lg !sp-bg-red-50 !sp-border !sp-border-solid !sp-border-red-200 !sp-text-[11px]";
+        bar.innerHTML = '<label class="!sp-block"><span class="!sp-block !sp-font-semibold !sp-text-red-800 !sp-mb-1">Motivo de la anulación (la persona tendrá que firmar un pagaré nuevo)</span><textarea class="!sp-block !sp-box-border !sp-w-full !sp-h-16 !sp-px-3 !sp-py-2 !sp-border !sp-border-solid !sp-border-slate-300 !sp-rounded-lg !sp-bg-white !sp-text-service-navy !sp-text-xs !sp-font-sans" name="promissory_void_note" maxlength="1000"></textarea></label>' +
+          '<div class="!sp-flex !sp-justify-end !sp-gap-2 !sp-mt-2"><button type="button" class="' + UI.secondary + '" data-owner-credit-promissory-void-cancel>Cancelar</button><button type="button" class="' + UI.secondary + ' !sp-text-red-700" data-owner-credit-promissory-void-confirm>Anular pagaré</button></div>';
+        promissoryBox.appendChild(bar);
+        bar.querySelector("[data-owner-credit-promissory-void-cancel]").addEventListener("click", function () { bar.remove(); });
+        bar.querySelector("[data-owner-credit-promissory-void-confirm]").addEventListener("click", function () {
+          var voidData = new FormData();
+          voidData.set("credit_id", form.getAttribute("data-credit-id"));
+          voidData.set("promissory_id", voidPromissory.getAttribute("data-owner-credit-promissory-void"));
+          voidData.set("note", bar.querySelector("textarea").value);
+          promissoryAction(promissoryBox, "scm_owner_credit_promissory_void", voidData, form.getAttribute("data-credit-id"));
+        });
+        bar.querySelector("textarea").focus();
+        return;
+      }
       var decide = form && target.closest("[data-owner-credit-decide]");
       if (decide) {
         var decision = decide.getAttribute("data-owner-credit-decide");
@@ -600,7 +663,8 @@
       if (newCredit && event.target.name === "term") updateTermHint(newCredit);
       if (newCredit && newCredit._simulatedKey && newCredit._simulatedKey !== requestKey(newCredit)) setRegistrable(newCredit, false);
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
-      if (!form || ["note", "owner_key", "main_contract_id"].indexOf(event.target.name) >= 0) return;
+      // El pagaré y el abono no recalculan el liquidador.
+      if (!form || ["note", "owner_key", "main_contract_id", "promissory_signers[]", "promissory_channels[]", "promissory_void_note"].indexOf(event.target.name) >= 0) return;
       window.clearTimeout(simulateTimer);
       simulateTimer = window.setTimeout(function () { simulate(form); }, 350);
     });
@@ -608,6 +672,15 @@
       var newRequest = event.target.closest && event.target.closest("[data-owner-credit-new-form]");
       if (newRequest && newRequest._simulatedKey && newRequest._simulatedKey !== requestKey(newRequest)) setRegistrable(newRequest, false);
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
+      // Quién firma el pagaré: se guarda y recarga el liquidador.
+      if (form && event.target.matches("[data-owner-credit-promissory-signer]")) {
+        var box = event.target.closest("[data-owner-credit-promissory]");
+        var signers = new FormData();
+        signers.set("credit_id", form.getAttribute("data-credit-id"));
+        box.querySelectorAll("[data-owner-credit-promissory-signer]:checked").forEach(function (input) { signers.append("signers[]", input.value); });
+        promissoryAction(box, "scm_owner_credit_promissory_signers", signers, form.getAttribute("data-credit-id"));
+        return;
+      }
       // Cambiar a quién es el crédito o su contrato principal se guarda y recarga el liquidador.
       var owner = form && event.target.matches("[data-owner-credit-owner]");
       if (owner || (form && event.target.matches("[data-owner-credit-main-contract]"))) {

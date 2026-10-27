@@ -25,6 +25,12 @@ trait HandlesOwnerCredits
     return $this->canAccessDashboardTab('credito_propietario') || $this->canUseDashboardAction('quote_financing');
   }
 
+  /** Vista interna del pagaré (credito-pagare.php sin token): los mismos que ven el liquidador. */
+  public function canViewOwnerCreditDocuments(): bool
+  {
+    return $this->canViewOwnerCredits();
+  }
+
   /** @return array<string,string> */
   private function ownerCreditInput(): array
   {
@@ -209,6 +215,71 @@ trait HandlesOwnerCredits
     }
   }
 
+  /** Quiénes firman el pagaré de este crédito: uno o varios de los propietarios del contrato principal. */
+  public function ajax_handler_owner_credit_promissory_signers(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('owner_credit_decide', 'Tu cargo no tiene permiso para elegir quién firma el pagaré.');
+    try {
+      $keys = array_map(static fn($key): string => sanitize_key((string) $key), (array) wp_unslash($_POST['signers'] ?? []));
+      $this->ownerCreditService()->setPromissorySigners((int) ($_POST['credit_id'] ?? 0), $keys, $this->ticketCompletionActor());
+      $this->jsonOk(['credit_id' => (int) ($_POST['credit_id'] ?? 0), 'message' => 'Firmantes del pagaré actualizados.']);
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo guardar quién firma el pagaré.');
+    }
+  }
+
+  /** Envía (o reenvía) el pagaré y la carta de instrucciones a quienes aún no lo tienen firmado. */
+  public function ajax_handler_owner_credit_promissory_send(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('owner_credit_decide', 'Tu cargo no tiene permiso para enviar el pagaré.');
+    try {
+      $channels = array_map(static fn($channel): string => sanitize_key((string) $channel), (array) wp_unslash($_POST['channels'] ?? []));
+      $result = $this->ownerCreditService()->sendPromissory((int) ($_POST['credit_id'] ?? 0), $channels, $this->ticketCompletionActor());
+      $message = $result['sent'] !== [] ? 'Pagaré enviado a ' . implode('; ', $result['sent']) . '.' : 'Todos los firmantes ya tienen el pagaré firmado.';
+      if ($result['errors'] !== []) $message .= ' ' . implode(' ', $result['errors']);
+      $this->jsonOk(['credit_id' => (int) ($_POST['credit_id'] ?? 0), 'message' => $message]);
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo enviar el pagaré.');
+    }
+  }
+
+  /** PDF del pagaré firmado (verificado contra su HMAC), para el visor del liquidador. */
+  public function ajax_handler_owner_credit_promissory_pdf(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canViewOwnerCredits()) $this->jsonFail('No tienes permiso para ver créditos.');
+    try {
+      $promissory = $this->ownerCreditService()->promissory();
+      $id = (int) ($_POST['promissory_id'] ?? 0);
+      $bytes = $promissory->pdf($promissory->find($id));
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo abrir el pagaré firmado.');
+    }
+    if (ob_get_level() > 0) ob_end_clean();
+    header_remove('Content-Type');
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="pagare-' . \SCM\Modules\OwnerCredits\OwnerCreditPromissoryService::number($id) . '-firmado.pdf"');
+    header('Content-Length: ' . (string) strlen($bytes));
+    header('Cache-Control: private, max-age=0, must-revalidate');
+    echo $bytes;
+    exit;
+  }
+
+  /** Anula un pagaré con nota (la persona tendrá que firmar uno nuevo). */
+  public function ajax_handler_owner_credit_promissory_void(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('owner_credit_manage', 'Tu cargo no tiene permiso para anular pagarés.');
+    try {
+      $this->ownerCreditService()->voidPromissory((int) ($_POST['promissory_id'] ?? 0), sanitize_textarea_field(wp_unslash((string) ($_POST['note'] ?? ''))), $this->ticketCompletionActor());
+      $this->jsonOk(['credit_id' => (int) ($_POST['credit_id'] ?? 0), 'message' => 'Pagaré anulado.']);
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo anular el pagaré.');
+    }
+  }
+
   /** "Nueva solicitud": contratos donde el documento es de un propietario, con esa persona como beneficiaria. */
   public function ajax_handler_owner_credit_contracts(): void
   {
@@ -288,7 +359,7 @@ trait HandlesOwnerCredits
       if ($mode === 'save') {
         // Se parte de lo guardado para no perder los datos de la última sincronización.
         $input = OwnerCreditSettings::read(App::settings());
-        foreach (['usury_auto', 'usury_annual', 'usury_updated_at', 'reference_rate', 'policy_discount', 'no_mandate_deduction', 'income_months', 'min_remaining_months', 'max_term_months', 'usable_income_factor', 'min_coverage', 'notify_owner_email', 'notify_owner_whatsapp', 'notify_staff_whatsapp'] as $key) {
+        foreach (['usury_auto', 'usury_annual', 'usury_updated_at', 'reference_rate', 'policy_discount', 'no_mandate_deduction', 'income_months', 'min_remaining_months', 'max_term_months', 'usable_income_factor', 'min_coverage', 'require_promissory', 'notify_owner_email', 'notify_owner_whatsapp', 'notify_staff_whatsapp'] as $key) {
           if (isset($_POST[$key])) $input[$key] = sanitize_text_field(wp_unslash((string) $_POST[$key]));
         }
         $saved = OwnerCreditSettings::save(App::settings(), $input, Auth::userId());

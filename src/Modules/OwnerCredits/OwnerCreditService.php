@@ -63,9 +63,96 @@ final class OwnerCreditService
   private SchemaInspector $schema;
 
   /** Sin $settings se usa la configuración de la app al momento de necesitarla (la sincronización nunca debe fallar). */
+  private ?OwnerCreditPromissoryService $promissory = null;
+
   public function __construct(private Database $db, private ?Settings $settings = null, ?SchemaInspector $schema = null)
   {
     $this->schema = $schema ?: new SchemaInspector($db);
+  }
+
+  /** Pagarés de las personas (se firman una vez y sirven para todos sus créditos). */
+  public function promissory(): OwnerCreditPromissoryService
+  {
+    return $this->promissory ??= new OwnerCreditPromissoryService($this->db, (string) (defined('SCM_APP_SECRET') ? SCM_APP_SECRET : ''), (string) (defined('SCM_BASE_URL') ? SCM_BASE_URL : ''));
+  }
+
+  public function usePromissory(OwnerCreditPromissoryService $promissory): void
+  {
+    $this->promissory = $promissory;
+  }
+
+  /**
+   * Dueños del contrato principal con el estado de su pagaré, y quiénes deben firmarlo para este crédito (por defecto,
+   * solo el beneficiario; el analista puede pedir que firmen todos o los que elija).
+   * @return array{owners:list<array<string,mixed>>,required:list<string>,missing:list<string>}
+   */
+  public function promissoryState(array $credit): array
+  {
+    $owners = array_map(function (array $owner) use ($credit): array {
+      if (trim((string) $owner['document']) === '') $owner['document'] = $this->ownerDocument($owner, $this->contractById((int) $credit['contract_id']) ?? []);
+      return $owner;
+    }, $this->contractOwners((int) $credit['contract_id']));
+    $keys = array_column($owners, 'key');
+    $stored = json_decode((string) ($credit['promissory_signers'] ?? ''), true);
+    $required = is_array($stored) ? array_values(array_intersect($keys, array_map('strval', $stored))) : [];
+    if ($required === []) {
+      $beneficiary = array_values(array_filter($this->ownerChoices($credit), static fn(array $row): bool => !empty($row['current'])));
+      $required = [$beneficiary[0]['key'] ?? ($keys[0] ?? '')];
+    }
+    $status = $this->promissory()->statusFor($owners);
+    foreach ($status as &$row) $row['required'] = in_array($row['key'], $required, true);
+    unset($row);
+    $missing = array_values(array_map(static fn(array $row): string => (string) $row['name'], array_filter($status, static fn(array $row): bool => $row['required'] && $row['status'] !== 'firmado')));
+    return ['owners' => $status, 'required' => array_values(array_filter($required)), 'missing' => $missing];
+  }
+
+  /** El analista elige quiénes firman el pagaré de este crédito (uno o todos los propietarios del contrato). @param list<string> $keys */
+  public function setPromissorySigners(int $id, array $keys, array $actor): array
+  {
+    $credit = $this->find($id);
+    if ($credit === null) throw new \DomainException('El crédito ya no existe.');
+    if ($credit['status'] !== 'pendiente') throw new \DomainException('Solo se puede cambiar quién firma mientras la solicitud está pendiente.');
+    $owners = $this->contractOwners((int) $credit['contract_id']);
+    $keys = array_values(array_intersect(array_column($owners, 'key'), array_map('strval', $keys)));
+    if ($keys === []) throw new \DomainException('Elige al menos una persona que firme el pagaré.');
+    $this->db->update($this->table(), $this->schema->filterTableData($this->table(), ['promissory_signers' => json_encode($keys, JSON_THROW_ON_ERROR), 'updated_at' => time()]), ['id' => $id]);
+    $names = array_values(array_map(static fn(array $owner): string => (string) $owner['name'], array_filter($owners, static fn(array $owner): bool => in_array($owner['key'], $keys, true))));
+    $this->event($id, 'pagare_firmantes', $actor, ['nota' => 'Firman el pagaré: ' . implode(', ', $names) . '.']);
+    return $this->promissoryState($this->find($id) ?? $credit);
+  }
+
+  /**
+   * Envía el pagaré y la carta de instrucciones a los firmantes que aún no lo tienen firmado (o lo reenvía).
+   * @param list<string> $channels email|whatsapp
+   * @return array{sent:list<string>,signed:list<string>,errors:list<string>}
+   */
+  public function sendPromissory(int $id, array $channels, array $actor): array
+  {
+    $credit = $this->find($id);
+    if ($credit === null) throw new \DomainException('El crédito ya no existe.');
+    if ($credit['status'] !== 'pendiente') throw new \DomainException('El pagaré se envía mientras la solicitud está pendiente.');
+    $result = ['sent' => [], 'signed' => [], 'errors' => []];
+    foreach ($this->promissoryState($credit)['owners'] as $owner) {
+      if (!$owner['required']) continue;
+      if ($owner['status'] === 'firmado') { $result['signed'][] = (string) $owner['name']; continue; }
+      try {
+        $sent = $this->promissory()->send($owner, $id, $channels, $actor);
+        $result['sent'][] = $owner['name'] . ' (' . implode(', ', array_keys(array_filter($sent['queued']))) . ')';
+      } catch (\DomainException $error) {
+        $result['errors'][] = $error->getMessage();
+      }
+    }
+    if ($result['sent'] !== []) $this->event($id, 'pagare_enviado', $actor, ['nota' => 'Pagaré y carta de instrucciones enviados a ' . implode('; ', $result['sent']) . '.']);
+    if ($result['sent'] === [] && $result['errors'] !== []) throw new \DomainException(implode(' ', $result['errors']));
+    return $result;
+  }
+
+  /** Anula un pagaré (la persona tendrá que firmar uno nuevo) y lo deja en el historial del crédito con que se envió. */
+  public function voidPromissory(int $promissoryId, string $note, array $actor): array
+  {
+    $row = $this->promissory()->void($promissoryId, $note, $actor);
+    if ((int) $row['credit_id'] > 0) $this->event((int) $row['credit_id'], 'pagare_anulado', $actor, ['nota' => 'Pagaré ' . OwnerCreditPromissoryService::number($promissoryId) . ' de ' . $row['owner_name'] . ' anulado: ' . $note]);
+    return $row;
   }
 
   /** @return array<string,mixed> */
@@ -125,6 +212,11 @@ final class OwnerCreditService
     }
     if (!$this->schema->columnExists($this->table(), 'disbursed_at')) {
       $this->db->pdo()->exec("ALTER TABLE `{$this->table()}` ADD COLUMN disbursed_at BIGINT NULL");
+      $this->schema = new SchemaInspector($this->db);
+    }
+    // Quién debe tener el pagaré firmado para aprobar este crédito (claves de dueños del contrato principal).
+    if (!$this->schema->columnExists($this->table(), 'promissory_signers')) {
+      $this->db->pdo()->exec("ALTER TABLE `{$this->table()}` ADD COLUMN promissory_signers TEXT NULL");
       $this->schema = new SchemaInspector($this->db);
     }
     // Los créditos existentes quedan como "propietario" por el valor por defecto.
@@ -507,6 +599,7 @@ final class OwnerCreditService
       'discount_plan' => $plan,
       'preapproval' => $preapproval,
       'owners' => $credit['status'] === 'pendiente' ? $this->ownerChoices($credit) : [],
+      'promissory' => $id > 0 ? $this->promissoryState($credit) : null,
       'policies' => $policies,
       'policies_ok' => !in_array(false, array_column($policies, 'ok'), true),
       // Decidido: lo que quedó guardado con la decisión; pendiente: se recalcula con lo que está editando.
@@ -553,6 +646,10 @@ final class OwnerCreditService
       if ($decision === 'aprobado') {
         if ($conditions['amount'] <= 0 || $conditions['term'] <= 0) throw new \DomainException('Indica el valor y el plazo a aprobar.');
         if (!$work['policies_ok'] && mb_strlen($note) < self::MIN_NOTE) throw new \DomainException('La solicitud incumple políticas: escribe la justificación de la aprobación (mínimo ' . self::MIN_NOTE . ' caracteres).');
+      }
+      // Pagaré: se revisa al final, cuando las condiciones ya son aprobables (un pagaré firmado sirve para todos sus créditos).
+      if ($decision === 'aprobado' && !empty($work['settings']['require_promissory']) && ($work['promissory']['missing'] ?? []) !== []) {
+        throw new \DomainException('Falta el pagaré firmado de ' . implode(', ', $work['promissory']['missing']) . '. Envíalo desde la sección "Pagaré y carta de instrucciones" y aprueba cuando esté firmado.');
       }
       $now = time();
       $data = [

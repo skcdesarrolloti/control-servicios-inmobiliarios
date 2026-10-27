@@ -550,6 +550,11 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Cuando una cotización queda con financiación Sí (respuesta del propietario o cambio desde el panel) o se crea un crédito manual. Avisa para revisarlo en el liquidador. El WhatsApp se activa en la configuración de créditos.',
             'channel' => 'Email y WhatsApp en cola',
           ],
+          'credito_propietario_pagare_firmado' => [
+            'label' => 'Pagaré firmado',
+            'description' => 'Cuando un propietario firma desde su enlace el pagaré en blanco y la carta de instrucciones. Se firma una sola vez por persona y desde ahí se pueden aprobar sus créditos.',
+            'channel' => 'Email interno en cola',
+          ],
           'credito_propietario_decidido' => [
             'label' => 'Crédito aprobado o rechazado',
             'description' => 'Cuando un funcionario aprueba o rechaza un crédito desde el liquidador, con las condiciones y la justificación si se aprobó fuera de política. El WhatsApp se activa en la configuración de créditos.',

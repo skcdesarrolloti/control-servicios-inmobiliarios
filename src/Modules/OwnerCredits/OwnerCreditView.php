@@ -203,6 +203,7 @@ final class OwnerCreditView
 
       . '<div data-owner-credit-schedule>' . $this->schedule($work) . '</div>'
       . $this->history($work)
+      . self::promissorySection($work, $canDecide, $canManage)
       . $this->actions($credit, $canDecide, $canManage, $work['adjustments'] ?? [], $work)
       . '</form>'
       . ($credit['status'] === 'aprobado' ? self::prepaymentForm($work) : '');
@@ -475,6 +476,66 @@ final class OwnerCreditView
       . '<p class="' . self::NOTE . ' !sp-mt-1">Simulación: no registra el pago ni cambia el crédito.</p>';
   }
 
+  /**
+   * Pagaré en blanco y carta de instrucciones: quién firma, en qué va cada uno y el envío del enlace. Cada persona lo
+   * firma una vez y sirve para todos sus créditos; aprobar exige el de cada firmante elegido.
+   * @param array<string,mixed> $work
+   */
+  private static function promissorySection(array $work, bool $canDecide, bool $canManage): string
+  {
+    $state = $work['promissory'] ?? null;
+    if (!is_array($state) || $state['owners'] === []) return '';
+    $ui = UI::class;
+    $pending = $work['credit']['status'] === 'pendiente';
+    $editable = $pending && $canDecide;
+    $several = count($state['owners']) > 1;
+    $done = $state['missing'] === [];
+    $rows = '';
+    foreach ($state['owners'] as $owner) {
+      $status = match (true) {
+        $owner['status'] === 'firmado' => '<span class="!sp-font-semibold !sp-text-emerald-700">Firmado el ' . date('d/m/Y', (int) $owner['signed_at']) . ' · ' . self::e($owner['number']) . '</span><span class="!sp-block !sp-text-service-muted">Sirve para todos sus créditos: no lo vuelve a firmar.</span>',
+        $owner['status'] === 'pendiente' => '<span class="!sp-font-semibold ' . ($owner['expired'] ? '!sp-text-red-700' : '!sp-text-amber-800') . '">' . ($owner['expired'] ? 'Enlace vencido' : 'Pendiente de firma') . ' · ' . self::e($owner['number']) . '</span><span class="!sp-block !sp-text-service-muted">Enviado el ' . date('d/m/Y H:i', (int) $owner['sent_at']) . '.</span>',
+        default => '<span class="!sp-text-service-muted">Sin enviar</span>',
+      };
+      $check = $several && $editable
+        ? '<input type="checkbox" class="!sp-mt-0.5" name="promissory_signers[]" value="' . self::e($owner['key']) . '" data-owner-credit-promissory-signer' . ($owner['required'] ? ' checked' : '') . ' aria-label="' . self::e('Firma ' . $owner['name']) . '">'
+        : '';
+      // El PDF firmado se ve en el visor del mismo popup.
+      $links = ($owner['status'] === 'firmado' ? '<button type="button" class="!sp-p-0 !sp-border-0 !sp-bg-transparent !sp-text-[10px] !sp-font-semibold !sp-text-service-blue !sp-cursor-pointer" data-owner-credit-promissory-pdf="' . (int) $owner['promissory_id'] . '" data-number="' . self::e($owner['number']) . '">Ver pagaré firmado</button>' : '')
+        . ($owner['promissory_id'] > 0 && $canManage ? '<button type="button" class="!sp-p-0 !sp-border-0 !sp-bg-transparent !sp-text-[10px] !sp-font-semibold !sp-text-red-700 !sp-cursor-pointer" data-owner-credit-promissory-void="' . (int) $owner['promissory_id'] . '">Anular</button>' : '');
+      $rows .= '<li class="!sp-flex !sp-gap-2.5 !sp-items-start !sp-py-2 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0 !sp-text-[11px]">' . $check
+        . '<span class="!sp-min-w-0 !sp-flex-1"><b class="!sp-block !sp-text-service-navy">' . self::e($owner['name']) . ($owner['required'] ? '' : ' <span class="!sp-font-normal !sp-text-service-muted">· no firma este crédito</span>') . '</b>'
+        . '<span class="!sp-block !sp-text-service-muted">' . (trim((string) $owner['document']) !== '' ? 'C.C. ' . self::e($owner['document']) : 'Sin documento registrado') . ' · ' . self::e(implode(' · ', array_filter([(string) $owner['email'], (string) $owner['phone']])) ?: 'sin contacto') . '</span>'
+        . ($owner['required'] ? $status : '') . '</span>'
+        . '<span class="!sp-flex !sp-flex-col !sp-items-end !sp-gap-1">' . $links . '</span></li>';
+    }
+    $missingSent = array_filter($state['owners'], static fn(array $o): bool => $o['required'] && $o['status'] !== 'firmado');
+    $resend = array_filter($missingSent, static fn(array $o): bool => $o['status'] === 'pendiente') !== [];
+    $send = $editable && !$done
+      ? '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-3 !sp-mt-3" data-owner-credit-promissory-send-box>'
+        . '<span class="' . $ui::LABEL . ' !sp-mb-0">Enviar por</span>'
+        . '<label class="!sp-flex !sp-items-center !sp-gap-1 !sp-text-[11px]"><input type="checkbox" name="promissory_channels[]" value="email" checked> Correo</label>'
+        . '<label class="!sp-flex !sp-items-center !sp-gap-1 !sp-text-[11px]"><input type="checkbox" name="promissory_channels[]" value="whatsapp"> WhatsApp</label>'
+        . '<button type="button" class="' . $ui::NAVY . ' !sp-ml-auto" data-owner-credit-promissory-send>' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . ($resend ? 'Reenviar enlace para firmar' : 'Enviar para firmar') . '</button></div>'
+      : '';
+    return '<section class="' . self::SECTION . ' !sp-mt-5" data-owner-credit-promissory><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Pagaré y carta de instrucciones</h4>'
+      . ($done ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Firmado</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-red-700">Falta firma</span>') . '</div>'
+      . self::guide('pagare', [
+        'Qué es' => 'Un pagaré en blanco (sin valor, interés ni vencimiento) con su carta de instrucciones, que autoriza a llenarlo si el propietario incumple, por el total que deba de sus créditos del Pasaporte SuCasa.',
+        'Una sola vez' => 'Cada persona lo firma una vez y respalda todos sus créditos. Si ya lo firmó, no se le vuelve a pedir.',
+        'Quién firma' => 'Por defecto, el beneficiario del crédito. Si el contrato tiene varios propietarios, marca quiénes deben firmar: puede ser uno o todos.',
+        'Cómo firma' => 'Recibe un enlace personal por correo o WhatsApp y firma con su nombre, su número de documento y un código de verificación, como el acta de satisfacción.',
+        'Para aprobar' => 'El crédito solo se puede aprobar cuando todos los firmantes marcados tengan el pagaré firmado.',
+      ])
+      . ($several && $editable ? '<p class="' . self::NOTE . ' !sp-mb-1">Marca quiénes firman el pagaré de este crédito.</p>' : '')
+      . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $rows . '</ul>'
+      . ($pending && !$done ? (!empty($work['settings']['require_promissory'])
+        ? '<p class="' . self::NOTE . ' !sp-mt-2 !sp-text-red-700">Para aprobar falta el pagaré firmado de ' . self::e(implode(', ', $state['missing'])) . '.</p>'
+        : '<p class="' . self::NOTE . ' !sp-mt-2">En Configuración el pagaré no es obligatorio para aprobar; falta el de ' . self::e(implode(', ', $state['missing'])) . '.</p>') : '')
+      . $send
+      . '<p class="!sp-m-0 !sp-mt-2 !sp-text-[11px]" data-owner-credit-promissory-status role="status" aria-live="polite"></p></section>';
+  }
+
   /** Aprobar exige justificación solo cuando incumple alguna política. */
   private static function needsNote(array $work): bool
   {
@@ -563,6 +624,7 @@ final class OwnerCreditView
       . $field('Plazo máximo de un crédito (meses)', '<input class="' . $ui::INPUT . '" type="number" name="max_term_months" min="1" max="60" value="' . (int) $settings['max_term_months'] . '">', 'Tope de plazo: se prueban todos los plazos hasta este y se toma el mayor con cobertura en todas sus cuotas.')
       . '</div></section>'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . UI::icon('bolt') . 'Avisos</h4><div class="' . $grid . '">'
+      . $field('Exigir pagaré firmado para aprobar', $yesNo('require_promissory', (bool) ($settings['require_promissory'] ?? true)), 'Pagaré en blanco y carta de instrucciones firmados por quienes elija el analista. Cada persona lo firma una vez y sirve para todos sus créditos.')
       . $field('Correo al propietario al decidir', $yesNo('notify_owner_email', (bool) $settings['notify_owner_email']), 'Condiciones y tabla de amortización.')
       . $field('WhatsApp al propietario al decidir', $yesNo('notify_owner_whatsapp', (bool) $settings['notify_owner_whatsapp']), 'Plantilla scm_credito_propietario_decision_v1.')
       . $field('WhatsApp a funcionarios', $yesNo('notify_staff_whatsapp', (bool) $settings['notify_staff_whatsapp']), 'Al solicitar y al decidir. Plantilla scm_credito_propietario_funcionario_v2.')

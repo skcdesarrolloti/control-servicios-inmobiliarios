@@ -1,0 +1,18 @@
+{
+  "name": "scm_credito_pagare_firmado_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}.\n\nConfirmamos que quedó firmado tu pagaré No. {{2}} con su carta de instrucciones. Respalda los créditos que tomes con el Pasaporte SuCasa: no tendrás que firmarlo de nuevo.\n\nDescarga tu copia firmada aquí: {{3}}\n\nConserva el documento para tu registro. Este enlace es personal; no lo compartas.",
+      "example": {
+        "body_text": [["María Pérez", "PS-000012", "https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/credito-pagare.php?id=12&token=EJEMPLO_NO_VALIDO&format=pdf"]]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    }
+  ]
+}

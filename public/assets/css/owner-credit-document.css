@@ -9,7 +9,25 @@
 .scm-owner-credit-schedule tbody tr:nth-child(even) td{background:#f6f8fa}
 .scm-owner-credit-keep{break-inside:avoid;page-break-inside:avoid}
 .scm-owner-credit-disclaimer{margin:0 0 14px;padding:8px 12px;border:1px solid #e8c547;border-radius:6px;background:#fff8dc;color:#10264a;font-size:11.5px;line-height:1.5;break-inside:avoid;page-break-inside:avoid}
+/* Pagaré en blanco y carta de instrucciones (credito-pagare.php y su PDF). */
+.scm-promissory-document .scm-promissory-text{margin:0 0 10px;font-size:12px;line-height:1.6;text-align:justify;color:#10264a}
+.scm-promissory-document .scm-promissory-blank{display:inline-block;min-width:90px;border-bottom:1px solid #10264a;vertical-align:baseline}
+.scm-promissory-document .scm-promissory-list{margin:0 0 10px;padding-left:22px;font-size:12px;line-height:1.6;color:#10264a}
+.scm-promissory-document .scm-promissory-list li{margin-bottom:4px}
+.scm-promissory-document .scm-promissory-signature{margin:18px 0 6px;max-width:320px;break-inside:avoid;page-break-inside:avoid}
+.scm-promissory-document .scm-promissory-signature p{margin:0;font-size:11.5px;line-height:1.45;color:#10264a}
+.scm-promissory-document .scm-promissory-signature-line{height:34px;border-bottom:1px solid #10264a;margin-bottom:6px!important}
+.scm-promissory-document .scm-promissory-signature .scm-acta-typed-signature{margin:0 0 4px;border-bottom:1px solid #10264a;padding-bottom:2px}
+.scm-promissory-document .scm-promissory-signed-note{color:#5b6b82!important;font-size:10.5px!important}
+.scm-promissory-document .scm-promissory-fingerprint{margin:12px 0 4px;font-size:10px;color:#5b6b82;word-break:break-all}
+.scm-promissory-letter{break-before:page;page-break-before:always}
+.scm-promissory-sign{max-width:860px;margin:18px auto}
+@media screen{.scm-promissory-letter{break-before:auto;page-break-before:auto}}
 @media print{
+  .scm-promissory-sign,.scm-acta-print,[data-acta-print]{display:none!important}
+  .scm-promissory-document .scm-promissory-text,.scm-promissory-document .scm-promissory-list{font-size:10.5px;line-height:1.45;margin-bottom:6px}
+  .scm-promissory-document .scm-promissory-signature{margin-top:12px}
+  .scm-acta-signature-certificate{break-inside:avoid;page-break-inside:avoid}
   .scm-owner-credit-schedule{font-size:9.5px}
   .scm-owner-credit-schedule th,.scm-owner-credit-schedule td{padding:3px 6px}
   .scm-owner-credit-schedule thead{display:table-header-group}

@@ -265,8 +265,12 @@
     overlay.className = "scm-acta-busy";
     overlay.setAttribute("role", "status");
     overlay.setAttribute("aria-live", "polite");
-    overlay.innerHTML =
-      '<div><span class="scm-acta-spinner" aria-hidden="true"></span><strong>Guardando tu firma</strong><p>Estamos generando el PDF y registrando el cierre. No cierres esta página.</p></div>';
+    // Cada documento puede describir lo que hace al firmar (el acta cierra el caso; el pagaré solo genera su PDF).
+    var busyTitle = form.getAttribute("data-acta-busy-title") || "Guardando tu firma";
+    var busyText = form.getAttribute("data-acta-busy-text") || "Estamos generando el PDF y registrando el cierre. No cierres esta página.";
+    overlay.innerHTML = '<div><span class="scm-acta-spinner" aria-hidden="true"></span><strong></strong><p></p></div>';
+    overlay.querySelector("strong").textContent = busyTitle;
+    overlay.querySelector("p").textContent = busyText;
     document.body.appendChild(overlay);
     form.setAttribute("aria-busy", "true");
     try {

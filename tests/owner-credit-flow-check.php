@@ -50,9 +50,10 @@ $pdo = new OwnerCreditTestPdo();
 $db = new Database($pdo, 'wp_');
 $pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema(_ID INTEGER PRIMARY KEY, funcion TEXT, valor TEXT)');
 // Usura manual (sin red) y una tasa de referencia por debajo de la usura vigente.
-$pdo->exec("INSERT INTO wp_jet_cct_confi_sistema(funcion, valor) VALUES ('control_servicios_config', '" . json_encode(['owner_credit_settings' => ['usury_auto' => false, 'usury_annual' => 0.2859, 'reference_rate' => 0.019, 'notify_staff_whatsapp' => true]]) . "')");
+$pdo->exec("INSERT INTO wp_jet_cct_confi_sistema(funcion, valor) VALUES ('control_servicios_config', '" . json_encode(['owner_credit_settings' => ['usury_auto' => false, 'usury_annual' => 0.2859, 'reference_rate' => 0.019, 'notify_staff_whatsapp' => true, 'require_promissory' => false]]) . "')");
 $pdo->exec('CREATE TABLE wp_scm_owner_credits(id INTEGER PRIMARY KEY AUTOINCREMENT, quote_id INTEGER UNIQUE, ticket_id TEXT DEFAULT "", contract_id INTEGER DEFAULT 0, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", address TEXT DEFAULT "", owner_id TEXT DEFAULT "", owner_name TEXT DEFAULT "", owner_email TEXT DEFAULT "", owner_phone TEXT DEFAULT "", purpose TEXT DEFAULT "", status TEXT DEFAULT "pendiente", requested_amount REAL DEFAULT 0, requested_term INTEGER DEFAULT 0, vacancy TEXT DEFAULT "Baja", gross_income REAL DEFAULT 0, deductions_json TEXT, net_income REAL DEFAULT 0, max_amount REAL DEFAULT 0, max_months INTEGER DEFAULT 0, approved_amount REAL, approved_term INTEGER, approved_rate REAL, monthly_payment REAL, total_interest REAL, first_payment_ts INTEGER, policy_json TEXT, evaluation_json TEXT, policy_override INTEGER DEFAULT 0, decision_note TEXT, decided_by_id TEXT DEFAULT "", decided_by_name TEXT DEFAULT "", decided_at INTEGER, closed_at INTEGER, created_by_id TEXT DEFAULT "", created_by_name TEXT DEFAULT "", created_at INTEGER, updated_at INTEGER)');
 $pdo->exec('CREATE TABLE wp_scm_owner_credit_sources(id INTEGER PRIMARY KEY AUTOINCREMENT, credit_id INTEGER, contract_id INTEGER, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", net_income REAL DEFAULT 0, end_ts INTEGER, is_primary INTEGER DEFAULT 0, created_at INTEGER)');
+$pdo->exec('CREATE TABLE wp_scm_owner_credit_promissory(id INTEGER PRIMARY KEY AUTOINCREMENT, owner_document TEXT, owner_id TEXT DEFAULT "", owner_name TEXT DEFAULT "", owner_email TEXT DEFAULT "", owner_phone TEXT DEFAULT "", credit_id INTEGER DEFAULT 0, status TEXT DEFAULT "pendiente", payload_json TEXT, payload_hash TEXT, token_nonce TEXT, expires_at INTEGER, channels TEXT DEFAULT "email", otp_json TEXT, delivery_json TEXT, signed_at INTEGER, signed_json TEXT, signed_pdf BLOB, pdf_hash TEXT, pdf_hmac TEXT, voided_at INTEGER, void_note TEXT, voided_by_name TEXT DEFAULT "", created_by_id TEXT DEFAULT "", created_by_name TEXT DEFAULT "", created_at INTEGER, updated_at INTEGER)');
 $pdo->exec('CREATE TABLE wp_scm_owner_credit_events(id INTEGER PRIMARY KEY AUTOINCREMENT, credit_id INTEGER, action TEXT, actor_id TEXT, actor_name TEXT, details_json TEXT, created_at INTEGER)');
 $pdo->exec('CREATE TABLE wp_jet_cct_contratos_arrendamiento(_ID INTEGER PRIMARY KEY, contrato TEXT, estado TEXT, inmueble TEXT, id_inmueble TEXT, id_inmueble_data TEXT, direccion TEXT, propietario TEXT, id_propietario TEXT, correo_propietario TEXT, celular_propietario TEXT, indicativo_propietario TEXT, valor_canon TEXT, valor_administracion TEXT, tasa_administracion TEXT, aseguradora TEXT, asegurado TEXT, inicio_contrato TEXT, fin_contrato TEXT, esta_sinestrado TEXT, id_contrato_mandato TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_cct_contrato_mandato(_ID INTEGER PRIMARY KEY, total_comision TEXT, incluye_garantia TEXT, precio_mes_garantia TEXT, incluye_garantia_servicios TEXT, precio_mes_servicios TEXT)');
@@ -426,6 +427,71 @@ try {
   $check(true, 'pending credits cannot simulate prepayments');
 }
 $service->changeStatus($coverageCredit, 'anulado', 'Crédito de prueba de cobertura de pago.', $actor);
+
+// Pagaré en blanco + carta de instrucciones: exigido para aprobar, se firma una vez por persona y sirve para sus créditos.
+$requirePromissory = static function (bool $on) use ($db): void {
+  $config = json_decode((string) $db->getVar("SELECT valor FROM wp_jet_cct_confi_sistema WHERE funcion = 'control_servicios_config'"), true);
+  $config['owner_credit_settings']['require_promissory'] = $on;
+  $db->update('wp_jet_cct_confi_sistema', ['valor' => json_encode($config)], ['funcion' => 'control_servicios_config']);
+};
+$requirePromissory(true);
+$pagareService = new OwnerCreditService($db, new Settings($db));
+$sentMessages = [];
+$promissory = new \SCM\Modules\OwnerCredits\OwnerCreditPromissoryService($db, 'test-secret', 'https://example.test',
+  static function (string $channel, string $to, array $message) use (&$sentMessages): int { $sentMessages[] = ['channel' => $channel, 'to' => $to] + $message; return 1; },
+  static fn(array $row, array $payload): string => '%PDF-1.4 pagare ' . $payload['number']);
+$pagareService->usePromissory($promissory);
+$pagareCredit = (int) $pagareService->createManual(9, 800000, 6, 'Libre Destinación', $actor, '', 'mandato_2');
+$state = $pagareService->promissoryState($pagareService->find($pagareCredit));
+$check($state['required'] === ['mandato_2'] && $state['missing'] === ['Segunda Dueña'] && count($state['owners']) === 2, 'by default only the beneficiary must sign the promissory note');
+try {
+  $pagareService->decide($pagareCredit, 'aprobado', ['note' => 'Aprobación sin pagaré firmado todavía.'], $actor);
+  $check(false, 'a credit cannot be approved without the signed promissory note');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'Falta el pagaré firmado de Segunda Dueña'), 'a credit cannot be approved without the signed promissory note');
+}
+$both = $pagareService->setPromissorySigners($pagareCredit, ['mandato_1', 'mandato_2'], $actor);
+$check($both['required'] === ['mandato_1', 'mandato_2'] && count($both['missing']) === 2, 'the analyst can ask every owner of the contract to sign');
+$pagareService->setPromissorySigners($pagareCredit, ['mandato_2'], $actor);
+$sent = $pagareService->sendPromissory($pagareCredit, ['email'], $actor);
+$invitation = array_values(array_filter($sentMessages, static fn(array $m): bool => $m['event'] === 'invitation'))[0] ?? null;
+$check($sent['sent'] !== [] && $invitation !== null && $invitation['to'] === 'segunda@example.invalid' && str_contains($invitation['url'], 'credito-pagare.php?id='), 'the signing link is sent to the signer email');
+parse_str((string) parse_url($invitation['url'], PHP_URL_QUERY), $query);
+$pid = (int) $query['id'];
+$token = (string) $query['token'];
+$row = $promissory->find($pid);
+$payload = $promissory->payloadOf($row);
+$check($row['status'] === 'pendiente' && $payload['number'] === \SCM\Modules\OwnerCredits\OwnerCreditPromissoryService::number($pid) && $payload['debtor']['document'] === '22233344', 'the promissory note is numbered and stores the debtor with a document fingerprint');
+$html = \SCM\Modules\OwnerCredits\OwnerCreditPromissoryDocument::render($row, $payload);
+$check(str_contains($html, 'SOLUCIONES COMERCIALES Y CONSTRUCTIVAS S.A.S.') && str_contains($html, 'Carta de instrucciones') && str_contains($html, 'artículo 622 del Código de Comercio') && str_contains($html, 'scm-promissory-blank') && !str_contains($html, 'Signio'), 'the document has the promissory note in blank and the instructions letter, signed in the panel (no Signio)');
+try { $promissory->publicRow($pid, str_repeat('0', 64)); $check(false, 'a wrong token is rejected'); } catch (DomainException) { $check(true, 'a wrong token is rejected'); }
+$promissory->requestCode($pid, $token, 'email');
+$otp = array_values(array_filter($sentMessages, static fn(array $m): bool => $m['event'] === 'otp'));
+$code = (string) end($otp)['code'];
+$check(preg_match('/^\d{6}$/', $code) === 1 && !str_contains((string) $promissory->find($pid)['otp_json'], $code), 'a 6-digit code is sent and only its HMAC is stored');
+$signInput = ['accepted' => '1', 'signature_name' => 'Segunda Dueña', 'document' => '22.233.344', 'otp_code' => $code, 'document_hash' => $row['payload_hash']];
+try { $promissory->sign($pid, $token, ['otp_code' => '000000'] + $signInput, '10.0.0.1', 'QA'); $check(false, 'a wrong code is rejected'); } catch (DomainException) {}
+$check((int) (json_decode((string) $promissory->find($pid)['otp_json'], true)['failures'] ?? 0) === 1, 'a wrong code is rejected and the failed try stays counted');
+try { $promissory->sign($pid, $token, ['document' => '99999999'] + $signInput, '10.0.0.1', 'QA'); $check(false, 'the document number must match'); } catch (DomainException $error) { $check(str_contains($error->getMessage(), 'documento no coincide'), 'the document number must match'); }
+try { $promissory->sign($pid, $token, ['signature_name' => 'Otra Persona'] + $signInput, '10.0.0.1', 'QA'); $check(false, 'the typed name must match'); } catch (DomainException $error) { $check(str_contains($error->getMessage(), 'nombre'), 'the typed name must match'); }
+$signedRow = $promissory->sign($pid, $token, $signInput, '10.0.0.1', 'QA browser');
+$evidence = json_decode((string) $signedRow['signed_json'], true);
+$check($signedRow['status'] === 'firmado' && $evidence['ip'] === '10.0.0.1' && $evidence['document_hash'] === $row['payload_hash'] && isset($evidence['evidence_hmac']) && $evidence['verification']['channel'] === 'email', 'signing stores the evidence: IP, document fingerprint, verification and HMAC');
+$check($promissory->pdf($signedRow) === '%PDF-1.4 pagare ' . $payload['number'] && array_filter($sentMessages, static fn(array $m): bool => $m['event'] === 'signed') !== [], 'the signed PDF is stored with its HMAC and the signer gets a copy');
+$check($promissory->sign($pid, $token, $signInput, '10.0.0.1', 'QA')['status'] === 'firmado', 'signing twice does nothing');
+$pagareService->decide($pagareCredit, 'aprobado', ['note' => 'Aprobado con pagaré firmado por la beneficiaria.'], $actor);
+$check($pagareService->find($pagareCredit)['status'] === 'aprobado', 'with the promissory note signed the credit can be approved');
+$nextCredit = (int) $pagareService->createManual(9, 500000, 3, 'Libre Destinación', $actor, '', 'mandato_2');
+$check($pagareService->promissoryState($pagareService->find($nextCredit))['missing'] === [], 'a later credit of the same person does not ask to sign again');
+try { $pagareService->voidPromissory($pid, 'corto', $actor); $check(false, 'voiding needs a reason'); } catch (DomainException) { $check(true, 'voiding a promissory note needs a reason'); }
+$pagareService->voidPromissory($pid, 'Se reemplaza por un pagaré con datos corregidos.', $actor);
+$check($promissory->find($pid)['status'] === 'anulado' && $pagareService->promissoryState($pagareService->find($nextCredit))['missing'] === ['Segunda Dueña'] && (int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'pagare_anulado'", [$pagareCredit]) === 1, 'a voided note is traced and the person must sign a new one');
+try { $promissory->publicRow($pid, $token); $check(false, 'a voided note cannot be opened to sign'); } catch (DomainException) { $check(true, 'a voided note cannot be opened to sign'); }
+$liquidator = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($pagareService->workspace($nextCredit), true, true);
+$check(str_contains($liquidator, 'data-owner-credit-promissory') && str_contains($liquidator, 'Falta firma') && str_contains($liquidator, 'data-owner-credit-promissory-send') && str_contains($liquidator, 'name="promissory_signers[]"'), 'the liquidator shows who signs, the status and the send button');
+$pagareService->changeStatus($pagareCredit, 'anulado', 'Crédito de prueba del pagaré.', $actor);
+$pagareService->changeStatus($nextCredit, 'anulado', 'Crédito de prueba del pagaré.', $actor);
+$requirePromissory(false);
 
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
 $template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-funcionario-v2-template.json'), true);

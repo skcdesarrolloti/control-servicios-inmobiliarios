@@ -46,6 +46,8 @@ final class OwnerCreditSettings
       'usable_income_factor' => 1.0,
       'min_coverage' => 1.0,
       'default_term' => 12,
+      // Aprobar exige el pagaré en blanco y la carta de instrucciones firmados por cada firmante elegido.
+      'require_promissory' => true,
       'notify_owner_email' => true,
       'notify_owner_whatsapp' => false,
       'notify_staff_whatsapp' => true,
@@ -110,6 +112,7 @@ final class OwnerCreditSettings
       'min_coverage' => $coverage($input['min_coverage'] ?? null, $defaults['min_coverage']),
       'max_term_months' => $int($input['max_term_months'] ?? null, $defaults['max_term_months'], 1, 60),
       'default_term' => $int($input['default_term'] ?? null, $defaults['default_term'], 1, 60),
+      'require_promissory' => $bool($input['require_promissory'] ?? null, $defaults['require_promissory']),
       'notify_owner_email' => $bool($input['notify_owner_email'] ?? null, $defaults['notify_owner_email']),
       'notify_owner_whatsapp' => $bool($input['notify_owner_whatsapp'] ?? null, $defaults['notify_owner_whatsapp']),
       'notify_staff_whatsapp' => $bool($input['notify_staff_whatsapp'] ?? null, $defaults['notify_staff_whatsapp']),

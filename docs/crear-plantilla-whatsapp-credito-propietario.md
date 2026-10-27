@@ -89,3 +89,64 @@ Agrega un botón **Visitar sitio web** con:
 - Ejemplo del sufijo: `control-servicios-inmobiliarios/public/index.php?tab=credito_propietario`.
 
 Cuando Meta la marque como **Aprobada**, activa la opción en Configuración. La definición para la API está en `whatsapp-credito-propietario-funcionario-v2-template.json`.
+
+## Plantillas del pagaré y la carta de instrucciones
+
+El propietario firma una sola vez el pagaré en blanco y su carta de instrucciones, desde un enlace personal (`credito-pagare.php`). El analista lo envía desde el liquidador, en la sección **Pagaré y carta de instrucciones**, eligiendo **Correo**, **WhatsApp** o ambos. Hasta que Meta apruebe estas plantillas, envíalo solo por correo: por WhatsApp no saldrá nada.
+
+Para el código de 6 dígitos se reutiliza la plantilla de autenticación del acta (`scm_acta_firma_otp_v1`), que no menciona el acta. No hay que crear otra.
+
+### Invitación a firmar
+
+- Nombre exacto: `scm_credito_pagare_firma_v1` (se puede cambiar con la variable de entorno `SCM_PAGARE_WHATSAPP_INVITATION_TEMPLATE`).
+- Categoría: **Utilidad** (`UTILITY`).
+- Idioma: **Español (Colombia)** (`es_CO`).
+- Variables: **numéricas**.
+- Encabezado: ninguno.
+- Pie de página: `SKC SuCasa Inmobiliaria`.
+- Botones: ninguno.
+
+```text
+Hola {{1}}.
+
+Te enviamos el pagaré No. {{2}} y su carta de instrucciones para que los revises y firmes electrónicamente. Se firman una sola vez y respaldan los créditos que tomes con el Pasaporte SuCasa.
+
+Para firmar necesitas tu nombre, tu número de documento y un código que te enviaremos al abrir el enlace.
+
+Revisar y firmar: {{3}}
+
+Este enlace es personal. No lo compartas.
+```
+
+| Variable | Qué envía el panel | Ejemplo |
+| --- | --- | --- |
+| 1 | Nombre del propietario | María Pérez |
+| 2 | Número del pagaré | PS-000012 |
+| 3 | Enlace personal para firmar | `https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/credito-pagare.php?id=12&token=EJEMPLO_NO_VALIDO` |
+
+La definición para la API está en `whatsapp-credito-pagare-firma-template.json`.
+
+### Copia firmada
+
+- Nombre exacto: `scm_credito_pagare_firmado_v1` (variable de entorno `SCM_PAGARE_WHATSAPP_SIGNED_TEMPLATE`).
+- Mismas opciones que la invitación.
+
+```text
+Hola {{1}}.
+
+Confirmamos que quedó firmado tu pagaré No. {{2}} con su carta de instrucciones. Respalda los créditos que tomes con el Pasaporte SuCasa: no tendrás que firmarlo de nuevo.
+
+Descarga tu copia firmada aquí: {{3}}
+
+Conserva el documento para tu registro. Este enlace es personal; no lo compartas.
+```
+
+| Variable | Qué envía el panel | Ejemplo |
+| --- | --- | --- |
+| 1 | Nombre del propietario | María Pérez |
+| 2 | Número del pagaré | PS-000012 |
+| 3 | Enlace para descargar el PDF firmado | `https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/credito-pagare.php?id=12&token=EJEMPLO_NO_VALIDO&format=pdf` |
+
+La definición para la API está en `whatsapp-credito-pagare-firmado-template.json`.
+
+Los funcionarios reciben un correo cuando el pagaré queda firmado si en **Notificaciones internas** está configurado el evento **Créditos a propietarios › Pagaré firmado**.
