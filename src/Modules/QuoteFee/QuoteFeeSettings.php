@@ -133,6 +133,30 @@ final class QuoteFeeSettings
     return $repair > 0 ? round(min(100.0, self::fee($config, $repair) / $repair * 100), 2) : null;
   }
 
+  /**
+   * Paso a paso del % sugerido para explicarlo antes de enviar la cotización; null sin valor de reparación.
+   * @return array{subtotal:float,tarifa:float,base:float,f:float,transicion:float,curva:string,k:float,x:float,adicional:float,honorario:float,porcentaje:float}|null
+   */
+  public static function breakdown(array $config, float $repair): ?array
+  {
+    if ($repair <= 0) return null;
+    $fee = self::fee($config, $repair);
+    $base = $repair * $config['tarifa'];
+    return [
+      'subtotal' => round($repair, 2),
+      'tarifa' => round($config['tarifa'] * 100, 4),
+      'base' => round($base, 2),
+      'f' => round($config['f'], 2),
+      'transicion' => round($config['transicion'], 2),
+      'curva' => $config['curva'],
+      'k' => round($config['k'], 4),
+      'x' => round(max(0.0, 1 - $repair / $config['transicion']), 4),
+      'adicional' => round($fee - $base, 2),
+      'honorario' => round($fee, 2),
+      'porcentaje' => (float) self::suggestedPercent($config, $repair),
+    ];
+  }
+
   /** El honorario en pesos nunca baja al subir la reparación (misma condición que la celda D8 del Excel). */
   public static function isIncreasing(array $config): bool
   {

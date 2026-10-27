@@ -10603,6 +10603,85 @@
   cursor: pointer;
 }
 
+.scm-quote-fee-breakdown {
+  grid-column: 1 / -1;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fffbeb;
+  text-align: left;
+}
+
+.scm-quote-fee-breakdown[hidden] {
+  display: none;
+}
+
+.scm-quote-fee-breakdown p {
+  margin: 0 0 10px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.scm-quote-fee-breakdown ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scm-quote-fee-breakdown li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  padding: 7px 0;
+  border-top: 1px dashed #fde68a;
+}
+
+.scm-quote-fee-breakdown li:first-child {
+  border-top: 0;
+}
+
+.scm-quote-fee-breakdown li span {
+  color: #082247;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.scm-quote-fee-breakdown li em {
+  grid-column: 1;
+  color: #64748b;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.scm-quote-fee-breakdown li strong {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: #082247;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.scm-quote-fee-breakdown li.is-total strong {
+  color: #b45309;
+  font-size: 15px;
+}
+
+#scm-app .scm-cotizacion-finance-grid .scm-cotizacion-fee-trace {
+  display: block;
+  margin-top: 4px;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .scm-cotizacion-order-form {
   text-align: left;
 }

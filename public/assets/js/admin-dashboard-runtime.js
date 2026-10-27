@@ -24372,6 +24372,28 @@
       };
     }
 
+    // Paso a paso del % sugerido (QuoteFeeSettings::breakdown) dentro del modal de envío.
+    function quoteFeeBreakdownHtml(d) {
+      var money = function (value) { return escHtml(formatCotizacionOrderCurrency(Number(value) || 0)); };
+      var pct = function (value) { return escHtml((Number(value) || 0).toLocaleString("es-CO", { maximumFractionDigits: 2 })) + " %"; };
+      var num = function (value) { return escHtml((Number(value) || 0).toLocaleString("es-CO", { maximumFractionDigits: 4 })); };
+      var curva = d.curva === "parabola"
+        ? "F × x² = " + money(d.f) + " × " + num(d.x) + "²"
+        : "F × (1 − √(1 − k²·x²)) ÷ (1 − √(1 − k²)), con F = " + money(d.f) + " y k = " + num(d.k);
+      var adicional = Number(d.x) > 0
+        ? '<li><span>Adicional por reparación pequeña</span><em>x = 1 − ' + money(d.subtotal) + ' ÷ ' + money(d.transicion) + ' = ' + num(d.x) + '<br>' + curva + '</em><strong>' + money(d.adicional) + '</strong></li>'
+        : '<li><span>Adicional por reparación pequeña</span><em>El subtotal llega a la transición T (' + money(d.transicion) + '): no lleva adicional.</em><strong>' + money(0) + '</strong></li>';
+      return '<div class="scm-quote-fee-breakdown" id="swal-send-cot-calculo" hidden>' +
+        '<p>Las reparaciones pequeñas llevan un % mayor para cubrir el costo fijo de gestionarlas; a partir de ' + money(d.transicion) + ' solo se cobra la tarifa base. Variables en Configuración › Honorarios de cotización.</p>' +
+        '<ol>' +
+        '<li><span>Subtotal trabajos</span><em>Materiales + mano de obra + equipos + otros costos</em><strong>' + money(d.subtotal) + '</strong></li>' +
+        '<li><span>Tarifa base</span><em>' + money(d.subtotal) + ' × ' + pct(d.tarifa) + '</em><strong>' + money(d.base) + '</strong></li>' +
+        adicional +
+        '<li><span>Honorario</span><em>Tarifa base + adicional</em><strong>' + money(d.honorario) + '</strong></li>' +
+        '<li class="is-total"><span>% sugerido</span><em>' + money(d.honorario) + ' ÷ ' + money(d.subtotal) + '</em><strong>' + pct(d.porcentaje) + '</strong></li>' +
+        '</ol></div>';
+    }
+
     function openSendCotizacionModal(button, options) {
       options = options || {};
       var cotizacionId = button ? button.getAttribute("data-cotizacion-id") || "" : "";
@@ -24388,6 +24410,8 @@
       // % sugerido por Configuración › Honorarios de cotización; un % ya guardado en la cotización tiene prioridad.
       var porcentajeSugerido = button ? button.getAttribute("data-porcentaje-sugerido") || "" : "";
       var porcentajeAdmon = (button ? button.getAttribute("data-porcentaje-admon") || "" : "") || porcentajeSugerido || "10";
+      var sugeridoDetalle = null;
+      try { sugeridoDetalle = JSON.parse(button ? button.getAttribute("data-porcentaje-sugerido-detalle") || "null" : "null"); } catch (e) { sugeridoDetalle = null; }
       var ivaCotizacion = button ? button.getAttribute("data-iva-cotizacion") || "19" : "19";
       if (!ajaxUrl || !actionSendCotizacion || !cotizacionId || !window.Swal) {
         showToast("error", "No se pudo abrir el envío de la cotización.");
@@ -24401,8 +24425,11 @@
           '<div class="scm-cotizacion-response-grid">' +
           '<div class="scm-cotizacion-dialog-field"><span>Subtotal trabajos</span><strong id="swal-send-cot-subtotal">' + escHtml(formatCotizacionOrderCurrency(subtotal)) + '</strong></div>' +
           '<label class="scm-cotizacion-dialog-field"><span>% Administración <em>*</em></span><input id="swal-send-cot-porcentaje-admon" type="number" inputmode="decimal" min="0" max="100" step="0.01" value="' + escHtml(porcentajeAdmon || "10") + '">' +
-          (porcentajeSugerido ? '<small class="scm-cotizacion-dialog-hint" id="swal-send-cot-sugerido">Sugerido: <strong>' + escHtml(porcentajeSugerido) + ' %</strong> <button type="button" class="scm-cotizacion-dialog-link" id="swal-send-cot-usar-sugerido">Usar sugerido</button></small>' : '') +
+          (porcentajeSugerido ? '<small class="scm-cotizacion-dialog-hint" id="swal-send-cot-sugerido">Sugerido: <strong>' + escHtml(porcentajeSugerido) + ' %</strong> <button type="button" class="scm-cotizacion-dialog-link" id="swal-send-cot-usar-sugerido">Usar sugerido</button>' +
+            (sugeridoDetalle ? '<button type="button" class="scm-cotizacion-dialog-link" id="swal-send-cot-ver-calculo" aria-expanded="false" aria-controls="swal-send-cot-calculo">¿Por qué este %?</button>' : '') +
+            '</small>' : '') +
           '</label>' +
+          (sugeridoDetalle ? quoteFeeBreakdownHtml(sugeridoDetalle) : '') +
           '<label class="scm-cotizacion-dialog-field"><span>IVA administración <em>*</em></span><input id="swal-send-cot-iva" type="number" inputmode="decimal" min="0" max="100" step="0.01" value="' + escHtml(ivaCotizacion || "19") + '"></label>' +
           '<div class="scm-cotizacion-dialog-field"><span>VR Administración</span><strong id="swal-send-cot-total-admon">$0</strong></div>' +
           '<div class="scm-cotizacion-dialog-field"><span>VR IVA administración</span><strong id="swal-send-cot-iva-admon">$0</strong></div>' +
@@ -24453,6 +24480,16 @@
               if (pct) pct.value = porcentajeSugerido;
               syncTotals();
               syncSuggested();
+            });
+          }
+          var verCalculo = document.getElementById("swal-send-cot-ver-calculo");
+          var calculo = document.getElementById("swal-send-cot-calculo");
+          if (verCalculo && calculo) {
+            verCalculo.addEventListener("click", function (event) {
+              event.preventDefault();
+              calculo.hidden = !calculo.hidden;
+              verCalculo.setAttribute("aria-expanded", calculo.hidden ? "false" : "true");
+              verCalculo.textContent = calculo.hidden ? "¿Por qué este %?" : "Ocultar cálculo";
             });
           }
           if (pct) pct.addEventListener("input", function () { syncTotals(); syncSuggested(); });

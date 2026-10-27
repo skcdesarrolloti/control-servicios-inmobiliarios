@@ -1498,7 +1498,8 @@ trait HandlesMaintenanceActions
 
   /**
    * @param array<string,mixed> $quote
-   * @return array{porcentaje_admon:string,iva:string,total_admon:string,iva_admon:string,total_admon_mas_iva:string,total:string}
+   * porcentaje_admon_sugerido: % de Configuración › Honorarios de cotización para el subtotal ('' sin subtotal).
+   * @return array{porcentaje_admon:string,porcentaje_admon_sugerido:string,iva:string,total_admon:string,iva_admon:string,total_admon_mas_iva:string,total:string}
    */
   private function maintenance_quote_send_totals(array $quote, $porcentajeRaw, $ivaRaw): array
   {
@@ -1519,8 +1520,9 @@ trait HandlesMaintenanceActions
       $ivaText = trim((string) ($quote['iva'] ?? ''));
     }
 
+    $sugerido = \SCM\Modules\QuoteFee\QuoteFeeSettings::suggestedPercent($this->quoteFeeConfig(), $subtotal);
     $porcentaje = $porcentajeText === ''
-      ? (\SCM\Modules\QuoteFee\QuoteFeeSettings::suggestedPercent($this->quoteFeeConfig(), $subtotal) ?? 10.0)
+      ? ($sugerido ?? 10.0)
       : $this->maintenance_quote_number($porcentajeText);
     $iva = $ivaText === '' ? 19.0 : $this->maintenance_quote_number($ivaText);
     $porcentaje = max(0.0, min(100.0, $porcentaje));
@@ -1533,6 +1535,7 @@ trait HandlesMaintenanceActions
 
     return [
       'porcentaje_admon' => $this->maintenance_quote_decimal_text($porcentaje),
+      'porcentaje_admon_sugerido' => $sugerido !== null ? $this->maintenance_quote_decimal_text($sugerido) : '',
       'iva' => $this->maintenance_quote_decimal_text($iva),
       'total_admon' => (string) $totalAdmon,
       'iva_admon' => (string) $ivaAdmon,
@@ -3042,12 +3045,14 @@ trait HandlesMaintenanceActions
     }
 
     try {
-      $schema = new \SCM\Support\SchemaInspector($this->db);
       $quoteTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
       $ticketTable = $this->db->table('jet_cct_tickets');
-      if (!$schema->tableExists($quoteTable)) {
+      if (!$this->table_exists($quoteTable)) {
         throw new \DomainException('La tabla de cotizaciones no está disponible.');
       }
+      // Antes de inspeccionar el esquema, para que filterTableData vea las columnas nuevas.
+      $this->ensure_quote_fee_trace_columns($quoteTable);
+      $schema = new \SCM\Support\SchemaInspector($this->db);
 
       $quote = $this->db->getRow("SELECT * FROM `{$quoteTable}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]);
       if (!is_array($quote)) {
@@ -3215,6 +3220,14 @@ trait HandlesMaintenanceActions
       if ($employeeId === '') {
         $employeeId = (string) Auth::userId();
       }
+      $porcentajeModificado = $sendTotals['porcentaje_admon_sugerido'] !== ''
+        && abs((float) $sendTotals['porcentaje_admon'] - (float) $sendTotals['porcentaje_admon_sugerido']) >= 0.005;
+      // También va al historial aunque la tabla no haya aceptado las columnas.
+      $quote = array_merge($quote, [
+        'porcentaje_admon_modificado' => $porcentajeModificado ? 'Si' : 'No',
+        'porcentaje_admon_modificado_por' => $porcentajeModificado ? $employeeId : '',
+        'porcentaje_admon_modificado_por_nombre' => $porcentajeModificado ? $actorName : '',
+      ]);
 
       $quoteUpdate = [
         'destinatario' => $destinatario,
@@ -3222,6 +3235,10 @@ trait HandlesMaintenanceActions
         'celular_destinatario' => $celular,
         'indicativo_destinarario' => $indicativo,
         'porcentaje_admon' => $sendTotals['porcentaje_admon'],
+        'porcentaje_admon_sugerido' => $sendTotals['porcentaje_admon_sugerido'],
+        'porcentaje_admon_modificado' => $quote['porcentaje_admon_modificado'],
+        'porcentaje_admon_modificado_por' => $quote['porcentaje_admon_modificado_por'],
+        'porcentaje_admon_modificado_por_nombre' => $quote['porcentaje_admon_modificado_por_nombre'],
         'iva' => $sendTotals['iva'],
         'total_admon' => $sendTotals['total_admon'],
         'iva_admon' => $sendTotals['iva_admon'],
@@ -3423,6 +3440,7 @@ trait HandlesMaintenanceActions
     $actorPhone = trim((string) ($actor['phone'] ?? ''));
     $destinatario = trim((string) ($quote['destinatario'] ?? 'destinatario'));
     $message = 'Se envió la cotización de mantenimiento #' . $quoteId . ' a ' . ($destinatario !== '' ? $destinatario : 'destinatario') . ' por correo y WhatsApp. Quedó en Esperando respuesta.';
+    $message .= ' ' . $this->maintenance_quote_fee_trace_text($quote);
 
     $histTicketTable = $this->db->table('jet_cct_historial_del_ticket');
     if ($schema->tableExists($histTicketTable)) {
@@ -4771,6 +4789,39 @@ trait HandlesMaintenanceActions
       'updated' => (string)$updated,
       'summary' => $summary,
     ]);
+  }
+
+  /** Trazabilidad del % de administración frente al sugerido por Configuración › Honorarios de cotización. */
+  private function ensure_quote_fee_trace_columns(string $table): void
+  {
+    $columns = [
+      'porcentaje_admon_sugerido' => "VARCHAR(20) NULL DEFAULT ''",
+      'porcentaje_admon_modificado' => "VARCHAR(5) NULL DEFAULT ''",
+      'porcentaje_admon_modificado_por' => "VARCHAR(80) NULL DEFAULT ''",
+      'porcentaje_admon_modificado_por_nombre' => "VARCHAR(190) NULL DEFAULT ''",
+    ];
+    foreach ($columns as $column => $definition) {
+      if ($this->column_exists($table, $column)) continue;
+      try {
+        $this->db->pdo()->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+      } catch (\Throwable $e) {
+        error_log('[cotizacion_mantenimiento_send] ' . $column . ': ' . $e->getMessage());
+      }
+      unset($this->columnExistsCache[$table . '::' . $column]);
+    }
+  }
+
+  /** "% de administración: 12 % (sugerido 15.3 %, ajustado por Ana)." para el historial del envío. */
+  private function maintenance_quote_fee_trace_text(array $quote): string
+  {
+    $pct = static fn(string $value): string => str_replace('.', ',', $value) . ' %';
+    $chosen = trim((string) ($quote['porcentaje_admon'] ?? ''));
+    $suggested = trim((string) ($quote['porcentaje_admon_sugerido'] ?? ''));
+    if ($chosen === '') return '';
+    if ($suggested === '') return '% de administración: ' . $pct($chosen) . '.';
+    if (($quote['porcentaje_admon_modificado'] ?? '') !== 'Si') return '% de administración: ' . $pct($chosen) . ' (el sugerido).';
+    $by = trim((string) ($quote['porcentaje_admon_modificado_por_nombre'] ?? ''));
+    return '% de administración: ' . $pct($chosen) . ' (sugerido ' . $pct($suggested) . ($by !== '' ? ', ajustado por ' . $by : ', ajustado') . ').';
   }
 
   private function ensure_magnitud_caso_column(string $table): bool

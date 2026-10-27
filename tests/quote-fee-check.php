@@ -54,6 +54,11 @@ foreach ([['k' => '0'], ['k' => '1,5'], ['transicion' => '0'], ['tarifa' => '100
   }
 }
 
+// Paso a paso que se muestra en "¿Por qué este %?".
+$detail = QuoteFeeSettings::breakdown($config, 1000000.0);
+$assert(is_array($detail) && $near($detail['base'], 100000.0) && $near($detail['adicional'], 22951.95) && $near($detail['base'] + $detail['adicional'], $detail['honorario']) && $detail['porcentaje'] === 12.3 && $near($detail['x'], 0.9), 'desglose 1.000.000: base + adicional = honorario, 12,3 %');
+$assert(QuoteFeeSettings::breakdown($config, 25000000.0)['adicional'] == 0.0 && QuoteFeeSettings::breakdown($config, 0.0) === null, 'desglose sin adicional desde T y nulo sin subtotal');
+
 $html = QuoteFeeView::form($config);
 $assert(str_contains($html, 'data-quote-fee-form') && str_contains($html, 'name="f" value="30000"') && str_contains($html, '12,3 %'), 'el formulario muestra F en pesos y la tabla de ejemplos');
 
@@ -63,3 +68,6 @@ $read = static fn(string $path): string => (string) file_get_contents($root . '/
 $assert(str_contains($read('src/Http/Api/AuthenticatedActionRouter.php'), "'scm_quote_fee_settings' => 'ajax_handler_quote_fee_settings'"), 'ruta AJAX registrada');
 $assert(str_contains($read('includes/header.php'), 'data-quote-fee-settings') && str_contains($read('public/assets/js/admin-dashboard-runtime.js'), 'quote_fee_configure: "[data-quote-fee-settings]"'), 'opción en Configuración, oculta sin quote_fee_configure');
 $assert(str_contains($read('src/App/Concerns/RendersDashboard.php'), 'data-porcentaje-sugerido') && str_contains($read('public/assets/js/admin-dashboard-runtime.js'), 'swal-send-cot-usar-sugerido'), 'el envío de la cotización propone el % sugerido');
+$assert(str_contains($read('src/App/Concerns/RendersDashboard.php'), 'data-porcentaje-sugerido-detalle') && str_contains($read('public/assets/js/admin-dashboard-runtime.js'), 'swal-send-cot-ver-calculo') && str_contains($read('public/assets/js/admin-dashboard-runtime.js'), 'function quoteFeeBreakdownHtml'), 'el envío explica el cálculo del % sugerido');
+$handler = $read('src/App/Concerns/HandlesMaintenanceActions.php');
+$assert(str_contains($handler, "'porcentaje_admon_sugerido' => \$sendTotals['porcentaje_admon_sugerido']") && str_contains($handler, "'porcentaje_admon_modificado_por' => \$quote['porcentaje_admon_modificado_por']") && str_contains($handler, 'ensure_quote_fee_trace_columns') && str_contains($handler, 'maintenance_quote_fee_trace_text($quote)'), 'al enviar se guarda el sugerido, si se cambió y quién, y va al historial');
