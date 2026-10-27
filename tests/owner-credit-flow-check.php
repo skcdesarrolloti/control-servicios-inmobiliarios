@@ -322,6 +322,17 @@ $check(array_column($checks, 'ok', 'label')['Sin siniestro'] === false && array_
 $moved = $service->changeContract((int) $changed['id'], 14, $actor);
 $check((int) $moved['contract_id'] === 14 && $moved['contract_code'] === '954' && (float) $moved['gross_income'] === 2000000.0, 'the analyst can change the main contract to another contract of the owner');
 $check((int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'contrato_principal'", [(int) $moved['id']]) === 1 && (int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_contrato_arrendamiento WHERE tipo_reporte = 'Cambio de contrato principal del crédito'") === 1, 'the main contract change is traced');
+// Siniestro en otro contrato que no paga cuotas: solo aviso; si paga cuotas o es el principal, incumple.
+$db->update('wp_jet_cct_contratos_arrendamiento', ['esta_sinestrado' => 'No'], ['_ID' => 14]);
+$db->update('wp_jet_cct_contratos_arrendamiento', ['esta_sinestrado' => 'Si'], ['_ID' => 9]);
+$aside = $service->workspace((int) $moved['id'], ['amount' => '$500.000', 'term' => '3']);
+$check(!array_filter($aside['discount_plan'], static fn(array $s): bool => in_array('950', array_column($s['parts'], 'contrato'), true)) && $policy($aside, 'siniestro')['ok'] && str_starts_with($policy($aside, 'siniestro')['detail'], 'Aviso: Cartera marcó como siniestrado #950'), 'a siniestro on a contract that does not pay installments is only a warning');
+$checksAside = $service->requestChecks($service->ownerPortfolio('22233344'), ['outstanding' => 0, 'available' => 1, 'max_term' => 3]);
+$check(array_column($checksAside, 'ok', 'label')['Sin siniestro'] === true && str_contains(array_column($checksAside, 'detail', 'label')['Sin siniestro'], 'Aviso'), 'the request pre-check only fails for a siniestro on the main contract');
+$db->update('wp_jet_cct_contratos_arrendamiento', ['esta_sinestrado' => 'No'], ['_ID' => 9]);
+$db->update('wp_jet_cct_contratos_arrendamiento', ['esta_sinestrado' => 'Si'], ['_ID' => 14]);
+$own = $service->workspace((int) $moved['id'], ['amount' => '$500.000', 'term' => '3']);
+$check(!$policy($own, 'siniestro')['ok'] && str_contains($policy($own, 'siniestro')['detail'], '#954'), 'a siniestro on the main contract fails the policy');
 try {
   $service->changeContract((int) $moved['id'], 7, $actor);
   $check(false, 'the main contract must be a contract of the owner');

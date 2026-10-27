@@ -148,7 +148,7 @@ final class OwnerCreditView
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('building') . 'Contrato de arriendo vigente</h4>' . self::guide('contrato', [
         'Fin del contrato' => 'Define cuántos meses se puede prestar: se cuentan los meses completos (de 30 días) que faltan hasta esa fecha. Si el contrato fue renovado y la fecha está desactualizada, corrígela aquí; se guarda en el contrato al aprobar o rechazar.',
         'Años arrendados' => 'Tiempo entre el inicio y el fin del contrato. Un historial largo da más confianza.',
-        'Siniestro' => 'Lo marca Cartera cuando un contrato fue reportado a la aseguradora por mora. Se revisan todos los contratos del propietario: si alguno está siniestrado, incumple la política. Confírmalo con Cartera y corrígelo con Sí o No si el sistema no está al día.',
+        'Siniestro' => 'Lo marca Cartera cuando un contrato fue reportado a la aseguradora por mora. Incumple la política si está siniestrado el contrato principal o uno que paga cuotas del crédito; si es otro contrato del propietario, queda como aviso. Confírmalo con Cartera y corrígelo con Sí o No si el sistema no está al día.',
       ]) . '<div class="!sp-grid !sp-grid-cols-2 sm:!sp-grid-cols-3 !sp-gap-3">'
       . self::tile('Inicio del contrato', $contract['inicio_ts'] > 0 ? date('d/m/Y', $contract['inicio_ts']) : '—') . $endTile . self::tile('Años arrendados', $years)
       . self::tile('Estado', self::e($contract['estado'] ?: '—')) . self::tile('Aseguradora', self::e($contract['aseguradora'] ?: '—'))
