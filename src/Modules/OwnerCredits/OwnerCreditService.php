@@ -697,6 +697,44 @@ final class OwnerCreditService
     return OwnerCreditCoverage::installmentTs($firstPaymentTs, $number);
   }
 
+  /**
+   * Simula un abono extraordinario a un crédito aprobado, sin registrarlo: se supone al día (las cuotas vencidas hasta
+   * la fecha del abono ya se descontaron) y sin otros cargos. Entre vencimientos, el interés causado se liquida con
+   * la prorrata propuesta del paquete de abonos (convención pendiente de validar con contabilidad).
+   * @return array<string,mixed> OwnerCreditPrepayment::simulate() + credit, prepay_ts, accrual, proposal, simi
+   */
+  public function prepayment(int $id, string $date, float $amount): array
+  {
+    $work = $this->workspace($id);
+    $credit = $work['credit'];
+    if ($credit['status'] !== 'aprobado') throw new \DomainException('Solo se pueden simular abonos a créditos aprobados.');
+    if ($amount <= 0) throw new \DomainException('Indica el valor del abono.');
+    $prepayTs = self::dateInput($date) ?: (int) strtotime('today');
+    $disbursedTs = (int) $work['disbursed_ts'];
+    if ($prepayTs < $disbursedTs) throw new \DomainException('La fecha del abono no puede ser anterior al desembolso (' . date('d/m/Y', $disbursedTs) . ').');
+    $paid = array_values(array_filter($work['schedule'], static fn(array $row): bool => (int) $row['fecha'] <= $prepayTs));
+    $pending = array_values(array_filter($work['schedule'], static fn(array $row): bool => (int) $row['fecha'] > $prepayTs));
+    if ($pending === []) throw new \DomainException('El crédito ya no tiene cuotas pendientes a esa fecha.');
+    $balance = $paid === [] ? (float) $work['conditions']['amount'] : (float) $paid[array_key_last($paid)]['saldo'];
+    $rate = (float) $work['conditions']['rate'];
+    $periodStart = $paid === [] ? $disbursedTs : (int) $paid[array_key_last($paid)]['fecha'];
+    $accrual = OwnerCreditPrepayment::accrual($balance, $rate, $periodStart, $prepayTs, (int) $pending[0]['fecha']);
+    // Abono justo en la fecha de la última cuota (o del desembolso): no hay interés causado y el tramo es completo.
+    if ($accrual['days_elapsed'] === 0) $accrual['first_rate'] = $rate;
+    $result = OwnerCreditPrepayment::simulate($balance, (float) $work['conditions']['payment'], $rate, $accrual['first_rate'], $accrual['interest'], $amount,
+      array_map(static fn(array $row): int => (int) $row['fecha'], $pending), (int) $pending[0]['mes']);
+    return $result + [
+      'credit' => $credit,
+      'prepay_ts' => $prepayTs,
+      'paid_installments' => count($paid),
+      'accrual' => $accrual,
+      // La prorrata entre vencimientos es una propuesta: hay que validarla antes de cobrar con ella.
+      'proposal' => $accrual['days_elapsed'] > 0,
+      // Si SIMI exige otro registro: solo el saldo de capital, sin nuevo desembolso, ligado al crédito original.
+      'simi' => ['original' => (int) $credit['id'], 'capital' => $result['liquidation']['new_balance'], 'disbursement' => 0.0],
+    ];
+  }
+
   /** Cuotas de los otros créditos aprobados de la persona que vencen en esa fecha (desde su primera hasta su última). */
   private function creditPaymentsDue(array $credits, int $date): float
   {

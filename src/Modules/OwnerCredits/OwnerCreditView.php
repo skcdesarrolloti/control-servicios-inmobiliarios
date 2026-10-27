@@ -204,7 +204,8 @@ final class OwnerCreditView
       . '<div data-owner-credit-schedule>' . $this->schedule($work) . '</div>'
       . $this->history($work)
       . $this->actions($credit, $canDecide, $canManage, $work['adjustments'] ?? [], $work)
-      . '</form>';
+      . '</form>'
+      . ($credit['status'] === 'aprobado' ? self::prepaymentForm($work) : '');
   }
 
   /** Bloques calculados que se refrescan al editar el formulario. @param array<string,mixed> $work */
@@ -401,6 +402,77 @@ final class OwnerCreditView
       . '<p class="' . self::NOTE . ' !sp-mt-3">Ingreso utilizable ' . $percent . ' · cobertura mínima ' . number_format((float) $c['min_coverage'], 2, ',', '.') . ((float) $c['other_obligations'] > 0 ? ' · otras obligaciones ' . self::money($c['other_obligations']) : '') . ((array) $c['credits'] !== [] ? ' · cuotas de los créditos ' . implode(', ', array_map(static fn(int $id): string => '#' . $id, (array) $c['credits'])) : '') . '.</p>'
       . ($rows !== '' ? '<details class="!sp-mt-2"><summary class="!sp-cursor-pointer !sp-text-[10px] !sp-font-semibold !sp-text-service-blue">Ver disponible por fecha</summary><table class="!sp-w-full !sp-mt-2 !sp-border-collapse !sp-text-[10px] !sp-text-service-navy"><thead><tr class="!sp-text-left !sp-text-service-muted"><th class="' . $td . '">Cuota</th><th class="' . $td . '">Fecha</th><th class="' . $td . ' !sp-text-right">Disponible</th><th class="' . $td . ' !sp-text-right">Cuota</th><th class="' . $td . ' !sp-text-right">Cobertura</th></tr></thead><tbody>' . $rows . '</tbody></table></details>' : '')
       . '</section>';
+  }
+
+  /**
+   * Simulador de abono extraordinario de un crédito aprobado: formulario aparte del liquidador (no recalcula ni
+   * guarda el crédito).
+   * @param array<string,mixed> $work
+   */
+  private static function prepaymentForm(array $work): string
+  {
+    $ui = UI::class;
+    $id = (int) $work['credit']['id'];
+    return '<form class="' . self::SECTION . ' !sp-mt-5" data-owner-credit-prepay-form data-credit-id="' . $id . '" novalidate>'
+      . '<h4 class="' . self::H4 . '">' . self::icon('cash') . 'Simular abono extraordinario</h4>'
+      . self::guide('abono', [
+        'Qué hace' => 'Compara qué pasa si el propietario abona a capital: reducir plazo (conserva la cuota y termina antes) o reducir cuota (conserva las fechas y baja la cuota). Es solo una simulación: no registra el pago ni cambia el crédito.',
+        'Cómo se aplica el dinero' => 'Primero salda el interés causado a la fecha; el resto va a capital. Si supera el saldo, el crédito se cancela y la diferencia queda como excedente por conciliar.',
+        'Supuestos' => 'El crédito está al día (las cuotas vencidas hasta esa fecha ya se descontaron) y sin otros cargos. Entre dos vencimientos, el interés se calcula con una prorrata por días que aún debe validar contabilidad.',
+      ])
+      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-4 !sp-items-end">'
+      . '<label class="!sp-block"><span class="' . $ui::LABEL . '">Fecha del abono</span><input class="' . UI::field('!sp-bg-white') . '" type="date" name="prepay_date" value="' . date('Y-m-d') . '" min="' . date('Y-m-d', (int) $work['disbursed_ts']) . '"></label>'
+      . '<label class="!sp-block"><span class="' . $ui::LABEL . '">Valor del abono</span><input class="' . UI::field('!sp-bg-white') . '" name="prepay_amount" inputmode="numeric" data-owner-credit-money placeholder="$0"></label>'
+      . '<button type="submit" class="' . $ui::PRIMARY . '">' . $ui::icon('refresh', '!sp-w-3.5 !sp-h-3.5') . 'Simular abono</button>'
+      . '</div><p class="!sp-m-0 !sp-mt-2 !sp-text-[11px]" data-owner-credit-status role="status" aria-live="polite"></p>'
+      . '<div class="!sp-mt-4" data-owner-credit-prepay-results></div></form>';
+  }
+
+  /**
+   * Resultado de la simulación de abono: liquidación del dinero y las dos alternativas lado a lado.
+   * @param array<string,mixed> $r OwnerCreditService::prepayment()
+   */
+  public static function prepaymentResults(array $r): string
+  {
+    $l = $r['liquidation'];
+    $date = static fn(int $ts): string => $ts > 0 ? date('d/m/Y', $ts) : '—';
+    $cents = static fn(float $value): string => '$' . number_format($value, 2, ',', '.');
+    $html = ($r['proposal'] ? self::alert('El abono cae entre dos vencimientos: el interés causado (' . $r['accrual']['days_elapsed'] . ' de ' . $r['accrual']['days_period'] . ' días) se calcula con una prorrata propuesta que aún debe validar contabilidad.', 'info') : '')
+      . '<div class="!sp-grid !sp-grid-cols-2 sm:!sp-grid-cols-3 !sp-gap-3">'
+      . self::tile('Saldo de capital', $cents($l['previous_balance']))
+      . self::tile('Intereses causados a la fecha', $cents($l['interest_paid']))
+      . self::tile('Abono a capital', $cents($l['capital']), 'key')
+      . self::tile('Nuevo saldo', $cents($l['new_balance']), 'key')
+      . ($l['surplus'] > 0 ? self::tile('Excedente por conciliar', $cents($l['surplus']), 'bad') : '')
+      . '</div>';
+    if ($r['paid_off']) {
+      return $html . '<p class="' . self::NOTE . ' !sp-mt-3" data-owner-credit-prepay-paid-off>Con este abono el crédito queda <b>cancelado totalmente</b>: no quedan cuotas.' . ($l['surplus'] > 0 ? ' El excedente no se devuelve ni se registra solo: hay que conciliarlo.' : '') . '</p>';
+    }
+    $labels = ['reduce_term' => ['Reducir plazo', 'Conserva la cuota y termina antes.'], 'reduce_payment' => ['Reducir cuota', 'Conserva las fechas y baja la cuota.']];
+    $td = '!sp-px-2 !sp-py-1 !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-100';
+    $columns = '';
+    foreach ($labels as $key => [$title, $hint]) {
+      $o = $r['options'][$key];
+      $last = $o['rows'] === [] ? null : $o['rows'][array_key_last($o['rows'])];
+      $rows = implode('', array_map(static fn(array $row): string => '<tr><td class="' . $td . '">' . (int) $row['numero'] . '</td><td class="' . $td . '">' . date('d/m/Y', (int) $row['fecha']) . '</td><td class="' . $td . ' !sp-text-right">' . $cents($row['cuota']) . '</td><td class="' . $td . ' !sp-text-right">' . $cents($row['interes']) . '</td><td class="' . $td . ' !sp-text-right">' . $cents($row['saldo']) . '</td></tr>', $o['rows']));
+      $columns .= '<article class="!sp-rounded-xl !sp-border !sp-border-solid !sp-border-slate-200 !sp-p-4" data-owner-credit-prepay-option="' . $key . '">'
+        . '<h5 class="!sp-m-0 !sp-text-sm !sp-font-bold !sp-text-service-navy">' . $title . '</h5><p class="' . self::NOTE . ' !sp-mb-3">' . $hint . '</p>'
+        . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-2">'
+        . self::tile('Pagos pendientes', (string) $o['installments'])
+        . self::tile('Cuota regular', $cents((float) ($o['rows'][0]['cuota'] ?? 0)))
+        . self::tile('Último pago', $last !== null ? $cents((float) $last['cuota']) : '—')
+        . self::tile('Fecha final', $date((int) $o['last_ts']))
+        . self::tile('Intereses futuros', $cents($o['interest']))
+        . self::tile('Ahorro de intereses', $cents($o['savings']), 'key')
+        . '</div>'
+        . ($o['early_close'] ? '<p class="' . self::NOTE . ' !sp-mt-2">El saldo se extingue una cuota antes por el ajuste de centavos.</p>' : '')
+        . '<details class="!sp-mt-3"><summary class="!sp-cursor-pointer !sp-text-[10px] !sp-font-semibold !sp-text-service-blue">Ver cuotas</summary><table class="!sp-w-full !sp-mt-2 !sp-border-collapse !sp-text-[10px] !sp-text-service-navy"><thead><tr class="!sp-text-left !sp-text-service-muted"><th class="' . $td . '">#</th><th class="' . $td . '">Fecha</th><th class="' . $td . ' !sp-text-right">Cuota</th><th class="' . $td . ' !sp-text-right">Interés</th><th class="' . $td . ' !sp-text-right">Saldo</th></tr></thead><tbody>' . $rows . '</tbody></table></details>'
+        . '</article>';
+    }
+    return $html . '<div class="!sp-grid !sp-grid-cols-1 md:!sp-grid-cols-2 !sp-gap-4 !sp-mt-4">' . $columns . '</div>'
+      . '<p class="' . self::NOTE . ' !sp-mt-3">Sin abono quedarían ' . $r['reference']['installments'] . ' cuotas con ' . $cents($r['reference']['interest']) . ' de intereses futuros. '
+      . 'Si SIMI exige abrir otro registro, sería por el nuevo saldo de capital (' . $cents($r['simi']['capital']) . ') con desembolso adicional de $0, ligado al crédito #' . (int) $r['simi']['original'] . '; soporte y contabilidad deben confirmar cómo retirar los cobros sustituidos.</p>'
+      . '<p class="' . self::NOTE . ' !sp-mt-1">Simulación: no registra el pago ni cambia el crédito.</p>';
   }
 
   /** Aprobar exige justificación solo cuando incumple alguna política. */

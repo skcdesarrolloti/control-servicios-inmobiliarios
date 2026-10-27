@@ -32,7 +32,8 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
       }
       const data = body.action === 'scm_owner_credit_open' ? { title: 'Crédito #12 · Pendiente', html: workspace }
         : body.action === 'scm_owner_credit_simulate' ? { results_html: '<p data-sim>recalculado ' + body.amount + '</p>', schedule_html: '<p>tabla</p>' }
-        : body.action === 'scm_owner_credit_decide' ? { message: 'Crédito aprobado.' } : {};
+        : body.action === 'scm_owner_credit_decide' ? { message: 'Crédito aprobado.' }
+        : body.action === 'scm_owner_credit_prepayment' ? { html: '<p data-prepay-result>abono ' + body.prepay_amount + ' el ' + body.prepay_date + '</p>' } : {};
       return Promise.resolve({ json: () => Promise.resolve({ success: true, data }) });
     };
   }, workspace);
@@ -126,6 +127,23 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   assert.equal(decide.decision, 'aprobado'); assert.equal(decide.note, 'Justificación de prueba suficiente.'); assert.equal(decide.credit_id, '12');
   await page.waitForFunction(() => (document.querySelector('[data-owner-credit-status]') || {}).textContent === 'Crédito aprobado.');
   console.log('OK approval asks for confirmation, sends the note and reloads the credit');
+
+  // Simulador de abono (créditos aprobados): formulario aparte, no recalcula el liquidador.
+  await page.evaluate(() => {
+    const body = document.querySelector('[data-owner-credit-body]');
+    body.insertAdjacentHTML('beforeend', '<form data-owner-credit-prepay-form data-credit-id="12"><input name="prepay_date" type="date" value="2026-11-15"><input name="prepay_amount" data-owner-credit-money><button type="submit" data-prepay-submit>Simular abono</button><p data-owner-credit-status></p><div data-owner-credit-prepay-results></div></form>');
+  });
+  await page.fill('[name="prepay_amount"]', '300000');
+  assert.equal(await page.inputValue('[name="prepay_amount"]'), '$300.000', 'the prepayment amount is formatted as pesos');
+  const simulatedBefore = (await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_simulate').length;
+  await page.click('[data-prepay-submit]');
+  await page.waitForSelector('[data-prepay-result]');
+  calls = await page.evaluate(() => window.calls);
+  const prepayCall = calls.filter(c => c.action === 'scm_owner_credit_prepayment').pop();
+  assert.equal(prepayCall.credit_id, '12'); assert.equal(prepayCall.prepay_amount, '$300.000'); assert.equal(prepayCall.prepay_date, '2026-11-15');
+  await page.waitForTimeout(450);
+  assert.equal((await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_simulate').length, simulatedBefore, 'typing in the prepayment form does not recalculate the liquidator');
+  console.log('OK the prepayment simulator posts the date and amount and shows the comparison in the same popup');
 
   await page.keyboard.press('Escape');
   assert.equal(await page.evaluate(() => document.querySelector('[data-owner-credit-modal]').hidden), true);

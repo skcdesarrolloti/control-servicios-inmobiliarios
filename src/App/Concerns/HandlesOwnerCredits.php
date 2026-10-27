@@ -137,6 +137,25 @@ trait HandlesOwnerCredits
     exit;
   }
 
+  /** Simulación de abono extraordinario (no registra nada): compara reducir plazo y reducir cuota. */
+  public function ajax_handler_owner_credit_prepayment(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canViewOwnerCredits()) $this->jsonFail('No tienes permiso para ver créditos.');
+    try {
+      $result = $this->ownerCreditService()->prepayment(
+        (int) ($_POST['credit_id'] ?? 0),
+        sanitize_text_field(wp_unslash((string) ($_POST['prepay_date'] ?? ''))),
+        OwnerCreditService::money(sanitize_text_field(wp_unslash((string) ($_POST['prepay_amount'] ?? ''))))
+      );
+      $this->jsonOk(['html' => OwnerCreditView::prepaymentResults($result)]);
+    } catch (\InvalidArgumentException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo simular el abono.');
+    }
+  }
+
   public function ajax_handler_owner_credit_simulate(): void
   {
     $this->verifyCsrf();

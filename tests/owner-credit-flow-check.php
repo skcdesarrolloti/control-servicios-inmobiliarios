@@ -404,6 +404,27 @@ $check($savedCoverage['rule'] === \SCM\Modules\OwnerCredits\OwnerCreditCoverage:
 // Con ese crédito aprobado, sus cuotas se restan del disponible de una nueva solicitud del mismo propietario.
 $next = $service->workspace((int) $service->createManual(9, 800000, 6, 'Libre Destinación', $actor, '', 'mandato_2'));
 $check($next['evaluation']['analyst']['has_credits'] && in_array($coverageCredit, $next['evaluation']['coverage']['credits'], true) && $next['evaluation']['coverage']['rows'][0]['obligaciones'] > 0, 'the installments of the owner approved credits are subtracted from the available income');
+// Abono extraordinario simulado sobre el crédito aprobado: no cambia el crédito ni deja eventos.
+$approvedCoverage = $service->workspace($coverageCredit);
+$eventsBeforePrepay = (int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ?', [$coverageCredit]);
+$prepay = $service->prepayment($coverageCredit, date('Y-m-d', (int) $approvedCoverage['disbursed_ts']), 300000);
+$check($prepay['paid_installments'] === 0 && !$prepay['proposal'] && abs($prepay['liquidation']['new_balance'] - ($approvedCoverage['conditions']['amount'] - 300000)) < 0.001, 'a prepayment on the disbursement day goes fully to capital');
+$check($prepay['options']['reduce_term']['installments'] < count($approvedCoverage['schedule']) && $prepay['options']['reduce_payment']['installments'] === count($approvedCoverage['schedule']) && $prepay['options']['reduce_payment']['rows'][0]['cuota'] < $approvedCoverage['conditions']['payment'], 'reduce term ends earlier and reduce payment keeps the dates with a lower installment');
+$check($prepay['options']['reduce_term']['savings'] > $prepay['options']['reduce_payment']['savings'] && $prepay['options']['reduce_payment']['savings'] > 0, 'both options save interest, reducing the term saves more');
+$midway = $service->prepayment($coverageCredit, date('Y-m-d', strtotime('+10 days', (int) $approvedCoverage['schedule'][0]['fecha'])), 300000);
+$check($midway['paid_installments'] === 1 && $midway['proposal'] && $midway['liquidation']['interest_paid'] > 0 && abs($midway['liquidation']['previous_balance'] - $approvedCoverage['schedule'][0]['saldo']) < 0.001, 'between due dates the first installment counts as paid and the accrued interest is a proposal');
+$payoff = $service->prepayment($coverageCredit, '', 99999999);
+$check($payoff['paid_off'] && $payoff['liquidation']['surplus'] > 0, 'paying more than the balance cancels the credit and shows the surplus');
+$prepayHtml = \SCM\Modules\OwnerCredits\OwnerCreditView::prepaymentResults($prepay);
+$check(str_contains($prepayHtml, 'data-owner-credit-prepay-option="reduce_term"') && str_contains($prepayHtml, 'Reducir cuota') && str_contains($prepayHtml, 'desembolso adicional de $0'), 'the comparison shows both options and the SIMI note');
+$check(str_contains((new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($approvedCoverage, true, true), 'data-owner-credit-prepay-form') && !str_contains($cwHtml, 'data-owner-credit-prepay-form'), 'only approved credits show the prepayment simulator');
+$check((int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ?', [$coverageCredit]) === $eventsBeforePrepay && $service->find($coverageCredit)['status'] === 'aprobado', 'simulating a prepayment records nothing');
+try {
+  $service->prepayment((int) $next['credit']['id'], '', 100000);
+  $check(false, 'pending credits cannot simulate prepayments');
+} catch (DomainException) {
+  $check(true, 'pending credits cannot simulate prepayments');
+}
 $service->changeStatus($coverageCredit, 'anulado', 'Crédito de prueba de cobertura de pago.', $actor);
 
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');

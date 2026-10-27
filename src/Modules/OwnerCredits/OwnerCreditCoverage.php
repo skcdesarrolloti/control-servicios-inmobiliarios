@@ -68,22 +68,44 @@ final class OwnerCreditCoverage
   public static function plan(float $amount, float $rate, int $months): array
   {
     if ($amount <= 0 || $months <= 0) return ['payment' => 0.0, 'rows' => [], 'total_interest' => 0.0];
+    return self::amortize($amount, self::payment($amount, $rate, $months), $rate, $rate, $months);
+  }
+
+  /**
+   * Cuota uniforme para un saldo con el primer tramo a otra tasa (abono entre vencimientos): saldo / Σ descuentos,
+   * con d1 = 1/(1+r1) y d(k) = d(k−1)/(1+i).
+   */
+  public static function paymentWithFirstRate(float $balance, float $rate, float $firstRate, int $months): float
+  {
+    if ($balance <= 0 || $months <= 0) return 0.0;
+    return (float) self::paymentText(self::money($balance), self::rate($rate), $months, self::rate($firstRate));
+  }
+
+  /**
+   * Amortiza un saldo con una cuota dada: cada mes paga lo menor entre la cuota y lo que falta (saldo + interés) y
+   * termina al llegar a cero; la última cuota del plazo cancela el saldo. Sirve para el plan del desembolso y para
+   * los abonos (conservar la cuota y terminar antes, o recalcularla y conservar los vencimientos).
+   * @return array{payment:float,rows:list<array{mes:int,saldo_inicial:float,cuota:float,interes:float,abono:float,saldo:float}>,total_interest:float}
+   */
+  public static function amortize(float $amount, float $payment, float $rate, float $firstRate, int $months): array
+  {
     $balance = self::money($amount);
+    $paymentText = self::money($payment);
     $rateText = self::rate($rate);
-    $payment = self::paymentText($balance, $rateText, $months);
+    $firstText = self::rate($firstRate);
     $rows = [];
     $interestTotal = '0.00';
     for ($month = 1; $month <= $months && bccomp($balance, '0', 2) > 0; $month++) {
-      $interest = self::round(bcmul($balance, $rateText, self::SCALE));
+      $interest = self::round(bcmul($balance, $month === 1 ? $firstText : $rateText, self::SCALE));
       $payoff = bcadd($balance, $interest, 2);
-      $pay = $month === $months || bccomp($payment, $payoff, 2) >= 0 ? $payoff : $payment;
+      $pay = $month === $months || bccomp($paymentText, $payoff, 2) >= 0 ? $payoff : $paymentText;
       $capital = bcsub($pay, $interest, 2);
       $next = bcsub($balance, $capital, 2);
       $rows[] = ['mes' => $month, 'saldo_inicial' => (float) $balance, 'cuota' => (float) $pay, 'interes' => (float) $interest, 'abono' => (float) $capital, 'saldo' => (float) $next];
       $interestTotal = bcadd($interestTotal, $interest, 2);
       $balance = $next;
     }
-    return ['payment' => (float) $payment, 'rows' => $rows, 'total_interest' => (float) $interestTotal];
+    return ['payment' => (float) $paymentText, 'rows' => $rows, 'total_interest' => (float) $interestTotal];
   }
 
   /**
@@ -195,17 +217,17 @@ final class OwnerCreditCoverage
     return 0.0;
   }
 
-  private static function paymentText(string $balance, string $rate, int $months): string
+  private static function paymentText(string $balance, string $rate, int $months, ?string $firstRate = null): string
   {
-    $payment = self::round(bcdiv($balance, self::annuity($rate, $months), self::SCALE));
+    $payment = self::round(bcdiv($balance, self::annuity($rate, $months, $firstRate), self::SCALE));
     return bccomp($payment, '0', 2) > 0 ? $payment : '0.01';
   }
 
-  /** Suma de los factores de descuento de $months cuotas: 1/(1+i) + 1/(1+i)² + … */
-  private static function annuity(string $rate, int $months): string
+  /** Suma de los factores de descuento de $months cuotas: 1/(1+r1) + 1/((1+r1)(1+i)) + … (r1 = i salvo abono). */
+  private static function annuity(string $rate, int $months, ?string $firstRate = null): string
   {
     $step = bcadd('1', $rate, self::SCALE);
-    $discount = bcdiv('1', $step, self::SCALE);
+    $discount = bcdiv('1', bcadd('1', $firstRate ?? $rate, self::SCALE), self::SCALE);
     $sum = '0';
     for ($month = 0; $month < $months; $month++) {
       $sum = bcadd($sum, $discount, self::SCALE);

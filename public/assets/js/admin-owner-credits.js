@@ -652,6 +652,20 @@
           .catch(function (error) { setStatus(form, error.message, "error"); });
         return;
       }
+      // Abono extraordinario: solo simula, en el mismo popup, sin tocar el liquidador.
+      if (form.matches("[data-owner-credit-prepay-form]")) {
+        event.preventDefault();
+        var prepay = new FormData(form);
+        prepay.set("credit_id", form.getAttribute("data-credit-id") || "");
+        var prepayResults = form.querySelector("[data-owner-credit-prepay-results]");
+        setStatus(form, "Simulando…", "");
+        setLoading(prepayResults, true);
+        post("scm_owner_credit_prepayment", prepay)
+          .then(function (data) { if (prepayResults) prepayResults.innerHTML = data.html || ""; setStatus(form, ""); })
+          .catch(function (error) { setStatus(form, error.message, "error"); })
+          .then(function () { setLoading(prepayResults, false); });
+        return;
+      }
       if (form.matches("[data-owner-credit-new-form]")) {
         event.preventDefault();
         if (!form.elements.contract_id.value) { setStatus(form, "Busca al propietario por documento.", "error"); return; }
