@@ -590,7 +590,19 @@ final class OwnerCreditService
   }
 
   /**
-   * Listado y totales para Métricas › Créditos.
+   * Anula una solicitud pendiente desde el listado: solo cambia el estado. No escribe eventos ni historiales
+   * y deja de contar en el informe (solo se ve filtrando por "Anulado").
+   */
+  public function voidRequest(int $id): void
+  {
+    $credit = $this->find($id);
+    if ($credit === null) throw new \DomainException('La solicitud ya no existe.');
+    if ($credit['status'] !== 'pendiente') throw new \DomainException('Solo se pueden anular solicitudes pendientes.');
+    $this->setStatus($id, 'anulado', ['closed_at' => time()]);
+  }
+
+  /**
+   * Listado y totales de Actividades administrativas › Créditos. Los anulados no cuentan salvo que se filtren.
    * @param array<string,mixed> $filters
    * @return array<string,mixed>
    */
@@ -602,6 +614,7 @@ final class OwnerCreditService
     $args = [];
     $status = (string) ($filters['status'] ?? '');
     if (isset(self::STATUSES[$status])) { $where[] = '`status` = ?'; $args[] = $status; }
+    else $where[] = "`status` <> 'anulado'";
     $type = (string) ($filters['beneficiary_type'] ?? '');
     if (isset(self::BENEFICIARY_TYPES[$type]) && $this->schema->columnExists($this->table(), 'beneficiary_type')) { $where[] = '`beneficiary_type` = ?'; $args[] = $type; }
     foreach (['from' => '>=', 'to' => '<='] as $key => $op) {

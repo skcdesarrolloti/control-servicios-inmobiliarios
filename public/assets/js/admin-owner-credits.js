@@ -480,6 +480,18 @@
       }
       if (target.closest("[data-owner-credit-dismiss]")) { closeModal(); return; }
 
+      var voidButton = target.closest("[data-owner-credit-void]");
+      if (voidButton) {
+        event.preventDefault();
+        askConfirm(voidButton, "¿Anular la solicitud #" + voidButton.getAttribute("data-credit-id") + "? Deja de aparecer en el listado y en los totales.", function () {
+          voidButton.disabled = true;
+          post("scm_owner_credit_void", { credit_id: voidButton.getAttribute("data-credit-id") })
+            .then(function () { loadReport(true); })
+            .catch(function (error) { voidButton.disabled = false; showModal("No se pudo anular", "", message(error.message, "error")); });
+        });
+        return;
+      }
+
       var form = target.closest("[data-owner-credit-form]");
       if (form && target.closest("[data-owner-credit-use-suggested]")) {
         var suggested = form.querySelector("[data-owner-credit-suggested]");

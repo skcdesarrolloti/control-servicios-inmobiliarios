@@ -364,6 +364,18 @@ try {
   $check(true, 'a simulation needs a contract of the owner');
 }
 
+$voided = (int) $service->createManual(9, 700000, 6, 'Libre Destinación', $actor, '', 'mandato_2');
+$eventsBefore = (int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credit_events');
+$historiesBefore = (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_contrato_arrendamiento');
+$service->voidRequest($voided);
+$check($service->find($voided)['status'] === 'anulado', 'a pending request can be voided from the list');
+$check((int) $db->getVar('SELECT COUNT(*) FROM wp_scm_owner_credit_events') === $eventsBefore && (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_contrato_arrendamiento') === $historiesBefore, 'voiding a request writes no event nor history');
+$check(!in_array($voided, array_map('intval', array_column($service->report([])['rows'], 'id')), true) && in_array($voided, array_map('intval', array_column($service->report(['status' => 'anulado'])['rows'], 'id')), true), 'voided requests leave the report unless filtered by Anulado');
+$listing = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->report($service->report([]), true, true);
+$check(str_contains($listing, 'Ver solicitud') && !str_contains($listing, 'Abrir liquidador') && str_contains($listing, 'data-owner-credit-void'), 'the list shows "Ver solicitud" and "Anular" for pending requests');
+$check(!str_contains((new \SCM\Modules\OwnerCredits\OwnerCreditView())->report($service->report([]), true, false), 'data-owner-credit-void'), 'without the manage permission there is no "Anular"');
+try { $service->voidRequest($voided); $check(false, 'only pending requests can be voided'); } catch (\DomainException $e) {}
+
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
 $template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-funcionario-v2-template.json'), true);
 $check(str_contains($source, "'" . $template['name'] . "'") && substr_count($template['components'][0]['text'], '{{') === 6, 'staff template name and its six variables match the code');

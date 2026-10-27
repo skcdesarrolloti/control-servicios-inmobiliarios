@@ -49,7 +49,7 @@ trait HandlesOwnerCredits
     try {
       $filters = [];
       foreach (['status', 'from', 'to', 'search'] as $key) $filters[$key] = trim(sanitize_text_field(wp_unslash((string) ($_POST[$key] ?? ''))));
-      $this->jsonOk(['html' => (new OwnerCreditView())->report($this->ownerCreditService()->report($filters), true)]);
+      $this->jsonOk(['html' => (new OwnerCreditView())->report($this->ownerCreditService()->report($filters), true, $this->canUseDashboardAction('owner_credit_manage'))]);
     } catch (\Throwable $error) {
       $this->ownerCreditFail($error, 'No se pudieron cargar los créditos.');
     }
@@ -208,6 +208,18 @@ trait HandlesOwnerCredits
       $this->jsonFail($error->getMessage());
     } catch (\Throwable $error) {
       $this->ownerCreditFail($error, 'No se pudo buscar contratos.');
+    }
+  }
+
+  public function ajax_handler_owner_credit_void(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('owner_credit_manage', 'Tu cargo no tiene permiso para anular solicitudes.');
+    try {
+      $this->ownerCreditService()->voidRequest((int) ($_POST['credit_id'] ?? 0));
+      $this->jsonOk(['message' => 'Solicitud anulada.']);
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo anular la solicitud.');
     }
   }
 

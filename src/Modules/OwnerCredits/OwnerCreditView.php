@@ -55,7 +55,7 @@ final class OwnerCreditView
   }
 
   /** @param array<string,mixed> $report */
-  public function report(array $report, bool $canOpen): string
+  public function report(array $report, bool $canOpen, bool $canVoid = false): string
   {
     $ui = UI::class;
     $t = $report['totals'];
@@ -65,7 +65,7 @@ final class OwnerCreditView
       . ($hint !== '' ? '<p class="!sp-m-0 !sp-mt-0.5 !sp-text-[10px] !sp-text-service-muted">' . self::e($hint) . '</p>' : '') . '</div></article>';
     $html = '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 xl:!sp-grid-cols-5 !sp-gap-4 !sp-mb-5" data-owner-credit-total="' . (int) $t['count'] . '">'
       . $metric('Solicitudes', (string) $t['count'], $t['pendiente'] . ' pendientes de evaluar', 'document')
-      . $metric('Aprobados', (string) ($t['aprobado'] + $t['pagado']), $t['rechazado'] . ' rechazados · ' . $t['anulado'] . ' anulados', 'check')
+      . $metric('Aprobados', (string) ($t['aprobado'] + $t['pagado']), $t['rechazado'] . ' rechazados', 'check')
       . $metric('Tasa de aprobación', $t['approval_rate'] === null ? '—' : number_format($t['approval_rate'] * 100, 0) . ' %', 'Sobre créditos decididos', 'chart')
       . $metric('Monto aprobado', self::money($t['approved_amount']), 'Intereses: ' . self::money($t['interest']), 'cash')
       . $metric('Saldo vigente', self::money($t['outstanding']), $t['aprobado'] . ' créditos por pagar', 'clock')
@@ -90,7 +90,10 @@ final class OwnerCreditView
         . '<td class="' . $td . ' !sp-whitespace-nowrap">' . ($row['balance'] !== null ? self::money($row['balance']) : '—') . '</td>'
         . '<td class="' . $td . '">' . self::status((string) $row['status']) . ((int) $row['policy_override'] === 1 ? $small('Fuera de política') : '') . '</td>'
         . '<td class="' . $td . ' !sp-whitespace-nowrap">' . date('d/m/Y', (int) $row['created_at']) . ((int) $row['decided_at'] > 0 ? $small('Decidido ' . date('d/m/Y', (int) $row['decided_at'])) : '') . '</td>'
-        . '<td class="' . $td . '">' . ($canOpen ? '<button type="button" class="' . $ui::NAVY . ' !sp-whitespace-nowrap" data-owner-credit-open data-credit-id="' . (int) $row['id'] . '">' . $ui::icon('eye', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . 'Abrir liquidador</button>' : '') . '</td></tr>';
+        . '<td class="' . $td . '"><div class="!sp-flex !sp-flex-wrap !sp-gap-2" data-owner-credit-actions>'
+        . ($canOpen ? '<button type="button" class="' . $ui::NAVY . ' !sp-whitespace-nowrap" data-owner-credit-open data-credit-id="' . (int) $row['id'] . '">' . $ui::icon('eye', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . 'Ver solicitud</button>' : '')
+        . ($canVoid && $row['status'] === 'pendiente' ? '<button type="button" class="!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-3 !sp-py-2 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-red-200 !sp-text-red-700 !sp-text-xs !sp-font-semibold !sp-whitespace-nowrap !sp-cursor-pointer hover:!sp-bg-red-50" data-owner-credit-void data-credit-id="' . (int) $row['id'] . '">' . $ui::icon('close', '!sp-w-3 !sp-h-3') . 'Anular</button>' : '')
+        . '</div></td></tr>';
     }
     return $html . '</tbody></table></div></div>';
   }
