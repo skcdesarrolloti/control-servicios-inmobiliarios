@@ -78,6 +78,8 @@
       box.querySelector("[data-owner-credit-title]").textContent = title;
       box.querySelector("[data-owner-credit-subtitle]").textContent = subtitle;
       box.querySelector("[data-owner-credit-body]").innerHTML = html;
+      // Un visor de PDF que quedó abierto al cerrar el popup no debe tapar el contenido nuevo.
+      box.querySelectorAll("[data-owner-credit-pdf-viewer]").forEach(function (viewer) { viewer.remove(); });
       box.hidden = false;
       document.body.classList.add("scm-cia-modal-open");
       // El foco va al diálogo (no al botón cerrar): Tab recorre el formulario desde el inicio.
@@ -458,6 +460,7 @@
         viewer.remove();
         if (url) URL.revokeObjectURL(url);
         restore();
+        if (options.onClose) options.onClose();
       });
       var body = options.data;
       body.set("action", options.action);
@@ -522,6 +525,18 @@
             .then(function () { loadReport(true); })
             .catch(function (error) { voidButton.disabled = false; showModal("No se pudo anular", "", message(error.message, "error")); });
         });
+        return;
+      }
+
+      // Pagaré firmado desde el listado: se ve en el visor del popup, sin abrir el liquidador.
+      var listPromissory = target.closest("[data-owner-credit-list-promissory]");
+      if (listPromissory) {
+        event.preventDefault();
+        var number = listPromissory.getAttribute("data-number") || "";
+        var listRequest = new FormData();
+        listRequest.set("promissory_id", listPromissory.getAttribute("data-owner-credit-list-promissory"));
+        showModal("Pagaré " + number + " firmado", listPromissory.getAttribute("data-owner") || "", "");
+        showPdf(listPromissory, { title: "Pagaré " + number + " firmado", back: "Cerrar", action: "scm_owner_credit_promissory_pdf", data: listRequest, filename: "pagare-" + number + "-firmado.pdf", onClose: closeModal });
         return;
       }
 

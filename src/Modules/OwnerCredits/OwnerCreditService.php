@@ -775,6 +775,13 @@ final class OwnerCreditService
       }
     }
     unset($row);
+    // Pagaré firmado del beneficiario: sirve para todos sus créditos, así que se muestra en cada fila.
+    $signed = $this->promissory()->signedByDocuments(array_map(static fn(array $row): string => (string) ($row['owner_document'] ?? ''), $rows));
+    foreach ($rows as &$row) {
+      $row['promissory_id'] = $signed[OwnerCreditPromissoryService::normalizeDocument((string) ($row['owner_document'] ?? ''))] ?? 0;
+      $row['promissory_number'] = $row['promissory_id'] > 0 ? OwnerCreditPromissoryService::number($row['promissory_id']) : '';
+    }
+    unset($row);
     $decided = $totals['aprobado'] + $totals['pagado'] + $totals['rechazado'];
     return [
       'rows' => $rows,

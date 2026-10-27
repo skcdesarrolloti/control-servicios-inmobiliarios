@@ -81,6 +81,22 @@ final class OwnerCreditPromissoryService
     return is_array($row) ? $row : null;
   }
 
+  /**
+   * Último pagaré firmado de cada documento, para el listado de créditos.
+   * @param list<string> $documents @return array<string,int> documento normalizado => id del pagaré
+   */
+  public function signedByDocuments(array $documents): array
+  {
+    $documents = array_values(array_unique(array_filter(array_map([self::class, 'normalizeDocument'], $documents))));
+    if ($documents === []) return [];
+    $this->ensureSchema();
+    $signed = [];
+    foreach ($this->db->getResults("SELECT `id`, `owner_document` FROM `{$this->table()}` WHERE `status` = 'firmado' AND `owner_document` IN (" . implode(',', array_fill(0, count($documents), '?')) . ') ORDER BY `id` DESC', $documents) as $row) {
+      $signed[(string) $row['owner_document']] ??= (int) $row['id'];
+    }
+    return $signed;
+  }
+
   /** @return array<string,mixed> */
   public function find(int $id): array
   {

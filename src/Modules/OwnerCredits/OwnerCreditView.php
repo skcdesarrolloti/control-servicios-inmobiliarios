@@ -92,6 +92,7 @@ final class OwnerCreditView
         . '<td class="' . $td . ' !sp-whitespace-nowrap">' . date('d/m/Y', (int) $row['created_at']) . ((int) $row['decided_at'] > 0 ? $small('Decidido ' . date('d/m/Y', (int) $row['decided_at'])) : '') . '</td>'
         . '<td class="' . $td . '"><div class="!sp-flex !sp-flex-wrap !sp-gap-2" data-owner-credit-actions>'
         . ($canOpen ? '<button type="button" class="' . $ui::NAVY . ' !sp-whitespace-nowrap" data-owner-credit-open data-credit-id="' . (int) $row['id'] . '">' . $ui::icon('eye', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . 'Ver solicitud</button>' : '')
+        . ($canOpen && (int) ($row['promissory_id'] ?? 0) > 0 ? '<button type="button" class="' . $ui::SECONDARY . ' !sp-whitespace-nowrap" data-owner-credit-list-promissory="' . (int) $row['promissory_id'] . '" data-number="' . self::e($row['promissory_number']) . '" data-owner="' . self::e($row['owner_name']) . '" title="' . self::e('Pagaré ' . $row['promissory_number'] . ' firmado') . '">' . $ui::icon('document', '!sp-w-3 !sp-h-3') . 'Pagaré</button>' : '')
         . ($canVoid && $row['status'] === 'pendiente' ? '<button type="button" class="!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-3 !sp-py-2 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-red-200 !sp-text-red-700 !sp-text-xs !sp-font-semibold !sp-whitespace-nowrap !sp-cursor-pointer hover:!sp-bg-red-50" data-owner-credit-void data-credit-id="' . (int) $row['id'] . '">' . $ui::icon('close', '!sp-w-3 !sp-h-3') . 'Anular</button>' : '')
         . '</div></td></tr>';
     }
