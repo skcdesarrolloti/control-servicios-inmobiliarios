@@ -1,6 +1,40 @@
 # Plantillas de WhatsApp de créditos a propietarios
 
-## Plantilla para el propietario
+## Plantilla para el propietario al registrar la solicitud
+
+Se envía al **propietario** cuando se registra su solicitud de crédito, desde **Nueva solicitud** o desde una cotización con financiación **Sí**. Confirma que la recibimos; no es una aprobación. Solo se envía si en **Configuración** de créditos está activo **WhatsApp al propietario al registrar la solicitud**. El correo de confirmación sale aparte, con su propia opción.
+
+- Nombre exacto: `scm_credito_propietario_solicitud_v1`.
+- Categoría: **Utilidad** (`UTILITY`): confirma una solicitud que hizo el propietario.
+- Idioma: **Español (Colombia)** (`es_CO`).
+- Variables: **numéricas**.
+- Encabezado: ninguno.
+- Pie de página: `SKC SuCasa Inmobiliaria`.
+- Botones: ninguno.
+
+No le agregues frases de oferta ("aprovecha", "preaprobado", "crédito disponible"): Meta la reclasificaría como marketing.
+
+### Cuerpo para copiar
+
+```text
+Buen día, {{1}}.
+
+Recibimos su solicitud de crédito por {{2}} asociada al contrato #{{3}}.
+
+La vamos a evaluar y le informaremos el resultado por este medio.
+```
+
+### Variables
+
+| Variable | Qué envía el panel | Ejemplo |
+| --- | --- | --- |
+| 1 | Nombre del propietario | David Esquivia Polo |
+| 2 | Valor solicitado y plazo | $893.723 a 12 meses |
+| 3 | Número del contrato | 817 |
+
+La definición para la API está en `whatsapp-credito-propietario-solicitud-template.json`.
+
+## Plantilla para el propietario al decidir
 
 Se envía al **propietario del contrato** cuando un funcionario aprueba o rechaza su solicitud de crédito en el liquidador. El número es el `celular_propietario` del contrato de arrendamiento, con su `indicativo_propietario`. Solo se envía si en **Métricas › Créditos a propietarios › Configuración** está activo **WhatsApp**. El correo con las condiciones y la tabla de amortización sale aparte.
 

@@ -1640,6 +1640,61 @@ final class OwnerCreditService
       'solicitado:' . $id);
     $this->notifyStaffWhatsapp(self::EVENT_REQUESTED, $credit, 'Nueva solicitud de crédito',
       'Solicita ' . $money . ((int) $credit['quote_id'] > 0 ? ' para la cotización #' . $credit['quote_id'] : '') . '. Revísala en el liquidador');
+    $this->notifyOwnerRequested($credit);
+  }
+
+  /**
+   * Confirmación al propietario de que su solicitud quedó registrada (correo y WhatsApp, cada uno configurable).
+   * Una solicitud reabierta desde la cotización vuelve a avisar.
+   * @return array{email:int,whatsapp:int}
+   */
+  private function notifyOwnerRequested(array $credit): array
+  {
+    $settings = $this->config();
+    $queued = ['email' => 0, 'whatsapp' => 0];
+    $request = '$' . number_format((float) $credit['requested_amount'], 0, ',', '.') . ((int) $credit['requested_term'] > 0 ? ' a ' . (int) $credit['requested_term'] . ' meses' : '');
+    $dedupe = (int) $credit['id'] . ':' . (int) $credit['updated_at'];
+    try {
+      if ($settings['notify_owner_request_email'] && filter_var($credit['owner_email'], FILTER_VALIDATE_EMAIL)) {
+        $title = 'Recibimos su solicitud de crédito';
+        $queued['email'] = (new EmailQueue($this->db))->enqueue([$credit['owner_email']], $title . ' · Contrato ' . $credit['contract_code'], EmailTemplate::render($title, self::ownerRequestEmailBody($credit)), [
+          'source_module' => 'creditos_propietarios', 'destination_name' => $credit['owner_name'],
+          'dedupe_key' => 'owner-credit-request:' . $dedupe, 'meta' => ['credit_id' => (int) $credit['id'], 'status' => 'pendiente'],
+        ]);
+      }
+      if ($settings['notify_owner_request_whatsapp'] && trim((string) $credit['owner_phone']) !== '') {
+        $params = [$credit['owner_name'] ?: 'Propietario', $request, (string) $credit['contract_code']];
+        $ok = (new SmsQueue($this->db))->enqueue((string) $credit['owner_phone'], (string) $credit['owner_name'], 'Recibimos su solicitud de crédito por ' . $request . ' (contrato #' . $credit['contract_code'] . ').', [
+          'source_module' => 'creditos_propietarios', 'dedupe_key' => 'owner-credit-request-wa:' . $dedupe,
+          'template_name' => 'scm_credito_propietario_solicitud_v1', 'template_language' => 'es_CO',
+          'template_components' => [['type' => 'body', 'parameters' => array_map(static fn(string $text): array => ['type' => 'text', 'text' => mb_substr(trim($text), 0, 300)], $params)]],
+          'credit_id' => (int) $credit['id'],
+        ]);
+        $queued['whatsapp'] = $ok ? 1 : 0;
+      }
+    } catch (\Throwable $error) {
+      error_log('[owner-credit-request-owner] ' . $error->getMessage());
+    }
+    return $queued;
+  }
+
+  private static function ownerRequestEmailBody(array $credit): string
+  {
+    $e = static fn($value): string => EmailTemplate::e((string) $value);
+    $rows = [
+      'Valor solicitado' => '$' . number_format((float) $credit['requested_amount'], 0, ',', '.'),
+      'Plazo solicitado' => (int) $credit['requested_term'] > 0 ? (int) $credit['requested_term'] . ' meses' : '',
+      'Destinación' => (string) $credit['purpose'],
+      'Contrato' => '#' . $credit['contract_code'] . ((string) $credit['property'] !== '' ? ' · Inmueble ' . $credit['property'] : ''),
+    ];
+    $list = '';
+    foreach ($rows as $label => $value) if ($value !== '') $list .= $e($label) . ': <b>' . $e($value) . '</b><br>';
+    return '<p style="margin:0 0 14px;font-weight:600;">Apreciado(a) ' . $e($credit['owner_name'] ?: 'propietario') . ':</p>'
+      . '<p style="margin:0 0 14px;line-height:1.65;">Recibimos su solicitud de crédito con estos datos:</p>'
+      . '<p style="margin:0 0 14px;line-height:1.8;">' . $list . '</p>'
+      . '<p style="margin:0 0 14px;line-height:1.65;">La vamos a evaluar y le informaremos el resultado por este medio.</p>'
+      . '<p style="margin:0 0 14px;line-height:1.65;font-size:12px;color:#475569;">' . $e(self::DISCLAIMER) . '</p>'
+      . '<p style="margin:0;line-height:1.65;">Cordialmente,<br><b>SKC SuCasa Inmobiliaria</b></p>';
   }
 
   /** @return array{email:int,whatsapp:int,internal:int,internal_whatsapp:int} */

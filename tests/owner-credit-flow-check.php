@@ -518,5 +518,10 @@ $requirePromissory(false);
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
 $template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-funcionario-v2-template.json'), true);
 $check(str_contains($source, "'" . $template['name'] . "'") && substr_count($template['components'][0]['text'], '{{') === 6, 'staff template name and its six variables match the code');
+$ownerTemplate = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-solicitud-template.json'), true);
+$check(str_contains($source, "'" . $ownerTemplate['name'] . "'") && substr_count($ownerTemplate['components'][0]['text'], '{{') === 3, 'owner request template name and its three variables match the code');
+$requestBody = (new ReflectionMethod(OwnerCreditService::class, 'ownerRequestEmailBody'))->invoke(null, ['owner_name' => 'Ana <b>', 'requested_amount' => 893723, 'requested_term' => 10, 'purpose' => 'Pago de Impuestos', 'contract_code' => '817', 'property' => '10420']);
+$check(str_contains($requestBody, '$893.723') && str_contains($requestBody, '10 meses') && str_contains($requestBody, 'Pago de Impuestos') && str_contains($requestBody, 'Ana &lt;b&gt;') && str_contains($requestBody, 'No constituyen una aprobación'), 'the owner gets a request confirmation with amount, term, purpose and the disclaimer');
+$check(\SCM\Modules\OwnerCredits\OwnerCreditSettings::normalize([])['notify_owner_request_email'] === true && \SCM\Modules\OwnerCredits\OwnerCreditSettings::normalize([])['notify_owner_request_whatsapp'] === false, 'the owner request email is on and the WhatsApp is off by default');
 
 echo "Owner credit flow checks passed.\n";

@@ -49,6 +49,8 @@ final class OwnerCreditSettings
       'default_term' => 12,
       // Aprobar exige el pagaré en blanco y la carta de instrucciones firmados por cada firmante elegido.
       'require_promissory' => true,
+      'notify_owner_request_email' => true,
+      'notify_owner_request_whatsapp' => false,
       'notify_owner_email' => true,
       'notify_owner_whatsapp' => false,
       'notify_staff_whatsapp' => true,
@@ -114,6 +116,8 @@ final class OwnerCreditSettings
       'term_margin_months' => $int($input['term_margin_months'] ?? null, $defaults['term_margin_months'], 0, 12),
       'default_term' => $int($input['default_term'] ?? null, $defaults['default_term'], 1, 60),
       'require_promissory' => $bool($input['require_promissory'] ?? null, $defaults['require_promissory']),
+      'notify_owner_request_email' => $bool($input['notify_owner_request_email'] ?? null, $defaults['notify_owner_request_email']),
+      'notify_owner_request_whatsapp' => $bool($input['notify_owner_request_whatsapp'] ?? null, $defaults['notify_owner_request_whatsapp']),
       'notify_owner_email' => $bool($input['notify_owner_email'] ?? null, $defaults['notify_owner_email']),
       'notify_owner_whatsapp' => $bool($input['notify_owner_whatsapp'] ?? null, $defaults['notify_owner_whatsapp']),
       'notify_staff_whatsapp' => $bool($input['notify_staff_whatsapp'] ?? null, $defaults['notify_staff_whatsapp']),

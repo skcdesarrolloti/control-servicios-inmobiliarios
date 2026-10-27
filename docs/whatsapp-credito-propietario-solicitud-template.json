@@ -1,0 +1,24 @@
+{
+  "name": "scm_credito_propietario_solicitud_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Buen día, {{1}}.\n\nRecibimos su solicitud de crédito por {{2}} asociada al contrato #{{3}}.\n\nLa vamos a evaluar y le informaremos el resultado por este medio.",
+      "example": {
+        "body_text": [
+          [
+            "David Esquivia Polo",
+            "$893.723 a 12 meses",
+            "817"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    }
+  ]
+}
