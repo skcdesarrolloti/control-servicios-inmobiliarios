@@ -2309,7 +2309,7 @@ trait HandlesMaintenanceActions
   {
     $this->verifyCsrf();
     if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') || !$this->canUseDashboardAction('quote_delete')) {
-      $this->jsonFail('No tienes permiso para eliminar cotizaciones.');
+      $this->jsonFail('No tienes permiso para desaprobar o anular cotizaciones.');
     }
 
     $cotizacionId = (int) ($_POST['id_cotizacion'] ?? 0);
@@ -2333,7 +2333,7 @@ trait HandlesMaintenanceActions
     }
     $currentEstado = strtolower(trim((string) ($row['estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? '')));
     if (!in_array($currentEstado, ['', 'esperando respuesta'], true)) {
-      $this->jsonFail('Solo se puede eliminar/desaprobar una cotizacion sin estado o en Esperando respuesta.');
+      $this->jsonFail('Solo se puede desaprobar/anular una cotización sin estado o en Esperando respuesta.');
     }
 
     $now = time();
@@ -2341,7 +2341,7 @@ trait HandlesMaintenanceActions
       'estado' => 'Desaprobada',
       'se_envio' => 'Si',
       'motivo' => $motivo,
-      'observacion_respuesta' => $observacion !== '' ? $observacion : 'Cotizacion eliminada desde el panel.',
+      'observacion_respuesta' => $observacion !== '' ? $observacion : 'Cotización desaprobada/anulada desde el panel.',
       'fecha_respuesta' => $now,
       'fecha_envio' => $now,
     ];
@@ -2352,7 +2352,7 @@ trait HandlesMaintenanceActions
     \SCM\Support\CurrentQuote::syncTicketForQuote($this->db, $cotizacionId);
 
     $this->jsonOk([
-      'message' => 'Cotizacion eliminada/desaprobada correctamente.',
+      'message' => 'Cotización desaprobada/anulada correctamente.',
       'id_cotizacion' => (string) $cotizacionId,
     ]);
   }

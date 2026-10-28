@@ -856,7 +856,7 @@ final class SuCasaControlServiciosInmobiliarios
           'quote_fee_configure' => 'Configurar honorarios de cotización (% de administración sugerido)',
           'quote_respond' => 'Responder cotización',
           'quote_approve' => 'Marcar cotización como aprobada',
-          'quote_delete' => 'Eliminar/desaprobar cotización',
+          'quote_delete' => 'Desaprobar/anular cotización',
           'quote_repair_followup' => 'Seguimiento de reparaciones',
           'quote_order_view' => 'Ver órdenes de cotización',
           'quote_order_create' => 'Añadir orden de mantenimiento',

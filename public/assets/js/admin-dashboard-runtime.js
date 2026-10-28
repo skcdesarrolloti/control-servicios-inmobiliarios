@@ -25680,10 +25680,10 @@
           return;
         }
         window.Swal.fire({
-          title: "Eliminar cotización",
+          title: "Desaprobar / anular cotización",
           html:
             '<div class="scm-cotizacion-delete-form">' +
-            '<p class="scm-cotizacion-dialog-intro scm-cotizacion-delete-intro">Esta acción retirará la cotización del caso y dejará trazabilidad del motivo registrado.</p>' +
+            '<p class="scm-cotizacion-dialog-intro scm-cotizacion-delete-intro">La cotización no se borra: quedará como <strong>Desaprobada</strong> con el motivo y la observación que registres, y dejará de ser la cotización vigente del caso.</p>' +
             '<label class="scm-cotizacion-dialog-field"><span>Motivo <em>*</em></span><select id="swal-del-motivo"><option value="">Elige una opción</option><option value="Por costo">Por costo</option><option value="Ejecución por cuenta propia">Ejecución por cuenta propia</option><option value="Duplicada">Duplicada</option><option value="Error de registro">Error de registro</option></select></label>' +
             '<label class="scm-cotizacion-dialog-field is-wide"><span>Observaciones a la cotización</span><textarea id="swal-del-observacion" rows="5" placeholder="Agrega una observación para complementar el motivo."></textarea><small>Esta observación queda asociada al historial de la cotización.</small></label>' +
             "</div>",
@@ -25693,7 +25693,7 @@
           allowOutsideClick: false,
           allowEscapeKey: false,
           buttonsStyling: false,
-          confirmButtonText: "Eliminar cotización",
+          confirmButtonText: "Desaprobar / anular",
           cancelButtonText: "Cancelar",
           customClass: {
             popup: "scm-cotizacion-dialog scm-cotizacion-delete-swal",
