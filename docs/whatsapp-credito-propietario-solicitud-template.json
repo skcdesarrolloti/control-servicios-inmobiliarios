@@ -1,16 +1,16 @@
 {
-  "name": "scm_credito_propietario_solicitud_v1",
+  "name": "scm_credito_propietario_solicitud_v2",
   "language": "es_CO",
   "category": "UTILITY",
   "components": [
     {
       "type": "BODY",
-      "text": "Buen día, {{1}}.\n\nRecibimos su solicitud de crédito por {{2}} asociada al contrato #{{3}}.\n\nLa vamos a evaluar y le informaremos el resultado por este medio.",
+      "text": "Buen día, {{1}}.\n\nUsted realizó una solicitud de crédito por {{2}} asociada al contrato #{{3}}.\n\nRecuerde que el crédito queda sujeto a estudio, verificación y aprobación. Le informaremos el resultado por este medio.",
       "example": {
         "body_text": [
           [
             "David Esquivia Polo",
-            "$893.723 a 12 meses",
+            "$893.723 a 12 meses para financiar la cotización #574",
             "817"
           ]
         ]

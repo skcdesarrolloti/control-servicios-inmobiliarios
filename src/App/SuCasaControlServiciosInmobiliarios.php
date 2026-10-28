@@ -547,7 +547,12 @@ final class SuCasaControlServiciosInmobiliarios
         'items' => [
           'credito_propietario_solicitado' => [
             'label' => 'Solicitud de crédito',
-            'description' => 'Cuando una cotización queda con financiación Sí (respuesta del propietario o cambio desde el panel) o se crea un crédito manual. Avisa para revisarlo en el liquidador. El WhatsApp se activa en la configuración de créditos.',
+            'description' => 'Cuando se registra una solicitud desde Nueva solicitud de crédito. Avisa el valor, el plazo, la destinación y quién la registró para revisarla en el liquidador. El WhatsApp se activa en la configuración de créditos.',
+            'channel' => 'Email y WhatsApp en cola',
+          ],
+          'credito_propietario_cotizacion' => [
+            'label' => 'Solicitud de crédito desde cotización',
+            'description' => 'Cuando una cotización queda con financiación Sí al responderla (o al cambiarla desde el panel). Avisa la cotización, el caso, el valor y quién registró la respuesta para revisarla en el liquidador. El WhatsApp se activa en la configuración de créditos.',
             'channel' => 'Email y WhatsApp en cola',
           ],
           'credito_propietario_pagare_firmado' => [

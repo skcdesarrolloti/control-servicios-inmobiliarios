@@ -57,6 +57,8 @@ final class OwnerCreditService
     'otros' => 'Otros descuentos',
   ];
   public const EVENT_REQUESTED = 'credito_propietario_solicitado';
+  /** Solicitud que nace al responder una cotización con financiación Sí: tiene sus propios funcionarios. */
+  public const EVENT_QUOTE_REQUESTED = 'credito_propietario_cotizacion';
   public const EVENT_DECIDED = 'credito_propietario_decidido';
   private const MIN_NOTE = 10;
 
@@ -241,12 +243,12 @@ final class OwnerCreditService
       if ($financing === 'si') {
         if ($credit === null) {
           $id = $this->createFromQuote($quoteId, $actor);
-          if ($id > 0) $this->notifyRequested($id);
+          if ($id > 0) $this->notifyRequested($id, $actor);
         } elseif ($credit['status'] === 'anulado') {
           $this->setStatus((int) $credit['id'], 'pendiente', ['closed_at' => null]);
           $this->event((int) $credit['id'], 'reabierto', $actor, ['motivo' => 'La cotización volvió a quedar con financiación Sí.']);
           $this->recordRequestHistory((int) $credit['id'], $actor, true);
-          $this->notifyRequested((int) $credit['id']);
+          $this->notifyRequested((int) $credit['id'], $actor);
         }
       } elseif ($financing === 'no' && $credit !== null && $credit['status'] === 'pendiente') {
         $this->setStatus((int) $credit['id'], 'anulado', ['closed_at' => time()]);
@@ -292,7 +294,7 @@ final class OwnerCreditService
     $id = $this->insertCredit($contract, null, '', $amount, $purpose, $actor, $term, $owner, $beneficiaryType);
     // La fecha fin corregida en el formulario se guarda en el contrato (con historial).
     if ($endTs !== $storedEnd) $this->saveContractEnd($this->find($id) ?? [], $endTs, $actor);
-    $this->notifyRequested($id);
+    $this->notifyRequested($id, $actor);
     return $id;
   }
 
@@ -1367,7 +1369,7 @@ final class OwnerCreditService
       if ($portfolio !== []) $term = (int) OwnerCreditCalculator::preapproval($portfolio, $this->config())['max_term'];
     } catch (\InvalidArgumentException) {
     }
-    return $this->insertCredit($contract, $quoteId, (string) ($quote['id_ticket'] ?? ''), self::money($quote['total'] ?? ''), 'Para Mejoras y/o Reparaciones al Inmueble', $actor, $term);
+    return $this->insertCredit($contract, $quoteId, (string) ($quote['id_ticket'] ?? ''), self::money($quote['total'] ?? ''), 'Reparaciones y mantenimiento', $actor, $term);
   }
 
   /** @param array<string,string>|null $owner beneficiario elegido (contractOwners); sin él, el propietario del contrato */
@@ -1629,18 +1631,43 @@ final class OwnerCreditService
     }
   }
 
-  private function notifyRequested(int $id): void
+  /**
+   * Aviso de una solicitud nueva (o reabierta). La manual va a los funcionarios de "Solicitud de crédito"; la que nace
+   * al responder una cotización va a los de "Solicitud de crédito desde cotización", con la cotización y quién la respondió.
+   * @param array{employee_id?:string,name?:string} $actor quien registró la solicitud o la respuesta de la cotización
+   */
+  private function notifyRequested(int $id, array $actor = []): void
   {
     $credit = $this->find($id);
     if ($credit === null) return;
-    $money = '$' . number_format((float) $credit['requested_amount'], 0, ',', '.');
-    $this->notifyInternal(self::EVENT_REQUESTED, 'Solicitud de crédito de propietario #' . $id,
-      'El propietario ' . $credit['owner_name'] . ' solicitó financiar ' . $money . ' (contrato ' . $credit['contract_code'] . ', inmueble ' . $credit['property'] . ')'
-      . ((int) $credit['quote_id'] > 0 ? ' para la cotización #' . $credit['quote_id'] . '.' : '.') . ' Revísalo en el liquidador de créditos.',
-      'solicitado:' . $id);
-    $this->notifyStaffWhatsapp(self::EVENT_REQUESTED, $credit, 'Nueva solicitud de crédito',
-      'Solicita ' . $money . ((int) $credit['quote_id'] > 0 ? ' para la cotización #' . $credit['quote_id'] : '') . '. Revísala en el liquidador');
+    $request = self::requestText($credit);
+    $by = trim((string) ($actor['name'] ?? '')) ?: ((string) $credit['created_by_name'] ?: 'el panel');
+    $where = 'contrato ' . $credit['contract_code'] . ((string) $credit['property'] !== '' ? ', inmueble ' . $credit['property'] : '');
+    $reference = 'solicitado:' . $id . ':' . (int) $credit['updated_at'];
+    $quoteId = (int) $credit['quote_id'];
+    if ($quoteId > 0) {
+      $ticket = trim((string) $credit['ticket_id']);
+      $this->notifyInternal(self::EVENT_QUOTE_REQUESTED, 'Crédito solicitado al responder la cotización #' . $quoteId,
+        'El propietario ' . $credit['owner_name'] . ' respondió la cotización #' . $quoteId . ($ticket !== '' ? ' del caso ' . $ticket : '') . ' pidiendo financiarla con un crédito por ' . $request . ' (' . $where . ').'
+        . ' Registró la respuesta: ' . $by . '. Revisa la solicitud #' . $id . ' en el liquidador de créditos: queda sujeta a estudio, verificación y aprobación.',
+        $reference);
+      $this->notifyStaffWhatsapp(self::EVENT_QUOTE_REQUESTED, $credit, 'Crédito desde cotización',
+        'Respondió la cotización #' . $quoteId . ' pidiendo financiarla por ' . $request . '. Registró la respuesta ' . $by . '. Revísala en el liquidador');
+    } else {
+      $this->notifyInternal(self::EVENT_REQUESTED, 'Solicitud de crédito de propietario #' . $id,
+        'El propietario ' . $credit['owner_name'] . ' solicitó un crédito por ' . $request . ((string) $credit['purpose'] !== '' ? ', destinación ' . $credit['purpose'] : '') . ' (' . $where . ').'
+        . ' Registró: ' . $by . '. Revísala en el liquidador de créditos: queda sujeta a estudio, verificación y aprobación.',
+        $reference);
+      $this->notifyStaffWhatsapp(self::EVENT_REQUESTED, $credit, 'Nueva solicitud de crédito',
+        'Solicita ' . $request . '. Registró ' . $by . '. Revísala en el liquidador');
+    }
     $this->notifyOwnerRequested($credit);
+  }
+
+  /** "$893.723 a 12 meses": valor y plazo solicitados. */
+  private static function requestText(array $credit): string
+  {
+    return '$' . number_format((float) $credit['requested_amount'], 0, ',', '.') . ((int) $credit['requested_term'] > 0 ? ' a ' . (int) $credit['requested_term'] . ' meses' : '');
   }
 
   /**
@@ -1652,11 +1679,12 @@ final class OwnerCreditService
   {
     $settings = $this->config();
     $queued = ['email' => 0, 'whatsapp' => 0];
-    $request = '$' . number_format((float) $credit['requested_amount'], 0, ',', '.') . ((int) $credit['requested_term'] > 0 ? ' a ' . (int) $credit['requested_term'] . ' meses' : '');
+    // Desde una cotización se dice qué financia: "$893.723 a 12 meses para financiar la cotización #574".
+    $request = self::requestText($credit) . ((int) ($credit['quote_id'] ?? 0) > 0 ? ' para financiar la cotización #' . (int) $credit['quote_id'] : '');
     $dedupe = (int) $credit['id'] . ':' . (int) $credit['updated_at'];
     try {
       if ($settings['notify_owner_request_email'] && filter_var($credit['owner_email'], FILTER_VALIDATE_EMAIL)) {
-        $title = 'Recibimos su solicitud de crédito';
+        $title = 'Usted realizó una solicitud de crédito';
         $queued['email'] = (new EmailQueue($this->db))->enqueue([$credit['owner_email']], $title . ' · Contrato ' . $credit['contract_code'], EmailTemplate::render($title, self::ownerRequestEmailBody($credit)), [
           'source_module' => 'creditos_propietarios', 'destination_name' => $credit['owner_name'],
           'dedupe_key' => 'owner-credit-request:' . $dedupe, 'meta' => ['credit_id' => (int) $credit['id'], 'status' => 'pendiente'],
@@ -1664,9 +1692,9 @@ final class OwnerCreditService
       }
       if ($settings['notify_owner_request_whatsapp'] && trim((string) $credit['owner_phone']) !== '') {
         $params = [$credit['owner_name'] ?: 'Propietario', $request, (string) $credit['contract_code']];
-        $ok = (new SmsQueue($this->db))->enqueue((string) $credit['owner_phone'], (string) $credit['owner_name'], 'Recibimos su solicitud de crédito por ' . $request . ' (contrato #' . $credit['contract_code'] . ').', [
+        $ok = (new SmsQueue($this->db))->enqueue((string) $credit['owner_phone'], (string) $credit['owner_name'], 'Usted realizó una solicitud de crédito por ' . $request . ' (contrato #' . $credit['contract_code'] . '). El crédito queda sujeto a estudio, verificación y aprobación.', [
           'source_module' => 'creditos_propietarios', 'dedupe_key' => 'owner-credit-request-wa:' . $dedupe,
-          'template_name' => 'scm_credito_propietario_solicitud_v1', 'template_language' => 'es_CO',
+          'template_name' => 'scm_credito_propietario_solicitud_v2', 'template_language' => 'es_CO',
           'template_components' => [['type' => 'body', 'parameters' => array_map(static fn(string $text): array => ['type' => 'text', 'text' => mb_substr(trim($text), 0, 300)], $params)]],
           'credit_id' => (int) $credit['id'],
         ]);
@@ -1681,7 +1709,9 @@ final class OwnerCreditService
   private static function ownerRequestEmailBody(array $credit): string
   {
     $e = static fn($value): string => EmailTemplate::e((string) $value);
+    $quoteId = (int) ($credit['quote_id'] ?? 0);
     $rows = [
+      'Cotización' => $quoteId > 0 ? '#' . $quoteId : '',
       'Valor solicitado' => '$' . number_format((float) $credit['requested_amount'], 0, ',', '.'),
       'Plazo solicitado' => (int) $credit['requested_term'] > 0 ? (int) $credit['requested_term'] . ' meses' : '',
       'Destinación' => (string) $credit['purpose'],
@@ -1690,9 +1720,9 @@ final class OwnerCreditService
     $list = '';
     foreach ($rows as $label => $value) if ($value !== '') $list .= $e($label) . ': <b>' . $e($value) . '</b><br>';
     return '<p style="margin:0 0 14px;font-weight:600;">Apreciado(a) ' . $e($credit['owner_name'] ?: 'propietario') . ':</p>'
-      . '<p style="margin:0 0 14px;line-height:1.65;">Recibimos su solicitud de crédito con estos datos:</p>'
+      . '<p style="margin:0 0 14px;line-height:1.65;">' . ($quoteId > 0 ? 'Al responder la cotización #' . $quoteId . ' usted realizó una solicitud de crédito para financiarla' : 'Usted realizó una solicitud de crédito') . ' con estos datos:</p>'
       . '<p style="margin:0 0 14px;line-height:1.8;">' . $list . '</p>'
-      . '<p style="margin:0 0 14px;line-height:1.65;">La vamos a evaluar y le informaremos el resultado por este medio.</p>'
+      . '<p style="margin:0 0 14px;line-height:1.65;">Recuerde que el crédito queda <b>sujeto a estudio, verificación y aprobación</b>. Le informaremos el resultado por este medio.</p>'
       . '<p style="margin:0 0 14px;line-height:1.65;font-size:12px;color:#475569;">' . $e(self::DISCLAIMER) . '</p>'
       . '<p style="margin:0;line-height:1.65;">Cordialmente,<br><b>SKC SuCasa Inmobiliaria</b></p>';
   }

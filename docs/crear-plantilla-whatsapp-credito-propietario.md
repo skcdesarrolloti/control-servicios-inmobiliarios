@@ -2,9 +2,9 @@
 
 ## Plantilla para el propietario al registrar la solicitud
 
-Se envía al **propietario** cuando se registra su solicitud de crédito, desde **Nueva solicitud** o desde una cotización con financiación **Sí**. Confirma que la recibimos; no es una aprobación. Solo se envía si en **Configuración** de créditos está activo **WhatsApp al propietario al registrar la solicitud**. El correo de confirmación sale aparte, con su propia opción.
+Se envía al **propietario** cuando se registra su solicitud de crédito, desde **Nueva solicitud** o desde una cotización con financiación **Sí**. Le confirma que realizó la solicitud y le recuerda que queda sujeta a estudio, verificación y aprobación; no es una aprobación. Reemplaza a `scm_credito_propietario_solicitud_v1`. Solo se envía si en **Configuración** de créditos está activo **WhatsApp al propietario al registrar la solicitud**. El correo de confirmación sale aparte, con su propia opción.
 
-- Nombre exacto: `scm_credito_propietario_solicitud_v1`.
+- Nombre exacto: `scm_credito_propietario_solicitud_v2`.
 - Categoría: **Utilidad** (`UTILITY`): confirma una solicitud que hizo el propietario.
 - Idioma: **Español (Colombia)** (`es_CO`).
 - Variables: **numéricas**.
@@ -19,9 +19,9 @@ No le agregues frases de oferta ("aprovecha", "preaprobado", "crédito disponibl
 ```text
 Buen día, {{1}}.
 
-Recibimos su solicitud de crédito por {{2}} asociada al contrato #{{3}}.
+Usted realizó una solicitud de crédito por {{2}} asociada al contrato #{{3}}.
 
-La vamos a evaluar y le informaremos el resultado por este medio.
+Recuerde que el crédito queda sujeto a estudio, verificación y aprobación. Le informaremos el resultado por este medio.
 ```
 
 ### Variables
@@ -29,7 +29,7 @@ La vamos a evaluar y le informaremos el resultado por este medio.
 | Variable | Qué envía el panel | Ejemplo |
 | --- | --- | --- |
 | 1 | Nombre del propietario | David Esquivia Polo |
-| 2 | Valor solicitado y plazo | $893.723 a 12 meses |
+| 2 | Valor solicitado y plazo; si viene de una cotización, también cuál financia | $893.723 a 12 meses · $893.723 a 12 meses para financiar la cotización #574 |
 | 3 | Número del contrato | 817 |
 
 La definición para la API está en `whatsapp-credito-propietario-solicitud-template.json`.
