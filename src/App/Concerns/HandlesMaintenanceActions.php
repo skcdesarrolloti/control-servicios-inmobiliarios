@@ -3222,7 +3222,7 @@ trait HandlesMaintenanceActions
       }
       $porcentajeModificado = $sendTotals['porcentaje_admon_sugerido'] !== ''
         && abs((float) $sendTotals['porcentaje_admon'] - (float) $sendTotals['porcentaje_admon_sugerido']) >= 0.005;
-      // También va al historial aunque la tabla no haya aceptado las columnas.
+      $porcentajeAnterior = trim((string) ($quote['porcentaje_admon'] ?? ''));
       $quote = array_merge($quote, [
         'porcentaje_admon_modificado' => $porcentajeModificado ? 'Si' : 'No',
         'porcentaje_admon_modificado_por' => $porcentajeModificado ? $employeeId : '',
@@ -3257,6 +3257,20 @@ trait HandlesMaintenanceActions
       $quoteUpdate = $schema->filterTableData($quoteTable, $quoteUpdate);
       if (!empty($quoteUpdate)) {
         $this->db->update($quoteTable, $quoteUpdate, ['_ID' => $cotizacionId]);
+      }
+      // Registro interno de cambios: el historial del ticket lo ve el cliente.
+      try {
+        (new \SCM\Modules\QuoteFee\QuoteChangeLog($this->db))->record($cotizacionId, [
+          'id_ticket' => trim((string) ($quote['id_ticket'] ?? '')),
+          'campo' => 'porcentaje_admon',
+          'valor_anterior' => $porcentajeAnterior,
+          'valor_nuevo' => $sendTotals['porcentaje_admon'],
+          'valor_sugerido' => $sendTotals['porcentaje_admon_sugerido'],
+          'id_empleado' => $employeeId,
+          'empleado_nombre' => $actorName,
+        ]);
+      } catch (\Throwable $e) {
+        error_log('[cotizacion_mantenimiento_send] registro de cambios: ' . $e->getMessage());
       }
 
       $ticket = $this->maintenance_quote_ticket_row_for_quote($schema, $quote);
@@ -3440,7 +3454,6 @@ trait HandlesMaintenanceActions
     $actorPhone = trim((string) ($actor['phone'] ?? ''));
     $destinatario = trim((string) ($quote['destinatario'] ?? 'destinatario'));
     $message = 'Se envió la cotización de mantenimiento #' . $quoteId . ' a ' . ($destinatario !== '' ? $destinatario : 'destinatario') . ' por correo y WhatsApp. Quedó en Esperando respuesta.';
-    $message .= ' ' . $this->maintenance_quote_fee_trace_text($quote);
 
     $histTicketTable = $this->db->table('jet_cct_historial_del_ticket');
     if ($schema->tableExists($histTicketTable)) {
@@ -4809,19 +4822,6 @@ trait HandlesMaintenanceActions
       }
       unset($this->columnExistsCache[$table . '::' . $column]);
     }
-  }
-
-  /** "% de administración: 12 % (sugerido 15.3 %, ajustado por Ana)." para el historial del envío. */
-  private function maintenance_quote_fee_trace_text(array $quote): string
-  {
-    $pct = static fn(string $value): string => str_replace('.', ',', $value) . ' %';
-    $chosen = trim((string) ($quote['porcentaje_admon'] ?? ''));
-    $suggested = trim((string) ($quote['porcentaje_admon_sugerido'] ?? ''));
-    if ($chosen === '') return '';
-    if ($suggested === '') return '% de administración: ' . $pct($chosen) . '.';
-    if (($quote['porcentaje_admon_modificado'] ?? '') !== 'Si') return '% de administración: ' . $pct($chosen) . ' (el sugerido).';
-    $by = trim((string) ($quote['porcentaje_admon_modificado_por_nombre'] ?? ''));
-    return '% de administración: ' . $pct($chosen) . ' (sugerido ' . $pct($suggested) . ($by !== '' ? ', ajustado por ' . $by : ', ajustado') . ').';
   }
 
   private function ensure_magnitud_caso_column(string $table): bool

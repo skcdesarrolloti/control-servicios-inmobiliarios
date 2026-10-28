@@ -10805,6 +10805,68 @@
   overflow-wrap: anywhere;
 }
 
+#scm-app .scm-cotizacion-change-log {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+#scm-app .scm-cotizacion-change-log h4 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: #082247;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+#scm-app .scm-cotizacion-change-log h4 em {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+#scm-app .scm-cotizacion-change-log ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#scm-app .scm-cotizacion-change-log li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+  padding-top: 6px;
+  border-top: 1px dashed #e2e8f0;
+  font-size: 12px;
+}
+
+#scm-app .scm-cotizacion-change-log li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+#scm-app .scm-cotizacion-change-log li span {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+#scm-app .scm-cotizacion-change-log li small {
+  color: #64748b;
+  font-size: 11px;
+}
+
 #scm-app .scm-cotizacion-finance-grid .scm-cotizacion-fee-trace {
   display: block;
   margin-top: 4px;

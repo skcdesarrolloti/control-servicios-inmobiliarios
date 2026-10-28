@@ -4867,8 +4867,10 @@ trait RendersDashboard
       return '<div class="scm-empty scm-empty-cards">No hay cotizaciones con los filtros actuales.</div>';
     }
     $linkedTicketCards = $this->cotizacion_linked_ticket_cards_by_rows($rows);
+    $changes = (new \SCM\Modules\QuoteFee\QuoteChangeLog($this->db))->forQuotes(array_map(static fn(array $row): string => (string) ($row['_ID'] ?? ''), $rows));
     $html = '';
     foreach ($rows as $row) {
+      $row['_scm_cambios'] = $changes[trim((string) ($row['_ID'] ?? ''))] ?? [];
       $html .= $this->render_cotizacion_mantenimiento_card($row, $linkedTicketCards);
     }
     return $html;
@@ -4983,6 +4985,19 @@ trait RendersDashboard
         ? 'Sugerido ' . str_replace('.', ',', $sugeridoGuardado) . '%' . ($ajustadoPor !== '' ? ' · ajustado por ' . $ajustadoPor : ' · ajustado')
         : 'Igual al sugerido';
     }
+    // Registro interno de cambios (solo panel; no va al historial que ve el cliente).
+    $cambios = is_array($row['_scm_cambios'] ?? null)
+      ? $row['_scm_cambios']
+      : ((new \SCM\Modules\QuoteFee\QuoteChangeLog($this->db))->forQuotes([$id])[$id] ?? []);
+    $cambiosHtml = '';
+    foreach ($cambios as $cambio) {
+      $cuando = (int) ($cambio['created_at'] ?? 0) > 0 ? date('d/m/Y H:i', (int) $cambio['created_at']) : '';
+      $quien = trim((string) ($cambio['empleado_nombre'] ?? ''));
+      $cambiosHtml .= '<li><span>' . esc_html(\SCM\Modules\QuoteFee\QuoteChangeLog::describe($cambio)) . '</span><small>' . esc_html(trim($cuando . ($quien !== '' ? ' · ' . $quien : ''))) . '</small></li>';
+    }
+    if ($cambiosHtml !== '') {
+      $cambiosHtml = '<div class="scm-cotizacion-change-log"><h4>Registro de cambios <em>Solo visible en el panel</em></h4><ul>' . $cambiosHtml . '</ul></div>';
+    }
     $ivaAdmonPct = trim((string) ($row['iva'] ?? ''));
     $totalAdmonValue = $this->cotizacion_money_value($row, ['total_admon']);
     $ivaAdmonValue = $this->cotizacion_money_value($row, ['iva_admon']);
@@ -5079,7 +5094,7 @@ trait RendersDashboard
       . '<div class="scm-cotizacion-meta"><div><span>Fecha</span><strong>' . esc_html($fecha) . '</strong></div><div><span>Destinatario</span><strong>' . esc_html($destinatario !== '' ? $destinatario : '-') . '</strong></div><div><span>Contacto</span><strong>' . esc_html($contacto !== '' ? $contacto : '-') . '</strong></div><div><span>Creada por</span><strong>' . esc_html($empleado !== '' ? $empleado : '-') . '</strong></div><div><span>Ordenes</span><strong>' . esc_html($ordenesTotal) . '</strong></div></div>'
       . '<div class="scm-cotizacion-finance-actions"><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="saldos" aria-expanded="false">Ver saldos</button><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="totales" aria-expanded="false">Ver totales</button></div>'
       . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="saldos" hidden><div class="scm-cotizacion-finance-grid"><div><span>Saldo mano de obra</span><strong>' . esc_html($saldoObra) . '</strong></div><div><span>Saldo materiales</span><strong>' . esc_html($saldoMateriales) . '</strong></div><div><span>Saldo equipos</span><strong>' . esc_html($saldoMaquinarias) . '</strong></div><div><span>Saldo otros costos</span><strong>' . esc_html($saldoOtros) . '</strong></div></div></div>'
-      . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="totales" hidden><div class="scm-cotizacion-finance-grid"><div><span>Total mano de obra</span><strong>' . esc_html($totalObra) . '</strong></div><div><span>Total materiales</span><strong>' . esc_html($totalMateriales) . '</strong></div><div><span>Total equipos</span><strong>' . esc_html($totalMaquinarias) . '</strong></div><div><span>Total otros costos</span><strong>' . esc_html($totalOtros) . '</strong></div><div><span>Administraci&oacute;n' . ($porcentajeAdmon !== '' ? ' ' . esc_html($porcentajeAdmon) . '%' : '') . '</span><strong>' . esc_html($totalAdmon) . '</strong>' . ($porcentajeAdmonTraza !== '' ? '<small class="scm-cotizacion-fee-trace">' . esc_html($porcentajeAdmonTraza) . '</small>' : '') . '</div><div><span>IVA admon' . ($ivaAdmonPct !== '' ? ' ' . esc_html($ivaAdmonPct) . '%' : '') . '</span><strong>' . esc_html($ivaAdmon) . '</strong></div><div><span>Total admon + IVA</span><strong>' . esc_html($totalAdmonMasIva) . '</strong></div><div class="scm-cotizacion-finance-total"><span>Total cotizaci&oacute;n</span><strong>' . esc_html($totalCotizacion) . '</strong></div></div></div>'
+      . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="totales" hidden><div class="scm-cotizacion-finance-grid"><div><span>Total mano de obra</span><strong>' . esc_html($totalObra) . '</strong></div><div><span>Total materiales</span><strong>' . esc_html($totalMateriales) . '</strong></div><div><span>Total equipos</span><strong>' . esc_html($totalMaquinarias) . '</strong></div><div><span>Total otros costos</span><strong>' . esc_html($totalOtros) . '</strong></div><div><span>Administraci&oacute;n' . ($porcentajeAdmon !== '' ? ' ' . esc_html($porcentajeAdmon) . '%' : '') . '</span><strong>' . esc_html($totalAdmon) . '</strong>' . ($porcentajeAdmonTraza !== '' ? '<small class="scm-cotizacion-fee-trace">' . esc_html($porcentajeAdmonTraza) . '</small>' : '') . '</div><div><span>IVA admon' . ($ivaAdmonPct !== '' ? ' ' . esc_html($ivaAdmonPct) . '%' : '') . '</span><strong>' . esc_html($ivaAdmon) . '</strong></div><div><span>Total admon + IVA</span><strong>' . esc_html($totalAdmonMasIva) . '</strong></div><div class="scm-cotizacion-finance-total"><span>Total cotizaci&oacute;n</span><strong>' . esc_html($totalCotizacion) . '</strong></div></div>' . $cambiosHtml . '</div>'
       // Aviso (no acción): con los saldos en cero ya no se pueden registrar órdenes sobre esta cotización.
       . ($cotizacionAprobada && ($canQuoteOrderCreate || $canQuoteOrderView) && !$this->maintenance_order_has_balance($row) ? '<p class="scm-cotizacion-notice" role="status"><strong>Saldo agotado.</strong> Las órdenes registradas ya cubren todas las categorías de esta cotización; no se pueden añadir más órdenes.</p>' : '')
       . '<div class="scm-cotizacion-actions">'
