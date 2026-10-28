@@ -17,6 +17,7 @@ final class CollectionPortfolioService
 {
   private const IMPORT_VERSION = 'auxiliar-1380-v2';
   private const MONEY_TOLERANCE = 0.005;
+  private const MAX_AUXILIARY_ROWS = 50000;
 
   private Database $db;
   private SpreadsheetReader $reader;
@@ -67,7 +68,10 @@ final class CollectionPortfolioService
       return ['duplicate' => true, 'import_id' => $existing] + $this->dashboard();
     }
 
-    $rows = $this->reader->read($path, $name);
+    // El auxiliar 1380 completo supera el límite general de hojas de cálculo.
+    @set_time_limit(300);
+    @ini_set('memory_limit', '512M');
+    $rows = $this->reader->read($path, $name, self::MAX_AUXILIARY_ROWS);
     $parsed = $this->parseAuxiliary($rows);
     $accounts = (array) ($parsed['accounts'] ?? []);
     if ($accounts === []) {

@@ -12,8 +12,9 @@ final class SpreadsheetReader
   public const MAX_ROWS = 5000;
 
   /** @return array<int,array<int,mixed>> */
-  public function read(string $path, string $originalName): array
+  public function read(string $path, string $originalName, int $maxRows = self::MAX_ROWS): array
   {
+    $maxRows = max(1, $maxRows);
     if ($path === '' || !is_readable($path)) {
       throw new \RuntimeException('El archivo temporal no se puede leer.');
     }
@@ -24,19 +25,19 @@ final class SpreadsheetReader
       if (!$book->success()) {
         throw new \RuntimeException('No se pudo leer el archivo XLS: ' . (string) $book->error());
       }
-      $rows = $book->rows(0, self::MAX_ROWS + 1);
+      $rows = $book->rows(0, $maxRows + 1);
     } elseif ($extension === 'xlsx') {
       $book = SimpleXLSX::parseFile($path);
       if (!$book instanceof SimpleXLSX) {
         throw new \RuntimeException('No se pudo leer el archivo XLSX: ' . (string) SimpleXLSX::parseError());
       }
-      $rows = $book->rows(0, self::MAX_ROWS + 1);
+      $rows = $book->rows(0, $maxRows + 1);
     } else {
       throw new \RuntimeException('Formato no soportado. Sube un archivo .xls o .xlsx.');
     }
 
-    if (count($rows) > self::MAX_ROWS) {
-      throw new \RuntimeException('El archivo supera el limite de ' . self::MAX_ROWS . ' filas.');
+    if (count($rows) > $maxRows) {
+      throw new \RuntimeException('El archivo supera el limite de ' . $maxRows . ' filas.');
     }
 
     return array_map(static function (array $row): array {
