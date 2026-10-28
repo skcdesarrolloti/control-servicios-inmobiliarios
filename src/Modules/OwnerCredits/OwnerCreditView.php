@@ -131,8 +131,11 @@ final class OwnerCreditView
 
     $deductions = '';
     foreach (OwnerCreditService::DEDUCTIONS as $key => $label) $deductions .= $field('(−) ' . $label, $money('ded_' . $key, (float) ($ev['deductions'][$key] ?? 0)));
+    $purposes = OwnerCreditSettings::PURPOSES;
+    // Créditos antiguos pueden tener una destinación que ya no está en la lista: se conserva para no perderla al guardar.
+    if ($credit['purpose'] !== '' && !in_array($credit['purpose'], $purposes, true)) array_unshift($purposes, (string) $credit['purpose']);
     $purposeOptions = '';
-    foreach (OwnerCreditSettings::PURPOSES as $purpose) $purposeOptions .= '<option' . ($purpose === $credit['purpose'] ? ' selected' : '') . '>' . self::e($purpose) . '</option>';
+    foreach ($purposes as $purpose) $purposeOptions .= '<option' . ($purpose === $credit['purpose'] ? ' selected' : '') . '>' . self::e($purpose) . '</option>';
     $vacancyOptions = '';
     foreach (self::VACANCY as $key => $label) $vacancyOptions .= '<option value="' . $key . '"' . ($key === $ev['vacancy'] ? ' selected' : '') . '>' . self::e($label) . '</option>';
 

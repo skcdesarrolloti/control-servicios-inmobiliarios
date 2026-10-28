@@ -10,17 +10,12 @@ use SCM\Core\Settings;
 final class OwnerCreditSettings
 {
   public const KEY = 'owner_credit_settings';
+  /** Mismas necesidades que ofrece el simulador de ingreso neto del propietario (servicios comerciales). */
   public const PURPOSES = [
-    'Pago de Impuestos',
-    'Para Mejoras y/o Reparaciones al Inmueble',
-    'Mejoras y/o Reparaciones a otro Inmueble',
-    'Educación',
-    'Libre Destinación',
-    'Pago Expensas',
-    'Pago Administración',
-    'Pago de Servicios Públicos',
-    'Compra de Electrodomésticos',
-    'Equipos de Oficina',
+    'Servicios públicos',
+    'Cuotas de administración',
+    'Reparaciones y mantenimiento',
+    'Libre inversión',
   ];
 
   /** @return array<string,mixed> */
