@@ -76,6 +76,8 @@ $service->update(12,'No',['employee_id'=>'99','name'=>'Test']);
 $assert((int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket')===1,'unchanged financing does not duplicate history');
 try{$service->update(12,'otro',['employee_id'=>'99']);throw new RuntimeException('Invalid financing accepted');}catch(\DomainException){}
 $assert($db->getVar('SELECT financiacion FROM wp_jet_cct_cotizacion_mantenimiento WHERE _ID=12')==='No','invalid financing cannot overwrite quote');
+$pdo->exec("INSERT INTO wp_jet_cct_cotizacion_mantenimiento (_ID,id_ticket,financiacion,estado) VALUES (14,'3','','')");
+try{$service->update(14,'No',['employee_id'=>'99','name'=>'Test']);throw new RuntimeException('Unsent quote financing accepted');}catch(\DomainException $error){$assert(str_contains($error->getMessage(),'después de enviar'),'financing is configured only after the quote is sent');}
 $denied = new class {
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   public bool $csrfChecked = false;

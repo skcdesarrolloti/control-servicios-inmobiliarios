@@ -5080,9 +5080,13 @@ trait RendersDashboard
 
     $financing = trim((string) ($row['financiacion'] ?? ''));
     $financingLabel = $financing === 'Si' ? 'Sí' : ($financing === 'No' ? 'No' : 'Sin definir');
-    $financingHtml = $canManageMaintenanceQuote && $this->canUseDashboardAction('quote_financing')
+    // El financiamiento se configura cuando la cotización ya se envió (o ya fue respondida); antes solo se muestra si ya tiene valor.
+    $quoteSent = $enviada || $fechaEnvioTs > 0 || in_array(strtolower(trim((string) ($row['estado'] ?? ''))), ['aprobada', 'desaprobada'], true);
+    $financingHtml = !$quoteSent
+      ? ($financing !== '' ? '<span class="scm-cotizacion-pill">Financiamiento: ' . esc_html($financingLabel) . '</span>' : '')
+      : ($canManageMaintenanceQuote && $this->canUseDashboardAction('quote_financing')
       ? '<button type="button" class="scm-case-work-btn scm-cotizacion-financing-action" data-scm-save-quote-financing data-financiacion="' . esc_attr($financing) . '">Configurar financiamiento · ' . esc_html($financingLabel) . '</button>'
-      : '<span class="scm-cotizacion-pill">Financiamiento: ' . esc_html($financingLabel) . '</span>';
+      : '<span class="scm-cotizacion-pill">Financiamiento: ' . esc_html($financingLabel) . '</span>');
     // Con financiación "Sí" la cotización abre el liquidador de créditos (crea la solicitud si aún no existe).
     if ($financing === 'Si' && $id !== '' && ($this->canUseDashboardAction('quote_financing') || $this->canAccessDashboardTab('credito_propietario'))) {
       $creditStatus = (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db))->statusesForQuotes([(int) $id])[(int) $id] ?? '';

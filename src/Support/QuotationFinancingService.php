@@ -23,6 +23,9 @@ final class QuotationFinancingService
     try {
       $quote = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ?" . ($pdo->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' FOR UPDATE' : ''), [$id]);
       if (!$quote) throw new \DomainException('La cotización ya no existe.');
+      $sent = in_array(strtolower(trim((string) ($quote['se_envio'] ?? ''))), ['si', 'sí', '1', 'true', 'enviada', 'enviado'], true) || (int) ($quote['fecha_envio'] ?? 0) > 0
+        || in_array(strtolower(trim((string) ($quote['estado'] ?? ''))), ['aprobada', 'desaprobada'], true);
+      if (!$sent) throw new \DomainException('El financiamiento se configura después de enviar la cotización.');
       $old = trim((string) ($quote['financiacion'] ?? ''));
       if ($old !== $value) {
         $now = date('Y-m-d H:i:s');
