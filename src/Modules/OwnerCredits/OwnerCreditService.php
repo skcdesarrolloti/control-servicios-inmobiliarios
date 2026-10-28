@@ -1897,9 +1897,10 @@ final class OwnerCreditService
     $request = self::requestText($credit);
     $contract = (string) $credit['contract_code'] . ((string) $credit['property'] !== '' ? ' · Inmueble ' . $credit['property'] : '');
     $origin = $quoteId > 0 ? 'Cotización #' . $quoteId : 'Solicitud manual';
+    $purpose = (string) $credit['purpose'];
     return $this->notifyStaffWhatsapp($action, $credit, 'scm_credito_propietario_solicitud_funcionario_v1',
-      static fn(string $name, callable $clean): array => [$name, $clean($credit['owner_name'], 120), $clean($request, 120), $clean($contract, 80), $clean($origin, 60)],
-      'Nueva solicitud de crédito: ' . $credit['owner_name'] . ', ' . $request . ', contrato ' . $contract . ' (' . $origin . ').');
+      static fn(string $name, callable $clean): array => [$name, $clean($credit['owner_name'], 120), $clean($request, 120), $clean($purpose, 120), $clean($contract, 80), $clean($origin, 60)],
+      'Nueva solicitud de crédito: ' . $credit['owner_name'] . ', ' . $request . ', destinación ' . ($purpose ?: 'sin dato') . ', contrato ' . $contract . ' (' . $origin . ').');
   }
 
   /**

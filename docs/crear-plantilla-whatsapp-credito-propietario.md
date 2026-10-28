@@ -212,8 +212,9 @@ Hola, {{1}}. Hay una nueva solicitud de crédito para revisar.
 
 Propietario: {{2}}
 Solicita: {{3}}
-Contrato: {{4}}
-Origen: {{5}}
+Destinación: {{4}}
+Contrato: {{5}}
+Origen: {{6}}
 
 Revísala en el liquidador desde el botón.
 ```
@@ -225,7 +226,8 @@ Revísala en el liquidador desde el botón.
 | 1 | Nombre del funcionario | Royner Guardo |
 | 2 | Propietario | Royner Andres Guardo Hernandez |
 | 3 | Valor y plazo solicitados | $2.238.000 a 10 meses |
-| 4 | Contrato e inmueble | 2000 · Inmueble 204578 |
-| 5 | Origen | Cotización #589 · Solicitud manual |
+| 4 | Destinación del crédito | Reparaciones y mantenimiento |
+| 5 | Contrato e inmueble | 2000 · Inmueble 204578 |
+| 6 | Origen | Cotización #589 · Solicitud manual |
 
 La definición para la API está en `whatsapp-credito-propietario-solicitud-funcionario-template.json`.

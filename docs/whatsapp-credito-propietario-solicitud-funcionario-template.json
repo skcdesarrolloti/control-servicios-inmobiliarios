@@ -5,13 +5,14 @@
   "components": [
     {
       "type": "BODY",
-      "text": "Hola, {{1}}. Hay una nueva solicitud de crédito para revisar.\n\nPropietario: {{2}}\nSolicita: {{3}}\nContrato: {{4}}\nOrigen: {{5}}\n\nRevísala en el liquidador desde el botón.",
+      "text": "Hola, {{1}}. Hay una nueva solicitud de crédito para revisar.\n\nPropietario: {{2}}\nSolicita: {{3}}\nDestinación: {{4}}\nContrato: {{5}}\nOrigen: {{6}}\n\nRevísala en el liquidador desde el botón.",
       "example": {
         "body_text": [
           [
             "Royner Guardo",
             "Royner Andres Guardo Hernandez",
             "$2.238.000 a 10 meses",
+            "Reparaciones y mantenimiento",
             "2000 · Inmueble 204578",
             "Cotización #589"
           ]
