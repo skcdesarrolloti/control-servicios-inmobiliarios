@@ -24813,11 +24813,13 @@
     }
 
     // Registro de cambios de la cotización (p. ej. % de administración frente al sugerido) en un popup interno.
-    function openCotizacionChangeLog(button) {
+    // Desde "Cotizaciones del caso" (otro popup), options.onClose vuelve a ese listado al cerrar.
+    function openCotizacionChangeLog(button, options) {
+      options = options || {};
       var card = button.closest(".scm-cotizacion-card");
       var template = card ? card.querySelector("template[data-scm-cotizacion-change-log-template]") : null;
       if (!template || !window.Swal) return;
-      window.Swal.fire({
+      return window.Swal.fire({
         title: "Cambios de la cotización #" + (card.getAttribute("data-cotizacion-id") || ""),
         html: template.innerHTML,
         width: "min(620px, 94vw)",
@@ -24832,6 +24834,8 @@
           confirmButton: "scm-cotizacion-dialog-cancel",
           closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
         },
+      }).then(function () {
+        if (typeof options.onClose === "function") options.onClose();
       });
     }
 
@@ -24968,6 +24972,15 @@
                 if (financeBtn) {
                   event.preventDefault();
                   toggleCotizacionFinancePanel(financeBtn);
+                  return;
+                }
+                var changeLogBtn = event.target && event.target.closest
+                  ? event.target.closest("[data-scm-cotizacion-change-log-open]")
+                  : null;
+                if (changeLogBtn) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  openCotizacionChangeLog(changeLogBtn, { onClose: makeCaseCotizacionesReturn(button) });
                   return;
                 }
                 var iframeBtn = event.target && event.target.closest
