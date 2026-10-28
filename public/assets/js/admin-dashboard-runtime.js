@@ -24380,21 +24380,25 @@
       var curva = d.curva === "parabola"
         ? "F × x² = " + money(d.f) + " × " + num(d.x) + "²"
         : "F × (1 − √(1 − k²·x²)) ÷ (1 − √(1 − k²)), con F = " + money(d.f) + " y k = " + num(d.k);
+      var partePequena = Number(d.f) > 0 ? Math.round((Number(d.adicional) || 0) / Number(d.f) * 100) : 0;
       var adicional = Number(d.x) > 0
-        ? '<li><span>Adicional por reparación pequeña</span><em>x = 1 − ' + money(d.subtotal) + ' ÷ ' + money(d.transicion) + ' = ' + num(d.x) + '<br>' + curva + '</em><strong>' + money(d.adicional) + '</strong></li>'
-        : '<li><span>Adicional por reparación pequeña</span><em>El subtotal llega a la transición T (' + money(d.transicion) + '): no lleva adicional.</em><strong>' + money(0) + '</strong></li>';
+        ? '<li><span>Adicional por reparación pequeña</span><em>Hasta ' + money(d.f) + ' extra; entre más pequeño el trabajo, más se acerca a ese tope. Este trabajo lleva el ' + escHtml(String(partePequena)) + ' %.</em><strong>+ ' + money(d.adicional) + '</strong></li>'
+        : '<li><span>Adicional por reparación pequeña</span><em>El trabajo es de ' + money(d.transicion) + ' o más, así que no lleva adicional.</em><strong>+ ' + money(0) + '</strong></li>';
+      var formula = Number(d.x) > 0
+        ? '<details class="scm-quote-fee-formula"><summary>Ver fórmula técnica</summary><code>x = 1 − ' + money(d.subtotal) + ' ÷ ' + money(d.transicion) + ' = ' + num(d.x) + '<br>Adicional = ' + curva + '</code></details>'
+        : '';
       return '<div class="scm-quote-fee-popover" id="swal-send-cot-calculo" role="dialog" aria-modal="true" aria-labelledby="swal-send-cot-calculo-title" hidden>' +
         '<div class="scm-quote-fee-breakdown">' +
         '<header><div><span class="scm-quote-fee-eyebrow">% sugerido</span><h3 id="swal-send-cot-calculo-title">¿Cómo se calcula?</h3></div>' +
         '<button type="button" class="scm-quote-fee-close" id="swal-send-cot-calculo-cerrar" aria-label="Cerrar cálculo">×</button></header>' +
-        '<p>Las reparaciones pequeñas llevan un % mayor para cubrir el costo fijo de gestionarlas; a partir de <strong>' + money(d.transicion) + '</strong> solo se cobra la tarifa base. Variables en Configuración › Honorarios de cotización.</p>' +
+        '<p>Gestionar una reparación tiene un costo fijo, sea grande o pequeña. Por eso a los trabajos pequeños se les suma un adicional; desde <strong>' + money(d.transicion) + '</strong> solo se cobra la tarifa base.</p>' +
         '<ol>' +
-        '<li><span>Subtotal trabajos</span><em>Materiales + mano de obra + equipos + otros costos</em><strong>' + money(d.subtotal) + '</strong></li>' +
-        '<li><span>Tarifa base</span><em>' + money(d.subtotal) + ' × ' + pct(d.tarifa) + '</em><strong>' + money(d.base) + '</strong></li>' +
+        '<li><span>Valor de los trabajos</span><em>Materiales, mano de obra, equipos y otros costos.</em><strong>' + money(d.subtotal) + '</strong></li>' +
+        '<li><span>Tarifa base</span><em>El ' + pct(d.tarifa) + ' del valor de los trabajos.</em><strong>' + money(d.base) + '</strong></li>' +
         adicional +
-        '<li><span>Honorario</span><em>Tarifa base + adicional</em><strong>' + money(d.honorario) + '</strong></li>' +
-        '<li class="is-total"><span>% sugerido</span><em>' + money(d.honorario) + ' ÷ ' + money(d.subtotal) + '</em><strong>' + pct(d.porcentaje) + '</strong></li>' +
-        '</ol></div></div>';
+        '<li><span>Honorario</span><em>Tarifa base + adicional.</em><strong>' + money(d.honorario) + '</strong></li>' +
+        '<li class="is-total"><span>% sugerido</span><em>' + money(d.honorario) + ' de honorario sobre ' + money(d.subtotal) + ' de trabajos.</em><strong>' + pct(d.porcentaje) + '</strong></li>' +
+        '</ol>' + formula + '</div></div>';
     }
 
     function openSendCotizacionModal(button, options) {
