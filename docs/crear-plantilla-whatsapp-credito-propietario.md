@@ -85,7 +85,7 @@ Envía la plantilla a revisión y espera a que aparezca **Aprobada**. Después a
 
 ## Plantilla para funcionarios
 
-Se envía a los **funcionarios elegidos en Notificaciones internas › Créditos a propietarios** en dos momentos: cuando llega una **solicitud de crédito** y cuando un crédito se **aprueba o rechaza**. El celular es el registrado para cada funcionario. Solo se envía si en **Configuración** de créditos está activo **WhatsApp al solicitar y al decidir**. El correo interno sale siempre.
+Se envía a los **funcionarios elegidos en Notificaciones internas › Créditos a propietarios** cuando un crédito se **aprueba o rechaza**. Las solicitudes nuevas usan `scm_credito_propietario_solicitud_funcionario_v1` (abajo). El celular es el registrado para cada funcionario. Solo se envía si en **Configuración** de créditos está activo **WhatsApp al solicitar y al decidir**. El correo interno sale siempre.
 
 - Nombre exacto: `scm_credito_propietario_funcionario_v2`.
 - Categoría: **Utilidad** (`UTILITY`).
@@ -192,3 +192,40 @@ Conserva el documento para tu registro. Este enlace es personal; no lo compartas
 La definición para la API está en `whatsapp-credito-pagare-firmado-template.json`.
 
 Los funcionarios reciben un correo cuando el pagaré queda firmado si en **Notificaciones internas** está configurado el evento **Créditos a propietarios › Pagaré firmado**.
+
+## Plantilla para funcionarios al llegar una solicitud
+
+Mensaje corto a los funcionarios de **Solicitud de crédito** (manual) o **Solicitud de crédito desde cotización**, según el origen. Solo se envía si en **Configuración** de créditos está activo **WhatsApp a funcionarios**.
+
+- Nombre exacto: `scm_credito_propietario_solicitud_funcionario_v1`.
+- Categoría: **Utilidad** (`UTILITY`). Sin lenguaje de oferta ("aprovecha", "preaprobado"): Meta la reclasificaría como marketing.
+- Idioma: **Español (COL)** (`es_CO`).
+- Variables: **numéricas**.
+- Encabezado: ninguno.
+- Pie de página: `SKC SuCasa Inmobiliaria`.
+- Botón: **Visitar sitio web**, texto `Abrir créditos`, URL dinámica `https://sucasainmobiliaria.com.co/{{1}}`, ejemplo `control-servicios-inmobiliarios/public/index.php?tab=credito_propietario`.
+
+### Cuerpo para copiar
+
+```text
+Hola, {{1}}. Hay una nueva solicitud de crédito para revisar.
+
+Propietario: {{2}}
+Solicita: {{3}}
+Contrato: {{4}}
+Origen: {{5}}
+
+Revísala en el liquidador desde el botón.
+```
+
+### Variables
+
+| Variable | Qué envía el panel | Ejemplo |
+| --- | --- | --- |
+| 1 | Nombre del funcionario | Royner Guardo |
+| 2 | Propietario | Royner Andres Guardo Hernandez |
+| 3 | Valor y plazo solicitados | $2.238.000 a 10 meses |
+| 4 | Contrato e inmueble | 2000 · Inmueble 204578 |
+| 5 | Origen | Cotización #589 · Solicitud manual |
+
+La definición para la API está en `whatsapp-credito-propietario-solicitud-funcionario-template.json`.

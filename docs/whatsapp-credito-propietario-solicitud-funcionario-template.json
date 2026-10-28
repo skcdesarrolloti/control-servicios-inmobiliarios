@@ -1,0 +1,39 @@
+{
+  "name": "scm_credito_propietario_solicitud_funcionario_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola, {{1}}. Hay una nueva solicitud de crédito para revisar.\n\nPropietario: {{2}}\nSolicita: {{3}}\nContrato: {{4}}\nOrigen: {{5}}\n\nRevísala en el liquidador desde el botón.",
+      "example": {
+        "body_text": [
+          [
+            "Royner Guardo",
+            "Royner Andres Guardo Hernandez",
+            "$2.238.000 a 10 meses",
+            "2000 · Inmueble 204578",
+            "Cotización #589"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Abrir créditos",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "control-servicios-inmobiliarios/public/index.php?tab=credito_propietario"
+          ]
+        }
+      ]
+    }
+  ]
+}
