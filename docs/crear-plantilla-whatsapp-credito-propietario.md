@@ -83,31 +83,32 @@ Si se rechaza, la variable 4 es: `Comunícate con nosotros para revisar alternat
 
 Envía la plantilla a revisión y espera a que aparezca **Aprobada**. Después activa **WhatsApp** en la configuración de créditos. No cambies el nombre, el idioma ni el orden de las variables, porque deben coincidir con el código. La definición para la API está en `whatsapp-credito-propietario-decision-template.json`; no pegues ese JSON en el campo del cuerpo.
 
-## Plantilla para funcionarios
+## Plantilla para funcionarios al aprobar o rechazar
 
-Se envía a los **funcionarios elegidos en Notificaciones internas › Créditos a propietarios** cuando un crédito se **aprueba o rechaza**. Las solicitudes nuevas usan `scm_credito_propietario_solicitud_funcionario_v1` (abajo). El celular es el registrado para cada funcionario. Solo se envía si en **Configuración** de créditos está activo **WhatsApp al solicitar y al decidir**. El correo interno sale siempre.
+Mensaje corto a los **funcionarios de Notificaciones internas › Créditos a propietarios › Crédito aprobado o rechazado** cuando un analista decide en el liquidador. Solo se envía si en **Configuración** de créditos está activo **WhatsApp a funcionarios**; el correo interno sale siempre. Las solicitudes nuevas usan `scm_credito_propietario_solicitud_funcionario_v1` (más abajo).
 
-- Nombre exacto: `scm_credito_propietario_funcionario_v2`.
-- Categoría: **Utilidad** (`UTILITY`).
-- Idioma: **Español (COL)** (`es_CO`). No uses English.
+Reemplaza a `scm_credito_propietario_funcionario_v2`, que mezclaba solicitudes y decisiones en un mensaje genérico; ya no se usa y se puede eliminar de Meta.
+
+- Nombre exacto: `scm_credito_propietario_respuesta_funcionario_v1`.
+- Categoría: **Utilidad** (`UTILITY`). Sin lenguaje de oferta ("aprovecha", "preaprobado"): Meta la reclasificaría como marketing.
+- Idioma: **Español (COL)** (`es_CO`).
 - Variables: **numéricas**.
 - Encabezado: ninguno.
 - Pie de página: `SKC SuCasa Inmobiliaria`.
-
-La v1 fue reclasificada por Meta como **marketing** y ya no se usa. La v2 describe la actualización de una solicitud asignada en el panel, sin lenguaje de oferta ni promoción; no le agregues frases como "aprovecha", "oferta", "crédito preaprobado" o similares.
+- Botón: **Visitar sitio web**, texto `Abrir créditos`, URL dinámica `https://sucasainmobiliaria.com.co/{{1}}`, ejemplo `control-servicios-inmobiliarios/public/index.php?tab=credito_propietario`.
 
 ### Cuerpo para copiar
 
 ```text
-Hola, {{1}}. Hay una actualización en una solicitud registrada en el panel de servicios inmobiliarios.
+Hola, {{1}}. Se respondió una solicitud de crédito.
 
-Estado: {{2}}.
-Solicitud número: {{3}}.
-Contrato de arrendamiento: {{4}}.
-Propietario: {{5}}.
-Detalle: {{6}}.
+Resultado: {{2}}
+Propietario: {{3}}
+Detalle: {{4}}
+Contrato: {{5}}
+Decidió: {{6}}
 
-Revisa la solicitud desde el botón para continuar la gestión.
+Revísala en el liquidador desde el botón.
 ```
 
 ### Variables
@@ -115,22 +116,13 @@ Revisa la solicitud desde el botón para continuar la gestión.
 | Variable | Qué envía el panel | Ejemplo |
 | --- | --- | --- |
 | 1 | Nombre del funcionario | Royner Guardo |
-| 2 | `Nueva solicitud de crédito`, `Crédito aprobado` o `Crédito no aprobado` | Nueva solicitud de crédito |
-| 3 | Número del crédito | 12 |
-| 4 | Número del contrato | 817 |
-| 5 | Propietario | David Esquivia Polo |
-| 6 | Solicitud: valor y cotización. Aprobado: valor, plazo, cuota y si quedó fuera de política. Rechazado: motivo. Siempre indica quién decidió | Solicita $893.723 para la cotización #574. Revísala en el liquidador |
+| 2 | `Aprobado`, `Aprobado fuera de política` o `No aprobado` | Aprobado |
+| 3 | Propietario | Royner Andres Guardo Hernandez |
+| 4 | Aprobado: valor, plazo y cuota. No aprobado: motivo | $2.238.000 a 10 meses, cuota $251.430 |
+| 5 | Contrato e inmueble | 2000 · Inmueble 204578 |
+| 6 | Quién decidió | Laura Pérez |
 
-### Botón
-
-Agrega un botón **Visitar sitio web** con:
-
-- Texto: `Abrir créditos`.
-- Tipo de URL: **Dinámica**.
-- URL: `https://sucasainmobiliaria.com.co/{{1}}`.
-- Ejemplo del sufijo: `control-servicios-inmobiliarios/public/index.php?tab=credito_propietario`.
-
-Cuando Meta la marque como **Aprobada**, activa la opción en Configuración. La definición para la API está en `whatsapp-credito-propietario-funcionario-v2-template.json`.
+La definición para la API está en `whatsapp-credito-propietario-respuesta-funcionario-template.json`.
 
 ## Plantillas del pagaré y la carta de instrucciones
 

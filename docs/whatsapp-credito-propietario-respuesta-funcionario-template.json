@@ -1,20 +1,20 @@
 {
-  "name": "scm_credito_propietario_funcionario_v2",
+  "name": "scm_credito_propietario_respuesta_funcionario_v1",
   "language": "es_CO",
   "category": "UTILITY",
   "components": [
     {
       "type": "BODY",
-      "text": "Hola, {{1}}. Hay una actualización en una solicitud registrada en el panel de servicios inmobiliarios.\n\nEstado: {{2}}.\nSolicitud número: {{3}}.\nContrato de arrendamiento: {{4}}.\nPropietario: {{5}}.\nDetalle: {{6}}.\n\nRevisa la solicitud desde el botón para continuar la gestión.",
+      "text": "Hola, {{1}}. Se respondió una solicitud de crédito.\n\nResultado: {{2}}\nPropietario: {{3}}\nDetalle: {{4}}\nContrato: {{5}}\nDecidió: {{6}}\n\nRevísala en el liquidador desde el botón.",
       "example": {
         "body_text": [
           [
             "Royner Guardo",
-            "Nueva solicitud de crédito",
-            "12",
-            "817",
-            "David Esquivia Polo",
-            "Solicita $893.723 para la cotización #574. Revísala en el liquidador"
+            "Aprobado",
+            "Royner Andres Guardo Hernandez",
+            "$2.238.000 a 10 meses, cuota $251.430",
+            "2000 · Inmueble 204578",
+            "Laura Pérez"
           ]
         ]
       }

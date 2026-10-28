@@ -1819,15 +1819,16 @@ final class OwnerCreditService
     $queued = ['email' => 0, 'whatsapp' => 0, 'internal' => 0, 'internal_whatsapp' => 0];
     $queued['internal'] = $this->notifyInternal(self::EVENT_DECIDED, $title . ' #' . $credit['id'] . ' · contrato ' . $credit['contract_code'], $summary . ' Decidió: ' . $credit['decided_by_name'] . '.', 'decidido:' . $credit['id']);
     $money = static fn($value): string => '$' . number_format((float) $value, 0, ',', '.');
-    $event = $approved ? 'Crédito aprobado' : 'Crédito no aprobado';
-    $detail = ($approved
-        ? $money($credit['approved_amount']) . ' a ' . $credit['approved_term'] . ' meses, cuota ' . $money($credit['monthly_payment']) . ((int) $credit['policy_override'] === 1 ? ', fuera de política' : '')
-        : 'Motivo: ' . trim((string) $credit['decision_note']))
-      . '. Decidió ' . ($credit['decided_by_name'] ?: 'el panel');
-    // Decisiones: plantilla scm_credito_propietario_funcionario_v2 (estado, número, contrato, propietario y detalle).
-    $queued['internal_whatsapp'] = $this->notifyStaffWhatsapp(self::EVENT_DECIDED, $credit, 'scm_credito_propietario_funcionario_v2',
-      static fn(string $name, callable $clean): array => [$name, $clean($event, 60), (string) (int) $credit['id'], $clean($credit['contract_code'], 40), $clean($credit['owner_name'], 120), $clean($detail, 400)],
-      $event . ' #' . $credit['id'] . ': ' . $detail);
+    // Respuesta a los funcionarios: plantilla corta scm_credito_propietario_respuesta_funcionario_v1.
+    $result = $approved ? ((int) $credit['policy_override'] === 1 ? 'Aprobado fuera de política' : 'Aprobado') : 'No aprobado';
+    $detail = $approved
+      ? $money($credit['approved_amount']) . ' a ' . $credit['approved_term'] . ' meses, cuota ' . $money($credit['monthly_payment'])
+      : 'Motivo: ' . trim((string) $credit['decision_note']);
+    $contract = (string) $credit['contract_code'] . ((string) $credit['property'] !== '' ? ' · Inmueble ' . $credit['property'] : '');
+    $decidedBy = (string) $credit['decided_by_name'] ?: 'el panel';
+    $queued['internal_whatsapp'] = $this->notifyStaffWhatsapp(self::EVENT_DECIDED, $credit, 'scm_credito_propietario_respuesta_funcionario_v1',
+      static fn(string $name, callable $clean): array => [$name, $clean($result, 60), $clean($credit['owner_name'], 120), $clean($detail, 300), $clean($contract, 80), $clean($decidedBy, 80)],
+      'Crédito ' . mb_strtolower($result) . ': ' . $credit['owner_name'] . ', ' . $detail . ', contrato ' . $contract . '. Decidió ' . $decidedBy . '.');
     try {
       if ($settings['notify_owner_email'] && filter_var($credit['owner_email'], FILTER_VALIDATE_EMAIL)) {
         $queued['email'] = (new EmailQueue($this->db))->enqueue([$credit['owner_email']], $title . ' · Contrato ' . $credit['contract_code'], EmailTemplate::render($title, $this->ownerEmailBody($credit)), [

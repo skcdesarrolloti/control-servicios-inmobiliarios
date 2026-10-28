@@ -532,8 +532,8 @@ $pagareService->changeStatus($nextCredit, 'anulado', 'Crédito de prueba del pag
 $requirePromissory(false);
 
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
-$template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-funcionario-v2-template.json'), true);
-$check(str_contains($source, "'" . $template['name'] . "'") && substr_count($template['components'][0]['text'], '{{') === 6, 'staff template name and its six variables match the code');
+$template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-respuesta-funcionario-template.json'), true);
+$check(str_contains($source, "'" . $template['name'] . "'") && substr_count($template['components'][0]['text'], '{{') === 6 && !str_contains($source, 'scm_credito_propietario_funcionario_v2'), 'staff decision template has its own six variables and the generic v2 is no longer used');
 $staffRequestTemplate = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-solicitud-funcionario-template.json'), true);
 $check(str_contains($source, "'" . $staffRequestTemplate['name'] . "'") && substr_count($staffRequestTemplate['components'][0]['text'], '{{') === 6 && str_contains($staffRequestTemplate['components'][0]['text'], 'Destinación: {{4}}') && !str_contains($staffRequestTemplate['components'][0]['text'], 'número'), 'staff request template is short, without the credit number, with the purpose, and its six variables match the code');
 $ownerTemplate = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-solicitud-template.json'), true);
