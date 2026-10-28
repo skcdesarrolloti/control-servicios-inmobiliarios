@@ -16,10 +16,36 @@ trait HandlesMaintenanceActions
       return;
     }
     try {
-      (new \SCM\Support\QuotationFinancingService($this->db, new \SCM\Support\SchemaInspector($this->db)))->update((int) ($_POST['id_cotizacion'] ?? 0), trim((string) ($_POST['financiacion'] ?? '')), $this->ticketCompletionActor());
+      (new \SCM\Support\QuotationFinancingService($this->db, new \SCM\Support\SchemaInspector($this->db)))->update((int) ($_POST['id_cotizacion'] ?? 0), trim((string) ($_POST['financiacion'] ?? '')), $this->ticketCompletionActor(), (int) ($_POST['plazo_financiacion'] ?? 0));
       $this->jsonOk(['message'=>'Financiamiento actualizado.','financiacion'=>trim((string) $_POST['financiacion'])]);
     } catch (\DomainException $error) { $this->jsonFail($error->getMessage()); }
     catch (\Throwable $error) { error_log('[cotizacion_financing] ' . $error->getMessage()); $this->jsonFail('No se pudo actualizar el financiamiento.'); }
+  }
+
+  /**
+   * Plazo máximo (meses) para financiar una cotización, para el campo "¿A cuántos meses?" al elegir financiación Sí.
+   * Recibe la cotización o, si el formulario no la conoce, el caso (todas sus cotizaciones son del mismo contrato).
+   */
+  public function ajax_handler_cotizacion_financing_term(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') && !$this->canAccessDashboardTab('abiertos') && !$this->canAccessDashboardTab('postergados') && !$this->canAccessDashboardTab('mis_tickets')) {
+      $this->jsonFail('No tienes permiso para ver cotizaciones.');
+      return;
+    }
+    $quoteId = (int) ($_POST['id_cotizacion'] ?? 0);
+    $ticketPk = (int) ($_POST['ticket_pk'] ?? 0);
+    if ($quoteId <= 0 && $ticketPk > 0) {
+      $ticket = $this->db->getRow("SELECT `id_cotizacion_mantenimiento` FROM `{$this->db->table('jet_cct_tickets')}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]);
+      $ids = array_values(array_filter(array_map('intval', preg_split('/[\s,;]+/', (string) ($ticket['id_cotizacion_mantenimiento'] ?? '')) ?: [])));
+      $quoteId = $ids === [] ? 0 : max($ids);
+    }
+    try {
+      $this->jsonOk(['max' => (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db))->quoteTermLimit($quoteId)]);
+    } catch (\Throwable $error) {
+      error_log('[cotizacion_financing_term] ' . $error->getMessage());
+      $this->jsonOk(['max' => 0]);
+    }
   }
 
   /** Configuración › Honorarios de cotización: variables del % de administración sugerido. */
@@ -3321,7 +3347,7 @@ trait HandlesMaintenanceActions
   }
 
   /** @return array<string,string> */
-  public function public_respond_cotizacion_mantenimiento(int $cotizacionId, string $estadoRaw, string $observacionRaw, string $motivoRaw = '', string $financiacionRaw = ''): array
+  public function public_respond_cotizacion_mantenimiento(int $cotizacionId, string $estadoRaw, string $observacionRaw, string $motivoRaw = '', string $financiacionRaw = '', string $plazoRaw = ''): array
   {
     if ($cotizacionId <= 0) {
       return ['ok' => '0', 'message' => 'Cotización inválida.'];
@@ -3359,7 +3385,7 @@ trait HandlesMaintenanceActions
     if ($ticketPk <= 0) {
       return ['ok' => '0', 'message' => 'La cotización no tiene caso asociado.'];
     }
-    return $this->get_seguimiento_service()->saveCotizacionResponse($ticketPk, $estado, $observacion, $motivo, $financiacion, [], $cotizacionId);
+    return $this->get_seguimiento_service()->saveCotizacionResponse($ticketPk, $estado, $observacion, $motivo, $financiacion, [], $cotizacionId, true, (int) $plazoRaw);
   }
 
   /** @return array{path:string,url:string,name:string,attachment_name:string} */

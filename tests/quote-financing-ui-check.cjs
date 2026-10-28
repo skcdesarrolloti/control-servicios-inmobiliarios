@@ -46,10 +46,16 @@ const functions = extract('    function syncCaseFinancingFilter(', '    function
   assert.equal(await page.evaluate(()=>popupOptions.preConfirm()),false);
   assert.equal(await page.evaluate(()=>requests.length),0);
   await page.locator('[data-scm-quote-financing]').selectOption('Si');
+  assert.equal(await page.locator('[data-scm-quote-financing-term-input]').isVisible(),true,'financing Sí asks for the months');
+  assert.equal(await page.evaluate(()=>requests[0].action),'scm_cotizacion_financing_term','the maximum term is asked to the server');
+  assert.equal(await page.evaluate(()=>popupOptions.preConfirm()),false,'the months are required');
+  assert.match(await page.evaluate(()=>validation),/cuántos meses/);
+  await page.locator('[data-scm-quote-financing-term-input]').fill('10');
+  await page.evaluate(()=>{requests.length=0;});
   const saved=await page.evaluate(()=>popupOptions.preConfirm());
   assert.equal(saved,'Si');
   await page.evaluate(()=>{finishPopup({isConfirmed:true,value:'Si'});return opening;});
-  assert.deepEqual(await page.evaluate(()=>requests[0]),{action:'scm_cotizacion_financing',nonce:'test',id_cotizacion:'573',financiacion:'Si'});
+  assert.deepEqual(await page.evaluate(()=>requests[0]),{action:'scm_cotizacion_financing',nonce:'test',id_cotizacion:'573',financiacion:'Si',plazo_financiacion:'10'});
   assert.equal(await page.locator('[data-scm-save-quote-financing]').textContent(),'Configurar financiamiento · Sí');
   assert.equal(await page.evaluate(()=>refreshes),1);
   assert.equal(await page.evaluate(()=>returns),1);

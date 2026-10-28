@@ -12,7 +12,7 @@ use SCM\Support\SchemaInspector;
 
 trait WorkflowCommandsConcern
 {
-  public function save(int $ticketPk, string $observacion, string $estadoTicket, string $estadoCotizacion, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $evidencias = '', array $documentos = [], string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = '', array $additionalEmails = []): array
+  public function save(int $ticketPk, string $observacion, string $estadoTicket, string $estadoCotizacion, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $evidencias = '', array $documentos = [], string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = '', array $additionalEmails = [], int $financingTerm = 0): array
   {
     try { $additionalEmails = \SCM\Support\AdditionalEmailRecipients::parse($additionalEmails); }
     catch (\InvalidArgumentException $error) { return ['ok'=>'0','message'=>$error->getMessage()]; }
@@ -123,7 +123,8 @@ trait WorkflowCommandsConcern
         $financiacionCotizacion,
         $notifyTargets,
         0,
-        false
+        false,
+        $financingTerm
       );
       if (($cotResult['ok'] ?? '0') !== '1') {
         return $cotResult;
@@ -145,7 +146,7 @@ trait WorkflowCommandsConcern
   /**
    * @return array<string,string>
    */
-  public function saveTicketResponse(int $ticketPk, string $respuesta, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $imagenes = '', array $documentos = [], string $estadoCotizacion = '__keep__', string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = '', bool $generarActaNoAccesoPreventiva = false, int $targetCotizacionId = 0, array $additionalEmails = [], bool $confirmedPendingActClose = false): array
+  public function saveTicketResponse(int $ticketPk, string $respuesta, string $estadoAdministrativo, bool $cerrarTicket, array $notifyTargets = [], $imagenes = '', array $documentos = [], string $estadoCotizacion = '__keep__', string $observacionCotizacion = '', string $motivoCotizacion = '', string $financiacionCotizacion = '', bool $generarActaNoAccesoPreventiva = false, int $targetCotizacionId = 0, array $additionalEmails = [], bool $confirmedPendingActClose = false, int $financingTerm = 0): array
   {
     try { $additionalEmails = \SCM\Support\AdditionalEmailRecipients::parse($additionalEmails); }
     catch (\InvalidArgumentException $error) { return ['ok'=>'0','message'=>$error->getMessage()]; }
@@ -315,7 +316,8 @@ trait WorkflowCommandsConcern
         $financiacionCotizacion,
         $notifyTargets,
         $targetCotizacionId,
-        false
+        false,
+        $financingTerm
       );
       if (($cotResult['ok'] ?? '0') !== '1') {
         return $cotResult;
@@ -1155,7 +1157,7 @@ trait WorkflowCommandsConcern
   /**
    * @return array<string,string>
    */
-  public function saveCotizacionResponse(int $ticketPk, string $estado, string $observacion, string $motivo, string $financiacion, array $notifyTargets = [], int $targetCotizacionId = 0, bool $writeTicketHistory = true): array
+  public function saveCotizacionResponse(int $ticketPk, string $estado, string $observacion, string $motivo, string $financiacion, array $notifyTargets = [], int $targetCotizacionId = 0, bool $writeTicketHistory = true, int $financingTerm = 0): array
   {
     $ticketsTable = $this->db->table('jet_cct_tickets');
     $cotTable = $this->db->table('jet_cct_cotizacion_mantenimiento');
@@ -1195,6 +1197,14 @@ trait WorkflowCommandsConcern
       return ['ok' => '0', 'message' => 'Solo se puede cambiar una cotizacion sin estado o en Esperando respuesta.'];
     }
     $cotIds = $pendingCotIds;
+    // Con financiación "Sí" se elige a cuántos meses (hasta el máximo del propietario).
+    if ($estado === 'Aprobada' && strtolower(trim($financiacion)) === 'si') {
+      try {
+        (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db, null, $this->schema))->assertQuoteTerm((int) $cotIds[0], $financingTerm);
+      } catch (\DomainException $error) {
+        return ['ok' => '0', 'message' => $error->getMessage()];
+      }
+    }
 
     $nowTs = time();
     $nowMysql = date('Y-m-d H:i:s', $nowTs);
@@ -1233,12 +1243,12 @@ trait WorkflowCommandsConcern
     if ($updated > 0 && in_array(strtolower(trim($financiacion)), ['si', 'no'], true)) {
       $credits = new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db, null, $this->schema);
       foreach ($cotIds as $cotId) {
-        $credits->syncFromQuote((int) $cotId, $financiacion, ['employee_id' => (string) $employeeId, 'name' => $userName]);
+        $credits->syncFromQuote((int) $cotId, $financiacion, ['employee_id' => (string) $employeeId, 'name' => $userName], strtolower(trim($financiacion)) === 'si' ? $financingTerm : 0);
       }
     }
 
     $ticketHistorySaved = $writeTicketHistory
-      ? $this->insertCotizacionResponseTicketHistory($ticket, $ticketPk, $cotIds, $estado, $observacion, $motivo, $financiacion, $userId, $employeeId, $userName, $nowTs, $nowMysql)
+      ? $this->insertCotizacionResponseTicketHistory($ticket, $ticketPk, $cotIds, $estado, $observacion, $motivo, $financiacion . (strtolower(trim($financiacion)) === 'si' && $financingTerm > 0 ? ' a ' . $financingTerm . ' meses' : ''), $userId, $employeeId, $userName, $nowTs, $nowMysql)
       : false;
     $propertyHistorySaved = $this->insertHistorialInmuebleCotizacion($ticket, $estado, $observacion, $motivo, $nowTs, $nowMysql);
     $notifications = ['email' => 0, 'whatsapp' => 0];

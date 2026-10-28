@@ -233,9 +233,10 @@ final class OwnerCreditService
   /**
    * Llamado cada vez que cambia la financiación de una cotización. "Sí" crea (o reabre si estaba anulada)
    * la solicitud y avisa; "No" anula la solicitud pendiente. Nunca lanza: la respuesta de la cotización manda.
+   * $term son los meses elegidos al responder (validados antes con assertQuoteTerm); 0 = el máximo del propietario.
    * @param array{employee_id?:string,name?:string} $actor
    */
-  public function syncFromQuote(int $quoteId, string $financing, array $actor): void
+  public function syncFromQuote(int $quoteId, string $financing, array $actor, int $term = 0): void
   {
     try {
       $this->ensureSchema();
@@ -243,13 +244,17 @@ final class OwnerCreditService
       $credit = $this->byQuote($quoteId);
       if ($financing === 'si') {
         if ($credit === null) {
-          $id = $this->createFromQuote($quoteId, $actor);
+          $id = $this->createFromQuote($quoteId, $actor, $term);
           if ($id > 0) $this->notifyRequested($id, $actor);
         } elseif ($credit['status'] === 'anulado') {
-          $this->setStatus((int) $credit['id'], 'pendiente', ['closed_at' => null]);
+          $this->setStatus((int) $credit['id'], 'pendiente', ['closed_at' => null] + ($term > 0 ? ['requested_term' => $term] : []));
           $this->event((int) $credit['id'], 'reabierto', $actor, ['motivo' => 'La cotización volvió a quedar con financiación Sí.']);
           $this->recordRequestHistory((int) $credit['id'], $actor, true);
           $this->notifyRequested((int) $credit['id'], $actor);
+        } elseif ($credit['status'] === 'pendiente' && $term > 0 && $term !== (int) $credit['requested_term']) {
+          // Se cambió el plazo con la financiación ya en Sí: se actualiza lo solicitado.
+          $this->setStatus((int) $credit['id'], 'pendiente', ['requested_term' => $term]);
+          $this->event((int) $credit['id'], 'plazo', $actor, ['antes' => (int) $credit['requested_term'], 'despues' => $term]);
         }
       } elseif ($financing === 'no' && $credit !== null && $credit['status'] === 'pendiente') {
         $this->setStatus((int) $credit['id'], 'anulado', ['closed_at' => time()]);
@@ -259,6 +264,32 @@ final class OwnerCreditService
     } catch (\Throwable $error) {
       error_log('[owner-credit-sync] ' . $error->getMessage());
     }
+  }
+
+  /**
+   * Plazo máximo para financiar una cotización: el de una solicitud del propietario de su contrato (cuotas antes del
+   * fin de su contrato más largo − margen; sin cuotas, el tope de Configuración).
+   */
+  public function quoteTermLimit(int $quoteId): int
+  {
+    $quote = $this->db->getRow("SELECT * FROM `{$this->db->table('jet_cct_cotizacion_mantenimiento')}` WHERE `_ID` = ? LIMIT 1", [$quoteId]);
+    $contract = is_array($quote) ? ($this->contractById((int) ($quote['id_contrato'] ?? 0)) ?? $this->contractByRef((string) ($quote['contrato'] ?? ''))) : null;
+    if ($contract !== null) {
+      try {
+        $portfolio = $this->ownerPortfolio($this->ownerDocument($this->contractOwners((int) $contract['_ID'])[0] ?? null, $contract));
+        if ($portfolio !== []) return $this->requestTermLimit(OwnerCreditCalculator::preapproval($portfolio, $this->config()));
+      } catch (\InvalidArgumentException) {
+      }
+    }
+    return (int) $this->config()['default_term'];
+  }
+
+  /** Los meses elegidos al responder la cotización con financiación Sí. @throws \DomainException */
+  public function assertQuoteTerm(int $quoteId, int $term): void
+  {
+    if ($term <= 0) throw new \DomainException('Indica a cuántos meses se financia la cotización.');
+    $limit = $this->quoteTermLimit($quoteId);
+    if ($limit > 0 && $term > $limit) throw new \DomainException('El plazo máximo para financiar la cotización #' . $quoteId . ' es de ' . $limit . ' meses.');
   }
 
   /** Abre el crédito de una cotización desde su tarjeta; si no existe lo crea sin notificar (cotizaciones previas). */
@@ -1357,18 +1388,20 @@ final class OwnerCreditService
     return $map;
   }
 
-  private function createFromQuote(int $quoteId, array $actor): int
+  private function createFromQuote(int $quoteId, array $actor, int $requestedTerm = 0): int
   {
     $quote = $this->db->getRow("SELECT * FROM `{$this->db->table('jet_cct_cotizacion_mantenimiento')}` WHERE `_ID` = ? LIMIT 1", [$quoteId]);
     if (!is_array($quote)) return 0;
     $contract = $this->contractById((int) ($quote['id_contrato'] ?? 0)) ?? $this->contractByRef((string) ($quote['contrato'] ?? ''));
     if ($contract === null) return 0;
-    // Plazo de la cotización: el máximo del propietario (cuotas antes del fin de su contrato más largo − margen).
-    $term = 0;
-    try {
-      $portfolio = $this->ownerPortfolio($this->ownerDocument($this->contractOwners((int) $contract['_ID'])[0] ?? null, $contract));
-      if ($portfolio !== []) $term = (int) OwnerCreditCalculator::preapproval($portfolio, $this->config())['max_term'];
-    } catch (\InvalidArgumentException) {
+    // Plazo: el elegido al responder o, si no se eligió, el máximo del propietario (cuotas antes del fin de su contrato más largo − margen).
+    $term = $requestedTerm;
+    if ($term <= 0) {
+      try {
+        $portfolio = $this->ownerPortfolio($this->ownerDocument($this->contractOwners((int) $contract['_ID'])[0] ?? null, $contract));
+        if ($portfolio !== []) $term = (int) OwnerCreditCalculator::preapproval($portfolio, $this->config())['max_term'];
+      } catch (\InvalidArgumentException) {
+      }
     }
     return $this->insertCredit($contract, $quoteId, (string) ($quote['id_ticket'] ?? ''), self::money($quote['total'] ?? ''), 'Reparaciones y mantenimiento', $actor, $term);
   }

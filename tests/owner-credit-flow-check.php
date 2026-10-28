@@ -373,6 +373,22 @@ $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 20, 'contrato' => '9
 $db->insert('wp_jet_cct_cotizacion_mantenimiento', ['_ID' => 590, 'id_ticket' => '10900', 'contrato' => '980', 'id_contrato' => '20', 'total' => '400000', 'financiacion' => 'Si']);
 $service->syncFromQuote(590, 'Si', $actor);
 $check($service->byQuote(590)['owner_document'] === '55.555.555', 'a quote credit on a contract without mandate takes the document from the owner record');
+// Financiación Sí desde la cotización: se elige a cuántos meses, hasta el máximo del propietario.
+$quoteLimit = $service->quoteTermLimit(590);
+$check($quoteLimit > 0, 'a quote has a maximum financing term');
+foreach ([0 => 'Indica a cuántos meses', $quoteLimit + 1 => 'El plazo máximo para financiar la cotización #590 es de ' . $quoteLimit . ' meses'] as $badTerm => $expected) {
+  try {
+    $service->assertQuoteTerm(590, $badTerm);
+    $check(false, 'a financing term of ' . $badTerm . ' months is rejected');
+  } catch (DomainException $error) {
+    $check(str_contains($error->getMessage(), $expected), 'a financing term of ' . $badTerm . ' months is rejected: ' . $error->getMessage());
+  }
+}
+$db->insert('wp_jet_cct_cotizacion_mantenimiento', ['_ID' => 591, 'id_ticket' => '10901', 'contrato' => '980', 'id_contrato' => '20', 'total' => '300000', 'financiacion' => 'Si']);
+$service->syncFromQuote(591, 'Si', $actor, 1);
+$check((int) $service->byQuote(591)['requested_term'] === 1 && $service->byQuote(591)['purpose'] === 'Reparaciones y mantenimiento', 'the quote request keeps the months chosen when answering, for repairs');
+$service->syncFromQuote(591, 'Si', $actor, min(2, $quoteLimit));
+$check((int) $service->byQuote(591)['requested_term'] === min(2, $quoteLimit), 'changing only the months updates the pending request');
 $db->insert('wp_scm_owner_credits', ['contract_id' => 20, 'contract_code' => '980', 'owner_id' => '970', 'owner_name' => 'Sin Mandato', 'owner_document' => '', 'status' => 'pendiente', 'requested_amount' => 300000, 'created_at' => time(), 'updated_at' => time()]);
 $legacy = (int) $db->lastInsertId();
 $service->workspace($legacy);

@@ -2760,7 +2760,72 @@
     if (!showMotivo) motivoInput.value = "";
     financiacionWrap.style.display = showFinanciacion ? "" : "none";
     if (!showFinanciacion) financiacionInput.value = "";
+    syncCotizacionFinancingTerm(box);
   }
+
+  // Financiación "Sí" al aprobar: se pregunta a cuántos meses, hasta el máximo del propietario (lo calcula el
+  // servidor con la cotización o, si el formulario no la tiene, con el caso).
+  function loadCotizacionFinancingTermLimit(node, params) {
+    var appRoot = document.querySelector("#scm-app.scm-wrap[data-scm-runtime]");
+    var runtime = (appRoot && parseRuntime(appRoot)) || {};
+    var fd = new FormData();
+    fd.set("action", "scm_cotizacion_financing_term");
+    fd.set("nonce", runtime.nonce || "");
+    Object.keys(params).forEach(function (key) {
+      fd.set(key, params[key] || "");
+    });
+    return fetch(runtime.ajaxUrl || "api.php", { method: "POST", credentials: "same-origin", body: fd })
+      .then(function (response) { return response.json(); })
+      .then(function (json) { return json && json.success ? Number((json.data || {}).max) || 0 : 0; })
+      .catch(function () { return 0; });
+  }
+
+  function syncCotizacionFinancingTerm(box) {
+    if (!box) return;
+    var estado = box.querySelector('select[name="estado_cotizacion"], select[name="estado"]');
+    var financiacion = box.querySelector('select[name="financiacion_cotizacion"], select[name="financiacion"]');
+    var financiacionWrap = box.querySelector(".scm-cotizacion-financiacion");
+    if (!estado || !financiacion || !financiacionWrap) return;
+    var wrap = box.querySelector(".scm-cotizacion-plazo");
+    if (!wrap) {
+      wrap = document.createElement("label");
+      wrap.className = financiacionWrap.className.replace("scm-cotizacion-financiacion", "scm-cotizacion-plazo");
+      wrap.innerHTML = '<span>&iquest;A cu&aacute;ntos meses? <em>*</em></span><input type="number" name="plazo_financiacion" min="1" step="1" inputmode="numeric" placeholder="Escribe los meses"><small data-scm-cotizacion-plazo-hint></small>';
+      financiacionWrap.insertAdjacentElement("afterend", wrap);
+    }
+    var input = wrap.querySelector('input[name="plazo_financiacion"]');
+    var financed = estado.value === "Aprobada" && financiacion.value === "Si";
+    wrap.style.display = financed ? "" : "none";
+    input.required = financed;
+    input.disabled = !financed;
+    if (!financed) {
+      input.value = "";
+      return;
+    }
+    if (wrap.dataset.scmTermLoaded) return;
+    wrap.dataset.scmTermLoaded = "1";
+    var form = box.closest("form") || box;
+    var quoteInput = form.querySelector('[name="id_cotizacion"]');
+    var ticketInput = form.querySelector('[name="ticket_pk"]');
+    var quoteNode = box.closest("[data-cotizacion-id]");
+    var ticketNode = box.closest("[data-ticket-pk]");
+    var hint = wrap.querySelector("[data-scm-cotizacion-plazo-hint]");
+    hint.textContent = "Calculando el plazo máximo…";
+    loadCotizacionFinancingTermLimit(box, {
+      id_cotizacion: (quoteInput && quoteInput.value) || (quoteNode && quoteNode.getAttribute("data-cotizacion-id")) || "",
+      ticket_pk: (ticketInput && ticketInput.value) || (ticketNode && ticketNode.getAttribute("data-ticket-pk")) || "",
+    }).then(function (max) {
+      if (max > 0) input.max = String(max);
+      hint.textContent = max > 0 ? "Máximo " + max + " meses según el contrato del propietario. El crédito queda sujeto a estudio, verificación y aprobación." : "";
+    });
+  }
+
+  document.addEventListener("change", function (event) {
+    var target = event.target;
+    if (!target || !target.matches || !target.matches('select[name="estado_cotizacion"], select[name="estado"], select[name="financiacion_cotizacion"], select[name="financiacion"]')) return;
+    var box = target.closest("[data-scm-cotizacion-response-fields]");
+    if (box) syncCotizacionFinancingTerm(box);
+  });
 
   function initCotizacionResponseFields(scope) {
     if (!scope || !scope.querySelectorAll) return;
@@ -9126,7 +9191,34 @@
     var cotDetails = composer.querySelector("[data-scm-composer-cot-details]");
     var cotMotivo = composer.querySelector("[data-scm-composer-cot-motivo]");
     var cotFin = composer.querySelector("[data-scm-composer-cot-financiacion]");
+    var cotFinInput = composer.querySelector("[data-scm-composer-cot-fin-input]");
+    var cotPlazo = composer.querySelector("[data-scm-composer-cot-plazo]");
+    // Financiación "Sí": a cuántos meses, hasta el máximo del propietario.
+    var syncComposerPlazo = function () {
+      if (!cotPlazo) return;
+      var financed = !!cotStateSelect && cotStateSelect.value === "Aprobada" && !!cotFinInput && cotFinInput.value === "Si";
+      var plazoInput = cotPlazo.querySelector("[data-scm-composer-cot-plazo-input]");
+      cotPlazo.style.display = financed ? "block" : "none";
+      if (!financed) {
+        plazoInput.value = "";
+        return;
+      }
+      if (cotPlazo.dataset.scmTermLoaded) return;
+      cotPlazo.dataset.scmTermLoaded = "1";
+      var hint = cotPlazo.querySelector("[data-scm-composer-cot-plazo-hint]");
+      hint.textContent = "Calculando el plazo máximo…";
+      loadCotizacionFinancingTermLimit(composer, {
+        id_cotizacion: (caseBtn && caseBtn.dataset.cotizacionId) || "",
+        ticket_pk: (caseBtn && (caseBtn.dataset.ticketPk || caseBtn.getAttribute("data-ticket-pk"))) || "",
+      }).then(function (max) {
+        cotPlazo.dataset.scmTermMax = String(max);
+        if (max > 0) plazoInput.max = String(max);
+        hint.textContent = max > 0 ? "Máximo " + max + " meses según el contrato del propietario." : "";
+      });
+    };
+    if (cotFinInput) cotFinInput.addEventListener("change", syncComposerPlazo);
     if (cotStateSelect) {
+      cotStateSelect.addEventListener("change", syncComposerPlazo);
       cotStateSelect.addEventListener("change", function () {
         var val = cotStateSelect.value;
         if (cotDetails) {
@@ -9362,6 +9454,12 @@
             }
             if (finInput && finInput.value) {
               fd.append("financiacion_cotizacion", finInput.value);
+            }
+            var plazoInput = composer.querySelector(
+              "[data-scm-composer-cot-plazo-input]",
+            );
+            if (cotState === "Aprobada" && finInput && finInput.value === "Si" && plazoInput) {
+              fd.append("plazo_financiacion", plazoInput.value);
             }
             if (obsInput && obsInput.value) {
               fd.append("observacion_cotizacion", obsInput.value);
@@ -10160,6 +10258,12 @@
               '<option value="Si">Si</option>' +
               '<option value="No">No</option>' +
               "</select>" +
+              "</label>" +
+              "</div>" +
+              '<div class="scm-composer-cot-plazo" data-scm-composer-cot-plazo style="display:none;">' +
+              '<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;"><span>¿A cuántos meses? <em>*</em></span>' +
+              '<input type="number" min="1" step="1" inputmode="numeric" placeholder="Escribe los meses" data-scm-composer-cot-plazo-input class="scm-input" style="font-size:12px;padding:3px 8px;border-radius:6px;border:1px solid #cbd5e1;">' +
+              '<small data-scm-composer-cot-plazo-hint style="font-weight:400;"></small>' +
               "</label>" +
               "</div>" +
               '<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;"><span>Observación cotización</span>' +

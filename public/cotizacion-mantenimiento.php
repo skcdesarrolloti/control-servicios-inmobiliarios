@@ -48,7 +48,8 @@ try {
           (string) ($_POST['estado'] ?? ''),
           (string) ($_POST['observacion'] ?? ''),
           (string) ($_POST['motivo'] ?? ''),
-          (string) ($_POST['financiacion'] ?? '')
+          (string) ($_POST['financiacion'] ?? ''),
+          (string) ($_POST['plazo_financiacion'] ?? '')
         );
         $ok = (string) ($saved['ok'] ?? '0') === '1';
         if ($ok) {
@@ -144,6 +145,8 @@ session_write_close();
         var approveWrap = form.querySelector("[data-public-quote-response-approve]");
         var rejectSelect = rejectWrap ? rejectWrap.querySelector("select") : null;
         var approveSelect = approveWrap ? approveWrap.querySelector("select") : null;
+        var termWrap = form.querySelector("[data-public-quote-response-term]");
+        var termInput = termWrap ? termWrap.querySelector("input") : null;
         function sync() {
           var value = state ? state.value : "";
           var isApproved = value === "Aprobada";
@@ -165,8 +168,20 @@ session_write_close();
             approveSelect.disabled = !isApproved;
             if (!isApproved) approveSelect.value = "";
           }
+          // Con financiación Sí se pregunta a cuántos meses (hasta el máximo del propietario).
+          var financed = isApproved && approveSelect && approveSelect.value === "Si";
+          if (termWrap) {
+            termWrap.hidden = !financed;
+            termWrap.style.display = financed ? "" : "none";
+          }
+          if (termInput) {
+            termInput.disabled = !financed;
+            termInput.required = financed;
+            if (!financed) termInput.value = "";
+          }
         }
         if (state) state.addEventListener("change", sync);
+        if (approveSelect) approveSelect.addEventListener("change", sync);
         form.addEventListener("submit", function (event) {
           sync();
           if (rejectSelect && !rejectSelect.disabled && !rejectSelect.value) {

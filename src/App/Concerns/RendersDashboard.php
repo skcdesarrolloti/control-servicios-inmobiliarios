@@ -5415,6 +5415,12 @@ trait RendersDashboard
       return '<section class="scm-cotizacion-native-section scm-public-quote-response"><h3>Respuesta registrada</h3><p>Esta cotización ya fue respondida como <strong>' . esc_html($this->cotizacion_clean_text($row['estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? '-')) . '</strong>.</p></section>';
     }
     $destinatario = $this->cotizacion_clean_text($row['destinatario'] ?? '');
+    try {
+      $maxTerm = (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db))->quoteTermLimit((int) $id);
+    } catch (\Throwable $error) {
+      error_log('[public_quote_term] ' . $error->getMessage());
+      $maxTerm = 0;
+    }
     return '<section id="responder-cotizacion" tabindex="-1" class="scm-cotizacion-native-section scm-public-quote-response"><h3>Responder cotización</h3>'
       . '<p>Selecciona tu respuesta para que el equipo de SKC SuCasa Inmobiliaria pueda continuar el proceso.</p>'
       . '<form method="post" class="scm-public-quote-response-form" data-public-quote-response-form>'
@@ -5423,6 +5429,8 @@ trait RendersDashboard
       . '<label><span>Respuesta *</span><select name="estado" required data-public-quote-response-state><option value="">Selecciona</option><option value="Aprobada">Aprobar cotización</option><option value="Desaprobada">Desaprobar cotización</option></select></label>'
       . '<label data-public-quote-response-reject hidden><span>Motivo si desapruebas <em>*</em></span><select name="motivo" disabled><option value="">Selecciona motivo</option><option value="Por costo">Por costo</option><option value="Ejecución por cuenta propia">Ejecución por cuenta propia</option></select></label>'
       . '<label data-public-quote-response-approve hidden><span>Financiación si apruebas</span><select name="financiacion" disabled><option value="">No aplica / sin respuesta</option><option value="Si">Sí</option><option value="No">No</option></select></label>'
+      . '<label data-public-quote-response-term hidden><span>¿A cuántos meses? <em>*</em></span><input type="number" name="plazo_financiacion" min="1"' . ($maxTerm > 0 ? ' max="' . $maxTerm . '"' : '') . ' step="1" inputmode="numeric" placeholder="Escribe los meses" disabled>'
+      . ($maxTerm > 0 ? '<small>Máximo ' . $maxTerm . ' meses. El crédito queda sujeto a estudio, verificación y aprobación.</small>' : '') . '</label>'
       . '<label class="is-wide"><span>Observaciones</span><textarea name="observacion" rows="4" placeholder="Agrega observaciones si deseas complementar la respuesta."></textarea></label>'
       . '<button type="submit">Guardar respuesta</button>'
       . '</form></section>';

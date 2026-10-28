@@ -23920,7 +23920,7 @@
       var current = button.getAttribute('data-financiacion') || '';
       return window.Swal.fire({
         title: 'Financiamiento de cotización #' + id,
-        html: '<div class="scm-cotizacion-response-form"><label class="scm-cotizacion-dialog-field"><span>¿Requiere financiamiento? <em>*</em></span><select data-scm-quote-financing><option value="">Selecciona una opción</option><option value="Si">Sí</option><option value="No">No</option></select></label></div>',
+        html: '<div class="scm-cotizacion-response-form"><label class="scm-cotizacion-dialog-field"><span>¿Requiere financiamiento? <em>*</em></span><select data-scm-quote-financing><option value="">Selecciona una opción</option><option value="Si">Sí</option><option value="No">No</option></select></label>' + '<label class="scm-cotizacion-dialog-field" data-scm-quote-financing-term hidden><span>¿A cuántos meses? <em>*</em></span><input type="number" min="1" step="1" inputmode="numeric" placeholder="Escribe los meses" data-scm-quote-financing-term-input><small data-scm-quote-financing-term-hint></small></label>' + '</div>',
         width: 'min(540px, 94vw)',
         showCloseButton: true,
         showCancelButton: true,
@@ -23941,15 +23941,21 @@
           closeButton: 'scm-swal-close-round scm-cotizacion-dialog-close'
         },
         didOpen: function(){
-          var select = window.Swal.getPopup().querySelector('[data-scm-quote-financing]');
+          var popup = window.Swal.getPopup();
+          var select = popup.querySelector('[data-scm-quote-financing]');
           select.value = current;
+          select.addEventListener('change', function(){ syncQuoteFinancingTerm(popup, select.value === 'Si', { id_cotizacion: id }); });
+          syncQuoteFinancingTerm(popup, current === 'Si', { id_cotizacion: id });
           select.focus();
         },
         preConfirm: function(){
-          var value = window.Swal.getPopup().querySelector('[data-scm-quote-financing]').value;
+          var popup = window.Swal.getPopup();
+          var value = popup.querySelector('[data-scm-quote-financing]').value;
           if (!['Si','No'].includes(value)) { window.Swal.showValidationMessage('Selecciona Sí o No.'); return false; }
+          var termError = quoteFinancingTermError(popup);
+          if (termError) { window.Swal.showValidationMessage(termError); return false; }
           var fd = new FormData();
-          fd.set('action','scm_cotizacion_financing');fd.set('nonce',nonce);fd.set('id_cotizacion',id);fd.set('financiacion',value);
+          fd.set('action','scm_cotizacion_financing');fd.set('nonce',nonce);fd.set('id_cotizacion',id);fd.set('financiacion',value);fd.set('plazo_financiacion',quoteFinancingTermValue(popup));
           return fetch(ajaxUrl,{method:'POST',credentials:'same-origin',body:fd}).then(function(response){return response.json();}).then(function(json){
             if (!json.success) throw new Error((json.data||{}).message||'No se pudo guardar.');
             return value;
@@ -23970,6 +23976,50 @@
         if(typeof options.onClose==='function')options.onClose();
         return result;
       });
+    }
+
+    // Financiación "Sí": se pregunta a cuántos meses, hasta el máximo del propietario (lo calcula el servidor).
+    function loadQuoteFinancingTermLimit(params) {
+      var fd = new FormData();
+      fd.set('action', 'scm_cotizacion_financing_term');
+      fd.set('nonce', nonce);
+      Object.keys(params || {}).forEach(function (key) { fd.set(key, params[key] || ''); });
+      return fetch(ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+        .then(function (response) { return response.json(); })
+        .then(function (json) { return json && json.success ? Number((json.data || {}).max) || 0 : 0; })
+        .catch(function () { return 0; });
+    }
+
+    // Muestra u oculta el campo de meses del popup según la financiación elegida y pide el máximo una sola vez.
+    function syncQuoteFinancingTerm(scope, financed, params) {
+      var wrap = scope.querySelector('[data-scm-quote-financing-term]');
+      if (!wrap) return;
+      var input = wrap.querySelector('[data-scm-quote-financing-term-input]');
+      var hint = wrap.querySelector('[data-scm-quote-financing-term-hint]');
+      wrap.hidden = !financed;
+      if (!financed) { input.value = ''; return; }
+      if (wrap._scmTermLoaded) return;
+      wrap._scmTermLoaded = true;
+      hint.textContent = 'Calculando el plazo máximo…';
+      loadQuoteFinancingTermLimit(params).then(function (max) {
+        wrap._scmTermMax = max;
+        if (max > 0) input.max = String(max);
+        hint.textContent = max > 0 ? 'Máximo ' + max + ' meses según el contrato del propietario. El crédito queda sujeto a estudio, verificación y aprobación.' : '';
+      });
+    }
+
+    function quoteFinancingTermError(scope) {
+      var wrap = scope.querySelector('[data-scm-quote-financing-term]');
+      if (!wrap || wrap.hidden) return '';
+      var term = Number(wrap.querySelector('[data-scm-quote-financing-term-input]').value) || 0;
+      if (term < 1 || Math.floor(term) !== term) return 'Indica a cuántos meses se financia.';
+      if (wrap._scmTermMax > 0 && term > wrap._scmTermMax) return 'El plazo máximo es de ' + wrap._scmTermMax + ' meses.';
+      return '';
+    }
+
+    function quoteFinancingTermValue(scope) {
+      var wrap = scope.querySelector('[data-scm-quote-financing-term]');
+      return wrap && !wrap.hidden ? wrap.querySelector('[data-scm-quote-financing-term-input]').value : '';
     }
 
     function openCotizacionActaFromCard(target, options) {
@@ -25511,6 +25561,7 @@
             '<label class="scm-cotizacion-dialog-field"><span>Respuesta <em>*</em></span><select id="swal-cot-estado"><option value="">Selecciona una respuesta</option><option value="Aprobada">Aprobada</option><option value="Desaprobada">Desaprobada</option></select></label>' +
             '<label class="scm-cotizacion-dialog-field" id="swal-cot-motivo-wrap" hidden><span>Motivo <em>*</em></span><select id="swal-cot-motivo"><option value="">Selecciona un motivo</option><option value="Por costo">Por costo</option><option value="Ejecución por cuenta propia">Ejecución por cuenta propia</option></select></label>' +
             '<label class="scm-cotizacion-dialog-field" id="swal-cot-fin-wrap" hidden><span>Financiación</span><select id="swal-cot-fin"><option value="">No aplica / sin respuesta</option><option value="Si">Sí</option><option value="No">No</option></select></label>' +
+            '<label class="scm-cotizacion-dialog-field" data-scm-quote-financing-term hidden><span>¿A cuántos meses? <em>*</em></span><input type="number" min="1" step="1" inputmode="numeric" placeholder="Escribe los meses" data-scm-quote-financing-term-input><small data-scm-quote-financing-term-hint></small></label>' +
             '<label class="scm-cotizacion-dialog-field is-wide"><span>Observaciones</span><textarea id="swal-cot-observacion" rows="5" placeholder="Agrega contexto para el equipo">Ninguna</textarea><small>Este comentario quedará asociado a la respuesta de la cotización.</small></label>' +
             "</div></div>",
           width: "min(700px, 94vw)",
@@ -25536,6 +25587,13 @@
             var estado = document.getElementById("swal-cot-estado");
             var motivoWrap = document.getElementById("swal-cot-motivo-wrap");
             var finWrap = document.getElementById("swal-cot-fin-wrap");
+            var fin = document.getElementById("swal-cot-fin");
+            var popup = window.Swal.getPopup();
+            var termParams = { id_cotizacion: responseBtn.getAttribute("data-cotizacion-id") || "", ticket_pk: ticketPk };
+            var syncTerm = function () {
+              syncQuoteFinancingTerm(popup, !!estado && estado.value === "Aprobada" && !!fin && fin.value === "Si", termParams);
+            };
+            if (fin) fin.addEventListener("change", syncTerm);
             if (estado) {
               estado.focus();
               estado.addEventListener("change", function () {
@@ -25543,6 +25601,7 @@
                 var isYes = estado.value === "Aprobada";
                 if (motivoWrap) motivoWrap.hidden = !isNo;
                 if (finWrap) finWrap.hidden = !isYes;
+                syncTerm();
               });
             }
           },
@@ -25559,10 +25618,16 @@
               window.Swal.showValidationMessage("Elige el motivo.");
               return false;
             }
+            var termError = quoteFinancingTermError(window.Swal.getPopup());
+            if (termError) {
+              window.Swal.showValidationMessage(termError);
+              return false;
+            }
             return {
               estado: estado.value,
               motivo: motivo ? motivo.value : "",
               financiacion: financiacion ? financiacion.value : "",
+              plazo: quoteFinancingTermValue(window.Swal.getPopup()),
               observacion: observacion ? observacion.value : "Ninguna",
             };
           },
@@ -25583,6 +25648,7 @@
           fd.append("estado", responseData.estado || "");
           fd.append("motivo", responseData.motivo || "");
           fd.append("financiacion", responseData.financiacion || "");
+          if (responseData.financiacion === "Si") fd.append("plazo_financiacion", responseData.plazo || "");
           fd.append("observacion", responseData.observacion || "Ninguna");
           return submitCotizacionAction(
             fd,

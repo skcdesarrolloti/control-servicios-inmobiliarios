@@ -8,9 +8,12 @@ final class QuotationFinancingService
 {
   public function __construct(private Database $db, private SchemaInspector $schema) {}
 
-  public function update(int $id, string $value, array $actor): void
+  /** $term: meses a los que se financia (obligatorio con "Sí"). */
+  public function update(int $id, string $value, array $actor, int $term = 0): void
   {
     if ($id <= 0 || !in_array($value, ['Si','No'], true)) throw new \DomainException('Selecciona Sí o No para el financiamiento.');
+    $credits = new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db, null, $this->schema);
+    if ($value === 'Si') $credits->assertQuoteTerm($id, $term);
     $employee = trim((string) ($actor['employee_id'] ?? ''));
     if ($employee === '') throw new \DomainException('No se pudo identificar al funcionario.');
     $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
@@ -26,7 +29,7 @@ final class QuotationFinancingService
         $this->db->update($table, $this->schema->filterTableData($table, ['financiacion'=>$value,'cct_modified'=>$now]), ['_ID'=>$id]);
         $historyTable = $this->db->table('jet_cct_historial_del_ticket');
         if ($this->schema->tableExists($historyTable)) {
-          $message = 'Financiamiento de cotización #' . $id . ': ' . ($old !== '' ? $old : 'Sin definir') . ' → ' . $value . '.';
+          $message = 'Financiamiento de cotización #' . $id . ': ' . ($old !== '' ? $old : 'Sin definir') . ' → ' . $value . ($value === 'Si' ? ' a ' . $term . ' meses' : '') . '.';
           $history = $this->schema->filterTableData($historyTable, [
             'cct_status'=>'publish','cct_author_id'=>$employee,'id_empleado'=>$employee,
             'cct_created'=>$now,'cct_modified'=>$now,'fecha'=>time(),'id_ticket'=>$quote['id_ticket'] ?? '',
@@ -38,8 +41,7 @@ final class QuotationFinancingService
       }
       $pdo->commit();
     } catch (\Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
-    if ($old !== $value) {
-      (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db, null, $this->schema))->syncFromQuote($id, $value, $actor);
-    }
+    // Con "Sí" también se sincroniza si solo cambió el plazo.
+    if ($old !== $value || $value === 'Si') $credits->syncFromQuote($id, $value, $actor, $value === 'Si' ? $term : 0);
   }
 }
