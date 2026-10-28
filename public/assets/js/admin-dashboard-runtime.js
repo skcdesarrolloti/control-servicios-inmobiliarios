@@ -24812,6 +24812,29 @@
       target.click();
     }
 
+    // Registro de cambios de la cotización (p. ej. % de administración frente al sugerido) en un popup interno.
+    function openCotizacionChangeLog(button) {
+      var card = button.closest(".scm-cotizacion-card");
+      var template = card ? card.querySelector("template[data-scm-cotizacion-change-log-template]") : null;
+      if (!template || !window.Swal) return;
+      window.Swal.fire({
+        title: "Cambios de la cotización #" + (card.getAttribute("data-cotizacion-id") || ""),
+        html: template.innerHTML,
+        width: "min(620px, 94vw)",
+        showCloseButton: true,
+        confirmButtonText: "Cerrar",
+        buttonsStyling: false,
+        customClass: {
+          popup: "scm-cotizacion-dialog",
+          title: "scm-cotizacion-dialog-title",
+          htmlContainer: "scm-cotizacion-dialog-body",
+          actions: "scm-cotizacion-dialog-actions",
+          confirmButton: "scm-cotizacion-dialog-cancel",
+          closeButton: "scm-swal-close-round scm-cotizacion-dialog-close",
+        },
+      });
+    }
+
     function toggleCotizacionFinancePanel(financeBtn) {
       if (!financeBtn) return false;
       var panelKey = financeBtn.getAttribute("data-scm-cotizacion-toggle-panel") || "";
@@ -25413,6 +25436,16 @@
       if (financeBtn) {
         e.preventDefault();
         toggleCotizacionFinancePanel(financeBtn);
+        return;
+      }
+
+      var changeLogBtn =
+        e.target && e.target.closest
+          ? e.target.closest("[data-scm-cotizacion-change-log-open]")
+          : null;
+      if (changeLogBtn) {
+        e.preventDefault();
+        openCotizacionChangeLog(changeLogBtn);
         return;
       }
 

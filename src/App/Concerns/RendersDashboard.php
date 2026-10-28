@@ -4990,13 +4990,22 @@ trait RendersDashboard
       ? $row['_scm_cambios']
       : ((new \SCM\Modules\QuoteFee\QuoteChangeLog($this->db))->forQuotes([$id])[$id] ?? []);
     $cambiosHtml = '';
+    // "Ver cambios" aparece cuando algún envío usó un % distinto al sugerido.
+    $ajusteFrenteSugerido = false;
     foreach ($cambios as $cambio) {
+      $sugeridoCambio = trim((string) ($cambio['valor_sugerido'] ?? ''));
+      if ($sugeridoCambio !== '' && abs((float) $sugeridoCambio - (float) ($cambio['valor_nuevo'] ?? 0)) >= 0.005) $ajusteFrenteSugerido = true;
       $cuando = (int) ($cambio['created_at'] ?? 0) > 0 ? date('d/m/Y H:i', (int) $cambio['created_at']) : '';
       $quien = trim((string) ($cambio['empleado_nombre'] ?? ''));
       $cambiosHtml .= '<li><span>' . esc_html(\SCM\Modules\QuoteFee\QuoteChangeLog::describe($cambio)) . '</span><small>' . esc_html(trim($cuando . ($quien !== '' ? ' · ' . $quien : ''))) . '</small></li>';
     }
+    $verCambiosHtml = '';
     if ($cambiosHtml !== '') {
       $cambiosHtml = '<div class="scm-cotizacion-change-log"><h4>Registro de cambios <em>Solo visible en el panel</em></h4><ul>' . $cambiosHtml . '</ul></div>';
+      if ($ajusteFrenteSugerido) {
+        $verCambiosHtml = '<button type="button" class="scm-case-work-btn" data-scm-cotizacion-change-log-open>Ver cambios</button>'
+          . '<template data-scm-cotizacion-change-log-template>' . $cambiosHtml . '</template>';
+      }
     }
     $ivaAdmonPct = trim((string) ($row['iva'] ?? ''));
     $totalAdmonValue = $this->cotizacion_money_value($row, ['total_admon']);
@@ -5096,7 +5105,7 @@ trait RendersDashboard
     return '<article class="scm-cotizacion-card card" data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '" data-cot-fecha-envio="' . esc_attr((string) $fechaEnvioTs) . '" data-cot-dias-calendario="' . esc_attr((string) $diasCalendarioSinRespuesta) . '" data-cot-seguimiento-reparaciones-disponible="' . esc_attr($seguimientoReparacionesDisponible ? '1' : '0') . '">'
       . '<div class="scm-cotizacion-main"><div><span class="scm-ticket-badge badge badge-primary">#' . esc_html($id) . '</span><h3>' . esc_html($direccion !== '' ? $direccion : 'Cotizacion de mantenimiento') . '</h3><p>Caso <strong>#' . esc_html($ticket !== '' ? $ticket : '-') . '</strong> · Inmueble <strong>' . esc_html($inmueble !== '' ? $inmueble : '-') . '</strong> · Contrato <strong>' . esc_html($contrato !== '' ? $contrato : '-') . '</strong></p></div><div class="scm-cotizacion-status"><span class="scm-cotizacion-pill ' . ($enviada ? 'is-sent' : 'is-pending') . '">' . ($enviada ? 'Fue enviada' : 'Sin enviar') . '</span><span class="scm-cotizacion-pill is-state">' . esc_html($estado !== '' ? $estado : 'Sin estado') . '</span></div></div>'
       . '<div class="scm-cotizacion-meta"><div><span>Fecha</span><strong>' . esc_html($fecha) . '</strong></div><div><span>Destinatario</span><strong>' . esc_html($destinatario !== '' ? $destinatario : '-') . '</strong></div><div><span>Contacto</span><strong>' . esc_html($contacto !== '' ? $contacto : '-') . '</strong></div><div><span>Creada por</span><strong>' . esc_html($empleado !== '' ? $empleado : '-') . '</strong></div><div><span>Ordenes</span><strong>' . esc_html($ordenesTotal) . '</strong></div></div>'
-      . '<div class="scm-cotizacion-finance-actions"><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="saldos" aria-expanded="false">Ver saldos</button><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="totales" aria-expanded="false">Ver totales</button></div>'
+      . '<div class="scm-cotizacion-finance-actions"><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="saldos" aria-expanded="false">Ver saldos</button><button type="button" class="scm-case-work-btn" data-scm-cotizacion-toggle-panel="totales" aria-expanded="false">Ver totales</button>' . $verCambiosHtml . '</div>'
       . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="saldos" hidden><div class="scm-cotizacion-finance-grid"><div><span>Saldo mano de obra</span><strong>' . esc_html($saldoObra) . '</strong></div><div><span>Saldo materiales</span><strong>' . esc_html($saldoMateriales) . '</strong></div><div><span>Saldo equipos</span><strong>' . esc_html($saldoMaquinarias) . '</strong></div><div><span>Saldo otros costos</span><strong>' . esc_html($saldoOtros) . '</strong></div></div></div>'
       . '<div class="scm-cotizacion-finance-panel" data-scm-cotizacion-finance-panel="totales" hidden><div class="scm-cotizacion-finance-grid"><div><span>Total mano de obra</span><strong>' . esc_html($totalObra) . '</strong></div><div><span>Total materiales</span><strong>' . esc_html($totalMateriales) . '</strong></div><div><span>Total equipos</span><strong>' . esc_html($totalMaquinarias) . '</strong></div><div><span>Total otros costos</span><strong>' . esc_html($totalOtros) . '</strong></div><div><span>Administraci&oacute;n' . ($porcentajeAdmon !== '' ? ' ' . esc_html($porcentajeAdmon) . '%' : '') . '</span><strong>' . esc_html($totalAdmon) . '</strong>' . ($porcentajeAdmonTraza !== '' ? '<small class="scm-cotizacion-fee-trace">' . esc_html($porcentajeAdmonTraza) . '</small>' : '') . '</div><div><span>IVA admon' . ($ivaAdmonPct !== '' ? ' ' . esc_html($ivaAdmonPct) . '%' : '') . '</span><strong>' . esc_html($ivaAdmon) . '</strong></div><div><span>Total admon + IVA</span><strong>' . esc_html($totalAdmonMasIva) . '</strong></div><div class="scm-cotizacion-finance-total"><span>Total cotizaci&oacute;n</span><strong>' . esc_html($totalCotizacion) . '</strong></div></div>' . $cambiosHtml . '</div>'
       // Aviso (no acción): con los saldos en cero ya no se pueden registrar órdenes sobre esta cotización.
