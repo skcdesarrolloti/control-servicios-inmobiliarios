@@ -10603,29 +10603,121 @@
   cursor: pointer;
 }
 
-.scm-quote-fee-breakdown {
-  grid-column: 1 / -1;
-  border: 1px solid #fed7aa;
-  border-radius: 12px;
-  padding: 12px 14px;
-  background: #fffbeb;
-  text-align: left;
+.scm-cotizacion-response-swal {
+  position: relative;
 }
 
-.scm-quote-fee-breakdown[hidden] {
+.scm-quote-fee-popover {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  border-radius: inherit;
+  background: rgba(8, 34, 71, 0.38);
+  backdrop-filter: blur(3px);
+  animation: scm-quote-fee-fade 0.16s ease-out;
+}
+
+.scm-quote-fee-popover[hidden] {
   display: none;
 }
 
+@keyframes scm-quote-fee-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scm-quote-fee-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.scm-quote-fee-breakdown {
+  width: min(460px, 100%);
+  max-height: calc(100% - 8px);
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 18px 20px 16px;
+  background: #fff;
+  box-shadow: 0 24px 48px -12px rgba(8, 34, 71, 0.35);
+  text-align: left;
+  animation: scm-quote-fee-pop 0.18s ease-out;
+}
+
+.scm-quote-fee-breakdown header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.scm-quote-fee-eyebrow {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.scm-quote-fee-breakdown h3 {
+  margin: 6px 0 0;
+  color: #082247;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.scm-quote-fee-close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.scm-quote-fee-close:hover,
+.scm-quote-fee-close:focus-visible {
+  background: #f1f5f9;
+  color: #082247;
+  outline: none;
+}
+
 .scm-quote-fee-breakdown p {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f8fafc;
   color: #475569;
   font-size: 12px;
   line-height: 1.5;
 }
 
+.scm-quote-fee-breakdown p strong {
+  color: #082247;
+}
+
 .scm-quote-fee-breakdown ol {
   display: grid;
-  gap: 6px;
+  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -10634,9 +10726,10 @@
 .scm-quote-fee-breakdown li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: 12px;
-  padding: 7px 0;
-  border-top: 1px dashed #fde68a;
+  column-gap: 16px;
+  row-gap: 2px;
+  padding: 10px 0;
+  border-top: 1px solid #f1f5f9;
 }
 
 .scm-quote-fee-breakdown li:first-child {
@@ -10645,16 +10738,17 @@
 
 .scm-quote-fee-breakdown li span {
   color: #082247;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 12.5px;
+  font-weight: 700;
 }
 
 .scm-quote-fee-breakdown li em {
   grid-column: 1;
   color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px;
   font-style: normal;
-  line-height: 1.45;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
@@ -10664,13 +10758,26 @@
   align-self: center;
   color: #082247;
   font-size: 13px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
+.scm-quote-fee-breakdown li.is-total {
+  margin-top: 6px;
+  padding: 12px 14px;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+}
+
+.scm-quote-fee-breakdown li.is-total span {
+  color: #9a3412;
+}
+
 .scm-quote-fee-breakdown li.is-total strong {
-  color: #b45309;
-  font-size: 15px;
+  color: #c2410c;
+  font-size: 18px;
 }
 
 #scm-app .scm-cotizacion-finance-grid .scm-cotizacion-fee-trace {

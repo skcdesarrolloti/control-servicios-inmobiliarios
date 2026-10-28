@@ -24383,15 +24383,18 @@
       var adicional = Number(d.x) > 0
         ? '<li><span>Adicional por reparación pequeña</span><em>x = 1 − ' + money(d.subtotal) + ' ÷ ' + money(d.transicion) + ' = ' + num(d.x) + '<br>' + curva + '</em><strong>' + money(d.adicional) + '</strong></li>'
         : '<li><span>Adicional por reparación pequeña</span><em>El subtotal llega a la transición T (' + money(d.transicion) + '): no lleva adicional.</em><strong>' + money(0) + '</strong></li>';
-      return '<div class="scm-quote-fee-breakdown" id="swal-send-cot-calculo" hidden>' +
-        '<p>Las reparaciones pequeñas llevan un % mayor para cubrir el costo fijo de gestionarlas; a partir de ' + money(d.transicion) + ' solo se cobra la tarifa base. Variables en Configuración › Honorarios de cotización.</p>' +
+      return '<div class="scm-quote-fee-popover" id="swal-send-cot-calculo" role="dialog" aria-modal="true" aria-labelledby="swal-send-cot-calculo-title" hidden>' +
+        '<div class="scm-quote-fee-breakdown">' +
+        '<header><div><span class="scm-quote-fee-eyebrow">% sugerido</span><h3 id="swal-send-cot-calculo-title">¿Cómo se calcula?</h3></div>' +
+        '<button type="button" class="scm-quote-fee-close" id="swal-send-cot-calculo-cerrar" aria-label="Cerrar cálculo">×</button></header>' +
+        '<p>Las reparaciones pequeñas llevan un % mayor para cubrir el costo fijo de gestionarlas; a partir de <strong>' + money(d.transicion) + '</strong> solo se cobra la tarifa base. Variables en Configuración › Honorarios de cotización.</p>' +
         '<ol>' +
         '<li><span>Subtotal trabajos</span><em>Materiales + mano de obra + equipos + otros costos</em><strong>' + money(d.subtotal) + '</strong></li>' +
         '<li><span>Tarifa base</span><em>' + money(d.subtotal) + ' × ' + pct(d.tarifa) + '</em><strong>' + money(d.base) + '</strong></li>' +
         adicional +
         '<li><span>Honorario</span><em>Tarifa base + adicional</em><strong>' + money(d.honorario) + '</strong></li>' +
         '<li class="is-total"><span>% sugerido</span><em>' + money(d.honorario) + ' ÷ ' + money(d.subtotal) + '</em><strong>' + pct(d.porcentaje) + '</strong></li>' +
-        '</ol></div>';
+        '</ol></div></div>';
     }
 
     function openSendCotizacionModal(button, options) {
@@ -24485,11 +24488,35 @@
           var verCalculo = document.getElementById("swal-send-cot-ver-calculo");
           var calculo = document.getElementById("swal-send-cot-calculo");
           if (verCalculo && calculo) {
+            // Mini popup sobre el modal: se monta en el popup de Swal para no desplazar la grilla del formulario.
+            var popup = window.Swal.getPopup();
+            if (popup) popup.appendChild(calculo);
+            var setCalculoOpen = function (open) {
+              calculo.hidden = !open;
+              verCalculo.setAttribute("aria-expanded", open ? "true" : "false");
+              if (open) {
+                var cerrar = document.getElementById("swal-send-cot-calculo-cerrar");
+                if (cerrar) cerrar.focus();
+              } else {
+                verCalculo.focus();
+              }
+            };
             verCalculo.addEventListener("click", function (event) {
               event.preventDefault();
-              calculo.hidden = !calculo.hidden;
-              verCalculo.setAttribute("aria-expanded", calculo.hidden ? "false" : "true");
-              verCalculo.textContent = calculo.hidden ? "¿Por qué este %?" : "Ocultar cálculo";
+              setCalculoOpen(calculo.hidden);
+            });
+            calculo.addEventListener("click", function (event) {
+              if (event.target === calculo || event.target.closest("#swal-send-cot-calculo-cerrar")) {
+                event.preventDefault();
+                setCalculoOpen(false);
+              }
+            });
+            calculo.addEventListener("keydown", function (event) {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                setCalculoOpen(false);
+              }
             });
           }
           if (pct) pct.addEventListener("input", function () { syncTotals(); syncSuggested(); });
