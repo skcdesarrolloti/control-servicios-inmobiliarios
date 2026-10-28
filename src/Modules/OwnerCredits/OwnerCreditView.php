@@ -630,7 +630,7 @@ final class OwnerCreditView
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . UI::icon('bolt') . 'Avisos</h4><div class="' . $grid . '">'
       . $field('Exigir pagaré firmado para aprobar', $yesNo('require_promissory', (bool) ($settings['require_promissory'] ?? true)), 'Pagaré en blanco y carta de instrucciones firmados por quienes elija el analista. Cada persona lo firma una vez y sirve para todos sus créditos.')
       . $field('Correo al propietario al registrar la solicitud', $yesNo('notify_owner_request_email', (bool) $settings['notify_owner_request_email']), 'Le confirma que realizó la solicitud (valor, plazo, destinación, contrato y la cotización si viene de una) y que queda sujeta a estudio, verificación y aprobación.')
-      . $field('WhatsApp al propietario al registrar la solicitud', $yesNo('notify_owner_request_whatsapp', (bool) $settings['notify_owner_request_whatsapp']), 'Plantilla scm_credito_propietario_solicitud_v2.')
+      . $field('WhatsApp al propietario al registrar la solicitud', $yesNo('notify_owner_request_whatsapp', (bool) $settings['notify_owner_request_whatsapp']), 'Plantilla scm_credito_propietario_solicitud_v1.')
       . $field('Correo al propietario al decidir', $yesNo('notify_owner_email', (bool) $settings['notify_owner_email']), 'Condiciones y tabla de amortización.')
       . $field('WhatsApp al propietario al decidir', $yesNo('notify_owner_whatsapp', (bool) $settings['notify_owner_whatsapp']), 'Plantilla scm_credito_propietario_decision_v1.')
       . $field('WhatsApp a funcionarios', $yesNo('notify_staff_whatsapp', (bool) $settings['notify_staff_whatsapp']), 'Al solicitar y al decidir. Plantilla scm_credito_propietario_funcionario_v2.')

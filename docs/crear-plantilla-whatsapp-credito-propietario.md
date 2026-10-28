@@ -2,9 +2,9 @@
 
 ## Plantilla para el propietario al registrar la solicitud
 
-Se envía al **propietario** cuando se registra su solicitud de crédito, desde **Nueva solicitud** o desde una cotización con financiación **Sí**. Le confirma que realizó la solicitud y le recuerda que queda sujeta a estudio, verificación y aprobación; no es una aprobación. Reemplaza a `scm_credito_propietario_solicitud_v1`. Solo se envía si en **Configuración** de créditos está activo **WhatsApp al propietario al registrar la solicitud**. El correo de confirmación sale aparte, con su propia opción.
+Se envía al **propietario** cuando se registra su solicitud de crédito, desde **Nueva solicitud** o desde una cotización con financiación **Sí**. Le confirma que realizó la solicitud y le recuerda que queda sujeta a estudio, verificación y aprobación; no es una aprobación. Si ya existía con el texto anterior ("Recibimos su solicitud…"), edítala en Meta con este cuerpo: mismo nombre, idioma y 3 variables. Solo se envía si en **Configuración** de créditos está activo **WhatsApp al propietario al registrar la solicitud**. El correo de confirmación sale aparte, con su propia opción.
 
-- Nombre exacto: `scm_credito_propietario_solicitud_v2`.
+- Nombre exacto: `scm_credito_propietario_solicitud_v1`.
 - Categoría: **Utilidad** (`UTILITY`): confirma una solicitud que hizo el propietario.
 - Idioma: **Español (Colombia)** (`es_CO`).
 - Variables: **numéricas**.

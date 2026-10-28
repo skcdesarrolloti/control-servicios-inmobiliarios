@@ -1694,7 +1694,7 @@ final class OwnerCreditService
         $params = [$credit['owner_name'] ?: 'Propietario', $request, (string) $credit['contract_code']];
         $ok = (new SmsQueue($this->db))->enqueue((string) $credit['owner_phone'], (string) $credit['owner_name'], 'Usted realizó una solicitud de crédito por ' . $request . ' (contrato #' . $credit['contract_code'] . '). El crédito queda sujeto a estudio, verificación y aprobación.', [
           'source_module' => 'creditos_propietarios', 'dedupe_key' => 'owner-credit-request-wa:' . $dedupe,
-          'template_name' => 'scm_credito_propietario_solicitud_v2', 'template_language' => 'es_CO',
+          'template_name' => 'scm_credito_propietario_solicitud_v1', 'template_language' => 'es_CO',
           'template_components' => [['type' => 'body', 'parameters' => array_map(static fn(string $text): array => ['type' => 'text', 'text' => mb_substr(trim($text), 0, 300)], $params)]],
           'credit_id' => (int) $credit['id'],
         ]);
