@@ -5,13 +5,14 @@
   "components": [
     {
       "type": "BODY",
-      "text": "Buen día, {{1}}.\n\nUsted realizó una solicitud de crédito por {{2}} asociada al contrato #{{3}}.\n\nRecuerde que el crédito queda sujeto a estudio, verificación y aprobación. Le informaremos el resultado por este medio.",
+      "text": "Hola, {{1}}.\n\nUsted realizó una solicitud de crédito por {{2}} asociada al contrato #{{3}}.\n\nRecuerde que el crédito queda sujeto a estudio, verificación y aprobación. Le informaremos el resultado por este medio.\n\nAtentamente,\n{{4}}\n\nGracias por confiar en nosotros.",
       "example": {
         "body_text": [
           [
             "David Esquivia Polo",
             "$893.723 a 12 meses para financiar la cotización #574",
-            "817"
+            "817",
+            "Royner Guardo · Coordinador de mantenimiento · mantenimiento@sucasa.com"
           ]
         ]
       }

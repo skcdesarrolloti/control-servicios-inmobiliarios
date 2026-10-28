@@ -359,12 +359,12 @@ final class QuoteMetricsReport
     // Mediodía en Colombia para que la fecha no cambie de día por zona horaria.
     $timestamp = (new DateTimeImmutable($date . ' 12:00:00', $this->timezone))->getTimestamp();
     $guard = $overwrite ? 'CAST(COALESCE(`fecha_respuesta`, 0) AS SIGNED) = ?' : 'CAST(COALESCE(`fecha_respuesta`, 0) AS SIGNED) = 0';
-    $args = [$timestamp, (new DateTimeImmutable('now', $this->timezone))->format('Y-m-d H:i:s'), $actorEmployeeId, $quoteId];
+    $args = [$timestamp, (new DateTimeImmutable('now', $this->timezone))->format('Y-m-d H:i:s'), $quoteId];
     if ($overwrite) {
       $args[] = (int) ($quote['fecha_respuesta'] ?? 0);
     }
     $stmt = $this->db->pdo()->prepare(
-      "UPDATE `{$table}` SET `fecha_respuesta` = ?, `cct_modified` = ?, `cct_author_id` = ?
+      "UPDATE `{$table}` SET `fecha_respuesta` = ?, `cct_modified` = ?
        WHERE `_ID` = ? AND `estado` = 'Aprobada' AND {$guard}"
     );
     $stmt->execute($args);
@@ -434,7 +434,7 @@ final class QuoteMetricsReport
       if ($match === null) {
         continue;
       }
-      $data = ['inmueble' => $match['inmueble'], 'cct_modified' => $now, 'cct_author_id' => $actorEmployeeId];
+      $data = ['inmueble' => $match['inmueble'], 'cct_modified' => $now];
       if ($match['contrato'] !== '' && self::missingContract((string) ($row['contrato'] ?? ''))) {
         $data['contrato'] = $match['contrato'];
       }
@@ -513,7 +513,7 @@ final class QuoteMetricsReport
       return ['id' => $quoteId, 'total' => $oldTotal, 'admin' => $oldAdmin];
     }
     $now = (new DateTimeImmutable('now', $this->timezone))->format('Y-m-d H:i:s');
-    $this->db->update($table, $data + ['cct_modified' => $now, 'cct_author_id' => $actorEmployeeId], ['_ID' => $quoteId]);
+    $this->db->update($table, $data + ['cct_modified' => $now], ['_ID' => $quoteId]);
 
     $this->logEdit($quoteId, ['total' => $oldTotal, 'admin' => $oldAdmin], ['total' => $newTotal, 'admin' => $newAdmin], $actorEmployeeId, $now);
     return ['id' => $quoteId, 'total' => $newTotal, 'admin' => $newAdmin];
@@ -589,7 +589,7 @@ final class QuoteMetricsReport
       return $result;
     }
     $now = (new DateTimeImmutable('now', $this->timezone))->format('Y-m-d H:i:s');
-    $this->db->update($table, $data + ['cct_modified' => $now, 'cct_author_id' => $actorEmployeeId], ['_ID' => $quoteId]);
+    $this->db->update($table, $data + ['cct_modified' => $now], ['_ID' => $quoteId]);
     if ($newResponse !== null && $newResponse !== $oldResponse) {
       $this->recordReviews([['id' => $quoteId, 'respuesta' => $newResponse]], $actorEmployeeId);
     }

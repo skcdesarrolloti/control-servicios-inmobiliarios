@@ -1202,7 +1202,6 @@ trait WorkflowCommandsConcern
     $userName = \SCM\Core\Auth::user() ?: ($userId > 0 ? ('Usuario #' . $userId) : 'Sistema');
     $userInfo = $this->findFuncionario($userId);
     $employeeId = $this->employeeLogicalId($userId, $userInfo);
-    $ticketEmployeeId = $this->ticketEmployeeId($ticket, $employeeId);
     $cotUpdate = [
       'estado' => $estado,
       'estado_respuesta_cotizacion_mantenimiento' => $estado,
@@ -1213,9 +1212,7 @@ trait WorkflowCommandsConcern
       'tuvo_seguimiento' => 'Si',
       'fecha_seguimiento' => $nowTs,
       'cct_modified' => $nowMysql,
-      'cct_author_id' => $employeeId,
-      'id_empleado' => $ticketEmployeeId,
-      'id_coordinador' => $employeeId,
+      // Quien creó la cotización no cambia al responderla: quién registró la respuesta queda en los historiales.
     ];
     $cotUpdate = $this->schema->filterTableData($cotTable, $cotUpdate);
     $updated = $this->updateCotizacionesByIds($cotTable, $cotIds, $cotUpdate);

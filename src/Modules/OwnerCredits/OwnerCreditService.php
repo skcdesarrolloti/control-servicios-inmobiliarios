@@ -8,6 +8,7 @@ use SCM\Core\Database;
 use SCM\Core\Settings;
 use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
+use SCM\Support\FuncionarioOptions;
 use SCM\Support\InternalNotificationRecipients;
 use SCM\Support\SchemaInspector;
 use SCM\Support\SmsQueue;
@@ -1645,11 +1646,12 @@ final class OwnerCreditService
     $where = 'contrato ' . $credit['contract_code'] . ((string) $credit['property'] !== '' ? ', inmueble ' . $credit['property'] : '');
     $reference = 'solicitado:' . $id . ':' . (int) $credit['updated_at'];
     $quoteId = (int) $credit['quote_id'];
+    $signer = $this->requestSigner($credit, $actor);
     if ($quoteId > 0) {
       $ticket = trim((string) $credit['ticket_id']);
       $this->notifyInternal(self::EVENT_QUOTE_REQUESTED, 'Crédito solicitado al responder la cotización #' . $quoteId,
         'El propietario ' . $credit['owner_name'] . ' respondió la cotización #' . $quoteId . ($ticket !== '' ? ' del caso ' . $ticket : '') . ' pidiendo financiarla con un crédito por ' . $request . ' (' . $where . ').'
-        . ' Registró la respuesta: ' . $by . '. Revisa la solicitud #' . $id . ' en el liquidador de créditos: queda sujeta a estudio, verificación y aprobación.',
+        . ' Envió la cotización: ' . $signer['name'] . '. Registró la respuesta: ' . $by . '. Revisa la solicitud #' . $id . ' en el liquidador de créditos: queda sujeta a estudio, verificación y aprobación.',
         $reference);
       $this->notifyStaffWhatsapp(self::EVENT_QUOTE_REQUESTED, $credit, 'Crédito desde cotización',
         'Respondió la cotización #' . $quoteId . ' pidiendo financiarla por ' . $request . '. Registró la respuesta ' . $by . '. Revísala en el liquidador');
@@ -1661,7 +1663,48 @@ final class OwnerCreditService
       $this->notifyStaffWhatsapp(self::EVENT_REQUESTED, $credit, 'Nueva solicitud de crédito',
         'Solicita ' . $request . '. Registró ' . $by . '. Revísala en el liquidador');
     }
-    $this->notifyOwnerRequested($credit);
+    $this->notifyOwnerRequested($credit, $signer);
+  }
+
+  /**
+   * Quién firma ("Atentamente") la confirmación al propietario: en una cotización, el funcionario que la envió
+   * (enviado_por; las enviadas antes de guardarlo, cct_author_id); en una solicitud manual, quien la registró.
+   * @return array{name:string,cargo:string,email:string}
+   */
+  private function requestSigner(array $credit, array $actor): array
+  {
+    $employeeId = '';
+    $name = '';
+    if ((int) $credit['quote_id'] > 0) {
+      $quote = $this->db->getRow("SELECT * FROM `{$this->db->table('jet_cct_cotizacion_mantenimiento')}` WHERE `_ID` = ? LIMIT 1", [(int) $credit['quote_id']]);
+      if (is_array($quote)) {
+        $employeeId = trim((string) ($quote['enviado_por'] ?? '')) ?: trim((string) ($quote['cct_author_id'] ?? ''));
+        $name = trim((string) ($quote['enviado_por_nombre'] ?? ''));
+      }
+    } else {
+      $employeeId = trim((string) ($actor['employee_id'] ?? '')) ?: (string) $credit['created_by_id'];
+      $name = trim((string) ($actor['name'] ?? '')) ?: (string) $credit['created_by_name'];
+    }
+    $signer = ['name' => $name, 'cargo' => '', 'email' => ''];
+    if ($employeeId !== '') {
+      try {
+        foreach (FuncionarioOptions::activeFuncionarios($this->db, $this->schema) as $funcionario) {
+          if ($funcionario['employee_id'] !== $employeeId) continue;
+          $signer = ['name' => $funcionario['name'] !== 'Funcionario' ? $funcionario['name'] : $name, 'cargo' => $funcionario['cargo'] !== 'Funcionario' ? $funcionario['cargo'] : '', 'email' => $funcionario['email']];
+          break;
+        }
+      } catch (\Throwable $error) {
+        error_log('[owner-credit-signer] ' . $error->getMessage());
+      }
+    }
+    if ($signer['name'] === '') $signer['name'] = 'SKC SuCasa Inmobiliaria';
+    return $signer;
+  }
+
+  /** "Royner Guardo · Analista de crédito · correo@sucasa.com" para el WhatsApp. */
+  private static function signerLine(array $signer): string
+  {
+    return implode(' · ', array_filter([$signer['name'] ?? '', $signer['cargo'] ?? '', $signer['email'] ?? ''], static fn($value): bool => trim((string) $value) !== ''));
   }
 
   /** "$893.723 a 12 meses": valor y plazo solicitados. */
@@ -1675,8 +1718,9 @@ final class OwnerCreditService
    * Una solicitud reabierta desde la cotización vuelve a avisar.
    * @return array{email:int,whatsapp:int}
    */
-  private function notifyOwnerRequested(array $credit): array
+  private function notifyOwnerRequested(array $credit, array $signer = []): array
   {
+    $signer += ['name' => 'SKC SuCasa Inmobiliaria', 'cargo' => '', 'email' => ''];
     $settings = $this->config();
     $queued = ['email' => 0, 'whatsapp' => 0];
     // Desde una cotización se dice qué financia: "$893.723 a 12 meses para financiar la cotización #574".
@@ -1685,14 +1729,14 @@ final class OwnerCreditService
     try {
       if ($settings['notify_owner_request_email'] && filter_var($credit['owner_email'], FILTER_VALIDATE_EMAIL)) {
         $title = 'Usted realizó una solicitud de crédito';
-        $queued['email'] = (new EmailQueue($this->db))->enqueue([$credit['owner_email']], $title . ' · Contrato ' . $credit['contract_code'], EmailTemplate::render($title, self::ownerRequestEmailBody($credit)), [
+        $queued['email'] = (new EmailQueue($this->db))->enqueue([$credit['owner_email']], $title . ' · Contrato ' . $credit['contract_code'], EmailTemplate::render($title, self::ownerRequestEmailBody($credit, $signer)), [
           'source_module' => 'creditos_propietarios', 'destination_name' => $credit['owner_name'],
           'dedupe_key' => 'owner-credit-request:' . $dedupe, 'meta' => ['credit_id' => (int) $credit['id'], 'status' => 'pendiente'],
         ]);
       }
       if ($settings['notify_owner_request_whatsapp'] && trim((string) $credit['owner_phone']) !== '') {
-        $params = [$credit['owner_name'] ?: 'Propietario', $request, (string) $credit['contract_code']];
-        $ok = (new SmsQueue($this->db))->enqueue((string) $credit['owner_phone'], (string) $credit['owner_name'], 'Usted realizó una solicitud de crédito por ' . $request . ' (contrato #' . $credit['contract_code'] . '). El crédito queda sujeto a estudio, verificación y aprobación.', [
+        $params = [$credit['owner_name'] ?: 'Propietario', $request, (string) $credit['contract_code'], self::signerLine($signer)];
+        $ok = (new SmsQueue($this->db))->enqueue((string) $credit['owner_phone'], (string) $credit['owner_name'], 'Usted realizó una solicitud de crédito por ' . $request . ' (contrato #' . $credit['contract_code'] . '). El crédito queda sujeto a estudio, verificación y aprobación. Atentamente, ' . self::signerLine($signer) . '.', [
           'source_module' => 'creditos_propietarios', 'dedupe_key' => 'owner-credit-request-wa:' . $dedupe,
           'template_name' => 'scm_credito_propietario_solicitud_v1', 'template_language' => 'es_CO',
           'template_components' => [['type' => 'body', 'parameters' => array_map(static fn(string $text): array => ['type' => 'text', 'text' => mb_substr(trim($text), 0, 300)], $params)]],
@@ -1706,7 +1750,8 @@ final class OwnerCreditService
     return $queued;
   }
 
-  private static function ownerRequestEmailBody(array $credit): string
+  /** @param array{name?:string,cargo?:string,email?:string} $signer */
+  private static function ownerRequestEmailBody(array $credit, array $signer = []): string
   {
     $e = static fn($value): string => EmailTemplate::e((string) $value);
     $quoteId = (int) ($credit['quote_id'] ?? 0);
@@ -1724,7 +1769,11 @@ final class OwnerCreditService
       . '<p style="margin:0 0 14px;line-height:1.8;">' . $list . '</p>'
       . '<p style="margin:0 0 14px;line-height:1.65;">Recuerde que el crédito queda <b>sujeto a estudio, verificación y aprobación</b>. Le informaremos el resultado por este medio.</p>'
       . '<p style="margin:0 0 14px;line-height:1.65;font-size:12px;color:#475569;">' . $e(self::DISCLAIMER) . '</p>'
-      . '<p style="margin:0;line-height:1.65;">Cordialmente,<br><b>SKC SuCasa Inmobiliaria</b></p>';
+      . '<p style="margin:0;line-height:1.65;">Atentamente,<br>'
+      . (trim((string) ($signer['name'] ?? '')) !== '' && $signer['name'] !== 'SKC SuCasa Inmobiliaria' ? '<b>' . $e($signer['name']) . '</b><br>' : '')
+      . (trim((string) ($signer['cargo'] ?? '')) !== '' ? $e($signer['cargo']) . '<br>' : '')
+      . (trim((string) ($signer['email'] ?? '')) !== '' ? $e($signer['email']) . '<br>' : '')
+      . '<b>SKC SuCasa Inmobiliaria</b></p>';
   }
 
   /** @return array{email:int,whatsapp:int,internal:int,internal_whatsapp:int} */

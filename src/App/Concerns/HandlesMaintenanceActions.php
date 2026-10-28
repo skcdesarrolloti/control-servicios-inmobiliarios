@@ -2423,8 +2423,7 @@ trait HandlesMaintenanceActions
       'tuvo_seguimiento' => 'Si',
       'fecha_seguimiento' => $now,
       'cct_modified' => $nowMysql,
-      'cct_author_id' => $employeeId,
-      'id_coordinador' => $employeeId,
+      // Quien la creó no cambia al aprobarla: quién la aprobó queda en los historiales.
     ];
     $update = $schema->filterTableData($table, $update);
     $updatedCotizacion = !empty($update) ? $this->db->update($table, $update, ['_ID' => $cotizacionId]) : 0;
@@ -3252,7 +3251,9 @@ trait HandlesMaintenanceActions
         'observacion_respuesta' => '',
         'motivo' => '',
         'cct_modified' => $nowSql,
-        'cct_author_id' => $employeeId,
+        // cct_author_id es quien la creó: el envío se guarda aparte.
+        'enviado_por' => $employeeId,
+        'enviado_por_nombre' => $actorName,
       ];
       $quoteUpdate = $schema->filterTableData($quoteTable, $quoteUpdate);
       if (!empty($quoteUpdate)) {
@@ -4804,10 +4805,15 @@ trait HandlesMaintenanceActions
     ]);
   }
 
-  /** Trazabilidad del % de administración frente al sugerido por Configuración › Honorarios de cotización. */
+  /**
+   * Trazabilidad del envío: % de administración frente al sugerido (Configuración › Honorarios de cotización) y quién
+   * envió la cotización. Quien la creó queda en cct_author_id y no cambia al enviarla.
+   */
   private function ensure_quote_fee_trace_columns(string $table): void
   {
     $columns = [
+      'enviado_por' => "VARCHAR(80) NULL DEFAULT ''",
+      'enviado_por_nombre' => "VARCHAR(190) NULL DEFAULT ''",
       'porcentaje_admon_sugerido' => "VARCHAR(20) NULL DEFAULT ''",
       'porcentaje_admon_modificado' => "VARCHAR(5) NULL DEFAULT ''",
       'porcentaje_admon_modificado_por' => "VARCHAR(80) NULL DEFAULT ''",

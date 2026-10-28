@@ -2,7 +2,7 @@
 
 ## Plantilla para el propietario al registrar la solicitud
 
-Se envía al **propietario** cuando se registra su solicitud de crédito, desde **Nueva solicitud** o desde una cotización con financiación **Sí**. Le confirma que realizó la solicitud y le recuerda que queda sujeta a estudio, verificación y aprobación; no es una aprobación. Si ya existía con el texto anterior ("Recibimos su solicitud…"), edítala en Meta con este cuerpo: mismo nombre, idioma y 3 variables. Solo se envía si en **Configuración** de créditos está activo **WhatsApp al propietario al registrar la solicitud**. El correo de confirmación sale aparte, con su propia opción.
+Se envía al **propietario** cuando se registra su solicitud de crédito, desde **Nueva solicitud** o desde una cotización con financiación **Sí**. Le confirma que realizó la solicitud y le recuerda que queda sujeta a estudio, verificación y aprobación; no es una aprobación. Si ya existía con el texto anterior ("Recibimos su solicitud…"), edítala en Meta con este cuerpo (mismo nombre e idioma; ahora lleva 4 variables). Si Meta no deja agregar la variable al editar, créala como `scm_credito_propietario_solicitud_v2` y cambia el nombre en el código. Solo se envía si en **Configuración** de créditos está activo **WhatsApp al propietario al registrar la solicitud**. El correo de confirmación sale aparte, con su propia opción.
 
 - Nombre exacto: `scm_credito_propietario_solicitud_v1`.
 - Categoría: **Utilidad** (`UTILITY`): confirma una solicitud que hizo el propietario.
@@ -17,12 +17,19 @@ No le agregues frases de oferta ("aprovecha", "preaprobado", "crédito disponibl
 ### Cuerpo para copiar
 
 ```text
-Buen día, {{1}}.
+Hola, {{1}}.
 
 Usted realizó una solicitud de crédito por {{2}} asociada al contrato #{{3}}.
 
 Recuerde que el crédito queda sujeto a estudio, verificación y aprobación. Le informaremos el resultado por este medio.
+
+Atentamente,
+{{4}}
+
+Gracias por confiar en nosotros.
 ```
+
+El cuerpo no puede terminar en una variable: por eso cierra con "Gracias por confiar en nosotros.".
 
 ### Variables
 
@@ -31,6 +38,7 @@ Recuerde que el crédito queda sujeto a estudio, verificación y aprobación. Le
 | 1 | Nombre del propietario | David Esquivia Polo |
 | 2 | Valor solicitado y plazo; si viene de una cotización, también cuál financia | $893.723 a 12 meses · $893.723 a 12 meses para financiar la cotización #574 |
 | 3 | Número del contrato | 817 |
+| 4 | Quien firma: nombre · cargo · correo. En una cotización, el funcionario que la envió; en una solicitud manual, quien la registró | Royner Guardo · Coordinador de mantenimiento · mantenimiento@sucasa.com |
 
 La definición para la API está en `whatsapp-credito-propietario-solicitud-template.json`.
 
