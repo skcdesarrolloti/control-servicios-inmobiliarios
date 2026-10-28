@@ -527,12 +527,10 @@ $quoteBody = (new ReflectionMethod(OwnerCreditService::class, 'ownerRequestEmail
 $signedBody = (new ReflectionMethod(OwnerCreditService::class, 'ownerRequestEmailBody'))->invoke(null, ['owner_name' => 'Ana', 'requested_amount' => 1, 'requested_term' => 1, 'purpose' => '', 'contract_code' => '817', 'property' => ''], ['name' => 'Laura <i>', 'cargo' => 'Coordinadora', 'email' => 'laura@example.invalid']);
 $check(str_contains($signedBody, 'Atentamente,<br><b>Laura &lt;i&gt;</b><br>Coordinadora<br>laura@example.invalid<br><b>SKC SuCasa Inmobiliaria</b>'), 'the owner request email is signed with name, position and email');
 $check((new ReflectionMethod(OwnerCreditService::class, 'signerLine'))->invoke(null, ['name' => 'Laura', 'cargo' => '', 'email' => 'laura@example.invalid']) === 'Laura · laura@example.invalid', 'the WhatsApp signature skips missing data');
-$pdo->exec("ALTER TABLE wp_jet_cct_cotizacion_mantenimiento ADD COLUMN cct_author_id TEXT DEFAULT ''");
-$pdo->exec("ALTER TABLE wp_jet_cct_cotizacion_mantenimiento ADD COLUMN enviado_por TEXT DEFAULT ''");
-$pdo->exec("ALTER TABLE wp_jet_cct_cotizacion_mantenimiento ADD COLUMN enviado_por_nombre TEXT DEFAULT ''");
-$db->update('wp_jet_cct_cotizacion_mantenimiento', ['cct_author_id' => '111', 'enviado_por' => '', 'enviado_por_nombre' => 'Quien Envía'], ['_ID' => 574]);
+foreach (['cct_author_id', 'id_coordinador', 'coordinador', 'email_coordinador'] as $column) $pdo->exec("ALTER TABLE wp_jet_cct_cotizacion_mantenimiento ADD COLUMN {$column} TEXT DEFAULT ''");
+$db->update('wp_jet_cct_cotizacion_mantenimiento', ['cct_author_id' => '111', 'id_coordinador' => '', 'coordinador' => 'Quien Envía', 'email_coordinador' => 'envia@example.invalid'], ['_ID' => 574]);
 $signer = (new ReflectionMethod(OwnerCreditService::class, 'requestSigner'))->invoke($service, $service->byQuote(574), $actor);
-$check($signer['name'] === 'Quien Envía', 'a quote request is signed by whoever sent the quote, not by whoever registered the response');
+$check($signer['name'] === 'Quien Envía' && $signer['email'] === 'envia@example.invalid', 'a quote request is signed by whoever sent the quote, not by whoever registered the response');
 $signer = (new ReflectionMethod(OwnerCreditService::class, 'requestSigner'))->invoke($service, $service->find($longTerm), $actor);
 $check($signer['name'] === 'Analista QA', 'a manual request is signed by whoever registered it');
 $check(str_contains($quoteBody, 'Al responder la cotización #574 usted realizó una solicitud de crédito para financiarla') && str_contains($quoteBody, 'Cotización: <b>#574</b>'), 'the quote request email names the quote it finances');

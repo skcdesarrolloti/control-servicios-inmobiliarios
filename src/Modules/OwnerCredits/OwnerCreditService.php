@@ -1667,30 +1667,32 @@ final class OwnerCreditService
   }
 
   /**
-   * Quién firma ("Atentamente") la confirmación al propietario: en una cotización, el funcionario que la envió
-   * (enviado_por; las enviadas antes de guardarlo, cct_author_id); en una solicitud manual, quien la registró.
+   * Quién firma ("Atentamente") la confirmación al propietario: en una cotización, su coordinador (quien la envió);
+   * en una solicitud manual, quien la registró.
    * @return array{name:string,cargo:string,email:string}
    */
   private function requestSigner(array $credit, array $actor): array
   {
     $employeeId = '';
     $name = '';
+    $email = '';
     if ((int) $credit['quote_id'] > 0) {
       $quote = $this->db->getRow("SELECT * FROM `{$this->db->table('jet_cct_cotizacion_mantenimiento')}` WHERE `_ID` = ? LIMIT 1", [(int) $credit['quote_id']]);
       if (is_array($quote)) {
-        $employeeId = trim((string) ($quote['enviado_por'] ?? '')) ?: trim((string) ($quote['cct_author_id'] ?? ''));
-        $name = trim((string) ($quote['enviado_por_nombre'] ?? ''));
+        $employeeId = trim((string) ($quote['id_coordinador'] ?? ''));
+        $name = trim((string) ($quote['coordinador'] ?? ''));
+        $email = trim((string) ($quote['email_coordinador'] ?? ''));
       }
     } else {
       $employeeId = trim((string) ($actor['employee_id'] ?? '')) ?: (string) $credit['created_by_id'];
       $name = trim((string) ($actor['name'] ?? '')) ?: (string) $credit['created_by_name'];
     }
-    $signer = ['name' => $name, 'cargo' => '', 'email' => ''];
+    $signer = ['name' => $name, 'cargo' => '', 'email' => $email];
     if ($employeeId !== '') {
       try {
         foreach (FuncionarioOptions::activeFuncionarios($this->db, $this->schema) as $funcionario) {
           if ($funcionario['employee_id'] !== $employeeId) continue;
-          $signer = ['name' => $funcionario['name'] !== 'Funcionario' ? $funcionario['name'] : $name, 'cargo' => $funcionario['cargo'] !== 'Funcionario' ? $funcionario['cargo'] : '', 'email' => $funcionario['email']];
+          $signer = ['name' => $funcionario['name'] !== 'Funcionario' ? $funcionario['name'] : $name, 'cargo' => $funcionario['cargo'] !== 'Funcionario' ? $funcionario['cargo'] : '', 'email' => $funcionario['email'] ?: $email];
           break;
         }
       } catch (\Throwable $error) {

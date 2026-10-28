@@ -3251,9 +3251,11 @@ trait HandlesMaintenanceActions
         'observacion_respuesta' => '',
         'motivo' => '',
         'cct_modified' => $nowSql,
-        // cct_author_id es quien la creó: el envío se guarda aparte.
-        'enviado_por' => $employeeId,
-        'enviado_por_nombre' => $actorName,
+        // cct_author_id es quien la creó y no cambia; el coordinador es quien la envía.
+        'id_coordinador' => $employeeId,
+        'coordinador' => $actorName,
+        'email_coordinador' => $actorEmail,
+        'celular_coordinador' => trim((string) ($actor['phone'] ?? '')),
       ];
       $quoteUpdate = $schema->filterTableData($quoteTable, $quoteUpdate);
       if (!empty($quoteUpdate)) {
@@ -4805,15 +4807,10 @@ trait HandlesMaintenanceActions
     ]);
   }
 
-  /**
-   * Trazabilidad del envío: % de administración frente al sugerido (Configuración › Honorarios de cotización) y quién
-   * envió la cotización. Quien la creó queda en cct_author_id y no cambia al enviarla.
-   */
+  /** Trazabilidad del % de administración frente al sugerido por Configuración › Honorarios de cotización. */
   private function ensure_quote_fee_trace_columns(string $table): void
   {
     $columns = [
-      'enviado_por' => "VARCHAR(80) NULL DEFAULT ''",
-      'enviado_por_nombre' => "VARCHAR(190) NULL DEFAULT ''",
       'porcentaje_admon_sugerido' => "VARCHAR(20) NULL DEFAULT ''",
       'porcentaje_admon_modificado' => "VARCHAR(5) NULL DEFAULT ''",
       'porcentaje_admon_modificado_por' => "VARCHAR(80) NULL DEFAULT ''",
