@@ -247,21 +247,19 @@
         .then(function () { setLoading(target, false); });
     }
 
-    // Nuevo crédito sin cotización: se busca al propietario por documento. Sus contratos son informativos: el de
-    // vigencia más larga queda como principal (el analista lo puede cambiar en el liquidador).
+    // Nuevo crédito sin cotización: se busca al propietario por documento y solo se muestra su cupo por verificar.
+    // El contrato de vigencia más larga queda como principal; el analista revisa todo en el liquidador.
     function searchContracts(form) {
       var query = form.querySelector("[data-owner-credit-search-query]").value.trim();
       var status = form.querySelector("[data-owner-credit-search-status]");
       var results = form.querySelector("[data-owner-credit-search-results]");
       var person = form.querySelector("[data-owner-credit-person]");
       var preapproval = form.querySelector("[data-owner-credit-preapproval]");
-      var checks = form.querySelector("[data-owner-credit-checks]");
       pickContract(form, null);
       results.innerHTML = "";
       person.hidden = true;
       preapproval.hidden = true;
       form._preapproval = null;
-      checks.hidden = true;
       var byName = /[A-Za-zÁÉÍÓÚÑáéíóúñ]{2,}/.test(query);
       if (byName ? query.length < 3 : query.replace(/[\s.]/g, "").length < 4) { status.textContent = "Escribe la cédula, el NIT o el nombre del propietario (mínimo 4 números o 3 letras)."; return; }
       status.textContent = "Buscando…";
@@ -290,16 +288,8 @@
             '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">' + escapeHtml(detail || "Sin datos de contacto") + "</span>";
           person.hidden = false;
           form._preapproval = data.preapproval || null;
-          renderPreapproval(preapproval, data.preapproval, data.disclaimer);
-          renderChecks(checks, data.checks);
-          status.textContent = contracts.length === 1 ? "Es propietario en 1 contrato." : "Es propietario en " + contracts.length + " contratos. El de vigencia más larga queda como contrato principal; el analista puede cambiarlo en el liquidador.";
-          results.innerHTML = contracts.map(function (c, index) {
-            return '<div data-owner-credit-contract-card class="!sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid ' + (index === 0 ? "!sp-border-service-yellow !sp-bg-amber-50/40" : "!sp-border-slate-200 !sp-bg-white") + ' !sp-text-[11px] !sp-text-service-muted">' +
-              '<span class="!sp-block !sp-min-w-0"><strong class="!sp-block !sp-text-xs !sp-text-service-navy">Contrato ' + escapeHtml(c.contrato) + " · SIMI " + escapeHtml(c.inmueble) + (index === 0 ? ' <span class="!sp-ml-1 !sp-px-1.5 !sp-py-0.5 !sp-rounded !sp-bg-service-navy !sp-text-white !sp-text-[9px]" data-owner-credit-main>Principal</span>' : "") + (c.siniestrado ? ' <span class="!sp-ml-1 !sp-text-red-700">· Siniestrado</span>' : "") + "</strong>" +
-              '<span class="!sp-block">' + escapeHtml(c.direccion) + " · " + escapeHtml(c.estado) + (c.fin ? " · Vence " + escapeHtml(c.fin) : "") + "</span>" +
-              (c.arrendatario ? '<span class="!sp-block">Arrendatario: ' + escapeHtml(c.arrendatario) + "</span>" : "") +
-              '<span class="!sp-block">Canon ' + money(c.canon) + " − descuentos " + money(c.deductions) + " = ingreso neto <strong class=\"!sp-text-service-navy\">" + money(c.net_income) + "</strong>" + (c.fin ? " · " + escapeHtml(c.max_months) + " meses de vigencia" : "") + "</span></span></div>";
-          }).join("");
+          renderPreapproval(preapproval, data.preapproval);
+          status.textContent = "";
           // El servidor los ordena con el de vigencia más larga primero: ese es el principal.
           pickContract(form, contracts[0]);
         })
@@ -315,51 +305,23 @@
       return "$" + moneyFormat.format(Math.round(Number(value) || 0));
     }
 
-    // Cupo con todos los contratos de la persona: Σ ingreso neto × meses de política; cuotas = las que vencen antes
-    // del fin del contrato más largo, sin pasar del tope. Con el valor, la simulación revisa la cobertura de cada cuota.
-    function renderPreapproval(box, p, disclaimer) {
+    // Cupo por verificar con todos los contratos de la persona: solo el valor y el plazo máximo. El análisis
+    // (contratos, políticas, cobertura) se hace en el liquidador.
+    function renderPreapproval(box, p) {
       if (!box || !p || !p.contracts) return;
-      var term = p.max_term > 0
-        ? "Hasta " + p.max_term + " cuotas (" + (p.term_basis || "") + "); la simulación revisa la cobertura de cada cuota."
-        : "Sin cuotas disponibles: ningún contrato tiene vigencia suficiente (" + (p.term_basis || "") + ").";
-      box.innerHTML = '<span class="!sp-block !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Cupo preaprobado máximo</span>' +
-        '<strong class="!sp-block !sp-text-base !sp-text-service-navy">' + money(p.outstanding > 0 ? p.available : p.amount) + "</strong>" +
-        '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">Ingreso neto de ' + (p.contracts === 1 ? "1 contrato" : p.contracts + " contratos") + " " + money(p.net_income) + " × " + p.income_months + " meses = " + money(p.amount) + ". " + escapeHtml(term) + "</span>" +
-        (p.outstanding > 0 ? '<span class="!sp-block !sp-text-[11px] !sp-font-semibold !sp-text-amber-800">Debe ' + money(p.outstanding) + " de créditos vigentes: queda disponible " + money(p.available) + ".</span>" : "") +
-        '<span class="!sp-block !sp-mt-1 !sp-text-[11px] !sp-font-semibold !sp-text-service-navy" data-owner-credit-disclaimer>' + escapeHtml(disclaimer || "Valores de referencia sujetos a las políticas de crédito y a los términos y condiciones de la empresa: no constituyen una aprobación.") + "</span>";
+      var tile = function (label, value) {
+        return '<div><span class="!sp-block !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">' + label + "</span>" +
+          '<strong class="!sp-block !sp-text-base !sp-text-service-navy">' + value + "</strong></div>";
+      };
+      box.innerHTML = '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">' +
+        tile("Cupo preaprobado por verificar", money(p.outstanding > 0 ? p.available : p.amount)) +
+        tile("Plazo máximo", p.max_term > 0 ? escapeHtml(p.max_term) + (Number(p.max_term) === 1 ? " mes" : " meses") : "Sin cuotas") + "</div>";
       box.className = box.className.replace(/!sp-(bg|border)-(amber|red)-(50|200)/g, "") + (p.max_term > 0 ? " !sp-bg-amber-50 !sp-border-amber-200" : " !sp-bg-red-50 !sp-border-red-200");
       box.hidden = false;
     }
 
-    // Revisión previa sobre todos los contratos: informa, no impide registrar.
-    function renderChecks(box, checks) {
-      if (!box || !checks || !checks.length) return;
-      box.innerHTML = '<span class="!sp-block !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted !sp-mb-1">Revisión previa de políticas</span>' +
-        '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' + checks.map(function (c) {
-          return '<li class="!sp-flex !sp-gap-2 !sp-py-1 !sp-text-[11px]" data-owner-credit-check="' + (c.ok ? "ok" : "bad") + '"><b class="' + (c.ok ? "!sp-text-emerald-700" : "!sp-text-red-700") + '">' + (c.ok ? "✓" : "✗") + "</b>" +
-            '<span><b class="!sp-text-service-navy">' + escapeHtml(c.label) + ":</b> " + escapeHtml(c.detail) + "</span></li>";
-        }).join("") + '</ul><span class="!sp-block !sp-mt-1 !sp-text-[11px] !sp-text-service-muted">Es informativa: puedes registrar la solicitud y el analista decide en el liquidador.</span>';
-      box.hidden = false;
-    }
-
-    // "Registrar solicitud" solo aparece después de ver la simulación con los datos actuales (valor, plazo,
-    // destinación y contrato); si cambian, hay que volver a simular.
-    function requestKey(form) {
-      return ["contract_id", "owner_key", "amount", "term", "purpose"].map(function (name) { return form.elements[name] ? form.elements[name].value : ""; }).join("|");
-    }
-
-    function setRegistrable(form, simulated) {
-      form._simulatedKey = simulated ? requestKey(form) : "";
-      var button = form.querySelector("[data-owner-credit-register]");
-      var hint = form.querySelector("[data-owner-credit-register-hint]");
-      // El botón usa !sp-inline-flex (!important): ocultarlo también necesita !important.
-      if (button) { if (simulated) button.style.removeProperty("display"); else button.style.setProperty("display", "none", "important"); }
-      if (hint) hint.textContent = simulated ? "Simulación revisada: si el propietario está de acuerdo, registra la solicitud." : "Primero simula y revisa el PDF con el propietario; si está de acuerdo, registra la solicitud.";
-    }
-
     function pickContract(form, contract) {
       var request = form.querySelector("[data-owner-credit-request]");
-      setRegistrable(form, false);
       form.elements.contract_id.value = contract ? String(contract.id) : "";
       form.elements.owner_key.value = contract && contract.owner ? contract.owner.key : "";
       request.hidden = !contract;
@@ -394,18 +356,18 @@
       } else if (term > limit) {
         hint.textContent = "El plazo máximo es de " + limit + " cuotas (" + basis + "). Corrige el plazo.";
       } else {
-        hint.textContent = "Máximo " + limit + " cuotas (" + basis + ").";
+        hint.textContent = "";
       }
       hint.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] " + (term > limit ? "!sp-font-semibold !sp-text-red-700" : (Number(p.max_term) > 0 ? "!sp-text-service-muted" : "!sp-font-semibold !sp-text-amber-800"));
-      // Mientras se escribe: campo en rojo y sin simular hasta corregir (el borde del input usa !important).
+      // Mientras se escribe: campo en rojo y sin registrar hasta corregir (el borde del input usa !important).
       var over = term > limit;
       form.elements.term.setAttribute("aria-invalid", over ? "true" : "false");
       if (over) form.elements.term.style.setProperty("border-color", "#dc2626", "important");
       else form.elements.term.style.removeProperty("border-color");
-      var simulateButton = form.querySelector("[data-owner-credit-simulate-pdf]");
-      if (simulateButton) {
-        simulateButton.disabled = over;
-        simulateButton.title = over ? "Corrige el plazo: máximo " + limit + " cuotas." : "";
+      var registerButton = form.querySelector("[data-owner-credit-register]");
+      if (registerButton) {
+        registerButton.disabled = over;
+        registerButton.title = over ? "Corrige el plazo: máximo " + limit + " cuotas." : "";
       }
     }
 
@@ -644,30 +606,6 @@
       if (newForm && target.closest("[data-owner-credit-search]")) { searchContracts(newForm); return; }
       var personButton = newForm && target.closest("[data-owner-credit-pick-person]");
       if (personButton) { pickPerson(newForm, personButton.getAttribute("data-owner-credit-pick-person")); return; }
-      if (newForm && target.closest("[data-owner-credit-simulate-pdf]")) {
-        if (!newForm.elements.contract_id.value) { setStatus(newForm, "Busca al propietario por documento.", "error"); return; }
-        // Sin valor o sin plazo la simulación queda incompleta: se piden antes de generar el PDF.
-        if (!(Number(String(newForm.elements.amount.value).replace(/\D/g, "")) > 0)) { setStatus(newForm, "Escribe el valor solicitado para simular.", "error"); newForm.elements.amount.focus(); return; }
-        if (!(Number(newForm.elements.term.value) > 0)) { setStatus(newForm, "Escribe el plazo solicitado en meses para simular.", "error"); newForm.elements.term.focus(); return; }
-        if (!termFits(newForm)) { setStatus(newForm, "El plazo supera el máximo de " + termLimit(newForm) + " cuotas.", "error"); return; }
-        setStatus(newForm, "");
-        var key = requestKey(newForm);
-        showPdf(target.closest("[data-owner-credit-simulate-pdf]"), {
-          title: "Simulación de crédito · Contrato " + (newForm._contract ? newForm._contract.contrato : ""), back: "Volver a la solicitud", action: "scm_owner_credit_simulation_pdf",
-          data: new FormData(newForm), filename: "simulacion-credito-" + (newForm._contract ? newForm._contract.contrato : "") + ".pdf",
-          onReady: function (viewer) {
-            if (requestKey(newForm) !== key) return;
-            setRegistrable(newForm, true);
-            // Se puede registrar desde el mismo visor.
-            viewer.querySelector("[data-owner-credit-pdf-actions]").insertAdjacentHTML("beforeend", '<button type="button" class="' + UI.primary + '" data-owner-credit-pdf-register>Registrar solicitud</button>');
-            viewer.querySelector("[data-owner-credit-pdf-register]").addEventListener("click", function () {
-              viewer.querySelector("[data-owner-credit-pdf-close]").click();
-              newForm.requestSubmit();
-            });
-          },
-        });
-        return;
-      }
       if (target.closest("[data-owner-credit-new]")) {
         post("scm_owner_credit_new_form", {})
           .then(function (data) { showModal("Nueva solicitud de crédito", "Registra lo que pide el propietario; luego se evalúa y se aprueba o rechaza en el liquidador.", data.html || ""); })
@@ -698,7 +636,6 @@
       if (event.target.matches && event.target.matches("[data-owner-credit-money]:not([readonly])")) formatMoneyInput(event.target, true);
       var newCredit = event.target.closest && event.target.closest("[data-owner-credit-new-form]");
       if (newCredit && event.target.name === "term") updateTermHint(newCredit);
-      if (newCredit && newCredit._simulatedKey && newCredit._simulatedKey !== requestKey(newCredit)) setRegistrable(newCredit, false);
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
       // El pagaré y el abono no recalculan el liquidador.
       if (!form || ["note", "owner_key", "main_contract_id", "promissory_signers[]", "promissory_channels[]", "promissory_void_note"].indexOf(event.target.name) >= 0) return;
@@ -706,8 +643,6 @@
       simulateTimer = window.setTimeout(function () { simulate(form); }, 350);
     });
     root.addEventListener("change", function (event) {
-      var newRequest = event.target.closest && event.target.closest("[data-owner-credit-new-form]");
-      if (newRequest && newRequest._simulatedKey && newRequest._simulatedKey !== requestKey(newRequest)) setRegistrable(newRequest, false);
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
       // Quién firma el pagaré: se guarda y recarga el liquidador.
       if (form && event.target.matches("[data-owner-credit-promissory-signer]")) {
@@ -780,7 +715,8 @@
         event.preventDefault();
         if (!form.elements.contract_id.value) { setStatus(form, "Busca al propietario por documento.", "error"); return; }
         if (!termFits(form)) { setStatus(form, "El plazo supera el máximo de " + termLimit(form) + " cuotas.", "error"); return; }
-        if (!form._simulatedKey || form._simulatedKey !== requestKey(form)) { setRegistrable(form, false); setStatus(form, "Primero simula y revisa el PDF con los datos actuales.", "error"); return; }
+        if (!(Number(String(form.elements.amount.value).replace(/\D/g, "")) > 0)) { setStatus(form, "Escribe el valor solicitado.", "error"); form.elements.amount.focus(); return; }
+        if (!(Number(form.elements.term.value) > 0)) { setStatus(form, "Escribe el plazo solicitado en meses.", "error"); form.elements.term.focus(); return; }
         setStatus(form, "Registrando…", "");
         post("scm_owner_credit_create", new FormData(form))
           .then(function (data) { loadReport(true); showRegistered(data); })

@@ -647,7 +647,7 @@ final class OwnerCreditView
     $step = static fn(string $n): string => '<span class="!sp-flex !sp-items-center !sp-justify-center !sp-w-5 !sp-h-5 !sp-rounded-full !sp-bg-service-navy !sp-text-white !sp-text-[10px]">' . $n . '</span>';
     $required = ' <em class="!sp-not-italic !sp-text-red-600">*</em>';
     // El solicitante se identifica por su documento: así ya se sabe quién es y en qué contratos es propietario.
-    return '<form class="!sp-font-sans !sp-text-service-navy !sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-5" data-owner-credit-new-form autocomplete="off"><input type="hidden" name="contract_id" value=""><input type="hidden" name="owner_key" value="">'
+    return '<form class="!sp-font-sans !sp-text-service-navy !sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-5" data-owner-credit-new-form autocomplete="off" novalidate><input type="hidden" name="contract_id" value=""><input type="hidden" name="owner_key" value="">'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . $step('1') . '¿Para quién es el crédito?</h4>'
       . self::guide('nuevo-tipo', [
         'Tipos' => 'Propietario, arrendatario, codeudor, externo o funcionario. Por ahora solo está habilitado el crédito a propietarios; los demás se habilitarán con su propia evaluación.',
@@ -657,9 +657,7 @@ final class OwnerCreditView
       . self::guide('nuevo-documento', [
         'Qué escribir' => 'La cédula o el NIT de quien pide el crédito, con o sin puntos, o su nombre. Por nombre aparecen las personas que coinciden: elige una y se buscan sus contratos por su documento.',
         'Qué encuentra' => 'Los contratos de arrendamiento donde esa persona es propietaria (en el contrato, en su ficha o en el contrato de mandato, aunque sean varios propietarios).',
-        'Contrato principal' => 'No se elige: el sistema toma el contrato de vigencia más larga, que es el que da el plazo máximo, y de él se descuenta primero la cuota. Si hace falta, el analista lo cambia en el liquidador.',
-        'Revisión previa' => 'Las políticas que no dependen del valor (contrato activo, vigencia, siniestro, créditos vigentes) revisadas sobre todos sus contratos. Es informativa: la solicitud se puede registrar igual y el analista decide.',
-        'Cupo preaprobado' => 'Suma del ingreso neto (canon − descuentos) de todos sus contratos × los meses de política. Las cuotas máximas son los meses de vigencia que le quedan al contrato más largo menos el margen de Configuración (n − 2); con el valor, la cobertura de pago puede bajarlas.',
+        'Cupo preaprobado por verificar' => 'Valor máximo que se puede solicitar y plazo máximo en meses, calculados con todos sus contratos. Es una referencia: el analista revisa contratos, políticas y cobertura al analizar la solicitud.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[minmax(0,1fr)_auto] !sp-gap-3 !sp-items-end">'
       . $field('Cédula, NIT o nombre' . $required, '<input class="' . $ui::INPUT . '" name="document" data-owner-credit-search-query placeholder="Ej. 1143415938 o Royner Guardo">')
@@ -667,14 +665,11 @@ final class OwnerCreditView
       . '<p class="' . self::NOTE . ' !sp-mt-2" data-owner-credit-search-status></p>'
       . '<div class="!sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200" data-owner-credit-person hidden></div>'
       . '<div class="!sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200" data-owner-credit-preapproval hidden></div>'
-      . '<div class="!sp-mt-2 !sp-p-3 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200" data-owner-credit-checks hidden></div>'
-      . '<div class="!sp-grid !sp-gap-2 !sp-mt-2" data-owner-credit-search-results aria-label="Contratos del propietario"></div></section>'
+      . '<div class="!sp-grid !sp-gap-2 !sp-mt-2" data-owner-credit-search-results aria-label="Propietarios encontrados"></div></section>'
       . '<section class="' . self::SECTION . '" data-owner-credit-request hidden><h4 class="' . self::H4 . '">' . $step('3') . 'Datos de la solicitud</h4>'
       . self::guide('nuevo-datos', [
-        'Primero simula' => 'Con "Simular y ver PDF" revisas con el propietario la cuota y la tabla de amortización. Si está de acuerdo, aparece "Registrar solicitud". Si cambias el valor, el plazo o la destinación, vuelve a simular.',
-        'Qué pasa al registrar' => 'Solo se registra lo que pide el propietario: todavía no se aprueba nada. El analista lo evalúa en el liquidador y ahí se aprueba o rechaza.',
-        'Plazo solicitado' => 'Los meses que pidió el propietario, hasta el plazo máximo del cupo preaprobado: meses de vigencia del contrato más largo menos el margen de Configuración (n − 2). La simulación revisa la cobertura de todas las cuotas. Si el contrato fue renovado y la fecha no está al día, regístralo con el máximo: el analista corrige la fecha fin en el liquidador.',
-        'Simular y ver PDF' => 'Calcula la cuota y la tabla de amortización con la tasa de política sin registrar la solicitud. Primero escribe el valor y el plazo: sin ellos no se simula. La simulación queda en el historial de los contratos y de los inmuebles del propietario.',
+        'Qué pasa al registrar' => 'Solo se registra lo que pide el propietario: todavía no se aprueba nada. El analista la analiza en el liquidador (contratos, políticas, cuota y cobertura) y ahí se aprueba o rechaza.',
+        'Plazo solicitado' => 'Los meses que pidió el propietario, hasta el plazo máximo del cupo preaprobado. Si el contrato fue renovado y la fecha no está al día, regístralo con el máximo: el analista corrige la fecha fin en el liquidador.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-3">'
       . $field('Valor solicitado' . $required, '<input class="' . $ui::INPUT . '" name="amount" inputmode="numeric" data-owner-credit-money required>')
@@ -683,10 +678,7 @@ final class OwnerCreditView
       . '</div><p class="' . self::NOTE . ' !sp-mt-2" data-owner-credit-term-hint></p>'
       . '<p class="!sp-m-0 !sp-mt-3 !sp-p-2.5 !sp-rounded-lg !sp-bg-slate-50 !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-[11px] !sp-font-semibold !sp-text-service-navy" data-owner-credit-disclaimer>' . self::e(OwnerCreditService::DISCLAIMER) . '</p></section>'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-end !sp-gap-3"><p class="!sp-m-0 !sp-text-[11px]" data-owner-credit-status role="status" aria-live="polite"></p>'
-      . '<p class="' . self::NOTE . ' !sp-m-0" data-owner-credit-register-hint>Primero simula y revisa el PDF con el propietario; si está de acuerdo, registra la solicitud.</p>'
-      . '<button type="button" class="' . $ui::NAVY . ' !sp-text-xs !sp-px-4 !sp-py-2.5" data-owner-credit-simulate-pdf>' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Simular y ver PDF</button>'
-      // Solo aparece después de ver la simulación con los datos actuales.
-      . '<button type="submit" class="' . $ui::PRIMARY . '" data-owner-credit-register style="display:none !important">' . $ui::icon('check', '!sp-w-3.5 !sp-h-3.5') . 'Registrar solicitud</button></div></form>';
+      . '<button type="submit" class="' . $ui::PRIMARY . '" data-owner-credit-register>' . $ui::icon('check', '!sp-w-3.5 !sp-h-3.5') . 'Registrar solicitud</button></div></form>';
   }
 
   /**
