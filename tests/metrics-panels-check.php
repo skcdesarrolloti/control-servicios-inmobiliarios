@@ -20,7 +20,7 @@ foreach (['dashboard' => 'dashboard', 'metricas' => 'dashboard', 'metricas_cotiz
   $menu = $rawNavItems['metricas'];
   $check($menu['children']['dashboard']['panel_id'] === 'scm-panel-metricas-casos' && str_ends_with($menu['children']['dashboard']['url'], '?tab=dashboard'), 'Casos abre con ?tab=dashboard.');
   $check($menu['children']['metricas_cotizaciones']['panel_id'] === 'scm-panel-metricas-cotizaciones', 'Cotizaciones tiene su propio panel.');
-  $check(substr_count($html, 'data-scm-dropdown-sub>') === 2 && str_contains($html, '<span>Mantenimiento</span>') && str_contains($html, '<span>Contratos</span>') && !str_contains($html, 'scm-dropdown-group-label'), 'Mantenimiento y Contratos abren su submenú; Casos es un enlace directo.');
+  $check(substr_count($html, 'data-scm-dropdown-sub>') === 6 && str_contains($html, '<span class="scm-nav-item-label">Mantenimiento</span>') && str_contains($html, '<span class="scm-nav-item-label">Contratos</span>') && !str_contains($html, 'scm-dropdown-group-label'), 'Mantenimiento y Contratos abren su submenú; Casos es un enlace directo.');
 }
 
 require $root . '/vendor/autoload.php';

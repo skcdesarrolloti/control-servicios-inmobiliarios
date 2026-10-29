@@ -355,6 +355,7 @@ $rawNavItems = [
       'inicio' => [
         'key' => 'inicio',
         'label' => 'Inicio (Resumen general)',
+        'description' => 'Resumen general de la operación',
         'panel_id' => 'scm-panel-inicio',
         'subtab' => 'mine',
         'url' => $baseUrl . '/index.php?tab=ini',
@@ -364,6 +365,7 @@ $rawNavItems = [
       'mine' => [
         'key' => 'mine',
         'label' => 'Mi calendario',
+        'description' => 'Tus casos y tareas agendadas',
         'panel_id' => 'scm-panel-inicio',
         'subtab' => 'mine',
         'url' => $baseUrl . '/index.php?tab=mine',
@@ -373,6 +375,7 @@ $rawNavItems = [
       'team' => [
         'key' => 'team',
         'label' => 'Calendario equipo',
+        'description' => 'Agenda de casos de todo el equipo',
         'panel_id' => 'scm-panel-inicio',
         'subtab' => 'team',
         'url' => $baseUrl . '/index.php?tab=team',
@@ -382,6 +385,7 @@ $rawNavItems = [
       'due' => [
         'key' => 'due',
         'label' => 'Vencimientos',
+        'description' => 'Casos y tareas próximos a vencer',
         'panel_id' => 'scm-panel-inicio',
         'subtab' => 'due',
         'url' => $baseUrl . '/index.php?tab=due',
@@ -391,6 +395,7 @@ $rawNavItems = [
       'property_history' => [
         'key' => 'property_history',
         'label' => 'Historial inmueble',
+        'description' => 'Trazabilidad de casos por inmueble',
         'panel_id' => 'scm-panel-inicio',
         'subtab' => 'property-history',
         'url' => $baseUrl . '/index.php?tab=property_history',
@@ -408,6 +413,7 @@ $rawNavItems = [
       'abiertos' => [
         'key' => 'abiertos',
         'label' => 'Casos Abiertos',
+        'description' => 'Casos en curso de todas las áreas',
         'panel_id' => 'scm-panel-abiertos',
         'url' => $baseUrl . '/index.php?tab=abiertos',
         'icon' => 'inbox',
@@ -416,6 +422,7 @@ $rawNavItems = [
       'mis_tickets' => [
         'key' => 'mis_tickets',
         'label' => 'Mis Casos',
+        'description' => 'Casos asignados a ti',
         'panel_id' => 'scm-panel-mis-tickets',
         'url' => $baseUrl . '/index.php?tab=mis_tickets',
         'icon' => 'assignment_ind',
@@ -424,6 +431,7 @@ $rawNavItems = [
       'postergados' => [
         'key' => 'postergados',
         'label' => 'Casos Postergados',
+        'description' => 'Casos en espera de retomarse',
         'panel_id' => 'scm-panel-postergados',
         'url' => $baseUrl . '/index.php?tab=postergados',
         'icon' => 'hourglass_empty',
@@ -432,6 +440,7 @@ $rawNavItems = [
       'cerrados' => [
         'key' => 'cerrados',
         'label' => 'Casos Cerrados',
+        'description' => 'Casos resueltos y finalizados',
         'panel_id' => 'scm-panel-cerrados',
         'url' => $baseUrl . '/index.php?tab=cerrados',
         'icon' => 'task_alt',
@@ -448,8 +457,10 @@ $rawNavItems = [
       'cotizaciones_mantenimiento' => [
         'key' => 'cotizaciones_mantenimiento',
         'label' => 'Cotizaciones de Mantenimiento',
+        'description' => 'Presupuestos de reparaciones y mejoras',
         'group' => 'Mantenimiento',
         'group_icon' => 'build',
+        'group_description' => 'Cotizaciones, órdenes, actas y preventivas',
         'panel_id' => 'scm-panel-actividades-administrativas',
         'admin_sub_target' => 'scm-panel-cotizaciones-mantenimiento',
         'admin_activity_key' => 'cotizaciones_mantenimiento',
@@ -460,6 +471,7 @@ $rawNavItems = [
       'ordenes_mantenimiento' => [
         'key' => 'ordenes_mantenimiento',
         'label' => 'Órdenes de Mantenimiento',
+        'description' => 'Trabajos aprobados en ejecución',
         'group' => 'Mantenimiento',
         'group_icon' => 'build',
         'panel_id' => 'scm-panel-actividades-administrativas',
@@ -472,6 +484,7 @@ $rawNavItems = [
       'actas_satisfaccion' => [
         'key' => 'actas_satisfaccion',
         'label' => 'Actas de Satisfacción',
+        'description' => 'Recibido a satisfacción de los trabajos',
         'group' => 'Mantenimiento',
         'group_icon' => 'build',
         'panel_id' => 'scm-panel-actividades-administrativas',
@@ -484,6 +497,7 @@ $rawNavItems = [
       'preventivas_pendientes' => [
         'key' => 'preventivas_pendientes',
         'label' => 'Revisión Preventiva',
+        'description' => 'Visitas preventivas a los inmuebles',
         'group' => 'Mantenimiento',
         'group_icon' => 'build',
         'panel_id' => 'scm-panel-actividades-administrativas',
@@ -496,8 +510,10 @@ $rawNavItems = [
       'servicios_publicos_pendientes' => [
         'key' => 'servicios_publicos_pendientes',
         'label' => 'Revisiones de Servicios Públicos',
+        'description' => 'Revisión de recibos y consumos',
         'group' => 'Servicios Públicos',
         'group_icon' => 'water_drop',
+        'group_description' => 'Revisiones y liquidación de servicios',
         'panel_id' => 'scm-panel-actividades-administrativas',
         'admin_sub_target' => 'scm-panel-servicios-publicos-pendientes',
         'admin_activity_key' => 'servicios_publicos_pendientes',
@@ -508,6 +524,7 @@ $rawNavItems = [
       'liquidador_servicios_publicos' => [
         'key' => 'liquidador_servicios_publicos',
         'label' => 'Liquidador de Servicios',
+        'description' => 'Liquidación de servicios entre las partes',
         'group' => 'Servicios Públicos',
         'group_icon' => 'water_drop',
         'panel_id' => 'scm-panel-actividades-administrativas',
@@ -520,6 +537,7 @@ $rawNavItems = [
       'reportes_administrativos_pendientes' => [
         'key' => 'reportes_administrativos_pendientes',
         'label' => 'Reportes Administrativos',
+        'description' => 'Reportes administrativos pendientes',
         'panel_id' => 'scm-panel-actividades-administrativas',
         'admin_sub_target' => 'scm-panel-reportes-administrativos-pendientes',
         'admin_activity_key' => 'reportes_administrativos_pendientes',
@@ -530,6 +548,7 @@ $rawNavItems = [
       'cartas_aumento' => [
         'key' => 'cartas_aumento',
         'label' => 'Cartas de Aumento',
+        'description' => 'Cartas de incremento del canon',
         'panel_id' => 'scm-panel-actividades-administrativas',
         'admin_sub_target' => 'scm-panel-cartas-aumento',
         'admin_activity_key' => 'cartas_aumento',
@@ -542,7 +561,9 @@ $rawNavItems = [
         'key' => 'credito_propietario',
         'group' => 'Créditos',
         'group_icon' => 'payments',
+        'group_description' => 'Créditos otorgados por actor',
         'label' => 'Propietarios',
+        'description' => 'Créditos preaprobados a propietarios',
         'panel_id' => 'scm-panel-credito-propietario',
         'url' => $baseUrl . '/index.php?tab=credito_propietario',
         'icon' => 'real_estate_agent',
@@ -560,6 +581,7 @@ $rawNavItems = [
       'gestiones_cobro' => [
         'key' => 'gestiones_cobro',
         'label' => 'Gestiones de Cobro',
+        'description' => 'Seguimiento a la cartera en mora',
         'panel_id' => 'scm-panel-actividades-administrativas',
         'admin_sub_target' => 'scm-panel-gestiones-cobro',
         'admin_activity_key' => 'gestiones_cobro',
@@ -570,6 +592,7 @@ $rawNavItems = [
       'auditoria_canon_aseguradoras' => [
         'key' => 'auditoria_canon_aseguradoras',
         'label' => 'Auditoría Canon y Aseguradoras',
+        'description' => 'Cruce del canon con las aseguradoras',
         'panel_id' => 'scm-panel-actividades-administrativas',
         'admin_sub_target' => 'scm-panel-auditoria-canon-aseguradoras',
         'admin_activity_key' => 'auditoria_canon_aseguradoras',
@@ -588,6 +611,7 @@ $rawNavItems = [
       'contratos_arrendamiento' => [
         'key' => 'contratos_arrendamiento',
         'label' => 'Contratos de arrendamiento',
+        'description' => 'Consulta y anexos de los contratos',
         'panel_id' => 'scm-panel-contratos-arrendamiento',
         'url' => $baseUrl . '/index.php?tab=contratos_arrendamiento',
         'icon' => 'description',
@@ -596,6 +620,7 @@ $rawNavItems = [
       'contracts_ending' => [
         'key' => 'contracts_ending',
         'label' => 'Contratos por terminar',
+        'description' => 'Contratos próximos a vencer',
         'panel_id' => 'scm-panel-actividades-contractuales',
         'subtab' => 'contracts-ending',
         'url' => $baseUrl . '/index.php?tab=contracts_ending',
@@ -605,6 +630,7 @@ $rawNavItems = [
       'contract_termination' => [
         'key' => 'contract_termination',
         'label' => 'Solicitudes de terminación de contrato',
+        'description' => 'Avisos de terminación recibidos',
         'panel_id' => 'scm-panel-actividades-contractuales',
         'subtab' => 'contract-termination',
         'url' => $baseUrl . '/index.php?tab=contract_termination',
@@ -614,6 +640,7 @@ $rawNavItems = [
       'contract_non_renewal' => [
         'key' => 'contract_non_renewal',
         'label' => 'Solicitudes de no prórroga de contrato',
+        'description' => 'Avisos de no renovación al vencimiento',
         'panel_id' => 'scm-panel-actividades-contractuales',
         'subtab' => 'contract-non-renewal',
         'url' => $baseUrl . '/index.php?tab=contract_non_renewal',
@@ -623,6 +650,7 @@ $rawNavItems = [
       'contract_owners' => [
         'key' => 'contract_owners',
         'label' => 'Funcionario de contratos',
+        'description' => 'Responsable asignado a cada contrato',
         'panel_id' => 'scm-panel-funcionario-contratos',
         'url' => $baseUrl . '/index.php?tab=contract_owners',
         'icon' => 'manage_accounts',
@@ -648,6 +676,7 @@ $rawNavItems = [
       'herramienta_pse' => [
         'key' => 'herramienta_pse',
         'label' => 'Generar PSE',
+        'description' => 'Archivos planos de recaudo PSE',
         'panel_id' => 'scm-panel-herramienta-pse',
         'url' => $baseUrl . '/index.php?tab=herramienta_pse',
         'icon' => 'payments',
@@ -656,6 +685,7 @@ $rawNavItems = [
       'herramienta_mora' => [
         'key' => 'herramienta_mora',
         'label' => 'Calculadora de mora',
+        'description' => 'Intereses por canon vs. cláusula penal',
         'panel_id' => 'scm-panel-herramienta-mora',
         'url' => $baseUrl . '/index.php?tab=herramienta_mora',
         'icon' => 'gavel',
@@ -664,6 +694,7 @@ $rawNavItems = [
       'herramienta_mercado' => [
         'key' => 'herramienta_mercado',
         'label' => 'Calculadora de mercado',
+        'description' => 'Precio por m² de venta y arriendo',
         'panel_id' => 'scm-panel-herramienta-mercado',
         'url' => $baseUrl . '/index.php?tab=herramienta_mercado',
         'icon' => 'query_stats',
@@ -672,6 +703,7 @@ $rawNavItems = [
       'herramienta_aseo' => [
         'key' => 'herramienta_aseo',
         'label' => 'Calculadora de aseo',
+        'description' => 'Cotización del servicio de aseo',
         'panel_id' => 'scm-panel-herramienta-aseo',
         'url' => $baseUrl . '/index.php?tab=herramienta_aseo',
         'icon' => 'cleaning_services',
@@ -689,6 +721,7 @@ $rawNavItems = [
         'key' => 'dashboard',
         'group' => 'Casos',
         'label' => 'Casos',
+        'description' => 'Indicadores de gestión de casos',
         'panel_id' => 'scm-panel-metricas-casos',
         'url' => $baseUrl . '/index.php?tab=dashboard',
         'icon' => 'confirmation_number',
@@ -698,7 +731,9 @@ $rawNavItems = [
         'key' => 'metricas_cotizaciones',
         'group' => 'Mantenimiento',
         'group_icon' => 'build',
+        'group_description' => 'Cotizaciones y revisiones preventivas',
         'label' => 'Cotizaciones',
+        'description' => 'Cotizaciones enviadas y aprobadas',
         'panel_id' => 'scm-panel-metricas-cotizaciones',
         'url' => $baseUrl . '/index.php?tab=metricas_cotizaciones',
         'icon' => 'request_quote',
@@ -709,6 +744,7 @@ $rawNavItems = [
         'group' => 'Mantenimiento',
         'group_icon' => 'build',
         'label' => 'Revisión preventiva',
+        'description' => 'Avance de las revisiones preventivas',
         'panel_id' => 'scm-panel-metricas-preventivas',
         'url' => $baseUrl . '/index.php?tab=metricas_preventivas',
         'icon' => 'pending_actions',
@@ -718,7 +754,9 @@ $rawNavItems = [
         'key' => 'metricas_servicios_publicos',
         'group' => 'Servicios públicos',
         'group_icon' => 'water_drop',
+        'group_description' => 'Revisiones de servicios públicos',
         'label' => 'Revisiones de servicios públicos',
+        'description' => 'Avance de las revisiones de servicios',
         'panel_id' => 'scm-panel-metricas-servicios-publicos',
         'url' => $baseUrl . '/index.php?tab=metricas_servicios_publicos',
         'icon' => 'receipt_long',
@@ -728,7 +766,9 @@ $rawNavItems = [
         'key' => 'ocupaciones',
         'group' => 'Contratos',
         'group_icon' => 'contract',
+        'group_description' => 'Ocupaciones, desocupaciones y crecimiento',
         'label' => 'Ocupaciones',
+        'description' => 'Contratos nuevos por periodo',
         'panel_id' => 'scm-panel-movimientos-contratos',
         'subtab' => 'ocupaciones',
         'url' => $baseUrl . '/index.php?tab=ocupaciones',
@@ -740,6 +780,7 @@ $rawNavItems = [
         'group' => 'Contratos',
         'group_icon' => 'contract',
         'label' => 'Desocupaciones',
+        'description' => 'Contratos terminados por periodo',
         'panel_id' => 'scm-panel-movimientos-contratos',
         'subtab' => 'desocupaciones',
         'url' => $baseUrl . '/index.php?tab=desocupaciones',
@@ -751,6 +792,7 @@ $rawNavItems = [
         'group' => 'Contratos',
         'group_icon' => 'contract',
         'label' => 'Ocupaciones vs Desocupaciones',
+        'description' => 'Comparativo de entradas y salidas',
         'panel_id' => 'scm-panel-movimientos-contratos',
         'subtab' => 'comparativo',
         'url' => $baseUrl . '/index.php?tab=ocupaciones_vs_desocupaciones',
@@ -762,6 +804,7 @@ $rawNavItems = [
         'group' => 'Contratos',
         'group_icon' => 'contract',
         'label' => 'Crecimiento de la empresa',
+        'description' => 'Evolución del número de contratos',
         'panel_id' => 'scm-panel-metricas-crecimiento',
         'url' => $baseUrl . '/index.php?tab=metricas_crecimiento',
         'icon' => 'trending_up',
@@ -1347,7 +1390,7 @@ foreach ($rawNavItems as $k => $item) {
                   <span><?php echo htmlspecialchars($tab['label'], ENT_QUOTES, 'UTF-8'); ?></span>
                   <span class="material-symbols-outlined text-[15px] <?php echo $isChildActive ? 'text-white' : 'text-slate-400'; ?> transition-transform scm-dropdown-chevron">expand_more</span>
                 </button>
-                <div class="scm-dropdown-menu absolute left-0 top-full pt-1.5 hidden z-50 min-w-[240px] drop-shadow-xl" data-scm-dropdown-menu>
+                <div class="scm-dropdown-menu absolute left-0 top-full pt-1.5 hidden z-50 min-w-[280px] drop-shadow-xl" data-scm-dropdown-menu>
                   <div class="bg-white rounded-xl shadow-lg border border-slate-200/90 py-1.5 px-1.5 flex flex-col gap-0.5">
                     <?php
                     // Las opciones con `group` se agrupan en una opción con submenú lateral (hover/foco);
@@ -1364,6 +1407,7 @@ foreach ($rawNavItems as $k => $item) {
                       $dropdownSections[] = [
                         'group' => $isSubmenu ? $sectionGroup : '',
                         'icon' => (string) ($sectionChild['group_icon'] ?? 'folder'),
+                        'description' => (string) ($sectionChild['group_description'] ?? ''),
                         'children' => [$sectionKey => $sectionChild],
                       ];
                     }
@@ -1373,7 +1417,10 @@ foreach ($rawNavItems as $k => $item) {
                         <div class="scm-dropdown-sub" data-scm-dropdown-sub>
                           <button type="button" class="scm-dropdown-sub-trigger<?php echo $isSectionActive ? ' is-active' : ''; ?>" aria-haspopup="true">
                             <span class="material-symbols-outlined" aria-hidden="true"><?php echo htmlspecialchars($dropdownSection['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
-                            <span><?php echo htmlspecialchars($dropdownSection['group'], ENT_QUOTES, 'UTF-8'); ?></span>
+                            <span class="scm-nav-item-text">
+                              <span class="scm-nav-item-label"><?php echo htmlspecialchars($dropdownSection['group'], ENT_QUOTES, 'UTF-8'); ?></span>
+                              <?php if ($dropdownSection['description'] !== ''): ?><span class="scm-nav-item-desc"><?php echo htmlspecialchars($dropdownSection['description'], ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
+                            </span>
                             <span class="material-symbols-outlined scm-dropdown-sub-chevron" aria-hidden="true">chevron_right</span>
                           </button>
                           <div class="scm-dropdown-submenu" role="menu" aria-label="<?php echo htmlspecialchars($dropdownSection['group'], ENT_QUOTES, 'UTF-8'); ?>">
@@ -1393,11 +1440,14 @@ foreach ($rawNavItems as $k => $item) {
                         <?php if (!empty($child['subtab'])): ?>data-subtab-target="<?php echo htmlspecialchars($child['subtab'], ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>
                         <?php if (!empty($child['admin_sub_target'])): ?>data-admin-sub-target="<?php echo htmlspecialchars($child['admin_sub_target'], ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>
                         <?php if (!empty($child['admin_activity_key'])): ?>data-admin-activity-key="<?php echo htmlspecialchars($child['admin_activity_key'], ENT_QUOTES, 'UTF-8'); ?>"<?php endif; ?>
-                        class="nav-tab-pill nav-tab-dropdown-item flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all whitespace-nowrap <?php echo $subClass; ?>"
+                        class="nav-tab-pill nav-tab-dropdown-item flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all whitespace-nowrap <?php echo $subClass; ?>"
                         <?php if ($isSubActive): ?>aria-current="page"<?php endif; ?>
                       >
-                        <span class="material-symbols-outlined text-[16px] <?php echo $isSubActive ? 'text-white' : 'text-slate-500'; ?>"><?php echo htmlspecialchars($child['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
-                        <span><?php echo htmlspecialchars($child['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+                        <span class="material-symbols-outlined text-[18px] <?php echo $isSubActive ? 'text-white' : 'text-slate-500'; ?>"><?php echo htmlspecialchars($child['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
+                        <span class="scm-nav-item-text">
+                          <span class="scm-nav-item-label"><?php echo htmlspecialchars($child['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+                          <?php if (!empty($child['description'])): ?><span class="scm-nav-item-desc"><?php echo htmlspecialchars($child['description'], ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
+                        </span>
                       </a>
                     <?php endforeach; ?>
                       <?php if ($dropdownSection['group'] !== ''): ?>

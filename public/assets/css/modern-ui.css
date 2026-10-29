@@ -5816,6 +5816,33 @@ body,
   color: #ffffff !important;
 }
 
+/* Opciones del desplegable con título y descripción corta, como en el Dashboard Comercial */
+.scm-nav-item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+}
+.scm-nav-item-label {
+  font-weight: 600;
+  line-height: 1.3;
+}
+.scm-nav-item-desc {
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: #64748b;
+}
+.nav-tab-dropdown-item.text-white .scm-nav-item-desc,
+[data-scm-main-nav] .nav-tab-dropdown-item:hover .scm-nav-item-desc,
+[data-scm-main-nav] .nav-tab-dropdown-item:focus-visible .scm-nav-item-desc,
+.scm-dropdown-sub-trigger.is-active .scm-nav-item-desc,
+.scm-dropdown-sub:hover > .scm-dropdown-sub-trigger .scm-nav-item-desc,
+.scm-dropdown-sub:focus-within > .scm-dropdown-sub-trigger .scm-nav-item-desc {
+  color: rgba(255, 255, 255, 0.78);
+}
+
 /* Opción con submenú lateral dentro de un desplegable del menú (p. ej. Métricas › Contratos) */
 .scm-dropdown-sub {
   position: relative;
@@ -5823,7 +5850,7 @@ body,
 .scm-dropdown-sub-trigger {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.625rem;
   width: 100%;
   padding: 0.5rem 0.75rem;
   border: 0;
@@ -5838,7 +5865,7 @@ body,
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 .scm-dropdown-sub-trigger .material-symbols-outlined {
-  font-size: 16px !important;
+  font-size: 18px !important;
   color: #64748b;
 }
 .scm-dropdown-sub-trigger .scm-dropdown-sub-chevron {
