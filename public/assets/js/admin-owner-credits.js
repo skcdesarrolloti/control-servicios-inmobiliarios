@@ -735,6 +735,18 @@
       var panel = reportModule.closest(".scm-tab-panel");
       if (panel && panel.classList.contains("active")) loadReport(false);
     }
+
+    // Enlace de los avisos (correo/WhatsApp): "?tab=credito_propietario&credito=2" abre ese crédito. Se quita de la URL
+    // para que recargar la página no lo vuelva a abrir.
+    try {
+      var url = new URL(window.location.href);
+      var linkedCredit = url.searchParams.get("credito") || "";
+      if (/^\d+$/.test(linkedCredit)) {
+        url.searchParams.delete("credito");
+        window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+        openCredit({ credit_id: linkedCredit });
+      }
+    } catch (error) {}
   }
 
   function boot() {

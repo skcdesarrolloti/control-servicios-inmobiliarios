@@ -567,6 +567,13 @@ $check(str_contains($source, 'mb_strtolower((string) $credit[\'purpose\']) ?: \'
 $decisionBody = (new ReflectionMethod(OwnerCreditService::class, 'ownerEmailBody'))->invoke($service, ['owner_name' => 'Ana', 'status' => 'rechazado', 'requested_amount' => 893723, 'purpose' => 'Libre inversión', 'contract_code' => '817'], ['name' => 'Laura', 'cargo' => 'Analista de crédito', 'email' => 'laura@example.invalid']);
 $check(str_contains($decisionBody, 'para libre inversión') && str_contains($decisionBody, 'Atentamente,<br><b>Laura</b><br>Analista de crédito<br>laura@example.invalid<br><b>SKC SuCasa Inmobiliaria</b>'), 'the owner decision email names the purpose and is signed by whoever decided');
 
+// Los avisos internos (correo y WhatsApp) llevan al liquidador de ese crédito, también después del login.
+$check(OwnerCreditService::panelPath(2) === 'index.php?tab=credito_propietario&credito=2' && OwnerCreditService::panelPath(0) === 'index.php?tab=credito_propietario', 'staff notices link to the credit itself');
+$check(substr_count($source, 'self::panelPath(') === 2 && str_contains($source, "'Abrir crédito #' . \$creditId"), 'the staff email button and the WhatsApp button both use the credit link');
+$creditsJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/admin-owner-credits.js');
+$loginPhp = (string) file_get_contents(dirname(__DIR__) . '/public/login.php');
+$check(str_contains($creditsJs, 'url.searchParams.get("credito")') && str_contains($creditsJs, 'openCredit({ credit_id: linkedCredit })') && str_contains($loginPhp, "'index.php?tab=credito_propietario' . (isset(\$query['credito'])"), 'the panel opens the linked credit and the login returns to it');
+
 // Reinicio de cotización para pruebas: el crédito aprobado se anula y se suelta, y la próxima financiación crea uno nuevo.
 $quoteCreditId = (int) $service->byQuote(574)['id'];
 $db->update('wp_scm_owner_credits', ['status' => 'pagado'], ['id' => $quoteCreditId]);

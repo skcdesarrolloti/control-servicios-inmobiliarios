@@ -42,6 +42,10 @@ $safeNext = static function (string $raw): string {
     if (isset($query['scm_case']) && $digits($query['scm_case'])) {
       return 'index.php?scm_case=' . rawurlencode((string) $query['scm_case']);
     }
+    // Avisos de créditos: vuelven al liquidador del crédito.
+    if (($query['tab'] ?? '') === 'credito_propietario') {
+      return 'index.php?tab=credito_propietario' . (isset($query['credito']) && $digits($query['credito']) ? '&credito=' . (string) $query['credito'] : '');
+    }
     $action = trim((string) ($query['scm_bridge_action'] ?? ''));
     $allowedActions = ['revision_correctiva', 'revision_preventiva', 'crear_cotizacion', 'editar_cotizacion', 'enviar_cotizacion', 'crear_orden', 'acta_satisfaccion', 'acta_cotizacion'];
     if (!in_array($action, $allowedActions, true)) {

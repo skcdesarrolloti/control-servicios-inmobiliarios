@@ -1697,13 +1697,13 @@ final class OwnerCreditService
     $signer = $this->requestSigner($credit, $actor);
     if ($quoteId > 0) {
       $ticket = trim((string) $credit['ticket_id']);
-      $this->notifyInternal(self::EVENT_QUOTE_REQUESTED, 'Crédito solicitado al responder la cotización #' . $quoteId,
+      $this->notifyInternal($id, self::EVENT_QUOTE_REQUESTED, 'Crédito solicitado al responder la cotización #' . $quoteId,
         'El propietario ' . $credit['owner_name'] . ' respondió la cotización #' . $quoteId . ($ticket !== '' ? ' del caso ' . $ticket : '') . ' pidiendo financiarla con un crédito por ' . $request . ' (' . $where . ').'
         . ' Envió la cotización: ' . $signer['name'] . '. Registró la respuesta: ' . $by . '. Revisa la solicitud #' . $id . ' en el liquidador de créditos: queda sujeta a estudio, verificación y aprobación.',
         $reference);
       $this->notifyStaffRequestWhatsapp(self::EVENT_QUOTE_REQUESTED, $credit);
     } else {
-      $this->notifyInternal(self::EVENT_REQUESTED, 'Solicitud de crédito de propietario #' . $id,
+      $this->notifyInternal($id, self::EVENT_REQUESTED, 'Solicitud de crédito de propietario #' . $id,
         'El propietario ' . $credit['owner_name'] . ' solicitó un crédito por ' . $request . ((string) $credit['purpose'] !== '' ? ', destinación ' . $credit['purpose'] : '') . ' (' . $where . ').'
         . ' Registró: ' . $by . '. Revísala en el liquidador de créditos: queda sujeta a estudio, verificación y aprobación.',
         $reference);
@@ -1853,7 +1853,7 @@ final class OwnerCreditService
     $title = $approved ? 'Crédito aprobado' : 'Solicitud de crédito no aprobada';
     $summary = $this->decisionSummary($credit);
     $queued = ['email' => 0, 'whatsapp' => 0, 'internal' => 0, 'internal_whatsapp' => 0];
-    $queued['internal'] = $this->notifyInternal(self::EVENT_DECIDED, $title . ' #' . $credit['id'] . ' · contrato ' . $credit['contract_code'], $summary . ' Decidió: ' . $credit['decided_by_name'] . '.', 'decidido:' . $credit['id']);
+    $queued['internal'] = $this->notifyInternal((int) $credit['id'], self::EVENT_DECIDED, $title . ' #' . $credit['id'] . ' · contrato ' . $credit['contract_code'], $summary . ' Decidió: ' . $credit['decided_by_name'] . '.', 'decidido:' . $credit['id']);
     $money = static fn($value): string => '$' . number_format((float) $value, 0, ',', '.');
     // Respuesta a los funcionarios: plantilla corta scm_credito_propietario_respuesta_funcionario_v1.
     $result = $approved ? ((int) $credit['policy_override'] === 1 ? 'Aprobado fuera de política' : 'Aprobado') : 'No aprobado';
@@ -1919,13 +1919,22 @@ final class OwnerCreditService
       . $closing;
   }
 
-  private function notifyInternal(string $action, string $title, string $details, string $reference): int
+  /**
+   * Ruta del panel que abre el liquidador de un crédito ("index.php?tab=credito_propietario&credito=2"). Sin sesión,
+   * el login devuelve a esta misma ruta.
+   */
+  public static function panelPath(int $creditId): string
+  {
+    return 'index.php?tab=credito_propietario' . ($creditId > 0 ? '&credito=' . $creditId : '');
+  }
+
+  private function notifyInternal(int $creditId, string $action, string $title, string $details, string $reference): int
   {
     try {
       $copies = InternalNotificationRecipients::emailsForAction($this->db, $action);
       if ($copies === []) return 0;
-      $url = (defined('SCM_BASE_URL') ? SCM_BASE_URL : '') . '/index.php?tab=credito_propietario';
-      return (new EmailQueue($this->db))->enqueue($copies, $title, EmailTemplate::render($title, '<p>' . EmailTemplate::e($details) . '</p>', ['buttons' => [['url' => $url, 'label' => 'Abrir créditos']]]), [
+      $url = rtrim(defined('SCM_BASE_URL') ? (string) SCM_BASE_URL : '', '/') . '/' . self::panelPath($creditId);
+      return (new EmailQueue($this->db))->enqueue($copies, $title, EmailTemplate::render($title, '<p>' . EmailTemplate::e($details) . '</p>', ['buttons' => [['url' => $url, 'label' => 'Abrir crédito #' . $creditId]]]), [
         'source_module' => $action, 'internal_action' => $action, 'internal_cc' => $copies,
         'dedupe_key' => 'internal-admin:' . $action . ':' . $reference, 'meta' => ['event' => $action],
       ]);
@@ -1956,7 +1965,7 @@ final class OwnerCreditService
   {
     try {
       if (!$this->config()['notify_staff_whatsapp']) return 0;
-      $base = parse_url((defined('SCM_BASE_URL') ? (string) SCM_BASE_URL : '') . '/index.php?tab=credito_propietario');
+      $base = parse_url(rtrim(defined('SCM_BASE_URL') ? (string) SCM_BASE_URL : '', '/') . '/' . self::panelPath((int) $credit['id']));
       $suffix = ltrim((string) ($base['path'] ?? ''), '/') . (isset($base['query']) ? '?' . $base['query'] : '');
       $clean = static fn($value, int $limit): string => mb_substr(preg_replace('/\s+/u', ' ', trim((string) $value)) ?: 'Sin dato', 0, $limit);
       $sms = new SmsQueue($this->db);

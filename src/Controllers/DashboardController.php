@@ -20,6 +20,9 @@ final class DashboardController
     $caseId = (string) ($_GET['scm_case'] ?? '');
     if (preg_match('/^[1-9][0-9]{0,18}$/D', $caseId)) {
       $loginUrl .= '?next=' . rawurlencode('index.php?scm_case=' . $caseId);
+    } elseif ((string) ($_GET['tab'] ?? '') === 'credito_propietario') {
+      $creditId = (string) ($_GET['credito'] ?? '');
+      $loginUrl .= '?next=' . rawurlencode('index.php?tab=credito_propietario' . (preg_match('/^[1-9][0-9]{0,18}$/D', $creditId) ? '&credito=' . $creditId : ''));
     }
     Auth::requireLogin($loginUrl);
   }
