@@ -1071,7 +1071,7 @@ foreach ($rawNavItems as $k => $item) {
             </button>
             <div
               id="global-config-dropdown-menu"
-              class="hidden absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200/90 py-1.5 z-50 drop-shadow-xl"
+              class="hidden absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200/90 py-1.5 z-50 drop-shadow-xl"
               role="menu"
             >
               <div class="px-3.5 py-1.5 border-b border-slate-100">
@@ -1085,7 +1085,10 @@ foreach ($rawNavItems as $k => $item) {
                   role="menuitem"
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">lock</span>
-                  <span>Permisos del Panel</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Permisos del Panel</span>
+                    <span class="scm-nav-item-desc">Vistas, acciones y cargos visibles</span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1094,7 +1097,10 @@ foreach ($rawNavItems as $k => $item) {
                   role="menuitem"
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">calendar_month</span>
-                  <span>Configurar Vencimientos</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Configurar Vencimientos</span>
+                    <span class="scm-nav-item-desc">Plazos y alertas de vencimiento de casos</span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1103,7 +1109,10 @@ foreach ($rawNavItems as $k => $item) {
                   role="menuitem"
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">tab</span>
-                  <span>Temas de Casos</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Temas de Casos</span>
+                    <span class="scm-nav-item-desc">Temas que alimentan cada pestaña operativa</span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1112,7 +1121,10 @@ foreach ($rawNavItems as $k => $item) {
                   role="menuitem"
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">category</span>
-                  <span>Temas de ayuda y categorías</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Temas de ayuda y categorías</span>
+                    <span class="scm-nav-item-desc">Catálogo para clasificar los casos</span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1121,7 +1133,10 @@ foreach ($rawNavItems as $k => $item) {
                   role="menuitem"
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">notifications</span>
-                  <span>Notificaciones Internas</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Notificaciones Internas</span>
+                    <span class="scm-nav-item-desc">Eventos y funcionarios que reciben avisos</span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1130,7 +1145,10 @@ foreach ($rawNavItems as $k => $item) {
                   role="menuitem"
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">shield_person</span>
-                  <span>Configuración de Guardian</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Configuración de Guardian</span>
+                    <span class="scm-nav-item-desc">Responsables descargados desde Guardian</span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1140,7 +1158,10 @@ foreach ($rawNavItems as $k => $item) {
                   role="menuitem"
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">payments</span>
-                  <span>Créditos a propietarios</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Créditos a propietarios</span>
+                    <span class="scm-nav-item-desc">Tasa, plazos y condiciones del crédito</span>
+                  </span>
                 </button>
                 <!-- Calculadora de aseo: salario, márgenes, insumos, transporte y tramos; se oculta sin cleaning_configure -->
                 <button
@@ -1151,7 +1172,10 @@ foreach ($rawNavItems as $k => $item) {
                   role="menuitem"
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">cleaning_services</span>
-                  <span>Calculadora de aseo</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Calculadora de aseo</span>
+                    <span class="scm-nav-item-desc">Salario, márgenes, insumos y transporte</span>
+                  </span>
                 </button>
                 <!-- Honorarios de cotización: variables del % de administración sugerido; se oculta sin quote_fee_configure -->
                 <button
@@ -1162,7 +1186,10 @@ foreach ($rawNavItems as $k => $item) {
                   role="menuitem"
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">percent</span>
-                  <span>Honorarios de cotización</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Honorarios de cotización</span>
+                    <span class="scm-nav-item-desc">Variables del % de administración sugerido</span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1171,7 +1198,10 @@ foreach ($rawNavItems as $k => $item) {
                   role="menuitem"
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">description</span>
-                  <span>Tipos de Actas</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Tipos de Actas</span>
+                    <span class="scm-nav-item-desc">Guía de los tipos de actas</span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1180,7 +1210,10 @@ foreach ($rawNavItems as $k => $item) {
                   role="menuitem"
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">menu_book</span>
-                  <span>Guías del Sistema</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Guías del Sistema</span>
+                    <span class="scm-nav-item-desc">Manuales de uso del panel</span>
+                  </span>
                 </button>
               </div>
             </div>
