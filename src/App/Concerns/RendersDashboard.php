@@ -5128,7 +5128,7 @@ trait RendersDashboard
       . ($actaInfo['url'] !== '' && ($actaInfo['status'] === 'legacy' || !$canQuoteActaCreate) ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-open-iframe data-iframe-url="' . esc_attr($actaInfo['url']) . '" data-iframe-title="Acta de satisfacci&oacute;n">Ver acta' . ($actaInfo['status'] === 'pending' ? ' pendiente' : '') . '</button>' : '')
       . ($cotizacionAprobada && $canQuoteActaCreate && $actaInfo['url'] === '' ? '<button type="button" class="scm-case-work-btn scm-primary-action" data-scm-create-cotizacion-acta data-cotizacion-id="' . esc_attr($id) . '" data-ticket-pk="' . esc_attr($ticket) . '">Crear acta de cotizaci&oacute;n</button>' : '')
       // Herramienta de pruebas (solo cargo de desarrollo): deja la cotización enviada y esperando respuesta.
-      . ($id !== '' && strtolower($estado) !== 'esperando respuesta' && $this->canUseDashboardAction('quote_reset_dev') ? '<button type="button" class="scm-case-work-btn scm-danger-action" data-scm-reset-cotizacion-dev data-cotizacion-id="' . esc_attr($id) . '">Reiniciar (pruebas)</button>' : '')
+      . ($id !== '' && $this->canUseDashboardAction('quote_reset_dev') ? '<button type="button" class="scm-case-work-btn scm-danger-action" data-scm-reset-cotizacion-dev data-cotizacion-id="' . esc_attr($id) . '">Reiniciar (pruebas)</button>' : '')
       . '</div><div class="scm-cotizacion-orders-source" style="display:none;">' . $ordersHtml . '</div>' . $orderDetailsHtml
       . '<template class="scm-cotizacion-native-source" data-scm-cotizacion-native-view>' . $nativeCotizacionHtml . '</template>'
       . $linkedTicketSource . '<div class="scm-case-source" aria-hidden="true" style="display:none;">' . $caseSource . '</div></article>';
