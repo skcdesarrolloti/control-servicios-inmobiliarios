@@ -59,7 +59,10 @@ final class OwnerCreditPromissoryService
   {
     if (isset(self::$schemaReady[$this->table()])) return;
     self::$schemaReady[$this->table()] = true;
-    if ($this->schema->tableExists($this->table())) return;
+    if ($this->schema->tableExists($this->table())) {
+      $this->normalizeStoredDocuments();
+      return;
+    }
     $this->db->pdo()->exec("CREATE TABLE IF NOT EXISTS `{$this->table()}` (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       owner_document VARCHAR(40) NOT NULL, owner_id VARCHAR(60) NOT NULL DEFAULT '', owner_name VARCHAR(190) NOT NULL DEFAULT '',
@@ -75,9 +78,31 @@ final class OwnerCreditPromissoryService
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
   }
 
+  /**
+   * Documento con el que se reconoce a la persona: sin espacios, puntos, comas ni guiones, y sin el dígito de
+   * verificación del NIT ("900.123.456-7" es la misma persona que "900123456").
+   */
   public static function normalizeDocument(string $value): string
   {
-    return strtoupper(preg_replace('/[\s.]+/', '', trim($value)) ?? '');
+    $document = strtoupper(preg_replace('/[\s.,]+/', '', trim($value)) ?? '');
+    $document = preg_replace('/-\d$/', '', $document) ?? $document;
+    return str_replace('-', '', $document);
+  }
+
+  /**
+   * Pagarés guardados con la regla anterior (con guion o dígito de verificación): se dejan con el documento
+   * normalizado para que se sigan reconociendo. La huella del documento firmado no cambia.
+   */
+  public function normalizeStoredDocuments(): int
+  {
+    $fixed = 0;
+    foreach ($this->db->getResults("SELECT `id`, `owner_document` FROM `{$this->table()}` WHERE `owner_document` LIKE '%-%' OR `owner_document` LIKE '%,%'") as $row) {
+      $document = self::normalizeDocument((string) $row['owner_document']);
+      if ($document === (string) $row['owner_document']) continue;
+      $this->db->update($this->table(), ['owner_document' => $document], ['id' => (int) $row['id']]);
+      $fixed++;
+    }
+    return $fixed;
   }
 
   /** Pagaré vigente (firmado o pendiente) de la persona; el firmado manda. @return array<string,mixed>|null */

@@ -559,6 +559,11 @@ $liquidator = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($paga
 $check(str_contains($liquidator, 'data-owner-credit-promissory') && str_contains($liquidator, 'Falta firma') && !str_contains($liquidator, 'data-owner-credit-promissory-send') && str_contains($liquidator, 'Al aprobar se enviará el pagaré para firmar a Segunda Dueña') && str_contains($liquidator, 'name="promissory_signers[]"'), 'while pending, the liquidator shows who signs and that the note goes out on approval');
 $pagareService->changeStatus($pagareCredit, 'anulado', 'Crédito de prueba del pagaré.', $actor);
 $pagareService->changeStatus($nextCredit, 'anulado', 'Crédito de prueba del pagaré.', $actor);
+// El documento se reconoce sin puntos, espacios, comas, guiones ni el dígito de verificación del NIT.
+$normalize = [\SCM\Modules\OwnerCredits\OwnerCreditPromissoryService::class, 'normalizeDocument'];
+$check($normalize('900.123.456-7') === '900123456' && $normalize('900 123 456') === '900123456' && $normalize('22.233.344') === '22233344' && $normalize('1-143-415') === '1143415' && $normalize('ab-12') === 'AB12', 'documents are compared without dots, spaces, hyphens or the NIT check digit');
+$db->insert('wp_scm_owner_credit_promissory', ['owner_document' => '900.123.456-7', 'owner_name' => 'Empresa QA', 'status' => 'firmado', 'payload_json' => '{}', 'payload_hash' => str_repeat('0', 64), 'token_nonce' => str_repeat('0', 64), 'expires_at' => time(), 'created_at' => time(), 'updated_at' => time()]);
+$check($promissory->normalizeStoredDocuments() === 1 && ($promissory->current('900123456-7')['owner_name'] ?? '') === 'Empresa QA' && ($promissory->current('900123456')['owner_name'] ?? '') === 'Empresa QA', 'a note stored with the check digit is recognized with or without it');
 $requirePromissory(false);
 
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
