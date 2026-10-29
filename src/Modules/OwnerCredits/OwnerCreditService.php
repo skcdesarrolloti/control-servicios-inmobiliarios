@@ -1764,9 +1764,15 @@ final class OwnerCreditService
   /** Firma del WhatsApp, como en las demás plantillas: "Royner Guardo - Asistente de Desarrollo TI - Cel. 3015232054". */
   private static function signerLine(array $signer): string
   {
-    $phone = preg_replace('/\D+/', '', (string) ($signer['phone'] ?? '')) ?: '';
-    if (strlen($phone) === 12 && str_starts_with($phone, '57')) $phone = substr($phone, 2);
+    $phone = self::signerPhone($signer);
     return implode(' - ', array_filter([trim((string) ($signer['name'] ?? '')), trim((string) ($signer['cargo'] ?? '')), $phone !== '' ? 'Cel. ' . $phone : ''], static fn(string $value): bool => $value !== ''));
+  }
+
+  /** Celular nacional de quien firma (sin indicativo 57), para la firma de WhatsApp y correo. */
+  private static function signerPhone(array $signer): string
+  {
+    $phone = preg_replace('/\D+/', '', (string) ($signer['phone'] ?? '')) ?: '';
+    return strlen($phone) === 12 && str_starts_with($phone, '57') ? substr($phone, 2) : $phone;
   }
 
   /** "$893.723 a 12 meses": valor y plazo solicitados. */
@@ -1835,6 +1841,7 @@ final class OwnerCreditService
       . (trim((string) ($signer['name'] ?? '')) !== '' && $signer['name'] !== 'SKC SuCasa Inmobiliaria' ? '<b>' . $e($signer['name']) . '</b><br>' : '')
       . (trim((string) ($signer['cargo'] ?? '')) !== '' ? $e($signer['cargo']) . '<br>' : '')
       . (trim((string) ($signer['email'] ?? '')) !== '' ? $e($signer['email']) . '<br>' : '')
+      . (self::signerPhone($signer) !== '' ? 'Cel. ' . $e(self::signerPhone($signer)) . '<br>' : '')
       . '<b>SKC SuCasa Inmobiliaria</b></p>';
   }
 
@@ -1895,6 +1902,7 @@ final class OwnerCreditService
       . (trim((string) ($signer['name'] ?? '')) !== '' && $signer['name'] !== 'SKC SuCasa Inmobiliaria' ? '<b>' . $e($signer['name']) . '</b><br>' : '')
       . (trim((string) ($signer['cargo'] ?? '')) !== '' ? $e($signer['cargo']) . '<br>' : '')
       . (trim((string) ($signer['email'] ?? '')) !== '' ? $e($signer['email']) . '<br>' : '')
+      . (self::signerPhone($signer) !== '' ? 'Cel. ' . $e(self::signerPhone($signer)) . '<br>' : '')
       . '<b>SKC SuCasa Inmobiliaria</b></p>';
     if ($credit['status'] !== 'aprobado') {
       return $html . '<p style="margin:0 0 14px;line-height:1.65;">Revisamos su solicitud de crédito por ' . $e($money($credit['requested_amount'])) . ((string) $credit['purpose'] !== '' ? ' para ' . $e(mb_strtolower((string) $credit['purpose'])) : '') . ' asociada al contrato <b>#' . $e($credit['contract_code']) . '</b> y en esta oportunidad no fue aprobada.</p>'
