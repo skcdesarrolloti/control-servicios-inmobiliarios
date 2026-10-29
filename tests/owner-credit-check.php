@@ -22,7 +22,7 @@ $near = static fn(float $a, float $b, float $tolerance = 0.01): bool => abs($a -
 
 // Valores de "Simuladore de Creditos a Propietarios Version 2.xlsx" (contrato 890).
 // Sin margen de meses, como el Excel (el margen del preaprobado se prueba aparte).
-$settings = OwnerCreditSettings::normalize(['usury_annual' => '0.333', 'reference_rate' => '0.0242', 'policy_discount' => '0.05', 'income_months' => 3, 'term_margin_months' => 0]);
+$settings = OwnerCreditSettings::normalize(['usury_annual' => '0.333', 'reference_rate' => '0.0242', 'policy_discount' => '0.05', 'income_months' => 3, 'term_margin_months' => 0, 'max_term' => 24]);
 $assert($near($settings['usury_annual'], 0.333, 1e-9) && $near($settings['reference_rate'], 0.0242, 1e-9), 'settings keep decimal rates');
 $assert($near(OwnerCreditSettings::normalize(['usury_annual' => '33,3', 'reference_rate' => '2,42'])['reference_rate'], 0.0242, 1e-9), 'settings accept rates typed as percentages');
 
@@ -58,7 +58,16 @@ $assert(OwnerCreditCalculator::preapproval([], $settings)['max_term'] === 0, 'pr
 $short = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 7, 'end_ts' => strtotime('2027-05-31')]], $settings, $disbursed);
 $assert($short['max_term'] === 7 && str_contains($short['term_basis'], '7 meses de vigencia del contrato (fin 31/05/2027)'), 'a contract with 7 months left gives 7 installments without margin');
 $long = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 25, 'end_ts' => strtotime('2028-12-31')], ['net_income' => 400000, 'max_months' => 6, 'end_ts' => strtotime('2027-04-30')]], OwnerCreditSettings::normalize(['term_margin_months' => 2] + $settings), $disbursed);
-$assert($long['max_term'] === 23 && str_contains($long['term_basis'], '25 meses de vigencia del contrato más largo') && str_contains($long['term_basis'], '− 2 de margen'), 'the maximum term is n − 2 with no 12-month cap');
+$assert($long['max_term'] === 23 && str_contains($long['term_basis'], '25 meses de vigencia del contrato más largo') && str_contains($long['term_basis'], '− 2 de margen'), 'the maximum term is n − 2 when the cap is higher');
+// Tope de plazo de Configuración (10 por defecto): el máximo es el menor entre n − 2 y el tope.
+$capped = OwnerCreditSettings::normalize(['term_margin_months' => 2, 'max_term' => 10] + $settings);
+$capLong = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 25, 'end_ts' => strtotime('2028-12-31')]], $capped, $disbursed);
+$assert($capLong['max_term'] === 10 && str_contains($capLong['term_basis'], 'tope 10 meses'), 'n − 2 above the cap is limited to the configured maximum (10)');
+$capShort = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 8, 'end_ts' => strtotime('2027-06-30')]], $capped, $disbursed);
+$assert($capShort['max_term'] === 6 && !str_contains($capShort['term_basis'], 'tope'), 'n − 2 below the cap is kept (8 − 2 = 6)');
+$capNone = OwnerCreditCalculator::preapproval([['net_income' => 800000, 'max_months' => 2, 'end_ts' => strtotime('2027-01-15')]], $capped, $disbursed);
+$assert($capNone['max_term'] === 0 && $capNone['fallback_term'] === 10, 'a contract with no installments left falls back to the cap');
+$assert(OwnerCreditSettings::normalize([])['max_term'] === 10, 'the term cap defaults to 10 months');
 $assert(OwnerCreditSettings::normalize([])['term_margin_months'] === 2 && OwnerCreditSettings::normalize(['term_margin_months' => 3])['term_margin_months'] === 3 && !array_key_exists('max_term_months', OwnerCreditSettings::normalize([])), 'the margin is configurable (2 by default) and there is no term cap');
 $assert(OwnerCreditSettings::normalize(['usable_income_factor' => '70', 'min_coverage' => '1,2'])['usable_income_factor'] === 0.7 && OwnerCreditSettings::normalize(['min_coverage' => '1,2'])['min_coverage'] === 1.2, 'usable income (%) and minimum coverage (times the installment) are configurable');
 $assert(OwnerCreditSettings::normalize(OwnerCreditSettings::normalize([]))['usable_income_factor'] === 1.0 && OwnerCreditSettings::normalize(['min_coverage' => '0,5'])['min_coverage'] === 1.0, '100 % stays 100 % when read back and the minimum coverage is at least 1');

@@ -268,7 +268,7 @@ final class OwnerCreditService
 
   /**
    * Plazo máximo para financiar una cotización: el de una solicitud del propietario de su contrato (cuotas antes del
-   * fin de su contrato más largo − margen; sin cuotas, el plazo por defecto de Configuración − margen).
+   * fin de su contrato más largo − margen, sin pasar del tope de Configuración; sin cuotas, ese tope).
    */
   public function quoteTermLimit(int $quoteId): int
   {
@@ -632,7 +632,7 @@ final class OwnerCreditService
     // del calendario hasta el fin del contrato (o hasta el plazo pedido, si es mayor).
     $longestEnd = max(0, ...array_map(static fn(array $row): int => (int) $row['end_ts'], $coverageContracts));
     $longestMonths = max(OwnerCreditCalculator::monthsUntil($evaluationTs, $endTs), ...array_map(static fn(array $row): int => (int) $row['max_months'], $others ?: [['max_months' => 0]]));
-    $termLimit = max(0, $longestMonths - $margin);
+    $termLimit = OwnerCreditCalculator::capTerm(max(0, $longestMonths - $margin), $settings);
     $dueDates = OwnerCreditCoverage::dueDates($firstPaymentTs, max(1, OwnerCreditCoverage::duesUntil($firstPaymentTs, $longestEnd, 600), $termLimit, $requestedTerm));
     $obligations = array_map(fn(int $date): float => $extraObligations + ($hasCredits ? $this->creditPaymentsDue($approved, $date) : 0.0), $dueDates);
     $slots = OwnerCreditCoverage::availability($dueDates, $coverageContracts, (float) $settings['usable_income_factor'], $obligations);
@@ -647,7 +647,7 @@ final class OwnerCreditService
     ], $settings);
     $evaluation['other_contracts'] = $others;
     $evaluation['vacancy_signal'] = $vacancySignal;
-    $evaluation['term_basis'] = OwnerCreditCalculator::termBasisText($longestMonths, $margin, $longestEnd, $others !== []);
+    $evaluation['term_basis'] = OwnerCreditCalculator::termBasisText($longestMonths, $margin, $longestEnd, $others !== [], OwnerCreditCalculator::maxTerm($settings));
 
     $suggested = $evaluation['suggested'];
     $amount = array_key_exists('amount', $input) ? self::money($input['amount']) : ($decided ? (float) $credit['approved_amount'] : (float) $suggested['amount']);

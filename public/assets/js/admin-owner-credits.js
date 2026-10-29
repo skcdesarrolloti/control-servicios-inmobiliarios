@@ -336,7 +336,7 @@
     // contratos no dan cuotas se permite hasta el tope, para que el analista revise la fecha fin en el liquidador.
     function termLimit(form) {
       var p = form._preapproval || {};
-      return Number(p.max_term) > 0 ? Number(p.max_term) : (Number(p.fallback_term) || 12);
+      return Number(p.max_term) > 0 ? Number(p.max_term) : (Number(p.fallback_term) || 10);
     }
 
     function termFits(form) {

@@ -37,6 +37,8 @@ final class OwnerCreditSettings
       'min_remaining_months' => 3,
       // Plazo máximo = cuotas que vencen antes del fin del contrato más largo menos este margen (n − 2).
       'term_margin_months' => 2,
+      // Tope de plazo: el máximo es el menor entre n − margen y estos meses (también cuando el contrato no da cuotas).
+      'max_term' => 10,
       // Cobertura de pago: % del ingreso neto de cada contrato que se puede usar para la cuota y cuántas veces debe
       // alcanzar el disponible a la cuota (1 = alcanza exacto). Los define la empresa.
       'usable_income_factor' => 1.0,
@@ -110,6 +112,7 @@ final class OwnerCreditSettings
       'min_coverage' => $coverage($input['min_coverage'] ?? null, $defaults['min_coverage']),
       'term_margin_months' => $int($input['term_margin_months'] ?? null, $defaults['term_margin_months'], 0, 12),
       'default_term' => $int($input['default_term'] ?? null, $defaults['default_term'], 1, 60),
+      'max_term' => $int($input['max_term'] ?? null, $defaults['max_term'], 1, 60),
       'require_promissory' => $bool($input['require_promissory'] ?? null, $defaults['require_promissory']),
       'notify_owner_request_email' => $bool($input['notify_owner_request_email'] ?? null, $defaults['notify_owner_request_email']),
       'notify_owner_request_whatsapp' => $bool($input['notify_owner_request_whatsapp'] ?? null, $defaults['notify_owner_request_whatsapp']),

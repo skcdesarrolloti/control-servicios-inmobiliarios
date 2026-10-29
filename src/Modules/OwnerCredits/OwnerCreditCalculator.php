@@ -130,18 +130,29 @@ final class OwnerCreditCalculator
       'longest_end_ts' => $longestEnd,
       'first_due_ts' => $firstDue,
       'term_margin' => $margin,
-      'max_term' => max(0, $longest - $margin),
-      // Sin cuotas por vigencia (contrato por vencer o fecha fin vieja) se deja registrar hasta el plazo por defecto
-      // menos el margen: el analista revisa la fecha fin.
+      'max_term' => self::capTerm(max(0, $longest - $margin), $settings),
+      // Sin cuotas por vigencia (contrato por vencer o fecha fin vieja) se deja registrar hasta el tope de plazo:
+      // el analista revisa la fecha fin.
       'fallback_term' => self::fallbackTerm($settings),
-      'term_basis' => self::termBasisText($longest, $margin, $longestEnd, count($contracts) > 1),
+      'term_basis' => self::termBasisText($longest, $margin, $longestEnd, count($contracts) > 1, self::maxTerm($settings)),
     ];
   }
 
-  /** Plazo cuando los contratos no dan cuotas: el plazo por defecto menos el margen (12 − 2 = 10), mínimo 1. */
+  /** Tope de plazo de cualquier crédito (Configuración): el plazo máximo es el menor entre n − margen y este tope. */
+  public static function maxTerm(array $settings): int
+  {
+    return max(1, (int) ($settings['max_term'] ?? 10));
+  }
+
+  public static function capTerm(int $term, array $settings): int
+  {
+    return min($term, self::maxTerm($settings));
+  }
+
+  /** Plazo cuando los contratos no dan cuotas: el tope de plazo. */
   public static function fallbackTerm(array $settings): int
   {
-    return max(1, (int) ($settings['default_term'] ?? 12) - self::termMargin($settings));
+    return self::maxTerm($settings);
   }
 
   /** Meses de margen antes del fin del contrato: el plazo máximo es n − margen (Configuración). */
@@ -150,12 +161,13 @@ final class OwnerCreditCalculator
     return max(0, (int) ($settings['term_margin_months'] ?? 2));
   }
 
-  /** "24 meses de vigencia del contrato más largo (fin 14/11/2028) − 2 de margen". */
-  public static function termBasisText(int $months, int $margin, int $longestEnd, bool $several): string
+  /** "24 meses de vigencia del contrato más largo (fin 14/11/2028) − 2 de margen, tope 10". */
+  public static function termBasisText(int $months, int $margin, int $longestEnd, bool $several, int $cap = 0): string
   {
     $contract = $several ? 'del contrato más largo' : 'del contrato';
+    $capped = $cap > 0 && $months - $margin > $cap ? ', tope ' . $cap . ' meses' : '';
     if ($longestEnd <= 0) return 'sin fecha fin ' . $contract;
-    return $months . ' mes' . ($months === 1 ? '' : 'es') . ' de vigencia ' . $contract . ' (fin ' . date('d/m/Y', $longestEnd) . ')' . ($margin > 0 ? ' − ' . $margin . ' de margen' : '');
+    return $months . ' mes' . ($months === 1 ? '' : 'es') . ' de vigencia ' . $contract . ' (fin ' . date('d/m/Y', $longestEnd) . ')' . ($margin > 0 ? ' − ' . $margin . ' de margen' : '') . $capped;
   }
 
   /**
@@ -185,7 +197,7 @@ final class OwnerCreditCalculator
     $slots = $coverage !== null ? array_values((array) $coverage['availability']) : [];
     $minCoverage = $coverage !== null ? max(1.0, (float) $coverage['min_coverage']) : 1.0;
     // Plazo máximo por vigencia (límite superior); la cobertura lo puede bajar según el valor.
-    $termLimit = $coverage !== null ? max(0, (int) $coverage['term_limit']) : max(0, $longestMonths - $margin);
+    $termLimit = self::capTerm($coverage !== null ? max(0, (int) $coverage['term_limit']) : max(0, $longestMonths - $margin), $settings);
     // Mayor plazo con cobertura para $amount a $rate, probando desde $from hasta 1 (0 si ninguno).
     $covered = static fn(float $amount, float $rate, int $from): int => $coverage === null || $amount <= 0 ? $from
       : OwnerCreditCoverage::bestTerm($amount, min($rate, $usuryLegal), $from, $slots, $minCoverage)['term'];

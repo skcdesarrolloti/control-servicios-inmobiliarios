@@ -50,7 +50,7 @@ $pdo = new OwnerCreditTestPdo();
 $db = new Database($pdo, 'wp_');
 $pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema(_ID INTEGER PRIMARY KEY, funcion TEXT, valor TEXT)');
 // Usura manual (sin red) y una tasa de referencia por debajo de la usura vigente.
-$pdo->exec("INSERT INTO wp_jet_cct_confi_sistema(funcion, valor) VALUES ('control_servicios_config', '" . json_encode(['owner_credit_settings' => ['usury_auto' => false, 'usury_annual' => 0.2859, 'reference_rate' => 0.019, 'notify_staff_whatsapp' => true, 'require_promissory' => false]]) . "')");
+$pdo->exec("INSERT INTO wp_jet_cct_confi_sistema(funcion, valor) VALUES ('control_servicios_config', '" . json_encode(['owner_credit_settings' => ['usury_auto' => false, 'usury_annual' => 0.2859, 'reference_rate' => 0.019, 'notify_staff_whatsapp' => true, 'require_promissory' => false, 'max_term' => 24]]) . "')");
 $pdo->exec('CREATE TABLE wp_scm_owner_credits(id INTEGER PRIMARY KEY AUTOINCREMENT, quote_id INTEGER UNIQUE, ticket_id TEXT DEFAULT "", contract_id INTEGER DEFAULT 0, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", address TEXT DEFAULT "", owner_id TEXT DEFAULT "", owner_name TEXT DEFAULT "", owner_email TEXT DEFAULT "", owner_phone TEXT DEFAULT "", purpose TEXT DEFAULT "", status TEXT DEFAULT "pendiente", requested_amount REAL DEFAULT 0, requested_term INTEGER DEFAULT 0, vacancy TEXT DEFAULT "Baja", gross_income REAL DEFAULT 0, deductions_json TEXT, net_income REAL DEFAULT 0, max_amount REAL DEFAULT 0, max_months INTEGER DEFAULT 0, approved_amount REAL, approved_term INTEGER, approved_rate REAL, monthly_payment REAL, total_interest REAL, first_payment_ts INTEGER, policy_json TEXT, evaluation_json TEXT, policy_override INTEGER DEFAULT 0, decision_note TEXT, decided_by_id TEXT DEFAULT "", decided_by_name TEXT DEFAULT "", decided_at INTEGER, closed_at INTEGER, created_by_id TEXT DEFAULT "", created_by_name TEXT DEFAULT "", created_at INTEGER, updated_at INTEGER)');
 $pdo->exec('CREATE TABLE wp_scm_owner_credit_sources(id INTEGER PRIMARY KEY AUTOINCREMENT, credit_id INTEGER, contract_id INTEGER, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", net_income REAL DEFAULT 0, end_ts INTEGER, is_primary INTEGER DEFAULT 0, created_at INTEGER)');
 $pdo->exec('CREATE TABLE wp_scm_owner_credit_promissory(id INTEGER PRIMARY KEY AUTOINCREMENT, owner_document TEXT, owner_id TEXT DEFAULT "", owner_name TEXT DEFAULT "", owner_email TEXT DEFAULT "", owner_phone TEXT DEFAULT "", credit_id INTEGER DEFAULT 0, status TEXT DEFAULT "pendiente", payload_json TEXT, payload_hash TEXT, token_nonce TEXT, expires_at INTEGER, channels TEXT DEFAULT "email", otp_json TEXT, delivery_json TEXT, signed_at INTEGER, signed_json TEXT, signed_pdf BLOB, pdf_hash TEXT, pdf_hmac TEXT, voided_at INTEGER, void_note TEXT, voided_by_name TEXT DEFAULT "", created_by_id TEXT DEFAULT "", created_by_name TEXT DEFAULT "", created_at INTEGER, updated_at INTEGER)');
@@ -169,9 +169,9 @@ try {
 $newEnd = date('Y-m-d', strtotime('+3 years'));
 $simulated = $service->workspace((int) $pending['id'], ['requested_term' => '10', 'contract_end' => $newEnd]);
 $check($simulated['term_error'] === '' && $simulated['contract']['fin_ts'] !== $simulated['contract']['fin_saved_ts'], 'a corrected end date is simulated before saving');
-// Con vigencia de 36 meses el plazo máximo es n − 2, sin tope de 12.
+// Con vigencia de 36 meses n − 2 pasa el tope de Configuración (24 en esta prueba): el liquidador limita al tope.
 $capped = $service->workspace((int) $pending['id'], ['requested_term' => '40', 'contract_end' => $newEnd]);
-$check($capped['evaluation']['term_limit'] === $capped['evaluation']['longest_months'] - 2 && $capped['evaluation']['term_limit'] > 12 && str_contains($capped['term_error'], '− 2 de margen'), 'the maximum term is the months left minus 2, without the 12-month cap');
+$check($capped['evaluation']['longest_months'] - 2 > 24 && $capped['evaluation']['term_limit'] === 24 && str_contains($capped['term_error'], '− 2 de margen, tope 24 meses'), 'the liquidator caps n − 2 at the configured maximum term');
 $check($db->getRow('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 7')['fin_contrato'] === $end, 'simulating does not touch the contract');
 $check(!method_exists($service, 'updateContractEnd'), 'the end date is no longer saved with a separate button');
 $service->decide((int) $pending['id'], 'rechazado', ['requested_term' => '30', 'contract_end' => $newEnd, 'note' => 'Se rechaza tras corregir la fecha fin.'], $actor);
@@ -237,7 +237,7 @@ $check(array_column($portfolio, 'id') === [14, 9] && $portfolio[0]['net_income']
 $work = $service->workspace((int) $chosen['id']);
 $ev = $work['evaluation'];
 $check(count($ev['other_contracts']) === 1 && abs($ev['total_net_income'] - 3300000) < 0.01 && abs($ev['max_amount'] - 9900000) < 0.01, 'the liquidator adds the other contracts to the cap');
-$check($ev['longest_months'] === $portfolio[0]['max_months'] && $ev['term_limit'] === $portfolio[0]['max_months'] - 2, 'the liquidator term is the longest contract minus the margin');
+$check($ev['longest_months'] === $portfolio[0]['max_months'] && $ev['term_limit'] === min($portfolio[0]['max_months'] - 2, 24), 'the liquidator term is the longest contract minus the margin, up to the cap');
 foreach ([[0, $ev['max_months'], 'valor'], [9900000, 0, 'plazo']] as [$amount, $term, $missing]) {
   try {
     $service->simulation('22233344', 9, $amount, $term, 'Libre Destinación', 'mandato_2', $actor);
