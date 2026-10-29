@@ -118,6 +118,7 @@ session_write_close();
     .scm-public-quote-response-form label.is-wide{grid-column:1/-1}
     .scm-public-quote-response-form input,.scm-public-quote-response-form select,.scm-public-quote-response-form textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:12px;padding:11px 12px;font:500 14px Poppins,Arial,sans-serif;color:#0f172a;background:#fff}
     .scm-public-quote-response-form input[readonly]{background:#f1f5f9;color:#475569}
+    .scm-public-quote-response-form .scm-public-quote-response-error{color:#b91c1c;font-weight:700}
     .scm-public-quote-response-form button{grid-column:1/-1;justify-self:start;border:0;border-radius:13px;background:#ff8a00;color:#fff;font:800 14px Poppins,Arial,sans-serif;padding:12px 18px;cursor:pointer}
     @media (max-width:720px){.scm-public-quote-response-form{grid-template-columns:1fr}.scm-public-quote-head{align-items:flex-start;flex-direction:column}.scm-public-quote-logo{max-width:100%;width:170px}.scm-public-quote-confirmation{align-items:flex-start;flex-direction:column}.scm-public-quote-confirmation a{width:100%;box-sizing:border-box}}
     @media print{body{background:#fff}#scm-app{max-width:none;padding:0}.scm-public-quote-head,.scm-public-quote-alert,.scm-public-quote-confirmation,.scm-public-quote-response{display:none!important}#scm-app>.scm-cotizacion-native-doc{width:800px;max-width:none;box-sizing:border-box;margin:0 auto;zoom:.9}}
@@ -180,6 +181,21 @@ session_write_close();
             if (!financed) termInput.value = "";
           }
         }
+        // Si escriben más meses que el máximo se avisa al lado del campo y no se deja enviar.
+        var termError = termWrap ? termWrap.querySelector("[data-public-quote-response-term-error]") : null;
+        function checkTerm() {
+          if (!termInput) return true;
+          var max = Number(termInput.getAttribute("max")) || 0;
+          var term = Number(termInput.value) || 0;
+          var message = !termInput.disabled && max > 0 && term > max ? "El plazo máximo para financiar esta cotización es de " + max + " meses." : "";
+          termInput.setCustomValidity(message);
+          if (termError) {
+            termError.textContent = message;
+            termError.hidden = message === "";
+          }
+          return message === "";
+        }
+        if (termInput) termInput.addEventListener("input", checkTerm);
         if (state) state.addEventListener("change", sync);
         if (approveSelect) approveSelect.addEventListener("change", sync);
         form.addEventListener("submit", function (event) {
@@ -187,6 +203,10 @@ session_write_close();
           if (rejectSelect && !rejectSelect.disabled && !rejectSelect.value) {
             event.preventDefault();
             rejectSelect.focus();
+          }
+          if (!checkTerm()) {
+            event.preventDefault();
+            termInput.focus();
           }
         });
         sync();

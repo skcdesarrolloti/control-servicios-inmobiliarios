@@ -268,7 +268,7 @@ final class OwnerCreditService
 
   /**
    * Plazo máximo para financiar una cotización: el de una solicitud del propietario de su contrato (cuotas antes del
-   * fin de su contrato más largo − margen; sin cuotas, el tope de Configuración).
+   * fin de su contrato más largo − margen; sin cuotas, el plazo por defecto de Configuración − margen).
    */
   public function quoteTermLimit(int $quoteId): int
   {
@@ -281,7 +281,7 @@ final class OwnerCreditService
       } catch (\InvalidArgumentException) {
       }
     }
-    return (int) $this->config()['default_term'];
+    return OwnerCreditCalculator::fallbackTerm($this->config());
   }
 
   /** Los meses elegidos al responder la cotización con financiación Sí. @throws \DomainException */
@@ -1113,7 +1113,7 @@ final class OwnerCreditService
    */
   public function requestTermLimit(array $preapproval): int
   {
-    return (int) $preapproval['max_term'] > 0 ? (int) $preapproval['max_term'] : (int) ($preapproval['fallback_term'] ?? $this->config()['default_term']);
+    return (int) $preapproval['max_term'] > 0 ? (int) $preapproval['max_term'] : (int) ($preapproval['fallback_term'] ?? OwnerCreditCalculator::fallbackTerm($this->config()));
   }
 
   private function assertRequestTerm(int $term, string $document): void

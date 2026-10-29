@@ -5443,7 +5443,8 @@ trait RendersDashboard
       . '<label data-public-quote-response-reject hidden><span>Motivo si desapruebas <em>*</em></span><select name="motivo" disabled><option value="">Selecciona motivo</option><option value="Por costo">Por costo</option><option value="Ejecución por cuenta propia">Ejecución por cuenta propia</option></select></label>'
       . '<label data-public-quote-response-approve hidden><span>Financiación si apruebas</span><select name="financiacion" disabled><option value="">No aplica / sin respuesta</option><option value="Si">Sí</option><option value="No">No</option></select></label>'
       . '<label data-public-quote-response-term hidden><span>¿A cuántos meses? <em>*</em></span><input type="number" name="plazo_financiacion" min="1"' . ($maxTerm > 0 ? ' max="' . $maxTerm . '"' : '') . ' step="1" inputmode="numeric" placeholder="Escribe los meses" disabled>'
-      . ($maxTerm > 0 ? '<small>Máximo ' . $maxTerm . ' meses. El crédito queda sujeto a estudio, verificación y aprobación.</small>' : '') . '</label>'
+      . ($maxTerm > 0 ? '<small>Máximo ' . $maxTerm . ' meses. El crédito queda sujeto a estudio, verificación y aprobación.</small>' : '')
+      . '<small class="scm-public-quote-response-error" data-public-quote-response-term-error role="alert" hidden></small></label>'
       . '<label class="is-wide"><span>Observaciones</span><textarea name="observacion" rows="4" placeholder="Agrega observaciones si deseas complementar la respuesta."></textarea></label>'
       . '<button type="submit">Guardar respuesta</button>'
       . '</form></section>';

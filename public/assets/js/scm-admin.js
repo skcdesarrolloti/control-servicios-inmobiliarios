@@ -2820,6 +2820,20 @@
     });
   }
 
+  // Si escriben más meses que el máximo, el aviso reemplaza la ayuda del campo y el formulario no lo acepta.
+  document.addEventListener("input", function (event) {
+    var input = event.target;
+    if (!input || !input.matches || !input.matches('.scm-cotizacion-plazo input[name="plazo_financiacion"], [data-scm-composer-cot-plazo-input]')) return;
+    var hint = input.parentNode.querySelector("[data-scm-cotizacion-plazo-hint], [data-scm-composer-cot-plazo-hint]");
+    var max = Number(input.getAttribute("max")) || 0;
+    var message = max > 0 && (Number(input.value) || 0) > max ? "El plazo máximo para financiar esta cotización es de " + max + " meses." : "";
+    input.setCustomValidity(message);
+    if (!hint) return;
+    if (!hint.hasAttribute("data-scm-term-help")) hint.setAttribute("data-scm-term-help", hint.textContent);
+    hint.textContent = message || hint.getAttribute("data-scm-term-help");
+    hint.style.color = message ? "#b91c1c" : "";
+  });
+
   document.addEventListener("change", function (event) {
     var target = event.target;
     if (!target || !target.matches || !target.matches('select[name="estado_cotizacion"], select[name="estado"], select[name="financiacion_cotizacion"], select[name="financiacion"]')) return;

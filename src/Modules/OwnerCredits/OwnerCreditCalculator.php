@@ -131,10 +131,17 @@ final class OwnerCreditCalculator
       'first_due_ts' => $firstDue,
       'term_margin' => $margin,
       'max_term' => max(0, $longest - $margin),
-      // Sin cuotas por vigencia (fecha fin vieja) se deja registrar hasta el plazo por defecto: el analista la corrige.
-      'fallback_term' => max(1, (int) ($settings['default_term'] ?? 12)),
+      // Sin cuotas por vigencia (contrato por vencer o fecha fin vieja) se deja registrar hasta el plazo por defecto
+      // menos el margen: el analista revisa la fecha fin.
+      'fallback_term' => self::fallbackTerm($settings),
       'term_basis' => self::termBasisText($longest, $margin, $longestEnd, count($contracts) > 1),
     ];
+  }
+
+  /** Plazo cuando los contratos no dan cuotas: el plazo por defecto menos el margen (12 − 2 = 10), mínimo 1. */
+  public static function fallbackTerm(array $settings): int
+  {
+    return max(1, (int) ($settings['default_term'] ?? 12) - self::termMargin($settings));
   }
 
   /** Meses de margen antes del fin del contrato: el plazo máximo es n − margen (Configuración). */
