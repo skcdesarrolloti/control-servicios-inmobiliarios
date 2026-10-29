@@ -6,6 +6,7 @@ namespace SCM\Modules\OwnerCredits;
 
 use SCM\Core\Database;
 use SCM\Core\Settings;
+use SCM\Modules\LeaseContracts\ContractCoOwners;
 use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
 use SCM\Support\FuncionarioOptions;
@@ -2262,46 +2263,34 @@ final class OwnerCreditService
   {
     $contract = $this->contractById($contractId);
     if ($contract === null) return [];
-    $owners = [];
     $mandateTable = $this->db->table('jet_cct_contrato_mandato');
     $mandateId = (int) ($contract['id_contrato_mandato'] ?? 0);
     $mandate = $mandateId > 0 && $this->schema->tableExists($mandateTable) ? $this->db->getRow("SELECT * FROM `{$mandateTable}` WHERE `_ID` = ? LIMIT 1", [$mandateId]) : null;
-    if (is_array($mandate)) {
-      $count = max(1, min(6, (int) ($mandate['propietarios'] ?? 1)));
-      for ($i = 1; $i <= $count; $i++) {
-        $company = strcasecmp(trim((string) ($mandate['tipo_' . $i] ?? '')), 'Natural') !== 0 && trim((string) ($mandate['empresa_' . $i] ?? '')) !== '';
-        $name = trim((string) ($company ? $mandate['empresa_' . $i] : ($mandate['nombre_' . $i] ?? '')));
-        if ($name === '') continue;
-        $document = trim((string) ($company ? ($mandate['nit_' . $i] ?? '') : ($mandate['documento_' . $i] ?? '')));
-        $ownerId = trim((string) ($mandate['id_propietario_nuevo_' . $i] ?? ''));
-        if ($ownerId === '') $ownerId = $i === 1 ? (string) ($contract['id_propietario'] ?? '') : 'doc:' . $document;
-        $owners[] = [
-          'key' => 'mandato_' . $i, 'name' => $name, 'document' => $document,
-          'email' => trim((string) ($mandate['correo_' . $i] ?? '')),
-          'phone' => self::phone((string) ($mandate['celular_' . $i] ?? ''), (string) ($mandate['indicativo_' . $i] ?? '')),
-          'owner_id' => $ownerId,
-        ];
-      }
+    return ContractCoOwners::resolve($contract, is_array($mandate) ? $mandate : null, is_array($mandate) ? [] : $this->coOwnerProfiles($contract));
+  }
+
+  /**
+   * Fichas de propietarios de los `id_propietario_2..6` del contrato (solo se usan si el contrato no tiene mandato).
+   * @return array<string,array<string,mixed>> `_ID` => ficha
+   */
+  private function coOwnerProfiles(array $contract): array
+  {
+    $ids = [];
+    for ($i = 2; $i <= ContractCoOwners::MAX; $i++) {
+      $id = trim((string) ($contract['id_propietario_' . $i] ?? ''));
+      if ($id !== '' && ctype_digit($id)) $ids[] = $id;
     }
-    if ($owners === []) {
-      $owners[] = [
-        'key' => 'contrato', 'name' => trim((string) ($contract['propietario'] ?? '')), 'document' => '',
-        'email' => trim((string) ($contract['correo_propietario'] ?? '')),
-        'phone' => self::phone((string) ($contract['celular_propietario'] ?? ''), (string) ($contract['indicativo_propietario'] ?? '')),
-        'owner_id' => (string) ($contract['id_propietario'] ?? ''),
-      ];
-    }
-    return $owners;
+    $table = $this->db->table('jet_cct_propietarios');
+    if ($ids === [] || !$this->schema->tableExists($table)) return [];
+    $profiles = [];
+    foreach ($this->db->getResults("SELECT * FROM `{$table}` WHERE `_ID` IN (" . implode(',', array_fill(0, count($ids), '?')) . ')', $ids) as $row) $profiles[(string) $row['_ID']] = $row;
+    return $profiles;
   }
 
   /** Celular con indicativo en dígitos (+57 314 5106244 → 573145106244). */
   private static function phone(string $phone, string $prefix): string
   {
-    $digits = preg_replace('/\D/', '', $phone) ?? '';
-    $prefixDigits = preg_replace('/\D/', '', $prefix) ?? '';
-    if ($digits === '') return '';
-    if (str_starts_with(trim($phone), '+') || $prefixDigits === '' || str_starts_with($digits, $prefixDigits)) return $digits;
-    return $prefixDigits . $digits;
+    return ContractCoOwners::phone($phone, $prefix);
   }
 
   /** @return array<string,mixed>|null */
