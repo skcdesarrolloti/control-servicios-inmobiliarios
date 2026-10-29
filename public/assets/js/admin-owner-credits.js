@@ -633,7 +633,7 @@
         if (decision === "rechazado" && !requireNote(form, "Rechazar")) return;
         if (decision === "aprobado" && form.querySelector("[data-owner-credit-needs-note]") && !requireNote(form, "Aprobar crédito")) return;
         askConfirm(decide, decision === "aprobado"
-          ? "Se aprobará el crédito con las condiciones del analista y se enviará la respuesta al propietario: carta de aprobación, pagaré firmado y plan de pagos."
+          ? "Se aprobará el crédito con las condiciones del analista. Si el propietario no tiene el pagaré firmado se le envía para firmar; con la firma sale la respuesta con la carta de aprobación, el pagaré firmado y el plan de pagos."
           : "Se rechazará la solicitud y se avisará al propietario.", function () {
           runAction(form, "scm_owner_credit_decide", { decision: decision });
         });

@@ -132,7 +132,7 @@ La definición para la API está en `whatsapp-credito-propietario-respuesta-func
 
 ## Plantillas del pagaré y la carta de instrucciones
 
-El propietario firma una sola vez el pagaré en blanco y su carta de instrucciones, desde un enlace personal (`credito-pagare.php`). Se firma **antes de aprobar**: el analista lo envía desde la etapa **3. Firma de documentos** del liquidador, eligiendo **Correo**, **WhatsApp** o ambos, y el crédito solo se puede aprobar cuando está firmado. Hasta que Meta apruebe estas plantillas, envíalo solo por correo: por WhatsApp no saldrá nada.
+El propietario firma una sola vez el pagaré en blanco y su carta de instrucciones, desde un enlace personal (`credito-pagare.php`). Se firma **después de que el analista aprueba**: al aprobar, el panel envía el enlace a quien no lo tenga firmado (por correo y, si está activo **WhatsApp al propietario con la respuesta**, también por WhatsApp). El analista lo puede reenviar desde la etapa **3. Firma de documentos** del liquidador. Al firmar sale sola la respuesta. Hasta que Meta apruebe estas plantillas, envíalo solo por correo: por WhatsApp no saldrá nada.
 
 Para el código de 6 dígitos se reutiliza la plantilla de autenticación del acta (`scm_acta_firma_otp_v1`), que no menciona el acta. No hay que crear otra.
 
@@ -167,6 +167,8 @@ Este enlace es personal. No lo compartas.
 La definición para la API está en `whatsapp-credito-pagare-firma-template.json`.
 
 ### Copia firmada
+
+Solo le llega a quien firma cuando la respuesta del crédito no le lleva ya el pagaré firmado (por ejemplo, un copropietario que firma un crédito de otra persona). Al beneficiario el pagaré firmado le llega en la respuesta.
 
 - Nombre exacto: `scm_credito_pagare_firmado_v1` (variable de entorno `SCM_PAGARE_WHATSAPP_SIGNED_TEMPLATE`).
 - Mismas opciones que la invitación.
@@ -232,7 +234,7 @@ La definición para la API está en `whatsapp-credito-propietario-solicitud-func
 
 ## Plantillas de la respuesta con documentos
 
-Al **aprobar** el crédito (el pagaré ya está firmado), el panel le envía al propietario la **respuesta**: un correo con los tres PDF adjuntos y, por WhatsApp, **un mensaje por documento**, porque una plantilla con encabezado de documento solo lleva un PDF. Los mismos mensajes van a los funcionarios de **Notificaciones internas › Créditos a propietarios › Respuesta de crédito enviada** (en {{1}} va el nombre del funcionario).
+Cuando el propietario firma el pagaré de un crédito aprobado (o al aprobar, si ya lo tenía firmado), el panel le envía la **respuesta**: un correo con los tres PDF adjuntos y, por WhatsApp, **un mensaje por documento**, porque una plantilla con encabezado de documento solo lleva un PDF. Los mismos mensajes van a los funcionarios de **Notificaciones internas › Créditos a propietarios › Respuesta de crédito enviada** (en {{1}} va el nombre del funcionario).
 
 - WhatsApp al propietario: **Configuración › WhatsApp al propietario con la respuesta**.
 - WhatsApp a funcionarios: **Configuración › WhatsApp a funcionarios**.

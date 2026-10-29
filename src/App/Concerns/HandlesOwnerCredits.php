@@ -186,8 +186,8 @@ trait HandlesOwnerCredits
       $next = $result['next'];
       $message = $decision === 'aprobado'
         ? 'Crédito aprobado. ' . ($next['response'] !== null
-          ? 'Respuesta enviada con ' . count($next['response']['documents']) . ' documento(s). Propietario: ' . $next['response']['email'] . ' correo(s), ' . $next['response']['whatsapp'] . ' WhatsApp.'
-          : '')
+          ? 'Ya tenía el pagaré firmado: se envió la respuesta con ' . count($next['response']['documents']) . ' documento(s).'
+          : ($next['promissory'] !== [] ? 'Pagaré enviado para firmar a ' . implode('; ', $next['promissory']) . '. La respuesta sale cuando lo firme.' : ''))
         : 'Crédito rechazado. Propietario: ' . $q['email'] . ' correo(s), ' . $q['whatsapp'] . ' WhatsApp.';
       $this->jsonOk(['message' => trim($message . ' Funcionarios: ' . $q['internal'] . ' correo(s), ' . $q['internal_whatsapp'] . ' WhatsApp. ' . implode(' ', $next['errors']))]);
     } catch (\Throwable $error) {
