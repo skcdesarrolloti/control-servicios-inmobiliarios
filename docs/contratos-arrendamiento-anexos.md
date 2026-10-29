@@ -34,7 +34,7 @@ Reemplaza el formulario JetForm "Crear contrato de arrendamiento". Se ofrece en 
 3. Actualiza el contrato (`acta_*`, partes, fechas, `contrato_arrendamiento`, `se_envio = Si`; `asegurado = No` solo si estaba vacío). No cambia `estado`, `id_empleado`, `creador`, `cct_author_id` ni `cct_created` del contrato.
 4. Registra el envío en el historial del contrato y del inmueble.
 5. Encola por actor un correo (acta adjunta; arrendatario y codeudores también reciben el contrato de arrendamiento) y un WhatsApp con la plantilla `scm_anexos_contrato_arrendamiento_v1` (acta en el encabezado y botón "Ver anexos" con el enlace firmado) (`docs/whatsapp-anexos-contrato-arrendamiento-template.json`).
-6. Copia cada correo del paso anterior y envía además un resumen interno con todas las actas a quienes se configuren en **Notificaciones internas › Contratos › Envío de anexos del contrato de arrendamiento** (`anexos_contrato_arrendamiento`).
+6. Copia cada correo del paso anterior y envía además un único resumen interno (primer funcionario en Para, el resto en CC) con todas las actas a quienes se configuren en **Notificaciones internas › Contratos › Envío de anexos del contrato de arrendamiento** (`anexos_contrato_arrendamiento`).
 
 ## Vista pública
 

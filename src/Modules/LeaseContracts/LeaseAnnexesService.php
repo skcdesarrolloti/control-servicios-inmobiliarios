@@ -702,7 +702,8 @@ final class LeaseAnnexesService
         . '<p style="margin:0;line-height:1.65;">Envío realizado por <b>' . EmailTemplate::e((string) ($context['realizado_por'] ?? '')) . '</b>. Las actas también están adjuntas.</p>';
       $queued['internal'] = $emailQueue->enqueue($internal, $subject, EmailTemplate::render($subject, $body), [
         'source_module' => 'anexos_contrato_arrendamiento',
-        'internal_cc' => [],
+        // Un solo correo: el primer funcionario en Para y el resto en CC.
+        'internal_cc' => $internal,
         'destination_name' => 'Equipo interno',
         'dedupe_key' => $dedupe . '_interno',
         'payload' => ['attachments' => array_values(array_map(static fn(array $document): array => ['path' => $document['path'], 'name' => $document['name']], $documents))],
