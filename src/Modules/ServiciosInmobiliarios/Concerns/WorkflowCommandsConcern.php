@@ -1239,13 +1239,6 @@ trait WorkflowCommandsConcern
       $this->db->update($ticketsTable, $ticketUpdate, ['_ID' => $ticketPk]);
     }
     \SCM\Support\CurrentQuote::syncTicket($this->db, $ticketPk);
-    // Financiación "Sí" abre la solicitud en el liquidador de créditos; "No" anula la pendiente.
-    if ($updated > 0 && in_array(strtolower(trim($financiacion)), ['si', 'no'], true)) {
-      $credits = new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db, null, $this->schema);
-      foreach ($cotIds as $cotId) {
-        $credits->syncFromQuote((int) $cotId, $financiacion, ['employee_id' => (string) $employeeId, 'name' => $userName], strtolower(trim($financiacion)) === 'si' ? $financingTerm : 0);
-      }
-    }
 
     $ticketHistorySaved = $writeTicketHistory
       ? $this->insertCotizacionResponseTicketHistory($ticket, $ticketPk, $cotIds, $estado, $observacion, $motivo, $financiacion . (strtolower(trim($financiacion)) === 'si' && $financingTerm > 0 ? ' a ' . $financingTerm . ' meses' : ''), $userId, $employeeId, $userName, $nowTs, $nowMysql)
@@ -1257,6 +1250,14 @@ trait WorkflowCommandsConcern
       $queued = $this->notifyCotizacionResponse($ticket, is_array($cotRow) ? $cotRow : [], $estado, $observacion);
       $notifications['email'] += $queued['email'];
       $notifications['whatsapp'] += $queued['whatsapp'];
+    }
+    // Financiación "Sí" abre la solicitud en el liquidador de créditos; "No" anula la pendiente.
+    // Va después de avisar la respuesta para que sus notificaciones queden detrás en la cola.
+    if ($updated > 0 && in_array(strtolower(trim($financiacion)), ['si', 'no'], true)) {
+      $credits = new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db, null, $this->schema);
+      foreach ($cotIds as $cotId) {
+        $credits->syncFromQuote((int) $cotId, $financiacion, ['employee_id' => (string) $employeeId, 'name' => $userName], strtolower(trim($financiacion)) === 'si' ? $financingTerm : 0);
+      }
     }
     return [
       'ok' => '1',
