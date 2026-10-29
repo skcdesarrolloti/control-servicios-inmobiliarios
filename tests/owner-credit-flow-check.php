@@ -556,4 +556,11 @@ $check(str_contains($source, "self::EVENT_QUOTE_REQUESTED, 'Crédito solicitado 
 $check(in_array('Reparaciones y mantenimiento', \SCM\Modules\OwnerCredits\OwnerCreditSettings::PURPOSES, true) && $service->byQuote(574)['purpose'] === 'Reparaciones y mantenimiento', 'quote requests use a purpose from the list');
 $check(\SCM\Modules\OwnerCredits\OwnerCreditSettings::normalize([])['notify_owner_request_email'] === true && \SCM\Modules\OwnerCredits\OwnerCreditSettings::normalize([])['notify_owner_request_whatsapp'] === false, 'the owner request email is on and the WhatsApp is off by default');
 
+$decisionTemplate = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-decision-template.json'), true);
+$decisionText = $decisionTemplate['components'][0]['text'];
+$check(str_contains($source, "'" . $decisionTemplate['name'] . "'") && substr_count($decisionText, '{{') === 5 && !str_ends_with(trim($decisionText), '}}') && !str_contains($decisionText, 'Comunícate') && !str_contains($source, 'Comunícate con nosotros'), 'owner decision template has five variables, ends with fixed text and speaks of usted');
+$check(str_contains($source, 'mb_strtolower((string) $credit[\'purpose\']) ?: \'libre inversión\', (string) $credit[\'contract_code\'], $detail, self::signerLine($signer)'), 'owner decision WhatsApp sends the purpose and the signature of whoever decided');
+$decisionBody = (new ReflectionMethod(OwnerCreditService::class, 'ownerEmailBody'))->invoke($service, ['owner_name' => 'Ana', 'status' => 'rechazado', 'requested_amount' => 893723, 'purpose' => 'Libre inversión', 'contract_code' => '817'], ['name' => 'Laura', 'cargo' => 'Analista de crédito', 'email' => 'laura@example.invalid']);
+$check(str_contains($decisionBody, 'para libre inversión') && str_contains($decisionBody, 'Atentamente,<br><b>Laura</b><br>Analista de crédito<br>laura@example.invalid<br><b>SKC SuCasa Inmobiliaria</b>'), 'the owner decision email names the purpose and is signed by whoever decided');
+
 echo "Owner credit flow checks passed.\n";

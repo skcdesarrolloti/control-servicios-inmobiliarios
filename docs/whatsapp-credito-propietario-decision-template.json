@@ -5,14 +5,15 @@
   "components": [
     {
       "type": "BODY",
-      "text": "Buen día, {{1}}.\n\nSu solicitud de crédito asociada al contrato #{{3}} fue {{2}}.\n\n{{4}}.\n\nEl detalle completo llegó a su correo.",
+      "text": "Hola, {{1}}.\n\nRevisamos su solicitud de crédito para {{2}} asociada al contrato #{{3}}.\n\n{{4}}.\n\nAtentamente,\n{{5}}\n\nGracias por confiar en nosotros.",
       "example": {
         "body_text": [
           [
             "David Esquivia Polo",
-            "aprobada",
+            "reparaciones y mantenimiento",
             "817",
-            "$893.723 a 12 meses, cuota de $86.070"
+            "Fue aprobada por $893.723 a 12 meses, con cuota mensual de $86.070 que se descontará de los giros de arrendamiento",
+            "Laura Pérez · Analista de crédito · creditos@sucasa.com"
           ]
         ]
       }

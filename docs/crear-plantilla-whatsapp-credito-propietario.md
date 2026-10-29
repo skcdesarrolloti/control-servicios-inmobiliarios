@@ -61,13 +61,16 @@ Selecciona el idioma **Español (COL)**, no English: el panel envía `es_CO`. Me
 ### Cuerpo para copiar
 
 ```text
-Buen día, {{1}}.
+Hola, {{1}}.
 
-Su solicitud de crédito asociada al contrato #{{3}} fue {{2}}.
+Revisamos su solicitud de crédito para {{2}} asociada al contrato #{{3}}.
 
 {{4}}.
 
-El detalle completo llegó a su correo.
+Atentamente,
+{{5}}
+
+Gracias por confiar en nosotros.
 ```
 
 ### Variables
@@ -75,11 +78,14 @@ El detalle completo llegó a su correo.
 | Variable | Qué envía el panel | Ejemplo |
 | --- | --- | --- |
 | 1 | Nombre del propietario | David Esquivia Polo |
-| 2 | `aprobada` o `no aprobada` | aprobada |
+| 2 | Destinación del crédito, en minúscula | reparaciones y mantenimiento |
 | 3 | Número del contrato | 817 |
-| 4 | Si se aprueba: valor, plazo y cuota. Si se rechaza: un texto fijo | $893.723 a 12 meses, cuota de $86.070 |
+| 4 | El resultado. Si se aprueba: valor, plazo y cuota; si se rechaza: un texto fijo | Fue aprobada por $893.723 a 12 meses, con cuota mensual de $86.070 que se descontará de los giros de arrendamiento |
+| 5 | Quien firma: nombre · cargo · correo del analista que decidió | Laura Pérez · Analista de crédito · creditos@sucasa.com |
 
-Si se rechaza, la variable 4 es: `Comunícate con nosotros para revisar alternativas`.
+Si se rechaza, la variable 4 es: `En esta oportunidad no fue aprobada. Si desea revisar alternativas, comuníquese con nosotros`.
+
+Esta versión reemplaza el cuerpo anterior de 4 variables: se edita la misma plantilla en Meta. Si Meta no permite agregar la quinta variable al editarla, crea `scm_credito_propietario_decision_v2` con este contenido y cambia el nombre en `OwnerCreditService::notifyDecision`.
 
 Envía la plantilla a revisión y espera a que aparezca **Aprobada**. Después activa **WhatsApp** en la configuración de créditos. No cambies el nombre, el idioma ni el orden de las variables, porque deben coincidir con el código. La definición para la API está en `whatsapp-credito-propietario-decision-template.json`; no pegues ese JSON en el campo del cuerpo.
 

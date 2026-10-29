@@ -1718,6 +1718,16 @@ final class OwnerCreditService
       $employeeId = trim((string) ($actor['employee_id'] ?? '')) ?: (string) $credit['created_by_id'];
       $name = trim((string) ($actor['name'] ?? '')) ?: (string) $credit['created_by_name'];
     }
+    return $this->funcionarioSigner($employeeId, $name, $email);
+  }
+
+  /**
+   * Firma con nombre, cargo y correo del funcionario activo con ese id_empleado; si no aparece, se queda con lo que
+   * se sabe y, sin nombre, firma la empresa.
+   * @return array{name:string,cargo:string,email:string}
+   */
+  private function funcionarioSigner(string $employeeId, string $name, string $email = ''): array
+  {
     $signer = ['name' => $name, 'cargo' => '', 'email' => $email];
     if ($employeeId !== '') {
       try {
@@ -1826,21 +1836,23 @@ final class OwnerCreditService
       : 'Motivo: ' . trim((string) $credit['decision_note']);
     $contract = (string) $credit['contract_code'] . ((string) $credit['property'] !== '' ? ' · Inmueble ' . $credit['property'] : '');
     $decidedBy = (string) $credit['decided_by_name'] ?: 'el panel';
+    $signer = $this->funcionarioSigner(trim((string) $credit['decided_by_id']), trim((string) $credit['decided_by_name']));
     $queued['internal_whatsapp'] = $this->notifyStaffWhatsapp(self::EVENT_DECIDED, $credit, 'scm_credito_propietario_respuesta_funcionario_v1',
       static fn(string $name, callable $clean): array => [$name, $clean($result, 60), $clean($credit['owner_name'], 120), $clean($detail, 300), $clean($contract, 80), $clean($decidedBy, 80)],
       'Crédito ' . mb_strtolower($result) . ': ' . $credit['owner_name'] . ', ' . $detail . ', contrato ' . $contract . '. Decidió ' . $decidedBy . '.');
     try {
       if ($settings['notify_owner_email'] && filter_var($credit['owner_email'], FILTER_VALIDATE_EMAIL)) {
-        $queued['email'] = (new EmailQueue($this->db))->enqueue([$credit['owner_email']], $title . ' · Contrato ' . $credit['contract_code'], EmailTemplate::render($title, $this->ownerEmailBody($credit)), [
+        $queued['email'] = (new EmailQueue($this->db))->enqueue([$credit['owner_email']], $title . ' · Contrato ' . $credit['contract_code'], EmailTemplate::render($title, $this->ownerEmailBody($credit, $signer)), [
           'source_module' => 'creditos_propietarios', 'destination_name' => $credit['owner_name'],
           'dedupe_key' => 'owner-credit-decision:' . $credit['id'], 'meta' => ['credit_id' => (int) $credit['id'], 'status' => $credit['status']],
         ]);
       }
       if ($settings['notify_owner_whatsapp'] && trim((string) $credit['owner_phone']) !== '') {
+        // Plantilla de 5 variables: propietario, destinación, contrato, resultado y quién firma (el analista que decidió).
         $detail = $approved
-          ? '$' . number_format((float) $credit['approved_amount'], 0, ',', '.') . ' a ' . $credit['approved_term'] . ' meses, cuota de $' . number_format((float) $credit['monthly_payment'], 0, ',', '.')
-          : 'Comunícate con nosotros para revisar alternativas';
-        $params = [$credit['owner_name'] ?: 'Propietario', $approved ? 'aprobada' : 'no aprobada', (string) $credit['contract_code'], $detail];
+          ? 'Fue aprobada por ' . $money($credit['approved_amount']) . ' a ' . $credit['approved_term'] . ' meses, con cuota mensual de ' . $money($credit['monthly_payment']) . ' que se descontará de los giros de arrendamiento'
+          : 'En esta oportunidad no fue aprobada. Si desea revisar alternativas, comuníquese con nosotros';
+        $params = [$credit['owner_name'] ?: 'Propietario', mb_strtolower((string) $credit['purpose']) ?: 'libre inversión', (string) $credit['contract_code'], $detail, self::signerLine($signer)];
         $ok = (new SmsQueue($this->db))->enqueue((string) $credit['owner_phone'], (string) $credit['owner_name'], $title . ': ' . $detail, [
           'source_module' => 'creditos_propietarios', 'dedupe_key' => 'owner-credit-decision-wa:' . $credit['id'],
           'template_name' => 'scm_credito_propietario_decision_v1', 'template_language' => 'es_CO',
@@ -1855,14 +1867,19 @@ final class OwnerCreditService
     return $queued;
   }
 
-  private function ownerEmailBody(array $credit): string
+  private function ownerEmailBody(array $credit, array $signer = []): string
   {
     $e = static fn($value): string => EmailTemplate::e((string) $value);
     $money = static fn($value): string => '$' . number_format((float) $value, 0, ',', '.');
     $html = '<p style="margin:0 0 14px;font-weight:600;">Apreciado(a) ' . $e($credit['owner_name'] ?: 'propietario') . ':</p>';
+    $closing = '<p style="margin:14px 0 0;line-height:1.65;">Atentamente,<br>'
+      . (trim((string) ($signer['name'] ?? '')) !== '' && $signer['name'] !== 'SKC SuCasa Inmobiliaria' ? '<b>' . $e($signer['name']) . '</b><br>' : '')
+      . (trim((string) ($signer['cargo'] ?? '')) !== '' ? $e($signer['cargo']) . '<br>' : '')
+      . (trim((string) ($signer['email'] ?? '')) !== '' ? $e($signer['email']) . '<br>' : '')
+      . '<b>SKC SuCasa Inmobiliaria</b></p>';
     if ($credit['status'] !== 'aprobado') {
-      return $html . '<p style="margin:0 0 14px;line-height:1.65;">Revisamos su solicitud de crédito por ' . $e($money($credit['requested_amount'])) . ' asociada al contrato <b>#' . $e($credit['contract_code']) . '</b> y en esta oportunidad no fue aprobada.</p>'
-        . '<p style="margin:0;line-height:1.65;">Si desea conocer el detalle o revisar alternativas, comuníquese con nosotros.</p>';
+      return $html . '<p style="margin:0 0 14px;line-height:1.65;">Revisamos su solicitud de crédito por ' . $e($money($credit['requested_amount'])) . ((string) $credit['purpose'] !== '' ? ' para ' . $e(mb_strtolower((string) $credit['purpose'])) : '') . ' asociada al contrato <b>#' . $e($credit['contract_code']) . '</b> y en esta oportunidad no fue aprobada.</p>'
+        . '<p style="margin:0;line-height:1.65;">Si desea conocer el detalle o revisar alternativas, comuníquese con nosotros.</p>' . $closing;
     }
     $rows = '';
     foreach (OwnerCreditCoverage::plan((float) $credit['approved_amount'], (float) $credit['approved_rate'], (int) $credit['approved_term'])['rows'] as $row) {
@@ -1872,7 +1889,7 @@ final class OwnerCreditService
       . '<p style="margin:0 0 14px;line-height:1.8;">Valor: <b>' . $e($money($credit['approved_amount'])) . '</b><br>Plazo: <b>' . (int) $credit['approved_term'] . ' meses</b><br>Tasa: <b>' . $e(number_format((float) $credit['approved_rate'] * 100, 2, ',', '.')) . ' % nominal mes vencido</b><br>Cuota mensual: <b>' . $e($money($credit['monthly_payment'])) . '</b></p>'
       . '<p style="margin:0 0 8px;line-height:1.65;">Las cuotas se descontarán de los giros de arrendamiento del inmueble.</p>'
       . '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f1f5f9;"><th style="padding:4px 8px;text-align:left;">Mes</th><th style="padding:4px 8px;text-align:right;">Cuota</th><th style="padding:4px 8px;text-align:right;">Intereses</th><th style="padding:4px 8px;text-align:right;">Abono a capital</th><th style="padding:4px 8px;text-align:right;">Saldo</th></tr></thead><tbody>' . $rows . '</tbody></table>'
-      . '<p style="margin:14px 0 0;line-height:1.65;">Cordialmente,<br><b>SKC SuCasa Inmobiliaria</b></p>';
+      . $closing;
   }
 
   private function notifyInternal(string $action, string $title, string $details, string $reference): int
