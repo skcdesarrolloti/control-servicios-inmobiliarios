@@ -38,7 +38,7 @@ El cuerpo no puede terminar en una variable: por eso cierra con "Gracias por con
 | 1 | Nombre del propietario | David Esquivia Polo |
 | 2 | Valor solicitado y plazo; si viene de una cotización, también cuál financia | $893.723 a 12 meses · $893.723 a 12 meses para financiar la cotización #574 |
 | 3 | Número del contrato | 817 |
-| 4 | Quien firma: nombre · cargo · correo. En una cotización, el funcionario que la envió; en una solicitud manual, quien la registró | Royner Guardo · Coordinador de mantenimiento · mantenimiento@sucasa.com |
+| 4 | Quien firma: nombre - cargo - Cel. celular. En una cotización, el funcionario que la envió; en una solicitud manual, quien la registró | Royner Guardo - Asistente de Desarrollo TI - Cel. 3015232054 |
 
 La definición para la API está en `whatsapp-credito-propietario-solicitud-template.json`.
 
@@ -81,7 +81,7 @@ Gracias por confiar en nosotros.
 | 2 | Destinación del crédito, en minúscula | reparaciones y mantenimiento |
 | 3 | Número del contrato | 817 |
 | 4 | El resultado. Si se aprueba: valor, plazo y cuota; si se rechaza: un texto fijo | Fue aprobada por $893.723 a 12 meses, con cuota mensual de $86.070 que se descontará de los giros de arrendamiento |
-| 5 | Quien firma: nombre · cargo · correo del analista que decidió | Laura Pérez · Analista de crédito · creditos@sucasa.com |
+| 5 | Quien firma: nombre - cargo - Cel. celular del analista que decidió | Laura Pérez - Analista de crédito - Cel. 3001234567 |
 
 Si se rechaza, la variable 4 es: `En esta oportunidad no fue aprobada. Si desea revisar alternativas, comuníquese con nosotros`.
 

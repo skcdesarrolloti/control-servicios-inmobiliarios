@@ -1715,40 +1715,42 @@ final class OwnerCreditService
   /**
    * Quién firma ("Atentamente") la confirmación al propietario: en una cotización, su coordinador (quien la envió);
    * en una solicitud manual, quien la registró.
-   * @return array{name:string,cargo:string,email:string}
+   * @return array{name:string,cargo:string,email:string,phone:string}
    */
   private function requestSigner(array $credit, array $actor): array
   {
     $employeeId = '';
     $name = '';
     $email = '';
+    $phone = '';
     if ((int) $credit['quote_id'] > 0) {
       $quote = $this->db->getRow("SELECT * FROM `{$this->db->table('jet_cct_cotizacion_mantenimiento')}` WHERE `_ID` = ? LIMIT 1", [(int) $credit['quote_id']]);
       if (is_array($quote)) {
         $employeeId = trim((string) ($quote['id_coordinador'] ?? ''));
         $name = trim((string) ($quote['coordinador'] ?? ''));
         $email = trim((string) ($quote['email_coordinador'] ?? ''));
+        $phone = trim((string) ($quote['celular_coordinador'] ?? ''));
       }
     } else {
       $employeeId = trim((string) ($actor['employee_id'] ?? '')) ?: (string) $credit['created_by_id'];
       $name = trim((string) ($actor['name'] ?? '')) ?: (string) $credit['created_by_name'];
     }
-    return $this->funcionarioSigner($employeeId, $name, $email);
+    return $this->funcionarioSigner($employeeId, $name, $email, $phone);
   }
 
   /**
-   * Firma con nombre, cargo y correo del funcionario activo con ese id_empleado; si no aparece, se queda con lo que
-   * se sabe y, sin nombre, firma la empresa.
-   * @return array{name:string,cargo:string,email:string}
+   * Firma con nombre, cargo, correo y celular del funcionario activo con ese id_empleado; si no aparece, se queda con
+   * lo que se sabe y, sin nombre, firma la empresa.
+   * @return array{name:string,cargo:string,email:string,phone:string}
    */
-  private function funcionarioSigner(string $employeeId, string $name, string $email = ''): array
+  private function funcionarioSigner(string $employeeId, string $name, string $email = '', string $phone = ''): array
   {
-    $signer = ['name' => $name, 'cargo' => '', 'email' => $email];
+    $signer = ['name' => $name, 'cargo' => '', 'email' => $email, 'phone' => $phone];
     if ($employeeId !== '') {
       try {
         foreach (FuncionarioOptions::activeFuncionarios($this->db, $this->schema) as $funcionario) {
           if ($funcionario['employee_id'] !== $employeeId) continue;
-          $signer = ['name' => $funcionario['name'] !== 'Funcionario' ? $funcionario['name'] : $name, 'cargo' => $funcionario['cargo'] !== 'Funcionario' ? $funcionario['cargo'] : '', 'email' => $funcionario['email'] ?: $email];
+          $signer = ['name' => $funcionario['name'] !== 'Funcionario' ? $funcionario['name'] : $name, 'cargo' => $funcionario['cargo'] !== 'Funcionario' ? $funcionario['cargo'] : '', 'email' => $funcionario['email'] ?: $email, 'phone' => $funcionario['phone'] ?: $phone];
           break;
         }
       } catch (\Throwable $error) {
@@ -1759,10 +1761,12 @@ final class OwnerCreditService
     return $signer;
   }
 
-  /** "Royner Guardo · Analista de crédito · correo@sucasa.com" para el WhatsApp. */
+  /** Firma del WhatsApp, como en las demás plantillas: "Royner Guardo - Asistente de Desarrollo TI - Cel. 3015232054". */
   private static function signerLine(array $signer): string
   {
-    return implode(' · ', array_filter([$signer['name'] ?? '', $signer['cargo'] ?? '', $signer['email'] ?? ''], static fn($value): bool => trim((string) $value) !== ''));
+    $phone = preg_replace('/\D+/', '', (string) ($signer['phone'] ?? '')) ?: '';
+    if (strlen($phone) === 12 && str_starts_with($phone, '57')) $phone = substr($phone, 2);
+    return implode(' - ', array_filter([trim((string) ($signer['name'] ?? '')), trim((string) ($signer['cargo'] ?? '')), $phone !== '' ? 'Cel. ' . $phone : ''], static fn(string $value): bool => $value !== ''));
   }
 
   /** "$893.723 a 12 meses": valor y plazo solicitados. */
@@ -1778,7 +1782,7 @@ final class OwnerCreditService
    */
   private function notifyOwnerRequested(array $credit, array $signer = []): array
   {
-    $signer += ['name' => 'SKC SuCasa Inmobiliaria', 'cargo' => '', 'email' => ''];
+    $signer += ['name' => 'SKC SuCasa Inmobiliaria', 'cargo' => '', 'email' => '', 'phone' => ''];
     $settings = $this->config();
     $queued = ['email' => 0, 'whatsapp' => 0];
     // Desde una cotización se dice qué financia: "$893.723 a 12 meses para financiar la cotización #574".
