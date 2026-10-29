@@ -563,4 +563,19 @@ $check(str_contains($source, 'mb_strtolower((string) $credit[\'purpose\']) ?: \'
 $decisionBody = (new ReflectionMethod(OwnerCreditService::class, 'ownerEmailBody'))->invoke($service, ['owner_name' => 'Ana', 'status' => 'rechazado', 'requested_amount' => 893723, 'purpose' => 'Libre inversión', 'contract_code' => '817'], ['name' => 'Laura', 'cargo' => 'Analista de crédito', 'email' => 'laura@example.invalid']);
 $check(str_contains($decisionBody, 'para libre inversión') && str_contains($decisionBody, 'Atentamente,<br><b>Laura</b><br>Analista de crédito<br>laura@example.invalid<br><b>SKC SuCasa Inmobiliaria</b>'), 'the owner decision email names the purpose and is signed by whoever decided');
 
+// Reinicio de cotización para pruebas: el crédito aprobado se anula y se suelta, y la próxima financiación crea uno nuevo.
+$quoteCreditId = (int) $service->byQuote(574)['id'];
+$db->update('wp_scm_owner_credits', ['status' => 'pagado'], ['id' => $quoteCreditId]);
+try {
+  $service->detachFromQuoteForReset(574, $actor);
+  $check(false, 'a paid credit must block the reset');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'pagado'), 'a paid credit blocks the quote reset');
+}
+$db->update('wp_scm_owner_credits', ['status' => 'aprobado'], ['id' => $quoteCreditId]);
+$resetId = $service->detachFromQuoteForReset(574, $actor);
+$check($resetId === $quoteCreditId && $service->byQuote(574) === null && $service->find($resetId)['status'] === 'anulado', 'resetting the quote annuls its credit and frees the quote');
+$service->syncFromQuote(574, 'Si', $actor);
+$check((int) ($service->byQuote(574)['id'] ?? 0) > 0 && (int) $service->byQuote(574)['id'] !== $resetId && $service->byQuote(574)['status'] === 'pendiente', 'after a reset, financing "Sí" opens a new request');
+
 echo "Owner credit flow checks passed.\n";

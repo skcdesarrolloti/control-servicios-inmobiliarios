@@ -1947,6 +1947,7 @@ trait HandlesMaintenanceActions
     $message = match ($mode) {
       'edit' => 'Se actualizó la cotización de mantenimiento #' . $quoteId . '.',
       'note' => 'Se agregó una nota de cotización de mantenimiento #' . $quoteId . '.',
+      'reset' => 'Se reinició la cotización de mantenimiento #' . $quoteId . ' para pruebas: quedó sin enviar ni responder.',
       default => 'Se ha elaborado la cotización de mantenimiento #' . $quoteId . '.',
     };
 
@@ -2379,6 +2380,58 @@ trait HandlesMaintenanceActions
 
     $this->jsonOk([
       'message' => 'Cotización desaprobada/anulada correctamente.',
+      'id_cotizacion' => (string) $cotizacionId,
+    ]);
+  }
+
+  /**
+   * Solo desarrollo (permiso quote_reset_dev): deja la cotización como recién creada, sin enviar ni responder, para
+   * repetir pruebas sin entrar a la base de datos. Órdenes y actas no se tocan; el crédito ligado se anula y se suelta.
+   */
+  public function ajax_handler_reset_cotizacion_mantenimiento(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('cotizaciones_mantenimiento') || !$this->canUseDashboardAction('quote_reset_dev')) {
+      $this->jsonFail('No tienes permiso para reiniciar cotizaciones.');
+    }
+    $cotizacionId = (int) ($_POST['id_cotizacion'] ?? 0);
+    $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
+    $row = $cotizacionId > 0 && $this->table_exists($table) ? $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$cotizacionId]) : null;
+    if (!is_array($row)) {
+      $this->jsonFail('Cotizacion no encontrada.');
+    }
+
+    $schema = new \SCM\Support\SchemaInspector($this->db);
+    $actor = $this->ticketCompletionActor();
+    $employeeId = trim((string) ($actor['employee_id'] ?? '')) ?: (string) Auth::userId();
+    try {
+      $creditId = (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db, null, $schema))->detachFromQuoteForReset($cotizacionId, $actor);
+    } catch (\DomainException $error) {
+      $this->jsonFail($error->getMessage());
+    }
+    $now = time();
+    $nowSql = date('Y-m-d H:i:s', $now);
+    $this->db->update($table, $schema->filterTableData($table, [
+      'estado' => '',
+      'estado_respuesta_cotizacion_mantenimiento' => '',
+      'se_envio' => 'No',
+      'fecha_envio' => 0,
+      'fecha_respuesta' => 0,
+      'observacion_respuesta' => '',
+      'motivo' => '',
+      'financiacion' => '',
+      'tuvo_seguimiento' => 'No',
+      'fecha_seguimiento' => 0,
+      'cct_modified' => $nowSql,
+    ]), ['_ID' => $cotizacionId]);
+    \SCM\Support\CurrentQuote::syncTicketForQuote($this->db, $cotizacionId);
+
+    $ticketPk = (int) ($row['id_ticket'] ?? 0);
+    $ticket = $ticketPk > 0 ? ($this->db->getRow("SELECT * FROM `{$this->db->table('jet_cct_tickets')}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]) ?: []) : [];
+    $this->maintenance_quote_insert_histories($schema, $cotizacionId, 'reset', $row, $ticket, $actor, $employeeId, $now, $nowSql);
+
+    $this->jsonOk([
+      'message' => 'Cotización #' . $cotizacionId . ' reiniciada: quedó sin enviar ni responder.' . ($creditId > 0 ? ' El crédito #' . $creditId . ' quedó anulado.' : ''),
       'id_cotizacion' => (string) $cotizacionId,
     ]);
   }

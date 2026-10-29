@@ -48,6 +48,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_SAVE => 'ajax_handler_cotizacion_mantenimiento_save',
       'scm_cotizacion_financing' => 'ajax_handler_cotizacion_financing',
       'scm_cotizacion_financing_term' => 'ajax_handler_cotizacion_financing_term',
+      'scm_cotizacion_reset_dev' => 'ajax_handler_reset_cotizacion_mantenimiento',
       'scm_owner_credit_report' => 'ajax_handler_owner_credit_report',
       'scm_admin_reports_own' => 'ajax_handler_admin_reports_own',
       'scm_admin_reports_account_create' => 'ajax_handler_admin_reports_account_create',

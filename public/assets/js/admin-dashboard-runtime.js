@@ -143,6 +143,7 @@
         admin_case_create: "[data-scm-open-admin-ticket], [data-scm-dashboard-due-create-ticket]",
         admin_report_review: "[data-sra-action]",
         quote_financing: "[data-scm-save-quote-financing]",
+        quote_reset_dev: "[data-scm-reset-cotizacion-dev]",
         quote_order_edit: "[data-scm-edit-cotizacion-order]",
         act_resend: "[data-acta-resend]",
         act_cancel: "[data-acta-cancel]",
@@ -24008,6 +24009,50 @@
       });
     }
 
+    // Pruebas de desarrollo: confirma y deja la cotización como recién creada (sin enviar ni responder).
+    function resetCotizacionForTests(button) {
+      var id = button.getAttribute('data-cotizacion-id') || '';
+      if (!id || !window.Swal) return Promise.resolve();
+      return window.Swal.fire({
+        title: 'Reiniciar cotización #' + id,
+        html: '<p class="scm-cotizacion-dialog-intro">Solo para pruebas. La cotización quedará <strong>sin enviar y sin respuesta</strong> (estado, fechas, motivo, observación y financiamiento en blanco) y el caso volverá a reflejarlo. Si tiene un crédito ligado, quedará <strong>anulado</strong>. Las órdenes y actas no se modifican. Queda registro en el historial del caso.</p>',
+        width: 'min(540px, 94vw)',
+        icon: 'warning',
+        showCloseButton: true,
+        showCancelButton: true,
+        confirmButtonText: 'Sí, reiniciar',
+        cancelButtonText: 'Cancelar',
+        showLoaderOnConfirm: true,
+        allowOutsideClick: false,
+        allowEscapeKey: function(){return !window.Swal.isLoading();},
+        buttonsStyling: false,
+        focusCancel: true,
+        customClass: {
+          popup: 'scm-cotizacion-dialog scm-cotizacion-delete-swal',
+          title: 'scm-cotizacion-dialog-title',
+          htmlContainer: 'scm-cotizacion-dialog-body',
+          actions: 'scm-cotizacion-dialog-actions',
+          confirmButton: 'scm-cotizacion-dialog-confirm scm-cotizacion-delete-confirm',
+          cancelButton: 'scm-cotizacion-dialog-cancel',
+          closeButton: 'scm-swal-close-round scm-cotizacion-dialog-close'
+        },
+        preConfirm: function(){
+          var fd = new FormData();
+          fd.set('action','scm_cotizacion_reset_dev');fd.set('nonce',nonce);fd.set('id_cotizacion',id);
+          return fetch(ajaxUrl,{method:'POST',credentials:'same-origin',body:fd}).then(function(response){return response.json();}).then(function(json){
+            if (!json.success) throw new Error((json.data||{}).message||'No se pudo reiniciar.');
+            return (json.data||{}).message || 'Cotización reiniciada.';
+          }).catch(function(error){window.Swal.showValidationMessage(error.message);return false;});
+        }
+      }).then(function(result){
+        if(result.isConfirmed){
+          delete cotizacionCardCache[id];
+          showToast('success', result.value);
+          root.dispatchEvent(new CustomEvent('scm:refresh-active-tab'));
+        }
+      });
+    }
+
     function quoteFinancingTermError(scope) {
       var wrap = scope.querySelector('[data-scm-quote-financing-term]');
       if (!wrap || wrap.hidden) return '';
@@ -24953,6 +24998,8 @@
               popup.addEventListener("click", function (event) {
                 var financingButton=event.target.closest('[data-scm-save-quote-financing]');
                 if(financingButton){event.preventDefault();event.stopPropagation();saveQuoteFinancing(financingButton, {onClose:makeCaseCotizacionesReturn(button)});return;}
+                var resetQuoteButton=event.target.closest('[data-scm-reset-cotizacion-dev]');
+                if(resetQuoteButton){event.preventDefault();event.stopPropagation();resetCotizacionForTests(resetQuoteButton);return;}
                 var copyLinkButton=event.target.closest('[data-scm-copy-quote-link]');
                 if(copyLinkButton){event.preventDefault();event.stopPropagation();copyQuoteDirectLink(copyLinkButton);return;}
 
@@ -25281,6 +25328,8 @@
     root.addEventListener("click", function (e) {
       var financingButton=e.target.closest('[data-scm-save-quote-financing]');
       if(financingButton){e.preventDefault();saveQuoteFinancing(financingButton);return;}
+      var resetQuoteButton=e.target.closest('[data-scm-reset-cotizacion-dev]');
+      if(resetQuoteButton){e.preventDefault();resetCotizacionForTests(resetQuoteButton);return;}
       var copyLinkButton=e.target.closest('[data-scm-copy-quote-link]');
       if(copyLinkButton){e.preventDefault();copyQuoteDirectLink(copyLinkButton);return;}
 

@@ -292,6 +292,21 @@ final class OwnerCreditService
     if ($limit > 0 && $term > $limit) throw new \DomainException('El plazo máximo para financiar la cotización #' . $quoteId . ' es de ' . $limit . ' meses.');
   }
 
+  /**
+   * Reinicio de cotización para pruebas: el crédito ligado queda anulado y se suelta de la cotización, así la próxima
+   * respuesta con financiación crea uno nuevo (con sus avisos). Un crédito pagado no se toca. @throws \DomainException
+   */
+  public function detachFromQuoteForReset(int $quoteId, array $actor): int
+  {
+    $this->ensureSchema();
+    $credit = $this->byQuote($quoteId);
+    if ($credit === null) return 0;
+    if ($credit['status'] === 'pagado') throw new \DomainException('La cotización #' . $quoteId . ' tiene el crédito #' . $credit['id'] . ' pagado; no se puede reiniciar.');
+    $this->setStatus((int) $credit['id'], 'anulado', ['quote_id' => null, 'closed_at' => (int) ($credit['closed_at'] ?? 0) ?: time()]);
+    $this->event((int) $credit['id'], 'anulado', $actor, ['motivo' => 'Se reinició la cotización #' . $quoteId . ' para pruebas.', 'cotizacion' => $quoteId]);
+    return (int) $credit['id'];
+  }
+
   /** Abre el crédito de una cotización desde su tarjeta; si no existe lo crea sin notificar (cotizaciones previas). */
   public function ensureForQuote(int $quoteId, array $actor): int
   {

@@ -164,7 +164,10 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
-  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure'];
+  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure', 'quote_reset_dev'];
+  /** Herramientas de pruebas: hasta guardar permisos solo las tiene el cargo de desarrollo (Asistente de Desarrollo TI). */
+  const DEVELOPER_DEFAULT_ACTIONS = ['quote_reset_dev'];
+  const DEVELOPER_CARGOS = ['13'];
   /** Acciones que existían antes del catálogo ampliado; las demás heredan permisos hasta guardar (applyNewDashboardActionDefaults). */
   const LEGACY_DASHBOARD_ACTION_KEYS = [
     'case_followup', 'case_schedule', 'case_note', 'case_postpone', 'case_respond', 'contract_history_manage', 'case_transfer',
@@ -869,6 +872,7 @@ final class SuCasaControlServiciosInmobiliarios
           'quote_order_respond' => 'Responder orden de mantenimiento',
           'quote_order_delete' => 'Eliminar orden de mantenimiento',
           'quote_acta_create' => 'Crear acta de cotización',
+          'quote_reset_dev' => 'Reiniciar cotización a recién creada (pruebas de desarrollo)',
         ],
       ],
       'administrativas' => [
@@ -950,7 +954,7 @@ final class SuCasaControlServiciosInmobiliarios
     $raw = \SCM\Core\App::settings()->get('dashboard_action_permissions', []);
     $permissions = $this->sanitizeDashboardActionPermissions(is_array($raw) ? $raw : []);
     if (!\SCM\Core\App::settings()->get('contract_history_permissions_configured', false)) {
-      $permissions['11'] = array_values(array_unique(array_merge($permissions['11'] ?? $this->dashboardActionPermissionKeys(), ['contract_history_manage'])));
+      $permissions['11'] = array_values(array_unique(array_merge($permissions['11'] ?? array_values(array_diff($this->dashboardActionPermissionKeys(), self::DEVELOPER_DEFAULT_ACTIONS)), ['contract_history_manage'])));
     }
     // Mientras no se guarden los permisos con la nueva opción, la preventiva hereda la correctiva
     // para no ocultar el botón a cargos que ya la gestionaban con el formulario de WordPress.
@@ -1015,7 +1019,9 @@ final class SuCasaControlServiciosInmobiliarios
     foreach ($permissions as $cargo => $actions) {
       foreach ($newKeys as $key) {
         if (in_array($key, $actions, true)) continue;
-        if (in_array($key, self::SENSITIVE_DEFAULT_ACTIONS, true)) {
+        if (in_array($key, self::DEVELOPER_DEFAULT_ACTIONS, true)) {
+          $grant = in_array((string) $cargo, self::DEVELOPER_CARGOS, true);
+        } elseif (in_array($key, self::SENSITIVE_DEFAULT_ACTIONS, true)) {
           $grant = in_array((string) $cargo, $adminCargos, true);
         } elseif (isset($inherits[$key])) {
           $grant = (bool) array_intersect($inherits[$key], $actions);
@@ -1029,6 +1035,7 @@ final class SuCasaControlServiciosInmobiliarios
     foreach ($adminCargos as $cargo) {
       if (array_key_exists($cargo, $permissions)) continue;
       $sensitiveNew = array_values(array_intersect($newKeys, self::SENSITIVE_DEFAULT_ACTIONS));
+      if (!in_array($cargo, self::DEVELOPER_CARGOS, true)) $sensitiveNew = array_values(array_diff($sensitiveNew, self::DEVELOPER_DEFAULT_ACTIONS));
       if ($sensitiveNew) {
         $permissions[$cargo] = array_values(array_unique(array_merge(array_values(array_diff($this->dashboardActionPermissionKeys(), self::SENSITIVE_DEFAULT_ACTIONS)), $sensitiveNew)));
       }
