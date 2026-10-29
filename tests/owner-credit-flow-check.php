@@ -74,6 +74,12 @@ $db->insert('wp_jet_cct_cotizacion_mantenimiento', ['_ID' => 575, 'id_ticket' =>
 
 $service = new OwnerCreditService($db, new Settings($db));
 $actor = ['employee_id' => '2999', 'name' => 'Analista QA'];
+// La respuesta genera PDF con Chromium y los guarda en la carpeta de cargas: en la prueba se simulan.
+$responsePdfs = [];
+$responseFiles = [];
+$fakeResponsePdf = static function (string $html, string $title) use (&$responsePdfs): string { $responsePdfs[] = ['title' => $title, 'html' => $html]; return '%PDF-1.4 ' . $title; };
+$fakeResponseStore = static function (string $bytes, string $name) use (&$responseFiles): array { $responseFiles[] = $name; return ['path' => sys_get_temp_dir() . '/' . $name, 'url' => 'https://example.test/file.php?n=' . rawurlencode($name)]; };
+$service->useResponseFiles($fakeResponsePdf, $fakeResponseStore);
 
 $service->syncFromQuote(574, 'Si', $actor);
 $credit = $service->byQuote(574);
@@ -107,11 +113,12 @@ $approvedWork = $service->workspace((int) $approved['id']);
 $check($approvedWork['credit']['status'] === 'aprobado' && (int) $approved['disbursed_at'] === (int) strtotime('today') && (int) $approved['first_payment_ts'] === \SCM\Modules\OwnerCredits\OwnerCreditCoverage::firstDueTs((int) strtotime('today')) && $approvedWork['schedule'][0]['fecha'] === (int) $approved['first_payment_ts'] && in_array((int) date('j', (int) $approved['first_payment_ts']), [28, 29, 30], true), 'approval stores the disbursement date and the first installment on the agreed calendar (day 30, 15/16 cut-off)');
 $check(count($db->getResults('SELECT * FROM wp_scm_owner_credit_sources WHERE credit_id = ?', [(int) $approved['id']])) === 1, 'approval stores the contracts that back the credit');
 $check(abs((float) $approved['monthly_payment'] - 285423.85) < 1 && abs((float) $approved['approved_rate'] - 0.021) < 1e-9, 'monthly payment is recalculated on the server');
-$check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_ticket WHERE id_ticket = ?', ['10821'])) === 2, 'request and decision are written to the case history');
+$check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_ticket WHERE id_ticket = ?', ['10821'])) === 3, 'request, decision and response are written to the case history');
+$check((int) $approved['response_sent_at'] > 0 && $result['next']['response'] !== null && count($result['next']['response']['documents']) === 2, 'without a required promissory note the response (letter and statement) is sent on approval');
 $contractHistory = $db->getResults('SELECT * FROM wp_jet_cct_historial_contrato_arrendamiento WHERE id_contrato = ?', ['7']);
-$check(count($contractHistory) === 2 && $contractHistory[0]['tipo_reporte'] === 'Solicitud de crédito' && str_contains($contractHistory[0]['observacion'], 'solicitado por el propietario Ana Dueña: $893.723 para la cotización #574') && $contractHistory[1]['tipo_reporte'] === 'Crédito aprobado' && str_contains($contractHistory[1]['observacion'], 'fuera de política'), 'request and decision are written to the contract history');
+$check(count($contractHistory) === 3 && $contractHistory[2]['tipo_reporte'] === 'Respuesta de crédito enviada' && $contractHistory[0]['tipo_reporte'] === 'Solicitud de crédito' && str_contains($contractHistory[0]['observacion'], 'solicitado por el propietario Ana Dueña: $893.723 para la cotización #574') && $contractHistory[1]['tipo_reporte'] === 'Crédito aprobado' && str_contains($contractHistory[1]['observacion'], 'fuera de política'), 'request and decision are written to the contract history');
 $propertyHistory = $db->getResults('SELECT * FROM wp_jet_cct_historial_del_inmueble WHERE id_inmueble = ?', ['10420']);
-$check(count($propertyHistory) === 2 && $propertyHistory[0]['tipo_reporte'] === 'Solicitud de crédito' && $propertyHistory[1]['tipo_reporte'] === 'Crédito aprobado' && str_starts_with($propertyHistory[1]['observacion'], 'Contrato #817: Crédito #') && $propertyHistory[1]['nombre_empleado'] === 'Analista QA', 'request and decision are written to the property history with the contract');
+$check(count($propertyHistory) === 3 && $propertyHistory[0]['tipo_reporte'] === 'Solicitud de crédito' && $propertyHistory[1]['tipo_reporte'] === 'Crédito aprobado' && str_starts_with($propertyHistory[1]['observacion'], 'Contrato #817: Crédito #') && $propertyHistory[1]['nombre_empleado'] === 'Analista QA', 'request and decision are written to the property history with the contract');
 try {
   $service->decide((int) $credit['id'], 'rechazado', ['note' => 'Intento repetido de decisión.'], $actor);
   $check(false, 'a decided credit cannot be decided again');
@@ -140,7 +147,7 @@ $check($service->find((int) $second['id'])['status'] === 'rechazado', 'request i
 
 $service->changeStatus((int) $credit['id'], 'pagado', 'Se descontó la última cuota en el giro.', $actor);
 $check($service->find((int) $credit['id'])['status'] === 'pagado', 'approved credit can be marked as paid');
-$check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_inmueble WHERE id_inmueble = ?', ['10420'])) === 3, 'marking as paid is also written to the property history');
+$check(count($db->getResults('SELECT * FROM wp_jet_cct_historial_del_inmueble WHERE id_inmueble = ?', ['10420'])) === 4, 'marking as paid is also written to the property history');
 $check(!in_array('prestamos', array_column(array_filter($service->workspace((int) $second['id'])['policies'], static fn(array $p): bool => !$p['ok']), 'key'), true), 'a paid credit no longer counts as an active loan');
 
 $db->insert('wp_jet_cct_cotizacion_mantenimiento', ['_ID' => 576, 'id_ticket' => '10823', 'contrato' => '817', 'id_contrato' => '7', 'total' => '100000', 'financiacion' => 'Si']);
@@ -466,7 +473,7 @@ try {
 }
 $service->changeStatus($coverageCredit, 'anulado', 'Crédito de prueba de cobertura de pago.', $actor);
 
-// Pagaré en blanco + carta de instrucciones: exigido para aprobar, se firma una vez por persona y sirve para sus créditos.
+// Pagaré en blanco + carta de instrucciones: se firma después de aprobar (una vez por persona) y con la firma sale la respuesta.
 $requirePromissory = static function (bool $on) use ($db): void {
   $config = json_decode((string) $db->getVar("SELECT valor FROM wp_jet_cct_confi_sistema WHERE funcion = 'control_servicios_config'"), true);
   $config['owner_credit_settings']['require_promissory'] = $on;
@@ -474,6 +481,7 @@ $requirePromissory = static function (bool $on) use ($db): void {
 };
 $requirePromissory(true);
 $pagareService = new OwnerCreditService($db, new Settings($db));
+$pagareService->useResponseFiles($fakeResponsePdf, $fakeResponseStore);
 $sentMessages = [];
 $promissory = new \SCM\Modules\OwnerCredits\OwnerCreditPromissoryService($db, 'test-secret', 'https://example.test',
   static function (string $channel, string $to, array $message) use (&$sentMessages): int { $sentMessages[] = ['channel' => $channel, 'to' => $to] + $message; return 1; },
@@ -482,18 +490,26 @@ $pagareService->usePromissory($promissory);
 $pagareCredit = (int) $pagareService->createManual(9, 800000, 6, 'Libre Destinación', $actor, '', 'mandato_2');
 $state = $pagareService->promissoryState($pagareService->find($pagareCredit));
 $check($state['required'] === ['mandato_2'] && $state['missing'] === ['Segunda Dueña'] && count($state['owners']) === 2, 'by default only the beneficiary must sign the promissory note');
-try {
-  $pagareService->decide($pagareCredit, 'aprobado', ['note' => 'Aprobación sin pagaré firmado todavía.'], $actor);
-  $check(false, 'a credit cannot be approved without the signed promissory note');
-} catch (DomainException $error) {
-  $check(str_contains($error->getMessage(), 'Falta el pagaré firmado de Segunda Dueña'), 'a credit cannot be approved without the signed promissory note');
-}
+$check($pagareService->workspace($pagareCredit)['stage'] === 'estudio', 'a pending request is in the study stage');
 $both = $pagareService->setPromissorySigners($pagareCredit, ['mandato_1', 'mandato_2'], $actor);
 $check($both['required'] === ['mandato_1', 'mandato_2'] && count($both['missing']) === 2, 'the analyst can ask every owner of the contract to sign');
 $pagareService->setPromissorySigners($pagareCredit, ['mandato_2'], $actor);
-$sent = $pagareService->sendPromissory($pagareCredit, ['email'], $actor);
+try {
+  $pagareService->sendPromissory($pagareCredit, ['email'], $actor);
+  $check(false, 'the promissory note is sent after approving');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'después de aprobar'), 'the promissory note is sent after approving, not while the request is pending');
+}
+$approval = $pagareService->decide($pagareCredit, 'aprobado', ['note' => 'Aprobación antes de firmar el pagaré.'], $actor);
 $invitation = array_values(array_filter($sentMessages, static fn(array $m): bool => $m['event'] === 'invitation'))[0] ?? null;
-$check($sent['sent'] !== [] && $invitation !== null && $invitation['to'] === 'segunda@example.invalid' && str_contains($invitation['url'], 'credito-pagare.php?id='), 'the signing link is sent to the signer email');
+$check($approval['credit']['status'] === 'aprobado' && $approval['next']['promissory'] !== [] && $approval['next']['response'] === null && $invitation !== null && $invitation['to'] === 'segunda@example.invalid' && str_contains($invitation['url'], 'credito-pagare.php?id='), 'approving without the signed note sends the signing link and waits for the signature');
+$check(str_contains((string) $invitation['html'], 'fue aprobada') && $pagareService->workspace($pagareCredit)['stage'] === 'firma', 'the invitation says the credit was approved and the credit waits in the signing stage');
+try {
+  $pagareService->sendResponse($pagareCredit, $actor);
+  $check(false, 'the response needs the signed note');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'Falta el pagaré firmado de Segunda Dueña'), 'the response is not sent before the signature');
+}
 parse_str((string) parse_url($invitation['url'], PHP_URL_QUERY), $query);
 $pid = (int) $query['id'];
 $token = (string) $query['token'];
@@ -512,13 +528,26 @@ try { $promissory->sign($pid, $token, ['otp_code' => '000000'] + $signInput, '10
 $check((int) (json_decode((string) $promissory->find($pid)['otp_json'], true)['failures'] ?? 0) === 1, 'a wrong code is rejected and the failed try stays counted');
 try { $promissory->sign($pid, $token, ['document' => '99999999'] + $signInput, '10.0.0.1', 'QA'); $check(false, 'the document number must match'); } catch (DomainException $error) { $check(str_contains($error->getMessage(), 'documento no coincide'), 'the document number must match'); }
 try { $promissory->sign($pid, $token, ['signature_name' => 'Otra Persona'] + $signInput, '10.0.0.1', 'QA'); $check(false, 'the typed name must match'); } catch (DomainException $error) { $check(str_contains($error->getMessage(), 'nombre'), 'the typed name must match'); }
+$responsePdfs = [];
+$responseFiles = [];
 $signedRow = $promissory->sign($pid, $token, $signInput, '10.0.0.1', 'QA browser');
 $evidence = json_decode((string) $signedRow['signed_json'], true);
 $check($signedRow['status'] === 'firmado' && $evidence['ip'] === '10.0.0.1' && $evidence['document_hash'] === $row['payload_hash'] && isset($evidence['evidence_hmac']) && $evidence['verification']['channel'] === 'email', 'signing stores the evidence: IP, document fingerprint, verification and HMAC');
-$check($promissory->pdf($signedRow) === '%PDF-1.4 pagare ' . $payload['number'] && array_filter($sentMessages, static fn(array $m): bool => $m['event'] === 'signed') !== [], 'the signed PDF is stored with its HMAC and the signer gets a copy');
-$check($promissory->sign($pid, $token, $signInput, '10.0.0.1', 'QA')['status'] === 'firmado', 'signing twice does nothing');
-$pagareService->decide($pagareCredit, 'aprobado', ['note' => 'Aprobado con pagaré firmado por la beneficiaria.'], $actor);
-$check($pagareService->find($pagareCredit)['status'] === 'aprobado', 'with the promissory note signed the credit can be approved');
+$check($promissory->pdf($signedRow) === '%PDF-1.4 pagare ' . $payload['number'], 'the signed PDF is stored with its HMAC');
+$answered = $pagareService->find($pagareCredit);
+$response = json_decode((string) $answered['response_json'], true);
+$check((int) $answered['response_sent_at'] > 0 && count($response['documents']) === 3 && count($responseFiles) === 3 && str_contains($response['documents'][1], $payload['number']), 'signing sends the response with the approval letter, the signed note and the account statement');
+$check(array_column($responsePdfs, 'title') === ['Carta de aprobación · Crédito #' . $pagareCredit, 'Estado de cuenta · Crédito #' . $pagareCredit] && array_filter($sentMessages, static fn(array $m): bool => $m['event'] === 'signed') === [], 'the letter and the statement are generated and the signer does not get a second copy of the note');
+$check($pagareService->workspace($pagareCredit)['stage'] === 'completo' && (int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'respuesta_enviada'", [$pagareCredit]) === 1, 'the credit completes its stages and the response stays in its history');
+$letter = $responsePdfs[0]['html'];
+$check(str_contains($letter, 'Notificación de aprobación de crédito') && str_contains($letter, 'Segunda Dueña') && str_contains($letter, '$800.000') && str_contains($letter, 'como mínimo, dos meses antes de su vencimiento') && str_contains($letter, 'Analista QA') && str_contains($letter, 'SKC SuCasa Inmobiliaria'), 'the approval letter follows the model with the approved conditions and who approved');
+$statement = $responsePdfs[1]['html'];
+$check(str_contains($statement, 'Estado de cuenta') && str_contains($statement, 'Saldo a capital en pesos') && str_contains($statement, 'Distribución de la cuota a pagar') && str_contains($statement, 'Plan de pagos') && str_contains($statement, 'Realizado por') && !str_contains($statement, 'sucursal'), 'the account statement shows balance, next installment, plan and closes with "Realizado por"');
+$check($promissory->sign($pid, $token, $signInput, '10.0.0.1', 'QA')['status'] === 'firmado' && (int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'respuesta_enviada'", [$pagareCredit]) === 1, 'signing twice does nothing');
+$approvedView = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($pagareService->workspace($pagareCredit), true, true);
+$check(str_contains($approvedView, 'data-owner-credit-stepper') && str_contains($approvedView, 'data-owner-credit-stage="respuesta"') && str_contains($approvedView, 'data-owner-credit-document="carta"') && str_contains($approvedView, 'data-owner-credit-document="estado"') && str_contains($approvedView, 'Reenviar respuesta'), 'the liquidator shows the stages, the response documents and the resend button');
+$pagareService->sendResponse($pagareCredit, $actor);
+$check((int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'respuesta_enviada'", [$pagareCredit]) === 2, 'the response can be resent and the resend is traced');
 $nextCredit = (int) $pagareService->createManual(9, 500000, 3, 'Libre Destinación', $actor, '', 'mandato_2');
 $check($pagareService->promissoryState($pagareService->find($nextCredit))['missing'] === [], 'a later credit of the same person does not ask to sign again');
 try { $pagareService->voidPromissory($pid, 'corto', $actor); $check(false, 'voiding needs a reason'); } catch (DomainException) { $check(true, 'voiding a promissory note needs a reason'); }
@@ -526,7 +555,7 @@ $pagareService->voidPromissory($pid, 'Se reemplaza por un pagaré con datos corr
 $check($promissory->find($pid)['status'] === 'anulado' && $pagareService->promissoryState($pagareService->find($nextCredit))['missing'] === ['Segunda Dueña'] && (int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'pagare_anulado'", [$pagareCredit]) === 1, 'a voided note is traced and the person must sign a new one');
 try { $promissory->publicRow($pid, $token); $check(false, 'a voided note cannot be opened to sign'); } catch (DomainException) { $check(true, 'a voided note cannot be opened to sign'); }
 $liquidator = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($pagareService->workspace($nextCredit), true, true);
-$check(str_contains($liquidator, 'data-owner-credit-promissory') && str_contains($liquidator, 'Falta firma') && str_contains($liquidator, 'data-owner-credit-promissory-send') && str_contains($liquidator, 'name="promissory_signers[]"'), 'the liquidator shows who signs, the status and the send button');
+$check(str_contains($liquidator, 'data-owner-credit-promissory') && str_contains($liquidator, 'Falta firma') && !str_contains($liquidator, 'data-owner-credit-promissory-send') && str_contains($liquidator, 'Al aprobar se enviará el pagaré para firmar a Segunda Dueña') && str_contains($liquidator, 'name="promissory_signers[]"'), 'while pending, the liquidator shows who signs and that the note goes out on approval');
 $pagareService->changeStatus($pagareCredit, 'anulado', 'Crédito de prueba del pagaré.', $actor);
 $pagareService->changeStatus($nextCredit, 'anulado', 'Crédito de prueba del pagaré.', $actor);
 $requirePromissory(false);
@@ -534,6 +563,11 @@ $requirePromissory(false);
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
 $template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-respuesta-funcionario-template.json'), true);
 $check(str_contains($source, "'" . $template['name'] . "'") && substr_count($template['components'][0]['text'], '{{') === 6 && !str_contains($source, 'scm_credito_propietario_funcionario_v2'), 'staff decision template has its own six variables and the generic v2 is no longer used');
+foreach (['carta' => ['whatsapp-credito-carta-aprobacion-template.json', 7], 'pagare' => ['whatsapp-credito-pagare-firmado-doc-template.json', 6], 'estado' => ['whatsapp-credito-estado-cuenta-template.json', 7]] as $kind => [$file, $variables]) {
+  $responseTemplate = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/' . $file), true);
+  $body = $responseTemplate['components'][1]['text'];
+  $check(OwnerCreditService::RESPONSE_TEMPLATES[$kind] === $responseTemplate['name'] && $responseTemplate['components'][0]['format'] === 'DOCUMENT' && substr_count($body, '{{') === $variables && count($responseTemplate['components'][1]['example']['body_text'][0]) === $variables && !str_ends_with(trim($body), '}}') && str_contains($body, 'Atentamente,'), 'response template ' . $responseTemplate['name'] . ' carries the PDF in its header and its ' . $variables . ' variables');
+}
 $staffRequestTemplate = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-solicitud-funcionario-template.json'), true);
 $check(str_contains($source, "'" . $staffRequestTemplate['name'] . "'") && substr_count($staffRequestTemplate['components'][0]['text'], '{{') === 6 && str_contains($staffRequestTemplate['components'][0]['text'], 'Destinación: {{4}}') && !str_contains($staffRequestTemplate['components'][0]['text'], 'número'), 'staff request template is short, without the credit number, with the purpose, and its six variables match the code');
 $ownerTemplate = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-solicitud-template.json'), true);
@@ -569,7 +603,7 @@ $check(str_contains($decisionBody, 'para libre inversión') && str_contains($dec
 
 // Los avisos internos (correo y WhatsApp) llevan al liquidador de ese crédito, también después del login.
 $check(OwnerCreditService::panelPath(2) === 'index.php?tab=credito_propietario&credito=2' && OwnerCreditService::panelPath(0) === 'index.php?tab=credito_propietario', 'staff notices link to the credit itself');
-$check(substr_count($source, 'self::panelPath(') === 2 && str_contains($source, "'Abrir crédito #' . \$creditId"), 'the staff email button and the WhatsApp button both use the credit link');
+$check(substr_count($source, 'self::panelPath(') === 1 && substr_count($source, 'self::panelUrl(') === 3 && str_contains($source, "'Abrir crédito #' . \$creditId"), 'the staff email buttons (decision and response) and the WhatsApp button use the credit link');
 $creditsJs = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/admin-owner-credits.js');
 $loginPhp = (string) file_get_contents(dirname(__DIR__) . '/public/login.php');
 $check(str_contains($creditsJs, 'url.searchParams.get("credito")') && str_contains($creditsJs, 'openCredit({ credit_id: linkedCredit })') && str_contains($loginPhp, "'index.php?tab=credito_propietario' . (isset(\$query['credito'])"), 'the panel opens the linked credit and the login returns to it');

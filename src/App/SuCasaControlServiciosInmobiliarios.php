@@ -560,12 +560,17 @@ final class SuCasaControlServiciosInmobiliarios
           ],
           'credito_propietario_pagare_firmado' => [
             'label' => 'Pagaré firmado',
-            'description' => 'Cuando un propietario firma desde su enlace el pagaré en blanco y la carta de instrucciones. Se firma una sola vez por persona y desde ahí se pueden aprobar sus créditos.',
+            'description' => 'Cuando un propietario firma desde su enlace el pagaré en blanco y la carta de instrucciones. Se firma una sola vez por persona; con la firma, sus créditos aprobados envían la respuesta.',
             'channel' => 'Email interno en cola',
           ],
           'credito_propietario_decidido' => [
             'label' => 'Crédito aprobado o rechazado',
             'description' => 'Cuando un funcionario aprueba o rechaza un crédito desde el liquidador, con las condiciones y la justificación si se aprobó fuera de política. El WhatsApp se activa en la configuración de créditos.',
+            'channel' => 'Email y WhatsApp en cola',
+          ],
+          'credito_propietario_respuesta' => [
+            'label' => 'Respuesta de crédito enviada',
+            'description' => 'Cuando se envía al propietario la respuesta de un crédito aprobado (al firmar el pagaré o desde el liquidador). El correo lleva adjuntos la carta de aprobación, el pagaré firmado y el estado de cuenta; por WhatsApp llega un mensaje por documento si está activo en la configuración de créditos.',
             'channel' => 'Email y WhatsApp en cola',
           ],
         ],

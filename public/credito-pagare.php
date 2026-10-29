@@ -6,7 +6,7 @@ require dirname(__DIR__) . '/bootstrap/app.php';
 
 use SCM\Core\App;
 use SCM\Modules\OwnerCredits\OwnerCreditPromissoryDocument;
-use SCM\Modules\OwnerCredits\OwnerCreditPromissoryService;
+use SCM\Modules\OwnerCredits\OwnerCreditService;
 
 // Pagaré en blanco + carta de instrucciones: el deudor lo firma desde su enlace personal (id + token HMAC con
 // vencimiento); un funcionario con sesión lo consulta sin token. Mismas protecciones que la firma del acta.
@@ -22,7 +22,8 @@ $escape = static fn(mixed $value): string => htmlspecialchars((string) $value, E
 $id = (int) ($_GET['id'] ?? 0);
 $token = is_string($_GET['token'] ?? null) ? $_GET['token'] : '';
 $staff = $token === '';
-$service = new OwnerCreditPromissoryService(App::db(), SCM_APP_SECRET, SCM_BASE_URL);
+// Desde el servicio de créditos: al firmar, los créditos aprobados que esperaban la firma envían su respuesta.
+$service = (new OwnerCreditService(App::db(), App::settings()))->promissory();
 $jsonRequest = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
 $jsonResult = null;
 $content = '';

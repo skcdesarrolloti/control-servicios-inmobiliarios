@@ -1,0 +1,37 @@
+{
+  "name": "scm_credito_carta_aprobacion_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "HEADER",
+      "format": "DOCUMENT",
+      "example": {
+        "header_handle": [
+          "carta-aprobacion-credito-5.pdf"
+        ]
+      }
+    },
+    {
+      "type": "BODY",
+      "text": "Buen día, {{1}}.\n\nAdjuntamos la carta de aprobación del crédito No. {{2}} de {{3}}, por {{4}} a {{5}} meses, con cuota mensual de {{6}} que se descontará de los giros de arrendamiento.\n\nAtentamente,\n{{7}}\n\nGracias por confiar en nosotros.",
+      "example": {
+        "body_text": [
+          [
+            "María Pérez",
+            "5",
+            "María Pérez",
+            "$3.000.000",
+            "12",
+            "$285.424",
+            "Royner Guardo - Asistente de Desarrollo TI - Cel. 3015232054"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    }
+  ]
+}

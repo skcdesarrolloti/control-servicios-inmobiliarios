@@ -88,7 +88,8 @@ final class OwnerCreditView
         . '<td class="' . $td . ' !sp-whitespace-nowrap">' . ($approved ? '<strong>' . self::money($row['approved_amount']) . '</strong>' . $small((int) $row['approved_term'] . ' m · ' . self::percent((float) $row['approved_rate'])) : '—') . '</td>'
         . '<td class="' . $td . ' !sp-whitespace-nowrap">' . ($approved ? self::money($row['monthly_payment']) : '—') . '</td>'
         . '<td class="' . $td . ' !sp-whitespace-nowrap">' . ($row['balance'] !== null ? self::money($row['balance']) : '—') . '</td>'
-        . '<td class="' . $td . '">' . self::status((string) $row['status']) . ((int) $row['policy_override'] === 1 ? $small('Fuera de política') : '') . '</td>'
+        . '<td class="' . $td . '">' . self::status((string) $row['status']) . ((int) $row['policy_override'] === 1 ? $small('Fuera de política') : '')
+        . ($row['status'] === 'aprobado' ? $small((int) ($row['response_sent_at'] ?? 0) > 0 ? 'Respuesta enviada ' . date('d/m/Y', (int) $row['response_sent_at']) : ((int) ($row['promissory_id'] ?? 0) > 0 ? 'Respuesta por enviar' : 'Firma de documentos')) : '') . '</td>'
         . '<td class="' . $td . ' !sp-whitespace-nowrap">' . date('d/m/Y', (int) $row['created_at']) . ((int) $row['decided_at'] > 0 ? $small('Decidido ' . date('d/m/Y', (int) $row['decided_at'])) : '') . '</td>'
         . '<td class="' . $td . '"><div class="!sp-flex !sp-flex-wrap !sp-gap-2" data-owner-credit-actions>'
         . ($canOpen ? '<button type="button" class="' . $ui::NAVY . ' !sp-whitespace-nowrap" data-owner-credit-open data-credit-id="' . (int) $row['id'] . '">' . $ui::icon('eye', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . 'Ver solicitud</button>' : '')
@@ -144,10 +145,11 @@ final class OwnerCreditView
       . ($editable && ($ev['other_contracts'] ?? []) !== [] ? self::mainContractSelect($contract, $ev['other_contracts']) : $chip('Contrato principal', '#' . self::e($contract['code']))) . ((int) $credit['quote_id'] > 0 && $editable ? self::beneficiarySelect($credit) : '') . ($editable && count($work['owners'] ?? []) > 1 ? self::ownerSelect($credit, $work['owners']) : $chip(OwnerCreditService::beneficiaryLabel($credit), self::e($credit['owner_name']) . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · ' . self::e($credit['owner_document']) : ''))) . $chip('Inmueble', self::e($credit['property']))
       . ((int) $credit['quote_id'] > 0 ? $chip('Cotización', '#' . (int) $credit['quote_id']) : $chip('Origen', 'Manual'))
       . '<button type="button" class="' . $ui::NAVY . ' !sp-ml-auto" data-owner-credit-pdf title="Documento interno para funcionarios">' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Ver documento del crédito</button></div>'
+      . self::stepper($work)
 
-      . '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-12 !sp-gap-5 !sp-items-start">'
-      // Columna de datos y entradas.
-      . '<div class="lg:!sp-col-span-7 !sp-space-y-5">'
+      // 1. Solicitud: lo que pide el propietario y el contrato con el que se respalda.
+      . self::stageBlock('solicitud', '1', 'Solicitud', 'Lo que pide el propietario y el contrato del que se descuentan las cuotas.', $credit['status'] === 'pendiente',
+        '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-2 !sp-gap-5 !sp-items-start">'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('building') . 'Contrato de arriendo vigente</h4>' . self::guide('contrato', [
         'Fin del contrato' => 'Define cuántos meses se puede prestar: se cuentan los meses completos (de 30 días) que faltan hasta esa fecha. Si el contrato fue renovado y la fecha está desactualizada, corrígela aquí; se guarda en el contrato al aprobar o rechazar.',
         'Años arrendados' => 'Tiempo entre el inicio y el fin del contrato. Un historial largo da más confianza.',
@@ -157,16 +159,6 @@ final class OwnerCreditView
       . self::tile('Estado', self::e($contract['estado'] ?: '—')) . self::tile('Aseguradora', self::e($contract['aseguradora'] ?: '—'))
       . $siniestroTile
       . '</div></section>'
-
-      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('cash') . 'Ingreso del propietario</h4>' . self::guide('ingreso', [
-        'Ingreso bruto (canon)' => 'Lo que paga el arrendatario cada mes. Si ya tuvo aumento, ajústalo: solo cambia este crédito, no el contrato.',
-        'Descuentos' => 'Lo que se le descuenta al propietario cada mes antes de girarle: comisión de administración con IVA, garantía inmobiliaria (seguro de arrendamiento) y póliza de servicios públicos. Salen del contrato de mandato; sin mandato se estima un porcentaje del canon (Configuración).',
-        'Ingreso neto (INO)' => 'Canon menos descuentos: lo que realmente recibe el propietario y con lo que paga la cuota.',
-      ]) . '<p class="' . self::NOTE . ' !sp-mb-3">' . self::e($work['income_source']) . '</p>'
-      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">' . $field('Ingreso bruto (canon)', $money('gross', $ev['gross'])) . $deductions . '</div>'
-      . ($editable ? '<p class="' . self::NOTE . ' !sp-mt-3">Puedes ajustar el canon (por ejemplo, si ya tuvo aumento) y los descuentos: solo cambian este crédito, no el contrato.</p>' : '')
-      . self::otherIncome($ev) . '</section>'
-
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . $ui::icon('document') . 'Información de la solicitud</h4>' . self::guide('solicitud', [
         'Valor solicitado' => 'Lo que pide el propietario. Si viene de una cotización, es el total de la cotización.',
         'Plazo solicitado' => 'Meses en que quiere pagar. Escríbelo según lo que pidió; no puede superar los meses que faltan para el fin del contrato, porque las cuotas se descuentan del canon.',
@@ -183,6 +175,22 @@ final class OwnerCreditView
       . $field('¿Tiene créditos vigentes?', $yesNo('has_credits', (bool) $analyst['has_credits'], '¿Tiene créditos vigentes?'))
       . $field('Otras obligaciones mensuales', $money('other_obligations', (float) ($analyst['other_obligations'] ?? 0)))
       . '</div>' . self::vacancyNote($ev) . '</section>'
+      . '</div>')
+
+      // 2. Estudio: ingreso y condiciones a la izquierda; políticas, cobertura y cupo a la derecha.
+      . self::stageBlock('estudio', '2', 'Estudio', 'Ingreso, condiciones, políticas y cobertura; aquí se aprueba o se rechaza.', $credit['status'] === 'pendiente',
+        '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-12 !sp-gap-5 !sp-items-start">'
+      // Columna de datos y entradas.
+      . '<div class="lg:!sp-col-span-7 !sp-space-y-5">'
+
+      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('cash') . 'Ingreso del propietario</h4>' . self::guide('ingreso', [
+        'Ingreso bruto (canon)' => 'Lo que paga el arrendatario cada mes. Si ya tuvo aumento, ajústalo: solo cambia este crédito, no el contrato.',
+        'Descuentos' => 'Lo que se le descuenta al propietario cada mes antes de girarle: comisión de administración con IVA, garantía inmobiliaria (seguro de arrendamiento) y póliza de servicios públicos. Salen del contrato de mandato; sin mandato se estima un porcentaje del canon (Configuración).',
+        'Ingreso neto (INO)' => 'Canon menos descuentos: lo que realmente recibe el propietario y con lo que paga la cuota.',
+      ]) . '<p class="' . self::NOTE . ' !sp-mb-3">' . self::e($work['income_source']) . '</p>'
+      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">' . $field('Ingreso bruto (canon)', $money('gross', $ev['gross'])) . $deductions . '</div>'
+      . ($editable ? '<p class="' . self::NOTE . ' !sp-mt-3">Puedes ajustar el canon (por ejemplo, si ya tuvo aumento) y los descuentos: solo cambian este crédito, no el contrato.</p>' : '')
+      . self::otherIncome($ev) . '</section>'
 
       . '<section class="' . self::SECTION . ' !sp-border-service-yellow"><div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-3"><h4 class="' . self::H4 . ' !sp-mb-0">' . $ui::icon('edit') . 'Condiciones según el analista</h4>'
       . ($editable ? '<button type="button" class="' . $ui::SECONDARY . ' !sp-text-[10px]" data-owner-credit-use-suggested>' . $ui::icon('refresh', '!sp-w-3 !sp-h-3') . 'Usar condición sugerida</button>' : '') . '</div>'
@@ -206,11 +214,128 @@ final class OwnerCreditView
       . '</div>'
 
       . '<div data-owner-credit-schedule>' . $this->schedule($work) . '</div>'
+      . ($credit['status'] === 'pendiente' ? $this->actions($credit, $canDecide, $canManage, $work['adjustments'] ?? [], $work) : $this->decisionSummary($credit, $work['adjustments'] ?? [])))
+
+      // 3. Firma de documentos y 4. Respuesta: después de aprobar.
+      . self::stageBlock('firma', '3', 'Firma de documentos', 'Pagaré en blanco y carta de instrucciones, firmados por el propietario después de aprobar.', in_array($work['stage'] ?? '', ['firma', 'respuesta', 'completo'], true) && $credit['status'] !== 'rechazado', self::promissorySection($work, $canDecide, $canManage))
+      . self::stageBlock('respuesta', '4', 'Respuesta al propietario', 'Carta de aprobación, pagaré firmado y estado de cuenta, al propietario y a los funcionarios configurados.', $credit['status'] !== 'pendiente', self::responseSection($work, $canDecide))
+      . ($credit['status'] !== 'pendiente' ? $this->actions($credit, $canDecide, $canManage, [], $work, false) : '')
       . $this->history($work)
-      . self::promissorySection($work, $canDecide, $canManage)
-      . $this->actions($credit, $canDecide, $canManage, $work['adjustments'] ?? [], $work)
       . '</form>'
       . ($credit['status'] === 'aprobado' ? self::prepaymentForm($work) : '');
+  }
+
+  /**
+   * Barra de etapas: Solicitud → Estudio → Firma de documentos → Respuesta, con lo que pasó o falta en cada una. Cada
+   * paso lleva a su bloque.
+   * @param array<string,mixed> $work
+   */
+  private static function stepper(array $work): string
+  {
+    $credit = $work['credit'];
+    $status = (string) $credit['status'];
+    $stage = (string) ($work['stage'] ?? 'estudio');
+    $current = ['estudio' => 1, 'firma' => 2, 'respuesta' => 3, 'completo' => 4][$stage] ?? -1;
+    $missing = (array) ($work['promissory']['missing'] ?? []);
+    $sentAt = (int) ($credit['response_sent_at'] ?? 0);
+    $date = static fn($ts): string => (int) $ts > 0 ? date('d/m/Y', (int) $ts) : '';
+    $details = [
+      'solicitud' => 'Registrada el ' . $date($credit['created_at']),
+      'estudio' => match ($status) {
+        'pendiente' => 'En estudio',
+        'rechazado' => 'Rechazado el ' . $date($credit['decided_at']),
+        'anulado' => 'Anulado',
+        default => 'Aprobado el ' . $date($credit['decided_at']),
+      },
+      'firma' => match (true) {
+        in_array($status, ['rechazado', 'anulado'], true) => 'No aplica',
+        $status === 'pendiente' => 'Se envía al aprobar',
+        $missing === [] => 'Firmado',
+        empty($work['settings']['require_promissory']) => 'No exigido',
+        default => 'Falta: ' . implode(', ', $missing),
+      },
+      'respuesta' => match (true) {
+        $sentAt > 0 => 'Enviada el ' . $date($sentAt),
+        $status === 'anulado' => 'No aplica',
+        $stage === 'respuesta' => 'Lista para enviar',
+        default => 'Pendiente',
+      },
+    ];
+    $items = '';
+    $index = 0;
+    foreach (OwnerCreditService::STAGES as $key => $label) {
+      $skipped = $key === 'firma' && in_array($status, ['rechazado', 'anulado'], true);
+      $state = $status === 'anulado' && $index > 1 ? 'skip' : ($skipped ? 'skip' : ($index < $current ? 'done' : ($index === $current ? 'current' : 'todo')));
+      $tone = ['done' => '!sp-border-emerald-200 !sp-bg-emerald-50/60', 'current' => '!sp-border-service-yellow !sp-bg-amber-50', 'todo' => '!sp-border-slate-200 !sp-bg-white', 'skip' => '!sp-border-slate-200 !sp-bg-slate-50 !sp-opacity-60'][$state];
+      $dot = ['done' => '!sp-bg-emerald-600 !sp-text-white', 'current' => '!sp-bg-service-navy !sp-text-white', 'todo' => '!sp-bg-slate-200 !sp-text-service-muted', 'skip' => '!sp-bg-slate-200 !sp-text-service-muted'][$state];
+      $items .= '<li class="!sp-min-w-0"><button type="button" class="!sp-flex !sp-items-start !sp-gap-2 !sp-w-full !sp-h-full !sp-p-2.5 !sp-rounded-lg !sp-border !sp-border-solid ' . $tone . ' !sp-text-left !sp-font-sans !sp-cursor-pointer hover:!sp-border-service-yellow" data-owner-credit-stage-go="' . $key . '" data-owner-credit-stage-state="' . $state . '"' . ($state === 'current' ? ' aria-current="step"' : '') . '>'
+        . '<span class="!sp-flex !sp-items-center !sp-justify-center !sp-shrink-0 !sp-w-6 !sp-h-6 !sp-rounded-full ' . $dot . ' !sp-text-[10px] !sp-font-bold">' . ($state === 'done' ? UI::icon('check', '!sp-w-3 !sp-h-3') : (string) ($index + 1)) . '</span>'
+        . '<span class="!sp-min-w-0"><b class="!sp-block !sp-text-[11px] !sp-text-service-navy">' . self::e($label) . '</b><span class="!sp-block !sp-text-[10px] !sp-text-service-muted !sp-break-words">' . self::e($details[$key]) . '</span></span></button></li>';
+      $index++;
+    }
+    return '<nav aria-label="Etapas del crédito"><ol class="!sp-m-0 !sp-p-0 !sp-list-none !sp-grid !sp-grid-cols-2 lg:!sp-grid-cols-4 !sp-gap-2" data-owner-credit-stepper>' . $items . '</ol></nav>';
+  }
+
+  /** Bloque plegable de una etapa con su número y para qué sirve. */
+  private static function stageBlock(string $key, string $number, string $title, string $hint, bool $open, string $content): string
+  {
+    return '<details class="!sp-rounded-2xl !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-slate-50/50" data-owner-credit-stage="' . $key . '"' . ($open ? ' open' : '') . '>'
+      . '<summary class="!sp-flex !sp-items-center !sp-gap-3 !sp-px-4 !sp-py-3 !sp-cursor-pointer !sp-list-none">'
+      . '<span class="!sp-flex !sp-items-center !sp-justify-center !sp-shrink-0 !sp-w-7 !sp-h-7 !sp-rounded-full !sp-bg-service-navy !sp-text-white !sp-text-xs !sp-font-bold">' . $number . '</span>'
+      . '<span class="!sp-min-w-0 !sp-flex-1"><b class="!sp-block !sp-text-sm !sp-text-service-navy">' . self::e($title) . '</b><span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e($hint) . '</span></span>'
+      . self::icon('chevron', '!sp-w-4 !sp-h-4 !sp-text-service-muted') . '</summary>'
+      . '<div class="!sp-px-3 sm:!sp-px-4 !sp-pb-4 !sp-space-y-5">' . $content . '</div></details>';
+  }
+
+  /**
+   * 4. Respuesta: los documentos que recibe el propietario (carta de aprobación, pagaré firmado y estado de cuenta),
+   * a quién se enviaron y el botón para enviarla o reenviarla.
+   * @param array<string,mixed> $work
+   */
+  private static function responseSection(array $work, bool $canDecide): string
+  {
+    $ui = UI::class;
+    $credit = $work['credit'];
+    $status = (string) $credit['status'];
+    $stage = (string) ($work['stage'] ?? '');
+    $response = is_array($work['response'] ?? null) ? $work['response'] : null;
+    $sentAt = (int) ($credit['response_sent_at'] ?? 0);
+    $note = static fn(string $text): string => '<section class="' . self::SECTION . '"><p class="' . self::NOTE . '">' . self::e($text) . '</p></section>';
+    if ($status === 'pendiente') return $note('Al aprobar se le envía el pagaré para firmar a quien no lo tenga firmado. Cuando quede firmado se envía la respuesta: carta de aprobación, pagaré firmado y estado de cuenta, al propietario y a los funcionarios de Notificaciones internas › Respuesta de crédito enviada.');
+    if ($status === 'anulado') return $note('Crédito anulado: no se envía respuesta.');
+    $queued = (array) ($response['queued'] ?? []);
+    $delivery = $sentAt > 0
+      ? 'Enviada el ' . date('d/m/Y g:i a', $sentAt) . ((string) ($response['by'] ?? '') !== '' ? ' por ' . $response['by'] : '') . ': propietario ' . (int) ($queued['email'] ?? 0) . ' correo(s) y ' . (int) ($queued['whatsapp'] ?? 0) . ' WhatsApp'
+        . (isset($queued['internal']) ? '; funcionarios ' . (int) $queued['internal'] . ' correo(s) y ' . (int) ($queued['internal_whatsapp'] ?? 0) . ' WhatsApp' : '') . '.'
+      : '';
+    if ($status === 'rechazado') return $note('La respuesta de no aprobación se envió al decidir, con el motivo. ' . $delivery);
+
+    $missing = (array) ($work['promissory']['missing'] ?? []);
+    $link = static fn(string $attr, string $label): string => '<button type="button" class="!sp-p-0 !sp-border-0 !sp-bg-transparent !sp-text-[10px] !sp-font-semibold !sp-text-service-blue !sp-cursor-pointer" ' . $attr . '>' . self::e($label) . '</button>';
+    $row = static fn(string $title, string $detail, string $action): string => '<li class="!sp-flex !sp-gap-3 !sp-items-start !sp-justify-between !sp-py-2 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0 !sp-text-[11px]"><span class="!sp-min-w-0"><b class="!sp-block !sp-text-service-navy">' . self::e($title) . '</b><span class="!sp-block !sp-text-service-muted">' . self::e($detail) . '</span></span>' . $action . '</li>';
+    $rows = $row('Carta de aprobación', 'Condiciones aprobadas, forma de pago y firma de ' . ((string) $credit['decided_by_name'] ?: 'quien aprobó') . '.', $link('data-owner-credit-document="carta"', 'Ver carta'));
+    foreach ((array) ($work['promissory']['owners'] ?? []) as $owner) {
+      if (!$owner['required']) continue;
+      $rows .= $row('Pagaré y carta de instrucciones · ' . $owner['name'], $owner['status'] === 'firmado' ? 'Firmado el ' . date('d/m/Y', (int) $owner['signed_at']) . ' · ' . $owner['number'] . '.' : 'Pendiente de firma.',
+        $owner['status'] === 'firmado' ? $link('data-owner-credit-document-promissory="' . (int) $owner['promissory_id'] . '" data-number="' . self::e($owner['number']) . '"', 'Ver pagaré') : '');
+    }
+    $rows .= $row('Estado de cuenta', 'Saldo, cuota a pagar, tasas y plan de pagos a la fecha.', $link('data-owner-credit-document="estado"', 'Ver estado de cuenta'));
+    $wait = $stage === 'firma' ? 'Se envía automáticamente cuando firme el pagaré: falta ' . implode(', ', $missing) . '.' : '';
+    $button = $canDecide && $status === 'aprobado' && $stage !== 'firma'
+      ? '<button type="button" class="' . ($sentAt > 0 ? $ui::SECONDARY : $ui::PRIMARY) . ' !sp-ml-auto" data-owner-credit-response-send="' . ($sentAt > 0 ? 'reenviar' : 'enviar') . '">' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5') . ($sentAt > 0 ? 'Reenviar respuesta' : 'Enviar respuesta') . '</button>'
+      : '';
+    return '<section class="' . self::SECTION . '" data-owner-credit-response><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Documentos de la respuesta</h4>'
+      . ($sentAt > 0 ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Enviada</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-amber-800">Sin enviar</span>') . '</div>'
+      . self::guide('respuesta', [
+        'Qué recibe el propietario' => 'Un correo con la carta de aprobación, el pagaré y la carta de instrucciones firmados y el estado de cuenta adjuntos. Por WhatsApp llega un mensaje por documento, porque cada plantilla con documento lleva un solo PDF.',
+        'Funcionarios' => 'Los de Notificaciones internas › Créditos a propietarios › Respuesta de crédito enviada reciben el correo con los mismos adjuntos y, si está activo en Configuración, los WhatsApp.',
+        'Cuándo sale' => 'Sola, cuando el propietario firma el pagaré (o al aprobar si ya lo tenía firmado). También se puede enviar o reenviar desde aquí.',
+      ])
+      . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $rows . '</ul>'
+      . ($delivery !== '' ? '<p class="' . self::NOTE . ' !sp-mt-2">' . self::e($delivery) . '</p>' : '')
+      . ($wait !== '' ? '<p class="' . self::NOTE . ' !sp-mt-2 !sp-text-amber-800">' . self::e($wait) . '</p>' : '')
+      . ($button !== '' ? '<div class="!sp-flex !sp-mt-3">' . $button . '</div>' : '')
+      . '<p class="!sp-m-0 !sp-mt-2 !sp-text-[11px]" data-owner-credit-response-status role="status" aria-live="polite"></p></section>';
   }
 
   /** Bloques calculados que se refrescan al editar el formulario. @param array<string,mixed> $work */
@@ -337,7 +462,7 @@ final class OwnerCreditView
     foreach ($work['other_credits'] as $row) {
       $others .= '<li class="' . $item . ' !sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2"><b>#' . (int) $row['id'] . '</b> Contrato ' . self::e($row['contract_code']) . ' ' . self::status((string) $row['status']) . ' <span class="!sp-text-service-muted">' . self::money((float) ($row['approved_amount'] ?? 0) ?: (float) $row['requested_amount']) . ' · ' . date('d/m/Y', (int) $row['created_at']) . '</span></li>';
     }
-    $labels = ['solicitado' => 'Solicitud registrada', 'reabierto' => 'Solicitud reabierta', 'aprobado' => 'Aprobado', 'rechazado' => 'Rechazado', 'pagado' => 'Marcado como pagado', 'anulado' => 'Anulado', 'fecha_fin' => 'Fecha fin del contrato corregida', 'beneficiario' => 'Beneficiario cambiado', 'contrato_principal' => 'Contrato principal cambiado'];
+    $labels = ['solicitado' => 'Solicitud registrada', 'reabierto' => 'Solicitud reabierta', 'aprobado' => 'Aprobado', 'rechazado' => 'Rechazado', 'pagado' => 'Marcado como pagado', 'anulado' => 'Anulado', 'fecha_fin' => 'Fecha fin del contrato corregida', 'beneficiario' => 'Beneficiario cambiado', 'contrato_principal' => 'Contrato principal cambiado', 'pagare_firmantes' => 'Firmantes del pagaré', 'pagare_enviado' => 'Pagaré enviado para firmar', 'pagare_anulado' => 'Pagaré anulado', 'respuesta_enviada' => 'Respuesta enviada'];
     $events = '';
     foreach ($work['events'] as $event) {
       $detail = trim((string) ($event['details']['nota'] ?? $event['details']['motivo'] ?? ''));
@@ -481,17 +606,21 @@ final class OwnerCreditView
   }
 
   /**
-   * Pagaré en blanco y carta de instrucciones: quién firma, en qué va cada uno y el envío del enlace. Cada persona lo
-   * firma una vez y sirve para todos sus créditos; aprobar exige el de cada firmante elegido.
+   * 3. Firma de documentos: pagaré en blanco y carta de instrucciones, quién firma, en qué va cada uno y el envío del
+   * enlace. Se envía al aprobar; cada persona lo firma una vez y sirve para todos sus créditos.
    * @param array<string,mixed> $work
    */
   private static function promissorySection(array $work, bool $canDecide, bool $canManage): string
   {
     $state = $work['promissory'] ?? null;
-    if (!is_array($state) || $state['owners'] === []) return '';
+    $creditStatus = (string) $work['credit']['status'];
+    if (in_array($creditStatus, ['rechazado', 'anulado'], true)) return '<section class="' . self::SECTION . '"><p class="' . self::NOTE . '">' . ($creditStatus === 'rechazado' ? 'No aplica: la solicitud no fue aprobada.' : 'Crédito anulado.') . '</p></section>';
+    if (!is_array($state) || $state['owners'] === []) return '<section class="' . self::SECTION . '"><p class="' . self::NOTE . '">El contrato no tiene propietarios registrados para firmar el pagaré.</p></section>';
     $ui = UI::class;
-    $pending = $work['credit']['status'] === 'pendiente';
-    $editable = $pending && $canDecide;
+    $pending = $creditStatus === 'pendiente';
+    // Quién firma se elige hasta enviar la respuesta; el enlace se envía (o reenvía) después de aprobar.
+    $editable = OwnerCreditService::signersEditable($work['credit']) && $canDecide;
+    $canSend = $editable && $creditStatus === 'aprobado';
     $several = count($state['owners']) > 1;
     $done = $state['missing'] === [];
     $rows = '';
@@ -515,27 +644,27 @@ final class OwnerCreditView
     }
     $missingSent = array_filter($state['owners'], static fn(array $o): bool => $o['required'] && $o['status'] !== 'firmado');
     $resend = array_filter($missingSent, static fn(array $o): bool => $o['status'] === 'pendiente') !== [];
-    $send = $editable && !$done
+    $send = $canSend && !$done
       ? '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-3 !sp-mt-3" data-owner-credit-promissory-send-box>'
         . '<span class="' . $ui::LABEL . ' !sp-mb-0">Enviar por</span>'
         . '<label class="!sp-flex !sp-items-center !sp-gap-1 !sp-text-[11px]"><input type="checkbox" name="promissory_channels[]" value="email" checked> Correo</label>'
         . '<label class="!sp-flex !sp-items-center !sp-gap-1 !sp-text-[11px]"><input type="checkbox" name="promissory_channels[]" value="whatsapp"> WhatsApp</label>'
         . '<button type="button" class="' . $ui::NAVY . ' !sp-ml-auto" data-owner-credit-promissory-send>' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . ($resend ? 'Reenviar enlace para firmar' : 'Enviar para firmar') . '</button></div>'
       : '';
-    return '<section class="' . self::SECTION . ' !sp-mt-5" data-owner-credit-promissory><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Pagaré y carta de instrucciones</h4>'
+    return '<section class="' . self::SECTION . '" data-owner-credit-promissory><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Pagaré y carta de instrucciones</h4>'
       . ($done ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Firmado</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-red-700">Falta firma</span>') . '</div>'
       . self::guide('pagare', [
         'Qué es' => 'Un pagaré en blanco (sin valor, interés ni vencimiento) con su carta de instrucciones, que autoriza a llenarlo si el propietario incumple, por el total que deba de sus créditos del Pasaporte SuCasa.',
         'Una sola vez' => 'Cada persona lo firma una vez y respalda todos sus créditos. Si ya lo firmó, no se le vuelve a pedir.',
         'Quién firma' => 'Por defecto, el beneficiario del crédito. Si el contrato tiene varios propietarios, marca quiénes deben firmar: puede ser uno o todos.',
         'Cómo firma' => 'Recibe un enlace personal por correo o WhatsApp y firma con su nombre, su número de documento y un código de verificación, como el acta de satisfacción.',
-        'Para aprobar' => 'El crédito solo se puede aprobar cuando todos los firmantes marcados tengan el pagaré firmado.',
+        'Cuándo se firma' => 'Después de aprobar: al aprobar se envía el enlace a quien no lo tenga firmado. Cuando todos los firmantes marcados lo firman, sale sola la respuesta con la carta de aprobación, el pagaré firmado y el estado de cuenta.',
       ])
       . ($several && $editable ? '<p class="' . self::NOTE . ' !sp-mb-1">Marca quiénes firman el pagaré de este crédito.</p>' : '')
       . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $rows . '</ul>'
-      . ($pending && !$done ? (!empty($work['settings']['require_promissory'])
-        ? '<p class="' . self::NOTE . ' !sp-mt-2 !sp-text-red-700">Para aprobar falta el pagaré firmado de ' . self::e(implode(', ', $state['missing'])) . '.</p>'
-        : '<p class="' . self::NOTE . ' !sp-mt-2">En Configuración el pagaré no es obligatorio para aprobar; falta el de ' . self::e(implode(', ', $state['missing'])) . '.</p>') : '')
+      . (!$done && in_array($creditStatus, ['pendiente', 'aprobado'], true) ? (!empty($work['settings']['require_promissory'])
+        ? '<p class="' . self::NOTE . ' !sp-mt-2' . ($pending ? '' : ' !sp-text-red-700') . '">' . ($pending ? 'Al aprobar se enviará el pagaré para firmar a ' : 'Para enviar la respuesta falta el pagaré firmado de ') . self::e(implode(', ', $state['missing'])) . '.</p>'
+        : '<p class="' . self::NOTE . ' !sp-mt-2">En Configuración el pagaré no es obligatorio para enviar la respuesta; falta el de ' . self::e(implode(', ', $state['missing'])) . '.</p>') : '')
       . $send
       . '<p class="!sp-m-0 !sp-mt-2 !sp-text-[11px]" data-owner-credit-promissory-status role="status" aria-live="polite"></p></section>';
   }
@@ -546,7 +675,11 @@ final class OwnerCreditView
     return !($work['policies_ok'] ?? true);
   }
 
-  private function actions(array $credit, bool $canDecide, bool $canManage, array $adjustments = [], array $work = []): string
+  /**
+   * Botones de la decisión (pendiente, dentro del Estudio) o de gestión del crédito ya decidido (marcar como pagado,
+   * anular), con la observación que piden.
+   */
+  private function actions(array $credit, bool $canDecide, bool $canManage, array $adjustments = [], array $work = [], bool $withDecision = true): string
   {
     $ui = UI::class;
     $status = (string) $credit['status'];
@@ -562,18 +695,25 @@ final class OwnerCreditView
     if (in_array($status, ['pendiente', 'aprobado'], true) && $canManage) {
       $buttons .= '<button type="button" class="' . $danger . '" data-owner-credit-close="anulado">Anular</button>';
     }
-    $note = (string) ($credit['decision_note'] ?? '');
-    $decision = $status !== 'pendiente'
-      ? '<div class="!sp-rounded-lg !sp-bg-slate-50 !sp-p-3 !sp-mb-3 !sp-text-[11px]"><b>Decisión:</b> ' . self::status($status) . ((string) $credit['decided_by_name'] !== '' ? ' por ' . self::e($credit['decided_by_name']) : '') . ((int) $credit['decided_at'] > 0 ? ' el ' . date('d/m/Y', (int) $credit['decided_at']) : '') . ($note !== '' ? '<p class="' . self::NOTE . ' !sp-mt-1.5">' . nl2br(self::e($note)) . '</p>' : '') . '</div>'
-      . self::adjustments($adjustments, false)
-      : '';
+    $decision = $withDecision ? $this->decisionSummary($credit, $adjustments, false) : '';
     if ($buttons === '') return $decision !== '' ? '<section class="' . self::SECTION . '">' . $decision . '</section>' : '';
     // La observación aparece al pulsar Rechazar, Marcar como pagado o Anular, y al pulsar Aprobar solo si incumple políticas.
-    return '<section class="' . self::SECTION . '">' . $decision
+    return '<section class="' . self::SECTION . '">' . ($status === 'pendiente' ? '' : '<h4 class="' . self::H4 . '">' . self::icon('edit') . 'Gestión del crédito</h4>') . $decision
       . '<label class="!sp-block" style="display:none !important" data-owner-credit-note-box><span class="' . $ui::LABEL . '">' . ($status === 'pendiente' ? 'Observación / justificación' : 'Observación') . '</span>'
       . '<textarea class="' . $ui::INPUT . ' !sp-h-20 !sp-py-2 !sp-resize-y" name="note" rows="3" maxlength="2000" placeholder="Explica el motivo (mínimo 10 caracteres); queda guardado con la decisión."></textarea></label>'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-end !sp-gap-3 !sp-mt-4" data-owner-credit-actions>' . $buttons . '</div>'
       . '<p class="!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-text-right" data-owner-credit-status role="status" aria-live="polite"></p></section>';
+  }
+
+  /** Quién decidió, cuándo y con qué observación, y los cambios aprobados frente al sistema. */
+  private function decisionSummary(array $credit, array $adjustments, bool $section = true): string
+  {
+    $status = (string) $credit['status'];
+    if ($status === 'pendiente') return '';
+    $note = (string) ($credit['decision_note'] ?? '');
+    $html = '<div class="!sp-rounded-lg !sp-bg-slate-50 !sp-p-3 !sp-mb-3 !sp-text-[11px]"><b>Decisión:</b> ' . self::status($status) . ((string) $credit['decided_by_name'] !== '' ? ' por ' . self::e($credit['decided_by_name']) : '') . ((int) $credit['decided_at'] > 0 ? ' el ' . date('d/m/Y', (int) $credit['decided_at']) : '') . ($note !== '' ? '<p class="' . self::NOTE . ' !sp-mt-1.5">' . nl2br(self::e($note)) . '</p>' : '') . '</div>'
+      . self::adjustments($adjustments, false);
+    return $section ? '<section class="' . self::SECTION . '">' . $html . '</section>' : $html;
   }
 
   /**
@@ -629,12 +769,12 @@ final class OwnerCreditView
       . $field('Plazo máximo del crédito (meses)', '<input class="' . $ui::INPUT . '" type="number" name="max_term" min="1" max="60" value="' . (int) $settings['max_term'] . '">', 'Tope de plazo: el máximo es el menor entre n − margen y estos meses. Si el contrato no deja cuotas, se permite hasta este tope para que el analista revise la fecha fin.')
       . '</div></section>'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . UI::icon('bolt') . 'Avisos</h4><div class="' . $grid . '">'
-      . $field('Exigir pagaré firmado para aprobar', $yesNo('require_promissory', (bool) ($settings['require_promissory'] ?? true)), 'Pagaré en blanco y carta de instrucciones firmados por quienes elija el analista. Cada persona lo firma una vez y sirve para todos sus créditos.')
+      . $field('Exigir pagaré firmado para enviar la respuesta', $yesNo('require_promissory', (bool) ($settings['require_promissory'] ?? true)), 'Al aprobar se envía el pagaré en blanco y la carta de instrucciones a quienes elija el analista; la respuesta sale cuando lo firman. Cada persona lo firma una vez y sirve para todos sus créditos.')
       . $field('Correo al propietario al registrar la solicitud', $yesNo('notify_owner_request_email', (bool) $settings['notify_owner_request_email']), 'Le confirma que realizó la solicitud (valor, plazo, destinación, contrato y la cotización si viene de una) y que queda sujeta a estudio, verificación y aprobación.')
       . $field('WhatsApp al propietario al registrar la solicitud', $yesNo('notify_owner_request_whatsapp', (bool) $settings['notify_owner_request_whatsapp']), 'Plantilla scm_credito_propietario_solicitud_v1.')
-      . $field('Correo al propietario al decidir', $yesNo('notify_owner_email', (bool) $settings['notify_owner_email']), 'Condiciones y tabla de amortización.')
-      . $field('WhatsApp al propietario al decidir', $yesNo('notify_owner_whatsapp', (bool) $settings['notify_owner_whatsapp']), 'Plantilla scm_credito_propietario_decision_v1, firmada por quien decide.')
-      . $field('WhatsApp a funcionarios', $yesNo('notify_staff_whatsapp', (bool) $settings['notify_staff_whatsapp']), 'Al solicitar (plantilla scm_credito_propietario_solicitud_funcionario_v1) y al aprobar o rechazar (scm_credito_propietario_respuesta_funcionario_v1).')
+      . $field('Correo al propietario con la respuesta', $yesNo('notify_owner_email', (bool) $settings['notify_owner_email']), 'Rechazo: el motivo. Aprobación: condiciones y tabla de amortización con la carta de aprobación, el pagaré firmado y el estado de cuenta adjuntos.')
+      . $field('WhatsApp al propietario con la respuesta', $yesNo('notify_owner_whatsapp', (bool) $settings['notify_owner_whatsapp']), 'Rechazo: plantilla scm_credito_propietario_decision_v1. Aprobación: un mensaje por documento (scm_credito_carta_aprobacion_v1, scm_credito_pagare_firmado_doc_v1 y scm_credito_estado_cuenta_v1). También envía por WhatsApp el enlace del pagaré al aprobar.')
+      . $field('WhatsApp a funcionarios', $yesNo('notify_staff_whatsapp', (bool) $settings['notify_staff_whatsapp']), 'Al solicitar (plantilla scm_credito_propietario_solicitud_funcionario_v1), al aprobar o rechazar (scm_credito_propietario_respuesta_funcionario_v1) y con los documentos de la respuesta.')
       . '</div><p class="' . self::NOTE . ' !sp-mt-3">El correo interno siempre se envía. Los funcionarios se eligen en Notificaciones internas › Créditos a propietarios.</p></section>'
       . '<div class="!sp-flex !sp-items-center !sp-justify-end !sp-gap-3"><p class="!sp-m-0 !sp-text-[11px]" data-owner-credit-status role="status" aria-live="polite"></p><button type="submit" class="' . $ui::PRIMARY . '">' . $ui::icon('check', '!sp-w-3.5 !sp-h-3.5') . 'Guardar configuración</button></div></form>';
   }
@@ -821,6 +961,7 @@ final class OwnerCreditView
       'shield' => 'M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3zm-3 9 2 2 4-4',
       'target' => 'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18zm0 4a5 5 0 1 0 0 10 5 5 0 1 0 0-10zm0 4a1 1 0 1 0 0 2 1 1 0 1 0 0-2z',
       'info' => 'M12 3a9 9 0 1 0 0 18 9 9 0 1 0 0-18zM12 11v5m0-8h.01',
+      'chevron' => 'm6 9 6 6 6-6',
     ];
     if (!isset($paths[$name])) return UI::icon($name, $classes);
     return '<svg class="' . $classes . ' !sp-shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="' . $paths[$name] . '"></path></svg>';

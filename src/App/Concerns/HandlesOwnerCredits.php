@@ -74,7 +74,7 @@ trait HandlesOwnerCredits
       $work = $service->workspace($id);
       $this->jsonOk([
         'credit_id' => $id,
-        'title' => 'Crédito #' . $id . ' · ' . OwnerCreditService::STATUSES[$work['credit']['status']],
+        'title' => 'Crédito #' . $id . ' · ' . OwnerCreditService::STATUSES[$work['credit']['status']] . (isset(OwnerCreditService::STAGES[$work['stage']]) && $work['stage'] !== 'estudio' ? ' · ' . OwnerCreditService::STAGES[$work['stage']] : ''),
         'html' => (new OwnerCreditView())->workspace($work, $this->canUseDashboardAction('owner_credit_decide'), $this->canUseDashboardAction('owner_credit_manage')),
       ]);
     } catch (\Throwable $error) {
@@ -183,7 +183,13 @@ trait HandlesOwnerCredits
       $decision = sanitize_key((string) ($_POST['decision'] ?? ''));
       $result = $this->ownerCreditService()->decide((int) ($_POST['credit_id'] ?? 0), $decision, $this->ownerCreditInput(), $this->ticketCompletionActor());
       $q = $result['queued'];
-      $this->jsonOk(['message' => ($decision === 'aprobado' ? 'Crédito aprobado.' : 'Crédito rechazado.') . ' Propietario: ' . $q['email'] . ' correo(s), ' . $q['whatsapp'] . ' WhatsApp. Funcionarios: ' . $q['internal'] . ' correo(s), ' . $q['internal_whatsapp'] . ' WhatsApp.']);
+      $next = $result['next'];
+      $message = $decision === 'aprobado'
+        ? 'Crédito aprobado. ' . ($next['response'] !== null
+          ? 'Ya tenía el pagaré firmado: se envió la respuesta con ' . count($next['response']['documents']) . ' documento(s).'
+          : ($next['promissory'] !== [] ? 'Pagaré enviado para firmar a ' . implode('; ', $next['promissory']) . '. La respuesta sale cuando lo firme.' : ''))
+        : 'Crédito rechazado. Propietario: ' . $q['email'] . ' correo(s), ' . $q['whatsapp'] . ' WhatsApp.';
+      $this->jsonOk(['message' => trim($message . ' Funcionarios: ' . $q['internal'] . ' correo(s), ' . $q['internal_whatsapp'] . ' WhatsApp. ' . implode(' ', $next['errors']))]);
     } catch (\Throwable $error) {
       $this->ownerCreditFail($error, 'No se pudo guardar la decisión.');
     }
@@ -261,6 +267,42 @@ trait HandlesOwnerCredits
     header_remove('Content-Type');
     header('Content-Type: application/pdf');
     header('Content-Disposition: inline; filename="pagare-' . \SCM\Modules\OwnerCredits\OwnerCreditPromissoryService::number($id) . '-firmado.pdf"');
+    header('Content-Length: ' . (string) strlen($bytes));
+    header('Cache-Control: private, max-age=0, must-revalidate');
+    echo $bytes;
+    exit;
+  }
+
+  /** Envía (o reenvía) la respuesta del crédito aprobado: carta de aprobación, pagaré firmado y estado de cuenta. */
+  public function ajax_handler_owner_credit_response_send(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('owner_credit_decide', 'Tu cargo no tiene permiso para enviar la respuesta del crédito.');
+    try {
+      $id = (int) ($_POST['credit_id'] ?? 0);
+      $q = $this->ownerCreditService()->sendResponse($id, $this->ticketCompletionActor());
+      $this->jsonOk(['credit_id' => $id, 'message' => 'Respuesta enviada con ' . count($q['documents']) . ' documento(s). Propietario: ' . $q['email'] . ' correo(s), ' . $q['whatsapp'] . ' WhatsApp. Funcionarios: ' . $q['internal'] . ' correo(s), ' . $q['internal_whatsapp'] . ' WhatsApp.']);
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo enviar la respuesta del crédito.');
+    }
+  }
+
+  /** Carta de aprobación o estado de cuenta en PDF, para el visor del liquidador. */
+  public function ajax_handler_owner_credit_document(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canViewOwnerCredits()) $this->jsonFail('No tienes permiso para ver créditos.');
+    $id = (int) ($_POST['credit_id'] ?? 0);
+    $kind = sanitize_key((string) ($_POST['kind'] ?? ''));
+    try {
+      $bytes = $this->ownerCreditService()->responsePdf($id, $kind);
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo generar el documento del crédito.');
+    }
+    if (ob_get_level() > 0) ob_end_clean();
+    header_remove('Content-Type');
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . ($kind === 'carta' ? 'carta-aprobacion' : 'estado-de-cuenta') . '-credito-' . $id . '.pdf"');
     header('Content-Length: ' . (string) strlen($bytes));
     header('Cache-Control: private, max-age=0, must-revalidate');
     echo $bytes;

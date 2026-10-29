@@ -1,0 +1,36 @@
+{
+  "name": "scm_credito_pagare_firmado_doc_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "HEADER",
+      "format": "DOCUMENT",
+      "example": {
+        "header_handle": [
+          "pagare-PS-000012-firmado.pdf"
+        ]
+      }
+    },
+    {
+      "type": "BODY",
+      "text": "Buen día, {{1}}.\n\nAdjuntamos el pagaré No. {{2}} y su carta de instrucciones, firmados electrónicamente por {{3}} el {{4}}. Respaldan el crédito No. {{5}} y los demás créditos del Pasaporte SuCasa.\n\nAtentamente,\n{{6}}\n\nConserve este documento para su registro.",
+      "example": {
+        "body_text": [
+          [
+            "María Pérez",
+            "PS-000012",
+            "María Pérez",
+            "29/10/2026",
+            "5",
+            "Royner Guardo - Asistente de Desarrollo TI - Cel. 3015232054"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    }
+  ]
+}

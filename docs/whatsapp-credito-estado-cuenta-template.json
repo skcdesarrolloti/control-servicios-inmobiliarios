@@ -1,0 +1,37 @@
+{
+  "name": "scm_credito_estado_cuenta_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "HEADER",
+      "format": "DOCUMENT",
+      "example": {
+        "header_handle": [
+          "estado-de-cuenta-credito-5.pdf"
+        ]
+      }
+    },
+    {
+      "type": "BODY",
+      "text": "Buen día, {{1}}.\n\nAdjuntamos el estado de cuenta del crédito No. {{2}} de {{3}}. Saldo a capital: {{4}}. Próxima cuota: {{5}}, con vencimiento el {{6}}; se descontará de los giros de arrendamiento.\n\nAtentamente,\n{{7}}\n\nGracias por confiar en nosotros.",
+      "example": {
+        "body_text": [
+          [
+            "María Pérez",
+            "5",
+            "María Pérez",
+            "$3.000.000",
+            "$285.424",
+            "30/11/2026",
+            "Royner Guardo - Asistente de Desarrollo TI - Cel. 3015232054"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    }
+  ]
+}

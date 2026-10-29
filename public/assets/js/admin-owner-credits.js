@@ -93,7 +93,8 @@
     }
 
     function setStatus(form, message, tone) {
-      var status = form && form.querySelector("[data-owner-credit-status]");
+      // Sin botones de gestión (decidido y sin permiso), el resultado se muestra en la sección de la respuesta.
+      var status = form && (form.querySelector("[data-owner-credit-status]") || form.querySelector("[data-owner-credit-response-status]"));
       if (!status) return;
       if (!status.hasAttribute("data-base-class")) status.setAttribute("data-base-class", status.className);
       status.textContent = message || "";
@@ -112,7 +113,11 @@
       showModal("Cargando…", "Preparando el liquidador.", message("Cargando crédito…"));
       return post("scm_owner_credit_open", params)
         .then(function (data) {
-          showModal(data.title || "Crédito", "Datos del contrato, políticas, condiciones y tabla de amortización.", data.html || "");
+          showModal(data.title || "Crédito", "Solicitud, estudio, firma de documentos y respuesta al propietario.", data.html || "");
+          // Decidido: se lleva a la etapa en curso (firma o respuesta) en vez del estudio.
+          var current = modal.querySelector('[data-owner-credit-stage-state="current"]');
+          var key = current && current.getAttribute("data-owner-credit-stage-go");
+          if (key && key !== "estudio") goToStage(key, false);
         })
         .catch(function (error) {
           showModal("No se pudo abrir", "", message(error.message, "error"));
@@ -144,16 +149,25 @@
       return data;
     }
 
-    // Acciones del pagaré: muestran el resultado en la sección y recargan el liquidador para ver el estado nuevo.
-    function promissoryAction(box, action, data, creditId) {
-      var status = box.querySelector("[data-owner-credit-promissory-status]");
+    // Abre el bloque de una etapa del liquidador y lo lleva a la vista.
+    function goToStage(key, smooth) {
+      var block = modal && modal.querySelector('[data-owner-credit-stage="' + key + '"]');
+      if (!block) return;
+      block.open = true;
+      if (block.scrollIntoView) block.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+    }
+
+    // Acciones del pagaré y de la respuesta: muestran el resultado en su sección y recargan el liquidador.
+    function promissoryAction(box, action, data, creditId, statusAttr) {
+      statusAttr = statusAttr || "data-owner-credit-promissory-status";
+      var status = box.querySelector("[" + statusAttr + "]");
       box.querySelectorAll("button, input").forEach(function (el) { el.disabled = true; });
       if (status) { status.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px]"; status.textContent = "Guardando…"; }
       return post(action, data)
         .then(function (result) {
           loadReport(true);
           return openCredit({ credit_id: creditId }).then(function () {
-            var fresh = modal && modal.querySelector("[data-owner-credit-promissory-status]");
+            var fresh = modal && modal.querySelector("[" + statusAttr + "]");
             if (fresh) { fresh.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-font-semibold !sp-text-emerald-700"; fresh.textContent = result.message || "Listo."; }
           });
         })
@@ -537,6 +551,38 @@
         showPdf(target.closest("[data-owner-credit-pdf]"), { title: "Documento del crédito #" + creditId, back: "Volver al liquidador", action: "scm_owner_credit_pdf", data: formData(form), filename: "credito-propietario-" + creditId + ".pdf" });
         return;
       }
+      var stageGo = form && target.closest("[data-owner-credit-stage-go]");
+      if (stageGo) { goToStage(stageGo.getAttribute("data-owner-credit-stage-go"), true); return; }
+      // Documentos de la respuesta: carta de aprobación y estado de cuenta (se generan al verlos) y pagaré firmado.
+      var responseDoc = form && target.closest("[data-owner-credit-document]");
+      if (responseDoc) {
+        var kind = responseDoc.getAttribute("data-owner-credit-document");
+        var docRequest = new FormData();
+        docRequest.set("credit_id", form.getAttribute("data-credit-id") || "");
+        docRequest.set("kind", kind);
+        var docTitle = (kind === "carta" ? "Carta de aprobación" : "Estado de cuenta") + " · Crédito #" + form.getAttribute("data-credit-id");
+        showPdf(responseDoc, { title: docTitle, back: "Volver al liquidador", action: "scm_owner_credit_document", data: docRequest, filename: (kind === "carta" ? "carta-aprobacion" : "estado-de-cuenta") + "-credito-" + form.getAttribute("data-credit-id") + ".pdf" });
+        return;
+      }
+      var responsePromissory = form && target.closest("[data-owner-credit-document-promissory]");
+      if (responsePromissory) {
+        var responsePdfRequest = new FormData();
+        responsePdfRequest.set("promissory_id", responsePromissory.getAttribute("data-owner-credit-document-promissory"));
+        showPdf(responsePromissory, { title: "Pagaré " + responsePromissory.getAttribute("data-number") + " firmado", back: "Volver al liquidador", action: "scm_owner_credit_promissory_pdf", data: responsePdfRequest, filename: "pagare-" + responsePromissory.getAttribute("data-number") + "-firmado.pdf" });
+        return;
+      }
+      var responseSend = form && target.closest("[data-owner-credit-response-send]");
+      if (responseSend) {
+        var responseBox = responseSend.closest("[data-owner-credit-response]");
+        var responseData = new FormData();
+        responseData.set("credit_id", form.getAttribute("data-credit-id") || "");
+        askConfirm(responseSend, responseSend.getAttribute("data-owner-credit-response-send") === "reenviar"
+          ? "Se reenviarán la carta de aprobación, el pagaré firmado y el estado de cuenta al propietario y a los funcionarios configurados."
+          : "Se enviarán la carta de aprobación, el pagaré firmado y el estado de cuenta al propietario y a los funcionarios configurados.", function () {
+          promissoryAction(responseBox, "scm_owner_credit_response_send", responseData, form.getAttribute("data-credit-id"), "data-owner-credit-response-status");
+        });
+        return;
+      }
       var promissoryBox = form && target.closest("[data-owner-credit-promissory]");
       if (promissoryBox && target.closest("[data-owner-credit-promissory-send]")) {
         var sendData = new FormData();
@@ -587,7 +633,7 @@
         if (decision === "rechazado" && !requireNote(form, "Rechazar")) return;
         if (decision === "aprobado" && form.querySelector("[data-owner-credit-needs-note]") && !requireNote(form, "Aprobar crédito")) return;
         askConfirm(decide, decision === "aprobado"
-          ? "Se aprobará el crédito con las condiciones del analista y se avisará al propietario."
+          ? "Se aprobará el crédito con las condiciones del analista. Si el propietario no tiene el pagaré firmado se le envía para firmar; con la firma sale la respuesta con los documentos."
           : "Se rechazará la solicitud y se avisará al propietario.", function () {
           runAction(form, "scm_owner_credit_decide", { decision: decision });
         });
