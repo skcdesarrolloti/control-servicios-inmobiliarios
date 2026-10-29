@@ -132,7 +132,7 @@ La definición para la API está en `whatsapp-credito-propietario-respuesta-func
 
 ## Plantillas del pagaré y la carta de instrucciones
 
-El propietario firma una sola vez el pagaré en blanco y su carta de instrucciones, desde un enlace personal (`credito-pagare.php`). Se envía solo al **aprobar** el crédito (por correo y, si está activo **WhatsApp al propietario con la respuesta**, también por WhatsApp); el analista lo puede reenviar desde la etapa **3. Firma de documentos** del liquidador. Hasta que Meta apruebe estas plantillas, envíalo solo por correo: por WhatsApp no saldrá nada.
+El propietario firma una sola vez el pagaré en blanco y su carta de instrucciones, desde un enlace personal (`credito-pagare.php`). Se firma **antes de aprobar**: el analista lo envía desde la etapa **3. Firma de documentos** del liquidador, eligiendo **Correo**, **WhatsApp** o ambos, y el crédito solo se puede aprobar cuando está firmado. Hasta que Meta apruebe estas plantillas, envíalo solo por correo: por WhatsApp no saldrá nada.
 
 Para el código de 6 dígitos se reutiliza la plantilla de autenticación del acta (`scm_acta_firma_otp_v1`), que no menciona el acta. No hay que crear otra.
 
@@ -167,8 +167,6 @@ Este enlace es personal. No lo compartas.
 La definición para la API está en `whatsapp-credito-pagare-firma-template.json`.
 
 ### Copia firmada
-
-Solo le llega a quien firma cuando la respuesta del crédito no le lleva ya el pagaré firmado (por ejemplo, un copropietario que firma un crédito de otra persona).
 
 - Nombre exacto: `scm_credito_pagare_firmado_v1` (variable de entorno `SCM_PAGARE_WHATSAPP_SIGNED_TEMPLATE`).
 - Mismas opciones que la invitación.
@@ -234,7 +232,7 @@ La definición para la API está en `whatsapp-credito-propietario-solicitud-func
 
 ## Plantillas de la respuesta con documentos
 
-Cuando el propietario firma el pagaré (o al aprobar, si ya lo tenía firmado), el panel le envía la **respuesta** del crédito aprobado: un correo con los tres PDF adjuntos y, por WhatsApp, **un mensaje por documento**, porque una plantilla con encabezado de documento solo lleva un PDF. Los mismos mensajes van a los funcionarios de **Notificaciones internas › Créditos a propietarios › Respuesta de crédito enviada** (en {{1}} va el nombre del funcionario).
+Al **aprobar** el crédito (el pagaré ya está firmado), el panel le envía al propietario la **respuesta**: un correo con los tres PDF adjuntos y, por WhatsApp, **un mensaje por documento**, porque una plantilla con encabezado de documento solo lleva un PDF. Los mismos mensajes van a los funcionarios de **Notificaciones internas › Créditos a propietarios › Respuesta de crédito enviada** (en {{1}} va el nombre del funcionario).
 
 - WhatsApp al propietario: **Configuración › WhatsApp al propietario con la respuesta**.
 - WhatsApp a funcionarios: **Configuración › WhatsApp a funcionarios**.
@@ -297,14 +295,14 @@ Conserve este documento para su registro.
 | 5 | Número del crédito | 5 |
 | 6 | Quien aprobó: nombre - cargo - Cel. celular | Royner Guardo - Asistente de Desarrollo TI - Cel. 3015232054 |
 
-### Estado de cuenta
+### Condiciones y plan de pagos
 
-- Nombre exacto: `scm_credito_estado_cuenta_v1`.
+- Nombre exacto: `scm_credito_plan_pagos_v1`.
 
 ```text
 Buen día, {{1}}.
 
-Adjuntamos el estado de cuenta del crédito No. {{2}} de {{3}}. Saldo a capital: {{4}}. Próxima cuota: {{5}}, con vencimiento el {{6}}; se descontará de los giros de arrendamiento.
+Adjuntamos las condiciones y el plan de pagos del crédito No. {{2}} de {{3}}: {{4}} cuotas mensuales de {{5}}, la primera con vencimiento el {{6}}, que se descontarán de los giros de arrendamiento.
 
 Atentamente,
 {{7}}
@@ -317,9 +315,9 @@ Gracias por confiar en nosotros.
 | 1 | Quien recibe | María Pérez |
 | 2 | Número del crédito | 5 |
 | 3 | Propietario del crédito | María Pérez |
-| 4 | Saldo a capital a la fecha | $3.000.000 |
-| 5 | Valor de la próxima cuota | $285.424 |
-| 6 | Vencimiento de la próxima cuota | 30/11/2026 |
+| 4 | Número de cuotas | 12 |
+| 5 | Valor de la cuota | $285.424 |
+| 6 | Vencimiento de la primera cuota | 30/11/2026 |
 | 7 | Quien aprobó: nombre - cargo - Cel. celular | Royner Guardo - Asistente de Desarrollo TI - Cel. 3015232054 |
 
-Las definiciones para la API están en `whatsapp-credito-carta-aprobacion-template.json`, `whatsapp-credito-pagare-firmado-doc-template.json` y `whatsapp-credito-estado-cuenta-template.json`.
+Las definiciones para la API están en `whatsapp-credito-carta-aprobacion-template.json`, `whatsapp-credito-pagare-firmado-doc-template.json` y `whatsapp-credito-plan-pagos-template.json`.

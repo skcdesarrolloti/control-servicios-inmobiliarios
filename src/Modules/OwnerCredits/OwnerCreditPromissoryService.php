@@ -16,8 +16,7 @@ use SCM\Support\SmsQueue;
 
 /**
  * Pagaré en blanco + carta de instrucciones de cada persona que recibe créditos. Se firma una sola vez por número de
- * documento y respalda todos sus créditos. Se pide al aprobar un crédito; la respuesta al propietario (carta de
- * aprobación, pagaré firmado y estado de cuenta) sale cuando cada firmante elegido lo tiene firmado.
+ * documento y respalda todos sus créditos; aprobar un crédito exige que cada firmante elegido lo tenga firmado.
  *
  * Firma como el acta de satisfacción: enlace personal con token HMAC y vencimiento, nombre y documento escritos,
  * código de 6 dígitos por correo o WhatsApp y aceptación expresa. La evidencia (IP, navegador, huella del documento)
@@ -34,8 +33,6 @@ final class OwnerCreditPromissoryService
   private \Closure $enqueue;
   /** @var \Closure(array<string,mixed>,array<string,mixed>):string */
   private \Closure $renderPdf;
-  /** @var (\Closure(array<string,mixed>):bool)|null tras firmar; true = la respuesta del crédito ya le lleva su copia */
-  private ?\Closure $afterSign = null;
 
   public function __construct(private Database $db, private string $secret, private string $baseUrl, ?\Closure $enqueue = null, ?\Closure $renderPdf = null, ?SchemaInspector $schema = null)
   {
@@ -47,12 +44,6 @@ final class OwnerCreditPromissoryService
   public function table(): string
   {
     return $this->db->table('scm_owner_credit_promissory');
-  }
-
-  /** Lo que sigue al firmar (la respuesta de los créditos aprobados que esperaban la firma). */
-  public function afterSign(\Closure $callback): void
-  {
-    $this->afterSign = $callback;
   }
 
   public function ensureSchema(): void
@@ -182,8 +173,7 @@ final class OwnerCreditPromissoryService
       $queued[$channel] = ($this->enqueue)($channel, $channel === 'email' ? (string) $row['owner_email'] : (string) $row['owner_phone'], [
         'event' => 'invitation', 'row' => $row, 'url' => $url, 'text' => $text,
         'subject' => 'Firma del pagaré No. ' . self::number($id) . ' · SKC SuCasa Inmobiliaria',
-        'html' => '<p>Hola ' . EmailTemplate::e($row['owner_name']) . ',</p>' . ($creditId > 0 ? '<p>Tu solicitud de crédito <b>#' . $creditId . '</b> fue aprobada. Para continuar, firma el pagaré: al quedar firmado te enviaremos la carta de aprobación, el pagaré firmado y el estado de cuenta.</p>' : '')
-          . '<p>Te enviamos el <b>pagaré No. ' . self::number($id) . '</b> y su <b>carta de instrucciones</b> para que los revises y firmes electrónicamente. Se firman una sola vez y respaldan los créditos que tomes con el Pasaporte SuCasa.</p><p>Para firmar necesitarás tu nombre, tu número de documento y un código que te enviaremos al abrir el enlace.</p>',
+        'html' => '<p>Hola ' . EmailTemplate::e($row['owner_name']) . ',</p><p>Te enviamos el <b>pagaré No. ' . self::number($id) . '</b> y su <b>carta de instrucciones</b> para que los revises y firmes electrónicamente. Se firman una sola vez y respaldan los créditos que tomes con el Pasaporte SuCasa.</p><p>Para firmar necesitarás tu nombre, tu número de documento y un código que te enviaremos al abrir el enlace.</p>',
         'button' => ['url' => $url, 'label' => 'Revisar y firmar'],
         'key' => 'invitation:' . $row['token_nonce'],
       ]) > 0;
@@ -305,15 +295,7 @@ final class OwnerCreditPromissoryService
       $this->db->update($this->table(), ['signed_pdf' => $pdf, 'pdf_hash' => $hash, 'pdf_hmac' => hash_hmac('sha256', $id . '|' . $row['payload_hash'] . '|' . $hash, $this->secret)], ['id' => $id]);
       return $this->find($id);
     });
-    if ($verification !== null) {
-      $handled = false;
-      try {
-        $handled = $this->afterSign !== null && ($this->afterSign)($row);
-      } catch (\Throwable $error) {
-        error_log('[owner-credit-promissory] respuesta tras firmar: ' . $error->getMessage());
-      }
-      $this->notifySigned($row, !$handled);
-    }
+    if ($verification !== null) $this->notifySigned($row);
     return $row;
   }
 
@@ -364,12 +346,12 @@ final class OwnerCreditPromissoryService
     return $bytes;
   }
 
-  /** Copia al firmante (si la respuesta del crédito no se la lleva) y aviso a los funcionarios de "Notificaciones internas". */
-  private function notifySigned(array $row, bool $ownerCopy = true): void
+  /** Copia al firmante y aviso a los funcionarios de "Notificaciones internas". */
+  private function notifySigned(array $row): void
   {
     $queued = [];
     $url = $this->publicUrl($row) . '&format=pdf';
-    foreach ($ownerCopy ? array_filter(explode(',', (string) $row['channels'])) : [] as $channel) {
+    foreach (array_filter(explode(',', (string) $row['channels'])) as $channel) {
       $text = 'Hola ' . $row['owner_name'] . ', quedó firmado tu pagaré No. ' . self::number((int) $row['id']) . ' con su carta de instrucciones. Descarga tu copia: ' . $url;
       $queued[$channel] = ($this->enqueue)($channel, $channel === 'email' ? (string) $row['owner_email'] : (string) $row['owner_phone'], [
         'event' => 'signed', 'row' => $row, 'url' => $url, 'text' => $text, 'subject' => 'Pagaré No. ' . self::number((int) $row['id']) . ' firmado · SKC SuCasa Inmobiliaria',
@@ -382,7 +364,7 @@ final class OwnerCreditPromissoryService
       $copies = InternalNotificationRecipients::emailsForAction($this->db, 'credito_propietario_pagare_firmado');
       if ($copies === []) return;
       $title = 'Pagaré No. ' . self::number((int) $row['id']) . ' firmado por ' . $row['owner_name'];
-      $details = $row['owner_name'] . ' (documento ' . $row['owner_document'] . ') firmó el pagaré en blanco y la carta de instrucciones' . ((int) $row['credit_id'] > 0 ? ', enviados con el crédito #' . (int) $row['credit_id'] : '') . '. Sus créditos aprobados ya pueden enviar la respuesta con los documentos.';
+      $details = $row['owner_name'] . ' (documento ' . $row['owner_document'] . ') firmó el pagaré en blanco y la carta de instrucciones' . ((int) $row['credit_id'] > 0 ? ', enviados con el crédito #' . (int) $row['credit_id'] : '') . '. Ya se pueden aprobar sus créditos.';
       (new EmailQueue($this->db))->enqueue($copies, $title, EmailTemplate::render($title, '<p>' . EmailTemplate::e($details) . '</p>', ['buttons' => [['url' => $this->staffUrl((int) $row['id']), 'label' => 'Ver pagaré firmado']]]), [
         'source_module' => 'credito_propietario_pagare_firmado', 'internal_action' => 'credito_propietario_pagare_firmado', 'internal_cc' => $copies,
         'dedupe_key' => 'internal-admin:credito_propietario_pagare_firmado:' . (int) $row['id'], 'meta' => ['event' => 'credito_propietario_pagare_firmado'],

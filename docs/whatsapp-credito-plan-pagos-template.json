@@ -1,5 +1,5 @@
 {
-  "name": "scm_credito_estado_cuenta_v1",
+  "name": "scm_credito_plan_pagos_v1",
   "language": "es_CO",
   "category": "UTILITY",
   "components": [
@@ -8,20 +8,20 @@
       "format": "DOCUMENT",
       "example": {
         "header_handle": [
-          "estado-de-cuenta-credito-5.pdf"
+          "condiciones-plan-de-pagos-credito-5.pdf"
         ]
       }
     },
     {
       "type": "BODY",
-      "text": "Buen día, {{1}}.\n\nAdjuntamos el estado de cuenta del crédito No. {{2}} de {{3}}. Saldo a capital: {{4}}. Próxima cuota: {{5}}, con vencimiento el {{6}}; se descontará de los giros de arrendamiento.\n\nAtentamente,\n{{7}}\n\nGracias por confiar en nosotros.",
+      "text": "Buen día, {{1}}.\n\nAdjuntamos las condiciones y el plan de pagos del crédito No. {{2}} de {{3}}: {{4}} cuotas mensuales de {{5}}, la primera con vencimiento el {{6}}, que se descontarán de los giros de arrendamiento.\n\nAtentamente,\n{{7}}\n\nGracias por confiar en nosotros.",
       "example": {
         "body_text": [
           [
             "María Pérez",
             "5",
             "María Pérez",
-            "$3.000.000",
+            "12",
             "$285.424",
             "30/11/2026",
             "Royner Guardo - Asistente de Desarrollo TI - Cel. 3015232054"

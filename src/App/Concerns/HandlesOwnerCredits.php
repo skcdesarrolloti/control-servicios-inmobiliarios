@@ -186,8 +186,8 @@ trait HandlesOwnerCredits
       $next = $result['next'];
       $message = $decision === 'aprobado'
         ? 'Crédito aprobado. ' . ($next['response'] !== null
-          ? 'Ya tenía el pagaré firmado: se envió la respuesta con ' . count($next['response']['documents']) . ' documento(s).'
-          : ($next['promissory'] !== [] ? 'Pagaré enviado para firmar a ' . implode('; ', $next['promissory']) . '. La respuesta sale cuando lo firme.' : ''))
+          ? 'Respuesta enviada con ' . count($next['response']['documents']) . ' documento(s). Propietario: ' . $next['response']['email'] . ' correo(s), ' . $next['response']['whatsapp'] . ' WhatsApp.'
+          : '')
         : 'Crédito rechazado. Propietario: ' . $q['email'] . ' correo(s), ' . $q['whatsapp'] . ' WhatsApp.';
       $this->jsonOk(['message' => trim($message . ' Funcionarios: ' . $q['internal'] . ' correo(s), ' . $q['internal_whatsapp'] . ' WhatsApp. ' . implode(' ', $next['errors']))]);
     } catch (\Throwable $error) {
@@ -273,7 +273,7 @@ trait HandlesOwnerCredits
     exit;
   }
 
-  /** Envía (o reenvía) la respuesta del crédito aprobado: carta de aprobación, pagaré firmado y estado de cuenta. */
+  /** Envía (o reenvía) la respuesta del crédito aprobado: carta de aprobación, pagaré firmado y plan de pagos. */
   public function ajax_handler_owner_credit_response_send(): void
   {
     $this->verifyCsrf();
@@ -287,7 +287,7 @@ trait HandlesOwnerCredits
     }
   }
 
-  /** Carta de aprobación o estado de cuenta en PDF, para el visor del liquidador. */
+  /** Carta de aprobación o condiciones con plan de pagos en PDF, para el visor del liquidador. */
   public function ajax_handler_owner_credit_document(): void
   {
     $this->verifyCsrf();
@@ -302,7 +302,7 @@ trait HandlesOwnerCredits
     if (ob_get_level() > 0) ob_end_clean();
     header_remove('Content-Type');
     header('Content-Type: application/pdf');
-    header('Content-Disposition: inline; filename="' . ($kind === 'carta' ? 'carta-aprobacion' : 'estado-de-cuenta') . '-credito-' . $id . '.pdf"');
+    header('Content-Disposition: inline; filename="' . (\SCM\Modules\OwnerCredits\OwnerCreditResponseDocuments::FILENAMES[$kind] ?? 'documento') . '-credito-' . $id . '.pdf"');
     header('Content-Length: ' . (string) strlen($bytes));
     header('Cache-Control: private, max-age=0, must-revalidate');
     echo $bytes;

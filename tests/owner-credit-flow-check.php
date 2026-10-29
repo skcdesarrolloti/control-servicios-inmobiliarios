@@ -473,7 +473,7 @@ try {
 }
 $service->changeStatus($coverageCredit, 'anulado', 'Crédito de prueba de cobertura de pago.', $actor);
 
-// Pagaré en blanco + carta de instrucciones: se firma después de aprobar (una vez por persona) y con la firma sale la respuesta.
+// Pagaré en blanco + carta de instrucciones: se firma antes de aprobar (una vez por persona) y va en la respuesta.
 $requirePromissory = static function (bool $on) use ($db): void {
   $config = json_decode((string) $db->getVar("SELECT valor FROM wp_jet_cct_confi_sistema WHERE funcion = 'control_servicios_config'"), true);
   $config['owner_credit_settings']['require_promissory'] = $on;
@@ -490,26 +490,22 @@ $pagareService->usePromissory($promissory);
 $pagareCredit = (int) $pagareService->createManual(9, 800000, 6, 'Libre Destinación', $actor, '', 'mandato_2');
 $state = $pagareService->promissoryState($pagareService->find($pagareCredit));
 $check($state['required'] === ['mandato_2'] && $state['missing'] === ['Segunda Dueña'] && count($state['owners']) === 2, 'by default only the beneficiary must sign the promissory note');
-$check($pagareService->workspace($pagareCredit)['stage'] === 'estudio', 'a pending request is in the study stage');
+$check($pagareService->workspace($pagareCredit)['stage'] === 'estudio', 'a pending request without the note sent is in the study stage');
+try {
+  $pagareService->decide($pagareCredit, 'aprobado', ['note' => 'Aprobación sin pagaré firmado todavía.'], $actor);
+  $check(false, 'a credit cannot be approved without the signed promissory note');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'Falta el pagaré firmado de Segunda Dueña'), 'a credit cannot be approved without the signed promissory note');
+}
 $both = $pagareService->setPromissorySigners($pagareCredit, ['mandato_1', 'mandato_2'], $actor);
 $check($both['required'] === ['mandato_1', 'mandato_2'] && count($both['missing']) === 2, 'the analyst can ask every owner of the contract to sign');
 $pagareService->setPromissorySigners($pagareCredit, ['mandato_2'], $actor);
-try {
-  $pagareService->sendPromissory($pagareCredit, ['email'], $actor);
-  $check(false, 'the promissory note is sent after approving');
-} catch (DomainException $error) {
-  $check(str_contains($error->getMessage(), 'después de aprobar'), 'the promissory note is sent after approving, not while the request is pending');
-}
-$approval = $pagareService->decide($pagareCredit, 'aprobado', ['note' => 'Aprobación antes de firmar el pagaré.'], $actor);
+$sent = $pagareService->sendPromissory($pagareCredit, ['email'], $actor);
 $invitation = array_values(array_filter($sentMessages, static fn(array $m): bool => $m['event'] === 'invitation'))[0] ?? null;
-$check($approval['credit']['status'] === 'aprobado' && $approval['next']['promissory'] !== [] && $approval['next']['response'] === null && $invitation !== null && $invitation['to'] === 'segunda@example.invalid' && str_contains($invitation['url'], 'credito-pagare.php?id='), 'approving without the signed note sends the signing link and waits for the signature');
-$check(str_contains((string) $invitation['html'], 'fue aprobada') && $pagareService->workspace($pagareCredit)['stage'] === 'firma', 'the invitation says the credit was approved and the credit waits in the signing stage');
-try {
-  $pagareService->sendResponse($pagareCredit, $actor);
-  $check(false, 'the response needs the signed note');
-} catch (DomainException $error) {
-  $check(str_contains($error->getMessage(), 'Falta el pagaré firmado de Segunda Dueña'), 'the response is not sent before the signature');
-}
+$check($sent['sent'] !== [] && $invitation !== null && $invitation['to'] === 'segunda@example.invalid' && str_contains($invitation['url'], 'credito-pagare.php?id='), 'the signing link is sent to the signer email');
+$check($pagareService->workspace($pagareCredit)['stage'] === 'firma', 'with the link sent the request waits in the signing stage');
+$pendingView = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($pagareService->workspace($pagareCredit), true, true);
+$check(str_contains($pendingView, 'data-owner-credit-decide="aprobado" disabled') && str_contains($pendingView, 'data-owner-credit-approve-blocked'), 'the approve button stays disabled until the note is signed');
 parse_str((string) parse_url($invitation['url'], PHP_URL_QUERY), $query);
 $pid = (int) $query['id'];
 $token = (string) $query['token'];
@@ -528,34 +524,37 @@ try { $promissory->sign($pid, $token, ['otp_code' => '000000'] + $signInput, '10
 $check((int) (json_decode((string) $promissory->find($pid)['otp_json'], true)['failures'] ?? 0) === 1, 'a wrong code is rejected and the failed try stays counted');
 try { $promissory->sign($pid, $token, ['document' => '99999999'] + $signInput, '10.0.0.1', 'QA'); $check(false, 'the document number must match'); } catch (DomainException $error) { $check(str_contains($error->getMessage(), 'documento no coincide'), 'the document number must match'); }
 try { $promissory->sign($pid, $token, ['signature_name' => 'Otra Persona'] + $signInput, '10.0.0.1', 'QA'); $check(false, 'the typed name must match'); } catch (DomainException $error) { $check(str_contains($error->getMessage(), 'nombre'), 'the typed name must match'); }
-$responsePdfs = [];
-$responseFiles = [];
 $signedRow = $promissory->sign($pid, $token, $signInput, '10.0.0.1', 'QA browser');
 $evidence = json_decode((string) $signedRow['signed_json'], true);
 $check($signedRow['status'] === 'firmado' && $evidence['ip'] === '10.0.0.1' && $evidence['document_hash'] === $row['payload_hash'] && isset($evidence['evidence_hmac']) && $evidence['verification']['channel'] === 'email', 'signing stores the evidence: IP, document fingerprint, verification and HMAC');
-$check($promissory->pdf($signedRow) === '%PDF-1.4 pagare ' . $payload['number'], 'the signed PDF is stored with its HMAC');
+$check($promissory->pdf($signedRow) === '%PDF-1.4 pagare ' . $payload['number'] && array_filter($sentMessages, static fn(array $m): bool => $m['event'] === 'signed') !== [], 'the signed PDF is stored with its HMAC and the signer gets a copy');
+$check($promissory->sign($pid, $token, $signInput, '10.0.0.1', 'QA')['status'] === 'firmado', 'signing twice does nothing');
+$check($pagareService->workspace($pagareCredit)['stage'] === 'respuesta' && (int) ($pagareService->find($pagareCredit)['response_sent_at'] ?? 0) === 0, 'with the note signed the request is ready to approve and nothing is sent yet');
+$responsePdfs = [];
+$responseFiles = [];
+$approval = $pagareService->decide($pagareCredit, 'aprobado', ['note' => 'Aprobado con pagaré firmado por la beneficiaria.'], $actor);
 $answered = $pagareService->find($pagareCredit);
 $response = json_decode((string) $answered['response_json'], true);
-$check((int) $answered['response_sent_at'] > 0 && count($response['documents']) === 3 && count($responseFiles) === 3 && str_contains($response['documents'][1], $payload['number']), 'signing sends the response with the approval letter, the signed note and the account statement');
-$check(array_column($responsePdfs, 'title') === ['Carta de aprobación · Crédito #' . $pagareCredit, 'Estado de cuenta · Crédito #' . $pagareCredit] && array_filter($sentMessages, static fn(array $m): bool => $m['event'] === 'signed') === [], 'the letter and the statement are generated and the signer does not get a second copy of the note');
+$check($answered['status'] === 'aprobado' && $approval['next']['response'] !== null && (int) $answered['response_sent_at'] > 0 && count($response['documents']) === 3 && count($responseFiles) === 3 && str_contains($response['documents'][1], $payload['number']), 'approving sends the response with the approval letter, the signed note and the payment plan');
+$check(array_column($responsePdfs, 'title') === ['Carta de aprobación · Crédito #' . $pagareCredit, 'Condiciones y plan de pagos · Crédito #' . $pagareCredit], 'the letter and the payment plan are generated');
 $check($pagareService->workspace($pagareCredit)['stage'] === 'completo' && (int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'respuesta_enviada'", [$pagareCredit]) === 1, 'the credit completes its stages and the response stays in its history');
 $letter = $responsePdfs[0]['html'];
 $check(str_contains($letter, 'Notificación de aprobación de crédito') && str_contains($letter, 'Segunda Dueña') && str_contains($letter, '$800.000') && str_contains($letter, 'como mínimo, dos meses antes de su vencimiento') && str_contains($letter, 'Analista QA') && str_contains($letter, 'SKC SuCasa Inmobiliaria'), 'the approval letter follows the model with the approved conditions and who approved');
-$statement = $responsePdfs[1]['html'];
-$check(str_contains($statement, 'Estado de cuenta') && str_contains($statement, 'Saldo a capital en pesos') && str_contains($statement, 'Distribución de la cuota a pagar') && str_contains($statement, 'Plan de pagos') && str_contains($statement, 'Realizado por') && !str_contains($statement, 'sucursal'), 'the account statement shows balance, next installment, plan and closes with "Realizado por"');
-$check($promissory->sign($pid, $token, $signInput, '10.0.0.1', 'QA')['status'] === 'firmado' && (int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'respuesta_enviada'", [$pagareCredit]) === 1, 'signing twice does nothing');
+$check(str_contains($letter, 'quedará sujeta a estudio y aprobación') && !str_contains($letter, 'solamente podrá mantenerse una obligación activa'), 'the letter allows new requests subject to study instead of a single active credit');
+$plan = $responsePdfs[1]['html'];
+$check(str_contains($plan, 'Condiciones del crédito y plan de pagos') && str_contains($plan, 'Total a pagar') && str_contains($plan, 'Plan de pagos') && substr_count($plan, '<tr><td>') === 6 && str_contains($plan, 'Realizado por') && !str_contains($plan, 'Estado de cuenta') && !str_contains($plan, 'sucursal'), 'the payment plan carries every condition, the full amortization table and closes with "Realizado por"');
 $approvedView = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($pagareService->workspace($pagareCredit), true, true);
-$check(str_contains($approvedView, 'data-owner-credit-stepper') && str_contains($approvedView, 'data-owner-credit-stage="respuesta"') && str_contains($approvedView, 'data-owner-credit-document="carta"') && str_contains($approvedView, 'data-owner-credit-document="estado"') && str_contains($approvedView, 'Reenviar respuesta'), 'the liquidator shows the stages, the response documents and the resend button');
+$check(str_contains($approvedView, 'data-owner-credit-stepper') && str_contains($approvedView, 'data-owner-credit-stage="respuesta"') && str_contains($approvedView, 'data-owner-credit-document="carta"') && str_contains($approvedView, 'data-owner-credit-document="plan"') && str_contains($approvedView, 'Reenviar respuesta'), 'the liquidator shows the stages, the response documents and the resend button');
 $pagareService->sendResponse($pagareCredit, $actor);
 $check((int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'respuesta_enviada'", [$pagareCredit]) === 2, 'the response can be resent and the resend is traced');
 $nextCredit = (int) $pagareService->createManual(9, 500000, 3, 'Libre Destinación', $actor, '', 'mandato_2');
-$check($pagareService->promissoryState($pagareService->find($nextCredit))['missing'] === [], 'a later credit of the same person does not ask to sign again');
+$check($pagareService->promissoryState($pagareService->find($nextCredit))['missing'] === [] && $pagareService->workspace($nextCredit)['stage'] === 'respuesta', 'a later credit of the same person does not ask to sign again and is ready to approve');
 try { $pagareService->voidPromissory($pid, 'corto', $actor); $check(false, 'voiding needs a reason'); } catch (DomainException) { $check(true, 'voiding a promissory note needs a reason'); }
 $pagareService->voidPromissory($pid, 'Se reemplaza por un pagaré con datos corregidos.', $actor);
 $check($promissory->find($pid)['status'] === 'anulado' && $pagareService->promissoryState($pagareService->find($nextCredit))['missing'] === ['Segunda Dueña'] && (int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'pagare_anulado'", [$pagareCredit]) === 1, 'a voided note is traced and the person must sign a new one');
 try { $promissory->publicRow($pid, $token); $check(false, 'a voided note cannot be opened to sign'); } catch (DomainException) { $check(true, 'a voided note cannot be opened to sign'); }
 $liquidator = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($pagareService->workspace($nextCredit), true, true);
-$check(str_contains($liquidator, 'data-owner-credit-promissory') && str_contains($liquidator, 'Falta firma') && !str_contains($liquidator, 'data-owner-credit-promissory-send') && str_contains($liquidator, 'Al aprobar se enviará el pagaré para firmar a Segunda Dueña') && str_contains($liquidator, 'name="promissory_signers[]"'), 'while pending, the liquidator shows who signs and that the note goes out on approval');
+$check(str_contains($liquidator, 'data-owner-credit-promissory') && str_contains($liquidator, 'Falta firma') && str_contains($liquidator, 'data-owner-credit-promissory-send') && str_contains($liquidator, 'name="promissory_signers[]"'), 'the liquidator shows who signs, the status and the send button');
 $pagareService->changeStatus($pagareCredit, 'anulado', 'Crédito de prueba del pagaré.', $actor);
 $pagareService->changeStatus($nextCredit, 'anulado', 'Crédito de prueba del pagaré.', $actor);
 $requirePromissory(false);
@@ -563,7 +562,7 @@ $requirePromissory(false);
 $source = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
 $template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-propietario-respuesta-funcionario-template.json'), true);
 $check(str_contains($source, "'" . $template['name'] . "'") && substr_count($template['components'][0]['text'], '{{') === 6 && !str_contains($source, 'scm_credito_propietario_funcionario_v2'), 'staff decision template has its own six variables and the generic v2 is no longer used');
-foreach (['carta' => ['whatsapp-credito-carta-aprobacion-template.json', 7], 'pagare' => ['whatsapp-credito-pagare-firmado-doc-template.json', 6], 'estado' => ['whatsapp-credito-estado-cuenta-template.json', 7]] as $kind => [$file, $variables]) {
+foreach (['carta' => ['whatsapp-credito-carta-aprobacion-template.json', 7], 'pagare' => ['whatsapp-credito-pagare-firmado-doc-template.json', 6], 'plan' => ['whatsapp-credito-plan-pagos-template.json', 7]] as $kind => [$file, $variables]) {
   $responseTemplate = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/' . $file), true);
   $body = $responseTemplate['components'][1]['text'];
   $check(OwnerCreditService::RESPONSE_TEMPLATES[$kind] === $responseTemplate['name'] && $responseTemplate['components'][0]['format'] === 'DOCUMENT' && substr_count($body, '{{') === $variables && count($responseTemplate['components'][1]['example']['body_text'][0]) === $variables && !str_ends_with(trim($body), '}}') && str_contains($body, 'Atentamente,'), 'response template ' . $responseTemplate['name'] . ' carries the PDF in its header and its ' . $variables . ' variables');

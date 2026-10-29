@@ -553,15 +553,15 @@
       }
       var stageGo = form && target.closest("[data-owner-credit-stage-go]");
       if (stageGo) { goToStage(stageGo.getAttribute("data-owner-credit-stage-go"), true); return; }
-      // Documentos de la respuesta: carta de aprobación y estado de cuenta (se generan al verlos) y pagaré firmado.
+      // Documentos de la respuesta: carta de aprobación y plan de pagos (se generan al verlos) y pagaré firmado.
       var responseDoc = form && target.closest("[data-owner-credit-document]");
       if (responseDoc) {
         var kind = responseDoc.getAttribute("data-owner-credit-document");
         var docRequest = new FormData();
         docRequest.set("credit_id", form.getAttribute("data-credit-id") || "");
         docRequest.set("kind", kind);
-        var docTitle = (kind === "carta" ? "Carta de aprobación" : "Estado de cuenta") + " · Crédito #" + form.getAttribute("data-credit-id");
-        showPdf(responseDoc, { title: docTitle, back: "Volver al liquidador", action: "scm_owner_credit_document", data: docRequest, filename: (kind === "carta" ? "carta-aprobacion" : "estado-de-cuenta") + "-credito-" + form.getAttribute("data-credit-id") + ".pdf" });
+        var docTitle = (kind === "carta" ? "Carta de aprobación" : "Condiciones y plan de pagos") + " · Crédito #" + form.getAttribute("data-credit-id");
+        showPdf(responseDoc, { title: docTitle, back: "Volver al liquidador", action: "scm_owner_credit_document", data: docRequest, filename: (kind === "carta" ? "carta-aprobacion" : "condiciones-plan-de-pagos") + "-credito-" + form.getAttribute("data-credit-id") + ".pdf" });
         return;
       }
       var responsePromissory = form && target.closest("[data-owner-credit-document-promissory]");
@@ -577,8 +577,8 @@
         var responseData = new FormData();
         responseData.set("credit_id", form.getAttribute("data-credit-id") || "");
         askConfirm(responseSend, responseSend.getAttribute("data-owner-credit-response-send") === "reenviar"
-          ? "Se reenviarán la carta de aprobación, el pagaré firmado y el estado de cuenta al propietario y a los funcionarios configurados."
-          : "Se enviarán la carta de aprobación, el pagaré firmado y el estado de cuenta al propietario y a los funcionarios configurados.", function () {
+          ? "Se reenviarán la carta de aprobación, el pagaré firmado y el plan de pagos al propietario y a los funcionarios configurados."
+          : "Se enviarán la carta de aprobación, el pagaré firmado y el plan de pagos al propietario y a los funcionarios configurados.", function () {
           promissoryAction(responseBox, "scm_owner_credit_response_send", responseData, form.getAttribute("data-credit-id"), "data-owner-credit-response-status");
         });
         return;
@@ -633,7 +633,7 @@
         if (decision === "rechazado" && !requireNote(form, "Rechazar")) return;
         if (decision === "aprobado" && form.querySelector("[data-owner-credit-needs-note]") && !requireNote(form, "Aprobar crédito")) return;
         askConfirm(decide, decision === "aprobado"
-          ? "Se aprobará el crédito con las condiciones del analista. Si el propietario no tiene el pagaré firmado se le envía para firmar; con la firma sale la respuesta con los documentos."
+          ? "Se aprobará el crédito con las condiciones del analista y se enviará la respuesta al propietario: carta de aprobación, pagaré firmado y plan de pagos."
           : "Se rechazará la solicitud y se avisará al propietario.", function () {
           runAction(form, "scm_owner_credit_decide", { decision: decision });
         });

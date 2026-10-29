@@ -23,9 +23,9 @@ use SCM\Support\SmsQueue;
  * incumpliendo alguna política debe justificarlo. La decisión queda en el historial del crédito, del caso y
  * del contrato y del inmueble y se avisa al evento `credito_propietario_decidido`.
  *
- * Etapas del liquidador: Solicitud → Estudio (pendiente) → Firma de documentos → Respuesta. Al aprobar se envía el
- * pagaré y la carta de instrucciones a quien no los tenga firmados; cuando quedan firmados (o si ya lo estaban) se
- * envía la respuesta: carta de aprobación, pagaré firmado y estado de cuenta, al propietario y a los funcionarios de
+ * Etapas del liquidador: Solicitud → Estudio → Firma de documentos → Aprobación y respuesta. El pagaré y la carta de
+ * instrucciones se firman antes de aprobar (una vez por persona). Al aprobar se envía la respuesta: carta de
+ * aprobación, pagaré firmado y condiciones con el plan de pagos, al propietario y a los funcionarios de
  * `credito_propietario_respuesta`. Un rechazo es su propia respuesta. Un crédito aprobado se marca después como
  * pagado o se anula.
  */
@@ -67,12 +67,12 @@ final class OwnerCreditService
   public const EVENT_QUOTE_REQUESTED = 'credito_propietario_cotizacion';
   public const EVENT_DECIDED = 'credito_propietario_decidido';
   public const EVENT_RESPONSE = 'credito_propietario_respuesta';
-  public const STAGES = ['solicitud' => 'Solicitud', 'estudio' => 'Estudio', 'firma' => 'Firma de documentos', 'respuesta' => 'Respuesta'];
+  public const STAGES = ['solicitud' => 'Solicitud', 'estudio' => 'Estudio', 'firma' => 'Firma de documentos', 'respuesta' => 'Aprobación y respuesta'];
   /** Plantillas de WhatsApp de la respuesta: una por documento, con el PDF en el encabezado. */
   public const RESPONSE_TEMPLATES = [
     OwnerCreditResponseDocuments::LETTER => 'scm_credito_carta_aprobacion_v1',
     'pagare' => 'scm_credito_pagare_firmado_doc_v1',
-    OwnerCreditResponseDocuments::STATEMENT => 'scm_credito_estado_cuenta_v1',
+    OwnerCreditResponseDocuments::PLAN => 'scm_credito_plan_pagos_v1',
   ];
   private const MIN_NOTE = 10;
 
@@ -90,16 +90,14 @@ final class OwnerCreditService
     $this->schema = $schema ?: new SchemaInspector($db);
   }
 
-  /** Pagarés de las personas (se firman una vez y sirven para todos sus créditos). Al firmar sigue la respuesta. */
+  /** Pagarés de las personas (se firman una vez y sirven para todos sus créditos). */
   public function promissory(): OwnerCreditPromissoryService
   {
-    if ($this->promissory === null) $this->usePromissory(new OwnerCreditPromissoryService($this->db, (string) (defined('SCM_APP_SECRET') ? SCM_APP_SECRET : ''), (string) (defined('SCM_BASE_URL') ? SCM_BASE_URL : '')));
-    return $this->promissory;
+    return $this->promissory ??= new OwnerCreditPromissoryService($this->db, (string) (defined('SCM_APP_SECRET') ? SCM_APP_SECRET : ''), (string) (defined('SCM_BASE_URL') ? SCM_BASE_URL : ''));
   }
 
   public function usePromissory(OwnerCreditPromissoryService $promissory): void
   {
-    $promissory->afterSign(fn(array $row): bool => $this->afterPromissorySigned($row));
     $this->promissory = $promissory;
   }
 
@@ -140,7 +138,7 @@ final class OwnerCreditService
   {
     $credit = $this->find($id);
     if ($credit === null) throw new \DomainException('El crédito ya no existe.');
-    if (!self::signersEditable($credit)) throw new \DomainException('Solo se puede cambiar quién firma antes de enviar la respuesta del crédito.');
+    if ($credit['status'] !== 'pendiente') throw new \DomainException('Solo se puede cambiar quién firma mientras la solicitud está pendiente.');
     $owners = $this->contractOwners((int) $credit['contract_id']);
     $keys = array_values(array_intersect(array_column($owners, 'key'), array_map('strval', $keys)));
     if ($keys === []) throw new \DomainException('Elige al menos una persona que firme el pagaré.');
@@ -159,7 +157,7 @@ final class OwnerCreditService
   {
     $credit = $this->find($id);
     if ($credit === null) throw new \DomainException('El crédito ya no existe.');
-    if ($credit['status'] !== 'aprobado' || (int) ($credit['response_sent_at'] ?? 0) > 0) throw new \DomainException('El pagaré se envía después de aprobar el crédito y antes de enviar la respuesta.');
+    if ($credit['status'] !== 'pendiente') throw new \DomainException('El pagaré se envía mientras la solicitud está pendiente: se firma antes de aprobar.');
     $result = ['sent' => [], 'signed' => [], 'errors' => []];
     foreach ($this->promissoryState($credit)['owners'] as $owner) {
       if (!$owner['required']) continue;
@@ -176,23 +174,18 @@ final class OwnerCreditService
     return $result;
   }
 
-  /** Quién firma se elige durante el estudio o la firma, hasta que sale la respuesta. */
-  public static function signersEditable(array $credit): bool
-  {
-    return $credit['status'] === 'pendiente' || ($credit['status'] === 'aprobado' && (int) ($credit['response_sent_at'] ?? 0) <= 0);
-  }
-
   /**
-   * Etapa del liquidador: pendiente = estudio; aprobado = firma mientras falte un pagaré exigido y luego respuesta
-   * hasta enviarla; con la respuesta enviada, rechazado o pagado = completo. Anulado no avanza.
-   * @param list<string> $missing firmantes sin pagaré firmado
+   * Etapa del liquidador. Pendiente: estudio hasta enviar el pagaré, firma mientras falte la firma exigida y luego
+   * aprobación. Aprobado sin respuesta enviada (falló el envío): respuesta. Decidido con respuesta, rechazado o
+   * pagado: completo. Anulado no avanza.
+   * @param list<string> $missing firmantes sin pagaré firmado @param bool $sent algún firmante pendiente ya recibió el enlace
    */
-  public static function stage(array $credit, array $missing, bool $requirePromissory): string
+  public static function stage(array $credit, array $missing, bool $requirePromissory, bool $sent = false): string
   {
     return match (true) {
-      $credit['status'] === 'pendiente' => 'estudio',
+      $credit['status'] === 'pendiente' => $requirePromissory && $missing !== [] ? ($sent ? 'firma' : 'estudio') : 'respuesta',
       $credit['status'] === 'anulado' => 'anulado',
-      $credit['status'] === 'aprobado' && (int) ($credit['response_sent_at'] ?? 0) <= 0 => $requirePromissory && $missing !== [] ? 'firma' : 'respuesta',
+      $credit['status'] === 'aprobado' && (int) ($credit['response_sent_at'] ?? 0) <= 0 => 'respuesta',
       default => 'completo',
     };
   }
@@ -757,7 +750,7 @@ final class OwnerCreditService
       'preapproval' => $preapproval,
       'owners' => $credit['status'] === 'pendiente' ? $this->ownerChoices($credit) : [],
       'promissory' => $promissory,
-      'stage' => self::stage($credit, $promissory['missing'] ?? [], !empty($settings['require_promissory'])),
+      'stage' => self::stage($credit, $promissory['missing'] ?? [], !empty($settings['require_promissory']), array_filter((array) ($promissory['owners'] ?? []), static fn(array $o): bool => $o['required'] && $o['status'] === 'pendiente') !== []),
       'response' => json_decode((string) ($credit['response_json'] ?? ''), true) ?: null,
       'policies' => $policies,
       'policies_ok' => !in_array(false, array_column($policies, 'ok'), true),
@@ -806,7 +799,10 @@ final class OwnerCreditService
         if ($conditions['amount'] <= 0 || $conditions['term'] <= 0) throw new \DomainException('Indica el valor y el plazo a aprobar.');
         if (!$work['policies_ok'] && mb_strlen($note) < self::MIN_NOTE) throw new \DomainException('La solicitud incumple políticas: escribe la justificación de la aprobación (mínimo ' . self::MIN_NOTE . ' caracteres).');
       }
-      // El pagaré ya no se exige para aprobar: se firma después, en la etapa "Firma de documentos".
+      // Pagaré: se revisa al final, cuando las condiciones ya son aprobables (un pagaré firmado sirve para todos sus créditos).
+      if ($decision === 'aprobado' && !empty($work['settings']['require_promissory']) && ($work['promissory']['missing'] ?? []) !== []) {
+        throw new \DomainException('Falta el pagaré firmado de ' . implode(', ', $work['promissory']['missing']) . '. Envíalo desde "Firma de documentos" y aprueba cuando esté firmado.');
+      }
       $now = time();
       $data = [
         'status' => $decision,
@@ -855,46 +851,25 @@ final class OwnerCreditService
       }
     }
     $queued = $this->notifyDecision($credit);
-    $next = ['promissory' => [], 'response' => null, 'errors' => []];
+    $next = ['response' => null, 'errors' => []];
     if ($decision === 'rechazado') {
       // El rechazo es la respuesta: queda enviada con la decisión.
       $this->markResponse($id, ['at' => time(), 'by' => (string) ($actor['name'] ?? ''), 'decision' => 'rechazado', 'queued' => ['email' => $queued['email'], 'whatsapp' => $queued['whatsapp']], 'documents' => []]);
     } else {
-      $next = $this->advanceApproved($id, $actor);
+      // La aprobación no se deshace si falla el envío: queda en "Aprobación y respuesta" para enviarla de nuevo.
+      try {
+        $next['response'] = $this->sendResponse($id, $actor);
+      } catch (\Throwable $error) {
+        if (!$error instanceof \DomainException) error_log('[owner-credit-response] ' . $error->getMessage());
+        $next['errors'][] = 'No se pudo enviar la respuesta: ' . ($error instanceof \DomainException ? $error->getMessage() : 'intenta de nuevo desde el liquidador.');
+      }
     }
     return ['credit' => $this->find($id) ?? $credit, 'queued' => $queued, 'next' => $next];
   }
 
   /**
-   * Después de aprobar: si falta el pagaré firmado (y la configuración lo exige) se envía a los firmantes; si no falta,
-   * se envía de una vez la respuesta con los documentos. Nunca deshace la aprobación: los errores se devuelven.
-   * @return array{promissory:list<string>,response:?array<string,mixed>,errors:list<string>}
-   */
-  private function advanceApproved(int $id, array $actor): array
-  {
-    $result = ['promissory' => [], 'response' => null, 'errors' => []];
-    try {
-      $credit = $this->find($id);
-      if ($credit === null || $credit['status'] !== 'aprobado') return $result;
-      $settings = $this->config();
-      $state = $this->promissoryState($credit);
-      if (!empty($settings['require_promissory']) && $state['missing'] !== []) {
-        $sent = $this->sendPromissory($id, $settings['notify_owner_whatsapp'] ? ['email', 'whatsapp'] : ['email'], $actor);
-        $result['promissory'] = $sent['sent'];
-        $result['errors'] = $sent['errors'];
-      } else {
-        $result['response'] = $this->sendResponse($id, $actor);
-      }
-    } catch (\Throwable $error) {
-      if (!$error instanceof \DomainException) error_log('[owner-credit-advance] ' . $error->getMessage());
-      $result['errors'][] = $error instanceof \DomainException ? $error->getMessage() : 'No se pudo continuar con la firma o la respuesta; hazlo desde el liquidador.';
-    }
-    return $result;
-  }
-
-  /**
-   * Respuesta de un crédito aprobado con sus documentos firmados: correo con la carta de aprobación, el pagaré firmado
-   * y el estado de cuenta adjuntos, y un WhatsApp por documento (la plantilla con encabezado de documento solo lleva un
+   * Respuesta de un crédito aprobado: correo con la carta de aprobación, el pagaré firmado y las condiciones con el plan
+   * de pagos adjuntos, y un WhatsApp por documento (la plantilla con encabezado de documento solo lleva un
    * PDF). Los mismos documentos van a los funcionarios de "Respuesta de crédito enviada". Se puede reenviar.
    * @return array{email:int,whatsapp:int,internal:int,internal_whatsapp:int,documents:list<string>}
    */
@@ -905,13 +880,13 @@ final class OwnerCreditService
     if ($credit['status'] !== 'aprobado') throw new \DomainException('La respuesta con documentos se envía para créditos aprobados.');
     $settings = $this->config();
     $state = $this->promissoryState($credit);
-    if (!empty($settings['require_promissory']) && $state['missing'] !== []) throw new \DomainException('Falta el pagaré firmado de ' . implode(', ', $state['missing']) . '. La respuesta se envía cuando esté firmado.');
+    if (!empty($settings['require_promissory']) && $state['missing'] !== []) throw new \DomainException('Falta el pagaré firmado de ' . implode(', ', $state['missing']) . '.');
     $signer = $this->funcionarioSigner(trim((string) $credit['decided_by_id']), trim((string) $credit['decided_by_name']));
     $now = time();
     $documents = [];
-    foreach ([OwnerCreditResponseDocuments::LETTER, 'pagare', OwnerCreditResponseDocuments::STATEMENT] as $kind) {
+    foreach ([OwnerCreditResponseDocuments::LETTER, 'pagare', OwnerCreditResponseDocuments::PLAN] as $kind) {
       if ($kind !== 'pagare') {
-        $documents[] = ['kind' => $kind, 'label' => OwnerCreditResponseDocuments::TITLES[$kind] . ' del crédito #' . $id, 'filename' => ($kind === OwnerCreditResponseDocuments::LETTER ? 'carta-aprobacion' : 'estado-de-cuenta') . '-credito-' . $id . '.pdf', 'bytes' => $this->responsePdfBytes($credit, $kind, $signer, $now)];
+        $documents[] = ['kind' => $kind, 'label' => OwnerCreditResponseDocuments::TITLES[$kind] . ' del crédito #' . $id, 'filename' => OwnerCreditResponseDocuments::FILENAMES[$kind] . '-credito-' . $id . '.pdf', 'bytes' => $this->responsePdfBytes($credit, $kind, $signer, $now)];
         continue;
       }
       // Pagarés firmados de quienes firman este crédito (el pagaré es de la persona y sirve para todos sus créditos).
@@ -923,16 +898,16 @@ final class OwnerCreditService
     }
     foreach ($documents as $index => $document) $documents[$index] += ($this->responseStore ?? static fn(string $bytes, string $name): array => self::storeResponseFile($bytes, $name))($document['bytes'], $document['filename']);
 
-    $position = OwnerCreditResponseDocuments::position($credit, $now);
     $money = static fn($value): string => OwnerCreditResponseDocuments::money((float) $value);
     $clean = static fn($value, int $limit = 120): string => mb_substr(preg_replace('/\s+/u', ' ', trim((string) $value)) ?: 'Sin dato', 0, $limit);
     $signature = self::signerLine($signer);
     // Variables del cuerpo de cada plantilla para quien recibe (propietario o funcionario).
-    $params = static function (array $document, string $recipient) use ($credit, $position, $money, $clean, $signature, $id): array {
+    $first = (int) ($credit['first_payment_ts'] ?? 0);
+    $params = static function (array $document, string $recipient) use ($credit, $first, $money, $clean, $signature, $id): array {
       return match ($document['kind']) {
         OwnerCreditResponseDocuments::LETTER => [$clean($recipient, 80), (string) $id, $clean($credit['owner_name']), $money($credit['approved_amount']), (string) (int) $credit['approved_term'], $money($credit['monthly_payment']), $clean($signature, 200)],
         'pagare' => [$clean($recipient, 80), (string) OwnerCreditPromissoryService::number((int) $document['promissory']['id']), $clean($document['promissory']['owner_name']), date('d/m/Y', (int) $document['promissory']['signed_at']), (string) $id, $clean($signature, 200)],
-        default => [$clean($recipient, 80), (string) $id, $clean($credit['owner_name']), $money($position['balance']), $position['next'] !== null ? $money($position['next']['cuota']) : $money(0), $position['next'] !== null ? date('d/m/Y', (int) $position['next']['fecha']) : 'Sin cuotas pendientes', $clean($signature, 200)],
+        default => [$clean($recipient, 80), (string) $id, $clean($credit['owner_name']), (string) (int) $credit['approved_term'], $money($credit['monthly_payment']), $first > 0 ? date('d/m/Y', $first) : 'Sin fecha', $clean($signature, 200)],
       };
     };
     $queued = ['email' => 0, 'whatsapp' => 0, 'internal' => 0, 'internal_whatsapp' => 0, 'documents' => array_column($documents, 'label')];
@@ -978,16 +953,16 @@ final class OwnerCreditService
     return $queued;
   }
 
-  /** Carta de aprobación o estado de cuenta en PDF (también para verlos desde el liquidador). */
+  /** Carta de aprobación o condiciones con plan de pagos en PDF (también para verlos desde el liquidador). */
   public function responsePdf(int $id, string $kind): string
   {
     $credit = $this->find($id);
     if ($credit === null) throw new \DomainException('El crédito ya no existe.');
-    if (!in_array($credit['status'], ['aprobado', 'pagado'], true)) throw new \DomainException('La carta de aprobación y el estado de cuenta existen para créditos aprobados.');
+    if (!in_array($credit['status'], ['aprobado', 'pagado'], true)) throw new \DomainException('La carta de aprobación y el plan de pagos existen para créditos aprobados.');
     if (!isset(OwnerCreditResponseDocuments::TITLES[$kind])) throw new \DomainException('Documento no válido.');
     $sent = (int) ($credit['response_sent_at'] ?? 0);
-    // La carta conserva la fecha con que se envió; el estado de cuenta se corta hoy.
-    return $this->responsePdfBytes($credit, $kind, $this->funcionarioSigner(trim((string) $credit['decided_by_id']), trim((string) $credit['decided_by_name'])), $kind === OwnerCreditResponseDocuments::LETTER && $sent > 0 ? $sent : time());
+    // Conservan la fecha con que se enviaron.
+    return $this->responsePdfBytes($credit, $kind, $this->funcionarioSigner(trim((string) $credit['decided_by_id']), trim((string) $credit['decided_by_name'])), $sent > 0 ? $sent : time());
   }
 
   private function responsePdfBytes(array $credit, string $kind, array $signer, int $date): string
@@ -995,7 +970,7 @@ final class OwnerCreditService
     $settings = (json_decode((string) ($credit['evaluation_json'] ?? ''), true)['settings'] ?? null) ?: $this->config();
     $html = $kind === OwnerCreditResponseDocuments::LETTER
       ? OwnerCreditResponseDocuments::letter($credit, ['signer' => $signer, 'margin' => (int) ($settings['term_margin_months'] ?? 2), 'date' => $date])
-      : OwnerCreditResponseDocuments::statement($credit, ['signer' => $signer, 'date' => $date, 'usury_annual' => (float) $this->config()['usury_annual']]);
+      : OwnerCreditResponseDocuments::plan($credit, ['signer' => $signer, 'date' => $date]);
     $title = OwnerCreditResponseDocuments::TITLES[$kind] . ' · Crédito #' . (int) $credit['id'];
     return ($this->responsePdf ?? static fn(string $html, string $title): string => OwnerCreditResponseDocuments::pdf($html, $title))($html, $title);
   }
@@ -1028,34 +1003,6 @@ final class OwnerCreditService
   private function markResponse(int $id, array $response): void
   {
     $this->db->update($this->table(), $this->schema->filterTableData($this->table(), ['response_sent_at' => (int) $response['at'], 'response_json' => json_encode($response, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), 'updated_at' => time()]), ['id' => $id]);
-  }
-
-  /**
-   * Al firmar un pagaré: los créditos aprobados de esa persona que esperaban la firma envían su respuesta. Devuelve
-   * true si la respuesta ya le lleva a quien firmó su copia del pagaré (así no recibe dos veces el mismo documento).
-   * @param array<string,mixed> $promissory fila firmada de scm_owner_credit_promissory
-   */
-  public function afterPromissorySigned(array $promissory): bool
-  {
-    $document = OwnerCreditPromissoryService::normalizeDocument((string) ($promissory['owner_document'] ?? ''));
-    $handled = false;
-    try {
-      $this->ensureSchema();
-      $rows = $this->db->getResults("SELECT * FROM `{$this->table()}` WHERE `status` = 'aprobado' AND (`response_sent_at` IS NULL OR `response_sent_at` = 0) ORDER BY `id`");
-      foreach ($rows as $credit) {
-        if ((int) $credit['id'] !== (int) ($promissory['credit_id'] ?? 0) && OwnerCreditPromissoryService::normalizeDocument((string) ($credit['owner_document'] ?? '')) !== $document) continue;
-        if ($this->promissoryState($credit)['missing'] !== []) continue;
-        try {
-          $this->sendResponse((int) $credit['id'], ['employee_id' => (string) $credit['decided_by_id'], 'name' => (string) $credit['decided_by_name']]);
-          if (OwnerCreditPromissoryService::normalizeDocument((string) ($credit['owner_document'] ?? '')) === $document && $this->config()['notify_owner_email']) $handled = true;
-        } catch (\Throwable $error) {
-          error_log('[owner-credit-response:auto] crédito #' . (int) $credit['id'] . ': ' . $error->getMessage());
-        }
-      }
-    } catch (\Throwable $error) {
-      error_log('[owner-credit-response:auto] ' . $error->getMessage());
-    }
-    return $handled;
   }
 
   /** Crédito aprobado → pagado; pendiente o aprobado → anulado. Siempre con nota. */
