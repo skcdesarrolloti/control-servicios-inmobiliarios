@@ -872,7 +872,7 @@ final class SuCasaControlServiciosInmobiliarios
           'quote_order_respond' => 'Responder orden de mantenimiento',
           'quote_order_delete' => 'Eliminar orden de mantenimiento',
           'quote_acta_create' => 'Crear acta de cotización',
-          'quote_reset_dev' => 'Reiniciar cotización a recién creada (pruebas de desarrollo)',
+          'quote_reset_dev' => 'Reiniciar cotización a enviada sin respuesta (pruebas de desarrollo)',
         ],
       ],
       'administrativas' => [

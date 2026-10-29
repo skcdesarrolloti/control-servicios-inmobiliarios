@@ -24009,13 +24009,13 @@
       });
     }
 
-    // Pruebas de desarrollo: confirma y deja la cotización como recién creada (sin enviar ni responder).
+    // Pruebas de desarrollo: confirma y deja la cotización enviada y esperando respuesta.
     function resetCotizacionForTests(button) {
       var id = button.getAttribute('data-cotizacion-id') || '';
       if (!id || !window.Swal) return Promise.resolve();
       return window.Swal.fire({
         title: 'Reiniciar cotización #' + id,
-        html: '<p class="scm-cotizacion-dialog-intro">Solo para pruebas. La cotización quedará <strong>sin enviar y sin respuesta</strong> (estado, fechas, motivo, observación y financiamiento en blanco) y el caso volverá a reflejarlo. Si tiene un crédito ligado, quedará <strong>anulado</strong>. Las órdenes y actas no se modifican. Queda registro en el historial del caso.</p>',
+        html: '<p class="scm-cotizacion-dialog-intro">Solo para pruebas. La cotización quedará <strong>enviada y en Esperando respuesta</strong>, lista para responderla otra vez (se borran la respuesta, el motivo, la observación y el financiamiento; no se reenvían avisos) y el caso volverá a reflejarlo. Si tiene un crédito ligado, quedará <strong>anulado</strong>. Las órdenes y actas no se modifican. Queda registro en el historial del caso.</p>',
         width: 'min(540px, 94vw)',
         icon: 'warning',
         showCloseButton: true,

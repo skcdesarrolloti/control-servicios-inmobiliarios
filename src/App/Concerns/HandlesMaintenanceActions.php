@@ -1947,7 +1947,7 @@ trait HandlesMaintenanceActions
     $message = match ($mode) {
       'edit' => 'Se actualizó la cotización de mantenimiento #' . $quoteId . '.',
       'note' => 'Se agregó una nota de cotización de mantenimiento #' . $quoteId . '.',
-      'reset' => 'Se reinició la cotización de mantenimiento #' . $quoteId . ' para pruebas: quedó sin enviar ni responder.',
+      'reset' => 'Se reinició la cotización de mantenimiento #' . $quoteId . ' para pruebas: quedó enviada y esperando respuesta.',
       default => 'Se ha elaborado la cotización de mantenimiento #' . $quoteId . '.',
     };
 
@@ -2385,8 +2385,9 @@ trait HandlesMaintenanceActions
   }
 
   /**
-   * Solo desarrollo (permiso quote_reset_dev): deja la cotización como recién creada, sin enviar ni responder, para
-   * repetir pruebas sin entrar a la base de datos. Órdenes y actas no se tocan; el crédito ligado se anula y se suelta.
+   * Solo desarrollo (permiso quote_reset_dev): deja la cotización enviada y en "Esperando respuesta", sin respuesta,
+   * para repetir pruebas de respuesta sin entrar a la base de datos ni reenviar avisos. Conserva la fecha de envío
+   * original (si nunca se envió, usa ahora). Órdenes y actas no se tocan; el crédito ligado se anula y se suelta.
    */
   public function ajax_handler_reset_cotizacion_mantenimiento(): void
   {
@@ -2412,10 +2413,10 @@ trait HandlesMaintenanceActions
     $now = time();
     $nowSql = date('Y-m-d H:i:s', $now);
     $this->db->update($table, $schema->filterTableData($table, [
-      'estado' => '',
-      'estado_respuesta_cotizacion_mantenimiento' => '',
-      'se_envio' => 'No',
-      'fecha_envio' => 0,
+      'estado' => 'Esperando respuesta',
+      'estado_respuesta_cotizacion_mantenimiento' => 'Esperando respuesta',
+      'se_envio' => 'Si',
+      'fecha_envio' => (int) ($row['fecha_envio'] ?? 0) > 0 ? (int) $row['fecha_envio'] : $now,
       'fecha_respuesta' => 0,
       'observacion_respuesta' => '',
       'motivo' => '',
@@ -2431,7 +2432,7 @@ trait HandlesMaintenanceActions
     $this->maintenance_quote_insert_histories($schema, $cotizacionId, 'reset', $row, $ticket, $actor, $employeeId, $now, $nowSql);
 
     $this->jsonOk([
-      'message' => 'Cotización #' . $cotizacionId . ' reiniciada: quedó sin enviar ni responder.' . ($creditId > 0 ? ' El crédito #' . $creditId . ' quedó anulado.' : ''),
+      'message' => 'Cotización #' . $cotizacionId . ' reiniciada: quedó enviada y esperando respuesta.' . ($creditId > 0 ? ' El crédito #' . $creditId . ' quedó anulado.' : ''),
       'id_cotizacion' => (string) $cotizacionId,
     ]);
   }
