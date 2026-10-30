@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
+define('SCM_BASE_URL', 'https://example.test/panel');
+define('SCM_APP_SECRET', 'test-secret');
 
 use SCM\Core\Database;
 use SCM\Modules\ClosingSheets\ClosingSheetForm;

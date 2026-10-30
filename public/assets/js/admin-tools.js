@@ -109,6 +109,7 @@
     if (cleaning) initCleaning(cleaning, request, post);
     initCleaningSettings(root, post);
     initQuoteFeeSettings(root, post);
+    initClosingSheetSettings(root, post);
     // Si la página abrió directo en una herramienta, el runtime pudo pedir la carga antes de este script.
     [pse, mora, market].forEach(function (module) {
       var panel = module && module.closest(".scm-tab-panel");
@@ -2118,6 +2119,75 @@
       if (!event.target.closest || !event.target.closest("[data-quote-fee-settings]")) return;
       event.preventDefault();
       post("scm_quote_fee_settings", {})
+        .then(function (data) { show(data.html || ""); })
+        .catch(function (error) { window.alert(error.message); });
+    });
+  }
+
+  // Configuración › Hoja de cierre (src/Modules/ClosingSheets; se oculta sin la acción closing_sheet_configure).
+  function initClosingSheetSettings(root, post) {
+    var modal = null;
+
+    function ensureModal() {
+      if (modal) return modal;
+      modal = document.createElement("div");
+      modal.className = "scm-cia-modal";
+      modal.hidden = true;
+      modal.innerHTML =
+        '<div class="scm-cia-modal-backdrop" data-closing-sheet-settings-close></div>' +
+        '<section tabindex="-1" class="!sp-relative !sp-outline-none !sp-flex !sp-flex-col !sp-w-[min(720px,calc(100vw-24px))] !sp-max-h-[92vh] !sp-overflow-hidden !sp-rounded-2xl !sp-bg-service-background !sp-border !sp-border-solid !sp-border-slate-200 !sp-shadow-2xl !sp-font-sans" role="dialog" aria-modal="true" aria-labelledby="scm-closing-sheet-settings-title">' +
+        '<header class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-4 !sp-px-4 sm:!sp-px-6 !sp-py-4 !sp-bg-white !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200">' +
+        '<div><p class="!sp-m-0 !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Configuración</p><h3 id="scm-closing-sheet-settings-title" class="!sp-m-0 !sp-text-lg !sp-font-bold !sp-text-service-navy">Hoja de cierre</h3></div>' +
+        '<button type="button" class="!sp-flex !sp-items-center !sp-justify-center !sp-w-9 !sp-h-9 !sp-rounded-full !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-service-navy !sp-text-lg !sp-cursor-pointer hover:!sp-bg-slate-50" data-closing-sheet-settings-close aria-label="Cerrar">&times;</button></header>' +
+        '<div class="!sp-flex !sp-flex-col !sp-flex-1 !sp-min-h-0" data-closing-sheet-settings-body></div></section>';
+      root.appendChild(modal);
+      modal.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") close();
+      });
+      modal.addEventListener("click", function (event) {
+        if (event.target.closest("[data-closing-sheet-settings-close]")) close();
+      });
+      modal.addEventListener("submit", function (event) {
+        var form = event.target.closest("[data-closing-sheet-settings-form]");
+        if (!form) return;
+        event.preventDefault();
+        var data = { mode: "save" };
+        form.querySelectorAll('input[type="checkbox"]').forEach(function (input) { data[input.name] = input.checked ? "1" : "0"; });
+        var statusNode = form.querySelector("[data-closing-sheet-settings-status]");
+        statusNode.textContent = "Guardando…";
+        post("scm_hoja_cierre_config", data)
+          .then(function (result) {
+            show(result.html || "");
+            var done = modal.querySelector("[data-closing-sheet-settings-status]");
+            done.textContent = result.message || "Guardado.";
+            done.classList.add("!sp-text-emerald-700", "!sp-font-semibold");
+          })
+          .catch(function (error) {
+            statusNode.textContent = error.message;
+            statusNode.classList.add("!sp-text-red-700", "!sp-font-semibold");
+          });
+      });
+      return modal;
+    }
+
+    function show(html) {
+      var box = ensureModal();
+      box.querySelector("[data-closing-sheet-settings-body]").innerHTML = html;
+      box.hidden = false;
+      document.body.classList.add("scm-cia-modal-open");
+      box.querySelector("section").focus();
+    }
+
+    function close() {
+      if (!modal) return;
+      modal.hidden = true;
+      document.body.classList.remove("scm-cia-modal-open");
+    }
+
+    document.addEventListener("click", function (event) {
+      if (!event.target.closest || !event.target.closest("[data-closing-sheet-settings]")) return;
+      event.preventDefault();
+      post("scm_hoja_cierre_config", {})
         .then(function (data) { show(data.html || ""); })
         .catch(function (error) { window.alert(error.message); });
     });

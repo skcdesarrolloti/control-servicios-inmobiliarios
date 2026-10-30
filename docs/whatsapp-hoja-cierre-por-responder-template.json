@@ -1,0 +1,40 @@
+{
+  "name": "scm_hoja_cierre_por_responder_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "description": "Aviso interno: la hoja de cierre tiene la revisión de servicios (o se corrigió) y espera aprobación.",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola, {{1}}. La hoja de cierre {{2}} está lista para tu respuesta.\n\nInmueble: {{3}}\nÚltimo registro de: {{4}}\nDetalle: {{5}}\n\nApruébala o no desde el botón. El enlace es personal y vence en 30 días.",
+      "example": {
+        "body_text": [
+          [
+            "Said Abuita",
+            "#430",
+            "Inmueble 151187 · Carrera 32B #80-624 Apto 308",
+            "Elsie Johana Perez Kelly",
+            "Energía: Al día · Acueducto y alcantarillado: 30 días ($32.295)"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Responder hoja",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "control-servicios-inmobiliarios/public/hoja-cierre-ver.php?numero=430&p=respuesta&f=1001&expires=1795900000&sig=0a1b2c"
+          ]
+        }
+      ]
+    }
+  ]
+}

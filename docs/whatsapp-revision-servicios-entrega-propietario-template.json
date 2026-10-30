@@ -1,0 +1,39 @@
+{
+  "name": "scm_revision_servicios_entrega_propietario_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "description": "Al propietario: resultado de la revisión de servicios públicos antes de entregar su inmueble.",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola, {{1}}.\n\nEn el proceso de entrega de su inmueble ubicado en {{2}} realizamos la revisión de los servicios públicos. Resultado: {{3}}.\n\nPuede consultar el detalle desde el botón.\n\nAtentamente,\n{{4}}\n\nGracias por confiar en nosotros.",
+      "example": {
+        "body_text": [
+          [
+            "Yesenis Morales",
+            "Carrera 32B #80-624 Apto 308 Torre 2",
+            "Energía: Al día · Acueducto y alcantarillado: 30 días ($32.295)",
+            "Elsie Perez - Coordinadora de servicios - Cel. 3001112233"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Ver revisión",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "control-servicios-inmobiliarios/public/revision-servicios-publicos.php?numero=1047&expires=1808000000&sig=0a1b2c"
+          ]
+        }
+      ]
+    }
+  ]
+}

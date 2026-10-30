@@ -42,6 +42,13 @@ $safeNext = static function (string $raw): string {
       ? 'hoja-cierre.php?' . http_build_query(isset($out['id_cierre']) ? ['id_cierre' => $out['id_cierre']] : $out, '', '&', PHP_QUERY_RFC3986)
       : '';
   }
+  if (in_array($path, ['hoja-cierre-ver.php', 'revision-servicios-cierre.php'], true)) {
+    return isset($query['numero']) && $digits($query['numero']) ? $path . '?numero=' . (string) $query['numero'] : '';
+  }
+  if ($path === 'hojas-cierre.php') {
+    $state = (string) ($query['estado'] ?? '');
+    return 'hojas-cierre.php' . (in_array($state, \SCM\Modules\ClosingSheets\ClosingSheetWorkflow::LIST_STATES, true) ? '?estado=' . rawurlencode($state) : '');
+  }
   if ($path === 'revision.php') {
     $kind = (string) ($query['tipo'] ?? '');
     return in_array($kind, ['preventiva', 'correctiva'], true) && isset($query['ticket_pk']) && $digits($query['ticket_pk'])

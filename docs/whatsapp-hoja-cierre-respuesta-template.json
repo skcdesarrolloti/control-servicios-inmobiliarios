@@ -1,0 +1,41 @@
+{
+  "name": "scm_hoja_cierre_respuesta_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "description": "Aviso interno y a quien hizo la hoja: la hoja de cierre quedó aprobada o no aprobada.",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola, {{1}}. La hoja de cierre {{2}} quedó {{3}}.\n\nInmueble: {{4}}\nRespondió: {{5}}\nObservación: {{6}}\n\nConsulta la hoja desde el botón.",
+      "example": {
+        "body_text": [
+          [
+            "Kellys Roqueme",
+            "#430",
+            "no aprobada",
+            "Inmueble 151187 · Carrera 32B #80-624 Apto 308",
+            "Said Abuita Correa",
+            "Falta el certificado de tradición."
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Ver hoja",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "control-servicios-inmobiliarios/public/hoja-cierre-ver.php?numero=430&p=ver&f=1508&expires=1808000000&sig=0a1b2c"
+          ]
+        }
+      ]
+    }
+  ]
+}

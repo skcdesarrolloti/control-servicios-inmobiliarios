@@ -23,9 +23,10 @@ use SCM\Support\SchemaInspector;
  */
 final class ClosingSheetService
 {
+  use ClosingSheetRecords;
+
   public const INTERNAL_ACTION = 'hoja_cierre_creada';
   public const STATUS_NEW = 'En verificacion de servicios';
-  public const WP_URL = 'https://sucasainmobiliaria.com.co/';
 
   /** Glosarios JetEngine del formulario original. */
   private const GLOSSARIES = [
@@ -414,7 +415,10 @@ final class ClosingSheetService
         ];
         $closingId = $this->insert('jet_cct_cierres', $sender, $nowSql, $closingData);
       } else {
+        $current = $this->row('jet_cct_cierres', $closingId);
         $this->update('jet_cct_cierres', $closingId, $closingData + ['cct_modified' => $nowSql]);
+        // Una hoja no aprobada que se corrige vuelve a quedar por responder.
+        $resubmitted = (new ClosingSheetWorkflow($this->db))->resubmitIfRejected($current, $nowSql);
       }
 
       $synced = $this->syncMandate($mandate, $values, $owners, $creating ? $closingId : 0, $nowSql);
@@ -444,30 +448,34 @@ final class ClosingSheetService
       }
       throw $error;
     }
+    $resubmitted ??= false;
+    $workflow = new ClosingSheetWorkflow($this->db);
     return [
       'id' => $closingId,
       'mode' => $context['mode'],
       'url' => self::publicUrl($closingId),
       'edit_url' => 'hoja-cierre.php?' . http_build_query(['id_cierre' => $closingId], '', '&', PHP_QUERY_RFC3986),
       'synced' => $synced,
-      'notified' => $creating ? $this->notifySafely($closingId, $ids, $values, $sender) : 0,
+      'resubmitted' => $resubmitted,
+      'notified' => $creating ? $this->notifySafely($closingId, $sender) : ($resubmitted ? $workflow->notifyResubmitted($closingId, $sender['name']) : 0),
     ];
   }
 
-  /** La hoja ya quedó guardada: un fallo en la cola de correos solo se registra. @param array<string,string> $ids @param array<string,mixed> $values @param array<string,string> $sender */
-  private function notifySafely(int $closingId, array $ids, array $values, array $sender): int
+  /** La hoja ya quedó guardada: un fallo en la cola de correos solo se registra. @param array<string,string> $sender */
+  private function notifySafely(int $closingId, array $sender): int
   {
     try {
-      return $this->notify($closingId, $ids, $values, $sender);
+      return (new ClosingSheetWorkflow($this->db))->notifyCreated($closingId, $sender);
     } catch (\Throwable $error) {
       error_log('[closing_sheet_notify] #' . $closingId . ': ' . $error->getMessage());
       return 0;
     }
   }
 
+  /** Vista de la hoja en el panel (pide sesión; los avisos llevan el enlace firmado de cada funcionario). */
   public static function publicUrl(int $closingId): string
   {
-    return self::WP_URL . 'hoja-de-cierre/?numero=' . $closingId;
+    return ClosingSheetAccess::url(ClosingSheetAccess::VIEW, $closingId);
   }
 
   /**
@@ -807,36 +815,6 @@ final class ClosingSheetService
     }
   }
 
-  /** @param array<string,string> $ids @param array<string,mixed> $values @param array<string,string> $sender */
-  private function notify(int $closingId, array $ids, array $values, array $sender): int
-  {
-    $queue = new EmailQueue($this->db);
-    $e = static fn($value): string => EmailTemplate::e((string) $value);
-    $p = static fn(string $text): string => '<p style="margin:0 0 14px;line-height:1.65;">' . $text . '</p>';
-    $subject = 'Hoja de cierre #' . $closingId . ' del inmueble #' . $ids['id_inmueble'];
-    $address = $e($values['direccion']);
-    $link = self::WP_URL . 'hoja-de-cierre/?' . http_build_query(['numero' => $closingId, 'id_inmueble' => $ids['id_inmueble'], 'id_inmueble_data' => $ids['id_inmueble_data'], 'id_contrato' => $ids['id_contrato'], 'id_empleado' => $sender['employee_id']], '', '&', PHP_QUERY_RFC3986);
-    $buttons = ['buttons' => [['label' => 'Ver hoja de cierre', 'url' => $link]]];
-    $queued = 0;
-    $internal = InternalNotificationRecipients::emailsForAction($this->db, self::INTERNAL_ACTION);
-    if ($internal !== []) {
-      $body = $p('El funcionario <b>' . $e($sender['name']) . '</b> realizó la hoja de cierre de negocio <b>#' . $closingId . '</b> del inmueble <b>#' . $e($ids['id_inmueble']) . '</b>, ubicado en <b>' . $address . '</b>, con el arrendatario <b>' . $e($values['arrendatario']) . '</b>.')
-        . $p('Por favor realiza la revisión de servicios públicos.');
-      $queued += $queue->enqueue($internal, $subject, EmailTemplate::render($subject, $body, $buttons), [
-        'source_module' => 'hoja_cierre', 'internal_cc' => [], 'destination_name' => 'Equipo interno', 'dedupe_key' => 'hoja_cierre_' . $closingId . '_interno',
-        'meta' => ['closing_id' => $closingId, 'internal_action' => self::INTERNAL_ACTION],
-      ]);
-    }
-    if (filter_var($sender['email'], FILTER_VALIDATE_EMAIL)) {
-      $body = $p('Apreciado/a <b>' . $e($sender['name']) . '</b>, la hoja de cierre de negocio <b>#' . $closingId . '</b> del inmueble <b>#' . $e($ids['id_inmueble']) . '</b>, ubicado en <b>' . $address . '</b>, quedó creada.');
-      $queued += $queue->enqueue([$sender['email']], $subject, EmailTemplate::render($subject, $body, $buttons), [
-        'source_module' => 'hoja_cierre', 'internal_cc' => [], 'destination_name' => $sender['name'], 'dedupe_key' => 'hoja_cierre_' . $closingId . '_creador',
-        'meta' => ['closing_id' => $closingId],
-      ]);
-    }
-    return $queued;
-  }
-
   /** Evita guardar dos veces la misma hoja con un doble clic. @param array<string,string> $ids */
   private function recentDuplicate(array $ids, int $now): bool
   {
@@ -896,63 +874,6 @@ final class ClosingSheetService
       }
     }
     return $value;
-  }
-
-  /** @param array<string,mixed> $data */
-  private function update(string $name, int $id, array $data): void
-  {
-    $table = $this->db->table($name);
-    if ($id <= 0 || !$this->schema->tableExists($table)) {
-      return;
-    }
-    $data = $this->schema->filterTableData($table, $data);
-    if ($data !== []) {
-      $this->db->update($table, $data, ['_ID' => $id]);
-    }
-  }
-
-  /** @param array<string,string> $sender @param array<string,mixed> $data */
-  private function insert(string $name, array $sender, string $nowSql, array $data): int
-  {
-    $table = $this->db->table($name);
-    if (!$this->schema->tableExists($table)) {
-      return 0;
-    }
-    $data = $this->schema->filterTableData($table, ['cct_status' => 'publish', 'cct_author_id' => $sender['employee_id'], 'cct_created' => $nowSql, 'cct_modified' => $nowSql] + $data);
-    if ($data === [] || !$this->db->insert($table, $data)) {
-      throw new \RuntimeException('No se pudo guardar en ' . $name . '.');
-    }
-    return (int) $this->db->lastInsertId();
-  }
-
-  /** Metadatos del post "inmuebles" en WordPress, como la acción insert_post del formulario. @param array<string,string> $meta */
-  private function propertyMeta(int $postId, array $meta): void
-  {
-    $posts = $this->db->table('posts');
-    $postmeta = $this->db->table('postmeta');
-    if ($postId <= 0 || $meta === [] || !$this->schema->tableExists($postmeta)
-      || (string) $this->db->getVar("SELECT `post_type` FROM `{$posts}` WHERE `ID` = ? LIMIT 1", [$postId]) !== 'inmuebles') {
-      return;
-    }
-    foreach ($meta as $key => $value) {
-      $ids = $this->db->getCol("SELECT `meta_id` FROM `{$postmeta}` WHERE `post_id` = ? AND `meta_key` = ?", [$postId, $key]);
-      if ($ids === []) {
-        $this->db->insert($postmeta, ['post_id' => $postId, 'meta_key' => $key, 'meta_value' => (string) $value]);
-      } else {
-        $this->db->update($postmeta, ['meta_value' => (string) $value], ['post_id' => $postId, 'meta_key' => $key]);
-      }
-    }
-  }
-
-  /** @return array<string,mixed> */
-  private function row(string $name, mixed $id): array
-  {
-    $id = trim((string) $id);
-    $table = $this->db->table($name);
-    if (!ctype_digit($id) || (int) $id <= 0 || !$this->schema->tableExists($table)) {
-      return [];
-    }
-    return $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [(int) $id]) ?? [];
   }
 
   /** @param array<int,mixed> $values */

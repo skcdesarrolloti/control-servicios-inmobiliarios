@@ -1,0 +1,40 @@
+{
+  "name": "scm_hoja_cierre_revision_servicios_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "description": "Aviso interno: se creó una hoja de cierre y sigue la revisión de servicios públicos antes de la ocupación.",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola, {{1}}. Se creó la hoja de cierre {{2}} y sigue la revisión de servicios públicos antes de la ocupación.\n\nInmueble: {{3}}\nArrendatario: {{4}}\nHizo la hoja: {{5}}\n\nRealiza la revisión desde el botón. El enlace es personal y vence en 30 días.",
+      "example": {
+        "body_text": [
+          [
+            "Elsie Perez",
+            "#430",
+            "Inmueble 151187 · Carrera 32B #80-624 Apto 308",
+            "Juan Alberto Palacio Henry",
+            "Kellys Roqueme Camacho"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Hacer revisión",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "control-servicios-inmobiliarios/public/revision-servicios-cierre.php?numero=430&p=revision&f=2871&expires=1795900000&sig=0a1b2c"
+          ]
+        }
+      ]
+    }
+  ]
+}

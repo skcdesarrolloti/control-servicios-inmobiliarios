@@ -1191,6 +1191,20 @@ foreach ($rawNavItems as $k => $item) {
                     <span class="scm-nav-item-desc">Variables del % de administración sugerido</span>
                   </span>
                 </button>
+                <!-- Hoja de cierre: avisos al propietario y WhatsApp a funcionarios; se oculta sin closing_sheet_configure -->
+                <button
+                  type="button"
+                  data-scm-config-action="closing-sheet-settings"
+                  data-closing-sheet-settings
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">handshake</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Hoja de cierre</span>
+                    <span class="scm-nav-item-desc">Avisos de revisión de servicios y respuesta</span>
+                  </span>
+                </button>
                 <button
                   type="button"
                   data-scm-config-action="actas-guide"

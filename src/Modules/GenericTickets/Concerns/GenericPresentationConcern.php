@@ -234,7 +234,7 @@ trait GenericPresentationConcern
 
     $hojaCierre = trim((string) ($item['id_hoja_cierre'] ?? ''));
     if ($hojaCierre !== '') {
-      $url = 'https://sucasainmobiliaria.com.co/hoja-de-cierre/?numero=' . rawurlencode($hojaCierre);
+      $url = (defined('SCM_BASE_URL') ? rtrim((string) SCM_BASE_URL, '/') . '/' : '') . 'hoja-cierre-ver.php?numero=' . rawurlencode($hojaCierre);
       $extraMap = [
         'id_inmueble' => 'id_inmueble',
         'id_inventario' => 'id_inmueble_data',

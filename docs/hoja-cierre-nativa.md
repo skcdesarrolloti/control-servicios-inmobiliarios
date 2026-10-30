@@ -1,6 +1,67 @@
 # Hoja de cierre nativa
 
-Reemplaza los formularios JetForm "Añadir hoja de cierre de negocio" y "Editar hoja de cierre de negocio".
+Reemplaza los formularios JetForm "Añadir hoja de cierre de negocio", "Editar hoja de cierre de negocio", "Añadir revision de servicios publicos antes de entregar el inmueble" y "Responder hoja de cierre de negocio", y la vista de WordPress `/hoja-de-cierre/`.
+
+## Flujo
+
+| Estado de la hoja | Qué pasa | Quién recibe el aviso |
+| --- | --- | --- |
+| En verificacion de servicios | Se creó la hoja (`hoja-cierre.php`). | Notificaciones internas › **Hoja de cierre creada**, con su enlace para hacer la revisión. Copia a quien la creó. |
+| Esperando respuesta | Se registró la revisión de servicios antes de la ocupación (`revision-servicios-cierre.php`). | El propietario y los copropietarios (correo y, si está activo, WhatsApp). Notificaciones internas › **Hoja de cierre por responder**, con su enlace para responder. |
+| Aprobada / No aprobada | Se respondió (`hoja-cierre-ver.php`), con observación obligatoria si no se aprueba. | Notificaciones internas › **Hoja de cierre respondida** y quien hizo la hoja. |
+| Esperando respuesta (otra vez) | Se editó una hoja no aprobada. | **Hoja de cierre por responder**. |
+| Realizada | Se creó el contrato desde "No asignado". | (sin cambios) |
+
+- La revisión se puede repetir mientras la hoja no esté aprobada.
+- La respuesta se puede cambiar mientras esté "No aprobada".
+- Una hoja aprobada no admite cambios.
+
+## Enlaces sin iniciar sesión
+
+Cada aviso lleva un enlace firmado solo para ese funcionario, esa hoja y esa acción (`ClosingSheetAccess`: `p`, `f`, `expires`, `sig` con HMAC de `APP_SECRET`). La revisión y la respuesta vencen en 30 días; la vista, en 180.
+
+Quien abre el enlace queda como autor de lo que guarda (`cct_author_id`, verificador o aprobador). Si cambia `?numero=`, el enlace deja de servir. Si el funcionario ya no está activo (`activo = Si`), el enlace no abre.
+
+Con sesión del panel basta `?numero=` y se aplican los permisos del cargo.
+
+## Páginas
+
+- `hoja-cierre-ver.php?numero=<hoja>`: muestra la hoja en solo lectura, con la revisión de servicios, los copropietarios y la lista de chequeo. Desde ahí se aprueba o no, se hace la revisión, se edita y se imprime.
+- `revision-servicios-cierre.php?numero=<hoja>`: revisión de servicios antes de la ocupación. Por cada servicio pide NIC, póliza o contrato; medidor; fecha de corte; resultado en tiempo (glosario 998) y resultado en valores.
+- `hojas-cierre.php`: listado por estado con búsqueda. También se abre desde Contratos de arrendamiento › **Hojas de cierre**.
+
+## Qué guarda la revisión de servicios (en una transacción)
+
+- `jet_cct_revisiones_servicios`: tipo "Antes de la ocupacion", con "Contrato sin entregar" e "Inmueble sin entregar". Guarda `id_cierre`, `id_contrato` (contrato de arrendamiento), `id_contrato_mandato` y los servicios revisados.
+- La hoja: verificador, cuentas, medidores, fechas de corte y resultados. También `id_revision_servicios_publicos` y el estado "Esperando respuesta".
+- El mandato: las cuentas (energía, agua, gas).
+- El contrato de arrendamiento, si ya existe: fechas de corte y `ultima_revision_servicios`.
+- El historial del inmueble y el contador `revisiones-servicios` del post del inmueble.
+
+No genera actas PDF, igual que el formulario anterior. El propietario recibe el enlace firmado a `revision-servicios-publicos.php`.
+
+## Qué guarda la respuesta
+
+- La hoja: estado, `fecha_repuesta`, aprobador y `observacion_respuesta`.
+- El mandato: `estado_hoja_cierre`.
+- El historial del inmueble.
+
+## Configuración
+
+En **Configuración › Hoja de cierre** (permiso *Configurar avisos de la hoja de cierre*) se activan:
+
+- el correo al propietario (activo por defecto);
+- el WhatsApp al propietario;
+- el WhatsApp a funcionarios.
+
+Las plantillas están en `docs/crear-plantilla-whatsapp-hoja-cierre.md`.
+
+Permisos nuevos, en el grupo Contratos de arrendamiento:
+
+- *Hacer la revisión de servicios públicos antes de la ocupación*: todos los cargos.
+- *Aprobar o no aprobar hojas de cierre*: solo cargos administradores por defecto.
+
+Las columnas `observacion_respuesta` e `id_revision_servicios_publicos` de `cierres` se crearon con `bin/cct-add-fields.php`.
 
 ## Dónde se usa
 
@@ -39,5 +100,6 @@ aseguradora y ticket); no se usa la API REST de JetEngine.
 - Como JetForm: historial del inmueble, copropiedad, ticket (`estado`, `estado_comercial`; no toca
   `estado_administrativo`) y su historial, CCT `inmuebles`, metas del post `inmuebles` y ficha del arrendatario (con
   tipo de persona y representante).
-- Correos al crear: funcionarios del evento **Notificaciones internas → Hoja de cierre creada** y copia al creador.
-  Editar no envía correos.
+- Correos al crear: funcionarios del evento **Notificaciones internas → Hoja de cierre creada** (cada uno con su enlace
+  para la revisión) y copia al creador. Editar no envía correos, salvo que la hoja estuviera "No aprobada": vuelve a
+  "Esperando respuesta" y se avisa a **Hoja de cierre por responder**.

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace SCM\App\Concerns;
 
 use SCM\Core\Auth;
+use SCM\Modules\ClosingSheets\ClosingSheetFlowView;
 use SCM\Modules\ClosingSheets\ClosingSheetService;
+use SCM\Modules\ClosingSheets\ClosingSheetSettings;
 
-/** Hoja de cierre de negocio (hoja-cierre.php): guardar al crear o editar. */
+/** Hoja de cierre de negocio (hoja-cierre.php): guardar al crear o editar, y su configuración de avisos. */
 trait HandlesClosingSheets
 {
   public function ajax_handler_closing_sheet_save(): void
@@ -39,11 +41,30 @@ trait HandlesClosingSheets
     $synced = $result['synced'] !== [] ? ' También se actualizó el mandato (' . count($result['synced']) . ' ' . (count($result['synced']) === 1 ? 'dato' : 'datos') . ').' : '';
     $this->jsonOk([
       'title' => $creating ? 'Hoja de cierre #' . $result['id'] . ' creada' : 'Hoja de cierre #' . $result['id'] . ' actualizada',
-      'message' => ($creating ? 'Quedó en "' . ClosingSheetService::STATUS_NEW . '" y se avisó al equipo para la revisión de servicios públicos.' : 'Los cambios quedaron guardados.') . $synced,
+      'message' => ($creating ? 'Quedó en "' . ClosingSheetService::STATUS_NEW . '" y se avisó al equipo para la revisión de servicios públicos.' : 'Los cambios quedaron guardados.')
+        . ($result['resubmitted'] ? ' Como no estaba aprobada, volvió a quedar "Esperando respuesta" y se avisó para responderla.' : '') . $synced,
       'url' => $result['url'],
       'edit_url' => $result['edit_url'],
       'id' => $result['id'],
     ]);
+  }
+
+  /** Configuración › Hoja de cierre: avisos al propietario y WhatsApp a funcionarios. */
+  public function ajax_handler_closing_sheet_settings(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('closing_sheet_configure', 'Tu cargo no tiene permiso para configurar la hoja de cierre.');
+    $settings = new ClosingSheetSettings($this->db);
+    if (($_POST['mode'] ?? '') === 'save') {
+      try {
+        $saved = $settings->save(is_array($_POST['settings'] ?? null) ? $_POST['settings'] : [], Auth::userId());
+      } catch (\Throwable $error) {
+        error_log('[closing_sheet_settings] ' . $error->getMessage());
+        $this->jsonFail('No se pudo guardar la configuración de la hoja de cierre.');
+      }
+      $this->jsonOk(['html' => ClosingSheetFlowView::settingsForm($saved), 'message' => 'Configuración guardada.']);
+    }
+    $this->jsonOk(['html' => ClosingSheetFlowView::settingsForm($settings->read())]);
   }
 
   /** Funcionario que guarda: su id_empleado real (autor de los registros), nombre, correo y sucursal. @return array{employee_id:string,name:string,email:string,branch:string} */

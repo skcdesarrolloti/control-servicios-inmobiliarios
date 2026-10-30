@@ -54,7 +54,8 @@ final class HistoryLinkMap
       'contrato' => ['label' => 'Ver contrato de mandato', 'base' => 'https://sucasainmobiliaria.com.co/contrato-de-mandato/?numero='],
       'id_contrato_mandato' => ['label' => 'Ver contrato de mandato', 'base' => 'https://sucasainmobiliaria.com.co/contrato-de-mandato/?numero='],
       'id_orden' => ['label' => 'Ver orden', 'base' => 'https://sucasainmobiliaria.com.co/orden/?numero='],
-      'id_cierre' => ['label' => 'Ver cierre', 'base' => 'https://sucasainmobiliaria.com.co/hoja-de-cierre/?numero='],
+      'id_cierre' => ['label' => 'Ver hoja de cierre', 'base' => $baseUrl . 'hoja-cierre-ver.php?numero='],
+      'id_hoja_cierre' => ['label' => 'Ver hoja de cierre', 'base' => $baseUrl . 'hoja-cierre-ver.php?numero='],
 
       // Aseguradora
       'id_estudio_aseguradora' => ['label' => 'Ver estudio aseguradora', 'base' => 'https://sucasainmobiliaria.com.co/estudio-aseguradora/?id_estudio='],

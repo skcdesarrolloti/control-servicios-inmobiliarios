@@ -165,7 +165,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
-  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure', 'quote_reset_dev'];
+  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure', 'quote_reset_dev', 'closing_sheet_respond', 'closing_sheet_configure'];
   /** Herramientas de pruebas: hasta guardar permisos solo las tiene el cargo de desarrollo (Asistente de Desarrollo TI). */
   const DEVELOPER_DEFAULT_ACTIONS = ['quote_reset_dev'];
   const DEVELOPER_CARGOS = ['13'];
@@ -535,6 +535,16 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Cuando un funcionario crea la hoja de cierre de negocio de un mandato, para la revisión de servicios públicos. Reemplaza los correos fijos del formulario de WordPress.',
             'channel' => 'Email interno en cola',
           ],
+          'hoja_cierre_por_responder' => [
+            'label' => 'Hoja de cierre por responder',
+            'description' => 'Cuando se registra la revisión de servicios públicos antes de la ocupación (o se corrige una hoja no aprobada). Cada funcionario recibe su enlace para aprobar o no aprobar la hoja sin iniciar sesión.',
+            'channel' => 'Email interno en cola',
+          ],
+          'hoja_cierre_respondida' => [
+            'label' => 'Hoja de cierre respondida',
+            'description' => 'Cuando una hoja de cierre queda aprobada o no aprobada, con la observación. Quien hizo la hoja siempre recibe el aviso.',
+            'channel' => 'Email interno en cola',
+          ],
           'contrato_arrendamiento_creado' => [
             'label' => 'Contrato de arrendamiento creado',
             'description' => 'Cuando se crea un contrato desde un registro "No asignado". Incluye el acta de notificación de ingreso y la carta a la copropiedad si aplica.',
@@ -710,7 +720,7 @@ final class SuCasaControlServiciosInmobiliarios
       $selected = [];
       foreach ((array) $ids as $id) {
         $idKey = trim((string) ((int) $id));
-        $allowed = in_array($actionKey, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_recibo_manual','contrato_no_salida','nuevo_caso_panel','hoja_cierre_creada'], true) ? $allActiveIds : $validFuncionarioIds;
+        $allowed = in_array($actionKey, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_recibo_manual','contrato_no_salida','nuevo_caso_panel','hoja_cierre_creada','hoja_cierre_por_responder','hoja_cierre_respondida'], true) ? $allActiveIds : $validFuncionarioIds;
         if ($idKey !== '' && $idKey !== '0' && isset($allowed[$idKey])) {
           $selected[$idKey] = $idKey;
         }
@@ -945,6 +955,9 @@ final class SuCasaControlServiciosInmobiliarios
           'contract_owner_change' => 'Cambiar funcionario responsable del contrato',
           'closing_sheet_create' => 'Añadir hoja de cierre de negocio',
           'closing_sheet_edit' => 'Editar hoja de cierre de negocio',
+          'closing_sheet_review' => 'Hacer la revisión de servicios públicos antes de la ocupación (hoja de cierre)',
+          'closing_sheet_respond' => 'Aprobar o no aprobar hojas de cierre',
+          'closing_sheet_configure' => 'Configurar avisos de la hoja de cierre',
         ],
       ],
     ];
@@ -1232,6 +1245,12 @@ final class SuCasaControlServiciosInmobiliarios
   public function canOpenClosingSheet(bool $creating): bool
   {
     return $this->canUseDashboardAction($creating ? 'closing_sheet_create' : 'closing_sheet_edit');
+  }
+
+  /** Permisos de la hoja de cierre para sus páginas propias (revisión de servicios, ver y responder). */
+  public function canUseClosingSheetAction(string $action): bool
+  {
+    return str_starts_with($action, 'closing_sheet_') && $this->canUseDashboardAction($action);
   }
 
   /** Permiso para abrir una acción de cotización desde su página propia (cotizacion.php). */
