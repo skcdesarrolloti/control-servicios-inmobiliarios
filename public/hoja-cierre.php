@@ -74,6 +74,7 @@ $asset = static function (string $path) use ($baseUrl): string {
 };
 
 echo (new ClosingSheetPageView())->render($context, $service->options(), [
+  'embed' => ($_GET['embed'] ?? '') === '1',
   'user' => Auth::user(),
   'base_url' => $baseUrl,
   'logo' => system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL),

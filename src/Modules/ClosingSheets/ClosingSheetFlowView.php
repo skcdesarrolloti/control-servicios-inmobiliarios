@@ -35,7 +35,7 @@ final class ClosingSheetFlowView
       . ($page['favicon'] !== '' ? '<link rel="icon" href="' . $h($page['favicon']) . '" sizes="32x32">' : '')
       . '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">'
       . '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">'
-      . $css . $js . '</head><body class="scm-review-page cs-page csf-page">'
+      . $css . $js . '</head><body class="scm-review-page cs-page csf-page' . (!empty($page['embed']) ? ' is-embed' : '') . '">'
       . '<header class="rp-topbar"><a class="rp-brand" href="' . $h($page['session'] ? $page['base_url'] . '/index.php' : '#') . '">'
       . ($page['logo'] !== '' ? '<img src="' . $h($page['logo']) . '" alt="SKC SuCasa Inmobiliaria">' : '') . '<span>SKC SuCasa Inmobiliaria</span></a>'
       . ($firstName !== '' ? '<div class="rp-user"><span class="rp-avatar" aria-hidden="true">' . $h(mb_strtoupper(mb_substr($firstName, 0, 1, 'UTF-8'), 'UTF-8')) . '</span><span class="rp-user-name">Hola, <strong>' . $h($firstName) . '</strong></span></div>' : '')

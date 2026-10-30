@@ -47,7 +47,7 @@ final class ClosingSheetPageView
   <?php foreach ($page['js'] as $src): ?><script src="<?= $h($src) ?>" defer></script>
   <?php endforeach; ?>
 </head>
-<body class="scm-review-page cs-page">
+<body class="scm-review-page cs-page<?= !empty($page['embed']) ? ' is-embed' : '' ?>">
   <header class="rp-topbar">
     <a class="rp-brand" href="<?= $h($page['base_url'] . '/index.php') ?>">
       <?php if ($page['logo'] !== ''): ?><img src="<?= $h($page['logo']) ?>" alt="SKC SuCasa Inmobiliaria"><?php endif; ?>

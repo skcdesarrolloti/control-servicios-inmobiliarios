@@ -14241,6 +14241,9 @@
       if (panelId === "scm-panel-cartas-aumento") {
         return "cartas_aumento";
       }
+      if (panelId === "scm-panel-hojas-cierre") {
+        return "hojas_cierre";
+      }
       return "";
     }
 
@@ -26335,6 +26338,18 @@
             adminReportsModule.dispatchEvent(new CustomEvent("scm:load-admin-reports"));
           }
           return loadPendingFormOnce(activeAdministrativePanel, "#sra_form");
+        }
+        if (
+          activeAdministrativePanel &&
+          administrativeKey === "hojas_cierre"
+        ) {
+          var closingSheetsModule = activeAdministrativePanel.querySelector(
+            "[data-closing-sheets]",
+          );
+          if (closingSheetsModule) {
+            closingSheetsModule.dispatchEvent(new CustomEvent("scm:load-closing-sheets"));
+          }
+          return Promise.resolve();
         }
         if (
           activeAdministrativePanel &&

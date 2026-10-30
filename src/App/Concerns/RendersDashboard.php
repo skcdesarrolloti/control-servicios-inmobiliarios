@@ -266,6 +266,9 @@ trait RendersDashboard
       'cartas-aumento' => 'scm-panel-cartas-aumento',
       'cartas de aumento' => 'scm-panel-cartas-aumento',
       'scm-panel-cartas-aumento' => 'scm-panel-cartas-aumento',
+      'hojas_cierre' => 'scm-panel-hojas-cierre',
+      'hojas-cierre' => 'scm-panel-hojas-cierre',
+      'scm-panel-hojas-cierre' => 'scm-panel-hojas-cierre',
     ];
     $initialTab = $tabMap[$tabKey] ?? '';
     $contractSections = ['contracts-ending', 'contract-termination', 'contract-non-renewal'];
@@ -319,6 +322,10 @@ trait RendersDashboard
       'cartas_aumento' => [
         'panel' => 'scm-panel-cartas-aumento',
         'label' => $dashboardPermissionTabs['cartas_aumento'] ?? 'Cartas de aumento',
+      ],
+      'hojas_cierre' => [
+        'panel' => 'scm-panel-hojas-cierre',
+        'label' => $dashboardPermissionTabs['hojas_cierre'] ?? 'Hojas de cierre',
       ],
     ];
     $administrativePanelToTab = [];
@@ -1357,6 +1364,12 @@ trait RendersDashboard
               <?php echo $cartasAumentoHtml; ?>
             </div>
           <?php endif; ?>
+
+          <?php if (in_array('hojas_cierre', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'hojas_cierre' ? ' active' : ''; ?>" id="scm-panel-hojas-cierre" data-permission-tab="hojas_cierre" data-admin-activity-panel="hojas_cierre" data-scm-loaded="0">
+              <?php echo \SCM\Modules\ClosingSheets\ClosingSheetPanelView::shell(self::AJAX_CLOSING_SHEET_LIST); ?>
+            </div>
+          <?php endif; ?>
         </div>
       </div>
 
@@ -1499,6 +1512,7 @@ trait RendersDashboard
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-owner-credits.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-owner-credits.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-tools.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-tools.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-administrative-reports.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-administrative-reports.js'))); ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-closing-sheets.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-closing-sheets.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-movements.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-movements.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-case-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-case-metrics.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-quote-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-quote-metrics.js'))); ?>" defer></script>
@@ -1906,6 +1920,7 @@ trait RendersDashboard
         'liquidador_servicios_publicos' => '',
         'reportes_administrativos_pendientes' => '',
         'cartas_aumento' => '',
+        'hojas_cierre' => '',
       ]],
       ['label' => 'Actividades administrativas', 'hint' => 'Créditos', 'tabs' => [
         'credito_propietario' => '',

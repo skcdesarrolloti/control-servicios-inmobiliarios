@@ -202,6 +202,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_LEASE_CONTRACT_RESEND_ACTS = 'scm_contrato_arrendamiento_reenviar_actas';
   const AJAX_LEASE_CONTRACT_ANNEXES_OK = 'scm_contrato_arrendamiento_anexos_al_dia';
   const AJAX_CLOSING_SHEET_SAVE = 'scm_hoja_cierre_guardar';
+  const AJAX_CLOSING_SHEET_LIST = 'scm_hojas_cierre_listar';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';
@@ -357,6 +358,7 @@ final class SuCasaControlServiciosInmobiliarios
       'reportes_administrativos_pendientes' => 'Reportes Administrativos',
       'auditoria_canon_aseguradoras' => 'Auditoría Canon y Aseguradoras',
       'cartas_aumento' => 'Cartas de Aumento',
+      'hojas_cierre' => 'Hojas de Cierre',
       'metricas_casos' => 'Casos',
       'metricas_cotizaciones' => 'Cotizaciones',
       'metricas_preventivas' => 'Revisión preventiva',
@@ -792,6 +794,8 @@ final class SuCasaControlServiciosInmobiliarios
   {
     $raw = \SCM\Core\App::settings()->get('dashboard_tab_permissions', []);
     $raw = is_array($raw) ? $raw : [];
+    $knownTabs = \SCM\Core\App::settings()->get('dashboard_tab_permissions_known_keys', null);
+    $knownTabs = is_array($knownTabs) ? array_map('strval', $knownTabs) : [];
     // Permisos guardados antes de separar las opciones del menú: se traducen a lo que el cargo veía.
     if (!is_array(\SCM\Core\App::settings()->get('dashboard_tab_permissions_known_keys', null))) {
       foreach ($raw as $cargo => $tabs) {
@@ -806,6 +810,10 @@ final class SuCasaControlServiciosInmobiliarios
       // Créditos a propietarios se guardó primero como "metricas_creditos".
       if (in_array('metricas_creditos', (array) $raw[$cargo], true)) {
         $raw[$cargo] = array_merge((array) $raw[$cargo], ['credito_propietario']);
+      }
+      // Hojas de cierre es nueva: mientras no se guarden permisos que la conozcan, la ve quien ve contratos o servicios.
+      if (!in_array('hojas_cierre', $knownTabs, true) && array_intersect(['contratos_arrendamiento', 'servicios_publicos_pendientes'], (array) $raw[$cargo]) !== []) {
+        $raw[$cargo] = array_merge((array) $raw[$cargo], ['hojas_cierre']);
       }
     }
     return $this->sanitizeDashboardPermissions($raw);

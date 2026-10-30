@@ -214,6 +214,8 @@
 
   function done(data) {
     if (draft) draft.markSaved();
+    // Dentro de la ventana del panel: avisa para recargar el listado de hojas de cierre.
+    if (window.parent !== window) window.parent.postMessage({ type: "scm-closing-sheet-saved" }, window.location.origin);
     const card = document.querySelector("[data-cs-done]");
     card.querySelector("[data-cs-done-title]").textContent = data.title || "Hoja de cierre guardada";
     card.querySelector("[data-cs-done-text]").textContent = data.message || "";

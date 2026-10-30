@@ -22,6 +22,8 @@ $isPost = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST';
 $params = $isPost ? $_POST + $_GET : $_GET;
 $closingId = preg_match('/^[1-9][0-9]{0,18}$/D', trim((string) ($params['numero'] ?? ''))) === 1 ? (int) $params['numero'] : 0;
 $script = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+// embed=1: abierta en la ventana del panel (Actividades administrativas › Hojas de cierre), sin la barra superior.
+$embed = ($params['embed'] ?? '') === '1';
 $baseUrl = rtrim((string) SCM_BASE_URL, '/');
 
 $json = static function (bool $ok, array $data, int $status = 0): never {
@@ -32,8 +34,8 @@ $json = static function (bool $ok, array $data, int $status = 0): never {
 };
 
 // Enlace a otra página del flujo para la misma hoja, conservando la firma si se entró con una.
-$link = static function (string $page) use ($closingId, $params): string {
-  $query = ['numero' => $closingId];
+$link = static function (string $page) use ($closingId, $params, $embed): string {
+  $query = ['numero' => $closingId] + ($embed ? ['embed' => '1'] : []);
   foreach (['p', 'f', 'expires', 'sig'] as $key) {
     if (isset($params[$key]) && is_string($params[$key]) && $params[$key] !== '') {
       $query[$key] = $params[$key];
@@ -44,7 +46,7 @@ $link = static function (string $page) use ($closingId, $params): string {
 
 // Nombre del funcionario que actúa (sesión o enlace), para el saludo de la barra.
 $actorName = '';
-$render = static function (string $title, array $facts, string $body, int $status = 200, string $state = '', bool $hero = true) use ($baseUrl, &$actorName): never {
+$render = static function (string $title, array $facts, string $body, int $status = 200, string $state = '', bool $hero = true) use ($baseUrl, &$actorName, $embed): never {
   http_response_code($status);
   $asset = static function (string $path) use ($baseUrl): string {
     $file = dirname(__DIR__) . '/public/' . $path;
@@ -58,6 +60,7 @@ $render = static function (string $title, array $facts, string $body, int $statu
     'js' => array_map($asset, ['assets/js/form-draft.js', 'assets/js/closing-sheet-flow.js']),
     'user' => $actorName !== '' ? $actorName : (Auth::isLoggedIn() ? Auth::user() : ''),
     'session' => Auth::isLoggedIn(),
+    'embed' => $embed,
   ], $title, 'Hoja de cierre de negocio', 'handshake', $facts, $body, $state, $hero);
   exit;
 };
@@ -121,5 +124,6 @@ return [
   'page_guard' => $pageGuard,
   'json_guard' => $jsonGuard,
   'hidden' => $hidden,
+  'embed' => $embed,
   'input' => $input,
 ];

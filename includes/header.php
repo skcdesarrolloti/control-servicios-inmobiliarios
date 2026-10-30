@@ -289,6 +289,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'auditoria_canon_aseguradoras';
   } elseif (in_array($tabParam, ['cartas_aumento', 'scm-panel-cartas-aumento'], true)) {
     $current_page = 'cartas_aumento';
+  } elseif (in_array($tabParam, ['hojas_cierre', 'hojas-cierre', 'scm-panel-hojas-cierre'], true)) {
+    $current_page = 'hojas_cierre';
   } elseif (in_array($tabParam, ['liquidacion', 'liquidador', 'liquidador_servicios_publicos', 'scm-panel-liquidador-servicios-publicos'], true)) {
     $current_page = 'liquidador_servicios_publicos';
   } elseif (in_array($tabParam, ['contratos', 'contratos-arrendamiento', 'contratos_arrendamiento', 'scm-panel-contratos-arrendamiento'], true)) {
@@ -555,6 +557,17 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=cartas_aumento',
         'icon' => 'mail',
         'perms' => ['cartas_aumento'],
+      ],
+      'hojas_cierre' => [
+        'key' => 'hojas_cierre',
+        'label' => 'Hojas de Cierre',
+        'description' => 'Revisión de servicios y respuesta',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-hojas-cierre',
+        'admin_activity_key' => 'hojas_cierre',
+        'url' => $baseUrl . '/index.php?tab=hojas_cierre',
+        'icon' => 'handshake',
+        'perms' => ['hojas_cierre'],
       ],
       // Grupo Créditos: hoy solo propietarios; otros actores (arrendatarios, proveedores…) serán opciones hermanas.
       'credito_propietario' => [

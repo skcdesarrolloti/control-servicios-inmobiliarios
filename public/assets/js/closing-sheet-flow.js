@@ -85,6 +85,8 @@
         if (!json || !json.success) throw new Error((json && json.data && json.data.message) || "No se pudo guardar.");
         var draft = draftOf(form);
         if (draft) draft.markSaved();
+        // Dentro de la ventana del panel: avisa para recargar el listado de hojas de cierre.
+        if (window.parent !== window) window.parent.postMessage({ type: "scm-closing-sheet-saved" }, window.location.origin);
         showDone(json.data || {});
       })
       .catch(function (err) {

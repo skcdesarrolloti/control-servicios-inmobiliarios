@@ -36,7 +36,14 @@ Con sesión del panel basta `?numero=` y se aplican los permisos del cargo.
 
   Desde ahí se aprueba o no, se hace la revisión, se edita y se imprime. Se imprime en A4 sin botones ni formularios.
 - `revision-servicios-cierre.php?numero=<hoja>`: revisión de servicios antes de la ocupación. Por cada servicio pide NIC, póliza o contrato; medidor; fecha de corte; resultado en tiempo (glosario 998) y resultado en valores.
-- `hojas-cierre.php`: listado por estado con búsqueda. También se abre desde Contratos de arrendamiento › **Hojas de cierre**.
+- **Actividades Administrativas › Hojas de Cierre**, dentro del panel:
+  - pestañas por estado con su cantidad y búsqueda;
+  - abre en el primer estado con hojas pendientes;
+  - **Ver**, **Revisar servicios** y **Responder** abren la página en una ventana del panel (`embed=1`, sin barra superior);
+  - al guardar allí, el listado se recarga al cerrar la ventana.
+
+  Es la pestaña `hojas_cierre` de Permisos. Mientras no se guarden de nuevo los permisos, la ven los cargos que ven *Contratos de arrendamiento* o *Revisiones de servicios públicos*.
+- `hojas-cierre.php`: el mismo listado como página propia. Se abre desde Contratos de arrendamiento › **Hojas de cierre**.
 
 ## Qué guarda la revisión de servicios (en una transacción)
 

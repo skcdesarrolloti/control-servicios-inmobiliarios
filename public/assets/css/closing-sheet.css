@@ -76,3 +76,7 @@ textarea.cs-input { resize: vertical; }
 .scm-draft-banner p { flex: 1 1 260px; margin: 0; font-size: 14px; line-height: 1.45; }
 .scm-draft-banner > div { display: flex; flex-wrap: wrap; gap: 8px; }
 .scm-draft-banner .material-symbols-outlined { color: #b45309; }
+
+/* Abierta dentro de la ventana del panel (embed=1): sin barra superior ni márgenes grandes. */
+.is-embed .rp-topbar { display: none; }
+.is-embed .cs-shell { padding-top: 12px; }
