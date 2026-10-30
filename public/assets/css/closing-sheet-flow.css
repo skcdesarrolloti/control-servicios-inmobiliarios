@@ -93,6 +93,9 @@
 .csf-doc-foot { padding-top: 10px; border-top: 1px solid var(--rp-line); color: var(--rp-muted); font-size: 12px; text-align: center; }
 .csf-pending { padding: 10px 14px; border-radius: 12px; background: #fff7ed; }
 
+.csf-person { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--rp-line); border-radius: 12px; background: #f8fafc; break-inside: avoid; page-break-inside: avoid; }
+.csf-person h3 { margin: 0 0 8px !important; }
+
 @media (max-width: 640px) {
   .csf-doc-title { text-align: left; }
   .csf-signatures .csf-sign-grid { grid-template-columns: 1fr; }

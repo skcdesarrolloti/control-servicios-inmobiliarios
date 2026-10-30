@@ -254,4 +254,31 @@ final class ClosingSheetForm
       ['estado_termino_contrato', '¿El contrato es por el termino de 12 meses?', '¿El contrato es por el termino de 12 meses?'],
     ]],
   ];
+
+  /**
+   * Separa los campos de cada codeudor ("…_codeudor_N") para mostrarlos en un bloque por persona, con etiquetas cortas.
+   * @param list<array<string,mixed>> $fields
+   * @return array{0:list<array<string,mixed>>,1:array<string,list<array<string,mixed>>>} sueltos y "Codeudor N" => campos
+   */
+  public static function personGroups(array $fields): array
+  {
+    $loose = [];
+    $groups = [];
+    foreach ($fields as $field) {
+      if (preg_match('/(?:^|_)codeudor_(\d)$/', (string) $field['name'], $match) === 1) {
+        $groups['Codeudor ' . $match[1]][] = array_merge($field, ['label' => self::shortLabel((string) $field['label']), 'help' => '']);
+      } else {
+        $loose[] = $field;
+      }
+    }
+    return [$loose, $groups];
+  }
+
+  /** "Documento del codeudor 1" => "Documento"; "Codeudor 1" => "Nombre completo". */
+  public static function shortLabel(string $label): string
+  {
+    $label = preg_replace('/^Codeudor \d$/u', 'Nombre completo', $label) ?? $label;
+    $label = preg_replace('/\s+del codeudor(?: \d)?$/u', '', $label) ?? $label;
+    return str_replace('Direccion', 'Dirección', $label);
+  }
 }

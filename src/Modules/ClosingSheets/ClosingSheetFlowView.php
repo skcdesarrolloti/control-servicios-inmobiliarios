@@ -164,7 +164,7 @@ final class ClosingSheetFlowView
       }
       $doc .= self::readSection($title, $fields, $values, $sheet['options']);
       if ($title === 'Propietario') {
-        $doc .= self::ownersBlock($sheet['owners']);
+        $doc .= self::ownersBlock($sheet['owners'], $values);
       }
     }
     $doc .= self::reviewBlock($sheet) . self::checklistBlock($values) . self::signatures($sheet['signers']) . self::docFooter($sheet['company']);
@@ -299,6 +299,22 @@ final class ClosingSheetFlowView
   /** @param list<array<string,mixed>> $fields @param array<string,mixed> $values @param array<string,mixed> $options */
   private static function readSection(string $title, array $fields, array $values, array $options): string
   {
+    // Codeudores: un bloque por persona.
+    [$fields, $groups] = ClosingSheetForm::personGroups($fields);
+    $people = '';
+    foreach ($groups as $person => $personFields) {
+      $block = self::readItems($personFields, $values, $options);
+      if ($block !== '') {
+        $people .= '<div class="csf-person"><h3>' . self::e($person) . '</h3><dl class="csf-grid">' . $block . '</dl></div>';
+      }
+    }
+    $items = self::readItems($fields, $values, $options);
+    return $items === '' && $people === '' ? '' : '<section class="cs-section"><h2>' . self::e($title) . '</h2>' . ($items !== '' ? '<dl class="csf-grid">' . $items . '</dl>' : '') . $people . '</section>';
+  }
+
+  /** @param list<array<string,mixed>> $fields @param array<string,mixed> $values @param array<string,mixed> $options */
+  private static function readItems(array $fields, array $values, array $options): string
+  {
     $items = '';
     foreach ($fields as $field) {
       if (!ClosingSheetService::visible($field, $values)) {
@@ -315,7 +331,7 @@ final class ClosingSheetFlowView
       $wide = in_array($field['type'], ['textarea', 'repeater'], true);
       $items .= '<div class="csf-item' . ($wide ? ' is-wide' : '') . '"><dt>' . self::e($field['label']) . '</dt><dd>' . $shown . '</dd></div>';
     }
-    return $items === '' ? '' : '<section class="cs-section"><h2>' . self::e($title) . '</h2><dl class="csf-grid">' . $items . '</dl></section>';
+    return $items;
   }
 
   /** Valor listo para mostrar (HTML escapado). @param array<string,mixed> $field @param array<string,mixed> $options */
@@ -351,17 +367,29 @@ final class ClosingSheetFlowView
     return is_array($list) && !array_is_list($list) ? array_map('strval', $list) : [];
   }
 
-  /** @param list<array<string,mixed>> $owners */
-  private static function ownersBlock(array $owners): string
+  /** Copropietarios en tarjetas; el principal con los datos de la hoja. @param list<array<string,mixed>> $owners @param array<string,mixed> $values */
+  private static function ownersBlock(array $owners, array $values): string
   {
     if (count($owners) < 2) {
       return '';
     }
-    $rows = '';
+    $cards = '';
     foreach ($owners as $owner) {
-      $rows .= '<tr><td>' . (int) $owner['index'] . '</td><td><strong>' . self::e($owner['name']) . '</strong><small>' . self::e(trim(($owner['document_type'] ?? '') . ' ' . ($owner['document'] ?? ''))) . '</small></td><td>' . self::e(($owner['percent'] ?? '') !== '' ? $owner['percent'] . ' %' : 'Sin registrar') . '</td></tr>';
+      $main = (int) $owner['index'] === 1;
+      $name = $main ? ((string) ($values['propietario'] ?? '') ?: (string) $owner['name']) : (string) $owner['name'];
+      $type = $main ? (string) ($values['tipo_persona_propietario'] ?? '') : (string) $owner['type'];
+      $details = array_filter([
+        ['Participación', ($owner['percent'] ?? '') !== '' ? $owner['percent'] . ' %' : 'Sin registrar'],
+        ['Tipo de persona', $type === 'Juridica' ? 'Jurídica' : $type],
+        ['Documento', trim(($main ? (string) ($values['tipo_documento_propietario'] ?? '') : (string) ($owner['document_type'] ?? '')) . ' ' . ($main ? (string) ($values['documento_propietario'] ?? '') : (string) ($owner['document'] ?? '')))],
+        ['Correo', $main ? (string) ($values['correo_propietario'] ?? '') : (string) ($owner['email'] ?? '')],
+        ['Celular', $main ? (string) ($values['celular_propietario'] ?? '') : (string) ($owner['phone'] ?? '')],
+        ['Representante legal', $type === 'Juridica' ? trim(($main ? (string) ($values['representante_propietario'] ?? '') : (string) ($owner['representative'] ?? '')) . ' ' . ($main ? (string) ($values['documento_representante_propietario'] ?? '') : (string) ($owner['representative_document'] ?? ''))) : ''],
+      ], static fn(array $pair): bool => trim($pair[1]) !== '');
+      $cards .= '<div class="csf-person"><h3>' . self::e(($main ? 'Propietario principal' : 'Copropietario ' . (int) $owner['index']) . ' · ' . $name) . '</h3><dl class="csf-grid">'
+        . implode('', array_map(static fn(array $pair): string => '<div class="csf-item"><dt>' . self::e($pair[0]) . '</dt><dd>' . self::e($pair[1]) . '</dd></div>', $details)) . '</dl></div>';
     }
-    return '<section class="cs-section"><h2>Copropietarios y participación</h2><div class="cs-table-wrap"><table class="cs-table"><thead><tr><th>#</th><th>Propietario</th><th>Participación</th></tr></thead><tbody>' . $rows . '</tbody></table></div></section>';
+    return '<section class="cs-section"><h2>Propietarios y participación</h2>' . $cards . '</section>';
   }
 
   /** @param array<string,mixed> $values */

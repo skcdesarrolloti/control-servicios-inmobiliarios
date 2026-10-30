@@ -138,7 +138,8 @@
         input.classList.add("is-invalid");
         const field = input.closest("[data-cs-field], .cs-check-item");
         const label = field ? (field.querySelector(".cs-label, p")?.textContent || "").replace("*", "").trim() : input.name;
-        missing.push(label);
+        const person = input.closest(".cs-person");
+        missing.push((person && person.dataset.csPerson ? person.dataset.csPerson + ": " : "") + label);
       }
     });
     if (step.contains(form.querySelector("[data-cs-percent]")) && percents().length > 1) {

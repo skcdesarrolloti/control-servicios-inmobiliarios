@@ -80,3 +80,15 @@ textarea.cs-input { resize: vertical; }
 /* Abierta dentro de la ventana del panel (embed=1): sin barra superior ni márgenes grandes. */
 .is-embed .rp-topbar { display: none; }
 .is-embed .cs-shell { padding-top: 12px; }
+
+/* Un bloque por persona (codeudores y propietarios). */
+.cs-person { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--rp-line); border-radius: 14px; background: #f8fafc; }
+.cs-person h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; color: var(--rp-navy); font-size: 15px; font-weight: 700; }
+.cs-person h3 .material-symbols-outlined { font-size: 20px; color: #1e3a8a; }
+.cs-person .cs-input { background: #fff; }
+.cs-owner-data { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 16px; margin: 8px 0 0; }
+.cs-owner-data dt { color: var(--rp-muted); font-size: 12px; }
+.cs-owner-data dd { margin: 2px 0 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.cs-owner-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: 13px; }
+.cs-owner-foot small { color: var(--rp-muted); }
+.cs-percent > span:first-child { color: var(--rp-muted); font-size: 13px; font-weight: 600; }
