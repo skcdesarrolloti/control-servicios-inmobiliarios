@@ -11,7 +11,8 @@ namespace SCM\Modules\ClosingSheets;
  *   parqueadero, el referido PPH, la cuenta de la copropiedad y el incremento).
  * - `options`: clave de ClosingSheetService::options() (glosario o tabla) o lista fija (valor => etiqueta si difieren).
  * - `when`: se muestra (y se valida) solo si cada [campo, valores] se cumple; en un checkbox basta un valor marcado.
- * - `readonly`: viene del contrato de mandato y no se cambia aquí.
+ * - `readonly`: no se cambia aquí (hoy ningún campo; las condiciones del negocio se editan y pasan al mandato).
+ * - `mandate`: condición del negocio que también se guarda en el contrato de mandato (ClosingSheetService::MANDATE_TERMS).
  */
 final class ClosingSheetForm
 {
@@ -22,13 +23,13 @@ final class ClosingSheetForm
       ['name' => 'tipo_inmueble', 'type' => 'select', 'label' => 'Tipo de inmueble', 'required' => true, 'options' => 'tipo_inmueble', 'help' => 'Selecciona el tipo de inmueble a arrendar.'],
       ['name' => 'gestion_inmueble', 'type' => 'select', 'label' => 'Gestion', 'required' => true, 'options' => 'gestion_inmueble', 'help' => 'Selecciona el tipo de negocio a arrendar.'],
       ['name' => 'destinacion_inmueble', 'type' => 'select', 'label' => 'Destinacion', 'required' => true, 'options' => 'destinacion_inmueble', 'help' => 'Selecciona el destino a arrendar.'],
-      ['name' => 'incluye_iva', 'type' => 'select', 'label' => '¿El canon incluye iva?', 'options' => 'si_no', 'readonly' => true, 'help' => 'El canon lleva iva o no.'],
-      ['name' => 'meses_contrato', 'type' => 'number', 'label' => 'Meses de contrato', 'readonly' => true, 'help' => 'Esta es la cantidad de meses que durara el contrato.'],
-      ['name' => 'valor_canon', 'type' => 'text', 'label' => 'Canon', 'readonly' => true, 'help' => 'Este es el valor del canon mensual.'],
-      ['name' => 'valor_administracion', 'type' => 'text', 'label' => 'Administracion', 'readonly' => true, 'help' => 'Este es el valor de la administracion mensual.'],
-      ['name' => 'iva_total_precio', 'type' => 'text', 'label' => 'Iva del canon', 'readonly' => true, 'help' => 'Este es el valor del iva del canon.'],
-      ['name' => 'tasa_administracion', 'type' => 'number', 'label' => 'Porcentaje de comision', 'readonly' => true, 'help' => 'Este es el porcentaje que se le cobrara como comision al propietario.'],
-      ['name' => 'porcentaje_incremento', 'type' => 'text', 'label' => 'Incremento pactado', 'required' => true, 'readonly' => true, 'help' => 'Este es el porcentaje que se determino con el propietario para el aumento del valor del canon. NOTA: solamente se aceptan numero y para decimales . EJEMPLO: 5 4.10 etc.'],
+      ['name' => 'incluye_iva', 'type' => 'select', 'label' => '¿El canon incluye iva?', 'required' => true, 'options' => 'si_no', 'mandate' => true, 'help' => 'El canon lleva iva o no.'],
+      ['name' => 'meses_contrato', 'type' => 'number', 'label' => 'Meses de contrato', 'required' => true, 'mandate' => true, 'help' => 'Cantidad de meses que durará el contrato (solo el número, por ejemplo 12).'],
+      ['name' => 'valor_canon', 'type' => 'text', 'label' => 'Canon', 'required' => true, 'mandate' => true, 'help' => 'Valor del canon mensual en pesos, por ejemplo 1.150.000.'],
+      ['name' => 'valor_administracion', 'type' => 'text', 'label' => 'Administracion', 'mandate' => true, 'help' => 'Valor de la administración mensual en pesos. Vacío o 0 queda "No aplica".'],
+      ['name' => 'iva_total_precio', 'type' => 'text', 'label' => 'Iva del canon', 'mandate' => true, 'when' => [['incluye_iva', ['Si']]], 'help' => 'Valor del IVA del canon en pesos.'],
+      ['name' => 'tasa_administracion', 'type' => 'number', 'label' => 'Porcentaje de comision', 'required' => true, 'mandate' => true, 'help' => 'Porcentaje que se le cobra como comisión al propietario, por ejemplo 10.'],
+      ['name' => 'porcentaje_incremento', 'type' => 'text', 'label' => 'Incremento pactado', 'required' => true, 'mandate' => true, 'help' => 'Incremento anual pactado con el propietario, por ejemplo IPC, IPC +2 o 5.'],
       ['name' => 'derechos_inmobiliarios', 'type' => 'number', 'label' => 'Derechos inmobiliarios', 'required' => true, 'help' => 'Coloca los derechos pactados con el arrendatario.'],
       ['name' => 'dias_gracia', 'type' => 'text', 'label' => 'Dias de gracia', 'help' => 'Esta es la cantidad de dias de gracia que el propietario otorgo a este contrato.'],
       ['name' => 'direccion', 'type' => 'text', 'label' => 'Direccion fisica del inmueble', 'required' => true, 'help' => 'Está es la dirección del inmueble. NOTA: recuerda que es la fisica.'],

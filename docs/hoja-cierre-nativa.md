@@ -110,10 +110,23 @@ Las columnas `observacion_respuesta` e `id_revision_servicios_publicos` de `cier
 
 ## Pasos
 
-1. **Datos del negocio**: negocio (canon, administración, IVA, meses, comisión e incremento vienen del mandato y no se
-   editan), servicios, propiedad horizontal y copropiedad, horarios, parqueadero y depósito, propietario (tipo de
-   persona, documento y representante legal si es empresa), copropietarios con su % (deben sumar 100), arrendatario
-   (igual que el propietario), mascotas/vehículos/personas, codeudores, acuerdos y referido PPH.
+1. **Datos del negocio**:
+   - **Condiciones del negocio**: canon, administración, IVA, meses, comisión e incremento. Se precargan del mandato,
+     se pueden cambiar y, al guardar, pasan también al mandato en su formato:
+     - canon y administración en pesos, por ejemplo "1.200.000";
+     - duración como "12 Meses";
+     - administración sin valor: "0", o vacía si el mandato la tenía vacía;
+     - IVA vacío cuando el canon no lo incluye.
+
+     La hoja guarda "No aplica" en la administración vacía o en cero y en el IVA cuando el canon no lo lleva. El
+     campo del IVA solo aparece si el canon incluye IVA.
+   - Servicios, propiedad horizontal y copropiedad, horarios, parqueadero y depósito.
+   - Propietario: tipo de persona, documento y representante legal si es empresa.
+   - Copropietarios: una tarjeta por persona con su %, que deben sumar 100.
+   - Arrendatario: igual que el propietario.
+   - Mascotas, vehículos y personas.
+   - Codeudores: un bloque por codeudor.
+   - Acuerdos y referido PPH.
 2. **Lista de chequeo**: estado de 52 ítems y observación opcional. Al editar se cargan los estados y observaciones
    guardados; en hojas anteriores a la lista (antes de la #82) los ítems vacíos no son obligatorios.
 

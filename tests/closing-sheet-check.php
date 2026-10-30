@@ -123,7 +123,8 @@ $check($v['tipo_persona_propietario'] === 'Natural' && $v['tipo_documento_propie
 
 $input = $query + [
   'id_ticket' => '10999', 'tipo_inmueble' => 'apartamento', 'gestion_inmueble' => 'Arriendo', 'destinacion_inmueble' => 'Vivienda',
-  'valor_canon' => '999', 'derechos_inmobiliarios' => '20', 'dias_gracia' => '30', 'direccion' => 'Carrera 32B #80-624 Apto 308',
+  'valor_canon' => '$ 1200000', 'valor_administracion' => '', 'incluye_iva' => 'No', 'iva_total_precio' => '50.000', 'meses_contrato' => '12 meses',
+  'tasa_administracion' => '10%', 'porcentaje_incremento' => 'IPC +2', 'derechos_inmobiliarios' => '20', 'dias_gracia' => '30', 'direccion' => 'Carrera 32B #80-624 Apto 308',
   'servicios_publicos' => ['Agua', 'Energia'], 'luz' => '1484926', 'agua' => '921763', 'gas' => 'no se envía',
   'propiedad_horizontal' => 'Si', 'copropiedad' => 'Salvador de Bahía', 'nit_copropiedad' => '902081791', 'administrador' => 'Daniel Ramírez',
   'correo_copropiedad' => 'admon@example.invalid', 'celular_copropiedad' => '3229155720',
@@ -153,7 +154,13 @@ $check((int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_cierres') === 0, 'noth
 $result = $service->save($input, $sender);
 $closing = $db->getRow('SELECT * FROM wp_jet_cct_cierres WHERE _ID = ?', [$result['id']]);
 $check($result['mode'] === 'crear' && $closing['estado'] === ClosingSheetService::STATUS_NEW && $closing['id_empleado'] === '1508' && $closing['cct_author_id'] === '1508' && $closing['creador'] === 'Kellys Roqueme' && $closing['sucursal'] === '1', 'closing sheet is created with status, real employee id, creator and branch');
-$check($closing['valor_canon'] === '1.150.000' && $closing['numero_solicitud'] === '12485586' && $closing['id_contrato_arrendamiento'] === '880' && $closing['medio'] === 'Aviso', 'read-only and hidden data come from the server, not the browser');
+$check($closing['valor_canon'] === '1.200.000' && $closing['valor_administracion'] === 'No aplica' && $closing['iva_total_precio'] === 'No aplica' && $closing['meses_contrato'] === '12' && $closing['tasa_administracion'] === '10' && $closing['porcentaje_incremento'] === 'IPC +2', 'business terms are editable and saved in the sheet format');
+$termsMandate = $db->getRow('SELECT precio, administracion, iva_total_precio, duracion, tasa_comision, incremento_pactado FROM wp_jet_cct_contrato_mandato WHERE _ID = 636');
+$check(array_map('strval', $termsMandate) === ['precio' => '1.200.000', 'administracion' => '0', 'iva_total_precio' => '', 'duracion' => '12 Meses', 'tasa_comision' => '10', 'incremento_pactado' => 'IPC +2'], 'business terms go to the mandate in its own format');
+$check($closing['numero_solicitud'] === '12485586' && $closing['id_contrato_arrendamiento'] === '880' && $closing['medio'] === 'Aviso', 'hidden study data come from the server, not the browser');
+$terms = ['valor_canon' => 'mil', 'valor_administracion' => '0', 'incluye_iva' => 'Si', 'iva_total_precio' => '', 'meses_contrato' => '0', 'tasa_administracion' => '150'];
+$termErrors = ClosingSheetService::normalizeTerms($terms);
+$check(count($termErrors) === 4 && $terms['valor_administracion'] === 'No aplica', 'invalid canon, VAT, months and commission are reported; zero administration means not applicable');
 $check($closing['gas'] === '' && $closing['servicios_publicos'] === serialize(['Agua', 'Energia']) && $closing['mascotas'] === serialize([['tipo' => 'Perro', 'raza' => 'Pincher']]), 'hidden fields are empty and lists are serialized like JetForm');
 $check($closing['tipo_persona_arrendatario'] === 'Juridica' && $closing['representante_arrendatario'] === 'Andrés Ordóñez' && $closing['representante_propietario'] === '', 'person types are saved; the representative of a natural person is not');
 $tenant = $db->getRow('SELECT * FROM wp_jet_cct_arrendatarios WHERE _ID = 764');
@@ -169,7 +176,7 @@ $mandate = $db->getRow('SELECT * FROM wp_jet_cct_contrato_mandato WHERE _ID = 63
 $check($mandate['id_hoja_cierre'] === (string) $result['id'] && $mandate['estado_hoja_cierre'] === ClosingSheetService::STATUS_NEW, 'the mandate points to the new closing sheet');
 $check($mandate['direccion_fisica'] === 'Carrera 32B #80-624 Apto 308' && $mandate['dias_gracia'] === '30' && $mandate['copropiedad'] === 'Salvador de Bahía' && $mandate['administrador_co'] === 'Daniel Ramírez' && $mandate['correo_1'] === 'yesenis.nuevo@example.invalid' && $mandate['servicios_publicos'] === serialize(['Agua', 'Energia']), 'closing sheet changes are written to the mandate');
 $check($mandate['tipo_1'] === 'Natural' && $mandate['tipo_documento_1'] === 'Cédula de Ciudadania' && $mandate['empresa_1'] === 'no se borra', 'owner person type goes to the mandate; a hidden representative does not erase it');
-$check($mandate['porcentaje_1'] === '60' && $mandate['porcentaje_2'] === '40' && $mandate['id_propietario_nuevo_2'] === (string) $newOwner['_ID'] && $mandate['precio'] === '1.150.000', 'shares and owner ids go to the mandate; read-only data is untouched');
+$check($mandate['porcentaje_1'] === '60' && $mandate['porcentaje_2'] === '40' && $mandate['id_propietario_nuevo_2'] === (string) $newOwner['_ID'] && $mandate['precio'] === '1.200.000', 'shares, owner ids and the edited canon go to the mandate');
 $check(in_array('dias_gracia', $result['synced'], true) && !in_array('id_hoja_cierre', $result['synced'], true), 'the result lists the mandate data that changed');
 
 $property = $db->getRow('SELECT * FROM wp_jet_cct_inmuebles WHERE _ID = 13037');

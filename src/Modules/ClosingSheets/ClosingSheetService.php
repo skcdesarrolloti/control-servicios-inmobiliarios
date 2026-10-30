@@ -55,6 +55,15 @@ final class ClosingSheetService
     'tipo_documento_propietario' => 'tipo_documento_1', 'representante_propietario' => 'empresa_1', 'documento_representante_propietario' => 'nit_1',
   ];
 
+  /**
+   * Condiciones del negocio: columna de la hoja => columna del mandato. Se editan en la hoja y pasan al mandato en su
+   * formato ("1.150.000", "12 Meses"; administración sin valor = "0"; IVA que no aplica = vacío).
+   */
+  public const MANDATE_TERMS = [
+    'valor_canon' => 'precio', 'valor_administracion' => 'administracion', 'incluye_iva' => 'incluye_iva', 'iva_total_precio' => 'iva_total_precio',
+    'meses_contrato' => 'duracion', 'tasa_administracion' => 'tasa_comision', 'porcentaje_incremento' => 'incremento_pactado',
+  ];
+
   /** Columna de la hoja (sin _propietario / _arrendatario) => columna de la ficha. */
   private const PERSON_PROFILE = [
     'tipo_persona' => 'tipo_persona', 'tipo_documento' => 'tipo_documento', 'representante' => 'nombre_juridico', 'documento_representante' => 'documento_juridico',
@@ -323,6 +332,63 @@ final class ClosingSheetService
     return $values;
   }
 
+  /**
+   * Formato de las condiciones del negocio como las guarda la hoja: pesos con puntos de miles, meses y comisión como
+   * número, administración vacía o en cero = "No aplica" y, sin IVA, el IVA = "No aplica". Devuelve los errores.
+   * @param array<string,mixed> $values @return list<string>
+   */
+  public static function normalizeTerms(array &$values): array
+  {
+    $errors = [];
+    $pesos = static function (string $value): ?string {
+      $digits = preg_replace('/[$\s.]/', '', trim($value)) ?? '';
+      $digits = preg_replace('/,\d{1,2}$/', '', $digits) ?? $digits;
+      return preg_match('/^\d{1,12}$/D', $digits) === 1 ? number_format((int) $digits, 0, ',', '.') : null;
+    };
+    $canon = trim((string) ($values['valor_canon'] ?? ''));
+    if ($canon !== '') {
+      $formatted = $pesos($canon);
+      $formatted !== null && $formatted !== '0' ? $values['valor_canon'] = $formatted : $errors[] = 'Canon: escribe el valor en pesos, por ejemplo 1.150.000.';
+    }
+    $administration = trim((string) ($values['valor_administracion'] ?? ''));
+    if ($administration === '' || strcasecmp($administration, 'No aplica') === 0 || $pesos($administration) === '0') {
+      $values['valor_administracion'] = 'No aplica';
+    } else {
+      $formatted = $pesos($administration);
+      $formatted !== null ? $values['valor_administracion'] = $formatted : $errors[] = 'Administración: escribe el valor en pesos o déjala vacía si no aplica.';
+    }
+    if (strcasecmp(trim((string) ($values['incluye_iva'] ?? '')), 'Si') !== 0) {
+      $values['iva_total_precio'] = 'No aplica';
+    } else {
+      $iva = trim((string) ($values['iva_total_precio'] ?? ''));
+      $formatted = $iva === '' ? null : $pesos($iva);
+      $formatted !== null && $formatted !== '0' ? $values['iva_total_precio'] = $formatted : $errors[] = 'IVA del canon: si el canon incluye IVA, escribe su valor en pesos.';
+    }
+    $months = trim((string) ($values['meses_contrato'] ?? ''));
+    if ($months !== '') {
+      $number = (int) (preg_replace('/\D+/', '', $months) ?: 0);
+      $number >= 1 && $number <= 240 ? $values['meses_contrato'] = (string) $number : $errors[] = 'Meses de contrato: escribe un número de meses, por ejemplo 12.';
+    }
+    $rate = str_replace([' ', '%'], '', trim((string) ($values['tasa_administracion'] ?? '')));
+    if ($rate !== '') {
+      $rate = str_replace(',', '.', $rate);
+      is_numeric($rate) && (float) $rate >= 0 && (float) $rate <= 100 ? $values['tasa_administracion'] = rtrim(rtrim($rate, '0'), '.') === '' ? '0' : (str_contains($rate, '.') ? rtrim(rtrim($rate, '0'), '.') : $rate) : $errors[] = 'Porcentaje de comisión: escribe un número entre 0 y 100, por ejemplo 10.';
+    }
+    return $errors;
+  }
+
+  /** La condición como la guarda el mandato. */
+  private static function mandateTerm(string $column, string $value, string $current): string
+  {
+    return match ($column) {
+      // Sin administración el mandato tiene "0" o vacío: se respeta el que ya tenga.
+      'valor_administracion' => $value === 'No aplica' ? (trim($current) === '' ? '' : '0') : $value,
+      'iva_total_precio' => $value === 'No aplica' ? '' : $value,
+      'meses_contrato' => $value !== '' ? $value . ' Meses' : '',
+      default => $value,
+    };
+  }
+
   /** "Jurídica", "Juridico" y similares se guardan como "Juridica", el valor de los formularios actuales. */
   public static function personType(string $value): string
   {
@@ -503,8 +569,12 @@ final class ClosingSheetService
         default => trim((string) (is_array($raw) ? '' : $raw)),
       };
     }
+    $errors = array_merge($errors, self::normalizeTerms($values));
     foreach ($this->fields() as $field) {
       $name = $field['name'];
+      if ($name === 'iva_total_precio' && $values['iva_total_precio'] === 'No aplica') {
+        continue;
+      }
       if (!self::visible($field, $values)) {
         $values[$name] = in_array($field['type'], ['checkbox', 'repeater'], true) ? [] : '';
         continue;
@@ -746,6 +816,12 @@ final class ClosingSheetService
   private function syncMandate(array $mandate, array $values, array $owners, int $newClosingId, string $nowSql): array
   {
     $data = [];
+    foreach (self::MANDATE_TERMS as $column => $target) {
+      $value = trim((string) ($values[$column] ?? ''));
+      if ($value !== '') {
+        $data[$target] = self::mandateTerm($column, $value, (string) ($mandate[$target] ?? ''));
+      }
+    }
     foreach (self::MANDATE_SYNC as $column => $target) {
       $value = $values[$column] ?? '';
       $isEmpty = is_array($value) ? $value === [] : $value === '';

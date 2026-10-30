@@ -153,7 +153,7 @@ final class ClosingSheetPageView
     $required = !empty($field['required']) && !($this->editing && (is_array($value) ? $value === [] : trim((string) $value) === ''));
     $readonly = !empty($field['readonly']);
     $id = 'cs_' . $name;
-    $label = '<label class="cs-label" for="' . $id . '">' . $this->e($field['label']) . ($required ? ' <span class="cs-req" aria-hidden="true">*</span>' : '') . ($readonly ? ' <span class="cs-tag">del mandato</span>' : '') . '</label>';
+    $label = '<label class="cs-label" for="' . $id . '">' . $this->e($field['label']) . ($required ? ' <span class="cs-req" aria-hidden="true">*</span>' : '') . ($readonly ? ' <span class="cs-tag">del mandato</span>' : '') . (!empty($field['mandate']) ? ' <span class="cs-tag">también en el mandato</span>' : '') . '</label>';
     $common = ' id="' . $id . '" name="' . $this->e($name) . '"' . ($required ? ' data-cs-required' : '') . ($readonly ? ' readonly tabindex="-1"' : '');
     $choices = $this->choices($field, $options);
     $wide = in_array($field['type'], ['textarea', 'checkbox', 'repeater'], true);
