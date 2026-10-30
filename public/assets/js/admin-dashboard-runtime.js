@@ -12304,6 +12304,7 @@
       var sections = [
         { key: "actas", label: "Actas", icon: "task" },
         { key: "puente", label: "Puente funcionarios", icon: "badge" },
+        { key: "cierre", label: "Hoja de cierre", icon: "handshake" },
         { key: "publicas", label: "Vistas públicas", icon: "public" },
         { key: "autologin", label: "Autologin", icon: "key" },
       ];
@@ -12313,7 +12314,9 @@
         revision_preventiva: "Revisión preventiva", revision_correctiva: "Revisión correctiva",
         crear_cotizacion: "Crear cotización", editar_cotizacion: "Editar cotización",
         enviar_cotizacion: "Enviar cotización", crear_orden: "Crear orden de mantenimiento",
+        editar_hoja_cierre: "Editar hoja de cierre",
       };
+      var recordLabels = { id_cotizacion: "ID de la cotización (_ID)", id_cierre: "Número de la hoja de cierre (_ID)" };
       // El enlace se arma en el servidor: el secreto de autologin nunca llega al navegador.
       var generator = canGenerate
         ? '<section class="scm-guide-section" data-scm-guide-section="generar" hidden>' +
@@ -12344,6 +12347,11 @@
           { title: "Editar cotización", text: "Abre la cotización exacta en modo edición cuando su estado lo permita.", url: bridgeUrl("accion=editar_cotizacion&id_cotizacion=<ID_COTIZACION>") },
           { title: "Enviar cotización", text: "Abre el envío por correo/WhatsApp de la cotización exacta.", url: bridgeUrl("accion=enviar_cotizacion&id_cotizacion=<ID_COTIZACION>") },
           { title: "Crear orden de mantenimiento", text: "Abre la creación de la orden para la cotización aprobada.", url: bridgeUrl("accion=crear_orden&id_cotizacion=<ID_COTIZACION>") },
+        ]) +
+        section("cierre", "Hoja de cierre de negocio nativa", "Reemplaza los formularios JetForm de a&ntilde;adir y editar. Pide sesi&oacute;n del panel; agrega el sufijo de autologin para entrar directo desde WordPress. Todo lo que se guarda en la hoja actualiza tambi&eacute;n el mandato.", [
+          { title: "Añadir hoja de cierre", badge: "Comercial", tone: "good", text: "Botón \"Añadir Cierre\" de WordPress, después de elegir el arrendatario. Usa los mismos parámetros del enlace actual (/mi-cuenta/anadir-hoja-de-cierre/); solo id_contrato (el mandato) es obligatorio y lo que falte se toma del mandato.", how: "En WordPress cambia solo el inicio del enlace del botón; los parámetros quedan iguales.", url: appBase + "/hoja-cierre.php?id_contrato=<ID_MANDATO>&id_arrendatario=<ID_ARRENDATARIO>&id_inmueble=<ID_INMUEBLE>&id_inmueble_data=<ID_INMUEBLE_DATA>&id_propietario=<ID_PROPIETARIO>&id_copropiedad=<ID_COPROPIEDAD>&id_estudio_aseguradora=<ID_ESTUDIO>" },
+          { title: "Editar hoja de cierre", badge: "Comercial", text: "Abre la hoja guardada con sus datos y la lista de chequeo para corregirla. No envía correos.", how: "<ID_CIERRE> es el número de la hoja (_ID en wp_jet_cct_cierres).", url: appBase + "/hoja-cierre.php?id_cierre=<ID_CIERRE>" },
+          { title: "Ver hoja de cierre", badge: "WordPress", tone: "warn", text: "Vista de la hoja en WordPress (sigue siendo de WordPress).", url: "https://sucasainmobiliaria.com.co/hoja-de-cierre/?numero=<ID_CIERRE>" },
         ]) +
         section("publicas", "Vistas públicas para destinatarios", "Se abren sin login con un enlace firmado (<code>expires</code> + <code>sig</code>) que el sistema genera al enviar el documento por correo o WhatsApp. La firma no se puede armar a mano: copia el enlace desde la notificaci&oacute;n o el bot&oacute;n del caso. Con sesi&oacute;n del panel basta <code>?numero=</code> para revisar la vista tal como la ver&aacute; el destinatario.", [
           { title: "Revisión preventiva", badge: "Vence en 180 días", text: "Informe de la revisión preventiva para propietario o arrendatario, con evidencias y botón de imprimir. Agrega &format=pdf para descargar el PDF.", how: "Se genera al crear y al enviar la revisión preventiva desde el caso.", url: appBase + "/revision-preventiva.php?numero=<ID_REVISION>" + signed },
@@ -12388,8 +12396,7 @@
           var recordParams = {};
           var syncRecordLabel = function () {
             if (!form) return;
-            var byQuote = recordParams[form.elements.accion.value] === "id_cotizacion";
-            popup.querySelector("[data-scm-guide-record-label]").textContent = byQuote ? "ID de la cotización (_ID)" : "ID interno del caso (_ID)";
+            popup.querySelector("[data-scm-guide-record-label]").textContent = recordLabels[recordParams[form.elements.accion.value]] || "ID interno del caso (_ID)";
           };
           var loadEmployees = function () {
             if (!form || loadedEmployees) return;

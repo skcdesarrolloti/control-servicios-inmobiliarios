@@ -26,7 +26,14 @@ trait HandlesAutologinLinks
     'editar_cotizacion' => 'id_cotizacion',
     'enviar_cotizacion' => 'id_cotizacion',
     'crear_orden' => 'id_cotizacion',
+    'editar_hoja_cierre' => 'id_cierre',
     ];
+  }
+
+  /** Acciones que abren su propia página en vez del puente. @return array<string,string> */
+  private static function autologinLinkPages(): array
+  {
+    return ['editar_hoja_cierre' => 'hoja-cierre.php'];
   }
 
   private function autologinSecretForLinks(): string
@@ -66,16 +73,16 @@ trait HandlesAutologinLinks
       $this->jsonFail('Selecciona una acción válida.');
     }
     if (preg_match('/^\d{1,10}$/D', $recordId) !== 1 || (int) $recordId <= 0) {
-      $this->jsonFail('Escribe el ID numérico del caso o de la cotización.');
+      $this->jsonFail('Escribe el ID numérico del caso, la cotización o la hoja de cierre.');
     }
     $active = array_column(FuncionarioOptions::activeFuncionarios($this->db, new SchemaInspector($this->db), 'employee', true), null, 'employee_id');
     if ($employeeId === '' || !isset($active[$employeeId])) {
       $this->jsonFail('Selecciona un funcionario activo.');
     }
-    $base = rtrim((string) SCM_BASE_URL, '/') . '/puente-funcionario.php?' . http_build_query([
-      'accion' => $action,
-      self::autologinLinkActions()[$action] => $recordId,
-    ], '', '&', PHP_QUERY_RFC3986);
+    $page = self::autologinLinkPages()[$action] ?? null;
+    $query = $page === null ? ['accion' => $action] : [];
+    $query[self::autologinLinkActions()[$action]] = $recordId;
+    $base = rtrim((string) SCM_BASE_URL, '/') . '/' . ($page ?? 'puente-funcionario.php') . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
     $this->jsonOk([
       'url' => ActaAutologin::link($secret, $base, $employeeId),
       'employee' => (string) ($active[$employeeId]['name'] ?? ''),
