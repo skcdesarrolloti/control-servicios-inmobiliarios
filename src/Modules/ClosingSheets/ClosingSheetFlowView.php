@@ -23,7 +23,7 @@ final class ClosingSheetFlowView
    * @param array{base_url:string,logo:string,favicon:string,css:list<string>,js:list<string>,user:string,session:bool} $page
    * @param array<string,string> $facts
    */
-  public static function page(array $page, string $title, string $eyebrow, string $icon, array $facts, string $body, string $state = ''): string
+  public static function page(array $page, string $title, string $eyebrow, string $icon, array $facts, string $body, string $state = '', bool $hero = true): string
   {
     $h = [self::class, 'e'];
     $firstName = trim((string) strtok(trim($page['user']), ' ')) ?: $page['user'];
@@ -40,10 +40,11 @@ final class ClosingSheetFlowView
       . ($page['logo'] !== '' ? '<img src="' . $h($page['logo']) . '" alt="SKC SuCasa Inmobiliaria">' : '') . '<span>SKC SuCasa Inmobiliaria</span></a>'
       . ($firstName !== '' ? '<div class="rp-user"><span class="rp-avatar" aria-hidden="true">' . $h(mb_strtoupper(mb_substr($firstName, 0, 1, 'UTF-8'), 'UTF-8')) . '</span><span class="rp-user-name">Hola, <strong>' . $h($firstName) . '</strong></span></div>' : '')
       . '</header><main class="scm-review-page-shell cs-shell">'
-      . '<section class="rp-hero"><span class="rp-hero-icon material-symbols-outlined" aria-hidden="true">' . $h($icon) . '</span><div class="rp-hero-text">'
-      . '<p class="rp-eyebrow">' . $h($eyebrow) . '</p><h1>' . $h($title) . ($state !== '' ? ' ' . self::badge($state) : '') . '</h1>'
-      . ($facts !== [] ? '<dl class="rp-facts">' . implode('', array_map(static fn($term, $value): string => '<div><dt>' . $h($term) . '</dt><dd>' . $h($value) . '</dd></div>', array_keys($facts), $facts)) . '</dl>' : '')
-      . '</div></section>' . $body . '</main></body></html>';
+      . ($hero ? '<section class="rp-hero"><span class="rp-hero-icon material-symbols-outlined" aria-hidden="true">' . $h($icon) . '</span><div class="rp-hero-text">'
+        . '<p class="rp-eyebrow">' . $h($eyebrow) . '</p><h1>' . $h($title) . ($state !== '' ? ' ' . self::badge($state) : '') . '</h1>'
+        . ($facts !== [] ? '<dl class="rp-facts">' . implode('', array_map(static fn($term, $value): string => '<div><dt>' . $h($term) . '</dt><dd>' . $h($value) . '</dd></div>', array_keys($facts), $facts)) . '</dl>' : '')
+        . '</div></section>' : '')
+      . $body . '</main></body></html>';
   }
 
   public static function badge(string $state): string
@@ -113,15 +114,26 @@ final class ClosingSheetFlowView
 
   // ---------------------------------------------------------------- hoja en solo lectura
 
+  /** Datos del negocio que van en el resumen de arriba (no se repiten en su sección): columna => [etiqueta, en pesos]. */
+  private const SUMMARY = [
+    'valor_canon' => ['Canon', true], 'valor_administracion' => ['Administración', true], 'incluye_iva' => ['¿Canon con IVA?', false],
+    'iva_total_precio' => ['IVA del canon', true], 'meses_contrato' => ['Meses de contrato', false], 'tasa_administracion' => ['Comisión (%)', false],
+    'porcentaje_incremento' => ['Incremento pactado', false], 'derechos_inmobiliarios' => ['Derechos inmobiliarios', false], 'dias_gracia' => ['Días de gracia', false],
+  ];
+
   /**
-   * @param array{closing:array<string,mixed>,values:array<string,mixed>,owners:list<array<string,mixed>>,options:array<string,mixed>,review:array<string,mixed>|null,results:list<array<string,mixed>>} $sheet
-   * @param array{view:bool,review:bool,respond:bool,edit:bool} $can @param array<string,string> $hidden @param array<string,string> $links review/edit/panel
+   * La hoja como documento (membrete, resumen, secciones, revisión, lista de chequeo y firmas), con las acciones afuera.
+   * @param array{closing:array<string,mixed>,values:array<string,mixed>,owners:list<array<string,mixed>>,options:array<string,mixed>,review:array<string,mixed>|null,results:list<array<string,mixed>>,signers:list<array<string,mixed>>,company:array<string,string>} $sheet
+   * @param array{view:bool,review:bool,respond:bool,edit:bool} $can @param array<string,string> $hidden @param array<string,string> $links review, edit y back (listado, solo con sesión)
    */
-  public static function sheetBody(array $sheet, array $can, array $hidden, array $links): string
+  public static function sheetBody(array $sheet, array $can, array $hidden, array $links, string $logo = ''): string
   {
     $closing = $sheet['closing'];
     $state = ClosingSheetWorkflow::state($closing);
     $actions = '';
+    if (($links['back'] ?? '') !== '') {
+      $actions .= '<a class="cs-secondary" href="' . self::e($links['back']) . '"><span class="material-symbols-outlined" aria-hidden="true">list</span> Hojas de cierre</a>';
+    }
     if ($can['review'] && ClosingSheetWorkflow::canReview($closing)) {
       $actions .= '<a class="cs-primary" href="' . self::e($links['review']) . '"><span class="material-symbols-outlined" aria-hidden="true">fact_check</span> ' . ($sheet['review'] !== null ? 'Repetir revisión de servicios' : 'Hacer revisión de servicios') . '</a>';
     }
@@ -131,23 +143,116 @@ final class ClosingSheetFlowView
     $actions .= '<button type="button" class="cs-secondary" data-csf-print><span class="material-symbols-outlined" aria-hidden="true">print</span> Imprimir</button>';
 
     $html = '<div class="cs-actions csf-toolbar">' . $actions . '</div>';
-    $html .= self::responseBlock($closing);
     if ($can['respond'] && ClosingSheetWorkflow::canRespond($closing)) {
       $html .= self::responseForm($hidden, $state);
     } elseif ($can['respond'] && $state === ClosingSheetService::STATUS_NEW) {
-      $html .= '<p class="cs-note csf-note"><span class="material-symbols-outlined" aria-hidden="true">schedule</span> Podrás aprobarla o no cuando se registre la revisión de servicios públicos.</p>';
+      $html .= '<p class="cs-note csf-note csf-pending"><span class="material-symbols-outlined" aria-hidden="true">schedule</span> Podrás aprobarla o no cuando se registre la revisión de servicios públicos.</p>';
     }
-    $html .= self::reviewBlock($sheet);
+
+    $values = $sheet['values'];
+    $summary = [];
+    foreach (self::SUMMARY as $column => [$label, $money]) {
+      $value = $values[$column] ?? '';
+      $summary[] = [$label, self::amount(is_array($value) ? '' : (string) $value, $money)];
+    }
+    $doc = self::docHeader($closing, $sheet['company'], $logo)
+      . self::responseBlock($closing)
+      . self::keyValues('Resumen del negocio', $summary, 'csf-summary')
+      . self::keyValues('Datos del estudio y entrega', [
+        ['Fecha posible de entrega', self::anyDate($closing['fecha_posible_entrega'] ?? '')], ['Aseguradora', (string) ($closing['aseguradora'] ?? '')],
+        ['Número de solicitud', (string) ($closing['numero_solicitud'] ?? '')], ['Medio', (string) ($closing['medio'] ?? '')],
+        ['Ubicación de llaves', (string) ($closing['ubicacion_llaves'] ?? '')],
+        ['Encargado de llaves', trim((string) ($closing['persona_llaves'] ?? '') . ' ' . (string) ($closing['contacto_llaves'] ?? ''))],
+      ]);
     foreach (ClosingSheetForm::SECTIONS as [$title, $fields]) {
-      $html .= self::readSection($title, $fields, $sheet['values'], $sheet['options']);
+      if ($title === 'Datos del negocio') {
+        $fields = array_values(array_filter($fields, static fn(array $field): bool => !isset(self::SUMMARY[$field['name']])));
+        $title = 'Inmueble y negocio';
+      }
+      $doc .= self::readSection($title, $fields, $values, $sheet['options']);
       if ($title === 'Propietario') {
-        $html .= self::ownersBlock($sheet['owners']);
+        $doc .= self::ownersBlock($sheet['owners']);
       }
     }
-    $html .= self::checklistBlock($sheet['values']);
-    return '<div class="csf-sheet">' . $html . '</div>'
+    $doc .= self::reviewBlock($sheet) . self::checklistBlock($values) . self::signatures($sheet['signers']) . self::docFooter($sheet['company']);
+    return $html . '<article class="csf-doc">' . $doc . '</article>'
       . '<dialog class="csf-dialog" data-csf-dialog><header><strong>Revisión de servicios públicos</strong><button type="button" class="cs-secondary" data-csf-dialog-close>Cerrar</button></header><iframe title="Revisión de servicios públicos" referrerpolicy="no-referrer"></iframe></dialog>'
       . self::done();
+  }
+
+  /** @param array<string,string> $company */
+  private static function docHeader(array $closing, array $company, string $logo): string
+  {
+    $date = (int) ($closing['fecha'] ?? 0);
+    $facts = [
+      'Fecha' => $date > 0 ? self::date($date) : '', 'Inmueble' => '#' . trim((string) ($closing['id_inmueble'] ?? '')),
+      'Dirección' => trim((string) ($closing['direccion'] ?? '')), 'Propietario' => trim((string) ($closing['propietario'] ?? '')),
+      'Arrendatario' => trim((string) ($closing['arrendatario'] ?? '')), 'Mandato' => '#' . trim((string) ($closing['id_contrato'] ?? '')),
+    ];
+    $items = '';
+    foreach ($facts as $term => $value) {
+      if (trim($value, ' #') !== '') {
+        $items .= '<div><dt>' . self::e($term) . '</dt><dd>' . self::e($value) . '</dd></div>';
+      }
+    }
+    return '<header class="csf-doc-head"><div class="csf-doc-brand">' . ($logo !== '' ? '<img src="' . self::e($logo) . '" alt="SKC SuCasa Inmobiliaria">' : '')
+      . '<div><strong>SKC SuCasa Inmobiliaria</strong><span>NIT ' . self::e($company['nit']) . '</span></div></div>'
+      . '<div class="csf-doc-title"><p>Hoja de cierre de negocio</p><h1>#' . (int) $closing['_ID'] . '</h1>' . self::badge(ClosingSheetWorkflow::state($closing)) . '</div></header>'
+      . '<dl class="csf-doc-facts">' . $items . '</dl>';
+  }
+
+  /** @param list<array{0:string,1:string}> $pairs */
+  private static function keyValues(string $title, array $pairs, string $class = ''): string
+  {
+    $items = '';
+    foreach ($pairs as [$label, $value]) {
+      if (trim($value) !== '') {
+        $items .= '<div class="csf-item"><dt>' . self::e($label) . '</dt><dd>' . self::e($value) . '</dd></div>';
+      }
+    }
+    return $items === '' ? '' : '<section class="cs-section ' . $class . '"><h2>' . self::e($title) . '</h2><dl class="csf-grid">' . $items . '</dl></section>';
+  }
+
+  /** Cierre del documento: quién elaboró, verificó y autorizó, con su firma si la tiene en Funcionarios. @param list<array<string,mixed>> $signers */
+  private static function signatures(array $signers): string
+  {
+    $html = '';
+    foreach ($signers as $signer) {
+      $done = trim((string) $signer['name']) !== '';
+      $html .= '<div class="csf-sign' . ($done ? '' : ' is-pending') . '"><div class="csf-sign-line">'
+        . ($done && $signer['signature'] !== '' ? '<img src="' . self::e($signer['signature']) . '" alt="Firma de ' . self::e($signer['name']) . '">' : '') . '</div>'
+        . '<strong>' . self::e($done ? $signer['name'] : 'Pendiente') . '</strong>'
+        . '<span>' . self::e($signer['action'] . ' · ' . ($done && $signer['cargo'] !== '' ? $signer['cargo'] : $signer['role'])) . '</span>'
+        . ($done && (int) $signer['date'] > 0 ? '<small>' . self::e(self::date((int) $signer['date'])) . '</small>' : '') . '</div>';
+    }
+    return '<section class="cs-section csf-signatures"><h2>Realizado por</h2><div class="csf-sign-grid">' . $html . '</div></section>';
+  }
+
+  /** @param array<string,string> $company */
+  private static function docFooter(array $company): string
+  {
+    $parts = array_filter(['SKC SuCasa Inmobiliaria', 'NIT ' . $company['nit'], $company['address'], $company['phone'] !== '' ? 'Tel. ' . $company['phone'] : '', $company['email']]);
+    return '<footer class="csf-doc-foot">' . self::e(implode(' · ', $parts)) . '</footer>';
+  }
+
+  /** Valores en pesos con $ (los que traen texto, como "No aplica", quedan igual). */
+  private static function amount(string $value, bool $money): string
+  {
+    $value = trim($value);
+    if (!$money || $value === '' || preg_match('/^[\d.]+$/', $value) !== 1) {
+      return $value;
+    }
+    return '$' . number_format((int) str_replace('.', '', $value), 0, ',', '.');
+  }
+
+  /** Fecha guardada como timestamp o como texto. */
+  private static function anyDate(mixed $value): string
+  {
+    $value = trim((string) $value);
+    if ($value === '' || $value === '0') {
+      return '';
+    }
+    return ctype_digit($value) ? self::date((int) $value) : $value;
   }
 
   private static function responseBlock(array $closing): string
@@ -186,13 +291,14 @@ final class ClosingSheetFlowView
     $rows = '';
     foreach ($results as $result) {
       $rows .= '<tr><td><strong>' . self::e($result['label']) . '</strong><small>' . self::e(trim($result['account_label'] . ' ' . $result['account'])) . ($result['meter'] !== '' ? ' · Medidor ' . self::e($result['meter']) : '') . '</small></td>'
+        . '<td>' . self::e($result['reviewed'] > 0 ? self::date($result['reviewed']) : '—') . '</td>'
         . '<td>' . self::e($result['cutoff'] > 0 ? self::date($result['cutoff']) : '—') . '</td>'
         . '<td><span class="csf-result' . ($result['status'] === 'Al dia' ? ' is-good' : ' is-bad') . '">' . self::e(ClosingSheetWorkflow::statusLabel($result['status'])) . '</span></td>'
         . '<td>' . self::e(ClosingSheetWorkflow::money($result['value'])) . '</td></tr>';
     }
     $who = $review !== null ? 'Revisión #' . (int) $review['_ID'] . ' · ' . trim((string) ($review['realizado_por'] ?? '')) . ' · ' . self::date((int) ($review['fecha'] ?? 0)) : 'Verificó: ' . trim((string) ($sheet['closing']['verificador'] ?? ''));
     return '<section class="cs-section"><h2>Revisión de servicios públicos</h2><p class="cs-note">' . self::e($who) . '</p>'
-      . '<div class="cs-table-wrap"><table class="cs-table"><thead><tr><th>Servicio</th><th>Fecha de corte</th><th>Resultado</th><th>Valor</th></tr></thead><tbody>' . $rows . '</tbody></table></div>'
+      . '<div class="cs-table-wrap"><table class="cs-table"><thead><tr><th>Servicio</th><th>Revisado</th><th>Fecha de corte</th><th>Resultado</th><th>Valor</th></tr></thead><tbody>' . $rows . '</tbody></table></div>'
       . ($review !== null ? '<div class="cs-actions csf-left"><button type="button" class="cs-secondary" data-csf-preview="' . self::e(PublicServicesDocument::url((int) $review['_ID'])) . '"><span class="material-symbols-outlined" aria-hidden="true">description</span> Ver documento de la revisión</button></div>' : '')
       . '</section>';
   }
@@ -228,8 +334,8 @@ final class ClosingSheetFlowView
       if ($rows === [] || $columns === []) {
         return '';
       }
-      return '<table class="cs-table csf-mini"><thead><tr>' . implode('', array_map(static fn(array $c): string => '<th>' . self::e($c['label']) . '</th>', $columns)) . '</tr></thead><tbody>'
-        . implode('', array_map(static fn(array $row): string => '<tr>' . implode('', array_map(static fn(array $c): string => '<td>' . self::e($row[$c['name']] ?? '') . '</td>', $columns)) . '</tr>', $rows)) . '</tbody></table>';
+      return '<div class="cs-table-wrap"><table class="cs-table csf-mini"><thead><tr>' . implode('', array_map(static fn(array $c): string => '<th>' . self::e($c['label']) . '</th>', $columns)) . '</tr></thead><tbody>'
+        . implode('', array_map(static fn(array $row): string => '<tr>' . implode('', array_map(static fn(array $c): string => '<td>' . self::e($row[$c['name']] ?? '') . '</td>', $columns)) . '</tr>', $rows)) . '</tbody></table></div>';
     }
     $labels = self::labels($field, $options);
     if (is_array($value)) {
@@ -269,6 +375,7 @@ final class ClosingSheetFlowView
   private static function checklistBlock(array $values): string
   {
     $html = '';
+    $counts = ['good' => 0, 'bad' => 0, 'muted' => 0];
     foreach (ClosingSheetForm::CHECKLIST as [$group, $when, $items]) {
       if ($when !== null && !ClosingSheetService::visible(['when' => $when], $values)) {
         continue;
@@ -281,13 +388,16 @@ final class ClosingSheetFlowView
           continue;
         }
         $tone = match (mb_strtolower($state, 'UTF-8')) { 'cumple' => 'good', 'no cumple' => 'bad', default => 'muted' };
+        $counts[$tone]++;
         $rows .= '<li><span class="csf-result is-' . $tone . '">' . self::e($state !== '' ? $state : 'Sin estado') . '</span><div><p>' . self::e($text) . '</p>' . ($note !== '' ? '<small>' . nl2br(self::e($note)) . '</small>' : '') . '</div></li>';
       }
       if ($rows !== '') {
         $html .= '<div class="csf-check-group"><h3>' . self::e($group) . '</h3><ul class="csf-checklist">' . $rows . '</ul></div>';
       }
     }
-    return '<section class="cs-section csf-checks"><h2>Lista de chequeo</h2>' . ($html !== '' ? $html : '<p class="cs-note">La hoja no tiene lista de chequeo (hojas anteriores a la lista).</p>') . '</section>';
+    $totals = $html === '' ? '' : '<p class="csf-check-totals"><span class="csf-result is-good">Cumple: ' . $counts['good'] . '</span>'
+      . '<span class="csf-result is-bad">No cumple: ' . $counts['bad'] . '</span><span class="csf-result is-muted">No aplica u otro: ' . $counts['muted'] . '</span></p>';
+    return '<section class="cs-section csf-checks"><h2>Lista de chequeo</h2>' . $totals . ($html !== '' ? $html : '<p class="cs-note">La hoja no tiene lista de chequeo (hojas anteriores a la lista).</p>') . '</section>';
   }
 
   // ---------------------------------------------------------------- listado

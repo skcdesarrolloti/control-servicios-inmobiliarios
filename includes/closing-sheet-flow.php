@@ -44,7 +44,7 @@ $link = static function (string $page) use ($closingId, $params): string {
 
 // Nombre del funcionario que actúa (sesión o enlace), para el saludo de la barra.
 $actorName = '';
-$render = static function (string $title, array $facts, string $body, int $status = 200, string $state = '') use ($baseUrl, &$actorName): never {
+$render = static function (string $title, array $facts, string $body, int $status = 200, string $state = '', bool $hero = true) use ($baseUrl, &$actorName): never {
   http_response_code($status);
   $asset = static function (string $path) use ($baseUrl): string {
     $file = dirname(__DIR__) . '/public/' . $path;
@@ -58,7 +58,7 @@ $render = static function (string $title, array $facts, string $body, int $statu
     'js' => array_map($asset, ['assets/js/closing-sheet-flow.js']),
     'user' => $actorName !== '' ? $actorName : (Auth::isLoggedIn() ? Auth::user() : ''),
     'session' => Auth::isLoggedIn(),
-  ], $title, 'Hoja de cierre de negocio', 'handshake', $facts, $body, $state);
+  ], $title, 'Hoja de cierre de negocio', 'handshake', $facts, $body, $state, $hero);
   exit;
 };
 

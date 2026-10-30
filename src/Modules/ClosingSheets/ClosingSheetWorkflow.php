@@ -62,6 +62,8 @@ final class ClosingSheetWorkflow
   ];
 
   private const TIMEZONE = 'America/Bogota';
+  /** Dirección de la oficina en el membrete (la sucursal no la guarda). */
+  private const COMPANY_ADDRESS = 'Manga, Calle 28 No. 24-79, Ed. Iman, Of. 303 · Cartagena de Indias';
   private const OWNER_PORTAL = 'https://sucasainmobiliaria.com.co/propietario';
 
   private SchemaInspector $schema;
@@ -200,9 +202,54 @@ final class ClosingSheetWorkflow
       $owners = [];
     }
     $review = $this->latestReview($closingId);
+    $reviewDate = (int) ($review['fecha'] ?? 0);
     return [
       'closing' => $closing, 'values' => $values, 'owners' => $owners, 'options' => $service->options(), 'review' => $review,
       'results' => $review !== null ? self::results($review) : self::results($closing, 'closing'),
+      // Cierre del documento, como la vista de WordPress: consultor, quien verifica y quien autoriza.
+      'signers' => [
+        ['role' => 'Consultor de arriendos', 'action' => 'Elaboró', 'date' => (int) ($closing['fecha'] ?? 0)] + $this->signer((string) ($closing['id_empleado'] ?? ''), (string) ($closing['creador'] ?? '')),
+        ['role' => 'Revisión de servicios', 'action' => 'Verificó', 'date' => $reviewDate] + $this->signer((string) ($closing['id_verificador'] ?? ''), (string) ($closing['verificador'] ?? '')),
+        ['role' => 'Gerencia', 'action' => 'Autorizó', 'date' => (int) ($closing['fecha_repuesta'] ?? 0)] + $this->signer((string) ($closing['id_aprobador'] ?? ''), (string) ($closing['aprobador'] ?? '')),
+      ],
+      'company' => $this->company((string) ($closing['sucursal'] ?? '')),
+    ];
+  }
+
+  /** Nombre, cargo y firma (imagen) de un funcionario, activo o no. @return array{name:string,cargo:string,signature:string} */
+  private function signer(string $employeeId, string $fallbackName): array
+  {
+    $table = $this->db->table('jet_cct_funcionarios');
+    $row = trim($employeeId) !== '' && $this->schema->tableExists($table)
+      ? $this->db->getRow("SELECT * FROM `{$table}` WHERE `id_empleado` = ? LIMIT 1", [trim($employeeId)])
+      : null;
+    $cargo = '';
+    $cargos = $this->db->table('jet_cct_cargos');
+    if (is_array($row) && trim((string) ($row['id_cargo'] ?? '')) !== '' && $this->schema->tableExists($cargos)) {
+      $cargo = trim((string) $this->db->getVar("SELECT `nombre_cargo` FROM `{$cargos}` WHERE `_ID` = ? LIMIT 1", [(int) $row['id_cargo']]));
+    }
+    $signature = trim((string) ($row['firma'] ?? ''));
+    return [
+      'name' => trim($fallbackName) !== '' ? trim($fallbackName) : trim((string) ($row['nombre'] ?? '')),
+      'cargo' => $cargo,
+      'signature' => filter_var($signature, FILTER_VALIDATE_URL) && str_starts_with($signature, 'https://') ? $signature : '',
+    ];
+  }
+
+  /** Datos de la empresa para el membrete (sucursal de la hoja o la principal). @return array{nit:string,phone:string,email:string,address:string} */
+  private function company(string $branchId): array
+  {
+    $table = $this->db->table('jet_cct_sucursales');
+    $row = null;
+    if ($this->schema->tableExists($table)) {
+      $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [ctype_digit(trim($branchId)) && (int) $branchId > 0 ? (int) $branchId : 1]);
+    }
+    $nit = preg_replace('/\D+/', '', (string) ($row['nit'] ?? '')) ?: '9006232424';
+    return [
+      'nit' => strlen($nit) === 10 ? number_format((int) substr($nit, 0, 9), 0, ',', '.') . '-' . substr($nit, 9) : $nit,
+      'phone' => trim((string) ($row['celular'] ?? '')),
+      'email' => trim((string) ($row['correo'] ?? '')),
+      'address' => self::COMPANY_ADDRESS,
     ];
   }
 
@@ -670,7 +717,7 @@ final class ClosingSheetWorkflow
     return is_array($decoded) ? array_values(array_map('strval', $decoded)) : [];
   }
 
-  /** Resultados por servicio de una revisión o de la hoja. @return list<array{label:string,account_label:string,account:string,meter:string,cutoff:int,status:string,value:string}> */
+  /** Resultados por servicio de una revisión o de la hoja. @return list<array{label:string,account_label:string,account:string,meter:string,cutoff:int,reviewed:int,status:string,value:string}> */
   public static function results(array $row, string $accountSource = 'review'): array
   {
     $out = [];
@@ -682,6 +729,7 @@ final class ClosingSheetWorkflow
       $out[] = [
         'label' => $label, 'account_label' => $accountLabel, 'account' => trim((string) ($row[$accountSource === 'review' ? $reviewAccount : $closingAccount] ?? '')),
         'meter' => trim((string) ($row['medidor_' . $suffix] ?? '')), 'cutoff' => (int) ($row['fecha_corte_' . $suffix] ?? 0),
+        'reviewed' => (int) ($row['fecha_revision_' . $suffix] ?? 0),
         'status' => $status, 'value' => trim((string) ($row['resultado_valores_' . $suffix] ?? '')),
       ];
     }

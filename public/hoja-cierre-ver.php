@@ -48,7 +48,9 @@ $flow['render'](
   ClosingSheetFlowView::sheetBody($sheet, $gate['can'], $flow['hidden']($gate), [
     'review' => $flow['link']('revision-servicios-cierre.php'),
     'edit' => 'hoja-cierre.php?id_cierre=' . $closingId,
-  ]),
+    'back' => $gate['session'] ? 'hojas-cierre.php?estado=' . rawurlencode(ClosingSheetWorkflow::state($closing)) : '',
+  ], system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL)),
   200,
-  ClosingSheetWorkflow::state($closing)
+  ClosingSheetWorkflow::state($closing),
+  false
 );

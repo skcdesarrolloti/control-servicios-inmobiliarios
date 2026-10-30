@@ -26,7 +26,15 @@ Con sesión del panel basta `?numero=` y se aplican los permisos del cargo.
 
 ## Páginas
 
-- `hoja-cierre-ver.php?numero=<hoja>`: muestra la hoja en solo lectura, con la revisión de servicios, los copropietarios y la lista de chequeo. Desde ahí se aprueba o no, se hace la revisión, se edita y se imprime.
+- `hoja-cierre-ver.php?numero=<hoja>`: la hoja como documento. Reemplaza la vista de WordPress `/hoja-de-cierre/` y contiene:
+  - membrete con el NIT de la sucursal;
+  - resumen del negocio y datos del estudio y entrega (aseguradora, solicitud, posible entrega, llaves);
+  - las secciones de la hoja, los copropietarios y la revisión de servicios con la fecha de revisión y de corte;
+  - la lista de chequeo con su conteo;
+  - el cierre "Realizado por": quién elaboró, verificó y autorizó, con fecha y la imagen de `firma` de Funcionarios si existe;
+  - el pie con los datos de la empresa.
+
+  Desde ahí se aprueba o no, se hace la revisión, se edita y se imprime. Se imprime en A4 sin botones ni formularios.
 - `revision-servicios-cierre.php?numero=<hoja>`: revisión de servicios antes de la ocupación. Por cada servicio pide NIC, póliza o contrato; medidor; fecha de corte; resultado en tiempo (glosario 998) y resultado en valores.
 - `hojas-cierre.php`: listado por estado con búsqueda. También se abre desde Contratos de arrendamiento › **Hojas de cierre**.
 
