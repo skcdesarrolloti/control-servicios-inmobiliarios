@@ -70,6 +70,10 @@ $check(array_column($owners, 'key') === ['contrato', 'contrato_2'] && $owners[1]
 $owners = ContractCoOwners::resolve($contract, $mandate(['nombre_2' => '']));
 $check(array_column($owners, 'key') === ['mandato_1', 'mandato_3'] && $near($owners[0]['share'], 0.5), 'an empty mandate owner is skipped as before');
 
+// Persona jurídica: nombre_N/documento_N son la empresa y su NIT; empresa_N/nit_N, el representante legal.
+$owners = ContractCoOwners::resolve($contract, $mandate(['tipo_2' => 'Juridico', 'nombre_2' => 'Inversiones X SAS', 'documento_2' => '900.123.456-7', 'empresa_2' => 'Juan Representante', 'nit_2' => '44444444']));
+$check($owners[1]['name'] === 'Inversiones X SAS' && $owners[1]['document'] === '900.123.456-7', 'a company owner is the company and its NIT, not its legal representative');
+
 $check(ContractCoOwners::equalSplit(3) === [33.34, 33.33, 33.33] && ContractCoOwners::equalSplit(1) === [100.0] && ContractCoOwners::equalSplit(4) === [25.0, 25.0, 25.0, 25.0], 'equal split gives the extra cent to the first owner');
 $check(ContractCoOwners::sameDocument('900.123.456-7', '900123456') && !ContractCoOwners::sameDocument('', ''), 'documents are compared normalized');
 $check(ContractCoOwners::percentLabel(1 / 3) === '33,33 %' && ContractCoOwners::percentLabel(0.5) === '50 %', 'percentage labels');

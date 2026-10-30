@@ -463,7 +463,7 @@ final class OwnerCreditService
     }
     $mandates = $this->db->table('jet_cct_contrato_mandato');
     $owners = $this->db->table('jet_cct_propietarios');
-    foreach ([['id_contrato_mandato', $mandates, ['documento_1', 'nit_1', 'documento_2', 'nit_2', 'documento_3', 'nit_3', 'documento_4', 'nit_4', 'documento_5', 'nit_5', 'documento_6', 'nit_6'], ['_ID']], ['id_propietario', $owners, ['documento', 'documento_juridico'], ['_ID', 'id_propietario']]] as [$link, $source, $documentColumns, $idColumns]) {
+    foreach ([['id_contrato_mandato', $mandates, ['documento_1', 'documento_2', 'documento_3', 'documento_4', 'documento_5', 'documento_6'], ['_ID']], ['id_propietario', $owners, ['documento', 'documento_juridico'], ['_ID', 'id_propietario']]] as [$link, $source, $documentColumns, $idColumns]) {
       if (!$this->schema->columnExists($contracts, $link) || !$this->schema->tableExists($source)) continue;
       $documentColumns = array_values(array_filter($documentColumns, fn(string $column): bool => $this->schema->columnExists($source, $column)));
       $idColumns = array_values(array_filter($idColumns, fn(string $column): bool => $this->schema->columnExists($source, $column)));
@@ -514,11 +514,10 @@ final class OwnerCreditService
     if ($this->schema->columnExists($contracts, 'id_contrato_mandato') && $this->schema->tableExists($mandates)) {
       $join = " LEFT JOIN `{$mandates}` m ON m.`_ID` = c.`id_contrato_mandato`";
       for ($i = 1; $i <= 6; $i++) {
-        foreach (['nombre_', 'empresa_'] as $prefix) {
-          if (!$this->schema->columnExists($mandates, $prefix . $i)) continue;
-          $where[] = $like('m.`' . $prefix . $i . '`');
-          array_push($args, ...$likeArgs);
-        }
+        // nombre_N es el propietario (en persona jurídica, la razón social); empresa_N es el representante legal.
+        if (!$this->schema->columnExists($mandates, 'nombre_' . $i)) continue;
+        $where[] = $like('m.`nombre_' . $i . '`');
+        array_push($args, ...$likeArgs);
       }
     }
     if ($where === []) return [];

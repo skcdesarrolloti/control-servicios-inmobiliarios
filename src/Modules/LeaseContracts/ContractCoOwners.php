@@ -40,10 +40,11 @@ final class ContractCoOwners
     if (is_array($mandate)) {
       $count = max(1, min(self::MAX, (int) ($mandate['propietarios'] ?? 1)));
       for ($i = 1; $i <= $count; $i++) {
-        $company = strcasecmp(trim((string) ($mandate['tipo_' . $i] ?? '')), 'Natural') !== 0 && trim((string) ($mandate['empresa_' . $i] ?? '')) !== '';
-        $name = trim((string) ($company ? $mandate['empresa_' . $i] : ($mandate['nombre_' . $i] ?? '')));
+        // También en persona jurídica el propietario es nombre_N/documento_N (la empresa y su NIT); empresa_N/nit_N
+        // son el representante legal, que no es propietario.
+        $name = trim((string) ($mandate['nombre_' . $i] ?? ''));
         if ($name === '') continue;
-        $document = trim((string) ($company ? ($mandate['nit_' . $i] ?? '') : ($mandate['documento_' . $i] ?? '')));
+        $document = trim((string) ($mandate['documento_' . $i] ?? ''));
         $ownerId = trim((string) ($mandate['id_propietario_nuevo_' . $i] ?? ''));
         if ($ownerId === '') $ownerId = $i === 1 ? (string) ($contract['id_propietario'] ?? '') : 'doc:' . $document;
         $owners[] = [
