@@ -26,7 +26,6 @@ final class ClosingSheetFlowView
   public static function page(array $page, string $title, string $eyebrow, string $icon, array $facts, string $body, string $state = '', bool $hero = true): string
   {
     $h = [self::class, 'e'];
-    $firstName = trim((string) strtok(trim($page['user']), ' ')) ?: $page['user'];
     $facts = array_filter($facts, static fn($value): bool => trim((string) $value, ' #') !== '');
     $css = implode('', array_map(static fn(string $href): string => '<link rel="stylesheet" href="' . $h($href) . '">', $page['css']));
     $js = implode('', array_map(static fn(string $src): string => '<script src="' . $h($src) . '" defer></script>', $page['js']));
@@ -36,10 +35,7 @@ final class ClosingSheetFlowView
       . '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">'
       . '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">'
       . $css . $js . '</head><body class="scm-review-page cs-page csf-page' . (!empty($page['embed']) ? ' is-embed' : '') . '">'
-      . '<header class="rp-topbar"><a class="rp-brand" href="' . $h($page['session'] ? $page['base_url'] . '/index.php' : '#') . '">'
-      . ($page['logo'] !== '' ? '<img src="' . $h($page['logo']) . '" alt="SKC SuCasa Inmobiliaria">' : '') . '<span>SKC SuCasa Inmobiliaria</span></a>'
-      . ($firstName !== '' ? '<div class="rp-user"><span class="rp-avatar" aria-hidden="true">' . $h(mb_strtoupper(mb_substr($firstName, 0, 1, 'UTF-8'), 'UTF-8')) . '</span><span class="rp-user-name">Hola, <strong>' . $h($firstName) . '</strong></span></div>' : '')
-      . '</header><main class="scm-review-page-shell cs-shell">'
+      . '<main class="scm-review-page-shell cs-shell">'
       . ($hero ? '<section class="rp-hero"><span class="rp-hero-icon material-symbols-outlined" aria-hidden="true">' . $h($icon) . '</span><div class="rp-hero-text">'
         . '<p class="rp-eyebrow">' . $h($eyebrow) . '</p><h1>' . $h($title) . ($state !== '' ? ' ' . self::badge($state) : '') . '</h1>'
         . ($facts !== [] ? '<dl class="rp-facts">' . implode('', array_map(static fn($term, $value): string => '<div><dt>' . $h($term) . '</dt><dd>' . $h($value) . '</dd></div>', array_keys($facts), $facts)) . '</dl>' : '')
@@ -124,16 +120,13 @@ final class ClosingSheetFlowView
   /**
    * La hoja como documento (membrete, resumen, secciones, revisión, lista de chequeo y firmas), con las acciones afuera.
    * @param array{closing:array<string,mixed>,values:array<string,mixed>,owners:list<array<string,mixed>>,options:array<string,mixed>,review:array<string,mixed>|null,results:list<array<string,mixed>>,signers:list<array<string,mixed>>,company:array<string,string>} $sheet
-   * @param array{view:bool,review:bool,respond:bool,edit:bool} $can @param array<string,string> $hidden @param array<string,string> $links review, edit y back (listado, solo con sesión)
+   * @param array{view:bool,review:bool,respond:bool,edit:bool} $can @param array<string,string> $hidden @param array<string,string> $links review y edit
    */
   public static function sheetBody(array $sheet, array $can, array $hidden, array $links, string $logo = ''): string
   {
     $closing = $sheet['closing'];
     $state = ClosingSheetWorkflow::state($closing);
     $actions = '';
-    if (($links['back'] ?? '') !== '') {
-      $actions .= '<a class="cs-secondary" href="' . self::e($links['back']) . '"><span class="material-symbols-outlined" aria-hidden="true">list</span> Hojas de cierre</a>';
-    }
     if ($can['review'] && ClosingSheetWorkflow::canReview($closing)) {
       $actions .= '<a class="cs-primary" href="' . self::e($links['review']) . '"><span class="material-symbols-outlined" aria-hidden="true">fact_check</span> ' . ($sheet['review'] !== null ? 'Repetir revisión de servicios' : 'Hacer revisión de servicios') . '</a>';
     }

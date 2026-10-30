@@ -23,7 +23,6 @@ final class LeaseContractsView
         <div class="!sp-flex !sp-items-center !sp-gap-3"><span class="!sp-p-2.5 !sp-bg-amber-50 !sp-rounded-xl !sp-border !sp-border-solid !sp-border-amber-200"><?php echo $ui::icon('document', '!sp-w-6 !sp-h-6'); ?></span><div><h2 class="!sp-m-0 !sp-text-xl !sp-font-bold !sp-text-service-navy">Contratos de arrendamiento</h2><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">Partes del contrato · Documentación · Historiales · Envío de anexos a propietario, arrendatario y codeudores</p></div></div>
         <div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-4">
           <div class="!sp-text-right !sp-border-y-0 !sp-border-r-0 !sp-border-l !sp-border-solid !sp-border-slate-200 !sp-pl-4"><strong class="!sp-text-xl" id="sca-kpi-count">0</strong><p class="!sp-m-0 !sp-text-[9px] !sp-uppercase !sp-text-service-muted">Contratos en la vista</p></div>
-          <a class="<?php echo $ui::SECONDARY; ?> !sp-no-underline" href="hojas-cierre.php"><?php echo $ui::icon('document'); ?>Hojas de cierre</a>
           <button type="button" class="<?php echo $ui::SECONDARY; ?>" data-scm-open-due-settings><?php echo $ui::icon('calendar'); ?>Configurar vencimientos</button>
         </div>
       </header>

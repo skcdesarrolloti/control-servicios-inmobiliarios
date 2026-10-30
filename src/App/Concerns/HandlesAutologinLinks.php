@@ -27,13 +27,15 @@ trait HandlesAutologinLinks
     'enviar_cotizacion' => 'id_cotizacion',
     'crear_orden' => 'id_cotizacion',
     'editar_hoja_cierre' => 'id_cierre',
+    'ver_hoja_cierre' => 'numero',
+    'revision_servicios_cierre' => 'numero',
     ];
   }
 
   /** Acciones que abren su propia página en vez del puente. @return array<string,string> */
   private static function autologinLinkPages(): array
   {
-    return ['editar_hoja_cierre' => 'hoja-cierre.php'];
+    return ['editar_hoja_cierre' => 'hoja-cierre.php', 'ver_hoja_cierre' => 'hoja-cierre-ver.php', 'revision_servicios_cierre' => 'revision-servicios-cierre.php'];
   }
 
   private function autologinSecretForLinks(): string

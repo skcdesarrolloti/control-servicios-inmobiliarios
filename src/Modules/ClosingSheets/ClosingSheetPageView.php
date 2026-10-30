@@ -24,7 +24,6 @@ final class ClosingSheetPageView
     $this->editing = !$creating;
     $title = $creating ? 'Añadir hoja de cierre' : 'Editar hoja de cierre #' . $context['closing_id'];
     $values = $context['values'];
-    $firstName = trim((string) strtok(trim($page['user']), ' ')) ?: $page['user'];
     $facts = array_filter([
       'Mandato' => '#' . ($context['mandate']['_ID'] ?? ''),
       'Hoja' => $creating ? '' : '#' . $context['closing_id'],
@@ -48,17 +47,6 @@ final class ClosingSheetPageView
   <?php endforeach; ?>
 </head>
 <body class="scm-review-page cs-page<?= !empty($page['embed']) ? ' is-embed' : '' ?>">
-  <header class="rp-topbar">
-    <a class="rp-brand" href="<?= $h($page['base_url'] . '/index.php') ?>">
-      <?php if ($page['logo'] !== ''): ?><img src="<?= $h($page['logo']) ?>" alt="SKC SuCasa Inmobiliaria"><?php endif; ?>
-      <span>SKC SuCasa Inmobiliaria</span>
-    </a>
-    <div class="rp-user">
-      <span class="rp-avatar" aria-hidden="true"><?= $h(mb_strtoupper(mb_substr($firstName, 0, 1, 'UTF-8'), 'UTF-8')) ?></span>
-      <span class="rp-user-name">Hola, <strong><?= $h($firstName) ?></strong></span>
-    </div>
-  </header>
-
   <main class="scm-review-page-shell cs-shell">
     <section class="rp-hero">
       <span class="rp-hero-icon material-symbols-outlined" aria-hidden="true">handshake</span>

@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-// Piezas comunes de revision-servicios-cierre.php y hoja-cierre-ver.php: encabezados, acceso (sesión o enlace
-// firmado), respuesta JSON de los POST y render de la página. Devuelve un arreglo de funciones.
+// Piezas comunes de revision-servicios-cierre.php, hoja-cierre-ver.php y hojas-cierre.php: encabezados, acceso (sesión,
+// autologin desde WordPress o enlace firmado), respuesta JSON de los POST y render de la página. Devuelve un arreglo de
+// funciones.
 
 use SCM\Core\App;
 use SCM\Core\Auth;
@@ -25,6 +26,18 @@ $script = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
 // embed=1: abierta en la ventana del panel (Actividades administrativas › Hojas de cierre), sin la barra superior.
 $embed = ($params['embed'] ?? '') === '1';
 $baseUrl = rtrim((string) SCM_BASE_URL, '/');
+
+// Desde WordPress el botón puede traer id_empleado + token (como hoja-cierre.php y el puente): inicia sesión del panel
+// con ese funcionario y recarga sin el token, para que no quede en la barra de direcciones ni en el historial.
+if (!$isPost && isset($_GET['token'])) {
+  $employeeId = trim((string) ($_GET['id_empleado'] ?? ''));
+  $secret = defined('SCM_ACTA_AUTOLOGIN_SECRET') ? trim((string) SCM_ACTA_AUTOLOGIN_SECRET) : '';
+  if (Auth::isLoggedIn() || (\SCM\Support\ActaAutologin::valid($secret, $employeeId, trim((string) $_GET['token'])) && (new Auth(App::db()))->loginByEmployeeId($employeeId))) {
+    $clean = array_diff_key($_GET, ['token' => true, 'id_empleado' => true]);
+    header('Location: ' . $baseUrl . '/' . $script . ($clean !== [] ? '?' . http_build_query($clean, '', '&', PHP_QUERY_RFC3986) : ''), true, 302);
+    exit;
+  }
+}
 
 $json = static function (bool $ok, array $data, int $status = 0): never {
   http_response_code($status > 0 ? $status : ($ok ? 200 : 422));

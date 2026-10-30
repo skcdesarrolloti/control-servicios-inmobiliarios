@@ -24,6 +24,23 @@ Quien abre el enlace queda como autor de lo que guarda (`cct_author_id`, verific
 
 Con sesión del panel basta `?numero=` y se aplican los permisos del cargo.
 
+## Desde WordPress (autologin)
+
+La sesión de WordPress no sirve en el panel. Por eso, un botón de WordPress que abra cualquiera de estas páginas debe terminar en `&id_empleado=<ID_EMPLEADO>&token=<TOKEN>`. Es el mismo token de `ActaAutologin` que usan el puente, la revisión preventiva y las cotizaciones. Las páginas son:
+
+- `hoja-cierre.php`
+- `hoja-cierre-ver.php`
+- `revision-servicios-cierre.php`
+- `hojas-cierre.php`
+
+Con el token, el panel inicia sesión con ese funcionario y recarga la página sin el token. Sin token, pide iniciar sesión y vuelve a la hoja.
+
+En **Tipos de actas y enlaces › Generar enlace** se arma el enlace completo con estas acciones:
+
+- *Editar hoja de cierre*
+- *Ver o responder hoja de cierre*
+- *Revisión de servicios de la hoja de cierre*
+
 ## Páginas
 
 - `hoja-cierre-ver.php?numero=<hoja>`: la hoja como documento. Reemplaza la vista de WordPress `/hoja-de-cierre/` y contiene:
@@ -34,7 +51,7 @@ Con sesión del panel basta `?numero=` y se aplican los permisos del cargo.
   - el cierre "Realizado por": quién elaboró, verificó y autorizó, con fecha y la imagen de `firma` de Funcionarios si existe;
   - el pie con los datos de la empresa.
 
-  Desde ahí se aprueba o no, se hace la revisión, se edita y se imprime. Se imprime en A4 sin botones ni formularios.
+  Desde ahí se aprueba o no, se hace la revisión, se edita y se imprime. No lleva la barra superior del panel: el documento tiene su propio membrete. Se imprime en A4 sin botones ni formularios.
 - `revision-servicios-cierre.php?numero=<hoja>`: revisión de servicios antes de la ocupación. Por cada servicio pide NIC, póliza o contrato; medidor; fecha de corte; resultado en tiempo (glosario 998) y resultado en valores.
 - **Actividades Administrativas › Hojas de Cierre**, dentro del panel:
   - pestañas por estado con su cantidad y búsqueda;
@@ -43,7 +60,7 @@ Con sesión del panel basta `?numero=` y se aplican los permisos del cargo.
   - al guardar allí, el listado se recarga al cerrar la ventana.
 
   Es la pestaña `hojas_cierre` de Permisos. Mientras no se guarden de nuevo los permisos, la ven los cargos que ven *Contratos de arrendamiento* o *Revisiones de servicios públicos*.
-- `hojas-cierre.php`: el mismo listado como página propia. Se abre desde Contratos de arrendamiento › **Hojas de cierre**.
+- `hojas-cierre.php`: el mismo listado como página propia, para abrirlo con un enlace (por ejemplo desde WordPress con autologin). Dentro del panel se usa el menú.
 
 ## Qué guarda la revisión de servicios (en una transacción)
 
