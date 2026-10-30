@@ -9,7 +9,7 @@ use SCM\Modules\Pending\PublicServicesDocument;
 /**
  * Páginas del flujo de la hoja de cierre: revisión de servicios antes de la ocupación
  * (revision-servicios-cierre.php), la hoja en solo lectura para aprobarla o no (hoja-cierre-ver.php), el listado
- * (hojas-cierre.php) y la configuración de avisos (Configuración › Hoja de cierre).
+ * (hojas-cierre.php).
  */
 final class ClosingSheetFlowView
 {
@@ -456,25 +456,6 @@ final class ClosingSheetFlowView
       . ($body !== '' ? '<div class="cs-table-wrap"><table class="cs-table csf-list"><thead><tr><th>Hoja</th><th>Inmueble</th><th>Arrendatario</th><th>Funcionarios</th><th>Estado</th><th></th></tr></thead><tbody>' . $body . '</tbody></table></div>'
         : '<p class="cs-note">No hay hojas de cierre en este estado' . ($query !== '' ? ' con esa búsqueda' : '') . '.</p>')
       . '<p class="cs-note">Se muestran las 100 más recientes. <a href="' . self::e($baseUrl . '/index.php') . '">Volver al panel</a></p></section>';
-  }
-
-  // ---------------------------------------------------------------- configuración
-
-  /** @param array<string,bool> $settings */
-  public static function settingsForm(array $settings): string
-  {
-    $rows = '';
-    foreach (ClosingSheetSettings::OPTIONS as $key => [$title, $help]) {
-      $rows .= '<label class="!sp-flex !sp-items-start !sp-gap-3 !sp-p-3 !sp-rounded-xl !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-cursor-pointer">'
-        . '<input type="checkbox" class="!sp-mt-1 !sp-w-4 !sp-h-4" name="settings[' . self::e($key) . ']" value="1"' . (!empty($settings[$key]) ? ' checked' : '') . '>'
-        . '<span><strong class="!sp-block !sp-text-sm !sp-text-service-navy">' . self::e($title) . '</strong><small class="!sp-block !sp-text-xs !sp-text-service-muted !sp-mt-1">' . self::e($help) . '</small></span></label>';
-    }
-    return '<form class="!sp-font-sans !sp-text-service-navy !sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-4" data-closing-sheet-settings-form autocomplete="off">'
-      . '<p class="!sp-m-0 !sp-text-sm">Los correos internos siempre salen a los funcionarios que elijas en <strong>Notificaciones internas</strong>: <em>Hoja de cierre creada</em> (hacen la revisión de servicios), <em>Hoja de cierre por responder</em> (aprueban o no) y <em>Hoja de cierre respondida</em>. Cada uno recibe su enlace para actuar sin iniciar sesión.</p>'
-      . '<div class="!sp-grid !sp-gap-3">' . $rows . '</div>'
-      . '<p class="!sp-m-0 !sp-text-xs !sp-text-service-muted">Activa los WhatsApp solo cuando Meta haya aprobado las plantillas (docs/crear-plantilla-whatsapp-hoja-cierre.md).</p>'
-      . '<div class="!sp-flex !sp-items-center !sp-justify-end !sp-gap-3"><p class="!sp-m-0 !sp-text-[11px]" data-closing-sheet-settings-status role="status" aria-live="polite"></p>'
-      . '<button type="submit" class="!sp-inline-flex !sp-items-center !sp-gap-2 !sp-px-4 !sp-py-2 !sp-rounded-xl !sp-bg-service-navy !sp-text-white !sp-text-sm !sp-font-bold !sp-border-0 !sp-cursor-pointer">Guardar configuración</button></div></form>';
   }
 
   // ---------------------------------------------------------------- piezas

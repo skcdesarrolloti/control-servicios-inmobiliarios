@@ -498,7 +498,6 @@ final class ClosingSheetWorkflow
   private function notifyReview(int $closingId, int $reviewId, array $services, array $actor): int
   {
     $closing = $this->closing($closingId);
-    $settings = (new ClosingSheetSettings($this->db))->read();
     $reviewUrl = PublicServicesDocument::url($reviewId);
     $table = self::resultsTable($services);
     $summary = self::summaryText($services);
@@ -508,7 +507,7 @@ final class ClosingSheetWorkflow
     $propertyId = (string) ($closing['id_inmueble'] ?? '');
     $ownerSubject = 'Revisión de servicios públicos de su inmueble #' . $propertyId . ' antes de la entrega';
     foreach ($this->owners($closing) as $index => $owner) {
-      if ($settings['owner_email'] && filter_var($owner['email'], FILTER_VALIDATE_EMAIL)) {
+      if (filter_var($owner['email'], FILTER_VALIDATE_EMAIL)) {
         $html = EmailTemplate::render($ownerSubject, self::p('Apreciado(a) <b>' . self::e($owner['name']) . '</b>:')
           . self::p('En el proceso de entrega de su inmueble <b>#' . self::e($propertyId) . '</b>, ubicado en <b>' . self::e($closing['direccion'] ?? '') . '</b>, realizamos la revisión de los servicios públicos para verificar su estado y mantener actualizadas las cuentas asociadas a su propiedad.')
           . $table
@@ -521,7 +520,7 @@ final class ClosingSheetWorkflow
           'payload' => ['reply_to' => $actor['email']], 'meta' => ['closing_id' => $closingId, 'review_id' => $reviewId, 'recipient_role' => 'propietario'],
         ]);
       }
-      if ($settings['owner_whatsapp'] && $owner['phone'] !== '') {
+      if ($owner['phone'] !== '') {
         $queued += $this->whatsapp($owner['phone'], $owner['name'], self::TEMPLATE_OWNER, [$owner['name'], (string) ($closing['direccion'] ?? ''), $summary, $signature], $reviewUrl,
           'hoja_cierre_revision_' . $reviewId . '_wa_propietario_' . $index, 'Revisión de servicios públicos de su inmueble: ' . $reviewUrl, $closingId) ? 1 : 0;
       }
@@ -572,7 +571,7 @@ final class ClosingSheetWorkflow
           'dedupe_key' => 'hoja_cierre_' . $closingId . '_respuesta_' . (string) ($closing['fecha_repuesta'] ?? '') . '_creador', 'meta' => ['closing_id' => $closingId],
         ]);
       }
-      if ((new ClosingSheetSettings($this->db))->read()['staff_whatsapp'] && $creator['phone'] !== '') {
+      if ($creator['phone'] !== '') {
         $queued += $this->whatsapp($creator['phone'], $creator['name'], self::TEMPLATE_RESPONSE, $waParams($creator['name']), $buttons[0]['url'],
           'hoja_cierre_' . $closingId . '_respuesta_' . (string) ($closing['fecha_repuesta'] ?? '') . '_wa_creador', $waText, $closingId) ? 1 : 0;
       }
@@ -597,12 +596,11 @@ final class ClosingSheetWorkflow
   }
 
   /**
-   * Correo (y WhatsApp si está activo) a cada funcionario del evento interno, con su propio enlace firmado.
+   * Correo y WhatsApp a cada funcionario del evento interno, con su propio enlace firmado.
    * @param callable(string):string $body @param callable(string):list<string> $waParams @param list<array{label:string,url:string}> $extraButtons
    */
   private function notifyStaff(string $action, int $closingId, string $purpose, string $subject, callable $body, string $buttonLabel, string $template, callable $waParams, string $waText, array $extraButtons = [], string $dedupeSuffix = ''): int
   {
-    $whatsapp = (new ClosingSheetSettings($this->db))->read()['staff_whatsapp'];
     $queue = new EmailQueue($this->db);
     $queued = 0;
     $phones = [];
@@ -623,7 +621,7 @@ final class ClosingSheetWorkflow
         ]);
       }
       $phone = preg_replace('/\D+/', '', (string) ($contact['phone'] ?? '')) ?? '';
-      if ($whatsapp && $phone !== '' && !isset($phones[$phone])) {
+      if ($phone !== '' && !isset($phones[$phone])) {
         $phones[$phone] = true;
         $queued += $this->whatsapp((string) $contact['phone'], $name, $template, $waParams($name), $url, $dedupe . '_wa', $waText, $closingId) ? 1 : 0;
       }

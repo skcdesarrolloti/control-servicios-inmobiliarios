@@ -78,15 +78,15 @@ No genera actas PDF, igual que el formulario anterior. El propietario recibe el 
 - El mandato: `estado_hoja_cierre`.
 - El historial del inmueble.
 
-## Configuración
+## Avisos
 
-En **Configuración › Hoja de cierre** (permiso *Configurar avisos de la hoja de cierre*) se activan:
+Salen siempre por correo y por WhatsApp, a quien tenga correo o celular:
 
-- el correo al propietario (activo por defecto);
-- el WhatsApp al propietario;
-- el WhatsApp a funcionarios.
+- al propietario y a los copropietarios, con el resultado de la revisión de servicios;
+- a los funcionarios de los tres eventos de Notificaciones internas;
+- a quien hizo la hoja, con la respuesta.
 
-Las plantillas están en `docs/crear-plantilla-whatsapp-hoja-cierre.md`.
+No hay una configuración aparte: los funcionarios se eligen en **Notificaciones internas**. Las plantillas de WhatsApp están en `docs/crear-plantilla-whatsapp-hoja-cierre.md`. Mientras Meta no las apruebe, esos WhatsApp fallan en la cola y los correos salen igual.
 
 Permisos nuevos, en el grupo Contratos de arrendamiento:
 

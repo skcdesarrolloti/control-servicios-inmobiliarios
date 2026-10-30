@@ -154,7 +154,6 @@
         owner_credit_configure: "[data-owner-credit-settings]",
         cleaning_configure: "[data-cleaning-settings]",
         quote_fee_configure: "[data-quote-fee-settings]",
-        closing_sheet_configure: "[data-closing-sheet-settings]",
         collection_import: "[data-scm-portfolio-import]",
         collection_action: "[data-scm-portfolio-management], [data-scm-portfolio-letter], [data-scm-portfolio-bulkbar], [data-scm-portfolio-bulk-check], [data-scm-portfolio-reset]",
         canon_audit_import: "[data-cia-upload-form], [data-cia-upload-button]",

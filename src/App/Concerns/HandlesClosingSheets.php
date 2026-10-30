@@ -8,10 +8,9 @@ use SCM\Core\Auth;
 use SCM\Modules\ClosingSheets\ClosingSheetFlowView;
 use SCM\Modules\ClosingSheets\ClosingSheetPanelView;
 use SCM\Modules\ClosingSheets\ClosingSheetService;
-use SCM\Modules\ClosingSheets\ClosingSheetSettings;
 use SCM\Modules\ClosingSheets\ClosingSheetWorkflow;
 
-/** Hoja de cierre de negocio (hoja-cierre.php): guardar al crear o editar, y su configuración de avisos. */
+/** Hoja de cierre de negocio (hoja-cierre.php): guardar al crear o editar, y el listado del panel. */
 trait HandlesClosingSheets
 {
   public function ajax_handler_closing_sheet_save(): void
@@ -82,24 +81,6 @@ trait HandlesClosingSheets
       'review' => $this->canUseClosingSheetAction('closing_sheet_review'),
       'respond' => $this->canUseClosingSheetAction('closing_sheet_respond'),
     ])]);
-  }
-
-  /** Configuración › Hoja de cierre: avisos al propietario y WhatsApp a funcionarios. */
-  public function ajax_handler_closing_sheet_settings(): void
-  {
-    $this->verifyCsrf();
-    $this->requireDashboardAction('closing_sheet_configure', 'Tu cargo no tiene permiso para configurar la hoja de cierre.');
-    $settings = new ClosingSheetSettings($this->db);
-    if (($_POST['mode'] ?? '') === 'save') {
-      try {
-        $saved = $settings->save(is_array($_POST['settings'] ?? null) ? $_POST['settings'] : [], Auth::userId());
-      } catch (\Throwable $error) {
-        error_log('[closing_sheet_settings] ' . $error->getMessage());
-        $this->jsonFail('No se pudo guardar la configuración de la hoja de cierre.');
-      }
-      $this->jsonOk(['html' => ClosingSheetFlowView::settingsForm($saved), 'message' => 'Configuración guardada.']);
-    }
-    $this->jsonOk(['html' => ClosingSheetFlowView::settingsForm($settings->read())]);
   }
 
   /** Funcionario que guarda: su id_empleado real (autor de los registros), nombre, correo y sucursal. @return array{employee_id:string,name:string,email:string,branch:string} */

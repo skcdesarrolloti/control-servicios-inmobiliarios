@@ -1,6 +1,6 @@
 # Plantillas de WhatsApp de la hoja de cierre
 
-Son cuatro plantillas: tres para funcionarios y una para el propietario. Los WhatsApp empiezan apagados. Actívalos en **Configuración › Hoja de cierre** solo cuando Meta haya aprobado las plantillas correspondientes. Los correos salen igual, con o sin WhatsApp.
+Son cuatro plantillas: tres para funcionarios y una para el propietario. El panel envía estos WhatsApp siempre, junto con los correos. Mientras Meta no apruebe una plantilla, sus mensajes fallan en la cola; los correos salen igual. Por eso conviene crearlas antes de usar la hoja de cierre nativa.
 
 Los funcionarios se eligen en **Configuración › Notificaciones internas**, en tres eventos:
 
@@ -27,7 +27,7 @@ El celular de cada funcionario es el `celular` de su ficha en Funcionarios. El d
    - Tipo de URL: **Dinámica**.
    - URL: `https://sucasainmobiliaria.com.co/{{1}}`.
    - Ejemplo: el indicado en cada plantilla.
-10. Enviar a revisión. Cuando Meta la apruebe, activa el WhatsApp correspondiente en **Configuración › Hoja de cierre**.
+10. Enviar a revisión. Cuando Meta la apruebe, el panel la empieza a usar sola.
 
 No le agregues frases comerciales, porque Meta la reclasificaría como marketing. El cuerpo no puede terminar en una variable, por eso cada uno cierra con una frase fija.
 
@@ -119,7 +119,7 @@ Consulta la hoja desde el botón.
 
 ## 4. Revisión de servicios al propietario
 
-Se envía al propietario y a cada copropietario con celular cuando se registra la revisión antes de la ocupación. Solo se envía si está activo **WhatsApp al propietario con la revisión de servicios**. El botón abre la revisión pública firmada, que vence en 180 días.
+Se envía al propietario y a cada copropietario con celular cuando se registra la revisión antes de la ocupación. El botón abre la revisión pública firmada, que vence en 180 días.
 
 - Nombre: `scm_revision_servicios_entrega_propietario_v1`.
 - Botón: `Ver revisión`.

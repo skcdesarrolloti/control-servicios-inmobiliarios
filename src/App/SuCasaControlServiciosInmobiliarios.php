@@ -165,7 +165,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
-  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure', 'quote_reset_dev', 'closing_sheet_respond', 'closing_sheet_configure'];
+  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure', 'quote_reset_dev', 'closing_sheet_respond'];
   /** Herramientas de pruebas: hasta guardar permisos solo las tiene el cargo de desarrollo (Asistente de Desarrollo TI). */
   const DEVELOPER_DEFAULT_ACTIONS = ['quote_reset_dev'];
   const DEVELOPER_CARGOS = ['13'];
@@ -965,7 +965,6 @@ final class SuCasaControlServiciosInmobiliarios
           'closing_sheet_edit' => 'Editar hoja de cierre de negocio',
           'closing_sheet_review' => 'Hacer la revisión de servicios públicos antes de la ocupación (hoja de cierre)',
           'closing_sheet_respond' => 'Aprobar o no aprobar hojas de cierre',
-          'closing_sheet_configure' => 'Configurar avisos de la hoja de cierre',
         ],
       ],
     ];
