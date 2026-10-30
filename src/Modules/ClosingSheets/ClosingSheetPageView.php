@@ -71,7 +71,7 @@ final class ClosingSheetPageView
       </div>
     </section>
 
-    <form class="cs-form" data-cs-form data-cs-api="<?= $h($page['base_url'] . '/api.php') ?>" novalidate>
+    <form class="cs-form" data-cs-form data-cs-api="<?= $h($page['base_url'] . '/api.php') ?>" data-cs-draft="<?= $h($creating ? 'cierre:crear:' . $context['ids']['id_contrato'] . ':' . $context['ids']['id_arrendatario'] : 'cierre:editar:' . $context['closing_id']) ?>" novalidate>
       <input type="hidden" name="action" value="<?= $h($page['action']) ?>">
       <input type="hidden" name="nonce" value="<?= $h($page['nonce']) ?>">
       <input type="hidden" name="id_cierre" value="<?= (int) $context['closing_id'] ?>">

@@ -55,7 +55,7 @@ $render = static function (string $title, array $facts, string $body, int $statu
     'logo' => system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL),
     'favicon' => system_image('portal_favicon_url', SCM_DEFAULT_PORTAL_FAVICON_URL),
     'css' => array_map($asset, ['assets/css/review-page.css', 'assets/css/closing-sheet.css', 'assets/css/closing-sheet-flow.css']),
-    'js' => array_map($asset, ['assets/js/closing-sheet-flow.js']),
+    'js' => array_map($asset, ['assets/js/form-draft.js', 'assets/js/closing-sheet-flow.js']),
     'user' => $actorName !== '' ? $actorName : (Auth::isLoggedIn() ? Auth::user() : ''),
     'session' => Auth::isLoggedIn(),
   ], $title, 'Hoja de cierre de negocio', 'handshake', $facts, $body, $state, $hero);

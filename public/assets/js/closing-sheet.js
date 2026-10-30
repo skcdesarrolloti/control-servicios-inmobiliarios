@@ -103,6 +103,31 @@
   syncConditions();
   syncPercent();
 
+  // Borrador en el navegador: al recuperar, primero se recrean las filas de los repetidores que tenía.
+  const draft = window.SCMFormDraft
+    ? window.SCMFormDraft.attach(form, form.dataset.csDraft || "", {
+      beforeRestore(fields) {
+        form.querySelectorAll("[data-cs-repeat]").forEach((box) => {
+          const name = box.dataset.csRepeat;
+          const indexes = new Set();
+          Object.keys(fields).forEach((key) => {
+            const match = key.slice(0, name.length + 1) === name + "[" ? key.slice(name.length + 1).match(/^([^\]]+)\]\[/) : null;
+            if (match) indexes.add(match[1]);
+          });
+          const rows = box.querySelector("[data-cs-rows]");
+          rows.innerHTML = "";
+          const template = box.querySelector("[data-cs-template]").innerHTML;
+          indexes.forEach((index) => rows.insertAdjacentHTML("beforeend", template.replace(/__i__/g, index)));
+        });
+      },
+      afterRestore() {
+        syncConditions();
+        syncConditions();
+        syncPercent();
+      },
+    })
+    : null;
+
   // Validación de un paso: requeridos visibles y porcentajes.
   function check(step) {
     const missing = [];
@@ -168,7 +193,8 @@
     try {
       const response = await fetch(form.dataset.csApi, { method: "POST", body: new FormData(form), credentials: "same-origin" });
       if (response.status === 401) {
-        showError("Tu sesión venció. Inicia sesión de nuevo; la página se recargará.");
+        showError("Tu sesión venció. Lo escrito quedó como borrador en este navegador: inicia sesión y recupéralo. La página se recargará.");
+        if (draft) draft.keep();
         setTimeout(() => window.location.reload(), 2500);
         return;
       }
@@ -187,6 +213,7 @@
   });
 
   function done(data) {
+    if (draft) draft.markSaved();
     const card = document.querySelector("[data-cs-done]");
     card.querySelector("[data-cs-done-title]").textContent = data.title || "Hoja de cierre guardada";
     card.querySelector("[data-cs-done-text]").textContent = data.message || "";

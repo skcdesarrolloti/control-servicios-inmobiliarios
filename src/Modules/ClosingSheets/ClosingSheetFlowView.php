@@ -101,7 +101,7 @@ final class ClosingSheetFlowView
     $previous = $last !== null
       ? '<p class="cs-note csf-note"><span class="material-symbols-outlined" aria-hidden="true">history</span> Ya hay una revisión de esta hoja (#' . (int) $last['_ID'] . ', ' . self::e(self::date((int) ($last['fecha'] ?? 0))) . ', ' . self::e($last['realizado_por'] ?? '') . '). Si registras otra, la hoja toma los nuevos resultados.</p>'
       : '';
-    return '<form class="cs-form" data-csf-form method="post" novalidate>'
+    return '<form class="cs-form" data-csf-form data-csf-draft="cierre:revision:' . (int) $closing['_ID'] . '" method="post" novalidate>'
       . self::hidden($hidden + ['accion' => 'revision'])
       . '<section class="cs-section csf-intro"><p>Revisa cada servicio del inmueble antes de entregarlo. Al guardar, la hoja de cierre pasa a <strong>' . self::e(ClosingSheetWorkflow::STATUS_REVIEWED) . '</strong>, se avisa a quienes la aprueban y se envía al propietario el resultado (según la configuración).</p>'
       . '<p class="csf-actor"><span class="material-symbols-outlined" aria-hidden="true">badge</span> Queda registrada a nombre de <strong>' . self::e($actor['name']) . '</strong> (ID empleado ' . self::e($actor['employee_id']) . ').</p>' . $previous . '</section>'

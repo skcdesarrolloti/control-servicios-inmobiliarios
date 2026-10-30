@@ -83,6 +83,8 @@
       })
       .then(function (json) {
         if (!json || !json.success) throw new Error((json && json.data && json.data.message) || "No se pudo guardar.");
+        var draft = draftOf(form);
+        if (draft) draft.markSaved();
         showDone(json.data || {});
       })
       .catch(function (err) {
@@ -93,9 +95,21 @@
       });
   }
 
+  var drafts = [];
   document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll("[data-csf-service]").forEach(setService);
+    // Borrador en el navegador de la revisión de servicios.
+    document.querySelectorAll("[data-csf-draft]").forEach(function (form) {
+      if (!window.SCMFormDraft) return;
+      drafts.push({ form: form, draft: window.SCMFormDraft.attach(form, form.getAttribute("data-csf-draft"), {
+        afterRestore: function () { form.querySelectorAll("[data-csf-service]").forEach(setService); },
+      }) });
+    });
   });
+  function draftOf(form) {
+    for (var i = 0; i < drafts.length; i += 1) if (drafts[i].form === form) return drafts[i].draft;
+    return null;
+  }
 
   document.addEventListener("change", function (event) {
     var toggle = event.target.closest("[data-csf-toggle]");

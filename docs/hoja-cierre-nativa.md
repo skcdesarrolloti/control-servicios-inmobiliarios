@@ -111,3 +111,17 @@ aseguradora y ticket); no se usa la API REST de JetEngine.
 - Correos al crear: funcionarios del evento **Notificaciones internas → Hoja de cierre creada** (cada uno con su enlace
   para la revisión) y copia al creador. Editar no envía correos, salvo que la hoja estuviera "No aprobada": vuelve a
   "Esperando respuesta" y se avisa a **Hoja de cierre por responder**.
+
+## Borrador automático
+
+La hoja de cierre (crear y editar) y la revisión de servicios guardan lo escrito en el navegador mientras se llena (`public/assets/js/form-draft.js`):
+
+- **Cuándo guarda:** cada momento, incluidas las filas de mascotas, vehículos y personas, y los porcentajes.
+- **Clave:** `scm:borrador:cierre:crear:<mandato>:<arrendatario>`, `cierre:editar:<hoja>` o `cierre:revision:<hoja>`.
+- **Al volver a abrir:** sale un aviso para recuperarlo o descartarlo.
+- **Cuándo se borra:** al guardar con éxito, o a los 7 días.
+- **Al salir:** el navegador pregunta si hay cambios sin guardar.
+- **Si la sesión vence:** el borrador queda guardado.
+- **Qué no guarda:** ids, nonce, la firma del enlace ni los campos de solo lectura.
+- **Dónde queda:** solo en ese navegador; no viaja a otro equipo.
+

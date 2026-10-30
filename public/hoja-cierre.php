@@ -81,5 +81,5 @@ echo (new ClosingSheetPageView())->render($context, $service->options(), [
   'nonce' => App::csrf()->token('scm_nonce'),
   'action' => SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_SAVE,
   'css' => array_map($asset, ['assets/css/review-page.css', 'assets/css/closing-sheet.css']),
-  'js' => array_map($asset, ['assets/js/closing-sheet.js']),
+  'js' => array_map($asset, ['assets/js/form-draft.js', 'assets/js/closing-sheet.js']),
 ]);
