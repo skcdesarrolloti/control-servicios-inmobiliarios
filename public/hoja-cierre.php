@@ -28,6 +28,21 @@ foreach (ClosingSheetService::CONTEXT_IDS as $key) {
 }
 $relativeTarget = 'hoja-cierre.php?' . http_build_query($closingId > 0 ? ['id_cierre' => $closingId] : array_filter($query), '', '&', PHP_QUERY_RFC3986);
 
+// Desde WordPress el botón puede traer id_empleado + token (como cotizacion.php): inicia sesión con ese funcionario.
+$tryEmployeeTokenLogin = static function (): bool {
+  $employeeId = trim((string) ($_GET['id_empleado'] ?? ''));
+  $token = trim((string) ($_GET['token'] ?? ''));
+  $secret = defined('SCM_ACTA_AUTOLOGIN_SECRET') ? trim((string) SCM_ACTA_AUTOLOGIN_SECRET) : '';
+  if (!\SCM\Support\ActaAutologin::valid($secret, $employeeId, $token)) {
+    return false;
+  }
+  return (new Auth(App::db()))->loginByEmployeeId($employeeId);
+};
+// El token nunca se queda en la barra de direcciones ni en el historial del navegador.
+if (isset($_GET['token']) && (Auth::isLoggedIn() || $tryEmployeeTokenLogin())) {
+  header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/' . $relativeTarget, true, 302);
+  exit;
+}
 if (!Auth::isLoggedIn()) {
   header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/login.php?next=' . rawurlencode($relativeTarget), true, 302);
   exit;
