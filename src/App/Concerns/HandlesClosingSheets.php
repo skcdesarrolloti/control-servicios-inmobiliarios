@@ -1,0 +1,65 @@
+<?php
+
+declare(strict_types=1);
+
+namespace SCM\App\Concerns;
+
+use SCM\Core\Auth;
+use SCM\Modules\ClosingSheets\ClosingSheetService;
+
+/** Hoja de cierre de negocio (hoja-cierre.php): guardar al crear o editar. */
+trait HandlesClosingSheets
+{
+  public function ajax_handler_closing_sheet_save(): void
+  {
+    $this->verifyCsrf();
+    $closingId = (int) ($_POST['id_cierre'] ?? 0);
+    $creating = $closingId <= 0;
+    if (!$this->canOpenClosingSheet($creating)) {
+      $this->jsonFail($creating ? 'Tu cargo no tiene permiso para añadir hojas de cierre.' : 'Tu cargo no tiene permiso para editar hojas de cierre.');
+    }
+    $clean = static function ($value) use (&$clean) {
+      if (is_array($value)) {
+        return array_map($clean, $value);
+      }
+      return trim(strip_tags(wp_unslash((string) $value)));
+    };
+    $input = [];
+    foreach ($_POST as $key => $value) {
+      if (is_string($key) && preg_match('/^[a-z0-9_]+$/', $key) === 1) {
+        $input[$key] = $clean($value);
+      }
+    }
+    try {
+      $result = (new ClosingSheetService($this->db))->save($input, $this->closing_sheet_sender(), $closingId);
+    } catch (\Throwable $error) {
+      error_log('[closing_sheet_save] #' . $closingId . ': ' . $error->getMessage());
+      $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudo guardar la hoja de cierre. Intenta nuevamente.');
+    }
+    $synced = $result['synced'] !== [] ? ' También se actualizó el mandato (' . count($result['synced']) . ' ' . (count($result['synced']) === 1 ? 'dato' : 'datos') . ').' : '';
+    $this->jsonOk([
+      'title' => $creating ? 'Hoja de cierre #' . $result['id'] . ' creada' : 'Hoja de cierre #' . $result['id'] . ' actualizada',
+      'message' => ($creating ? 'Quedó en "' . ClosingSheetService::STATUS_NEW . '" y se avisó al equipo para la revisión de servicios públicos.' : 'Los cambios quedaron guardados.') . $synced,
+      'url' => $result['url'],
+      'edit_url' => $result['edit_url'],
+      'id' => $result['id'],
+    ]);
+  }
+
+  /** Funcionario que guarda: su id_empleado real (autor de los registros), nombre, correo y sucursal. @return array{employee_id:string,name:string,email:string,branch:string} */
+  private function closing_sheet_sender(): array
+  {
+    $employeeId = trim((string) $this->current_employee_id());
+    $sender = ['employee_id' => $employeeId !== '' ? $employeeId : (string) Auth::userId(), 'name' => trim(Auth::user()), 'email' => '', 'branch' => ''];
+    $table = $this->db->table('jet_cct_funcionarios');
+    if (Auth::userId() > 0 && $this->table_exists($table)) {
+      $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [Auth::userId()]);
+      if (is_array($row)) {
+        $sender['name'] = trim((string) ($row['nombre'] ?? '')) ?: $sender['name'];
+        $sender['email'] = trim((string) ($row['correo'] ?? ''));
+        $sender['branch'] = trim((string) ($row['id_sucursal'] ?? ''));
+      }
+    }
+    return $sender;
+  }
+}

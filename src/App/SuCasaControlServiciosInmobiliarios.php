@@ -18,6 +18,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesAdministrativeReports;
   use \SCM\App\Concerns\HandlesMaintenanceOrdersPanel;
   use \SCM\App\Concerns\HandlesLeaseContracts;
+  use \SCM\App\Concerns\HandlesClosingSheets;
   use \SCM\App\Concerns\HandlesPublicPqrActions;
   use \SCM\App\Concerns\HandlesPanelCaseCreation;
   use \SCM\App\Concerns\HandlesAdministrativeNotifications;
@@ -200,6 +201,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_LEASE_CONTRACT_CREATE = 'scm_contrato_arrendamiento_crear';
   const AJAX_LEASE_CONTRACT_RESEND_ACTS = 'scm_contrato_arrendamiento_reenviar_actas';
   const AJAX_LEASE_CONTRACT_ANNEXES_OK = 'scm_contrato_arrendamiento_anexos_al_dia';
+  const AJAX_CLOSING_SHEET_SAVE = 'scm_hoja_cierre_guardar';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';
@@ -528,6 +530,11 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Cuando un funcionario crea un caso con tema Recibo de inmuebles desde Crear nuevo caso o desde Contratos. Incluye el aviso previo de revisión antes de la desocupación del inmueble.',
             'channel' => 'Email interno en cola',
           ],
+          'hoja_cierre_creada' => [
+            'label' => 'Hoja de cierre creada',
+            'description' => 'Cuando un funcionario crea la hoja de cierre de negocio de un mandato, para la revisión de servicios públicos. Reemplaza los correos fijos del formulario de WordPress.',
+            'channel' => 'Email interno en cola',
+          ],
           'contrato_arrendamiento_creado' => [
             'label' => 'Contrato de arrendamiento creado',
             'description' => 'Cuando se crea un contrato desde un registro "No asignado". Incluye el acta de notificación de ingreso y la carta a la copropiedad si aplica.',
@@ -703,7 +710,7 @@ final class SuCasaControlServiciosInmobiliarios
       $selected = [];
       foreach ((array) $ids as $id) {
         $idKey = trim((string) ((int) $id));
-        $allowed = in_array($actionKey, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_recibo_manual','contrato_no_salida','nuevo_caso_panel'], true) ? $allActiveIds : $validFuncionarioIds;
+        $allowed = in_array($actionKey, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_recibo_manual','contrato_no_salida','nuevo_caso_panel','hoja_cierre_creada'], true) ? $allActiveIds : $validFuncionarioIds;
         if ($idKey !== '' && $idKey !== '0' && isset($allowed[$idKey])) {
           $selected[$idKey] = $idKey;
         }
@@ -936,6 +943,8 @@ final class SuCasaControlServiciosInmobiliarios
           'contract_desist' => 'Marcar contrato de arrendamiento como desistido',
           'contract_create' => 'Crear contrato de arrendamiento (contratos No asignado)',
           'contract_owner_change' => 'Cambiar funcionario responsable del contrato',
+          'closing_sheet_create' => 'Añadir hoja de cierre de negocio',
+          'closing_sheet_edit' => 'Editar hoja de cierre de negocio',
         ],
       ],
     ];
@@ -1217,6 +1226,12 @@ final class SuCasaControlServiciosInmobiliarios
       return array_values(array_diff($allActions, self::SENSITIVE_DEFAULT_ACTIONS));
     }
     return !empty($permissions[$cargo]) ? $permissions[$cargo] : [];
+  }
+
+  /** Permiso para abrir la hoja de cierre desde su página propia (hoja-cierre.php). */
+  public function canOpenClosingSheet(bool $creating): bool
+  {
+    return $this->canUseDashboardAction($creating ? 'closing_sheet_create' : 'closing_sheet_edit');
   }
 
   /** Permiso para abrir una acción de cotización desde su página propia (cotizacion.php). */

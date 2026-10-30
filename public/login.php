@@ -32,6 +32,16 @@ $safeNext = static function (string $raw): string {
       ? 'cotizacion.php?' . http_build_query(['accion' => $pageAction, $param => (string) $query[$param]], '', '&', PHP_QUERY_RFC3986)
       : '';
   }
+  if ($path === 'hoja-cierre.php') {
+    $keys = ['id_cierre', 'id_contrato', 'id_inmueble', 'id_inmueble_data', 'id_propietario', 'id_arrendatario', 'id_copropiedad', 'id_estudio_aseguradora'];
+    $out = [];
+    foreach ($keys as $key) {
+      if (isset($query[$key]) && $digits($query[$key])) { $out[$key] = (string) $query[$key]; }
+    }
+    return isset($out['id_cierre']) || isset($out['id_contrato'])
+      ? 'hoja-cierre.php?' . http_build_query(isset($out['id_cierre']) ? ['id_cierre' => $out['id_cierre']] : $out, '', '&', PHP_QUERY_RFC3986)
+      : '';
+  }
   if ($path === 'revision.php') {
     $kind = (string) ($query['tipo'] ?? '');
     return in_array($kind, ['preventiva', 'correctiva'], true) && isset($query['ticket_pk']) && $digits($query['ticket_pk'])
