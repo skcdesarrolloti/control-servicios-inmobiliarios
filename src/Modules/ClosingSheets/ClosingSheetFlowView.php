@@ -331,15 +331,57 @@ final class ClosingSheetFlowView
       if ($shown === '') {
         continue;
       }
-      $wide = in_array($field['type'], ['textarea', 'repeater'], true);
+      $wide = in_array($field['type'], ['textarea', 'repeater'], true) || isset(self::ICON_LISTS[$field['name']]);
       $items .= '<div class="csf-item' . ($wide ? ' is-wide' : '') . '"><dt>' . self::e($field['label']) . '</dt><dd>' . $shown . '</dd></div>';
     }
     return $items;
   }
 
+  /** Listas que se muestran como etiquetas con ícono (amenidades y servicios). */
+  private const ICON_LISTS = ['zonas_sociales' => true, 'servicios_publicos' => true];
+
+  /**
+   * Ícono (Material Symbols) de una amenidad o servicio, por palabra clave para que las opciones nuevas del glosario
+   * también tengan uno; el orden importa (piscina infantil antes que infantil, plazoleta BBQ antes que plazoleta).
+   */
+  private const ICONS = [
+    'piscina' => 'pool', 'pool' => 'pool', 'bbq' => 'outdoor_grill', 'parrilla' => 'outdoor_grill', 'sky bar' => 'nightlife',
+    'barra' => 'local_bar', 'bar' => 'local_bar', 'gimnasio' => 'fitness_center', 'gym' => 'fitness_center', 'golf' => 'golf_course',
+    'polideportivo' => 'sports_basketball', 'cancha' => 'sports_soccer', 'parque infantil' => 'toys', 'guarderia' => 'child_care',
+    'juegos' => 'casino', 'biblioteca' => 'local_library', 'estudio' => 'menu_book', 'ejecutivo' => 'business_center',
+    'administracion' => 'admin_panel_settings', 'salon social' => 'celebration', 'multi escenario' => 'theater_comedy',
+    'teatro' => 'theaters', 'sauna' => 'hot_tub', 'turco' => 'waves', 'spa' => 'spa', 'zen' => 'self_improvement',
+    'solarium' => 'wb_sunny', 'chorros' => 'water_drop', 'ducha' => 'shower', 'bano' => 'wc', 'lavanderia' => 'local_laundry_service',
+    'locker' => 'inventory_2', 'bodega' => 'warehouse', 'lobby' => 'chair', 'recepcion' => 'room_service', 'espera' => 'event_seat',
+    'bahia' => 'directions_car', 'parqueadero' => 'local_parking', 'agua' => 'water_drop', 'acueducto' => 'water_drop',
+    'energia' => 'bolt', 'luz' => 'bolt', 'gas' => 'local_fire_department', 'internet' => 'wifi', 'telefon' => 'call', 'aseo' => 'delete',
+  ];
+
+  private static function icon(string $label): string
+  {
+    $key = strtolower(strtr(trim($label), ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ñ' => 'n', 'Á' => 'a', 'É' => 'e', 'Í' => 'i', 'Ó' => 'o', 'Ú' => 'u', 'Ñ' => 'n']));
+    foreach (self::ICONS as $word => $icon) {
+      if (str_contains($key, $word)) {
+        return $icon;
+      }
+    }
+    return 'check_circle';
+  }
+
   /** Valor listo para mostrar (HTML escapado). @param array<string,mixed> $field @param array<string,mixed> $options */
   private static function shown(array $field, mixed $value, array $options): string
   {
+    if (isset(self::ICON_LISTS[$field['name']]) && is_array($value)) {
+      $labels = self::labels($field, $options);
+      $chips = '';
+      foreach ($value as $one) {
+        $text = trim((string) ($labels[(string) $one] ?? $one));
+        if ($text !== '') {
+          $chips .= '<li><span class="material-symbols-outlined" aria-hidden="true">' . self::icon($text) . '</span>' . self::e($text) . '</li>';
+        }
+      }
+      return $chips === '' ? '' : '<ul class="csf-chips">' . $chips . '</ul>';
+    }
     if ($field['type'] === 'repeater') {
       $rows = array_values(array_filter(is_array($value) ? $value : [], 'is_array'));
       $columns = ClosingSheetForm::REPEATERS[$field['name']] ?? [];
