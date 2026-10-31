@@ -8,7 +8,7 @@ Los funcionarios se eligen en **Configuración › Notificaciones internas**, en
 | --- | --- | --- |
 | Hoja de cierre creada | Quienes hacen la revisión de servicios | `scm_hoja_cierre_revision_servicios_v1` |
 | Hoja de cierre por responder | Quienes aprueban o no la hoja | `scm_hoja_cierre_por_responder_v1` |
-| Hoja de cierre respondida | Quienes deben enterarse del resultado. Quien hizo la hoja lo recibe siempre. | `scm_hoja_cierre_respuesta_v1` |
+| Hoja de cierre respondida | Quienes deben enterarse del resultado. Quien hizo la hoja lo recibe siempre. | `scm_hoja_cierre_respuesta_v2` |
 
 El celular de cada funcionario es el `celular` de su ficha en Funcionarios. El del propietario es el celular de la hoja de cierre (y el de cada copropietario).
 
@@ -94,25 +94,26 @@ Apruébala o no desde el botón. El enlace es personal y vence en 30 días.
 
 Se envía a los funcionarios de **Hoja de cierre respondida** y a quien hizo la hoja. El botón abre la hoja en solo lectura y el enlace vence en 180 días. Si la hoja no se aprobó, quien la hizo la corrige desde el panel, con el botón del correo.
 
-- Nombre: `scm_hoja_cierre_respuesta_v1`.
-- Botón: `Ver hoja`.
+- Nombre: `scm_hoja_cierre_respuesta_v2`. La v1 la clasificó Meta como marketing; ya no se usa y se puede borrar.
+- Botón: `Ver hoja de cierre`.
 - Ejemplo de la URL: `control-servicios-inmobiliarios/public/hoja-cierre-ver.php?numero=430&p=ver&f=1508&expires=1808000000&sig=0a1b2c`.
 
 ```text
-Hola, {{1}}. La hoja de cierre {{2}} quedó {{3}}.
+Hola, {{1}}. Se registró la respuesta de la hoja de cierre {{2}}.
 
+Resultado: {{3}}
 Inmueble: {{4}}
 Respondió: {{5}}
 Observación: {{6}}
 
-Consulta la hoja desde el botón.
+Recibes este aviso porque haces seguimiento a esta hoja en el panel. El detalle está en el botón.
 ```
 
 | Variable | Qué envía el panel | Ejemplo |
 | --- | --- | --- |
 | 1 | Nombre del funcionario | Kellys Roqueme |
 | 2 | Número de la hoja | #430 |
-| 3 | `aprobada` o `no aprobada` | no aprobada |
+| 3 | `Aprobada` o `No aprobada` | No aprobada |
 | 4 | Inmueble y dirección | Inmueble 151187 · Carrera 32B #80-624 Apto 308 |
 | 5 | Quien respondió | Said Abuita Correa |
 | 6 | Observación, o "Sin observación" | Falta el certificado de tradición. |

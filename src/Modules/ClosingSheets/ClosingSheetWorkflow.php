@@ -47,7 +47,7 @@ final class ClosingSheetWorkflow
 
   public const TEMPLATE_REVIEW = 'scm_hoja_cierre_revision_servicios_v1';
   public const TEMPLATE_TO_RESPOND = 'scm_hoja_cierre_por_responder_v1';
-  public const TEMPLATE_RESPONSE = 'scm_hoja_cierre_respuesta_v1';
+  public const TEMPLATE_RESPONSE = 'scm_hoja_cierre_respuesta_v2';
   public const TEMPLATE_OWNER = 'scm_revision_servicios_entrega_propietario_v1';
 
   /** Resultados en tiempo (glosario 998 del formulario original). */
@@ -553,7 +553,7 @@ final class ClosingSheetWorkflow
       . ($note !== '' ? self::p('<b>Observación:</b> ' . nl2br(self::e($note))) : '')
       . $extra;
     $waText = 'Hoja de cierre #' . $closingId . ' ' . mb_strtolower($state, 'UTF-8') . ' por ' . $actor['name'] . '.';
-    $waParams = fn(string $name): array => [$name, '#' . $closingId, mb_strtolower($state, 'UTF-8'), self::place($closing), $actor['name'], $note !== '' ? $note : 'Sin observación'];
+    $waParams = fn(string $name): array => [$name, '#' . $closingId, $state, self::place($closing), $actor['name'], $note !== '' ? $note : 'Sin observación'];
     $queued = $this->notifyStaff(self::ACTION_RESPONDED, $closingId, ClosingSheetAccess::VIEW, $subject, fn(string $name): string => $body($name, ''),
       'Ver hoja de cierre', self::TEMPLATE_RESPONSE, $waParams, $waText, [], (string) ($closing['fecha_repuesta'] ?? ''));
 
