@@ -213,6 +213,7 @@ final class ClosingSheetWorkflow
         ['role' => 'Gerencia', 'action' => 'Autorizó', 'date' => (int) ($closing['fecha_repuesta'] ?? 0)] + $this->signer((string) ($closing['id_aprobador'] ?? ''), (string) ($closing['aprobador'] ?? '')),
       ],
       'company' => $this->company((string) ($closing['sucursal'] ?? '')),
+      'documents' => (new ClosingSheetDocuments($this->db))->forClosing($closingId),
     ];
   }
 
@@ -548,14 +549,26 @@ final class ClosingSheetWorkflow
     $rejected = $state === self::REJECTED;
     $subject = 'Hoja de cierre #' . $closingId . ' ' . mb_strtolower($state, 'UTF-8');
     $where = self::where($closing);
+    // Los documentos de la hoja van adjuntos hasta el límite de peso; los demás se ven en la hoja (botón).
+    $files = ['files' => [], 'skipped' => 0];
+    try {
+      $files = ClosingSheetDocuments::attachments((new ClosingSheetDocuments($this->db))->forClosing($closingId));
+    } catch (\Throwable $error) {
+      error_log('[closing_sheet_response_attachments] #' . $closingId . ': ' . $error->getMessage());
+    }
+    $attached = count($files['files']);
+    $documentsNote = $attached + $files['skipped'] === 0 ? ''
+      : self::p(($attached > 0 ? 'Van adjuntos <b>' . $attached . '</b> ' . ($attached === 1 ? 'documento' : 'documentos') . ' de la hoja.' : '')
+        . ($files['skipped'] > 0 ? ' ' . $files['skipped'] . ' ' . ($files['skipped'] === 1 ? 'documento no se adjuntó' : 'documentos no se adjuntaron') . ' por tamaño: están en la hoja de cierre (botón).' : ''));
     $body = static fn(string $name, string $extra): string => self::p('Hola, <b>' . self::e($name) . '</b>.')
       . self::p('<b>' . self::e($actor['name']) . '</b> respondió la hoja de cierre de negocio <b>#' . $closingId . '</b> del ' . $where . ': <b>' . self::e($state) . '</b>.')
       . ($note !== '' ? self::p('<b>Observación:</b> ' . nl2br(self::e($note))) : '')
+      . $documentsNote
       . $extra;
     $waText = 'Hoja de cierre #' . $closingId . ' ' . mb_strtolower($state, 'UTF-8') . ' por ' . $actor['name'] . '.';
     $waParams = fn(string $name): array => [$name, '#' . $closingId, $state, self::place($closing), $actor['name'], $note !== '' ? $note : 'Sin observación'];
     $queued = $this->notifyStaff(self::ACTION_RESPONDED, $closingId, ClosingSheetAccess::VIEW, $subject, fn(string $name): string => $body($name, ''),
-      'Ver hoja de cierre', self::TEMPLATE_RESPONSE, $waParams, $waText, [], (string) ($closing['fecha_repuesta'] ?? ''));
+      'Ver hoja de cierre', self::TEMPLATE_RESPONSE, $waParams, $waText, [], (string) ($closing['fecha_repuesta'] ?? ''), $files['files']);
 
     // Quien hizo la hoja: si no se aprobó, la corrige desde el panel y vuelve a quedar por responder.
     $creator = $this->funcionario('id_empleado', trim((string) ($closing['id_empleado'] ?? '')));
@@ -569,6 +582,7 @@ final class ClosingSheetWorkflow
         $queued += (new EmailQueue($this->db))->enqueue([$creator['email']], $subject, $html, [
           'source_module' => 'hoja_cierre', 'internal_cc' => [], 'destination_name' => $creator['name'],
           'dedupe_key' => 'hoja_cierre_' . $closingId . '_respuesta_' . (string) ($closing['fecha_repuesta'] ?? '') . '_creador', 'meta' => ['closing_id' => $closingId],
+          'payload' => ['attachments' => $files['files']],
         ]);
       }
       if ($creator['phone'] !== '') {
@@ -598,8 +612,9 @@ final class ClosingSheetWorkflow
   /**
    * Correo y WhatsApp a cada funcionario del evento interno, con su propio enlace firmado.
    * @param callable(string):string $body @param callable(string):list<string> $waParams @param list<array{label:string,url:string}> $extraButtons
+   * @param list<array{path:string,name:string}> $attachments adjuntos del correo
    */
-  private function notifyStaff(string $action, int $closingId, string $purpose, string $subject, callable $body, string $buttonLabel, string $template, callable $waParams, string $waText, array $extraButtons = [], string $dedupeSuffix = ''): int
+  private function notifyStaff(string $action, int $closingId, string $purpose, string $subject, callable $body, string $buttonLabel, string $template, callable $waParams, string $waText, array $extraButtons = [], string $dedupeSuffix = '', array $attachments = []): int
   {
     $queue = new EmailQueue($this->db);
     $queued = 0;
@@ -617,7 +632,7 @@ final class ClosingSheetWorkflow
         $html = EmailTemplate::render($subject, $body($name), ['buttons' => array_merge([['label' => $buttonLabel, 'url' => $url]], $extraButtons)]);
         $queued += $queue->enqueue([$email], $subject, $html, [
           'source_module' => 'hoja_cierre', 'internal_action' => $action, 'internal_cc' => [], 'destination_name' => $name, 'dedupe_key' => $dedupe,
-          'meta' => ['closing_id' => $closingId, 'internal_action' => $action],
+          'meta' => ['closing_id' => $closingId, 'internal_action' => $action], 'payload' => $attachments !== [] ? ['attachments' => $attachments] : [],
         ]);
       }
       $phone = preg_replace('/\D+/', '', (string) ($contact['phone'] ?? '')) ?? '';

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\Modules\LeaseContracts;
 
+use SCM\Modules\ClosingSheets\ClosingSheetDocuments;
 use SCM\Modules\Pending\PublicServicesUi as UI;
 
 /** Actividades contractuales › Contratos de arrendamiento, con el diseño Tailwind de los workspaces. */
@@ -121,6 +122,9 @@ final class LeaseContractsView
         : '<span class="!sp-inline-flex !sp-items-center !sp-gap-1 !sp-px-2 !sp-py-1 !sp-rounded-full !sp-border !sp-border-solid !sp-border-amber-200 !sp-bg-amber-50 !sp-text-amber-800 !sp-text-[9px] !sp-font-bold">' . $ui::icon('clock', '!sp-w-3 !sp-h-3') . 'Pendientes</span>') . '</td>';
       $html .= '<td class="' . $td . '"><div class="!sp-grid !sp-grid-cols-2 !sp-gap-1.5 !sp-min-w-[300px]">';
       $html .= $this->action('documentos', 'Documentación', 'document', $attrs);
+      if ($id !== '') {
+        $html .= $this->folderButton((int) $id, $code);
+      }
       $html .= $this->action('ficha', 'Ficha del inmueble', 'building', $attrs);
       $html .= $this->action('historial-inmueble', 'Historial inmueble', 'clock', $attrs);
       $html .= $this->action('historial-contrato', 'Historial contrato', 'copy', $attrs);
@@ -147,6 +151,12 @@ final class LeaseContractsView
       $html .= '</div></td></tr>';
     }
     return $html . '</tbody></table></div>';
+  }
+
+  /** Carpeta de documentos del negocio (hoja de cierre y contrato) en la ventana del panel. */
+  private function folderButton(int $id, string $code): string
+  {
+    return '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start" data-scm-open-iframe data-iframe-url="' . esc_attr(ClosingSheetDocuments::folderUrl($id) . '&embed=1') . '" data-iframe-title="Carpeta de documentos · #' . esc_attr($code) . '">' . UI::icon('copy', '!sp-w-3 !sp-h-3') . 'Carpeta de documentos</button>';
   }
 
   private function action(string $key, string $label, string $icon, string $attrs): string
@@ -217,6 +227,9 @@ final class LeaseContractsView
     $html .= '</div></div>';
 
     $html .= '<div class="' . $ui::CARD . ' !sp-p-5"><h4 class="!sp-m-0 !sp-mb-3 !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide">Documentos y expedientes</h4><div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-3 !sp-gap-2">';
+    if ((int) ($c['_ID'] ?? 0) > 0) {
+      $html .= $this->folderButton((int) $c['_ID'], $v('contrato', (string) $c['_ID']));
+    }
     foreach ($this->documents($c) as $doc) {
       $html .= $doc['external']
         ? '<a class="' . self::MODAL_BUTTON . ' !sp-justify-between !sp-py-2.5" href="' . esc_attr($doc['url']) . '" target="_blank" rel="noopener noreferrer"><span>' . esc_html($doc['label']) . '</span>' . $ui::icon('download', '!sp-w-3 !sp-h-3 !sp-text-service-muted') . '</a>'

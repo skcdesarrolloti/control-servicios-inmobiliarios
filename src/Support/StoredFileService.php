@@ -216,6 +216,26 @@ final class StoredFileService
     return $stored;
   }
 
+  /**
+   * Un archivo de $_FILES: las fotos (JPG, PNG, WebP) se reducen y comprimen como las evidencias; PDF, Word, Excel y los
+   * demás documentos permitidos se guardan tal cual.
+   * @param array<string,mixed> $file @return array{name:string,url:string,mime:string,bytes:int,sha256:string}|null
+   */
+  public function storeUploadedFile(array $file): ?array
+  {
+    if (!$this->isAcceptableUpload($file)) {
+      return null;
+    }
+    $image = in_array($this->detectMime((string) $file['tmp_name']), ['image/jpeg', 'image/png', 'image/webp'], true);
+    $name = $image ? $this->storeImage($file) : $this->storeDocument($file);
+    if ($name === '') {
+      return null;
+    }
+    $path = $this->directory . '/' . $name;
+    $hash = @hash_file('sha256', $path);
+    return ['name' => $name, 'url' => $this->urlFor($name), 'mime' => $this->detectMime($path), 'bytes' => (int) filesize($path), 'sha256' => is_string($hash) ? $hash : ''];
+  }
+
   public function urlFor(string $name): string
   {
     $name = basename($name);

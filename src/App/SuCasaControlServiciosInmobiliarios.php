@@ -205,6 +205,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CLOSING_SHEET_LIST = 'scm_hojas_cierre_listar';
   const AJAX_CLOSING_SHEET_TENANTS = 'scm_hoja_cierre_arrendatarios';
   const AJAX_CLOSING_SHEET_TENANT_SAVE = 'scm_hoja_cierre_arrendatario_guardar';
+  const AJAX_CLOSING_DOCUMENTS_UPLOAD = 'scm_documentos_cierre_subir';
+  const AJAX_CLOSING_DOCUMENTS_DELETE = 'scm_documentos_cierre_eliminar';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';
@@ -963,6 +965,7 @@ final class SuCasaControlServiciosInmobiliarios
           'contract_desist' => 'Marcar contrato de arrendamiento como desistido',
           'contract_create' => 'Crear contrato de arrendamiento (contratos No asignado)',
           'contract_owner_change' => 'Cambiar funcionario responsable del contrato',
+          'contract_documents_manage' => 'Subir y eliminar documentos en la carpeta del contrato (contratos de arrendamiento)',
           'closing_sheet_create' => 'Añadir hoja de cierre de negocio',
           'closing_sheet_edit' => 'Editar hoja de cierre de negocio',
           'closing_sheet_review' => 'Hacer la revisión de servicios públicos antes de la ocupación (hoja de cierre)',
@@ -1254,6 +1257,12 @@ final class SuCasaControlServiciosInmobiliarios
   public function canOpenClosingSheet(bool $creating): bool
   {
     return $this->canUseDashboardAction($creating ? 'closing_sheet_create' : 'closing_sheet_edit');
+  }
+
+  /** Carpeta de documentos del contrato (documentos-contrato.php): subir y eliminar. */
+  public function canManageContractDocuments(): bool
+  {
+    return $this->canUseDashboardAction('contract_documents_manage');
   }
 
   /** Permisos de la hoja de cierre para sus páginas propias (revisión de servicios, ver y responder). */

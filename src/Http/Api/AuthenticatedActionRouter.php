@@ -233,6 +233,8 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_LIST => 'ajax_handler_closing_sheet_list',
       SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_TENANTS => 'ajax_handler_closing_sheet_tenants',
       SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_TENANT_SAVE => 'ajax_handler_closing_sheet_tenant_save',
+      SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_DOCUMENTS_UPLOAD => 'ajax_handler_closing_documents_upload',
+      SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_DOCUMENTS_DELETE => 'ajax_handler_closing_documents_delete',
     ];
 
     $this->guideRoutes = [

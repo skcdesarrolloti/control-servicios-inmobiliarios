@@ -26,8 +26,9 @@
 .csf-result.is-bad { background: #fee2e2; color: #991b1b; }
 .csf-result.is-muted { background: #f1f5f9; color: #475569; }
 .csf-checklist { margin: 0; padding: 0; list-style: none; }
-.csf-checklist li { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--rp-line); }
-.csf-checklist li:last-child { border-bottom: 0; }
+.csf-checklist > li { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--rp-line); }
+.csf-checklist > li:last-child { border-bottom: 0; }
+.csf-checklist > li > .csf-result { align-self: start; justify-self: start; }
 .csf-checklist p { margin: 0; font-size: 14px; }
 .csf-checklist small { display: block; margin-top: 4px; color: var(--rp-muted); }
 
@@ -100,7 +101,7 @@
   .csf-doc-title { text-align: left; }
   .csf-signatures .csf-sign-grid { grid-template-columns: 1fr; }
   .csf-search { flex-direction: column; }
-  .csf-checklist li { grid-template-columns: 1fr; }
+  .csf-checklist > li { grid-template-columns: 1fr; }
   .csf-row-actions { justify-content: flex-start; }
 }
 
@@ -134,7 +135,7 @@
   .csf-item dd { font-size: 11px; }
   .csf-item dt { font-size: 9px; }
   .cs-table th, .cs-table td { padding: 3px 4px; font-size: 10px; }
-  .csf-checklist li { grid-template-columns: 80px minmax(0, 1fr); padding: 3px 0; break-inside: avoid; page-break-inside: avoid; }
+  .csf-checklist > li { grid-template-columns: 80px minmax(0, 1fr); padding: 3px 0; break-inside: avoid; page-break-inside: avoid; }
   .csf-checklist p { font-size: 10px; }
   .csf-check-group { break-inside: avoid; page-break-inside: avoid; }
 }

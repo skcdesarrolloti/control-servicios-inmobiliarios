@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace SCM\App\Concerns;
 
 use SCM\Core\Auth;
+use SCM\Modules\ClosingSheets\ClosingSheetDocuments;
+use SCM\Modules\ClosingSheets\ClosingSheetDocumentsView;
 use SCM\Modules\ClosingSheets\ClosingSheetFlowView;
 use SCM\Modules\ClosingSheets\ClosingSheetPanelView;
 use SCM\Modules\ClosingSheets\ClosingSheetService;
 use SCM\Modules\ClosingSheets\ClosingSheetTenants;
 use SCM\Modules\ClosingSheets\ClosingSheetWorkflow;
 
-/** Hoja de cierre de negocio (hoja-cierre.php): guardar al crear o editar, buscar y registrar el arrendatario, y el listado del panel. */
+/** Hoja de cierre de negocio (hoja-cierre.php): guardar al crear o editar, buscar y registrar el arrendatario, sus documentos y el listado del panel. */
 trait HandlesClosingSheets
 {
   public function ajax_handler_closing_sheet_save(): void
@@ -39,6 +41,14 @@ trait HandlesClosingSheets
     } catch (\Throwable $error) {
       error_log('[closing_sheet_save] #' . $closingId . ': ' . $error->getMessage());
       $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudo guardar la hoja de cierre. Intenta nuevamente.');
+    }
+    if ($creating) {
+      // Lo que se adjuntó antes de que la hoja tuviera número queda en la hoja.
+      try {
+        (new ClosingSheetDocuments($this->db))->claim((int) ($input['id_contrato'] ?? 0), (int) $result['id']);
+      } catch (\Throwable $error) {
+        error_log('[closing_sheet_documents_claim] #' . $result['id'] . ': ' . $error->getMessage());
+      }
     }
     $synced = $result['synced'] !== [] ? ' También se actualizó el mandato (' . count($result['synced']) . ' ' . (count($result['synced']) === 1 ? 'dato' : 'datos') . ').' : '';
     $this->jsonOk([
@@ -92,6 +102,58 @@ trait HandlesClosingSheets
         ? 'Ese documento ya está registrado a nombre de ' . $result['tenant']['nombre'] . '. Úsalo en la hoja; si algún dato cambió, corrígelo en los campos del arrendatario de la hoja y se actualiza su ficha al guardar.'
         : 'Arrendatario registrado' . ($result['notified'] ? ' y se le envió la bienvenida por correo.' : '.'),
     ]);
+  }
+
+  /** Documentos de la hoja o del contrato: sube un archivo (closing-documents.js los envía de a uno). */
+  public function ajax_handler_closing_documents_upload(): void
+  {
+    $this->verifyCsrf();
+    $scope = [];
+    foreach (['closing_id', 'mandate_id', 'contract_id'] as $key) {
+      $value = trim((string) ($_POST[$key] ?? ''));
+      $scope[$key] = ctype_digit($value) ? (int) $value : 0;
+    }
+    $allowed = $this->canManageContractDocuments() || ($scope['contract_id'] <= 0 && $this->canOpenClosingSheet($scope['closing_id'] <= 0));
+    if (!$allowed) {
+      $this->jsonFail('Tu cargo no tiene permiso para subir documentos aquí.');
+    }
+    $file = $_FILES['archivo'] ?? null;
+    if (!is_array($file) || is_array($file['name'] ?? null)) {
+      $this->jsonFail('Adjunta un archivo.');
+    }
+    $item = preg_replace('/[^a-z0-9_]/', '', strtolower((string) ($_POST['item'] ?? ''))) ?? '';
+    $title = mb_substr(trim(strip_tags(wp_unslash((string) ($_POST['titulo'] ?? '')))), 0, 120, 'UTF-8');
+    try {
+      $document = (new ClosingSheetDocuments($this->db))->store($scope, $item, (int) ($_POST['persona'] ?? 0), $title, $file, $this->closing_sheet_sender());
+    } catch (\Throwable $error) {
+      error_log('[closing_documents_upload] ' . $error->getMessage());
+      $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudo guardar el documento. Intenta nuevamente.');
+    }
+    $this->jsonOk(['document' => $document, 'html' => ClosingSheetDocumentsView::chip($document, true)]);
+  }
+
+  /** Documentos de la hoja o del contrato: eliminar (queda quién y cuándo). */
+  public function ajax_handler_closing_documents_delete(): void
+  {
+    $this->verifyCsrf();
+    $documents = new ClosingSheetDocuments($this->db);
+    $document = $documents->find((int) ($_POST['id'] ?? 0));
+    if ($document === [] || $document['deleted_at'] > 0) {
+      $this->jsonFail('Ese documento ya no está en la carpeta.');
+    }
+    $allowed = $this->canManageContractDocuments()
+      || ($document['closing_id'] > 0 && $this->canOpenClosingSheet(false))
+      || ($document['closing_id'] === 0 && $document['contract_id'] === 0 && $this->canOpenClosingSheet(true));
+    if (!$allowed) {
+      $this->jsonFail('Tu cargo no tiene permiso para eliminar este documento.');
+    }
+    try {
+      $documents->delete($document['id'], $this->closing_sheet_sender());
+    } catch (\Throwable $error) {
+      error_log('[closing_documents_delete] #' . $document['id'] . ': ' . $error->getMessage());
+      $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudo eliminar el documento. Intenta nuevamente.');
+    }
+    $this->jsonOk(['id' => $document['id'], 'message' => '«' . $document['name'] . '» se eliminó de la carpeta.']);
   }
 
   /** Actividades administrativas › Hojas de cierre: pestañas por estado y tabla. */

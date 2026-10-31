@@ -258,6 +258,60 @@ final class ClosingSheetForm
   ];
 
   /**
+   * Ítems de la lista de chequeo que son un documento y llevan archivo (los demás son preguntas o datos): columna del
+   * estado => nombre corto del archivo. Los del grupo del propietario se suben por cada propietario. "Asegurable" lleva el
+   * estudio de la aseguradora.
+   */
+  public const DOCUMENT_ITEMS = [
+    'estado_certificado_tradicion' => 'Certificado de tradición y libertad',
+    'estado_copia_escritura' => 'Copia de escritura pública',
+    'estado_factura_predial' => 'Factura del predial',
+    'estado_servicio_agua' => 'Factura de acueducto y alcantarillado',
+    'estado_servicio_energia' => 'Factura de energía',
+    'estado_servicio_gas' => 'Factura de gas',
+    'estado_servicio_internet' => 'Factura de internet',
+    'estado_servicio_telefonia' => 'Factura de teléfono fijo',
+    'estado_mora_servicios' => 'Autorización de pago de servicios en mora',
+    'estado_acreditacion_propietario' => 'Facultad para arrendar',
+    'estado_certificado_empresa_pro' => 'Existencia y representación legal',
+    'estado_certificado_camara_pro' => 'Cámara de comercio',
+    'estado_documento_pro' => 'Documento de identidad',
+    'estado_rut_pro' => 'RUT',
+    'estado_bancaria_pro' => 'Certificación bancaria',
+    'estado_certificado_empresa_arre' => 'Existencia y representación legal',
+    'estado_certificado_camara_arre' => 'Cámara de comercio',
+    'estado_documento_arre' => 'Documento de identidad',
+    'estado_rut_arre' => 'RUT',
+    'estado_certificado_empresa_co1' => 'Existencia y representación legal',
+    'estado_certificado_camara_co1' => 'Cámara de comercio',
+    'estado_documento_co1' => 'Documento de identidad',
+    'estado_rut_co1' => 'RUT',
+    'estado_certificado_empresa_co2' => 'Existencia y representación legal',
+    'estado_certificado_camara_co2' => 'Cámara de comercio',
+    'estado_documento_co2' => 'Documento de identidad',
+    'estado_rut_co2' => 'RUT',
+    'estado_certificado_empresa_co3' => 'Existencia y representación legal',
+    'estado_certificado_camara_co3' => 'Cámara de comercio',
+    'estado_documento_co3' => 'Documento de identidad',
+    'estado_rut_co3' => 'RUT',
+    'estado_certificado_empresa_co4' => 'Existencia y representación legal',
+    'estado_certificado_camara_co4' => 'Cámara de comercio',
+    'estado_documento_co4' => 'Documento de identidad',
+    'estado_rut_co4' => 'RUT',
+    'estado_reglamento_copropiedad' => 'Reglamento de propiedad horizontal',
+    'estado_manual_copropiedad' => 'Manual de convivencia',
+    'estado_rut_copropiedad' => 'RUT de la copropiedad',
+    'estado_certificacion_copropiedad' => 'Certificación bancaria de la copropiedad',
+    'estado_cuota_copropiedad' => 'Certificación de la cuota de administración',
+    'estado_paz_salvo_copropiedad' => 'Paz y salvo de la copropiedad',
+    'estado_asegurable' => 'Estudio de la aseguradora',
+  ];
+  /** Grupo de la lista de chequeo cuyos documentos se suben por cada propietario. */
+  public const OWNER_DOCUMENTS = 'ob_documentos_propietario';
+  /** Documentos que no son de un ítem de la lista. */
+  public const EXTRA_DOCUMENTS = 'adicional';
+
+  /**
    * Separa los campos de cada codeudor ("…_codeudor_N") para mostrarlos en un bloque por persona, con etiquetas cortas.
    * @param list<array<string,mixed>> $fields
    * @return array{0:list<array<string,mixed>>,1:array<string,list<array<string,mixed>>>} sueltos y "Codeudor N" => campos

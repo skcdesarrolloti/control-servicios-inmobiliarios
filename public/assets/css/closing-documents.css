@@ -1,0 +1,77 @@
+/* Documentos de la hoja de cierre y carpeta del contrato (ClosingSheetDocumentsView + closing-documents.js). */
+.cd-slots { grid-column: 1 / -1; display: grid; gap: 8px; }
+.cd-slot { display: grid; gap: 6px; padding: 10px 12px; border: 1px dashed #cbd5e1; border-radius: 12px; background: #f8fafc; }
+.cd-slot.is-busy { opacity: 0.75; }
+.cd-slot-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.cd-slot-label { font-size: 13px; font-weight: 600; color: var(--rp-ink); }
+.cd-add { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 6px 12px; border: 1px solid var(--rp-navy); border-radius: 999px; background: #fff; color: var(--rp-navy); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.cd-add:hover { background: #eef2f8; }
+.cd-add .material-symbols-outlined { font-size: 18px; }
+.cd-title { max-width: 420px; }
+.cd-docs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.cd-docs:empty { display: none; }
+.cd-doc { display: inline-flex; align-items: stretch; max-width: 100%; border: 1px solid var(--rp-line); border-radius: 10px; background: #fff; overflow: hidden; }
+.cd-doc-open { display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 10px; border: 0; background: none; color: var(--rp-ink); font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
+.cd-doc-open:hover { background: #f1f5f9; }
+.cd-doc-open .material-symbols-outlined { color: #b91c1c; font-size: 20px; }
+.cd-doc-text { display: flex; flex-direction: column; min-width: 0; }
+.cd-doc-name { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.cd-doc-text small { margin: 0; color: var(--rp-muted); font-size: 11px; }
+.cd-doc-del { padding: 0 8px; border: 0; border-left: 1px solid var(--rp-line); background: none; color: #b91c1c; cursor: pointer; }
+.cd-doc-del:hover { background: #fef2f2; }
+.cd-doc-del .material-symbols-outlined { font-size: 18px; }
+.cd-empty { margin: 0; color: var(--rp-muted); font-size: 12px; }
+.cd-warn, .cd-status { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; }
+.cd-warn { color: #92400e; font-weight: 600; }
+.cd-warn .material-symbols-outlined { font-size: 16px; }
+.cd-status { color: var(--rp-muted); }
+.cd-status.is-error { color: #b91c1c; font-weight: 600; }
+.cd-warn[hidden], .cd-status[hidden], .cd-pending[hidden] { display: none; }
+.cd-pending { padding: 14px 18px; border: 1px solid #fcd34d; border-radius: 14px; background: #fffbeb; color: #78350f; font-size: 14px; }
+.cd-pending p { margin: 0 0 8px; }
+.cd-pending ul { margin: 0 0 10px; padding-left: 20px; }
+.cd-danger { background: #b91c1c !important; border-color: #b91c1c !important; }
+
+/* Vista de la hoja y carpeta del contrato. */
+.cd-read { display: grid; gap: 4px; margin-top: 6px; }
+.csf-checklist small.cd-warn { color: #92400e; }
+.cd-folder { display: grid; gap: 18px; }
+.cd-intro p { margin: 0 0 8px; }
+.cd-group { display: grid; gap: 12px; }
+.cd-item { display: grid; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--rp-line); }
+.cd-item:last-child { border-bottom: 0; }
+.cd-item-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.cd-item-head p { margin: 0; font-size: 14px; font-weight: 600; }
+.cd-history summary { cursor: pointer; font-weight: 700; color: var(--rp-navy); }
+.cd-history ul { margin: 10px 0 0; padding-left: 20px; font-size: 13px; }
+.cd-history li { margin-bottom: 6px; }
+.cd-history small { display: block; color: var(--rp-muted); }
+
+.cd-viewer { width: min(960px, 96vw); height: min(88vh, 960px); padding: 0; border: 0; border-radius: 16px; box-shadow: 0 20px 60px rgba(15, 30, 54, 0.35); }
+.cd-viewer[open] { display: flex; flex-direction: column; }
+.cd-viewer::backdrop, .cd-confirm::backdrop { background: rgba(15, 23, 42, 0.55); }
+.cd-viewer header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--rp-line); }
+.cd-viewer header strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-viewer-body { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #f1f5f9; }
+.cd-viewer-body iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+.cd-viewer-body img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.cd-confirm { width: min(440px, calc(100vw - 24px)); padding: 20px 22px; border: 0; border-radius: 16px; box-shadow: 0 24px 60px rgba(15, 30, 54, 0.3); }
+.cd-confirm h2 { margin: 0 0 8px; color: var(--rp-navy); font-size: 18px; }
+.cd-confirm p { margin: 0 0 8px; }
+
+@media (max-width: 640px) {
+  .cd-add { margin-left: 0; }
+  .cd-doc, .cd-doc-open { width: 100%; }
+  .cd-doc-name { max-width: none; white-space: normal; }
+}
+
+@media print {
+  .cd-add, .cd-file, .cd-title, .cd-doc-del, .cd-status, .cd-viewer, .cd-confirm, .cd-pending { display: none !important; }
+  .cd-slot, .cd-item, .cd-doc { break-inside: avoid; page-break-inside: avoid; }
+  .cd-slot { padding: 4px 6px; background: none; }
+  .cd-doc { border: 0; }
+  .cd-doc-open { padding: 0 4px; }
+  .cd-doc-open .material-symbols-outlined { display: none; }
+  .cd-doc-name { font-size: 10px; }
+  .cd-doc-text small { font-size: 9px; }
+}

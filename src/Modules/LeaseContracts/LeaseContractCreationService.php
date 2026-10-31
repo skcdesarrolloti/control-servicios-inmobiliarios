@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Modules\LeaseContracts;
 
 use SCM\Core\Database;
+use SCM\Modules\ClosingSheets\ClosingSheetDocuments;
 use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
 use SCM\Support\HtmlPdfRenderer;
@@ -225,7 +226,8 @@ final class LeaseContractCreationService
             $contractData[$field] = (string) $value;
           }
         }
-        $this->update('jet_cct_contratos_arrendamiento', $contractId, $contractData);
+        // Carpeta de documentos del negocio (los de la hoja de cierre quedan en ella).
+        $this->update('jet_cct_contratos_arrendamiento', $contractId, $contractData + [ClosingSheetDocuments::LINK_COLUMN => ClosingSheetDocuments::folderUrl($contractId)]);
 
         $parties = [
           'id_propietario' => $ids['id_propietario'], 'id_arrendatario' => $ids['id_arrendatario'], 'contrato' => $data['contrato'], 'inmueble' => $data['inmueble'],

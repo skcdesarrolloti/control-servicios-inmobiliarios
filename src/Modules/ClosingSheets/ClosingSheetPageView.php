@@ -83,7 +83,7 @@ final class ClosingSheetPageView
       </div>
 
       <div class="cs-step" data-cs-step="2" hidden>
-        <?= $this->checklist($options['estado_checklist'] ?? [], $values, $creating) ?>
+        <?= $this->checklist($options['estado_checklist'] ?? [], $values, $creating, $context['owners'], $page['documents'] ?? null) ?>
         <div class="cs-actions">
           <button type="button" class="cs-secondary" data-cs-prev><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span> Anterior</button>
           <button type="submit" class="cs-primary"><span class="material-symbols-outlined" aria-hidden="true">save</span> <?= $creating ? 'Añadir hoja de cierre' : 'Guardar cambios' ?></button>
@@ -92,6 +92,7 @@ final class ClosingSheetPageView
       <p class="cs-error" data-cs-error role="alert" hidden></p>
     </form>
     <?php if ($creating && isset($page['tenant'])): ?><?= $this->tenantDialog($page['tenant']['options']) ?><?php endif; ?>
+    <?php if (isset($page['documents'])): ?><?= ClosingSheetDocumentsView::dialogs() ?><?php endif; ?>
 
     <section class="rp-card cs-done" data-cs-done hidden aria-live="polite">
       <span class="material-symbols-outlined cs-done-icon" aria-hidden="true">task_alt</span>
@@ -330,25 +331,50 @@ final class ClosingSheetPageView
 
   /**
    * Al editar se marcan los estados y observaciones guardados; un ítem que la hoja tenía vacío (hojas anteriores a la
-   * lista) no es obligatorio.
-   * @param list<string> $states @param array<string,mixed> $values
+   * lista) no es obligatorio. Los ítems que son documentos llevan su casilla para adjuntar (los del propietario, una por
+   * propietario) y al final van los documentos adicionales.
+   * @param list<string> $states @param array<string,mixed> $values @param list<array<string,mixed>> $owners
+   * @param array{config:array{api:string,nonce:string,upload:string,delete:string,scope:array<string,int>},items:list<array<string,mixed>>}|null $documents
    */
-  private function checklist(array $states, array $values, bool $creating): string
+  private function checklist(array $states, array $values, bool $creating, array $owners = [], ?array $documents = null): string
   {
     $states = $states !== [] ? $states : ['Cumple', 'No cumple', 'No aplica'];
-    $html = '<p class="cs-note">Marca el estado de cada documento o requisito. La observación es opcional.</p>';
-    foreach (ClosingSheetForm::CHECKLIST as [$group, $when, $items]) {
+    $files = ClosingSheetDocumentsView::byItem($documents['items'] ?? []);
+    $owners = $owners !== [] ? $owners : [['index' => 1, 'name' => (string) ($values['propietario'] ?? '')]];
+    $html = '<p class="cs-note">Marca el estado de cada documento o requisito. La observación es opcional.'
+      . ($documents !== null ? ' Adjunta el archivo de cada documento (PDF, foto, Word o Excel, máximo 10 MB). No es obligatorio, pero se avisa si un documento queda en «Cumple» sin archivo.' : '') . '</p>';
+    foreach (ClosingSheetForm::CHECKLIST as $notesColumn => [$group, $when, $items]) {
       $rows = '';
       foreach ($items as [$column, $text]) {
         $state = $creating ? '' : (string) ($values[$column] ?? '');
         $required = $creating || $state !== '';
-        $rows .= '<div class="cs-check-item"><p>' . $this->e($text) . '</p>'
+        $slots = '';
+        if ($documents !== null && isset(ClosingSheetForm::DOCUMENT_ITEMS[$column])) {
+          if ($notesColumn === ClosingSheetForm::OWNER_DOCUMENTS) {
+            foreach ($owners as $owner) {
+              $index = max(1, (int) ($owner['index'] ?? 1));
+              $slots .= ClosingSheetDocumentsView::slot($column, $index, ClosingSheetDocuments::personLabel($index, (string) ($owner['name'] ?? '')), $files[$column . '|' . $index] ?? [], true, $column);
+            }
+          } else {
+            $slots = ClosingSheetDocumentsView::slot($column, 0, '', $files[$column . '|0'] ?? [], true, $column);
+          }
+          $slots = '<div class="cd-slots">' . $slots . '</div>';
+        }
+        $rows .= '<div class="cs-check-item' . ($slots !== '' ? ' has-docs' : '') . '"><p>' . $this->e($text) . '</p>'
           . '<select class="cs-input" name="' . $this->e($column) . '"' . ($required ? ' data-cs-required' : '') . ' aria-label="Estado"><option value="">Estado…</option>' . $this->optionTags(array_combine($states, $states), $state) . '</select>'
-          . '<textarea class="cs-input" rows="2" name="notas[' . $this->e($column) . ']" placeholder="Observación (opcional)">' . $this->e($values['__notes'][$column] ?? '') . '</textarea></div>';
+          . '<textarea class="cs-input" rows="2" name="notas[' . $this->e($column) . ']" placeholder="Observación (opcional)">' . $this->e($values['__notes'][$column] ?? '') . '</textarea>' . $slots . '</div>';
       }
       $html .= '<fieldset class="cs-section"' . ($when !== null ? ' data-cs-when="' . $this->e(json_encode($when, JSON_UNESCAPED_UNICODE)) . '"' : '') . '><legend>' . $this->e($group) . '</legend>' . $rows . '</fieldset>';
     }
-    return $html;
+    if ($documents === null) {
+      return $html;
+    }
+    $html .= '<fieldset class="cs-section"><legend>Documentos adicionales</legend><p class="cs-note">Otros soportes del negocio que no están en la lista (opcional).</p>'
+      . ClosingSheetDocumentsView::slot(ClosingSheetForm::EXTRA_DOCUMENTS, 0, '', $files[ClosingSheetForm::EXTRA_DOCUMENTS . '|0'] ?? [], true) . '</fieldset>'
+      . '<div class="cd-pending" data-cd-pending hidden role="alert"><p><strong>Hay documentos en «Cumple» sin archivo:</strong></p><ul data-cd-pending-list></ul>'
+      . '<p>Puedes adjuntarlos ahora o guardar así y subirlos después desde la hoja o la carpeta del contrato.</p>'
+      . '<div class="cs-actions"><button type="button" class="cs-secondary" data-cd-pending-go>Revisar</button><button type="button" class="cs-primary" data-cd-pending-save>Guardar sin esos archivos</button></div></div>';
+    return '<div class="cd-root"' . ClosingSheetDocumentsView::rootAttributes($documents['config']) . '>' . $html . '</div>';
   }
 
   /** @param array<string,mixed> $field @param array<string,mixed> $options @return array<string,string> valor => etiqueta */

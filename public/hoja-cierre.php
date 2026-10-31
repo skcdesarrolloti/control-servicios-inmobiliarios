@@ -11,6 +11,7 @@ require dirname(__DIR__) . '/bootstrap/app.php';
 use SCM\App\SuCasaControlServiciosInmobiliarios;
 use SCM\Core\App;
 use SCM\Core\Auth;
+use SCM\Modules\ClosingSheets\ClosingSheetDocuments;
 use SCM\Modules\ClosingSheets\ClosingSheetPageView;
 use SCM\Modules\ClosingSheets\ClosingSheetService;
 use SCM\Modules\ClosingSheets\ClosingSheetTenants;
@@ -71,6 +72,10 @@ try {
 
 $baseUrl = rtrim((string) SCM_BASE_URL, '/');
 $tenants = new ClosingSheetTenants($db);
+// Documentos de la lista de chequeo: al crear se guardan del mandato y la hoja se queda con ellos al guardarla.
+$documents = new ClosingSheetDocuments($db);
+$mandateId = (int) $context['ids']['id_contrato'];
+$nonce = App::csrf()->token('scm_nonce');
 $asset = static function (string $path) use ($baseUrl): string {
   $file = __DIR__ . '/' . $path;
   return $baseUrl . '/' . $path . '?v=' . rawurlencode(SCM_VERSION . '-' . (is_file($file) ? (string) filemtime($file) : '0'));
@@ -82,14 +87,22 @@ echo (new ClosingSheetPageView())->render($context, $service->options(), [
   'base_url' => $baseUrl,
   'logo' => system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL),
   'favicon' => system_image('portal_favicon_url', SCM_DEFAULT_PORTAL_FAVICON_URL),
-  'nonce' => App::csrf()->token('scm_nonce'),
+  'nonce' => $nonce,
   'action' => SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_SAVE,
+  'documents' => [
+    'items' => $closingId > 0 ? $documents->forClosing($closingId) : $documents->pending($mandateId),
+    'config' => [
+      'api' => $baseUrl . '/api.php', 'nonce' => $nonce,
+      'upload' => SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_DOCUMENTS_UPLOAD, 'delete' => SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_DOCUMENTS_DELETE,
+      'scope' => $closingId > 0 ? ['closing_id' => $closingId] : ['mandate_id' => $mandateId],
+    ],
+  ],
   'tenant' => [
     'current' => $tenants->find((int) $context['ids']['id_arrendatario']),
     'options' => $tenants->options(),
     'search' => SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_TENANTS,
     'save' => SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_TENANT_SAVE,
   ],
-  'css' => array_map($asset, ['assets/css/review-page.css', 'assets/css/closing-sheet.css']),
-  'js' => array_map($asset, ['assets/js/form-draft.js', 'assets/js/closing-sheet.js', 'assets/js/closing-sheet-tenant.js']),
+  'css' => array_map($asset, ['assets/css/review-page.css', 'assets/css/closing-sheet.css', 'assets/css/closing-documents.css']),
+  'js' => array_map($asset, ['assets/js/form-draft.js', 'assets/js/scm-photo-compress.js', 'assets/js/closing-sheet.js', 'assets/js/closing-sheet-tenant.js', 'assets/js/closing-documents.js']),
 ]);

@@ -182,3 +182,34 @@ La hoja de cierre (crear y editar) y la revisión de servicios guardan lo escrit
 - **Qué no guarda:** ids, nonce, la firma del enlace ni los campos de solo lectura.
 - **Dónde queda:** solo en ese navegador; no viaja a otro equipo.
 
+
+## Documentos (carpeta del negocio)
+
+Los documentos de la lista de chequeo se suben en el panel, en su almacenamiento propio con enlace firmado
+(`file.php`), no en Google Drive. Tabla propia `scm_closing_documents` (la crea `ClosingSheetDocuments::ensureSchema()`).
+
+- **Qué lleva archivo:** los ítems de `ClosingSheetForm::DOCUMENT_ITEMS`. Los ítems que son preguntas o datos no llevan
+  archivo (amparo, medidor, reparaciones, días de gracia, datos del administrador, cobertura y término). «Asegurable» lleva
+  el estudio de la aseguradora. Hay además **Documentos adicionales**, con nombre opcional.
+- **Por propietario:** los documentos del propietario se suben por cada propietario (principal y copropietarios).
+- **Formatos:** PDF, JPG, PNG, WebP, Word y Excel, hasta `UPLOAD_MAX_BYTES` (10 MB) por archivo. Las fotos se comprimen
+  en el navegador (`scm-photo-compress.js`) y en el servidor (`StoredFileService::storeUploadedFile`). El mismo archivo
+  dos veces en la misma casilla se rechaza.
+- **Opcionales:** la hoja se guarda sin archivos. Un documento en «Cumple» sin archivo se marca en la casilla y, al
+  guardar, se listan con la opción **Guardar sin esos archivos**.
+- **Al crear:** la hoja aún no tiene número, así que los archivos quedan del mandato. Al guardar, la hoja se queda con
+  ellos (`claim`).
+- **Eliminar:** pide confirmación. No borra el archivo: guarda quién y cuándo, y se ve en la carpeta en **Eliminados**.
+- **Vista de la hoja:** la lista de chequeo muestra los archivos de cada ítem. PDF e imágenes se ven en la misma página.
+- **Correo «Hoja de cierre respondida»:** lleva los archivos adjuntos hasta 15 MB, en el orden de la lista. Los que no
+  caben se nombran en el correo y se ven en la hoja.
+- **Carpeta del contrato:** `documentos-contrato.php?contrato=<id>` (o `?cierre=<hoja>`). Junta los archivos del
+  contrato y los de sus hojas de cierre (`id_cierre` del contrato o `id_contrato_arrendamiento` de la hoja).
+  - Se abre en Contratos de arrendamiento con **Carpeta de documentos** (en la fila y en *Documentación*).
+  - En contratos viejos sin hoja nativa también se suben ahí.
+  - El enlace queda en la columna `link_documentos` de `contratos_arrendamiento`. Se llena al crear el contrato desde
+    «No asignado», al subir desde el contrato y al abrir la carpeta. La columna se crea con
+    `php bin/cct-add-fields.php contratos_arrendamiento anexos_tab link_documentos="Carpeta de documentos (enlace)" --aplicar`.
+- **Permisos:** ver la carpeta: quien ve *Contratos de arrendamiento* o puede añadir, editar, revisar o responder hojas.
+  Subir y eliminar en la hoja: quien puede añadirla o editarla. En la carpeta del contrato: el permiso nuevo *Subir y
+  eliminar documentos en la carpeta del contrato* (todos los cargos hasta que se guarden los permisos).

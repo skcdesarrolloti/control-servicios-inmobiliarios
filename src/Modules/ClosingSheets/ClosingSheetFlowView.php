@@ -167,10 +167,10 @@ final class ClosingSheetFlowView
         $doc .= self::ownersBlock($sheet['owners'], $values);
       }
     }
-    $doc .= self::reviewBlock($sheet) . self::checklistBlock($values) . self::signatures($sheet['signers']) . self::docFooter($sheet['company']);
+    $doc .= self::reviewBlock($sheet) . self::checklistBlock($values, $sheet['documents'] ?? [], $sheet['owners']) . self::signatures($sheet['signers']) . self::docFooter($sheet['company']);
     return $html . '<article class="csf-doc">' . $doc . '</article>'
       . '<dialog class="csf-dialog" data-csf-dialog><header><strong>Revisión de servicios públicos</strong><button type="button" class="cs-secondary" data-csf-dialog-close>Cerrar</button></header><iframe title="Revisión de servicios públicos" referrerpolicy="no-referrer"></iframe></dialog>'
-      . self::done();
+      . ClosingSheetDocumentsView::dialogs() . self::done();
   }
 
   /** @param array<string,string> $company */
@@ -392,12 +392,20 @@ final class ClosingSheetFlowView
     return '<section class="cs-section"><h2>Propietarios y participación</h2>' . $cards . '</section>';
   }
 
-  /** @param array<string,mixed> $values */
-  private static function checklistBlock(array $values): string
+  /**
+   * Lista de chequeo con los archivos de cada documento (se ven en la misma página) y los documentos adicionales.
+   * @param array<string,mixed> $values @param list<array<string,mixed>> $documents @param list<array<string,mixed>> $owners
+   */
+  private static function checklistBlock(array $values, array $documents = [], array $owners = []): string
   {
     $html = '';
     $counts = ['good' => 0, 'bad' => 0, 'muted' => 0];
-    foreach (ClosingSheetForm::CHECKLIST as [$group, $when, $items]) {
+    $files = ClosingSheetDocumentsView::byItem($documents);
+    $names = [];
+    foreach ($owners as $owner) {
+      $names[(int) ($owner['index'] ?? 0)] = (string) ($owner['name'] ?? '');
+    }
+    foreach (ClosingSheetForm::CHECKLIST as $notesColumn => [$group, $when, $items]) {
       if ($when !== null && !ClosingSheetService::visible(['when' => $when], $values)) {
         continue;
       }
@@ -405,20 +413,33 @@ final class ClosingSheetFlowView
       foreach ($items as [$column, $text]) {
         $state = trim((string) ($values[$column] ?? ''));
         $note = trim((string) ($values['__notes'][$column] ?? ''));
-        if ($state === '' && $note === '') {
+        $attached = '';
+        foreach ($files as $key => $list) {
+          if (str_starts_with($key, $column . '|')) {
+            $person = (int) substr($key, strlen($column) + 1);
+            $attached .= ClosingSheetDocumentsView::readList($list, $notesColumn === ClosingSheetForm::OWNER_DOCUMENTS ? ClosingSheetDocuments::personLabel($person, $names[$person] ?? '') : '');
+          }
+        }
+        if ($state === '' && $note === '' && $attached === '') {
           continue;
         }
-        $tone = match (mb_strtolower($state, 'UTF-8')) { 'cumple' => 'good', 'no cumple' => 'bad', default => 'muted' };
+        $tone = ClosingSheetDocumentsView::tone($state);
         $counts[$tone]++;
-        $rows .= '<li><span class="csf-result is-' . $tone . '">' . self::e($state !== '' ? $state : 'Sin estado') . '</span><div><p>' . self::e($text) . '</p>' . ($note !== '' ? '<small>' . nl2br(self::e($note)) . '</small>' : '') . '</div></li>';
+        $missing = $documents !== [] && $tone === 'good' && $attached === '' && isset(ClosingSheetForm::DOCUMENT_ITEMS[$column]) ? '<small class="cd-warn">Cumple, pero sin archivo en el panel.</small>' : '';
+        $rows .= '<li><span class="csf-result is-' . $tone . '">' . self::e($state !== '' ? $state : 'Sin estado') . '</span><div><p>' . self::e($text) . '</p>' . ($note !== '' ? '<small>' . nl2br(self::e($note)) . '</small>' : '') . $missing . $attached . '</div></li>';
       }
       if ($rows !== '') {
         $html .= '<div class="csf-check-group"><h3>' . self::e($group) . '</h3><ul class="csf-checklist">' . $rows . '</ul></div>';
       }
     }
+    $extra = ClosingSheetDocumentsView::readList($files[ClosingSheetForm::EXTRA_DOCUMENTS . '|0'] ?? []);
+    if ($extra !== '') {
+      $html .= '<div class="csf-check-group"><h3>Documentos adicionales</h3>' . $extra . '</div>';
+    }
     $totals = $html === '' ? '' : '<p class="csf-check-totals"><span class="csf-result is-good">Cumple: ' . $counts['good'] . '</span>'
-      . '<span class="csf-result is-bad">No cumple: ' . $counts['bad'] . '</span><span class="csf-result is-muted">No aplica u otro: ' . $counts['muted'] . '</span></p>';
-    return '<section class="cs-section csf-checks"><h2>Lista de chequeo</h2>' . $totals . ($html !== '' ? $html : '<p class="cs-note">La hoja no tiene lista de chequeo (hojas anteriores a la lista).</p>') . '</section>';
+      . '<span class="csf-result is-bad">No cumple: ' . $counts['bad'] . '</span><span class="csf-result is-muted">No aplica u otro: ' . $counts['muted'] . '</span>'
+      . ($documents !== [] ? '<span class="csf-result is-muted">Archivos: ' . count($documents) . '</span>' : '') . '</p>';
+    return '<section class="cs-section csf-checks"><h2>Lista de chequeo y documentos</h2>' . $totals . ($html !== '' ? $html : '<p class="cs-note">La hoja no tiene lista de chequeo (hojas anteriores a la lista).</p>') . '</section>';
   }
 
   // ---------------------------------------------------------------- listado
