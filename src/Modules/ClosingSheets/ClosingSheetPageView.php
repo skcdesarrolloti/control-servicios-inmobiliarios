@@ -370,6 +370,13 @@ final class ClosingSheetPageView
     $owners = $owners !== [] ? $owners : [['index' => 1, 'name' => (string) ($values['propietario'] ?? '')]];
     $html = '<p class="cs-note">Marca el estado de cada documento o requisito. La observación es opcional.'
       . ($documents !== null ? ' Adjunta el archivo de cada documento (PDF, foto, Word o Excel, máximo 10 MB). No es obligatorio, pero se avisa si un documento queda en «Cumple» sin archivo.' : '') . '</p>';
+    if ($documents !== null) {
+      $names = [];
+      foreach ($owners as $owner) {
+        $names[max(1, (int) ($owner['index'] ?? 1))] = (string) ($owner['name'] ?? '');
+      }
+      $html .= ClosingSheetDocumentsView::actorBar($names, $values);
+    }
     foreach (ClosingSheetForm::CHECKLIST as $notesColumn => [$group, $when, $items]) {
       $rows = '';
       foreach ($items as [$column, $text]) {

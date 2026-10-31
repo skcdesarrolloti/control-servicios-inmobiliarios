@@ -32,6 +32,34 @@
 .cd-pending ul { margin: 0 0 10px; padding-left: 20px; }
 .cd-danger { background: #b91c1c !important; border-color: #b91c1c !important; }
 
+/* Documentos por actor: barra de botones y popup con los documentos de cada uno. */
+.cd-actors { display: grid; gap: 8px; margin: 4px 0 14px; padding: 12px 14px; border: 1px solid var(--rp-line); border-radius: 14px; background: #f8fafc; }
+.cd-actors[hidden] { display: none; }
+.cd-actors-title { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--rp-navy); font-size: 14px; font-weight: 700; }
+.cd-actors-title .material-symbols-outlined { font-size: 20px; }
+.cd-actor-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.cd-actor { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; max-width: 100%; padding: 7px 14px; border: 1px solid var(--rp-line); border-radius: 12px; background: #fff; color: var(--rp-ink); font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
+.cd-actor:hover { border-color: var(--rp-navy); background: #eef2f8; }
+.cd-actor span { overflow-wrap: anywhere; }
+.cd-actor small { color: var(--rp-muted); font-size: 11px; font-weight: 500; }
+.cd-actor.has-missing { border-color: #fcd34d; }
+.cd-actor.has-missing small { color: #92400e; }
+.cd-actor-dialog { width: min(720px, calc(100vw - 24px)); max-height: min(86vh, 900px); padding: 0; border: 0; border-radius: 16px; box-shadow: 0 20px 60px rgba(15, 30, 54, 0.35); }
+.cd-actor-dialog[open] { display: flex; flex-direction: column; }
+.cd-actor-dialog::backdrop { background: rgba(15, 23, 42, 0.55); }
+.cd-actor-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--rp-line); }
+.cd-actor-dialog header strong { color: var(--rp-navy); font-size: 16px; overflow-wrap: anywhere; }
+.cd-actor-body { display: grid; gap: 0; padding: 4px 16px 12px; overflow-y: auto; }
+.cd-actor-item { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--rp-line); }
+.cd-actor-item:last-child { border-bottom: 0; }
+.cd-actor-item-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.cd-actor-item-head p { flex: 1 1 200px; margin: 0; font-size: 14px; font-weight: 600; }
+.cd-actor-item-head .cd-add { margin-left: 0; }
+/* El formulario de la hoja no carga closing-sheet-flow.css: el estado lleva aquí su etiqueta. */
+.cd-actor-item-head .csf-result { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.cd-actor-item-head .csf-result.is-good { background: #dcfce7; color: #166534; }
+.cd-actor-item-head .csf-result.is-bad { background: #fee2e2; color: #991b1b; }
+
 /* Vista de la hoja y carpeta del contrato. */
 .cd-read { display: grid; gap: 4px; margin-top: 6px; }
 .csf-checklist small.cd-warn { color: #92400e; }
@@ -66,7 +94,7 @@
 }
 
 @media print {
-  .cd-add, .cd-file, .cd-title, .cd-doc-del, .cd-status, .cd-viewer, .cd-confirm, .cd-pending { display: none !important; }
+  .cd-add, .cd-file, .cd-title, .cd-doc-del, .cd-status, .cd-viewer, .cd-confirm, .cd-pending, .cd-actors, .cd-actor-dialog { display: none !important; }
   .cd-slot, .cd-item, .cd-doc { break-inside: avoid; page-break-inside: avoid; }
   .cd-slot { padding: 4px 6px; background: none; }
   .cd-doc { border: 0; }

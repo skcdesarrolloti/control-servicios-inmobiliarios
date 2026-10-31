@@ -420,7 +420,7 @@ final class ClosingSheetFlowView
         foreach ($files as $key => $list) {
           if (str_starts_with($key, $column . '|')) {
             $person = (int) substr($key, strlen($column) + 1);
-            $attached .= ClosingSheetDocumentsView::readList($list, $notesColumn === ClosingSheetForm::OWNER_DOCUMENTS ? ClosingSheetDocuments::personLabel($person, $names[$person] ?? '') : '');
+            $attached .= ClosingSheetDocumentsView::readList($list, $notesColumn === ClosingSheetForm::OWNER_DOCUMENTS ? ClosingSheetDocuments::personLabel($person, $names[$person] ?? '') : '', $column, $person);
           }
         }
         if ($state === '' && $note === '' && $attached === '') {
@@ -435,13 +435,14 @@ final class ClosingSheetFlowView
         $html .= '<div class="csf-check-group"><h3>' . self::e($group) . '</h3><ul class="csf-checklist">' . $rows . '</ul></div>';
       }
     }
-    $extra = ClosingSheetDocumentsView::readList($files[ClosingSheetForm::EXTRA_DOCUMENTS . '|0'] ?? []);
+    $extra = ClosingSheetDocumentsView::readList($files[ClosingSheetForm::EXTRA_DOCUMENTS . '|0'] ?? [], '', ClosingSheetForm::EXTRA_DOCUMENTS);
     if ($extra !== '') {
       $html .= '<div class="csf-check-group"><h3>Documentos adicionales</h3>' . $extra . '</div>';
     }
     $totals = $html === '' ? '' : '<p class="csf-check-totals"><span class="csf-result is-good">Cumple: ' . $counts['good'] . '</span>'
       . '<span class="csf-result is-bad">No cumple: ' . $counts['bad'] . '</span><span class="csf-result is-muted">No aplica u otro: ' . $counts['muted'] . '</span>'
-      . ($documents !== [] ? '<span class="csf-result is-muted">Archivos: ' . count($documents) . '</span>' : '') . '</p>';
+      . ($documents !== [] ? '<span class="csf-result is-muted">Archivos: ' . count($documents) . '</span>' : '') . '</p>'
+      . ($documents !== [] ? ClosingSheetDocumentsView::actorBar($names, $values) : '');
     return '<section class="cs-section csf-checks"><h2>Lista de chequeo y documentos</h2>' . $totals . ($html !== '' ? $html : '<p class="cs-note">La hoja no tiene lista de chequeo (hojas anteriores a la lista).</p>') . '</section>';
   }
 

@@ -69,20 +69,67 @@ final class ClosingSheetDocumentsView
       . '</li>';
   }
 
-  /** Solo lectura (vista de la hoja de cierre). @param list<array<string,mixed>> $documents */
-  public static function readList(array $documents, string $label = ''): string
+  /** Solo lectura (vista de la hoja de cierre). Con el ítem y la persona entra en «Documentos por actor». @param list<array<string,mixed>> $documents */
+  public static function readList(array $documents, string $label = '', string $item = '', int $person = 0): string
   {
     if ($documents === []) {
       return '';
     }
-    return '<div class="cd-read">' . ($label !== '' ? '<span class="cd-slot-label">' . self::e($label) . '</span>' : '')
+    return '<div class="cd-read"' . ($item !== '' ? ' data-cd-item="' . self::e($item) . '" data-cd-person="' . $person . '"' : '') . '>' . ($label !== '' ? '<span class="cd-slot-label">' . self::e($label) . '</span>' : '')
       . '<ul class="cd-docs">' . implode('', array_map(static fn(array $doc): string => self::chip($doc, false), $documents)) . '</ul></div>';
   }
 
-  /** Visor dentro de la página (PDF o imagen) y confirmación de eliminar. */
+  /**
+   * Barra «Documentos por actor»: un botón por persona o zona (cada propietario, arrendatario, codeudores, inmueble,
+   * servicios, copropiedad, aseguradora y adicionales) con sus archivos. closing-documents.js arma los botones y el popup
+   * con las casillas o listas de la página (data-cd-item / data-cd-person), así siguen al día al subir o eliminar.
+   * @param array<int,string> $owners índice => nombre @param array<string,mixed> $values arrendatario y codeudor_N
+   */
+  public static function actorBar(array $owners, array $values): string
+  {
+    $text = static fn(mixed $value): string => is_array($value) ? '' : trim((string) $value);
+    $named = static fn(string $label, string $name): string => $name !== '' ? $label . ': ' . $name : $label;
+    $actors = [];
+    foreach ($owners !== [] ? $owners : [1 => $text($values['propietario'] ?? '')] as $index => $name) {
+      $actors['propietario_' . max(1, (int) $index)] = ClosingSheetDocuments::personLabel((int) $index, (string) $name);
+    }
+    $actors['arrendatario'] = $named('Arrendatario', $text($values['arrendatario'] ?? ''));
+    for ($i = 1; $i <= 4; $i++) {
+      $actors['codeudor_' . $i] = $named('Codeudor ' . $i, $text($values['codeudor_' . $i] ?? ''));
+    }
+    $actors += ['inmueble' => 'Inmueble', 'servicios' => 'Servicios públicos', 'copropiedad' => 'Copropiedad', 'aseguradora' => 'Aseguradora', 'adicionales' => 'Documentos adicionales'];
+    $items = [];
+    foreach (ClosingSheetDocuments::catalog() as $item => $entry) {
+      $items[$item] = [self::actorKey((string) $entry['column']), (string) $entry['label']];
+    }
+    $map = ['actors' => $actors, 'order' => array_keys($actors), 'items' => $items];
+    return '<div class="cd-actors" data-cd-actors="' . self::e(json_encode($map, JSON_UNESCAPED_UNICODE)) . '" hidden>'
+      . '<p class="cd-actors-title"><span class="material-symbols-outlined" aria-hidden="true">groups</span> Documentos por actor</p>'
+      . '<div class="cd-actor-list" data-cd-actor-list></div></div>';
+  }
+
+  /** Actor de un grupo de la lista de chequeo («propietario» se completa con el número de cada propietario). */
+  private static function actorKey(string $column): string
+  {
+    if (preg_match('/^ob_documentos_co(\d)$/', $column, $match) === 1) {
+      return 'codeudor_' . $match[1];
+    }
+    return match ($column) {
+      ClosingSheetForm::OWNER_DOCUMENTS => 'propietario',
+      'ob_documentos_arrendatario' => 'arrendatario',
+      'ob_servicios_publicos', 'ob_cumplimiento_servicio' => 'servicios',
+      'ob_documentos_copropiedad' => 'copropiedad',
+      'ob_documentos_aseguradora_cierre' => 'aseguradora',
+      '' => 'adicionales',
+      default => 'inmueble',
+    };
+  }
+
+  /** Visor dentro de la página (PDF o imagen), confirmación de eliminar y popup de «Documentos por actor». */
   public static function dialogs(): string
   {
-    return '<dialog class="cd-viewer" data-cd-viewer><header><strong data-cd-viewer-title>Documento</strong><button type="button" class="cs-secondary" data-cd-viewer-close>Cerrar</button></header><div class="cd-viewer-body" data-cd-viewer-body></div></dialog>'
+    return '<dialog class="cd-actor-dialog" data-cd-actor-dialog aria-labelledby="cd-actor-title"><header><strong id="cd-actor-title" data-cd-actor-title>Documentos</strong><button type="button" class="cs-secondary" data-cd-actor-close>Cerrar</button></header><div class="cd-actor-body" data-cd-actor-body></div></dialog>'
+      . '<dialog class="cd-viewer" data-cd-viewer><header><strong data-cd-viewer-title>Documento</strong><button type="button" class="cs-secondary" data-cd-viewer-close>Cerrar</button></header><div class="cd-viewer-body" data-cd-viewer-body></div></dialog>'
       . '<dialog class="cd-confirm" data-cd-confirm><form method="dialog"><h2>¿Eliminar documento?</h2><p data-cd-confirm-text></p><p class="cs-note">Deja de verse en la hoja y en la carpeta del contrato. Queda registrado quién lo eliminó.</p>'
       . '<div class="cs-actions"><button type="submit" value="cancel" class="cs-secondary">Cancelar</button><button type="submit" value="ok" class="cs-primary cd-danger">Eliminar</button></div></form></dialog>';
   }
@@ -98,12 +145,13 @@ final class ClosingSheetDocumentsView
     $editable = $config !== null;
     $closing = $folder['closing'];
     $documents = self::byItem($folder['documents']);
+    $people = $folder['closing'] !== [] ? $folder['closing'] : $folder['contract'];
     $html = '<section class="cs-section cd-intro"><p>' . ($editable
         ? 'Adjunta cada documento en su casilla (PDF, foto, Word o Excel, máximo 10 MB por archivo; las fotos se comprimen). Los del propietario van por cada propietario.'
         : 'Documentos del negocio. Tu cargo puede verlos, pero no subir ni eliminar.') . '</p>'
       . ($closingUrl !== '' ? '<p><a class="cs-link" href="' . self::e($closingUrl) . '"><span class="material-symbols-outlined" aria-hidden="true">description</span> Ver hoja de cierre #' . (int) ($closing['_ID'] ?? 0) . '</a></p>' : '')
       . ($closing === [] ? '<p class="cs-note">Este contrato no tiene hoja de cierre en el panel: los documentos quedan solo en el contrato.</p>' : '')
-      . '</section>';
+      . self::actorBar($folder['owners'], $people) . '</section>';
     $ph = strtolower(trim((string) ($closing['propiedad_horizontal'] ?? $folder['contract']['propiedad_horizontal'] ?? ''))) === 'si';
     foreach (ClosingSheetForm::CHECKLIST as $column => [$group, , $items]) {
       if (preg_match('/^ob_documentos_co(\d)$/', $column, $match) === 1 && (int) $match[1] > $folder['codebtors'] && !self::hasAny($documents, $items)) {

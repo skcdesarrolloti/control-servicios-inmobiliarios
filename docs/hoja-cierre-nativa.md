@@ -201,6 +201,10 @@ Los documentos de la lista de chequeo se suben en el panel, en su almacenamiento
   ellos (`claim`).
 - **Eliminar:** pide confirmación. No borra el archivo: guarda quién y cuándo, y se ve en la carpeta en **Eliminados**.
 - **Vista de la hoja:** la lista de chequeo muestra los archivos de cada ítem. PDF e imágenes se ven en la misma página.
+- **Documentos por actor:** en la hoja (formulario y vista) y en la carpeta, una barra con un botón por propietario,
+  arrendatario, codeudor, inmueble, servicios públicos, copropiedad, aseguradora y adicionales. Cada botón dice cuántos
+  archivos tiene y cuántos ítems en «Cumple» no tienen archivo, y abre un popup con solo esos documentos, su estado y,
+  donde se puede editar, **Adjuntar** (`ClosingSheetDocumentsView::actorBar` + `closing-documents.js`).
 - **Correo «Hoja de cierre respondida»:** lleva los archivos adjuntos hasta 15 MB, en el orden de la lista. Los que no
   caben se nombran en el correo y se ven en la hoja.
 - **Carpeta del contrato:** `documentos-contrato.php?contrato=<id>` (o `?cierre=<hoja>`). Junta los archivos del

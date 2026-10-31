@@ -40,6 +40,138 @@
     preview(open.dataset.cdPreview, open.dataset.cdKind, open.dataset.cdName);
   });
 
+  // «Documentos por actor» (ClosingSheetDocumentsView::actorBar): un botón por persona o zona con sus archivos y un
+  // popup con solo sus documentos, armado con las casillas o listas de la página para que siga al día.
+  const actorBar = document.querySelector("[data-cd-actors]");
+  const actorDialog = document.querySelector("[data-cd-actor-dialog]");
+  let actorMap = null;
+  try {
+    actorMap = actorBar ? JSON.parse(actorBar.dataset.cdActors || "{}") : null;
+  } catch (error) {
+    actorMap = null;
+  }
+  let openActorKey = "";
+  const toneOf = (state) => ({ cumple: "good", "no cumple": "bad" })[state.trim().toLowerCase()] || "muted";
+  // Estado del ítem: el selector de la hoja, o la etiqueta de la vista y de la carpeta.
+  function stateOf(node) {
+    const select = document.querySelector(`select[name="${CSS.escape(node.dataset.cdItem || "")}"]`);
+    if (select) return select.disabled ? "" : select.value;
+    const row = node.closest(".csf-checklist > li, .cd-item");
+    const badge = row ? row.querySelector(".csf-result") : null;
+    return badge ? badge.textContent.trim() : "";
+  }
+  function actorGroups() {
+    const groups = new Map((actorMap.order || []).map((key) => [key, []]));
+    document.querySelectorAll("[data-cd-slot][data-cd-item], .cd-read[data-cd-item]").forEach((node) => {
+      // Lo que la hoja oculta (codeudores de más, copropiedad sin PH) no cuenta.
+      if (node.closest("[data-cs-when][hidden]") || node.closest("[data-cd-actor-dialog]")) return;
+      const info = (actorMap.items || {})[node.dataset.cdItem];
+      if (!info) return;
+      const key = info[0] === "propietario" ? "propietario_" + Math.max(1, Number(node.dataset.cdPerson) || 1) : info[0];
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push({ node, label: info[1] });
+    });
+    return groups;
+  }
+  const actorLabel = (key) => (actorMap.actors || {})[key] || key;
+  const filesOf = (node) => node.querySelectorAll("[data-cd-docs] [data-cd-doc], .cd-docs [data-cd-doc]");
+  const isMissing = (entry) => toneOf(stateOf(entry.node)) === "good" && filesOf(entry.node).length === 0;
+  function refreshActors() {
+    if (!actorBar || !actorMap) return;
+    const buttons = [];
+    actorGroups().forEach((entries, key) => {
+      if (!entries.length) return;
+      const files = entries.reduce((total, entry) => total + filesOf(entry.node).length, 0);
+      const missing = entries.filter(isMissing).length;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "cd-actor" + (missing ? " has-missing" : "");
+      button.dataset.cdActor = key;
+      const name = document.createElement("span");
+      name.textContent = actorLabel(key);
+      const count = document.createElement("small");
+      count.textContent = files + (files === 1 ? " archivo" : " archivos") + (missing ? " · " + missing + " sin archivo" : "");
+      button.append(name, count);
+      buttons.push(button);
+    });
+    actorBar.querySelector("[data-cd-actor-list]").replaceChildren(...buttons);
+    actorBar.hidden = buttons.length === 0;
+    if (openActorKey && actorDialog && actorDialog.open) renderActor(openActorKey);
+  }
+  function renderActor(key) {
+    const entries = actorGroups().get(key) || [];
+    actorDialog.querySelector("[data-cd-actor-title]").textContent = actorLabel(key);
+    const body = actorDialog.querySelector("[data-cd-actor-body]");
+    body.replaceChildren(...entries.map((entry) => {
+      const item = document.createElement("section");
+      item.className = "cd-actor-item";
+      const head = document.createElement("div");
+      head.className = "cd-actor-item-head";
+      const title = document.createElement("p");
+      title.textContent = entry.label;
+      head.appendChild(title);
+      const state = stateOf(entry.node);
+      if (state) {
+        const badge = document.createElement("span");
+        badge.className = "csf-result is-" + toneOf(state);
+        badge.textContent = state;
+        head.appendChild(badge);
+      }
+      const input = entry.node.querySelector("[data-cd-input]");
+      if (input) {
+        const add = document.createElement("button");
+        add.type = "button";
+        add.className = "cd-add";
+        add.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">attach_file</span> Adjuntar';
+        add.addEventListener("click", () => input.click());
+        head.appendChild(add);
+      }
+      item.appendChild(head);
+      const files = Array.from(filesOf(entry.node));
+      if (files.length) {
+        const list = document.createElement("ul");
+        list.className = "cd-docs";
+        files.forEach((file) => {
+          const copy = file.cloneNode(true);
+          copy.querySelectorAll("[data-cd-delete]").forEach((button) => button.remove());
+          list.appendChild(copy);
+        });
+        item.appendChild(list);
+      } else {
+        const empty = document.createElement("p");
+        empty.className = isMissing(entry) ? "cd-warn" : "cd-empty";
+        empty.textContent = isMissing(entry) ? "Está en «Cumple» y no tiene archivo." : "Sin archivo.";
+        item.appendChild(empty);
+      }
+      const busy = entry.node.querySelector("[data-cd-status]:not([hidden])");
+      if (busy) {
+        const status = document.createElement("p");
+        status.className = busy.className;
+        status.textContent = busy.textContent;
+        item.appendChild(status);
+      }
+      return item;
+    }));
+  }
+  if (actorBar && actorMap && actorDialog) {
+    actorBar.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-cd-actor]");
+      if (!button) return;
+      openActorKey = button.dataset.cdActor;
+      renderActor(openActorKey);
+      actorDialog.showModal();
+    });
+    actorDialog.addEventListener("click", (event) => {
+      if (event.target.closest("[data-cd-actor-close]") || event.target === actorDialog) actorDialog.close();
+    });
+    actorDialog.addEventListener("close", () => {
+      openActorKey = "";
+    });
+    // Los campos condicionales de la hoja se recalculan en el mismo cambio: se espera a que terminen.
+    document.addEventListener("change", () => setTimeout(refreshActors, 0));
+    refreshActors();
+  }
+
   function ask(text) {
     if (!confirmDialog) return Promise.resolve(false);
     confirmDialog.querySelector("[data-cd-confirm-text]").textContent = text;
@@ -95,6 +227,7 @@
       slot.classList.add("is-busy");
       for (let i = 0; i < files.length; i += 1) {
         status(slot, "Subiendo " + (i + 1) + " de " + files.length + ": " + files[i].name + "…");
+        refreshActors();
         try {
           const file = window.ScmPhotoCompress ? await window.ScmPhotoCompress.prepare(files[i]) : files[i];
           const body = new FormData();
@@ -200,6 +333,7 @@
     function sync() {
       const list = missing();
       if (pending && !pending.hidden && !list.length) pending.hidden = true;
+      refreshActors();
     }
     if (!form) return;
     form.addEventListener("change", (event) => {
