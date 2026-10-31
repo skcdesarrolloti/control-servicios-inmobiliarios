@@ -249,10 +249,10 @@ $message = $fails(fn() => $tenants->save(['correo' => 'no-es-correo', 'cumpleano
 $check(str_contains($message, 'Correo válido') && str_contains($message, 'Cumpleaños') && str_contains($message, 'Representante legal') && str_contains($message, 'País'), 'tenant data is validated: email, past birthday, company representative and country');
 $created = $tenants->save($newTenant, $sender);
 $row = $db->getRow('SELECT * FROM wp_jet_cct_arrendatarios WHERE _ID = ?', [(int) $created['tenant']['id']]);
-$check($created['created'] && $row['id_arrendatario'] === $created['tenant']['id'] && $row['cct_author_id'] === '1508' && $row['sucursal'] === '1' && $row['celular'] === '3001234567' && $row['nombre_juridico'] === 'Ana Pérez' && $row['pais'] === 'Colombia', 'a new tenant is registered with the real employee id, branch and clean phone');
+$check($created['created'] && $row['documento'] === '900555111' && $row['id_arrendatario'] === $created['tenant']['id'] && $row['cct_author_id'] === '1508' && $row['sucursal'] === '1' && $row['celular'] === '3001234567' && $row['nombre_juridico'] === 'Ana Pérez' && $row['pais'] === 'Colombia', 'a new tenant is registered with the real employee id, branch and clean phone');
 $check($row['cumpleanos'] === (string) (new DateTimeImmutable('1990-05-16 00:00', new DateTimeZone('America/Bogota')))->getTimestamp(), 'the birthday is saved as JetForm does (midnight in Colombia)');
-$again = $tenants->save(['tipo_persona' => 'Natural', 'nombre' => 'Inversiones Prueba', 'documento' => '900555111'] + $newTenant, $sender);
-$check(!$again['created'] && $again['tenant']['id'] === $created['tenant']['id'] && $db->getVar('SELECT nombre_juridico FROM wp_jet_cct_arrendatarios WHERE _ID = ?', [(int) $created['tenant']['id']]) === 'No aplica' && (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_arrendatarios') === 2, 'the same document (with or without dots) updates the existing tenant instead of duplicating it');
+$again = $tenants->save(['nombre' => 'Otro nombre', 'documento' => '900.555 111', 'correo' => ''] + $newTenant, $sender);
+$check($again['exists'] && !$again['created'] && $again['tenant']['id'] === $created['tenant']['id'] && $db->getVar('SELECT nombre FROM wp_jet_cct_arrendatarios WHERE _ID = ?', [(int) $created['tenant']['id']]) === 'Inversiones Prueba SAS' && (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_arrendatarios') === 2, 'a registered document (with or without dots) is offered, not duplicated nor overwritten');
 
 // Hoja nueva sin id_arrendatario: se busca por documento; sin ficha, se pide elegirlo o crearlo.
 $noTenant = ['id_arrendatario' => ''] + $input;

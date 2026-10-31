@@ -104,8 +104,12 @@ Las columnas `observacion_respuesta` e `id_revision_servicios_publicos` de `cier
   - El buscador encuentra al arrendatario por nombre, documento o celular. Al elegirlo se llenan sus datos y el
     `id_arrendatario`.
   - **Crear arrendatario** abre una ventana con los campos del JetForm "Añadir arrendatario" (hook
-    `registro-arrendatario`). Si el documento ya existe, con o sin puntos, actualiza esa ficha. Si no, la crea con
-    el `id_empleado` real como autor y le envía la bienvenida por correo (cola compartida).
+    `registro-arrendatario`). El documento se guarda sin puntos ni espacios.
+    - Si el documento ya está registrado, no se crea otro ni se sobrescribe: se ofrece **Usar este arrendatario**.
+      Sus datos se corrigen en los campos de la hoja, que al guardar actualiza la ficha.
+    - El nuevo se registra con el `id_empleado` real como autor y recibe la bienvenida por correo (cola
+      compartida). La firma es la del representante legal: el funcionario activo con el cargo 14, como en las actas
+      de bienvenida (`LeaseAnnexesService::staff()`). Ya no se toma de la sucursal.
   - Si el enlace trae `id_arrendatario` (el de la página intermedia), la hoja abre con ese arrendatario elegido y se
     puede cambiar.
   - Al guardar, si no llegó el `id_arrendatario` (por ejemplo, un borrador recuperado), se busca por el documento del

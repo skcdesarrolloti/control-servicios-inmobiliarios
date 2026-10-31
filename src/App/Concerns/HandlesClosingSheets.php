@@ -68,7 +68,7 @@ trait HandlesClosingSheets
     $this->jsonOk(['items' => $items]);
   }
 
-  /** Hoja nueva › Crear arrendatario (reemplaza el JetForm "Añadir arrendatario"): registra o actualiza por documento. */
+  /** Hoja nueva › Crear arrendatario (reemplaza el JetForm "Añadir arrendatario"): registra al nuevo; si el documento existe, lo ofrece. */
   public function ajax_handler_closing_sheet_tenant_save(): void
   {
     $this->verifyCsrf();
@@ -87,9 +87,10 @@ trait HandlesClosingSheets
     }
     $this->jsonOk([
       'tenant' => $result['tenant'],
-      'message' => $result['created']
-        ? 'Arrendatario registrado' . ($result['notified'] ? ' y se le envió la bienvenida por correo.' : '.')
-        : 'Ya estaba registrado con ese documento: se actualizaron sus datos.',
+      'exists' => $result['exists'],
+      'message' => $result['exists']
+        ? 'Ese documento ya está registrado a nombre de ' . $result['tenant']['nombre'] . '. Úsalo en la hoja; si algún dato cambió, corrígelo en los campos del arrendatario de la hoja y se actualiza su ficha al guardar.'
+        : 'Arrendatario registrado' . ($result['notified'] ? ' y se le envió la bienvenida por correo.' : '.'),
     ]);
   }
 

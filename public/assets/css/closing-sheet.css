@@ -126,6 +126,9 @@ textarea.cs-input { resize: vertical; }
 .cs-dialog-box footer { justify-content: flex-end; border-top: 1px solid var(--rp-line); }
 .cs-dialog-body { padding: 4px 20px 16px; overflow-y: auto; }
 .cs-dialog-body .cs-error { margin-top: 14px; }
+.cs-tenant-exists { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 14px; padding: 12px 16px; border: 1px solid #bfdbfe; border-radius: 12px; background: #eff6ff; color: #1e3a8a; font-size: 14px; }
+.cs-tenant-exists[hidden] { display: none; }
+.cs-tenant-exists p { flex: 1 1 260px; margin: 0; }
 @media (max-width: 640px) {
   .cs-tenant-bar { flex-direction: column; }
   .cs-dialog-box footer { flex-direction: column-reverse; align-items: stretch; }

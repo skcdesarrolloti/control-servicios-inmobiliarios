@@ -153,6 +153,41 @@
   // Ventana "Crear arrendatario".
   const errorBox = dialogForm.querySelector("[data-cs-tenant-error]");
   const field = (name) => dialogForm.elements.namedItem(name);
+  // Documento ya registrado: no se crea otro; se ofrece usar esa ficha.
+  const existsBox = dialogForm.querySelector("[data-cs-tenant-exists]");
+  let existing = null;
+  existsBox.querySelector("[data-cs-tenant-use]").addEventListener("click", () => {
+    if (!existing) return;
+    choose(existing);
+    dialogForm.reset();
+    dialog.close();
+  });
+  async function lookup(document_) {
+    const body = new FormData();
+    body.append("q", document_);
+    const data = await post(picker.dataset.csTenantSearchAction, body);
+    const clean = (value) => String(value || "").replace(/[\s.-]/g, "").toUpperCase();
+    return (data.items || []).find((item) => clean(item.documento) === clean(document_)) || null;
+  }
+  function offer(tenant, text) {
+    existing = tenant;
+    existsBox.querySelector("[data-cs-tenant-exists-text]").textContent = text;
+    existsBox.hidden = false;
+    errorBox.hidden = true;
+  }
+  // Sin puntos ni espacios (como el formulario de WordPress); al salir del campo se revisa si ya está registrado.
+  field("documento").addEventListener("change", async () => {
+    const input = field("documento");
+    input.value = input.value.replace(/[\s.]/g, "");
+    existsBox.hidden = true;
+    if (input.value.length < 3) return;
+    try {
+      const found = await lookup(input.value);
+      if (found) offer(found, "Ese documento ya está registrado a nombre de " + found.nombre + ". Úsalo en la hoja; si algún dato cambió, corrígelo en los campos del arrendatario de la hoja.");
+    } catch (error) {
+      // Si falla la consulta, el servidor lo revisa al registrar.
+    }
+  });
   function syncCompany() {
     const company = field("tipo_persona").value === "Juridica";
     dialogForm.querySelectorAll("[data-cs-tenant-company]").forEach((box) => {
@@ -199,6 +234,7 @@
     syncCities();
     syncCountry();
     errorBox.hidden = true;
+    existsBox.hidden = true;
     dialog.showModal();
     field("nombre").focus();
   }
@@ -234,6 +270,10 @@
     button.disabled = true;
     try {
       const data = await post(picker.dataset.csTenantSaveAction, new FormData(dialogForm));
+      if (data.exists) {
+        offer(data.tenant, data.message || "");
+        return;
+      }
       choose(data.tenant, data.message || "");
       dialogForm.reset();
       dialog.close();

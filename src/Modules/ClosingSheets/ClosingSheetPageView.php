@@ -182,7 +182,7 @@ final class ClosingSheetPageView
       . '<header><h2 id="cs_t_title"><span class="material-symbols-outlined" aria-hidden="true">person_add</span> Crear arrendatario</h2>'
       . '<button type="button" class="cs-icon" data-cs-tenant-close aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>'
       . '<div class="cs-dialog-body">'
-      . '<p class="cs-note">Si ya hay un arrendatario con ese documento, se actualizan sus datos. Al arrendatario nuevo le llega la bienvenida por correo.</p>'
+      . '<p class="cs-note">Escribe el documento sin puntos. Si ya está registrado, te lo ofrecemos para usarlo en la hoja. Al arrendatario nuevo le llega la bienvenida por correo.</p>'
       . '<div class="cs-grid">'
       . $select('tipo_persona', 'Tipo de persona', (array) ($options['tipo_persona'] ?? []), 'Natural')
       . $input('nombre', 'Nombre o empresa', 'text', true, ' autocomplete="off"')
@@ -201,6 +201,7 @@ final class ClosingSheetPageView
       . $input('cumpleanos', 'Cumpleaños', 'date', true, ' max="' . date('Y-m-d') . '"')
       . '</div>'
       . '<p class="cs-error" data-cs-tenant-error role="alert" hidden></p>'
+      . '<div class="cs-tenant-exists" data-cs-tenant-exists hidden><p data-cs-tenant-exists-text></p><button type="button" class="cs-primary" data-cs-tenant-use><span class="material-symbols-outlined" aria-hidden="true">how_to_reg</span> Usar este arrendatario</button></div>'
       . '</div>'
       . '<footer><button type="button" class="cs-secondary" data-cs-tenant-close>Cancelar</button>'
       . '<button type="submit" class="cs-primary"><span class="material-symbols-outlined" aria-hidden="true">how_to_reg</span> Registrar y usar en la hoja</button></footer>'

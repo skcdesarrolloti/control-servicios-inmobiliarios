@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\Modules\ClosingSheets;
 
 use SCM\Core\Database;
+use SCM\Modules\LeaseContracts\LeaseAnnexesService;
 use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
 use SCM\Support\SchemaInspector;
@@ -12,7 +13,9 @@ use SCM\Support\SchemaInspector;
 /**
  * Arrendatario de la hoja de cierre: buscarlo y registrarlo desde hoja-cierre.php, sin la página intermedia de
  * WordPress (inmueble-de-administracion) ni el formulario JetForm "Añadir arrendatario" (hook registro-arrendatario).
- * Como el hook: si el documento ya existe se actualiza esa ficha; si no, se crea y se le envía la bienvenida.
+ * Como la validación de ese formulario: un documento ya registrado no se vuelve a crear ni se sobrescribe (se ofrece
+ * usar esa ficha) y el documento se guarda sin puntos. El nuevo recibe la bienvenida firmada por el representante legal,
+ * el funcionario activo con ese cargo, como en las actas de bienvenida.
  */
 final class ClosingSheetTenants
 {
@@ -22,6 +25,7 @@ final class ClosingSheetTenants
   private const GLOSSARIES = ['tipo_persona' => 272, 'tipo_documento' => 1, 'sexo' => 1047];
   private const TIMEZONE = 'America/Bogota';
   private const PORTAL_URL = 'https://sucasainmobiliaria.com.co/arrendatario';
+  private const MAGAZINE_URL = 'https://sucasainmobiliaria.com.co/revista/';
 
   private SchemaInspector $schema;
 
@@ -108,19 +112,19 @@ final class ClosingSheetTenants
   }
 
   /**
-   * Registra o actualiza (si el documento ya existe) y devuelve la ficha para llenar la hoja.
+   * Registra al arrendatario nuevo y devuelve su ficha para llenar la hoja. Si el documento ya está registrado no
+   * escribe nada y devuelve esa ficha con exists = true: sus datos se corrigen en la hoja, que al guardar actualiza la ficha.
    * @param array<string,string> $input @param array{employee_id:string,name:string,email:string,branch:string} $sender
-   * @return array{tenant:array<string,string>,created:bool,notified:bool}
+   * @return array{tenant:array<string,string>,created:bool,exists:bool,notified:bool}
    */
   public function save(array $input, array $sender): array
   {
+    $existing = $this->idByDocument(self::cleanDocument((string) ($input['documento'] ?? '')));
+    if ($existing > 0) {
+      return ['tenant' => (array) $this->find($existing), 'created' => false, 'exists' => true, 'notified' => false];
+    }
     $data = $this->validate($input);
     $nowSql = date('Y-m-d H:i:s');
-    $existing = $this->idByDocument($data['documento']);
-    if ($existing > 0) {
-      $this->update('jet_cct_arrendatarios', $existing, $data + ['id_arrendatario' => (string) $existing, 'cct_modified' => $nowSql]);
-      return ['tenant' => (array) $this->find($existing), 'created' => false, 'notified' => false];
-    }
     $id = $this->insert('jet_cct_arrendatarios', $sender, $nowSql, $data + ['sucursal' => $sender['branch']]);
     $this->update('jet_cct_arrendatarios', $id, ['id_arrendatario' => (string) $id]);
     $notified = false;
@@ -129,7 +133,7 @@ final class ClosingSheetTenants
     } catch (\Throwable $error) {
       error_log('[closing_sheet_tenant] bienvenida #' . $id . ': ' . $error->getMessage());
     }
-    return ['tenant' => (array) $this->find($id), 'created' => true, 'notified' => $notified];
+    return ['tenant' => (array) $this->find($id), 'created' => true, 'exists' => false, 'notified' => $notified];
   }
 
   /** @param array<string,string> $input @return array<string,string> columnas de wp_jet_cct_arrendatarios */
@@ -181,7 +185,7 @@ final class ClosingSheetTenants
       throw new \DomainException('Revisa estos datos del arrendatario: ' . implode(', ', $errors) . '.');
     }
     return [
-      'tipo_persona' => $type, 'nombre' => $v('nombre'), 'tipo_documento' => $documentType, 'documento' => $v('documento'),
+      'tipo_persona' => $type, 'nombre' => $v('nombre'), 'tipo_documento' => $documentType, 'documento' => self::cleanDocument($v('documento')),
       'expedicion' => $v('expedicion'),
       // Como el hook de WordPress: en persona natural el representante queda "No aplica".
       'nombre_juridico' => $company ? $v('representante_legal') : 'No aplica',
@@ -193,16 +197,26 @@ final class ClosingSheetTenants
     ];
   }
 
-  /** Bienvenida al arrendatario nuevo, como el hook de WordPress, por la cola compartida. @param array<string,string> $data */
+  /**
+   * Bienvenida al arrendatario nuevo, como el hook de WordPress, por la cola compartida: acceso al portal, revista y
+   * firma del representante legal (funcionario activo con el cargo de las actas de bienvenida, no la sucursal).
+   * @param array<string,string> $data
+   */
   private function welcome(int $id, array $data): bool
   {
     $subject = 'Te damos la bienvenida, ' . $data['nombre'];
     $p = static fn(string $html): string => '<p style="margin:0 0 14px;line-height:1.65;">' . $html . '</p>';
+    $legal = (new LeaseAnnexesService($this->db))->staff()['legal'] ?? [];
+    $signature = ($legal['nombre'] ?? '') === '' ? '' : implode(' - ', array_filter([
+      $legal['nombre'], 'Representante legal', ($legal['celular'] ?? '') !== '' ? 'Cel. ' . $legal['celular'] : '',
+    ]));
     $html = EmailTemplate::render($subject,
       $p('Apreciado(a) <b>' . EmailTemplate::e($data['nombre']) . '</b>,')
       . $p('Le damos una cordial bienvenida a <b>SKC SuCasa Inmobiliaria</b>. Nos complace informarle que quedó registrado(a) como <b>arrendatario</b> en nuestra plataforma.')
-      . $p('Para entrar a su cuenta use como <b>usuario</b> y <b>contraseña</b> su número de documento: <b>' . EmailTemplate::e($data['documento']) . '</b>.'),
-      ['buttons' => [['label' => 'Entrar a mi cuenta', 'url' => self::PORTAL_URL]]]);
+      . $p('Para entrar a su cuenta use como <b>usuario</b> y <b>contraseña</b> su número de documento: <b>' . EmailTemplate::e($data['documento']) . '</b>.')
+      . $p('Descubra también nuestra revista digital: oportunidades inmobiliarias, consejos y tendencias del mercado.')
+      . ($signature !== '' ? $p('Cordialmente,<br><b>' . EmailTemplate::e($signature) . '</b>') : ''),
+      ['buttons' => [['label' => 'Entrar a mi cuenta', 'url' => self::PORTAL_URL], ['label' => 'Ver revista', 'url' => self::MAGAZINE_URL]]]);
     return (new EmailQueue($this->db))->enqueue([$data['correo']], $subject, $html, [
       'source_module' => 'hoja_cierre', 'internal_cc' => [], 'destination_name' => $data['nombre'],
       'dedupe_key' => 'arrendatario_bienvenida_' . $id, 'meta' => ['tenant_id' => $id],
@@ -222,6 +236,12 @@ final class ClosingSheetTenants
       'representante' => $company && strcasecmp($s('nombre_juridico'), 'No aplica') !== 0 ? $s('nombre_juridico') : '',
       'documento_representante' => $company && strcasecmp($s('documento_juridico'), 'No aplica') !== 0 ? $s('documento_juridico') : '',
     ];
+  }
+
+  /** El formulario no admitía puntos en el documento: se quitan, con los espacios. */
+  private static function cleanDocument(string $document): string
+  {
+    return preg_replace('/[\s.]+/', '', trim($document)) ?? '';
   }
 
   private static function documentKey(string $document): string
