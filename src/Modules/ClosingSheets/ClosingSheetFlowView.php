@@ -133,12 +133,15 @@ final class ClosingSheetFlowView
     if ($can['edit'] && !in_array($state, [ClosingSheetWorkflow::APPROVED, 'Realizada'], true)) {
       $actions .= '<a class="cs-secondary" href="' . self::e($links['edit']) . '"><span class="material-symbols-outlined" aria-hidden="true">edit</span> Editar hoja</a>';
     }
+    // El formulario para responder va al final, después de leer la hoja; arriba solo un atajo hasta él.
+    $respond = $can['respond'] && ClosingSheetWorkflow::canRespond($closing);
+    if ($respond) {
+      $actions = '<a class="cs-primary" href="#responder"><span class="material-symbols-outlined" aria-hidden="true">rate_review</span> Ir a responder</a>' . $actions;
+    }
     $actions .= '<button type="button" class="cs-secondary" data-csf-print><span class="material-symbols-outlined" aria-hidden="true">print</span> Imprimir</button>';
 
     $html = '<div class="cs-actions csf-toolbar">' . $actions . '</div>';
-    if ($can['respond'] && ClosingSheetWorkflow::canRespond($closing)) {
-      $html .= self::responseForm($hidden, $state);
-    } elseif ($can['respond'] && $state === ClosingSheetService::STATUS_NEW) {
+    if (!$respond && $can['respond'] && $state === ClosingSheetService::STATUS_NEW) {
       $html .= '<p class="cs-note csf-note csf-pending"><span class="material-symbols-outlined" aria-hidden="true">schedule</span> Podrás aprobarla o no cuando se registre la revisión de servicios públicos.</p>';
     }
 
@@ -168,7 +171,7 @@ final class ClosingSheetFlowView
       }
     }
     $doc .= self::reviewBlock($sheet) . self::checklistBlock($values, $sheet['documents'] ?? [], $sheet['owners']) . self::signatures($sheet['signers']) . self::docFooter($sheet['company']);
-    return $html . '<article class="csf-doc">' . $doc . '</article>'
+    return $html . '<article class="csf-doc">' . $doc . '</article>' . ($respond ? self::responseForm($hidden, $state) : '')
       . '<dialog class="csf-dialog" data-csf-dialog><header><strong>Revisión de servicios públicos</strong><button type="button" class="cs-secondary" data-csf-dialog-close>Cerrar</button></header><iframe title="Revisión de servicios públicos" referrerpolicy="no-referrer"></iframe></dialog>'
       . ClosingSheetDocumentsView::dialogs() . self::done();
   }
@@ -462,7 +465,7 @@ final class ClosingSheetFlowView
         $actions .= '<a class="cs-secondary" href="revision-servicios-cierre.php?numero=' . $id . '">Revisar servicios</a>';
       }
       if ($can['respond'] && ClosingSheetWorkflow::canRespond($row)) {
-        $actions .= '<a class="cs-primary" href="hoja-cierre-ver.php?numero=' . $id . '#responder">Responder</a>';
+        $actions .= '<a class="cs-primary" href="hoja-cierre-ver.php?numero=' . $id . '">Responder</a>';
       }
       $body .= '<tr><td><strong>#' . $id . '</strong><small>' . self::e(self::date((int) ($row['fecha'] ?? 0))) . '</small></td>'
         . '<td>' . self::e($row['direccion'] ?? '') . '<small>Inmueble #' . self::e($row['id_inmueble'] ?? '') . '</small></td>'

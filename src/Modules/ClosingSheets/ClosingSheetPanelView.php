@@ -57,7 +57,7 @@ final class ClosingSheetPanelView
         $actions .= self::open('revision-servicios-cierre.php?numero=' . $id, 'Revisar servicios', UI::SECONDARY);
       }
       if ($can['respond'] && ClosingSheetWorkflow::canRespond($row)) {
-        $actions .= self::open('hoja-cierre-ver.php?numero=' . $id . '#responder', 'Responder', UI::PRIMARY);
+        $actions .= self::open('hoja-cierre-ver.php?numero=' . $id, 'Responder', UI::PRIMARY);
       }
       $people = array_filter([
         trim((string) ($row['creador'] ?? '')) !== '' ? 'Hizo: ' . trim((string) $row['creador']) : '',
