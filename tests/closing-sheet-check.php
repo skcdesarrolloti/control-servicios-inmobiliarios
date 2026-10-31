@@ -162,6 +162,7 @@ unset($missing['derechos_inmobiliarios'], $missing['estado_asegurable']);
 $message = $fails(fn() => $service->save($missing, $sender), 'Derechos inmobiliarios');
 $check(str_contains($message, 'Falta: Derechos inmobiliarios') && str_contains($message, 'Asegurable'), 'missing required fields and checklist items are listed');
 $check($fails(fn() => $service->save(['propiedad_horizontal' => 'Tal vez'] + $input, $sender), 'no es una opción válida') !== 'no falló', 'values outside the glossary are rejected');
+$check($fails(fn() => $service->save(['destinacion_inmueble' => 'Mixto'] + $input, $sender), 'Destinacion: "Mixto"') !== 'no falló', 'a new sheet only accepts Vivienda or Comercio as destination');
 $coOwnerMissing = $input;
 $coOwnerMissing['copropietario']['2']['correo'] = '';
 $coOwnerMissing['copropietario']['2']['representante'] = '';

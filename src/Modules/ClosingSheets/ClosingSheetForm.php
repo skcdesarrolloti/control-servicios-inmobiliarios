@@ -23,7 +23,7 @@ final class ClosingSheetForm
       ['name' => 'id_ticket', 'type' => 'number', 'label' => '#Ticket', 'required' => true, 'help' => 'Por favor ingresa el numero de ticket por el cual atendio al cliente'],
       ['name' => 'tipo_inmueble', 'type' => 'select', 'label' => 'Tipo de inmueble', 'required' => true, 'options' => 'tipo_inmueble', 'help' => 'Selecciona el tipo de inmueble a arrendar.'],
       ['name' => 'gestion_inmueble', 'type' => 'select', 'label' => 'Gestion', 'required' => true, 'options' => 'gestion_inmueble', 'readonly' => true, 'fixed' => 'Arriendo', 'help' => 'La hoja de cierre siempre es de un arriendo.'],
-      ['name' => 'destinacion_inmueble', 'type' => 'select', 'label' => 'Destinacion', 'required' => true, 'options' => 'destinacion_inmueble', 'help' => 'Selecciona el destino a arrendar.'],
+      ['name' => 'destinacion_inmueble', 'type' => 'select', 'label' => 'Destinacion', 'required' => true, 'options' => ['Vivienda' => 'Vivienda', 'Comercio' => 'Comercio'], 'help' => 'Selecciona el destino a arrendar: vivienda o comercio.'],
       ['name' => 'incluye_iva', 'type' => 'select', 'label' => '¿El canon incluye iva?', 'required' => true, 'options' => 'si_no', 'mandate' => true, 'help' => 'El canon lleva iva o no.'],
       ['name' => 'meses_contrato', 'type' => 'number', 'label' => 'Meses de contrato', 'required' => true, 'mandate' => true, 'help' => 'Cantidad de meses que durará el contrato (solo el número, por ejemplo 12).'],
       ['name' => 'valor_canon', 'type' => 'text', 'label' => 'Canon', 'required' => true, 'mandate' => true, 'help' => 'Valor del canon mensual en pesos, por ejemplo 1.150.000.'],

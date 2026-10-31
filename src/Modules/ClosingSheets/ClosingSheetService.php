@@ -219,7 +219,8 @@ final class ClosingSheetService
       'id_ticket' => $ticketId,
       'tipo_inmueble' => $this->match('tipo_inmueble', $p('tipo_inmueble')),
       'gestion_inmueble' => $this->match('gestion_inmueble', $p('tipo_negocio')),
-      'destinacion_inmueble' => $this->match('destinacion_inmueble', $p('destinacion')),
+      // Solo vivienda o comercio: un inmueble "Mixto" no se precarga y se elige en la hoja.
+      'destinacion_inmueble' => in_array($this->match('destinacion_inmueble', $p('destinacion')), ['Vivienda', 'Comercio'], true) ? $this->match('destinacion_inmueble', $p('destinacion')) : '',
       'incluye_iva' => $m('incluye_iva'),
       'meses_contrato' => (string) (int) $m('duracion') ?: '',
       'valor_canon' => $m('precio'),
