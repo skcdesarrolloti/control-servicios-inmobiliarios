@@ -173,10 +173,9 @@ final class ClosingSheetPageView
     foreach ((array) ($options['paises'] ?? []) as $row) {
       $countries .= '<option value="' . $this->e($row['codigo']) . '" data-pais="' . $this->e($row['pais']) . '"' . ($row['pais'] === 'Colombia' ? ' selected' : '') . '>' . $this->e($row['pais'] . ' (' . $row['codigo'] . ')') . '</option>';
     }
-    $cities = '<option value="">Selecciona…</option>';
-    foreach ((array) ($options['ciudades'] ?? []) as $row) {
-      $cities .= '<option value="' . $this->e($row['ciudad']) . '" data-departamento="' . $this->e($row['departamento']) . '">' . $this->e($row['ciudad']) . '</option>';
-    }
+    // La tabla de ciudades no tiene todos los municipios: la ciudad se escribe, con sugerencias (primero las del
+    // departamento elegido).
+    $cities = array_map(static fn(array $row): array => ['c' => (string) $row['ciudad'], 'd' => (string) $row['departamento']], (array) ($options['ciudades'] ?? []));
     return '<dialog class="cs-dialog" data-cs-tenant-dialog aria-labelledby="cs_t_title">'
       . '<form class="cs-dialog-box" data-cs-tenant-form novalidate>'
       . '<header><h2 id="cs_t_title"><span class="material-symbols-outlined" aria-hidden="true">person_add</span> Crear arrendatario</h2>'
@@ -196,7 +195,7 @@ final class ClosingSheetPageView
       . $input('correo', 'Correo', 'email', true, ' autocomplete="off"')
       . $input('direccion', 'Dirección', 'text', true, ' autocomplete="off"')
       . $select('departamento', 'Departamento', (array) ($options['departamentos'] ?? []), 'Bolívar')
-      . '<div class="cs-field">' . $label('ciudad', 'Ciudad') . '<select class="cs-input" id="cs_t_ciudad" name="ciudad" required>' . $cities . '</select></div>'
+      . '<div class="cs-field">' . $label('ciudad', 'Ciudad o municipio') . '<input class="cs-input" type="text" id="cs_t_ciudad" name="ciudad" list="cs_t_ciudades" required autocomplete="off" placeholder="Escríbela o elígela de la lista" data-cs-cities="' . $this->e(json_encode($cities, JSON_UNESCAPED_UNICODE)) . '"><datalist id="cs_t_ciudades"></datalist></div>'
       . $select('sexo', 'Sexo', (array) ($options['sexo'] ?? []))
       . $input('cumpleanos', 'Cumpleaños', 'date', true, ' max="' . date('Y-m-d') . '"')
       . '</div>'

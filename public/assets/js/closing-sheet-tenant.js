@@ -198,13 +198,23 @@
       });
     });
   }
+  // Sugerencias de ciudad: primero las del departamento elegido y luego las demás; se puede escribir cualquiera.
+  let cities = [];
+  try {
+    cities = JSON.parse(field("ciudad").dataset.csCities || "[]");
+  } catch (error) {
+    cities = [];
+  }
   function syncCities() {
     const department = field("departamento").value;
-    const city = field("ciudad");
-    Array.from(city.options).forEach((option) => {
-      option.hidden = option.value !== "" && department !== "" && option.dataset.departamento !== department;
-    });
-    if (city.selectedOptions[0] && city.selectedOptions[0].hidden) city.value = "";
+    const list = dialogForm.querySelector("#cs_t_ciudades");
+    const ordered = cities.filter((row) => row.d === department).concat(cities.filter((row) => row.d !== department));
+    list.replaceChildren(...ordered.map((row) => {
+      const option = document.createElement("option");
+      option.value = row.c;
+      if (row.d) option.label = row.d;
+      return option;
+    }));
   }
   function syncCountry() {
     const option = field("indicativo").selectedOptions[0];
