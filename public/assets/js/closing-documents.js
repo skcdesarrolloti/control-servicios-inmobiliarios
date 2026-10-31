@@ -59,10 +59,20 @@
       }
     })();
 
+    // Una subida colgada no puede bloquear el guardado de la hoja para siempre: se corta a los 3 minutos.
     async function post(action, body) {
       body.append("action", action);
       body.append("nonce", root.dataset.cdNonce || "");
-      const response = await fetch(root.dataset.cdApi, { method: "POST", body, credentials: "same-origin" });
+      const controller = window.AbortController ? new AbortController() : null;
+      const timer = controller ? setTimeout(() => controller.abort(), 180000) : 0;
+      let response;
+      try {
+        response = await fetch(root.dataset.cdApi, { method: "POST", body, credentials: "same-origin", signal: controller ? controller.signal : undefined });
+      } catch (error) {
+        throw new Error(error && error.name === "AbortError" ? "La subida tardó demasiado. Revisa tu conexión e intenta de nuevo." : "No se pudo conectar. Revisa tu conexión e intenta de nuevo.");
+      } finally {
+        clearTimeout(timer);
+      }
       if (response.status === 401) throw new Error("Tu sesión venció. Recarga la página e inicia sesión.");
       const json = await response.json().catch(() => null);
       if (!json || !json.success) throw new Error((json && json.data && json.data.message) || "No se pudo completar. Intenta de nuevo.");
@@ -77,6 +87,7 @@
     }
 
     let busy = 0;
+    let waiting = null; // Guardar que se pidió mientras subían documentos: { submitter, failed }.
     async function upload(slot, files) {
       const title = slot.querySelector("[data-cd-title]");
       const errors = [];
@@ -103,6 +114,30 @@
       slot.classList.remove("is-busy");
       status(slot, errors.join(" "), errors.length > 0);
       sync();
+      if (waiting) finishWaiting(errors.length > 0);
+    }
+
+    // Al terminar las subidas pendientes, la hoja se guarda sola; si alguna falló, se avisa y no se guarda.
+    function saveMessage(text) {
+      const box = form && form.querySelector("[data-cs-error]");
+      if (!box) return;
+      box.textContent = text;
+      box.hidden = text === "";
+    }
+    function finishWaiting(failed) {
+      waiting.failed = waiting.failed || failed;
+      if (busy > 0) {
+        saveMessage("Subiendo " + busy + (busy === 1 ? " documento" : " documentos") + "… la hoja se guardará apenas termine.");
+        return;
+      }
+      const { submitter, failed: anyFailed } = waiting;
+      waiting = null;
+      if (anyFailed) {
+        saveMessage("Algún documento no se pudo subir (mira el aviso en rojo en su casilla). Corrígelo o quítalo y vuelve a guardar.");
+        return;
+      }
+      saveMessage("");
+      form.requestSubmit(submitter && submitter.isConnected ? submitter : undefined);
     }
 
     root.addEventListener("click", async (event) => {
@@ -177,11 +212,8 @@
       if (busy > 0) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        const error = form.querySelector("[data-cs-error]");
-        if (error) {
-          error.textContent = "Espera a que terminen de subir los documentos y vuelve a guardar.";
-          error.hidden = false;
-        }
+        waiting = { submitter: event.submitter || null, failed: false };
+        saveMessage("Subiendo " + busy + (busy === 1 ? " documento" : " documentos") + "… la hoja se guardará apenas termine.");
         return;
       }
       const list = missing();
