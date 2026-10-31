@@ -97,10 +97,22 @@ Las columnas `observacion_respuesta` e `id_revision_servicios_publicos` de `cier
 
 ## Dónde se usa
 
-- **Añadir**: `hoja-cierre.php?id_contrato=<mandato>&id_arrendatario=…&id_inmueble=…&id_inmueble_data=…&id_propietario=…&id_copropiedad=…&id_estudio_aseguradora=…`
-  Son los mismos parámetros del enlace de WordPress (`/mi-cuenta/anadir-hoja-de-cierre/?…`); `id_empleado` e
-  `id_sucursal` se ignoran (el funcionario es el de la sesión). Solo `id_contrato` es obligatorio: lo que falte se toma
-  del mandato.
+- **Añadir**: `hoja-cierre.php?id_contrato=<mandato>&id_inmueble=…&id_propietario=…&id_copropiedad=…&id_estudio_aseguradora=…`
+  Son los parámetros del botón **Añadir cierre** de la tarjeta del mandato. Ese botón ya no pasa por la página
+  intermedia de WordPress (`/mi-cuenta/inmueble-de-administracion/`), donde se elegía o se creaba el arrendatario:
+  eso se hace ahora en la sección **Arrendatario** de la hoja.
+  - El buscador encuentra al arrendatario por nombre, documento o celular. Al elegirlo se llenan sus datos y el
+    `id_arrendatario`.
+  - **Crear arrendatario** abre una ventana con los campos del JetForm "Añadir arrendatario" (hook
+    `registro-arrendatario`). Si el documento ya existe, con o sin puntos, actualiza esa ficha. Si no, la crea con
+    el `id_empleado` real como autor y le envía la bienvenida por correo (cola compartida).
+  - Si el enlace trae `id_arrendatario` (el de la página intermedia), la hoja abre con ese arrendatario elegido y se
+    puede cambiar.
+  - Al guardar, si no llegó el `id_arrendatario` (por ejemplo, un borrador recuperado), se busca por el documento del
+    arrendatario. Sin ficha, pide elegirlo o crearlo.
+
+  `id_empleado` e `id_sucursal` se ignoran (el funcionario es el de la sesión). Solo `id_contrato` es obligatorio: lo
+  que falte se toma del mandato.
 - **Editar**: `hoja-cierre.php?id_cierre=<hoja>`.
 - **Sesión**: la del panel. Desde WordPress el botón puede agregar `&id_empleado=…&token=…` (mismo token de
   `ActaAutologin` que usan la revisión preventiva y las cotizaciones) para entrar sin pedir usuario; sin token pide

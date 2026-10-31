@@ -8,9 +8,10 @@ use SCM\Core\Auth;
 use SCM\Modules\ClosingSheets\ClosingSheetFlowView;
 use SCM\Modules\ClosingSheets\ClosingSheetPanelView;
 use SCM\Modules\ClosingSheets\ClosingSheetService;
+use SCM\Modules\ClosingSheets\ClosingSheetTenants;
 use SCM\Modules\ClosingSheets\ClosingSheetWorkflow;
 
-/** Hoja de cierre de negocio (hoja-cierre.php): guardar al crear o editar, y el listado del panel. */
+/** Hoja de cierre de negocio (hoja-cierre.php): guardar al crear o editar, buscar y registrar el arrendatario, y el listado del panel. */
 trait HandlesClosingSheets
 {
   public function ajax_handler_closing_sheet_save(): void
@@ -47,6 +48,48 @@ trait HandlesClosingSheets
       'url' => $result['url'],
       'edit_url' => $result['edit_url'],
       'id' => $result['id'],
+    ]);
+  }
+
+  /** Hoja nueva › Arrendatario: buscar por nombre, documento o celular. */
+  public function ajax_handler_closing_sheet_tenants(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canOpenClosingSheet(true)) {
+      $this->jsonFail('Tu cargo no tiene permiso para añadir hojas de cierre.');
+    }
+    $query = mb_substr(trim(strip_tags(wp_unslash((string) ($_POST['q'] ?? '')))), 0, 80, 'UTF-8');
+    try {
+      $items = (new ClosingSheetTenants($this->db))->search($query);
+    } catch (\Throwable $error) {
+      error_log('[closing_sheet_tenants] ' . $error->getMessage());
+      $this->jsonFail('No se pudo buscar el arrendatario.');
+    }
+    $this->jsonOk(['items' => $items]);
+  }
+
+  /** Hoja nueva › Crear arrendatario (reemplaza el JetForm "Añadir arrendatario"): registra o actualiza por documento. */
+  public function ajax_handler_closing_sheet_tenant_save(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canOpenClosingSheet(true)) {
+      $this->jsonFail('Tu cargo no tiene permiso para añadir hojas de cierre.');
+    }
+    $input = [];
+    foreach (['tipo_persona', 'nombre', 'tipo_documento', 'documento', 'expedicion', 'representante_legal', 'documento_legal', 'indicativo', 'pais', 'celular', 'correo', 'direccion', 'departamento', 'ciudad', 'sexo', 'cumpleanos'] as $key) {
+      $input[$key] = mb_substr(trim(strip_tags(wp_unslash((string) ($_POST[$key] ?? '')))), 0, 200, 'UTF-8');
+    }
+    try {
+      $result = (new ClosingSheetTenants($this->db))->save($input, $this->closing_sheet_sender());
+    } catch (\Throwable $error) {
+      error_log('[closing_sheet_tenant_save] ' . $error->getMessage());
+      $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudo registrar el arrendatario. Intenta nuevamente.');
+    }
+    $this->jsonOk([
+      'tenant' => $result['tenant'],
+      'message' => $result['created']
+        ? 'Arrendatario registrado' . ($result['notified'] ? ' y se le envió la bienvenida por correo.' : '.')
+        : 'Ya estaba registrado con ese documento: se actualizaron sus datos.',
     ]);
   }
 

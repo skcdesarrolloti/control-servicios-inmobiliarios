@@ -3,8 +3,9 @@
 declare(strict_types=1);
 
 // Hoja de cierre de negocio nativa: reemplaza los formularios JetForm "Añadir / Editar hoja de cierre".
-// Añadir: hoja-cierre.php?id_contrato=<mandato>&id_arrendatario=…&id_inmueble=…&id_inmueble_data=…&id_propietario=…&id_copropiedad=…&id_estudio_aseguradora=…
-//         (los mismos parámetros del enlace de WordPress). Editar: hoja-cierre.php?id_cierre=<hoja>.
+// Añadir: hoja-cierre.php?id_contrato=<mandato>&id_inmueble=…&id_propietario=…&id_copropiedad=…&id_estudio_aseguradora=…
+//         (los parámetros del botón "Añadir cierre" del mandato). id_arrendatario es opcional: el arrendatario se busca o se
+//         crea en la misma hoja, sin la página intermedia de WordPress. Editar: hoja-cierre.php?id_cierre=<hoja>.
 require dirname(__DIR__) . '/bootstrap/app.php';
 
 use SCM\App\SuCasaControlServiciosInmobiliarios;
@@ -12,6 +13,7 @@ use SCM\Core\App;
 use SCM\Core\Auth;
 use SCM\Modules\ClosingSheets\ClosingSheetPageView;
 use SCM\Modules\ClosingSheets\ClosingSheetService;
+use SCM\Modules\ClosingSheets\ClosingSheetTenants;
 
 header('Content-Type: text/html; charset=UTF-8');
 header('Cache-Control: no-store, private');
@@ -68,6 +70,7 @@ try {
 }
 
 $baseUrl = rtrim((string) SCM_BASE_URL, '/');
+$tenants = new ClosingSheetTenants($db);
 $asset = static function (string $path) use ($baseUrl): string {
   $file = __DIR__ . '/' . $path;
   return $baseUrl . '/' . $path . '?v=' . rawurlencode(SCM_VERSION . '-' . (is_file($file) ? (string) filemtime($file) : '0'));
@@ -81,6 +84,12 @@ echo (new ClosingSheetPageView())->render($context, $service->options(), [
   'favicon' => system_image('portal_favicon_url', SCM_DEFAULT_PORTAL_FAVICON_URL),
   'nonce' => App::csrf()->token('scm_nonce'),
   'action' => SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_SAVE,
+  'tenant' => [
+    'current' => $tenants->find((int) $context['ids']['id_arrendatario']),
+    'options' => $tenants->options(),
+    'search' => SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_TENANTS,
+    'save' => SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_TENANT_SAVE,
+  ],
   'css' => array_map($asset, ['assets/css/review-page.css', 'assets/css/closing-sheet.css']),
-  'js' => array_map($asset, ['assets/js/form-draft.js', 'assets/js/closing-sheet.js']),
+  'js' => array_map($asset, ['assets/js/form-draft.js', 'assets/js/closing-sheet.js', 'assets/js/closing-sheet-tenant.js']),
 ]);

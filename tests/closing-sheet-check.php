@@ -9,6 +9,7 @@ define('SCM_APP_SECRET', 'test-secret');
 use SCM\Core\Database;
 use SCM\Modules\ClosingSheets\ClosingSheetForm;
 use SCM\Modules\ClosingSheets\ClosingSheetService;
+use SCM\Modules\ClosingSheets\ClosingSheetTenants;
 
 $check = static function (bool $condition, string $message): void {
   if (!$condition) {
@@ -76,7 +77,10 @@ $table('wp_jet_cct_contrato_mandato', $mandateColumns);
 $table('wp_jet_cct_inmuebles', array_merge($cct, ['tipo_inmueble', 'tipo_negocio', 'destinacion', 'direccion_fisica', 'servicios_publicos', 'luz', 'agua', 'gas', 'pertenece_copropiedad', 'zonas_sociales', 'parqueadero', 'tipo_parqueadero', 'parqueaderos', 'numero_parqueadero', 'deposito', 'depositos', 'id_arrendatario', 'arrendatario', 'id_hoja_cierre', 'estado', 'id_contrato_mandato', 'horario_mudanza_inicio_1']));
 $table('wp_jet_cct_copropiedades', array_merge($cct, ['copropiedad', 'nit', 'administrador', 'correo', 'contacto', 'tipo_cuenta', 'numero_cuenta', 'banco']));
 $table('wp_jet_cct_propietarios', array_merge($cct, ['nombre', 'documento', 'correo', 'celular']));
-$table('wp_jet_cct_arrendatarios', array_merge($cct, ['nombre', 'documento', 'correo', 'celular', 'tipo_persona', 'tipo_documento', 'nombre_juridico', 'documento_juridico']));
+$table('wp_jet_cct_arrendatarios', array_merge($cct, ['nombre', 'documento', 'correo', 'celular', 'tipo_persona', 'tipo_documento', 'nombre_juridico', 'documento_juridico', 'sucursal', 'expedicion', 'indicativo', 'direccion', 'pais', 'departamento', 'ciudad', 'cumpleanos', 'sexo', 'id_arrendatario']));
+$table('wp_jet_cct_paises', ['pais', 'codigo']);
+$table('wp_jet_cct_departamentos', ['departamento', 'pais']);
+$table('wp_jet_cct_ciudades', ['ciudad', 'departamento', 'pais']);
 $table('wp_jet_cct_estudios_aseguradoras', array_merge($cct, ['id_ticket', 'num_solicitud', 'aseguradora', 'fecha_posible_entrega', 'ubicacion_llaves', 'persona_llaves', 'contacto_llaves', 'id_contrato_mandato_arrendamiento']));
 $table('wp_jet_cct_tickets', array_merge($cct, ['estado', 'estado_comercial', 'estado_administrativo', 'medio']));
 $table('wp_jet_cct_historial_del_inmueble', array_merge($cct, ['id_inmueble', 'id_inmueble_data', 'fecha', 'funcionario', 'id_empleado', 'tipo_reporte', 'observacion']));
@@ -89,6 +93,13 @@ $glossary = static fn(array $values): string => serialize(array_map(static fn(st
 $db->insert('wp_jet_post_types', ['id' => 175, 'status' => 'glossary', 'meta_fields' => $glossary(['Si', 'No'])]);
 $db->insert('wp_jet_post_types', ['id' => 1154, 'status' => 'glossary', 'meta_fields' => $glossary(['Cumple ', 'No cumple', 'No aplica'])]);
 $db->insert('wp_jet_post_types', ['id' => 1003, 'status' => 'glossary', 'meta_fields' => $glossary(['Agua', 'Gas', 'Energia'])]);
+$db->insert('wp_jet_post_types', ['id' => 272, 'status' => 'glossary', 'meta_fields' => $glossary(['Natural', 'Juridica'])]);
+$db->insert('wp_jet_post_types', ['id' => 1, 'status' => 'glossary', 'meta_fields' => $glossary(['Cédula de Ciudadania', 'Nit', 'Cédula Extranjería', 'Pasaporte'])]);
+$db->insert('wp_jet_post_types', ['id' => 1047, 'status' => 'glossary', 'meta_fields' => $glossary(['Masculino', 'Femenino'])]);
+$db->insert('wp_jet_cct_paises', ['pais' => 'Colombia', 'codigo' => '+57']);
+$db->insert('wp_jet_cct_paises', ['pais' => 'Estados Unidos', 'codigo' => '+1']);
+$db->insert('wp_jet_cct_departamentos', ['departamento' => 'Bolívar', 'pais' => 'Colombia']);
+$db->insert('wp_jet_cct_ciudades', ['ciudad' => 'Cartagena', 'departamento' => 'Bolívar', 'pais' => 'Colombia']);
 
 // Mandato con dos propietarios: el 2 todavía no tiene ficha en Propietarios.
 $db->insert('wp_jet_cct_contrato_mandato', [
@@ -227,5 +238,26 @@ $service->save($legacyInput, $sender, $oldId);
 $old = $db->getRow('SELECT * FROM wp_jet_cct_cierres WHERE _ID = ?', [$oldId]);
 $check($old['estado_asegurable'] === 'Cumple' && $old['estado_cobertura'] === '' && str_contains($old['ob_documentos_aseguradora_cierre'], '<b>Asegurable</b><br />Sí asegurable') && $old['ob_documentos_juridicos'] === '', 'an old sheet without checklist can be edited and only what was filled is saved');
 $check(ClosingSheetService::percents([['index' => 3, 'name' => 'Ana']], []) === [3 => '100'], 'a single owner always has 100 %');
+
+// Arrendatario desde la hoja (reemplaza la página intermedia y el JetForm "Añadir arrendatario").
+$tenants = new ClosingSheetTenants($db);
+$check(array_column($tenants->search('palacio'), 'id') === ['764'] && array_column($tenants->search('1524'), 'id') === ['764'] && $tenants->search('p') === [], 'tenants are found by name or document from two characters');
+$newTenant = ['tipo_persona' => 'Juridica', 'nombre' => 'Inversiones Prueba SAS', 'tipo_documento' => 'Nit', 'documento' => '900.555.111', 'expedicion' => '',
+  'representante_legal' => 'Ana Pérez', 'documento_legal' => '45123456', 'indicativo' => '+57', 'pais' => 'Colombia', 'celular' => '300 123 4567',
+  'correo' => 'ana@example.invalid', 'direccion' => 'Calle 1', 'departamento' => 'Bolívar', 'ciudad' => 'Cartagena', 'sexo' => 'Femenino', 'cumpleanos' => '1990-05-16'];
+$message = $fails(fn() => $tenants->save(['correo' => 'no-es-correo', 'cumpleanos' => '2999-01-01', 'representante_legal' => '', 'indicativo' => '+99'] + $newTenant, $sender), 'Revisa estos datos');
+$check(str_contains($message, 'Correo válido') && str_contains($message, 'Cumpleaños') && str_contains($message, 'Representante legal') && str_contains($message, 'País'), 'tenant data is validated: email, past birthday, company representative and country');
+$created = $tenants->save($newTenant, $sender);
+$row = $db->getRow('SELECT * FROM wp_jet_cct_arrendatarios WHERE _ID = ?', [(int) $created['tenant']['id']]);
+$check($created['created'] && $row['id_arrendatario'] === $created['tenant']['id'] && $row['cct_author_id'] === '1508' && $row['sucursal'] === '1' && $row['celular'] === '3001234567' && $row['nombre_juridico'] === 'Ana Pérez' && $row['pais'] === 'Colombia', 'a new tenant is registered with the real employee id, branch and clean phone');
+$check($row['cumpleanos'] === (string) (new DateTimeImmutable('1990-05-16 00:00', new DateTimeZone('America/Bogota')))->getTimestamp(), 'the birthday is saved as JetForm does (midnight in Colombia)');
+$again = $tenants->save(['tipo_persona' => 'Natural', 'nombre' => 'Inversiones Prueba', 'documento' => '900555111'] + $newTenant, $sender);
+$check(!$again['created'] && $again['tenant']['id'] === $created['tenant']['id'] && $db->getVar('SELECT nombre_juridico FROM wp_jet_cct_arrendatarios WHERE _ID = ?', [(int) $created['tenant']['id']]) === 'No aplica' && (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_arrendatarios') === 2, 'the same document (with or without dots) updates the existing tenant instead of duplicating it');
+
+// Hoja nueva sin id_arrendatario: se busca por documento; sin ficha, se pide elegirlo o crearlo.
+$noTenant = ['id_arrendatario' => ''] + $input;
+$check($fails(fn() => $service->save(['documento_arrendatario' => '11111111'] + $noTenant, $sender), 'Elige el arrendatario') !== 'no falló', 'a new sheet without a registered tenant asks to choose or create one');
+// Con el documento de Juan (764) lo encuentra; como su hoja se acaba de guardar, lo frena el control de duplicados.
+$check($fails(fn() => $service->save($noTenant, $sender), 'hace un momento') !== 'no falló', 'a new sheet without the tenant id finds the tenant by document');
 
 echo "Closing sheet checks passed.\n";

@@ -231,6 +231,8 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_LEASE_CONTRACT_ANNEXES_OK => 'ajax_handler_lease_contract_annexes_up_to_date',
       SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_SAVE => 'ajax_handler_closing_sheet_save',
       SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_LIST => 'ajax_handler_closing_sheet_list',
+      SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_TENANTS => 'ajax_handler_closing_sheet_tenants',
+      SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_TENANT_SAVE => 'ajax_handler_closing_sheet_tenant_save',
     ];
 
     $this->guideRoutes = [

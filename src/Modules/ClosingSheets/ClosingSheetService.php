@@ -389,6 +389,22 @@ final class ClosingSheetService
     };
   }
 
+  /**
+   * Arrendatario de una hoja nueva: el elegido en la hoja o, si no llegó (borrador recuperado), el que tenga ese
+   * documento. Sin ficha no se crea la hoja: se registra con "Crear arrendatario".
+   */
+  private function tenantId(string $id, string $document): string
+  {
+    if ($id !== '' && $this->row('jet_cct_arrendatarios', $id) !== []) {
+      return $id;
+    }
+    $found = (new ClosingSheetTenants($this->db))->idByDocument($document);
+    if ($found <= 0) {
+      throw new \DomainException('Elige el arrendatario en la sección Arrendatario o regístralo con "Crear arrendatario".');
+    }
+    return (string) $found;
+  }
+
   /** "Jurídica", "Juridico" y similares se guardan como "Juridica", el valor de los formularios actuales. */
   public static function personType(string $value): string
   {
@@ -454,6 +470,9 @@ final class ClosingSheetService
   {
     $context = $this->context($input, $closingId);
     $creating = $context['mode'] === 'crear';
+    if ($creating) {
+      $context['ids']['id_arrendatario'] = $this->tenantId($context['ids']['id_arrendatario'], (string) ($input['documento_arrendatario'] ?? ''));
+    }
     $ids = $context['ids'];
     $values = $this->validate($input, $context, $creating);
     $now = time();

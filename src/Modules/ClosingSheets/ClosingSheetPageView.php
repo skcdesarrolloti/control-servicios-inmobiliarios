@@ -6,7 +6,8 @@ namespace SCM\Modules\ClosingSheets;
 
 /**
  * Página propia de la hoja de cierre de negocio (public/hoja-cierre.php): paso 1 con los datos del negocio y paso 2
- * con la lista de chequeo (solo al crear, como el formulario original).
+ * con la lista de chequeo (solo al crear, como el formulario original). Al crear, la sección Arrendatario trae el
+ * buscador y la ventana "Crear arrendatario" (reemplazan la página intermedia de WordPress).
  */
 final class ClosingSheetPageView
 {
@@ -15,7 +16,7 @@ final class ClosingSheetPageView
   /**
    * @param array<string,mixed> $context ClosingSheetService::context()
    * @param array<string,mixed> $options ClosingSheetService::options()
-   * @param array{user:string,base_url:string,logo:string,favicon:string,nonce:string,action:string,css:list<string>,js:list<string>} $page
+   * @param array{user:string,base_url:string,logo:string,favicon:string,nonce:string,action:string,css:list<string>,js:list<string>,tenant?:array{current:?array<string,string>,options:array<string,mixed>,search:string,save:string}} $page
    */
   public function render(array $context, array $options, array $page): string
   {
@@ -73,7 +74,7 @@ final class ClosingSheetPageView
 
       <div class="cs-step" data-cs-step="1">
         <?php foreach (ClosingSheetForm::SECTIONS as [$sectionTitle, $fields]): ?>
-          <?= $this->section($sectionTitle, $fields, $values, $options) ?>
+          <?= $this->section($sectionTitle, $fields, $values, $options, $creating && $sectionTitle === 'Arrendatario' && isset($page['tenant']) ? $this->tenantPicker($page['tenant']) : '') ?>
           <?php if ($sectionTitle === 'Propietario'): ?><?= $this->owners($context['owners'], $values) ?><?php endif; ?>
         <?php endforeach; ?>
         <div class="cs-actions">
@@ -90,6 +91,7 @@ final class ClosingSheetPageView
       </div>
       <p class="cs-error" data-cs-error role="alert" hidden></p>
     </form>
+    <?php if ($creating && isset($page['tenant'])): ?><?= $this->tenantDialog($page['tenant']['options']) ?><?php endif; ?>
 
     <section class="rp-card cs-done" data-cs-done hidden aria-live="polite">
       <span class="material-symbols-outlined cs-done-icon" aria-hidden="true">task_alt</span>
@@ -109,7 +111,7 @@ final class ClosingSheetPageView
   }
 
   /** @param list<array<string,mixed>> $fields @param array<string,mixed> $values @param array<string,mixed> $options */
-  private function section(string $title, array $fields, array $values, array $options): string
+  private function section(string $title, array $fields, array $values, array $options, string $before = ''): string
   {
     // Codeudores: un bloque por persona (se oculta entero según el número de codeudores).
     [$loose, $groups] = ClosingSheetForm::personGroups($fields);
@@ -126,7 +128,83 @@ final class ClosingSheetPageView
       $people .= '<div class="cs-person" data-cs-person="' . $this->e($person) . '"' . $this->sharedWhen($personFields) . '><h3><span class="material-symbols-outlined" aria-hidden="true">person</span>' . $this->e($person) . '</h3><div class="cs-grid">' . $inner . '</div></div>';
     }
     $when = $this->sharedWhen($fields);
-    return '<fieldset class="cs-section"' . $when . '><legend>' . $this->e($title) . '</legend><div class="cs-grid">' . $html . '</div>' . $people . '</fieldset>';
+    return '<fieldset class="cs-section"' . $when . '><legend>' . $this->e($title) . '</legend>' . $before . '<div class="cs-grid">' . $html . '</div>' . $people . '</fieldset>';
+  }
+
+  /**
+   * Buscador del arrendatario: el elegido llena los campos de abajo y el id_arrendatario oculto.
+   * @param array{current:?array<string,string>,search:string,save:string} $tenant
+   */
+  private function tenantPicker(array $tenant): string
+  {
+    $current = $tenant['current'];
+    $detail = $current !== null ? trim($current['tipo_documento'] . ' ' . $current['documento'] . ($current['celular'] !== '' ? ' · ' . $current['celular'] : '')) : '';
+    return '<div class="cs-tenant" data-cs-tenant data-cs-tenant-search-action="' . $this->e($tenant['search']) . '" data-cs-tenant-save-action="' . $this->e($tenant['save']) . '">'
+      . '<div class="cs-tenant-current' . ($current === null ? ' is-empty' : '') . '" data-cs-tenant-current>'
+      . '<span class="material-symbols-outlined" aria-hidden="true" data-cs-tenant-icon>' . ($current === null ? 'person_search' : 'how_to_reg') . '</span>'
+      . '<div><strong data-cs-tenant-name>' . $this->e($current !== null ? $current['nombre'] : 'Sin arrendatario elegido') . '</strong>'
+      . '<small data-cs-tenant-detail>' . $this->e($current !== null ? $detail : 'Búscalo por nombre, documento o celular. Si no aparece, créalo aquí mismo.') . '</small></div></div>'
+      . '<div class="cs-tenant-bar">'
+      . '<label class="cs-sr" for="cs_tenant_q">Buscar arrendatario</label>'
+      . '<input type="search" id="cs_tenant_q" class="cs-input" placeholder="Buscar por nombre, documento o celular" autocomplete="off" data-cs-tenant-q aria-controls="cs_tenant_results">'
+      . '<button type="button" class="cs-secondary" data-cs-tenant-new><span class="material-symbols-outlined" aria-hidden="true">person_add</span> Crear arrendatario</button>'
+      . '</div>'
+      . '<div class="cs-tenant-results" id="cs_tenant_results" data-cs-tenant-results aria-live="polite" hidden></div>'
+      . '</div>';
+  }
+
+  /**
+   * Ventana "Crear arrendatario", con los campos del JetForm "Añadir arrendatario" (fuera del formulario de la hoja).
+   * @param array<string,mixed> $options ClosingSheetTenants::options()
+   */
+  private function tenantDialog(array $options): string
+  {
+    $label = fn(string $name, string $text, bool $required = true): string => '<label class="cs-label" for="cs_t_' . $name . '">' . $this->e($text) . ($required ? ' <span class="cs-req" aria-hidden="true">*</span>' : '') . '</label>';
+    $select = function (string $name, string $text, array $choices, string $selected = '') use ($label): string {
+      $tags = '<option value="">Selecciona…</option>';
+      foreach ($choices as $value) {
+        $tags .= '<option value="' . $this->e($value) . '"' . ((string) $value === $selected ? ' selected' : '') . '>' . $this->e($value === 'Juridica' ? 'Jurídica' : $value) . '</option>';
+      }
+      return '<div class="cs-field">' . $label($name, $text) . '<select class="cs-input" id="cs_t_' . $name . '" name="' . $name . '" required>' . $tags . '</select></div>';
+    };
+    $input = fn(string $name, string $text, string $type = 'text', bool $required = true, string $attrs = ''): string => '<div class="cs-field">' . $label($name, $text, $required)
+      . '<input class="cs-input" type="' . $type . '" id="cs_t_' . $name . '" name="' . $name . '"' . ($required ? ' required' : '') . $attrs . '></div>';
+    $countries = '<option value="">Selecciona…</option>';
+    foreach ((array) ($options['paises'] ?? []) as $row) {
+      $countries .= '<option value="' . $this->e($row['codigo']) . '" data-pais="' . $this->e($row['pais']) . '"' . ($row['pais'] === 'Colombia' ? ' selected' : '') . '>' . $this->e($row['pais'] . ' (' . $row['codigo'] . ')') . '</option>';
+    }
+    $cities = '<option value="">Selecciona…</option>';
+    foreach ((array) ($options['ciudades'] ?? []) as $row) {
+      $cities .= '<option value="' . $this->e($row['ciudad']) . '" data-departamento="' . $this->e($row['departamento']) . '">' . $this->e($row['ciudad']) . '</option>';
+    }
+    return '<dialog class="cs-dialog" data-cs-tenant-dialog aria-labelledby="cs_t_title">'
+      . '<form class="cs-dialog-box" data-cs-tenant-form novalidate>'
+      . '<header><h2 id="cs_t_title"><span class="material-symbols-outlined" aria-hidden="true">person_add</span> Crear arrendatario</h2>'
+      . '<button type="button" class="cs-icon" data-cs-tenant-close aria-label="Cerrar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></header>'
+      . '<div class="cs-dialog-body">'
+      . '<p class="cs-note">Si ya hay un arrendatario con ese documento, se actualizan sus datos. Al arrendatario nuevo le llega la bienvenida por correo.</p>'
+      . '<div class="cs-grid">'
+      . $select('tipo_persona', 'Tipo de persona', (array) ($options['tipo_persona'] ?? []), 'Natural')
+      . $input('nombre', 'Nombre o empresa', 'text', true, ' autocomplete="off"')
+      . $select('tipo_documento', 'Tipo de documento', (array) ($options['tipo_documento'] ?? []), 'Cédula de Ciudadania')
+      . $input('documento', 'Documento o NIT', 'text', true, ' autocomplete="off"')
+      . $input('expedicion', 'Lugar de expedición', 'text', false)
+      . '<div class="cs-field" data-cs-tenant-company hidden>' . $label('representante_legal', 'Representante legal') . '<input class="cs-input" type="text" id="cs_t_representante_legal" name="representante_legal" disabled></div>'
+      . '<div class="cs-field" data-cs-tenant-company hidden>' . $label('documento_legal', 'Documento del representante') . '<input class="cs-input" type="text" id="cs_t_documento_legal" name="documento_legal" disabled></div>'
+      . '<div class="cs-field">' . $label('indicativo', 'País (indicativo)') . '<select class="cs-input" id="cs_t_indicativo" name="indicativo" required>' . $countries . '</select><input type="hidden" name="pais" value="Colombia"></div>'
+      . $input('celular', 'Celular', 'tel', true, ' inputmode="numeric" autocomplete="off"')
+      . $input('correo', 'Correo', 'email', true, ' autocomplete="off"')
+      . $input('direccion', 'Dirección', 'text', true, ' autocomplete="off"')
+      . $select('departamento', 'Departamento', (array) ($options['departamentos'] ?? []), 'Bolívar')
+      . '<div class="cs-field">' . $label('ciudad', 'Ciudad') . '<select class="cs-input" id="cs_t_ciudad" name="ciudad" required>' . $cities . '</select></div>'
+      . $select('sexo', 'Sexo', (array) ($options['sexo'] ?? []))
+      . $input('cumpleanos', 'Cumpleaños', 'date', true, ' max="' . date('Y-m-d') . '"')
+      . '</div>'
+      . '<p class="cs-error" data-cs-tenant-error role="alert" hidden></p>'
+      . '</div>'
+      . '<footer><button type="button" class="cs-secondary" data-cs-tenant-close>Cancelar</button>'
+      . '<button type="submit" class="cs-primary"><span class="material-symbols-outlined" aria-hidden="true">how_to_reg</span> Registrar y usar en la hoja</button></footer>'
+      . '</form></dialog>';
   }
 
   /** Si todos los campos de la sección dependen de lo mismo, la sección entera se oculta. @param list<array<string,mixed>> $fields */

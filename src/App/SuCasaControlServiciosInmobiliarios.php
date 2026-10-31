@@ -203,6 +203,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_LEASE_CONTRACT_ANNEXES_OK = 'scm_contrato_arrendamiento_anexos_al_dia';
   const AJAX_CLOSING_SHEET_SAVE = 'scm_hoja_cierre_guardar';
   const AJAX_CLOSING_SHEET_LIST = 'scm_hojas_cierre_listar';
+  const AJAX_CLOSING_SHEET_TENANTS = 'scm_hoja_cierre_arrendatarios';
+  const AJAX_CLOSING_SHEET_TENANT_SAVE = 'scm_hoja_cierre_arrendatario_guardar';
 
   // Guía – Correspondencias de Daños
   const AJAX_GUIDE_GCD_READ = 'scm_guide_gcd_read';
