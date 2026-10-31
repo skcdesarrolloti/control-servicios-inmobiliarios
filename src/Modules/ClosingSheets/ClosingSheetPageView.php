@@ -273,6 +273,10 @@ final class ClosingSheetPageView
       foreach ($columns as $column) {
         $input = $name . '[' . $index . '][' . $column['name'] . ']';
         $value = (string) ($data[$column['name']] ?? '');
+        if (($column['type'] ?? '') === 'select' && !empty($column['other'])) {
+          $cells .= $this->otherSelect($column, $input, $value, $options);
+          continue;
+        }
         $cells .= '<label class="cs-mini"><span>' . $this->e($column['label']) . '</span>' . (($column['type'] ?? '') === 'select'
           ? '<select class="cs-input" name="' . $this->e($input) . '"><option value=""></option>' . $this->optionTags($this->choices($column, $options), $value) . '</select>'
           : '<input type="text" class="cs-input" name="' . $this->e($input) . '" value="' . $this->e($value) . '">') . '</label>';
@@ -286,6 +290,25 @@ final class ClosingSheetPageView
     return '<div class="cs-repeat" data-cs-repeat="' . $this->e($name) . '"><div data-cs-rows>' . $html . '</div>'
       . '<template data-cs-template>' . $row('__i__', []) . '</template>'
       . '<button type="button" class="cs-secondary cs-add" data-cs-add><span class="material-symbols-outlined" aria-hidden="true">add</span> Agregar</button></div>';
+  }
+
+  /**
+   * Lista con «Otro» (o la opción equivalente del glosario, como «Otros»): al elegirla aparece un campo para escribir el
+   * valor, que es lo que se guarda. Un valor guardado que no está en la lista se muestra como «Otro» con su texto.
+   * @param array<string,mixed> $column @param array<string,mixed> $options
+   */
+  private function otherSelect(array $column, string $input, string $value, array $options): string
+  {
+    $choices = $this->choices($column, $options);
+    $other = ClosingSheetForm::otherOption(array_keys($choices));
+    if ($other === 'Otro' && !isset($choices['Otro'])) {
+      $choices['Otro'] = 'Otro';
+    }
+    $custom = $value !== '' && !isset($choices[$value]);
+    $isOther = $custom || $value === $other;
+    return '<label class="cs-mini"><span>' . $this->e($column['label']) . '</span>'
+      . '<select class="cs-input" name="' . $this->e($input) . '" data-cs-other="' . $this->e($other) . '"><option value=""></option>' . $this->optionTags($choices, $isOther ? $other : $value) . '</select>'
+      . '<input type="text" class="cs-input cs-other" name="' . $this->e(substr($input, 0, -1) . '_otro]') . '" value="' . $this->e($custom ? $value : '') . '" placeholder="¿Cuál? Escríbelo" aria-label="' . $this->e($column['label']) . ': otro"' . ($isOther ? ' data-cs-required' : ' hidden disabled') . '></label>';
   }
 
   /**

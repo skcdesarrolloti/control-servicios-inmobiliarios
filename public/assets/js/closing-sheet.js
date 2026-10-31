@@ -32,6 +32,7 @@
         });
       });
     }
+    syncOthers();
   }
   const hiddenByParent = (input) => {
     for (let node = input.parentElement; node && node !== form; node = node.parentElement) {
@@ -53,6 +54,26 @@
     }
     const remove = event.target.closest("[data-cs-remove]");
     if (remove) remove.closest("[data-cs-row]").remove();
+  });
+
+  // Listas con «Otro»: al elegirlo aparece el campo para escribir el valor (obligatorio mientras esté visible). Va después
+  // de syncConditions, que habilita todo lo de una sección visible.
+  function syncOthers() {
+    form.querySelectorAll("select[data-cs-other]").forEach((select) => {
+      const typed = select.parentElement.querySelector(".cs-other");
+      if (!typed || typed.closest("[data-cs-template]")) return;
+      const show = !select.disabled && select.value !== "" && select.value === select.dataset.csOther;
+      typed.hidden = !show;
+      typed.disabled = !show;
+      typed.toggleAttribute("data-cs-required", show);
+      if (!show) typed.classList.remove("is-invalid");
+    });
+  }
+  form.addEventListener("change", (event) => {
+    if (!event.target.matches("select[data-cs-other]")) return;
+    syncConditions();
+    const typed = event.target.parentElement.querySelector(".cs-other");
+    if (typed && !typed.hidden) typed.focus();
   });
 
   // Porcentajes de participación.

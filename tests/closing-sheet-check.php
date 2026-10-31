@@ -145,7 +145,7 @@ $input = $query + [
   'tipo_persona_arrendatario' => 'Juridica', 'tipo_documento_arrendatario' => 'Nit', 'representante_arrendatario' => 'Andrés Ordóñez', 'documento_representante_arrendatario' => '1047448935',
   'propietario' => 'Yesenis Morales', 'documento_propietario' => '3243894030', 'correo_propietario' => 'yesenis.nuevo@example.invalid', 'celular_propietario' => '3243894030',
   'arrendatario' => 'Juan Alberto Palacio', 'documento_arrendatario' => '15242928', 'correo_arrendatario' => 'juan@example.invalid', 'celular_arrendatario' => '3166611888',
-  'tiene_mascotas' => 'Si', 'mascotas' => [['tipo' => 'Perro', 'raza' => 'Pincher'], ['tipo' => '', 'raza' => '']], 'tiene_vehiculo' => 'No', 'convive_personas' => 'No',
+  'tiene_mascotas' => 'Si', 'mascotas' => [['tipo' => 'Perro', 'raza' => 'Pincher', 'tipo_otro' => 'Ignorado'], ['tipo' => 'Otro', 'tipo_otro' => ' Conejo ', 'raza' => 'Cabeza de león'], ['tipo' => '', 'raza' => '']], 'tiene_vehiculo' => 'No', 'convive_personas' => 'No',
   'num_codeudores' => 'Ninguno', 'acuerdos_precontractuales' => ['Propietario'], 'acuerdos_precontractuales_pro' => 'Pinta antes', 'acuerdos_precontractuales_arre' => 'no marcado',
   'referido_pph' => 'No', 'porcentaje' => ['1' => '60', '2' => '40'],
   'copropietario' => ['2' => ['tipo_persona' => 'Juridica', 'tipo_documento' => 'Nit', 'nombre' => 'Inversiones X SAS', 'documento' => '900.123.456-7',
@@ -180,7 +180,7 @@ $check($closing['numero_solicitud'] === '12485586' && $closing['id_contrato_arre
 $terms = ['valor_canon' => 'mil', 'valor_administracion' => '0', 'incluye_iva' => 'Si', 'iva_total_precio' => '', 'meses_contrato' => '0', 'tasa_administracion' => '150'];
 $termErrors = ClosingSheetService::normalizeTerms($terms);
 $check(count($termErrors) === 4 && $terms['valor_administracion'] === 'No aplica', 'invalid canon, VAT, months and commission are reported; zero administration means not applicable');
-$check($closing['gas'] === '' && $closing['servicios_publicos'] === serialize(['Agua', 'Energia']) && $closing['mascotas'] === serialize([['tipo' => 'Perro', 'raza' => 'Pincher']]), 'hidden fields are empty and lists are serialized like JetForm');
+$check($closing['gas'] === '' && $closing['servicios_publicos'] === serialize(['Agua', 'Energia']) && $closing['mascotas'] === serialize([['tipo' => 'Perro', 'raza' => 'Pincher'], ['tipo' => 'Conejo', 'raza' => 'Cabeza de león']]), 'hidden fields are empty and lists are serialized like JetForm ("Otro" saves the typed value)');
 $check($closing['tipo_persona_arrendatario'] === 'Juridica' && $closing['representante_arrendatario'] === 'Andrés Ordóñez' && $closing['representante_propietario'] === '', 'person types are saved; the representative of a natural person is not');
 $tenant = $db->getRow('SELECT * FROM wp_jet_cct_arrendatarios WHERE _ID = 764');
 $check($tenant['tipo_persona'] === 'Juridica' && $tenant['tipo_documento'] === 'Nit' && $tenant['nombre_juridico'] === 'Andrés Ordóñez' && $tenant['documento_juridico'] === '1047448935', 'the tenant profile gets the person type and legal representative');

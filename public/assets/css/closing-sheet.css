@@ -32,6 +32,7 @@ textarea.cs-input { resize: vertical; }
 .cs-repeat { display: grid; gap: 10px; }
 .cs-repeat-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding: 12px; border: 1px dashed #cbd5e1; border-radius: 12px; background: #f8fafc; }
 .cs-mini { display: flex; flex-direction: column; gap: 4px; flex: 1 1 150px; font-size: 12px; color: var(--rp-muted); }
+.cs-mini .cs-other[hidden] { display: none; }
 .cs-icon { border: 0; background: transparent; color: #dc2626; cursor: pointer; padding: 8px; }
 .cs-add { justify-self: start; }
 

@@ -1007,7 +1007,9 @@ final class ClosingSheetService
   /** @param array<mixed> $rows @return list<array<string,string>> */
   private function repeaterRows(string $name, array $rows): array
   {
-    $keys = array_column(ClosingSheetForm::REPEATERS[$name] ?? [], 'name');
+    $columns = ClosingSheetForm::REPEATERS[$name] ?? [];
+    $keys = array_column($columns, 'name');
+    $others = array_column(array_filter($columns, static fn(array $column): bool => !empty($column['other'])), 'name');
     $out = [];
     foreach ($rows as $row) {
       if (!is_array($row)) {
@@ -1016,6 +1018,13 @@ final class ClosingSheetService
       $clean = [];
       foreach ($keys as $key) {
         $clean[$key] = trim((string) (is_array($row[$key] ?? null) ? '' : ($row[$key] ?? '')));
+      }
+      // «Otro» se guarda con lo que se escribió a mano.
+      foreach ($others as $key) {
+        $typed = trim((string) (is_array($row[$key . '_otro'] ?? null) ? '' : ($row[$key . '_otro'] ?? '')));
+        if ($typed !== '' && $clean[$key] === ClosingSheetForm::otherOption([$clean[$key]])) {
+          $clean[$key] = $typed;
+        }
       }
       if (implode('', $clean) !== '') {
         $out[] = $clean;

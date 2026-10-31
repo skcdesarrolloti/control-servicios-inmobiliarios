@@ -154,23 +154,24 @@ final class ClosingSheetForm
   ];
 
   /** Sub-campos de los repetidores (se guardan como arreglo serializado). */
+  /** Columnas de los repetidores. 'other': la lista ofrece «Otro» y, al elegirlo, se escribe el valor a mano. */
   public const REPEATERS = [
     'mascotas' => [
-      ['name' => 'tipo', 'type' => 'select', 'label' => 'Tipo', 'options' => 'tipo_mascota'],
+      ['name' => 'tipo', 'type' => 'select', 'label' => 'Tipo', 'options' => 'tipo_mascota', 'other' => true],
       ['name' => 'raza', 'type' => 'text', 'label' => 'Raza'],
     ],
     'vehiculo' => [
-      ['name' => 'tipo', 'type' => 'select', 'label' => 'Tipo', 'options' => 'tipo_vehiculo'],
+      ['name' => 'tipo', 'type' => 'select', 'label' => 'Tipo', 'options' => 'tipo_vehiculo', 'other' => true],
       ['name' => 'placa', 'type' => 'text', 'label' => 'Placa'],
     ],
     'personas' => [
       ['name' => 'nombre', 'type' => 'text', 'label' => 'Nombre'],
       ['name' => 'edad', 'type' => 'number', 'label' => 'Edad'],
       ['name' => 'identificacion', 'type' => 'text', 'label' => 'Identificacion'],
-      ['name' => 'parentesco', 'type' => 'select', 'label' => 'Parentesco', 'options' => 'parentesco'],
+      ['name' => 'parentesco', 'type' => 'select', 'label' => 'Parentesco', 'options' => 'parentesco', 'other' => true],
       ['name' => 'correo', 'type' => 'text', 'label' => 'Correo'],
       ['name' => 'celular', 'type' => 'text', 'label' => 'Celular'],
-      ['name' => 'ocupacion', 'type' => 'select', 'label' => 'Ocupacion', 'options' => 'ocupacion'],
+      ['name' => 'ocupacion', 'type' => 'select', 'label' => 'Ocupacion', 'options' => 'ocupacion', 'other' => true],
     ],
   ];
 
@@ -384,5 +385,16 @@ final class ClosingSheetForm
     $label = preg_replace('/^Codeudor \d$/u', 'Nombre completo', $label) ?? $label;
     $label = preg_replace('/\s+del codeudor(?: \d)?$/u', '', $label) ?? $label;
     return str_replace('Direccion', 'Dirección', $label);
+  }
+
+  /** Opción «Otro» de una lista: la del glosario si ya la tiene (Otro, Otros, Otra…); si no, «Otro». @param list<int|string> $choices */
+  public static function otherOption(array $choices): string
+  {
+    foreach ($choices as $choice) {
+      if (preg_match('/^otr[oa]s?$/i', trim((string) $choice))) {
+        return (string) $choice;
+      }
+    }
+    return 'Otro';
   }
 }
