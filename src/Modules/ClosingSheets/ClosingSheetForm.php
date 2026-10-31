@@ -58,12 +58,12 @@ final class ClosingSheetForm
       ['name' => 'zonas_sociales', 'type' => 'checkbox', 'label' => 'Zonas sociales', 'options' => 'zonas_sociales', 'when' => [['propiedad_horizontal', ['Si']]]],
     ]],
     ['Mudanza', [
-      ['name' => 'horario_mudanza_inicio_1', 'type' => 'time', 'label' => 'Inicio franja 1', 'required' => true, 'when' => [['propiedad_horizontal', ['Si']]], 'help' => 'Digita la hora de apertura franja 1.'],
-      ['name' => 'horario_mudanza_final_1', 'type' => 'time', 'label' => 'Final franja 1', 'required' => true, 'when' => [['propiedad_horizontal', ['Si']]], 'help' => 'Digita la hora de cierre franja 1.'],
-      ['name' => 'horario_mudanza_inicio_2', 'type' => 'time', 'label' => 'Inicio franja 2', 'required' => true, 'when' => [['propiedad_horizontal', ['Si']]], 'help' => 'Digita la hora de apertura franja 2.'],
-      ['name' => 'horario_mudanza_final_2', 'type' => 'time', 'label' => 'Final franja 2', 'required' => true, 'when' => [['propiedad_horizontal', ['Si']]], 'help' => 'Digita la hora de cierre franja 2.'],
-      ['name' => 'horario_mudanza_inicio_sabado', 'type' => 'time', 'label' => 'Inicio sabado', 'when' => [['propiedad_horizontal', ['Si']]], 'help' => 'Digita la hora de apertura dia sabado. Si la copropiedad no da apartura los dia sabado dejar el campo vacio.'],
-      ['name' => 'horario_mudanza_final_sabado', 'type' => 'time', 'label' => 'Final sabado', 'when' => [['propiedad_horizontal', ['Si']]], 'help' => 'Digita la hora de cierre dia sabado. Si la copropiedad no da apartura los dia sabado dejar el campo vacio.'],
+      ['name' => 'horario_mudanza_inicio_1', 'type' => 'time', 'default' => '08:00', 'label' => 'Inicio franja 1', 'required' => true, 'when' => [['propiedad_horizontal', ['Si']]], 'help' => 'Digita la hora de apertura franja 1.'],
+      ['name' => 'horario_mudanza_final_1', 'type' => 'time', 'default' => '12:00', 'label' => 'Final franja 1', 'required' => true, 'when' => [['propiedad_horizontal', ['Si']]], 'help' => 'Digita la hora de cierre franja 1.'],
+      ['name' => 'horario_mudanza_inicio_2', 'type' => 'time', 'default' => '14:00', 'label' => 'Inicio franja 2', 'required' => true, 'when' => [['propiedad_horizontal', ['Si']]], 'help' => 'Digita la hora de apertura franja 2.'],
+      ['name' => 'horario_mudanza_final_2', 'type' => 'time', 'default' => '17:00', 'label' => 'Final franja 2', 'required' => true, 'when' => [['propiedad_horizontal', ['Si']]], 'help' => 'Digita la hora de cierre franja 2.'],
+      ['name' => 'horario_mudanza_inicio_sabado', 'type' => 'time', 'default' => '08:00', 'label' => 'Inicio sabado', 'when' => [['propiedad_horizontal', ['Si']]], 'help' => 'Digita la hora de apertura del sábado. Si la copropiedad no abre los sábados, borra la hora.'],
+      ['name' => 'horario_mudanza_final_sabado', 'type' => 'time', 'default' => '12:00', 'label' => 'Final sabado', 'when' => [['propiedad_horizontal', ['Si']]], 'help' => 'Digita la hora de cierre del sábado. Si la copropiedad no abre los sábados, borra la hora.'],
     ]],
     ['Zonas sociales', [
       ['name' => 'horario_zonas_inicio', 'type' => 'time', 'label' => 'Inicio', 'when' => [['propiedad_horizontal', ['Si']], ['zonas_sociales', ['Bahia de acceso', 'Baños', 'Barra', 'BBQ', 'Biblioteca', 'Bodega', 'Chorros de agua', 'Cuarto de administracion', 'Duchas', 'Guarderia', 'Juegos de mesa', 'Lavanderia', 'Lobby', 'Mini lockers', 'Multi escenario', 'Plazoleta BBQ', 'Recepcion', 'Sala de ejecutivos', 'Sala de estudio', 'Salon social', 'Sky bar', 'Solarium', 'Spa', 'Zona zen', 'Zonas de espera']]], 'help' => 'Digita la hora de apertura.'],

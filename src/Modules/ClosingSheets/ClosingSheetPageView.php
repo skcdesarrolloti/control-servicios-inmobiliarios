@@ -228,6 +228,10 @@ final class ClosingSheetPageView
   {
     $name = (string) $field['name'];
     $value = $values[$name] ?? '';
+    // Al crear, los campos con valor por defecto (horario de mudanza habitual) llegan prellenados.
+    if (!$this->editing && isset($field['default']) && (is_array($value) ? $value === [] : trim((string) $value) === '')) {
+      $value = $field['default'];
+    }
     // Al editar, lo que la hoja guardada tenía vacío no es obligatorio (igual que en el servidor).
     $required = !empty($field['required']) && !($this->editing && (is_array($value) ? $value === [] : trim((string) $value) === ''));
     $readonly = !empty($field['readonly']);
