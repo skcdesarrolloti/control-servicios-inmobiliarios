@@ -136,9 +136,11 @@ Las columnas `observacion_respuesta` e `id_revision_servicios_publicos` de `cier
 
      La hoja guarda "No aplica" en la administración vacía o en cero y en el IVA cuando el canon no lo lleva. El
      campo del IVA solo aparece si el canon incluye IVA.
+   - **Gestión**: siempre "Arriendo", bloqueada (también al editar hojas viejas con "Arriendo/Venta").
    - Servicios, propiedad horizontal y copropiedad, horarios, parqueadero y depósito.
-   - Propietario: tipo de persona, documento y representante legal si es empresa.
-   - Copropietarios: una tarjeta por persona con su %, que deben sumar 100.
+   - **Propietarios**: un bloque por persona (principal y cada copropietario del mandato) con tipo de persona,
+     documento, nombre, correo, celular, representante legal si es empresa y su participación. Los % deben sumar 100.
+     Los datos de los copropietarios llegan en `copropietario[N][…]` y son obligatorios como los del principal.
    - Arrendatario: igual que el propietario.
    - Mascotas, vehículos y personas.
    - Codeudores: un bloque por codeudor.
@@ -156,8 +158,10 @@ aseguradora y ticket); no se usa la API REST de JetEngine.
   persona y representante), `estado = En verificacion de servicios` al crear.
 - **Mandato**: `id_hoja_cierre` y `estado_hoja_cierre` al crear, y todo dato de la hoja que el mandato también tiene
   (dirección, servicios, copropiedad, parqueadero, depósito, días de gracia, propietario principal con su tipo de
-  persona y representante, porcentajes e ids de los copropietarios). Lo oculto no borra lo del mandato.
-- Copropietarios sin ficha se registran en `jet_cct_propietarios`.
+  persona y representante, porcentajes e ids de los copropietarios, y los datos editados de cada copropietario en
+  `nombre_N`, `documento_N`, `correo_N`, `celular_N`, `tipo_N`, `tipo_documento_N` y, si es empresa, `empresa_N` /
+  `nit_N` para su representante). Lo oculto no borra lo del mandato.
+- Copropietarios sin ficha se registran en `jet_cct_propietarios`, con su tipo de persona y representante.
 - Como JetForm: historial del inmueble, copropiedad, ticket (`estado`, `estado_comercial`; no toca
   `estado_administrativo`) y su historial, CCT `inmuebles`, metas del post `inmuebles` y ficha del arrendatario (con
   tipo de persona y representante).

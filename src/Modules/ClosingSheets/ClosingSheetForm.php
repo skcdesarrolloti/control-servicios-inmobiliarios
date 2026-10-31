@@ -12,6 +12,7 @@ namespace SCM\Modules\ClosingSheets;
  * - `options`: clave de ClosingSheetService::options() (glosario o tabla) o lista fija (valor => etiqueta si difieren).
  * - `when`: se muestra (y se valida) solo si cada [campo, valores] se cumple; en un checkbox basta un valor marcado.
  * - `readonly`: no se cambia aquí (hoy ningún campo; las condiciones del negocio se editan y pasan al mandato).
+ * - `fixed`: valor que siempre lleva (se muestra bloqueado y no se acepta del navegador).
  * - `mandate`: condición del negocio que también se guarda en el contrato de mandato (ClosingSheetService::MANDATE_TERMS).
  */
 final class ClosingSheetForm
@@ -21,7 +22,7 @@ final class ClosingSheetForm
     ['Datos del negocio', [
       ['name' => 'id_ticket', 'type' => 'number', 'label' => '#Ticket', 'required' => true, 'help' => 'Por favor ingresa el numero de ticket por el cual atendio al cliente'],
       ['name' => 'tipo_inmueble', 'type' => 'select', 'label' => 'Tipo de inmueble', 'required' => true, 'options' => 'tipo_inmueble', 'help' => 'Selecciona el tipo de inmueble a arrendar.'],
-      ['name' => 'gestion_inmueble', 'type' => 'select', 'label' => 'Gestion', 'required' => true, 'options' => 'gestion_inmueble', 'help' => 'Selecciona el tipo de negocio a arrendar.'],
+      ['name' => 'gestion_inmueble', 'type' => 'select', 'label' => 'Gestion', 'required' => true, 'options' => 'gestion_inmueble', 'readonly' => true, 'fixed' => 'Arriendo', 'help' => 'La hoja de cierre siempre es de un arriendo.'],
       ['name' => 'destinacion_inmueble', 'type' => 'select', 'label' => 'Destinacion', 'required' => true, 'options' => 'destinacion_inmueble', 'help' => 'Selecciona el destino a arrendar.'],
       ['name' => 'incluye_iva', 'type' => 'select', 'label' => '¿El canon incluye iva?', 'required' => true, 'options' => 'si_no', 'mandate' => true, 'help' => 'El canon lleva iva o no.'],
       ['name' => 'meses_contrato', 'type' => 'number', 'label' => 'Meses de contrato', 'required' => true, 'mandate' => true, 'help' => 'Cantidad de meses que durará el contrato (solo el número, por ejemplo 12).'],
@@ -273,6 +274,54 @@ final class ClosingSheetForm
       }
     }
     return [$loose, $groups];
+  }
+
+  /** Dato del copropietario en el formulario (copropietario[N][clave]) => clave del propietario en ClosingSheetService::owners(). */
+  public const CO_OWNER_KEYS = [
+    'tipo_persona' => 'type', 'tipo_documento' => 'document_type', 'nombre' => 'name', 'documento' => 'document',
+    'correo' => 'email', 'celular' => 'phone', 'representante' => 'representative', 'documento_representante' => 'representative_document',
+  ];
+
+  /** Campo del propietario principal => clave de CO_OWNER_KEYS (los copropietarios llevan los mismos campos). */
+  private const OWNER_FIELD_KEYS = [
+    'tipo_persona_propietario' => 'tipo_persona', 'tipo_documento_propietario' => 'tipo_documento', 'propietario' => 'nombre',
+    'documento_propietario' => 'documento', 'correo_propietario' => 'correo', 'celular_propietario' => 'celular',
+    'representante_propietario' => 'representante', 'documento_representante_propietario' => 'documento_representante',
+  ];
+
+  /** Etiqueta corta dentro del bloque de cada propietario: "Celular del propietario" => "Celular". */
+  public static function ownerLabel(string $label): string
+  {
+    $label = preg_replace('/^Propietario \(nombre o empresa\)$/u', 'Nombre o empresa', $label) ?? $label;
+    return preg_replace('/\s+del propietario$/u', '', $label) ?? $label;
+  }
+
+  /**
+   * Campos del copropietario N: los mismos del propietario principal, con nombre copropietario[N][clave].
+   * @return list<array<string,mixed>>
+   */
+  public static function coOwnerFields(int $index): array
+  {
+    $out = [];
+    foreach (self::SECTIONS as [$title, $fields]) {
+      if ($title !== 'Propietario') {
+        continue;
+      }
+      foreach ($fields as $field) {
+        $key = self::OWNER_FIELD_KEYS[$field['name']] ?? null;
+        if ($key === null) {
+          continue;
+        }
+        $field['name'] = 'copropietario[' . $index . '][' . $key . ']';
+        $field['label'] = self::ownerLabel((string) $field['label']);
+        $field['help'] = '';
+        if (isset($field['when'])) {
+          $field['when'] = [['copropietario[' . $index . '][tipo_persona]', ['Juridica']]];
+        }
+        $out[] = $field;
+      }
+    }
+    return $out;
   }
 
   /** "Documento del codeudor 1" => "Documento"; "Codeudor 1" => "Nombre completo". */

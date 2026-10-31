@@ -186,6 +186,11 @@ final class ClosingSheetService
       $ids['id_propietario'] = $this->firstId([$mandate['id_propietario_nuevo_1'] ?? '', $mandate['id_propietario'] ?? '']);
     }
     $values = $closing !== [] ? $this->editValues($closing, $ids) : $this->createValues($mandate, $ids);
+    foreach ($this->fields() as $field) {
+      if (isset($field['fixed'])) {
+        $values[$field['name']] = (string) $field['fixed'];
+      }
+    }
     return [
       'mode' => $closing !== [] ? 'editar' : 'crear',
       'closing_id' => $closingId,
@@ -482,7 +487,9 @@ final class ClosingSheetService
     try {
       $mandateTable = $this->db->table('jet_cct_contrato_mandato');
       $mandate = $this->db->getRow("SELECT * FROM `{$mandateTable}` WHERE `_ID` = ? LIMIT 1 FOR UPDATE", [(int) $ids['id_contrato']]) ?? $context['mandate'];
-      $owners = $this->registerOwners($context['owners'], $values['__percents'], $sender, $nowSql);
+      $edited = $values['__coowners'];
+      $owners = array_map(static fn(array $owner): array => array_merge($owner, $edited[(int) $owner['index']] ?? []), $context['owners']);
+      $owners = $this->registerOwners($owners, $values['__percents'], $sender, $nowSql);
       $closingData = $this->closingColumns($values, $owners);
 
       if ($creating) {
@@ -577,8 +584,8 @@ final class ClosingSheetService
     foreach ($this->fields() as $field) {
       $name = $field['name'];
       if (!empty($field['readonly'])) {
-        // Vienen del mandato (crear) o de la hoja guardada (editar); no se aceptan del navegador.
-        $values[$name] = $context['values'][$name] ?? '';
+        // Valor fijo, o del mandato (crear) o de la hoja guardada (editar); no se aceptan del navegador.
+        $values[$name] = isset($field['fixed']) ? (string) $field['fixed'] : ($context['values'][$name] ?? '');
         continue;
       }
       $raw = $input[$name] ?? '';
@@ -662,10 +669,64 @@ final class ClosingSheetService
     } catch (\InvalidArgumentException $error) {
       $errors[] = $error->getMessage();
     }
+    [$values['__coowners'], $coOwnerErrors] = $this->coOwners($context['owners'], is_array($input['copropietario'] ?? null) ? $input['copropietario'] : [], $creating);
+    $errors = array_merge($errors, $coOwnerErrors);
     if ($errors !== []) {
       throw new \DomainException(implode("\n", array_slice(array_unique($errors), 0, 12)));
     }
     return $values;
+  }
+
+  /**
+   * Datos de los copropietarios 2 a 6 como se editaron en la hoja (copropietario[N][clave]). Mismas reglas que el
+   * propietario principal; al editar, lo que el mandato tenía vacío puede seguir vacío.
+   * @param list<array<string,mixed>> $owners @param array<mixed> $posted
+   * @return array{0:array<int,array<string,string>>,1:list<string>} índice => datos, y errores
+   */
+  private function coOwners(array $owners, array $posted, bool $creating): array
+  {
+    $documentTypes = ['Cédula de Ciudadania', 'Nit', 'Cédula Extranjería', 'Pasaporte'];
+    $labels = ['tipo_persona' => 'Tipo de persona', 'tipo_documento' => 'Tipo de documento', 'nombre' => 'Nombre o empresa', 'documento' => 'Documento o NIT',
+      'correo' => 'Correo', 'celular' => 'Celular', 'representante' => 'Representante legal', 'documento_representante' => 'Documento del representante legal'];
+    $out = [];
+    $errors = [];
+    foreach ($owners as $owner) {
+      $index = (int) $owner['index'];
+      if ($index === 1) {
+        continue;
+      }
+      $data = is_array($posted[$index] ?? null) ? $posted[$index] : [];
+      $row = [];
+      foreach (ClosingSheetForm::CO_OWNER_KEYS as $key => $property) {
+        $row[$property] = trim((string) (is_array($data[$key] ?? null) ? '' : ($data[$key] ?? '')));
+      }
+      $row['type'] = self::personType($row['type']);
+      $company = $row['type'] === 'Juridica';
+      if (!$company) {
+        $row['representative'] = '';
+        $row['representative_document'] = '';
+      }
+      $who = 'Copropietario ' . $index . ($row['name'] !== '' ? ' (' . $row['name'] . ')' : '');
+      foreach (ClosingSheetForm::CO_OWNER_KEYS as $key => $property) {
+        if (!$company && in_array($key, ['representante', 'documento_representante'], true)) {
+          continue;
+        }
+        if ($row[$property] === '' && ($creating || trim((string) ($owner[$property] ?? '')) !== '')) {
+          $errors[] = $who . ': falta ' . lcfirst($labels[$key]) . '.';
+        }
+      }
+      if ($row['type'] !== '' && !in_array($row['type'], ['Natural', 'Juridica'], true)) {
+        $errors[] = $who . ': el tipo de persona no es válido.';
+      }
+      if ($row['document_type'] !== '' && !in_array($row['document_type'], array_merge($documentTypes, [(string) ($owner['document_type'] ?? '')]), true)) {
+        $errors[] = $who . ': el tipo de documento no es válido.';
+      }
+      if ($row['email'] !== '' && filter_var($row['email'], FILTER_VALIDATE_EMAIL) === false) {
+        $errors[] = $who . ': el correo no es válido.';
+      }
+      $out[$index] = $row;
+    }
+    return [$out, $errors];
   }
 
   /** @param array<string,mixed> $field @param array<string,mixed> $values */
@@ -778,6 +839,8 @@ final class ClosingSheetService
       if ($owner['owner_id'] === '') {
         $owner['owner_id'] = (string) $this->insert('jet_cct_propietarios', $sender, $nowSql, [
           'nombre' => $owner['name'], 'documento' => $owner['document'], 'correo' => $owner['email'], 'celular' => $owner['phone'],
+          'tipo_persona' => $owner['type'], 'tipo_documento' => $owner['document_type'],
+          'nombre_juridico' => $owner['representative'], 'documento_juridico' => $owner['representative_document'],
         ]);
       }
     }
@@ -856,6 +919,16 @@ final class ClosingSheetService
       $data['porcentaje_' . $i] = (string) $owner['percent'];
       if ($owner['owner_id'] !== '') {
         $data['id_propietario_nuevo_' . $i] = (string) $owner['owner_id'];
+      }
+      // Copropietarios editados en la hoja. En el mandato, nombre_N es la empresa y empresa_N / nit_N su representante.
+      if ($i > 1 && isset($values['__coowners'][$i])) {
+        $data += [
+          'nombre_' . $i => (string) $owner['name'], 'documento_' . $i => (string) $owner['document'], 'correo_' . $i => (string) $owner['email'],
+          'celular_' . $i => (string) $owner['phone'], 'tipo_' . $i => (string) $owner['type'], 'tipo_documento_' . $i => (string) $owner['document_type'],
+        ];
+        if ($owner['type'] === 'Juridica') {
+          $data += ['empresa_' . $i => (string) $owner['representative'], 'nit_' . $i => (string) $owner['representative_document']];
+        }
       }
     }
     if ($newClosingId > 0) {

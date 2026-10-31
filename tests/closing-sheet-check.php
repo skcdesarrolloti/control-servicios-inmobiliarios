@@ -133,7 +133,7 @@ $check(array_column($context['owners'], 'name') === ['Yesenis Morales', 'Inversi
 $check($v['tipo_persona_propietario'] === 'Natural' && $v['tipo_documento_propietario'] === 'Cédula de Ciudadania' && $v['tipo_persona_arrendatario'] === 'Natural' && ClosingSheetService::personType('Jurídica') === 'Juridica', 'person and document types are preloaded from the profile or the mandate');
 
 $input = $query + [
-  'id_ticket' => '10999', 'tipo_inmueble' => 'apartamento', 'gestion_inmueble' => 'Arriendo', 'destinacion_inmueble' => 'Vivienda',
+  'id_ticket' => '10999', 'tipo_inmueble' => 'apartamento', 'gestion_inmueble' => 'Venta', 'destinacion_inmueble' => 'Vivienda',
   'valor_canon' => '$ 1200000', 'valor_administracion' => '', 'incluye_iva' => 'No', 'iva_total_precio' => '50.000', 'meses_contrato' => '12 meses',
   'tasa_administracion' => '10%', 'porcentaje_incremento' => 'IPC +2', 'derechos_inmobiliarios' => '20', 'dias_gracia' => '30', 'direccion' => 'Carrera 32B #80-624 Apto 308',
   'servicios_publicos' => ['Agua', 'Energia'], 'luz' => '1484926', 'agua' => '921763', 'gas' => 'no se envía',
@@ -147,7 +147,9 @@ $input = $query + [
   'arrendatario' => 'Juan Alberto Palacio', 'documento_arrendatario' => '15242928', 'correo_arrendatario' => 'juan@example.invalid', 'celular_arrendatario' => '3166611888',
   'tiene_mascotas' => 'Si', 'mascotas' => [['tipo' => 'Perro', 'raza' => 'Pincher'], ['tipo' => '', 'raza' => '']], 'tiene_vehiculo' => 'No', 'convive_personas' => 'No',
   'num_codeudores' => 'Ninguno', 'acuerdos_precontractuales' => ['Propietario'], 'acuerdos_precontractuales_pro' => 'Pinta antes', 'acuerdos_precontractuales_arre' => 'no marcado',
-  'referido_pph' => 'No', 'porcentaje' => ['1' => '60', '2' => '40'], 'notas' => ['estado_certificado_tradicion' => 'No actualizado', 'estado_factura_predial' => "Factura\ndel garaje"],
+  'referido_pph' => 'No', 'porcentaje' => ['1' => '60', '2' => '40'],
+  'copropietario' => ['2' => ['tipo_persona' => 'Juridica', 'tipo_documento' => 'Nit', 'nombre' => 'Inversiones X SAS', 'documento' => '900.123.456-7',
+    'correo' => 'x.nuevo@example.invalid', 'celular' => '3000000099', 'representante' => 'Juan Representante', 'documento_representante' => '44444444']], 'notas' => ['estado_certificado_tradicion' => 'No actualizado', 'estado_factura_predial' => "Factura\ndel garaje"],
 ];
 foreach (ClosingSheetForm::CHECKLIST as [, $when, $items]) {
   foreach ($items as [$column]) $input[$column] = 'Cumple';
@@ -160,6 +162,11 @@ unset($missing['derechos_inmobiliarios'], $missing['estado_asegurable']);
 $message = $fails(fn() => $service->save($missing, $sender), 'Derechos inmobiliarios');
 $check(str_contains($message, 'Falta: Derechos inmobiliarios') && str_contains($message, 'Asegurable'), 'missing required fields and checklist items are listed');
 $check($fails(fn() => $service->save(['propiedad_horizontal' => 'Tal vez'] + $input, $sender), 'no es una opción válida') !== 'no falló', 'values outside the glossary are rejected');
+$coOwnerMissing = $input;
+$coOwnerMissing['copropietario']['2']['correo'] = '';
+$coOwnerMissing['copropietario']['2']['representante'] = '';
+$message = $fails(fn() => $service->save($coOwnerMissing, $sender), 'Copropietario 2');
+$check(str_contains($message, 'Copropietario 2 (Inversiones X SAS): falta correo') && str_contains($message, 'falta representante legal'), 'co-owner data is required like the main owner, with the representative of a company');
 $check((int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_cierres') === 0, 'nothing is saved when validation fails');
 
 $result = $service->save($input, $sender);
@@ -181,12 +188,14 @@ $check($closing['acuerdos_precontractuales_pro'] === 'Pinta antes' && $closing['
 $check($closing['estado_certificado_tradicion'] === 'Cumple' && $closing['ob_documentos_juridicos'] === "<p><b>Certificado de Tradición y Libertad no mayor a treinta (30) días:</b><br />No actualizado</p>\n<p><b>Copia de escritura pública:</b></p>\n<p><b>Factura del predial:</b><br />Factura<br />\ndel garaje</p>\n" && $closing['ob_servicios_publicos'] === '', 'checklist states and notes keep the JetForm format');
 $newOwner = $db->getRow("SELECT * FROM wp_jet_cct_propietarios WHERE documento = '900.123.456-7'");
 $check($closing['propietarios'] === '2' && $closing['porcentaje_1'] === '60' && $closing['porcentaje_2'] === '40' && $closing['id_propietario_2'] === (string) $newOwner['_ID'] && $closing['propietario_2'] === 'Inversiones X SAS' && $newOwner['cct_author_id'] === '1508', 'co-owners and shares are saved and the missing owner is registered');
-$check($closing['tipo_persona_propietario_2'] === 'Juridica' && $closing['representante_propietario_2'] === 'Juan Representante' && $closing['documento_representante_propietario_2'] === '44444444' && $closing['tipo_persona_propietario_3'] === '', 'each co-owner keeps person type and legal representative from the mandate');
+$check($closing['tipo_persona_propietario_2'] === 'Juridica' && $closing['representante_propietario_2'] === 'Juan Representante' && $closing['documento_representante_propietario_2'] === '44444444' && $closing['correo_propietario_2'] === 'x.nuevo@example.invalid' && $closing['tipo_persona_propietario_3'] === '', 'each co-owner is saved with the data edited in the sheet');
+$check($closing['gestion_inmueble'] === 'Arriendo', 'the management type is always Arriendo, whatever the browser sends');
 
 $mandate = $db->getRow('SELECT * FROM wp_jet_cct_contrato_mandato WHERE _ID = 636');
 $check($mandate['id_hoja_cierre'] === (string) $result['id'] && $mandate['estado_hoja_cierre'] === ClosingSheetService::STATUS_NEW, 'the mandate points to the new closing sheet');
 $check($mandate['direccion_fisica'] === 'Carrera 32B #80-624 Apto 308' && $mandate['dias_gracia'] === '30' && $mandate['copropiedad'] === 'Salvador de Bahía' && $mandate['administrador_co'] === 'Daniel Ramírez' && $mandate['correo_1'] === 'yesenis.nuevo@example.invalid' && $mandate['servicios_publicos'] === serialize(['Agua', 'Energia']), 'closing sheet changes are written to the mandate');
 $check($mandate['tipo_1'] === 'Natural' && $mandate['tipo_documento_1'] === 'Cédula de Ciudadania' && $mandate['empresa_1'] === 'no se borra', 'owner person type goes to the mandate; a hidden representative does not erase it');
+$check($mandate['correo_2'] === 'x.nuevo@example.invalid' && $mandate['celular_2'] === '3000000099' && $mandate['tipo_2'] === 'Juridica' && $mandate['tipo_documento_2'] === 'Nit' && $mandate['nombre_2'] === 'Inversiones X SAS' && $mandate['empresa_2'] === 'Juan Representante', 'co-owner data edited in the sheet goes to the mandate (company in nombre_N, representative in empresa_N)');
 $check($mandate['porcentaje_1'] === '60' && $mandate['porcentaje_2'] === '40' && $mandate['id_propietario_nuevo_2'] === (string) $newOwner['_ID'] && $mandate['precio'] === '1.200.000', 'shares, owner ids and the edited canon go to the mandate');
 $check(in_array('dias_gracia', $result['synced'], true) && !in_array('id_hoja_cierre', $result['synced'], true), 'the result lists the mandate data that changed');
 

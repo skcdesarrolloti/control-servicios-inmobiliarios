@@ -74,8 +74,8 @@ final class ClosingSheetPageView
 
       <div class="cs-step" data-cs-step="1">
         <?php foreach (ClosingSheetForm::SECTIONS as [$sectionTitle, $fields]): ?>
-          <?= $this->section($sectionTitle, $fields, $values, $options, $creating && $sectionTitle === 'Arrendatario' && isset($page['tenant']) ? $this->tenantPicker($page['tenant']) : '') ?>
-          <?php if ($sectionTitle === 'Propietario'): ?><?= $this->owners($context['owners'], $values) ?><?php endif; ?>
+          <?php if ($sectionTitle === 'Propietario'): ?><?= $this->owners($fields, $context['owners'], $values, $options) ?>
+          <?php else: ?><?= $this->section($sectionTitle, $fields, $values, $options, $creating && $sectionTitle === 'Arrendatario' && isset($page['tenant']) ? $this->tenantPicker($page['tenant']) : '') ?><?php endif; ?>
         <?php endforeach; ?>
         <div class="cs-actions">
           <button type="button" class="cs-primary" data-cs-next>Siguiente: lista de chequeo <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></button>
@@ -232,7 +232,7 @@ final class ClosingSheetPageView
     $required = !empty($field['required']) && !($this->editing && (is_array($value) ? $value === [] : trim((string) $value) === ''));
     $readonly = !empty($field['readonly']);
     $id = 'cs_' . $name;
-    $label = '<label class="cs-label" for="' . $id . '">' . $this->e($field['label']) . ($required ? ' <span class="cs-req" aria-hidden="true">*</span>' : '') . ($readonly ? ' <span class="cs-tag">del mandato</span>' : '') . (!empty($field['mandate']) ? ' <span class="cs-tag">también en el mandato</span>' : '') . '</label>';
+    $label = '<label class="cs-label" for="' . $id . '">' . $this->e($field['label']) . ($required ? ' <span class="cs-req" aria-hidden="true">*</span>' : '') . ($readonly ? ' <span class="cs-tag">' . (isset($field['fixed']) ? 'fijo' : 'del mandato') . '</span>' : '') . (!empty($field['mandate']) ? ' <span class="cs-tag">también en el mandato</span>' : '') . '</label>';
     $common = ' id="' . $id . '" name="' . $this->e($name) . '"' . ($required ? ' data-cs-required' : '') . ($readonly ? ' readonly tabindex="-1"' : '');
     $choices = $this->choices($field, $options);
     $wide = in_array($field['type'], ['textarea', 'checkbox', 'repeater'], true);
@@ -285,40 +285,46 @@ final class ClosingSheetPageView
   }
 
   /**
-   * Una tarjeta por propietario con su participación. El principal toma sus datos de la sección Propietario de la hoja
-   * (al guardar pasan al mandato); los copropietarios se muestran como están en el mandato.
-   * @param list<array<string,mixed>> $owners @param array<string,mixed> $values
+   * Sección Propietario: un bloque por persona con sus datos editables y su participación. El principal usa los campos
+   * de la hoja (propietario, documento_propietario…); cada copropietario, copropietario[N][…]. Todo pasa al mandato.
+   * @param list<array<string,mixed>> $fields @param list<array<string,mixed>> $owners @param array<string,mixed> $values @param array<string,mixed> $options
    */
-  private function owners(array $owners, array $values): string
+  private function owners(array $fields, array $owners, array $values, array $options): string
   {
-    if ($owners === []) {
-      return '';
-    }
-    $single = count($owners) === 1;
-    $cards = '';
+    $single = count($owners) <= 1;
+    $byIndex = [];
     foreach ($owners as $owner) {
-      $index = (int) $owner['index'];
-      $main = $index === 1;
-      $type = $main ? (string) ($values['tipo_persona_propietario'] ?? '') : (string) $owner['type'];
-      $company = $type === 'Juridica';
-      $details = array_filter([
-        'Tipo de persona' => $type === 'Juridica' ? 'Jurídica' : $type,
-        'Documento' => trim(($main ? (string) ($values['tipo_documento_propietario'] ?? '') : (string) $owner['document_type']) . ' ' . ($main ? (string) ($values['documento_propietario'] ?? '') : (string) $owner['document'])),
-        'Correo' => $main ? (string) ($values['correo_propietario'] ?? '') : (string) $owner['email'],
-        'Celular' => $main ? (string) ($values['celular_propietario'] ?? '') : (string) $owner['phone'],
-        'Representante legal' => $company ? trim(($main ? (string) ($values['representante_propietario'] ?? '') : (string) $owner['representative']) . ' ' . ($main ? (string) ($values['documento_representante_propietario'] ?? '') : (string) $owner['representative_document'])) : '',
-      ], static fn(string $value): bool => trim($value) !== '');
-      $name = $main ? ((string) ($values['propietario'] ?? '') ?: (string) $owner['name']) : (string) $owner['name'];
-      $cards .= '<div class="cs-person cs-owner"><h3><span class="material-symbols-outlined" aria-hidden="true">' . ($main ? 'star' : 'person') . '</span>'
-        . $this->e(($main ? 'Propietario principal' : 'Copropietario ' . $index) . ' · ' . $name) . '</h3>'
-        . '<dl class="cs-owner-data">' . implode('', array_map(fn($term, $value): string => '<div><dt>' . $this->e($term) . '</dt><dd>' . $this->e($value) . '</dd></div>', array_keys($details), $details)) . '</dl>'
-        . '<div class="cs-owner-foot"><span>' . ($owner['owner_id'] !== '' ? '<span class="cs-ok">Ficha registrada</span>' : '<span class="cs-warn">La ficha se registrará al guardar</span>')
-        . ($main ? ' · <small>Sus datos se editan en la sección Propietario.</small>' : ' · <small>Datos del contrato de mandato.</small>') . '</span>'
-        . '<label class="cs-percent"><span>Participación</span><input type="text" inputmode="decimal" class="cs-input" name="porcentaje[' . $index . ']" value="' . $this->e($owner['percent']) . '"' . ($single ? ' readonly' : '') . ' data-cs-percent aria-label="Porcentaje de ' . $this->e($name) . '"><span>%</span></label></div></div>';
+      $byIndex[(int) $owner['index']] = $owner;
     }
-    return '<fieldset class="cs-section"><legend>' . ($single ? 'Participación del propietario' : 'Propietarios y participación') . '</legend>'
-      . '<p class="cs-note">' . ($single ? 'El contrato de mandato tiene un solo propietario: le corresponde el 100 %.' : 'Propietarios del contrato de mandato. El porcentaje de cada uno define su participación (por ejemplo, en el cupo de créditos) y debe sumar 100 %. Al guardar, también se actualiza en el mandato.') . '</p>'
-      . $cards
+    $foot = function (array $owner, string $name) use ($single): string {
+      return '<div class="cs-owner-foot"><span>' . ($owner['owner_id'] !== '' ? '<span class="cs-ok">Ficha registrada</span>' : '<span class="cs-warn">La ficha se registrará al guardar</span>') . '</span>'
+        . '<label class="cs-percent"><span>Participación</span><input type="text" inputmode="decimal" class="cs-input" name="porcentaje[' . (int) $owner['index'] . ']" value="' . $this->e($owner['percent']) . '"' . ($single ? ' readonly' : '') . ' data-cs-percent aria-label="Porcentaje de ' . $this->e($name) . '"><span>%</span></label></div>';
+    };
+    $block = fn(string $title, string $icon, string $inner, string $footer): string => '<div class="cs-person cs-owner" data-cs-person="' . $this->e($title) . '"><h3><span class="material-symbols-outlined" aria-hidden="true">' . $icon . '</span>' . $this->e($title) . '</h3><div class="cs-grid">' . $inner . '</div>' . $footer . '</div>';
+
+    $inner = '';
+    foreach ($fields as $field) {
+      $inner .= $this->field(['label' => ClosingSheetForm::ownerLabel((string) $field['label']), 'help' => ''] + $field, $values, $options);
+    }
+    $main = $byIndex[1] ?? null;
+    $html = $block('Propietario principal', 'star', $inner, $main !== null ? $foot($main, (string) ($values['propietario'] ?? '')) : '');
+    foreach ($byIndex as $index => $owner) {
+      if ($index === 1) {
+        continue;
+      }
+      $ownerValues = [];
+      foreach (ClosingSheetForm::CO_OWNER_KEYS as $key => $property) {
+        $ownerValues['copropietario[' . $index . '][' . $key . ']'] = (string) ($owner[$property] ?? '');
+      }
+      $inner = '';
+      foreach (ClosingSheetForm::coOwnerFields($index) as $field) {
+        $inner .= $this->field($field, $ownerValues, $options);
+      }
+      $html .= $block('Copropietario ' . $index, 'person', $inner, $foot($owner, (string) $owner['name']));
+    }
+    return '<fieldset class="cs-section"><legend>' . ($single ? 'Propietario' : 'Propietarios') . '</legend>'
+      . '<p class="cs-note">' . ($single ? 'El contrato de mandato tiene un solo propietario: le corresponde el 100 %.' : 'Los propietarios del contrato de mandato, cada uno con sus datos y su participación. La participación define, por ejemplo, el cupo de créditos de cada uno y debe sumar 100 %. Al guardar, todo se actualiza también en el mandato.') . '</p>'
+      . $html
       . ($single ? '' : '<div class="cs-percent-bar"><span data-cs-percent-sum></span><button type="button" class="cs-secondary" data-cs-split>Repartir en partes iguales</button></div>')
       . '</fieldset>';
   }
