@@ -38,6 +38,7 @@ contrato de arrendamiento, y que los créditos a propietarios respeten ese %:
 | **Fase 5:** al crear el contrato desde «No asignado», `LeaseContractCreationService::coOwners()` copia `propietarios`, `id_propietario_2..6` y `porcentaje_1..6` del mandato (o de la hoja si el mandato no los tiene). Solo escribe lo que tiene valor. El formulario muestra el bloque «Copropietarios» de solo lectura con avisos: no suman 100, falta %, la hoja no coincide con el mandato, un dueño vacío o sin ficha. Los avisos nunca bloquean y se repiten en el resultado. Un copropietario sin id se busca en Propietarios por documento; si no tiene ficha, queda el aviso (se registra desde el mandato o la hoja). | `src/Modules/LeaseContracts/LeaseContractCreationService.php`, `LeaseContractCreateView.php`, `tests/lease-contract-creation-check.php` | ver `git log` |
 | **Fase 3 (código):** `bin/sync-co-owners.php` (`CoOwnersBackfill`). Hace tres cosas: (1) vincula por documento o registra en Propietarios a los dueños 2..N de los mandatos con más de un propietario y llena `id_propietario_nuevo_N`; (2) completa en los contratos solo las columnas vacías desde el mandato y lista como conflicto los valores distintos; (3) lista los contratos con copropietarios sin % válido. Repetirlo no cambia nada. **Falta correrlo en el servidor**: primero `php bin/sync-co-owners.php` (solo muestra), revisar conflictos y luego `--aplicar --funcionario=<id_empleado>`. | `src/Modules/LeaseContracts/CoOwnersBackfill.php`, `bin/sync-co-owners.php`, `tests/co-owners-backfill-check.php` | ver `git log` |
 | **Fase 6:** cálculo de créditos según el %. Puntos principales: (1) `OwnerCreditCalculator::evaluate` recibe `share`: el tope sale del ingreso atribuible y `net_income` se muestra al 100 %; (2) `ownerPortfolio` (`net_income` atribuible, `net_total` al 100 %, `share`), la cobertura y las fuentes de descuento usan solo la parte de la persona; (3) reparaciones (`OwnerCreditService::isRepair`/`mode`, `OwnerCreditSettings::REPAIR_PURPOSE`) usa el contrato del inmueble al 100 %, sin otros contratos, y su plazo sale solo de ese contrato (cotización, solicitud y simulación); (4) las reparaciones vigentes pesan sobre cada copropietario por su %, y una reparación compromete lo que ya se descuenta de su contrato (`personObligations`, `contractObligations`); (5) `requestPreapproval()` da el cupo personal y, por contrato, el de reparaciones, y el JS muestra el que toca según la destinación; (6) `contractsByOwnerDocument` encuentra copropietarios por `id_propietario_2..6` y por documento normalizado; (7) política «Porcentaje de participación registrado», tiles «Participación» e «Ingreso atribuible» y el PDF interno; (8) al decidir se congelan modo, % y copropietarios en `evaluation_json["share"]`: los decididos antes quedan `historico` al 100 %, y una reparación histórica no se reparte. | `src/Modules/OwnerCredits/*`, `public/assets/js/admin-owner-credits.js`, `tests/owner-credit-co-owners-check.php`, `tests/owner-credit-flow-check.php` | ver `git log` |
+| **Fase 8 (puntos 1–4):** (1) la cotización que aprueba el propietario también llega, por correo y WhatsApp, a cada copropietario (`ContractCoOwnerContacts::forContract`), sin repetir a quien ya es el destinatario; (2) la búsqueda del solicitante (`RequesterLookupConcern`, `PanelTicketCreationConcern`) encuentra contratos por `id_propietario_2..6` y por `documento_2..6` del mandato; (3) Notificaciones administrativas incluye a los copropietarios (`contract_co_actor_columns`) en filtros, resumen e importación; (4) «+N copropietarios» en el listado y la documentación del contrato. | `src/App/Concerns/HandlesMaintenanceActions.php`, `src/Modules/PublicTickets/Concerns/*`, `AdministrativeNotificationsService.php`, `LeaseContractsView.php`, `tests/co-owners-modules-check.php` | ver `git log` |
 
 ## Fases pendientes (orden recomendado)
 
@@ -53,14 +54,17 @@ contrato de arrendamiento, y que los créditos a propietarios respeten ese %:
 - **Antes de cerrar esta fase:** jurídica debe confirmar que el texto del pagaré («obligaciones que adquiera») respalda
   obligaciones solidarias de reparaciones.
 
-### 5. Fase 8: otros módulos (por prioridad)
+### 5. Fase 8: lo que queda
 
-1. `HandlesMaintenanceActions::maintenance_quote_owner_contact`: la cotización de reparaciones a todos los
-   copropietarios.
-2. `RequesterLookupConcern` y `PanelTicketCreationConcern`: buscar también por `id_propietario_2..6`.
-3. `AdministrativeNotificationsService` (`contract_actor_column`): incluir a los copropietarios.
-4. Vistas del contrato: mostrar «+N copropietarios».
-5. Aumento de canon, anexos, terminación y cartera siguen avisando solo al propietario 1. Queda como decisión de negocio.
+- Aumento de canon, anexos, terminación y cartera siguen avisando solo al propietario 1. Queda como decisión de negocio.
+- Por confirmar:
+  - los copropietarios reciben el mismo enlace firmado de la cotización, así que cualquiera puede responderla;
+  - si el destinatario es «Inmobiliaria», no se envía a los copropietarios.
+- Falta hacer:
+  - el filtro «Propietario» del listado de contratos todavía no encuentra a un copropietario por nombre;
+  - «+N copropietarios» solo aparece en las vistas de contratos de arrendamiento, no en casos ni revisiones.
+- Ya pasaba antes: `findOwnerProfilesByDocument` compara el documento sin normalizar, así que «111111» no encuentra una
+  ficha guardada como «111.111».
 
 ## Verificación por fase
 

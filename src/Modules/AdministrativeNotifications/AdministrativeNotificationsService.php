@@ -42,6 +42,8 @@ final class AdministrativeNotificationsService
       'role' => 'Propietario',
       'table' => $this->db->table('jet_cct_propietarios'),
       'contract_actor_column' => 'id_propietario',
+      // Copropietarios del contrato: también son propietarios de ese contrato.
+      'contract_co_actor_columns' => ['id_propietario_2', 'id_propietario_3', 'id_propietario_4', 'id_propietario_5', 'id_propietario_6'],
       'name' => ['nombre', 'nombre_juridico', 'titular'],
       'email' => ['correo', 'correo_cuenta'],
       'phone' => ['celular', 'telefono', 'contacto'],
@@ -2802,11 +2804,15 @@ final class AdministrativeNotificationsService
     $contractsByMeta = $this->importContractsByMeta($config, $metas, $this->effectiveContractStatus($config, ''));
     $actorIds = [];
     $contractActorColumn = (string) ($config['contract_actor_column'] ?? '');
+    // Cada columna es un puesto del contrato: el propietario y, si los hay, sus copropietarios.
+    $actorColumns = array_merge([$contractActorColumn], $this->contractCoActorColumns($config));
     foreach ($contractsByMeta as $contracts) {
       foreach ($contracts as $contract) {
-        $actorId = (int) preg_replace('/\D+/', '', (string) ($contract[$contractActorColumn] ?? ''));
-        if ($actorId > 0) {
-          $actorIds[$actorId] = $actorId;
+        foreach ($actorColumns as $column) {
+          $actorId = (int) preg_replace('/\D+/', '', (string) ($contract[$column] ?? ''));
+          if ($actorId > 0) {
+            $actorIds[$actorId] = $actorId;
+          }
         }
       }
     }
@@ -2830,30 +2836,38 @@ final class AdministrativeNotificationsService
       }
 
       $candidates = [];
+      // Destinatarios por puesto (contrato + columna): dos fichas en el mismo puesto es una coincidencia múltiple; el
+      // propietario y sus copropietarios son puestos distintos y se marcan todos.
+      $slots = [];
       foreach ($contracts as $contract) {
         $contractId = (int) ($contract['_ID'] ?? 0);
-        $actorId = (int) preg_replace('/\D+/', '', (string) ($contract[$contractActorColumn] ?? ''));
-        if ($actorId <= 0 || empty($recipientsByActor[$actorId])) {
-          continue;
-        }
-        foreach ($recipientsByActor[$actorId] as $recipient) {
-          $id = (int) ($recipient['_ID'] ?? 0);
-          if ($id <= 0) {
+        foreach ($actorColumns as $column) {
+          $actorId = (int) preg_replace('/\D+/', '', (string) ($contract[$column] ?? ''));
+          if ($actorId <= 0 || empty($recipientsByActor[$actorId])) {
             continue;
           }
-          if ($document !== '' && !$this->recipientMatchesImportDocument($recipient, $document)) {
-            continue;
+          foreach ($recipientsByActor[$actorId] as $recipient) {
+            $id = (int) ($recipient['_ID'] ?? 0);
+            if ($id <= 0) {
+              continue;
+            }
+            if ($document !== '' && !$this->recipientMatchesImportDocument($recipient, $document)) {
+              continue;
+            }
+            if (!isset($candidates[$id])) {
+              $candidates[$id] = [
+                'recipient' => $recipient,
+                'contracts' => [],
+              ];
+            }
+            $candidateKey = $contractId > 0 ? $contractId : count($candidates[$id]['contracts']) + 1;
+            $candidates[$id]['contracts'][$candidateKey] = $contract;
+            $slots[$contractId . ':' . $column][$id] = true;
           }
-          if (!isset($candidates[$id])) {
-            $candidates[$id] = [
-              'recipient' => $recipient,
-              'contracts' => [],
-            ];
-          }
-          $candidateKey = $contractId > 0 ? $contractId : count($candidates[$id]['contracts']) + 1;
-          $candidates[$id]['contracts'][$candidateKey] = $contract;
         }
       }
+      $sharedSlot = array_filter($slots, static fn(array $ids): bool => count($ids) > 1) !== [];
+      $severalRecipients = count($candidates) > 1 && (count($contracts) > 1 || $sharedSlot);
       if ($candidates === []) {
         $unmatched++;
         $reportRows[] = $this->importReportRow($index, $meta, null, 'Contrato encontrado sin destinatario', 'No', 'El contrato existe, pero no se encontro el actor en esta pestana.');
@@ -2872,7 +2886,7 @@ final class AdministrativeNotificationsService
         }
         continue;
       }
-      if (count($candidates) > 1) {
+      if ($severalRecipients) {
         $ambiguous++;
         foreach ($candidates as $candidate) {
           $recipient = is_array($candidate['recipient'] ?? null) ? $candidate['recipient'] : null;
@@ -2886,27 +2900,26 @@ final class AdministrativeNotificationsService
         continue;
       }
 
-      $candidate = reset($candidates);
-      $recipient = is_array($candidate['recipient'] ?? null) ? $candidate['recipient'] : null;
-      if ($recipient === null) {
-        $unmatched++;
-        $reportRows[] = $this->importReportRow($index, $meta, null, 'Contrato encontrado sin destinatario', 'No', 'El contrato existe, pero no se encontro el actor en esta pestana.');
-        continue;
+      foreach ($candidates as $candidate) {
+        $recipient = is_array($candidate['recipient'] ?? null) ? $candidate['recipient'] : null;
+        if ($recipient === null) {
+          continue;
+        }
+        $id = (int) ($recipient['_ID'] ?? 0);
+        $contractInfo = $this->contractInfoFromRows(array_values((array) ($candidate['contracts'] ?? [])));
+        $recipient['contrato_arrendamiento_estado'] = $contractInfo['label'];
+        $recipient['contratos_arrendamiento_resumen'] = $contractInfo['summary'];
+        if (isset($seen[$id])) {
+          $duplicates++;
+          $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Duplicado omitido', 'No', 'Ya habia sido marcado por otra fila del Excel.');
+          continue;
+        }
+        $seen[$id] = true;
+        $recipient['_scm_import_meta'] = $meta;
+        $outRows[] = $recipient;
+        $payload[(string) $id] = $meta;
+        $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Encontrado', 'Si', count($candidates) > 1 ? 'Marcado automaticamente con los demas propietarios del contrato.' : 'Marcado automaticamente en la pagina.');
       }
-      $id = (int) ($recipient['_ID'] ?? 0);
-      $contractInfo = $this->contractInfoFromRows(array_values((array) ($candidate['contracts'] ?? [])));
-      $recipient['contrato_arrendamiento_estado'] = $contractInfo['label'];
-      $recipient['contratos_arrendamiento_resumen'] = $contractInfo['summary'];
-      if (isset($seen[$id])) {
-        $duplicates++;
-        $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Duplicado omitido', 'No', 'Ya habia sido marcado por otra fila del Excel.');
-        continue;
-      }
-      $seen[$id] = true;
-      $recipient['_scm_import_meta'] = $meta;
-      $outRows[] = $recipient;
-      $payload[(string) $id] = $meta;
-      $reportRows[] = $this->importReportRow($index, $meta, $recipient, 'Encontrado', 'Si', 'Marcado automaticamente en la pagina.');
     }
 
     return [
@@ -2956,7 +2969,7 @@ final class AdministrativeNotificationsService
       }
     }
 
-    $selectColumns = array_values(array_unique(array_merge(['_ID', $contractActorColumn, 'estado'], $contractColumns, $propertyColumns)));
+    $selectColumns = array_values(array_unique(array_merge(['_ID', $contractActorColumn, 'estado'], $this->contractCoActorColumns($config), $contractColumns, $propertyColumns)));
     $select = array_map(static fn(string $column): string => "`{$column}`", $selectColumns);
     $matched = [];
     $queries = [
@@ -4901,8 +4914,10 @@ final class AdministrativeNotificationsService
     ), static fn(int $id): bool => $id > 0)));
     if ($contractActorColumn !== '' && $this->schema->columnExists($contractTable, $contractActorColumn) && $ids !== []) {
       $placeholders = implode(',', array_fill(0, count($ids), '?'));
-      $parts[] = "CAST(`{$contractActorColumn}` AS UNSIGNED) IN ({$placeholders})";
-      array_push($args, ...$ids);
+      foreach (array_merge([$contractActorColumn], $this->contractCoActorColumns($config)) as $column) {
+        $parts[] = "CAST(`{$column}` AS UNSIGNED) IN ({$placeholders})";
+        array_push($args, ...$ids);
+      }
     }
 
     foreach ((array) ($config['contract_match_columns'] ?? []) as $actorColumn => $contractColumn) {
@@ -4963,6 +4978,20 @@ final class AdministrativeNotificationsService
     return $summary;
   }
 
+  /**
+   * Columnas extra del contrato que también apuntan al actor (copropietarios `id_propietario_2..6`), solo las que existen.
+   * @param array<string,mixed> $config
+   * @return string[]
+   */
+  private function contractCoActorColumns(array $config): array
+  {
+    $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
+    return array_values(array_filter(
+      array_map('strval', (array) ($config['contract_co_actor_columns'] ?? [])),
+      fn(string $column): bool => $column !== '' && $this->schema->columnExists($contractTable, $column)
+    ));
+  }
+
   /** @param array<string,mixed> $config */
   private function contractActorComparisonSql(string $actorTable, string $contractActorColumn, array $config = []): string
   {
@@ -4970,11 +4999,12 @@ final class AdministrativeNotificationsService
     // actor with a contract: CAST('' AS UNSIGNED) is 0 and placeholders repeat.
     $idMatch = static fn(string $contractExpr, string $actorExpr): string => "(CAST({$contractExpr} AS UNSIGNED) > 0 AND CAST({$contractExpr} AS UNSIGNED) = CAST({$actorExpr} AS UNSIGNED))";
     $placeholders = "('" . implode("','", self::PLACEHOLDER_VALUES) . "')";
-    $parts = [
-      $idMatch("ca.`{$contractActorColumn}`", "`{$actorTable}`.`_ID`"),
-    ];
-    if ($this->schema->columnExists($actorTable, $contractActorColumn)) {
-      $parts[] = $idMatch("ca.`{$contractActorColumn}`", "`{$actorTable}`.`{$contractActorColumn}`");
+    $parts = [];
+    foreach (array_merge([$contractActorColumn], $this->contractCoActorColumns($config)) as $column) {
+      $parts[] = $idMatch("ca.`{$column}`", "`{$actorTable}`.`_ID`");
+      if ($this->schema->columnExists($actorTable, $contractActorColumn)) {
+        $parts[] = $idMatch("ca.`{$column}`", "`{$actorTable}`.`{$contractActorColumn}`");
+      }
     }
     foreach ((array) ($config['contract_match_columns'] ?? []) as $actorColumn => $contractColumn) {
       $actorColumn = trim((string) $actorColumn);

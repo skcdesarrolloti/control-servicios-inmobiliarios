@@ -114,7 +114,8 @@ final class LeaseContractsView
       $html .= '<tr class="!sp-bg-white hover:!sp-bg-slate-50 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100">';
       $html .= '<td class="' . $td . ' !sp-whitespace-nowrap"><span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200 !sp-text-amber-900 !sp-font-bold">#' . esc_html($code) . '</span>' . $this->stateBadge($v('estado', 'Sin estado')) . '</td>';
       $html .= '<td class="' . $td . ' !sp-max-w-[240px]"><span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-bg-emerald-50 !sp-border !sp-border-solid !sp-border-emerald-200 !sp-text-emerald-700 !sp-font-semibold">SIMI ' . esc_html($v('inmueble')) . '</span><small class="' . $muted . '">Código web ' . esc_html($v('id_inmueble')) . '</small><p class="!sp-m-0 !sp-mt-1.5 !sp-leading-relaxed !sp-font-medium">' . esc_html($v('direccion')) . '</p></td>';
-      $html .= '<td class="' . $td . ' !sp-max-w-[200px]"><strong class="!sp-block !sp-leading-relaxed">' . esc_html($v('propietario')) . '</strong><small class="' . $muted . '">' . esc_html($v('celular_propietario', '')) . '</small></td>';
+      $coOwners = self::coOwnersLabel($row);
+      $html .= '<td class="' . $td . ' !sp-max-w-[200px]"><strong class="!sp-block !sp-leading-relaxed">' . esc_html($v('propietario')) . '</strong><small class="' . $muted . '">' . esc_html($v('celular_propietario', '')) . '</small>' . ($coOwners !== '' ? '<small class="' . $muted . ' !sp-font-semibold">' . esc_html($coOwners) . '</small>' : '') . '</td>';
       $html .= '<td class="' . $td . ' !sp-max-w-[200px]"><strong class="!sp-block !sp-leading-relaxed">' . esc_html($v('arrendatario')) . '</strong><small class="' . $muted . '">' . esc_html($v('celular_arrendatario', '')) . '</small>' . ($codebtors > 0 ? '<small class="' . $muted . '">' . $codebtors . ' codeudor(es)</small>' : '') . '</td>';
       $html .= '<td class="' . $td . ' !sp-whitespace-nowrap"><span class="!sp-block">' . esc_html($this->date($row['inicio_contrato'] ?? null)) . '</span><small class="' . $muted . '">hasta ' . esc_html($this->date($row['fin_contrato'] ?? null)) . '</small></td>';
       $html .= '<td class="' . $td . ' !sp-whitespace-nowrap">' . ($sent
@@ -203,7 +204,8 @@ final class LeaseContractsView
     $html .= '<div class="' . $ui::CARD . ' !sp-p-5 !sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-3"><div><p class="!sp-m-0 !sp-text-sm !sp-font-bold">Contrato de arrendamiento #' . esc_html($v('contrato', $v('_ID'))) . '</p><p class="!sp-m-0 !sp-mt-1 !sp-text-[10px] !sp-text-service-muted">Código inmueble web: ' . esc_html($v('id_inmueble', '-')) . ' · Inmueble SIMI: ' . esc_html($v('inmueble', '-')) . ' · ' . esc_html($v('direccion', '-')) . '</p></div>' . $this->stateBadge($v('estado', 'Sin estado')) . '</div>';
 
     $html .= '<div class="!sp-grid !sp-grid-cols-1 md:!sp-grid-cols-2 !sp-gap-4">';
-    $html .= $this->party('Propietario', 'Titular', $v('propietario'), $v('documento_propietario'), $v('correo_propietario'), $v('celular_propietario'));
+    $coOwners = self::coOwnersLabel($c);
+    $html .= $this->party('Propietario', $coOwners !== '' ? 'Titular · ' . $coOwners : 'Titular', $v('propietario'), $v('documento_propietario'), $v('correo_propietario'), $v('celular_propietario'));
     $html .= $this->party('Arrendatario', 'Activo', $v('arrendatario'), $v('documento_arrendatario'), $v('correo_arrendatario'), $v('celular_arrendatario'));
     for ($i = 1; $i <= 4; $i++) {
       if ($v('codeudor_' . $i) !== '') {
@@ -544,6 +546,13 @@ final class LeaseContractsView
       ? ($feminine ? 'La ' : 'El ') . $noun . ' #' . $record['id'] . ' registrad' . ($feminine ? 'a' : 'o') . ' en el contrato no existe.'
       : 'Este contrato no tiene ' . $noun . ' registrad' . ($feminine ? 'a' : 'o') . '.';
     return '<div>' . $head . '<div class="!sp-flex !sp-items-center !sp-gap-1.5 !sp-min-h-10 !sp-px-3 !sp-py-2 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-rose-200 !sp-bg-rose-50 !sp-text-[11px] !sp-font-semibold !sp-text-rose-700" role="status">' . $ui::icon('alert', '!sp-w-3.5 !sp-h-3.5') . esc_html($message) . '</div></div>';
+  }
+
+  /** "+2 copropietarios" cuando el contrato registra más de un propietario (columna `propietarios`); si no, vacío. */
+  public static function coOwnersLabel(array $contract): string
+  {
+    $extra = min(ContractCoOwners::MAX, (int) ($contract['propietarios'] ?? 0)) - 1;
+    return $extra > 0 ? '+' . $extra . ' copropietario' . ($extra === 1 ? '' : 's') : '';
   }
 
   private function party(string $role, string $badge, string $name, string $document, string $email, string $phone): string

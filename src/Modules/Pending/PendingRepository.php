@@ -404,6 +404,7 @@ final class PendingRepository
       'fecha_preventiva',
       'se_envio',
       'num_codeudores',
+      'propietarios',
       'propiedad_horizontal',
       'acta_notificacion_arrendatario',
       'acta_administracion',

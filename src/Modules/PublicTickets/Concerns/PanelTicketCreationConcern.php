@@ -58,9 +58,17 @@ trait PanelTicketCreationConcern
       $personTable = $this->db->table('jet_cct_' . ($by === 'propietario' ? 'propietarios' : 'arrendatarios'));
       $personId = 'id_' . $by;
       if ($this->schema->columnExists($table, $personId) && $this->schema->tableExists($personTable)) {
+        // Propietario: también los copropietarios registrados en el contrato (id_propietario_2..6).
+        $contractColumns = [$personId];
+        if ($by === 'propietario') {
+          for ($i = 2; $i <= 6; $i++) {
+            if ($this->schema->columnExists($table, 'id_propietario_' . $i)) $contractColumns[] = 'id_propietario_' . $i;
+          }
+        }
         $identities = [];
         foreach (['_ID', $personId] as $column) {
-          if ($this->schema->columnExists($personTable, $column)) $identities[] = "CAST(p.`{$column}` AS CHAR) = `{$table}`.`{$personId}`";
+          if (!$this->schema->columnExists($personTable, $column)) continue;
+          foreach ($contractColumns as $contractColumn) $identities[] = "CAST(p.`{$column}` AS CHAR) = `{$table}`.`{$contractColumn}`";
         }
         $documents = [];
         foreach (['documento', 'documento_juridico'] as $column) {
@@ -116,17 +124,23 @@ trait PanelTicketCreationConcern
     };
     $mandateColumns = [];
     for ($i = 1; $i <= 6; $i++) array_push($mandateColumns, 'documento_' . $i, 'nit_' . $i);
+    // Las fichas de propietario también cuentan para los copropietarios del contrato (id_propietario_2..6).
+    $ownerColumns = ['id_propietario'];
+    for ($i = 2; $i <= 6; $i++) $ownerColumns[] = 'id_propietario_' . $i;
     $links = [
-      'id_propietario' => [$this->db->table('jet_cct_propietarios'), ['documento', 'documento_juridico'], ['_ID', 'id_propietario']],
-      'id_arrendatario' => [$this->db->table('jet_cct_arrendatarios'), ['documento', 'documento_juridico'], ['_ID', 'id_arrendatario']],
-      'id_contrato_mandato' => [$this->db->table('jet_cct_contrato_mandato'), $mandateColumns, ['_ID']],
+      [$ownerColumns, $this->db->table('jet_cct_propietarios'), ['documento', 'documento_juridico'], ['_ID', 'id_propietario']],
+      [['id_arrendatario'], $this->db->table('jet_cct_arrendatarios'), ['documento', 'documento_juridico'], ['_ID', 'id_arrendatario']],
+      [['id_contrato_mandato'], $this->db->table('jet_cct_contrato_mandato'), $mandateColumns, ['_ID']],
     ];
-    foreach ($links as $column => [$source, $documentColumns, $idColumns]) {
-      if (!$this->schema->columnExists($table, $column) || !$this->schema->tableExists($source)) continue;
+    foreach ($links as [$columns, $source, $documentColumns, $idColumns]) {
+      $columns = array_values(array_filter($columns, fn(string $column): bool => $this->schema->columnExists($table, $column)));
+      if ($columns === [] || !$this->schema->tableExists($source)) continue;
       $ids = $matchingIds($source, $documentColumns, $idColumns);
       if ($ids === []) continue;
-      $where[] = "`{$column}` IN (" . implode(',', array_fill(0, count($ids), '?')) . ')';
-      array_push($args, ...array_map('strval', $ids));
+      foreach ($columns as $column) {
+        $where[] = "`{$column}` IN (" . implode(',', array_fill(0, count($ids), '?')) . ')';
+        array_push($args, ...array_map('strval', $ids));
+      }
     }
     if ($where === []) return [];
     $select = ['_ID'];

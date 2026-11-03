@@ -19,16 +19,90 @@ trait RequesterLookupConcern
       return [];
     }
 
-    $ownerIds = $this->findOwnerIdsByDocument($lookupValue, $docKey);
+    $profiles = $this->findOwnerProfilesByDocument($lookupValue, $docKey);
+    $ownerIds = $this->ownerIdsFromProfiles($profiles);
+    $mandateOwners = null;
     $rows = [];
     foreach ($this->getContractsCatalog() as $contract) {
       $contractDoc = $this->normalizeAlphaNum((string) ($contract['documento_propietario'] ?? ''));
       $contractOwnerId = trim((string) ($contract['id_propietario'] ?? ''));
       if ($contractDoc === $docKey || isset($ownerIds[$contractOwnerId])) {
         $rows[] = $this->formatContractLookupRow($contract, 'propietario');
+        continue;
+      }
+      // Copropietario: por su ficha en id_propietario_2..6 o por su documento en el mandato.
+      $mandateOwners ??= $this->findMandateOwnersByDocument($docKey);
+      $coOwner = $this->coOwnerContactForContract($contract, $profiles, $mandateOwners);
+      if ($coOwner !== null) {
+        $rows[] = $this->formatContractLookupRow($contract, 'propietario', $coOwner);
       }
     }
     return $rows;
+  }
+
+  /**
+   * Datos de contacto de la persona buscada si es copropietaria del contrato (no el propietario principal).
+   * @param array<string,array<string,mixed>> $profiles fichas que coinciden con el documento, por _ID
+   * @param array<string,array{name:string,email:string,phone:string,indicativo:string,actor_id:string}> $mandateOwners por id de mandato
+   * @return array{name:string,email:string,phone:string,indicativo:string,actor_id:string}|null
+   */
+  private function coOwnerContactForContract(array $contract, array $profiles, array $mandateOwners): ?array
+  {
+    for ($i = 2; $i <= \SCM\Modules\LeaseContracts\ContractCoOwners::MAX; $i++) {
+      $id = trim((string) ($contract['id_propietario_' . $i] ?? ''));
+      if ($id !== '' && isset($profiles[$id])) {
+        $profile = $profiles[$id];
+        return [
+          'name' => trim((string) ($profile['nombre'] ?? '')) ?: trim((string) ($profile['nombre_juridico'] ?? '')),
+          'email' => trim((string) ($profile['correo'] ?? '')),
+          'phone' => trim((string) ($profile['celular'] ?? '')),
+          'indicativo' => $this->normalizeIndicativo((string) ($profile['indicativo'] ?? '+57')),
+          'actor_id' => $id,
+        ];
+      }
+    }
+    $mandateId = trim((string) ($contract['id_contrato_mandato'] ?? ''));
+    return $mandateId !== '' ? ($mandateOwners[$mandateId] ?? null) : null;
+  }
+
+  /**
+   * Propietarios 2..6 de los mandatos cuyo documento_N es el buscado, por id de mandato.
+   * @return array<string,array{name:string,email:string,phone:string,indicativo:string,actor_id:string}>
+   */
+  private function findMandateOwnersByDocument(string $docKey): array
+  {
+    $table = $this->db->table('jet_cct_contrato_mandato');
+    if (strlen($docKey) < 4 || !$this->schema->tableExists($table)) {
+      return [];
+    }
+    $indexes = array_values(array_filter(range(2, \SCM\Modules\LeaseContracts\ContractCoOwners::MAX), fn(int $i): bool => $this->schema->columnExists($table, 'documento_' . $i)));
+    if ($indexes === []) {
+      return [];
+    }
+    $like = '%' . $this->db->escapeLike($docKey) . '%';
+    $clean = static fn(int $i): string => "LOWER(REPLACE(REPLACE(REPLACE(COALESCE(`documento_{$i}`, ''), '.', ''), ' ', ''), '-', '')) LIKE ?";
+    $rows = $this->db->getResults(
+      "SELECT * FROM `{$table}` WHERE " . implode(' OR ', array_map($clean, $indexes)) . ' LIMIT 100',
+      array_fill(0, count($indexes), $like)
+    );
+    $out = [];
+    foreach ($rows as $row) {
+      $count = (int) ($row['propietarios'] ?? 0);
+      foreach ($indexes as $i) {
+        if (($count > 0 && $i > $count) || $this->normalizeAlphaNum((string) ($row['documento_' . $i] ?? '')) !== $docKey) {
+          continue;
+        }
+        $out[trim((string) $row['_ID'])] = [
+          'name' => trim((string) ($row['nombre_' . $i] ?? '')),
+          'email' => trim((string) ($row['correo_' . $i] ?? '')),
+          'phone' => trim((string) ($row['celular_' . $i] ?? '')),
+          'indicativo' => $this->normalizeIndicativo((string) ($row['indicativo_' . $i] ?? '+57')),
+          'actor_id' => trim((string) ($row['id_propietario_nuevo_' . $i] ?? '')),
+        ];
+        break;
+      }
+    }
+    return $out;
   }
 
   /** @return array<int,array<string,mixed>> */
@@ -146,13 +220,22 @@ trait RequesterLookupConcern
   /** @return array<string,bool> */
   private function findOwnerIdsByDocument(string $rawLookup, string $docKey): array
   {
+    return $this->ownerIdsFromProfiles($this->findOwnerProfilesByDocument($rawLookup, $docKey));
+  }
+
+  /**
+   * Fichas de propietario con ese documento, indexadas por `_ID` y por `id_propietario`.
+   * @return array<string,array<string,mixed>>
+   */
+  private function findOwnerProfilesByDocument(string $rawLookup, string $docKey): array
+  {
     $table = $this->db->table('jet_cct_propietarios');
     if (!$this->schema->tableExists($table)) {
       return [];
     }
     $like = '%' . $this->db->escapeLike(trim($rawLookup)) . '%';
     $rows = $this->db->getResults(
-      "SELECT `_ID`, `id_propietario`, `documento`, `documento_juridico`
+      "SELECT *
          FROM `{$table}`
         WHERE TRIM(COALESCE(`documento`, '')) LIKE ?
            OR TRIM(COALESCE(`documento_juridico`, '')) LIKE ?
@@ -161,7 +244,7 @@ trait RequesterLookupConcern
       [$like, $like, $like]
     );
 
-    $ids = [];
+    $profiles = [];
     foreach ($rows as $row) {
       $keys = [
         $this->normalizeAlphaNum((string) ($row['documento'] ?? '')),
@@ -171,16 +254,19 @@ trait RequesterLookupConcern
       if (!in_array($docKey, $keys, true)) {
         continue;
       }
-      $idA = trim((string) ($row['_ID'] ?? ''));
-      $idB = trim((string) ($row['id_propietario'] ?? ''));
-      if ($idA !== '') {
-        $ids[$idA] = true;
-      }
-      if ($idB !== '') {
-        $ids[$idB] = true;
+      foreach ([trim((string) ($row['_ID'] ?? '')), trim((string) ($row['id_propietario'] ?? ''))] as $id) {
+        if ($id !== '') {
+          $profiles[$id] ??= $row;
+        }
       }
     }
-    return $ids;
+    return $profiles;
+  }
+
+  /** @param array<string,array<string,mixed>> $profiles @return array<string,bool> */
+  private function ownerIdsFromProfiles(array $profiles): array
+  {
+    return array_fill_keys(array_map('strval', array_keys($profiles)), true);
   }
 
   /** @return array<string,bool> */
@@ -486,8 +572,11 @@ trait RequesterLookupConcern
     ];
   }
 
-  /** @return array<string,mixed> */
-  private function formatContractLookupRow(array $contract, string $actor): array
+  /**
+   * @param array{name:string,email:string,phone:string,indicativo:string,actor_id:string}|null $coOwner contacto si quien busca es copropietario
+   * @return array<string,mixed>
+   */
+  private function formatContractLookupRow(array $contract, string $actor, ?array $coOwner = null): array
   {
     $contactName = '';
     $contactEmail = '';
@@ -495,7 +584,13 @@ trait RequesterLookupConcern
     $contactIndicativo = '+57';
     $actorId = '';
 
-    if ($actor === 'propietario') {
+    if ($actor === 'propietario' && $coOwner !== null) {
+      $contactName = $coOwner['name'];
+      $contactEmail = $coOwner['email'];
+      $contactPhone = $coOwner['phone'];
+      $contactIndicativo = $coOwner['indicativo'];
+      $actorId = $coOwner['actor_id'];
+    } elseif ($actor === 'propietario') {
       $contactName = trim((string) ($contract['propietario'] ?? ''));
       $contactEmail = trim((string) ($contract['correo_propietario'] ?? ''));
       $contactPhone = trim((string) ($contract['celular_propietario'] ?? ''));
@@ -557,9 +652,12 @@ trait RequesterLookupConcern
       if ($contractDoc !== '' && $contractDoc === $docKey) {
         return true;
       }
-      $ownerIds = $this->findOwnerIdsByDocument($lookupValue, $docKey);
+      $profiles = $this->findOwnerProfilesByDocument($lookupValue, $docKey);
       $ownerId = trim((string) ($contract['id_propietario'] ?? ''));
-      return $ownerId !== '' && isset($ownerIds[$ownerId]);
+      if ($ownerId !== '' && isset($profiles[$ownerId])) {
+        return true;
+      }
+      return $this->coOwnerContactForContract($contract, $profiles, $this->findMandateOwnersByDocument($docKey)) !== null;
     }
 
     if ($actor === 'arrendatario') {
