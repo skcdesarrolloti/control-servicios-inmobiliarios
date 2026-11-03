@@ -92,6 +92,74 @@ final class DeliveryReviewForm
   /** Espacios que se agregan con una fila al crear (los demás se agregan si el inmueble los tiene). */
   public const DEFAULT_SPACES = ['fachada', 'sala_comedor_hall', 'cocina', 'area_labores'];
 
+  public const MAX_FLOORS = 10;
+  public const SERVICE_TYPE = 'De servicio';
+
+  /** Habitación y baño de servicio se eligen como tipo dentro de habitaciones y baños; se guardan en sus columnas. */
+  public const MERGED = ['habitacion' => 'hab_ser', 'bano' => 'bano_ser'];
+
+  /** Piso de cada habitación o baño dentro de la fila del repeater. */
+  public const FLOOR_KEYS = ['habitacion' => 'piso_habitacion', 'bano' => 'piso_bano', 'hab_ser' => 'piso_hab_servicio', 'bano_ser' => 'piso_bano_servicio'];
+
+  /** @return list<string> */
+  public static function typeOptions(string $space): array
+  {
+    return $space === 'bano'
+      ? ['Principal', 'Social', 'Privado', 'Auxiliar', self::SERVICE_TYPE]
+      : ['Principal', 'Secundaria', 'Estudio', self::SERVICE_TYPE];
+  }
+
+  /** Tipo escrito a mano en el formulario de WordPress ("#1 o Principal", "#2 o Social o Compartido") → opción de la lista. */
+  public static function normalizeType(string $space, string $value): string
+  {
+    $value = trim($value);
+    if ($value === '' || in_array($value, self::typeOptions($space), true)) {
+      return $value;
+    }
+    $key = mb_strtolower($value, 'UTF-8');
+    $map = ['servicio' => self::SERVICE_TYPE, 'princip' => 'Principal'];
+    $map += $space === 'bano'
+      ? ['social' => 'Social', 'compartid' => 'Social', 'privad' => 'Privado', 'auxiliar' => 'Auxiliar']
+      : ['estudio' => 'Estudio', 'secundari' => 'Secundaria', 'auxiliar' => 'Secundaria'];
+    foreach ($map as $needle => $option) {
+      if (str_contains($key, $needle)) {
+        return $option;
+      }
+    }
+    // Solo un número ("#1", "#3"): la 1 es la principal y las demás secundarias o sociales.
+    if (preg_match('/^#?\s*(\d+)$/', $key, $match) === 1) {
+      return (int) $match[1] === 1 ? 'Principal' : self::typeOptions($space)[1];
+    }
+    return $value;
+  }
+
+  /**
+   * Habitaciones y baños (incluidos los de servicio) agrupados por piso, con tipo, contenido y observación.
+   *
+   * @param array<string,mixed> $review
+   * @return array<int,array<string,list<array{tipo:string,contiene:list<string>,observacion:string}>>>
+   */
+  public static function roomsByFloor(array $review): array
+  {
+    $spaces = self::spaces();
+    $out = [];
+    foreach (self::MERGED as $base => $service) {
+      foreach ([$base, $service] as $key) {
+        foreach (self::rows($review[$key] ?? '') as $row) {
+          $floor = max(1, min(self::MAX_FLOORS, (int) ($row[self::FLOOR_KEYS[$key]] ?? 1)));
+          $type = $key === $service ? self::SERVICE_TYPE : self::normalizeType($base, (string) ($row[$spaces[$base]['type']] ?? ''));
+          $out[$floor][$base][] = [
+            'tipo' => $type,
+            'contiene' => self::values($row[$spaces[$key]['contains']] ?? []),
+            'observacion' => trim((string) ($row[$spaces[$key]['observation']] ?? '')),
+          ];
+        }
+      }
+    }
+    ksort($out);
+    return $out;
+  }
+
   /**
    * Servicios públicos. Cada ítem tiene sus campos y una observación (columna ob_*), como el formulario original.
    *

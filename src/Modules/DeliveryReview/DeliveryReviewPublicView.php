@@ -60,7 +60,7 @@ final class DeliveryReviewPublicView
     $property = [
       'Habitaciones' => $this->first([$review['habitaciones'] ?? '']),
       'Baños' => $this->first([$review['banos'] ?? '']),
-      'Piso' => $this->first([$review['piso'] ?? '']),
+      'Pisos' => $this->first([$review['piso'] ?? '']),
       'Parqueadero' => $yes($parking) ? trim(implode(' · ', array_filter([$this->first([$review['tipo_parqueadero'] ?? '']), $this->first([$review['parqueaderos'] ?? '']) !== '' ? $review['parqueaderos'] . ' celda(s)' : '', $this->first([$review['numero_parqueadero'] ?? '']) !== '' ? '# ' . $review['numero_parqueadero'] : '']))) ?: 'Sí' : ($parking ?: '-'),
       'Depósito' => $yes($storage) ? ($this->first([$review['depositos'] ?? '']) !== '' ? $review['depositos'] . ' depósito(s)' : 'Sí') : ($storage ?: '-'),
       'Toma de linderos' => $this->date($review['fech_linderos'] ?? '', '', 'd/m/Y'),
@@ -110,21 +110,25 @@ final class DeliveryReviewPublicView
   private function spacesHtml(array $review): string
   {
     $cards = '';
-    foreach (DeliveryReviewForm::spaces() as $key => $space) {
+    $spaces = DeliveryReviewForm::spaces();
+    $byFloor = DeliveryReviewForm::roomsByFloor($review);
+    $multiFloor = count($byFloor) > 1 || (int) ($review['piso'] ?? 1) > 1;
+    foreach ($byFloor as $floor => $groups) {
+      foreach ($groups as $base => $rows) {
+        foreach ($rows as $index => $row) {
+          $name = $spaces[$base]['item'] . (count($rows) > 1 ? ' ' . ($index + 1) : '') . ($row['tipo'] !== '' ? ' · ' . $row['tipo'] : '') . ($multiFloor ? ' · Piso ' . $floor : '');
+          $cards .= $this->spaceCard($name, $row['contiene'], $row['observacion']);
+        }
+      }
+    }
+    foreach ($spaces as $key => $space) {
+      if (isset(DeliveryReviewForm::MERGED[$key]) || in_array($key, DeliveryReviewForm::MERGED, true)) {
+        continue;
+      }
       $rows = DeliveryReviewForm::rows($review[$key] ?? '');
       foreach ($rows as $index => $row) {
-        $contains = DeliveryReviewForm::values($row[$space['contains']] ?? []);
-        $observation = trim((string) ($row[$space['observation']] ?? ''));
-        $type = $space['type'] !== '' ? $this->first([$row[$space['type']] ?? '']) : '';
-        $name = $space['item'] . ($type !== '' ? ' · ' . $type : (count($rows) > 1 ? ' ' . ($index + 1) : ''));
-        $chips = '';
-        foreach ($contains as $item) {
-          $chips .= '<span>' . $this->h($item) . '</span>';
-        }
-        $hasNote = !DeliveryReviewForm::isNone($observation);
-        $cards .= '<div class="scm-delivery-public-card' . ($hasNote ? ' has-note' : '') . '"><h3>' . $this->h($name) . '</h3>'
-          . ($chips !== '' ? '<div class="scm-delivery-public-chips">' . $chips . '</div>' : '')
-          . '<p class="scm-delivery-public-note">' . ($hasNote ? '<b>Observación:</b> ' . nl2br($this->h($observation)) : 'Sin observaciones.') . '</p></div>';
+        $name = $space['item'] . (count($rows) > 1 ? ' ' . ($index + 1) : '');
+        $cards .= $this->spaceCard($name, DeliveryReviewForm::values($row[$space['contains']] ?? []), trim((string) ($row[$space['observation']] ?? '')));
       }
     }
     $photo = trim((string) ($review['registro_fotografico'] ?? ''));
@@ -143,6 +147,19 @@ final class DeliveryReviewPublicView
     }
     return '<section class="scm-corrective-public-card scm-delivery-public-section"><h2>Registro fotográfico por espacio</h2>' . $photoHtml
       . ($cards !== '' ? '<div class="scm-delivery-public-cards">' . $cards . '</div>' : '') . '</section>';
+  }
+
+  /** @param list<string> $contains */
+  private function spaceCard(string $name, array $contains, string $observation): string
+  {
+    $chips = '';
+    foreach ($contains as $item) {
+      $chips .= '<span>' . $this->h($item) . '</span>';
+    }
+    $hasNote = !DeliveryReviewForm::isNone($observation);
+    return '<div class="scm-delivery-public-card' . ($hasNote ? ' has-note' : '') . '"><h3>' . $this->h($name) . '</h3>'
+      . ($chips !== '' ? '<div class="scm-delivery-public-chips">' . $chips . '</div>' : '')
+      . '<p class="scm-delivery-public-note">' . ($hasNote ? '<b>Observación:</b> ' . nl2br($this->h($observation)) : 'Sin observaciones.') . '</p></div>';
   }
 
   /** @param array<string,mixed> $review */

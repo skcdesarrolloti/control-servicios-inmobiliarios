@@ -118,8 +118,8 @@ trait HandlesDeliveryReviewActions
   {
     $text = fn($value, int $max = 200): string => mb_substr($this->correctiveReviewText($value), 0, $max);
     $choice = static fn(string $value, array $options): string => in_array($value, $options, true) ? $value : '';
-    $count = function (string $key, string $label): string {
-      $raw = trim((string) ($_POST[$key] ?? ''));
+    $count = function ($raw, string $label): string {
+      $raw = trim(is_scalar($raw) ? (string) $raw : '');
       if ($raw === '' || !ctype_digit($raw) || (int) $raw > 30) {
         throw new \DomainException('Indica la cantidad de ' . $label . ' (0 a 30).');
       }
@@ -133,10 +133,23 @@ trait HandlesDeliveryReviewActions
       return $value;
     };
 
+    // "piso" es la cantidad de pisos del inmueble; habitaciones y baños se cuentan por piso.
+    $floorsRaw = trim((string) ($_POST['piso'] ?? ''));
+    if (!ctype_digit($floorsRaw) || (int) $floorsRaw < 1 || (int) $floorsRaw > DeliveryReviewForm::MAX_FLOORS) {
+      throw new \DomainException('Indica la cantidad de pisos del inmueble (1 a ' . DeliveryReviewForm::MAX_FLOORS . ').');
+    }
+    $floors = (int) $floorsRaw;
+    $rooms = 0;
+    $baths = 0;
+    for ($floor = 1; $floor <= $floors; $floor++) {
+      $suffix = $floors > 1 ? ' del piso ' . $floor : '';
+      $rooms += (int) $count($_POST['hab_piso'][$floor] ?? '', 'habitaciones' . $suffix);
+      $baths += (int) $count($_POST['ban_piso'][$floor] ?? '', 'baños' . $suffix);
+    }
     $data = [
-      'habitaciones' => $count('habitaciones', 'habitaciones'),
-      'banos' => $count('banos', 'baños'),
-      'piso' => $text($_POST['piso'] ?? '', 60),
+      'habitaciones' => (string) $rooms,
+      'banos' => (string) $baths,
+      'piso' => (string) $floors,
       'tiene_parqueadero' => $yesNo('tiene_parqueadero', '¿Tiene parqueadero?'),
       'tiene_deposito' => $yesNo('tiene_deposito', '¿Tiene depósito?'),
     ];
@@ -198,7 +211,11 @@ trait HandlesDeliveryReviewActions
 
     // Registro fotográfico por espacio: qué contiene y observación.
     $rawSpaces = is_array($_POST['espacios'] ?? null) ? $_POST['espacios'] : [];
+    $data += $this->deliveryReviewInputRooms($rawSpaces, $floors);
     foreach (DeliveryReviewForm::spaces() as $key => $space) {
+      if (isset(DeliveryReviewForm::MERGED[$key]) || in_array($key, DeliveryReviewForm::MERGED, true)) {
+        continue;
+      }
       $rows = [];
       foreach (is_array($rawSpaces[$key] ?? null) ? $rawSpaces[$key] : [] as $input) {
         if (!is_array($input)) {
@@ -252,6 +269,49 @@ trait HandlesDeliveryReviewActions
     $data['servicios_adicionales'] = serialize(array_values(array_intersect($extras, array_map('strval', (array) ($_POST['servicios_adicionales'] ?? [])))));
 
     return ['data' => $data, 'services' => $active];
+  }
+
+  /**
+   * Habitaciones y baños llegan por piso (espacios[habitacion_p2][0][...]). Los de tipo "De servicio" se guardan
+   * en hab_ser / bano_ser, como el formulario original; cada fila lleva su piso.
+   *
+   * @param array<mixed> $rawSpaces
+   * @return array<string,string>
+   */
+  private function deliveryReviewInputRooms(array $rawSpaces, int $floors): array
+  {
+    $spaces = DeliveryReviewForm::spaces();
+    $out = [];
+    foreach (DeliveryReviewForm::MERGED as $base => $serviceKey) {
+      $stored = [$base => [], $serviceKey => []];
+      for ($floor = 1; $floor <= $floors; $floor++) {
+        foreach (is_array($rawSpaces[$base . '_p' . $floor] ?? null) ? $rawSpaces[$base . '_p' . $floor] : [] as $input) {
+          if (!is_array($input)) {
+            continue;
+          }
+          $type = DeliveryReviewForm::normalizeType($base, mb_substr($this->correctiveReviewText($input['tipo'] ?? ''), 0, 120));
+          $contains = array_slice(array_values(array_unique(array_filter(array_map(fn($value): string => mb_substr($this->correctiveReviewText($value), 0, 120), (array) ($input['contiene'] ?? [])), static fn(string $value): bool => $value !== ''))), 0, 40);
+          $observation = mb_substr($this->preventiveReviewMultiline($input['observacion'] ?? ''), 0, 2000);
+          if ($type === '' && $contains === [] && $observation === '') {
+            continue;
+          }
+          $key = $type === DeliveryReviewForm::SERVICE_TYPE ? $serviceKey : $base;
+          $space = $spaces[$key];
+          $row = $key === $base ? [$space['type'] => $type] : [];
+          $row[DeliveryReviewForm::FLOOR_KEYS[$key]] = (string) $floor;
+          $row[$space['contains']] = $contains;
+          $row[$space['observation']] = $observation;
+          if (strcasecmp($observation, 'Ninguna') === 0) {
+            $row[$space['none']] = ['Ninguna'];
+          }
+          $stored[$key][] = $row;
+        }
+      }
+      foreach ($stored as $key => $rows) {
+        $out[$key] = DeliveryReviewForm::storeRows(array_slice($rows, 0, 60));
+      }
+    }
+    return $out;
   }
 
   /** @param array{name:string,type:string,label:string,glossary:int,required:bool,contract:string} $field */
@@ -565,7 +625,6 @@ trait HandlesDeliveryReviewActions
         'depositos' => $value('depositos'),
         'habitaciones' => $value('habitaciones'),
         'banos' => $value('banos'),
-        'piso' => $value('piso'),
       ] + array_intersect_key($serviceColumns, array_flip(['agua', 'gas', 'luz']));
       foreach ($meta as $key => $metaValue) {
         $this->deliveryReviewSetPostMeta($postId, $key, $metaValue);
@@ -745,12 +804,13 @@ trait HandlesDeliveryReviewActions
   private function deliveryReviewDefaults(array $ticket, array $contract, array $property): array
   {
     $postId = (int) $this->correctiveReviewDigits($this->correctiveReviewFirstText([$ticket['id_inmueble'] ?? '', $contract['id_inmueble'] ?? '']));
-    $meta = $this->deliveryReviewPostMeta($postId, ['habitaciones', 'banos', 'piso']);
+    $meta = $this->deliveryReviewPostMeta($postId, ['habitaciones', 'banos']);
     $first = fn(array $values): string => $this->correctiveReviewFirstText($values);
     $defaults = [
       'habitaciones' => $this->correctiveReviewDigits($first([$meta['habitaciones'] ?? '', $property['habitaciones'] ?? ''])),
       'banos' => $this->correctiveReviewDigits($first([$meta['banos'] ?? '', $property['banos'] ?? ''])),
-      'piso' => $first([$meta['piso'] ?? '']),
+      // El meta "piso" de WordPress puede ser el piso donde queda el apartamento: no se usa como cantidad de pisos.
+      'piso' => '1',
       'tiene_parqueadero' => $first([$contract['tiene_parqueadero'] ?? '', $property['parqueadero'] ?? '']),
       'tipo_parqueadero' => $first([$contract['tipo_parqueadero'] ?? '', $property['tipo_parqueadero'] ?? '']),
       'parqueaderos' => $first([$contract['parqueaderos'] ?? '', $property['parqueaderos'] ?? '']),
@@ -870,12 +930,34 @@ trait HandlesDeliveryReviewActions
     $steps = ['inmueble' => 'Inmueble', 'linderos' => 'Linderos', 'espacios' => 'Espacios', 'servicios' => 'Servicios', 'resumen' => 'Resumen'];
     $spaceRows = [];
     foreach (DeliveryReviewForm::spaces() as $key => $space) {
+      if ($space['count'] !== '' || in_array($key, DeliveryReviewForm::MERGED, true)) {
+        continue;
+      }
       $rows = DeliveryReviewForm::rows($values[$key] ?? '');
       if (!$editing && $rows === []) {
-        $countValue = $space['count'] !== '' ? (int) $v($space['count']) : 0;
-        $rows = array_fill(0, $space['count'] !== '' ? min(30, $countValue) : (in_array($key, DeliveryReviewForm::DEFAULT_SPACES, true) ? 1 : 0), []);
+        $rows = in_array($key, DeliveryReviewForm::DEFAULT_SPACES, true) ? [[]] : [];
       }
       $spaceRows[$key] = $rows;
+    }
+    // Habitaciones y baños por piso: al crear salen de lo registrado en el inmueble, todo en el piso 1.
+    $floorRooms = $editing ? DeliveryReviewForm::roomsByFloor($review) : [];
+    $floors = max(1, min(DeliveryReviewForm::MAX_FLOORS, max((int) preg_replace('/\D+/', '', $v('piso')), $floorRooms ? max(array_keys($floorRooms)) : 1)));
+    $floorCounts = [];
+    for ($floor = 1; $floor <= $floors; $floor++) {
+      $floorCounts[$floor] = ['habitacion' => count($floorRooms[$floor]['habitacion'] ?? []), 'bano' => count($floorRooms[$floor]['bano'] ?? [])];
+    }
+    foreach (['habitacion' => 'habitaciones', 'bano' => 'banos'] as $base => $column) {
+      $others = 0;
+      for ($floor = 2; $floor <= $floors; $floor++) {
+        $others += $floorCounts[$floor][$base];
+      }
+      $floorCounts[1][$base] = min(30, max($floorCounts[1][$base], (int) $v($column) - $others));
+      if (!$editing) {
+        $floorRooms[1][$base] = [];
+        for ($i = 0; $i < $floorCounts[1][$base]; $i++) {
+          $floorRooms[1][$base][] = ['tipo' => DeliveryReviewForm::typeOptions($base)[$i === 0 ? 0 : 1], 'contiene' => [], 'observacion' => '', 'auto' => true];
+        }
+      }
     }
     ob_start();
     ?>
@@ -896,11 +978,13 @@ trait HandlesDeliveryReviewActions
           <?php foreach ($summary as $label => $value): ?><div><span><?= $h($label) ?></span><strong><?= $h($value) ?></strong></div><?php endforeach; ?>
         </div>
         <div class="scm-delivery-grid scm-delivery-grid--3">
-          <label class="scm-delivery-field"><span>Habitaciones *</span><input type="number" name="habitaciones" min="0" max="30" step="1" inputmode="numeric" required value="<?= $h($v('habitaciones')) ?>" data-delivery-count="habitacion"></label>
-          <label class="scm-delivery-field"><span>Baños *</span><input type="number" name="banos" min="0" max="30" step="1" inputmode="numeric" required value="<?= $h($v('banos')) ?>" data-delivery-count="bano"></label>
-          <label class="scm-delivery-field"><span>Piso</span><input type="text" name="piso" maxlength="60" value="<?= $h($v('piso')) ?>" placeholder="Ej: 5 o Casa de 2 niveles"></label>
+          <label class="scm-delivery-field"><span>Cantidad de pisos *</span><input type="number" name="piso" min="1" max="<?= DeliveryReviewForm::MAX_FLOORS ?>" step="1" inputmode="numeric" required value="<?= $h((string) $floors) ?>" data-delivery-floors-input></label>
         </div>
-        <p class="scm-prev-muted">Al indicar habitaciones y baños se agrega una ficha por cada uno en el paso Espacios.</p>
+        <div class="scm-delivery-floor-counts<?= $floors === 1 ? ' is-single' : '' ?>" data-delivery-floor-counts>
+          <?php for ($floor = 1; $floor <= $floors; $floor++): ?><?= $this->renderDeliveryFloorCount((string) $floor, $floorCounts[$floor]['habitacion'], $floorCounts[$floor]['bano']) ?><?php endfor; ?>
+        </div>
+        <template data-delivery-floor-count-template><?= $this->renderDeliveryFloorCount('__FLOOR__', 0, 0) ?></template>
+        <p class="scm-prev-muted"><?= $editing ? '' : 'Según el inmueble registrado: ' . $h($v('habitaciones') !== '' ? $v('habitaciones') : 'sin dato') . ' habitación(es) y ' . $h($v('banos') !== '' ? $v('banos') : 'sin dato') . ' baño(s). ' ?>Si tiene varios pisos, reparte las habitaciones y los baños en cada piso; en el paso Espacios sale una ficha por cada uno.</p>
         <div class="scm-delivery-grid">
           <fieldset class="scm-prev-block">
             <legend>¿Tiene parqueadero? *</legend>
@@ -942,14 +1026,21 @@ trait HandlesDeliveryReviewActions
 
       <section class="scm-prev-step" data-prev-step="espacios" hidden>
         <header><h3>Registro fotográfico por espacio</h3><p>Por cada espacio marca qué quedó en las fotos y anota observaciones. Usa "Sin novedad" si todo está bien.</p></header>
-        <?php foreach (DeliveryReviewForm::spaces() as $key => $space): $options = DeliveryReviewForm::glossary($this->db, $space['glossary']); ?>
+        <div data-delivery-floors>
+          <?php for ($floor = 1; $floor <= $floors; $floor++): ?><?= $this->renderDeliveryFloorBlock((string) $floor, $floorRooms[$floor] ?? [], $floors) ?><?php endfor; ?>
+        </div>
+        <template data-delivery-floor-template><?= $this->renderDeliveryFloorBlock('__FLOOR__', [], 2) ?></template>
+        <?php foreach (array_keys(DeliveryReviewForm::MERGED) as $base): ?>
+          <template data-delivery-template="esp-<?= $h($base) ?>"><?= $this->renderDeliveryRoomRow($base, '__FLOOR__', '__INDEX__', []) ?></template>
+        <?php endforeach; ?>
+        <?php foreach ($spaceRows as $key => $rows): $space = DeliveryReviewForm::spaces()[$key]; $options = DeliveryReviewForm::glossary($this->db, $space['glossary']); ?>
           <div class="scm-prev-group scm-delivery-repeater" data-delivery-space="<?= $h($key) ?>">
             <header>
-              <div><h3><span class="material-symbols-outlined" aria-hidden="true"><?= $h($space['icon']) ?></span> <?= $h($space['label']) ?></h3><p data-delivery-space-count><?= count($spaceRows[$key]) ?> registrado(s)</p></div>
+              <div><h3><span class="material-symbols-outlined" aria-hidden="true"><?= $h($space['icon']) ?></span> <?= $h($space['label']) ?></h3><p data-delivery-space-count><?= count($rows) ?> registrado(s)</p></div>
               <button type="button" class="scm-prev-quick" data-delivery-add="esp-<?= $h($key) ?>">Agregar <?= $h(mb_strtolower($space['item'], 'UTF-8')) ?></button>
             </header>
             <div data-delivery-list="esp-<?= $h($key) ?>">
-              <?php foreach ($spaceRows[$key] as $index => $row): ?><?= $this->renderDeliverySpaceRow($key, $space, $options, (string) $index, $row) ?><?php endforeach; ?>
+              <?php foreach ($rows as $index => $row): ?><?= $this->renderDeliverySpaceRow($key, $space, $options, (string) $index, $row) ?><?php endforeach; ?>
             </div>
             <template data-delivery-template="esp-<?= $h($key) ?>"><?= $this->renderDeliverySpaceRow($key, $space, $options, '__INDEX__', []) ?></template>
           </div>
@@ -1047,18 +1138,82 @@ trait HandlesDeliveryReviewActions
       . '<div class="scm-delivery-row-head"><strong data-delivery-row-title>' . $h($space['item']) . '</strong>'
       . '<button type="button" class="scm-delivery-link" data-delivery-all>Marcar todo</button>'
       . '<button type="button" class="scm-delivery-remove" data-delivery-remove aria-label="Quitar ' . $h(mb_strtolower($space['item'], 'UTF-8')) . '">Quitar</button></div>';
-    if ($space['type'] !== '') {
-      $html .= '<label class="scm-delivery-field"><span>¿Cuál ' . ($key === 'bano' ? 'baño' : 'habitación') . ' es?</span><input type="text" name="' . $h($prefix . '[tipo]') . '" maxlength="120" value="' . $h($row[$space['type']] ?? '') . '" data-delivery-type placeholder="Ej: #1 o principal"></label>';
-    }
-    $html .= '<div class="scm-delivery-chips" role="group" aria-label="Qué contiene el registro">';
-    foreach ($options as $option) {
+    return $html . $this->renderDeliveryContents($prefix, $options, $contains, $observation) . '</div>';
+  }
+
+  /** Chips de "qué contiene" (glosario + opciones antiguas) y observación con "Sin novedad". @param list<string> $options @param list<string> $contains */
+  private function renderDeliveryContents(string $prefix, array $options, array $contains, string $observation): string
+  {
+    $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    $html = '<div class="scm-delivery-chips" role="group" aria-label="Qué contiene el registro">';
+    foreach (array_merge($options, array_values(array_diff($contains, $options))) as $option) {
       $html .= '<label><input type="checkbox" name="' . $h($prefix . '[contiene][]') . '" value="' . $h($option) . '"' . (in_array($option, $contains, true) ? ' checked' : '') . '><span>' . $h($option) . '</span></label>';
     }
-    foreach (array_diff($contains, $options) as $legacy) {
-      $html .= '<label><input type="checkbox" name="' . $h($prefix . '[contiene][]') . '" value="' . $h($legacy) . '" checked><span>' . $h($legacy) . '</span></label>';
-    }
-    $html .= '</div><div class="scm-delivery-obs"><label class="scm-prev-observation"><span>Observación</span><textarea name="' . $h($prefix . '[observacion]') . '" rows="2" maxlength="2000" placeholder="Describe detalles o daños visibles">' . $h($observation) . '</textarea></label>'
+    return $html . '</div><div class="scm-delivery-obs"><label class="scm-prev-observation"><span>Observación</span><textarea name="' . $h($prefix . '[observacion]') . '" rows="2" maxlength="2000" placeholder="Describe detalles o daños visibles">' . $h($observation) . '</textarea></label>'
       . '<button type="button" class="scm-prev-quick" data-delivery-none>Sin novedad</button></div>';
+  }
+
+  /** Cantidad de habitaciones y baños de un piso (paso Inmueble). */
+  private function renderDeliveryFloorCount(string $floor, int $rooms, int $baths): string
+  {
+    $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    return '<div class="scm-delivery-floor-count" data-delivery-floor-count="' . $h($floor) . '">'
+      . '<strong class="scm-delivery-floor-label">Piso ' . $h($floor) . '</strong>'
+      . '<label class="scm-delivery-field"><span>Habitaciones *</span><input type="number" name="hab_piso[' . $h($floor) . ']" min="0" max="30" step="1" inputmode="numeric" required value="' . $rooms . '" data-delivery-count="habitacion_p' . $h($floor) . '"></label>'
+      . '<label class="scm-delivery-field"><span>Baños *</span><input type="number" name="ban_piso[' . $h($floor) . ']" min="0" max="30" step="1" inputmode="numeric" required value="' . $baths . '" data-delivery-count="bano_p' . $h($floor) . '"></label>'
+      . '</div>';
+  }
+
+  /**
+   * Habitaciones y baños de un piso (paso Espacios).
+   *
+   * @param array<string,list<array<string,mixed>>> $rooms
+   */
+  private function renderDeliveryFloorBlock(string $floor, array $rooms, int $floors): string
+  {
+    $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    $spaces = DeliveryReviewForm::spaces();
+    $html = '<div class="scm-prev-group scm-delivery-floor" data-delivery-floor="' . $h($floor) . '">'
+      . '<header><div><h3><span class="material-symbols-outlined" aria-hidden="true">stairs</span> <span data-delivery-floor-title>' . ($floors > 1 ? 'Piso ' . $h($floor) : 'Habitaciones y baños') . '</span></h3>'
+      . '<p>La habitación y el baño de servicio se eligen en el tipo.</p></div></header>';
+    foreach (array_keys(DeliveryReviewForm::MERGED) as $base) {
+      $rows = $rooms[$base] ?? [];
+      $list = 'esp-' . $base . '_p' . $floor;
+      $html .= '<div class="scm-delivery-repeater scm-delivery-floor-space" data-delivery-space="' . $h($base) . '">'
+        . '<div class="scm-delivery-subhead"><strong><span class="material-symbols-outlined" aria-hidden="true">' . $h($spaces[$base]['icon']) . '</span> ' . $h($spaces[$base]['label']) . '</strong>'
+        . '<span data-delivery-space-count>' . count($rows) . ' registrado(s)</span>'
+        . '<button type="button" class="scm-prev-quick" data-delivery-add="' . $h($list) . '">Agregar ' . $h(mb_strtolower($spaces[$base]['item'], 'UTF-8')) . '</button></div>'
+        . '<div data-delivery-list="' . $h($list) . '">';
+      foreach ($rows as $index => $row) {
+        $html .= $this->renderDeliveryRoomRow($base, $floor, (string) $index, $row);
+      }
+      $html .= '</div></div>';
+    }
     return $html . '</div>';
+  }
+
+  /** @param array<string,mixed> $row tipo, contiene, observacion y "auto" si el tipo lo puso el formulario */
+  private function renderDeliveryRoomRow(string $base, string $floor, string $index, array $row): string
+  {
+    $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    $space = DeliveryReviewForm::spaces()[$base];
+    $prefix = 'espacios[' . $base . '_p' . $floor . '][' . $index . ']';
+    $type = (string) ($row['tipo'] ?? '');
+    $options = DeliveryReviewForm::typeOptions($base);
+    if ($type !== '' && !in_array($type, $options, true)) {
+      $options[] = $type;
+    }
+    $select = '<select name="' . $h($prefix . '[tipo]') . '" required data-delivery-type' . (!empty($row['auto']) ? ' data-auto="1"' : '') . '><option value="">Selecciona</option>';
+    foreach ($options as $option) {
+      $select .= '<option value="' . $h($option) . '"' . ($option === $type ? ' selected' : '') . '>' . $h($option) . '</option>';
+    }
+    $select .= '</select>';
+    return '<div class="scm-delivery-row scm-delivery-space-row" data-delivery-row>'
+      . '<div class="scm-delivery-row-head"><strong data-delivery-row-title>' . $h($space['item']) . '</strong>'
+      . '<button type="button" class="scm-delivery-link" data-delivery-all>Marcar todo</button>'
+      . '<button type="button" class="scm-delivery-remove" data-delivery-remove aria-label="Quitar ' . $h(mb_strtolower($space['item'], 'UTF-8')) . '">Quitar</button></div>'
+      . '<label class="scm-delivery-field scm-delivery-field--type"><span>Tipo de ' . ($base === 'bano' ? 'baño' : 'habitación') . ' *</span>' . $select . '</label>'
+      . $this->renderDeliveryContents($prefix, DeliveryReviewForm::glossary($this->db, $space['glossary']), array_values((array) ($row['contiene'] ?? [])), (string) ($row['observacion'] ?? ''))
+      . '</div>';
   }
 }

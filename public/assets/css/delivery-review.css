@@ -401,3 +401,71 @@
   align-self: start;
   justify-self: start;
 }
+
+/* Habitaciones y baños por piso. */
+.scm-delivery-floor-counts {
+  display: grid;
+  gap: 8px;
+}
+
+.scm-delivery-floor-count {
+  display: grid;
+  grid-template-columns: 90px repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px 12px;
+}
+
+.scm-delivery-floor-label {
+  padding-bottom: 10px;
+  color: #1d4ed8;
+  font-size: 13px;
+}
+
+.scm-delivery-floor-counts.is-single .scm-delivery-floor-count {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scm-delivery-floor-counts.is-single .scm-delivery-floor-label {
+  display: none;
+}
+
+.scm-delivery-floor-space + .scm-delivery-floor-space {
+  margin-top: 14px;
+}
+
+.scm-delivery-subhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-bottom: 8px;
+}
+
+.scm-delivery-subhead strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #0f172a;
+  font-size: 13.5px;
+}
+
+.scm-delivery-subhead > span {
+  flex: 1;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.scm-delivery-field--type {
+  max-width: 280px;
+}
+
+@media (max-width: 720px) {
+  .scm-delivery-floor-count {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scm-delivery-floor-label {
+    grid-column: 1 / -1;
+    padding-bottom: 0;
+  }
+}

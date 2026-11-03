@@ -50,18 +50,39 @@ const shots = process.env.DELIVERY_SHOTS || '';
     const rows = key => page.evaluate(k => document.querySelectorAll('[data-delivery-list="' + k + '"] > [data-delivery-row]').length, key);
     assert.equal(await visibleStep(), 'inmueble');
     assert.equal(await page.textContent('.scm-case-submodal-title'), 'Revisión antes de la ocupación');
-    assert.equal(await rows('esp-habitacion'), 3, 'One room card per room from the property');
-    assert.equal(await rows('esp-bano'), 2, 'One bathroom card per bathroom');
+    assert.equal(await rows('esp-habitacion_p1'), 3, 'One room card per room from the property');
+    assert.equal(await rows('esp-bano_p1'), 2, 'One bathroom card per bathroom');
+    assert.equal(await page.inputValue('select[name="espacios[habitacion_p1][0][tipo]"]'), 'Principal');
+    assert.equal(await page.inputValue('select[name="espacios[habitacion_p1][1][tipo]"]'), 'Secundaria');
+    assert.equal(await page.isVisible('.scm-delivery-floor-label'), false, 'Single floor hides the floor label');
     if (shots) await page.screenshot({ path: path.join(shots, 'entrega-1-inmueble.png'), fullPage: true });
 
     // Habitaciones: subir agrega fichas con nombre; bajar solo quita las vacías.
-    await page.fill('input[name="habitaciones"]', '4');
-    await page.dispatchEvent('input[name="habitaciones"]', 'change');
-    assert.equal(await rows('esp-habitacion'), 4);
-    assert.equal(await page.inputValue('input[name="espacios[habitacion][3][tipo]"]'), '#4');
-    await page.fill('input[name="habitaciones"]', '2');
-    await page.dispatchEvent('input[name="habitaciones"]', 'change');
-    assert.equal(await rows('esp-habitacion'), 2, 'Empty extra room cards are removed');
+    await page.fill('input[name="hab_piso[1]"]', '4');
+    await page.dispatchEvent('input[name="hab_piso[1]"]', 'change');
+    assert.equal(await rows('esp-habitacion_p1'), 4);
+    assert.equal(await page.inputValue('select[name="espacios[habitacion_p1][3][tipo]"]'), 'Secundaria');
+    await page.fill('input[name="hab_piso[1]"]', '2');
+    await page.dispatchEvent('input[name="hab_piso[1]"]', 'change');
+    assert.equal(await rows('esp-habitacion_p1'), 2, 'Empty extra room cards are removed');
+
+    // Pisos: cada piso tiene su cantidad y su bloque de habitaciones y baños.
+    await page.fill('input[name="piso"]', '2');
+    await page.dispatchEvent('input[name="piso"]', 'change');
+    assert.equal(await page.isVisible('input[name="hab_piso[2]"]'), true);
+    assert.equal(await page.isVisible('.scm-delivery-floor-label'), true);
+    await page.fill('input[name="hab_piso[2]"]', '1');
+    await page.dispatchEvent('input[name="hab_piso[2]"]', 'change');
+    assert.equal(await rows('esp-habitacion_p2'), 1);
+    assert.equal(await page.inputValue('select[name="espacios[habitacion_p2][0][tipo]"]'), 'Secundaria');
+    await page.fill('input[name="piso"]', '1');
+    await page.dispatchEvent('input[name="piso"]', 'change');
+    assert.equal(await page.$('input[name="hab_piso[2]"]'), null, 'An empty floor is removed');
+    await page.fill('input[name="piso"]', '2');
+    await page.dispatchEvent('input[name="piso"]', 'change');
+    await page.fill('input[name="hab_piso[2]"]', '1');
+    await page.dispatchEvent('input[name="hab_piso[2]"]', 'change');
+    await page.fill('input[name="ban_piso[2]"]', '0');
 
     // Condicionales: sin parqueadero se ocultan sus campos y no bloquean el avance.
     await page.click('input[name="tiene_parqueadero"][value="No"] + span');
@@ -83,16 +104,18 @@ const shots = process.env.DELIVERY_SHOTS || '';
     // Espacios: "Sin novedad", "Marcar todo" y quitar una fila renumera.
     await page.click('[data-prev-next]');
     assert.equal(await visibleStep(), 'espacios');
-    const firstRoom = '[data-delivery-list="esp-habitacion"] > [data-delivery-row]:first-child';
+    assert.equal(await page.textContent('[data-delivery-floor="2"] [data-delivery-floor-title]'), 'Piso 2');
+    await page.selectOption('select[name="espacios[habitacion_p2][0][tipo]"]', 'De servicio');
+    const firstRoom = '[data-delivery-list="esp-habitacion_p1"] > [data-delivery-row]:first-child';
     await page.click(firstRoom + ' [data-delivery-none]');
     assert.equal(await page.inputValue(firstRoom + ' textarea'), 'Ninguna');
     await page.click(firstRoom + ' [data-delivery-all]');
     assert.equal(await page.evaluate(sel => [...document.querySelectorAll(sel + ' .scm-delivery-chips input')].every(i => i.checked), firstRoom), true);
     await page.click('[data-delivery-add="esp-patio"]');
     await page.fill('textarea[name="espacios[patio][0][observacion]"]', 'Grieta en el muro');
-    await page.click('[data-delivery-list="esp-habitacion"] > [data-delivery-row]:first-child [data-delivery-remove]');
-    assert.equal(await rows('esp-habitacion'), 1);
-    assert.equal(await page.inputValue('input[name="espacios[habitacion][0][tipo]"]'), '#2', 'Rows are renumbered after removing one');
+    await page.click('[data-delivery-list="esp-habitacion_p1"] > [data-delivery-row]:first-child [data-delivery-remove]');
+    assert.equal(await rows('esp-habitacion_p1'), 1);
+    assert.equal(await page.inputValue('select[name="espacios[habitacion_p1][0][tipo]"]'), 'Secundaria', 'Rows are renumbered after removing one');
     if (shots) await page.screenshot({ path: path.join(shots, 'entrega-3-espacios.png'), fullPage: true });
 
     // Servicios: activar energía exige sus datos; quitar gas lo oculta.
@@ -120,7 +143,7 @@ const shots = process.env.DELIVERY_SHOTS || '';
     await page.click('[data-prev-next]');
     assert.equal(await visibleStep(), 'resumen');
     const summary = await page.textContent('[data-delivery-summary]');
-    assert.match(summary, /Habitaciones: 2 \(1 ficha\(s\)\)/);
+    assert.match(summary, /Pisos: 2 · Habitaciones: 3 \(2 ficha\(s\)\)/);
     assert.match(summary, /Grieta en el muro/);
     assert.match(summary, /Agua, Energía/);
     assert.match(summary, /menos fichas/, 'Warns when there are fewer cards than rooms');
@@ -133,8 +156,10 @@ const shots = process.env.DELIVERY_SHOTS || '';
       const field = document.querySelector('textarea[name="espacios[patio][0][observacion]"]');
       return field && field.value === 'Grieta en el muro';
     }, null, { timeout: 5000 });
-    assert.equal(await rows('esp-habitacion'), 1, 'Draft restores the room cards');
-    assert.equal(await page.inputValue('input[name="espacios[habitacion][0][tipo]"]'), '#2');
+    assert.equal(await rows('esp-habitacion_p1'), 1, 'Draft restores the room cards');
+    assert.equal(await rows('esp-habitacion_p2'), 1, 'Draft restores the second floor');
+    assert.equal(await page.inputValue('input[name="hab_piso[2]"]'), '1');
+    assert.equal(await page.inputValue('select[name="espacios[habitacion_p2][0][tipo]"]'), 'De servicio');
     assert.equal(await page.inputValue('input[name="linderos[parqueadero][0][num]"]'), '14');
     assert.equal(await page.isChecked('[data-delivery-service-toggle="luz"]'), true);
     assert.equal(await page.isVisible('[data-delivery-service="gas"]'), false, 'Restored service toggles keep their sections hidden');
@@ -146,10 +171,12 @@ const shots = process.env.DELIVERY_SHOTS || '';
     const sent = posts.find(p => p.operation === 'create');
     assert(sent, 'Create request was not sent');
     assert.match(sent.body, /name="action"\r\n\r\nscm_revision_entrega/);
-    assert.match(sent.body, /name="espacios\[habitacion\]\[0\]\[tipo\]"\r\n\r\n#2/);
+    assert.match(sent.body, /name="espacios\[habitacion_p1\]\[0\]\[tipo\]"\r\n\r\nSecundaria/);
+    assert.match(sent.body, /name="espacios\[habitacion_p2\]\[0\]\[tipo\]"\r\n\r\nDe servicio/);
     assert.match(sent.body, /name="espacios\[patio\]\[0\]\[observacion\]"\r\n\r\nGrieta en el muro/);
     assert.match(sent.body, /name="servicios_publicos\[\]"\r\n\r\nEnergia/);
-    assert.match(sent.body, /name="piso"\r\n\r\n5/);
+    assert.match(sent.body, /name="piso"\r\n\r\n2/);
+    assert.match(sent.body, /name="hab_piso\[2\]"\r\n\r\n1/);
     assert.doesNotMatch(sent.body, /servicios_publicos\[\]"\r\n\r\nGas/);
 
     // Móvil: sin desbordamiento horizontal.

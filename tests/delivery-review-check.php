@@ -94,16 +94,18 @@ if (getenv('DELIVERY_EMIT_FORM') === '1') {
   exit(0);
 }
 $assert(substr_count($panel, 'data-prev-step=') === 5, 'El asistente debe tener 5 pasos.');
-$assert(str_contains($panel, 'name="habitaciones" min="0" max="30" step="1" inputmode="numeric" required value="3"') && str_contains($panel, 'name="piso" maxlength="60" value="5"'), 'Habitaciones y piso deben venir de la ficha del inmueble.');
-$assert(substr_count($panel, 'name="espacios[habitacion][') >= 3 && str_contains($panel, 'name="espacios[habitacion][2][tipo]"'), 'Debe haber una ficha por habitación.');
+$assert(str_contains($panel, 'name="hab_piso[1]" min="0" max="30" step="1" inputmode="numeric" required value="3"') && str_contains($panel, 'name="ban_piso[1]" min="0" max="30" step="1" inputmode="numeric" required value="2"'), 'Habitaciones y baños deben venir del inmueble registrado.');
+$assert(str_contains($panel, 'name="piso" min="1" max="10" step="1" inputmode="numeric" required value="1"'), 'Piso es la cantidad de pisos (numérica) y no se toma del meta "piso" del inmueble.');
+$assert(str_contains($panel, 'name="espacios[habitacion_p1][2][tipo]"') && str_contains($panel, '<option value="Principal" selected>') && str_contains($panel, '<option value="De servicio">'), 'Debe haber una ficha por habitación con el tipo en una lista.');
+$assert(!str_contains($panel, 'data-delivery-list="esp-hab_ser"') && !str_contains($panel, 'data-delivery-list="esp-bano_ser"'), 'Habitación y baño de servicio se eligen como tipo, no como sección aparte.');
 $assert(str_contains($panel, 'Vacío hacia pasillo') && str_contains($panel, 'value="523279"'), 'Linderos y póliza deben venir del contrato.');
 $assert(!str_contains($panel, 'ac_pago') && !str_contains($panel, 'resultado'), 'Acuerdo de pago y resultado de la revisión ya no se piden.');
 
 $space = static fn(array $contains, string $observation = '', string $type = ''): array => array_filter(['tipo' => $type, 'contiene' => $contains, 'observacion' => $observation], static fn($v) => $v !== '');
 $post = [
-  'habitaciones' => '2',
-  'banos' => '1',
-  'piso' => '7',
+  'piso' => '2',
+  'hab_piso' => [1 => '1', 2 => '2'],
+  'ban_piso' => [1 => '1', 2 => '0'],
   'tiene_parqueadero' => 'Si',
   'tipo_parqueadero' => 'Privado',
   'parqueaderos' => '1',
@@ -118,8 +120,10 @@ $post = [
     'deposito' => [['norte' => 'No debe guardarse']],
   ],
   'espacios' => [
-    'habitacion' => [$space(['Paredes', 'Pisos', 'Closet'], 'Ninguna', '#1 o principal'), $space(['Paredes'], 'Rayón en la puerta', '#2'), $space([])],
-    'bano' => [$space(['Ducha', 'Espejos'], '', '#1 o principal')],
+    'habitacion_p1' => [$space(['Paredes', 'Pisos', 'Closet'], 'Ninguna', 'Principal')],
+    'habitacion_p2' => [$space(['Paredes'], 'Rayón en la puerta', 'Secundaria'), $space(['Lampara'], '', 'De servicio'), $space([])],
+    'habitacion_p3' => [$space(['Paredes'], 'Piso que no existe', 'Secundaria')],
+    'bano_p1' => [$space(['Ducha', 'Espejos'], '', 'Principal')],
     'cocina' => [$space(['Estufa', 'Valor que ya no está en el glosario'])],
   ],
   'servicios_publicos' => ['Agua', 'Energia'],
@@ -149,11 +153,14 @@ $_POST = $post;
 $created = $call('deliveryReviewCreate', 11106);
 $reviewId = (int) $created['review_id'];
 $review = $db->getRow('SELECT * FROM wp_jet_cct_revision_entrega WHERE _ID = ?', [$reviewId]);
-$assert($reviewId > 0 && $review['habitaciones'] === '2' && $review['banos'] === '1' && $review['piso'] === '7', 'No guardó habitaciones, baños y piso.');
+$assert($reviewId > 0 && $review['habitaciones'] === '3' && $review['banos'] === '1' && $review['piso'] === '2', 'No guardó habitaciones y baños por piso ni la cantidad de pisos.');
 $assert($review['cct_author_id'] === '2706' && $review['id_empleado'] === '2706' && $review['coordinador'] === 'Coordinador Contractual', 'cct_author_id debe ser el id_empleado real y el coordinador el de la sucursal.');
 $assert($review['destinatario'] === 'Eliana Carrasquilla' && $review['cesion'] === 'No' && $review['tip_inm'] === 'Apartamento', 'Faltan datos del propietario o del inmueble.');
 $rooms = unserialize($review['habitacion']);
-$assert(count($rooms) === 2 && $rooms['item-0']['tipo_habitacion'] === '#1 o principal' && $rooms['item-0']['contiene_habitacion'] === ['Paredes', 'Pisos', 'Closet'] && $rooms['item-0']['ninguna_hab'] === ['Ninguna'] && $rooms['item-1']['observacion_habitacion'] === 'Rayón en la puerta', 'Las habitaciones no se guardaron con el formato de JetEngine.');
+$assert(count($rooms) === 2 && $rooms['item-0']['tipo_habitacion'] === 'Principal' && $rooms['item-0']['piso_habitacion'] === '1' && $rooms['item-0']['contiene_habitacion'] === ['Paredes', 'Pisos', 'Closet'] && $rooms['item-0']['ninguna_hab'] === ['Ninguna'] && $rooms['item-1']['observacion_habitacion'] === 'Rayón en la puerta' && $rooms['item-1']['piso_habitacion'] === '2', 'Las habitaciones no se guardaron con el formato de JetEngine y su piso.');
+$serviceRooms = unserialize($review['hab_ser']);
+$assert(count($serviceRooms) === 1 && $serviceRooms['item-0']['contiene_hab_servicio'] === ['Lampara'] && $serviceRooms['item-0']['piso_hab_servicio'] === '2' && $review['bano_ser'] === '', 'La habitación de servicio debe guardarse en hab_ser.');
+$assert(!str_contains($review['habitacion'], 'Piso que no existe'), 'Un piso por encima de la cantidad de pisos no se guarda.');
 $assert(in_array('Valor que ya no está en el glosario', unserialize($review['cocina'])['item-0']['contiene_cocina'], true), 'Al editar no se deben perder opciones antiguas.');
 $assert($review['conjunto'] === '' && $review['deposito'] === '' && unserialize($review['inmueble_rep'])['item-0']['cenit_inmueble'] === 'Apto 6A' && unserialize($review['parqueadero'])['item-0']['num_parqueadero'] === '14', 'Los linderos no se guardaron bien.');
 $assert(unserialize($review['servicios_publicos']) === ['Agua', 'Energia'] && $review['num_ser_gas'] === '' && $review['ob_num_ser_gas'] === '', 'Un servicio inactivo no debe guardar datos.');
@@ -168,9 +175,9 @@ $assert(($ticket['resultado_revision_entrega'] ?? '') === '', 'El caso ya no rec
 $contract = $db->getRow('SELECT * FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 796');
 $assert($contract['id_revision_entrega'] === (string) $reviewId && $contract['lectura_inicial_agua'] === '4724.29' && $contract['luz'] === '1187772' && $contract['gas'] === 'GAS-OLD' && $contract['numero_parqueadero'] === '14' && $contract['inmueble_lin'] === $review['inmueble_rep'], 'El contrato no se sincronizó (o se borró un servicio inactivo).');
 $property = $db->getRow('SELECT * FROM wp_jet_cct_inmuebles WHERE _ID = 55');
-$assert($property['habitaciones'] === '2' && $property['banos'] === '1' && $property['parqueadero'] === 'Si', 'El inmueble (CCT) no se sincronizó.');
+$assert($property['habitaciones'] === '3' && $property['banos'] === '1' && $property['parqueadero'] === 'Si', 'El inmueble (CCT) no se sincronizó.');
 $meta = static fn(string $key): string => (string) $db->getVar('SELECT meta_value FROM wp_postmeta WHERE post_id = 150851 AND meta_key = ?', [$key]);
-$assert($meta('piso') === '7' && $meta('habitaciones') === '2' && $meta('id_revision_entrega') === (string) $reviewId && $meta('tiene-parqueadero') === serialize(['Si']) && $meta('servicios-publicos') === serialize(['Agua', 'Energia']), 'La ficha del inmueble en WordPress no se sincronizó.');
+$assert($meta('piso') === '5' && $meta('habitaciones') === '3' && $meta('id_revision_entrega') === (string) $reviewId && $meta('tiene-parqueadero') === serialize(['Si']) && $meta('servicios-publicos') === serialize(['Agua', 'Energia']), 'La ficha del inmueble en WordPress no se sincronizó.');
 $assert((int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket WHERE id_revision_entrega = ?', [(string) $reviewId]) === 1, 'Falta el historial del caso.');
 $assert((int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_historial_del_inmueble WHERE tipo_reporte = 'Revision de entrega'") === 1, 'Falta el historial del inmueble.');
 try { $call('deliveryReviewCreate', 11106); $assert(false, 'No debe permitir una segunda revisión en el caso.'); } catch (DomainException $e) { $assert(str_contains($e->getMessage(), 'ya tiene'), $e->getMessage()); }
@@ -180,22 +187,25 @@ $context = $call('deliveryReviewContext', 11106);
 $panel = $call('renderDeliveryReviewPanel', $context, 0);
 $assert(str_contains($panel, 'data-delivery-edit-review="' . $reviewId . '"') && str_contains($panel, 'data-delivery-delete-review="' . $reviewId . '"') && str_contains($panel, 'revision-entrega.php?numero=' . $reviewId), 'El panel no lista la revisión.');
 $editForm = $call('renderDeliveryReviewPanel', $context, $reviewId);
-$assert(str_contains($editForm, 'data-delivery-review-edit') && str_contains($editForm, 'Rayón en la puerta') && str_contains($editForm, 'name="espacios[habitacion][1][tipo]"') && !str_contains($editForm, 'name="espacios[habitacion][2][tipo]"'), 'El formulario de edición no carga lo guardado.');
+$assert(str_contains($editForm, 'data-delivery-review-edit') && str_contains($editForm, 'Rayón en la puerta') && str_contains($editForm, 'name="espacios[habitacion_p2][1][tipo]"') && str_contains($editForm, 'name="hab_piso[2]" min="0" max="30" step="1" inputmode="numeric" required value="2"') && !str_contains($editForm, 'name="espacios[habitacion_p2][2][tipo]"'), 'El formulario de edición no carga lo guardado.');
 
 $_POST = $post;
-$_POST['piso'] = 'Casa de 2 niveles';
+$_POST['ban_piso'] = [1 => '1', 2 => '1'];
+$_POST['espacios']['bano_p2'] = [$space(['Ducha'], '', 'Social')];
 $_POST['servicios_publicos'] = ['Agua'];
 $_POST['review_id'] = (string) $reviewId;
 $call('deliveryReviewUpdate', 11106, $reviewId);
 $review = $db->getRow('SELECT * FROM wp_jet_cct_revision_entrega WHERE _ID = ?', [$reviewId]);
 $contract = $db->getRow('SELECT * FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 796');
-$assert($review['piso'] === 'Casa de 2 niveles' && $review['num_nic_luz'] === '' && $meta('piso') === 'Casa de 2 niveles' && $contract['luz'] === '1187772', 'La edición no actualizó o borró datos del contrato.');
+$assert($review['banos'] === '2' && unserialize($review['bano'])['item-1']['piso_bano'] === '2' && $review['num_nic_luz'] === '' && $contract['luz'] === '1187772', 'La edición no actualizó o borró datos del contrato.');
+$_POST['piso'] = 'dos';
+try { $call('deliveryReviewUpdate', 11106, $reviewId); $assert(false, 'La cantidad de pisos debe ser numérica.'); } catch (DomainException $e) { $assert(str_contains($e->getMessage(), 'cantidad de pisos'), $e->getMessage()); }
 $assert((int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket WHERE id_revision_entrega = ?', [(string) $reviewId]) === 2, 'La edición debe dejar historial.');
 
 // Informe público nativo.
 $public = (new \SCM\Modules\DeliveryReview\DeliveryReviewPublicView($db))->render($reviewId);
 $content = $public['content'];
-$assert($public['status'] === 200 && str_contains($content, 'Revisión antes de la ocupación #' . $reviewId) && str_contains($content, 'Habitación · #1 o principal') && str_contains($content, 'Rayón en la puerta'), 'El informe público no muestra los espacios.');
+$assert($public['status'] === 200 && str_contains($content, 'Revisión antes de la ocupación #' . $reviewId) && str_contains($content, 'Habitación · Principal · Piso 1') && str_contains($content, 'Habitación 1 · Secundaria · Piso 2') && str_contains($content, 'Habitación 2 · De servicio · Piso 2') && str_contains($content, 'Pisos') && str_contains($content, 'Rayón en la puerta'), 'El informe público no muestra los espacios.');
 $assert(str_contains($content, 'Linderos') && str_contains($content, 'Apto 6A') && str_contains($content, '$186.440') && str_contains($content, 'Internet'), 'El informe no muestra linderos o servicios.');
 $assert(str_contains($content, 'embeddedfolderview?id=16zrd23ypbnQljUJGrsymrHAxFJ4bFCf0') && str_contains($content, 'Realizado por') && !str_contains($content, 'Sucursal') && !str_contains($content, 'target="_blank"'), 'El informe debe abrir las fotos en la misma página, cerrar con "Realizado por" y no mostrar sucursal.');
 $url = \SCM\App\SuCasaControlServiciosInmobiliarios::signedDeliveryReviewPublicUrl($reviewId);

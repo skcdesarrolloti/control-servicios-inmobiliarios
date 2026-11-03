@@ -3842,6 +3842,7 @@
   // Revisión antes de la ocupación: campos condicionales, filas repetibles (linderos y espacios),
   // fichas de habitaciones y baños según la cantidad indicada y resumen antes de guardar.
   function bindDeliveryReviewForm(form, helpers) {
+    var maxFloors = 10;
     function lists() {
       return Array.from(form.querySelectorAll("[data-delivery-list]"));
     }
@@ -3849,16 +3850,29 @@
       return form.querySelector('[data-delivery-list="' + key + '"]');
     }
     function rowsOf(list) {
-      return Array.from(list.children).filter(function (node) {
-        return node.hasAttribute("data-delivery-row");
+      return list
+        ? Array.from(list.children).filter(function (node) {
+            return node.hasAttribute("data-delivery-row");
+          })
+        : [];
+    }
+    function fromTemplate(selector, replacements) {
+      var template = form.querySelector(selector);
+      if (!template) return null;
+      var html = template.innerHTML;
+      Object.keys(replacements).forEach(function (token) {
+        html = html.split(token).join(replacements[token]);
       });
+      var wrap = document.createElement("div");
+      wrap.innerHTML = html;
+      return wrap.firstElementChild;
     }
     // Las filas se numeran siempre 0..n-1 para que el borrador se restaure con los mismos nombres.
     function renumber(list) {
       var rows = rowsOf(list);
       rows.forEach(function (row, index) {
         row.querySelectorAll("[name]").forEach(function (field) {
-          field.name = field.name.replace(/^((?:linderos|espacios)\[[a-z_]+\])\[\d+\]/, "$1[" + index + "]");
+          field.name = field.name.replace(/^((?:linderos|espacios)\[[a-z0-9_]+\])\[\d+\]/, "$1[" + index + "]");
         });
         var title = row.querySelector("[data-delivery-row-title]");
         if (title) {
@@ -3875,28 +3889,40 @@
           : "No aplica: agrégalo si el inmueble lo tiene";
       }
     }
+    // Habitaciones y baños usan una plantilla por tipo de espacio con el piso como variable.
     function addRow(key, silent) {
       var list = listOf(key);
-      var template = form.querySelector('template[data-delivery-template="' + key + '"]');
-      if (!list || !template) return null;
+      if (!list) return null;
       if (rowsOf(list).length >= 30) {
         if (!silent) helpers.message("Máximo 30 filas por sección.", true);
         return null;
       }
-      var wrap = document.createElement("div");
-      wrap.innerHTML = template.innerHTML.replace(/__INDEX__/g, String(rowsOf(list).length));
-      var row = wrap.firstElementChild;
+      var floorMatch = key.match(/^(esp-[a-z]+)_p(\d+)$/);
+      var index = String(rowsOf(list).length);
+      var row = floorMatch
+        ? fromTemplate('template[data-delivery-template="' + floorMatch[1] + '"]', { __FLOOR__: floorMatch[2], __INDEX__: index })
+        : fromTemplate('template[data-delivery-template="' + key + '"]', { __INDEX__: index });
+      if (!row) return null;
       list.appendChild(row);
       renumber(list);
+      if (floorMatch) defaultTypes(list);
       return row;
     }
-    // El nombre automático ("#2", "#1 o principal") no cuenta como dato diligenciado.
     function rowIsEmpty(row) {
-      return !Array.from(row.querySelectorAll("input, textarea")).some(function (field) {
+      return !Array.from(row.querySelectorAll("input, textarea, select")).some(function (field) {
         if (field.type === "checkbox" || field.type === "radio") return field.checked;
-        var value = String(field.value || "").trim();
-        if (field.hasAttribute("data-delivery-type") && /^#\d+( o principal)?$/i.test(value)) return false;
-        return value !== "";
+        if (field.hasAttribute("data-auto")) return false;
+        return String(field.value || "").trim() !== "";
+      });
+    }
+    // Tipo sugerido: la primera habitación/baño del piso 1 es la principal; las demás, secundaria o social.
+    function defaultTypes(list) {
+      var firstFloor = /_p1$/.test(list.getAttribute("data-delivery-list") || "");
+      rowsOf(list).forEach(function (row, index) {
+        var type = row.querySelector("select[data-delivery-type]");
+        if (!type || type.value) return;
+        type.selectedIndex = firstFloor && index === 0 ? 1 : 2;
+        type.setAttribute("data-auto", "1");
       });
     }
     function setRowCount(key, count) {
@@ -3907,7 +3933,7 @@
       while (rows.length > count) rows.pop().remove();
       renumber(list);
     }
-    // Ajusta las fichas de habitaciones/baños a la cantidad: agrega las que falten y solo quita fichas vacías.
+    // Ajusta las fichas a la cantidad indicada: agrega las que falten y solo quita fichas vacías.
     function syncCount(input) {
       var key = "esp-" + input.getAttribute("data-delivery-count");
       var list = listOf(key);
@@ -3919,10 +3945,52 @@
         if (rowIsEmpty(rows[i])) rows[i].remove();
       }
       renumber(list);
-      rowsOf(list).forEach(function (row, index) {
-        var type = row.querySelector("[data-delivery-type]");
-        if (type && !type.value) type.value = index === 0 ? "#1 o principal" : "#" + (index + 1);
+      defaultTypes(list);
+    }
+    function floorBlocks() {
+      return Array.from(form.querySelectorAll("[data-delivery-floor]"));
+    }
+    function floorCounts() {
+      return Array.from(form.querySelectorAll("[data-delivery-floor-count]"));
+    }
+    // Un bloque de habitaciones y baños (y su cantidad) por piso. Un piso con datos no se quita solo.
+    function ensureFloors(total, force) {
+      total = Math.max(1, Math.min(maxFloors, total || 1));
+      var countsBox = form.querySelector("[data-delivery-floor-counts]");
+      var floorsBox = form.querySelector("[data-delivery-floors]");
+      if (!countsBox || !floorsBox) return total;
+      for (var floor = floorBlocks().length + 1; floor <= total; floor++) {
+        var block = fromTemplate("template[data-delivery-floor-template]", { __FLOOR__: String(floor) });
+        var counts = fromTemplate("template[data-delivery-floor-count-template]", { __FLOOR__: String(floor) });
+        if (block) floorsBox.appendChild(block);
+        if (counts) countsBox.appendChild(counts);
+      }
+      var kept = [];
+      floorBlocks().slice(total).reverse().forEach(function (block) {
+        var floor = block.getAttribute("data-delivery-floor");
+        var hasData = Array.from(block.querySelectorAll("[data-delivery-row]")).some(function (row) {
+          return !rowIsEmpty(row);
+        });
+        if (hasData && !force) {
+          kept.push(floor);
+          return;
+        }
+        block.remove();
+        var counts = form.querySelector('[data-delivery-floor-count="' + floor + '"]');
+        if (counts) counts.remove();
       });
+      var actual = floorBlocks().length;
+      if (kept.length) {
+        var input = form.querySelector("[data-delivery-floors-input]");
+        if (input) input.value = String(actual);
+        helpers.message("El piso " + kept.reverse().join(" y ") + " tiene datos registrados. Quítalos en el paso Espacios antes de reducir los pisos.", true);
+      }
+      countsBox.classList.toggle("is-single", actual === 1);
+      floorBlocks().forEach(function (block) {
+        var title = block.querySelector("[data-delivery-floor-title]");
+        if (title) title.textContent = actual === 1 ? "Habitaciones y baños" : "Piso " + block.getAttribute("data-delivery-floor");
+      });
+      return actual;
     }
     function radioValue(name) {
       var checked = form.querySelector('input[type="radio"][name="' + name + '"]:checked');
@@ -3941,16 +4009,23 @@
     function renderSummary() {
       var box = form.querySelector("[data-delivery-summary]");
       if (!box) return;
-      function value(name) {
-        var field = form.querySelector('[name="' + name + '"]');
-        return field ? String(field.value || "").trim() : "";
+      function sum(selector) {
+        return Array.from(form.querySelectorAll(selector)).reduce(function (total, field) {
+          return total + (parseInt(field.value, 10) || 0);
+        }, 0);
       }
-      function count(key) {
-        var list = listOf(key);
-        return list ? rowsOf(list).length : 0;
+      function cards(prefix) {
+        return lists()
+          .filter(function (list) {
+            return (list.getAttribute("data-delivery-list") || "").indexOf(prefix) === 0;
+          })
+          .reduce(function (total, list) {
+            return total + rowsOf(list).length;
+          }, 0);
       }
-      var rooms = parseInt(value("habitaciones"), 10) || 0;
-      var baths = parseInt(value("banos"), 10) || 0;
+      var rooms = sum('input[name^="hab_piso["]');
+      var baths = sum('input[name^="ban_piso["]');
+      var floors = floorBlocks().length;
       var spaces = 0;
       var notes = [];
       form.querySelectorAll("[data-delivery-space]").forEach(function (group) {
@@ -3960,7 +4035,8 @@
           var text = obs ? obs.value.trim() : "";
           if (text && !/^ningun[ao]$/i.test(text)) {
             var title = row.querySelector("[data-delivery-row-title]");
-            notes.push((title ? title.textContent : "Espacio") + ": " + text);
+            var block = row.closest("[data-delivery-floor]");
+            notes.push((title ? title.textContent : "Espacio") + (block && floors > 1 ? " (piso " + block.getAttribute("data-delivery-floor") + ")" : "") + ": " + text);
           }
         });
       });
@@ -3969,12 +4045,11 @@
       });
       var html =
         "<strong>Resumen antes de guardar</strong><ul>" +
-        "<li>Habitaciones: " + rooms + " (" + count("esp-habitacion") + " ficha(s)) · Baños: " + baths + " (" + count("esp-bano") + " ficha(s))" +
-        (value("piso") ? " · Piso: " + escHtml(value("piso")) : "") + "</li>" +
+        "<li>Pisos: " + floors + " · Habitaciones: " + rooms + " (" + cards("esp-habitacion_") + " ficha(s)) · Baños: " + baths + " (" + cards("esp-bano_") + " ficha(s))</li>" +
         "<li>Parqueadero: " + (radioValue("tiene_parqueadero") || "falta responder") + " · Depósito: " + (radioValue("tiene_deposito") || "falta responder") + "</li>" +
         "<li>Espacios con registro fotográfico: " + spaces + "</li>" +
         "<li>Servicios públicos activos: " + escHtml(services.length ? services.join(", ") : "ninguno") + "</li></ul>";
-      if (count("esp-habitacion") < rooms || count("esp-bano") < baths) {
+      if (cards("esp-habitacion_") < rooms || cards("esp-bano_") < baths) {
         html += '<p class="scm-prev-warning">Hay menos fichas que habitaciones o baños indicados. Revisa el paso Espacios.</p>';
       }
       if (notes.length) {
@@ -3991,7 +4066,7 @@
         event.preventDefault();
         var row = addRow(add.getAttribute("data-delivery-add"), false);
         if (row) {
-          var first = row.querySelector("input:not([type=checkbox]), textarea");
+          var first = row.querySelector("select, input:not([type=checkbox]), textarea");
           if (first) first.focus();
           helpers.scheduleSave();
         }
@@ -4029,7 +4104,9 @@
       }
     });
     form.addEventListener("change", function (event) {
+      if (event.target.matches("[data-delivery-floors-input]")) ensureFloors(parseInt(event.target.value, 10) || 1, false);
       if (event.target.matches("[data-delivery-count]")) syncCount(event.target);
+      if (event.target.matches("[data-delivery-type]")) event.target.removeAttribute("data-auto");
       if (event.target.matches('input[type="radio"], [data-delivery-service-toggle]')) syncConditions();
     });
     form._scmStepShown = function (step) {
@@ -4040,9 +4117,10 @@
       lists().forEach(function (list) {
         counts[list.getAttribute("data-delivery-list")] = rowsOf(list).length;
       });
-      return { rows: counts };
+      return { floors: floorBlocks().length, rows: counts };
     };
     form._scmBeforeDraftRestore = function (extra) {
+      if (extra && extra.floors) ensureFloors(Number(extra.floors) || 1, true);
       var counts = (extra && extra.rows) || {};
       Object.keys(counts).forEach(function (key) {
         setRowCount(key, Math.max(0, Math.min(30, Number(counts[key]) || 0)));

@@ -21,11 +21,15 @@ Los enlaces de la app (historial del caso, línea de tiempo de Entrega, document
 Asistente por pasos con autoguardado en el navegador (también las filas agregadas): **Inmueble → Linderos → Espacios →
 Servicios → Resumen**.
 
-- Inmueble: **habitaciones, baños y piso** (nuevos), parqueadero (tipo, cantidad, números), depósito y enlace del registro
-  fotográfico. Arranca con lo que ya tienen el contrato y la ficha del inmueble en WordPress.
+- Inmueble: **cantidad de pisos** (columna `piso`, numérica 1–10) y **habitaciones y baños por piso** (al crear salen
+  de lo registrado en el inmueble, en el piso 1), parqueadero, depósito y enlace del registro fotográfico. El meta `piso`
+  de WordPress no se usa ni se modifica (puede ser el piso donde queda el apartamento).
 - Linderos: conjunto, torre, inmueble (obligatorio), parqueaderos y depósitos (solo si aplica).
-- Espacios: una ficha por habitación y por baño según la cantidad indicada; chips "qué contiene" del glosario de JetEngine,
-  "Marcar todo" y "Sin novedad".
+- Espacios: un bloque por piso con una ficha por habitación y por baño. El **tipo** es una lista (habitación: Principal,
+  Secundaria, Estudio, De servicio; baño: Principal, Social, Privado, Auxiliar, De servicio). Habitación y baño de
+  servicio ya no son secciones aparte: se eligen en el tipo y se guardan en `hab_ser` / `bano_ser`. Cada fila guarda
+  su piso (`piso_habitacion`, `piso_bano`, …). Los tipos escritos a mano en revisiones antiguas ("#1 o Principal",
+  "#2") se muestran como la opción equivalente. Chips "qué contiene" del glosario, "Marcar todo" y "Sin novedad".
 - Servicios: agua, gas y energía solo si están activos; observaciones vacías se guardan como "Ninguna".
 - Se quitaron **acuerdo de pago** (`ac_pago_*`) y **resultado de la revisión** (`resultado`); las columnas siguen en el CCT
   con los datos antiguos. Sin resultado ya no se crea el caso automático de "Daños encontrados antes de la ocupación"
