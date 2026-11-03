@@ -71,6 +71,7 @@
 .scm-corrective-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
 .scm-corrective-summary > div { padding: 12px; border: 1px solid var(--acta-border); border-radius: 10px; background: var(--acta-surface); }
 .scm-corrective-summary span { display: block; color: var(--acta-muted); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.scm-corrective-summary small { display: block; margin-top: 2px; color: var(--acta-muted); font-size: 12px; font-weight: 600; }
 .scm-corrective-summary strong { display: block; margin-top: 4px; color: var(--acta-ink); overflow-wrap: anywhere; }
 .scm-corrective-existing { margin: 18px 0; }
 .scm-corrective-existing article { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px; padding: 12px; border: 1px solid var(--acta-border); border-radius: 10px; background: #fff; }

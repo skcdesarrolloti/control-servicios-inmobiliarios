@@ -469,7 +469,16 @@ trait HistoryPresentationConcern
     $html .= '</div></header>';
 
     $html .= '<div class="scm-contract-parties">';
-    $html .= $this->renderContractPartyCard('Propietario', 'Titular', $record, ['propietario', 'nombre_propietario'], ['correo_propietario', 'email_propietario'], ['celular_propietario', 'telefono_propietario']);
+    $coOwners = \SCM\Modules\LeaseContracts\LeaseContractsView::coOwnersLabel($record);
+    $html .= $this->renderContractPartyCard('Propietario', $coOwners !== '' ? 'Titular · ' . $coOwners : 'Titular', $record, ['propietario', 'nombre_propietario'], ['correo_propietario', 'email_propietario'], ['celular_propietario', 'telefono_propietario']);
+    // Copropietarios del contrato (propietario_N…), con su participación.
+    for ($i = 2; $coOwners !== '' && $i <= min(\SCM\Modules\LeaseContracts\ContractCoOwners::CONTRACT_MAX, (int) ($record['propietarios'] ?? 1)); $i++) {
+      if (trim((string) ($record['propietario_' . $i] ?? '')) === '') {
+        continue;
+      }
+      $share = trim((string) ($record['porcentaje_' . $i] ?? ''));
+      $html .= $this->renderContractPartyCard('Copropietario ' . $i, 'Copropietario' . ($share !== '' ? ' · ' . str_replace('.', ',', $share) . ' %' : ''), $record, ['propietario_' . $i], ['correo_propietario_' . $i], ['celular_propietario_' . $i]);
+    }
     $html .= $this->renderContractPartyCard('Arrendatario', 'Activo', $record, ['arrendatario', 'nombre_arrendatario'], ['correo_arrendatario', 'email_arrendatario'], ['celular_arrendatario', 'telefono_arrendatario']);
     $html .= '</div>';
 

@@ -1565,7 +1565,7 @@
     }
     if (targetId === "scm-sec-contrato") {
       pushRow("Contrato", caseBtn.dataset.contrato || "");
-      pushRow("Propietario", caseBtn.dataset.propietario || "");
+      pushRow("Propietario", (caseBtn.dataset.propietario || "") + (caseBtn.dataset.copropietarios && caseBtn.dataset.propietario ? " · " + caseBtn.dataset.copropietarios : ""));
       pushRow("Arrendatario", caseBtn.dataset.arrendatario || "");
       pushRow("Inmueble", caseBtn.dataset.inmueble || caseBtn.dataset.idInmuebleWeb || "");
       pushRow("Direccion", caseBtn.dataset.direccion || "");

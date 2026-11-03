@@ -1234,7 +1234,7 @@ trait HandlesPreventiveReviewActions
       'Contrato' => ltrim($this->correctiveReviewFirstText([$contract['contrato'] ?? '', $ticket['contrato'] ?? '']), '#') ?: '-',
       'Inmueble simi' => $this->correctiveReviewFirstText([$contract['inmueble'] ?? '', $ticket['inmueble'] ?? '']) ?: '-',
       'Dirección' => $this->correctiveReviewFirstText([$contract['direccion'] ?? '', $ticket['direccion'] ?? '']) ?: '-',
-      'Propietario' => $this->correctiveReviewFirstText([$contract['propietario'] ?? '', $ticket['propietario'] ?? '']) ?: '-',
+      'Propietario' => trim(($this->correctiveReviewFirstText([$contract['propietario'] ?? '', $ticket['propietario'] ?? '']) ?: '-') . ' · ' . \SCM\Modules\LeaseContracts\LeaseContractsView::coOwnersLabel($contract), ' ·'),
       'Arrendatario' => $this->correctiveReviewFirstText([$contract['arrendatario'] ?? '', $ticket['arrendatario'] ?? '']) ?: '-',
     ];
     ob_start();

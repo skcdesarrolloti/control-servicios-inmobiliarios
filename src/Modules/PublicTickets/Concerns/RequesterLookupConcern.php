@@ -233,15 +233,22 @@ trait RequesterLookupConcern
     if (!$this->schema->tableExists($table)) {
       return [];
     }
+    // El documento puede estar guardado con puntos, espacios, guiones o el tipo delante («CC. 111.111»): se compara sin
+    // ellos en SQL y luego, en PHP, con la misma normalización que el resto del panel.
+    $number = \SCM\Modules\OwnerCredits\OwnerCreditPromissoryService::normalizeDocument($rawLookup);
+    $clean = static fn(string $column): string => "REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(`{$column}`, ''))), '.', ''), ' ', ''), '-', ''), ',', '')";
     $like = '%' . $this->db->escapeLike(trim($rawLookup)) . '%';
+    $likeNumber = '%' . $this->db->escapeLike($number !== '' ? $number : trim($rawLookup)) . '%';
     $rows = $this->db->getResults(
       "SELECT *
          FROM `{$table}`
         WHERE TRIM(COALESCE(`documento`, '')) LIKE ?
            OR TRIM(COALESCE(`documento_juridico`, '')) LIKE ?
            OR TRIM(COALESCE(`id_propietario`, '')) LIKE ?
+           OR {$clean('documento')} LIKE ?
+           OR {$clean('documento_juridico')} LIKE ?
         LIMIT 300",
-      [$like, $like, $like]
+      [$like, $like, $like, $likeNumber, $likeNumber]
     );
 
     $profiles = [];
@@ -251,7 +258,11 @@ trait RequesterLookupConcern
         $this->normalizeAlphaNum((string) ($row['documento_juridico'] ?? '')),
         $this->normalizeAlphaNum((string) ($row['id_propietario'] ?? '')),
       ];
-      if (!in_array($docKey, $keys, true)) {
+      $sameDocument = $number !== '' && (
+        \SCM\Modules\OwnerCredits\OwnerCreditPromissoryService::normalizeDocument((string) ($row['documento'] ?? '')) === $number
+        || \SCM\Modules\OwnerCredits\OwnerCreditPromissoryService::normalizeDocument((string) ($row['documento_juridico'] ?? '')) === $number
+      );
+      if (!in_array($docKey, $keys, true) && !$sameDocument) {
         continue;
       }
       foreach ([trim((string) ($row['_ID'] ?? '')), trim((string) ($row['id_propietario'] ?? ''))] as $id) {

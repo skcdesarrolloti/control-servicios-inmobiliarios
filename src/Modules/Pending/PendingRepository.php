@@ -324,11 +324,16 @@ final class PendingRepository
       $where[] = '1=1';
     }
 
+    // Copropietarios 2..8 del contrato (nombre, documento e id de su ficha): el filtro «Propietario» también los encuentra.
+    $coOwnerColumns = [];
+    for ($i = 2; $i <= \SCM\Modules\LeaseContracts\ContractCoOwners::CONTRACT_MAX; $i++) {
+      array_push($coOwnerColumns, 'propietario_' . $i, 'documento_propietario_' . $i, 'id_propietario_' . $i);
+    }
     $likeFilters = [
       'contrato' => ['contrato'],
       'inmueble' => ['inmueble', 'id_inmueble'],
       'direccion' => ['direccion'],
-      'propietario' => ['propietario', 'id_propietario', 'documento_propietario'],
+      'propietario' => array_merge(['propietario', 'id_propietario', 'documento_propietario'], $coOwnerColumns),
       'arrendatario' => ['arrendatario', 'id_arrendatario', 'documento_arrendatario'],
       'codeudor' => ['codeudor_1', 'codeudor_2', 'codeudor_3', 'codeudor_4', 'documento_codeudor_1', 'documento_codeudor_2', 'documento_codeudor_3', 'documento_codeudor_4'],
     ];
@@ -352,7 +357,7 @@ final class PendingRepository
     $query = trim((string) ($filters['query'] ?? ''));
     if ($query !== '') {
       $parts = [];
-      foreach (['_ID', 'contrato', 'inmueble', 'id_inmueble', 'direccion', 'propietario', 'arrendatario', 'estado'] as $column) {
+      foreach (array_merge(['_ID', 'contrato', 'inmueble', 'id_inmueble', 'direccion', 'propietario', 'arrendatario', 'estado'], array_values(array_filter($coOwnerColumns, static fn(string $c): bool => str_starts_with($c, 'propietario_')))) as $column) {
         if ($this->schema()->columnExists($table, $column)) {
           $parts[] = $column === '_ID' ? "CAST(`_ID` AS CHAR) LIKE ?" : "COALESCE(`{$column}`, '') LIKE ?";
           $args[] = '%' . $this->db->escapeLike($query) . '%';

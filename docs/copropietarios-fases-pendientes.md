@@ -97,11 +97,16 @@ Estado al 03/11/2026 (modo de prueba contra la base de datos):
 - Aumento de canon, anexos, terminación y cartera siguen avisando solo al propietario 1. Queda como decisión de negocio.
 - Decidido (03/11/2026): la cotización de mantenimiento va solo a su destinatario (propietario principal o quien se
   elija al enviarla). Los copropietarios no la reciben ni pueden responderla.
-- Falta hacer:
-  - el filtro «Propietario» del listado de contratos todavía no encuentra a un copropietario por nombre;
-  - «+N copropietarios» solo aparece en las vistas de contratos de arrendamiento, no en casos ni revisiones.
-- Ya pasaba antes: `findOwnerProfilesByDocument` compara el documento sin normalizar, así que «111111» no encuentra una
-  ficha guardada como «111.111».
+- Hecho el 03/11/2026:
+  - el filtro «Propietario» (y la búsqueda general) del listado de contratos encuentra a los copropietarios 2..8 por
+    nombre, documento o id de ficha (`PendingRepository::getContratosArrendamiento`);
+  - «+N copropietarios» en el contrato de los casos (tarjeta del titular y una tarjeta por copropietario con su %), en
+    la sección «Contrato» del caso, en la revisión correctiva y en la preventiva;
+  - `findOwnerProfilesByDocument` compara el documento sin puntos, espacios, guiones ni tipo delante, así que «111111»
+    encuentra una ficha guardada como «111.111» o «CC. 111.111».
+- La Fase 3 ya se aplicó en el servidor (03/11/2026): 7 fichas nuevas (#2032–#2038), sin duplicados. El modo de prueba
+  ya no muestra pendientes; quedan 13 conflictos y 24 contratos sin %.
+- La barra «Documentos por actor» se queda en el formulario de la hoja (sirve para adjuntar por persona).
 
 ## Verificación por fase
 
@@ -130,8 +135,7 @@ Estado al 03/11/2026 (modo de prueba contra la base de datos):
 
 ## Pregunta abierta
 
-La barra «Documentos por actor» (`a610f2ad`) está en el formulario de la hoja, en la vista y en la carpeta del contrato.
-Falta decidir si se quita del formulario y queda solo en la vista y la carpeta.
+Resuelta: la barra «Documentos por actor» (`a610f2ad`) se queda en el formulario, la vista y la carpeta.
 
 ## Cómo retomar
 

@@ -841,7 +841,7 @@ trait HandlesCorrectiveReviewActions
         <div><span>Contrato</span><strong><?= $h($contrato !== '' ? $contrato : '-') ?></strong></div>
         <div><span>Inmueble simi</span><strong><?= $h($inmueble !== '' ? $inmueble : '-') ?></strong></div>
         <div><span>Dirección</span><strong><?= $h($direccion !== '' ? $direccion : '-') ?></strong></div>
-        <div><span>Propietario</span><strong><?= $h($this->correctiveReviewFirstText([$ticket['propietario'] ?? '', $contract['propietario'] ?? '']) ?: '-') ?></strong></div>
+        <div><span>Propietario</span><strong><?= $h($this->correctiveReviewFirstText([$ticket['propietario'] ?? '', $contract['propietario'] ?? '']) ?: '-') ?></strong><?php $coOwners = \SCM\Modules\LeaseContracts\LeaseContractsView::coOwnersLabel($contract); if ($coOwners !== ''): ?><small><?= $h($coOwners) ?></small><?php endif; ?></div>
         <div><span>Arrendatario</span><strong><?= $h($this->correctiveReviewFirstText([$ticket['arrendatario'] ?? '', $contract['arrendatario'] ?? '']) ?: '-') ?></strong></div>
       </div>
       <?php if ($reviews): ?>

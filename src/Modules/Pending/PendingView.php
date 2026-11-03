@@ -656,6 +656,7 @@ final class PendingView
       . ' data-empleado="' . esc_attr($empleado !== '' ? $empleado : '-') . '"'
       . ' data-empleado-id="' . esc_attr((string) ($ticket['id_empleado'] ?? '')) . '"'
       . ' data-propietario="' . esc_attr((string) ($contractRow['propietario'] ?? $ticket['propietario'] ?? '')) . '"'
+      . ' data-copropietarios="' . esc_attr(\SCM\Modules\LeaseContracts\LeaseContractsView::coOwnersLabel($contractRow)) . '"'
       . ' data-correo-propietario="' . esc_attr((string) ($contractRow['correo_propietario'] ?? $ticket['correo_propietario'] ?? '')) . '"'
       . ' data-celular-propietario="' . esc_attr((string) ($contractRow['celular_propietario'] ?? $ticket['celular_propietario'] ?? '')) . '"'
       . ' data-indicativo-propietario="' . esc_attr((string) ($contractRow['indicativo_propietario'] ?? $ticket['indicativo_propietario'] ?? '')) . '"'
