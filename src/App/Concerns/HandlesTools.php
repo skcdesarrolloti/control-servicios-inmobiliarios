@@ -12,12 +12,14 @@ use SCM\Modules\Tools\CleaningQuotePdf;
 use SCM\Modules\Tools\CleaningSettings;
 use SCM\Modules\Tools\LateFeeCalculator;
 use SCM\Modules\Tools\MarketStatsService;
+use SCM\Modules\Tools\OwnerPreapprovalPdf;
+use SCM\Modules\Tools\OwnerPreapprovalService;
 use SCM\Modules\Tools\PseArchive;
 use SCM\Modules\Tools\PsePaymentFile;
 use SCM\Modules\Tools\SuperfinRateService;
 use SCM\Modules\Tools\ToolsView;
 
-/** Herramientas del encabezado: Generar PSE, Calculadora de mora, Calculadora de mercado y Calculadora de aseo. */
+/** Herramientas del encabezado: Generar PSE, Calculadora de mora, Calculadora de mercado, Calculadora de aseo y Simulador de ingreso neto. */
 trait HandlesTools
 {
   /** Formulario de Generar PSE prellenado con la última generación llevada al mes actual. */
@@ -191,6 +193,52 @@ trait HandlesTools
       $input[$key] = trim(sanitize_text_field(wp_unslash((string) ($_POST[$key] ?? ''))));
     }
     return $input;
+  }
+
+  /** Simulador de ingreso neto: contratos Entregado o Por entregar del documento del propietario. */
+  public function ajax_handler_tools_preapproval_lookup(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('herramienta_ingreso_neto')) $this->jsonFail('No tienes permiso para usar el simulador de ingreso neto del propietario.');
+    $result = [];
+    try {
+      $result = (new OwnerPreapprovalService($this->db))->lookup(sanitize_text_field(wp_unslash((string) ($_POST['document'] ?? ''))));
+    } catch (\InvalidArgumentException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      error_log('[tools-preapproval-lookup] ' . $error->getMessage());
+      $this->jsonFail('No se pudieron buscar los contratos del propietario.');
+    }
+    $this->jsonOk($result);
+  }
+
+  /** PDF de la simulación para el propietario: el servidor recalcula con lo que llegó y lo genera con Chromium. */
+  public function ajax_handler_tools_preapproval_pdf(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('herramienta_ingreso_neto')) $this->jsonFail('No tienes permiso para usar el simulador de ingreso neto del propietario.');
+    $bytes = '';
+    $estimate = [];
+    try {
+      $payload = json_decode(wp_unslash((string) ($_POST['payload'] ?? '')), true);
+      $service = new OwnerPreapprovalService($this->db);
+      $estimate = $service->estimate(is_array($payload) ? $payload : []);
+      $bytes = OwnerPreapprovalPdf::bytes($estimate, $service->signer());
+    } catch (\InvalidArgumentException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      error_log('[tools-preapproval-pdf] ' . $error->getMessage());
+      $this->jsonFail($error instanceof \RuntimeException ? $error->getMessage() : 'No se pudo generar el PDF.');
+    }
+    if (ob_get_level() > 0) ob_end_clean();
+    header_remove('Content-Type');
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="' . OwnerPreapprovalPdf::filename($estimate) . '"');
+    header('Content-Length: ' . (string) strlen($bytes));
+    header('Cache-Control: private, no-store');
+    header('X-Content-Type-Options: nosniff');
+    echo $bytes;
+    exit;
   }
 
   public function ajax_handler_tools_cleaning_calculate(): void

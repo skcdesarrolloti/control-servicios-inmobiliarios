@@ -376,6 +376,7 @@ final class SuCasaControlServiciosInmobiliarios
       'herramienta_mora' => 'Calculadora de mora',
       'herramienta_mercado' => 'Calculadora de mercado',
       'herramienta_aseo' => 'Calculadora de aseo',
+      'herramienta_ingreso_neto' => 'Simulador de ingreso neto del propietario',
     ];
   }
 
@@ -818,6 +819,10 @@ final class SuCasaControlServiciosInmobiliarios
       // Hojas de cierre es nueva: mientras no se guarden permisos que la conozcan, la ve quien ve contratos o servicios.
       if (!in_array('hojas_cierre', $knownTabs, true) && array_intersect(['contratos_arrendamiento', 'servicios_publicos_pendientes'], (array) $raw[$cargo]) !== []) {
         $raw[$cargo] = array_merge((array) $raw[$cargo], ['hojas_cierre']);
+      }
+      // El simulador de ingreso neto es nuevo: mientras no se guarden permisos que lo conozcan, lo ve quien ve Créditos.
+      if (!in_array('herramienta_ingreso_neto', $knownTabs, true) && in_array('credito_propietario', (array) $raw[$cargo], true)) {
+        $raw[$cargo] = array_merge((array) $raw[$cargo], ['herramienta_ingreso_neto']);
       }
     }
     return $this->sanitizeDashboardPermissions($raw);

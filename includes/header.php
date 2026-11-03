@@ -319,6 +319,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'herramienta_mercado';
   } elseif (in_array($tabParam, ['herramienta_aseo', 'calculadora_aseo', 'aseo', 'scm-panel-herramienta-aseo'], true)) {
     $current_page = 'herramienta_aseo';
+  } elseif (in_array($tabParam, ['herramienta_ingreso_neto', 'simulador_ingreso_neto', 'ingreso_neto', 'scm-panel-herramienta-ingreso-neto'], true)) {
+    $current_page = 'herramienta_ingreso_neto';
   } else {
     $current_page = empty($tabParam) ? 'inicio' : 'abiertos';
   }
@@ -721,6 +723,15 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=herramienta_aseo',
         'icon' => 'cleaning_services',
         'perms' => ['herramienta_aseo'],
+      ],
+      'herramienta_ingreso_neto' => [
+        'key' => 'herramienta_ingreso_neto',
+        'label' => 'Simulador de ingreso neto',
+        'description' => 'Ingreso neto del propietario y crédito preaprobado',
+        'panel_id' => 'scm-panel-herramienta-ingreso-neto',
+        'url' => $baseUrl . '/index.php?tab=simulador_ingreso_neto',
+        'icon' => 'savings',
+        'perms' => ['herramienta_ingreso_neto'],
       ],
     ],
   ],

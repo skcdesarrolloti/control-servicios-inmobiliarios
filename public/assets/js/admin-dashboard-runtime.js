@@ -26215,6 +26215,7 @@
         activePanel.id !== "scm-panel-herramienta-mora" &&
         activePanel.id !== "scm-panel-herramienta-mercado" &&
         activePanel.id !== "scm-panel-herramienta-aseo" &&
+        activePanel.id !== "scm-panel-herramienta-ingreso-neto" &&
         !dashboardFilterOptionsLoaded &&
         !skipFilterOptions
       ) {

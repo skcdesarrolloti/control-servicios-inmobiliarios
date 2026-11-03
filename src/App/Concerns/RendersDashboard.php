@@ -195,6 +195,10 @@ trait RendersDashboard
       'calculadora_aseo' => 'scm-panel-herramienta-aseo',
       'aseo' => 'scm-panel-herramienta-aseo',
       'scm-panel-herramienta-aseo' => 'scm-panel-herramienta-aseo',
+      'herramienta_ingreso_neto' => 'scm-panel-herramienta-ingreso-neto',
+      'simulador_ingreso_neto' => 'scm-panel-herramienta-ingreso-neto',
+      'ingreso_neto' => 'scm-panel-herramienta-ingreso-neto',
+      'scm-panel-herramienta-ingreso-neto' => 'scm-panel-herramienta-ingreso-neto',
       'ocupaciones' => 'scm-panel-movimientos-contratos',
       'desocupaciones' => 'scm-panel-movimientos-contratos',
       'ocupaciones_vs_desocupaciones' => 'scm-panel-movimientos-contratos',
@@ -418,6 +422,7 @@ trait RendersDashboard
       'scm-panel-herramienta-mora' => 'herramienta_mora',
       'scm-panel-herramienta-mercado' => 'herramienta_mercado',
       'scm-panel-herramienta-aseo' => 'herramienta_aseo',
+      'scm-panel-herramienta-ingreso-neto' => 'herramienta_ingreso_neto',
     ];
     if ($initialTab !== '') {
       $initialTabPermissionKey = $dashboardPanelToTab[$initialTab] ?? '';
@@ -763,6 +768,7 @@ trait RendersDashboard
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/preventive-review.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/preventive-review.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/contract-movements.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/contract-movements.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/contract-ownership.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/contract-ownership.css'))); ?>" media="all">
+    <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/owner-net-income.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/owner-net-income.css'))); ?>" media="all">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" defer></script>
@@ -1454,6 +1460,11 @@ trait RendersDashboard
           <?php echo (new \SCM\Modules\Tools\ToolsView())->cleaning($this->canSeeCleaningInternal(), (new \SCM\Modules\Tools\CleaningSettings($this->db))->read()); ?>
         </div>
         <?php endif; ?>
+        <?php if (in_array('herramienta_ingreso_neto', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-herramienta-ingreso-neto' ? ' active' : ''; ?>" id="scm-panel-herramienta-ingreso-neto" data-permission-tab="herramienta_ingreso_neto" data-scm-loaded="0">
+          <?php echo \SCM\Modules\Tools\OwnerPreapprovalView::render(new \SCM\Modules\Tools\OwnerPreapprovalService($this->db)); ?>
+        </div>
+        <?php endif; ?>
       <?php endif; ?>
 
       <?php // Créditos (Actividades Administrativas): panel propio, no depende de Métricas. ?>
@@ -1511,6 +1522,7 @@ trait RendersDashboard
     <script src="<?php echo $canonInsuranceAuditJsUrl; ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-owner-credits.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-owner-credits.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-tools.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-tools.js'))); ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/owner-net-income.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/owner-net-income.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-administrative-reports.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-administrative-reports.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-closing-sheets.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-closing-sheets.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-movements.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-movements.js'))); ?>" defer></script>
