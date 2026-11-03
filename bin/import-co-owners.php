@@ -24,8 +24,12 @@ foreach (array_slice($argv, 1) as $arg) {
   if (str_starts_with($arg, '--funcionario=')) $author = trim(substr($arg, strlen('--funcionario=')));
   elseif (!str_starts_with($arg, '--')) $file = $arg;
 }
-if ($file === '' || !is_file($file)) {
+if ($file === '') {
   fwrite(STDERR, "Uso: php bin/import-co-owners.php <archivo.xlsx|.csv|.xls> [--aplicar --funcionario=<id_empleado>]\n");
+  exit(1);
+}
+if (!is_file($file)) {
+  fwrite(STDERR, "No se encontró el archivo: " . (str_starts_with($file, '/') ? $file : getcwd() . '/' . $file) . "\nSúbelo al servidor (por ejemplo a la carpeta del panel) o escribe la ruta completa entre comillas.\n");
   exit(1);
 }
 $db = \SCM\Core\App::db();
