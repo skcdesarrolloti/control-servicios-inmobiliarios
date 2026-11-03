@@ -203,25 +203,13 @@ final class LeaseContractCreationService
     }
   }
 
-  /**
-   * Propietarios 1..`propietarios` del mandato, con la numeración del mandato (como el plugin `skc_coprop_owners`).
-   * @param list<string> $warnings @return list<array{index:int,name:string,document:string,owner_id:string,percent:string}>
-   */
+  /** @param list<string> $warnings @return list<array{index:int,name:string,document:string,owner_id:string,percent:string}> */
   private function mandateOwners(array $mandate, array &$warnings): array
   {
+    $owners = ContractCoOwners::mandateOwners($mandate, $skipped);
     $count = max(1, min(ContractCoOwners::MAX, (int) ($mandate['propietarios'] ?? 1)));
-    $owners = [];
-    for ($i = 1; $i <= $count; $i++) {
-      $name = trim((string) ($mandate['nombre_' . $i] ?? ''));
-      $document = trim((string) ($mandate['documento_' . $i] ?? ''));
-      if ($name === '' && $document === '') {
-        if ($i > 1) {
-          $warnings[] = 'El mandato indica ' . $count . ' propietarios, pero el propietario ' . $i . ' no tiene nombre ni documento; no se copia.';
-        }
-        continue;
-      }
-      $id = trim((string) ($mandate['id_propietario_nuevo_' . $i] ?? '')) ?: ($i === 1 ? trim((string) ($mandate['id_propietario'] ?? '')) : '');
-      $owners[] = ['index' => $i, 'name' => $name, 'document' => $document, 'owner_id' => ctype_digit($id) ? $id : '', 'percent' => self::percent($mandate['porcentaje_' . $i] ?? '')];
+    foreach (array_diff($skipped, [1]) as $i) {
+      $warnings[] = 'El mandato indica ' . $count . ' propietarios, pero el propietario ' . $i . ' no tiene nombre ni documento; no se copia.';
     }
     return $owners;
   }
@@ -242,7 +230,7 @@ final class LeaseContractCreationService
         continue;
       }
       $id = trim((string) ($closing['id_propietario' . $suffix] ?? ''));
-      $owners[] = ['index' => $i, 'name' => $name, 'document' => $document, 'owner_id' => ctype_digit($id) ? $id : '', 'percent' => self::percent($closing['porcentaje_' . $i] ?? '')];
+      $owners[] = ['index' => $i, 'name' => $name, 'document' => $document, 'owner_id' => ctype_digit($id) ? $id : '', 'percent' => ContractCoOwners::percentValue($closing['porcentaje_' . $i] ?? '')];
     }
     return $owners;
   }
@@ -284,13 +272,6 @@ final class LeaseContractCreationService
   private static function ownersKey(array $owners): string
   {
     return implode('|', array_map(static fn(array $o): string => $o['index'] . ':' . OwnerCreditPromissoryService::normalizeDocument((string) $o['document']) . ':' . $o['percent'], $owners));
-  }
-
-  /** "33,34 %" → "33.34"; vacío o inválido → "". */
-  private static function percent(mixed $value): string
-  {
-    $number = ContractCoOwners::number($value);
-    return $number === null ? '' : rtrim(rtrim(number_format(round($number, 2), 2, '.', ''), '0'), '.');
   }
 
   /**

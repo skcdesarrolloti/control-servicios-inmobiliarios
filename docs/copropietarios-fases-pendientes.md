@@ -37,17 +37,9 @@ contrato de arrendamiento, y que los créditos a propietarios respeten ese %:
 | Columnas en la base de datos | `cierres` y `contratos_arrendamiento` ya tienen `propietarios`, `id_propietario_2..6` y `porcentaje_1..6`. `contrato_mandato` tiene `porcentaje_1..6` y usa `id_propietario_nuevo_N` para los ids (no `id_propietario_N`). | — |
 | **Fase 5:** al crear el contrato desde «No asignado», `LeaseContractCreationService::coOwners()` copia `propietarios`, `id_propietario_2..6` y `porcentaje_1..6` del mandato (o de la hoja si el mandato no los tiene). Solo escribe lo que tiene valor. El formulario muestra el bloque «Copropietarios» de solo lectura con avisos: no suman 100, falta %, la hoja no coincide con el mandato, un dueño vacío o sin ficha. Los avisos nunca bloquean y se repiten en el resultado. Un copropietario sin id se busca en Propietarios por documento; si no tiene ficha, queda el aviso (se registra desde el mandato o la hoja). | `src/Modules/LeaseContracts/LeaseContractCreationService.php`, `LeaseContractCreateView.php`, `tests/lease-contract-creation-check.php` | ver `git log` |
 
+| **Fase 3 (código):** `bin/sync-co-owners.php` (`CoOwnersBackfill`). Hace tres cosas: (1) vincula por documento o registra en Propietarios a los dueños 2..N de los mandatos con más de un propietario y llena `id_propietario_nuevo_N`; (2) completa en los contratos solo las columnas vacías desde el mandato y lista como conflicto los valores distintos; (3) lista los contratos con copropietarios sin % válido. Repetirlo no cambia nada. **Falta correrlo en el servidor**: primero `php bin/sync-co-owners.php` (solo muestra), revisar conflictos y luego `--aplicar --funcionario=<id_empleado>`. | `src/Modules/LeaseContracts/CoOwnersBackfill.php`, `bin/sync-co-owners.php`, `tests/co-owners-backfill-check.php` | ver `git log` |
+
 ## Fases pendientes (orden recomendado)
-
-### 2. Fase 3: completar los datos existentes
-
-Script en `bin/` con modo de prueba primero (solo muestra) y luego `--aplicar`:
-
-1. Mandatos con `propietarios > 1`: registrar en `wp_jet_cct_propietarios` a los propietarios 2..N que no tengan ficha
-   (buscar por documento normalizado con `OwnerCreditPromissoryService::normalizeDocument`) y llenar
-   `id_propietario_nuevo_N`.
-2. Contratos de arrendamiento: llenar `propietarios`, `id_propietario_2..6` y `porcentaje_1..6` desde su mandato.
-3. Listado final de contratos con copropietarios sin %, para cargarlos en el mandato (plugin o hoja de cierre).
 
 ### 3. Fase 6: créditos, cálculo según el % (`src/Modules/OwnerCredits/`)
 
@@ -95,7 +87,7 @@ Script en `bin/` con modo de prueba primero (solo muestra) y luego `--aplicar`:
 ## Verificación por fase
 
 - Panel: `php tests/owner-credit-flow-check.php`, `owner-credit-check.php`, `owner-credit-coverage-check.php`,
-  `owner-credit-prepayment-check.php`, `contract-co-owners-check.php` y la nueva `lease-contract-creation-check.php`.
+  `owner-credit-prepayment-check.php`, `contract-co-owners-check.php` y `lease-contract-creation-check.php` y `co-owners-backfill-check.php`.
   Casos: personal al 30 % → cupo del 30 %; reparaciones → 100 % y firman 3; sin % → partes iguales y política en rojo;
   créditos antiguos sin cambio.
 - Navegador: liquidador (personal y reparaciones con 3 copropietarios), bloque de copropietarios al crear el contrato y
@@ -126,4 +118,4 @@ Falta decidir si se quita del formulario y queda solo en la vista y la carpeta.
 
 1. `git pull` en `main`.
 2. Leer este documento, `AGENTS.md`, `docs/hoja-cierre-nativa.md` y `docs/cct-agregar-columnas.md`.
-3. Seguir con la Fase 3. Si hace falta una columna CCT nueva, usar `bin/cct-add-fields.php`, nunca `ALTER TABLE`.
+3. Seguir con la Fase 6 (y correr la Fase 3 en el servidor). Si hace falta una columna CCT nueva, usar `bin/cct-add-fields.php`, nunca `ALTER TABLE`.

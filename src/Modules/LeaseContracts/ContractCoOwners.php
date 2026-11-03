@@ -172,6 +172,37 @@ final class ContractCoOwners
     return array_map(static fn(float $value): float => $value / $sum, $values);
   }
 
+  /**
+   * Filas de propietarios 1..`propietarios` del mandato con su numeración, como el plugin `skc_coprop_owners`: se salta
+   * el que no tiene nombre ni documento (mandatos viejos con `propietarios=2` y el dueño 2 vacío).
+   * @param list<int>|null $skipped índices saltados
+   * @return list<array{index:int,name:string,document:string,owner_id:string,percent:string}>
+   */
+  public static function mandateOwners(array $mandate, ?array &$skipped = null): array
+  {
+    $skipped = [];
+    $count = max(1, min(self::MAX, (int) ($mandate['propietarios'] ?? 1)));
+    $owners = [];
+    for ($i = 1; $i <= $count; $i++) {
+      $name = trim((string) ($mandate['nombre_' . $i] ?? ''));
+      $document = trim((string) ($mandate['documento_' . $i] ?? ''));
+      if ($name === '' && $document === '') {
+        $skipped[] = $i;
+        continue;
+      }
+      $id = trim((string) ($mandate['id_propietario_nuevo_' . $i] ?? '')) ?: ($i === 1 ? trim((string) ($mandate['id_propietario'] ?? '')) : '');
+      $owners[] = ['index' => $i, 'name' => $name, 'document' => $document, 'owner_id' => ctype_digit($id) ? $id : '', 'percent' => self::percentValue($mandate['porcentaje_' . $i] ?? '')];
+    }
+    return $owners;
+  }
+
+  /** Porcentaje como se guarda: punto decimal, máximo 2 decimales, sin "%" ("33,34 %" → "33.34"); vacío o inválido → "". */
+  public static function percentValue(mixed $value): string
+  {
+    $number = self::number($value);
+    return $number === null ? '' : rtrim(rtrim(number_format(round($number, 2), 2, '.', ''), '0'), '.');
+  }
+
   /** "33,34" o "33.34 %" → 33.34; vacío o inválido → null. */
   public static function number($value): ?float
   {
