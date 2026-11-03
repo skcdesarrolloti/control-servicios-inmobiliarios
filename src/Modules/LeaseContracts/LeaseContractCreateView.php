@@ -164,7 +164,8 @@ final class LeaseContractCreateView
   }
 
   /**
-   * Copropietarios y su % de participación, de solo lectura: se copian del mandato o de la hoja de cierre.
+   * Copropietarios y su % de participación, de solo lectura: se copian del mandato o de la hoja de cierre. El principal
+   * se edita en la tarjeta «Propietario»; cada copropietario lleva su tarjeta con nombre, documento, contacto y %.
    * @param array{owners?:list<array<string,mixed>>,source?:string,source_id?:string,valid?:bool,warnings?:list<string>} $co
    */
   private function coOwners(array $co): string
@@ -174,12 +175,26 @@ final class LeaseContractCreateView
     if (count($owners) <= 1 && $warnings === []) {
       return '';
     }
-    $rows = '';
+    $percentText = static fn(array $owner): string => (string) ($owner['percent'] ?? '') !== '' ? str_replace('.', ',', (string) $owner['percent']) . ' %' : 'Sin %';
+    $readonly = static fn(string $label, string $value, string $extra = ''): string => '<label class="!sp-block ' . $extra . '"><span class="' . UI::LABEL . '">' . esc_html($label) . '</span>'
+      . '<input class="' . UI::INPUT . ' !sp-bg-slate-50 !sp-text-service-muted" type="text" value="' . esc_attr($value !== '' ? $value : '—') . '" readonly tabindex="-1"></label>';
+    $principal = '';
+    $cards = '';
     foreach ($owners as $owner) {
-      $percent = (string) ($owner['percent'] ?? '');
-      $rows .= '<tr class="!sp-border-0 !sp-border-t !sp-border-solid !sp-border-slate-100"><td class="!sp-py-2 !sp-pr-3 !sp-font-semibold">' . esc_html((string) $owner['name']) . ((int) $owner['index'] === 1 ? ' <span class="!sp-text-[9px] !sp-font-bold !sp-uppercase !sp-text-service-muted">Principal</span>' : '') . '</td>'
-        . '<td class="!sp-py-2 !sp-pr-3">' . esc_html((string) $owner['document'] !== '' ? (string) $owner['document'] : '—') . '</td>'
-        . '<td class="!sp-py-2 !sp-text-right !sp-font-bold">' . ($percent !== '' ? esc_html(str_replace('.', ',', $percent)) . ' %' : '<span class="!sp-text-rose-700">Sin %</span>') . '</td></tr>';
+      $percent = $percentText($owner);
+      $percentPill = '<span class="!sp-px-2 !sp-py-0.5 !sp-rounded-full !sp-border !sp-border-solid ' . ($percent === 'Sin %' ? '!sp-border-rose-200 !sp-bg-rose-50 !sp-text-rose-700' : '!sp-border-blue-200 !sp-bg-blue-50 !sp-text-blue-700') . ' !sp-text-[9px] !sp-font-bold">' . esc_html($percent) . '</span>';
+      if ((int) $owner['index'] === 1) {
+        $principal = '<p class="!sp-m-0 !sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2 !sp-text-[11px]"><span class="!sp-text-[9px] !sp-font-bold !sp-uppercase !sp-text-service-muted">Propietario principal</span><strong>' . esc_html((string) $owner['name']) . '</strong>' . $percentPill . '<span class="!sp-text-[10px] !sp-text-service-muted">(sus datos van en la tarjeta «Propietario»)</span></p>';
+        continue;
+      }
+      $phone = trim((string) ($owner['phone'] ?? ''));
+      $code = trim((string) ($owner['indicativo'] ?? ''));
+      $cards .= '<div class="!sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-white" data-lease-co-owner="' . (int) $owner['index'] . '">'
+        . '<div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-2"><span class="!sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide">Copropietario ' . (int) $owner['index'] . '</span>' . $percentPill . '</div>'
+        . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-3">'
+        . $readonly('Nombre', (string) $owner['name']) . $readonly('Documento', (string) $owner['document'])
+        . $readonly('Correo', (string) ($owner['email'] ?? '')) . $readonly('Celular', $phone !== '' && $code !== '' && !str_starts_with($phone, '+') ? '+' . ltrim($code, '+') . ' ' . $phone : $phone)
+        . '</div></div>';
     }
     $source = match ((string) ($co['source'] ?? '')) {
       'mandato' => 'Copiados del contrato de mandato #' . (string) ($co['source_id'] ?? ''),
@@ -193,7 +208,8 @@ final class LeaseContractCreateView
       : '';
     return '<fieldset class="' . self::SECTION . '" data-lease-co-owners><legend class="' . self::LEGEND . '">Copropietarios</legend><div class="!sp-clear-both !sp-space-y-3">'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2"><span class="!sp-text-[10px] !sp-text-service-muted">' . esc_html($source) . ($source !== '' ? '. ' : '') . 'Solo lectura: se corrigen en el mandato o en la hoja de cierre.</span>' . $pill . '</div>'
-      . ($rows !== '' ? '<div class="!sp-overflow-x-auto"><table class="!sp-w-full !sp-border-collapse !sp-text-[11px]"><thead><tr class="!sp-text-left !sp-text-[9px] !sp-uppercase !sp-text-service-muted"><th class="!sp-pb-1 !sp-pr-3">Propietario</th><th class="!sp-pb-1 !sp-pr-3">Documento</th><th class="!sp-pb-1 !sp-text-right">Participación</th></tr></thead><tbody>' . $rows . '</tbody></table></div>' : '')
+      . $principal
+      . ($cards !== '' ? '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-2 !sp-gap-3">' . $cards . '</div>' : '')
       . $this->warnings($warnings) . '</div></fieldset>';
   }
 

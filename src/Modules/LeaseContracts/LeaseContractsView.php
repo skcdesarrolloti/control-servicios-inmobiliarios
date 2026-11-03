@@ -205,7 +205,15 @@ final class LeaseContractsView
 
     $html .= '<div class="!sp-grid !sp-grid-cols-1 md:!sp-grid-cols-2 !sp-gap-4">';
     $coOwners = self::coOwnersLabel($c);
-    $html .= $this->party('Propietario', $coOwners !== '' ? 'Titular · ' . $coOwners : 'Titular', $v('propietario'), $v('documento_propietario'), $v('correo_propietario'), $v('celular_propietario'));
+    $share = static fn(int $i): string => $v('porcentaje_' . $i) !== '' ? ' · ' . str_replace('.', ',', $v('porcentaje_' . $i)) . ' %' : '';
+    $html .= $this->party('Propietario', ($coOwners !== '' ? 'Titular · ' . $coOwners : 'Titular') . ($coOwners !== '' ? $share(1) : ''), $v('propietario'), $v('documento_propietario'), $v('correo_propietario'), $v('celular_propietario'));
+    // Cada copropietario con sus datos y su participación (columnas propietario_N… del contrato).
+    $total = min(ContractCoOwners::CONTRACT_MAX, (int) ($c['propietarios'] ?? 1));
+    for ($i = 2; $i <= $total; $i++) {
+      if ($v('propietario_' . $i) !== '' || $v('documento_propietario_' . $i) !== '') {
+        $html .= $this->party('Copropietario ' . $i, 'Copropietario' . $share($i), $v('propietario_' . $i), $v('documento_propietario_' . $i), $v('correo_propietario_' . $i), $v('celular_propietario_' . $i));
+      }
+    }
     $html .= $this->party('Arrendatario', 'Activo', $v('arrendatario'), $v('documento_arrendatario'), $v('correo_arrendatario'), $v('celular_arrendatario'));
     for ($i = 1; $i <= 4; $i++) {
       if ($v('codeudor_' . $i) !== '') {
