@@ -98,6 +98,7 @@ $assert(str_contains($panel, 'name="hab_piso[1]" min="0" max="30" step="1" input
 $assert(str_contains($panel, 'name="piso" min="1" max="10" step="1" inputmode="numeric" required value="1"'), 'Piso es la cantidad de pisos (numérica) y no se toma del meta "piso" del inmueble.');
 $assert(str_contains($panel, 'name="espacios[habitacion_p1][2][tipo]"') && str_contains($panel, '<option value="Principal" selected>') && str_contains($panel, '<option value="De servicio">'), 'Debe haber una ficha por habitación con el tipo en una lista.');
 $assert(!str_contains($panel, 'data-delivery-list="esp-hab_ser"') && !str_contains($panel, 'data-delivery-list="esp-bano_ser"'), 'Habitación y baño de servicio se eligen como tipo, no como sección aparte.');
+$assert(str_contains($panel, 'data-delivery-list="esp-fachada"') && str_contains($panel, 'data-delivery-list="esp-cocina_p1"') && str_contains($panel, 'data-delivery-list="esp-garaje_p1"') && !str_contains($panel, 'data-delivery-list="esp-cocina"'), 'Exteriores son generales; los demás espacios van por piso.');
 $assert(str_contains($panel, 'Vacío hacia pasillo') && str_contains($panel, 'value="523279"'), 'Linderos y póliza deben venir del contrato.');
 $assert(!str_contains($panel, 'ac_pago') && !str_contains($panel, 'resultado'), 'Acuerdo de pago y resultado de la revisión ya no se piden.');
 
@@ -124,7 +125,10 @@ $post = [
     'habitacion_p2' => [$space(['Paredes'], 'Rayón en la puerta', 'Secundaria'), $space(['Lampara'], '', 'De servicio'), $space([])],
     'habitacion_p3' => [$space(['Paredes'], 'Piso que no existe', 'Secundaria')],
     'bano_p1' => [$space(['Ducha', 'Espejos'], '', 'Principal')],
-    'cocina' => [$space(['Estufa', 'Valor que ya no está en el glosario'])],
+    'cocina_p1' => [$space(['Estufa', 'Valor que ya no está en el glosario'])],
+    'cocina_p2' => [$space(['Meson'], 'Cocineta del segundo piso')],
+    'fachada' => [$space(['Frontal'])],
+    'cocina' => [$space(['No debe guardarse: la cocina va por piso'])],
   ],
   'servicios_publicos' => ['Agua', 'Energia'],
   'servicios' => [
@@ -161,7 +165,9 @@ $assert(count($rooms) === 2 && $rooms['item-0']['tipo_habitacion'] === 'Principa
 $serviceRooms = unserialize($review['hab_ser']);
 $assert(count($serviceRooms) === 1 && $serviceRooms['item-0']['contiene_hab_servicio'] === ['Lampara'] && $serviceRooms['item-0']['piso_hab_servicio'] === '2' && $review['bano_ser'] === '', 'La habitación de servicio debe guardarse en hab_ser.');
 $assert(!str_contains($review['habitacion'], 'Piso que no existe'), 'Un piso por encima de la cantidad de pisos no se guarda.');
-$assert(in_array('Valor que ya no está en el glosario', unserialize($review['cocina'])['item-0']['contiene_cocina'], true), 'Al editar no se deben perder opciones antiguas.');
+$kitchens = unserialize($review['cocina']);
+$assert(count($kitchens) === 2 && in_array('Valor que ya no está en el glosario', $kitchens['item-0']['contiene_cocina'], true) && $kitchens['item-0']['piso_cocina'] === '1' && $kitchens['item-1']['piso_cocina'] === '2', 'La cocina se guarda por piso y conserva opciones antiguas.');
+$assert(unserialize($review['fachada'])['item-0']['contiene_fachada'] === ['Frontal'] && !isset(unserialize($review['fachada'])['item-0']['piso_fachada']), 'La fachada es general, sin piso.');
 $assert($review['conjunto'] === '' && $review['deposito'] === '' && unserialize($review['inmueble_rep'])['item-0']['cenit_inmueble'] === 'Apto 6A' && unserialize($review['parqueadero'])['item-0']['num_parqueadero'] === '14', 'Los linderos no se guardaron bien.');
 $assert(unserialize($review['servicios_publicos']) === ['Agua', 'Energia'] && $review['num_ser_gas'] === '' && $review['ob_num_ser_gas'] === '', 'Un servicio inactivo no debe guardar datos.');
 $assert($review['valor_fac_ag'] === '186440' && $review['fc_pago_ag'] === '2026-09-19' && $review['ob_fac_agua'] === 'Factura al día' && $review['ob_lec_agua'] === 'Ninguna', 'Los datos del agua no se guardaron.');
@@ -205,7 +211,7 @@ $assert((int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket 
 // Informe público nativo.
 $public = (new \SCM\Modules\DeliveryReview\DeliveryReviewPublicView($db))->render($reviewId);
 $content = $public['content'];
-$assert($public['status'] === 200 && str_contains($content, 'Revisión antes de la ocupación #' . $reviewId) && str_contains($content, 'Habitación · Principal · Piso 1') && str_contains($content, 'Habitación 1 · Secundaria · Piso 2') && str_contains($content, 'Habitación 2 · De servicio · Piso 2') && str_contains($content, 'Pisos') && str_contains($content, 'Rayón en la puerta'), 'El informe público no muestra los espacios.');
+$assert($public['status'] === 200 && str_contains($content, 'Revisión antes de la ocupación #' . $reviewId) && str_contains($content, '>Exteriores</h3>') && str_contains($content, '>Piso 2</h3>') && str_contains($content, 'Habitación · Principal') && str_contains($content, 'Habitación 1 · Secundaria') && str_contains($content, 'Habitación 2 · De servicio') && str_contains($content, 'Cocineta del segundo piso') && str_contains($content, 'Pisos') && str_contains($content, 'Rayón en la puerta'), 'El informe público no muestra los espacios.');
 $assert(str_contains($content, 'Linderos') && str_contains($content, 'Apto 6A') && str_contains($content, '$186.440') && str_contains($content, 'Internet'), 'El informe no muestra linderos o servicios.');
 $assert(str_contains($content, 'embeddedfolderview?id=16zrd23ypbnQljUJGrsymrHAxFJ4bFCf0') && str_contains($content, 'Realizado por') && !str_contains($content, 'Sucursal') && !str_contains($content, 'target="_blank"'), 'El informe debe abrir las fotos en la misma página, cerrar con "Realizado por" y no mostrar sucursal.');
 $url = \SCM\App\SuCasaControlServiciosInmobiliarios::signedDeliveryReviewPublicUrl($reviewId);

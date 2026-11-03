@@ -25,7 +25,10 @@ Servicios → Resumen**.
   de lo registrado en el inmueble, en el piso 1), parqueadero, depósito y enlace del registro fotográfico. El meta `piso`
   de WordPress no se usa ni se modifica (puede ser el piso donde queda el apartamento).
 - Linderos: conjunto, torre, inmueble (obligatorio), parqueaderos y depósitos (solo si aplica).
-- Espacios: un bloque por piso con una ficha por habitación y por baño. El **tipo** es una lista (habitación: Principal,
+- Espacios: los exteriores (conjunto, torre y fachada) se registran una vez; todo lo interior (habitaciones, baños,
+  sala-comedor, cocina, área de labores, garaje y patio) se registra en un bloque por piso, y cada fila guarda su piso
+  (`piso_cocina`, `piso_habitacion`, …; las revisiones antiguas sin piso quedan en el piso 1). Hay una ficha por
+  habitación y por baño según la cantidad de cada piso. El **tipo** es una lista (habitación: Principal,
   Secundaria, Estudio, De servicio; baño: Principal, Social, Privado, Auxiliar, De servicio). Habitación y baño de
   servicio ya no son secciones aparte: se eligen en el tipo y se guardan en `hab_ser` / `bano_ser`. Cada fila guarda
   su piso (`piso_habitacion`, `piso_bano`, …). Los tipos escritos a mano en revisiones antiguas ("#1 o Principal",

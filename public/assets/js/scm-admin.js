@@ -3886,7 +3886,7 @@
       if (counter) {
         counter.textContent = rows.length
           ? rows.length + " registrado(s)"
-          : "No aplica: agrégalo si el inmueble lo tiene";
+          : "No aplica: agrégalo si el " + (list.closest("[data-delivery-floor]") ? "piso" : "inmueble") + " lo tiene";
       }
     }
     // Habitaciones y baños usan una plantilla por tipo de espacio con el piso como variable.
@@ -3897,7 +3897,7 @@
         if (!silent) helpers.message("Máximo 30 filas por sección.", true);
         return null;
       }
-      var floorMatch = key.match(/^(esp-[a-z]+)_p(\d+)$/);
+      var floorMatch = key.match(/^(esp-[a-z_]+)_p(\d+)$/);
       var index = String(rowsOf(list).length);
       var row = floorMatch
         ? fromTemplate('template[data-delivery-template="' + floorMatch[1] + '"]', { __FLOOR__: floorMatch[2], __INDEX__: index })
@@ -3988,7 +3988,7 @@
       countsBox.classList.toggle("is-single", actual === 1);
       floorBlocks().forEach(function (block) {
         var title = block.querySelector("[data-delivery-floor-title]");
-        if (title) title.textContent = actual === 1 ? "Habitaciones y baños" : "Piso " + block.getAttribute("data-delivery-floor");
+        if (title) title.textContent = actual === 1 ? "Espacios interiores" : "Piso " + block.getAttribute("data-delivery-floor");
       });
       return actual;
     }

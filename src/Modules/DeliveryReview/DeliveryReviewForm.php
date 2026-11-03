@@ -89,8 +89,11 @@ final class DeliveryReviewForm
     ];
   }
 
-  /** Espacios que se agregan con una fila al crear (los demás se agregan si el inmueble los tiene). */
+  /** Espacios del piso 1 que se agregan con una fila al crear (los demás se agregan si el inmueble los tiene). */
   public const DEFAULT_SPACES = ['fachada', 'sala_comedor_hall', 'cocina', 'area_labores'];
+
+  /** Exteriores: se registran una vez para todo el inmueble. Los demás espacios se registran por piso. */
+  public const GENERAL_SPACES = ['pano_conjunto', 'pano_torre', 'fachada'];
 
   public const MAX_FLOORS = 10;
   public const SERVICE_TYPE = 'De servicio';
@@ -98,8 +101,17 @@ final class DeliveryReviewForm
   /** Habitación y baño de servicio se eligen como tipo dentro de habitaciones y baños; se guardan en sus columnas. */
   public const MERGED = ['habitacion' => 'hab_ser', 'bano' => 'bano_ser'];
 
-  /** Piso de cada habitación o baño dentro de la fila del repeater. */
-  public const FLOOR_KEYS = ['habitacion' => 'piso_habitacion', 'bano' => 'piso_bano', 'hab_ser' => 'piso_hab_servicio', 'bano_ser' => 'piso_bano_servicio'];
+  /** Clave del piso dentro de la fila del repeater (piso_habitacion, piso_cocina…). */
+  public static function floorKey(string $space): string
+  {
+    return ['hab_ser' => 'piso_hab_servicio', 'bano_ser' => 'piso_bano_servicio'][$space] ?? 'piso_' . $space;
+  }
+
+  /** Espacios interiores que se registran en cada piso, en el orden del formulario. @return list<string> */
+  public static function floorSpaces(): array
+  {
+    return array_values(array_filter(array_keys(self::spaces()), static fn(string $key): bool => !in_array($key, self::GENERAL_SPACES, true) && !in_array($key, self::MERGED, true)));
+  }
 
   /** @return list<string> */
   public static function typeOptions(string $space): array
@@ -134,20 +146,25 @@ final class DeliveryReviewForm
   }
 
   /**
-   * Habitaciones y baños (incluidos los de servicio) agrupados por piso, con tipo, contenido y observación.
+   * Espacios interiores agrupados por piso (habitación y baño de servicio quedan como tipo "De servicio").
+   * Las filas antiguas sin piso van al piso 1.
    *
    * @param array<string,mixed> $review
    * @return array<int,array<string,list<array{tipo:string,contiene:list<string>,observacion:string}>>>
    */
-  public static function roomsByFloor(array $review): array
+  public static function spacesByFloor(array $review): array
   {
     $spaces = self::spaces();
     $out = [];
-    foreach (self::MERGED as $base => $service) {
-      foreach ([$base, $service] as $key) {
+    foreach (self::floorSpaces() as $base) {
+      $sources = isset(self::MERGED[$base]) ? [$base, self::MERGED[$base]] : [$base];
+      foreach ($sources as $key) {
         foreach (self::rows($review[$key] ?? '') as $row) {
-          $floor = max(1, min(self::MAX_FLOORS, (int) ($row[self::FLOOR_KEYS[$key]] ?? 1)));
-          $type = $key === $service ? self::SERVICE_TYPE : self::normalizeType($base, (string) ($row[$spaces[$base]['type']] ?? ''));
+          $floor = max(1, min(self::MAX_FLOORS, (int) ($row[self::floorKey($key)] ?? 1)));
+          $type = '';
+          if (isset(self::MERGED[$base])) {
+            $type = $key !== $base ? self::SERVICE_TYPE : self::normalizeType($base, (string) ($row[$spaces[$base]['type']] ?? ''));
+          }
           $out[$floor][$base][] = [
             'tipo' => $type,
             'contiene' => self::values($row[$spaces[$key]['contains']] ?? []),

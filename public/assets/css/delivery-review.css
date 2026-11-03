@@ -355,6 +355,12 @@
   font-weight: 600;
 }
 
+h3.scm-delivery-public-subtitle {
+  margin: 14px 0 8px;
+  color: #1d4ed8;
+  font-size: 14px;
+}
+
 @media (max-width: 640px) {
   .scm-delivery-public-table thead {
     display: none;
@@ -381,6 +387,7 @@
   .scm-delivery-public-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .scm-delivery-public-card { padding: 6px 8px; border-radius: 8px; break-inside: avoid; page-break-inside: avoid; }
   .scm-delivery-public-card h3 { font-size: 10.5px; margin-bottom: 3px; }
+  h3.scm-delivery-public-subtitle { margin: 6px 0 4px; font-size: 11px; break-after: avoid; page-break-after: avoid; }
   .scm-delivery-public-list li,
   .scm-delivery-public-note { font-size: 9.5px; }
   .scm-delivery-public-chips span { padding: 0 5px; font-size: 8.5px; }
@@ -468,4 +475,17 @@
     grid-column: 1 / -1;
     padding-bottom: 0;
   }
+}
+
+.scm-delivery-section-title {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.scm-delivery-floor > header h3 {
+  color: #1d4ed8;
 }

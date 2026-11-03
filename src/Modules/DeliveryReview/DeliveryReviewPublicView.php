@@ -109,27 +109,30 @@ final class DeliveryReviewPublicView
   /** @param array<string,mixed> $review */
   private function spacesHtml(array $review): string
   {
-    $cards = '';
+    // Exteriores primero y luego cada piso con todos sus espacios, como se recorre el inmueble.
     $spaces = DeliveryReviewForm::spaces();
-    $byFloor = DeliveryReviewForm::roomsByFloor($review);
+    $groups = [];
+    foreach (DeliveryReviewForm::GENERAL_SPACES as $key) {
+      $rows = DeliveryReviewForm::rows($review[$key] ?? '');
+      foreach ($rows as $index => $row) {
+        $name = $spaces[$key]['item'] . (count($rows) > 1 ? ' ' . ($index + 1) : '');
+        $groups['Exteriores'][] = $this->spaceCard($name, DeliveryReviewForm::values($row[$spaces[$key]['contains']] ?? []), trim((string) ($row[$spaces[$key]['observation']] ?? '')));
+      }
+    }
+    $byFloor = DeliveryReviewForm::spacesByFloor($review);
     $multiFloor = count($byFloor) > 1 || (int) ($review['piso'] ?? 1) > 1;
-    foreach ($byFloor as $floor => $groups) {
-      foreach ($groups as $base => $rows) {
+    foreach ($byFloor as $floor => $floorSpaces) {
+      $label = $multiFloor ? 'Piso ' . $floor : 'Espacios interiores';
+      foreach ($floorSpaces as $base => $rows) {
         foreach ($rows as $index => $row) {
-          $name = $spaces[$base]['item'] . (count($rows) > 1 ? ' ' . ($index + 1) : '') . ($row['tipo'] !== '' ? ' · ' . $row['tipo'] : '') . ($multiFloor ? ' · Piso ' . $floor : '');
-          $cards .= $this->spaceCard($name, $row['contiene'], $row['observacion']);
+          $name = $spaces[$base]['item'] . (count($rows) > 1 ? ' ' . ($index + 1) : '') . ($row['tipo'] !== '' ? ' · ' . $row['tipo'] : '');
+          $groups[$label][] = $this->spaceCard($name, $row['contiene'], $row['observacion']);
         }
       }
     }
-    foreach ($spaces as $key => $space) {
-      if (isset(DeliveryReviewForm::MERGED[$key]) || in_array($key, DeliveryReviewForm::MERGED, true)) {
-        continue;
-      }
-      $rows = DeliveryReviewForm::rows($review[$key] ?? '');
-      foreach ($rows as $index => $row) {
-        $name = $space['item'] . (count($rows) > 1 ? ' ' . ($index + 1) : '');
-        $cards .= $this->spaceCard($name, DeliveryReviewForm::values($row[$space['contains']] ?? []), trim((string) ($row[$space['observation']] ?? '')));
-      }
+    $cards = '';
+    foreach ($groups as $label => $items) {
+      $cards .= '<h3 class="scm-delivery-public-subtitle">' . $this->h($label) . '</h3><div class="scm-delivery-public-cards">' . implode('', $items) . '</div>';
     }
     $photo = trim((string) ($review['registro_fotografico'] ?? ''));
     $photoHtml = '';
@@ -146,7 +149,7 @@ final class DeliveryReviewPublicView
       return '';
     }
     return '<section class="scm-corrective-public-card scm-delivery-public-section"><h2>Registro fotográfico por espacio</h2>' . $photoHtml
-      . ($cards !== '' ? '<div class="scm-delivery-public-cards">' . $cards . '</div>' : '') . '</section>';
+      . $cards . '</section>';
   }
 
   /** @param list<string> $contains */
