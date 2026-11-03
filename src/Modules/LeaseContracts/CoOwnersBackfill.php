@@ -153,6 +153,13 @@ final class CoOwnersBackfill
         $conflicts[$column] = [$current, $value];
       }
     }
+    // Nombre, documento y contacto de los copropietarios: solo se llenan si están vacíos (no son conflicto).
+    foreach ($owners as $owner) {
+      if ($owner['index'] === 1) continue;
+      foreach (ContractCoOwners::contactColumns($owner['index'], $owner) as $column => $value) {
+        if ($value !== '' && trim((string) ($contract[$column] ?? '')) === '') $fill[$column] = $value;
+      }
+    }
     return [$fill, $conflicts];
   }
 

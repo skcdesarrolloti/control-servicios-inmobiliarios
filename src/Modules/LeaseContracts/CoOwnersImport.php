@@ -134,10 +134,12 @@ final class CoOwnersImport
           }
           $data['id_propietario_' . $i] = $id;
           $data['porcentaje_' . $i] = (string) $owner['percent'];
+          $data += ContractCoOwners::contactColumns($i, self::contact($owner));
         }
         // Manda el archivo: los puestos que sobran quedan vacíos.
         for ($i = $total + 1; $i <= ContractCoOwners::CONTRACT_MAX; $i++) {
           foreach (['id_propietario_' . $i, 'porcentaje_' . $i] as $column) $data[$column] = '';
+          $data += ContractCoOwners::contactColumns($i, [], true);
         }
         $data = $this->schema->filterTableData($table, $data);
         $changes = [];
@@ -200,16 +202,30 @@ final class CoOwnersImport
     return $index;
   }
 
+  /**
+   * Datos del copropietario como los guarda el panel: correo válido, indicativo +57 para celulares colombianos y tipo
+   * de persona. @return array<string,string>
+   */
+  private static function contact(array $owner): array
+  {
+    $phone = (string) $owner['phone'];
+    return [
+      'name' => (string) $owner['name'], 'document' => (string) $owner['document'],
+      'email' => filter_var($owner['email'], FILTER_VALIDATE_EMAIL) ? (string) $owner['email'] : '', 'phone' => $phone,
+      'indicativo' => preg_match('/^3\d{9}$/', $phone) === 1 ? '+57' : '', 'type' => self::personType((string) $owner['name'], (string) $owner['document']),
+    ];
+  }
+
   /** Ficha nueva en Propietarios con los datos del archivo. */
   private function registerProfile(array $owner, string $author, string $now): string
   {
     $table = $this->db->table('jet_cct_propietarios');
-    $phone = (string) $owner['phone'];
+    $contact = self::contact($owner);
     $row = $this->schema->filterTableData($table, [
       'cct_status' => 'publish', 'cct_author_id' => $author, 'cct_created' => $now, 'cct_modified' => $now,
-      'nombre' => $owner['name'], 'documento' => $owner['document'], 'tipo_persona' => self::personType($owner['name'], $owner['document']),
-      'correo' => filter_var($owner['email'], FILTER_VALIDATE_EMAIL) ? $owner['email'] : '', 'celular' => $phone,
-      'indicativo' => preg_match('/^3\d{9}$/', $phone) === 1 ? '+57' : '', 'direccion' => $owner['address'], 'expedicion' => $owner['issued'],
+      'nombre' => $contact['name'], 'documento' => $contact['document'], 'tipo_persona' => $contact['type'],
+      'correo' => $contact['email'], 'celular' => $contact['phone'], 'indicativo' => $contact['indicativo'],
+      'direccion' => $owner['address'], 'expedicion' => $owner['issued'],
     ]);
     if ($row === [] || !$this->db->insert($table, $row)) throw new \RuntimeException('No se pudo registrar a ' . $owner['name'] . ' en Propietarios.');
     return (string) $this->db->lastInsertId();

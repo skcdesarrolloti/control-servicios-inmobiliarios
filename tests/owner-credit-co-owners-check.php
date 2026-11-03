@@ -187,4 +187,24 @@ try {
   $check(str_contains($error->getMessage(), 'Marta Tres'), 'the promissory note is not sent while a co-owner lacks document or contact');
 }
 
+// API del bot de WhatsApp: firmada, solo sobre los contratos de la persona, con la lógica del panel.
+$secret = 'bot-secret-bot-secret-123456';
+$api = new \SCM\Modules\OwnerCredits\OwnerCreditBotApi($service, $secret);
+$call = static function (array $payload, ?string $signature = null, ?int $ts = null) use ($api, $secret): array {
+  $body = json_encode($payload + ['ts' => $ts ?? time(), 'phone' => '3000000002']);
+  return $api->handle($body, $signature ?? \SCM\Modules\OwnerCredits\OwnerCreditBotApi::signature($body, $secret));
+};
+$check($call(['action' => 'list', 'document' => '222222'], 'firma-falsa')['status'] === 401 && $call(['action' => 'list', 'document' => '222222'], null, time() - 3600)['status'] === 401, 'the bot API rejects a bad signature and an old request');
+$pre = $call(['action' => 'preapproval', 'document' => '222222']);
+$data = $pre['body']['data'] ?? [];
+$check($pre['status'] === 200 && array_column($data['contracts'], 'id') === [20] && $data['contracts'][0]['owner']['key'] === 'mandato_2' && $data['contracts'][0]['repair']['amount'] > $data['preapproval']['amount'] && in_array(OwnerCreditSettings::REPAIR_PURPOSE, $data['purposes'], true), 'the bot gets the person contracts, the personal and repair caps and the purposes');
+$check($call(['action' => 'create', 'document' => '222222', 'contract_id' => 21, 'amount' => 100000, 'term' => 3, 'purpose' => 'Libre inversión'])['status'] === 422, 'the bot cannot request a credit on a contract of somebody else');
+$check($call(['action' => 'create', 'document' => '222222', 'contract_id' => 20, 'amount' => 100000, 'term' => 3, 'purpose' => 'Viaje'])['status'] === 422, 'the bot only accepts the configured purposes');
+$check(str_contains((string) ($call(['action' => 'create', 'document' => '222222', 'contract_id' => 20, 'amount' => 100000, 'term' => 99, 'purpose' => 'Libre inversión'])['body']['message'] ?? ''), 'supera el máximo'), 'the bot request respects the maximum term');
+$created = $call(['action' => 'create', 'document' => '222222', 'contract_id' => 20, 'amount' => '1.500.000', 'term' => 6, 'purpose' => 'Libre inversión']);
+$botCredit = $service->find((int) ($created['body']['data']['credit_id'] ?? 0));
+$check($created['status'] === 200 && $botCredit !== null && $botCredit['owner_name'] === 'Luis Dos' && (float) $botCredit['requested_amount'] === 1500000.0 && str_starts_with((string) $botCredit['created_by_name'], 'Guardian (WhatsApp)'), 'the bot registers the request for the identified co-owner');
+$list = $call(['action' => 'list', 'document' => '222.222'])['body']['data']['credits'] ?? [];
+$check($list !== [] && $list[0]['id'] === (int) $botCredit['id'] && $list[0]['status_label'] === 'Pendiente de estudio' && $list[0]['requested_term'] === 6, 'the bot lists the person credits, newest first, with a readable status');
+
 echo "Owner credit co-owner checks passed.\n";

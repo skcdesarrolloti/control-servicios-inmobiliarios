@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\Modules\LeaseContracts;
 
+use SCM\Modules\ClosingSheets\ClosingSheetService;
 use SCM\Modules\OwnerCredits\OwnerCreditPromissoryService;
 
 /**
@@ -186,8 +187,9 @@ final class ContractCoOwners
   /**
    * Filas de propietarios 1..`propietarios` del mandato con su numeración, como el plugin `skc_coprop_owners`: se salta
    * el que no tiene nombre ni documento (mandatos viejos con `propietarios=2` y el dueño 2 vacío).
+   * Cada fila trae también su contacto, tipo de persona y representante (para las columnas del contrato).
    * @param list<int>|null $skipped índices saltados
-   * @return list<array{index:int,name:string,document:string,owner_id:string,percent:string}>
+   * @return list<array{index:int,name:string,document:string,owner_id:string,percent:string,email:string,phone:string,indicativo:string,type:string,document_type:string,representative:string,representative_document:string}>
    */
   public static function mandateOwners(array $mandate, ?array &$skipped = null): array
   {
@@ -195,16 +197,44 @@ final class ContractCoOwners
     $count = max(1, min(self::MAX, (int) ($mandate['propietarios'] ?? 1)));
     $owners = [];
     for ($i = 1; $i <= $count; $i++) {
-      $name = trim((string) ($mandate['nombre_' . $i] ?? ''));
-      $document = trim((string) ($mandate['documento_' . $i] ?? ''));
+      $value = static fn(string $column): string => trim((string) ($mandate[$column . '_' . $i] ?? ''));
+      $name = $value('nombre');
+      $document = $value('documento');
       if ($name === '' && $document === '') {
         $skipped[] = $i;
         continue;
       }
-      $id = trim((string) ($mandate['id_propietario_nuevo_' . $i] ?? '')) ?: ($i === 1 ? trim((string) ($mandate['id_propietario'] ?? '')) : '');
-      $owners[] = ['index' => $i, 'name' => $name, 'document' => $document, 'owner_id' => ctype_digit($id) ? $id : '', 'percent' => self::percentValue($mandate['porcentaje_' . $i] ?? '')];
+      $id = $value('id_propietario_nuevo') ?: ($i === 1 ? trim((string) ($mandate['id_propietario'] ?? '')) : '');
+      $type = ClosingSheetService::personType($value('tipo'));
+      // En el mandato, empresa_N / nit_N son el representante legal de una persona jurídica.
+      $company = $type === 'Juridica';
+      $owners[] = [
+        'index' => $i, 'name' => $name, 'document' => $document, 'owner_id' => ctype_digit($id) ? $id : '', 'percent' => self::percentValue($mandate['porcentaje_' . $i] ?? ''),
+        'email' => $value('correo'), 'phone' => $value('celular'), 'indicativo' => $value('indicativo'), 'type' => $type, 'document_type' => $value('tipo_documento'),
+        'representative' => $company ? $value('empresa') : '', 'representative_document' => $company ? $value('nit') : '',
+      ];
     }
     return $owners;
+  }
+
+  /**
+   * Columnas del copropietario N en el contrato de arrendamiento (las mismas de la hoja de cierre): nombre, documento,
+   * contacto, tipo de persona y representante. Con $clear, todas vacías (puesto sin copropietario).
+   * @param array<string,mixed> $owner name, document, email, phone, indicativo, type, document_type, representative, representative_document
+   * @return array<string,string>
+   */
+  public static function contactColumns(int $index, array $owner, bool $clear = false): array
+  {
+    $columns = [
+      'propietario_' => 'name', 'documento_propietario_' => 'document', 'correo_propietario_' => 'email', 'indicativo_propietario_' => 'indicativo',
+      'celular_propietario_' => 'phone', 'tipo_persona_propietario_' => 'type', 'tipo_documento_propietario_' => 'document_type',
+      'representante_propietario_' => 'representative', 'documento_representante_propietario_' => 'representative_document',
+    ];
+    $out = [];
+    foreach ($columns as $prefix => $key) {
+      if ($clear || array_key_exists($key, $owner)) $out[$prefix . $index] = $clear ? '' : trim((string) $owner[$key]);
+    }
+    return $out;
   }
 
   /** Porcentaje como se guarda: punto decimal, máximo 2 decimales, sin "%" ("33,34 %" → "33.34"); vacío o inválido → "". */

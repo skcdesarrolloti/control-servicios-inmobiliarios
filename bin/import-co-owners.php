@@ -66,8 +66,12 @@ $result = (new CoOwnersImport($db))->run($groups, $apply, $author, basename($fil
 $changed = array_values(array_filter($result['contracts'], static fn(array $row): bool => $row['cambios'] !== []));
 echo "\n== Contratos que se " . ($apply ? 'actualizaron' : 'actualizan') . ': ' . count($changed) . "\n";
 foreach ($changed as $row) {
+  // Ids y % con su valor; los datos de contacto (nombre, documento, correo…) solo se cuentan.
+  $main = array_filter($row['cambios'], static fn(string $column): bool => preg_match('/^(propietarios|id_propietario_\d|porcentaje_\d)$/', $column) === 1, ARRAY_FILTER_USE_KEY);
+  $contact = count($row['cambios']) - count($main);
   echo "  inmueble {$row['inmueble']} · contrato {$row['contrato']} (#{$row['id']}) · {$row['propietarios']} propietarios: "
-    . implode(', ', array_map(static fn(string $column, array $change): string => "{$column} " . ($change[0] !== '' ? $change[0] : '∅') . ' → ' . ($change[1] !== '' ? $change[1] : '∅'), array_keys($row['cambios']), $row['cambios'])) . "\n";
+    . implode(', ', array_map(static fn(string $column, array $change): string => "{$column} " . ($change[0] !== '' ? $change[0] : '∅') . ' → ' . ($change[1] !== '' ? $change[1] : '∅'), array_keys($main), $main))
+    . ($contact > 0 ? ($main !== [] ? '; ' : '') . $contact . ' datos de contacto' : '') . "\n";
   foreach ($row['avisos'] as $note) echo "      aviso: {$note}\n";
 }
 $same = array_values(array_filter($result['contracts'], static fn(array $row): bool => $row['cambios'] === []));

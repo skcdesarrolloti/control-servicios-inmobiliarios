@@ -46,14 +46,30 @@ contrato de arrendamiento, y que los créditos a propietarios respeten ese %:
 
 ### Importación de SIMI: pasos en el servidor
 
-1. `php bin/add-co-owner-7-8-fields.php` (plan) y luego `--aplicar`: crea `id_propietario_7..8` y `porcentaje_7..8` en
-   la pestaña de su par 6. Hace falta para los inmuebles del listado con 7 u 8 propietarios (el modo de prueba de la
-   importación los muestra como «faltan las columnas»). Revisar en JetEngine que el CCT no muestre el aviso de esquema.
+1. `php bin/add-co-owner-7-8-fields.php` (plan) y luego `--aplicar`: copia la pestaña «Propietario 6» como
+   «Propietario 7» y «Propietario 8» con todos sus campos y crea las columnas.
+   - Campos: id, porcentaje, nombre, documento, correo, indicativo, celular, actas, tipo de persona y documento, y
+     representante.
+   - Los `id_propietario_7/8` y `porcentaje_7/8` que la primera versión dejó en la pestaña 6 pasan a su pestaña con
+     su id. Repetirlo no cambia nada (`CctFieldInstaller::cloneTab`).
+   - Después, revisar en JetEngine que el CCT no muestre el aviso de esquema.
 2. Subir el archivo al servidor y correr `php bin/import-co-owners.php "COPROPETARIOS ACTIVOS 2026.xlsx"`, que solo
    muestra lo que haría. Revisar los omitidos (otro principal, sin contrato activo) y los avisos de mandato.
-3. Aplicar con `--aplicar --funcionario=<id_empleado>`. Si se repite, no cambia nada.
-4. Contratos con aviso «el mandato tiene otros copropietarios»: el liquidador sigue usando el mandato hasta que se
+3. Aplicar con `--aplicar --funcionario=<id_empleado>`. Además de ids y %, llena en el contrato el nombre, documento,
+   correo, indicativo, celular y tipo de persona de cada copropietario. Si se repite, no cambia nada.
+4. Para los contratos con mandato de varios dueños: `php bin/sync-co-owners.php` y luego `--aplicar` (Fase 3). Ahora
+   también llena el nombre, documento y contacto de los copropietarios que estén vacíos en el contrato.
+5. Contratos con aviso «el mandato tiene otros copropietarios»: el liquidador sigue usando el mandato hasta que se
    corrija allí (plugin `[skc_copropietarios]` u hoja de cierre).
+
+### Bot de WhatsApp: créditos
+
+- `public/owner-credit-bot.php` (`OwnerCreditBotApi`): el bot consulta el cupo, radica y consulta solicitudes de crédito
+  con la lógica del panel (plazo máximo, avisos internos y confirmación al propietario).
+- El cuerpo JSON va firmado con HMAC-SHA256 en `X-SCM-Signature` y lleva `ts` (máximo 5 minutos).
+- El secreto es `APP_SECRET` del panel, que debe ser igual a `WHATSAPP_APP_SECRET` del bot.
+- Solo opera sobre los contratos donde el documento enviado es de un propietario, y el beneficiario es esa persona.
+- Las solicitudes quedan registradas por «Guardian (WhatsApp) · celular».
 
 ### 4. Fase 7: lo que queda
 

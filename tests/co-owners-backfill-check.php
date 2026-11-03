@@ -55,7 +55,7 @@ $table('wp_jet_cct_contrato_mandato', $mandateColumns);
 $contractColumns = array_merge($cct, ['contrato', 'estado', 'propietario', 'id_propietario', 'id_contrato_mandato', 'propietarios']);
 for ($i = 1; $i <= 6; $i++) {
   $contractColumns[] = 'porcentaje_' . $i;
-  if ($i > 1) $contractColumns[] = 'id_propietario_' . $i;
+  if ($i > 1) array_push($contractColumns, 'id_propietario_' . $i, 'propietario_' . $i, 'documento_propietario_' . $i, 'correo_propietario_' . $i);
 }
 $table('wp_jet_cct_contratos_arrendamiento', $contractColumns);
 $table('wp_jet_cct_propietarios', array_merge($cct, ['nombre', 'documento', 'correo', 'celular', 'tipo_persona', 'nombre_juridico', 'documento_juridico']));
@@ -111,6 +111,7 @@ $check($mandate(31)['id_propietario_nuevo_2'] === '501' && $mandate(31)['id_prop
 
 $c = $contract(10);
 $check($c['propietarios'] === '3' && $c['id_propietario_2'] === '501' && $c['id_propietario_3'] === (string) $marta['_ID'] && $c['porcentaje_1'] === '50' && $c['porcentaje_2'] === '30.5' && $c['porcentaje_3'] === '19.5', 'the contract gets the co-owners and percentages from the mandate (a stale "1" is replaced)');
+$check($c['propietario_2'] === 'Luis' && $c['documento_propietario_2'] === '2222222' && $c['propietario_3'] === 'Inversiones Marta SAS' && $c['correo_propietario_3'] === 'marta@example.invalid', 'the co-owner name, document and contact are filled from the mandate');
 $c = $contract(11);
 $check($c['porcentaje_1'] === '60' && $c['porcentaje_2'] === '30.5' && $c['id_propietario_2'] === '501', 'a different contract value is kept and only empty columns are filled');
 $check(count(array_filter($result['conflicts'], static fn(array $r): bool => $r['id'] === '11' && $r['columna'] === 'porcentaje_1' && $r['contrato_valor'] === '60' && $r['mandato_valor'] === '50')) === 1, 'the different value is listed as a conflict');

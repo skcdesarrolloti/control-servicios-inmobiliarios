@@ -121,7 +121,7 @@ $setup = static function (int $max): array {
   $columns = array_merge($cct, ['contrato', 'estado', 'inmueble', 'id_inmueble', 'propietario', 'documento_propietario', 'id_propietario', 'id_contrato_mandato', 'propietarios']);
   for ($i = 1; $i <= $max; $i++) {
     $columns[] = 'porcentaje_' . $i;
-    if ($i > 1) $columns[] = 'id_propietario_' . $i;
+    if ($i > 1) array_push($columns, 'id_propietario_' . $i, 'propietario_' . $i, 'documento_propietario_' . $i, 'correo_propietario_' . $i, 'celular_propietario_' . $i, 'indicativo_propietario_' . $i, 'tipo_persona_propietario_' . $i);
   }
   $table('wp_jet_cct_contratos_arrendamiento', $columns);
   $table('wp_jet_cct_propietarios', array_merge($cct, ['nombre', 'documento', 'correo', 'celular', 'indicativo', 'tipo_persona', 'direccion', 'expedicion']));
@@ -170,6 +170,7 @@ $check($c['propietarios'] === '4' && $c['porcentaje_1'] === '40' && $c['id_propi
 $check($marta['cct_author_id'] === 'EMP-7' && $marta['tipo_persona'] === 'Natural' && $marta['celular'] === '' && $ideas['tipo_persona'] === 'Juridica' && $ideas['celular'] === '56000001', 'new profiles are registered with the employee as author');
 $c = $contract($pdo, 11);
 $check($c['propietarios'] === '4' && $c['id_propietario_5'] === '' && $c['porcentaje_5'] === '' && $c['id_propietario_3'] === (string) $marta['_ID'], 'the file wins: extra slots are cleared and the same profile is used in every contract');
+$check($c['propietario_3'] === 'MARTA TRES' && $c['documento_propietario_3'] === '3333333' && $c['correo_propietario_3'] === 'marta@example.invalid' && $c['indicativo_propietario_2'] === '+57' && $c['tipo_persona_propietario_4'] === 'Juridica' && $c['propietario_5'] === '' && $c['correo_propietario_5'] === '', 'the contract also gets each co-owner name, document and contact, and the extra slot contact is cleared');
 $check($contract($pdo, 12)['propietarios'] === null, 'finished contracts are not touched');
 $c = $contract($pdo, 14);
 $check($c['propietarios'] === '8' && $c['porcentaje_8'] === '12.5' && $c['id_propietario_8'] !== '', 'a property with 8 owners fits in the contract');

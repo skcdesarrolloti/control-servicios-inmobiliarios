@@ -188,6 +188,10 @@ final class LeaseContractCreationService
       if ($owner['percent'] !== '') {
         $columns['porcentaje_' . $i] = $owner['percent'];
       }
+      // Nombre, documento y contacto de cada copropietario (el principal ya va en las columnas del propietario).
+      if ($i > 1) {
+        $columns += array_filter(ContractCoOwners::contactColumns($i, $owner), static fn(string $value): bool => $value !== '');
+      }
     }
     return ['owners' => $owners, 'columns' => $columns, 'source' => $source, 'source_id' => $sourceId, 'valid' => $valid, 'warnings' => array_values(array_unique($warnings))];
   }
@@ -230,7 +234,13 @@ final class LeaseContractCreationService
         continue;
       }
       $id = trim((string) ($closing['id_propietario' . $suffix] ?? ''));
-      $owners[] = ['index' => $i, 'name' => $name, 'document' => $document, 'owner_id' => ctype_digit($id) ? $id : '', 'percent' => ContractCoOwners::percentValue($closing['porcentaje_' . $i] ?? '')];
+      $value = static fn(string $prefix): string => trim((string) ($closing[$prefix . $suffix] ?? ''));
+      $owners[] = [
+        'index' => $i, 'name' => $name, 'document' => $document, 'owner_id' => ctype_digit($id) ? $id : '', 'percent' => ContractCoOwners::percentValue($closing['porcentaje_' . $i] ?? ''),
+        'email' => $value('correo_propietario'), 'phone' => $value('celular_propietario'), 'indicativo' => $value('indicativo_propietario'),
+        'type' => $value('tipo_persona_propietario'), 'document_type' => $value('tipo_documento_propietario'),
+        'representative' => $value('representante_propietario'), 'representative_document' => $value('documento_representante_propietario'),
+      ];
     }
     return $owners;
   }

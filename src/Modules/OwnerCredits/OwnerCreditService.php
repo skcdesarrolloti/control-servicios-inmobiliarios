@@ -1456,6 +1456,33 @@ final class OwnerCreditService
     return array_sum(array_map(fn(array $credit): float => $this->balance($credit) * (float) $credit['weight'], $this->personObligations($document, $ownerIds, $shares)));
   }
 
+  /**
+   * Créditos de la persona (por documento o por sus fichas de propietario), del más reciente al más antiguo, para
+   * consultarlos fuera del panel (bot de WhatsApp). Sin simulaciones.
+   * @return list<array<string,mixed>>
+   */
+  public function creditsForDocument(string $document, int $limit = 10): array
+  {
+    $this->ensureSchema();
+    $document = self::document($document);
+    if (preg_match('/^[0-9A-Z-]{4,20}$/', $document) !== 1) throw new \InvalidArgumentException('Falta el documento del propietario.');
+    $this->settleFinished();
+    $ids = ['doc:' . $document];
+    $profiles = $this->db->table('jet_cct_propietarios');
+    if ($this->schema->tableExists($profiles) && $this->schema->columnExists($profiles, 'documento')) {
+      array_push($ids, ...array_map('strval', $this->db->getCol("SELECT `_ID` FROM `{$profiles}` WHERE UPPER(REPLACE(REPLACE(`documento`, '.', ''), ' ', '')) = ? LIMIT 20", [$document])));
+    }
+    $rows = $this->db->getResults("SELECT * FROM `{$this->table()}` WHERE `status` <> 'simulacion' AND (UPPER(REPLACE(REPLACE(`owner_document`, '.', ''), ' ', '')) = ? OR `owner_id` IN (" . implode(',', array_fill(0, count($ids), '?')) . ")) ORDER BY `id` DESC LIMIT " . max(1, min(50, $limit)), [$document, ...$ids]);
+    return array_map(static fn(array $row): array => [
+      'id' => (int) $row['id'], 'status' => (string) $row['status'], 'status_label' => OwnerCreditBotApi::statusLabel((string) $row['status']),
+      'purpose' => (string) $row['purpose'], 'contract_code' => (string) $row['contract_code'],
+      'requested_amount' => (float) $row['requested_amount'], 'requested_term' => (int) $row['requested_term'],
+      'approved_amount' => $row['approved_amount'] !== null ? (float) $row['approved_amount'] : null, 'approved_term' => $row['approved_term'] !== null ? (int) $row['approved_term'] : null,
+      'monthly_payment' => $row['monthly_payment'] !== null ? (float) $row['monthly_payment'] : null,
+      'created_at' => (int) $row['created_at'], 'decided_at' => (int) ($row['decided_at'] ?? 0) ?: null, 'response_sent' => (int) ($row['response_sent_at'] ?? 0) > 0,
+    ], $rows);
+  }
+
   /** Destinación "Reparaciones y mantenimiento": crédito del inmueble (100 % de su contrato, firman todos). */
   public static function isRepair(array $credit): bool
   {

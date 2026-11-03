@@ -44,7 +44,7 @@ final class LeaseCreationTestPdo extends PDO
 $coOwnerColumns = ['propietarios'];
 for ($i = 1; $i <= 6; $i++) {
   $coOwnerColumns[] = 'porcentaje_' . $i;
-  if ($i > 1) $coOwnerColumns[] = 'id_propietario_' . $i;
+  if ($i > 1) array_push($coOwnerColumns, 'id_propietario_' . $i, 'propietario_' . $i, 'documento_propietario_' . $i, 'correo_propietario_' . $i);
 }
 
 /**
@@ -135,6 +135,7 @@ $check(str_contains($html, 'data-lease-co-owners') && str_contains($html, 'Luis'
 $result = $service->create(10, $input, $sender);
 $row = $contractRow($pdo);
 $check($row['propietarios'] === '3' && $row['id_propietario_2'] === '501' && $row['id_propietario_3'] === '502' && $row['porcentaje_1'] === '50' && $row['porcentaje_2'] === '30.5' && $row['porcentaje_3'] === '19.5', 'three owners and their percentages are copied to the contract, ignoring the form input');
+$check($row['propietario_2'] === 'Luis' && $row['documento_propietario_2'] === '222' && $row['propietario_3'] === 'Marta', 'each co-owner name and document is copied to the contract');
 $check($row['id_propietario'] === '500', 'the main owner stays as before');
 
 // 4. Sin %: se copian los ids, los % quedan vacíos y se avisa. Lo que el contrato ya tenía no se borra.
