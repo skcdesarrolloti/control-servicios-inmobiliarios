@@ -1442,6 +1442,31 @@ final class SuCasaControlServiciosInmobiliarios
     return hash_equals(self::maintenanceQuotePublicSignature($quoteId, $expires), trim($signature));
   }
 
+  /**
+   * Enlace firmado solo para consultar la cotización (copia a los copropietarios): `modo=ver` y una firma con otro
+   * propósito, así no sirve para responderla ni se convierte en el enlace de respuesta cambiando el parámetro.
+   */
+  public static function signedMaintenanceQuoteViewUrl(int $quoteId, ?int $expires = null): string
+  {
+    $expires = $expires && $expires > time() ? $expires : (time() + 180 * 86400);
+    return self::maintenanceQuotePublicUrl($quoteId)
+      . '&modo=ver&expires=' . rawurlencode((string) $expires)
+      . '&sig=' . rawurlencode(self::maintenanceQuoteViewSignature($quoteId, $expires));
+  }
+
+  public static function maintenanceQuoteViewSignature(int $quoteId, int $expires): string
+  {
+    return hash_hmac('sha256', 'cotizacion_mantenimiento_ver|' . $quoteId . '|' . $expires, (string) SCM_APP_SECRET);
+  }
+
+  public static function maintenanceQuoteViewSignatureValid(int $quoteId, int $expires, string $signature): bool
+  {
+    if ($quoteId <= 0 || $expires <= time() || trim($signature) === '') {
+      return false;
+    }
+    return hash_equals(self::maintenanceQuoteViewSignature($quoteId, $expires), trim($signature));
+  }
+
   private function normalizePropertyLocationInput(string $raw): string
   {
     $raw = trim($raw);

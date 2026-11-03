@@ -101,6 +101,17 @@ $check(array_column($recipients, 'name') === ['Luis Copropietario', 'Pedro Manda
 $recipients = $call($quoteSender, 'maintenance_quote_co_owner_recipients', ['id_contrato' => '10'], 'luis@example.invalid', '');
 $check(array_column($recipients, 'name') === ['Ana Dueña', 'Pedro Mandato'], 'when a co-owner is the main recipient, the main owner also receives it');
 $check($call($quoteSender, 'maintenance_quote_co_owner_recipients', ['id_contrato' => '12'], 'ana@example.invalid', '') === [], 'a single-owner contract adds nobody');
+// Destinatario «Inmobiliaria»: la copia llega a todos los propietarios.
+$recipients = $call($quoteSender, 'maintenance_quote_co_owner_recipients', ['id_contrato' => '10'], 'gerencia@sucasa.invalid', '+573019999999');
+$check(array_column($recipients, 'name') === ['Ana Dueña', 'Luis Copropietario', 'Pedro Mandato'], 'when the agency is the recipient every owner gets the copy');
+
+// Los copropietarios reciben un enlace solo para consultar: su firma no sirve para responder.
+$app = \SCM\App\SuCasaControlServiciosInmobiliarios::class;
+parse_str((string) parse_url($app::signedMaintenanceQuoteViewUrl(574), PHP_URL_QUERY), $view);
+parse_str((string) parse_url($app::signedMaintenanceQuotePublicUrl(574), PHP_URL_QUERY), $respond);
+$check(($view['modo'] ?? '') === 'ver' && $app::maintenanceQuoteViewSignatureValid(574, (int) $view['expires'], (string) $view['sig']), 'the view-only link is signed for viewing');
+$check(!$app::maintenanceQuotePublicSignatureValid(574, (int) $view['expires'], (string) $view['sig']) && !$app::maintenanceQuoteViewSignatureValid(574, (int) $respond['expires'], (string) $respond['sig']), 'the view-only signature cannot respond and the response link is not a view link');
+$check(str_contains((string) file_get_contents(dirname(__DIR__) . '/public/cotizacion-mantenimiento.php'), "\$hasValidPublicSignature = !\$viewOnly &&"), 'the public page only accepts responses with the response signature');
 
 // 2. Búsqueda del solicitante: el copropietario encuentra su contrato con sus propios datos.
 $tickets = new PublicTicketsService($db, ['app_secret' => SCM_APP_SECRET]);

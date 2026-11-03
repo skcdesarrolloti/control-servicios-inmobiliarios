@@ -1090,8 +1090,9 @@ trait HandlesMaintenanceActions
   }
 
   /**
-   * Los demás propietarios del contrato de la cotización (mandato o `id_propietario_2..6`), para que la cotización que
-   * aprueba el propietario les llegue a todos. Se omite quien ya es el destinatario (mismo correo o celular).
+   * Los propietarios del contrato de la cotización (mandato o `id_propietario_2..6`), para que la cotización que
+   * aprueba el propietario o la inmobiliaria les llegue a todos (como copia para consultar). Se omite quien ya es el
+   * destinatario (mismo correo o celular).
    * @param array<string,mixed> $quote
    * @return list<array{index:int,name:string,email:string,phone:string}>
    */
@@ -3228,17 +3229,22 @@ trait HandlesMaintenanceActions
       $direccionRef = $this->maintenance_quote_clean($quote['direccion'] ?? '');
       $subject = 'Cotización de mantenimiento #' . $cotizacionId . ($ticketRef !== '' ? ' del caso #' . $ticketRef : '');
 
-      // Mismo correo y WhatsApp para el destinatario y, si aprueba el propietario, para cada copropietario.
+      // Mismo correo y WhatsApp para el destinatario y, si la aprueba el propietario o la inmobiliaria, para cada
+      // copropietario. Los copropietarios reciben un enlace solo para consultar: la responde el destinatario.
       $sentAt = time();
-      $deliver = function (string $destinatario, string $email, string $whatsappPhone, string $dedupeSuffix) use ($cotizacionId, $ticketRef, $contratoRef, $direccionRef, $total, $actorSignature, $actorEmail, $actorName, $subject, $quoteUrl, $document, $sentAt): array {
+      $deliver = function (string $destinatario, string $email, string $whatsappPhone, string $dedupeSuffix, string $responder = '') use ($cotizacionId, $ticketRef, $contratoRef, $direccionRef, $total, $actorSignature, $actorEmail, $actorName, $subject, $quoteUrl, $document, $sentAt): array {
+        $informative = $responder !== '';
+        $quoteLink = $informative ? self::signedMaintenanceQuoteViewUrl($cotizacionId) : $quoteUrl;
         $content = '<p style="font-weight:600;margin:0 0 14px;">Apreciado(a) ' . \SCM\Support\EmailTemplate::e($destinatario) . ',</p>'
-          . '<p style="line-height:1.65;margin:0 0 14px;">Te compartimos la cotización de mantenimiento <b>#' . \SCM\Support\EmailTemplate::e((string) $cotizacionId) . '</b>' . ($ticketRef !== '' ? ' asociada al caso <b>#' . \SCM\Support\EmailTemplate::e($ticketRef) . '</b>' : '') . '.</p>'
+          . '<p style="line-height:1.65;margin:0 0 14px;">Te compartimos la cotización de mantenimiento <b>#' . \SCM\Support\EmailTemplate::e((string) $cotizacionId) . '</b>' . ($ticketRef !== '' ? ' asociada al caso <b>#' . \SCM\Support\EmailTemplate::e($ticketRef) . '</b>' : '') . ($informative ? ' del inmueble del que eres copropietario' : '') . '.</p>'
           . '<p style="line-height:1.65;margin:0 0 14px;">Contrato: <b>#' . \SCM\Support\EmailTemplate::e($contratoRef !== '' ? $contratoRef : '-') . '</b><br>Dirección: <b>' . \SCM\Support\EmailTemplate::e($direccionRef !== '' ? $direccionRef : '-') . '</b></p>'
-          . '<p style="line-height:1.65;margin:0 0 14px;">El valor total registrado es <b>' . \SCM\Support\EmailTemplate::e($total) . '</b>. Adjuntamos el PDF de la cotización y también puedes verla y responderla desde el botón seguro.</p>'
+          . '<p style="line-height:1.65;margin:0 0 14px;">El valor total registrado es <b>' . \SCM\Support\EmailTemplate::e($total) . '</b>. ' . ($informative
+            ? 'Adjuntamos el PDF de la cotización y también puedes consultarla desde el botón seguro. Es una copia informativa: la responde <b>' . \SCM\Support\EmailTemplate::e($responder) . '</b>.</p>'
+            : 'Adjuntamos el PDF de la cotización y también puedes verla y responderla desde el botón seguro.</p>')
           . '<p style="line-height:1.65;margin:0;">Atentamente,<br><b>' . \SCM\Support\EmailTemplate::e($actorSignature) . '</b><br>SKC SuCasa Inmobiliaria</p>';
         $html = \SCM\Support\EmailTemplate::render($subject, $content, [
           'buttons' => [
-            ['url' => $quoteUrl, 'label' => 'Ver y responder cotización'],
+            ['url' => $quoteLink, 'label' => $informative ? 'Ver cotización' : 'Ver y responder cotización'],
             ['url' => (string) ($document['url'] ?? ''), 'label' => 'Ver PDF'],
           ],
         ]);
@@ -3258,7 +3264,7 @@ trait HandlesMaintenanceActions
             'event' => 'cotizacion_mantenimiento_enviada',
             'id_cotizacion' => $cotizacionId,
             'id_ticket' => $ticketRef,
-            'quote_url' => $quoteUrl,
+            'quote_url' => $quoteLink,
             'pdf_url' => (string) ($document['url'] ?? ''),
             'actor' => $actorName,
           ],
@@ -3268,13 +3274,15 @@ trait HandlesMaintenanceActions
           return [$emailQueued, 0];
         }
         $smsQueue = new \SCM\Support\SmsQueue($this->db);
-        $buttonSuffix = $this->maintenance_quote_whatsapp_url_button_suffix($quoteUrl);
+        $buttonSuffix = $this->maintenance_quote_whatsapp_url_button_suffix($quoteLink);
         $message = "Buen día, {$destinatario}.\n\n";
         $message .= "Te compartimos la cotización de mantenimiento #{$cotizacionId}" . ($ticketRef !== '' ? " del caso #{$ticketRef}" : '') . " por {$total}.\n\n";
         $message .= "Contrato: #" . ($contratoRef !== '' ? $contratoRef : '-') . ".\n";
         $message .= "Dirección: " . ($direccionRef !== '' ? $direccionRef : '-') . ".\n\n";
-        $message .= "Puedes ver el PDF adjunto y responder la cotización desde el botón.\n\n";
-        $message .= "Enlace directo: {$quoteUrl}\n\n";
+        $message .= $informative
+          ? "Puedes ver el PDF adjunto y consultar la cotización desde el botón. Es una copia informativa: la responde {$responder}.\n\n"
+          : "Puedes ver el PDF adjunto y responder la cotización desde el botón.\n\n";
+        $message .= "Enlace directo: {$quoteLink}\n\n";
         $message .= "Atentamente,\n{$actorSignature}";
         $whatsappOk = $smsQueue->enqueue($whatsappPhone, $destinatario, $message, [
           'source_module' => 'cotizaciones_mantenimiento_envio',
@@ -3282,7 +3290,7 @@ trait HandlesMaintenanceActions
           'categoria_mensaje' => 'informacion',
           'id_ticket' => $ticketRef,
           'id_cotizacion' => $cotizacionId,
-          'quote_url' => $quoteUrl,
+          'quote_url' => $quoteLink,
           'pdf_url' => (string) ($document['url'] ?? ''),
           'document_url' => (string) ($document['url'] ?? ''),
           'document_filename' => (string) ($document['attachment_name'] ?? 'cotizacion-mantenimiento-' . $cotizacionId . '.pdf'),
@@ -3332,11 +3340,11 @@ trait HandlesMaintenanceActions
         throw new \DomainException('No se pudo encolar el correo ni el WhatsApp. La cotización quedó sin marcar como enviada.');
       }
       $coOwnerQueued = ['email' => 0, 'whatsapp' => 0, 'names' => []];
-      if ($this->maintenance_quote_executor_key((string) ($quote['ejecutado'] ?? '')) === 'propietario') {
+      if (in_array($this->maintenance_quote_executor_key((string) ($quote['ejecutado'] ?? '')), ['propietario', 'inmobiliaria'], true)) {
         // El envío principal ya quedó en cola: un fallo con los copropietarios no debe dejar la cotización sin marcar.
         try {
           foreach ($this->maintenance_quote_co_owner_recipients($quote, $email, $whatsappPhone) as $coOwner) {
-            [$mails, $messages] = $deliver($coOwner['name'], $coOwner['email'], $coOwner['phone'], ':copropietario:' . $coOwner['index']);
+            [$mails, $messages] = $deliver($coOwner['name'], $coOwner['email'], $coOwner['phone'], ':copropietario:' . $coOwner['index'], $destinatario !== '' ? $destinatario : 'el destinatario de la cotización');
             $coOwnerQueued['email'] += $mails;
             $coOwnerQueued['whatsapp'] += $messages;
             if ($mails + $messages > 0) {

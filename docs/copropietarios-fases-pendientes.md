@@ -51,9 +51,15 @@ contrato de arrendamiento, y que los créditos a propietarios respeten ese %:
 ### 5. Fase 8: lo que queda
 
 - Aumento de canon, anexos, terminación y cartera siguen avisando solo al propietario 1. Queda como decisión de negocio.
-- Por confirmar:
-  - los copropietarios reciben el mismo enlace firmado de la cotización, así que cualquiera puede responderla;
-  - si el destinatario es «Inmobiliaria», no se envía a los copropietarios.
+- Decidido (03/11/2026) y hecho:
+  - La cotización llega a los copropietarios tanto si la aprueba el propietario como si la aprueba «Inmobiliaria».
+  - Los copropietarios reciben una copia **solo para consultar**:
+    - el enlace lleva `modo=ver` y una firma con otro propósito (`signedMaintenanceQuoteViewUrl`), así que no sirve
+      para responder;
+    - la página muestra «Copia informativa» en lugar del formulario;
+    - la responde solo el destinatario.
+  - El WhatsApp usa la misma plantilla `scm_cotizacion_mantenimiento_envio_v1`. Si su texto dice «responder», conviene
+    una plantilla informativa aparte.
 - Falta hacer:
   - el filtro «Propietario» del listado de contratos todavía no encuentra a un copropietario por nombre;
   - «+N copropietarios» solo aparece en las vistas de contratos de arrendamiento, no en casos ni revisiones.
