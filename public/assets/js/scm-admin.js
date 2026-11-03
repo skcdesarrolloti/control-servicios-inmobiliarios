@@ -2863,6 +2863,23 @@
     return "revision-preventiva.php?numero=" + encodeURIComponent(String(id || ""));
   }
 
+  function previewDeliveryReviewUrl(id) {
+    return "revision-entrega.php?numero=" + encodeURIComponent(String(id || ""));
+  }
+
+  // Casos de entrega de inmueble (pestaña Entrega o tema de entrega): tienen la revisión antes de la ocupación.
+  function isEntregaCase(caseBtn) {
+    if (!caseBtn || !caseBtn.dataset) return false;
+    if (String(caseBtn.dataset.idRevisionEntrega || "").trim()) return true;
+    if (String(caseBtn.dataset.tabKey || "").toLowerCase() === "entrega") return true;
+    var tema = String(caseBtn.dataset.tema || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+    return /^entregas? de inmuebles?$|^entrega$/.test(tema);
+  }
+
   function isPreventivaCase(caseBtn) {
     if (!caseBtn || !caseBtn.dataset) return false;
     var values = [
@@ -3804,7 +3821,239 @@
       draftPrefix: "revision-preventiva-draft",
       wizard: true,
     },
+    entrega: {
+      label: "Revisión antes de la ocupación",
+      lower: "revisión antes de la ocupación",
+      actionKey: "revision_entrega",
+      action: "scm_revision_entrega",
+      formSelector: "[data-delivery-review-form]",
+      editAttr: "data-delivery-edit-review",
+      deleteAttr: "data-delivery-delete-review",
+      cancelAttr: "data-delivery-cancel-edit",
+      editFormAttr: "data-delivery-review-edit",
+      versionAttr: "data-delivery-review-version",
+      draftPrefix: "revision-entrega-draft",
+      deleteNote: " Se desvincula del caso, del contrato y de la ficha del inmueble.",
+      wizard: true,
+      extras: bindDeliveryReviewForm,
+    },
   };
+
+  // Revisión antes de la ocupación: campos condicionales, filas repetibles (linderos y espacios),
+  // fichas de habitaciones y baños según la cantidad indicada y resumen antes de guardar.
+  function bindDeliveryReviewForm(form, helpers) {
+    function lists() {
+      return Array.from(form.querySelectorAll("[data-delivery-list]"));
+    }
+    function listOf(key) {
+      return form.querySelector('[data-delivery-list="' + key + '"]');
+    }
+    function rowsOf(list) {
+      return Array.from(list.children).filter(function (node) {
+        return node.hasAttribute("data-delivery-row");
+      });
+    }
+    // Las filas se numeran siempre 0..n-1 para que el borrador se restaure con los mismos nombres.
+    function renumber(list) {
+      var rows = rowsOf(list);
+      rows.forEach(function (row, index) {
+        row.querySelectorAll("[name]").forEach(function (field) {
+          field.name = field.name.replace(/^((?:linderos|espacios)\[[a-z_]+\])\[\d+\]/, "$1[" + index + "]");
+        });
+        var title = row.querySelector("[data-delivery-row-title]");
+        if (title) {
+          var base = title.getAttribute("data-base") || title.textContent;
+          title.setAttribute("data-base", base);
+          title.textContent = rows.length > 1 ? base + " #" + (index + 1) : base;
+        }
+      });
+      var group = list.closest("[data-delivery-space]");
+      var counter = group && group.querySelector("[data-delivery-space-count]");
+      if (counter) {
+        counter.textContent = rows.length
+          ? rows.length + " registrado(s)"
+          : "No aplica: agrégalo si el inmueble lo tiene";
+      }
+    }
+    function addRow(key, silent) {
+      var list = listOf(key);
+      var template = form.querySelector('template[data-delivery-template="' + key + '"]');
+      if (!list || !template) return null;
+      if (rowsOf(list).length >= 30) {
+        if (!silent) helpers.message("Máximo 30 filas por sección.", true);
+        return null;
+      }
+      var wrap = document.createElement("div");
+      wrap.innerHTML = template.innerHTML.replace(/__INDEX__/g, String(rowsOf(list).length));
+      var row = wrap.firstElementChild;
+      list.appendChild(row);
+      renumber(list);
+      return row;
+    }
+    // El nombre automático ("#2", "#1 o principal") no cuenta como dato diligenciado.
+    function rowIsEmpty(row) {
+      return !Array.from(row.querySelectorAll("input, textarea")).some(function (field) {
+        if (field.type === "checkbox" || field.type === "radio") return field.checked;
+        var value = String(field.value || "").trim();
+        if (field.hasAttribute("data-delivery-type") && /^#\d+( o principal)?$/i.test(value)) return false;
+        return value !== "";
+      });
+    }
+    function setRowCount(key, count) {
+      var list = listOf(key);
+      if (!list) return;
+      while (rowsOf(list).length < count && addRow(key, true)) {}
+      var rows = rowsOf(list);
+      while (rows.length > count) rows.pop().remove();
+      renumber(list);
+    }
+    // Ajusta las fichas de habitaciones/baños a la cantidad: agrega las que falten y solo quita fichas vacías.
+    function syncCount(input) {
+      var key = "esp-" + input.getAttribute("data-delivery-count");
+      var list = listOf(key);
+      var target = Math.max(0, Math.min(30, parseInt(input.value, 10) || 0));
+      if (!list) return;
+      while (rowsOf(list).length < target && addRow(key, true)) {}
+      var rows = rowsOf(list);
+      for (var i = rows.length - 1; i >= target; i--) {
+        if (rowIsEmpty(rows[i])) rows[i].remove();
+      }
+      renumber(list);
+      rowsOf(list).forEach(function (row, index) {
+        var type = row.querySelector("[data-delivery-type]");
+        if (type && !type.value) type.value = index === 0 ? "#1 o principal" : "#" + (index + 1);
+      });
+    }
+    function radioValue(name) {
+      var checked = form.querySelector('input[type="radio"][name="' + name + '"]:checked');
+      return checked ? checked.value : "";
+    }
+    function syncConditions() {
+      form.querySelectorAll("[data-delivery-when]").forEach(function (box) {
+        var rule = (box.getAttribute("data-delivery-when") || "").split("=");
+        box.hidden = radioValue(rule[0]) !== rule[1];
+      });
+      form.querySelectorAll("[data-delivery-service-toggle]").forEach(function (toggle) {
+        var box = form.querySelector('[data-delivery-service="' + toggle.getAttribute("data-delivery-service-toggle") + '"]');
+        if (box) box.hidden = !toggle.checked;
+      });
+    }
+    function renderSummary() {
+      var box = form.querySelector("[data-delivery-summary]");
+      if (!box) return;
+      function value(name) {
+        var field = form.querySelector('[name="' + name + '"]');
+        return field ? String(field.value || "").trim() : "";
+      }
+      function count(key) {
+        var list = listOf(key);
+        return list ? rowsOf(list).length : 0;
+      }
+      var rooms = parseInt(value("habitaciones"), 10) || 0;
+      var baths = parseInt(value("banos"), 10) || 0;
+      var spaces = 0;
+      var notes = [];
+      form.querySelectorAll("[data-delivery-space]").forEach(function (group) {
+        rowsOf(group.querySelector("[data-delivery-list]")).forEach(function (row) {
+          spaces++;
+          var obs = row.querySelector("textarea");
+          var text = obs ? obs.value.trim() : "";
+          if (text && !/^ningun[ao]$/i.test(text)) {
+            var title = row.querySelector("[data-delivery-row-title]");
+            notes.push((title ? title.textContent : "Espacio") + ": " + text);
+          }
+        });
+      });
+      var services = Array.from(form.querySelectorAll("[data-delivery-service-toggle]:checked")).map(function (toggle) {
+        return toggle.getAttribute("data-label") || toggle.value;
+      });
+      var html =
+        "<strong>Resumen antes de guardar</strong><ul>" +
+        "<li>Habitaciones: " + rooms + " (" + count("esp-habitacion") + " ficha(s)) · Baños: " + baths + " (" + count("esp-bano") + " ficha(s))" +
+        (value("piso") ? " · Piso: " + escHtml(value("piso")) : "") + "</li>" +
+        "<li>Parqueadero: " + (radioValue("tiene_parqueadero") || "falta responder") + " · Depósito: " + (radioValue("tiene_deposito") || "falta responder") + "</li>" +
+        "<li>Espacios con registro fotográfico: " + spaces + "</li>" +
+        "<li>Servicios públicos activos: " + escHtml(services.length ? services.join(", ") : "ninguno") + "</li></ul>";
+      if (count("esp-habitacion") < rooms || count("esp-bano") < baths) {
+        html += '<p class="scm-prev-warning">Hay menos fichas que habitaciones o baños indicados. Revisa el paso Espacios.</p>';
+      }
+      if (notes.length) {
+        html += "<strong>Observaciones registradas</strong><ul>" + notes.slice(0, 10).map(function (text) {
+          return "<li>" + escHtml(text) + "</li>";
+        }).join("") + (notes.length > 10 ? "<li>…y " + (notes.length - 10) + " más</li>" : "") + "</ul>";
+      }
+      box.innerHTML = html;
+    }
+
+    form.addEventListener("click", function (event) {
+      var add = event.target.closest("[data-delivery-add]");
+      if (add) {
+        event.preventDefault();
+        var row = addRow(add.getAttribute("data-delivery-add"), false);
+        if (row) {
+          var first = row.querySelector("input:not([type=checkbox]), textarea");
+          if (first) first.focus();
+          helpers.scheduleSave();
+        }
+        return;
+      }
+      var remove = event.target.closest("[data-delivery-remove]");
+      if (remove) {
+        event.preventDefault();
+        var current = remove.closest("[data-delivery-row]");
+        var list = current.parentElement;
+        current.remove();
+        renumber(list);
+        helpers.scheduleSave();
+        return;
+      }
+      var all = event.target.closest("[data-delivery-all]");
+      if (all) {
+        event.preventDefault();
+        var boxes = all.closest("[data-delivery-row]").querySelectorAll(".scm-delivery-chips input[type=checkbox]");
+        var mark = Array.from(boxes).some(function (box) {
+          return !box.checked;
+        });
+        boxes.forEach(function (box) {
+          box.checked = mark;
+        });
+        helpers.scheduleSave();
+        return;
+      }
+      var none = event.target.closest("[data-delivery-none]");
+      if (none) {
+        event.preventDefault();
+        var area = none.closest("[data-delivery-row]").querySelector("textarea");
+        if (area) area.value = "Ninguna";
+        helpers.scheduleSave();
+      }
+    });
+    form.addEventListener("change", function (event) {
+      if (event.target.matches("[data-delivery-count]")) syncCount(event.target);
+      if (event.target.matches('input[type="radio"], [data-delivery-service-toggle]')) syncConditions();
+    });
+    form._scmStepShown = function (step) {
+      if (step.getAttribute("data-prev-step") === "resumen") renderSummary();
+    };
+    form._scmDraftExtra = function () {
+      var counts = {};
+      lists().forEach(function (list) {
+        counts[list.getAttribute("data-delivery-list")] = rowsOf(list).length;
+      });
+      return { rows: counts };
+    };
+    form._scmBeforeDraftRestore = function (extra) {
+      var counts = (extra && extra.rows) || {};
+      Object.keys(counts).forEach(function (key) {
+        setRowCount(key, Math.max(0, Math.min(30, Number(counts[key]) || 0)));
+      });
+    };
+    form._scmAfterDraftRestore = function () {
+      syncConditions();
+    };
+    lists().forEach(renumber);
+    syncConditions();
+  }
 
   // Asistente paso a paso de la revisión preventiva (checklist, daños y cobro).
   function bindPreventiveWizard(form, helpers) {
@@ -3847,6 +4096,7 @@
       if (submit) submit.hidden = current !== steps.length - 1;
       if (progress) progress.style.width = Math.round(((current + 1) / steps.length) * 100) + "%";
       if (steps[current].getAttribute("data-prev-step") === "cobro") renderReview();
+      if (typeof form._scmStepShown === "function") form._scmStepShown(steps[current]);
       if (focus) {
         scrollTop();
         var heading = steps[current].querySelector("h3");
@@ -3999,10 +4249,12 @@
       if (event.target.matches("[data-prev-found]")) syncDamages();
       if (event.target.matches("[data-prev-transport]")) syncTotal();
     });
+    var extraAfterRestore = form._scmAfterDraftRestore;
     form._scmAfterDraftRestore = function () {
       form.querySelectorAll(".scm-prev-question[data-prev-alert]").forEach(syncQuestion);
       syncDamages();
       syncTotal();
+      if (typeof extraAfterRestore === "function") extraAfterRestore();
     };
     form.querySelectorAll(".scm-prev-question[data-prev-alert]").forEach(syncQuestion);
     syncDamages();
@@ -4207,7 +4459,8 @@
                 " del caso" +
                 (kind === "preventiva"
                   ? " y su cobro administrativo pendiente."
-                  : "."),
+                  : ".") +
+                (cfg.deleteNote || ""),
               input: "text",
               inputLabel: "Escribe ELIMINAR para confirmar",
               showCancelButton: true,
@@ -4516,7 +4769,7 @@
           });
         }
         function correctiveDraftPayload() {
-          return {outside:outsideDraftFieldElements().map(function(field){return {name:field.name,value:field.value||"",checked:field.type==="checkbox"||field.type==="radio"?!!field.checked:undefined};}), items:Array.from(form.querySelectorAll('[data-corrective-item]')).map(function(item){
+          return {extra:typeof form._scmDraftExtra==="function"?form._scmDraftExtra():null, outside:outsideDraftFieldElements().map(function(field){return {name:field.name,value:field.value||"",checked:field.type==="checkbox"||field.type==="radio"?!!field.checked:undefined};}), items:Array.from(form.querySelectorAll('[data-corrective-item]')).map(function(item){
             var input=item.querySelector('[data-corrective-photos]');
             return {fields:correctiveDraftFields(item), photos:window.ScmPanelDrafts.pack(filesOf(input)), kept:Array.from(item.querySelectorAll('[data-corrective-existing-photo] input')).map(function(field){return field.value;})};
           })};
@@ -4530,6 +4783,7 @@
           }
         }
         function restoreCorrectiveDraft(payload) {
+          if (payload.extra && typeof form._scmBeforeDraftRestore === "function") form._scmBeforeDraftRestore(payload.extra);
           var outsideEntries = Array.isArray(payload.outside) ? payload.outside : [];
           outsideDraftFieldElements().forEach(function (field, fieldIndex) {
             var entry = outsideEntries[fieldIndex];
@@ -4639,6 +4893,10 @@
         form
           .querySelectorAll("[data-corrective-item]")
           .forEach(syncCorrectiveAreaFields);
+        if (cfg.extras) cfg.extras(form, {
+          message: message,
+          scheduleSave: scheduleCorrectiveDraftSave,
+        });
         if (cfg.wizard) bindPreventiveWizard(form, {
           message: message,
           syncAreas: syncCorrectiveAreaFields,
@@ -10089,6 +10347,30 @@
             }
           }
         }
+        if (!isPublicPqr && isEntregaCase(btn)) {
+          var deliveryIdVal = (btn.dataset.idRevisionEntrega || "").trim();
+          if (statusBucket !== "cerrados" && canUseDashboardAction("delivery_review_manage")) {
+            complementaryActionButtons.push(
+              '<button type="button" class="scm-case-work-btn" data-scm-open-delivery-review><span class="material-symbols-outlined scm-btn-icon">key</span><div class="scm-btn-text"><span class="scm-btn-label">' +
+                (deliveryIdVal
+                  ? "Gestionar revisi&oacute;n antes de la ocupaci&oacute;n"
+                  : "Crear revisi&oacute;n antes de la ocupaci&oacute;n") +
+                '</span><span class="scm-btn-sub">' +
+                (deliveryIdVal ? "Revisi&oacute;n #" + escHtml(deliveryIdVal) + " · ver o editar" : "Linderos, espacios y servicios") +
+                "</span></div></button>",
+            );
+          } else if (deliveryIdVal) {
+            complementaryActionButtons.push(
+              '<button type="button" class="scm-case-work-btn" data-scm-open-iframe data-iframe-title="Revisi&oacute;n antes de la ocupaci&oacute;n #' +
+                escHtml(deliveryIdVal) +
+                '" data-iframe-url="' +
+                escHtml(previewDeliveryReviewUrl(deliveryIdVal)) +
+                '"><span class="material-symbols-outlined scm-btn-icon">key</span><div class="scm-btn-text"><span class="scm-btn-label">Revisi&oacute;n antes de la ocupaci&oacute;n</span><span class="scm-btn-sub">Informe #' +
+                escHtml(deliveryIdVal) +
+                "</span></div></button>",
+            );
+          }
+        }
         if (!isPublicPqr && (cotizacionUrl || cotizacionId)) {
           if (canUseDashboardAction("quote_manage")) {
             quoteActionButtons.push(
@@ -10819,6 +11101,12 @@
             headActions.innerHTML +=
               '<button type="button" class="scm-case-side-link" data-scm-open-damage="preventiva"><span class="material-symbols-outlined text-[16px]">shield</span> Magnitud preventiva</button>';
           }
+          if ((btn.dataset.idRevisionEntrega || "").trim()) {
+            headActions.innerHTML +=
+              '<button type="button" class="scm-case-side-link" data-scm-open-iframe data-iframe-title="Revisión antes de la ocupación" data-iframe-url="' +
+              escHtml(previewDeliveryReviewUrl((btn.dataset.idRevisionEntrega || "").trim())) +
+              '"><span class="material-symbols-outlined text-[16px]">key</span> Ver revisión antes de la ocupación</button>';
+          }
           topActionButtons.forEach(function (rawBtn) {
             var sectionId = rawBtn.getAttribute("data-scm-open-section") || "";
             var label = (rawBtn.textContent || "").trim() || "Ver detalle";
@@ -11126,6 +11414,14 @@
         .forEach(function (reviewBtn) {
           reviewBtn.addEventListener("click", function () {
             openPreventiveReviewEditor(modal, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-delivery-review]")
+        .forEach(function (reviewBtn) {
+          reviewBtn.addEventListener("click", function () {
+            openDamageReviewEditor(modal, btn, "entrega");
           });
         });
 

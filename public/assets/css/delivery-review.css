@@ -1,0 +1,403 @@
+/* Revisión antes de la ocupación (revisión de entrega): complementa el asistente de preventive-review.css
+   con campos, repeaters y chips, y el informe público. */
+
+/* Los bloques condicionales usan el atributo hidden; las grillas no deben volver a mostrarlos. */
+.scm-delivery-wizard [hidden] {
+  display: none !important;
+}
+
+.scm-delivery-wizard .material-symbols-outlined {
+  font-size: 18px;
+  vertical-align: -4px;
+}
+
+.scm-delivery-autosave {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.scm-delivery-autosave .material-symbols-outlined {
+  color: #10b981;
+}
+
+.scm-delivery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.scm-delivery-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.scm-delivery-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.scm-delivery-field > span {
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.scm-delivery-field input,
+.scm-delivery-field select {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 14px;
+}
+
+.scm-delivery-field input:focus,
+.scm-delivery-field select:focus {
+  outline: 2px solid #bfdbfe;
+  border-color: #1d4ed8;
+}
+
+.scm-delivery-field--date {
+  max-width: 260px;
+}
+
+.scm-delivery-field--obs {
+  grid-column: 1 / -1;
+}
+
+.scm-delivery-wizard .scm-prev-block .scm-prev-choice + .scm-delivery-grid,
+.scm-delivery-wizard .scm-prev-block .scm-prev-choice + div {
+  margin-top: 10px;
+}
+
+.scm-delivery-repeater > header h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.scm-delivery-row {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.scm-delivery-row + .scm-delivery-row {
+  margin-top: 10px;
+}
+
+.scm-delivery-row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scm-delivery-row-head strong {
+  flex: 1;
+  color: #0f172a;
+  font-size: 13.5px;
+}
+
+.scm-delivery-link,
+.scm-delivery-remove {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scm-delivery-link {
+  color: #1d4ed8;
+}
+
+.scm-delivery-remove {
+  color: #be123c;
+}
+
+.scm-delivery-link:hover,
+.scm-delivery-remove:hover {
+  background: #f1f5f9;
+}
+
+.scm-delivery-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scm-delivery-chips label {
+  position: relative;
+  cursor: pointer;
+}
+
+.scm-delivery-chips input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scm-delivery-chips label > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 5px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 500;
+  user-select: none;
+}
+
+.scm-delivery-chips input:checked + span {
+  border-color: #1d4ed8;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.scm-delivery-chips input:checked + span::before {
+  content: "✓";
+  font-weight: 700;
+}
+
+.scm-delivery-chips input:focus-visible + span {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+}
+
+.scm-delivery-chips--lg label > span {
+  min-height: 44px;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.scm-delivery-obs {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.scm-delivery-obs .scm-prev-observation {
+  flex: 1;
+}
+
+.scm-delivery-item {
+  padding-top: 8px;
+}
+
+@media (max-width: 720px) {
+  .scm-delivery-grid,
+  .scm-delivery-grid--3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .scm-delivery-obs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ---------- Informe público ---------- */
+
+.scm-delivery-public-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.scm-delivery-public-card {
+  padding: 14px;
+  border: 1px solid #dce8f7;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.scm-delivery-public-card.has-note {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.scm-delivery-public-card h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.scm-delivery-public-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scm-delivery-public-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.scm-delivery-public-list span {
+  color: #64748b;
+}
+
+.scm-delivery-public-list strong {
+  text-align: right;
+}
+
+.scm-delivery-public-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.scm-delivery-public-chips span {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e0ecff;
+  color: #1e3a8a;
+  font-size: 11.5px;
+}
+
+.scm-delivery-public-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.scm-delivery-public-photos {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.scm-delivery-public-photos > button,
+.scm-delivery-public-photos > a {
+  justify-self: start;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid var(--scm-orange, #ff8500);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--scm-orange, #ff8500);
+  font: inherit;
+  font-weight: 800;
+  line-height: 44px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.scm-delivery-public-print-link {
+  display: none;
+}
+
+.scm-delivery-public-frame iframe {
+  width: 100%;
+  height: 520px;
+  border: 1px solid #dce8f7;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.scm-delivery-public-service + .scm-delivery-public-service {
+  margin-top: 14px;
+}
+
+.scm-delivery-public-service h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.scm-delivery-public-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.scm-delivery-public-table th,
+.scm-delivery-public-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.scm-delivery-public-table thead th {
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.scm-delivery-public-table tbody th {
+  width: 26%;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .scm-delivery-public-table thead {
+    display: none;
+  }
+
+  .scm-delivery-public-table tr {
+    display: grid;
+    padding: 6px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .scm-delivery-public-table th,
+  .scm-delivery-public-table td {
+    width: auto;
+    padding: 2px 0;
+    border: 0;
+  }
+}
+
+@media print {
+  @page { margin: 12mm 10mm; }
+
+  .scm-delivery-public-section h2 { font-size: 13px; margin-bottom: 4px; }
+  .scm-delivery-public-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .scm-delivery-public-card { padding: 6px 8px; border-radius: 8px; break-inside: avoid; page-break-inside: avoid; }
+  .scm-delivery-public-card h3 { font-size: 10.5px; margin-bottom: 3px; }
+  .scm-delivery-public-list li,
+  .scm-delivery-public-note { font-size: 9.5px; }
+  .scm-delivery-public-chips span { padding: 0 5px; font-size: 8.5px; }
+  .scm-delivery-public-table { font-size: 9.5px; }
+  .scm-delivery-public-table th,
+  .scm-delivery-public-table td { padding: 2px 4px; }
+  .scm-delivery-public-table tr { break-inside: avoid; page-break-inside: avoid; }
+  .scm-delivery-public-service { break-inside: avoid; page-break-inside: avoid; }
+  .scm-delivery-public-photos > button,
+  .scm-delivery-public-photos > a,
+  .scm-delivery-public-frame { display: none !important; }
+  .scm-delivery-public-print-link { display: block; font-size: 9px; word-break: break-all; }
+  .scm-delivery-public-section { break-inside: auto; page-break-inside: auto; }
+}
+
+/* El selector Sí/No no se estira con la altura de la tarjeta vecina. */
+.scm-delivery-wizard .scm-prev-block > .scm-prev-choice {
+  align-self: start;
+  justify-self: start;
+}

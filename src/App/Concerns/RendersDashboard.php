@@ -523,6 +523,7 @@ trait RendersDashboard
         'actas_satisfaccion' => self::AJAX_TICKET_COMPLETION_LIST,
         'revision_correctiva' => self::AJAX_CORRECTIVE_REVIEW,
         'revision_preventiva' => self::AJAX_PREVENTIVE_REVIEW,
+        'revision_entrega' => self::AJAX_DELIVERY_REVIEW,
         'delete_cotizacion' => self::AJAX_DELETE_COTIZACION,
         'approve_cotizacion' => self::AJAX_APPROVE_COTIZACION,
         'cotizacion_form_context' => self::AJAX_COTIZACION_FORM_CONTEXT,
@@ -766,6 +767,7 @@ trait RendersDashboard
     <link rel="stylesheet" href="<?php echo $cssUrl; ?>" media="all">
     <link rel="stylesheet" href="<?php echo $damageCssUrl; ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/preventive-review.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/preventive-review.css'))); ?>" media="all">
+    <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/delivery-review.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/delivery-review.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/contract-movements.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/contract-movements.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/contract-ownership.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/contract-ownership.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/owner-net-income.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/owner-net-income.css'))); ?>" media="all">

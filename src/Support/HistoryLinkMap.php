@@ -28,7 +28,7 @@ final class HistoryLinkMap
       // Revisiones
       'id_revision_preventiva' => ['label' => 'Ver revision preventiva', 'base' => $baseUrl . 'revision-preventiva.php?numero='],
       'id_revision_correctiva' => ['label' => 'Ver revision correctiva', 'base' => $correctiveReviewUrl],
-      'id_revision_entrega' => ['label' => 'Ver revision de entrega', 'base' => 'https://sucasainmobiliaria.com.co/revision-de-entrega/?numero='],
+      'id_revision_entrega' => ['label' => 'Ver revision antes de la ocupacion', 'base' => $baseUrl . 'revision-entrega.php?numero='],
       'id_revision_recibo' => ['label' => 'Ver revision de recibo', 'base' => 'https://sucasainmobiliaria.com.co/revision-de-recibo/?numero='],
       'id_revision_sp' => ['label' => 'Ver revision de servicios publicos', 'base' => $baseUrl . 'revision-servicios-publicos.php?numero='],
       'id_revision_servicios_publicos' => ['label' => 'Ver revision de servicios publicos', 'base' => $baseUrl . 'revision-servicios-publicos.php?numero='],

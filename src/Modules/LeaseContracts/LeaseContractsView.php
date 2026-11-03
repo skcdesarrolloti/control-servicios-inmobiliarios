@@ -280,7 +280,7 @@ final class LeaseContractsView
       ['Contrato de mandato', 'id_contrato_mandato', $wp . 'contrato-de-mandato/?numero=', false],
       ['Inventario del inmueble', 'id_inventario', $wp . 'inventario-inmueble/?numero=', false],
       ['Acta de entrega', 'id_acta_entrega', $wp . 'acta-de-entrega/?numero=', false],
-      ['Revisión de entrega', 'id_revision_entrega', $wp . 'revision-de-entrega/?numero=', false],
+      ['Revisión antes de la ocupación', 'id_revision_entrega', $base . 'revision-entrega.php?numero=', false],
       ['Acta de recibo', 'id_acta_recibo', $wp . 'acta-de-recibo/?numero=', false],
       ['Revisión de recibo', 'id_revision_recibo', $wp . 'revision-de-recibo/?numero=', false],
       ['Acta de revisión de desocupación', 'id_acta_revision_desocupacion', $wp . 'acta-de-revision-de-desocupacion/?numero=', false],

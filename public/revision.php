@@ -20,12 +20,13 @@ header('X-Robots-Tag: noindex, nofollow');
 $kinds = [
   'preventiva' => ['label' => 'Revisión preventiva', 'can' => 'canAccessPreventiveReview', 'action' => 'preventive_review_manage'],
   'correctiva' => ['label' => 'Revisión correctiva', 'can' => 'canAccessCorrectiveReview', 'action' => 'corrective_review_manage'],
+  'entrega' => ['label' => 'Revisión antes de la ocupación', 'can' => 'canAccessDeliveryReview', 'action' => 'delivery_review_manage'],
 ];
 $kind = is_string($_GET['tipo'] ?? null) ? strtolower(trim($_GET['tipo'])) : '';
 $ticketPk = is_string($_GET['ticket_pk'] ?? null) && ctype_digit($_GET['ticket_pk']) ? (int) $_GET['ticket_pk'] : 0;
 if (!isset($kinds[$kind]) || $ticketPk <= 0) {
   http_response_code(400);
-  exit('Enlace incompleto: usa tipo=preventiva o tipo=correctiva y el ticket_pk interno del caso.');
+  exit('Enlace incompleto: usa tipo=preventiva, tipo=correctiva o tipo=entrega y el ticket_pk interno del caso.');
 }
 
 $relativeTarget = 'revision.php?' . http_build_query(['tipo' => $kind, 'ticket_pk' => $ticketPk], '', '&', PHP_QUERY_RFC3986);
@@ -77,6 +78,7 @@ $runtime = [
   'actions' => [
     'revision_preventiva' => SuCasaControlServiciosInmobiliarios::AJAX_PREVENTIVE_REVIEW,
     'revision_correctiva' => SuCasaControlServiciosInmobiliarios::AJAX_CORRECTIVE_REVIEW,
+    'revision_entrega' => SuCasaControlServiciosInmobiliarios::AJAX_DELIVERY_REVIEW,
   ],
 ];
 $asset = static function (string $path) use ($baseUrl): string {
@@ -100,7 +102,7 @@ echo (new \SCM\Views\ReviewPageView())->render([
   'draft_user' => (string) Auth::userId(),
   'assets' => [
     'drafts' => $asset('assets/js/ticket-completion-form-state.js'),
-    'css' => array_map($asset, ['assets/css/tailwind-admin.css', 'assets/css/scm-admin.css', 'assets/css/preventive-review.css', 'assets/css/scm-damage-magnitude.css', 'assets/css/review-page.css']),
+    'css' => array_map($asset, ['assets/css/tailwind-admin.css', 'assets/css/scm-admin.css', 'assets/css/preventive-review.css', 'assets/css/delivery-review.css', 'assets/css/scm-damage-magnitude.css', 'assets/css/review-page.css']),
     'js' => array_map($asset, ['assets/js/scm-admin.js', 'assets/js/scm-damage-magnitude.js', 'assets/js/review-page.js']),
   ],
 ]);

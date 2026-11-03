@@ -51,7 +51,7 @@ $safeNext = static function (string $raw): string {
   }
   if ($path === 'revision.php') {
     $kind = (string) ($query['tipo'] ?? '');
-    return in_array($kind, ['preventiva', 'correctiva'], true) && isset($query['ticket_pk']) && $digits($query['ticket_pk'])
+    return in_array($kind, ['preventiva', 'correctiva', 'entrega'], true) && isset($query['ticket_pk']) && $digits($query['ticket_pk'])
       ? 'revision.php?' . http_build_query(['tipo' => $kind, 'ticket_pk' => (string) $query['ticket_pk']], '', '&', PHP_QUERY_RFC3986)
       : '';
   }
@@ -64,7 +64,7 @@ $safeNext = static function (string $raw): string {
       return 'index.php?tab=credito_propietario' . (isset($query['credito']) && $digits($query['credito']) ? '&credito=' . (string) $query['credito'] : '');
     }
     $action = trim((string) ($query['scm_bridge_action'] ?? ''));
-    $allowedActions = ['revision_correctiva', 'revision_preventiva', 'crear_cotizacion', 'editar_cotizacion', 'enviar_cotizacion', 'crear_orden', 'acta_satisfaccion', 'acta_cotizacion'];
+    $allowedActions = ['revision_correctiva', 'revision_preventiva', 'revision_entrega', 'crear_cotizacion', 'editar_cotizacion', 'enviar_cotizacion', 'crear_orden', 'acta_satisfaccion', 'acta_cotizacion'];
     if (!in_array($action, $allowedActions, true)) {
       return '';
     }

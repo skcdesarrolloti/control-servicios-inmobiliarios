@@ -12,6 +12,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesTicketCompletion;
   use \SCM\App\Concerns\HandlesCorrectiveReviewActions;
   use \SCM\App\Concerns\HandlesPreventiveReviewActions;
+  use \SCM\App\Concerns\HandlesDeliveryReviewActions;
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   use \SCM\App\Concerns\HandlesOwnerCredits;
   use \SCM\App\Concerns\HandlesTools;
@@ -63,6 +64,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_TICKET_COMPLETION_LIST = 'scm_ticket_actas_satisfaccion';
   const AJAX_CORRECTIVE_REVIEW = 'scm_revision_correctiva';
   const AJAX_PREVENTIVE_REVIEW = 'scm_revision_preventiva';
+  const AJAX_DELIVERY_REVIEW = 'scm_revision_entrega';
   const AJAX_CONTACTS_UPDATE = 'scm_actualizar_contactos';
   const AJAX_ENTREGA         = 'scm_entrega';
   const AJAX_PREVENTIVA      = 'scm_preventiva';
@@ -228,6 +230,7 @@ final class SuCasaControlServiciosInmobiliarios
 
   const DEFAULT_TICKET_URL = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=';
   const DEFAULT_PREVENTIVA_URL = 'revision-preventiva.php?numero=';
+  const DEFAULT_ENTREGA_URL = 'revision-entrega.php?numero=';
   const DEFAULT_CORRECTIVA_URL = 'revision-correctiva.php?numero=';
   const DEFAULT_COTIZACION_URL = 'cotizacion-mantenimiento.php?numero=';
   const DEFAULT_ACTA_URL = 'https://sucasainmobiliaria.com.co/acta-de-satisfaccion/?numero=';
@@ -659,6 +662,21 @@ final class SuCasaControlServiciosInmobiliarios
           ],
         ],
       ],
+      'entregas' => [
+        'label' => 'Entregas de inmuebles',
+        'items' => [
+          'revision_entrega_creada' => [
+            'label' => 'Revisión antes de la ocupación registrada',
+            'description' => 'Cuando se registra la revisión antes de la ocupación de un caso de entrega desde el panel (reemplaza el formulario de WordPress). También se avisa a quien la registró.',
+            'channel' => 'Email interno en cola',
+          ],
+          'revision_entrega_actualizada' => [
+            'label' => 'Revisión antes de la ocupación editada',
+            'description' => 'Cuando se edita una revisión antes de la ocupación ya registrada. Solo reciben aviso los funcionarios seleccionados aquí.',
+            'channel' => 'Email interno en cola',
+          ],
+        ],
+      ],
       'preventivas' => [
         'label' => 'Preventivas',
         'items' => [
@@ -887,6 +905,7 @@ final class SuCasaControlServiciosInmobiliarios
           'corrective_review_manage' => 'Gestionar revisión correctiva (casos de mantenimiento)',
           'preventive_review_manage' => 'Gestionar revisión preventiva (casos preventivos)',
           'preventive_review_send' => 'Enviar revisión preventiva al propietario y arrendatario',
+          'delivery_review_manage' => 'Gestionar revisión antes de la ocupación (casos de entrega)',
           'case_contacts_edit' => 'Editar datos de contacto de arrendatario y propietario',
           'case_magnitude_calculate' => 'Calcular magnitud del daño (botón de los filtros)',
           'case_export_excel' => 'Exportar casos a Excel',
@@ -1379,6 +1398,38 @@ final class SuCasaControlServiciosInmobiliarios
       return false;
     }
     return hash_equals(self::preventiveReviewPublicSignature($reviewId, $expires), trim($signature));
+  }
+
+  public static function defaultDeliveryReviewUrl(): string
+  {
+    $base = defined('SCM_BASE_URL') ? rtrim((string) SCM_BASE_URL, '/') : '';
+    return ($base !== '' ? $base . '/' : '') . self::DEFAULT_ENTREGA_URL;
+  }
+
+  public static function deliveryReviewPublicUrl(int $reviewId): string
+  {
+    return self::defaultDeliveryReviewUrl() . rawurlencode((string) $reviewId);
+  }
+
+  public static function signedDeliveryReviewPublicUrl(int $reviewId, ?int $expires = null): string
+  {
+    $expires = $expires && $expires > time() ? $expires : (time() + 180 * 86400);
+    return self::deliveryReviewPublicUrl($reviewId)
+      . '&expires=' . rawurlencode((string) $expires)
+      . '&sig=' . rawurlencode(self::deliveryReviewPublicSignature($reviewId, $expires));
+  }
+
+  public static function deliveryReviewPublicSignature(int $reviewId, int $expires): string
+  {
+    return hash_hmac('sha256', 'revision-entrega|' . $reviewId . '|' . $expires, (string) SCM_APP_SECRET);
+  }
+
+  public static function deliveryReviewPublicSignatureValid(int $reviewId, int $expires, string $signature): bool
+  {
+    if ($reviewId <= 0 || $expires <= time() || trim($signature) === '') {
+      return false;
+    }
+    return hash_equals(self::deliveryReviewPublicSignature($reviewId, $expires), trim($signature));
   }
 
   public static function defaultCorrectiveReviewUrl(): string

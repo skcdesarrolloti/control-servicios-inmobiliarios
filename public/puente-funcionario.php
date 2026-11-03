@@ -23,6 +23,7 @@ $normalizeAction = static function (string $action): string {
   return match ($action) {
     'revision_correctiva', 'crear_revision_correctiva', 'gestionar_revision_correctiva', 'correctiva' => 'revision_correctiva',
     'revision_preventiva', 'crear_revision_preventiva', 'gestionar_revision_preventiva', 'anadir_revision_preventiva', 'añadir_revision_preventiva', 'preventiva' => 'revision_preventiva',
+    'revision_entrega', 'revision_de_entrega', 'crear_revision_entrega', 'anadir_revision_de_entrega', 'añadir_revision_de_entrega', 'revision_antes_ocupacion', 'entrega' => 'revision_entrega',
     'crear_cotizacion', 'cotizacion_crear', 'nueva_cotizacion', 'anadir_cotizacion', 'añadir_cotizacion' => 'crear_cotizacion',
     'editar_cotizacion', 'cotizacion_editar' => 'editar_cotizacion',
     'enviar_cotizacion', 'cotizacion_enviar' => 'enviar_cotizacion',
@@ -36,7 +37,7 @@ $normalizeAction = static function (string $action): string {
 $action = $normalizeAction($clean('accion', $clean('action')));
 if ($action === '') {
   http_response_code(400);
-  exit('Acción no válida. Usa accion=revision_correctiva, revision_preventiva, crear_cotizacion, editar_cotizacion, enviar_cotizacion, crear_orden o acta_satisfaccion.');
+  exit('Acción no válida. Usa accion=revision_correctiva, revision_preventiva, revision_entrega, crear_cotizacion, editar_cotizacion, enviar_cotizacion, crear_orden o acta_satisfaccion.');
 }
 
 $ticketPk = $numeric($clean('ticket_pk', $clean('_ID', $clean('id', $clean('id_ticket')))));
@@ -67,7 +68,7 @@ if (in_array($action, $quoteActions, true) && $quotePk <= 0) {
   http_response_code(400);
   exit('Falta id_cotizacion para esta acción.');
 }
-if (in_array($action, ['revision_correctiva', 'revision_preventiva', 'crear_cotizacion', 'acta_satisfaccion'], true) && $ticketPk <= 0) {
+if (in_array($action, ['revision_correctiva', 'revision_preventiva', 'revision_entrega', 'crear_cotizacion', 'acta_satisfaccion'], true) && $ticketPk <= 0) {
   http_response_code(400);
   exit('Falta ticket_pk interno del caso para esta acción.');
 }
@@ -114,9 +115,9 @@ $standaloneActTarget = $standaloneActQuery !== []
   ? 'crear-acta.php?' . http_build_query($standaloneActQuery, '', '&', PHP_QUERY_RFC3986)
   : '';
 // Las revisiones tienen vista propia (revision.php), como el acta: no dependen del panel completo.
-if (in_array($action, ['revision_preventiva', 'revision_correctiva'], true) && $ticketPk > 0) {
+if (in_array($action, ['revision_preventiva', 'revision_correctiva', 'revision_entrega'], true) && $ticketPk > 0) {
   $standaloneActTarget = 'revision.php?' . http_build_query([
-    'tipo' => $action === 'revision_preventiva' ? 'preventiva' : 'correctiva',
+    'tipo' => ['revision_preventiva' => 'preventiva', 'revision_entrega' => 'entrega'][$action] ?? 'correctiva',
     'ticket_pk' => $ticketPk,
   ], '', '&', PHP_QUERY_RFC3986);
 }
@@ -156,6 +157,10 @@ $app = new SuCasaControlServiciosInmobiliarios(App::db());
 if ($action === 'revision_correctiva' && !$app->canAccessCorrectiveReview($ticketPk)) {
   http_response_code(403);
   exit('No tienes permiso para gestionar la revisión correctiva de este caso.');
+}
+if ($action === 'revision_entrega' && !$app->canAccessDeliveryReview($ticketPk)) {
+  http_response_code(403);
+  exit('No tienes permiso para gestionar la revisión antes de la ocupación de este caso.');
 }
 if ($action === 'revision_preventiva' && !$app->canAccessPreventiveReview($ticketPk)) {
   http_response_code(403);

@@ -39,7 +39,7 @@ final class EntregaTimelineMap
         'done_field'          => 'entrega_rev_fecha',
         'elapsed_from_fields' => ['cita_fecha_inicio', 'ticket_cct_created'],
         'elapsed_from_label'  => 'Cita agendada',
-        'link_url'            => 'https://sucasainmobiliaria.com.co/revision-de-entrega/?numero={id_revision_entrega}',
+        'link_url'            => \SCM\App\SuCasaControlServiciosInmobiliarios::defaultDeliveryReviewUrl() . '{id_revision_entrega}',
         'empty_text'          => 'Sin revisión antes de la entrega',
       ],
       [

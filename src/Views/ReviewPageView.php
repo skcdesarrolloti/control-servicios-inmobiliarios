@@ -18,7 +18,13 @@ final class ReviewPageView
     $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $isPreventive = $data['kind'] === 'preventiva';
     $firstName = trim((string) strtok(trim($data['user']), ' ')) ?: $data['user'];
-    $steps = $isPreventive
+    $steps = $data['kind'] === 'entrega'
+      ? [
+        ['home', 'Confirma el inmueble', 'Habitaciones, baños, piso, parqueadero y depósito.'],
+        ['photo_camera', 'Recorre cada espacio', 'Linderos, registro fotográfico y servicios públicos.'],
+        ['save', 'Guarda la revisión', 'Se guarda sola mientras avanzas; al final pulsa guardar.'],
+      ]
+      : ($isPreventive
       ? [
         ['checklist', 'Revisa el inmueble', 'Recorre cada espacio y marca cómo está.'],
         ['photo_camera', 'Registra los daños', 'Si encuentras algo, descríbelo y agrega fotos.'],
@@ -28,7 +34,7 @@ final class ReviewPageView
         ['search', 'Diagnostica el daño', 'Describe qué pasó y dónde está.'],
         ['photo_camera', 'Agrega evidencias', 'Toma fotos claras del daño.'],
         ['save', 'Guarda la revisión', 'Al final pulsa el botón de guardar.'],
-      ];
+      ]);
     // El formulario ya muestra contrato, inmueble y partes; aquí solo lo necesario para ubicarse.
     $details = array_filter([
       'Caso' => '#' . $data['case'],
