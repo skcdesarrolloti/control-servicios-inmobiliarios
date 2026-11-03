@@ -336,12 +336,8 @@ trait HandlesOwnerCredits
         $people = $service->ownersByName($document);
         if ($people !== [] || preg_match('/^[0-9A-Z-]{4,20}$/', strtoupper(preg_replace('/[\s.]+/', '', $document) ?? '')) !== 1) $this->jsonOk(['people' => $people]);
       }
-      $rows = $service->ownerPortfolio($document);
-      // Cupo preaprobado con todos los contratos de la persona, menos el saldo de sus créditos vigentes.
-      $preapproval = \SCM\Modules\OwnerCredits\OwnerCreditCalculator::preapproval($rows, OwnerCreditSettings::read(App::settings()));
-      $preapproval['outstanding'] = $rows === [] ? 0.0 : $service->outstandingByDocument($document, array_map(static fn(array $row): string => (string) ($row['owner']['owner_id'] ?? ''), $rows));
-      $preapproval['available'] = max(0.0, $preapproval['amount'] - $preapproval['outstanding']);
-      $this->jsonOk(['contracts' => $rows, 'preapproval' => $preapproval, 'checks' => $service->requestChecks($rows, $preapproval), 'disclaimer' => OwnerCreditService::DISCLAIMER]);
+      // Cupo personal con todos los contratos de la persona (según su %) y, por contrato, el de reparaciones (100 %).
+      $this->jsonOk($service->requestPreapproval($document) + ['repair_purpose' => OwnerCreditSettings::REPAIR_PURPOSE, 'disclaimer' => OwnerCreditService::DISCLAIMER]);
     } catch (\InvalidArgumentException $error) {
       $this->jsonFail($error->getMessage());
     } catch (\Throwable $error) {

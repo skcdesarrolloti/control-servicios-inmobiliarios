@@ -130,7 +130,8 @@ $service->syncFromQuote(575, 'Si', $actor);
 $second = $service->byQuote(575);
 $secondWork = $service->workspace((int) $second['id']);
 $failed = array_column(array_filter($secondWork['policies'], static fn(array $p): bool => !$p['ok']), 'key');
-$check(in_array('prestamos', $failed, true) && in_array('siniestro', $failed, true) && in_array('vigencia', $failed, true), 'second request flags active loan, siniestro and contract about to expire');
+// Reparaciones solo cuenta el contrato del inmueble (#900): la reparación vigente del #817 no pesa sobre él.
+$check(!in_array('prestamos', $failed, true) && in_array('siniestro', $failed, true) && in_array('vigencia', $failed, true) && $secondWork['evaluation']['share']['mode'] === 'reparaciones' && $secondWork['evaluation']['other_contracts'] === [], 'a repair request on another contract only counts its own contract, and flags siniestro and contract about to expire');
 $usury = array_values(array_filter($secondWork['policies'], static fn(array $p): bool => $p['key'] === 'usura'))[0];
 $check($usury['ok'] && str_contains($usury['detail'], '28,59 % E.A.'), 'usury policy compares against the effective annual rate');
 $high = $service->workspace((int) $second['id'], ['rate' => '2,2']);
@@ -193,12 +194,14 @@ $check($manual['status'] === 'pendiente' && $manual['quote_id'] === null && (int
 $check($db->getRow('SELECT fin_contrato FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = 8')['fin_contrato'] === (string) strtotime(date('Y-m-d', strtotime('+1 year')) . ' 00:00:00'), 'manual credit saves the corrected contract end date');
 
 // Mandato con dos propietarios: se elige a quién se le hace el crédito.
-foreach (['propietarios', 'tipo_1', 'nombre_1', 'documento_1', 'correo_1', 'celular_1', 'indicativo_1', 'empresa_1', 'nit_1', 'id_propietario_nuevo_1', 'tipo_2', 'nombre_2', 'documento_2', 'correo_2', 'celular_2', 'indicativo_2', 'empresa_2', 'nit_2', 'id_propietario_nuevo_2'] as $column) {
+foreach (['propietarios', 'tipo_1', 'nombre_1', 'documento_1', 'correo_1', 'celular_1', 'indicativo_1', 'empresa_1', 'nit_1', 'id_propietario_nuevo_1', 'tipo_2', 'nombre_2', 'documento_2', 'correo_2', 'celular_2', 'indicativo_2', 'empresa_2', 'nit_2', 'id_propietario_nuevo_2', 'porcentaje_1', 'porcentaje_2'] as $column) {
   $pdo->exec("ALTER TABLE wp_jet_cct_contrato_mandato ADD COLUMN {$column} TEXT");
 }
 $db->insert('wp_jet_cct_contrato_mandato', ['_ID' => 31, 'total_comision' => '100.000', 'incluye_garantia' => 'No', 'incluye_garantia_servicios' => 'No', 'propietarios' => '2',
   'tipo_1' => 'Natural', 'nombre_1' => 'Primer Dueño', 'documento_1' => '111', 'celular_1' => '3001110000', 'indicativo_1' => '+57', 'id_propietario_nuevo_1' => '960',
-  'tipo_2' => 'Natural', 'nombre_2' => 'Segunda Dueña', 'documento_2' => '22233344', 'correo_2' => 'segunda@example.invalid', 'celular_2' => '+1 (813) 389-8958', 'indicativo_2' => '+57']);
+  'tipo_2' => 'Natural', 'nombre_2' => 'Segunda Dueña', 'documento_2' => '22233344', 'correo_2' => 'segunda@example.invalid', 'celular_2' => '+1 (813) 389-8958', 'indicativo_2' => '+57',
+  // Cada una es dueña del 50 %: el cupo de Segunda Dueña sale de su mitad de cada contrato.
+  'porcentaje_1' => '50', 'porcentaje_2' => '50']);
 $db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 9, 'contrato' => '950', 'estado' => 'Entregado', 'inmueble' => '10600', 'propietario' => 'Primer Dueño', 'id_propietario' => '960', 'valor_canon' => '1.500.000', 'fin_contrato' => (string) strtotime('+2 years'), 'esta_sinestrado' => 'No', 'id_contrato_mandato' => '31']);
 $owners = $service->contractOwners(9);
 $byDocument = $service->contractsByOwnerDocument('2223');
@@ -240,10 +243,10 @@ $portfolio = $service->ownerPortfolio('22233344');
 $people = $service->ownersByName('  SEGUNDA ');
 $check(count($people) === 1 && $people[0]['document'] === '22233344' && $people[0]['name'] === 'Segunda Dueña', 'the new request finds the owner by name and returns their document');
 $check($service->ownersByName('Nadie Inexistente') === [], 'a name with no owner returns nobody');
-$check(array_column($portfolio, 'id') === [14, 9] && $portfolio[0]['net_income'] == 1900000.0, 'the owner portfolio lists the longest contract first, with its net income');
+$check(array_column($portfolio, 'id') === [14, 9] && $portfolio[0]['net_total'] == 1900000.0 && $portfolio[0]['net_income'] == 950000.0 && $portfolio[0]['share'] == 0.5, 'the owner portfolio lists the longest contract first, with its net income and the 50 % attributable to the owner');
 $work = $service->workspace((int) $chosen['id']);
 $ev = $work['evaluation'];
-$check(count($ev['other_contracts']) === 1 && abs($ev['total_net_income'] - 3300000) < 0.01 && abs($ev['max_amount'] - 9900000) < 0.01, 'the liquidator adds the other contracts to the cap');
+$check(count($ev['other_contracts']) === 1 && abs($ev['total_net_income'] - 1650000) < 0.01 && abs($ev['max_amount'] - 4950000) < 0.01 && abs($ev['attributable_income'] - 700000) < 0.01 && abs($ev['net_income'] - 1400000) < 0.01, 'the liquidator adds the other contracts to the cap with the owner share (net shown at 100 %)');
 $check($ev['longest_months'] === $portfolio[0]['max_months'] && $ev['term_limit'] === min($portfolio[0]['max_months'] - 2, 24), 'the liquidator term is the longest contract minus the margin, up to the cap');
 foreach ([[0, $ev['max_months'], 'valor'], [9900000, 0, 'plazo']] as [$amount, $term, $missing]) {
   try {
@@ -297,7 +300,7 @@ $service->changeStatus($adjusted, 'anulado', 'Crédito de prueba de cambios fren
 // Cupo preaprobado en el liquidador y cambio de beneficiario mientras está pendiente.
 $pending = $service->workspace($service->createManual(9, 12000000, 6, 'Libre Destinación', $actor, '', 'mandato_2'));
 $p = $pending['preapproval'];
-$check(abs($p['amount'] - 9900000) < 0.01 && $p['contracts'] === 2 && $p['outstanding'] == 0.0 && abs($p['requested'] - 12000000) < 0.01, 'the liquidator shows the pre-approved amount of all the owner contracts');
+$check(abs($p['amount'] - 4950000) < 0.01 && $p['contracts'] === 2 && $p['outstanding'] == 0.0 && abs($p['requested'] - 12000000) < 0.01, 'the liquidator shows the pre-approved amount of all the owner contracts');
 $pendingHtml = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($pending, true, true);
 $check(str_contains($pendingHtml, 'Otros contratos del propietario (ingreso neto)') && count($pending['evaluation']['other_contracts']) === 1, 'the income section lists the other contracts that add to the cap');
 $single = $service->workspace((int) $manual['id']);

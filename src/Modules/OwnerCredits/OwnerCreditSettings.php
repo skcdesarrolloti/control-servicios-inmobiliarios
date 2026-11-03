@@ -10,6 +10,8 @@ use SCM\Core\Settings;
 final class OwnerCreditSettings
 {
   public const KEY = 'owner_credit_settings';
+  /** Crédito del inmueble: usa el 100 % del ingreso de su contrato y lo firman todos los copropietarios. */
+  public const REPAIR_PURPOSE = 'Reparaciones y mantenimiento';
   /** Mismas necesidades que ofrece el simulador de ingreso neto del propietario (servicios comerciales). */
   public const PURPOSES = [
     'Servicios públicos',

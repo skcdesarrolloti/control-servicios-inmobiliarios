@@ -274,6 +274,7 @@
       person.hidden = true;
       preapproval.hidden = true;
       form._preapproval = null;
+      form._personal = null;
       var byName = /[A-Za-zÁÉÍÓÚÑáéíóúñ]{2,}/.test(query);
       if (byName ? query.length < 3 : query.replace(/[\s.]/g, "").length < 4) { status.textContent = "Escribe la cédula, el NIT o el nombre del propietario (mínimo 4 números o 3 letras)."; return; }
       status.textContent = "Buscando…";
@@ -301,11 +302,13 @@
           person.innerHTML = '<strong class="!sp-block !sp-text-xs !sp-text-service-navy">' + escapeHtml(owner.name || "Propietario") + "</strong>" +
             '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">' + escapeHtml(detail || "Sin datos de contacto") + "</span>";
           person.hidden = false;
-          form._preapproval = data.preapproval || null;
-          renderPreapproval(preapproval, data.preapproval);
+          form._personal = data.preapproval || null;
+          form._repairPurpose = data.repair_purpose || "";
+          form._preapproval = form._personal;
           status.textContent = "";
           // El servidor los ordena con el de vigencia más larga primero: ese es el principal.
           pickContract(form, contracts[0]);
+          syncPreapproval(form);
         })
         .catch(function (error) { status.textContent = error.message; });
     }
@@ -319,16 +322,26 @@
       return "$" + moneyFormat.format(Math.round(Number(value) || 0));
     }
 
+    // Reparaciones y mantenimiento: cupo y plazo solo con el contrato elegido, al 100 %; las demás destinaciones usan
+    // el cupo personal (todos sus contratos, cada uno según su % de participación).
+    function syncPreapproval(form) {
+      var purpose = form.elements.purpose ? form.elements.purpose.value : "";
+      var repair = purpose !== "" && purpose === form._repairPurpose && form._contract && form._contract.repair;
+      form._preapproval = repair ? form._contract.repair : form._personal;
+      renderPreapproval(form.querySelector("[data-owner-credit-preapproval]"), form._preapproval, repair ? form._contract : null);
+      updateTermHint(form);
+    }
+
     // Cupo por verificar con todos los contratos de la persona: solo el valor y el plazo máximo. El análisis
     // (contratos, políticas, cobertura) se hace en el liquidador.
-    function renderPreapproval(box, p) {
+    function renderPreapproval(box, p, repairContract) {
       if (!box || !p || !p.contracts) return;
       var tile = function (label, value) {
         return '<div><span class="!sp-block !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">' + label + "</span>" +
           '<strong class="!sp-block !sp-text-base !sp-text-service-navy">' + value + "</strong></div>";
       };
       box.innerHTML = '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">' +
-        tile("Cupo preaprobado por verificar", money(p.outstanding > 0 ? p.available : p.amount)) +
+        tile(repairContract ? "Cupo de reparaciones · contrato #" + escapeHtml(repairContract.contrato) + " al 100 %" : "Cupo preaprobado por verificar", money(p.outstanding > 0 ? p.available : p.amount)) +
         tile("Plazo máximo", p.max_term > 0 ? escapeHtml(p.max_term) + (Number(p.max_term) === 1 ? " mes" : " meses") : "Sin cuotas") + "</div>";
       box.className = box.className.replace(/!sp-(bg|border)-(amber|red)-(50|200)/g, "") + (p.max_term > 0 ? " !sp-bg-amber-50 !sp-border-amber-200" : " !sp-bg-red-50 !sp-border-red-200");
       box.hidden = false;
@@ -682,6 +695,7 @@
       if (event.target.matches && event.target.matches("[data-owner-credit-money]:not([readonly])")) formatMoneyInput(event.target, true);
       var newCredit = event.target.closest && event.target.closest("[data-owner-credit-new-form]");
       if (newCredit && event.target.name === "term") updateTermHint(newCredit);
+      if (newCredit && event.target.name === "purpose") syncPreapproval(newCredit);
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
       // El pagaré y el abono no recalculan el liquidador.
       if (!form || ["note", "owner_key", "main_contract_id", "promissory_signers[]", "promissory_channels[]", "promissory_void_note"].indexOf(event.target.name) >= 0) return;

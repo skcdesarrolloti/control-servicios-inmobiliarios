@@ -1,0 +1,156 @@
+<?php
+
+declare(strict_types=1);
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+use SCM\Core\Database;
+use SCM\Core\Settings;
+use SCM\Modules\OwnerCredits\OwnerCreditService;
+use SCM\Modules\OwnerCredits\OwnerCreditSettings;
+use SCM\Modules\OwnerCredits\OwnerCreditView;
+
+// Créditos a propietarios con copropietarios: el cupo personal sale del % del solicitante; reparaciones usa el 100 %
+// del contrato del inmueble; sin % se toma partes iguales con la política en rojo; lo ya decidido no cambia.
+
+$check = static function (bool $condition, string $message): void {
+  if (!$condition) {
+    fwrite(STDERR, "FAIL: {$message}\n");
+    exit(1);
+  }
+  echo "OK: {$message}\n";
+};
+$near = static fn(float $a, float $b): bool => abs($a - $b) < 0.01;
+
+final class OwnerCreditCoOwnersTestPdo extends PDO
+{
+  public function __construct()
+  {
+    parent::__construct('sqlite::memory:');
+    $this->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+  }
+
+  public function prepare(string $query, array $options = []): PDOStatement|false
+  {
+    if (str_contains($query, 'information_schema.TABLES')) $query = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1";
+    if (preg_match('/^DESCRIBE `([^`]+)`/', $query, $m)) $query = "SELECT name FROM pragma_table_info('{$m[1]}')";
+    return parent::prepare(str_replace(' FOR UPDATE', '', $query), $options);
+  }
+
+  public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false
+  {
+    $stmt = $this->prepare($query);
+    $stmt->execute();
+    if ($fetchMode !== null) $stmt->setFetchMode($fetchMode, ...$fetchModeArgs);
+    return $stmt;
+  }
+
+  /** El DDL de MySQL de ensureSchema() se omite: las tablas se crean abajo en SQLite. */
+  public function exec(string $statement): int|false
+  {
+    return str_contains($statement, 'ENGINE=InnoDB') ? 0 : parent::exec($statement);
+  }
+}
+
+$pdo = new OwnerCreditCoOwnersTestPdo();
+$db = new Database($pdo, 'wp_');
+$pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema(_ID INTEGER PRIMARY KEY, funcion TEXT, valor TEXT)');
+$pdo->exec("INSERT INTO wp_jet_cct_confi_sistema(funcion, valor) VALUES ('control_servicios_config', '" . json_encode(['owner_credit_settings' => ['usury_auto' => false, 'usury_annual' => 0.2859, 'reference_rate' => 0.019, 'require_promissory' => false, 'max_term' => 24, 'income_months' => 3]]) . "')");
+$pdo->exec('CREATE TABLE wp_scm_owner_credits(id INTEGER PRIMARY KEY AUTOINCREMENT, quote_id INTEGER UNIQUE, ticket_id TEXT DEFAULT "", contract_id INTEGER DEFAULT 0, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", address TEXT DEFAULT "", owner_id TEXT DEFAULT "", owner_name TEXT DEFAULT "", owner_email TEXT DEFAULT "", owner_phone TEXT DEFAULT "", purpose TEXT DEFAULT "", status TEXT DEFAULT "pendiente", requested_amount REAL DEFAULT 0, requested_term INTEGER DEFAULT 0, vacancy TEXT DEFAULT "Baja", gross_income REAL DEFAULT 0, deductions_json TEXT, net_income REAL DEFAULT 0, max_amount REAL DEFAULT 0, max_months INTEGER DEFAULT 0, approved_amount REAL, approved_term INTEGER, approved_rate REAL, monthly_payment REAL, total_interest REAL, first_payment_ts INTEGER, policy_json TEXT, evaluation_json TEXT, policy_override INTEGER DEFAULT 0, decision_note TEXT, decided_by_id TEXT DEFAULT "", decided_by_name TEXT DEFAULT "", decided_at INTEGER, closed_at INTEGER, created_by_id TEXT DEFAULT "", created_by_name TEXT DEFAULT "", created_at INTEGER, updated_at INTEGER)');
+$pdo->exec('CREATE TABLE wp_scm_owner_credit_sources(id INTEGER PRIMARY KEY AUTOINCREMENT, credit_id INTEGER, contract_id INTEGER, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", net_income REAL DEFAULT 0, end_ts INTEGER, is_primary INTEGER DEFAULT 0, created_at INTEGER)');
+$pdo->exec('CREATE TABLE wp_scm_owner_credit_promissory(id INTEGER PRIMARY KEY AUTOINCREMENT, owner_document TEXT, owner_id TEXT DEFAULT "", owner_name TEXT DEFAULT "", owner_email TEXT DEFAULT "", owner_phone TEXT DEFAULT "", credit_id INTEGER DEFAULT 0, status TEXT DEFAULT "pendiente", payload_json TEXT, payload_hash TEXT, token_nonce TEXT, expires_at INTEGER, channels TEXT DEFAULT "email", otp_json TEXT, delivery_json TEXT, signed_at INTEGER, signed_json TEXT, signed_pdf BLOB, pdf_hash TEXT, pdf_hmac TEXT, voided_at INTEGER, void_note TEXT, voided_by_name TEXT DEFAULT "", created_by_id TEXT DEFAULT "", created_by_name TEXT DEFAULT "", created_at INTEGER, updated_at INTEGER)');
+$pdo->exec('CREATE TABLE wp_scm_owner_credit_events(id INTEGER PRIMARY KEY AUTOINCREMENT, credit_id INTEGER, action TEXT, actor_id TEXT, actor_name TEXT, details_json TEXT, created_at INTEGER)');
+$contractColumns = 'contrato TEXT, estado TEXT, inmueble TEXT, id_inmueble TEXT, direccion TEXT, propietario TEXT, documento_propietario TEXT, id_propietario TEXT, correo_propietario TEXT, celular_propietario TEXT, indicativo_propietario TEXT, valor_canon TEXT, inicio_contrato TEXT, fin_contrato TEXT, esta_sinestrado TEXT, id_contrato_mandato TEXT, propietarios TEXT';
+for ($i = 1; $i <= 6; $i++) $contractColumns .= ', porcentaje_' . $i . ' TEXT' . ($i > 1 ? ', id_propietario_' . $i . ' TEXT' : '');
+$pdo->exec("CREATE TABLE wp_jet_cct_contratos_arrendamiento(_ID INTEGER PRIMARY KEY, {$contractColumns})");
+$mandateColumns = 'total_comision TEXT, incluye_garantia TEXT, incluye_garantia_servicios TEXT, propietarios TEXT, id_propietario TEXT';
+for ($i = 1; $i <= 6; $i++) $mandateColumns .= ", tipo_{$i} TEXT, nombre_{$i} TEXT, documento_{$i} TEXT, correo_{$i} TEXT, celular_{$i} TEXT, indicativo_{$i} TEXT, id_propietario_nuevo_{$i} TEXT, porcentaje_{$i} TEXT";
+$pdo->exec("CREATE TABLE wp_jet_cct_contrato_mandato(_ID INTEGER PRIMARY KEY, {$mandateColumns})");
+$pdo->exec('CREATE TABLE wp_jet_cct_cotizacion_mantenimiento(_ID INTEGER PRIMARY KEY, id_ticket TEXT, contrato TEXT, id_contrato TEXT, total TEXT, financiacion TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_historial_del_inmueble(_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT, id_empleado TEXT, nombre_empleado TEXT, funcionario TEXT, id_inmueble TEXT, fecha INTEGER, tipo_reporte TEXT, observacion TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_historial_contrato_arrendamiento(_ID INTEGER PRIMARY KEY AUTOINCREMENT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT, id_empleado TEXT, funcionario TEXT, id_contrato TEXT, contrato TEXT, inmueble TEXT, id_inmueble TEXT, fecha INTEGER, tipo_reporte TEXT, observacion TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_propietarios(_ID INTEGER PRIMARY KEY, id_propietario TEXT, nombre TEXT, documento TEXT, documento_juridico TEXT, correo TEXT, celular TEXT, indicativo TEXT)');
+
+$owner = static fn(int $i, string $name, string $document, string $percent, string $id): array => [
+  'tipo_' . $i => 'Natural', 'nombre_' . $i => $name, 'documento_' . $i => $document, 'correo_' . $i => strtolower(explode(' ', $name)[0]) . '@example.invalid',
+  'celular_' . $i => '30000000' . $i, 'indicativo_' . $i => '+57', 'id_propietario_nuevo_' . $i => $id, 'porcentaje_' . $i => $percent,
+];
+// Mandato #40: Ana 30 %, Luis 50 %, Marta 20 %. Comisión 200.000 → ingreso neto 1.800.000.
+$db->insert('wp_jet_cct_contrato_mandato', ['_ID' => 40, 'total_comision' => '200.000', 'incluye_garantia' => 'No', 'incluye_garantia_servicios' => 'No', 'propietarios' => '3', 'id_propietario' => '500']
+  + $owner(1, 'Ana Uno', '111111', '30', '500') + $owner(2, 'Luis Dos', '222222', '50', '501') + $owner(3, 'Marta Tres', '333333', '20', '502'));
+$db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 20, 'contrato' => '2020', 'estado' => 'Entregado', 'inmueble' => '7000', 'id_inmueble' => '7000', 'direccion' => 'Calle 20', 'propietario' => 'Ana Uno', 'id_propietario' => '500',
+  'valor_canon' => '2.000.000', 'inicio_contrato' => (string) strtotime('-1 year'), 'fin_contrato' => (string) strtotime('+3 years'), 'esta_sinestrado' => 'No', 'id_contrato_mandato' => '40', 'propietarios' => '3', 'id_propietario_2' => '501', 'id_propietario_3' => '502']);
+// Mandato #41: dos dueños sin % registrado.
+$db->insert('wp_jet_cct_contrato_mandato', ['_ID' => 41, 'total_comision' => '100.000', 'incluye_garantia' => 'No', 'incluye_garantia_servicios' => 'No', 'propietarios' => '2', 'id_propietario' => '510']
+  + $owner(1, 'Sofia Sin', '555555', '', '510') + $owner(2, 'Tomas Sin', '666666', '', ''));
+$db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 21, 'contrato' => '2121', 'estado' => 'Entregado', 'inmueble' => '7100', 'propietario' => 'Sofia Sin', 'id_propietario' => '510',
+  'valor_canon' => '1.100.000', 'inicio_contrato' => (string) strtotime('-1 year'), 'fin_contrato' => (string) strtotime('+3 years'), 'esta_sinestrado' => 'No', 'id_contrato_mandato' => '41']);
+// Contrato #22 sin mandato: Pedro es copropietario solo por su ficha en id_propietario_2.
+$db->insert('wp_jet_cct_propietarios', ['_ID' => 520, 'nombre' => 'Pedro Ficha', 'documento' => '7.777.777', 'correo' => 'pedro@example.invalid', 'celular' => '3007777777', 'indicativo' => '57']);
+$db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 22, 'contrato' => '2222', 'estado' => 'Entregado', 'inmueble' => '7200', 'propietario' => 'Rosa Principal', 'documento_propietario' => '888888', 'id_propietario' => '530',
+  'valor_canon' => '1.000.000', 'inicio_contrato' => (string) strtotime('-1 year'), 'fin_contrato' => (string) strtotime('+3 years'), 'esta_sinestrado' => 'No', 'propietarios' => '2', 'id_propietario_2' => '520', 'porcentaje_1' => '60', 'porcentaje_2' => '40']);
+
+$service = new OwnerCreditService($db, new Settings($db));
+$service->useResponseFiles(static fn(string $html, string $title): string => '%PDF-1.4 ' . $title, static fn(string $bytes, string $name): array => ['path' => sys_get_temp_dir() . '/' . $name, 'url' => 'https://example.test/file.php?n=' . rawurlencode($name)]);
+$actor = ['employee_id' => '2999', 'name' => 'Analista QA'];
+$policy = static fn(array $work, string $key): array => array_values(array_filter($work['policies'], static fn(array $p): bool => $p['key'] === $key))[0];
+$note = 'Aprobado en prueba con justificación suficiente.';
+
+// Personal al 30 %: tope y cobertura con el 30 % del ingreso; el neto se muestra al 100 %.
+$personal = $service->workspace($service->createManual(20, 500000, 6, 'Libre inversión', $actor, '', 'mandato_1'));
+$ev = $personal['evaluation'];
+$check($near($ev['net_income'], 1800000) && $near($ev['share']['value'], 0.3) && $near($ev['attributable_income'], 540000) && $near($ev['max_amount'], 540000 * 3) && $ev['share']['mode'] === 'personal', 'a personal credit at 30 % gets 30 % of the income for its cap');
+$check($near($personal['sources'][0]['net_income'], 540000), 'only the owner share of the contract pays the installment');
+$check($policy($personal, 'participacion')['ok'] && str_contains($policy($personal, 'participacion')['detail'], '#2020 30 %'), 'the share policy passes when the percentage is registered');
+$html = (new OwnerCreditView())->workspace($personal, true, true);
+$check(str_contains($html, 'Participación del solicitante') && str_contains($html, '30 %') && str_contains($html, 'Ingreso atribuible'), 'the liquidator shows the share and the attributable income tiles');
+$check(str_contains(\SCM\Modules\OwnerCredits\OwnerCreditPdf::html($personal, 'QA'), 'Ingreso atribuible del contrato #2020'), 'the internal PDF shows the attributable income');
+
+// Reparaciones: 100 % del contrato del inmueble y sin los demás contratos.
+$repairId = $service->createManual(20, 1000000, 6, OwnerCreditSettings::REPAIR_PURPOSE, $actor, '', 'mandato_1');
+$repair = $service->workspace($repairId);
+$check($near($repair['evaluation']['share']['value'], 1.0) && $repair['evaluation']['share']['mode'] === 'reparaciones' && $near($repair['evaluation']['max_amount'], 1800000 * 3) && $repair['evaluation']['other_contracts'] === [], 'a repair credit uses 100 % of the property contract and no other contracts');
+$check(str_contains($policy($repair, 'participacion')['detail'], 'firman los 3 copropietarios'), 'the repair share policy names every co-owner');
+// Cambiar la destinación mientras se estudia cambia el cálculo.
+$check($near($service->workspace($repairId, ['purpose' => 'Libre inversión'])['evaluation']['share']['value'], 0.3), 'changing the purpose while pending recalculates with the owner share');
+
+// Aprobada la reparación, el modo y el % quedan congelados y su saldo pesa sobre cada copropietario según su %.
+$service->decide($repairId, 'aprobado', ['requested_term' => '6', 'amount' => '$1.000.000', 'term' => '6', 'rate' => '1,9', 'note' => $note], $actor);
+$approvedRepair = $service->find($repairId);
+$check(OwnerCreditService::mode($approvedRepair) === 'reparaciones' && json_decode((string) $approvedRepair['evaluation_json'], true)['share']['mode'] === 'reparaciones', 'the repair mode is frozen with the decision');
+$luis = $service->workspace($service->createManual(20, 300000, 6, 'Libre inversión', $actor, '', 'mandato_2'));
+$check($near($luis['evaluation']['share']['value'], 0.5) && $near($luis['preapproval']['outstanding'], 500000) && in_array($repairId, $luis['preapproval']['credits'], true), 'a repair in force reduces each co-owner cap by their share (50 % of the balance)');
+$request = $service->requestPreapproval('222222');
+$check(count($request['contracts']) === 1 && $near($request['contracts'][0]['share'], 0.5) && $near($request['preapproval']['amount'], 900000 * 3) && $near($request['preapproval']['outstanding'], 500000), 'the new request cap uses the owner share and their part of the repairs in force');
+$check(!empty($request['contracts'][0]['repair']['repair']) && $near($request['contracts'][0]['repair']['amount'], 1800000 * 3) && $near($request['contracts'][0]['repair']['outstanding'], 1000000), 'the new request also returns the repair cap of the contract at 100 %');
+
+// Sin % registrado: partes iguales, política en rojo y aprobable con justificación.
+$noShare = $service->workspace($service->createManual(21, 200000, 6, 'Libre inversión', $actor, '', 'mandato_2'));
+$check($near($noShare['evaluation']['share']['value'], 0.5) && $noShare['evaluation']['share']['source'] === 'partes_iguales' && !$policy($noShare, 'participacion')['ok'] && !$noShare['policies_ok'], 'without percentages the share is equal and the policy is red');
+try {
+  $service->decide((int) $noShare['credit']['id'], 'aprobado', ['requested_term' => '6', 'amount' => '$200.000', 'term' => '6', 'rate' => '1,9', 'note' => ''], $actor);
+  $check(false, 'approving without a registered share needs a justification');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'justificación'), 'approving without a registered share needs a justification');
+}
+
+// Lo decidido no cambia: un crédito anterior sin "share" queda histórico al 100 %, y uno nuevo conserva su % aunque cambie el mandato.
+$personalId = (int) $personal['credit']['id'];
+$service->decide($personalId, 'aprobado', ['requested_term' => '6', 'amount' => '$500.000', 'term' => '6', 'rate' => '1,9', 'note' => $note], $actor);
+$pdo->exec("UPDATE wp_jet_cct_contrato_mandato SET porcentaje_1 = '60', porcentaje_2 = '20' WHERE _ID = 40");
+$frozen = $service->workspace($personalId);
+$check($near($frozen['evaluation']['share']['value'], 0.3) && OwnerCreditService::mode($frozen['credit']) === 'personal', 'a decided credit keeps the share it was decided with');
+$db->insert('wp_scm_owner_credits', ['contract_id' => 20, 'contract_code' => '2020', 'owner_id' => '500', 'owner_name' => 'Ana Uno', 'purpose' => OwnerCreditSettings::REPAIR_PURPOSE, 'status' => 'aprobado', 'requested_amount' => 100000, 'requested_term' => 3,
+  'gross_income' => 2000000, 'deductions_json' => json_encode(['comision' => 200000]), 'approved_amount' => 100000, 'approved_term' => 3, 'approved_rate' => 0.019, 'monthly_payment' => 34700, 'first_payment_ts' => strtotime('+1 month'),
+  'evaluation_json' => json_encode(['other_contracts' => []]), 'decided_at' => strtotime('-1 day'), 'created_at' => strtotime('-2 days'), 'updated_at' => time()]);
+$old = $service->workspace((int) $db->lastInsertId());
+$check(OwnerCreditService::mode($old['credit']) === 'historico' && $near($old['evaluation']['share']['value'], 1.0) && $policy($old, 'participacion')['ok'], 'a credit decided before the share is historic at 100 %');
+// Un crédito de reparaciones histórico no se reparte: sigue pesando solo sobre su beneficiaria.
+$check($near($service->workspace($service->createManual(20, 100000, 3, 'Libre inversión', $actor, '', 'mandato_2'))['preapproval']['outstanding'], 1000000 * 0.2), 'historic repairs are not split among the co-owners (only the frozen repair counts, at the new 20 %)');
+
+// Búsqueda por documento: el copropietario de un contrato sin mandato se encuentra por su ficha en id_propietario_2.
+$found = $service->contractsByOwnerDocument('7777777');
+$check(count($found) === 1 && (int) $found[0]['contract']['_ID'] === 22 && $found[0]['owner']['key'] === 'contrato_2' && $near($found[0]['owner']['share'], 0.4), 'a co-owner registered only in id_propietario_2 is found with their share');
+$check($service->contractsByOwnerDocument('888888')[0]['owner']['key'] === 'contrato', 'the main owner of that contract is still found by the contract document');
+
+echo "Owner credit co-owner checks passed.\n";

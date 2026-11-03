@@ -107,10 +107,21 @@ final class OwnerCreditPdf
     // Ingreso de todos los contratos del propietario (suman al tope); con uno solo, el detalle de sus descuentos.
     $others = $ev['other_contracts'] ?? [];
     $income = ['Ingreso bruto (canon)' => $money($ev['gross'])] + $deductions + ['Ingreso neto (INO)' => $money($ev['net_income'])];
+    // Con copropietarios: la participación con que se evaluó y el ingreso atribuible (en reparaciones, el 100 %).
+    $shareLines = [];
+    $share = is_array($ev['share'] ?? null) ? $ev['share'] : null;
+    if ($share !== null && count((array) ($share['owners'] ?? [])) > 1) {
+      $shareLines[($share['mode'] ?? '') === 'reparaciones' ? 'Participación (reparaciones: todos los copropietarios)' : 'Participación del solicitante en el contrato #' . $contract['code']] = \SCM\Modules\LeaseContracts\ContractCoOwners::percentLabel((float) ($share['value'] ?? 1.0))
+        . ((string) ($share['source'] ?? '') === 'partes_iguales' ? ' (partes iguales, sin % registrado)' : '');
+      $shareLines['Ingreso atribuible del contrato #' . $contract['code']] = $money((float) ($ev['attributable_income'] ?? $ev['net_income']));
+    }
+    $income += $shareLines;
     if ($others !== []) {
       $line = static fn(float $canon, float $less, float $net, int $months, string $end, bool $siniestrado): string => $money($canon) . ' − ' . $money($less) . ' = ' . $money($net) . ' · ' . $months . ' meses de vigencia' . ($end !== '' ? ' (fin ' . $end . ')' : '') . ($siniestrado ? ' · Siniestrado' : '');
       $income = ['Contrato #' . $contract['code'] . ' · SIMI ' . $credit['property'] . ' (principal)' => $line((float) $ev['gross'], (float) $ev['deductions_total'], (float) $ev['net_income'], (int) $ev['contract_months'], $contract['fin_ts'] > 0 ? date('d/m/Y', (int) $contract['fin_ts']) : '', !empty($contract['siniestrado']))];
-      foreach ($others as $row) $income['Contrato #' . $row['contrato'] . ' · SIMI ' . $row['inmueble']] = $line((float) ($row['canon'] ?? 0), (float) ($row['deductions'] ?? 0), (float) $row['net_income'], (int) $row['max_months'], (string) ($row['fin'] ?? ''), !empty($row['siniestrado']));
+      $income += $shareLines;
+      foreach ($others as $row) $income['Contrato #' . $row['contrato'] . ' · SIMI ' . $row['inmueble']] = $line((float) ($row['canon'] ?? 0), (float) ($row['deductions'] ?? 0), (float) ($row['net_total'] ?? $row['net_income']), (int) $row['max_months'], (string) ($row['fin'] ?? ''), !empty($row['siniestrado']))
+        . ((float) ($row['share'] ?? 1.0) < 0.9999 ? ' · participación ' . \SCM\Modules\LeaseContracts\ContractCoOwners::percentLabel((float) $row['share']) . ' = ' . $money((float) $row['net_income']) : '');
       $income['Ingreso neto total (' . (count($others) + 1) . ' contratos)'] = $money($ev['total_net_income']);
     }
 

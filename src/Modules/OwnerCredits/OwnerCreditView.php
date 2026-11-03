@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\Modules\OwnerCredits;
 
+use SCM\Modules\LeaseContracts\ContractCoOwners;
 use SCM\Modules\Pending\PublicServicesUi as UI;
 
 /**
@@ -367,6 +368,7 @@ final class OwnerCreditView
         'Tasa para el riesgo' => 'Solo cuando lo pedido supera el valor máximo: cobra la usura mensual sobre la parte que excede. Si lo pedido cabe en el tope, no aplica.',
       ]) . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">'
       . self::tile($others !== [] ? 'Ingreso neto de este contrato' : 'Ingreso neto (INO)', self::money($ev['net_income']), 'key')
+      . self::shareTiles($ev)
       . ($others !== [] ? self::tile('Ingreso neto total (' . (count($others) + 1) . ' contratos)', self::money($ev['total_net_income']), 'key') : '')
       . self::tile('Valor máximo a prestar', self::money($ev['max_amount']), 'key')
       . self::tile('Plazo máximo por vigencia', (int) ($ev['term_limit'] ?? $ev['max_months']) . ' meses')
@@ -377,7 +379,9 @@ final class OwnerCreditView
       . self::tile('Meses que excede', (string) $ev['exceed_months'], $ev['exceed_months'] < 0 ? 'bad' : '')
       . self::tile('Valor que excede', self::money($ev['exceed_amount'], true), $ev['exceed_amount'] < 0 ? 'bad' : '')
       . '</div><p class="' . self::NOTE . ' !sp-mt-3">Plazo máximo por vigencia: ' . self::e(OwnerCreditService::termBasis($ev)) . '.</p>'
-      . ($others !== [] ? '<ul class="!sp-m-0 !sp-mt-2 !sp-pl-4 !sp-text-[10px] !sp-text-service-muted">' . implode('', array_map(static fn(array $row): string => '<li>Contrato #' . self::e($row['contrato']) . ' · SIMI ' . self::e($row['inmueble']) . ' · ingreso neto ' . self::money((float) $row['net_income']) . ' · ' . (int) $row['max_months'] . ' meses de vigencia</li>', $others)) . '</ul>' : '')
+      . ($others !== [] ? '<ul class="!sp-m-0 !sp-mt-2 !sp-pl-4 !sp-text-[10px] !sp-text-service-muted">' . implode('', array_map(static fn(array $row): string => '<li>Contrato #' . self::e($row['contrato']) . ' · SIMI ' . self::e($row['inmueble']) . ' · ingreso neto ' . self::money((float) ($row['net_total'] ?? $row['net_income']))
+        . ((float) ($row['share'] ?? 1.0) < 0.9999 ? ' · participación ' . self::e(ContractCoOwners::percentLabel((float) $row['share'])) . ((string) ($row['share_source'] ?? '') === 'partes_iguales' ? ' (partes iguales)' : '') . ' = ' . self::money((float) $row['net_income']) : '')
+        . ' · ' . (int) $row['max_months'] . ' meses de vigencia</li>', $others)) . '</ul>' : '')
       . '</section>'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('target') . 'Condición sugerida · probabilidad ' . self::e($ev['vacancy']) . '</h4>'
       . self::guide('sugerida', [
@@ -837,6 +841,22 @@ final class OwnerCreditView
         . ($available ? '' : '<span class="!sp-block !sp-text-[10px]">Próximamente</span>') . '</span></label>';
     }
     return '<div class="!sp-grid !sp-grid-cols-2 sm:!sp-grid-cols-5 !sp-gap-2" role="radiogroup" aria-label="Para quién es el crédito">' . $html . '</div>';
+  }
+
+  /**
+   * Participación del solicitante en el contrato principal e ingreso atribuible (neto × participación), cuando el
+   * contrato tiene copropietarios. En reparaciones se muestra el 100 % del contrato.
+   * @param array<string,mixed> $ev evaluación del liquidador
+   */
+  private static function shareTiles(array $ev): string
+  {
+    $share = is_array($ev['share'] ?? null) ? $ev['share'] : null;
+    if ($share === null || count((array) ($share['owners'] ?? [])) <= 1) return '';
+    $value = (float) ($share['value'] ?? 1.0);
+    $label = ($share['mode'] ?? '') === 'reparaciones' ? 'Participación · reparaciones' : 'Participación del solicitante';
+    $equal = (string) ($share['source'] ?? '') === 'partes_iguales';
+    return self::tile($label, self::e(ContractCoOwners::percentLabel($value)) . ($equal ? ' (partes iguales, sin % registrado)' : ''), $equal ? 'bad' : '')
+      . self::tile('Ingreso atribuible', self::money((float) ($ev['attributable_income'] ?? (float) $ev['net_income'] * $value)), 'key');
   }
 
   /**

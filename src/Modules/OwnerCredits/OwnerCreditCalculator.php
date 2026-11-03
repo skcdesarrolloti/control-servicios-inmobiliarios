@@ -173,8 +173,10 @@ final class OwnerCreditCalculator
   /**
    * other_net_income y longest_months vienen de los demás contratos del propietario (opcionales). Con "coverage"
    * (availability y term_limit de OwnerCreditCoverage) el plazo máximo es el mayor con cobertura en todas sus
-   * cuotas; sin ella (cálculo del Excel), la vigencia más larga sin pasar del tope.
-   * @param array<string,mixed> $input gross, deductions, requested_amount, requested_term, request_ts, contract_end_ts, vacancy, other_net_income?, longest_months?, coverage?
+   * cuotas; sin ella (cálculo del Excel), la vigencia más larga sin pasar del tope. "share" es la participación del
+   * solicitante en el contrato (0..1, por defecto 1): el tope sale del ingreso atribuible (neto × participación) y el
+   * ingreso neto se sigue mostrando al 100 %.
+   * @param array<string,mixed> $input gross, deductions, requested_amount, requested_term, request_ts, contract_end_ts, vacancy, other_net_income?, longest_months?, coverage?, share?
    * @param array<string,mixed> $settings OwnerCreditSettings::read()
    * @return array<string,mixed>
    */
@@ -203,7 +205,9 @@ final class OwnerCreditCalculator
       : OwnerCreditCoverage::bestTerm($amount, min($rate, $usuryLegal), $from, $slots, $minCoverage)['term'];
     $maxMonths = $covered($requested, $referenceRate, $termLimit);
     $otherNet = max(0.0, (float) ($input['other_net_income'] ?? 0));
-    $maxAmount = ($net + $otherNet) * (int) $settings['income_months'];
+    $share = min(1.0, max(0.0, (float) ($input['share'] ?? 1.0)));
+    $attributable = $net * $share;
+    $maxAmount = ($attributable + $otherNet) * (int) $settings['income_months'];
     $exceedMonths = $maxMonths - $requestedTerm;
     $exceedAmount = $maxAmount - $requested;
     // La tasa para el riesgo (Excel B29) compensa lo que se pide por encima del tope cobrando la usura sobre ese
@@ -234,8 +238,10 @@ final class OwnerCreditCalculator
       'deductions' => $deductions,
       'deductions_total' => array_sum($deductions),
       'net_income' => $net,
+      'share' => $share,
+      'attributable_income' => $attributable,
       'other_net_income' => $otherNet,
-      'total_net_income' => $net + $otherNet,
+      'total_net_income' => $attributable + $otherNet,
       'usury_monthly' => $usuryMonthly,
       'usury_monthly_legal' => $usuryLegal,
       'policy_rate' => $policyRate,
