@@ -70,6 +70,9 @@ contrato de arrendamiento, y que los créditos a propietarios respeten ese %:
 - El secreto es `OWNER_CREDIT_BOT_SECRET`, propio de esta integración y con el mismo valor en el `.env` del panel y
   del bot (mínimo 16 caracteres). No reemplaza `APP_SECRET` ni `WHATSAPP_APP_SECRET`. Sin él, el endpoint responde que
   la integración no está configurada.
+- En el `.env` del bot, `OWNER_CREDIT_BOT_URL` es la URL completa del endpoint, en la carpeta `public` del panel:
+  `https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/owner-credit-bot.php`.
+  `CONTROL_SERVICIOS_PUBLIC_URL` no lleva `/public`, así que no sirve para esto.
 - Solo opera sobre los contratos donde el documento enviado es de un propietario, y el beneficiario es esa persona.
 - Las solicitudes quedan registradas por «Guardian (WhatsApp) · celular».
 
