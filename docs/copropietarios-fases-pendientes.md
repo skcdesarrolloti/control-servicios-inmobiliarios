@@ -67,7 +67,9 @@ contrato de arrendamiento, y que los créditos a propietarios respeten ese %:
 - `public/owner-credit-bot.php` (`OwnerCreditBotApi`): el bot consulta el cupo, radica y consulta solicitudes de crédito
   con la lógica del panel (plazo máximo, avisos internos y confirmación al propietario).
 - El cuerpo JSON va firmado con HMAC-SHA256 en `X-SCM-Signature` y lleva `ts` (máximo 5 minutos).
-- El secreto es `APP_SECRET` del panel, que debe ser igual a `WHATSAPP_APP_SECRET` del bot.
+- El secreto es `OWNER_CREDIT_BOT_SECRET`, propio de esta integración y con el mismo valor en el `.env` del panel y
+  del bot (mínimo 16 caracteres). No reemplaza `APP_SECRET` ni `WHATSAPP_APP_SECRET`. Sin él, el endpoint responde que
+  la integración no está configurada.
 - Solo opera sobre los contratos donde el documento enviado es de un propietario, y el beneficiario es esa persona.
 - Las solicitudes quedan registradas por «Guardian (WhatsApp) · celular».
 

@@ -24,6 +24,8 @@ return [
   'base_url' => $env('APP_URL', ''),
   'app_secret' => $env('APP_SECRET', ''),
   'acta_autologin_secret' => $env('ACTA_AUTOLOGIN_SECRET', ''),
+  // Secreto compartido solo con el bot de WhatsApp para la API de créditos (public/owner-credit-bot.php).
+  'owner_credit_bot_secret' => $env('OWNER_CREDIT_BOT_SECRET', ''),
 
   'db_host' => $env('DB_HOST', ''),
   'db_port' => (int) $env('DB_PORT', '3306'),

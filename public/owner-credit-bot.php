@@ -19,7 +19,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 }
 
 $body = (string) file_get_contents('php://input', false, null, 0, 65536);
-$api = new \SCM\Modules\OwnerCredits\OwnerCreditBotApi(new \SCM\Modules\OwnerCredits\OwnerCreditService(\SCM\Core\App::db(), \SCM\Core\App::settings()), (string) SCM_APP_SECRET);
+// Secreto propio de esta integración (OWNER_CREDIT_BOT_SECRET), el mismo en el .env del panel y del bot.
+$api = new \SCM\Modules\OwnerCredits\OwnerCreditBotApi(new \SCM\Modules\OwnerCredits\OwnerCreditService(\SCM\Core\App::db(), \SCM\Core\App::settings()), trim((string) ($scmConfig['owner_credit_bot_secret'] ?? '')));
 $result = $api->handle($body, (string) ($_SERVER['HTTP_X_SCM_SIGNATURE'] ?? ''));
 http_response_code($result['status']);
 echo json_encode($result['body'], JSON_UNESCAPED_UNICODE);

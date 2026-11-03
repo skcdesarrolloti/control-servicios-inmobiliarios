@@ -9,8 +9,8 @@ namespace SCM\Modules\OwnerCredits;
  * en el bot consulta su cupo, radica una solicitud y consulta sus solicitudes. La lógica es la del panel
  * (OwnerCreditService): mismas validaciones de plazo, avisos internos y confirmación al propietario.
  *
- * Seguridad: cuerpo JSON firmado con HMAC-SHA256 del secreto compartido (APP_SECRET del panel = WHATSAPP_APP_SECRET
- * del bot) en `X-SCM-Signature`, y `ts` a menos de 5 minutos. Solo opera sobre los contratos donde el documento
+ * Seguridad: cuerpo JSON firmado con HMAC-SHA256 del secreto propio de esta integración (OWNER_CREDIT_BOT_SECRET, el
+ * mismo en el .env del panel y del bot) en `X-SCM-Signature`, y `ts` a menos de 5 minutos. Sin secreto no responde. Solo opera sobre los contratos donde el documento
  * enviado es de un propietario.
  */
 final class OwnerCreditBotApi
