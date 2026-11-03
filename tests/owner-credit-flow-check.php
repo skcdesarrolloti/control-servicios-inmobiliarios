@@ -130,8 +130,9 @@ $service->syncFromQuote(575, 'Si', $actor);
 $second = $service->byQuote(575);
 $secondWork = $service->workspace((int) $second['id']);
 $failed = array_column(array_filter($secondWork['policies'], static fn(array $p): bool => !$p['ok']), 'key');
-// Reparaciones solo cuenta el contrato del inmueble (#900): la reparación vigente del #817 no pesa sobre él.
-$check(!in_array('prestamos', $failed, true) && in_array('siniestro', $failed, true) && in_array('vigencia', $failed, true) && $secondWork['evaluation']['share']['mode'] === 'reparaciones' && $secondWork['evaluation']['other_contracts'] === [], 'a repair request on another contract only counts its own contract, and flags siniestro and contract about to expire');
+// Crédito del inmueble (#900): las deudas de la propietaria pesan sobre él (el crédito vigente del #817). Sin documento
+// no se encuentran sus demás contratos, como en un crédito personal.
+$check(in_array('prestamos', $failed, true) && in_array((int) $credit['id'], $secondWork['preapproval']['credits'], true) && in_array('siniestro', $failed, true) && in_array('vigencia', $failed, true) && $secondWork['evaluation']['share']['mode'] === 'reparaciones', 'a repair request counts the owner debts on her other contracts, and flags siniestro and contract about to expire');
 $usury = array_values(array_filter($secondWork['policies'], static fn(array $p): bool => $p['key'] === 'usura'))[0];
 $check($usury['ok'] && str_contains($usury['detail'], '28,59 % E.A.'), 'usury policy compares against the effective annual rate');
 $high = $service->workspace((int) $second['id'], ['rate' => '2,2']);

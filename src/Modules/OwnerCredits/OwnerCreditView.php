@@ -626,7 +626,7 @@ final class OwnerCreditView
     $editable = OwnerCreditService::signersEditable($work['credit']) && $canDecide;
     $canSend = $editable && $creditStatus === 'aprobado';
     $several = count($state['owners']) > 1;
-    // Reparaciones: firman todos los copropietarios, sin casillas para desmarcar.
+    // Crédito del inmueble: firman todos los copropietarios, sin casillas para desmarcar.
     $locked = !empty($state['locked']);
     $done = $state['missing'] === [];
     $rows = '';
@@ -662,12 +662,12 @@ final class OwnerCreditView
       . self::guide('pagare', [
         'Qué es' => 'Un pagaré en blanco (sin valor, interés ni vencimiento) con su carta de instrucciones, que autoriza a llenarlo si el propietario incumple, por el total que deba de sus créditos del Pasaporte SuCasa.',
         'Una sola vez' => 'Cada persona lo firma una vez y respalda todos sus créditos. Si ya lo firmó, no se le vuelve a pedir.',
-        'Quién firma' => 'Por defecto, el beneficiario del crédito. Si el contrato tiene varios propietarios, marca quiénes deben firmar: puede ser uno o todos. En reparaciones y mantenimiento firman todos los copropietarios y no se puede desmarcar a nadie.',
+        'Quién firma' => 'En libre inversión firma solo el beneficiario del crédito (si el contrato tiene varios propietarios, puedes marcar a otros). En servicios públicos, cuotas de administración y reparaciones y mantenimiento firman todos los copropietarios y no se puede desmarcar a nadie.',
         'Cómo firma' => 'Recibe un enlace personal por correo o WhatsApp y firma con su nombre, su número de documento y un código de verificación, como el acta de satisfacción.',
         'Cuándo se firma' => 'Después de aprobar: al aprobar se envía el enlace a quien no lo tenga firmado. Cuando todos los firmantes marcados lo firman, sale sola la respuesta con la carta de aprobación, el pagaré firmado y el plan de pagos.',
       ])
       . ($several && $editable && !$locked ? '<p class="' . self::NOTE . ' !sp-mb-1">Marca quiénes firman el pagaré de este crédito.</p>' : '')
-      . ($locked && $several ? '<p class="' . self::NOTE . ' !sp-mb-1">Crédito de reparaciones del inmueble: lo firman todos los copropietarios y a todos les llegan la confirmación, la respuesta y los pagarés firmados.</p>' : '')
+      . ($locked && $several ? '<p class="' . self::NOTE . ' !sp-mb-1">Crédito del inmueble (' . self::e(mb_strtolower((string) $work['credit']['purpose'])) . '): lo firman todos los copropietarios y a todos les llegan la confirmación, la respuesta y los pagarés firmados.</p>' : '')
       . ((array) ($state['contact_missing'] ?? []) !== [] ? '<p class="' . self::NOTE . ' !sp-mb-1 !sp-font-semibold !sp-text-red-700" data-owner-credit-co-owner-contact>Copropietarios con documento y contacto: falta el de ' . self::e(implode(', ', (array) $state['contact_missing'])) . '. Complétalo en el mandato o en la hoja de cierre; sin eso no se envía el pagaré.</p>' : '')
       . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $rows . '</ul>'
       . (!$done && in_array($creditStatus, ['pendiente', 'aprobado'], true) ? (!empty($work['settings']['require_promissory'])
@@ -849,7 +849,7 @@ final class OwnerCreditView
 
   /**
    * Participación del solicitante en el contrato principal e ingreso atribuible (neto × participación), cuando el
-   * contrato tiene copropietarios. En reparaciones se muestra el 100 % del contrato.
+   * contrato tiene copropietarios. En el crédito del inmueble se muestra el 100 % del contrato.
    * @param array<string,mixed> $ev evaluación del liquidador
    */
   private static function shareTiles(array $ev): string
@@ -857,7 +857,7 @@ final class OwnerCreditView
     $share = is_array($ev['share'] ?? null) ? $ev['share'] : null;
     if ($share === null || count((array) ($share['owners'] ?? [])) <= 1) return '';
     $value = (float) ($share['value'] ?? 1.0);
-    $label = ($share['mode'] ?? '') === 'reparaciones' ? 'Participación · reparaciones' : 'Participación del solicitante';
+    $label = ($share['mode'] ?? '') === 'reparaciones' ? 'Participación · crédito del inmueble' : 'Participación del solicitante';
     $equal = (string) ($share['source'] ?? '') === 'partes_iguales';
     return self::tile($label, self::e(ContractCoOwners::percentLabel($value)) . ($equal ? ' (partes iguales, sin % registrado)' : ''), $equal ? 'bad' : '')
       . self::tile('Ingreso atribuible', self::money((float) ($ev['attributable_income'] ?? (float) $ev['net_income'] * $value)), 'key');

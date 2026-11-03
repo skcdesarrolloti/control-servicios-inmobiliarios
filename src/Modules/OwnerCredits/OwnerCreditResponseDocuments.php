@@ -55,7 +55,7 @@ final class OwnerCreditResponseDocuments
   }
 
   /**
-   * Carta de aprobación firmada por el funcionario que aprobó. Con varios titulares (crédito de reparaciones) va
+   * Carta de aprobación firmada por el funcionario que aprobó. Con varios titulares (crédito del inmueble) va
    * dirigida a todos.
    * @param array<string,mixed> $credit @param array{signer:array<string,string>,margin:int,date:int,holders?:list<array{name:string,document:string}>} $context
    */
@@ -80,7 +80,7 @@ final class OwnerCreditResponseDocuments
       . '<header class="scm-owner-credit-letter-company"><strong>SOLUCIONES COMERCIALES Y CONSTRUCTIVAS S.A.S.</strong><span>SKC SuCasa Inmobiliaria</span><em>¡Construimos confianza y protegemos su patrimonio!</em></header>'
       . '<p class="scm-owner-credit-letter-text">Cartagena de Indias, ' . $e(self::longDate((int) $context['date'])) . '</p>'
       . '<p class="scm-owner-credit-letter-text">' . $addressee . '</p>'
-      . '<p class="scm-owner-credit-letter-text"><strong>Asunto: Notificación de aprobación de crédito' . (count($holders) > 1 ? ' para reparaciones del inmueble' : '') . '</strong></p>'
+      . '<p class="scm-owner-credit-letter-text"><strong>Asunto: Notificación de aprobación de crédito' . (count($holders) > 1 ? ' para ' . $e(mb_strtolower((string) ($credit['purpose'] ?? ''))) . ' del inmueble' : '') . '</strong></p>'
       . '<p class="scm-owner-credit-letter-text">' . $greeting . '</p>'
       . '<p class="scm-owner-credit-letter-text">Nos complace informarle que SKC SuCasa Inmobiliaria ha aprobado su solicitud de crédito, como parte de los beneficios que ofrecemos a nuestros propietarios, con el propósito de brindarles soluciones financieras ágiles y oportunas, aprovechando nuestra relación comercial y de confianza.</p>'
       . '<p class="scm-owner-credit-letter-text">A continuación, presentamos las condiciones de su crédito:</p>'

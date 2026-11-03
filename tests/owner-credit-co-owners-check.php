@@ -10,8 +10,9 @@ use SCM\Modules\OwnerCredits\OwnerCreditService;
 use SCM\Modules\OwnerCredits\OwnerCreditSettings;
 use SCM\Modules\OwnerCredits\OwnerCreditView;
 
-// Créditos a propietarios con copropietarios: el cupo personal sale del % del solicitante; reparaciones usa el 100 %
-// del contrato del inmueble; sin % se toma partes iguales con la política en rojo; lo ya decidido no cambia.
+// Créditos a propietarios con copropietarios: el cupo personal (libre inversión) sale del % del solicitante; el crédito
+// del inmueble (servicios públicos, administración, reparaciones) usa el 100 % de su contrato más los demás contratos
+// del propietario y lo firman todos; sin % se toma partes iguales con la política en rojo; lo ya decidido no cambia.
 
 $check = static function (bool $condition, string $message): void {
   if (!$condition) {
@@ -106,10 +107,10 @@ $html = (new OwnerCreditView())->workspace($personal, true, true);
 $check(str_contains($html, 'Participación del solicitante') && str_contains($html, '30 %') && str_contains($html, 'Ingreso atribuible'), 'the liquidator shows the share and the attributable income tiles');
 $check(str_contains(\SCM\Modules\OwnerCredits\OwnerCreditPdf::html($personal, 'QA'), 'Ingreso atribuible del contrato #2020'), 'the internal PDF shows the attributable income');
 
-// Reparaciones: 100 % del contrato del inmueble y sin los demás contratos.
+// Reparaciones: 100 % del contrato del inmueble (Ana aún no tiene otros contratos).
 $repairId = $service->createManual(20, 1000000, 6, OwnerCreditSettings::REPAIR_PURPOSE, $actor, '', 'mandato_1');
 $repair = $service->workspace($repairId);
-$check($near($repair['evaluation']['share']['value'], 1.0) && $repair['evaluation']['share']['mode'] === 'reparaciones' && $near($repair['evaluation']['max_amount'], 1800000 * 3) && $repair['evaluation']['other_contracts'] === [], 'a repair credit uses 100 % of the property contract and no other contracts');
+$check($near($repair['evaluation']['share']['value'], 1.0) && $repair['evaluation']['share']['mode'] === 'reparaciones' && $near($repair['evaluation']['max_amount'], 1800000 * 3) && $repair['evaluation']['other_contracts'] === [], 'a repair credit uses 100 % of the property contract');
 $check(str_contains($policy($repair, 'participacion')['detail'], 'firman los 3 copropietarios'), 'the repair share policy names every co-owner');
 // Cambiar la destinación mientras se estudia cambia el cálculo.
 $check($near($service->workspace($repairId, ['purpose' => 'Libre inversión'])['evaluation']['share']['value'], 0.3), 'changing the purpose while pending recalculates with the owner share');
@@ -206,5 +207,24 @@ $botCredit = $service->find((int) ($created['body']['data']['credit_id'] ?? 0));
 $check($created['status'] === 200 && $botCredit !== null && $botCredit['owner_name'] === 'Luis Dos' && (float) $botCredit['requested_amount'] === 1500000.0 && str_starts_with((string) $botCredit['created_by_name'], 'Guardian (WhatsApp)'), 'the bot registers the request for the identified co-owner');
 $list = $call(['action' => 'list', 'document' => '222.222'])['body']['data']['credits'] ?? [];
 $check($list !== [] && $list[0]['id'] === (int) $botCredit['id'] && $list[0]['status_label'] === 'Pendiente de estudio' && $list[0]['requested_term'] === 6, 'the bot lists the person credits, newest first, with a readable status');
+
+// Servicios públicos y cuotas de administración son créditos del inmueble como reparaciones: el contrato del inmueble
+// al 100 % más los demás contratos del propietario (cupo sumado, plazo con el más largo) y firman todos.
+$db->insert('wp_jet_cct_contrato_mandato', ['_ID' => 42, 'total_comision' => '100.000', 'incluye_garantia' => 'No', 'incluye_garantia_servicios' => 'No', 'propietarios' => '1', 'id_propietario' => '500'] + $owner(1, 'Ana Uno', '111111', '100', '500'));
+$db->insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 23, 'contrato' => '2323', 'estado' => 'Entregado', 'inmueble' => '7300', 'propietario' => 'Ana Uno', 'id_propietario' => '500',
+  'valor_canon' => '1.000.000', 'inicio_contrato' => (string) strtotime('-1 year'), 'fin_contrato' => (string) strtotime('+5 years'), 'esta_sinestrado' => 'No', 'id_contrato_mandato' => '42']);
+$check(OwnerCreditService::isRepair(['purpose' => 'Servicios públicos']) && OwnerCreditService::isRepair(['purpose' => 'Cuotas de administración']) && !OwnerCreditService::isRepair(['purpose' => 'Libre inversión']), 'public services, HOA fees and repairs are property credits; free use is personal');
+$servicesId = $service->createManual(20, 600000, 6, 'Servicios públicos', $actor, '', 'mandato_1');
+$sev = $service->workspace($servicesId)['evaluation'];
+$check($sev['share']['mode'] === 'reparaciones' && array_column($sev['other_contracts'], 'contrato') === ['2323'] && $near($sev['max_amount'], (1800000 + 900000) * 3), 'a property credit adds the owner other contracts to the cap (property contract at 100 %)');
+$check((int) $sev['longest_months'] === \SCM\Modules\OwnerCredits\OwnerCreditCalculator::monthsUntil(time(), (int) strtotime('+5 years')) && (int) $sev['longest_months'] > (int) $sev['contract_months'], 'a property credit takes its maximum term from the longest owner contract');
+$servicesState = $service->promissoryState($service->find($servicesId));
+$check($servicesState['locked'] && $servicesState['required'] === ['mandato_1', 'mandato_2', 'mandato_3'], 'a public services credit is signed by every co-owner');
+$hoaState = $service->promissoryState($service->find($service->createManual(20, 300000, 6, 'Cuotas de administración', $actor, '', 'mandato_1')));
+$check($hoaState['locked'] && count($hoaState['required']) === 3, 'an HOA fees credit is signed by every co-owner');
+$freeState = $service->promissoryState($service->find($service->createManual(20, 300000, 6, 'Libre inversión', $actor, '', 'mandato_1')));
+$check(!$freeState['locked'] && $freeState['required'] === ['mandato_1'], 'a free use credit is signed only by the requester');
+$byId = array_column($service->requestPreapproval('111111')['contracts'], null, 'id');
+$check($near($byId[20]['repair']['amount'], (1800000 + 900000) * 3) && $near($byId[23]['repair']['amount'], (1800000 * 0.6 + 900000) * 3), 'the new request property cap of each contract adds the owner other contracts');
 
 echo "Owner credit co-owner checks passed.\n";

@@ -337,7 +337,7 @@ trait HandlesOwnerCredits
         if ($people !== [] || preg_match('/^[0-9A-Z-]{4,20}$/', strtoupper(preg_replace('/[\s.]+/', '', $document) ?? '')) !== 1) $this->jsonOk(['people' => $people]);
       }
       // Cupo personal con todos los contratos de la persona (según su %) y, por contrato, el de reparaciones (100 %).
-      $this->jsonOk($service->requestPreapproval($document) + ['repair_purpose' => OwnerCreditSettings::REPAIR_PURPOSE, 'disclaimer' => OwnerCreditService::DISCLAIMER]);
+      $this->jsonOk($service->requestPreapproval($document) + ['repair_purpose' => OwnerCreditSettings::REPAIR_PURPOSE, 'property_purposes' => OwnerCreditSettings::PROPERTY_PURPOSES, 'disclaimer' => OwnerCreditService::DISCLAIMER]);
     } catch (\InvalidArgumentException $error) {
       $this->jsonFail($error->getMessage());
     } catch (\Throwable $error) {

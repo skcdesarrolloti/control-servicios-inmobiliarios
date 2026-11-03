@@ -69,6 +69,8 @@ final class OwnerCreditBotApi
       'preapproval' => $keep($request['preapproval']),
       'purposes' => OwnerCreditSettings::PURPOSES,
       'repair_purpose' => OwnerCreditSettings::REPAIR_PURPOSE,
+      // Destinaciones con el cupo del inmueble (`repair` de cada contrato); las demás usan `preapproval`.
+      'property_purposes' => OwnerCreditSettings::PROPERTY_PURPOSES,
       'disclaimer' => OwnerCreditService::DISCLAIMER,
     ];
   }

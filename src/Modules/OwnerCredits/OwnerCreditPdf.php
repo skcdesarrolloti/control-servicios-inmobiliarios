@@ -107,11 +107,11 @@ final class OwnerCreditPdf
     // Ingreso de todos los contratos del propietario (suman al tope); con uno solo, el detalle de sus descuentos.
     $others = $ev['other_contracts'] ?? [];
     $income = ['Ingreso bruto (canon)' => $money($ev['gross'])] + $deductions + ['Ingreso neto (INO)' => $money($ev['net_income'])];
-    // Con copropietarios: la participación con que se evaluó y el ingreso atribuible (en reparaciones, el 100 %).
+    // Con copropietarios: la participación con que se evaluó y el ingreso atribuible (en el crédito del inmueble, el 100 %).
     $shareLines = [];
     $share = is_array($ev['share'] ?? null) ? $ev['share'] : null;
     if ($share !== null && count((array) ($share['owners'] ?? [])) > 1) {
-      $shareLines[($share['mode'] ?? '') === 'reparaciones' ? 'Participación (reparaciones: todos los copropietarios)' : 'Participación del solicitante en el contrato #' . $contract['code']] = \SCM\Modules\LeaseContracts\ContractCoOwners::percentLabel((float) ($share['value'] ?? 1.0))
+      $shareLines[($share['mode'] ?? '') === 'reparaciones' ? 'Participación (crédito del inmueble: todos los copropietarios)' : 'Participación del solicitante en el contrato #' . $contract['code']] = \SCM\Modules\LeaseContracts\ContractCoOwners::percentLabel((float) ($share['value'] ?? 1.0))
         . ((string) ($share['source'] ?? '') === 'partes_iguales' ? ' (partes iguales, sin % registrado)' : '');
       $shareLines['Ingreso atribuible del contrato #' . $contract['code']] = $money((float) ($ev['attributable_income'] ?? $ev['net_income']));
     }

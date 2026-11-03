@@ -10,8 +10,13 @@ use SCM\Core\Settings;
 final class OwnerCreditSettings
 {
   public const KEY = 'owner_credit_settings';
-  /** Crédito del inmueble: usa el 100 % del ingreso de su contrato y lo firman todos los copropietarios. */
+  /** Destinación de los créditos que nacen de una cotización. */
   public const REPAIR_PURPOSE = 'Reparaciones y mantenimiento';
+  /**
+   * Créditos del inmueble: su contrato cuenta al 100 % (más los demás contratos del propietario) y responden todos los
+   * copropietarios. Libre inversión es personal: cuenta la participación del solicitante y firma solo él.
+   */
+  public const PROPERTY_PURPOSES = ['Servicios públicos', 'Cuotas de administración', self::REPAIR_PURPOSE];
   /** Mismas necesidades que ofrece el simulador de ingreso neto del propietario (servicios comerciales). */
   public const PURPOSES = [
     'Servicios públicos',

@@ -7,8 +7,9 @@ Estado al 31/10/2026, para retomar el trabajo desde otro equipo: `git pull` y se
 Registrar a todos los copropietarios de un inmueble con su % de participación en el mandato, la hoja de cierre y el
 contrato de arrendamiento, y que los créditos a propietarios respeten ese %:
 
-- **Crédito personal:** el cupo y el ingreso salen del % del solicitante. Firma solo el solicitante.
-- **Crédito de reparaciones:** usa el 100 % del ingreso del contrato del inmueble. Firman todos los copropietarios y a
+- **Crédito personal (libre inversión):** el cupo y el ingreso salen del % del solicitante. Firma solo el solicitante.
+- **Crédito del inmueble (servicios públicos, cuotas de administración, reparaciones y mantenimiento):** usa el 100 %
+  del ingreso del contrato del inmueble más los demás contratos del propietario. Firman todos los copropietarios y a
   todos les llega todo: confirmación de la solicitud, rechazo, respuesta, pagarés firmados y plan de pagos.
 - No se puede romper el flujo de «Contratos no asignados».
 
@@ -18,9 +19,9 @@ contrato de arrendamiento, y que los créditos a propietarios respeten ese %:
 |---|---|
 | Columnas | Numeradas, igual que el mandato: `id_propietario_N`, `porcentaje_N`. |
 | De dónde sale el % en el liquidador | `porcentaje_N` del contrato → `porcentaje_N` del mandato → partes iguales, con la política **«Porcentaje de participación registrado»** en rojo (aprobable con justificación) hasta que se cargue el %. |
-| Firmantes del pagaré | Personal: solo el solicitante. Reparaciones: todos, obligatorio; el analista no puede desmarcar. |
-| Avisos en reparaciones | A todos los copropietarios: confirmación, rechazo, respuesta y cada uno recibe todos los pagarés firmados. |
-| Contratos que cuentan en reparaciones | Solo el contrato del inmueble, al 100 %. Los otros contratos del solicitante no entran. |
+| Firmantes del pagaré | Libre inversión: solo el solicitante. Servicios públicos, cuotas de administración y reparaciones (`OwnerCreditSettings::PROPERTY_PURPOSES`): todos, obligatorio; el analista no puede desmarcar. |
+| Avisos en créditos del inmueble | A todos los copropietarios: confirmación, rechazo, respuesta y cada uno recibe todos los pagarés firmados. |
+| Contratos que cuentan en créditos del inmueble | El contrato del inmueble al 100 % más los demás contratos del solicitante (con su %): el cupo es la suma y el plazo sale del contrato que más dure (decisión del 03/11/2026; antes solo contaba el del inmueble). Pesan lo que ya compromete el contrato del inmueble y las deudas del solicitante. |
 | Reparaciones vigentes | Reducen el cupo y la cobertura de **cada** copropietario según su % (saldo y cuota × participación). |
 | % al crear el contrato desde «No asignado» | Solo lectura: se copian del mandato. Si están mal, se corrigen en el mandato o en la hoja de cierre. |
 | Relaciones JetEngine (864 propietario→contrato, 658 propietario→inmueble) | Solo el propietario principal, como hoy. |

@@ -303,7 +303,7 @@
             '<span class="!sp-block !sp-text-[11px] !sp-text-service-muted">' + escapeHtml(detail || "Sin datos de contacto") + "</span>";
           person.hidden = false;
           form._personal = data.preapproval || null;
-          form._repairPurpose = data.repair_purpose || "";
+          form._propertyPurposes = data.property_purposes || (data.repair_purpose ? [data.repair_purpose] : []);
           form._preapproval = form._personal;
           status.textContent = "";
           // El servidor los ordena con el de vigencia más larga primero: ese es el principal.
@@ -322,11 +322,11 @@
       return "$" + moneyFormat.format(Math.round(Number(value) || 0));
     }
 
-    // Reparaciones y mantenimiento: cupo y plazo solo con el contrato elegido, al 100 %; las demás destinaciones usan
-    // el cupo personal (todos sus contratos, cada uno según su % de participación).
+    // Servicios públicos, cuotas de administración y reparaciones: cupo del inmueble (el contrato elegido al 100 % más
+    // los demás contratos); libre inversión usa el cupo personal (todos sus contratos, cada uno según su %).
     function syncPreapproval(form) {
       var purpose = form.elements.purpose ? form.elements.purpose.value : "";
-      var repair = purpose !== "" && purpose === form._repairPurpose && form._contract && form._contract.repair;
+      var repair = purpose !== "" && (form._propertyPurposes || []).indexOf(purpose) !== -1 && form._contract && form._contract.repair;
       form._preapproval = repair ? form._contract.repair : form._personal;
       renderPreapproval(form.querySelector("[data-owner-credit-preapproval]"), form._preapproval, repair ? form._contract : null);
       updateTermHint(form);
@@ -341,7 +341,7 @@
           '<strong class="!sp-block !sp-text-base !sp-text-service-navy">' + value + "</strong></div>";
       };
       box.innerHTML = '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3">' +
-        tile(repairContract ? "Cupo de reparaciones · contrato #" + escapeHtml(repairContract.contrato) + " al 100 %" : "Cupo preaprobado por verificar", money(p.outstanding > 0 ? p.available : p.amount)) +
+        tile(repairContract ? "Cupo del inmueble · contrato #" + escapeHtml(repairContract.contrato) + " al 100 % y demás contratos" : "Cupo preaprobado por verificar", money(p.outstanding > 0 ? p.available : p.amount)) +
         tile("Plazo máximo", p.max_term > 0 ? escapeHtml(p.max_term) + (Number(p.max_term) === 1 ? " mes" : " meses") : "Sin cuotas") + "</div>";
       box.className = box.className.replace(/!sp-(bg|border)-(amber|red)-(50|200)/g, "") + (p.max_term > 0 ? " !sp-bg-amber-50 !sp-border-amber-200" : " !sp-bg-red-50 !sp-border-red-200");
       box.hidden = false;

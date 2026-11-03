@@ -149,7 +149,7 @@ final class OwnerCreditService
   }
 
   /**
-   * Copropietarios de un crédito de reparaciones: decidido, los que quedaron congelados (por clave) con sus datos de
+   * Copropietarios de un crédito del inmueble: decidido, los que quedaron congelados (por clave) con sus datos de
    * hoy; pendiente, los del contrato. @param list<array<string,mixed>>|null $owners contractOwners() ya leídos
    * @return list<array<string,mixed>>
    */
@@ -216,7 +216,7 @@ final class OwnerCreditService
   {
     $credit = $this->find($id);
     if ($credit === null) throw new \DomainException('El crédito ya no existe.');
-    if (self::signersLocked($credit)) throw new \DomainException('En un crédito de reparaciones firman todos los copropietarios: no se puede cambiar quién firma.');
+    if (self::signersLocked($credit)) throw new \DomainException('En los créditos del inmueble (servicios públicos, cuotas de administración, reparaciones) firman todos los copropietarios: no se puede cambiar quién firma.');
     if (!self::signersEditable($credit)) throw new \DomainException('Solo se puede cambiar quién firma antes de enviar la respuesta del crédito.');
     $owners = $this->contractOwners((int) $credit['contract_id']);
     $keys = array_values(array_intersect(array_column($owners, 'key'), array_map('strval', $keys)));
@@ -240,7 +240,7 @@ final class OwnerCreditService
     $result = ['sent' => [], 'signed' => [], 'errors' => []];
     $state = $this->promissoryState($credit);
     // Reparaciones: el pagaré se envía a todos a la vez; si a alguno le falta documento o contacto, no se envía.
-    if ($state['contact_missing'] !== []) throw new \DomainException('Falta el documento o el contacto (correo o celular) de ' . implode(', ', $state['contact_missing']) . '. Complétalo en el mandato o en la hoja de cierre antes de enviar el pagaré: en reparaciones firman todos los copropietarios.');
+    if ($state['contact_missing'] !== []) throw new \DomainException('Falta el documento o el contacto (correo o celular) de ' . implode(', ', $state['contact_missing']) . '. Complétalo en el mandato o en la hoja de cierre antes de enviar el pagaré: en los créditos del inmueble firman todos los copropietarios.');
     foreach ($state['owners'] as $owner) {
       if (!$owner['required']) continue;
       if ($owner['status'] === 'firmado') { $result['signed'][] = (string) $owner['name']; continue; }
@@ -400,22 +400,42 @@ final class OwnerCreditService
   }
 
   /**
-   * Plazo máximo para financiar una cotización (crédito de reparaciones): solo con el contrato del inmueble, cuotas
-   * antes de su fin − margen, sin pasar del tope de Configuración; sin cuotas, ese tope.
+   * Plazo máximo para financiar una cotización (crédito del inmueble): cuotas antes del fin del contrato más largo
+   * del propietario (el del inmueble incluido) − margen, sin pasar del tope de Configuración; sin cuotas, ese tope.
    */
   public function quoteTermLimit(int $quoteId): int
   {
     $quote = $this->db->getRow("SELECT * FROM `{$this->db->table('jet_cct_cotizacion_mantenimiento')}` WHERE `_ID` = ? LIMIT 1", [$quoteId]);
     $contract = is_array($quote) ? ($this->contractById((int) ($quote['id_contrato'] ?? 0)) ?? $this->contractByRef((string) ($quote['contrato'] ?? ''))) : null;
-    if ($contract !== null) return $this->requestTermLimit($this->repairTerm($contract));
+    if ($contract !== null) return $this->requestTermLimit($this->repairTerm($contract, $this->ownerDocument($this->contractOwners((int) $contract['_ID'])[0] ?? null, $contract)));
     return OwnerCreditCalculator::fallbackTerm($this->config());
   }
 
-  /** Preaprobado de plazo de un crédito de reparaciones: solo el contrato del inmueble, al 100 %. @return array<string,mixed> */
-  private function repairTerm(array $contract): array
+  /** Preaprobado de un crédito del inmueble: su contrato al 100 % más los demás contratos del propietario. @return array<string,mixed> */
+  private function repairTerm(array $contract, string $document): array
   {
-    $row = $this->portfolioRow($contract, null);
-    return OwnerCreditCalculator::preapproval([['net_income' => (float) $row['net_total']] + $row], $this->config());
+    try {
+      $rows = $document !== '' ? $this->ownerPortfolio($document) : [];
+    } catch (\InvalidArgumentException) {
+      $rows = [];
+    }
+    return OwnerCreditCalculator::preapproval(self::withPropertyAtFull($rows, $this->portfolioRow($contract, null)), $this->config());
+  }
+
+  /**
+   * Contratos del propietario con el del inmueble al 100 % de su ingreso neto (si no aparece por el documento, se
+   * agrega); los demás quedan con la participación del propietario.
+   * @param list<array<string,mixed>> $rows ownerPortfolio() @param array<string,mixed> $property portfolioRow()
+   * @return list<array<string,mixed>>
+   */
+  private static function withPropertyAtFull(array $rows, array $property): array
+  {
+    foreach ($rows as $index => $row) {
+      if ((int) $row['id'] !== (int) $property['id']) continue;
+      $rows[$index]['net_income'] = (float) $row['net_total'];
+      return $rows;
+    }
+    return array_merge([['net_income' => (float) $property['net_total']] + $property], $rows);
   }
 
   /** Los meses elegidos al responder la cotización con financiación Sí. @throws \DomainException */
@@ -499,9 +519,9 @@ final class OwnerCreditService
     if ($amount <= 0) throw new \DomainException('Escribe el valor solicitado para simular.');
     if ($term <= 0) throw new \DomainException('Escribe el plazo solicitado en meses para simular.');
     if (!in_array($purpose, OwnerCreditSettings::PURPOSES, true)) $purpose = OwnerCreditSettings::PURPOSES[0];
-    // Reparaciones: cupo y plazo solo con el contrato elegido, al 100 %.
+    // Crédito del inmueble: el contrato elegido al 100 % más los demás contratos del propietario.
     $repair = self::isRepair(['purpose' => $purpose]);
-    $preapproval = $repair ? $this->repairPreapproval($row) : OwnerCreditCalculator::preapproval($portfolio, $this->config());
+    $preapproval = $repair ? $this->repairPreapproval($portfolio, $row, $document) : OwnerCreditCalculator::preapproval($portfolio, $this->config());
     $this->assertRequestTerm($term, $document, $repair ? $contract : null);
     $credit = ['id' => 0, 'status' => 'simulacion', 'evaluation_json' => null, 'policy_override' => 0, 'decision_note' => '', 'decided_by_name' => '', 'decided_at' => 0]
       + $this->creditRow($contract, null, '', $amount, $purpose, $actor, $term, $owner, 'propietario');
@@ -690,8 +710,8 @@ final class OwnerCreditService
 
   /**
    * "Nueva solicitud": contratos de la persona, su cupo preaprobado personal (con el % de cada contrato, menos lo que
-   * debe de sus créditos y su parte de las reparaciones vigentes) y, por contrato, el cupo de reparaciones (100 % del
-   * ingreso de ese contrato, menos lo que ya lo compromete). El formulario muestra uno u otro según la destinación.
+   * debe de sus créditos y su parte de las reparaciones vigentes) y, por contrato, el cupo del inmueble (ese contrato
+   * al 100 % más los demás, menos lo que ya los compromete). El formulario muestra uno u otro según la destinación.
    * @return array{contracts:list<array<string,mixed>>,preapproval:array<string,mixed>,checks:list<array<string,mixed>>}
    */
   public function requestPreapproval(string $document): array
@@ -702,20 +722,25 @@ final class OwnerCreditService
     foreach ($rows as $row) $shares[(int) $row['id']] = (float) $row['share'];
     $preapproval['outstanding'] = $rows === [] ? 0.0 : $this->outstandingByDocument($document, array_map(static fn(array $row): string => (string) ($row['owner']['owner_id'] ?? ''), $rows), $shares);
     $preapproval['available'] = max(0.0, $preapproval['amount'] - $preapproval['outstanding']);
-    foreach ($rows as $index => $row) $rows[$index]['repair'] = $this->repairPreapproval($row);
+    foreach ($rows as $index => $row) $rows[$index]['repair'] = $this->repairPreapproval($rows, $row, $document);
     return ['contracts' => $rows, 'preapproval' => $preapproval, 'checks' => $this->requestChecks($rows, $preapproval)];
   }
 
   /**
-   * Cupo de un crédito de reparaciones del contrato: 100 % de su ingreso neto × meses de política, plazo solo con ese
-   * contrato, menos el saldo de lo que ya lo compromete (reparaciones vigentes y la parte de créditos personales que se
-   * descuenta de él). @param array<string,mixed> $row portfolioRow() @return array<string,mixed>
+   * Cupo de un crédito del inmueble del contrato $row: (su ingreso neto al 100 % + el de los demás contratos del
+   * propietario) × meses de política, plazo con el contrato más largo, menos el saldo de lo que ya compromete el
+   * contrato y de las deudas del propietario. @param list<array<string,mixed>> $portfolio ownerPortfolio()
+   * @param array<string,mixed> $row portfolioRow() @return array<string,mixed>
    */
-  private function repairPreapproval(array $row, int $excludeId = 0): array
+  private function repairPreapproval(array $portfolio, array $row, string $document, int $excludeId = 0): array
   {
-    $preapproval = OwnerCreditCalculator::preapproval([['net_income' => (float) $row['net_total']] + $row], $this->config());
+    $rows = self::withPropertyAtFull($portfolio, $row);
+    $preapproval = OwnerCreditCalculator::preapproval($rows, $this->config());
     $preapproval['repair'] = true;
-    $preapproval['outstanding'] = array_sum(array_map(fn(array $credit): float => $this->balance($credit) * (float) $credit['weight'], $this->contractObligations((int) $row['id'], $excludeId)));
+    $shares = [];
+    foreach ($rows as $item) $shares[(int) $item['id']] = (int) $item['id'] === (int) $row['id'] ? 1.0 : (float) $item['share'];
+    $ownerIds = array_map(static fn(array $item): string => (string) ($item['owner']['owner_id'] ?? ''), $rows);
+    $preapproval['outstanding'] = array_sum(array_map(fn(array $credit): float => $this->balance($credit) * (float) $credit['weight'], $this->repairObligations((int) $row['id'], $document, $ownerIds, $shares, $excludeId)));
     $preapproval['available'] = max(0.0, $preapproval['amount'] - $preapproval['outstanding']);
     return $preapproval;
   }
@@ -798,12 +823,12 @@ final class OwnerCreditService
     $inputEndTs = self::dateInput($input['contract_end'] ?? '');
     $endTs = $inputEndTs > 0 ? $inputEndTs : $storedEndTs;
     $evaluationTs = in_array($credit['status'], ['pendiente', 'simulacion'], true) ? time() : $requestTs;
-    // Personal: la participación del beneficiario en cada contrato. Reparaciones: 100 % del contrato del inmueble, sin
-    // los demás contratos. Un crédito decidido conserva lo que quedó congelado al decidir (los anteriores, 100 %).
+    // Personal: la participación del beneficiario en cada contrato. Crédito del inmueble: 100 % del contrato del
+    // inmueble. Un crédito decidido conserva lo que quedó congelado al decidir (los anteriores, 100 %).
     $mode = $pending ? (self::isRepair(['purpose' => (string) ($input['purpose'] ?? $credit['purpose'])]) ? 'reparaciones' : 'personal') : self::mode($credit);
     $shareInfo = $this->creditShare($credit, $mode, $pending);
     // Tope y plazo con todos los contratos del propietario, no solo con el que se descuentan las cuotas.
-    $others = $pending && $mode === 'reparaciones' ? [] : $this->otherContracts($credit, $evaluationTs);
+    $others = $this->otherContracts($credit, $evaluationTs);
     $vacancySignal = $this->vacancySignal(array_merge([['id' => (int) $credit['contract_id'], 'contrato' => (string) ($contract['contrato'] ?? $credit['contract_code']), 'end_ts' => $storedEndTs]], $others));
     $vacancy = in_array($input['vacancy'] ?? null, ['Alta', 'Media', 'Baja'], true) ? (string) $input['vacancy'] : ($pending ? $vacancySignal['level'] : ((string) ($credit['vacancy'] ?? '') ?: 'Baja'));
 
@@ -815,11 +840,11 @@ final class OwnerCreditService
     $firstPaymentTs = $decided && (int) ($credit['first_payment_ts'] ?? 0) > 0 ? (int) $credit['first_payment_ts'] : OwnerCreditCoverage::firstDueTs($disbursedTs);
 
     // Créditos vigentes que pesan sobre este crédito, cada uno con su peso: en personal, los de la persona al 100 % y
-    // las reparaciones de sus contratos según su participación; en reparaciones, lo que ya compromete el contrato.
+    // las reparaciones de sus contratos según su participación; en el inmueble, además, lo que ya compromete su contrato.
     $shares = [(int) $credit['contract_id'] => (float) $shareInfo['value']];
     foreach ($others as $row) $shares[(int) $row['id']] = (float) ($row['share'] ?? 1.0);
     $approved = $mode === 'reparaciones'
-      ? $this->contractObligations((int) $credit['contract_id'], $id)
+      ? $this->repairObligations((int) $credit['contract_id'], (string) ($credit['owner_document'] ?? ''), [(string) $credit['owner_id']], $shares, $id)
       : $this->personObligations((string) ($credit['owner_document'] ?? ''), [(string) $credit['owner_id']], $shares, $id, (int) $credit['contract_id']);
     $outstanding = array_sum(array_map(fn(array $row): float => $this->balance($row) * (float) $row['weight'], $approved));
     // Siniestro y créditos vigentes los propone el sistema; el analista los corrige (Sí/No) tras verificar con Cartera.
@@ -1483,10 +1508,13 @@ final class OwnerCreditService
     ], $rows);
   }
 
-  /** Destinación "Reparaciones y mantenimiento": crédito del inmueble (100 % de su contrato, firman todos). */
+  /**
+   * Crédito del inmueble (servicios públicos, cuotas de administración, reparaciones): su contrato al 100 % más los
+   * demás contratos del propietario, y firman todos los copropietarios. El modo se sigue llamando "reparaciones".
+   */
   public static function isRepair(array $credit): bool
   {
-    return trim((string) ($credit['purpose'] ?? '')) === OwnerCreditSettings::REPAIR_PURPOSE;
+    return in_array(trim((string) ($credit['purpose'] ?? '')), OwnerCreditSettings::PROPERTY_PURPOSES, true);
   }
 
   /**
@@ -1561,7 +1589,7 @@ final class OwnerCreditService
   }
 
   /**
-   * Lo que ya compromete el ingreso de un contrato (para un crédito de reparaciones): sus reparaciones vigentes al
+   * Lo que ya compromete el ingreso de un contrato (para un crédito del inmueble): sus reparaciones vigentes al
    * 100 % y la parte de los créditos personales que se descuenta de él (su ingreso frente al de todas las fuentes
    * de ese crédito). @return list<array<string,mixed>> con `weight`
    */
@@ -1577,6 +1605,22 @@ final class OwnerCreditService
       $total = array_sum(array_map(static fn(array $source): float => (float) $source['net_income'], $sources));
       $mine = array_sum(array_map(static fn(array $source): float => (int) $source['contract_id'] === $contractId ? (float) $source['net_income'] : 0.0, $sources));
       $out[(int) $row['id']] = $row + ['weight' => $total > 0 ? $mine / $total : 1.0 / max(1, count($sources))];
+    }
+    return array_values($out);
+  }
+
+  /**
+   * Lo que pesa sobre un crédito del inmueble: lo que ya compromete su contrato y las deudas del propietario con sus
+   * demás contratos ($shares). Un crédito que aparece en ambas cuenta una vez, con el mayor peso.
+   * @param list<string> $ownerIds @param array<int,float> $shares contrato => participación (el del inmueble, 1)
+   * @return list<array<string,mixed>> con `weight`
+   */
+  private function repairObligations(int $contractId, string $document, array $ownerIds, array $shares, int $excludeId = 0): array
+  {
+    $out = [];
+    foreach ([...$this->contractObligations($contractId, $excludeId), ...$this->personObligations($document, $ownerIds, $shares, $excludeId)] as $row) {
+      $id = (int) $row['id'];
+      if (!isset($out[$id]) || (float) $row['weight'] > (float) $out[$id]['weight']) $out[$id] = $row;
     }
     return array_values($out);
   }
@@ -1688,12 +1732,12 @@ final class OwnerCreditService
     return (int) $preapproval['max_term'] > 0 ? (int) $preapproval['max_term'] : (int) ($preapproval['fallback_term'] ?? OwnerCreditCalculator::fallbackTerm($this->config()));
   }
 
-  /** @param array<string,mixed>|null $repairContract reparaciones: el plazo sale solo de ese contrato */
+  /** @param array<string,mixed>|null $repairContract crédito del inmueble: ese contrato cuenta aunque no salga por el documento */
   private function assertRequestTerm(int $term, string $document, ?array $repairContract = null): void
   {
     if ($repairContract !== null) {
-      $limit = $this->requestTermLimit($this->repairTerm($repairContract));
-      if ($term > $limit) throw new \DomainException('El plazo solicitado (' . $term . ' meses) supera el máximo de ' . $limit . ' cuotas del contrato del inmueble. Corrige el plazo.');
+      $limit = $this->requestTermLimit($this->repairTerm($repairContract, $document));
+      if ($term > $limit) throw new \DomainException('El plazo solicitado (' . $term . ' meses) supera el máximo de ' . $limit . ' cuotas del propietario. Corrige el plazo.');
       return;
     }
     try {
@@ -1973,10 +2017,11 @@ final class OwnerCreditService
     if (!is_array($quote)) return 0;
     $contract = $this->contractById((int) ($quote['id_contrato'] ?? 0)) ?? $this->contractByRef((string) ($quote['contrato'] ?? ''));
     if ($contract === null) return 0;
-    // Plazo: el elegido al responder o, si no se eligió, el máximo del contrato del inmueble (cuotas antes de su fin −
-    // margen). Como antes, sin documento del propietario queda en 0 hasta que alguien lo escriba.
+    // Plazo: el elegido al responder o, si no se eligió, el máximo del propietario (cuotas antes del fin de su contrato
+    // más largo − margen). Como antes, sin documento del propietario queda en 0 hasta que alguien lo escriba.
     $term = $requestedTerm;
-    if ($term <= 0 && $this->ownerDocument($this->contractOwners((int) $contract['_ID'])[0] ?? null, $contract) !== '') $term = (int) $this->repairTerm($contract)['max_term'];
+    $document = $this->ownerDocument($this->contractOwners((int) $contract['_ID'])[0] ?? null, $contract);
+    if ($term <= 0 && $document !== '') $term = (int) $this->repairTerm($contract, $document)['max_term'];
     return $this->insertCredit($contract, $quoteId, (string) ($quote['id_ticket'] ?? ''), self::money($quote['total'] ?? ''), OwnerCreditSettings::REPAIR_PURPOSE, $actor, $term);
   }
 
@@ -2122,7 +2167,7 @@ final class OwnerCreditService
 
   /**
    * Porcentaje de participación registrado: incumple (se aprueba con justificación) si en algún contrato que suma al
-   * cupo la parte de la persona salió en partes iguales porque falta el %. Reparaciones usa el 100 % del contrato.
+   * cupo la parte de la persona salió en partes iguales porque falta el %. El crédito del inmueble usa el 100 % de su contrato.
    * @param list<array<string,mixed>> $all contrato principal y demás contratos @param array<string,mixed>|null $share creditShare()
    * @return array{key:string,label:string,ok:bool,detail:string}
    */
@@ -2134,7 +2179,7 @@ final class OwnerCreditService
     if ($mode === 'reparaciones') {
       $owners = (array) ($share['owners'] ?? []);
       $names = implode(', ', array_map(static fn(array $owner): string => (string) $owner['name'], $owners));
-      return $policy + ['ok' => true, 'detail' => 'Reparaciones y mantenimiento: se usa el 100 % del ingreso del contrato del inmueble' . (count($owners) > 1 ? ' y firman los ' . count($owners) . ' copropietarios (' . $names . ')' : '') . '.'];
+      return $policy + ['ok' => true, 'detail' => 'Crédito del inmueble: se usa el 100 % del ingreso del contrato del inmueble, más los demás contratos del propietario,' . (count($owners) > 1 ? ' y firman los ' . count($owners) . ' copropietarios (' . $names . ')' : '') . '.'];
     }
     $missing = [];
     $shown = [];
@@ -2429,7 +2474,7 @@ final class OwnerCreditService
     return '<p style="margin:0 0 14px;font-weight:600;">Apreciado(a) ' . $e($credit['owner_name'] ?: 'propietario') . ':</p>'
       . '<p style="margin:0 0 14px;line-height:1.65;">' . ($quoteId > 0 ? 'Al responder la cotización #' . $quoteId . ' usted realizó una solicitud de crédito para financiarla' : 'Usted realizó una solicitud de crédito') . ' con estos datos:</p>'
       . '<p style="margin:0 0 14px;line-height:1.8;">' . $list . '</p>'
-      . (self::isRepair($credit) ? '<p style="margin:0 0 14px;line-height:1.65;">Es un crédito para las reparaciones del inmueble: se paga con el ingreso del contrato y lo firman <b>todos sus copropietarios</b>, por eso le llega también a usted.</p>' : '')
+      . (self::isRepair($credit) ? '<p style="margin:0 0 14px;line-height:1.65;">Es un crédito del inmueble para ' . $e(mb_strtolower((string) $credit['purpose'])) . ': se paga con el ingreso del contrato y lo firman <b>todos sus copropietarios</b>, por eso le llega también a usted.</p>' : '')
       . '<p style="margin:0 0 14px;line-height:1.65;">Recuerde que el crédito queda <b>sujeto a estudio, verificación y aprobación</b>. Le informaremos el resultado por este medio.</p>'
       . '<p style="margin:0 0 14px;line-height:1.65;font-size:12px;color:#475569;">' . $e(self::DISCLAIMER) . '</p>'
       . '<p style="margin:0;line-height:1.65;">Atentamente,<br>'
@@ -2502,7 +2547,7 @@ final class OwnerCreditService
     $money = static fn($value): string => '$' . number_format((float) $value, 0, ',', '.');
     $html = '<p style="margin:0 0 14px;font-weight:600;">Apreciado(a) ' . $e(($recipient !== '' ? $recipient : $credit['owner_name']) ?: 'propietario') . ':</p>';
     $holders = self::mode($credit) === 'reparaciones' ? $this->creditRecipients($credit) : [];
-    if (count($holders) > 1) $html .= '<p style="margin:0 0 14px;line-height:1.65;">Crédito para las reparaciones del inmueble a nombre de sus copropietarios: <b>' . $e(implode(', ', array_column($holders, 'name'))) . '</b>.</p>';
+    if (count($holders) > 1) $html .= '<p style="margin:0 0 14px;line-height:1.65;">Crédito del inmueble para ' . $e(mb_strtolower((string) $credit['purpose'])) . ' a nombre de sus copropietarios: <b>' . $e(implode(', ', array_column($holders, 'name'))) . '</b>.</p>';
     $closing = '<p style="margin:14px 0 0;line-height:1.65;">Atentamente,<br>'
       . (trim((string) ($signer['name'] ?? '')) !== '' && $signer['name'] !== 'SKC SuCasa Inmobiliaria' ? '<b>' . $e($signer['name']) . '</b><br>' : '')
       . (trim((string) ($signer['cargo'] ?? '')) !== '' ? $e($signer['cargo']) . '<br>' : '')
