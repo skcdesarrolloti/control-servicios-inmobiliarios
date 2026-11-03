@@ -56,7 +56,7 @@ final class OwnerCreditCoOwnersTestPdo extends PDO
 $pdo = new OwnerCreditCoOwnersTestPdo();
 $db = new Database($pdo, 'wp_');
 $pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema(_ID INTEGER PRIMARY KEY, funcion TEXT, valor TEXT)');
-$pdo->exec("INSERT INTO wp_jet_cct_confi_sistema(funcion, valor) VALUES ('control_servicios_config', '" . json_encode(['owner_credit_settings' => ['usury_auto' => false, 'usury_annual' => 0.2859, 'reference_rate' => 0.019, 'require_promissory' => false, 'max_term' => 24, 'income_months' => 3]]) . "')");
+$pdo->exec("INSERT INTO wp_jet_cct_confi_sistema(funcion, valor) VALUES ('control_servicios_config', '" . json_encode(['owner_credit_settings' => ['usury_auto' => false, 'usury_annual' => 0.2859, 'usury_updated_at' => date('Y-m-01'), 'reference_rate' => 0.019, 'require_promissory' => false, 'max_term' => 24, 'income_months' => 3]]) . "')");
 $pdo->exec('CREATE TABLE wp_scm_owner_credits(id INTEGER PRIMARY KEY AUTOINCREMENT, quote_id INTEGER UNIQUE, ticket_id TEXT DEFAULT "", contract_id INTEGER DEFAULT 0, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", address TEXT DEFAULT "", owner_id TEXT DEFAULT "", owner_name TEXT DEFAULT "", owner_email TEXT DEFAULT "", owner_phone TEXT DEFAULT "", purpose TEXT DEFAULT "", status TEXT DEFAULT "pendiente", requested_amount REAL DEFAULT 0, requested_term INTEGER DEFAULT 0, vacancy TEXT DEFAULT "Baja", gross_income REAL DEFAULT 0, deductions_json TEXT, net_income REAL DEFAULT 0, max_amount REAL DEFAULT 0, max_months INTEGER DEFAULT 0, approved_amount REAL, approved_term INTEGER, approved_rate REAL, monthly_payment REAL, total_interest REAL, first_payment_ts INTEGER, policy_json TEXT, evaluation_json TEXT, policy_override INTEGER DEFAULT 0, decision_note TEXT, decided_by_id TEXT DEFAULT "", decided_by_name TEXT DEFAULT "", decided_at INTEGER, closed_at INTEGER, created_by_id TEXT DEFAULT "", created_by_name TEXT DEFAULT "", created_at INTEGER, updated_at INTEGER)');
 $pdo->exec('CREATE TABLE wp_scm_owner_credit_sources(id INTEGER PRIMARY KEY AUTOINCREMENT, credit_id INTEGER, contract_id INTEGER, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", net_income REAL DEFAULT 0, end_ts INTEGER, is_primary INTEGER DEFAULT 0, created_at INTEGER)');
 $pdo->exec('CREATE TABLE wp_scm_owner_credit_promissory(id INTEGER PRIMARY KEY AUTOINCREMENT, owner_document TEXT, owner_id TEXT DEFAULT "", owner_name TEXT DEFAULT "", owner_email TEXT DEFAULT "", owner_phone TEXT DEFAULT "", credit_id INTEGER DEFAULT 0, status TEXT DEFAULT "pendiente", payload_json TEXT, payload_hash TEXT, token_nonce TEXT, expires_at INTEGER, channels TEXT DEFAULT "email", otp_json TEXT, delivery_json TEXT, signed_at INTEGER, signed_json TEXT, signed_pdf BLOB, pdf_hash TEXT, pdf_hmac TEXT, voided_at INTEGER, void_note TEXT, voided_by_name TEXT DEFAULT "", created_by_id TEXT DEFAULT "", created_by_name TEXT DEFAULT "", created_at INTEGER, updated_at INTEGER)');
@@ -245,5 +245,27 @@ $check($near($decidedWork['conditions']['rate_discount'] * 1000, 15) && $near($d
 $events = $db->getResults("SELECT details_json FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'aprobado'", [$discountId]);
 $check(str_contains((string) $events[0]['details_json'], 'rate_discount') && str_contains((string) $db->getVar("SELECT observacion FROM wp_jet_cct_historial_contrato_arrendamiento WHERE tipo_reporte = 'Crédito aprobado' ORDER BY _ID DESC LIMIT 1"), 'descuento según política de 1,50 %'), 'the discount is traced in the credit and contract histories');
 $check(str_contains(\SCM\Modules\OwnerCredits\OwnerCreditPdf::html($decidedWork, 'QA'), 'Descuento según política') && str_contains(\SCM\Modules\OwnerCredits\OwnerCreditResponseDocuments::letter($discountCredit, ['signer' => ['name' => 'Analista QA', 'cargo' => ''], 'margin' => 2, 'date' => time()]), 'incluye descuento de 1,50 %'), 'the internal document and the approval letter show the discount');
+
+// Transparencia: con la usura de otro periodo no se aprueba (rechazar sí). La automática rige hasta su "vigente hasta";
+// la manual, hasta fin del mes en que empezó.
+$usury = \SCM\Modules\OwnerCredits\OwnerCreditUsuryRate::class;
+$check($usury::staleMessage(['usury_auto' => true, 'usury_updated_at' => '2026-10-01', 'usury_valid_until' => '2026-10-31'], '2026-10-31') === ''
+  && str_contains($usury::staleMessage(['usury_auto' => true, 'usury_updated_at' => '2026-10-01', 'usury_valid_until' => '2026-10-31'], '2026-11-03'), 'Actualizar usura')
+  && $usury::staleMessage(['usury_auto' => false, 'usury_updated_at' => '2026-11-01', 'usury_valid_until' => ''], '2026-11-30') === ''
+  && str_contains($usury::staleMessage(['usury_auto' => false, 'usury_updated_at' => '2026-10-15', 'usury_valid_until' => '2026-12-31'], '2026-11-01'), 'Configuración'), 'the usury is current only inside its period (manual: until the end of its month)');
+$config = json_decode((string) $db->getVar("SELECT valor FROM wp_jet_cct_confi_sistema WHERE funcion = 'control_servicios_config'"), true);
+$config['owner_credit_settings']['usury_updated_at'] = date('Y-m-01', strtotime('first day of last month'));
+$db->update('wp_jet_cct_confi_sistema', ['valor' => json_encode($config)], ['funcion' => 'control_servicios_config']);
+$staleService = new OwnerCreditService($db, new Settings($db));
+$staleId = $staleService->createManual(20, 100000, 3, 'Libre inversión', $actor, '', 'mandato_2');
+$staleWork = $staleService->workspace($staleId);
+$check($staleWork['usury_stale'] !== '' && str_contains((new OwnerCreditView())->workspace($staleWork, true, true), 'no está vigente hoy'), 'the liquidator warns when the usury is not current');
+try {
+  $staleService->decide($staleId, 'aprobado', ['rate' => '1,9', 'amount' => '$100.000', 'term' => '3', 'requested_term' => '3', 'note' => $note], $actor);
+  $check(false, 'a credit cannot be approved with a usury from another period');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'no está vigente hoy') && $staleService->find($staleId)['status'] === 'pendiente', 'a credit cannot be approved with a usury from another period');
+}
+$check($staleService->decide($staleId, 'rechazado', ['note' => 'Rechazo de prueba con usura vencida.'], $actor)['credit']['status'] === 'rechazado', 'a credit can still be rejected while the usury is not current');
 
 echo "Owner credit co-owner checks passed.\n";

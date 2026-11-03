@@ -947,6 +947,7 @@ final class OwnerCreditService
       ],
       'income_source' => $defaults['source'],
       'term_error' => $termError,
+      'usury_stale' => OwnerCreditUsuryRate::staleMessage($settings),
       'settings' => $settings,
       'evaluation' => $evaluation,
       'conditions' => ['amount' => $amount, 'term' => $term, 'rate' => $rate, 'base_rate' => $baseRate, 'rate_discount' => $discount, 'payment' => $payment, 'total_interest' => array_sum(array_column($schedule, 'interes'))],
@@ -989,6 +990,8 @@ final class OwnerCreditService
       if ($locked['status'] !== 'pendiente') throw new \DomainException('Este crédito ya fue ' . strtolower(self::STATUSES[$locked['status']] ?? $locked['status']) . '.');
       $work = $this->workspace($id, $input);
       if ($decision === 'aprobado' && $work['term_error'] !== '') throw new \DomainException($work['term_error']);
+      // Transparencia: no se aprueba con una usura de otro periodo (rechazar sí se puede).
+      if ($decision === 'aprobado' && $work['usury_stale'] !== '') throw new \DomainException($work['usury_stale']);
       // La usura es un tope legal: no se puede aprobar por encima ni con justificación.
       if ($decision === 'aprobado' && $work['conditions']['rate'] > $work['evaluation']['usury_monthly_legal'] + 1e-9) {
         throw new \DomainException('La tasa supera la usura (' . number_format($work['evaluation']['usury_monthly_legal'] * 100, 4, ',', '.') . ' % mensual). Bájala para poder aprobar.');
@@ -2760,8 +2763,9 @@ final class OwnerCreditService
   public static function usuryPeriod(array $settings): string
   {
     $date = static fn(string $value): string => preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? date('d/m/Y', (int) strtotime($value)) : '';
-    $from = $date((string) ($settings['usury_updated_at'] ?? ''));
-    $to = $date((string) ($settings['usury_valid_until'] ?? ''));
+    $period = OwnerCreditUsuryRate::period($settings);
+    $from = $date($period['from']);
+    $to = $date($period['to']);
     $resolution = trim((string) ($settings['usury_resolution'] ?? ''));
     return ($from !== '' ? ($to !== '' ? ' · vigente del ' . $from . ' al ' . $to : ' · vigente desde ' . $from) : '') . ($resolution !== '' ? ' · Res. ' . $resolution : '');
   }

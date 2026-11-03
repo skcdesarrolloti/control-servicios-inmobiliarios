@@ -40,6 +40,34 @@ final class OwnerCreditUsuryRate
   }
 
   /**
+   * Vigencia de la usura guardada: desde "vigente desde" hasta "vigente hasta" (la automática) o, si no hay fecha final
+   * (la manual), hasta el último día del mes en que empezó. @param array<string,mixed> $config OwnerCreditSettings::read()
+   * @return array{from:string,to:string}
+   */
+  public static function period(array $config): array
+  {
+    $from = (string) ($config['usury_updated_at'] ?? '');
+    $to = !empty($config['usury_auto']) ? (string) ($config['usury_valid_until'] ?? '') : '';
+    if ($to === '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) === 1) $to = date('Y-m-t', (int) strtotime($from));
+    return ['from' => $from, 'to' => $to];
+  }
+
+  /**
+   * Por qué no se puede aprobar con la usura guardada: vacío si está vigente hoy. Para no aprobar con una tasa de otro
+   * periodo, quien decide debe actualizarla (o quien configura, escribir la del mes en modo manual).
+   * @param array<string,mixed> $config OwnerCreditSettings::read()
+   */
+  public static function staleMessage(array $config, ?string $today = null): string
+  {
+    $today ??= date('Y-m-d');
+    ['from' => $from, 'to' => $to] = self::period($config);
+    if ($from !== '' && $to !== '' && $from <= $today && $today <= $to) return '';
+    $date = static fn(string $value): string => $value !== '' ? date('d/m/Y', (int) strtotime($value)) : 'sin fecha';
+    $how = !empty($config['usury_auto']) ? 'Pulsa "Actualizar usura" en el liquidador' : 'Escribe la usura de este mes en Configuración › Créditos a propietarios';
+    return 'La tasa de usura guardada no está vigente hoy (' . date('d/m/Y', (int) strtotime($today)) . '): rige del ' . $date($from) . ' al ' . $date($to) . '. ' . $how . ' antes de aprobar.';
+  }
+
+  /**
    * Fila vigente hoy (o la más reciente ya iniciada).
    * @param list<array<string,mixed>> $rows
    * @return array{usury_annual:float,usury_updated_at:string,usury_valid_until:string,usury_bank_rate:float,usury_resolution:string}|null

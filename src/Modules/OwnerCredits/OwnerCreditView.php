@@ -379,7 +379,10 @@ final class OwnerCreditView
     $termError = (string) ($work['term_error'] ?? '');
     $others = $ev['other_contracts'] ?? [];
     $where = $this->canConfigure ? 'aquí, debajo de Condiciones según el analista, o en Configuración' : 'en Configuración (pídelo a quien configura créditos)';
-    return ($termError !== '' ? self::alert($termError, 'bad') : '')
+    // Con la usura de otro periodo no se puede aprobar: se avisa mientras el crédito está en estudio.
+    $stale = $work['credit']['status'] === 'pendiente' ? (string) ($work['usury_stale'] ?? '') : '';
+    return ($stale !== '' ? self::alert($stale, 'bad') : '')
+      . ($termError !== '' ? self::alert($termError, 'bad') : '')
       . (($usury = self::usuryWarning((float) $work['settings']['reference_rate'], (float) $ev['usury_monthly_legal'], $where)) !== '' ? self::alert($usury, 'bad') : '')
       . self::preapproval($work)
       . ($endChanged ? self::alert('Estás calculando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Se guardará en el contrato al aprobar o rechazar el crédito.', 'info') : '')
