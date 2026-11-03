@@ -33,6 +33,11 @@ final class OwnerCreditView
   /** Pestaña de etapa elegida (el JS la pone y la quita con estas mismas clases). */
   private const TAB_SELECTED = '!sp-ring-2 !sp-ring-service-navy';
 
+  /** $canConfigure: puede cambiar la tasa de referencia desde el liquidador (permiso de configurar créditos). */
+  public function __construct(private bool $canConfigure = false)
+  {
+  }
+
   /** Contenedor de Métricas › Créditos a propietarios; el listado llega por AJAX. */
   public function shell(): string
   {
@@ -181,7 +186,8 @@ final class OwnerCreditView
       . '</div>' . self::vacancyNote($ev) . '</section>'
       . '</div>')
 
-      // 2. Estudio: ingreso y condiciones a la izquierda; políticas, cobertura y cupo a la derecha.
+      // 2. Estudio: ingreso y condiciones a la izquierda; cupo, política y condición sugerida a la derecha; debajo, a
+      // dos columnas, cobertura, plan de descuento, cambios y políticas (así no queda espacio vacío a la izquierda).
       . self::stageBlock('estudio', '2', 'Estudio', 'Ingreso, condiciones, políticas y cobertura; aquí se aprueba o se rechaza.', $active === 'estudio',
         '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-12 !sp-gap-5 !sp-items-start">'
       // Columna de datos y entradas.
@@ -202,20 +208,25 @@ final class OwnerCreditView
         'Qué son' => 'Las condiciones que realmente se aprueban. Arrancan con la condición sugerida y las puedes ajustar.',
         'Valor a colocar' => 'El dinero que se presta.',
         'Plazo' => 'Número de cuotas mensuales.',
-        'Tasa N.M.V' => 'Tasa nominal mes vencido: el interés de cada mes sobre el saldo. Se sugiere la tasa de referencia; puedes aplicar un descuento hasta el descuento máximo de Configuración. Más abajo queda fuera de política; por encima de la usura no se puede aprobar.',
+        'Tasa base N.M.V' => 'Tasa nominal mes vencido antes del descuento: el interés de cada mes sobre el saldo. Se sugiere la tasa de referencia (o la de riesgo, o la usura si la supera).',
+        'Descuento según política' => 'Lo eliges tú, de 0 % a 5 % de a 0,5 %: se descuenta de la tasa base (1 % sobre 2,10 % = 2,079 %). Por defecto 0 %. Queda en el historial del crédito, en el documento interno y en la carta de aprobación.',
+        'Tasa final' => 'Tasa base menos el descuento: la que se aprueba y con la que se calcula la cuota. Por debajo de la tasa mínima queda fuera de política; por encima de la usura no se puede aprobar.',
         'Cuota' => 'Fija, calculada como la función PAGO de Excel; se descuenta de los giros del canon.',
         'Fecha de desembolso' => 'Día en que se entrega el dinero. La primera cuota se descuenta un mes después y el crédito queda pagado solo cuando vence la última.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-4">'
       . $field('Valor a colocar', $money('amount', $c['amount']))
       . $field('Plazo (meses)', '<input class="' . $inputClass . '" name="term" type="number" min="1" max="60" value="' . (int) $c['term'] . '"' . $lock . '>')
-      . $field('Tasa N.M.V (%)', '<input class="' . $inputClass . '" name="rate" inputmode="decimal" value="' . self::e(number_format($c['rate'] * 100, 4, ',', '')) . '"' . $lock . '>')
       . $field('Fecha de desembolso', '<input class="' . $inputClass . '" type="date" name="disbursed_at" value="' . date('Y-m-d', (int) ($work['disbursed_ts'] ?? 0) ?: time()) . '"' . $lock . '>')
-      . '</div></section>'
+      . $field('Tasa base N.M.V (%)', '<input class="' . $inputClass . '" name="rate" inputmode="decimal" value="' . self::e(number_format((float) ($c['base_rate'] ?? $c['rate']) * 100, 4, ',', '')) . '"' . $lock . '>')
+      . $field('Descuento según política', $select('rate_discount', self::discountOptions((float) ($c['rate_discount'] ?? 0))))
+      . $field('Tasa final N.M.V', '<input class="' . $ui::INPUT . ' ' . self::READONLY . ' !sp-font-bold" data-owner-credit-final-rate value="' . self::e(self::fine((float) $c['rate'])) . '" readonly tabindex="-1">')
+      . '</div>' . $this->rateInfo($work, $editable) . '</section>'
       . '</div>'
       // Columna de resultados (se refresca al editar).
       . '<div class="lg:!sp-col-span-5 !sp-space-y-5" data-owner-credit-results>' . $this->results($work) . '</div>'
       . '</div>'
+      . '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-2 !sp-gap-5 !sp-items-start" data-owner-credit-results-below>' . $this->resultsBelow($work) . '</div>'
 
       . '<div data-owner-credit-schedule>' . $this->schedule($work) . '</div>'
       . ($credit['status'] === 'pendiente' ? $this->actions($credit, $canDecide, $canManage, $work['adjustments'] ?? [], $work) : $this->decisionSummary($credit, $work['adjustments'] ?? [])))
@@ -356,23 +367,20 @@ final class OwnerCreditView
       . '<p class="!sp-m-0 !sp-mt-2 !sp-text-[11px]" data-owner-credit-response-status role="status" aria-live="polite"></p></section>';
   }
 
-  /** Bloques calculados que se refrescan al editar el formulario. @param array<string,mixed> $work */
+  /**
+   * Bloques calculados de la columna derecha del estudio (avisos, cupo, política y condición sugerida); se refrescan
+   * al editar el formulario. @param array<string,mixed> $work
+   */
   public function results(array $work): string
   {
-    $ui = UI::class;
     $ev = $work['evaluation'];
     $s = $ev['suggested'];
     $endChanged = (int) ($work['contract']['fin_saved_ts'] ?? 0) !== (int) ($work['contract']['fin_ts'] ?? 0);
     $termError = (string) ($work['term_error'] ?? '');
     $others = $ev['other_contracts'] ?? [];
-    $policies = '';
-    foreach ($work['policies'] as $policy) {
-      $policies .= '<li class="!sp-flex !sp-gap-2.5 !sp-items-start !sp-py-2.5 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0">'
-        . '<span class="!sp-mt-0.5 !sp-flex !sp-items-center !sp-justify-center !sp-w-5 !sp-h-5 !sp-rounded-full ' . ($policy['ok'] ? '!sp-bg-emerald-50 !sp-text-emerald-600' : '!sp-bg-red-50 !sp-text-red-600') . '">' . $ui::icon($policy['ok'] ? 'check' : 'close', '!sp-w-3 !sp-h-3') . '</span>'
-        . '<span class="!sp-min-w-0"><b class="!sp-block !sp-text-[11px] ' . ($policy['ok'] ? '!sp-text-service-navy' : '!sp-text-red-700') . '">' . self::e($policy['label']) . '</b><span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e($policy['detail']) . '</span></span></li>';
-    }
+    $where = $this->canConfigure ? 'aquí, debajo de Condiciones según el analista, o en Configuración' : 'en Configuración (pídelo a quien configura créditos)';
     return ($termError !== '' ? self::alert($termError, 'bad') : '')
-      . (($usury = self::usuryWarning((float) $work['settings']['reference_rate'], (float) $ev['usury_monthly_legal'])) !== '' ? self::alert($usury, 'bad') : '')
+      . (($usury = self::usuryWarning((float) $work['settings']['reference_rate'], (float) $ev['usury_monthly_legal'], $where)) !== '' ? self::alert($usury, 'bad') : '')
       . self::preapproval($work)
       . ($endChanged ? self::alert('Estás calculando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Se guardará en el contrato al aprobar o rechazar el crédito.', 'info') : '')
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('chart') . 'Política de créditos</h4>' . self::guide('politica', [
@@ -408,10 +416,26 @@ final class OwnerCreditView
       . self::tile('Plazo', $s['term'] . ' meses') . self::tile('Tasa', self::percent($s['rate']))
       . self::tile('Valor a colocar', self::money($s['amount'])) . self::tile('Cuota mensual', self::money($s['payment']), 'key')
       . '</div>' . (!empty($s['rate_capped']) ? '<p class="' . self::NOTE . ' !sp-mt-2">La tasa de esta condición superaba la usura; se sugiere la usura mes vencido (' . self::percent($ev['usury_monthly_legal']) . ').</p>' : '')
-      . (!empty($s['uncovered']) ? '<p class="' . self::NOTE . ' !sp-mt-2 !sp-text-red-700">Con este valor ningún plazo tiene cobertura en todas sus cuotas: baja el valor.</p>' : '') . '</section>'
-      . self::coverage($work)
-      . self::discountPlan($work)
-      . ($work['credit']['status'] === 'pendiente' ? self::adjustments($work['adjustments'] ?? [], true) : '')
+      . (!empty($s['uncovered']) ? '<p class="' . self::NOTE . ' !sp-mt-2 !sp-text-red-700">Con este valor ningún plazo tiene cobertura en todas sus cuotas: baja el valor.</p>' : '') . '</section>';
+  }
+
+  /**
+   * Bloques calculados debajo del estudio, a dos columnas: cobertura y plan de descuento; cambios frente al sistema y
+   * políticas. Se refrescan junto con results(). @param array<string,mixed> $work
+   */
+  public function resultsBelow(array $work): string
+  {
+    $ui = UI::class;
+    $policies = '';
+    foreach ($work['policies'] as $policy) {
+      $policies .= '<li class="!sp-flex !sp-gap-2.5 !sp-items-start !sp-py-2.5 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0">'
+        . '<span class="!sp-mt-0.5 !sp-flex !sp-items-center !sp-justify-center !sp-w-5 !sp-h-5 !sp-rounded-full ' . ($policy['ok'] ? '!sp-bg-emerald-50 !sp-text-emerald-600' : '!sp-bg-red-50 !sp-text-red-600') . '">' . $ui::icon($policy['ok'] ? 'check' : 'close', '!sp-w-3 !sp-h-3') . '</span>'
+        . '<span class="!sp-min-w-0"><b class="!sp-block !sp-text-[11px] ' . ($policy['ok'] ? '!sp-text-service-navy' : '!sp-text-red-700') . '">' . self::e($policy['label']) . '</b><span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e($policy['detail']) . '</span></span></li>';
+    }
+    // Sin cobertura ni plan (falta valor o plazo), cambios y políticas ocupan todo el ancho.
+    $left = self::coverage($work) . self::discountPlan($work);
+    return ($left !== '' ? '<div class="!sp-space-y-5">' . $left . '</div>' : '')
+      . '<div class="!sp-space-y-5' . ($left === '' ? ' lg:!sp-col-span-2' : '') . '">' . ($work['credit']['status'] === 'pendiente' ? self::adjustments($work['adjustments'] ?? [], true) : '')
       . '<section class="' . self::SECTION . '"' . (self::needsNote($work) ? ' data-owner-credit-needs-note' : '') . '><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Políticas</h4>'
       . ($work['policies_ok'] ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Cumple todas</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-red-700">Incumple políticas</span>') . '</div>'
       . self::guide('politicas', [
@@ -421,7 +445,53 @@ final class OwnerCreditView
       ])
       . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $policies . '</ul>'
       . ($work['policies_ok'] ? '' : '<p class="' . self::NOTE . ' !sp-mt-2">Para aprobar fuera de política escribe la justificación al final; quedará en el historial.</p>')
-      . '</section>';
+      . '</section></div>';
+  }
+
+  /**
+   * Debajo de las condiciones: tasa de referencia y usura vigente con su fecha. Quien decide puede volver a consultar
+   * la usura; quien configura créditos puede cambiar la tasa de referencia sin salir del liquidador.
+   * @param array<string,mixed> $work
+   */
+  private function rateInfo(array $work, bool $editable): string
+  {
+    $ui = UI::class;
+    $settings = $work['settings'];
+    $usuryMonthly = (float) ($work['evaluation']['usury_monthly_legal'] ?? 0);
+    $synced = (int) ($settings['usury_synced_at'] ?? 0);
+    $text = 'Tasa de referencia <b class="!sp-text-service-navy">' . self::e(self::fine((float) $settings['reference_rate'])) . '</b> N.M.V · Usura <b class="!sp-text-service-navy">' . self::e(self::percent((float) $settings['usury_annual'])) . ' E.A.</b> ('
+      . self::e(self::fine($usuryMonthly)) . ' mensual)' . self::e(OwnerCreditService::usuryPeriod($settings))
+      . (!empty($settings['usury_auto']) ? ($synced > 0 ? ' · consultada el ' . date('d/m/Y g:i a', $synced) : '') : ' · usura manual (Configuración)') . '.';
+    $actions = '';
+    if ($editable) {
+      $actions .= !empty($settings['usury_auto']) ? '<button type="button" class="' . $ui::SECONDARY . ' !sp-text-[10px]" data-owner-credit-rate-action="usury">' . $ui::icon('refresh', '!sp-w-3 !sp-h-3') . 'Actualizar usura</button>' : '';
+      if ($this->canConfigure) {
+        $actions .= '<label class="!sp-flex !sp-items-center !sp-gap-2 !sp-text-[10px] !sp-text-service-muted">Tasa de referencia (%)'
+          . '<input class="' . $ui::INPUT . ' !sp-h-8 !sp-w-24 !sp-bg-white" name="reference_rate" inputmode="decimal" value="' . self::e(number_format((float) $settings['reference_rate'] * 100, 2, ',', '')) . '" aria-label="Nueva tasa de referencia N.M.V"></label>'
+          . '<button type="button" class="' . $ui::NAVY . ' !sp-text-[10px]" data-owner-credit-rate-action="reference">Guardar tasa de referencia</button>';
+      }
+    }
+    return '<div class="!sp-mt-4 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-slate-50 !sp-p-3" data-owner-credit-rates>'
+      . '<p class="' . self::NOTE . '">' . $text . '</p>'
+      . ((string) ($settings['usury_sync_error'] ?? '') !== '' ? '<p class="' . self::NOTE . ' !sp-mt-1 !sp-text-red-700">No se pudo actualizar la usura: ' . self::e($settings['usury_sync_error']) . ' Se usa la última tasa guardada.</p>' : '')
+      . ($actions !== '' ? '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2 !sp-mt-2">' . $actions . '</div>' : '')
+      . '<p class="!sp-m-0 !sp-mt-1 !sp-text-[11px]" data-owner-credit-rates-status role="status" aria-live="polite"></p></div>';
+  }
+
+  /** Opciones del descuento según política: 0 % a 5 %, de a 0,5 %. */
+  private static function discountOptions(float $selected): string
+  {
+    $options = '';
+    foreach (OwnerCreditService::rateDiscounts() as $discount) {
+      $options .= '<option value="' . self::e(number_format($discount * 100, 2, '.', '')) . '"' . (abs($discount - $selected) < 1e-9 ? ' selected' : '') . '>' . self::e(OwnerCreditService::discountLabel($discount)) . '</option>';
+    }
+    return $options;
+  }
+
+  /** Tasa con 4 decimales: "2,0882 %". */
+  private static function fine(float $rate): string
+  {
+    return number_format($rate * 100, 4, ',', '.') . ' %';
   }
 
   /**
@@ -916,12 +986,11 @@ final class OwnerCreditView
    * La tasa de referencia (la que se sugiere y se simula) no puede superar la usura: el crédito se recorta a la usura,
    * pero la referencia de Configuración está desactualizada. Indica hasta cuánto bajarla.
    */
-  public static function usuryWarning(float $referenceRate, float $usuryMonthly): string
+  public static function usuryWarning(float $referenceRate, float $usuryMonthly, string $where = 'en Configuración'): string
   {
     if ($referenceRate <= $usuryMonthly + 1e-9) return '';
     // Con 4 decimales: la diferencia puede ser de milésimas (2,1200 % frente a 2,1176 %).
-    $fine = static fn(float $value): string => number_format($value * 100, 4, ',', '.') . ' %';
-    return 'La tasa de referencia (' . $fine($referenceRate) . ' mensual) supera la usura (' . $fine($usuryMonthly) . ' mensual): los créditos se recortan a la usura. Baja la tasa de referencia en Configuración a máximo ' . number_format(floor($usuryMonthly * 10000) / 100, 2, ',', '.') . ' %.';
+    return 'La tasa de referencia (' . self::fine($referenceRate) . ' mensual) supera la usura (' . self::fine($usuryMonthly) . ' mensual): los créditos se recortan a la usura. Baja la tasa de referencia ' . $where . ' a máximo ' . number_format(floor($usuryMonthly * 10000) / 100, 2, ',', '.') . ' %.';
   }
 
   /** Por qué el sistema sugiere esa probabilidad de desocupación y avisos de los demás contratos. @param array<string,mixed> $ev */

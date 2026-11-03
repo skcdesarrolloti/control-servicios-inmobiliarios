@@ -31,8 +31,9 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
         return new Promise(r => setTimeout(() => r({ headers: { get: () => 'application/pdf' }, blob: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })) }), 400));
       }
       const data = body.action === 'scm_owner_credit_open' ? { title: 'Crédito #12 · Pendiente', html: workspace }
-        : body.action === 'scm_owner_credit_simulate' ? { results_html: '<p data-sim>recalculado ' + body.amount + '</p>', schedule_html: '<p>tabla</p>' }
+        : body.action === 'scm_owner_credit_simulate' ? { results_html: '<p data-sim>recalculado ' + body.amount + '</p>', results_below_html: '<p data-sim-below>abajo ' + (body.rate_discount || '') + '</p>', schedule_html: '<p>tabla</p>' }
         : body.action === 'scm_owner_credit_decide' ? { message: 'Crédito aprobado.' }
+        : body.action === 'scm_owner_credit_rate' ? { message: 'Usura actualizada.' }
         : body.action === 'scm_owner_credit_prepayment' ? { html: '<p data-prepay-result>abono ' + body.prepay_amount + ' el ' + body.prepay_date + '</p>' } : {};
       return Promise.resolve({ json: () => Promise.resolve({ success: true, data }) });
     };
@@ -98,6 +99,16 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   assert.equal(await page.evaluate(() => document.querySelector('[name="gross"]').selectionStart), 3);
   console.log('OK money inputs are formatted as Colombian pesos while typing and keep the caret');
 
+  // Descuento según política: 0 % por defecto, de 0 a 5 % de a 0,5 %; la tasa final se ve al instante y se simula.
+  assert.equal(await page.inputValue('[name="rate_discount"]'), '0.00');
+  assert.equal(await page.$$eval('[name="rate_discount"] option', options => options.length), 11);
+  await page.selectOption('[name="rate_discount"]', '1.00');
+  assert.equal(await page.inputValue('[data-owner-credit-final-rate]'), '2,2770 %');
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'scm_owner_credit_simulate' && c.rate_discount === '1.00'));
+  await page.waitForSelector('[data-sim-below]');
+  assert.match(await page.textContent('[data-owner-credit-results-below]'), /abajo 1.00/);
+  console.log('OK the policy discount lowers the final rate, is simulated and refreshes the blocks below the study');
+
   await page.click('[data-owner-credit-pdf]');
   await page.waitForSelector('[data-owner-credit-pdf-viewer]');
   assert.match(await page.textContent('[data-owner-credit-pdf-viewer]'), /Generando PDF/);
@@ -110,6 +121,15 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   await page.click('[data-owner-credit-pdf-close]');
   assert.match(await page.textContent('[data-owner-credit-pdf]'), /Ver documento del crédito/);
   console.log('OK Ver documento del crédito shows "Generando PDF…" until the PDF arrives');
+
+  // La usura se vuelve a consultar desde el liquidador, que muestra su vigencia, y el crédito se recarga.
+  assert.match(await page.textContent('[data-owner-credit-rates]'), /Usura .* E\.A\..*vigente del/);
+  const opensBefore = (await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_open').length;
+  await page.click('[data-owner-credit-rate-action="usury"]');
+  await page.waitForFunction((n) => window.calls.filter(c => c.action === 'scm_owner_credit_open').length === n + 1, opensBefore);
+  assert.equal((await page.evaluate(() => window.calls)).find(c => c.action === 'scm_owner_credit_rate').mode, 'usury');
+  await page.waitForFunction(() => (document.querySelector('[data-owner-credit-rates-status]') || {}).textContent === 'Usura actualizada.');
+  console.log('OK the usury rate is refreshed from the liquidator and the credit reloads');
 
   assert.equal(await page.isVisible('[name="note"]'), false, 'the note is hidden while every policy is met and nothing changed');
   await page.click('[data-owner-credit-decide="aprobado"]');

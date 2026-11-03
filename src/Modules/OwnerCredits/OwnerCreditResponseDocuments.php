@@ -46,7 +46,7 @@ final class OwnerCreditResponseDocuments
       'Plazo' => (int) $credit['approved_term'] . ' meses',
       'Número de cuotas' => (string) (int) $credit['approved_term'],
       'Valor de la cuota mensual' => self::money((float) $credit['monthly_payment']),
-      'Tasa de interés' => self::rate((float) $credit['approved_rate']),
+      'Tasa de interés' => self::rate((float) $credit['approved_rate']) . (($discount = OwnerCreditService::rateDiscountOf($credit)) > 0 ? ' (incluye descuento de ' . OwnerCreditService::discountLabel($discount) . ')' : ''),
       'Fecha de desembolso' => self::shortDate((int) ($credit['disbursed_at'] ?? 0)),
       'Fecha de primera cuota' => self::shortDate((int) ($credit['first_payment_ts'] ?? 0)),
       'Fecha de última cuota' => self::shortDate($last),

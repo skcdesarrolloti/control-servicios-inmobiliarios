@@ -161,6 +161,15 @@
       if (nav && nav.scrollIntoView) nav.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
+    // Tasa final = tasa base × (1 − descuento según política); se muestra mientras se escribe (el servidor la recalcula).
+    function syncFinalRate(form) {
+      var output = form.querySelector("[data-owner-credit-final-rate]");
+      if (!output || !form.elements.rate) return;
+      var base = parseFloat(String(form.elements.rate.value || "").replace("%", "").replace(",", ".")) || 0;
+      var discount = form.elements.rate_discount ? parseFloat(form.elements.rate_discount.value) || 0 : 0;
+      output.value = (base * (1 - discount / 100)).toFixed(4).replace(".", ",") + " %";
+    }
+
     // Acciones del pagaré y de la respuesta: muestran el resultado en su sección y recargan el liquidador.
     function promissoryAction(box, action, data, creditId, statusAttr) {
       statusAttr = statusAttr || "data-owner-credit-promissory-status";
@@ -203,8 +212,10 @@
     function simulate(form) {
       var seq = ++simulateSeq;
       var results = form.querySelector("[data-owner-credit-results]");
+      var below = form.querySelector("[data-owner-credit-results-below]");
       var schedule = form.querySelector("[data-owner-credit-schedule]");
       setLoading(results, true);
+      setLoading(below, true);
       setLoading(schedule, true);
       post("scm_owner_credit_simulate", formData(form))
         .then(function (data) {
@@ -212,6 +223,7 @@
           // Las guías abiertas siguen abiertas tras recalcular.
           var open = Array.prototype.map.call(form.querySelectorAll("[data-owner-credit-guide][open]"), function (el) { return el.getAttribute("data-owner-credit-guide"); });
           if (results) results.innerHTML = data.results_html || "";
+          if (below) below.innerHTML = data.results_below_html || "";
           if (schedule) schedule.innerHTML = data.schedule_html || "";
           open.forEach(function (key) { var guide = form.querySelector('[data-owner-credit-guide="' + key + '"]'); if (guide) guide.open = true; });
           syncNote(form);
@@ -221,6 +233,7 @@
         .then(function () {
           if (seq !== simulateSeq) return;
           setLoading(results, false);
+          setLoading(below, false);
           setLoading(schedule, false);
         });
     }
@@ -559,7 +572,18 @@
         formatMoneyInput(form.elements.amount);
         form.elements.term.value = suggested.getAttribute("data-term") || "";
         form.elements.rate.value = suggested.getAttribute("data-rate") || "";
+        syncFinalRate(form);
         simulate(form);
+        return;
+      }
+      // Tasas desde el liquidador: volver a consultar la usura o guardar la tasa de referencia; recarga el crédito.
+      var rateAction = form && target.closest("[data-owner-credit-rate-action]");
+      if (rateAction) {
+        var ratesBox = rateAction.closest("[data-owner-credit-rates]");
+        var rateData = new FormData();
+        rateData.set("mode", rateAction.getAttribute("data-owner-credit-rate-action"));
+        if (form.elements.reference_rate) rateData.set("reference_rate", form.elements.reference_rate.value);
+        promissoryAction(ratesBox, "scm_owner_credit_rate", rateData, form.getAttribute("data-credit-id"), "data-owner-credit-rates-status");
         return;
       }
       if (form && target.closest("[data-owner-credit-pdf]")) {
@@ -702,7 +726,8 @@
       if (newCredit && event.target.name === "purpose") syncPreapproval(newCredit);
       var form = event.target.closest && event.target.closest("[data-owner-credit-form][data-credit-id]");
       // El pagaré y el abono no recalculan el liquidador.
-      if (!form || ["note", "owner_key", "main_contract_id", "promissory_signers[]", "promissory_channels[]", "promissory_void_note"].indexOf(event.target.name) >= 0) return;
+      if (!form || ["note", "owner_key", "main_contract_id", "promissory_signers[]", "promissory_channels[]", "promissory_void_note", "reference_rate"].indexOf(event.target.name) >= 0) return;
+      if (event.target.name === "rate" || event.target.name === "rate_discount") syncFinalRate(form);
       window.clearTimeout(simulateTimer);
       simulateTimer = window.setTimeout(function () { simulate(form); }, 350);
     });

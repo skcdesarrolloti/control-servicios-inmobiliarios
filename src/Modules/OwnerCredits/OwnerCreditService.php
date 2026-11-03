@@ -901,7 +901,12 @@ final class OwnerCreditService
     $suggested = $evaluation['suggested'];
     $amount = array_key_exists('amount', $input) ? self::money($input['amount']) : ($decided ? (float) $credit['approved_amount'] : (float) $suggested['amount']);
     $term = array_key_exists('term', $input) ? max(0, (int) $input['term']) : ($decided ? (int) $credit['approved_term'] : (int) $suggested['term']);
-    $rate = array_key_exists('rate', $input) ? self::rate($input['rate']) : ($decided ? (float) $credit['approved_rate'] : round((float) $suggested['rate'], 6));
+    // Tasa base (la sugerida o la que escribe el analista) menos el descuento según política que elige el analista
+    // (0 a 5 %, sobre la tasa base). Un crédito decidido conserva la base y el descuento con que se aprobó.
+    $decidedAnalyst = (array) $stored;
+    $discount = array_key_exists('rate_discount', $input) ? self::rateDiscount($input['rate_discount']) : (float) ($decidedAnalyst['rate_discount'] ?? 0);
+    $baseRate = array_key_exists('rate', $input) ? self::rate($input['rate']) : ($decided ? (float) ($decidedAnalyst['base_rate'] ?? $credit['approved_rate']) : round((float) $suggested['rate'], 6));
+    $rate = round($baseRate * (1 - $discount), 6);
     // Plan a centavos: la última cuota se ajusta para dejar el saldo en cero.
     $amortization = OwnerCreditCoverage::plan($amount, $rate, $term);
     $payment = $amortization['payment'];
@@ -917,7 +922,7 @@ final class OwnerCreditService
       'share' => (float) $shareInfo['value'], 'share_source' => (string) $shareInfo['source'], 'share_detail' => (string) $shareInfo['detail'],
     ]], $others);
     $siniestrados = array_values(array_map(static fn(array $row): string => '#' . $row['contrato'], array_filter($all, static fn(array $row): bool => !empty($row['siniestrado']))));
-    $evaluation['analyst'] = ['siniestro' => $choice('siniestro', $siniestrados !== []), 'siniestrados' => $siniestrados, 'has_credits' => $hasCredits, 'other_obligations' => $extraObligations];
+    $evaluation['analyst'] = ['siniestro' => $choice('siniestro', $siniestrados !== []), 'siniestrados' => $siniestrados, 'has_credits' => $hasCredits, 'other_obligations' => $extraObligations, 'base_rate' => $baseRate, 'rate_discount' => $discount];
     if ($pending && $evaluation['vacancy'] !== $vacancySignal['level']) $overrides[] = 'vacancy';
     $evaluation['analyst']['overrides'] = $overrides;
     // Cupo preaprobado de la persona con todos sus contratos, menos el saldo de sus créditos aprobados.
@@ -944,7 +949,7 @@ final class OwnerCreditService
       'term_error' => $termError,
       'settings' => $settings,
       'evaluation' => $evaluation,
-      'conditions' => ['amount' => $amount, 'term' => $term, 'rate' => $rate, 'payment' => $payment, 'total_interest' => array_sum(array_column($schedule, 'interes'))],
+      'conditions' => ['amount' => $amount, 'term' => $term, 'rate' => $rate, 'base_rate' => $baseRate, 'rate_discount' => $discount, 'payment' => $payment, 'total_interest' => array_sum(array_column($schedule, 'interes'))],
       'schedule' => $schedule,
       'disbursed_ts' => $disbursedTs,
       'first_payment_ts' => $firstPaymentTs,
@@ -959,7 +964,7 @@ final class OwnerCreditService
       'policies' => $policies,
       'policies_ok' => !in_array(false, array_column($policies, 'ok'), true),
       // Decidido: lo que quedó guardado con la decisión; pendiente: se recalcula con lo que está editando.
-      'adjustments' => $pending ? $this->adjustments($evaluation, $defaults, $policies, ['amount' => $amount, 'term' => $term, 'rate' => $rate], $storedEndTs, $endTs)
+      'adjustments' => $pending ? $this->adjustments($evaluation, $defaults, $policies, ['amount' => $amount, 'term' => $term, 'rate' => $rate, 'base_rate' => $baseRate, 'rate_discount' => $discount], $storedEndTs, $endTs)
         : array_values((array) (json_decode((string) ($credit['evaluation_json'] ?? ''), true)['adjustments'] ?? [])),
       'other_credits' => $this->ownerCredits($credit),
       'events' => $id > 0 ? $this->events($id) : [],
@@ -1695,7 +1700,7 @@ final class OwnerCreditService
    * Lo que el analista cambió frente a lo que propone el sistema (o lo que incumple), para guardarlo con la decisión.
    * Solo se registran (con la decisión); aprobar exige justificación únicamente cuando incumple políticas.
    * @param array<string,mixed> $evaluation @param array<string,mixed> $defaults defaultIncome()
-   * @param list<array<string,mixed>> $policies @param array{amount:float,term:int,rate:float} $conditions
+   * @param list<array<string,mixed>> $policies @param array{amount:float,term:int,rate:float,base_rate:float,rate_discount:float} $conditions
    * @return list<array{key:string,label:string,detail:string,note:bool}>
    */
   private function adjustments(array $evaluation, array $defaults, array $policies, array $conditions, int $storedEndTs, int $endTs): array
@@ -1718,7 +1723,9 @@ final class OwnerCreditService
     if (in_array('has_credits', $overrides, true)) $items[] = ['key' => 'has_credits', 'label' => 'Créditos vigentes', 'detail' => 'sistema ' . $yes(!$analyst['has_credits']) . ' → analista ' . $yes((bool) $analyst['has_credits']), 'note' => true];
     if (in_array('vacancy', $overrides, true)) $items[] = ['key' => 'vacancy', 'label' => 'Probabilidad de desocupación', 'detail' => 'sistema ' . $evaluation['vacancy_signal']['level'] . ' → analista ' . $evaluation['vacancy'], 'note' => true];
     $suggested = $evaluation['suggested'];
-    if (abs((float) $conditions['rate'] - (float) $suggested['rate']) > 1e-7) $items[] = ['key' => 'tasa', 'label' => 'Tasa', 'detail' => 'sugerida ' . $percent((float) $suggested['rate']) . ' → ' . $percent((float) $conditions['rate']) . ' mensual', 'note' => true];
+    if (abs((float) $conditions['base_rate'] - (float) $suggested['rate']) > 1e-7) $items[] = ['key' => 'tasa', 'label' => 'Tasa', 'detail' => 'sugerida ' . $percent((float) $suggested['rate']) . ' → ' . $percent((float) $conditions['base_rate']) . ' mensual', 'note' => true];
+    // El descuento según política lo decide el analista: no exige justificación, pero queda registrado con la decisión.
+    if ((float) $conditions['rate_discount'] > 0) $items[] = ['key' => 'descuento', 'label' => 'Descuento según política', 'detail' => self::discountText((float) $conditions['rate_discount'], (float) $conditions['base_rate'], (float) $conditions['rate']), 'note' => false];
     if (abs((float) $conditions['amount'] - (float) $suggested['amount']) >= 1) $items[] = ['key' => 'valor', 'label' => 'Valor', 'detail' => 'sugerido ' . $money((float) $suggested['amount']) . ' → ' . $money((float) $conditions['amount']), 'note' => false];
     if ((int) $conditions['term'] !== (int) $suggested['term']) $items[] = ['key' => 'plazo', 'label' => 'Plazo', 'detail' => 'sugerido ' . (int) $suggested['term'] . ' → ' . (int) $conditions['term'] . ' meses', 'note' => false];
     if ($endTs !== $storedEndTs) $items[] = ['key' => 'fecha_fin', 'label' => 'Fecha fin del contrato', 'detail' => ($storedEndTs > 0 ? date('d/m/Y', $storedEndTs) : 'sin fecha') . ' → ' . ($endTs > 0 ? date('d/m/Y', $endTs) : 'sin fecha'), 'note' => false];
@@ -2265,8 +2272,9 @@ final class OwnerCreditService
     if ($credit['status'] !== 'aprobado') {
       return 'Crédito #' . $credit['id'] . ' rechazado (solicitado ' . $money($credit['requested_amount']) . '). Motivo: ' . $credit['decision_note'];
     }
+    $discount = self::rateDiscountOf($credit);
     return 'Crédito #' . $credit['id'] . ' aprobado: ' . $money($credit['approved_amount']) . ' a ' . $credit['approved_term'] . ' meses, tasa '
-      . number_format((float) $credit['approved_rate'] * 100, 2, ',', '.') . ' % N.M.V, cuota ' . $money($credit['monthly_payment']) . '.'
+      . number_format((float) $credit['approved_rate'] * 100, 2, ',', '.') . ' % N.M.V' . ($discount > 0 ? ' (descuento según política de ' . self::discountLabel($discount) . ')' : '') . ', cuota ' . $money($credit['monthly_payment']) . '.'
       . ((int) $credit['policy_override'] === 1 ? ' Aprobado fuera de política: ' . $credit['decision_note'] : ((string) $credit['decision_note'] !== '' ? ' ' . $credit['decision_note'] : ''));
   }
 
@@ -2725,6 +2733,50 @@ final class OwnerCreditService
       $text = preg_match('/^\d{1,3}(?:,\d{3})+$/', $text) === 1 ? str_replace(',', '', $text) : str_replace(',', '.', $text);
     }
     return is_numeric($text) ? max(0.0, (float) $text) : 0.0;
+  }
+
+  /** Descuentos según política que puede elegir el analista: de 0 a 5 % de la tasa base, de a 0,5 %. @return list<float> */
+  public static function rateDiscounts(): array
+  {
+    return array_map(static fn(int $step): float => $step / 200, range(0, 10));
+  }
+
+  /** "1,5" o "1,5 %" → 0,015, ajustado al paso de 0,5 % y sin pasar de 5 %. */
+  public static function rateDiscount($value): float
+  {
+    $text = str_replace(',', '.', trim(rtrim(trim((string) $value), '%')));
+    if (!is_numeric($text)) return 0.0;
+    return min(10, max(0, (int) round((float) $text * 2))) / 200;
+  }
+
+  /** Descuento según política con que se decidió un crédito (0 si no tuvo). */
+  public static function rateDiscountOf(array $credit): float
+  {
+    $stored = json_decode((string) ($credit['evaluation_json'] ?? ''), true);
+    return is_array($stored) ? (float) ($stored['analyst']['rate_discount'] ?? 0) : 0.0;
+  }
+
+  /** " · vigente del 01/11/2026 al 30/11/2026 · Res. 1472" (vacío si no se conoce la vigencia). @param array<string,mixed> $settings */
+  public static function usuryPeriod(array $settings): string
+  {
+    $date = static fn(string $value): string => preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? date('d/m/Y', (int) strtotime($value)) : '';
+    $from = $date((string) ($settings['usury_updated_at'] ?? ''));
+    $to = $date((string) ($settings['usury_valid_until'] ?? ''));
+    $resolution = trim((string) ($settings['usury_resolution'] ?? ''));
+    return ($from !== '' ? ($to !== '' ? ' · vigente del ' . $from . ' al ' . $to : ' · vigente desde ' . $from) : '') . ($resolution !== '' ? ' · Res. ' . $resolution : '');
+  }
+
+  /** "1,50 %" */
+  public static function discountLabel(float $discount): string
+  {
+    return number_format($discount * 100, 2, ',', '.') . ' %';
+  }
+
+  /** "1,50 % sobre 2,1200 % = 2,0882 % mensual" */
+  public static function discountText(float $discount, float $baseRate, float $rate): string
+  {
+    $fine = static fn(float $value): string => number_format($value * 100, 4, ',', '.') . ' %';
+    return self::discountLabel($discount) . ' sobre ' . $fine($baseRate) . ' = ' . $fine($rate) . ' mensual';
   }
 
   /** El liquidador escribe la tasa en porcentaje N.M.V (2,3 = 0,023). */

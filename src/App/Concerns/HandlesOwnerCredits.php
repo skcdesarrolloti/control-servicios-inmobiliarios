@@ -35,7 +35,7 @@ trait HandlesOwnerCredits
   private function ownerCreditInput(): array
   {
     $input = [];
-    foreach (['contract_end', 'gross', 'ded_comision', 'ded_garantia', 'ded_poliza_servicios', 'ded_otros', 'requested_amount', 'requested_term', 'purpose', 'vacancy', 'amount', 'term', 'rate', 'disbursed_at', 'siniestro', 'has_credits', 'other_obligations', 'note'] as $key) {
+    foreach (['contract_end', 'gross', 'ded_comision', 'ded_garantia', 'ded_poliza_servicios', 'ded_otros', 'requested_amount', 'requested_term', 'purpose', 'vacancy', 'amount', 'term', 'rate', 'rate_discount', 'disbursed_at', 'siniestro', 'has_credits', 'other_obligations', 'note'] as $key) {
       if (isset($_POST[$key])) $input[$key] = trim(sanitize_textarea_field(wp_unslash((string) $_POST[$key])));
     }
     return $input;
@@ -75,7 +75,7 @@ trait HandlesOwnerCredits
       $this->jsonOk([
         'credit_id' => $id,
         'title' => 'Crédito #' . $id . ' · ' . OwnerCreditService::STATUSES[$work['credit']['status']] . (isset(OwnerCreditService::STAGES[$work['stage']]) && $work['stage'] !== 'estudio' ? ' · ' . OwnerCreditService::STAGES[$work['stage']] : ''),
-        'html' => (new OwnerCreditView())->workspace($work, $this->canUseDashboardAction('owner_credit_decide'), $this->canUseDashboardAction('owner_credit_manage')),
+        'html' => (new OwnerCreditView($this->canUseDashboardAction('owner_credit_configure')))->workspace($work, $this->canUseDashboardAction('owner_credit_decide'), $this->canUseDashboardAction('owner_credit_manage')),
       ]);
     } catch (\Throwable $error) {
       $this->ownerCreditFail($error, 'No se pudo abrir el liquidador.');
@@ -168,10 +168,41 @@ trait HandlesOwnerCredits
     if (!$this->canViewOwnerCredits()) $this->jsonFail('No tienes permiso para ver créditos.');
     try {
       $work = $this->ownerCreditService()->workspace((int) ($_POST['credit_id'] ?? 0), $this->ownerCreditInput());
-      $view = new OwnerCreditView();
-      $this->jsonOk(['results_html' => $view->results($work), 'schedule_html' => $view->schedule($work)]);
+      $view = new OwnerCreditView($this->canUseDashboardAction('owner_credit_configure'));
+      $this->jsonOk(['results_html' => $view->results($work), 'results_below_html' => $view->resultsBelow($work), 'schedule_html' => $view->schedule($work)]);
     } catch (\Throwable $error) {
       $this->ownerCreditFail($error, 'No se pudo calcular el crédito.');
+    }
+  }
+
+  /**
+   * Tasas desde el liquidador: "usury" vuelve a consultar la usura en datos.gov.co (quien decide créditos);
+   * "reference" cambia la tasa de referencia de Configuración (solo con permiso de configurar créditos).
+   */
+  public function ajax_handler_owner_credit_rate(): void
+  {
+    $this->verifyCsrf();
+    $percent = static fn(float $rate, int $decimals = 2): string => number_format($rate * 100, $decimals, ',', '.') . ' %';
+    try {
+      if (sanitize_key((string) ($_POST['mode'] ?? '')) === 'reference') {
+        $this->requireDashboardAction('owner_credit_configure', 'Tu cargo no tiene permiso para cambiar la tasa de referencia.');
+        $value = sanitize_text_field(wp_unslash((string) ($_POST['reference_rate'] ?? '')));
+        if (OwnerCreditService::rate($value) <= 0) throw new \DomainException('Escribe la tasa de referencia mensual, por ejemplo 2,05.');
+        $settings = OwnerCreditSettings::read(App::settings());
+        $before = (float) $settings['reference_rate'];
+        // Con "%" se lee siempre como porcentaje (0,9 = 0,9 % y no 90 %).
+        $settings['reference_rate'] = rtrim($value, '% ') . '%';
+        $saved = OwnerCreditSettings::save(App::settings(), $settings, Auth::userId());
+        error_log('[owner-credit-rate] reference ' . $before . ' -> ' . $saved['reference_rate'] . ' by ' . Auth::userId());
+        $this->jsonOk(['message' => 'Tasa de referencia: ' . $percent($before) . ' → ' . $percent((float) $saved['reference_rate']) . ' N.M.V.']);
+      }
+      $this->requireDashboardAction('owner_credit_decide', 'Tu cargo no tiene permiso para actualizar la tasa de usura.');
+      if (!OwnerCreditSettings::read(App::settings())['usury_auto']) throw new \DomainException('La usura está en modo manual: cámbiala en Configuración › Créditos a propietarios.');
+      $settings = OwnerCreditUsuryRate::sync(App::settings(), true);
+      if ((string) $settings['usury_sync_error'] !== '') throw new \DomainException('No se pudo actualizar la usura: ' . $settings['usury_sync_error'] . ' Se conserva la última tasa.');
+      $this->jsonOk(['message' => 'Usura actualizada: ' . $percent((float) $settings['usury_annual']) . ' E.A.' . OwnerCreditService::usuryPeriod($settings) . '.']);
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo actualizar la tasa.');
     }
   }
 

@@ -227,4 +227,23 @@ $check($freeState['locked'] && $freeState['required'] === ['mandato_1'], 'a free
 $byId = array_column($service->requestPreapproval('111111')['contracts'], null, 'id');
 $check($near($byId[20]['repair']['amount'], (1800000 + 900000) * 3) && $near($byId[23]['repair']['amount'], (1800000 * 0.6 + 900000) * 3), 'the new request property cap of each contract adds the owner other contracts');
 
+// Descuento según política: el analista elige de 0 a 5 % (de a 0,5 %) sobre la tasa base; queda con la decisión, en el
+// historial, en el documento interno y en la carta de aprobación.
+$check(OwnerCreditService::rateDiscount('1,5') === 0.015 && OwnerCreditService::rateDiscount('7') === 0.05 && OwnerCreditService::rateDiscount('1,3') === 0.015 && OwnerCreditService::rateDiscount('') === 0.0 && count(OwnerCreditService::rateDiscounts()) === 11, 'the policy discount goes from 0 to 5 % in steps of 0,5 %');
+$discountId = $service->createManual(20, 200000, 3, 'Libre inversión', $actor, '', 'mandato_2');
+$discountInput = ['rate' => '1,9', 'rate_discount' => '1.50', 'amount' => '$200.000', 'term' => '3', 'requested_term' => '3'];
+$discounted = $service->workspace($discountId, $discountInput);
+$check($near($discounted['conditions']['rate'] * 10000, 0.019 * 0.985 * 10000) && $near($discounted['conditions']['base_rate'] * 10000, 190) && in_array('descuento', array_column($discounted['adjustments'], 'key'), true), 'the discount lowers the base rate and is listed among the changes');
+$discountHtml = (new OwnerCreditView(true))->workspace($discounted, true, true);
+$check(str_contains($discountHtml, 'name="rate_discount"') && str_contains($discountHtml, '<option value="1.50" selected>') && str_contains($discountHtml, 'data-owner-credit-results-below') && str_contains($discountHtml, 'data-owner-credit-rate-action="reference"') && str_contains($discountHtml, 'name="reference_rate"'), 'the liquidator shows the discount select, the blocks below and, with permission, the reference rate field');
+$check(!str_contains((new OwnerCreditView(false))->workspace($discounted, true, true), 'name="reference_rate"'), 'without the configure permission the reference rate is not editable from the liquidator');
+$service->decide($discountId, 'aprobado', $discountInput + ['note' => $note], $actor);
+$discountCredit = $service->find($discountId);
+$check($near(OwnerCreditService::rateDiscountOf($discountCredit) * 1000, 15) && $near((float) $discountCredit['approved_rate'] * 1e6, round(0.019 * 0.985, 6) * 1e6), 'the approved rate and the discount are stored with the decision');
+$decidedWork = $service->workspace($discountId);
+$check($near($decidedWork['conditions']['rate_discount'] * 1000, 15) && $near($decidedWork['conditions']['base_rate'] * 10000, 190), 'a decided credit keeps its base rate and discount');
+$events = $db->getResults("SELECT details_json FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'aprobado'", [$discountId]);
+$check(str_contains((string) $events[0]['details_json'], 'rate_discount') && str_contains((string) $db->getVar("SELECT observacion FROM wp_jet_cct_historial_contrato_arrendamiento WHERE tipo_reporte = 'Crédito aprobado' ORDER BY _ID DESC LIMIT 1"), 'descuento según política de 1,50 %'), 'the discount is traced in the credit and contract histories');
+$check(str_contains(\SCM\Modules\OwnerCredits\OwnerCreditPdf::html($decidedWork, 'QA'), 'Descuento según política') && str_contains(\SCM\Modules\OwnerCredits\OwnerCreditResponseDocuments::letter($discountCredit, ['signer' => ['name' => 'Analista QA', 'cargo' => ''], 'margin' => 2, 'date' => time()]), 'incluye descuento de 1,50 %'), 'the internal document and the approval letter show the discount');
+
 echo "Owner credit co-owner checks passed.\n";

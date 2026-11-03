@@ -67,6 +67,7 @@ final class AuthenticatedActionRouter
       'scm_owner_credit_owner' => 'ajax_handler_owner_credit_owner',
       'scm_owner_credit_contract' => 'ajax_handler_owner_credit_contract',
       'scm_owner_credit_simulate' => 'ajax_handler_owner_credit_simulate',
+      'scm_owner_credit_rate' => 'ajax_handler_owner_credit_rate',
       'scm_owner_credit_prepayment' => 'ajax_handler_owner_credit_prepayment',
       'scm_owner_credit_promissory_signers' => 'ajax_handler_owner_credit_promissory_signers',
       'scm_owner_credit_promissory_send' => 'ajax_handler_owner_credit_promissory_send',

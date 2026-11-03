@@ -186,12 +186,16 @@ final class OwnerCreditPdf
         'Tasa mínima (descuento máximo)' => $percent($ev['policy_rate']) . ' N.M.V',
         'Tasa para el riesgo' => ($ev['risk_applies'] ?? true) ? $percent($ev['risk_rate']) . ' N.M.V' : 'No aplica (lo pedido no supera el valor máximo)',
       ]) + [
-        'Tasa de usura vigente' => $percent((float) $work['settings']['usury_annual']) . ' E.A. (' . $percent((float) $ev['usury_monthly_legal']) . ' mensual)',
+        'Tasa de usura vigente' => $percent((float) $work['settings']['usury_annual']) . ' E.A. (' . $percent((float) $ev['usury_monthly_legal']) . ' mensual)' . OwnerCreditService::usuryPeriod($work['settings']),
       ]) . '</section>'
       . '<section class="scm-acta-receipt-section scm-owner-credit-keep"><h2>5. ' . ($approved ? 'Condiciones aprobadas' : ($simulation ? 'Condiciones simuladas' : 'Condiciones propuestas')) . '</h2>' . Doc::table([
         'Valor del crédito' => $money($c['amount']),
         'Plazo' => (int) $c['term'] . ' meses',
         'Tasa' => $percent($c['rate']) . ' N.M.V (' . $percent((1 + $c['rate']) ** 12 - 1) . ' E.A.)',
+      ] + ((float) ($c['rate_discount'] ?? 0) > 0 ? [
+        // El descuento lo eligió el analista: queda en el documento con la tasa base.
+        'Descuento según política' => OwnerCreditService::discountText((float) $c['rate_discount'], (float) $c['base_rate'], (float) $c['rate']),
+      ] : []) + [
         'Cuota mensual' => $money($c['payment']),
       ] + ($simulation ? [] : [
         'Total intereses' => $money($c['total_interest']),
