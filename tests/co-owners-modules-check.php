@@ -8,11 +8,10 @@ define('SCM_APP_SECRET', 'test-secret-test-secret-test-secret-00');
 
 use SCM\Core\Database;
 use SCM\Modules\AdministrativeNotifications\AdministrativeNotificationsService;
-use SCM\Modules\LeaseContracts\ContractCoOwnerContacts;
 use SCM\Modules\LeaseContracts\LeaseContractsView;
 use SCM\Modules\PublicTickets\PublicTicketsService;
 
-// Fase 8 de copropietarios: cotización de reparaciones, búsqueda del solicitante, avisos administrativos y vistas.
+// Fase 8 de copropietarios: búsqueda del solicitante, avisos administrativos y vistas (la cotización va solo a su destinatario).
 $check = static function (bool $condition, string $message): void {
   if (!$condition) {
     fwrite(STDERR, "FAIL: {$message}\n");
@@ -84,34 +83,8 @@ $insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 11, 'contrato' => '702',
 $insert('wp_jet_cct_contratos_arrendamiento', ['_ID' => 12, 'contrato' => '703', 'estado' => 'Entregado', 'inmueble' => '9003', 'propietario' => 'Ana Dueña', 'id_propietario' => '500']);
 $contract = static fn(int $id): array => $pdo->query("SELECT * FROM wp_jet_cct_contratos_arrendamiento WHERE _ID = {$id}")->fetch(PDO::FETCH_ASSOC);
 
-// 1. Contactos de todos los propietarios del contrato (cotización de reparaciones).
-$owners = ContractCoOwnerContacts::forContract($db, $contract(10));
-$check(array_column($owners, 'name') === ['Ana Dueña', 'Luis Copropietario', 'Pedro Mandato'] && $owners[2]['email'] === 'pedro@example.invalid' && $owners[2]['phone'] === '573000000004', 'with a mandate every owner comes with email and phone');
-$owners = ContractCoOwnerContacts::forContract($db, $contract(11));
-$check(array_column($owners, 'name') === ['Ana Dueña', 'Marta Sin Mandato'] && $owners[1]['email'] === 'marta@example.invalid', 'without a mandate the co-owners come from their profile');
-$check(count(ContractCoOwnerContacts::forContract($db, $contract(12))) === 1 && ContractCoOwnerContacts::forContract($db, []) === [], 'a single owner or no contract has no co-owners');
-
-$quoteSender = new class($db) {
-  use \SCM\App\Concerns\HandlesMaintenanceActions;
-  public function __construct(public Database $db) {}
-  public function table_exists($table): bool { return (new \SCM\Support\SchemaInspector($this->db))->tableExists((string) $table); }
-};
-$recipients = $call($quoteSender, 'maintenance_quote_co_owner_recipients', ['id_contrato' => '10'], 'ana@example.invalid', '+573000000001');
-$check(array_column($recipients, 'name') === ['Luis Copropietario', 'Pedro Mandato'] && $recipients[1]['phone'] === '+573000000004' && $recipients[0]['email'] === 'luis@example.invalid', 'the quote goes to the co-owners, skipping the main recipient');
-$recipients = $call($quoteSender, 'maintenance_quote_co_owner_recipients', ['id_contrato' => '10'], 'luis@example.invalid', '');
-$check(array_column($recipients, 'name') === ['Ana Dueña', 'Pedro Mandato'], 'when a co-owner is the main recipient, the main owner also receives it');
-$check($call($quoteSender, 'maintenance_quote_co_owner_recipients', ['id_contrato' => '12'], 'ana@example.invalid', '') === [], 'a single-owner contract adds nobody');
-// Destinatario «Inmobiliaria»: la copia llega a todos los propietarios.
-$recipients = $call($quoteSender, 'maintenance_quote_co_owner_recipients', ['id_contrato' => '10'], 'gerencia@sucasa.invalid', '+573019999999');
-$check(array_column($recipients, 'name') === ['Ana Dueña', 'Luis Copropietario', 'Pedro Mandato'], 'when the agency is the recipient every owner gets the copy');
-
-// Los copropietarios reciben un enlace solo para consultar: su firma no sirve para responder.
-$app = \SCM\App\SuCasaControlServiciosInmobiliarios::class;
-parse_str((string) parse_url($app::signedMaintenanceQuoteViewUrl(574), PHP_URL_QUERY), $view);
-parse_str((string) parse_url($app::signedMaintenanceQuotePublicUrl(574), PHP_URL_QUERY), $respond);
-$check(($view['modo'] ?? '') === 'ver' && $app::maintenanceQuoteViewSignatureValid(574, (int) $view['expires'], (string) $view['sig']), 'the view-only link is signed for viewing');
-$check(!$app::maintenanceQuotePublicSignatureValid(574, (int) $view['expires'], (string) $view['sig']) && !$app::maintenanceQuoteViewSignatureValid(574, (int) $respond['expires'], (string) $respond['sig']), 'the view-only signature cannot respond and the response link is not a view link');
-$check(str_contains((string) file_get_contents(dirname(__DIR__) . '/public/cotizacion-mantenimiento.php'), "\$hasValidPublicSignature = !\$viewOnly &&"), 'the public page only accepts responses with the response signature');
+// 1. La cotización de mantenimiento solo le llega a su destinatario (decisión del 03/11/2026): no a los copropietarios.
+$check(!str_contains((string) file_get_contents(dirname(__DIR__) . '/src/App/Concerns/HandlesMaintenanceActions.php'), 'copropietario'), 'the maintenance quote is sent only to its recipient');
 
 // 2. Búsqueda del solicitante: el copropietario encuentra su contrato con sus propios datos.
 $tickets = new PublicTicketsService($db, ['app_secret' => SCM_APP_SECRET]);

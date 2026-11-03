@@ -5389,8 +5389,7 @@ trait RendersDashboard
   }
 
   /** @return array{title:string,content:string,status:int} */
-  /** @param bool $canRespond false en la copia para los copropietarios: se ve la cotización sin el formulario de respuesta */
-  public function render_public_cotizacion_mantenimiento(int $cotizacionId, bool $canRespond = true): array
+  public function render_public_cotizacion_mantenimiento(int $cotizacionId): array
   {
     if ($cotizacionId <= 0) {
       return [
@@ -5422,10 +5421,7 @@ trait RendersDashboard
     $row = $rows[0] ?? $row;
     $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
     $title = 'Cotización de mantenimiento #' . $cotizacionId;
-    $responder = trim((string) ($row['destinatario'] ?? ''));
-    $responsePanel = $canRespond
-      ? $this->render_public_cotizacion_response_panel($row)
-      : '<section class="scm-cotizacion-native-section" id="responder-cotizacion"><h2>Copia informativa</h2><p>Te compartimos esta cotización porque eres copropietario del inmueble. La respuesta la registra ' . esc_html($responder !== '' ? $responder : 'el destinatario de la cotización') . ' desde su propio enlace.</p></section>';
+    $responsePanel = $this->render_public_cotizacion_response_panel($row);
     $responseGuide = str_contains($responsePanel, 'data-public-quote-response-form')
       ? '<aside class="scm-public-quote-response-guide" aria-label="Cómo responder la cotización"><div><strong>Responde esta cotización al final de la página</strong><p>Revisa la información y, en la sección «Responder cotización», indica si la apruebas o desapruebas.</p></div><a href="#responder-cotizacion">Ir a responder</a></aside>'
       : '';

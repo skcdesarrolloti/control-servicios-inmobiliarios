@@ -29,11 +29,8 @@ $result = [
 
 try {
   $hasPanelSession = Auth::isLoggedIn();
-  // modo=ver: copia para los copropietarios, solo para consultar (su firma no sirve para responder).
-  $viewOnly = (string) ($_GET['modo'] ?? '') === 'ver';
-  $hasValidPublicSignature = !$viewOnly && SuCasaControlServiciosInmobiliarios::maintenanceQuotePublicSignatureValid($quoteId, $expires, $signature);
-  $hasValidViewSignature = $viewOnly && SuCasaControlServiciosInmobiliarios::maintenanceQuoteViewSignatureValid($quoteId, $expires, $signature);
-  if (!$hasPanelSession && !$hasValidPublicSignature && !$hasValidViewSignature) {
+  $hasValidPublicSignature = SuCasaControlServiciosInmobiliarios::maintenanceQuotePublicSignatureValid($quoteId, $expires, $signature);
+  if (!$hasPanelSession && !$hasValidPublicSignature) {
     $result = [
       'title' => 'Enlace no válido',
       'content' => '<article class="scm-cotizacion-native-doc"><section class="scm-cotizacion-native-section"><h2>Enlace no válido o vencido</h2><p role="alert">Solicita a la inmobiliaria un nuevo enlace para consultar esta cotización de mantenimiento.</p></section></article>',
@@ -70,7 +67,7 @@ try {
         }
       }
     }
-    $result = $app->render_public_cotizacion_mantenimiento($quoteId, !$viewOnly);
+    $result = $app->render_public_cotizacion_mantenimiento($quoteId);
     http_response_code((int) ($result['status'] ?? 200));
   }
 } catch (Throwable $error) {
