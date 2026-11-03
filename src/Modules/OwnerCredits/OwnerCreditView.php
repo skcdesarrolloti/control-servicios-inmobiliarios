@@ -30,6 +30,8 @@ final class OwnerCreditView
   private const H4 = '!sp-m-0 !sp-mb-3 !sp-flex !sp-items-center !sp-gap-2 !sp-text-xs !sp-font-bold !sp-text-service-navy';
   private const NOTE = '!sp-m-0 !sp-text-[11px] !sp-leading-relaxed !sp-text-service-muted';
   private const READONLY = '!sp-bg-slate-100 !sp-text-service-muted';
+  /** Pestaña de etapa elegida (el JS la pone y la quita con estas mismas clases). */
+  private const TAB_SELECTED = '!sp-ring-2 !sp-ring-service-navy';
 
   /** Contenedor de Métricas › Créditos a propietarios; el listado llega por AJAX. */
   public function shell(): string
@@ -140,16 +142,17 @@ final class OwnerCreditView
     foreach ($purposes as $purpose) $purposeOptions .= '<option' . ($purpose === $credit['purpose'] ? ' selected' : '') . '>' . self::e($purpose) . '</option>';
     $vacancyOptions = '';
     foreach (self::VACANCY as $key => $label) $vacancyOptions .= '<option value="' . $key . '"' . ($key === $ev['vacancy'] ? ' selected' : '') . '>' . self::e($label) . '</option>';
+    $active = self::activeStage($work);
 
     return '<form class="!sp-font-sans !sp-text-service-navy !sp-flex-1 !sp-min-h-0 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-5" data-owner-credit-form data-credit-id="' . (int) $credit['id'] . '" autocomplete="off">'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2">' . self::status((string) $credit['status'])
       . ($editable && ($ev['other_contracts'] ?? []) !== [] ? self::mainContractSelect($contract, $ev['other_contracts']) : $chip('Contrato principal', '#' . self::e($contract['code']))) . ((int) $credit['quote_id'] > 0 && $editable ? self::beneficiarySelect($credit) : '') . ($editable && count($work['owners'] ?? []) > 1 ? self::ownerSelect($credit, $work['owners']) : $chip(OwnerCreditService::beneficiaryLabel($credit), self::e($credit['owner_name']) . ((string) ($credit['owner_document'] ?? '') !== '' ? ' · ' . self::e($credit['owner_document']) : ''))) . $chip('Inmueble', self::e($credit['property']))
       . ((int) $credit['quote_id'] > 0 ? $chip('Cotización', '#' . (int) $credit['quote_id']) : $chip('Origen', 'Manual'))
       . '<button type="button" class="' . $ui::NAVY . ' !sp-ml-auto" data-owner-credit-pdf title="Documento interno para funcionarios">' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . 'Ver documento del crédito</button></div>'
-      . self::stepper($work)
+      . self::stepper($work, $active)
 
       // 1. Solicitud: lo que pide el propietario y el contrato con el que se respalda.
-      . self::stageBlock('solicitud', '1', 'Solicitud', 'Lo que pide el propietario y el contrato del que se descuentan las cuotas.', $credit['status'] === 'pendiente',
+      . self::stageBlock('solicitud', '1', 'Solicitud', 'Lo que pide el propietario y el contrato del que se descuentan las cuotas.', $active === 'solicitud',
         '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-2 !sp-gap-5 !sp-items-start">'
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('building') . 'Contrato de arriendo vigente</h4>' . self::guide('contrato', [
         'Fin del contrato' => 'Define cuántos meses se puede prestar: se cuentan los meses completos (de 30 días) que faltan hasta esa fecha. Si el contrato fue renovado y la fecha está desactualizada, corrígela aquí; se guarda en el contrato al aprobar o rechazar.',
@@ -179,7 +182,7 @@ final class OwnerCreditView
       . '</div>')
 
       // 2. Estudio: ingreso y condiciones a la izquierda; políticas, cobertura y cupo a la derecha.
-      . self::stageBlock('estudio', '2', 'Estudio', 'Ingreso, condiciones, políticas y cobertura; aquí se aprueba o se rechaza.', $credit['status'] === 'pendiente',
+      . self::stageBlock('estudio', '2', 'Estudio', 'Ingreso, condiciones, políticas y cobertura; aquí se aprueba o se rechaza.', $active === 'estudio',
         '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-12 !sp-gap-5 !sp-items-start">'
       // Columna de datos y entradas.
       . '<div class="lg:!sp-col-span-7 !sp-space-y-5">'
@@ -218,8 +221,8 @@ final class OwnerCreditView
       . ($credit['status'] === 'pendiente' ? $this->actions($credit, $canDecide, $canManage, $work['adjustments'] ?? [], $work) : $this->decisionSummary($credit, $work['adjustments'] ?? [])))
 
       // 3. Firma de documentos y 4. Respuesta: después de aprobar.
-      . self::stageBlock('firma', '3', 'Firma de documentos', 'Pagaré en blanco y carta de instrucciones, firmados por el propietario después de aprobar.', in_array($work['stage'] ?? '', ['firma', 'respuesta', 'completo'], true) && $credit['status'] !== 'rechazado', self::promissorySection($work, $canDecide, $canManage))
-      . self::stageBlock('respuesta', '4', 'Respuesta al propietario', 'Carta de aprobación, pagaré firmado y plan de pagos, al propietario y a los funcionarios configurados.', $credit['status'] !== 'pendiente', self::responseSection($work, $canDecide))
+      . self::stageBlock('firma', '3', 'Firma de documentos', 'Pagaré en blanco y carta de instrucciones, firmados por el propietario después de aprobar.', $active === 'firma', self::promissorySection($work, $canDecide, $canManage))
+      . self::stageBlock('respuesta', '4', 'Respuesta al propietario', 'Carta de aprobación, pagaré firmado y plan de pagos, al propietario y a los funcionarios configurados.', $active === 'respuesta', self::responseSection($work, $canDecide))
       . ($credit['status'] !== 'pendiente' ? $this->actions($credit, $canDecide, $canManage, [], $work, false) : '')
       . $this->history($work)
       . '</form>'
@@ -227,11 +230,25 @@ final class OwnerCreditView
   }
 
   /**
-   * Barra de etapas: Solicitud → Estudio → Firma de documentos → Respuesta, con lo que pasó o falta en cada una. Cada
-   * paso lleva a su bloque.
+   * Pestaña que se abre con el liquidador: la etapa en curso (pendiente: estudio; esperando firmas: firma; con la
+   * respuesta lista, enviada o rechazado: respuesta). Anulado abre el estudio.
    * @param array<string,mixed> $work
    */
-  private static function stepper(array $work): string
+  private static function activeStage(array $work): string
+  {
+    return match ((string) ($work['stage'] ?? 'estudio')) {
+      'firma' => 'firma',
+      'respuesta', 'completo' => 'respuesta',
+      default => 'estudio',
+    };
+  }
+
+  /**
+   * Barra de etapas: Solicitud → Estudio → Firma de documentos → Respuesta, con lo que pasó o falta en cada una. Son
+   * pestañas: cada paso muestra solo el bloque de su etapa ($active es la que se ve al abrir).
+   * @param array<string,mixed> $work
+   */
+  private static function stepper(array $work, string $active): string
   {
     $credit = $work['credit'];
     $status = (string) $credit['status'];
@@ -269,23 +286,23 @@ final class OwnerCreditView
       $state = $status === 'anulado' && $index > 1 ? 'skip' : ($skipped ? 'skip' : ($index < $current ? 'done' : ($index === $current ? 'current' : 'todo')));
       $tone = ['done' => '!sp-border-emerald-200 !sp-bg-emerald-50/60', 'current' => '!sp-border-service-yellow !sp-bg-amber-50', 'todo' => '!sp-border-slate-200 !sp-bg-white', 'skip' => '!sp-border-slate-200 !sp-bg-slate-50 !sp-opacity-60'][$state];
       $dot = ['done' => '!sp-bg-emerald-600 !sp-text-white', 'current' => '!sp-bg-service-navy !sp-text-white', 'todo' => '!sp-bg-slate-200 !sp-text-service-muted', 'skip' => '!sp-bg-slate-200 !sp-text-service-muted'][$state];
-      $items .= '<li class="!sp-min-w-0"><button type="button" class="!sp-flex !sp-items-start !sp-gap-2 !sp-w-full !sp-h-full !sp-p-2.5 !sp-rounded-lg !sp-border !sp-border-solid ' . $tone . ' !sp-text-left !sp-font-sans !sp-cursor-pointer hover:!sp-border-service-yellow" data-owner-credit-stage-go="' . $key . '" data-owner-credit-stage-state="' . $state . '"' . ($state === 'current' ? ' aria-current="step"' : '') . '>'
+      $selected = $key === $active;
+      $items .= '<li class="!sp-min-w-0" role="presentation"><button type="button" role="tab" id="scm-owner-credit-tab-' . $key . '" aria-controls="scm-owner-credit-stage-' . $key . '" aria-selected="' . ($selected ? 'true' : 'false') . '" class="!sp-flex !sp-items-start !sp-gap-2 !sp-w-full !sp-h-full !sp-p-2.5 !sp-rounded-lg !sp-border !sp-border-solid ' . $tone . ($selected ? ' ' . self::TAB_SELECTED : '') . ' !sp-text-left !sp-font-sans !sp-cursor-pointer hover:!sp-border-service-yellow" data-owner-credit-stage-go="' . $key . '" data-owner-credit-stage-state="' . $state . '"' . ($state === 'current' ? ' aria-current="step"' : '') . '>'
         . '<span class="!sp-flex !sp-items-center !sp-justify-center !sp-shrink-0 !sp-w-6 !sp-h-6 !sp-rounded-full ' . $dot . ' !sp-text-[10px] !sp-font-bold">' . ($state === 'done' ? UI::icon('check', '!sp-w-3 !sp-h-3') : (string) ($index + 1)) . '</span>'
         . '<span class="!sp-min-w-0"><b class="!sp-block !sp-text-[11px] !sp-text-service-navy">' . self::e($label) . '</b><span class="!sp-block !sp-text-[10px] !sp-text-service-muted !sp-break-words">' . self::e($details[$key]) . '</span></span></button></li>';
       $index++;
     }
-    return '<nav aria-label="Etapas del crédito"><ol class="!sp-m-0 !sp-p-0 !sp-list-none !sp-grid !sp-grid-cols-2 lg:!sp-grid-cols-4 !sp-gap-2" data-owner-credit-stepper>' . $items . '</ol></nav>';
+    return '<nav aria-label="Etapas del crédito"><ol class="!sp-m-0 !sp-p-0 !sp-list-none !sp-grid !sp-grid-cols-2 lg:!sp-grid-cols-4 !sp-gap-2" role="tablist" data-owner-credit-stepper>' . $items . '</ol></nav>';
   }
 
-  /** Bloque plegable de una etapa con su número y para qué sirve. */
-  private static function stageBlock(string $key, string $number, string $title, string $hint, bool $open, string $content): string
+  /** Panel de una etapa (pestaña del stepper) con su número y para qué sirve; solo se ve el de la pestaña elegida. */
+  private static function stageBlock(string $key, string $number, string $title, string $hint, bool $active, string $content): string
   {
-    return '<details class="!sp-rounded-2xl !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-slate-50/50" data-owner-credit-stage="' . $key . '"' . ($open ? ' open' : '') . '>'
-      . '<summary class="!sp-flex !sp-items-center !sp-gap-3 !sp-px-4 !sp-py-3 !sp-cursor-pointer !sp-list-none">'
+    return '<section class="!sp-rounded-2xl !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-slate-50/50" role="tabpanel" id="scm-owner-credit-stage-' . $key . '" aria-labelledby="scm-owner-credit-tab-' . $key . '" data-owner-credit-stage="' . $key . '"' . ($active ? '' : ' hidden') . '>'
+      . '<header class="!sp-flex !sp-items-center !sp-gap-3 !sp-px-4 !sp-py-3">'
       . '<span class="!sp-flex !sp-items-center !sp-justify-center !sp-shrink-0 !sp-w-7 !sp-h-7 !sp-rounded-full !sp-bg-service-navy !sp-text-white !sp-text-xs !sp-font-bold">' . $number . '</span>'
-      . '<span class="!sp-min-w-0 !sp-flex-1"><b class="!sp-block !sp-text-sm !sp-text-service-navy">' . self::e($title) . '</b><span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e($hint) . '</span></span>'
-      . self::icon('chevron', '!sp-w-4 !sp-h-4 !sp-text-service-muted') . '</summary>'
-      . '<div class="!sp-px-3 sm:!sp-px-4 !sp-pb-4 !sp-space-y-5">' . $content . '</div></details>';
+      . '<span class="!sp-min-w-0 !sp-flex-1"><b class="!sp-block !sp-text-sm !sp-text-service-navy">' . self::e($title) . '</b><span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e($hint) . '</span></span></header>'
+      . '<div class="!sp-px-3 sm:!sp-px-4 !sp-pb-4 !sp-space-y-5">' . $content . '</div></section>';
   }
 
   /**
@@ -626,11 +643,13 @@ final class OwnerCreditView
     $editable = OwnerCreditService::signersEditable($work['credit']) && $canDecide;
     $canSend = $editable && $creditStatus === 'aprobado';
     $several = count($state['owners']) > 1;
-    // Crédito del inmueble: firman todos los copropietarios, sin casillas para desmarcar.
+    // Quién firma lo fija la destinación (libre inversión: el beneficiario; del inmueble: todos): sin casillas. Solo
+    // los créditos históricos dejan elegir.
     $locked = !empty($state['locked']);
     $done = $state['missing'] === [];
     $rows = '';
     foreach ($state['owners'] as $owner) {
+      if ($locked && !$owner['required']) continue;
       $status = match (true) {
         $owner['status'] === 'firmado' => '<span class="!sp-font-semibold !sp-text-emerald-700">Firmado el ' . date('d/m/Y', (int) $owner['signed_at']) . ' · ' . self::e($owner['number']) . '</span><span class="!sp-block !sp-text-service-muted">Sirve para todos sus créditos: no lo vuelve a firmar.</span>',
         $owner['status'] === 'pendiente' => '<span class="!sp-font-semibold ' . ($owner['expired'] ? '!sp-text-red-700' : '!sp-text-amber-800') . '">' . ($owner['expired'] ? 'Enlace vencido' : 'Pendiente de firma') . ' · ' . self::e($owner['number']) . '</span><span class="!sp-block !sp-text-service-muted">Enviado el ' . date('d/m/Y H:i', (int) $owner['sent_at']) . '.</span>',
@@ -662,12 +681,13 @@ final class OwnerCreditView
       . self::guide('pagare', [
         'Qué es' => 'Un pagaré en blanco (sin valor, interés ni vencimiento) con su carta de instrucciones, que autoriza a llenarlo si el propietario incumple, por el total que deba de sus créditos del Pasaporte SuCasa.',
         'Una sola vez' => 'Cada persona lo firma una vez y respalda todos sus créditos. Si ya lo firmó, no se le vuelve a pedir.',
-        'Quién firma' => 'En libre inversión firma solo el beneficiario del crédito (si el contrato tiene varios propietarios, puedes marcar a otros). En servicios públicos, cuotas de administración y reparaciones y mantenimiento firman todos los copropietarios y no se puede desmarcar a nadie.',
+        'Quién firma' => 'Lo fija la destinación y no se puede cambiar. Libre inversión: firma solo el beneficiario del crédito. Servicios públicos, cuotas de administración y reparaciones y mantenimiento: firman todos los copropietarios del inmueble.',
         'Cómo firma' => 'Recibe un enlace personal por correo o WhatsApp y firma con su nombre, su número de documento y un código de verificación, como el acta de satisfacción.',
-        'Cuándo se firma' => 'Después de aprobar: al aprobar se envía el enlace a quien no lo tenga firmado. Cuando todos los firmantes marcados lo firman, sale sola la respuesta con la carta de aprobación, el pagaré firmado y el plan de pagos.',
+        'Cuándo se firma' => 'Después de aprobar: al aprobar se envía el enlace a quien no lo tenga firmado. Cuando todos los firmantes lo firman, sale sola la respuesta con la carta de aprobación, el pagaré firmado y el plan de pagos.',
       ])
       . ($several && $editable && !$locked ? '<p class="' . self::NOTE . ' !sp-mb-1">Marca quiénes firman el pagaré de este crédito.</p>' : '')
-      . ($locked && $several ? '<p class="' . self::NOTE . ' !sp-mb-1">Crédito del inmueble (' . self::e(mb_strtolower((string) $work['credit']['purpose'])) . '): lo firman todos los copropietarios y a todos les llegan la confirmación, la respuesta y los pagarés firmados.</p>' : '')
+      . ($state['mode'] === 'personal' && $several ? '<p class="' . self::NOTE . ' !sp-mb-1">Crédito de libre inversión: lo firma solo el beneficiario. Los demás propietarios del contrato no firman ni reciben avisos.</p>' : '')
+      . ($state['mode'] === 'reparaciones' && $several ? '<p class="' . self::NOTE . ' !sp-mb-1">Crédito del inmueble (' . self::e(mb_strtolower((string) $work['credit']['purpose'])) . '): lo firman todos los copropietarios y a todos les llegan la confirmación, la respuesta y los pagarés firmados.</p>' : '')
       . ((array) ($state['contact_missing'] ?? []) !== [] ? '<p class="' . self::NOTE . ' !sp-mb-1 !sp-font-semibold !sp-text-red-700" data-owner-credit-co-owner-contact>Copropietarios con documento y contacto: falta el de ' . self::e(implode(', ', (array) $state['contact_missing'])) . '. Complétalo en el mandato o en la hoja de cierre; sin eso no se envía el pagaré.</p>' : '')
       . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $rows . '</ul>'
       . (!$done && in_array($creditStatus, ['pendiente', 'aprobado'], true) ? (!empty($work['settings']['require_promissory'])

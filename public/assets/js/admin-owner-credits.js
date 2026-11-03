@@ -113,11 +113,8 @@
       showModal("Cargando…", "Preparando el liquidador.", message("Cargando crédito…"));
       return post("scm_owner_credit_open", params)
         .then(function (data) {
+          // El servidor abre la pestaña de la etapa en curso (estudio, firma o respuesta).
           showModal(data.title || "Crédito", "Solicitud, estudio, firma de documentos y respuesta al propietario.", data.html || "");
-          // Decidido: se lleva a la etapa en curso (firma o respuesta) en vez del estudio.
-          var current = modal.querySelector('[data-owner-credit-stage-state="current"]');
-          var key = current && current.getAttribute("data-owner-credit-stage-go");
-          if (key && key !== "estudio") goToStage(key, false);
         })
         .catch(function (error) {
           showModal("No se pudo abrir", "", message(error.message, "error"));
@@ -149,12 +146,19 @@
       return data;
     }
 
-    // Abre el bloque de una etapa del liquidador y lo lleva a la vista.
-    function goToStage(key, smooth) {
+    // Pestañas de etapas: muestra solo el bloque de la etapa elegida y marca su paso en la barra.
+    var TAB_SELECTED = ["!sp-ring-2", "!sp-ring-service-navy"];
+    function goToStage(key) {
       var block = modal && modal.querySelector('[data-owner-credit-stage="' + key + '"]');
       if (!block) return;
-      block.open = true;
-      if (block.scrollIntoView) block.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+      modal.querySelectorAll("[data-owner-credit-stage]").forEach(function (panel) { panel.hidden = panel !== block; });
+      modal.querySelectorAll("[data-owner-credit-stage-go]").forEach(function (tab) {
+        var selected = tab.getAttribute("data-owner-credit-stage-go") === key;
+        tab.setAttribute("aria-selected", selected ? "true" : "false");
+        TAB_SELECTED.forEach(function (name) { tab.classList.toggle(name, selected); });
+      });
+      var nav = modal.querySelector("[data-owner-credit-stepper]");
+      if (nav && nav.scrollIntoView) nav.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
     // Acciones del pagaré y de la respuesta: muestran el resultado en su sección y recargan el liquidador.
@@ -565,7 +569,7 @@
         return;
       }
       var stageGo = form && target.closest("[data-owner-credit-stage-go]");
-      if (stageGo) { goToStage(stageGo.getAttribute("data-owner-credit-stage-go"), true); return; }
+      if (stageGo) { goToStage(stageGo.getAttribute("data-owner-credit-stage-go")); return; }
       // Documentos de la respuesta: carta de aprobación y plan de pagos (se generan al verlos) y pagaré firmado.
       var responseDoc = form && target.closest("[data-owner-credit-document]");
       if (responseDoc) {

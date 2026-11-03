@@ -52,6 +52,13 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   assert.equal(sim.credit_id, '12'); assert.equal(sim.amount, '$1.000.000');
   console.log('OK edits are simulated on the server with the credit id');
 
+  // Las etapas son pestañas: se abre en el estudio y la solicitud se ve solo al elegir su pestaña.
+  assert.equal(await page.isVisible('[data-owner-credit-stage="solicitud"]'), false);
+  await page.click('[data-owner-credit-stage-go="solicitud"]');
+  assert.equal(await page.isVisible('[data-owner-credit-stage="solicitud"]'), true);
+  assert.equal(await page.isVisible('[data-owner-credit-stage="estudio"]'), false);
+  assert.equal(await page.getAttribute('[data-owner-credit-stage-go="solicitud"]', 'aria-selected'), 'true');
+  console.log('OK each stage tab shows only its own block');
   await page.fill('[name="contract_end"]', '2028-05-31');
   await page.waitForFunction(() => window.calls.some(c => c.action === 'scm_owner_credit_simulate' && c.contract_end === '2028-05-31'));
   console.log('OK the contract end date is simulated before saving');
@@ -75,11 +82,13 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   assert.equal(mainChange.credit_id, '12'); assert.equal(mainChange.contract_id, '99');
   assert.equal(calls.filter(c => c.action === 'scm_owner_credit_simulate').length, simsBefore, 'changing the main contract does not simulate');
   await page.waitForSelector('[data-owner-credit-form]');
+  await page.click('[data-owner-credit-stage-go="solicitud"]');
   assert.equal(await page.inputValue('[name="siniestro"]'), 'no');
   await page.selectOption('[name="siniestro"]', 'si');
   await page.waitForFunction(() => window.calls.some(c => c.action === 'scm_owner_credit_simulate' && c.siniestro === 'si'));
   console.log('OK the main contract is changed in the liquidator and the siniestro Sí/No is simulated');
 
+  await page.click('[data-owner-credit-stage-go="estudio"]');
   await page.fill('[name="gross"]', '');
   await page.type('[name="gross"]', '1250000');
   assert.equal(await page.inputValue('[name="gross"]'), '$1.250.000');
@@ -164,7 +173,7 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
         : body.action === 'scm_owner_credit_contracts' ? { contracts: [
           { id: 9, contrato: '950', inmueble: '10600', direccion: 'Calle 1', estado: 'Entregado', arrendatario: 'Inquilino', fin: '15/01/2027', max_months: 2, owner },
           { id: 10, contrato: '951', inmueble: '10601', direccion: 'Calle 2', estado: 'Entregado', arrendatario: '', fin: '', max_months: 0, owner }],
-          preapproval: { contracts: 2, net_income: 3440000, income_months: 3, amount: 10320000, longest_months: 2, max_term: 0, term_basis: '0 cuotas vencen antes del fin del contrato más largo, el 20/12/2026' },
+          preapproval: { contracts: 2, net_income: 3440000, income_months: 3, amount: 10320000, longest_months: 2, max_term: 0, fallback_term: 12, term_basis: '0 cuotas vencen antes del fin del contrato más largo, el 20/12/2026' },
           checks: [{ label: 'Contrato activo', ok: true, detail: '2 de 2 contratos Entregado.' }, { label: 'Sin siniestro', ok: false, detail: 'Cartera marcó como siniestrado: #951.' }] }
         : body.action === 'scm_owner_credit_create' ? { credit_id: 40, message: 'Solicitud registrada.' } : {};
       if (body.action === 'scm_owner_credit_simulation_pdf') {

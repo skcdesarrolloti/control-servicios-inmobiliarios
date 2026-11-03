@@ -169,7 +169,7 @@ $names = array_column($recipients->invoke($service, $repairCredit), 'name');
 $check($names === ['Ana Uno', 'Luis Dos', 'Marta Tres'], 'the repair notices go to every co-owner, the beneficiary first');
 $check(array_column($recipients->invoke($service, $service->find($personalId)), 'name') === ['Ana Uno'], 'a personal credit notifies only the requester');
 $personalState = $service->promissoryState($service->find($personalId));
-$check(!$personalState['locked'] && $personalState['required'] === ['mandato_1'], 'a personal credit is signed by the requester only');
+$check($personalState['locked'] && $personalState['required'] === ['mandato_1'], 'a personal credit is signed by the requester only, without choosing other signers');
 $repairHtml = (new OwnerCreditView())->workspace($service->workspace($repairId), true, true);
 $check(!str_contains($repairHtml, 'data-owner-credit-promissory-signer') && str_contains($repairHtml, 'lo firman todos los copropietarios'), 'the liquidator shows no signer checkboxes on a repair credit');
 $letter = \SCM\Modules\OwnerCredits\OwnerCreditResponseDocuments::letter($repairCredit, ['signer' => ['name' => 'Analista QA', 'cargo' => ''], 'margin' => 2, 'date' => time(), 'holders' => [['name' => 'Ana Uno', 'document' => '111111'], ['name' => 'Luis Dos', 'document' => '222222'], ['name' => 'Marta Tres', 'document' => '333333']]], false);
@@ -223,7 +223,7 @@ $check($servicesState['locked'] && $servicesState['required'] === ['mandato_1', 
 $hoaState = $service->promissoryState($service->find($service->createManual(20, 300000, 6, 'Cuotas de administración', $actor, '', 'mandato_1')));
 $check($hoaState['locked'] && count($hoaState['required']) === 3, 'an HOA fees credit is signed by every co-owner');
 $freeState = $service->promissoryState($service->find($service->createManual(20, 300000, 6, 'Libre inversión', $actor, '', 'mandato_1')));
-$check(!$freeState['locked'] && $freeState['required'] === ['mandato_1'], 'a free use credit is signed only by the requester');
+$check($freeState['locked'] && $freeState['required'] === ['mandato_1'], 'a free use credit is signed only by the requester');
 $byId = array_column($service->requestPreapproval('111111')['contracts'], null, 'id');
 $check($near($byId[20]['repair']['amount'], (1800000 + 900000) * 3) && $near($byId[23]['repair']['amount'], (1800000 * 0.6 + 900000) * 3), 'the new request property cap of each contract adds the owner other contracts');
 

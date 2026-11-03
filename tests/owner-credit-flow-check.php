@@ -495,9 +495,12 @@ $pagareCredit = (int) $pagareService->createManual(9, 800000, 6, 'Libre Destinac
 $state = $pagareService->promissoryState($pagareService->find($pagareCredit));
 $check($state['required'] === ['mandato_2'] && $state['missing'] === ['Segunda Dueña'] && count($state['owners']) === 2, 'by default only the beneficiary must sign the promissory note');
 $check($pagareService->workspace($pagareCredit)['stage'] === 'estudio', 'a pending request is in the study stage');
-$both = $pagareService->setPromissorySigners($pagareCredit, ['mandato_1', 'mandato_2'], $actor);
-$check($both['required'] === ['mandato_1', 'mandato_2'] && count($both['missing']) === 2, 'the analyst can ask every owner of the contract to sign');
-$pagareService->setPromissorySigners($pagareCredit, ['mandato_2'], $actor);
+try {
+  $pagareService->setPromissorySigners($pagareCredit, ['mandato_1', 'mandato_2'], $actor);
+  $check(false, 'a free use credit cannot add signers');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'firma solo el beneficiario') && $state['locked'], 'a free use credit is signed only by the beneficiary and the signers cannot be changed');
+}
 try {
   $pagareService->sendPromissory($pagareCredit, ['email'], $actor);
   $check(false, 'the promissory note is sent after approving');
@@ -560,7 +563,9 @@ $pagareService->voidPromissory($pid, 'Se reemplaza por un pagaré con datos corr
 $check($promissory->find($pid)['status'] === 'anulado' && $pagareService->promissoryState($pagareService->find($nextCredit))['missing'] === ['Segunda Dueña'] && (int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'pagare_anulado'", [$pagareCredit]) === 1, 'a voided note is traced and the person must sign a new one');
 try { $promissory->publicRow($pid, $token); $check(false, 'a voided note cannot be opened to sign'); } catch (DomainException) { $check(true, 'a voided note cannot be opened to sign'); }
 $liquidator = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($pagareService->workspace($nextCredit), true, true);
-$check(str_contains($liquidator, 'data-owner-credit-promissory') && str_contains($liquidator, 'Falta firma') && !str_contains($liquidator, 'data-owner-credit-promissory-send') && str_contains($liquidator, 'Al aprobar se enviará el pagaré para firmar a Segunda Dueña') && str_contains($liquidator, 'name="promissory_signers[]"'), 'while pending, the liquidator shows who signs and that the note goes out on approval');
+$check(str_contains($liquidator, 'data-owner-credit-promissory') && str_contains($liquidator, 'Falta firma') && !str_contains($liquidator, 'data-owner-credit-promissory-send') && str_contains($liquidator, 'Al aprobar se enviará el pagaré para firmar a Segunda Dueña') && !str_contains($liquidator, 'name="promissory_signers[]"') && str_contains($liquidator, 'lo firma solo el beneficiario'), 'while pending, the liquidator shows the beneficiary as the only signer (no checkboxes) and that the note goes out on approval');
+// Las etapas son pestañas: al abrir solo se ve la etapa en curso (pendiente: estudio).
+$check(preg_match('/<section[^>]*role="tabpanel"[^>]*data-owner-credit-stage="estudio">/', $liquidator) === 1 && preg_match('/<section[^>]*data-owner-credit-stage="solicitud" hidden>/', $liquidator) === 1 && preg_match('/<section[^>]*data-owner-credit-stage="firma" hidden>/', $liquidator) === 1 && str_contains($liquidator, 'id="scm-owner-credit-tab-estudio" aria-controls="scm-owner-credit-stage-estudio" aria-selected="true"'), 'the stages are tabs and only the current one is shown');
 $pagareService->changeStatus($pagareCredit, 'anulado', 'Crédito de prueba del pagaré.', $actor);
 $pagareService->changeStatus($nextCredit, 'anulado', 'Crédito de prueba del pagaré.', $actor);
 // El documento se reconoce sin puntos, espacios, comas, guiones ni el dígito de verificación del NIT.

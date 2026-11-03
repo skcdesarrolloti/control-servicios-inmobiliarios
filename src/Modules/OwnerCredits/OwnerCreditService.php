@@ -112,10 +112,10 @@ final class OwnerCreditService
   }
 
   /**
-   * Dueños del contrato principal con el estado de su pagaré, y quiénes deben firmarlo para este crédito. Personal: por
-   * defecto el beneficiario (el analista puede pedir que firmen todos o los que elija). Reparaciones: todos los
-   * copropietarios, sin desmarcar, y cada uno necesita documento y contacto (`contact_missing`) para recibirlo.
-   * Los créditos decididos antes del % siguen con la regla anterior.
+   * Dueños del contrato principal con el estado de su pagaré, y quiénes deben firmarlo para este crédito. Personal
+   * (libre inversión): solo el beneficiario. Crédito del inmueble: todos los copropietarios, y cada uno necesita
+   * documento y contacto (`contact_missing`) para recibirlo. En ambos no se puede cambiar quién firma. Los créditos
+   * decididos antes del % siguen con la regla anterior (el beneficiario o los que eligió el analista).
    * @return array{owners:list<array<string,mixed>>,required:list<string>,missing:list<string>,mode:string,locked:bool,contact_missing:list<string>}
    */
   public function promissoryState(array $credit): array
@@ -134,7 +134,7 @@ final class OwnerCreditService
         if (trim((string) $owner['document']) === '' || (trim((string) $owner['email']) === '' && trim((string) $owner['phone']) === '')) $contactMissing[] = (string) $owner['name'];
       }
     } else {
-      $stored = json_decode((string) ($credit['promissory_signers'] ?? ''), true);
+      $stored = $mode === 'historico' ? json_decode((string) ($credit['promissory_signers'] ?? ''), true) : null;
       $required = is_array($stored) ? array_values(array_intersect($keys, array_map('strval', $stored))) : [];
       if ($required === []) {
         $beneficiary = array_values(array_filter($this->ownerChoices($credit), static fn(array $row): bool => !empty($row['current'])));
@@ -145,7 +145,7 @@ final class OwnerCreditService
     foreach ($status as &$row) $row['required'] = in_array($row['key'], $required, true);
     unset($row);
     $missing = array_values(array_map(static fn(array $row): string => (string) $row['name'], array_filter($status, static fn(array $row): bool => $row['required'] && $row['status'] !== 'firmado')));
-    return ['owners' => $status, 'required' => array_values(array_filter($required)), 'missing' => $missing, 'mode' => $mode, 'locked' => $mode === 'reparaciones', 'contact_missing' => $contactMissing];
+    return ['owners' => $status, 'required' => array_values(array_filter($required)), 'missing' => $missing, 'mode' => $mode, 'locked' => self::signersLocked($credit), 'contact_missing' => $contactMissing];
   }
 
   /**
@@ -205,10 +205,10 @@ final class OwnerCreditService
     return array_values($recipients);
   }
 
-  /** En reparaciones firman todos los copropietarios: no se puede desmarcar a nadie. */
+  /** Quién firma lo fija la destinación (libre inversión: el beneficiario; del inmueble: todos); solo los históricos se eligen. */
   public static function signersLocked(array $credit): bool
   {
-    return self::mode($credit) === 'reparaciones';
+    return self::mode($credit) !== 'historico';
   }
 
   /** El analista elige quiénes firman el pagaré de este crédito (uno o todos los propietarios del contrato). @param list<string> $keys */
@@ -216,7 +216,9 @@ final class OwnerCreditService
   {
     $credit = $this->find($id);
     if ($credit === null) throw new \DomainException('El crédito ya no existe.');
-    if (self::signersLocked($credit)) throw new \DomainException('En los créditos del inmueble (servicios públicos, cuotas de administración, reparaciones) firman todos los copropietarios: no se puede cambiar quién firma.');
+    if (self::signersLocked($credit)) throw new \DomainException(self::mode($credit) === 'reparaciones'
+      ? 'En los créditos del inmueble (servicios públicos, cuotas de administración, reparaciones) firman todos los copropietarios: no se puede cambiar quién firma.'
+      : 'En libre inversión firma solo el beneficiario del crédito: no se puede cambiar quién firma.');
     if (!self::signersEditable($credit)) throw new \DomainException('Solo se puede cambiar quién firma antes de enviar la respuesta del crédito.');
     $owners = $this->contractOwners((int) $credit['contract_id']);
     $keys = array_values(array_intersect(array_column($owners, 'key'), array_map('strval', $keys)));
