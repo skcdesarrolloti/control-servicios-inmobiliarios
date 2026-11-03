@@ -35,26 +35,9 @@ contrato de arrendamiento, y que los créditos a propietarios respeten ese %:
 | Plugin de WordPress `[skc_copropietarios]`: ver y editar el % de un mandato. Al guardar valida que sume 100, registra en Propietarios a quien no tenga ficha, escribe `porcentaje_N` en el mandato y copia `propietarios`, `id_propietario_2..6` y `porcentaje_1..6` a sus hojas de cierre y contratos. También copia al crear con JetEngine una hoja o un contrato ligado a un mandato. | `wordpress/mu-plugins/skc-copropietarios.php` | `0c818e0d` |
 | Hoja de cierre nativa: edita a cada copropietario con sus datos y su %, y lo pasa al mandato. Reemplaza lo que iban a hacer las fases 2 y 4 en los formularios viejos (JetForm y `formularios/*-mandato`). | `src/Modules/ClosingSheets/*`, `docs/hoja-cierre-nativa.md` | `3d01017c` y anteriores |
 | Columnas en la base de datos | `cierres` y `contratos_arrendamiento` ya tienen `propietarios`, `id_propietario_2..6` y `porcentaje_1..6`. `contrato_mandato` tiene `porcentaje_1..6` y usa `id_propietario_nuevo_N` para los ids (no `id_propietario_N`). | — |
+| **Fase 5:** al crear el contrato desde «No asignado», `LeaseContractCreationService::coOwners()` copia `propietarios`, `id_propietario_2..6` y `porcentaje_1..6` del mandato (o de la hoja si el mandato no los tiene). Solo escribe lo que tiene valor. El formulario muestra el bloque «Copropietarios» de solo lectura con avisos: no suman 100, falta %, la hoja no coincide con el mandato, un dueño vacío o sin ficha. Los avisos nunca bloquean y se repiten en el resultado. Un copropietario sin id se busca en Propietarios por documento; si no tiene ficha, queda el aviso (se registra desde el mandato o la hoja). | `src/Modules/LeaseContracts/LeaseContractCreationService.php`, `LeaseContractCreateView.php`, `tests/lease-contract-creation-check.php` | ver `git log` |
 
 ## Fases pendientes (orden recomendado)
-
-### 1. Fase 5: copiar los copropietarios al crear el contrato desde «No asignado»
-
-El panel crea el contrato con `LeaseContractCreationService`, que hoy solo copia al propietario principal. El plugin de
-WordPress no actúa aquí porque el panel escribe directo en la base de datos.
-
-- `LeaseContractCreationService::prefill` / `create` (`src/Modules/LeaseContracts/`):
-  - Copiar `propietarios`, `id_propietario_2..6` y `porcentaje_1..6`: primero del mandato vigente; si no los tiene, de
-    la hoja de cierre. Si no coinciden, mostrar aviso.
-  - En el mandato el id es `id_propietario_nuevo_N`; en el contrato se guarda como `id_propietario_N`.
-  - Escribir solo lo que no está vacío, para no borrar datos. Pasar por `filterTableData`, así no falla si falta una
-    columna.
-  - Un copropietario incompleto o un fallo al registrarlo es un aviso, no un error. Los mandatos viejos con
-    `propietarios=2` y el dueño 2 vacío deben seguir funcionando.
-  - Las relaciones JetEngine siguen solo con el principal.
-- `LeaseContractCreateView`: bloque de solo lectura «Copropietarios» con su %, y el aviso si no suman 100 o falta alguno.
-- Nueva prueba `tests/lease-contract-creation-check.php` con cuatro casos: columnas inexistentes, un propietario, tres
-  con %, y sin %.
 
 ### 2. Fase 3: completar los datos existentes
 
@@ -143,4 +126,4 @@ Falta decidir si se quita del formulario y queda solo en la vista y la carpeta.
 
 1. `git pull` en `main`.
 2. Leer este documento, `AGENTS.md`, `docs/hoja-cierre-nativa.md` y `docs/cct-agregar-columnas.md`.
-3. Empezar por la Fase 5. Si hace falta una columna CCT nueva, usar `bin/cct-add-fields.php`, nunca `ALTER TABLE`.
+3. Seguir con la Fase 3. Si hace falta una columna CCT nueva, usar `bin/cct-add-fields.php`, nunca `ALTER TABLE`.

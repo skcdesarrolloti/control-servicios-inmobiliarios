@@ -82,6 +82,7 @@ final class LeaseContractCreateView
         . '</div></div>', true));
 
     $html .= '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-2 !sp-gap-4">' . $this->person('propietario', 'Propietario', $v) . $this->person('arrendatario', 'Arrendatario', $v) . '</div>';
+    $html .= $this->coOwners((array) ($v['_co_owners'] ?? []));
 
     $html .= '<div data-lease-when="propiedad_horizontal=Si">' . $this->section('Información adicional del arrendatario (para la copropiedad)', ''
       . $this->select('tiene_mascotas', '¿Tiene mascotas?' . self::REQ, $o['si_no'], (string) $v['tiene_mascotas'], true)
@@ -158,7 +159,52 @@ final class LeaseContractCreateView
       . '<p class="!sp-m-0 !sp-text-sm !sp-font-bold">Contrato #' . esc_html((string) ($result['contrato'] ?? '')) . ' creado</p>'
       . '<p class="!sp-m-0 !sp-text-[11px] !sp-text-service-muted">En cola: ' . (int) ($queued['email'] ?? 0) . ' correo(s), ' . (int) ($queued['whatsapp'] ?? 0) . ' WhatsApp y ' . (int) ($queued['internal'] ?? 0) . ' aviso(s) internos. Ahora puedes enviar los anexos del contrato desde el listado.</p>'
       . ($docs !== '' ? '<div class="!sp-flex !sp-flex-wrap !sp-justify-center !sp-gap-2">' . $docs . '</div>' : '')
+      . $this->warnings((array) ($result['warnings'] ?? []))
       . '<div><button type="button" class="' . $ui::NAVY . '" data-lease-modal-close>Cerrar</button></div></div>';
+  }
+
+  /**
+   * Copropietarios y su % de participación, de solo lectura: se copian del mandato o de la hoja de cierre.
+   * @param array{owners?:list<array<string,mixed>>,source?:string,source_id?:string,valid?:bool,warnings?:list<string>} $co
+   */
+  private function coOwners(array $co): string
+  {
+    $owners = (array) ($co['owners'] ?? []);
+    $warnings = (array) ($co['warnings'] ?? []);
+    if (count($owners) <= 1 && $warnings === []) {
+      return '';
+    }
+    $rows = '';
+    foreach ($owners as $owner) {
+      $percent = (string) ($owner['percent'] ?? '');
+      $rows .= '<tr class="!sp-border-0 !sp-border-t !sp-border-solid !sp-border-slate-100"><td class="!sp-py-2 !sp-pr-3 !sp-font-semibold">' . esc_html((string) $owner['name']) . ((int) $owner['index'] === 1 ? ' <span class="!sp-text-[9px] !sp-font-bold !sp-uppercase !sp-text-service-muted">Principal</span>' : '') . '</td>'
+        . '<td class="!sp-py-2 !sp-pr-3">' . esc_html((string) $owner['document'] !== '' ? (string) $owner['document'] : '—') . '</td>'
+        . '<td class="!sp-py-2 !sp-text-right !sp-font-bold">' . ($percent !== '' ? esc_html(str_replace('.', ',', $percent)) . ' %' : '<span class="!sp-text-rose-700">Sin %</span>') . '</td></tr>';
+    }
+    $source = match ((string) ($co['source'] ?? '')) {
+      'mandato' => 'Copiados del contrato de mandato #' . (string) ($co['source_id'] ?? ''),
+      'cierre' => 'Copiados de la hoja de cierre #' . (string) ($co['source_id'] ?? ''),
+      default => '',
+    };
+    $pill = count($owners) > 1
+      ? (!empty($co['valid'])
+        ? '<span class="!sp-px-2 !sp-py-0.5 !sp-rounded-full !sp-border !sp-border-solid !sp-border-emerald-200 !sp-bg-emerald-50 !sp-text-emerald-800 !sp-text-[9px] !sp-font-bold">Suma 100 %</span>'
+        : '<span class="!sp-px-2 !sp-py-0.5 !sp-rounded-full !sp-border !sp-border-solid !sp-border-rose-200 !sp-bg-rose-50 !sp-text-rose-700 !sp-text-[9px] !sp-font-bold">No suma 100 %</span>')
+      : '';
+    return '<fieldset class="' . self::SECTION . '" data-lease-co-owners><legend class="' . self::LEGEND . '">Copropietarios</legend><div class="!sp-clear-both !sp-space-y-3">'
+      . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2"><span class="!sp-text-[10px] !sp-text-service-muted">' . esc_html($source) . ($source !== '' ? '. ' : '') . 'Solo lectura: se corrigen en el mandato o en la hoja de cierre.</span>' . $pill . '</div>'
+      . ($rows !== '' ? '<div class="!sp-overflow-x-auto"><table class="!sp-w-full !sp-border-collapse !sp-text-[11px]"><thead><tr class="!sp-text-left !sp-text-[9px] !sp-uppercase !sp-text-service-muted"><th class="!sp-pb-1 !sp-pr-3">Propietario</th><th class="!sp-pb-1 !sp-pr-3">Documento</th><th class="!sp-pb-1 !sp-text-right">Participación</th></tr></thead><tbody>' . $rows . '</tbody></table></div>' : '')
+      . $this->warnings($warnings) . '</div></fieldset>';
+  }
+
+  /** @param list<string> $warnings */
+  private function warnings(array $warnings): string
+  {
+    if ($warnings === []) {
+      return '';
+    }
+    return '<ul class="!sp-m-0 !sp-p-3 !sp-pl-6 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-amber-200 !sp-bg-amber-50 !sp-text-left !sp-text-[11px] !sp-text-amber-900 !sp-space-y-1" data-lease-co-owner-warnings>'
+      . implode('', array_map(static fn($w): string => '<li>' . esc_html((string) $w) . '</li>', $warnings)) . '</ul>';
   }
 
   private function section(string $title, string $body): string

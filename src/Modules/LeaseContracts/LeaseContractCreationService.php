@@ -6,6 +6,7 @@ namespace SCM\Modules\LeaseContracts;
 
 use SCM\Core\Database;
 use SCM\Modules\ClosingSheets\ClosingSheetDocuments;
+use SCM\Modules\OwnerCredits\OwnerCreditPromissoryService;
 use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
 use SCM\Support\HtmlPdfRenderer;
@@ -125,7 +126,171 @@ final class LeaseContractCreationService
         $values[$prefix . 'codeudor_' . $i] = $fromClosing($prefix . 'codeudor_' . $i);
       }
     }
+    $values['_co_owners'] = $this->safeCoOwners($contract, $closing);
     return $values;
+  }
+
+  /**
+   * Copropietarios que pasan al contrato, de solo lectura: los del mandato y, si el mandato no los tiene, los de la hoja
+   * de cierre. Se editan en el mandato o en la hoja; aquí solo se copian `propietarios`, `id_propietario_2..6` y
+   * `porcentaje_1..6`. Lo que esté incompleto queda como aviso, nunca como error.
+   *
+   * @param array<string,mixed> $contract @param array<string,mixed> $closing
+   * @return array{owners:list<array{index:int,name:string,document:string,owner_id:string,percent:string}>,columns:array<string,string>,source:string,source_id:string,valid:bool,warnings:list<string>}
+   */
+  public function coOwners(array $contract, array $closing): array
+  {
+    $mandateId = $this->firstId([$closing['id_contrato'] ?? '', $contract['id_contrato_mandato'] ?? '']);
+    $mandate = $this->row('jet_cct_contrato_mandato', $mandateId);
+    $warnings = [];
+    $fromMandate = $mandate !== [] ? $this->mandateOwners($mandate, $warnings) : [];
+    $closingWarnings = [];
+    $fromClosing = $closing !== [] ? $this->closingOwners($closing, $closingWarnings) : [];
+    $hasData = static fn(array $owners): bool => count($owners) > 1 || array_filter(array_column($owners, 'percent'), static fn(string $p): bool => $p !== '') !== [];
+
+    if ($fromMandate !== [] && ($hasData($fromMandate) || !$hasData($fromClosing))) {
+      [$owners, $source, $sourceId] = [$fromMandate, 'mandato', $mandateId];
+      if ($hasData($fromClosing) && self::ownersKey($fromClosing) !== self::ownersKey($fromMandate)) {
+        $warnings[] = 'La hoja de cierre #' . (string) ($closing['_ID'] ?? '') . ' tiene otros copropietarios o porcentajes que el mandato #' . $mandateId . '; se copian los del mandato.';
+      }
+    } elseif ($fromClosing !== []) {
+      [$owners, $source, $sourceId, $warnings] = [$fromClosing, 'cierre', (string) ($closing['_ID'] ?? ''), $closingWarnings];
+    } else {
+      return ['owners' => [], 'columns' => [], 'source' => '', 'source_id' => '', 'valid' => true, 'warnings' => []];
+    }
+
+    if (count($owners) === 1) {
+      $owners[0]['percent'] = '100';
+    }
+    $owners = $this->withProfiles($owners, $warnings);
+    $valid = true;
+    if (count($owners) > 1) {
+      $reason = '';
+      $row = [];
+      foreach ($owners as $owner) {
+        $row['porcentaje_' . $owner['index']] = $owner['percent'];
+      }
+      $valid = ContractCoOwners::percentages($row, array_column($owners, 'index'), $reason) !== null;
+      if (!$valid) {
+        $warnings[] = $reason === ''
+          ? 'No hay porcentaje de participación registrado: los créditos lo toman en partes iguales hasta que se cargue en el mandato o en la hoja de cierre.'
+          : 'Los porcentajes no cuadran (' . $reason . '): corrígelos en el mandato o en la hoja de cierre.';
+      }
+    }
+
+    // Solo lo que tiene valor: así no se borra lo que el contrato ya tenga.
+    $columns = ['propietarios' => (string) count($owners)];
+    foreach ($owners as $owner) {
+      $i = $owner['index'];
+      if ($i > 1 && $owner['owner_id'] !== '') {
+        $columns['id_propietario_' . $i] = $owner['owner_id'];
+      }
+      if ($owner['percent'] !== '') {
+        $columns['porcentaje_' . $i] = $owner['percent'];
+      }
+    }
+    return ['owners' => $owners, 'columns' => $columns, 'source' => $source, 'source_id' => $sourceId, 'valid' => $valid, 'warnings' => array_values(array_unique($warnings))];
+  }
+
+  /** coOwners() sin interrumpir la creación del contrato si algo falla. @return array<string,mixed> */
+  private function safeCoOwners(array $contract, array $closing): array
+  {
+    try {
+      return $this->coOwners($contract, $closing);
+    } catch (\Throwable $error) {
+      error_log('[lease_contract_co_owners] #' . (string) ($contract['_ID'] ?? '') . ': ' . $error->getMessage());
+      return ['owners' => [], 'columns' => [], 'source' => '', 'source_id' => '', 'valid' => false, 'warnings' => ['No se pudieron leer los copropietarios; el contrato queda solo con el propietario principal.']];
+    }
+  }
+
+  /**
+   * Propietarios 1..`propietarios` del mandato, con la numeración del mandato (como el plugin `skc_coprop_owners`).
+   * @param list<string> $warnings @return list<array{index:int,name:string,document:string,owner_id:string,percent:string}>
+   */
+  private function mandateOwners(array $mandate, array &$warnings): array
+  {
+    $count = max(1, min(ContractCoOwners::MAX, (int) ($mandate['propietarios'] ?? 1)));
+    $owners = [];
+    for ($i = 1; $i <= $count; $i++) {
+      $name = trim((string) ($mandate['nombre_' . $i] ?? ''));
+      $document = trim((string) ($mandate['documento_' . $i] ?? ''));
+      if ($name === '' && $document === '') {
+        if ($i > 1) {
+          $warnings[] = 'El mandato indica ' . $count . ' propietarios, pero el propietario ' . $i . ' no tiene nombre ni documento; no se copia.';
+        }
+        continue;
+      }
+      $id = trim((string) ($mandate['id_propietario_nuevo_' . $i] ?? '')) ?: ($i === 1 ? trim((string) ($mandate['id_propietario'] ?? '')) : '');
+      $owners[] = ['index' => $i, 'name' => $name, 'document' => $document, 'owner_id' => ctype_digit($id) ? $id : '', 'percent' => self::percent($mandate['porcentaje_' . $i] ?? '')];
+    }
+    return $owners;
+  }
+
+  /** @param list<string> $warnings @return list<array{index:int,name:string,document:string,owner_id:string,percent:string}> */
+  private function closingOwners(array $closing, array &$warnings): array
+  {
+    $count = max(1, min(ContractCoOwners::MAX, (int) ($closing['propietarios'] ?? 1)));
+    $owners = [];
+    for ($i = 1; $i <= $count; $i++) {
+      $suffix = $i === 1 ? '' : '_' . $i;
+      $name = trim((string) ($closing['propietario' . $suffix] ?? ''));
+      $document = trim((string) ($closing['documento_propietario' . $suffix] ?? ''));
+      if ($name === '' && $document === '') {
+        if ($i > 1) {
+          $warnings[] = 'La hoja de cierre indica ' . $count . ' propietarios, pero el propietario ' . $i . ' no tiene nombre ni documento; no se copia.';
+        }
+        continue;
+      }
+      $id = trim((string) ($closing['id_propietario' . $suffix] ?? ''));
+      $owners[] = ['index' => $i, 'name' => $name, 'document' => $document, 'owner_id' => ctype_digit($id) ? $id : '', 'percent' => self::percent($closing['porcentaje_' . $i] ?? '')];
+    }
+    return $owners;
+  }
+
+  /**
+   * Copropietarios sin id: se busca su ficha en Propietarios por documento. Sin ficha queda el aviso (se registra desde
+   * el mandato o la hoja de cierre).
+   * @param list<array<string,mixed>> $owners @param list<string> $warnings @return list<array<string,mixed>>
+   */
+  private function withProfiles(array $owners, array &$warnings): array
+  {
+    $table = $this->db->table('jet_cct_propietarios');
+    $profiles = null;
+    foreach ($owners as &$owner) {
+      if ($owner['index'] === 1 || $owner['owner_id'] !== '') {
+        continue;
+      }
+      if ($owner['document'] !== '') {
+        if ($profiles === null) {
+          $profiles = $this->schema->tableExists($table) ? $this->db->getResults("SELECT `_ID`, `documento` FROM `{$table}`") : [];
+        }
+        foreach ($profiles as $profile) {
+          if (ContractCoOwners::sameDocument((string) $profile['documento'], $owner['document'])) {
+            $owner['owner_id'] = (string) $profile['_ID'];
+            break;
+          }
+        }
+      }
+      if ($owner['owner_id'] === '') {
+        $warnings[] = ($owner['name'] !== '' ? $owner['name'] : 'El propietario ' . $owner['index']) . ($owner['document'] === '' ? ' no tiene documento' : ' no tiene ficha en Propietarios')
+          . ': regístralo desde el mandato o la hoja de cierre.';
+      }
+    }
+    unset($owner);
+    return $owners;
+  }
+
+  /** Clave para comparar dos listas de copropietarios: índice, documento y porcentaje. @param list<array<string,mixed>> $owners */
+  private static function ownersKey(array $owners): string
+  {
+    return implode('|', array_map(static fn(array $o): string => $o['index'] . ':' . OwnerCreditPromissoryService::normalizeDocument((string) $o['document']) . ':' . $o['percent'], $owners));
+  }
+
+  /** "33,34 %" → "33.34"; vacío o inválido → "". */
+  private static function percent(mixed $value): string
+  {
+    $number = ContractCoOwners::number($value);
+    return $number === null ? '' : rtrim(rtrim(number_format(round($number, 2), 2, '.', ''), '0'), '.');
   }
 
   /**
@@ -141,6 +306,8 @@ final class LeaseContractCreationService
     }
     $closing = $this->closing($contract);
     $data = $this->validate($input, $contractId);
+    // Copropietarios y su %: de solo lectura, salen del mandato o de la hoja de cierre (no del formulario).
+    $coOwners = $this->safeCoOwners($contract, $closing);
     $now = time();
     $nowSql = date('Y-m-d H:i:s', $now);
     $ph = $data['propiedad_horizontal'] === 'Si';
@@ -206,7 +373,7 @@ final class LeaseContractCreationService
           'medio' => trim((string) ($ticket['medio'] ?? $contract['medio'] ?? '')),
           'numero_solicitud' => trim((string) ($study['num_solicitud'] ?? $contract['numero_solicitud'] ?? '')), 'aseguradora' => trim((string) ($study['aseguradora'] ?? $contract['aseguradora'] ?? '')),
           'cct_modified' => $nowSql,
-        ] + $ids;
+        ] + $ids + $coOwners['columns'];
         foreach (array_values(self::AGREEMENTS) as $field) {
           $contractData[$field] = $data[$field];
         }
@@ -296,7 +463,9 @@ final class LeaseContractCreationService
         ]);
         $summary = 'Se creó el contrato de arrendamiento #' . $data['contrato'] . ' (inmueble ' . $data['inmueble'] . ') para el arrendatario ' . $data['arrendatario'] . '.'
           . ($ids['id_cierre'] !== '' ? ' Hoja de cierre #' . $ids['id_cierre'] . ' marcada como realizada.' : '')
-          . ($ph ? ' Se generaron el acta de notificación de ingreso y la carta de presentación para ' . $data['copropiedad'] . '.' : '');
+          . ($ph ? ' Se generaron el acta de notificación de ingreso y la carta de presentación para ' . $data['copropiedad'] . '.' : '')
+          . (count($coOwners['owners']) > 1 ? ' Copropietarios (' . ($coOwners['source'] === 'mandato' ? 'del mandato' : 'de la hoja de cierre') . '): '
+            . implode(', ', array_map(static fn(array $o): string => $o['name'] . ($o['percent'] !== '' ? ' ' . str_replace('.', ',', $o['percent']) . ' %' : ' sin %'), $coOwners['owners'])) . '.' : '');
         $this->history($contract, $data, $summary, $sender, $now, $nowSql);
         $pdo->commit();
       } catch (\Throwable $error) {
@@ -315,7 +484,7 @@ final class LeaseContractCreationService
     }
 
     $queued = $this->notify($context, $documents, $ph, $actaAdministracionId, $contractId, $now);
-    return ['contrato' => $data['contrato'], 'queued' => $queued, 'documents' => array_map(static fn(array $d): string => $d['url'], $documents)];
+    return ['contrato' => $data['contrato'], 'queued' => $queued, 'documents' => array_map(static fn(array $d): string => $d['url'], $documents), 'warnings' => $coOwners['warnings']];
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
