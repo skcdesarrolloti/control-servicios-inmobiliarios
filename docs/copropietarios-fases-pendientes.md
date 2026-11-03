@@ -39,20 +39,14 @@ contrato de arrendamiento, y que los créditos a propietarios respeten ese %:
 | **Fase 3 (código):** `bin/sync-co-owners.php` (`CoOwnersBackfill`). Hace tres cosas: (1) vincula por documento o registra en Propietarios a los dueños 2..N de los mandatos con más de un propietario y llena `id_propietario_nuevo_N`; (2) completa en los contratos solo las columnas vacías desde el mandato y lista como conflicto los valores distintos; (3) lista los contratos con copropietarios sin % válido. Repetirlo no cambia nada. **Falta correrlo en el servidor**: primero `php bin/sync-co-owners.php` (solo muestra), revisar conflictos y luego `--aplicar --funcionario=<id_empleado>`. | `src/Modules/LeaseContracts/CoOwnersBackfill.php`, `bin/sync-co-owners.php`, `tests/co-owners-backfill-check.php` | ver `git log` |
 | **Fase 6:** cálculo de créditos según el %. Puntos principales: (1) `OwnerCreditCalculator::evaluate` recibe `share`: el tope sale del ingreso atribuible y `net_income` se muestra al 100 %; (2) `ownerPortfolio` (`net_income` atribuible, `net_total` al 100 %, `share`), la cobertura y las fuentes de descuento usan solo la parte de la persona; (3) reparaciones (`OwnerCreditService::isRepair`/`mode`, `OwnerCreditSettings::REPAIR_PURPOSE`) usa el contrato del inmueble al 100 %, sin otros contratos, y su plazo sale solo de ese contrato (cotización, solicitud y simulación); (4) las reparaciones vigentes pesan sobre cada copropietario por su %, y una reparación compromete lo que ya se descuenta de su contrato (`personObligations`, `contractObligations`); (5) `requestPreapproval()` da el cupo personal y, por contrato, el de reparaciones, y el JS muestra el que toca según la destinación; (6) `contractsByOwnerDocument` encuentra copropietarios por `id_propietario_2..6` y por documento normalizado; (7) política «Porcentaje de participación registrado», tiles «Participación» e «Ingreso atribuible» y el PDF interno; (8) al decidir se congelan modo, % y copropietarios en `evaluation_json["share"]`: los decididos antes quedan `historico` al 100 %, y una reparación histórica no se reparte. | `src/Modules/OwnerCredits/*`, `public/assets/js/admin-owner-credits.js`, `tests/owner-credit-co-owners-check.php`, `tests/owner-credit-flow-check.php` | ver `git log` |
 | **Fase 8 (puntos 1–4):** (1) la cotización que aprueba el propietario también llega, por correo y WhatsApp, a cada copropietario (`ContractCoOwnerContacts::forContract`), sin repetir a quien ya es el destinatario; (2) la búsqueda del solicitante (`RequesterLookupConcern`, `PanelTicketCreationConcern`) encuentra contratos por `id_propietario_2..6` y por `documento_2..6` del mandato; (3) Notificaciones administrativas incluye a los copropietarios (`contract_co_actor_columns`) en filtros, resumen e importación; (4) «+N copropietarios» en el listado y la documentación del contrato. | `src/App/Concerns/HandlesMaintenanceActions.php`, `src/Modules/PublicTickets/Concerns/*`, `AdministrativeNotificationsService.php`, `LeaseContractsView.php`, `tests/co-owners-modules-check.php` | ver `git log` |
+| **Fase 7 (código):** firmas y avisos. (1) `promissoryState`: en personal firma el solicitante por defecto (el analista puede sumar firmantes, como antes); en reparaciones firman todos los copropietarios, sin desmarcar (`signersLocked`; `setPromissorySigners` se rechaza). Los decididos antes del % siguen con la regla vieja. (2) Chequeo «Copropietarios con documento y contacto» (`contact_missing`): si a alguno le falta, no se envía el pagaré y el liquidador lo avisa. (3) En reparaciones, la confirmación de la solicitud, el rechazo y la respuesta llegan a cada copropietario (`creditRecipients`, sin repetir contactos), con la carta, todos los pagarés firmados y el plan de pagos; la carta nombra a todos los titulares; se usan las mismas plantillas de WhatsApp. | `src/Modules/OwnerCredits/OwnerCreditService.php`, `OwnerCreditView.php`, `OwnerCreditResponseDocuments.php`, `tests/owner-credit-co-owners-check.php` | ver `git log` |
 
 ## Fases pendientes (orden recomendado)
 
-### 4. Fase 7: créditos, firmas y avisos
+### 4. Fase 7: lo que queda
 
-- `promissoryState`: personal → el solicitante; reparaciones → todos los copropietarios, obligatorio. El modo se congela
-  al decidir; los créditos aprobados antes siguen con la regla vieja. `setPromissorySigners` queda bloqueado en
-  reparaciones.
-- Nuevo chequeo «Copropietarios con documento y contacto» en reparaciones: si falta alguno, no deja enviar el pagaré.
-- `sendResponse` en reparaciones: a todos los copropietarios, cada uno con la carta, todos los pagarés firmados y el plan
-  de pagos. La carta nombra a todos los titulares. Mismas plantillas de WhatsApp.
-- `notifyOwnerRequested` y el rechazo (`notifyDecision`): también a todos en reparaciones.
-- **Antes de cerrar esta fase:** jurídica debe confirmar que el texto del pagaré («obligaciones que adquiera») respalda
-  obligaciones solidarias de reparaciones.
+- **Antes de usarla en producción:** jurídica debe confirmar que el texto del pagaré («obligaciones que adquiera»)
+  respalda obligaciones solidarias de reparaciones. El texto del pagaré no se cambió.
 
 ### 5. Fase 8: lo que queda
 
@@ -100,4 +94,4 @@ Falta decidir si se quita del formulario y queda solo en la vista y la carpeta.
 
 1. `git pull` en `main`.
 2. Leer este documento, `AGENTS.md`, `docs/hoja-cierre-nativa.md` y `docs/cct-agregar-columnas.md`.
-3. Seguir con la Fase 7 (y correr la Fase 3 en el servidor). Si hace falta una columna CCT nueva, usar `bin/cct-add-fields.php`, nunca `ALTER TABLE`.
+3. Pendiente: correr la Fase 3 en el servidor, la confirmación de jurídica (Fase 7) y lo que queda de la Fase 8. Si hace falta una columna CCT nueva, usar `bin/cct-add-fields.php`, nunca `ALTER TABLE`.

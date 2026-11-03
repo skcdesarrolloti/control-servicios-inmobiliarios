@@ -626,6 +626,8 @@ final class OwnerCreditView
     $editable = OwnerCreditService::signersEditable($work['credit']) && $canDecide;
     $canSend = $editable && $creditStatus === 'aprobado';
     $several = count($state['owners']) > 1;
+    // Reparaciones: firman todos los copropietarios, sin casillas para desmarcar.
+    $locked = !empty($state['locked']);
     $done = $state['missing'] === [];
     $rows = '';
     foreach ($state['owners'] as $owner) {
@@ -634,7 +636,7 @@ final class OwnerCreditView
         $owner['status'] === 'pendiente' => '<span class="!sp-font-semibold ' . ($owner['expired'] ? '!sp-text-red-700' : '!sp-text-amber-800') . '">' . ($owner['expired'] ? 'Enlace vencido' : 'Pendiente de firma') . ' · ' . self::e($owner['number']) . '</span><span class="!sp-block !sp-text-service-muted">Enviado el ' . date('d/m/Y H:i', (int) $owner['sent_at']) . '.</span>',
         default => '<span class="!sp-text-service-muted">Sin enviar</span>',
       };
-      $check = $several && $editable
+      $check = $several && $editable && !$locked
         ? '<input type="checkbox" class="!sp-mt-0.5" name="promissory_signers[]" value="' . self::e($owner['key']) . '" data-owner-credit-promissory-signer' . ($owner['required'] ? ' checked' : '') . ' aria-label="' . self::e('Firma ' . $owner['name']) . '">'
         : '';
       // El PDF firmado se ve en el visor del mismo popup.
@@ -660,11 +662,13 @@ final class OwnerCreditView
       . self::guide('pagare', [
         'Qué es' => 'Un pagaré en blanco (sin valor, interés ni vencimiento) con su carta de instrucciones, que autoriza a llenarlo si el propietario incumple, por el total que deba de sus créditos del Pasaporte SuCasa.',
         'Una sola vez' => 'Cada persona lo firma una vez y respalda todos sus créditos. Si ya lo firmó, no se le vuelve a pedir.',
-        'Quién firma' => 'Por defecto, el beneficiario del crédito. Si el contrato tiene varios propietarios, marca quiénes deben firmar: puede ser uno o todos.',
+        'Quién firma' => 'Por defecto, el beneficiario del crédito. Si el contrato tiene varios propietarios, marca quiénes deben firmar: puede ser uno o todos. En reparaciones y mantenimiento firman todos los copropietarios y no se puede desmarcar a nadie.',
         'Cómo firma' => 'Recibe un enlace personal por correo o WhatsApp y firma con su nombre, su número de documento y un código de verificación, como el acta de satisfacción.',
         'Cuándo se firma' => 'Después de aprobar: al aprobar se envía el enlace a quien no lo tenga firmado. Cuando todos los firmantes marcados lo firman, sale sola la respuesta con la carta de aprobación, el pagaré firmado y el plan de pagos.',
       ])
-      . ($several && $editable ? '<p class="' . self::NOTE . ' !sp-mb-1">Marca quiénes firman el pagaré de este crédito.</p>' : '')
+      . ($several && $editable && !$locked ? '<p class="' . self::NOTE . ' !sp-mb-1">Marca quiénes firman el pagaré de este crédito.</p>' : '')
+      . ($locked && $several ? '<p class="' . self::NOTE . ' !sp-mb-1">Crédito de reparaciones del inmueble: lo firman todos los copropietarios y a todos les llegan la confirmación, la respuesta y los pagarés firmados.</p>' : '')
+      . ((array) ($state['contact_missing'] ?? []) !== [] ? '<p class="' . self::NOTE . ' !sp-mb-1 !sp-font-semibold !sp-text-red-700" data-owner-credit-co-owner-contact>Copropietarios con documento y contacto: falta el de ' . self::e(implode(', ', (array) $state['contact_missing'])) . '. Complétalo en el mandato o en la hoja de cierre; sin eso no se envía el pagaré.</p>' : '')
       . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $rows . '</ul>'
       . (!$done && in_array($creditStatus, ['pendiente', 'aprobado'], true) ? (!empty($work['settings']['require_promissory'])
         ? '<p class="' . self::NOTE . ' !sp-mt-2' . ($pending ? '' : ' !sp-text-red-700') . '">' . ($pending ? 'Al aprobar se enviará el pagaré para firmar a ' : 'Para enviar la respuesta falta el pagaré firmado de ') . self::e(implode(', ', $state['missing'])) . '.</p>'

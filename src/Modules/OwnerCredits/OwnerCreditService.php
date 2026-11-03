@@ -112,9 +112,11 @@ final class OwnerCreditService
   }
 
   /**
-   * Dueños del contrato principal con el estado de su pagaré, y quiénes deben firmarlo para este crédito (por defecto,
-   * solo el beneficiario; el analista puede pedir que firmen todos o los que elija).
-   * @return array{owners:list<array<string,mixed>>,required:list<string>,missing:list<string>}
+   * Dueños del contrato principal con el estado de su pagaré, y quiénes deben firmarlo para este crédito. Personal: por
+   * defecto el beneficiario (el analista puede pedir que firmen todos o los que elija). Reparaciones: todos los
+   * copropietarios, sin desmarcar, y cada uno necesita documento y contacto (`contact_missing`) para recibirlo.
+   * Los créditos decididos antes del % siguen con la regla anterior.
+   * @return array{owners:list<array<string,mixed>>,required:list<string>,missing:list<string>,mode:string,locked:bool,contact_missing:list<string>}
    */
   public function promissoryState(array $credit): array
   {
@@ -123,17 +125,90 @@ final class OwnerCreditService
       return $owner;
     }, $this->contractOwners((int) $credit['contract_id']));
     $keys = array_column($owners, 'key');
-    $stored = json_decode((string) ($credit['promissory_signers'] ?? ''), true);
-    $required = is_array($stored) ? array_values(array_intersect($keys, array_map('strval', $stored))) : [];
-    if ($required === []) {
-      $beneficiary = array_values(array_filter($this->ownerChoices($credit), static fn(array $row): bool => !empty($row['current'])));
-      $required = [$beneficiary[0]['key'] ?? ($keys[0] ?? '')];
+    $mode = self::mode($credit);
+    $contactMissing = [];
+    if ($mode === 'reparaciones') {
+      $repairOwners = $this->repairOwners($credit, $owners);
+      $required = array_values(array_intersect($keys, array_column($repairOwners, 'key'))) ?: $keys;
+      foreach ($repairOwners as $owner) {
+        if (trim((string) $owner['document']) === '' || (trim((string) $owner['email']) === '' && trim((string) $owner['phone']) === '')) $contactMissing[] = (string) $owner['name'];
+      }
+    } else {
+      $stored = json_decode((string) ($credit['promissory_signers'] ?? ''), true);
+      $required = is_array($stored) ? array_values(array_intersect($keys, array_map('strval', $stored))) : [];
+      if ($required === []) {
+        $beneficiary = array_values(array_filter($this->ownerChoices($credit), static fn(array $row): bool => !empty($row['current'])));
+        $required = [$beneficiary[0]['key'] ?? ($keys[0] ?? '')];
+      }
     }
     $status = $this->promissory()->statusFor($owners);
     foreach ($status as &$row) $row['required'] = in_array($row['key'], $required, true);
     unset($row);
     $missing = array_values(array_map(static fn(array $row): string => (string) $row['name'], array_filter($status, static fn(array $row): bool => $row['required'] && $row['status'] !== 'firmado')));
-    return ['owners' => $status, 'required' => array_values(array_filter($required)), 'missing' => $missing];
+    return ['owners' => $status, 'required' => array_values(array_filter($required)), 'missing' => $missing, 'mode' => $mode, 'locked' => $mode === 'reparaciones', 'contact_missing' => $contactMissing];
+  }
+
+  /**
+   * Copropietarios de un crédito de reparaciones: decidido, los que quedaron congelados (por clave) con sus datos de
+   * hoy; pendiente, los del contrato. @param list<array<string,mixed>>|null $owners contractOwners() ya leídos
+   * @return list<array<string,mixed>>
+   */
+  private function repairOwners(array $credit, ?array $owners = null): array
+  {
+    $owners ??= array_map(function (array $owner) use ($credit): array {
+      if (trim((string) $owner['document']) === '') $owner['document'] = $this->ownerDocument($owner, $this->contractById((int) $credit['contract_id']) ?? []);
+      return $owner;
+    }, $this->contractOwners((int) $credit['contract_id']));
+    $stored = json_decode((string) ($credit['evaluation_json'] ?? ''), true);
+    $frozen = !in_array((string) $credit['status'], ['pendiente', 'simulacion'], true) && is_array($stored) ? array_column((array) ($stored['share']['owners'] ?? []), 'key') : [];
+    $kept = $frozen !== [] ? array_values(array_filter($owners, static fn(array $owner): bool => in_array($owner['key'], $frozen, true))) : [];
+    return $kept !== [] ? $kept : $owners;
+  }
+
+  /**
+   * A quién se avisa del crédito (solicitud, rechazo y respuesta): el beneficiario y, en reparaciones, cada copropietario.
+   * El beneficiario va primero con el contacto guardado en el crédito.
+   * @return list<array{key:string,name:string,document:string,email:string,phone:string}>
+   */
+  private function creditRecipients(array $credit): array
+  {
+    $beneficiary = ['key' => '', 'name' => (string) $credit['owner_name'], 'document' => (string) ($credit['owner_document'] ?? ''), 'email' => (string) $credit['owner_email'], 'phone' => (string) $credit['owner_phone']];
+    if (self::mode($credit) !== 'reparaciones') return [$beneficiary];
+    $out = [$beneficiary];
+    foreach ($this->repairOwners($credit) as $owner) {
+      $same = ContractCoOwners::sameDocument((string) $owner['document'], $beneficiary['document']) || ((string) $owner['owner_id'] !== '' && (string) $owner['owner_id'] === (string) $credit['owner_id']);
+      if ($same) {
+        $out[0]['key'] = (string) $owner['key'];
+        continue;
+      }
+      $out[] = array_intersect_key($owner, array_flip(['key', 'name', 'document', 'email', 'phone']));
+    }
+    return $out;
+  }
+
+  /**
+   * Quita el correo o el celular que ya recibe alguien anterior de la lista (dos copropietarios con el mismo contacto
+   * reciben un solo aviso). @param list<array<string,string>> $recipients @return list<array<string,string>>
+   */
+  private function uniqueContacts(array $recipients): array
+  {
+    $emails = [];
+    $phones = [];
+    foreach ($recipients as $index => $recipient) {
+      $email = strtolower(trim((string) $recipient['email']));
+      $phone = preg_replace('/\D+/', '', (string) $recipient['phone']) ?? '';
+      if ($email !== '' && isset($emails[$email])) $recipients[$index]['email'] = '';
+      if ($phone !== '' && isset($phones[$phone])) $recipients[$index]['phone'] = '';
+      $emails[$email] = true;
+      $phones[$phone] = true;
+    }
+    return array_values($recipients);
+  }
+
+  /** En reparaciones firman todos los copropietarios: no se puede desmarcar a nadie. */
+  public static function signersLocked(array $credit): bool
+  {
+    return self::mode($credit) === 'reparaciones';
   }
 
   /** El analista elige quiénes firman el pagaré de este crédito (uno o todos los propietarios del contrato). @param list<string> $keys */
@@ -141,6 +216,7 @@ final class OwnerCreditService
   {
     $credit = $this->find($id);
     if ($credit === null) throw new \DomainException('El crédito ya no existe.');
+    if (self::signersLocked($credit)) throw new \DomainException('En un crédito de reparaciones firman todos los copropietarios: no se puede cambiar quién firma.');
     if (!self::signersEditable($credit)) throw new \DomainException('Solo se puede cambiar quién firma antes de enviar la respuesta del crédito.');
     $owners = $this->contractOwners((int) $credit['contract_id']);
     $keys = array_values(array_intersect(array_column($owners, 'key'), array_map('strval', $keys)));
@@ -162,7 +238,10 @@ final class OwnerCreditService
     if ($credit === null) throw new \DomainException('El crédito ya no existe.');
     if ($credit['status'] !== 'aprobado' || (int) ($credit['response_sent_at'] ?? 0) > 0) throw new \DomainException('El pagaré se envía después de aprobar el crédito y antes de enviar la respuesta.');
     $result = ['sent' => [], 'signed' => [], 'errors' => []];
-    foreach ($this->promissoryState($credit)['owners'] as $owner) {
+    $state = $this->promissoryState($credit);
+    // Reparaciones: el pagaré se envía a todos a la vez; si a alguno le falta documento o contacto, no se envía.
+    if ($state['contact_missing'] !== []) throw new \DomainException('Falta el documento o el contacto (correo o celular) de ' . implode(', ', $state['contact_missing']) . '. Complétalo en el mandato o en la hoja de cierre antes de enviar el pagaré: en reparaciones firman todos los copropietarios.');
+    foreach ($state['owners'] as $owner) {
       if (!$owner['required']) continue;
       if ($owner['status'] === 'firmado') { $result['signed'][] = (string) $owner['name']; continue; }
       try {
@@ -1021,14 +1100,19 @@ final class OwnerCreditService
     $attachments = array_map(static fn(array $document): array => ['path' => $document['path'], 'name' => $document['filename']], $documents);
     try {
       $email = new EmailQueue($this->db);
-      if ($settings['notify_owner_email'] && filter_var($credit['owner_email'], FILTER_VALIDATE_EMAIL)) {
-        $queued['email'] = $email->enqueue([$credit['owner_email']], $title, EmailTemplate::render('Crédito aprobado', $this->ownerEmailBody($credit, $signer)), [
-          'source_module' => 'creditos_propietarios', 'destination_name' => $credit['owner_name'], 'payload' => ['attachments' => $attachments],
-          'dedupe_key' => 'owner-credit-response:' . $id . ':' . $now, 'meta' => ['credit_id' => $id, 'event' => 'respuesta'],
-        ]);
-      }
-      if ($settings['notify_owner_whatsapp'] && trim((string) $credit['owner_phone']) !== '') {
-        foreach ($documents as $index => $document) $queued['whatsapp'] += $this->responseWhatsapp((string) $credit['owner_phone'], (string) $credit['owner_name'], $document, $params($document, (string) $credit['owner_name'] ?: 'Propietario'), 'owner-credit-response-wa:' . $id . ':' . $now . ':' . $index, $id);
+      // En reparaciones, cada copropietario recibe la carta, todos los pagarés firmados y el plan de pagos.
+      foreach ($this->uniqueContacts($this->creditRecipients($credit)) as $position => $recipient) {
+        $suffix = $position === 0 ? '' : ':' . $recipient['key'];
+        $name = (string) $recipient['name'];
+        if ($settings['notify_owner_email'] && filter_var($recipient['email'], FILTER_VALIDATE_EMAIL)) {
+          $queued['email'] += $email->enqueue([$recipient['email']], $title, EmailTemplate::render('Crédito aprobado', $this->ownerEmailBody($credit, $signer, $name)), [
+            'source_module' => 'creditos_propietarios', 'destination_name' => $name, 'payload' => ['attachments' => $attachments],
+            'dedupe_key' => 'owner-credit-response:' . $id . ':' . $now . $suffix, 'meta' => ['credit_id' => $id, 'event' => 'respuesta'],
+          ]);
+        }
+        if ($settings['notify_owner_whatsapp'] && trim((string) $recipient['phone']) !== '') {
+          foreach ($documents as $index => $document) $queued['whatsapp'] += $this->responseWhatsapp((string) $recipient['phone'], $name, $document, $params($document, $name ?: 'Propietario'), 'owner-credit-response-wa:' . $id . ':' . $now . ':' . $index . $suffix, $id);
+        }
       }
       $copies = InternalNotificationRecipients::emailsForAction($this->db, self::EVENT_RESPONSE);
       if ($copies !== []) {
@@ -1074,8 +1158,10 @@ final class OwnerCreditService
   private function responsePdfBytes(array $credit, string $kind, array $signer, int $date): string
   {
     $settings = (json_decode((string) ($credit['evaluation_json'] ?? ''), true)['settings'] ?? null) ?: $this->config();
+    // Reparaciones: la carta nombra a todos los titulares.
+    $holders = self::mode($credit) === 'reparaciones' ? array_map(static fn(array $row): array => ['name' => (string) $row['name'], 'document' => (string) $row['document']], $this->creditRecipients($credit)) : [];
     $html = $kind === OwnerCreditResponseDocuments::LETTER
-      ? OwnerCreditResponseDocuments::letter($credit, ['signer' => $signer, 'margin' => (int) ($settings['term_margin_months'] ?? 2), 'date' => $date])
+      ? OwnerCreditResponseDocuments::letter($credit, ['signer' => $signer, 'margin' => (int) ($settings['term_margin_months'] ?? 2), 'date' => $date, 'holders' => $holders])
       : OwnerCreditResponseDocuments::plan($credit, ['signer' => $signer, 'date' => $date]);
     $title = OwnerCreditResponseDocuments::TITLES[$kind] . ' · Crédito #' . (int) $credit['id'];
     return ($this->responsePdf ?? static fn(string $html, string $title): string => OwnerCreditResponseDocuments::pdf($html, $title))($html, $title);
@@ -2260,22 +2346,27 @@ final class OwnerCreditService
     $request = self::requestText($credit) . ((int) ($credit['quote_id'] ?? 0) > 0 ? ' para financiar la cotización #' . (int) $credit['quote_id'] : '');
     $dedupe = (int) $credit['id'] . ':' . (int) $credit['updated_at'];
     try {
-      if ($settings['notify_owner_request_email'] && filter_var($credit['owner_email'], FILTER_VALIDATE_EMAIL)) {
-        $title = 'Usted realizó una solicitud de crédito';
-        $queued['email'] = (new EmailQueue($this->db))->enqueue([$credit['owner_email']], $title . ' · Contrato ' . $credit['contract_code'], EmailTemplate::render($title, self::ownerRequestEmailBody($credit, $signer)), [
-          'source_module' => 'creditos_propietarios', 'destination_name' => $credit['owner_name'],
-          'dedupe_key' => 'owner-credit-request:' . $dedupe, 'meta' => ['credit_id' => (int) $credit['id'], 'status' => 'pendiente'],
-        ]);
-      }
-      if ($settings['notify_owner_request_whatsapp'] && trim((string) $credit['owner_phone']) !== '') {
-        $params = [$credit['owner_name'] ?: 'Propietario', $request, (string) $credit['contract_code'], self::signerLine($signer)];
-        $ok = (new SmsQueue($this->db))->enqueue((string) $credit['owner_phone'], (string) $credit['owner_name'], 'Usted realizó una solicitud de crédito por ' . $request . ' (contrato #' . $credit['contract_code'] . '). El crédito queda sujeto a estudio, verificación y aprobación. Atentamente, ' . self::signerLine($signer) . '.', [
-          'source_module' => 'creditos_propietarios', 'dedupe_key' => 'owner-credit-request-wa:' . $dedupe,
-          'template_name' => 'scm_credito_propietario_solicitud_v1', 'template_language' => 'es_CO',
-          'template_components' => [['type' => 'body', 'parameters' => array_map(static fn(string $text): array => ['type' => 'text', 'text' => mb_substr(trim($text), 0, 300)], $params)]],
-          'credit_id' => (int) $credit['id'],
-        ]);
-        $queued['whatsapp'] = $ok ? 1 : 0;
+      // En reparaciones la confirmación llega a todos los copropietarios (con las mismas plantillas).
+      foreach ($this->uniqueContacts($this->creditRecipients($credit)) as $position => $recipient) {
+        $suffix = $position === 0 ? '' : ':' . $recipient['key'];
+        $name = (string) $recipient['name'];
+        if ($settings['notify_owner_request_email'] && filter_var($recipient['email'], FILTER_VALIDATE_EMAIL)) {
+          $title = 'Usted realizó una solicitud de crédito';
+          $queued['email'] += (new EmailQueue($this->db))->enqueue([$recipient['email']], $title . ' · Contrato ' . $credit['contract_code'], EmailTemplate::render($title, self::ownerRequestEmailBody(['owner_name' => $name] + $credit, $signer, self::isRepair($credit) && $position > 0 ? (string) $credit['owner_name'] : '')), [
+            'source_module' => 'creditos_propietarios', 'destination_name' => $name,
+            'dedupe_key' => 'owner-credit-request:' . $dedupe . $suffix, 'meta' => ['credit_id' => (int) $credit['id'], 'status' => 'pendiente'],
+          ]);
+        }
+        if ($settings['notify_owner_request_whatsapp'] && trim((string) $recipient['phone']) !== '') {
+          $params = [$name ?: 'Propietario', $request, (string) $credit['contract_code'], self::signerLine($signer)];
+          $ok = (new SmsQueue($this->db))->enqueue((string) $recipient['phone'], $name, 'Usted realizó una solicitud de crédito por ' . $request . ' (contrato #' . $credit['contract_code'] . '). El crédito queda sujeto a estudio, verificación y aprobación. Atentamente, ' . self::signerLine($signer) . '.', [
+            'source_module' => 'creditos_propietarios', 'dedupe_key' => 'owner-credit-request-wa:' . $dedupe . $suffix,
+            'template_name' => 'scm_credito_propietario_solicitud_v1', 'template_language' => 'es_CO',
+            'template_components' => [['type' => 'body', 'parameters' => array_map(static fn(string $text): array => ['type' => 'text', 'text' => mb_substr(trim($text), 0, 300)], $params)]],
+            'credit_id' => (int) $credit['id'],
+          ]);
+          $queued['whatsapp'] += $ok ? 1 : 0;
+        }
       }
     } catch (\Throwable $error) {
       error_log('[owner-credit-request-owner] ' . $error->getMessage());
@@ -2283,12 +2374,13 @@ final class OwnerCreditService
     return $queued;
   }
 
-  /** @param array{name?:string,cargo?:string,email?:string} $signer */
-  private static function ownerRequestEmailBody(array $credit, array $signer = []): string
+  /** @param array{name?:string,cargo?:string,email?:string} $signer @param string $beneficiary en reparaciones, a nombre de quién quedó la solicitud (para los demás copropietarios) */
+  private static function ownerRequestEmailBody(array $credit, array $signer = [], string $beneficiary = ''): string
   {
     $e = static fn($value): string => EmailTemplate::e((string) $value);
     $quoteId = (int) ($credit['quote_id'] ?? 0);
     $rows = [
+      'Solicitada por' => $beneficiary,
       'Cotización' => $quoteId > 0 ? '#' . $quoteId : '',
       'Valor solicitado' => '$' . number_format((float) $credit['requested_amount'], 0, ',', '.'),
       'Plazo solicitado' => (int) $credit['requested_term'] > 0 ? (int) $credit['requested_term'] . ' meses' : '',
@@ -2300,6 +2392,7 @@ final class OwnerCreditService
     return '<p style="margin:0 0 14px;font-weight:600;">Apreciado(a) ' . $e($credit['owner_name'] ?: 'propietario') . ':</p>'
       . '<p style="margin:0 0 14px;line-height:1.65;">' . ($quoteId > 0 ? 'Al responder la cotización #' . $quoteId . ' usted realizó una solicitud de crédito para financiarla' : 'Usted realizó una solicitud de crédito') . ' con estos datos:</p>'
       . '<p style="margin:0 0 14px;line-height:1.8;">' . $list . '</p>'
+      . (self::isRepair($credit) ? '<p style="margin:0 0 14px;line-height:1.65;">Es un crédito para las reparaciones del inmueble: se paga con el ingreso del contrato y lo firman <b>todos sus copropietarios</b>, por eso le llega también a usted.</p>' : '')
       . '<p style="margin:0 0 14px;line-height:1.65;">Recuerde que el crédito queda <b>sujeto a estudio, verificación y aprobación</b>. Le informaremos el resultado por este medio.</p>'
       . '<p style="margin:0 0 14px;line-height:1.65;font-size:12px;color:#475569;">' . $e(self::DISCLAIMER) . '</p>'
       . '<p style="margin:0;line-height:1.65;">Atentamente,<br>'
@@ -2334,25 +2427,30 @@ final class OwnerCreditService
     // Aprobado: el propietario recibe la respuesta con los documentos cuando firma el pagaré (sendResponse).
     if ($approved) return $queued;
     try {
-      if ($settings['notify_owner_email'] && filter_var($credit['owner_email'], FILTER_VALIDATE_EMAIL)) {
-        $queued['email'] = (new EmailQueue($this->db))->enqueue([$credit['owner_email']], $title . ' · Contrato ' . $credit['contract_code'], EmailTemplate::render($title, $this->ownerEmailBody($credit, $signer)), [
-          'source_module' => 'creditos_propietarios', 'destination_name' => $credit['owner_name'],
-          'dedupe_key' => 'owner-credit-decision:' . $credit['id'], 'meta' => ['credit_id' => (int) $credit['id'], 'status' => $credit['status']],
-        ]);
-      }
-      if ($settings['notify_owner_whatsapp'] && trim((string) $credit['owner_phone']) !== '') {
-        // Plantilla de 5 variables: propietario, destinación, contrato, resultado y quién firma (el analista que decidió).
-        $detail = $approved
-          ? 'Fue aprobada por ' . $money($credit['approved_amount']) . ' a ' . $credit['approved_term'] . ' meses, con cuota mensual de ' . $money($credit['monthly_payment']) . ' que se descontará de los giros de arrendamiento'
-          : 'En esta oportunidad no fue aprobada. Si desea revisar alternativas, comuníquese con nosotros';
-        $params = [$credit['owner_name'] ?: 'Propietario', mb_strtolower((string) $credit['purpose']) ?: 'libre inversión', (string) $credit['contract_code'], $detail, self::signerLine($signer)];
-        $ok = (new SmsQueue($this->db))->enqueue((string) $credit['owner_phone'], (string) $credit['owner_name'], $title . ': ' . $detail, [
-          'source_module' => 'creditos_propietarios', 'dedupe_key' => 'owner-credit-decision-wa:' . $credit['id'],
-          'template_name' => 'scm_credito_propietario_decision_v1', 'template_language' => 'es_CO',
-          'template_components' => [['type' => 'body', 'parameters' => array_map(static fn(string $text): array => ['type' => 'text', 'text' => mb_substr(trim($text), 0, 300)], $params)]],
-          'credit_id' => (int) $credit['id'],
-        ]);
-        $queued['whatsapp'] = $ok ? 1 : 0;
+      // En reparaciones el rechazo llega a todos los copropietarios.
+      foreach ($this->uniqueContacts($this->creditRecipients($credit)) as $position => $recipient) {
+        $suffix = $position === 0 ? '' : ':' . $recipient['key'];
+        $name = (string) $recipient['name'];
+        if ($settings['notify_owner_email'] && filter_var($recipient['email'], FILTER_VALIDATE_EMAIL)) {
+          $queued['email'] += (new EmailQueue($this->db))->enqueue([$recipient['email']], $title . ' · Contrato ' . $credit['contract_code'], EmailTemplate::render($title, $this->ownerEmailBody($credit, $signer, $name)), [
+            'source_module' => 'creditos_propietarios', 'destination_name' => $name,
+            'dedupe_key' => 'owner-credit-decision:' . $credit['id'] . $suffix, 'meta' => ['credit_id' => (int) $credit['id'], 'status' => $credit['status']],
+          ]);
+        }
+        if ($settings['notify_owner_whatsapp'] && trim((string) $recipient['phone']) !== '') {
+          // Plantilla de 5 variables: propietario, destinación, contrato, resultado y quién firma (el analista que decidió).
+          $detail = $approved
+            ? 'Fue aprobada por ' . $money($credit['approved_amount']) . ' a ' . $credit['approved_term'] . ' meses, con cuota mensual de ' . $money($credit['monthly_payment']) . ' que se descontará de los giros de arrendamiento'
+            : 'En esta oportunidad no fue aprobada. Si desea revisar alternativas, comuníquese con nosotros';
+          $params = [$name ?: 'Propietario', mb_strtolower((string) $credit['purpose']) ?: 'libre inversión', (string) $credit['contract_code'], $detail, self::signerLine($signer)];
+          $ok = (new SmsQueue($this->db))->enqueue((string) $recipient['phone'], $name, $title . ': ' . $detail, [
+            'source_module' => 'creditos_propietarios', 'dedupe_key' => 'owner-credit-decision-wa:' . $credit['id'] . $suffix,
+            'template_name' => 'scm_credito_propietario_decision_v1', 'template_language' => 'es_CO',
+            'template_components' => [['type' => 'body', 'parameters' => array_map(static fn(string $text): array => ['type' => 'text', 'text' => mb_substr(trim($text), 0, 300)], $params)]],
+            'credit_id' => (int) $credit['id'],
+          ]);
+          $queued['whatsapp'] += $ok ? 1 : 0;
+        }
       }
     } catch (\Throwable $error) {
       error_log('[owner-credit-notify] ' . $error->getMessage());
@@ -2360,11 +2458,14 @@ final class OwnerCreditService
     return $queued;
   }
 
-  private function ownerEmailBody(array $credit, array $signer = []): string
+  /** @param string $recipient a quién va (en reparaciones, cada copropietario); vacío, el beneficiario */
+  private function ownerEmailBody(array $credit, array $signer = [], string $recipient = ''): string
   {
     $e = static fn($value): string => EmailTemplate::e((string) $value);
     $money = static fn($value): string => '$' . number_format((float) $value, 0, ',', '.');
-    $html = '<p style="margin:0 0 14px;font-weight:600;">Apreciado(a) ' . $e($credit['owner_name'] ?: 'propietario') . ':</p>';
+    $html = '<p style="margin:0 0 14px;font-weight:600;">Apreciado(a) ' . $e(($recipient !== '' ? $recipient : $credit['owner_name']) ?: 'propietario') . ':</p>';
+    $holders = self::mode($credit) === 'reparaciones' ? $this->creditRecipients($credit) : [];
+    if (count($holders) > 1) $html .= '<p style="margin:0 0 14px;line-height:1.65;">Crédito para las reparaciones del inmueble a nombre de sus copropietarios: <b>' . $e(implode(', ', array_column($holders, 'name'))) . '</b>.</p>';
     $closing = '<p style="margin:14px 0 0;line-height:1.65;">Atentamente,<br>'
       . (trim((string) ($signer['name'] ?? '')) !== '' && $signer['name'] !== 'SKC SuCasa Inmobiliaria' ? '<b>' . $e($signer['name']) . '</b><br>' : '')
       . (trim((string) ($signer['cargo'] ?? '')) !== '' ? $e($signer['cargo']) . '<br>' : '')

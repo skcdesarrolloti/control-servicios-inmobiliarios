@@ -153,4 +153,38 @@ $found = $service->contractsByOwnerDocument('7777777');
 $check(count($found) === 1 && (int) $found[0]['contract']['_ID'] === 22 && $found[0]['owner']['key'] === 'contrato_2' && $near($found[0]['owner']['share'], 0.4), 'a co-owner registered only in id_propietario_2 is found with their share');
 $check($service->contractsByOwnerDocument('888888')[0]['owner']['key'] === 'contrato', 'the main owner of that contract is still found by the contract document');
 
+// Firmas y avisos. Reparaciones: firman los tres, sin poder desmarcar, y a todos les llegan los avisos.
+$recipients = (new ReflectionMethod(OwnerCreditService::class, 'creditRecipients'));
+$repairCredit = $service->find($repairId);
+$state = $service->promissoryState($repairCredit);
+$check($state['locked'] && $state['required'] === ['mandato_1', 'mandato_2', 'mandato_3'] && count($state['missing']) === 3 && $state['contact_missing'] === [], 'a repair credit requires every co-owner to sign');
+try {
+  $service->setPromissorySigners($repairId, ['mandato_1'], $actor);
+  $check(false, 'repair signers cannot be changed');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'firman todos los copropietarios'), 'repair signers cannot be changed');
+}
+$names = array_column($recipients->invoke($service, $repairCredit), 'name');
+$check($names === ['Ana Uno', 'Luis Dos', 'Marta Tres'], 'the repair notices go to every co-owner, the beneficiary first');
+$check(array_column($recipients->invoke($service, $service->find($personalId)), 'name') === ['Ana Uno'], 'a personal credit notifies only the requester');
+$personalState = $service->promissoryState($service->find($personalId));
+$check(!$personalState['locked'] && $personalState['required'] === ['mandato_1'], 'a personal credit is signed by the requester only');
+$repairHtml = (new OwnerCreditView())->workspace($service->workspace($repairId), true, true);
+$check(!str_contains($repairHtml, 'data-owner-credit-promissory-signer') && str_contains($repairHtml, 'lo firman todos los copropietarios'), 'the liquidator shows no signer checkboxes on a repair credit');
+$letter = \SCM\Modules\OwnerCredits\OwnerCreditResponseDocuments::letter($repairCredit, ['signer' => ['name' => 'Analista QA', 'cargo' => ''], 'margin' => 2, 'date' => time(), 'holders' => [['name' => 'Ana Uno', 'document' => '111111'], ['name' => 'Luis Dos', 'document' => '222222'], ['name' => 'Marta Tres', 'document' => '333333']]], false);
+$check(str_contains($letter, 'Señores:') && str_contains($letter, 'Luis Dos') && str_contains($letter, 'Marta Tres') && str_contains($letter, 'Estimados copropietarios'), 'the approval letter names every holder');
+
+// Copropietarios con documento y contacto: si falta uno, no se envía el pagaré de la reparación.
+$pdo->exec("UPDATE wp_jet_cct_contrato_mandato SET documento_3 = '', correo_3 = '', celular_3 = '' WHERE _ID = 40");
+$state = $service->promissoryState($repairCredit);
+$check($state['contact_missing'] === ['Marta Tres'], 'a co-owner without document or contact is flagged');
+// Sin pagaré exigido la respuesta salió al aprobar: se deja como no enviada para llegar a la etapa de firma.
+$pdo->exec("UPDATE wp_scm_owner_credits SET response_sent_at = NULL WHERE id = {$repairId}");
+try {
+  $service->sendPromissory($repairId, ['email'], $actor);
+  $check(false, 'the promissory note is not sent while a co-owner lacks document or contact');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'Marta Tres'), 'the promissory note is not sent while a co-owner lacks document or contact');
+}
+
 echo "Owner credit co-owner checks passed.\n";

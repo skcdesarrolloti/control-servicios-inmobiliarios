@@ -55,14 +55,20 @@ final class OwnerCreditResponseDocuments
   }
 
   /**
-   * Carta de aprobación firmada por el funcionario que aprobó.
-   * @param array<string,mixed> $credit @param array{signer:array<string,string>,margin:int,date:int} $context
+   * Carta de aprobación firmada por el funcionario que aprobó. Con varios titulares (crédito de reparaciones) va
+   * dirigida a todos.
+   * @param array<string,mixed> $credit @param array{signer:array<string,string>,margin:int,date:int,holders?:list<array{name:string,document:string}>} $context
    */
   public static function letter(array $credit, array $context, bool $pdf = true): string
   {
     [$top, $bottom] = LeaseAnnexesDocument::letterhead($pdf);
     $e = static fn($value): string => Doc::e((string) $value);
     $name = trim((string) $credit['owner_name']) ?: 'Propietario';
+    $holders = array_values(array_filter((array) ($context['holders'] ?? []), static fn(array $row): bool => trim((string) $row['name']) !== ''));
+    $addressee = count($holders) > 1
+      ? 'Señores:<br>' . implode('<br>', array_map(static fn(array $row): string => '<strong>' . $e($row['name']) . '</strong> · Identificación: ' . $e(trim((string) $row['document']) ?: 'Sin registrar'), $holders)) . '<br>Ciudad'
+      : 'Señor(a):<br><strong>' . $e($name) . '</strong><br>Identificación: ' . $e((string) ($credit['owner_document'] ?? '') ?: 'Sin registrar') . '<br>Ciudad';
+    $greeting = count($holders) > 1 ? 'Estimados copropietarios:' : 'Estimado(a) ' . $e($name) . ':';
     $table = '';
     foreach (self::conditions($credit, self::schedule($credit)) as $label => $value) $table .= '<tr><th scope="row">' . $e($label) . '</th><td>' . $e($value) . '</td></tr>';
     $margin = max(0, (int) $context['margin']);
@@ -73,9 +79,9 @@ final class OwnerCreditResponseDocuments
     return '<article class="scm-acta-receipt scm-services-document scm-owner-credit-document scm-owner-credit-letter">' . $top
       . '<header class="scm-owner-credit-letter-company"><strong>SOLUCIONES COMERCIALES Y CONSTRUCTIVAS S.A.S.</strong><span>SKC SuCasa Inmobiliaria</span><em>¡Construimos confianza y protegemos su patrimonio!</em></header>'
       . '<p class="scm-owner-credit-letter-text">Cartagena de Indias, ' . $e(self::longDate((int) $context['date'])) . '</p>'
-      . '<p class="scm-owner-credit-letter-text">Señor(a):<br><strong>' . $e($name) . '</strong><br>Identificación: ' . $e((string) ($credit['owner_document'] ?? '') ?: 'Sin registrar') . '<br>Ciudad</p>'
-      . '<p class="scm-owner-credit-letter-text"><strong>Asunto: Notificación de aprobación de crédito</strong></p>'
-      . '<p class="scm-owner-credit-letter-text">Estimado(a) ' . $e($name) . ':</p>'
+      . '<p class="scm-owner-credit-letter-text">' . $addressee . '</p>'
+      . '<p class="scm-owner-credit-letter-text"><strong>Asunto: Notificación de aprobación de crédito' . (count($holders) > 1 ? ' para reparaciones del inmueble' : '') . '</strong></p>'
+      . '<p class="scm-owner-credit-letter-text">' . $greeting . '</p>'
       . '<p class="scm-owner-credit-letter-text">Nos complace informarle que SKC SuCasa Inmobiliaria ha aprobado su solicitud de crédito, como parte de los beneficios que ofrecemos a nuestros propietarios, con el propósito de brindarles soluciones financieras ágiles y oportunas, aprovechando nuestra relación comercial y de confianza.</p>'
       . '<p class="scm-owner-credit-letter-text">A continuación, presentamos las condiciones de su crédito:</p>'
       . '<table class="scm-acta-receipt-data scm-owner-credit-keep"><thead><tr><th scope="col">Concepto</th><th scope="col">Condición aprobada</th></tr></thead><tbody>' . $table . '</tbody></table>'
