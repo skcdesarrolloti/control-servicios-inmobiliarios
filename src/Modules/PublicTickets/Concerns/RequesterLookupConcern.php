@@ -30,7 +30,7 @@ trait RequesterLookupConcern
         $rows[] = $this->formatContractLookupRow($contract, 'propietario');
         continue;
       }
-      // Copropietario: por su ficha en id_propietario_2..6 o por su documento en el mandato.
+      // Copropietario: por su ficha en id_propietario_2..8 o por su documento en el mandato.
       $mandateOwners ??= $this->findMandateOwnersByDocument($docKey);
       $coOwner = $this->coOwnerContactForContract($contract, $profiles, $mandateOwners);
       if ($coOwner !== null) {
@@ -48,7 +48,7 @@ trait RequesterLookupConcern
    */
   private function coOwnerContactForContract(array $contract, array $profiles, array $mandateOwners): ?array
   {
-    for ($i = 2; $i <= \SCM\Modules\LeaseContracts\ContractCoOwners::MAX; $i++) {
+    for ($i = 2; $i <= \SCM\Modules\LeaseContracts\ContractCoOwners::CONTRACT_MAX; $i++) {
       $id = trim((string) ($contract['id_propietario_' . $i] ?? ''));
       if ($id !== '' && isset($profiles[$id])) {
         $profile = $profiles[$id];

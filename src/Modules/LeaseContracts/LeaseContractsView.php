@@ -551,7 +551,7 @@ final class LeaseContractsView
   /** "+2 copropietarios" cuando el contrato registra más de un propietario (columna `propietarios`); si no, vacío. */
   public static function coOwnersLabel(array $contract): string
   {
-    $extra = min(ContractCoOwners::MAX, (int) ($contract['propietarios'] ?? 0)) - 1;
+    $extra = min(ContractCoOwners::CONTRACT_MAX, (int) ($contract['propietarios'] ?? 0)) - 1;
     return $extra > 0 ? '+' . $extra . ' copropietario' . ($extra === 1 ? '' : 's') : '';
   }
 

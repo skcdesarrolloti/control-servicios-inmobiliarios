@@ -164,6 +164,8 @@ function skc_coprop_sync(array $mandate, ?string $onlyTable = null, ?int $onlyId
 {
   global $wpdb;
   $copy = skc_coprop_copy_columns($mandate);
+  // Mandato de un solo dueño: no borra los copropietarios que el contrato ya tenga (cargados desde SIMI).
+  $single = count(skc_coprop_owners($mandate)) <= 1;
   $updated = 0;
   foreach (['cierres' => 'id_contrato', 'contratos_arrendamiento' => 'id_contrato_mandato'] as $name => $link) {
     $table = skc_coprop_table($name);
@@ -171,12 +173,12 @@ function skc_coprop_sync(array $mandate, ?string $onlyTable = null, ?int $onlyId
     $cols = skc_coprop_columns($table);
     $data = skc_coprop_filter($table, $copy);
     if ($data === [] || !isset($cols[$link])) continue;
-    if ($onlyId !== null) {
-      $updated += (int) $wpdb->update($table, $data, ['_ID' => $onlyId]);
-      continue;
+    $ids = $onlyId !== null ? [$onlyId] : $wpdb->get_col($wpdb->prepare("SELECT _ID FROM `{$table}` WHERE TRIM(`{$link}`) = %s", (string) $mandate['_ID']));
+    foreach ($ids as $id) {
+      if ($single && $name === 'contratos_arrendamiento' && isset($cols['id_propietario_2'])
+        && trim((string) $wpdb->get_var($wpdb->prepare("SELECT `id_propietario_2` FROM `{$table}` WHERE _ID = %d", (int) $id))) !== '') continue;
+      $updated += (int) $wpdb->update($table, $data, ['_ID' => (int) $id]);
     }
-    $ids = $wpdb->get_col($wpdb->prepare("SELECT _ID FROM `{$table}` WHERE TRIM(`{$link}`) = %s", (string) $mandate['_ID']));
-    foreach ($ids as $id) $updated += (int) $wpdb->update($table, $data, ['_ID' => (int) $id]);
   }
   return $updated;
 }

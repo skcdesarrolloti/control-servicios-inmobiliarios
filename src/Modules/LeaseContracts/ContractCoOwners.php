@@ -10,15 +10,19 @@ use SCM\Modules\OwnerCredits\OwnerCreditPromissoryService;
  * Propietarios de un contrato de arrendamiento y su porcentaje de participación. Es la única lectura de copropietarios:
  * créditos, creación del contrato y avisos la comparten.
  *
- * - Propietarios: los del contrato de mandato (1 a 6, columnas `_N`); sin mandato, el propietario del contrato y, si
- *   existen, los `id_propietario_2..6` del contrato con su ficha de propietarios.
+ * - Propietarios: los del contrato de mandato (1 a 6, columnas `_N`). Sin mandato, o con un mandato de un solo dueño
+ *   cuando el contrato sí registra copropietarios (importados de SIMI), el propietario del contrato y los
+ *   `id_propietario_2..8` del contrato con su ficha de propietarios.
  * - Porcentaje (`porcentaje_N`): el del contrato, si cuadra con los propietarios del mandato; si no, el del mandato; si
  *   ninguno suma 100 %, partes iguales (queda marcado para que el liquidador lo muestre en rojo).
  * - Las columnas nuevas pueden no existir todavía: se leen de filas `SELECT *` y, si faltan, se cae a la siguiente fuente.
  */
 final class ContractCoOwners
 {
+  /** Propietarios del mandato y de la hoja de cierre (columnas `_1.._6`). */
   public const MAX = 6;
+  /** Propietarios del contrato de arrendamiento (`id_propietario_2..8`, `porcentaje_1..8`). */
+  public const CONTRACT_MAX = 8;
   /** Tolerancia al leer: 33,33 × 3 = 99,99 cargado a mano también cuenta como 100 %. */
   private const TOLERANCE = 0.05;
   public const SOURCES = [
@@ -31,7 +35,7 @@ final class ContractCoOwners
   /**
    * @param array<string,mixed> $contract fila de jet_cct_contratos_arrendamiento
    * @param array<string,mixed>|null $mandate fila de jet_cct_contrato_mandato
-   * @param array<string,array<string,mixed>> $profiles fichas de jet_cct_propietarios por `_ID` (para un contrato sin mandato)
+   * @param array<string,array<string,mixed>> $profiles fichas de jet_cct_propietarios por `_ID` de los `id_propietario_2..8` del contrato
    * @return list<array{key:string,index:int,name:string,document:string,email:string,phone:string,owner_id:string,share:float,share_source:string,share_detail:string}>
    */
   public static function resolve(array $contract, ?array $mandate, array $profiles = []): array
@@ -55,6 +59,13 @@ final class ContractCoOwners
         ];
       }
     }
+    // Mandato de un solo dueño y contrato con copropietarios con ficha: manda el contrato.
+    $contractCoOwners = false;
+    for ($i = 2; $i <= self::CONTRACT_MAX; $i++) {
+      $id = trim((string) ($contract['id_propietario_' . $i] ?? ''));
+      $contractCoOwners = $contractCoOwners || ($id !== '' && is_array($profiles[$id] ?? null));
+    }
+    if (count($owners) <= 1 && $contractCoOwners) $owners = [];
     if ($owners === []) {
       $owners[] = [
         'key' => 'contrato', 'index' => 1, 'name' => trim((string) ($contract['propietario'] ?? '')), 'document' => '',
@@ -62,8 +73,8 @@ final class ContractCoOwners
         'phone' => self::phone((string) ($contract['celular_propietario'] ?? ''), (string) ($contract['indicativo_propietario'] ?? '')),
         'owner_id' => (string) ($contract['id_propietario'] ?? ''),
       ];
-      // Sin mandato: los copropietarios registrados en el contrato, con los datos de su ficha.
-      for ($i = 2; $i <= self::MAX; $i++) {
+      // Los copropietarios registrados en el contrato, con los datos de su ficha.
+      for ($i = 2; $i <= self::CONTRACT_MAX; $i++) {
         $id = trim((string) ($contract['id_propietario_' . $i] ?? ''));
         $profile = $id !== '' ? ($profiles[$id] ?? null) : null;
         if (!is_array($profile)) continue;

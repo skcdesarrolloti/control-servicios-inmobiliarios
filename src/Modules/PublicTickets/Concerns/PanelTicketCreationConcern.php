@@ -58,10 +58,10 @@ trait PanelTicketCreationConcern
       $personTable = $this->db->table('jet_cct_' . ($by === 'propietario' ? 'propietarios' : 'arrendatarios'));
       $personId = 'id_' . $by;
       if ($this->schema->columnExists($table, $personId) && $this->schema->tableExists($personTable)) {
-        // Propietario: también los copropietarios registrados en el contrato (id_propietario_2..6).
+        // Propietario: también los copropietarios registrados en el contrato (id_propietario_2..8).
         $contractColumns = [$personId];
         if ($by === 'propietario') {
-          for ($i = 2; $i <= 6; $i++) {
+          for ($i = 2; $i <= \SCM\Modules\LeaseContracts\ContractCoOwners::CONTRACT_MAX; $i++) {
             if ($this->schema->columnExists($table, 'id_propietario_' . $i)) $contractColumns[] = 'id_propietario_' . $i;
           }
         }
@@ -124,9 +124,9 @@ trait PanelTicketCreationConcern
     };
     $mandateColumns = [];
     for ($i = 1; $i <= 6; $i++) array_push($mandateColumns, 'documento_' . $i, 'nit_' . $i);
-    // Las fichas de propietario también cuentan para los copropietarios del contrato (id_propietario_2..6).
+    // Las fichas de propietario también cuentan para los copropietarios del contrato (id_propietario_2..8).
     $ownerColumns = ['id_propietario'];
-    for ($i = 2; $i <= 6; $i++) $ownerColumns[] = 'id_propietario_' . $i;
+    for ($i = 2; $i <= \SCM\Modules\LeaseContracts\ContractCoOwners::CONTRACT_MAX; $i++) $ownerColumns[] = 'id_propietario_' . $i;
     $links = [
       [$ownerColumns, $this->db->table('jet_cct_propietarios'), ['documento', 'documento_juridico'], ['_ID', 'id_propietario']],
       [['id_arrendatario'], $this->db->table('jet_cct_arrendatarios'), ['documento', 'documento_juridico'], ['_ID', 'id_arrendatario']],

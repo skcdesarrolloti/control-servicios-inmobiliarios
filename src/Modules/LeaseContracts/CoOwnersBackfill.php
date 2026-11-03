@@ -135,7 +135,7 @@ final class CoOwnersBackfill
     }
     // "1" en un contrato sin ningún copropietario es el valor de un único dueño, no un dato distinto.
     $hasCoOwners = false;
-    for ($i = 2; $i <= ContractCoOwners::MAX; $i++) {
+    for ($i = 2; $i <= ContractCoOwners::CONTRACT_MAX; $i++) {
       $hasCoOwners = $hasCoOwners || trim((string) ($contract['id_propietario_' . $i] ?? '')) !== '';
     }
     $fill = [];

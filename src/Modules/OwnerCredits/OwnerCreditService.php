@@ -546,7 +546,7 @@ final class OwnerCreditService
     $mandates = $this->db->table('jet_cct_contrato_mandato');
     $owners = $this->db->table('jet_cct_propietarios');
     // Fichas de propietario con ese documento: el contrato las tiene como principal (id_propietario) o como
-    // copropietario (id_propietario_2..6).
+    // copropietario (id_propietario_2..8).
     $profileIds = [];
     foreach ([['id_contrato_mandato', $mandates, ['documento_1', 'documento_2', 'documento_3', 'documento_4', 'documento_5', 'documento_6'], ['_ID']], ['id_propietario', $owners, ['documento', 'documento_juridico'], ['_ID', 'id_propietario']]] as [$link, $source, $documentColumns, $idColumns]) {
       if (!$this->schema->columnExists($contracts, $link) || !$this->schema->tableExists($source)) continue;
@@ -560,7 +560,7 @@ final class OwnerCreditService
       $links = [$link];
       if ($source === $owners) {
         $profileIds = $ids;
-        for ($i = 2; $i <= ContractCoOwners::MAX; $i++) if ($this->schema->columnExists($contracts, 'id_propietario_' . $i)) $links[] = 'id_propietario_' . $i;
+        for ($i = 2; $i <= ContractCoOwners::CONTRACT_MAX; $i++) if ($this->schema->columnExists($contracts, 'id_propietario_' . $i)) $links[] = 'id_propietario_' . $i;
       }
       foreach ($links as $column) {
         $where[] = "`{$column}` IN (" . implode(',', array_fill(0, count($ids), '?')) . ')';
@@ -621,6 +621,16 @@ final class OwnerCreditService
         if (!$this->schema->columnExists($mandates, 'nombre_' . $i)) continue;
         $where[] = $like('m.`nombre_' . $i . '`');
         array_push($args, ...$likeArgs);
+      }
+    }
+    // Copropietarios registrados solo en el contrato (id_propietario_2..8): por el nombre de su ficha.
+    $profiles = $this->db->table('jet_cct_propietarios');
+    $coOwnerColumns = array_values(array_filter(array_map(static fn(int $i): string => 'id_propietario_' . $i, range(2, ContractCoOwners::CONTRACT_MAX)), fn(string $column): bool => $this->schema->columnExists($contracts, $column)));
+    if ($coOwnerColumns !== [] && $this->schema->tableExists($profiles) && $this->schema->columnExists($profiles, 'nombre')) {
+      $ids = array_map('strval', $this->db->getCol("SELECT `_ID` FROM `{$profiles}` WHERE " . $like('`nombre`') . ' LIMIT 50', $likeArgs));
+      foreach ($ids === [] ? [] : $coOwnerColumns as $column) {
+        $where[] = 'c.`' . $column . '` IN (' . implode(',', array_fill(0, count($ids), '?')) . ')';
+        array_push($args, ...$ids);
       }
     }
     if ($where === []) return [];
@@ -2578,17 +2588,18 @@ final class OwnerCreditService
     $mandateTable = $this->db->table('jet_cct_contrato_mandato');
     $mandateId = (int) ($contract['id_contrato_mandato'] ?? 0);
     $mandate = $mandateId > 0 && $this->schema->tableExists($mandateTable) ? $this->db->getRow("SELECT * FROM `{$mandateTable}` WHERE `_ID` = ? LIMIT 1", [$mandateId]) : null;
-    return ContractCoOwners::resolve($contract, is_array($mandate) ? $mandate : null, is_array($mandate) ? [] : $this->coOwnerProfiles($contract));
+    // Las fichas cuentan también con mandato: si el mandato tiene un solo dueño, mandan los copropietarios del contrato.
+    return ContractCoOwners::resolve($contract, is_array($mandate) ? $mandate : null, $this->coOwnerProfiles($contract));
   }
 
   /**
-   * Fichas de propietarios de los `id_propietario_2..6` del contrato (solo se usan si el contrato no tiene mandato).
+   * Fichas de propietarios de los `id_propietario_2..8` del contrato.
    * @return array<string,array<string,mixed>> `_ID` => ficha
    */
   private function coOwnerProfiles(array $contract): array
   {
     $ids = [];
-    for ($i = 2; $i <= ContractCoOwners::MAX; $i++) {
+    for ($i = 2; $i <= ContractCoOwners::CONTRACT_MAX; $i++) {
       $id = trim((string) ($contract['id_propietario_' . $i] ?? ''));
       if ($id !== '' && ctype_digit($id)) $ids[] = $id;
     }

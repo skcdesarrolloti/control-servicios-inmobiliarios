@@ -43,7 +43,7 @@ final class AdministrativeNotificationsService
       'table' => $this->db->table('jet_cct_propietarios'),
       'contract_actor_column' => 'id_propietario',
       // Copropietarios del contrato: también son propietarios de ese contrato.
-      'contract_co_actor_columns' => ['id_propietario_2', 'id_propietario_3', 'id_propietario_4', 'id_propietario_5', 'id_propietario_6'],
+      'contract_co_actor_columns' => ['id_propietario_2', 'id_propietario_3', 'id_propietario_4', 'id_propietario_5', 'id_propietario_6', 'id_propietario_7', 'id_propietario_8'],
       'name' => ['nombre', 'nombre_juridico', 'titular'],
       'email' => ['correo', 'correo_cuenta'],
       'phone' => ['celular', 'telefono', 'contacto'],
@@ -4979,7 +4979,7 @@ final class AdministrativeNotificationsService
   }
 
   /**
-   * Columnas extra del contrato que también apuntan al actor (copropietarios `id_propietario_2..6`), solo las que existen.
+   * Columnas extra del contrato que también apuntan al actor (copropietarios `id_propietario_2..8`), solo las que existen.
    * @param array<string,mixed> $config
    * @return string[]
    */
