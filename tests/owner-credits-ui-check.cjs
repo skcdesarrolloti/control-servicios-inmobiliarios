@@ -46,6 +46,25 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   assert.equal(await page.textContent('[data-owner-credit-title]'), 'Crédito #12 · Pendiente');
   console.log('OK open from quote card');
 
+  // Pendiente: las etapas a las que aún no llega (firma, respuesta) no se pueden abrir.
+  assert.equal(await page.isDisabled('[data-owner-credit-stage-go="firma"]'), true);
+  assert.equal(await page.isDisabled('[data-owner-credit-stage-go="respuesta"]'), true);
+  assert.equal(await page.isDisabled('[data-owner-credit-stage-go="solicitud"]'), false);
+  console.log('OK the stages not reached yet cannot be opened');
+
+  // Las condiciones del crédito siempre están a la vista; el detalle se abre en popups dentro del liquidador.
+  assert.match(await page.textContent('[data-owner-credit-summary]'), /Total a pagar/);
+  assert.equal(await page.isVisible('[data-owner-credit-dialog="sugerida"]'), false);
+  await page.click('[data-owner-credit-dialog-open="sugerida"]');
+  assert.equal(await page.isVisible('[data-owner-credit-dialog="sugerida"]'), true);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.isVisible('[data-owner-credit-dialog="sugerida"]'), false);
+  assert.equal(await page.isVisible('[data-owner-credit-form]'), true, 'Escape closes only the popup, not the liquidator');
+  await page.click('[data-owner-credit-dialog-open="cobertura"]');
+  await page.click('[data-owner-credit-dialog="cobertura"] [data-owner-credit-dialog-close]');
+  assert.equal(await page.isVisible('[data-owner-credit-dialog="cobertura"]'), false);
+  console.log('OK suggested condition, coverage, discount plan and changes open in popups that close with Escape or the X');
+
   await page.fill('[name="amount"]', '1000000');
   await page.waitForSelector('[data-sim]');
   calls = await page.evaluate(() => window.calls);

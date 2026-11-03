@@ -64,7 +64,7 @@
       // (Tab, Escape) no deben recibir lo que se escribe aquí: Escape cierra solo el liquidador.
       modal.addEventListener("keydown", function (event) {
         event.stopPropagation();
-        if (event.key === "Escape") closeModal();
+        if (event.key === "Escape" && !closeDialog()) closeModal();
         if (event.key === "Enter" && event.target.matches && event.target.matches("[data-owner-credit-search-query]")) {
           event.preventDefault();
           searchContracts(event.target.closest("[data-owner-credit-new-form]"));
@@ -159,6 +159,26 @@
       });
       var nav = modal.querySelector("[data-owner-credit-stepper]");
       if (nav && nav.scrollIntoView) nav.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    // Popups de detalle del estudio (condición sugerida, cobertura, plan de descuento, cambios): se abren dentro del
+    // liquidador y conservan lo que se está editando.
+    var dialogOpener = null;
+    function openDialog(form, key, opener) {
+      var dialog = form.querySelector('[data-owner-credit-dialog="' + key + '"]');
+      if (!dialog) return;
+      dialogOpener = opener || null;
+      dialog.hidden = false;
+      var close = dialog.querySelector("[data-owner-credit-dialog-close]");
+      if (close) close.focus();
+    }
+    function closeDialog() {
+      var dialog = modal && modal.querySelector("[data-owner-credit-dialog]:not([hidden])");
+      if (!dialog) return false;
+      dialog.hidden = true;
+      if (dialogOpener && dialogOpener.isConnected) dialogOpener.focus();
+      dialogOpener = null;
+      return true;
     }
 
     // Tasa final = tasa base × (1 − descuento según política); se muestra mientras se escribe (el servidor la recalcula).
@@ -565,6 +585,11 @@
       }
 
       var form = target.closest("[data-owner-credit-form]");
+      var dialogButton = form && target.closest("[data-owner-credit-dialog-open]");
+      if (dialogButton) { openDialog(form, dialogButton.getAttribute("data-owner-credit-dialog-open"), dialogButton); return; }
+      // Se cierra con la X o pulsando fuera del bloque.
+      var openPopup = target.closest("[data-owner-credit-dialog]");
+      if (openPopup && (target === openPopup || target.closest("[data-owner-credit-dialog-close]"))) { closeDialog(); return; }
       if (form && target.closest("[data-owner-credit-use-suggested]")) {
         var suggested = form.querySelector("[data-owner-credit-suggested]");
         if (!suggested) return;

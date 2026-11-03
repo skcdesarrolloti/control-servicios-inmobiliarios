@@ -186,8 +186,8 @@ final class OwnerCreditView
       . '</div>' . self::vacancyNote($ev) . '</section>'
       . '</div>')
 
-      // 2. Estudio: ingreso y condiciones a la izquierda; cupo, política y condición sugerida a la derecha; debajo, a
-      // dos columnas, cobertura, plan de descuento, cambios y políticas (así no queda espacio vacío a la izquierda).
+      // 2. Estudio: ingreso y condiciones a la izquierda; a la derecha, las condiciones del crédito siempre a la vista,
+      // el cupo, los botones de detalle (popups) y la política; debajo, las políticas y la tabla de amortización.
       . self::stageBlock('estudio', '2', 'Estudio', 'Ingreso, condiciones, políticas y cobertura; aquí se aprueba o se rechaza.', $active === 'estudio',
         '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-12 !sp-gap-5 !sp-items-start">'
       // Columna de datos y entradas.
@@ -212,7 +212,7 @@ final class OwnerCreditView
         'Descuento según política' => 'Lo eliges tú, de 0 % a 5 % de a 0,5 %: se descuenta de la tasa base (1 % sobre 2,10 % = 2,079 %). Por defecto 0 %. Queda en el historial del crédito, en el documento interno y en la carta de aprobación.',
         'Tasa final' => 'Tasa base menos el descuento: la que se aprueba y con la que se calcula la cuota. Por debajo de la tasa mínima queda fuera de política; por encima de la usura no se puede aprobar.',
         'Cuota' => 'Fija, calculada como la función PAGO de Excel; se descuenta de los giros del canon.',
-        'Fecha de desembolso' => 'Día en que se entrega el dinero. La primera cuota se descuenta un mes después y el crédito queda pagado solo cuando vence la última.',
+        'Fecha de desembolso' => 'Día en que se le entrega el dinero al propietario (por defecto hoy; cámbiala si se desembolsa otro día). Define el calendario: si es hasta el día 15, la primera cuota vence el 30 de ese mes; si es del 16 en adelante, el 30 del mes siguiente (en febrero, el último día). De ahí salen las fechas de la tabla, la cobertura de cada cuota y la fecha en que el crédito queda pagado.',
       ])
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-4">'
       . $field('Valor a colocar', $money('amount', $c['amount']))
@@ -226,7 +226,7 @@ final class OwnerCreditView
       // Columna de resultados (se refresca al editar).
       . '<div class="lg:!sp-col-span-5 !sp-space-y-5" data-owner-credit-results>' . $this->results($work) . '</div>'
       . '</div>'
-      . '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-2 !sp-gap-5 !sp-items-start" data-owner-credit-results-below>' . $this->resultsBelow($work) . '</div>'
+      . '<div data-owner-credit-results-below>' . $this->resultsBelow($work) . '</div>'
 
       . '<div data-owner-credit-schedule>' . $this->schedule($work) . '</div>'
       . ($credit['status'] === 'pendiente' ? $this->actions($credit, $canDecide, $canManage, $work['adjustments'] ?? [], $work) : $this->decisionSummary($credit, $work['adjustments'] ?? [])))
@@ -298,7 +298,9 @@ final class OwnerCreditView
       $tone = ['done' => '!sp-border-emerald-200 !sp-bg-emerald-50/60', 'current' => '!sp-border-service-yellow !sp-bg-amber-50', 'todo' => '!sp-border-slate-200 !sp-bg-white', 'skip' => '!sp-border-slate-200 !sp-bg-slate-50 !sp-opacity-60'][$state];
       $dot = ['done' => '!sp-bg-emerald-600 !sp-text-white', 'current' => '!sp-bg-service-navy !sp-text-white', 'todo' => '!sp-bg-slate-200 !sp-text-service-muted', 'skip' => '!sp-bg-slate-200 !sp-text-service-muted'][$state];
       $selected = $key === $active;
-      $items .= '<li class="!sp-min-w-0" role="presentation"><button type="button" role="tab" id="scm-owner-credit-tab-' . $key . '" aria-controls="scm-owner-credit-stage-' . $key . '" aria-selected="' . ($selected ? 'true' : 'false') . '" class="!sp-flex !sp-items-start !sp-gap-2 !sp-w-full !sp-h-full !sp-p-2.5 !sp-rounded-lg !sp-border !sp-border-solid ' . $tone . ($selected ? ' ' . self::TAB_SELECTED : '') . ' !sp-text-left !sp-font-sans !sp-cursor-pointer hover:!sp-border-service-yellow" data-owner-credit-stage-go="' . $key . '" data-owner-credit-stage-state="' . $state . '"' . ($state === 'current' ? ' aria-current="step"' : '') . '>'
+      // Una etapa a la que aún no se llega (o que no aplica) no se puede abrir.
+      $locked = in_array($state, ['todo', 'skip'], true) && !$selected;
+      $items .= '<li class="!sp-min-w-0" role="presentation"><button type="button" role="tab" id="scm-owner-credit-tab-' . $key . '" aria-controls="scm-owner-credit-stage-' . $key . '" aria-selected="' . ($selected ? 'true' : 'false') . '"' . ($locked ? ' disabled aria-disabled="true" title="' . self::e($state === 'skip' ? 'No aplica para este crédito.' : 'Se habilita cuando el crédito llegue a esta etapa.') . '"' : '') . ' class="!sp-flex !sp-items-start !sp-gap-2 !sp-w-full !sp-h-full !sp-p-2.5 !sp-rounded-lg !sp-border !sp-border-solid ' . $tone . ($selected ? ' ' . self::TAB_SELECTED : '') . ' !sp-text-left !sp-font-sans ' . ($locked ? '!sp-cursor-not-allowed' : '!sp-cursor-pointer hover:!sp-border-service-yellow') . '" data-owner-credit-stage-go="' . $key . '" data-owner-credit-stage-state="' . $state . '"' . ($state === 'current' ? ' aria-current="step"' : '') . '>'
         . '<span class="!sp-flex !sp-items-center !sp-justify-center !sp-shrink-0 !sp-w-6 !sp-h-6 !sp-rounded-full ' . $dot . ' !sp-text-[10px] !sp-font-bold">' . ($state === 'done' ? UI::icon('check', '!sp-w-3 !sp-h-3') : (string) ($index + 1)) . '</span>'
         . '<span class="!sp-min-w-0"><b class="!sp-block !sp-text-[11px] !sp-text-service-navy">' . self::e($label) . '</b><span class="!sp-block !sp-text-[10px] !sp-text-service-muted !sp-break-words">' . self::e($details[$key]) . '</span></span></button></li>';
       $index++;
@@ -368,8 +370,9 @@ final class OwnerCreditView
   }
 
   /**
-   * Bloques calculados de la columna derecha del estudio (avisos, cupo, política y condición sugerida); se refrescan
-   * al editar el formulario. @param array<string,mixed> $work
+   * Columna derecha del estudio, que se refresca al editar: avisos, condiciones del crédito (siempre a la vista), cupo,
+   * botones de detalle (condición sugerida, cobertura, plan de descuento y cambios, que abren un popup) y política.
+   * @param array<string,mixed> $work
    */
   public function results(array $work): string
   {
@@ -384,8 +387,10 @@ final class OwnerCreditView
     return ($stale !== '' ? self::alert($stale, 'bad') : '')
       . ($termError !== '' ? self::alert($termError, 'bad') : '')
       . (($usury = self::usuryWarning((float) $work['settings']['reference_rate'], (float) $ev['usury_monthly_legal'], $where)) !== '' ? self::alert($usury, 'bad') : '')
+      . self::summary($work)
       . self::preapproval($work)
       . ($endChanged ? self::alert('Estás calculando con la fecha fin ' . date('d/m/Y', (int) $work['contract']['fin_ts']) . '. Se guardará en el contrato al aprobar o rechazar el crédito.', 'info') : '')
+      . self::details($work)
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('chart') . 'Política de créditos</h4>' . self::guide('politica', [
         'Valor máximo a prestar' => 'Tope = ingreso neto de todos los contratos del propietario × los meses de política (Configuración, hoy ' . (int) $work['settings']['income_months'] . ').',
         'Plazo máximo por vigencia' => 'Meses de vigencia que le quedan al contrato más largo del propietario menos el margen de Configuración (hoy ' . (int) ($work['settings']['term_margin_months'] ?? 2) . ' meses): n − 2. Es un límite: la cobertura de pago decide cuántas se pueden pagar.',
@@ -410,21 +415,12 @@ final class OwnerCreditView
       . ($others !== [] ? '<ul class="!sp-m-0 !sp-mt-2 !sp-pl-4 !sp-text-[10px] !sp-text-service-muted">' . implode('', array_map(static fn(array $row): string => '<li>Contrato #' . self::e($row['contrato']) . ' · SIMI ' . self::e($row['inmueble']) . ' · ingreso neto ' . self::money((float) ($row['net_total'] ?? $row['net_income']))
         . ((float) ($row['share'] ?? 1.0) < 0.9999 ? ' · participación ' . self::e(ContractCoOwners::percentLabel((float) $row['share'])) . ((string) ($row['share_source'] ?? '') === 'partes_iguales' ? ' (partes iguales)' : '') . ' = ' . self::money((float) $row['net_income']) : '')
         . ' · ' . (int) $row['max_months'] . ' meses de vigencia</li>', $others)) . '</ul>' : '')
-      . '</section>'
-      . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('target') . 'Condición sugerida · probabilidad ' . self::e($ev['vacancy']) . '</h4>'
-      . self::guide('sugerida', [
-        'Qué es' => 'La propuesta automática del simulador según la probabilidad de desocupación elegida. Úsala con "Usar condición sugerida" o ajusta las condiciones del analista.',
-      ])
-      . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3" data-owner-credit-suggested data-amount="' . round((float) $s['amount']) . '" data-term="' . (int) $s['term'] . '" data-rate="' . self::e(number_format($s['rate'] * 100, 4, ',', '')) . '">'
-      . self::tile('Plazo', $s['term'] . ' meses') . self::tile('Tasa', self::percent($s['rate']))
-      . self::tile('Valor a colocar', self::money($s['amount'])) . self::tile('Cuota mensual', self::money($s['payment']), 'key')
-      . '</div>' . (!empty($s['rate_capped']) ? '<p class="' . self::NOTE . ' !sp-mt-2">La tasa de esta condición superaba la usura; se sugiere la usura mes vencido (' . self::percent($ev['usury_monthly_legal']) . ').</p>' : '')
-      . (!empty($s['uncovered']) ? '<p class="' . self::NOTE . ' !sp-mt-2 !sp-text-red-700">Con este valor ningún plazo tiene cobertura en todas sus cuotas: baja el valor.</p>' : '') . '</section>';
+      . '</section>';
   }
 
   /**
-   * Bloques calculados debajo del estudio, a dos columnas: cobertura y plan de descuento; cambios frente al sistema y
-   * políticas. Se refrescan junto con results(). @param array<string,mixed> $work
+   * Debajo del estudio, a todo el ancho: las políticas (lista a dos columnas). Se refresca junto con results().
+   * @param array<string,mixed> $work
    */
   public function resultsBelow(array $work): string
   {
@@ -435,20 +431,91 @@ final class OwnerCreditView
         . '<span class="!sp-mt-0.5 !sp-flex !sp-items-center !sp-justify-center !sp-w-5 !sp-h-5 !sp-rounded-full ' . ($policy['ok'] ? '!sp-bg-emerald-50 !sp-text-emerald-600' : '!sp-bg-red-50 !sp-text-red-600') . '">' . $ui::icon($policy['ok'] ? 'check' : 'close', '!sp-w-3 !sp-h-3') . '</span>'
         . '<span class="!sp-min-w-0"><b class="!sp-block !sp-text-[11px] ' . ($policy['ok'] ? '!sp-text-service-navy' : '!sp-text-red-700') . '">' . self::e($policy['label']) . '</b><span class="!sp-block !sp-text-[10px] !sp-text-service-muted">' . self::e($policy['detail']) . '</span></span></li>';
     }
-    // Sin cobertura ni plan (falta valor o plazo), cambios y políticas ocupan todo el ancho.
-    $left = self::coverage($work) . self::discountPlan($work);
-    return ($left !== '' ? '<div class="!sp-space-y-5">' . $left . '</div>' : '')
-      . '<div class="!sp-space-y-5' . ($left === '' ? ' lg:!sp-col-span-2' : '') . '">' . ($work['credit']['status'] === 'pendiente' ? self::adjustments($work['adjustments'] ?? [], true) : '')
-      . '<section class="' . self::SECTION . '"' . (self::needsNote($work) ? ' data-owner-credit-needs-note' : '') . '><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Políticas</h4>'
+    return '<section class="' . self::SECTION . '"' . (self::needsNote($work) ? ' data-owner-credit-needs-note' : '') . '><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Políticas</h4>'
       . ($work['policies_ok'] ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Cumple todas</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-red-700">Incumple políticas</span>') . '</div>'
       . self::guide('politicas', [
         'Requisitos' => 'Contrato activo y no próximo a vencer, plazo dentro de la vigencia, sin siniestro, valor dentro del cupo disponible (tope menos el saldo de sus créditos vigentes), valor dentro del tope, tasa bajo la usura y cuota con cobertura en todas las fechas.',
         'Cobertura' => 'Si ningún plazo cubre todas las cuotas con el valor, no se puede aprobar ni con justificación: hay que bajar el valor.',
         'Si alguna está en rojo' => 'Puedes aprobar igual, pero con justificación: el crédito queda marcado "Fuera de política" y la razón queda en el historial.',
       ])
-      . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $policies . '</ul>'
+      . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none lg:!sp-grid lg:!sp-grid-cols-2 lg:!sp-gap-x-6">' . $policies . '</ul>'
       . ($work['policies_ok'] ? '' : '<p class="' . self::NOTE . ' !sp-mt-2">Para aprobar fuera de política escribe la justificación al final; quedará en el historial.</p>')
-      . '</section></div>';
+      . '</section>';
+  }
+
+  /**
+   * Condiciones del crédito siempre a la vista (se recalculan al editar, con el descuento): valor, plazo, tasa final,
+   * cuota, intereses, total y las fechas de desembolso y de las cuotas.
+   * @param array<string,mixed> $work
+   */
+  private static function summary(array $work): string
+  {
+    $c = $work['conditions'];
+    $date = static fn(int $ts): string => $ts > 0 ? date('d/m/Y', $ts) : '—';
+    $discount = (float) ($c['rate_discount'] ?? 0);
+    return '<section class="' . self::SECTION . ' !sp-border-service-yellow" data-owner-credit-summary><h4 class="' . self::H4 . '">' . self::icon('cash') . 'Condiciones del crédito</h4>'
+      . '<div class="!sp-grid !sp-grid-cols-2 sm:!sp-grid-cols-3 !sp-gap-3">'
+      . self::tile('Valor a colocar', self::money($c['amount']), 'key')
+      . self::tile('Plazo', (int) $c['term'] . ((int) $c['term'] === 1 ? ' cuota' : ' cuotas'))
+      . self::tile('Tasa final N.M.V', self::e(self::fine((float) $c['rate'])))
+      . self::tile('Cuota mensual', self::money($c['payment']), 'key')
+      . self::tile('Total intereses', self::money($c['total_interest']))
+      . self::tile('Total a pagar', self::money((float) $c['amount'] + (float) $c['total_interest']), 'key')
+      . '</div><p class="' . self::NOTE . ' !sp-mt-3">' . self::e(($discount > 0 ? 'Descuento según política: ' . OwnerCreditService::discountText($discount, (float) $c['base_rate'], (float) $c['rate']) : 'Sin descuento según política') . '. '
+        . 'Desembolso ' . $date((int) ($work['disbursed_ts'] ?? 0)) . ' · primera cuota ' . $date((int) ($work['first_payment_ts'] ?? 0)) . ' · última cuota ' . $date((int) ($work['last_payment_ts'] ?? 0)) . '.') . '</p></section>';
+  }
+
+  /**
+   * Botones de detalle con su estado (condición sugerida, cobertura de pago, plan de descuento y cambios frente al
+   * sistema); cada uno abre su bloque en un popup dentro del liquidador.
+   * @param array<string,mixed> $work
+   */
+  private static function details(array $work): string
+  {
+    $ev = $work['evaluation'];
+    $s = $ev['suggested'];
+    $empty = static fn(string $title, string $text): string => '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::e($title) . '</h4><p class="' . self::NOTE . '">' . self::e($text) . '</p></section>';
+    $suggested = '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('target') . 'Condición sugerida · probabilidad ' . self::e($ev['vacancy']) . '</h4>'
+      . self::guide('sugerida', [
+        'Qué es' => 'La propuesta automática del simulador según la probabilidad de desocupación elegida. Úsala con "Usar condición sugerida" o ajusta las condiciones del analista.',
+      ])
+      . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-3" data-owner-credit-suggested data-amount="' . round((float) $s['amount']) . '" data-term="' . (int) $s['term'] . '" data-rate="' . self::e(number_format($s['rate'] * 100, 4, ',', '')) . '">'
+      . self::tile('Plazo', $s['term'] . ' meses') . self::tile('Tasa', self::percent($s['rate']))
+      . self::tile('Valor a colocar', self::money($s['amount'])) . self::tile('Cuota mensual', self::money($s['payment']), 'key')
+      . '</div>' . (!empty($s['rate_capped']) ? '<p class="' . self::NOTE . ' !sp-mt-2">La tasa de esta condición superaba la usura; se sugiere la usura mes vencido (' . self::percent($ev['usury_monthly_legal']) . ').</p>' : '')
+      . (!empty($s['uncovered']) ? '<p class="' . self::NOTE . ' !sp-mt-2 !sp-text-red-700">Con este valor ningún plazo tiene cobertura en todas sus cuotas: baja el valor.</p>' : '') . '</section>';
+    $coverage = self::coverage($work);
+    $covered = (bool) ($ev['coverage']['ok'] ?? false);
+    $plan = self::discountPlan($work);
+    $contracts = [];
+    $direct = false;
+    foreach ($work['discount_plan'] ?? [] as $segment) {
+      foreach ($segment['parts'] as $part) $contracts['#' . $part['contrato']] = true;
+      if ((float) $segment['direct'] >= 0.5) $direct = true;
+    }
+    $items = [
+      'sugerida' => ['Condición sugerida', 'Probabilidad ' . $ev['vacancy'] . ' · ' . (int) $s['term'] . ' meses · cuota ' . self::money($s['payment']), !empty($s['uncovered']) ? 'bad' : '', $suggested],
+      'cobertura' => ['Cobertura de pago', $coverage === '' ? 'Indica valor y plazo' : ($covered ? 'Con cobertura en todas las cuotas' : 'Sin cobertura'), $coverage !== '' && !$covered ? 'bad' : '', $coverage ?: $empty('Cobertura de pago', 'Indica el valor y el plazo para revisar la cobertura de cada cuota.')],
+      'plan' => ['Plan de descuento por contrato', $plan === '' ? 'Indica valor y plazo' : 'Contrato ' . implode(', ', array_keys($contracts)) . ($direct ? ' · con pago directo' : ''), $direct ? 'bad' : '', $plan ?: $empty('Plan de descuento por contrato', 'Indica el valor y el plazo para ver de qué contrato se descuenta cada cuota.')],
+    ];
+    // Los cambios se revisan antes de decidir; decidido, quedan en el resumen de la decisión.
+    if ($work['credit']['status'] === 'pendiente') {
+      $count = count($work['adjustments'] ?? []);
+      $items['cambios'] = ['Cambios frente al sistema', $count === 0 ? 'Sin cambios' : $count . ($count === 1 ? ' cambio' : ' cambios'), '', self::adjustments($work['adjustments'] ?? [], true)];
+    }
+    $buttons = '';
+    $dialogs = '';
+    foreach ($items as $key => [$title, $detail, $tone, $content]) {
+      $buttons .= '<button type="button" class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-w-full !sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid ' . ($tone === 'bad' ? '!sp-border-red-200 !sp-bg-red-50/60' : '!sp-border-slate-200 !sp-bg-white') . ' !sp-text-left !sp-font-sans !sp-cursor-pointer hover:!sp-border-service-yellow" data-owner-credit-dialog-open="' . $key . '" aria-haspopup="dialog">'
+        . '<span class="!sp-min-w-0"><b class="!sp-block !sp-text-[11px] !sp-text-service-navy">' . self::e($title) . '</b><span class="!sp-block !sp-text-[10px] ' . ($tone === 'bad' ? '!sp-text-red-700 !sp-font-semibold' : '!sp-text-service-muted') . '">' . self::e($detail) . '</span></span>'
+        . '<span class="!sp-shrink-0 !sp-text-[10px] !sp-font-semibold !sp-text-service-blue">Ver</span></button>';
+      $dialogs .= '<div class="!sp-fixed !sp-inset-0 !sp-z-50 !sp-overflow-y-auto !sp-bg-slate-900/40 !sp-p-4" data-owner-credit-dialog="' . $key . '" role="dialog" aria-modal="true" aria-label="' . self::e($title) . '" hidden>'
+        . '<div class="!sp-relative !sp-mx-auto !sp-my-8 !sp-w-full !sp-max-w-3xl">'
+        . '<button type="button" class="!sp-absolute !sp-top-3 !sp-right-3 !sp-z-10 !sp-flex !sp-items-center !sp-justify-center !sp-w-8 !sp-h-8 !sp-rounded-full !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-service-navy !sp-text-lg !sp-cursor-pointer hover:!sp-bg-slate-50" data-owner-credit-dialog-close aria-label="Cerrar">&times;</button>'
+        . $content . '</div></div>';
+    }
+    return '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('target') . 'Detalle del cálculo</h4>'
+      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-2">' . $buttons . '</div></section>' . $dialogs;
   }
 
   /**
