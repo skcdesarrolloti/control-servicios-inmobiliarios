@@ -85,6 +85,8 @@ final class OwnerCreditPromissoryService
   public static function normalizeDocument(string $value): string
   {
     $document = strtoupper(preg_replace('/[\s.,]+/', '', trim($value)) ?? '');
+    // El tipo escrito delante del número («CC. 33.155.303», «CE 162.162», «NIT: 900…») no es parte del documento.
+    $document = preg_replace('/^(?:CC|CE|TI|NIT|PP|PEP|PPT|RC)[:#]?(?=\d)/', '', $document) ?? $document;
     $document = preg_replace('/-\d$/', '', $document) ?? $document;
     return str_replace('-', '', $document);
   }

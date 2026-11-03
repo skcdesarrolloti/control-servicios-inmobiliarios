@@ -44,7 +44,11 @@ $print = static function (string $title, array $rows, callable $line): void {
 $columns = static fn(array $data): string => implode(', ', array_map(static fn(string $k, string $v): string => "{$k}={$v}", array_keys($data), $data));
 
 $print('Fichas de copropietarios (1)', $result['profiles'], static fn(array $r): string => "mandato #{$r['mandato']} propietario {$r['indice']}: {$r['nombre']} ({$r['documento']}) → "
-  . ($r['accion'] === 'vincular' ? "ficha existente #{$r['id']}" : ($r['id'] !== '' ? "registrado #{$r['id']}" : 'se registra en Propietarios')));
+  . match ($r['accion']) {
+    'vincular' => "ficha existente #{$r['id']}",
+    'repetido' => "misma ficha nueva que en el mandato #{$r['id']}",
+    default => $r['id'] !== '' ? "registrado #{$r['id']}" : 'se registra en Propietarios',
+  });
 $print('Mandatos que se actualizan (1)', $result['mandates'], static fn(array $r): string => "mandato #{$r['mandato']}: " . $columns($r['columnas']));
 $print('Contratos que se completan (2)', $result['contracts'], static fn(array $r): string => "contrato {$r['contrato']} (#{$r['id']}, mandato #{$r['mandato']}): " . $columns($r['columnas']));
 $print('Conflictos sin tocar (2)', $result['conflicts'], static fn(array $r): string => "contrato {$r['contrato']} (#{$r['id']}, mandato #{$r['mandato']}): {$r['columna']} contrato={$r['contrato_valor']} mandato={$r['mandato_valor']}");

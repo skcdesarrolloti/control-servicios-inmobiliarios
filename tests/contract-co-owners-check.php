@@ -76,6 +76,8 @@ $check($owners[1]['name'] === 'Inversiones X SAS' && $owners[1]['document'] === 
 
 $check(ContractCoOwners::equalSplit(3) === [33.34, 33.33, 33.33] && ContractCoOwners::equalSplit(1) === [100.0] && ContractCoOwners::equalSplit(4) === [25.0, 25.0, 25.0, 25.0], 'equal split gives the extra cent to the first owner');
 $check(ContractCoOwners::sameDocument('900.123.456-7', '900123456') && !ContractCoOwners::sameDocument('', ''), 'documents are compared normalized');
+$check(ContractCoOwners::sameDocument('CC. 33.155.303', '33155303') && ContractCoOwners::sameDocument('CE 162.162', '162162') && ContractCoOwners::sameDocument('NIT: 900053139-7', '900053139')
+  && ContractCoOwners::sameDocument('C.C. 1.047.439.221', '1047439221') && !ContractCoOwners::sameDocument('AB123456', '123456'), 'a document type written before the number is ignored');
 $check(ContractCoOwners::percentLabel(1 / 3) === '33,33 %' && ContractCoOwners::percentLabel(0.5) === '50 %', 'percentage labels');
 
 echo "Contract co-owner checks passed.\n";

@@ -62,6 +62,17 @@ contrato de arrendamiento, y que los créditos a propietarios respeten ese %:
 5. Contratos con aviso «el mandato tiene otros copropietarios»: el liquidador sigue usando el mandato hasta que se
    corrija allí (plugin `[skc_copropietarios]` u hoja de cierre).
 
+Estado al 03/11/2026 (modo de prueba contra la base de datos):
+
+- Las columnas 7 y 8 ya existen y la importación de SIMI ya se aplicó (41 contratos activos con más de un propietario).
+- `bin/sync-co-owners.php` **aún no se ha aplicado**. El modo de prueba muestra 80 fichas, de las cuales 7 personas
+  nuevas; 47 mandatos y 35 contratos por completar; 12 conflictos sin tocar y 24 contratos con copropietarios sin %.
+- Corregido antes de aplicarlo: `normalizeDocument` ya ignora el tipo escrito delante del número («CC. 33.155.303»,
+  «CE 162.162», «NIT: 900…»). Sin eso se habrían creado fichas duplicadas. El modo de prueba muestra una sola vez a quien
+  aparece en varios mandatos.
+- Conflictos (el contrato, cargado desde SIMI, tiene más copropietarios que su mandato): contratos #302, #433, #447,
+  #472, #479, #487, #588 y #613. Hay que corregir el mandato para que el liquidador use los datos buenos.
+
 ### Bot de WhatsApp: créditos
 
 - `public/owner-credit-bot.php` (`OwnerCreditBotApi`): el bot consulta el cupo, radica y consulta solicitudes de crédito

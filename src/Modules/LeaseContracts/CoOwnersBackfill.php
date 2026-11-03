@@ -57,19 +57,24 @@ final class CoOwnersBackfill
         }
         $document = OwnerCreditPromissoryService::normalizeDocument($owner['document']);
         $id = strlen($document) >= 4 ? ($index['documents'][$document] ?? '') : '';
-        $action = 'vincular';
+        // En modo de prueba, quien ya se iba a registrar en un mandato anterior se muestra como la misma ficha nueva.
+        $action = str_starts_with($id, 'nueva:') ? 'repetido' : 'vincular';
         if ($id === '') {
           if ($owner['name'] === '') {
             continue;
           }
           $action = 'registrar';
+          $id = $apply ? $this->registerProfile($mandate, $owner, $author, $now) : '';
           if ($apply) {
-            $id = $this->registerProfile($mandate, $owner, $author, $now);
             $index['ids'][$id] = true;
-            if (strlen($document) >= 4) {
-              $index['documents'][$document] = $id;
-            }
           }
+          if (strlen($document) >= 4) {
+            $index['documents'][$document] = $apply ? $id : 'nueva:' . $mandate['_ID'];
+          }
+        }
+        if ($action === 'repetido') {
+          $out['profiles'][] = ['mandato' => (string) $mandate['_ID'], 'indice' => (string) $i, 'nombre' => $owner['name'], 'documento' => $owner['document'], 'accion' => $action, 'id' => substr($id, 6)];
+          continue;
         }
         $out['profiles'][] = ['mandato' => (string) $mandate['_ID'], 'indice' => (string) $i, 'nombre' => $owner['name'], 'documento' => $owner['document'], 'accion' => $action, 'id' => $id];
         if ($id !== '' && $this->schema->columnExists($mandateTable, 'id_propietario_nuevo_' . $i)) {
