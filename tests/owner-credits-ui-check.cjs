@@ -12,7 +12,7 @@ $s = OwnerCreditSettings::defaults();
 $ev = OwnerCreditCalculator::evaluate(['gross'=>1075000,'deductions'=>['comision'=>142800],'requested_amount'=>893723,'requested_term'=>12,'request_ts'=>time(),'contract_end_ts'=>strtotime('+14 months'),'vacancy'=>'Baja'], $s);
 $ev['other_contracts'] = [['id'=>99,'contrato'=>'818','inmueble'=>'10421','net_income'=>900000,'max_months'=>20]];
 $w = ['credit'=>['id'=>12,'status'=>'pendiente','quote_id'=>574,'owner_name'=>'Propietario','property'=>'10420','purpose'=>'','requested_amount'=>893723,'requested_term'=>12,'created_at'=>time(),'decision_note'=>'','decided_by_name'=>'','decided_at'=>0],
-'contract'=>['id'=>7,'code'=>'817','estado'=>'Entregado','inicio_ts'=>0,'fin_ts'=>0,'aseguradora'=>'','siniestrado'=>false],'income_source'=>'','settings'=>$s,'evaluation'=>$ev,
+'contract'=>['id'=>7,'code'=>'817','estado'=>'Entregado','inicio_ts'=>0,'fin_ts'=>0,'aseguradora'=>'','siniestrado'=>false],'income_source'=>'','income_defaults'=>['gross'=>1075000,'deductions'=>['comision'=>142800,'garantia'=>0,'poliza_servicios'=>50000,'otros'=>0]],'settings'=>$s,'evaluation'=>$ev,
 'conditions'=>['amount'=>893723,'term'=>12,'rate'=>0.023,'payment'=>86070,'total_interest'=>139117],'schedule'=>[],'policies'=>[],'policies_ok'=>true,'other_credits'=>[],'events'=>[],
 'owners'=>[['key'=>'mandato_1','name'=>'Primer Dueño','document'=>'111','current'=>false],['key'=>'mandato_2','name'=>'Segunda Dueña','document'=>'222','current'=>true]]];
 echo (new OwnerCreditView())->workspace($w, true, true);`;
@@ -112,6 +112,9 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   await page.fill('[name="gross"]', '');
   await page.type('[name="gross"]', '1250000');
   assert.equal(await page.inputValue('[name="gross"]'), '$1.250.000');
+  // La comisión se recalcula con el canon (142.800 × 1.250.000 / 1.075.000); la póliza de servicios no cambia.
+  assert.equal(await page.inputValue('[name="ded_comision"]'), '$166.047');
+  assert.equal(await page.$eval('[name="ded_poliza_servicios"]', el => el.hasAttribute('data-owner-credit-scale-base')), false);
   await page.evaluate(() => { const i = document.querySelector('[name="gross"]'); i.setSelectionRange(2, 2); });
   await page.keyboard.type('9');
   assert.equal(await page.inputValue('[name="gross"]'), '$19.250.000');

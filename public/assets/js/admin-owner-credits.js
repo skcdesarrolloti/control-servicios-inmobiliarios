@@ -181,6 +181,19 @@
       return true;
     }
 
+    // Comisión y garantía se calculan sobre el canon: si el analista lo ajusta, se escalan en la misma proporción
+    // desde los valores del contrato (la póliza de servicios no cambia). Después se pueden corregir a mano.
+    function scaleDeductions(form) {
+      var gross = form.elements.gross;
+      var base = Number(gross && gross.getAttribute("data-owner-credit-base-gross")) || 0;
+      if (!base) return;
+      var value = Number(String(gross.value || "").replace(/\D/g, "")) || 0;
+      form.querySelectorAll("[data-owner-credit-scale-base]").forEach(function (input) {
+        input.value = String(Math.round((Number(input.getAttribute("data-owner-credit-scale-base")) || 0) * value / base));
+        formatMoneyInput(input);
+      });
+    }
+
     // Tasa final = tasa base × (1 − descuento según política); se muestra mientras se escribe (el servidor la recalcula).
     function syncFinalRate(form) {
       var output = form.querySelector("[data-owner-credit-final-rate]");
@@ -753,6 +766,7 @@
       // El pagaré y el abono no recalculan el liquidador.
       if (!form || ["note", "owner_key", "main_contract_id", "promissory_signers[]", "promissory_channels[]", "promissory_void_note", "reference_rate"].indexOf(event.target.name) >= 0) return;
       if (event.target.name === "rate" || event.target.name === "rate_discount") syncFinalRate(form);
+      if (event.target.name === "gross") scaleDeductions(form);
       window.clearTimeout(simulateTimer);
       simulateTimer = window.setTimeout(function () { simulate(form); }, 350);
     });

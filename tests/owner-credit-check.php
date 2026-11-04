@@ -145,7 +145,7 @@ $db = App::db();
 $contract = $db->getRow("SELECT c.* FROM `{$db->table('jet_cct_contratos_arrendamiento')}` c JOIN `{$db->table('jet_cct_contrato_mandato')}` m ON CAST(m.`_ID` AS CHAR) = c.`id_contrato_mandato` WHERE LOWER(c.`estado`) = 'entregado' AND m.`total_comision` <> '' ORDER BY c.`_ID` DESC LIMIT 1");
 if (is_array($contract)) {
   $income = (new OwnerCreditService($db, null))->defaultIncome($contract);
-  $assert($income['gross'] > 0 && $income['deductions']['comision'] > 0 && str_starts_with($income['source'], 'Contrato de mandato'), 'income deductions come from the lease mandate');
+  $assert($income['gross'] > 0 && $income['deductions']['comision'] > 0 && str_starts_with($income['source'], 'Contrato de arrendamiento #') && str_contains($income['source'], 'según su contrato de mandato'), 'income deductions come from the lease mandate and the source names the lease contract');
 }
 
 // Vista: renderiza el liquidador con políticas incumplidas y deja la justificación obligatoria visible.

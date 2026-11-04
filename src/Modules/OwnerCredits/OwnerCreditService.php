@@ -946,6 +946,7 @@ final class OwnerCreditService
         'aseguradora' => (string) ($contract['aseguradora'] ?? ''),
       ],
       'income_source' => $defaults['source'],
+      'income_defaults' => $defaults,
       'term_error' => $termError,
       'usury_stale' => OwnerCreditUsuryRate::staleMessage($settings),
       'settings' => $settings,
@@ -1715,8 +1716,10 @@ final class OwnerCreditService
     $failed = array_values(array_filter($policies, static fn(array $policy): bool => !$policy['ok']));
     if ($failed !== []) $items[] = ['key' => 'politicas', 'label' => 'Políticas incumplidas', 'detail' => implode(', ', array_column($failed, 'label')), 'note' => true];
     if (abs((float) $evaluation['gross'] - (float) $defaults['gross']) >= 1) $items[] = ['key' => 'canon', 'label' => 'Canon', 'detail' => $money((float) $defaults['gross']) . ' → ' . $money((float) $evaluation['gross']), 'note' => true];
+    // Con el canon ajustado, comisión y garantía se comparan con su valor escalado: solo cuenta lo que el analista cambió a mano.
+    $expected = self::scaledDeductions($defaults, (float) $evaluation['gross']);
     foreach (self::DEDUCTIONS as $key => $label) {
-      $from = (float) ($defaults['deductions'][$key] ?? 0);
+      $from = (float) ($expected[$key] ?? 0);
       $to = (float) ($evaluation['deductions'][$key] ?? 0);
       if (abs($to - $from) >= 1) $items[] = ['key' => 'ded_' . $key, 'label' => $label, 'detail' => $money($from) . ' → ' . $money($to), 'note' => true];
     }
@@ -2108,12 +2111,35 @@ final class OwnerCreditService
       $deductions['comision'] = self::money($mandate['total_comision'] ?? '');
       $deductions['garantia'] = self::isYes($mandate['incluye_garantia'] ?? '') ? self::money($mandate['precio_mes_garantia'] ?? '') : 0.0;
       $deductions['poliza_servicios'] = self::isYes($mandate['incluye_garantia_servicios'] ?? '') ? self::money($mandate['precio_mes_servicios'] ?? '') : 0.0;
-      return ['gross' => $canon, 'deductions' => $deductions, 'source' => 'Contrato de mandato #' . $mandateId . '.' . $canonNote];
+      return ['gross' => $canon, 'deductions' => $deductions, 'source' => self::leaseLabel($contract) . ': comisión, garantía y póliza según su contrato de mandato.' . $canonNote];
     }
     // Sin mandato (o sin comisión registrada) se descuenta un porcentaje fijo del canon, configurable (15 % por defecto).
     $percent = (float) $this->config()['no_mandate_deduction'];
     $deductions['otros'] = round($canon * $percent);
     return ['gross' => $canon, 'deductions' => $deductions, 'source' => 'Estimado: el contrato no tiene mandato con comisión registrada; se descuenta el ' . rtrim(rtrim(number_format($percent * 100, 2, ',', ''), '0'), ',') . ' % del canon. Corrige los descuentos si conoces los valores reales.' . $canonNote];
+  }
+
+  /** "Contrato de arrendamiento #817 · inmueble 10420" */
+  private static function leaseLabel(array $contract): string
+  {
+    $property = trim((string) ($contract['inmueble'] ?? $contract['id_inmueble'] ?? ''));
+    return 'Contrato de arrendamiento #' . trim((string) ($contract['contrato'] ?? '')) . ($property !== '' ? ' · inmueble ' . $property : '');
+  }
+
+  /**
+   * Descuentos que se calculan sobre el canon (comisión con IVA, garantía y, sin mandato, el % estimado): si el
+   * analista ajusta el canon se escalan en la misma proporción. La póliza de servicios no depende del canon.
+   */
+  public const CANON_DEDUCTIONS = ['comision', 'garantia', 'otros'];
+
+  /** Descuentos sugeridos para un canon distinto al del contrato. @param array{gross:float,deductions:array<string,float>} $defaults @return array<string,float> */
+  public static function scaledDeductions(array $defaults, float $gross): array
+  {
+    $base = (float) $defaults['gross'];
+    $out = $defaults['deductions'];
+    if ($base <= 0) return $out;
+    foreach (self::CANON_DEDUCTIONS as $key) $out[$key] = round((float) ($out[$key] ?? 0) * $gross / $base);
+    return $out;
   }
 
   /** Canon de la última carta de aumento de canon del contrato (0 si no hay). */

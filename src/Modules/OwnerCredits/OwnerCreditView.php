@@ -121,7 +121,9 @@ final class OwnerCreditView
     // Editables en blanco; de solo lectura en gris.
     $inputClass = $editable ? UI::field('!sp-bg-white') : $ui::INPUT . ' ' . self::READONLY;
     $field = static fn(string $label, string $control, string $class = ''): string => '<label class="!sp-block' . ($class !== '' ? ' ' . $class : '') . '"><span class="' . $ui::LABEL . '">' . self::e($label) . '</span>' . $control . '</label>';
-    $money = static fn(string $name, float $value): string => '<input class="' . $inputClass . '" name="' . $name . '" inputmode="numeric" data-owner-credit-money value="' . self::e(self::money($value)) . '"' . $lock . '>';
+    $money = static fn(string $name, float $value, string $attrs = ''): string => '<input class="' . $inputClass . '" name="' . $name . '" inputmode="numeric" data-owner-credit-money value="' . self::e(self::money($value)) . '"' . $attrs . $lock . '>';
+    // Al cambiar el canon, la comisión y la garantía se recalculan en la misma proporción (el JS usa estos valores base).
+    $defaultIncome = $work['income_defaults'] ?? ['gross' => 0.0, 'deductions' => []];
     $select = static fn(string $name, string $options): string => '<select class="' . $inputClass . '" name="' . $name . '"' . ($editable ? '' : ' disabled') . '>' . $options . '</select>';
     $chip = static fn(string $label, string $value): string => '<span class="!sp-inline-flex !sp-items-center !sp-gap-1 !sp-px-2.5 !sp-py-1 !sp-rounded-full !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-[10px] !sp-text-service-muted">' . self::e($label) . ' <b class="!sp-text-service-navy">' . $value . '</b></span>';
     $analyst = $ev['analyst'] ?? ['siniestro' => $contract['siniestrado'], 'siniestrados' => [], 'has_credits' => false];
@@ -139,7 +141,10 @@ final class OwnerCreditView
       : self::tile('Fin del contrato', $contract['fin_ts'] > 0 ? date('d/m/Y', $contract['fin_ts']) : '—');
 
     $deductions = '';
-    foreach (OwnerCreditService::DEDUCTIONS as $key => $label) $deductions .= $field('(−) ' . $label, $money('ded_' . $key, (float) ($ev['deductions'][$key] ?? 0)));
+    foreach (OwnerCreditService::DEDUCTIONS as $key => $label) {
+      $scale = in_array($key, OwnerCreditService::CANON_DEDUCTIONS, true) ? ' data-owner-credit-scale-base="' . round((float) ($defaultIncome['deductions'][$key] ?? 0)) . '"' : '';
+      $deductions .= $field('(−) ' . $label, $money('ded_' . $key, (float) ($ev['deductions'][$key] ?? 0), $scale));
+    }
     $purposes = OwnerCreditSettings::PURPOSES;
     // Créditos antiguos pueden tener una destinación que ya no está en la lista: se conserva para no perderla al guardar.
     if ($credit['purpose'] !== '' && !in_array($credit['purpose'], $purposes, true)) array_unshift($purposes, (string) $credit['purpose']);
@@ -195,10 +200,10 @@ final class OwnerCreditView
 
       . '<section class="' . self::SECTION . '"><h4 class="' . self::H4 . '">' . self::icon('cash') . 'Ingreso del propietario</h4>' . self::guide('ingreso', [
         'Ingreso bruto (canon)' => 'Lo que paga el arrendatario cada mes. Si ya tuvo aumento, ajústalo: solo cambia este crédito, no el contrato.',
-        'Descuentos' => 'Lo que se le descuenta al propietario cada mes antes de girarle: comisión de administración con IVA, garantía inmobiliaria (seguro de arrendamiento) y póliza de servicios públicos. Salen del contrato de mandato; sin mandato se estima un porcentaje del canon (Configuración).',
+        'Descuentos' => 'Lo que se le descuenta al propietario cada mes antes de girarle: comisión de administración con IVA, garantía inmobiliaria (seguro de arrendamiento) y póliza de servicios públicos. Salen del contrato de mandato; sin mandato se estima un porcentaje del canon (Configuración). Si cambias el canon, la comisión y la garantía se recalculan en la misma proporción; la póliza de servicios no depende del canon. Después puedes corregir cualquiera a mano.',
         'Ingreso neto (INO)' => 'Canon menos descuentos: lo que realmente recibe el propietario y con lo que paga la cuota.',
       ]) . '<p class="' . self::NOTE . ' !sp-mb-3">' . self::e($work['income_source']) . '</p>'
-      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">' . $field('Ingreso bruto (canon)', $money('gross', $ev['gross'])) . $deductions . '</div>'
+      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">' . $field('Ingreso bruto (canon)', $money('gross', $ev['gross'], ' data-owner-credit-base-gross="' . round((float) $defaultIncome['gross']) . '"')) . $deductions . '</div>'
       . ($editable ? '<p class="' . self::NOTE . ' !sp-mt-3">Puedes ajustar el canon (por ejemplo, si ya tuvo aumento) y los descuentos: solo cambian este crédito, no el contrato.</p>' : '')
       . self::otherIncome($ev) . '</section>'
 

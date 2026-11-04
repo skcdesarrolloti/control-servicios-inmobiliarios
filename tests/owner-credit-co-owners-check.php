@@ -107,6 +107,12 @@ $html = (new OwnerCreditView())->workspace($personal, true, true);
 $check(str_contains($html, 'Participación del solicitante') && str_contains($html, '30 %') && str_contains($html, 'Ingreso atribuible'), 'the liquidator shows the share and the attributable income tiles');
 $check(str_contains(\SCM\Modules\OwnerCredits\OwnerCreditPdf::html($personal, 'QA'), 'Ingreso atribuible del contrato #2020'), 'the internal PDF shows the attributable income');
 
+// El origen del ingreso nombra el contrato de arrendamiento; al ajustar el canon, la comisión se escala en la misma
+// proporción y no cuenta como cambio aparte (solo el canon).
+$canonWork = $service->workspace((int) $personal['credit']['id'], ['gross' => '$2.200.000', 'ded_comision' => '$220.000']);
+$check(str_starts_with((string) $canonWork['income_source'], 'Contrato de arrendamiento #2020 · inmueble 7000') && !str_contains((string) $canonWork['income_source'], 'mandato #'), 'the income source names the lease contract, not the mandate number');
+$check(OwnerCreditService::scaledDeductions($canonWork['income_defaults'], 2200000)['comision'] === 220000.0 && in_array('canon', array_column($canonWork['adjustments'], 'key'), true) && !in_array('ded_comision', array_column($canonWork['adjustments'], 'key'), true), 'a commission scaled with the canon is not flagged as a separate change');
+
 // Reparaciones: 100 % del contrato del inmueble (Ana aún no tiene otros contratos).
 $repairId = $service->createManual(20, 1000000, 6, OwnerCreditSettings::REPAIR_PURPOSE, $actor, '', 'mandato_1');
 $repair = $service->workspace($repairId);
