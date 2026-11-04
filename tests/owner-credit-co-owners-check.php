@@ -180,6 +180,7 @@ $repairHtml = (new OwnerCreditView())->workspace($service->workspace($repairId),
 $check(!str_contains($repairHtml, 'data-owner-credit-promissory-signer') && str_contains($repairHtml, 'lo firman todos los copropietarios'), 'the liquidator shows no signer checkboxes on a repair credit');
 $letter = \SCM\Modules\OwnerCredits\OwnerCreditResponseDocuments::letter($repairCredit, ['signer' => ['name' => 'Analista QA', 'cargo' => ''], 'margin' => 2, 'date' => time(), 'holders' => [['name' => 'Ana Uno', 'document' => '111111'], ['name' => 'Luis Dos', 'document' => '222222'], ['name' => 'Marta Tres', 'document' => '333333']]], false);
 $check(str_contains($letter, 'Señores:') && str_contains($letter, 'Luis Dos') && str_contains($letter, 'Marta Tres') && str_contains($letter, 'Estimados copropietarios'), 'the approval letter names every holder');
+$check(!str_contains($letter, 'desembolso') && !str_contains(\SCM\Modules\OwnerCredits\OwnerCreditResponseDocuments::plan($repairCredit, ['signer' => ['name' => 'Analista QA', 'cargo' => ''], 'margin' => 2, 'date' => time()], false), 'desembolso'), 'the approval letter and the payment plan do not show the disbursement date');
 
 // Copropietarios con documento y contacto: si falta uno, no se envía el pagaré de la reparación.
 $pdo->exec("UPDATE wp_jet_cct_contrato_mandato SET documento_3 = '', correo_3 = '', celular_3 = '' WHERE _ID = 40");
