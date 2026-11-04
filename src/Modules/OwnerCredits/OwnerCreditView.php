@@ -822,7 +822,10 @@ final class OwnerCreditView
         . '<button type="button" class="' . $ui::NAVY . ' !sp-ml-auto" data-owner-credit-promissory-send>' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . ($resend ? 'Reenviar enlace para firmar' : 'Enviar para firmar') . '</button></div>'
       : '';
     return '<section class="' . self::SECTION . '" data-owner-credit-promissory><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Pagaré y carta de instrucciones</h4>'
-      . ($done ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Firmado</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-red-700">Falta firma</span>') . '</div>'
+      . ($done ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Firmado</span>' : '<span class="!sp-flex !sp-items-center !sp-gap-3">'
+        // Los propietarios firman desde su enlace: este botón vuelve a consultar si ya firmaron sin cerrar el popup.
+        . ($resend ? '<button type="button" class="' . $ui::SECONDARY . '" data-owner-credit-promissory-refresh title="Consultar si ya firmaron">' . $ui::icon('refresh', '!sp-w-3.5 !sp-h-3.5') . 'Actualizar estado</button>' : '')
+        . '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-red-700">Falta firma</span></span>') . '</div>'
       . self::guide('pagare', [
         'Qué es' => 'Un pagaré en blanco (sin valor, interés ni vencimiento) con su carta de instrucciones, que autoriza a llenarlo si el propietario incumple, por el total que deba de sus créditos del Pasaporte SuCasa.',
         'Una sola vez' => 'Cada persona lo firma una vez y respalda todos sus créditos. Si ya lo firmó, no se le vuelve a pedir.',

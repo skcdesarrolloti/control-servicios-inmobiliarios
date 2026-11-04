@@ -698,6 +698,23 @@
         });
         return;
       }
+      // Vuelve a consultar el liquidador: si ya firmaron todos, abre la etapa de respuesta; si no, lo dice aquí.
+      var refreshPromissory = promissoryBox && target.closest("[data-owner-credit-promissory-refresh]");
+      if (refreshPromissory) {
+        var refreshId = form.getAttribute("data-credit-id");
+        refreshPromissory.disabled = true;
+        refreshPromissory.style.opacity = "0.55";
+        loadReport(true);
+        openCredit({ credit_id: refreshId }).then(function () {
+          var fresh = modal && modal.querySelector("[data-owner-credit-promissory-status]");
+          var still = modal && modal.querySelector("[data-owner-credit-promissory-refresh]");
+          if (fresh && still && !fresh.closest("[hidden]")) {
+            fresh.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-font-semibold !sp-text-amber-800";
+            fresh.textContent = "Estado actualizado a las " + new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }) + ": aún falta la firma.";
+          }
+        });
+        return;
+      }
       var promissoryPdf = promissoryBox && target.closest("[data-owner-credit-promissory-pdf]");
       if (promissoryPdf) {
         var pdfRequest = new FormData();

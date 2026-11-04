@@ -989,6 +989,8 @@ final class OwnerCreditService
     // (la aprobación quedaba guardada pero no salían el historial, los avisos ni el pagaré).
     $this->ensureSchema();
     $this->promissory()->ensureSchema();
+    // Igual con la cola de avisos: se inicia antes, o los avisos y el pagaré que salen al aprobar no se encolan.
+    $this->promissory()->prewarmQueue();
     $pdo = $this->db->pdo();
     $pdo->beginTransaction();
     try {

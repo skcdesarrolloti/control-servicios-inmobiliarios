@@ -12,6 +12,7 @@ use SCM\Support\EmailTemplate;
 use SCM\Support\HtmlPdfRenderer;
 use SCM\Support\InternalNotificationRecipients;
 use SCM\Support\SchemaInspector;
+use SCM\Support\SharedNotificationsBridge;
 use SCM\Support\SmsQueue;
 
 /**
@@ -36,10 +37,12 @@ final class OwnerCreditPromissoryService
   private \Closure $renderPdf;
   /** @var (\Closure(array<string,mixed>):bool)|null tras firmar; true = la respuesta del crédito ya le lleva su copia */
   private ?\Closure $afterSign = null;
+  private bool $sharedQueue;
 
   public function __construct(private Database $db, private string $secret, private string $baseUrl, ?\Closure $enqueue = null, ?\Closure $renderPdf = null, ?SchemaInspector $schema = null)
   {
     $this->schema = $schema ?: new SchemaInspector($db);
+    $this->sharedQueue = $enqueue === null;
     $this->enqueue = $enqueue ?? fn(string $channel, string $to, array $message): int => $this->deliver($channel, $to, $message);
     $this->renderPdf = $renderPdf ?? static fn(array $row, array $payload): string => self::pdfBytes($row, $payload);
   }
@@ -457,7 +460,7 @@ final class OwnerCreditPromissoryService
       }
       if ($count > 0) {
         try {
-          (new \SCM\Support\SharedNotificationsBridge($this->db))->dispatchNow($key . ':' . $destination);
+          (new SharedNotificationsBridge($this->db))->dispatchNow($key . ':' . $destination);
         } catch (\Throwable) {
           // Queda en la cola compartida para reintento.
         }
@@ -484,10 +487,25 @@ final class OwnerCreditPromissoryService
     $this->db->update($this->table(), ['delivery_json' => self::json($delivery)], ['id' => $id]);
   }
 
+  /**
+   * La cola compartida crea sus tablas al iniciarse y se niega a hacerlo dentro de una transacción: hay que iniciarla
+   * antes de abrirla. Sin esto, el código de firma y los enlaces que se envían bajo bloqueo nunca se encolaban.
+   */
+  public function prewarmQueue(): void
+  {
+    if (!$this->sharedQueue || $this->db->pdo()->inTransaction()) return;
+    try {
+      (new SharedNotificationsBridge($this->db))->queue();
+    } catch (\Throwable $error) {
+      error_log('[owner-credit-promissory] No se pudo iniciar la cola compartida: ' . $error->getMessage());
+    }
+  }
+
   /** Serializa la operación sobre el pagaré (código, firma, anulación). */
   private function locked(int $id, callable $callback): mixed
   {
     $this->ensureSchema();
+    $this->prewarmQueue();
     $pdo = $this->db->pdo();
     $own = !$pdo->inTransaction();
     if ($own) $pdo->beginTransaction();
