@@ -556,6 +556,18 @@
   #scm-app .scm-gc .scm-gc-filter-actions { @apply flex flex-wrap gap-2 sm:col-span-2 xl:col-span-1; }
   #scm-app .scm-gc .scm-gc-filter-actions .scm-gc-btn { @apply min-h-[40px] flex-1 xl:flex-none; }
 
+  /* Lista desde Excel */
+  #scm-app .scm-gc .scm-gc-excel-banner { @apply flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[#061d49] sm:flex-row sm:items-start; }
+  #scm-app .scm-gc .scm-gc-excel-banner.is-expired { @apply border-slate-200 bg-slate-50; }
+  #scm-app .scm-gc .scm-gc-excel-banner > div { @apply flex min-w-0 flex-1 flex-col gap-0.5; }
+  #scm-app .scm-gc .scm-gc-excel-banner > div > strong { @apply text-[13px] font-semibold; }
+  #scm-app .scm-gc .scm-gc-excel-banner > div > span { @apply text-xs text-slate-600; }
+  #scm-app .scm-gc .scm-gc-excel-unmatched { @apply mt-1.5 text-xs; }
+  #scm-app .scm-gc .scm-gc-excel-unmatched summary { @apply cursor-pointer font-semibold text-amber-800; }
+  #scm-app .scm-gc .scm-gc-excel-unmatched ul { @apply m-0 mt-2 grid max-h-56 list-none gap-1 overflow-y-auto p-0 sm:grid-cols-2; }
+  #scm-app .scm-gc .scm-gc-excel-unmatched li { @apply rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-inset ring-amber-100; }
+  #scm-app .scm-gc .scm-gc-excel-unmatched li small { @apply block text-[11px] text-slate-500; }
+
   /* Bulk bar */
   #scm-app .scm-gc .scm-gc-bulkbar { @apply flex flex-col gap-3 rounded-xl border border-indigo-100 bg-[#f2f3ff] px-4 py-3 xl:flex-row xl:items-center xl:justify-between; }
   #scm-app .scm-gc .scm-gc-bulkbar-info { @apply flex min-w-0 flex-col gap-0.5; }

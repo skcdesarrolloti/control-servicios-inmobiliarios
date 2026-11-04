@@ -79,7 +79,7 @@
       var panel = root.querySelector("#scm-panel-gestiones-cobro [data-scm-collection-log]");
       [
         "scmgc_buscar", "scmgc_estado", "scmgc_etapa", "scmgc_movimiento", "scmgc_cartera_page",
-        "scmgc_contratos_buscar", "scmgc_contratos_estado", "scmgc_contratos_etapa", "scmgc_contratos_page",
+        "scmgc_contratos_buscar", "scmgc_contratos_estado", "scmgc_contratos_etapa", "scmgc_contratos_lista", "scmgc_contratos_page",
         "scmgc_fecha_desde", "scmgc_fecha_hasta", "scmgc_tipo", "scmgc_contrato", "scmgc_inmueble", "scmgc_arrendatario", "scmgc_page",
         "scmgc_queue_fecha_desde", "scmgc_queue_fecha_hasta", "scmgc_queue_estado", "scmgc_queue_canal",
         "scmgc_queue_tipo", "scmgc_queue_plantilla", "scmgc_queue_buscar", "scmgc_queue_page"
@@ -808,6 +808,71 @@
           checkAll.checked = checks.length > 0 && checked.length === checks.length;
           checkAll.indeterminate = checked.length > 0 && checked.length < checks.length;
         }
+      });
+    }
+
+    function selectAllFiltered(panel) {
+      if (!panel) return;
+      var state = bulkState(panel);
+      panel.setAttribute("data-scm-bulk-all-filtered", "1");
+      state.all = true;
+      state.selected = {};
+      state.excluded = {};
+      state.filterSignature = bulkFilterSignature(panel);
+      state.filterValues = bulkFilterValues(panel);
+      state.total = bulkAllCount(panel);
+      panel.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled)").forEach(function (input) {
+        input.checked = true;
+      });
+      updateBulkBars(panel);
+    }
+
+    var pendingExcelSelection = false;
+
+    function uploadContractsExcel(input) {
+      var panel = input.closest("[data-scm-portfolio-panel]");
+      var filterForm = panel ? panel.querySelector("[data-scm-collection-log-form]") : null;
+      var pick = panel ? panel.querySelector("[data-scm-contracts-excel-pick]") : null;
+      if (!filterForm || !input.files || !input.files.length) return;
+      var file = input.files[0];
+      if (!/\.(xls|xlsx)$/i.test(String(file.name || ""))) {
+        notify("warning", "Sube el listado en formato .xls o .xlsx.", "Cartera");
+        return;
+      }
+      var fd = new FormData();
+      fd.set("operation", "contract_list_excel");
+      fd.set("file", file);
+      if (pick) pick.disabled = true;
+      notify("info", "Cruzando el archivo con los contratos activos...", "Cartera");
+      postJson(actionPortfolio, fd).then(function (data) {
+        notify(Number(data.contracts || 0) > 0 ? "success" : "warning", data.message || "Archivo procesado.", "Cartera");
+        var setField = function (name, value) {
+          var field = filterForm.querySelector("[name='" + name + "']");
+          if (field) field.value = value;
+        };
+        setField("scmgc_contratos_lista", String(data.token || ""));
+        setField("scmgc_contratos_buscar", "");
+        setField("scmgc_contratos_estado", "");
+        setField("scmgc_contratos_etapa", "");
+        setField("scmgc_contratos_page", "1");
+        var state = bulkState(panel);
+        state.all = false;
+        state.selected = {};
+        state.excluded = {};
+        state.filterSignature = "";
+        state.filterValues = {};
+        state.total = 0;
+        pendingExcelSelection = Number(data.contracts || 0) > 0;
+        if (typeof filterForm.requestSubmit === "function") {
+          filterForm.requestSubmit();
+        } else {
+          filterForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        }
+      }).catch(function (error) {
+        notify("error", error.message, "Cartera");
+      }).finally(function () {
+        if (pick) pick.disabled = false;
+        input.value = "";
       });
     }
 
@@ -1619,23 +1684,21 @@
         openReportDrilldown(reportDetailButton);
         return;
       }
+      var excelPick = event.target.closest && event.target.closest("[data-scm-contracts-excel-pick]");
+      if (excelPick && root.contains(excelPick)) {
+        event.preventDefault();
+        var excelPanel = excelPick.closest("[data-scm-portfolio-panel]");
+        var excelFile = excelPanel ? excelPanel.querySelector("[data-scm-contracts-excel-file]") : null;
+        if (excelFile) {
+          excelFile.value = "";
+          excelFile.click();
+        }
+        return;
+      }
       var bulkAllButton = event.target.closest && event.target.closest("[data-scm-portfolio-bulk-all]");
       if (bulkAllButton && root.contains(bulkAllButton)) {
         event.preventDefault();
-        var allPanel = bulkAllButton.closest("[data-scm-portfolio-panel]");
-        if (allPanel) {
-          allPanel.setAttribute("data-scm-bulk-all-filtered", "1");
-          bulkState(allPanel).all = true;
-          bulkState(allPanel).selected = {};
-          bulkState(allPanel).excluded = {};
-          bulkState(allPanel).filterSignature = bulkFilterSignature(allPanel);
-          bulkState(allPanel).filterValues = bulkFilterValues(allPanel);
-          bulkState(allPanel).total = bulkAllCount(allPanel);
-          allPanel.querySelectorAll("[data-scm-portfolio-bulk-check]:not(:disabled)").forEach(function (input) {
-            input.checked = true;
-          });
-          updateBulkBars(allPanel);
-        }
+        selectAllFiltered(bulkAllButton.closest("[data-scm-portfolio-panel]"));
         return;
       }
       var bulkClearButton = event.target.closest && event.target.closest("[data-scm-portfolio-bulk-clear]");
@@ -1811,7 +1874,20 @@
     });
 
     root.addEventListener("scm:collection-log-replaced", function (event) {
-      restoreBulkSelection((event.detail && event.detail.container) || root);
+      var container = (event.detail && event.detail.container) || root;
+      restoreBulkSelection(container);
+      if (pendingExcelSelection) {
+        pendingExcelSelection = false;
+        var contractsPanel = container.querySelector("[data-scm-portfolio-panel='contratos']");
+        if (contractsPanel && contractsPanel.querySelector("[data-scm-portfolio-bulkbar]")) {
+          selectAllFiltered(contractsPanel);
+        }
+      }
+    });
+
+    root.addEventListener("change", function (event) {
+      var excelInput = event.target.closest && event.target.closest("[data-scm-contracts-excel-file]");
+      if (excelInput && root.contains(excelInput)) uploadContractsExcel(excelInput);
     });
 
     document.addEventListener("keydown", function (event) {

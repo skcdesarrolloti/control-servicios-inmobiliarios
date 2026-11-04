@@ -528,11 +528,27 @@ final class CollectionPortfolioService
     if (!in_array($stage, ['', 'normal', 'prejuridico', 'siniestro'], true)) {
       $stage = '';
     }
+    $listToken = $this->contractListToken((string) ($filters['list'] ?? ''));
+    $listInfo = null;
+    $listContracts = null;
+    if ($listToken !== '') {
+      $stored = $this->loadContractList($listToken);
+      if ($stored === null) {
+        $listInfo = ['token' => $listToken, 'expired' => true];
+        $listContracts = [];
+      } else {
+        $listContracts = array_fill_keys(array_map('intval', (array) ($stored['contract_ids'] ?? [])), true);
+        $listInfo = ['token' => $listToken, 'expired' => false] + array_diff_key($stored, ['contract_ids' => true]);
+      }
+    }
 
     $rows = [];
     foreach ($contracts as $contract) {
       $contractId = (int) ($contract['_ID'] ?? 0);
       if ($contractId <= 0) {
+        continue;
+      }
+      if ($listContracts !== null && !isset($listContracts[$contractId])) {
         continue;
       }
       $portfolio = is_array($portfolioByContract[$contractId] ?? null) ? $portfolioByContract[$contractId] : [];
@@ -614,9 +630,202 @@ final class CollectionPortfolioService
 
     return [
       'rows' => array_slice($rows, $offset, $perPage),
-      'filters' => ['status' => $status, 'stage' => $stage, 'search' => $search],
+      'filters' => ['status' => $status, 'stage' => $stage, 'search' => $search, 'list' => $listToken],
+      'list' => $listInfo,
       'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'total_pages' => $totalPages],
     ];
+  }
+
+  /**
+   * Lee un Excel externo (facturación, listados de SIMI, etc.), cruza cada fila
+   * por documento y código de inmueble con los contratos activos y guarda el
+   * resultado como lista temporal para filtrar y seleccionar en lote.
+   *
+   * @param array<string,mixed> $file
+   * @return array<string,mixed>
+   */
+  public function buildContractListFromFile(array $file): array
+  {
+    $error = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($error !== UPLOAD_ERR_OK) {
+      throw new \RuntimeException($this->uploadErrorMessage($error));
+    }
+    $path = (string) ($file['tmp_name'] ?? '');
+    $name = basename(trim((string) ($file['name'] ?? 'listado.xls')));
+    $size = (int) ($file['size'] ?? 0);
+    $maxBytes = defined('SCM_UPLOAD_MAX_BYTES') ? (int) SCM_UPLOAD_MAX_BYTES : 10485760;
+    if ($path === '' || !is_readable($path) || $size <= 0 || $size > $maxBytes) {
+      throw new \RuntimeException('El archivo está vacío, no se puede leer o supera el límite permitido.');
+    }
+    if (!in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), ['xls', 'xlsx'], true)) {
+      throw new \RuntimeException('Formato no soportado. Sube el listado en .xls o .xlsx.');
+    }
+
+    $rows = $this->reader->read($path, $name, SpreadsheetReader::MAX_ROWS);
+    $entries = $this->parseContractListRows($rows);
+    if ($entries === []) {
+      throw new \RuntimeException('No se encontraron filas con cédula/NIT o código de inmueble en el archivo.');
+    }
+
+    $result = $this->matchContractListEntries($entries, $this->activeContracts());
+    $token = bin2hex(random_bytes(8));
+    $payload = [
+      'file_name' => $name,
+      'entries' => count($entries),
+      'matched_entries' => (int) $result['matched_entries'],
+      'contracts' => count($result['contract_ids']),
+      'unmatched' => array_slice($result['unmatched'], 0, 200),
+      'unmatched_count' => count($result['unmatched']),
+      'created_at' => date('Y-m-d H:i:s'),
+      'contract_ids' => $result['contract_ids'],
+    ];
+    $this->storeContractList($token, $payload);
+
+    return ['token' => $token] + array_diff_key($payload, ['contract_ids' => true]);
+  }
+
+  /**
+   * @param array<int,array<int,mixed>> $rows
+   * @return array<int,array{document:string,property:string,name:string}>
+   */
+  public function parseContractListRows(array $rows): array
+  {
+    $columns = null;
+    $headerIndex = -1;
+    foreach (array_slice($rows, 0, 15, true) as $index => $row) {
+      $map = ['document' => -1, 'property' => -1, 'name' => -1, 'voided' => -1];
+      foreach (array_values((array) $row) as $position => $cell) {
+        $key = $this->headerKey($cell);
+        if ($key === '') {
+          continue;
+        }
+        if ($map['document'] < 0 && in_array($key, ['cedula', 'documento', 'nit', 'cc', 'identificacion', 'nitcedula', 'cedulanit', 'documentoarrendatario', 'numerodocumento', 'nodocumento', 'nrodocumento'], true)) {
+          $map['document'] = $position;
+        } elseif ($map['property'] < 0 && in_array($key, ['noinm', 'inmueble', 'codinmueble', 'codigoinmueble', 'idinmueble', 'nroinmueble', 'numeroinmueble', 'codigo', 'codigosimi', 'inmueblesimi'], true)) {
+          $map['property'] = $position;
+        } elseif ($map['name'] < 0 && in_array($key, ['nomcedula', 'nombre', 'nombres', 'arrendatario', 'tercero', 'nombretercero', 'cliente', 'razonsocial'], true)) {
+          $map['name'] = $position;
+        } elseif ($map['voided'] < 0 && in_array($key, ['anulada', 'anulado'], true)) {
+          $map['voided'] = $position;
+        }
+      }
+      if ($map['document'] >= 0 || $map['property'] >= 0) {
+        $columns = $map;
+        $headerIndex = (int) $index;
+        break;
+      }
+    }
+    if ($columns === null) {
+      throw new \RuntimeException('No se encontró una columna de cédula/NIT ni de inmueble (ej. "Cedula" o "NoInm") en las primeras filas del archivo.');
+    }
+
+    $entries = [];
+    foreach ($rows as $index => $row) {
+      if ((int) $index <= $headerIndex) {
+        continue;
+      }
+      $row = array_values((array) $row);
+      if ($columns['voided'] >= 0 && in_array($this->headerKey($row[$columns['voided']] ?? ''), ['true', 'si', '1', 'verdadero'], true)) {
+        continue;
+      }
+      $document = $columns['document'] >= 0 ? $this->digits($row[$columns['document']] ?? '') : '';
+      $property = $columns['property'] >= 0 ? $this->digits($row[$columns['property']] ?? '') : '';
+      if ($document === '' && $property === '') {
+        continue;
+      }
+      $key = $document . '|' . $property;
+      if (isset($entries[$key])) {
+        continue;
+      }
+      $entries[$key] = [
+        'document' => $document,
+        'property' => $property,
+        'name' => $columns['name'] >= 0 ? trim(preg_replace('/\s+/', ' ', (string) ($row[$columns['name']] ?? '')) ?? '') : '',
+      ];
+    }
+    return array_values($entries);
+  }
+
+  /**
+   * Cruza por documento del arrendatario; si el documento tiene varios
+   * contratos usa el inmueble para precisar, y si no aparece el documento
+   * recurre al código de inmueble.
+   *
+   * @param array<int,array{document:string,property:string,name:string}> $entries
+   * @param array<int,array<string,mixed>> $contracts
+   * @return array{contract_ids:int[],matched_entries:int,unmatched:array<int,array<string,string>>}
+   */
+  public function matchContractListEntries(array $entries, array $contracts): array
+  {
+    $byDocument = [];
+    $byProperty = [];
+    foreach ($contracts as $contract) {
+      $contractId = (int) ($contract['_ID'] ?? 0);
+      if ($contractId <= 0) {
+        continue;
+      }
+      $rawDocument = trim((string) ($contract['documento_arrendatario'] ?? ''));
+      $document = $this->digits($rawDocument);
+      if ($document !== '') {
+        $byDocument[$document][$contractId] = true;
+        // NIT guardado con dígito de verificación (900378212-1).
+        if (preg_match('/^\s*[\d.\s]+-\s*\d\s*$/', $rawDocument)) {
+          $byDocument[substr($document, 0, -1)][$contractId] = true;
+        }
+      }
+      foreach ($this->contractPropertyCandidates($contract) as $property) {
+        $byProperty[$property][$contractId] = true;
+      }
+    }
+
+    $selected = [];
+    $matchedEntries = 0;
+    $unmatched = [];
+    foreach ($entries as $entry) {
+      $documentMatches = $entry['document'] !== '' ? array_keys($byDocument[$entry['document']] ?? []) : [];
+      $propertyMatches = $entry['property'] !== '' ? array_keys($byProperty[$entry['property']] ?? []) : [];
+      if ($documentMatches !== []) {
+        $both = array_values(array_intersect($documentMatches, $propertyMatches));
+        $matches = $both !== [] ? $both : $documentMatches;
+      } else {
+        $matches = $propertyMatches;
+      }
+      if ($matches === []) {
+        $unmatched[] = $entry;
+        continue;
+      }
+      $matchedEntries++;
+      foreach ($matches as $contractId) {
+        $selected[(int) $contractId] = true;
+      }
+    }
+
+    return ['contract_ids' => array_keys($selected), 'matched_entries' => $matchedEntries, 'unmatched' => $unmatched];
+  }
+
+  private function contractListToken(string $token): string
+  {
+    $token = strtolower(trim($token));
+    return preg_match('/^[a-f0-9]{16}$/', $token) ? $token : '';
+  }
+
+  /** @param array<string,mixed> $payload */
+  private function storeContractList(string $token, array $payload): void
+  {
+    if (!function_exists('set_transient')) {
+      throw new \RuntimeException('No se pudo guardar la lista temporal de contratos.');
+    }
+    set_transient('scm_gc_clist_' . $token, $payload, 12 * 3600);
+  }
+
+  /** @return array<string,mixed>|null */
+  private function loadContractList(string $token): ?array
+  {
+    if (!function_exists('get_transient')) {
+      return null;
+    }
+    $payload = get_transient('scm_gc_clist_' . $token);
+    return is_array($payload) ? $payload : null;
   }
 
   /** @return array<string,mixed> */

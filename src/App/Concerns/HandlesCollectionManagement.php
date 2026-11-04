@@ -52,6 +52,14 @@ trait HandlesCollectionManagement
           'message' => 'Datos de prueba de la 1380 limpiados. No se tocaron contratos, gestiones históricas ni notificaciones.',
         ]);
       }
+      if ($operation === 'contract_list_excel') {
+        $list = $service->buildContractListFromFile((array) ($_FILES['file'] ?? []));
+        $this->jsonOk($list + [
+          'message' => (int) $list['contracts'] > 0
+            ? (int) $list['contracts'] . ' contrato(s) activos coinciden con ' . (int) $list['matched_entries'] . ' de ' . (int) $list['entries'] . ' fila(s) del archivo.'
+            : 'Ninguna fila del archivo coincide con contratos activos.',
+        ]);
+      }
       if (strpos($operation, 'bulk_') === 0) {
         $this->jsonOk($this->handle_collection_portfolio_bulk_action($service, $operation, $_POST));
       }
@@ -312,6 +320,7 @@ trait HandlesCollectionManagement
         'status' => sanitize_key((string) ($post['scmgc_contratos_estado'] ?? '')),
         'stage' => sanitize_key((string) ($post['scmgc_contratos_etapa'] ?? '')),
         'search' => sanitize_text_field(wp_unslash((string) ($post['scmgc_contratos_buscar'] ?? ''))),
+        'list' => sanitize_key((string) ($post['scmgc_contratos_lista'] ?? '')),
         'all' => true,
         'limit' => $limit,
       ]);

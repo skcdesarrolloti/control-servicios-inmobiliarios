@@ -3644,6 +3644,7 @@ trait RendersDashboard
       'status' => trim((string) ($input['scmgc_contratos_estado'] ?? '')),
       'stage' => trim((string) ($input['scmgc_contratos_etapa'] ?? '')),
       'search' => trim((string) ($input['scmgc_contratos_buscar'] ?? '')),
+      'list' => trim((string) ($input['scmgc_contratos_lista'] ?? '')),
       'page' => max(1, (int) ($input['scmgc_contratos_page'] ?? 1)),
       'per_page' => 60,
     ];
@@ -3651,6 +3652,7 @@ trait RendersDashboard
     $contractRows = is_array($contractsPortfolio['rows'] ?? null) ? $contractsPortfolio['rows'] : [];
     $contractApplied = is_array($contractsPortfolio['filters'] ?? null) ? $contractsPortfolio['filters'] : [];
     $contractPagination = is_array($contractsPortfolio['pagination'] ?? null) ? $contractsPortfolio['pagination'] : [];
+    $contractList = is_array($contractsPortfolio['list'] ?? null) ? $contractsPortfolio['list'] : null;
     $rawReportDrilldowns = $portfolioService->reportDrilldowns();
     $prelegalNoticeAccounts = (int) ($rawReportDrilldowns['aviso_prejuridico']['count'] ?? count((array) ($rawReportDrilldowns['aviso_prejuridico']['rows'] ?? [])));
     $claimNoticeAccounts = (int) ($rawReportDrilldowns['aviso_siniestro']['count'] ?? count((array) ($rawReportDrilldowns['aviso_siniestro']['rows'] ?? [])));
@@ -3970,6 +3972,7 @@ trait RendersDashboard
             <input type="hidden" name="scm_tab" value="gestiones_cobro">
             <input type="hidden" name="scmgc_view" value="contratos">
             <input type="hidden" name="scmgc_contratos_page" value="1">
+            <input type="hidden" name="scmgc_contratos_lista" value="<?php echo esc_attr((string) ($contractApplied['list'] ?? '')); ?>" data-scm-contracts-list-token>
             <label class="scm-gc-field is-search"><span>Buscar contrato</span><input id="scmgc_contratos_buscar" name="scmgc_contratos_buscar" type="search" value="<?php echo esc_attr((string) ($contractApplied['search'] ?? '')); ?>" placeholder="Arrendatario, documento, contrato, inmueble, celular o propietario"></label>
             <label class="scm-gc-field"><span>Estado de saldo</span><select id="scmgc_contratos_estado" name="scmgc_contratos_estado">
               <?php foreach (['' => 'Todos', 'deuda' => 'Con deuda', 'al_dia' => 'Al día', 'saldo_favor' => 'Saldo a favor', 'sin_dato' => 'Sin dato 1380'] as $value => $label): ?><option value="<?php echo esc_attr($value); ?>" <?php selected((string) ($contractApplied['status'] ?? ''), $value); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
@@ -3979,9 +3982,12 @@ trait RendersDashboard
             </select></label>
             <div class="scm-gc-filter-actions">
               <button type="submit" class="scm-gc-btn is-navy"><?php echo $this->collection_gc_icon('filter_alt'); ?>Filtrar contratos</button>
-              <a class="scm-gc-btn" href="?scm_tab=gestiones_cobro&amp;scmgc_view=contratos&amp;scmgc_contratos_buscar=&amp;scmgc_contratos_estado=&amp;scmgc_contratos_etapa=&amp;scmgc_contratos_page=1" data-scm-collection-log-clear>Limpiar</a>
+              <a class="scm-gc-btn" href="?scm_tab=gestiones_cobro&amp;scmgc_view=contratos&amp;scmgc_contratos_buscar=&amp;scmgc_contratos_estado=&amp;scmgc_contratos_etapa=&amp;scmgc_contratos_lista=&amp;scmgc_contratos_page=1" data-scm-collection-log-clear>Limpiar</a>
+              <button type="button" class="scm-gc-btn" data-scm-contracts-excel-pick title="Sube un Excel con columnas de cédula/NIT o inmueble (ej. facturación) para seleccionar esos contratos"><?php echo $this->collection_gc_icon('upload_file'); ?>Seleccionar desde Excel</button>
             </div>
           </form>
+          <form class="scm-gc-excel-form" data-scm-contracts-excel-form hidden><input type="file" name="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-scm-contracts-excel-file></form>
+          <?php if ($contractList !== null) { echo $this->render_collection_contract_list_banner($contractList, (int) ($contractPagination['total'] ?? 0)); } ?>
 
           <?php if ($contractRows === []): ?>
             <?php echo $this->render_collection_gc_empty('Sin contratos para mostrar', 'No hay contratos activos con los filtros actuales.'); ?>
@@ -4385,6 +4391,43 @@ trait RendersDashboard
     return $timestamp === false ? '-' : date('d/m/Y', $timestamp);
   }
 
+  /** @param array<string,mixed> $list */
+  private function render_collection_contract_list_banner(array $list, int $visible): string
+  {
+    $clearHref = '?scm_tab=gestiones_cobro&amp;scmgc_view=contratos&amp;scmgc_contratos_buscar=&amp;scmgc_contratos_estado=&amp;scmgc_contratos_etapa=&amp;scmgc_contratos_lista=&amp;scmgc_contratos_page=1';
+    if (!empty($list['expired'])) {
+      return '<div class="scm-gc-excel-banner is-expired" role="status">'
+        . $this->collection_gc_icon('history_toggle_off')
+        . '<div><strong>La lista cargada desde Excel venció</strong><span>Vuelve a subir el archivo para seleccionar sus contratos.</span></div>'
+        . '<a class="scm-gc-action" href="' . $clearHref . '" data-scm-collection-log-clear>' . $this->collection_gc_icon('close') . 'Quitar lista</a></div>';
+    }
+    $unmatched = array_values(array_filter((array) ($list['unmatched'] ?? []), 'is_array'));
+    $unmatchedCount = (int) ($list['unmatched_count'] ?? count($unmatched));
+    ob_start();
+?>
+    <div class="scm-gc-excel-banner" role="status">
+      <?php echo $this->collection_gc_icon('table_view'); ?>
+      <div>
+        <strong>Lista desde Excel: <?php echo esc_html((string) ($list['file_name'] ?? 'archivo')); ?></strong>
+        <span><?php echo esc_html((string) ((int) ($list['matched_entries'] ?? 0))); ?> de <?php echo esc_html((string) ((int) ($list['entries'] ?? 0))); ?> fila(s) del archivo cruzaron con <?php echo esc_html((string) ((int) ($list['contracts'] ?? 0))); ?> contrato(s) activo(s)<?php echo $visible !== (int) ($list['contracts'] ?? 0) ? ' &middot; ' . esc_html((string) $visible) . ' con los filtros actuales' : ''; ?>. Cruce por c&eacute;dula/NIT del arrendatario y, si no aparece, por c&oacute;digo de inmueble.</span>
+        <?php if ($unmatchedCount > 0): ?>
+          <details class="scm-gc-excel-unmatched">
+            <summary><?php echo esc_html((string) $unmatchedCount); ?> fila(s) sin contrato activo</summary>
+            <ul>
+              <?php foreach ($unmatched as $entry): ?>
+                <li><strong><?php echo esc_html((string) (($entry['name'] ?? '') ?: 'Sin nombre')); ?></strong> <small>Doc. <?php echo esc_html((string) (($entry['document'] ?? '') ?: '-')); ?> &middot; Inmueble <?php echo esc_html((string) (($entry['property'] ?? '') ?: '-')); ?></small></li>
+              <?php endforeach; ?>
+              <?php if ($unmatchedCount > count($unmatched)): ?><li><small>&hellip; y <?php echo esc_html((string) ($unmatchedCount - count($unmatched))); ?> m&aacute;s.</small></li><?php endif; ?>
+            </ul>
+          </details>
+        <?php endif; ?>
+      </div>
+      <a class="scm-gc-action" href="<?php echo $clearHref; ?>" data-scm-collection-log-clear><?php echo $this->collection_gc_icon('close'); ?>Quitar lista</a>
+    </div>
+<?php
+    return (string) ob_get_clean();
+  }
+
   private function render_collection_portfolio_bulk_toolbar(string $scope, int $total = 0): string
   {
     $scopeLabel = $scope === 'contratos' ? 'contratos visibles' : 'registros visibles';
@@ -4571,6 +4614,7 @@ trait RendersDashboard
       'scmgc_contratos_buscar' => (string) ($filters['search'] ?? ''),
       'scmgc_contratos_estado' => (string) ($filters['status'] ?? ''),
       'scmgc_contratos_etapa' => (string) ($filters['stage'] ?? ''),
+      'scmgc_contratos_lista' => (string) ($filters['list'] ?? ''),
     ], 'scmgc_contratos_page');
   }
 
