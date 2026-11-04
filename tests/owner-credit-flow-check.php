@@ -530,7 +530,16 @@ $check($row['status'] === 'pendiente' && $payload['number'] === \SCM\Modules\Own
 $html = \SCM\Modules\OwnerCredits\OwnerCreditPromissoryDocument::render($row, $payload);
 $check(str_contains($html, 'SOLUCIONES COMERCIALES Y CONSTRUCTIVAS S.A.S.') && str_contains($html, 'Carta de instrucciones') && str_contains($html, 'artículo 622 del Código de Comercio') && str_contains($html, 'scm-promissory-blank') && !str_contains($html, 'Signio'), 'the document has the promissory note in blank and the instructions letter, signed in the panel (no Signio)');
 try { $promissory->publicRow($pid, str_repeat('0', 64)); $check(false, 'a wrong token is rejected'); } catch (DomainException) { $check(true, 'a wrong token is rejected'); }
+// Un envío fallido no bloquea: se puede reintentar enseguida (o cambiar de canal) sin gastar el límite.
+$failedCode = (new \SCM\Modules\OwnerCredits\OwnerCreditPromissoryVerification($db, 'wp_scm_owner_credit_promissory', 'test-secret'))->request($promissory->find($pid), 'whatsapp', static fn(): bool => false);
+$check(!$failedCode['queued'] && (int) (json_decode((string) $promissory->find($pid)['otp_json'], true)['requests'] ?? -1) === 0, 'a failed code delivery does not count as a request');
 $promissory->requestCode($pid, $token, 'email');
+try {
+  $promissory->requestCode($pid, $token, 'email');
+  $check(false, 'a sent code asks to wait before another one');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'Ya te enviamos un código por correo'), 'a sent code asks to wait before another one, saying where it went');
+}
 $otp = array_values(array_filter($sentMessages, static fn(array $m): bool => $m['event'] === 'otp'));
 $code = (string) end($otp)['code'];
 $check(preg_match('/^\d{6}$/', $code) === 1 && !str_contains((string) $promissory->find($pid)['otp_json'], $code), 'a 6-digit code is sent and only its HMAC is stored');

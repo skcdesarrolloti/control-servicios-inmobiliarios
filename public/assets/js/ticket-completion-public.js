@@ -169,6 +169,8 @@
     feedbackTitle.textContent = options.title || "No se pudo firmar";
     feedbackMessage.textContent = options.message || "Revisa los datos e inténtalo nuevamente.";
     feedbackPrimary.textContent = options.primaryLabel || "Entendido";
+    // Si la acción principal ya es "Cerrar", no se repite el botón de cerrar.
+    feedbackClose.hidden = (options.primaryLabel || "") === "Cerrar";
     feedbackPrimary.onclick = function () {
       closeFeedback();
       if (typeof options.onPrimary === "function") options.onPrimary();
@@ -225,7 +227,7 @@
           codeStatus.textContent = text;
         }
         showFeedback({
-          title: "No se pudo enviar el código",
+          title: /^Ya te enviamos un código/.test(text) ? "Código ya enviado" : "No se pudo enviar el código",
           message: text,
           primaryLabel: "Cerrar",
           onPrimary: function () { if (codeButton) codeButton.focus(); },

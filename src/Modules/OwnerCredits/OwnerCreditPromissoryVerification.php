@@ -20,7 +20,9 @@ final class OwnerCreditPromissoryVerification
   {
     $state = $this->state($row);
     $now = time();
-    if ((int) ($state['last_request'] ?? 0) > $now - 60) throw new \DomainException('Espera un minuto antes de solicitar otro código.');
+    // Solo se espera el minuto si el código anterior sí salió; un envío fallido deja reintentar o cambiar de canal.
+    $wait = (int) ($state['last_request'] ?? 0) + 60 - $now;
+    if ($wait > 0 && !empty($state['queued'])) throw new \DomainException('Ya te enviamos un código por ' . ((string) ($state['channel'] ?? '') === 'whatsapp' ? 'WhatsApp' : 'correo') . '. Revisa ese mensaje; si no te llegó, podrás pedir otro en ' . $wait . ' segundos.');
     if ((int) ($state['requests'] ?? 0) >= 5 || (int) ($state['failures'] ?? 0) >= 5) throw new \DomainException('Alcanzaste el límite de verificación. Intenta nuevamente en una hora.');
     $code = (string) random_int(100000, 999999);
     $nonce = bin2hex(random_bytes(16));
@@ -30,10 +32,12 @@ final class OwnerCreditPromissoryVerification
     ]);
     $this->save((int) $row['id'], $state);
     $state['queued'] = $send($code, $nonce);
+    // Un envío fallido no cuenta como solicitud: no bloquea el siguiente intento ni gasta el límite.
+    if (!$state['queued']) $state = array_merge($state, ['last_request' => 0, 'requests' => max(0, (int) $state['requests'] - 1)]);
     $this->save((int) $row['id'], $state);
     return ['queued' => $state['queued'], 'message' => $state['queued']
       ? 'Código enviado. Revisa el contacto elegido: vence en 10 minutos y solo sirve el último que pidas.'
-      : 'No se pudo enviar el código. Espera un minuto y vuelve a intentarlo o elige otro canal.'];
+      : 'No se pudo enviar el código por este canal. Vuelve a intentarlo o elige otro canal.'];
   }
 
   /** Los intentos fallidos se guardan de inmediato (fuera de la transacción de la firma). */
