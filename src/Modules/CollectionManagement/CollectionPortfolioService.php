@@ -812,20 +812,48 @@ final class CollectionPortfolioService
   /** @param array<string,mixed> $payload */
   private function storeContractList(string $token, array $payload): void
   {
-    if (!function_exists('set_transient')) {
+    $this->ensureContractListSchema();
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    if (!is_string($json)) {
       throw new \RuntimeException('No se pudo guardar la lista temporal de contratos.');
     }
-    set_transient('scm_gc_clist_' . $token, $payload, 12 * 3600);
+    $this->db->pdo()
+      ->prepare("DELETE FROM `{$this->contractListsTable()}` WHERE `expires_at` < ?")
+      ->execute([date('Y-m-d H:i:s')]);
+    $this->db->insert($this->contractListsTable(), [
+      'token' => $token,
+      'payload' => $json,
+      'created_by_id' => Auth::userId(),
+      'created_at' => date('Y-m-d H:i:s'),
+      'expires_at' => date('Y-m-d H:i:s', time() + 12 * 3600),
+    ]);
   }
 
   /** @return array<string,mixed>|null */
   private function loadContractList(string $token): ?array
   {
-    if (!function_exists('get_transient')) {
-      return null;
-    }
-    $payload = get_transient('scm_gc_clist_' . $token);
+    $this->ensureContractListSchema();
+    $json = $this->db->getVar(
+      "SELECT `payload` FROM `{$this->contractListsTable()}` WHERE `token` = ? AND `expires_at` >= ? LIMIT 1",
+      [$token, date('Y-m-d H:i:s')]
+    );
+    $payload = is_string($json) ? json_decode($json, true) : null;
     return is_array($payload) ? $payload : null;
+  }
+
+  private function ensureContractListSchema(): void
+  {
+    $this->db->pdo()->exec("CREATE TABLE IF NOT EXISTS `{$this->contractListsTable()}` (
+      `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      `token` CHAR(16) NOT NULL,
+      `payload` LONGTEXT NOT NULL,
+      `created_by_id` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+      `created_at` DATETIME NOT NULL,
+      `expires_at` DATETIME NOT NULL,
+      PRIMARY KEY (`id`),
+      UNIQUE KEY `uniq_token` (`token`),
+      KEY `idx_expires_at` (`expires_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
   }
 
   /** @return array<string,mixed> */
@@ -2288,5 +2316,6 @@ final class CollectionPortfolioService
   private function importsTable(): string { return $this->db->table('scm_collection_imports'); }
   private function portfolioTable(): string { return $this->db->table('scm_collection_portfolio'); }
   private function eventsTable(): string { return $this->db->table('scm_collection_events'); }
+  private function contractListsTable(): string { return $this->db->table('scm_collection_contract_lists'); }
   private function contractsTable(): string { return $this->db->table('jet_cct_contratos_arrendamiento'); }
 }
