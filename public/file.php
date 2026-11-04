@@ -15,6 +15,10 @@ if ($path === null || !$files->isValidSignature($name, $signature)) {
 
 $finfo = new finfo(FILEINFO_MIME_TYPE);
 $mime = (string) $finfo->file($path);
+// Los .pdf guardados ya se validaron al subirlos; algunos traen saltos de línea antes de la cabecera y finfo no los reconoce.
+if (str_ends_with($name, '.pdf')) {
+  $mime = 'application/pdf';
+}
 $inlineTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 $disposition = in_array($mime, $inlineTypes, true) ? 'inline' : 'attachment';
 

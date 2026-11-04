@@ -233,7 +233,11 @@ final class StoredFileService
     }
     $path = $this->directory . '/' . $name;
     $hash = @hash_file('sha256', $path);
-    return ['name' => $name, 'url' => $this->urlFor($name), 'mime' => $this->detectMime($path), 'bytes' => (int) filesize($path), 'sha256' => is_string($hash) ? $hash : ''];
+    $mime = $this->detectMime($path);
+    if ($mime !== 'application/pdf' && str_ends_with($name, '.pdf')) {
+      $mime = 'application/pdf';
+    }
+    return ['name' => $name, 'url' => $this->urlFor($name), 'mime' => $mime,'bytes' => (int) filesize($path), 'sha256' => is_string($hash) ? $hash : ''];
   }
 
   public function urlFor(string $name): string
@@ -379,7 +383,11 @@ final class StoredFileService
       'gif' => ['image/gif'],
       'webp' => ['image/webp'],
     ];
-    if (!isset($allowed[$originalExtension]) || !in_array($mime, $allowed[$originalExtension], true)) {
+    $valid = isset($allowed[$originalExtension]) && in_array($mime, $allowed[$originalExtension], true);
+    if (!$valid && $originalExtension === 'pdf') {
+      $valid = $this->hasPdfHeader((string) $file['tmp_name']);
+    }
+    if (!$valid) {
       return '';
     }
 
@@ -405,6 +413,16 @@ final class StoredFileService
   private function newName(string $extension): string
   {
     return bin2hex(random_bytes(12)) . '_' . time() . '.' . $extension;
+  }
+
+  /**
+   * Algunos sistemas de facturación (p. ej. Surtigas) anteponen saltos de línea a la cabecera: finfo ya no lo reconoce
+   * como PDF, pero los lectores sí, porque buscan `%PDF-` dentro de los primeros 1024 bytes.
+   */
+  private function hasPdfHeader(string $path): bool
+  {
+    $head = @file_get_contents($path, false, null, 0, 1024);
+    return is_string($head) && str_contains($head, '%PDF-');
   }
 
   private function detectMime(string $path): string
