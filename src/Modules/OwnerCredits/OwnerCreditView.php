@@ -990,6 +990,8 @@ final class OwnerCreditView
       . $field('Plazo solicitado (meses)' . $required, '<input class="' . $ui::INPUT . '" name="term" type="number" min="1" max="60" placeholder="Escribe los meses" required>')
       . $field('Destinación', '<select class="' . $ui::INPUT . '" name="purpose">' . $options . '</select>')
       . '</div><p class="' . self::NOTE . ' !sp-mt-2" data-owner-credit-term-hint></p>'
+      // Qué ingreso cuenta y quién firma según la destinación (lo llena el JS al elegir contrato y destinación).
+      . '<p class="!sp-m-0 !sp-mt-3 !sp-p-2.5 !sp-rounded-lg !sp-bg-blue-50 !sp-border !sp-border-solid !sp-border-blue-200 !sp-text-[11px] !sp-text-service-navy" data-owner-credit-purpose-hint hidden></p>'
       . '<p class="!sp-m-0 !sp-mt-3 !sp-p-2.5 !sp-rounded-lg !sp-bg-slate-50 !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-[11px] !sp-font-semibold !sp-text-service-navy" data-owner-credit-disclaimer>' . self::e(OwnerCreditService::DISCLAIMER) . '</p></section>'
       . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-end !sp-gap-3"><p class="!sp-m-0 !sp-text-[11px]" data-owner-credit-status role="status" aria-live="polite"></p>'
       . '<button type="submit" class="' . $ui::PRIMARY . '" data-owner-credit-register>' . $ui::icon('check', '!sp-w-3.5 !sp-h-3.5') . 'Registrar solicitud</button></div></form>';

@@ -376,10 +376,31 @@
     // los demás contratos); libre inversión usa el cupo personal (todos sus contratos, cada uno según su %).
     function syncPreapproval(form) {
       var purpose = form.elements.purpose ? form.elements.purpose.value : "";
-      var repair = purpose !== "" && (form._propertyPurposes || []).indexOf(purpose) !== -1 && form._contract && form._contract.repair;
+      var property = purpose !== "" && (form._propertyPurposes || []).indexOf(purpose) !== -1;
+      var repair = property && form._contract && form._contract.repair;
       form._preapproval = repair ? form._contract.repair : form._personal;
       renderPreapproval(form.querySelector("[data-owner-credit-preapproval]"), form._preapproval, repair ? form._contract : null);
+      renderPurposeHint(form, purpose, property);
       updateTermHint(form);
+    }
+
+    // Qué ingreso se usa y quién firma según la destinación: del inmueble, el 100 % de su contrato más los demás y firman
+    // todos; libre inversión, la participación de la persona y firma solo ella.
+    function renderPurposeHint(form, purpose, property) {
+      var hint = form.querySelector("[data-owner-credit-purpose-hint]");
+      var contract = form._contract;
+      if (!hint) return;
+      if (!contract || !purpose) { hint.hidden = true; return; }
+      var share = Number(contract.share);
+      var shareText = share > 0 && share < 0.9999 ? (Math.round(share * 10000) / 100).toString().replace(".", ",") + " %" : "";
+      var name = (contract.owner && contract.owner.name) || "el propietario";
+      hint.innerHTML = property
+        ? "<b>Crédito del inmueble (" + escapeHtml(purpose.toLowerCase()) + "):</b> se usa el <b>100 % del ingreso neto del contrato #" + escapeHtml(contract.contrato) + "</b>" +
+          (shareText ? " aunque " + escapeHtml(name) + " tenga el " + shareText + " de participación" : "") +
+          ", más sus demás contratos, y lo firman <b>todos los copropietarios</b> del inmueble."
+        : "<b>Libre inversión:</b> se usa solo la participación de " + escapeHtml(name) + " en cada contrato" +
+          (shareText ? " (" + shareText + " del contrato #" + escapeHtml(contract.contrato) + ")" : "") + " y lo firma <b>solo " + escapeHtml(name) + "</b>.";
+      hint.hidden = false;
     }
 
     // Cupo por verificar con todos los contratos de la persona: solo el valor y el plazo máximo. El análisis

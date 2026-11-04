@@ -213,10 +213,11 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
       window.calls.push(body);
       const data = body.action === 'scm_owner_credit_new_form' ? { html: newForm }
         : body.action === 'scm_owner_credit_contracts' ? { contracts: [
-          { id: 9, contrato: '950', inmueble: '10600', direccion: 'Calle 1', estado: 'Entregado', arrendatario: 'Inquilino', fin: '15/01/2027', max_months: 2, owner },
+          { id: 9, contrato: '950', inmueble: '10600', direccion: 'Calle 1', estado: 'Entregado', arrendatario: 'Inquilino', fin: '15/01/2027', max_months: 2, share: 0.5, owner },
           { id: 10, contrato: '951', inmueble: '10601', direccion: 'Calle 2', estado: 'Entregado', arrendatario: '', fin: '', max_months: 0, owner }],
           preapproval: { contracts: 2, net_income: 3440000, income_months: 3, amount: 10320000, longest_months: 2, max_term: 0, fallback_term: 12, term_basis: '0 cuotas vencen antes del fin del contrato más largo, el 20/12/2026' },
-          checks: [{ label: 'Contrato activo', ok: true, detail: '2 de 2 contratos Entregado.' }, { label: 'Sin siniestro', ok: false, detail: 'Cartera marcó como siniestrado: #951.' }] }
+          checks: [{ label: 'Contrato activo', ok: true, detail: '2 de 2 contratos Entregado.' }, { label: 'Sin siniestro', ok: false, detail: 'Cartera marcó como siniestrado: #951.' }],
+          property_purposes: ['Servicios públicos', 'Cuotas de administración', 'Reparaciones y mantenimiento'] }
         : body.action === 'scm_owner_credit_create' ? { credit_id: 40, message: 'Solicitud registrada.' } : {};
       if (body.action === 'scm_owner_credit_simulation_pdf') {
         return Promise.resolve({ headers: { get: () => 'application/pdf' }, blob: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })) });
@@ -237,6 +238,12 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   assert.match(await page.textContent('[data-owner-credit-preapproval]'), /Plazo máximo\s*Sin cuotas/);
   assert.match(await page.textContent('[data-owner-credit-request] [data-owner-credit-disclaimer]'), /No constituyen una aprobación/);
   assert.equal(await page.isVisible('[data-owner-credit-request]'), true, 'the request opens without choosing a contract');
+  // La nota dice qué ingreso cuenta y quién firma según la destinación.
+  await page.selectOption('[data-owner-credit-new-form] [name="purpose"]', 'Servicios públicos');
+  assert.match(await page.textContent('[data-owner-credit-purpose-hint]'), /Crédito del inmueble \(servicios públicos\).*100 % del ingreso neto del contrato #950.*50 % de participación.*todos los copropietarios/);
+  await page.selectOption('[data-owner-credit-new-form] [name="purpose"]', 'Libre inversión');
+  assert.match(await page.textContent('[data-owner-credit-purpose-hint]'), /Libre inversión:.*participación de Segunda Dueña.*50 % del contrato #950.*solo Segunda Dueña/);
+  console.log('OK the new request explains which income counts and who signs for each purpose');
   assert.equal(await page.$('[data-owner-credit-contract-card]'), null, 'the contracts are not listed');
   assert.equal(await page.$('[data-owner-credit-checks]'), null, 'the policy pre-check is reviewed in the liquidator');
   assert.equal(await page.$('[data-owner-credit-simulate-pdf]'), null, 'the request is not simulated here');
