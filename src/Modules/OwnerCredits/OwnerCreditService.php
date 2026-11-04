@@ -304,7 +304,9 @@ final class OwnerCreditService
   {
     if (isset(self::$schemaReady[$this->table()])) return;
     self::$schemaReady[$this->table()] = true;
-    $this->db->pdo()->exec("CREATE TABLE IF NOT EXISTS `{$this->table()}` (
+    // Solo se crea lo que falta: en MySQL un CREATE TABLE (aunque la tabla exista) cierra la transacción abierta, y
+    // esto se puede llamar con una en curso (al decidir o al firmar el pagaré).
+    if (!$this->schema->tableExists($this->table())) $this->db->pdo()->exec("CREATE TABLE IF NOT EXISTS `{$this->table()}` (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       quote_id BIGINT UNSIGNED NULL, ticket_id VARCHAR(40) NOT NULL DEFAULT '',
       contract_id BIGINT UNSIGNED NOT NULL DEFAULT 0, contract_code VARCHAR(60) NOT NULL DEFAULT '',
@@ -326,13 +328,13 @@ final class OwnerCreditService
       created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL,
       UNIQUE KEY uniq_quote (quote_id), KEY idx_status (status), KEY idx_owner (owner_id), KEY idx_contract (contract_id), KEY idx_beneficiary_type (beneficiary_type)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    $this->db->pdo()->exec("CREATE TABLE IF NOT EXISTS `{$this->eventsTable()}` (
+    if (!$this->schema->tableExists($this->eventsTable())) $this->db->pdo()->exec("CREATE TABLE IF NOT EXISTS `{$this->eventsTable()}` (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, credit_id BIGINT UNSIGNED NOT NULL,
       action VARCHAR(40) NOT NULL, actor_id VARCHAR(40) NOT NULL DEFAULT '', actor_name VARCHAR(190) NOT NULL DEFAULT '',
       details_json MEDIUMTEXT NOT NULL, created_at BIGINT NOT NULL, KEY idx_credit (credit_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     // Contratos que respaldan un crédito aprobado: de ellos se descuenta la cuota (el crédito es de la persona).
-    $this->db->pdo()->exec("CREATE TABLE IF NOT EXISTS `{$this->sourcesTable()}` (
+    if (!$this->schema->tableExists($this->sourcesTable())) $this->db->pdo()->exec("CREATE TABLE IF NOT EXISTS `{$this->sourcesTable()}` (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, credit_id BIGINT UNSIGNED NOT NULL, contract_id BIGINT UNSIGNED NOT NULL,
       contract_code VARCHAR(60) NOT NULL DEFAULT '', property VARCHAR(60) NOT NULL DEFAULT '', net_income DECIMAL(14,2) NOT NULL DEFAULT 0,
       end_ts BIGINT NULL, is_primary TINYINT NOT NULL DEFAULT 0, created_at BIGINT NOT NULL, KEY idx_credit (credit_id), KEY idx_contract (contract_id)
@@ -983,6 +985,10 @@ final class OwnerCreditService
     if (!in_array($decision, ['aprobado', 'rechazado'], true)) throw new \DomainException('Decisión no válida.');
     $note = trim((string) ($input['note'] ?? ''));
     $purpose = trim((string) ($input['purpose'] ?? ''));
+    // Las tablas se revisan antes de abrir la transacción: un cambio de estructura en MySQL la cerraría a mitad de camino
+    // (la aprobación quedaba guardada pero no salían el historial, los avisos ni el pagaré).
+    $this->ensureSchema();
+    $this->promissory()->ensureSchema();
     $pdo = $this->db->pdo();
     $pdo->beginTransaction();
     try {
@@ -1085,7 +1091,8 @@ final class OwnerCreditService
       $settings = $this->config();
       $state = $this->promissoryState($credit);
       if (!empty($settings['require_promissory']) && $state['missing'] !== []) {
-        $sent = $this->sendPromissory($id, $settings['notify_owner_whatsapp'] ? ['email', 'whatsapp'] : ['email'], $actor);
+        // Al aprobar, el pagaré sale de una vez por correo y WhatsApp (a cada firmante, por los canales que tenga).
+        $sent = $this->sendPromissory($id, ['email', 'whatsapp'], $actor);
         $result['promissory'] = $sent['sent'];
         $result['errors'] = $sent['errors'];
       } else {

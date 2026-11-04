@@ -40,8 +40,10 @@ final class OwnerCreditTestPdo extends PDO
   }
 
   /** El DDL de MySQL de ensureSchema() se omite: las tablas se crean abajo en SQLite. */
+  /** Como en MySQL, un cambio de estructura cierra la transacción abierta: aquí se rechaza para detectarlo. */
   public function exec(string $statement): int|false
   {
+    if ($this->inTransaction() && preg_match('/^\s*(CREATE|ALTER|DROP)\s/i', $statement) === 1) throw new RuntimeException('DDL inside a transaction: ' . substr(trim($statement), 0, 60));
     return str_contains($statement, 'ENGINE=InnoDB') ? 0 : parent::exec($statement);
   }
 }
@@ -105,6 +107,8 @@ try {
 } catch (DomainException $error) {
   $check(str_contains($error->getMessage(), 'usura'), 'approving above the usury fails even with justification');
 }
+// Como en una petición nueva, las tablas aún no se han revisado: decidir no puede revisarlas dentro de su transacción.
+(new ReflectionProperty(OwnerCreditService::class, 'schemaReady'))->setValue(null, []);
 $result = $service->decide((int) $credit['id'], 'aprobado', ['requested_term' => '12', 'amount' => '$3.000.000', 'term' => '12', 'rate' => '2,1', 'note' => 'Propietario con 10 años sin mora, se aprueba excepción.'], $actor);
 $approved = $result['credit'];
 $check(array_key_exists('internal_whatsapp', $result['queued']), 'staff WhatsApp is attempted on decisions without breaking them when no staff is configured');

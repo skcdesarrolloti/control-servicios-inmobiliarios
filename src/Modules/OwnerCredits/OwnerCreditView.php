@@ -818,7 +818,7 @@ final class OwnerCreditView
       ? '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-3 !sp-mt-3" data-owner-credit-promissory-send-box>'
         . '<span class="' . $ui::LABEL . ' !sp-mb-0">Enviar por</span>'
         . '<label class="!sp-flex !sp-items-center !sp-gap-1 !sp-text-[11px]"><input type="checkbox" name="promissory_channels[]" value="email" checked> Correo</label>'
-        . '<label class="!sp-flex !sp-items-center !sp-gap-1 !sp-text-[11px]"><input type="checkbox" name="promissory_channels[]" value="whatsapp"> WhatsApp</label>'
+        . '<label class="!sp-flex !sp-items-center !sp-gap-1 !sp-text-[11px]"><input type="checkbox" name="promissory_channels[]" value="whatsapp" checked> WhatsApp</label>'
         . '<button type="button" class="' . $ui::NAVY . ' !sp-ml-auto" data-owner-credit-promissory-send>' . $ui::icon('document', '!sp-w-3.5 !sp-h-3.5 !sp-text-service-yellow') . ($resend ? 'Reenviar enlace para firmar' : 'Enviar para firmar') . '</button></div>'
       : '';
     return '<section class="' . self::SECTION . '" data-owner-credit-promissory><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('shield') . 'Pagaré y carta de instrucciones</h4>'
