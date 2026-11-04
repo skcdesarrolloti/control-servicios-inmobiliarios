@@ -581,6 +581,8 @@ $check(!str_contains($liquidator, 'data-owner-credit-promissory-refresh'), 'the 
 $pagareSource = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditPromissoryService.php');
 $lockedBody = substr($pagareSource, (int) strpos($pagareSource, 'private function locked('));
 $check(strpos($lockedBody, '$this->prewarmQueue();') !== false && strpos($lockedBody, '$this->prewarmQueue();') < strpos($lockedBody, 'beginTransaction'), 'the shared queue starts before the promissory lock opens its transaction (otherwise the code is never queued)');
+$deliverBody = substr($pagareSource, (int) strpos($pagareSource, 'private function deliver('), 4000);
+$check(str_contains($deliverBody, 'inTransaction()) $this->pendingDispatch[]') && str_contains($lockedBody, 'foreach ($pending as $dedupeKey) $this->dispatchNow($dedupeKey);'), 'the immediate send waits until the promissory lock commits (its worker runs DDL that would end the transaction)');
 // Las etapas son pestañas: al abrir solo se ve la etapa en curso (pendiente: estudio).
 $check(preg_match('/<section[^>]*role="tabpanel"[^>]*data-owner-credit-stage="estudio">/', $liquidator) === 1 && preg_match('/<section[^>]*data-owner-credit-stage="solicitud" hidden>/', $liquidator) === 1 && preg_match('/<section[^>]*data-owner-credit-stage="firma" hidden>/', $liquidator) === 1 && str_contains($liquidator, 'id="scm-owner-credit-tab-estudio" aria-controls="scm-owner-credit-stage-estudio" aria-selected="true"'), 'the stages are tabs and only the current one is shown');
 $pagareService->changeStatus($pagareCredit, 'anulado', 'Crédito de prueba del pagaré.', $actor);

@@ -38,6 +38,8 @@ final class OwnerCreditPromissoryService
   /** @var (\Closure(array<string,mixed>):bool)|null tras firmar; true = la respuesta del crédito ya le lleva su copia */
   private ?\Closure $afterSign = null;
   private bool $sharedQueue;
+  /** @var list<string> envíos inmediatos que esperan a que cierre la transacción del bloqueo */
+  private array $pendingDispatch = [];
 
   public function __construct(private Database $db, private string $secret, private string $baseUrl, ?\Closure $enqueue = null, ?\Closure $renderPdf = null, ?SchemaInspector $schema = null)
   {
@@ -459,11 +461,10 @@ final class OwnerCreditPromissoryService
         $destination = $phone;
       }
       if ($count > 0) {
-        try {
-          (new SharedNotificationsBridge($this->db))->dispatchNow($key . ':' . $destination);
-        } catch (\Throwable) {
-          // Queda en la cola compartida para reintento.
-        }
+        // El envío inmediato arma el worker de la cola, que revisa sus tablas (CREATE TABLE): dentro de una
+        // transacción MySQL la cerraría a mitad de camino y el commit fallaría aunque el mensaje sí saliera.
+        if ($this->db->pdo()->inTransaction()) $this->pendingDispatch[] = $key . ':' . $destination;
+        else $this->dispatchNow($key . ':' . $destination);
       }
       return $count;
     } catch (\Throwable $error) {
@@ -512,11 +513,27 @@ final class OwnerCreditPromissoryService
     try {
       $this->db->getRow("SELECT `id` FROM `{$this->table()}` WHERE `id` = ? LIMIT 1 FOR UPDATE", [$id]);
       $result = $callback();
-      if ($own) $pdo->commit();
-      return $result;
+      // Si algo cerró la transacción por su cuenta (un cambio de estructura en MySQL), lo hecho ya quedó guardado.
+      if ($own && $pdo->inTransaction()) $pdo->commit();
     } catch (\Throwable $error) {
       if ($own && $pdo->inTransaction()) $pdo->rollBack();
+      $this->pendingDispatch = [];
       throw $error;
+    }
+    if ($own) {
+      $pending = $this->pendingDispatch;
+      $this->pendingDispatch = [];
+      foreach ($pending as $dedupeKey) $this->dispatchNow($dedupeKey);
+    }
+    return $result;
+  }
+
+  private function dispatchNow(string $dedupeKey): void
+  {
+    try {
+      (new SharedNotificationsBridge($this->db))->dispatchNow($dedupeKey);
+    } catch (\Throwable) {
+      // Queda en la cola compartida para reintento.
     }
   }
 
