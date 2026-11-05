@@ -69,8 +69,9 @@ final class OwnerCreditService
   public const EVENT_DECIDED = 'credito_propietario_decidido';
   public const EVENT_RESPONSE = 'credito_propietario_respuesta';
   public const STAGES = ['solicitud' => 'Solicitud', 'estudio' => 'Estudio', 'firma' => 'Firma de documentos', 'respuesta' => 'Respuesta'];
-  /** Plantillas de WhatsApp de la respuesta: una por documento, con el PDF en el encabezado. */
+  /** Plantillas de WhatsApp de la respuesta, con el PDF en el encabezado: una por documento, o una sola con todos unidos. */
   public const RESPONSE_TEMPLATES = [
+    'unificado' => 'scm_credito_documentos_v1',
     OwnerCreditResponseDocuments::LETTER => 'scm_credito_carta_aprobacion_v1',
     'pagare' => 'scm_credito_pagare_firmado_doc_v1',
     OwnerCreditResponseDocuments::PLAN => 'scm_credito_plan_pagos_v1',
@@ -85,6 +86,7 @@ final class OwnerCreditService
   private ?\Closure $responsePdf = null;
   /** @var (\Closure(string,string):array{path:string,url:string})|null bytes y nombre → archivo guardado con enlace firmado */
   private ?\Closure $responseStore = null;
+  private ?\Closure $responseMerge = null;
 
   public function __construct(private Database $db, private ?Settings $settings = null, ?SchemaInspector $schema = null)
   {
@@ -105,10 +107,11 @@ final class OwnerCreditService
   }
 
   /** Pruebas: cómo se generan y guardan los PDF de la respuesta (por defecto Chromium y la carpeta de cargas). */
-  public function useResponseFiles(\Closure $pdf, \Closure $store): void
+  public function useResponseFiles(\Closure $pdf, \Closure $store, ?\Closure $merge = null): void
   {
     $this->responsePdf = $pdf;
     $this->responseStore = $store;
+    $this->responseMerge = $merge;
   }
 
   /**
@@ -247,7 +250,7 @@ final class OwnerCreditService
       if (!$owner['required']) continue;
       if ($owner['status'] === 'firmado') { $result['signed'][] = (string) $owner['name']; continue; }
       try {
-        $sent = $this->promissory()->send($owner, $id, $channels, $actor);
+        $sent = $this->promissory()->send($owner, $id, $channels, $actor, !empty($this->config()['whatsapp_unified_templates']));
         $result['sent'][] = $owner['name'] . ' (' . implode(', ', array_keys(array_filter($sent['queued']))) . ')';
       } catch (\DomainException $error) {
         $result['errors'][] = $error->getMessage();
@@ -1137,6 +1140,11 @@ final class OwnerCreditService
       }
     }
     foreach ($documents as $index => $document) $documents[$index] += ($this->responseStore ?? static fn(string $bytes, string $name): array => self::storeResponseFile($bytes, $name))($document['bytes'], $document['filename']);
+    // WhatsApp lleva un documento por mensaje: con la plantilla única va todo en un PDF. El correo conserva los archivos
+    // por separado y, si no se pueden unir, el WhatsApp también, para que nadie se quede sin sus documentos.
+    $unifiedActive = !empty($settings['whatsapp_unified_templates']);
+    $unified = $unifiedActive ? $this->unifiedDocument($id, $documents) : null;
+    $whatsappDocuments = $unified !== null ? [$unified] : $documents;
 
     $money = static fn($value): string => OwnerCreditResponseDocuments::money((float) $value);
     $clean = static fn($value, int $limit = 120): string => mb_substr(preg_replace('/\s+/u', ' ', trim((string) $value)) ?: 'Sin dato', 0, $limit);
@@ -1145,6 +1153,7 @@ final class OwnerCreditService
     $first = (int) ($credit['first_payment_ts'] ?? 0);
     $params = static function (array $document, string $recipient) use ($credit, $first, $money, $clean, $signature, $id): array {
       return match ($document['kind']) {
+        'unificado' => [$clean($recipient, 80), (string) $id, $money($credit['approved_amount']), (string) (int) $credit['approved_term'], $money($credit['monthly_payment']), $first > 0 ? date('d/m/Y', $first) : 'Sin fecha', $clean($signature, 200)],
         OwnerCreditResponseDocuments::LETTER => [$clean($recipient, 80), (string) $id, $clean($credit['owner_name']), $money($credit['approved_amount']), (string) (int) $credit['approved_term'], $money($credit['monthly_payment']), $clean($signature, 200)],
         'pagare' => [$clean($recipient, 80), (string) OwnerCreditPromissoryService::number((int) $document['promissory']['id']), $clean($document['promissory']['owner_name']), date('d/m/Y', (int) $document['promissory']['signed_at']), (string) $id, $clean($signature, 200)],
         default => [$clean($recipient, 80), (string) $id, $clean($credit['owner_name']), (string) (int) $credit['approved_term'], $money($credit['monthly_payment']), $first > 0 ? date('d/m/Y', $first) : 'Sin fecha', $clean($signature, 200)],
@@ -1166,7 +1175,7 @@ final class OwnerCreditService
           ]);
         }
         if ($settings['notify_owner_whatsapp'] && trim((string) $recipient['phone']) !== '') {
-          foreach ($documents as $index => $document) $queued['whatsapp'] += $this->responseWhatsapp((string) $recipient['phone'], $name, $document, $params($document, $name ?: 'Propietario'), 'owner-credit-response-wa:' . $id . ':' . $now . ':' . $index . $suffix, $id);
+          foreach ($whatsappDocuments as $index => $document) $queued['whatsapp'] += $this->responseWhatsapp((string) $recipient['phone'], $name, $document, $params($document, $name ?: 'Propietario'), 'owner-credit-response-wa:' . $id . ':' . $now . ':' . $index . $suffix, $id);
         }
       }
       $copies = InternalNotificationRecipients::emailsForAction($this->db, self::EVENT_RESPONSE);
@@ -1184,7 +1193,7 @@ final class OwnerCreditService
           $phone = preg_replace('/\D+/', '', (string) ($contact['phone'] ?? '')) ?? '';
           if ($phone === '' || isset($sent[$phone])) continue;
           $sent[$phone] = true;
-          foreach ($documents as $index => $document) $queued['internal_whatsapp'] += $this->responseWhatsapp((string) $contact['phone'], (string) ($contact['name'] ?? ''), $document, $params($document, (string) ($contact['name'] ?? '') ?: 'Funcionario'), 'owner-credit-response-staff-wa:' . $id . ':' . $now . ':' . $phone . ':' . $index, $id);
+          foreach ($whatsappDocuments as $index => $document) $queued['internal_whatsapp'] += $this->responseWhatsapp((string) $contact['phone'], (string) ($contact['name'] ?? ''), $document, $params($document, (string) ($contact['name'] ?? '') ?: 'Funcionario'), 'owner-credit-response-staff-wa:' . $id . ':' . $now . ':' . $phone . ':' . $index, $id);
         }
       }
     } catch (\Throwable $error) {
@@ -1192,10 +1201,27 @@ final class OwnerCreditService
     }
     $resent = (int) ($credit['response_sent_at'] ?? 0) > 0;
     $this->markResponse($id, ['at' => $now, 'by' => (string) ($actor['name'] ?? ''), 'decision' => 'aprobado', 'queued' => array_diff_key($queued, ['documents' => 1]), 'documents' => $queued['documents']]);
-    $summary = ($resent ? 'Respuesta reenviada' : 'Respuesta enviada') . ' al propietario con ' . implode(', ', $queued['documents']) . ' (' . $queued['email'] . ' correo(s), ' . $queued['whatsapp'] . ' WhatsApp).';
+    $summary = ($resent ? 'Respuesta reenviada' : 'Respuesta enviada') . ' al propietario con ' . implode(', ', $queued['documents']) . ' (' . $queued['email'] . ' correo(s), ' . $queued['whatsapp'] . ' WhatsApp).' . ($unifiedActive && $unified === null ? ' Los documentos no se pudieron unir: por WhatsApp salieron por separado.' : '');
     $this->event($id, 'respuesta_enviada', $actor, ['nota' => $summary]);
     $this->recordHistories($credit, $resent ? 'Respuesta de crédito reenviada' : 'Respuesta de crédito enviada', 'Crédito #' . $id . ': ' . $summary, $actor);
     return $queued;
+  }
+
+  /**
+   * Copia con todos los documentos en un PDF para el WhatsApp. Los originales no cambian.
+   * @param list<array<string,mixed>> $documents @return array<string,mixed>|null
+   */
+  private function unifiedDocument(int $id, array $documents): ?array
+  {
+    try {
+      $bytes = ($this->responseMerge ?? static fn(array $pdfs): ?string => \SCM\Support\PdfMerger::merge($pdfs))(array_column($documents, 'bytes'));
+      if (!is_string($bytes) || $bytes === '') throw new \RuntimeException('No se pudo unir los PDF.');
+      $filename = 'documentos-credito-' . $id . '.pdf';
+      return ['kind' => 'unificado', 'label' => 'Documentos del crédito #' . $id, 'filename' => $filename, 'bytes' => $bytes] + ($this->responseStore ?? static fn(string $bytes, string $name): array => self::storeResponseFile($bytes, $name))($bytes, $filename);
+    } catch (\Throwable $error) {
+      error_log('[owner-credit-response] Crédito #' . $id . ': ' . $error->getMessage());
+      return null;
+    }
   }
 
   /** Carta de aprobación o condiciones con plan de pagos en PDF (también para verlos desde el liquidador). */
@@ -1254,7 +1280,8 @@ final class OwnerCreditService
 
   /**
    * Al firmar un pagaré: los créditos aprobados de esa persona que esperaban la firma envían su respuesta. Devuelve
-   * true si la respuesta ya le lleva a quien firmó su copia del pagaré (así no recibe dos veces el mismo documento).
+   * true si la respuesta le lleva (o le llevará, cuando firmen los demás) a quien firmó su copia del pagaré: así no
+   * recibe dos veces el mismo documento. Mientras tanto la puede descargar desde su enlace.
    * @param array<string,mixed> $promissory fila firmada de scm_owner_credit_promissory
    */
   public function afterPromissorySigned(array $promissory): bool
@@ -1266,10 +1293,16 @@ final class OwnerCreditService
       $rows = $this->db->getResults("SELECT * FROM `{$this->table()}` WHERE `status` = 'aprobado' AND (`response_sent_at` IS NULL OR `response_sent_at` = 0) ORDER BY `id`");
       foreach ($rows as $credit) {
         if ((int) $credit['id'] !== (int) ($promissory['credit_id'] ?? 0) && OwnerCreditPromissoryService::normalizeDocument((string) ($credit['owner_document'] ?? '')) !== $document) continue;
-        if ($this->promissoryState($credit)['missing'] !== []) continue;
+        $state = $this->promissoryState($credit);
+        $settings = $this->config();
+        $carries = ($settings['notify_owner_email'] || $settings['notify_owner_whatsapp']) && array_filter($state['owners'], static fn(array $owner): bool => $owner['required'] && OwnerCreditPromissoryService::normalizeDocument((string) $owner['document']) === $document) !== [];
+        if ($state['missing'] !== []) {
+          $handled = $handled || $carries;
+          continue;
+        }
         try {
           $this->sendResponse((int) $credit['id'], ['employee_id' => (string) $credit['decided_by_id'], 'name' => (string) $credit['decided_by_name']]);
-          if (OwnerCreditPromissoryService::normalizeDocument((string) ($credit['owner_document'] ?? '')) === $document && $this->config()['notify_owner_email']) $handled = true;
+          $handled = $handled || $carries;
         } catch (\Throwable $error) {
           error_log('[owner-credit-response:auto] crédito #' . (int) $credit['id'] . ': ' . $error->getMessage());
         }

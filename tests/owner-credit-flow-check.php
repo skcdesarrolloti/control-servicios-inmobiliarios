@@ -569,6 +569,40 @@ $approvedView = (new \SCM\Modules\OwnerCredits\OwnerCreditView())->workspace($pa
 $check(str_contains($approvedView, 'data-owner-credit-stepper') && str_contains($approvedView, 'data-owner-credit-stage="respuesta"') && str_contains($approvedView, 'data-owner-credit-document="carta"') && str_contains($approvedView, 'data-owner-credit-document="plan"') && str_contains($approvedView, 'Reenviar respuesta'), 'the liquidator shows the stages, the response documents and the resend button');
 $pagareService->sendResponse($pagareCredit, $actor);
 $check((int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'respuesta_enviada'", [$pagareCredit]) === 2, 'the response can be resent and the resend is traced');
+// Un solo WhatsApp: con la opción activa los documentos se unen en un PDF; si no se pueden unir salen por separado.
+$setUnified = static function (bool $on) use ($db): void {
+  $config = json_decode((string) $db->getVar("SELECT valor FROM wp_jet_cct_confi_sistema WHERE funcion = 'control_servicios_config'"), true);
+  $config['owner_credit_settings']['whatsapp_unified_templates'] = $on;
+  $db->update('wp_jet_cct_confi_sistema', ['valor' => json_encode($config)], ['funcion' => 'control_servicios_config']);
+};
+$check(\SCM\Modules\OwnerCredits\OwnerCreditSettings::read(new Settings($db))['whatsapp_unified_templates'] === false, 'the single WhatsApp stays off until the Meta templates are approved');
+$mergedPdfs = [];
+$pagareService->useResponseFiles($fakeResponsePdf, $fakeResponseStore, static function (array $pdfs) use (&$mergedPdfs): ?string { $mergedPdfs = $pdfs; return '%PDF-1.4 unido'; });
+$responseFiles = [];
+$pagareService->sendResponse($pagareCredit, $actor);
+$pagareService->useResponseFiles($fakeResponsePdf, $fakeResponseStore);
+$check($mergedPdfs === [] && count($responseFiles) === 3, 'with the option off nothing is merged');
+$setUnified(true);
+$unifiedService = new OwnerCreditService($db, new Settings($db));
+$unifiedService->usePromissory($promissory);
+$unifiedService->useResponseFiles($fakeResponsePdf, $fakeResponseStore, static function (array $pdfs) use (&$mergedPdfs): ?string { $mergedPdfs = $pdfs; return '%PDF-1.4 unido'; });
+$responseFiles = [];
+$unifiedService->sendResponse($pagareCredit, $actor);
+$check(count($mergedPdfs) === 3 && str_contains($mergedPdfs[1], 'pagare') && count($responseFiles) === 4 && $responseFiles[3] === 'documentos-credito-' . $pagareCredit . '.pdf', 'with the option on the letter, the signed note and the plan are merged in that order, keeping the separate files for the email');
+$unifiedService->useResponseFiles($fakeResponsePdf, $fakeResponseStore, static fn(array $pdfs): ?string => null);
+$responseFiles = [];
+$unifiedService->sendResponse($pagareCredit, $actor);
+$check(count($responseFiles) === 3 && (int) $db->getVar("SELECT COUNT(*) FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'respuesta_enviada' AND details_json LIKE '%no se pudieron unir%'", [$pagareCredit]) === 1, 'if the PDFs cannot be merged the documents go out separately and the history says so');
+$promissory->send(['document' => '55566677', 'name' => 'Tercera QA', 'email' => 'tercera@example.test', 'phone' => '', 'owner_id' => ''], $pagareCredit, ['email'], $actor, true);
+$lastMessage = $sentMessages[array_key_last($sentMessages)];
+$check($lastMessage['event'] === 'invitation' && $lastMessage['approved_template'] === true && $lastMessage['credit_id'] === $pagareCredit && str_contains($lastMessage['text'], 'fue aprobada'), 'the signing link says the request was approved');
+$setUnified(false);
+$pagareService->usePromissory($promissory);
+foreach (['whatsapp-credito-documentos-template.json' => ['scm_credito_documentos_v1', 'BODY', 7, 'OwnerCreditService'], 'whatsapp-credito-pagare-firma-v2-template.json' => ['scm_credito_pagare_firma_v2', 'BODY', 4, 'OwnerCreditPromissoryService']] as $file => [$name, $type, $variables, $class]) {
+  $definition = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/' . $file), true);
+  $body = array_values(array_filter($definition['components'], static fn(array $c): bool => $c['type'] === $type))[0];
+  $check($definition['name'] === $name && str_contains((string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/' . $class . '.php'), "'" . $name . "'") && substr_count($body['text'], '{{') === $variables && count($body['example']['body_text'][0]) === $variables, $name . ' matches the panel: name and ' . $variables . ' variables');
+}
 $nextCredit = (int) $pagareService->createManual(9, 500000, 3, 'Libre Destinación', $actor, '', 'mandato_2');
 $check($pagareService->promissoryState($pagareService->find($nextCredit))['missing'] === [], 'a later credit of the same person does not ask to sign again');
 try { $pagareService->voidPromissory($pid, 'corto', $actor); $check(false, 'voiding needs a reason'); } catch (DomainException) { $check(true, 'voiding a promissory note needs a reason'); }

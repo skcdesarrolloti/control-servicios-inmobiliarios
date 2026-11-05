@@ -194,6 +194,9 @@ try {
 } catch (DomainException $error) {
   $check(str_contains($error->getMessage(), 'Marta Tres'), 'the promissory note is not sent while a co-owner lacks document or contact');
 }
+// La respuesta le llevará el pagaré cuando firmen los demás: quien firma no recibe además una copia aparte.
+$check($service->afterPromissorySigned(['owner_document' => '222222', 'credit_id' => $repairId]) === true && (int) ($service->find($repairId)['response_sent_at'] ?? 0) === 0, 'a co-owner who signs first gets no separate copy: the final response carries it');
+$check($service->afterPromissorySigned(['owner_document' => '999999', 'credit_id' => $repairId]) === false, 'somebody who is not a signer of the credit keeps their own copy');
 
 // API del bot de WhatsApp: firmada, solo sobre los contratos de la persona, con la lógica del panel.
 $secret = 'bot-secret-bot-secret-123456';

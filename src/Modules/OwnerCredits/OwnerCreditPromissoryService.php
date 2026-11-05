@@ -174,7 +174,7 @@ final class OwnerCreditPromissoryService
    * @param array<string,mixed> $signer @param list<string> $channels email|whatsapp
    * @return array{id:int,status:string,queued:array<string,bool>}
    */
-  public function send(array $signer, int $creditId, array $channels, array $actor): array
+  public function send(array $signer, int $creditId, array $channels, array $actor, bool $approvedTemplate = false): array
   {
     $this->ensureSchema();
     $document = self::normalizeDocument((string) ($signer['document'] ?? ''));
@@ -210,9 +210,9 @@ final class OwnerCreditPromissoryService
     $queued = [];
     $url = $this->publicUrl($row);
     foreach ($channels as $channel) {
-      $text = 'Hola ' . $row['owner_name'] . ', te enviamos el pagaré No. ' . self::number($id) . ' y su carta de instrucciones para que los revises y firmes electrónicamente. Se firman una sola vez y respaldan tus créditos del Pasaporte SuCasa. Enlace personal: ' . $url;
+      $text = 'Hola ' . $row['owner_name'] . ', ' . ($creditId > 0 ? 'la solicitud de crédito No. ' . $creditId . ' fue aprobada. Para continuar, ' : '') . 'te enviamos el pagaré No. ' . self::number($id) . ' y su carta de instrucciones para que los revises y firmes electrónicamente. Se firman una sola vez y respaldan tus créditos del Pasaporte SuCasa. Enlace personal: ' . $url;
       $queued[$channel] = ($this->enqueue)($channel, $channel === 'email' ? (string) $row['owner_email'] : (string) $row['owner_phone'], [
-        'event' => 'invitation', 'row' => $row, 'url' => $url, 'text' => $text,
+        'event' => 'invitation', 'row' => $row, 'url' => $url, 'text' => $text, 'credit_id' => $creditId, 'approved_template' => $approvedTemplate,
         'subject' => 'Firma del pagaré No. ' . self::number($id) . ' · SKC SuCasa Inmobiliaria',
         'html' => '<p>Hola ' . EmailTemplate::e($row['owner_name']) . ',</p>' . ($creditId > 0 ? '<p>Tu solicitud de crédito <b>#' . $creditId . '</b> fue aprobada. Para continuar, firma el pagaré: al quedar firmado te enviaremos la carta de aprobación, el pagaré firmado y el plan de pagos.</p>' : '')
           . '<p>Te enviamos el <b>pagaré No. ' . self::number($id) . '</b> y su <b>carta de instrucciones</b> para que los revises y firmes electrónicamente. Se firman una sola vez y respaldan los créditos que tomes con el Pasaporte SuCasa.</p><p>Para firmar necesitarás tu nombre, tu número de documento y un código que te enviaremos al abrir el enlace.</p>',
@@ -444,9 +444,11 @@ final class OwnerCreditPromissoryService
         $phone = CompletionPolicy::phone($to);
         if ($phone === '') return 0;
         $number = self::number((int) $row['id']);
-        [$template, $parameters] = match ($m['event']) {
-          'otp' => [CompletionDelivery::otpTemplate(), [(string) $m['code']]],
-          'invitation' => [self::template('SCM_PAGARE_WHATSAPP_INVITATION_TEMPLATE', 'scm_credito_pagare_firma_v1'), [(string) $row['owner_name'], $number, (string) $m['url']]],
+        [$template, $parameters] = match (true) {
+          $m['event'] === 'otp' => [CompletionDelivery::otpTemplate(), [(string) $m['code']]],
+          // v2: además del enlace dice que la solicitud fue aprobada (el propietario se entera por este mensaje).
+          $m['event'] === 'invitation' && !empty($m['approved_template']) && (int) ($m['credit_id'] ?? 0) > 0 => ['scm_credito_pagare_firma_v2', [(string) $row['owner_name'], (string) (int) $m['credit_id'], $number, (string) $m['url']]],
+          $m['event'] === 'invitation' => [self::template('SCM_PAGARE_WHATSAPP_INVITATION_TEMPLATE', 'scm_credito_pagare_firma_v1'), [(string) $row['owner_name'], $number, (string) $m['url']]],
           default => [self::template('SCM_PAGARE_WHATSAPP_SIGNED_TEMPLATE', 'scm_credito_pagare_firmado_v1'), [(string) $row['owner_name'], $number, (string) $m['url']]],
         };
         if ($template === '') return 0;

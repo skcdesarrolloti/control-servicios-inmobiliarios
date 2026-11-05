@@ -1,0 +1,37 @@
+{
+  "name": "scm_credito_documentos_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "HEADER",
+      "format": "DOCUMENT",
+      "example": {
+        "header_handle": [
+          "documentos-credito-5.pdf"
+        ]
+      }
+    },
+    {
+      "type": "BODY",
+      "text": "Buen día, {{1}}.\n\nAdjuntamos los documentos del crédito No. {{2}}: carta de aprobación, pagaré y carta de instrucciones firmados, y plan de pagos.\n\nValor aprobado: {{3}}\nPlazo: {{4}} meses\nCuota mensual: {{5}}\nPrimera cuota: {{6}}\n\nLa cuota se descontará de los giros de arrendamiento.\n\nAtentamente,\n{{7}}\n\nConstruimos confianza, protegemos su patrimonio.",
+      "example": {
+        "body_text": [
+          [
+            "María Pérez",
+            "5",
+            "$3.000.000",
+            "12",
+            "$285.424",
+            "30/11/2026",
+            "Royner Guardo - Asistente de Desarrollo TI - Cel. 3015232054"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    }
+  ]
+}

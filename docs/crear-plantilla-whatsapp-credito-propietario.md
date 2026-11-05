@@ -323,3 +323,71 @@ Gracias por confiar en nosotros.
 | 7 | Quien aprobó: nombre - cargo - Cel. celular | Royner Guardo - Asistente de Desarrollo TI - Cel. 3015232054 |
 
 Las definiciones para la API están en `whatsapp-credito-carta-aprobacion-template.json`, `whatsapp-credito-pagare-firmado-doc-template.json` y `whatsapp-credito-plan-pagos-template.json`.
+
+## Plantillas de un solo mensaje
+
+Reemplazan el envío de un WhatsApp por documento. Se crean en Meta y, cuando **las dos** estén aprobadas, se activa **Configuración › Documentos de la respuesta en un solo WhatsApp**. Las plantillas anteriores se conservan: si un día no se pueden unir los PDF, el panel envía los documentos por separado con ellas.
+
+### Documentos del crédito
+
+- Nombre exacto: `scm_credito_documentos_v1`.
+- Categoría: **Utilidad** (`UTILITY`). Idioma: **Español (Colombia)** (`es_CO`). Variables: **numéricas**.
+- Encabezado: **Documento** (PDF de ejemplo, por ejemplo `documentos-credito-5.pdf`).
+- Pie de página: `SKC SuCasa Inmobiliaria`. Botones: ninguno.
+
+```text
+Buen día, {{1}}.
+
+Adjuntamos los documentos del crédito No. {{2}}: carta de aprobación, pagaré y carta de instrucciones firmados, y plan de pagos.
+
+Valor aprobado: {{3}}
+Plazo: {{4}} meses
+Cuota mensual: {{5}}
+Primera cuota: {{6}}
+
+La cuota se descontará de los giros de arrendamiento.
+
+Atentamente,
+{{7}}
+
+Construimos confianza, protegemos su patrimonio.
+```
+
+| Variable | Qué envía el panel | Ejemplo |
+| --- | --- | --- |
+| 1 | Quien recibe | María Pérez |
+| 2 | Número del crédito | 5 |
+| 3 | Valor aprobado | $3.000.000 |
+| 4 | Plazo en meses | 12 |
+| 5 | Valor de la cuota | $285.424 |
+| 6 | Vencimiento de la primera cuota | 30/11/2026 |
+| 7 | Quien aprobó: nombre - cargo - Cel. celular | Royner Guardo - Asistente de Desarrollo TI - Cel. 3015232054 |
+
+La definición para la API está en `whatsapp-credito-documentos-template.json`.
+
+### Enlace para firmar con aviso de aprobación
+
+- Nombre exacto: `scm_credito_pagare_firma_v2`.
+- Categoría: **Utilidad** (`UTILITY`). Idioma: **Español (Colombia)** (`es_CO`). Variables: **numéricas**.
+- Encabezado: ninguno. Pie de página: `SKC SuCasa Inmobiliaria`. Botones: ninguno.
+
+```text
+Hola {{1}}.
+
+La solicitud de crédito No. {{2}} fue aprobada.
+
+Para continuar, revisa y firma electrónicamente el pagaré No. {{3}} y su carta de instrucciones. Se firman una sola vez y respaldan los créditos que tomes con el Pasaporte SuCasa. Al quedar firmados te enviaremos los documentos del crédito.
+
+Revisar y firmar: {{4}}
+
+Este enlace es personal. No lo compartas.
+```
+
+| Variable | Qué envía el panel | Ejemplo |
+| --- | --- | --- |
+| 1 | Quien firma | María Pérez |
+| 2 | Número del crédito | 5 |
+| 3 | Número del pagaré | PS-000012 |
+| 4 | Enlace personal para firmar | https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/credito-pagare.php?id=12&token=EJEMPLO_NO_VALIDO |
+
+La definición para la API está en `whatsapp-credito-pagare-firma-v2-template.json`.
