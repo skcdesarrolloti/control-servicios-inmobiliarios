@@ -14,6 +14,11 @@ final class EmployeeBudgetReport
   private const TIMEOUT_SECONDS = 25;
   // La API de Reportes atiende mal las ráfagas: su propio frontend limita a dos lecturas.
   private const CONCURRENCY = 2;
+  private const CASE_TOPICS = ['Reparaciones necesarias', 'Reparaciones locativas', 'Mejoras utiles', 'Reparaciones voluntarias', 'Reparaciones antes de la entrega', 'Reparaciones antes del recibo', 'Revision preventiva'];
+  // Mismas reglas del Reporte funcionario: cargo 7 y cargo 3, con la exclusión del funcionario 9.
+  private const REVIEW_CARGOS = ['3', '7'];
+  private const REVIEW_EXCLUDED_EMPLOYEES = ['9'];
+  private const CASES_CARGO = '3';
 
   /** @param \Closure(array<int,array<string,scalar>>):array<int,?array> $fetch */
   public function __construct(private \Closure $fetch)
@@ -56,6 +61,72 @@ final class EmployeeBudgetReport
       $activities[] = self::activity($group, $execution[$key] ?? [], $month);
     }
     return ['year' => $year, 'month' => $month, 'activities' => $activities];
+  }
+
+  /**
+   * Cumplimientos globales del cargo: no dependen de un presupuesto.
+   * @return array{reviews:bool,stats:?array,cases:bool,case_summary:?array}
+   */
+  public function compliance(string $employeeId, string $cargoId, int $year, int $month, string $date): array
+  {
+    $reviews = in_array($cargoId, self::REVIEW_CARGOS, true) && !in_array($employeeId, self::REVIEW_EXCLUDED_EMPLOYEES, true);
+    $cases = $cargoId === self::CASES_CARGO;
+    $requests = [];
+    if ($reviews) $requests['stats'] = ['route' => 'compensacion/revisiones-stats', 'mes_num' => $month, 'year' => $year];
+    if ($cases) $requests['cases'] = ['route' => 'historial', 'tipo' => 'tickets', 'fecha_ref' => $date, 'fallback_forward' => 1, 'casos_al_dia' => 1, 'temas' => implode(',', self::CASE_TOPICS)];
+    $keys = array_keys($requests);
+    $responses = $requests ? array_values(($this->fetch)(array_values($requests))) : [];
+    $results = $keys ? array_combine($keys, array_pad($responses, count($keys), null)) : [];
+
+    $stats = $results['stats'] ?? null;
+    $rows = $results['cases']['data'] ?? null;
+    return [
+      'reviews' => $reviews,
+      'stats' => is_array($stats) && !empty($stats['success']) ? $stats : null,
+      'cases' => $cases,
+      'case_summary' => is_array($rows) && $rows !== [] ? self::summarizeCases($rows) : null,
+    ];
+  }
+
+  /** @param array<int,array<string,mixed>> $rows una fila por funcionario del historial de tickets */
+  public static function summarizeCases(array $rows): array
+  {
+    $line = static fn(string $name, int $total, int $onTime): array => [
+      'name' => $name,
+      'total' => $total,
+      'on_time' => $onTime,
+      'late' => $total - $onTime,
+      'pct' => $total > 0 ? round($onTime * 100 / $total, 1) : 0.0,
+    ];
+    $sorted = static function (array $lines): array {
+      $lines = array_values(array_filter($lines, static fn(array $item): bool => $item['total'] > 0));
+      usort($lines, static fn(array $a, array $b): int => [$b['late'], $b['total'], $a['name']] <=> [$a['late'], $a['total'], $b['name']]);
+      return $lines;
+    };
+
+    $topics = [];
+    $employees = [];
+    foreach ($rows as $row) {
+      $ownTopics = [];
+      foreach ((array) ($row['temas_casos'] ?? []) as $topic) {
+        $name = (string) ($topic['categoria'] ?? '');
+        $total = (int) ($topic['total'] ?? 0);
+        $onTime = (int) ($topic['cumple'] ?? 0);
+        $ownTopics[] = $line($name, $total, $onTime);
+        $topics[$name]['total'] = ($topics[$name]['total'] ?? 0) + $total;
+        $topics[$name]['on_time'] = ($topics[$name]['on_time'] ?? 0) + $onTime;
+      }
+      $employee = $line((string) ($row['nombre_empleado'] ?? $row['id_empleado'] ?? ''), (int) ($row['total'] ?? 0), (int) ($row['cumple'] ?? 0));
+      $employee['topics'] = $sorted($ownTopics);
+      $employees[] = $employee;
+    }
+
+    $byEmployee = $sorted($employees);
+    $byTopic = [];
+    foreach ($topics as $name => $topic) $byTopic[] = $line((string) $name, $topic['total'], $topic['on_time']);
+    $total = array_sum(array_column($byEmployee, 'total'));
+    $onTime = array_sum(array_column($byEmployee, 'on_time'));
+    return ['total' => $total, 'on_time' => $onTime, 'pct' => $total > 0 ? round($onTime * 100 / $total, 1) : 0.0, 'by_employee' => $byEmployee, 'by_topic' => $sorted($byTopic)];
   }
 
   /** @param array<int,array<string,mixed>> $rows @return array<string,array<string,mixed>> */

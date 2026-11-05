@@ -84,8 +84,14 @@ trait HandlesMetricsPanels
     $lastMonth = $year === $currentYear ? (int) $today->format('n') : 12;
     $month = max(1, min($lastMonth, (int) ($_POST['month'] ?? $lastMonth)));
     try {
-      $report = \SCM\Modules\Metrics\EmployeeBudgetReport::remote()->build(\SCM\Core\Auth::employeeId(), $year, $month);
-      $this->jsonOk(['html' => (new \SCM\Modules\Metrics\EmployeeBudgetView())->render($report)]);
+      $employeeId = \SCM\Core\Auth::employeeId();
+      $remote = \SCM\Modules\Metrics\EmployeeBudgetReport::remote();
+      $report = $remote->build($employeeId, $year, $month);
+      $lastDay = $today->setDate($year, $month, 1)->modify('last day of this month');
+      $cutDate = ($lastDay > $today ? $today : $lastDay)->format('Y-m-d');
+      $report['compliance'] = $remote->compliance($employeeId, \SCM\Core\Auth::userCargo(), $year, $month, $cutDate);
+      $vista = (string) ($_POST['vista'] ?? 'mes') === 'acumulado' ? 'acumulado' : 'mes';
+      $this->jsonOk(['html' => (new \SCM\Modules\Metrics\EmployeeBudgetView())->render($report, $vista)]);
     } catch (\Throwable $exception) {
       error_log('[employee-budget] ' . $exception->getMessage());
       $this->jsonFail('No se pudo cargar tu información desde Reportes.');

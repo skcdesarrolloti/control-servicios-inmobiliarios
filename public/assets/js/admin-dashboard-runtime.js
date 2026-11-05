@@ -12800,7 +12800,7 @@
     });
     root.addEventListener("change", function (event) {
       // Por mes y Anual se recalculan al elegir; Acumulado espera a "Aplicar" para no recargar con cada extremo.
-      if (!event.target.matches('[data-maint-metrics-form] [name="month"], [data-maint-metrics-form] [name="year"]')) return;
+      if (!event.target.matches('[data-maint-metrics-form] [name="month"], [data-maint-metrics-form] [name="year"], [data-maint-metrics-form] [name="vista"]')) return;
       loadMaintenanceMetrics(event.target.closest("[data-maint-metrics]"), true);
     });
 
