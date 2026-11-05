@@ -598,11 +598,16 @@ $lastMessage = $sentMessages[array_key_last($sentMessages)];
 $check($lastMessage['event'] === 'invitation' && $lastMessage['approved_template'] === true && $lastMessage['credit_id'] === $pagareCredit && str_contains($lastMessage['text'], 'fue aprobada'), 'the signing link says the request was approved');
 $setUnified(false);
 $pagareService->usePromissory($promissory);
-foreach (['whatsapp-credito-documentos-template.json' => ['scm_credito_documentos_v1', 'BODY', 7, 'OwnerCreditService'], 'whatsapp-credito-pagare-firma-v2-template.json' => ['scm_credito_pagare_firma_v2', 'BODY', 4, 'OwnerCreditPromissoryService']] as $file => [$name, $type, $variables, $class]) {
+foreach (['whatsapp-credito-documentos-template.json' => ['scm_credito_documentos_v1', 'BODY', 7, 'OwnerCreditService'], 'whatsapp-credito-pagare-firma-v2-template.json' => ['scm_credito_pagare_firma_v2', 'BODY', 3, 'OwnerCreditPromissoryService']] as $file => [$name, $type, $variables, $class]) {
   $definition = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/' . $file), true);
   $body = array_values(array_filter($definition['components'], static fn(array $c): bool => $c['type'] === $type))[0];
   $check($definition['name'] === $name && str_contains((string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/' . $class . '.php'), "'" . $name . "'") && substr_count($body['text'], '{{') === $variables && count($body['example']['body_text'][0]) === $variables, $name . ' matches the panel: name and ' . $variables . ' variables');
 }
+$signTemplate = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-credito-pagare-firma-v2-template.json'), true);
+$signButton = $signTemplate['components'][array_key_last($signTemplate['components'])]['buttons'][0];
+$buttonSuffix = [\SCM\Modules\OwnerCredits\OwnerCreditPromissoryService::class, 'buttonSuffix'];
+$check($signButton['type'] === 'URL' && $signButton['url'] === 'https://sucasainmobiliaria.com.co/{{1}}' && !str_contains($signTemplate['components'][0]['text'], '{{4}}') && $buttonSuffix('https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/credito-pagare.php?id=12&token=abc') === 'control-servicios-inmobiliarios/public/credito-pagare.php?id=12&token=abc', 'the signing link goes in a dynamic button, not in the text');
+$check($buttonSuffix('https://example.test/credito-pagare.php?id=12&token=abc') === '', 'a link on another domain does not use the button');
 $nextCredit = (int) $pagareService->createManual(9, 500000, 3, 'Libre Destinación', $actor, '', 'mandato_2');
 $check($pagareService->promissoryState($pagareService->find($nextCredit))['missing'] === [], 'a later credit of the same person does not ask to sign again');
 try { $pagareService->voidPromissory($pid, 'corto', $actor); $check(false, 'voiding needs a reason'); } catch (DomainException) { $check(true, 'voiding a promissory note needs a reason'); }

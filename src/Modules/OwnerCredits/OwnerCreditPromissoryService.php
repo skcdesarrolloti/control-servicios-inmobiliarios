@@ -444,15 +444,17 @@ final class OwnerCreditPromissoryService
         $phone = CompletionPolicy::phone($to);
         if ($phone === '') return 0;
         $number = self::number((int) $row['id']);
+        $signButton = $m['event'] === 'invitation' && !empty($m['approved_template']) && (int) ($m['credit_id'] ?? 0) > 0 ? self::buttonSuffix((string) $m['url']) : '';
         [$template, $parameters] = match (true) {
           $m['event'] === 'otp' => [CompletionDelivery::otpTemplate(), [(string) $m['code']]],
-          // v2: además del enlace dice que la solicitud fue aprobada (el propietario se entera por este mensaje).
-          $m['event'] === 'invitation' && !empty($m['approved_template']) && (int) ($m['credit_id'] ?? 0) > 0 => ['scm_credito_pagare_firma_v2', [(string) $row['owner_name'], (string) (int) $m['credit_id'], $number, (string) $m['url']]],
+          // v2: dice que la solicitud fue aprobada (el propietario se entera por este mensaje) y lleva el enlace en un botón.
+          $signButton !== '' => ['scm_credito_pagare_firma_v2', [(string) $row['owner_name'], (string) (int) $m['credit_id'], $number]],
           $m['event'] === 'invitation' => [self::template('SCM_PAGARE_WHATSAPP_INVITATION_TEMPLATE', 'scm_credito_pagare_firma_v1'), [(string) $row['owner_name'], $number, (string) $m['url']]],
           default => [self::template('SCM_PAGARE_WHATSAPP_SIGNED_TEMPLATE', 'scm_credito_pagare_firmado_v1'), [(string) $row['owner_name'], $number, (string) $m['url']]],
         };
         if ($template === '') return 0;
         $components = [['type' => 'body', 'parameters' => array_map(static fn(string $text): array => ['type' => 'text', 'text' => $text], $parameters)]];
+        if ($signButton !== '') $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $signButton]]];
         // Las plantillas de autenticación (código) llevan el código también en el botón de copiar.
         if ($m['event'] === 'otp') $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => (string) $m['code']]]];
         $count = (new SmsQueue($this->db))->enqueue($phone, (string) $row['owner_name'], (string) $m['text'], [
@@ -473,6 +475,18 @@ final class OwnerCreditPromissoryService
       error_log('[owner-credit-promissory] No se pudo encolar ' . $m['event'] . ' por ' . $channel . ' del pagaré #' . (int) $row['id'] . ': ' . $error->getMessage());
       return 0;
     }
+  }
+
+  /**
+   * Parte variable del botón de la plantilla, cuya base fija es https://sucasainmobiliaria.com.co/{{1}}. Vacío si el
+   * enlace es de otro dominio: el botón no llevaría a él y se usa la plantilla con el enlace en el texto.
+   */
+  public static function buttonSuffix(string $url): string
+  {
+    $parts = parse_url($url);
+    $path = ltrim((string) ($parts['path'] ?? ''), '/');
+    if (strtolower((string) ($parts['host'] ?? '')) !== 'sucasainmobiliaria.com.co' || $path === '') return '';
+    return $path . (($parts['query'] ?? '') !== '' ? '?' . $parts['query'] : '');
   }
 
   private static function template(string $env, string $default): string

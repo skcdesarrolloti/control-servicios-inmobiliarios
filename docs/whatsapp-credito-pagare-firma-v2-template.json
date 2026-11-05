@@ -5,14 +5,13 @@
   "components": [
     {
       "type": "BODY",
-      "text": "Hola {{1}}.\n\nLa solicitud de crédito No. {{2}} fue aprobada.\n\nPara continuar, revisa y firma electrónicamente el pagaré No. {{3}} y su carta de instrucciones. Se firman una sola vez y respaldan los créditos que tomes con el Pasaporte SuCasa. Al quedar firmados te enviaremos los documentos del crédito.\n\nRevisar y firmar: {{4}}\n\nEste enlace es personal. No lo compartas.",
+      "text": "Hola {{1}}.\n\nLa solicitud de crédito No. {{2}} fue aprobada.\n\nPara continuar, revisa y firma electrónicamente el pagaré No. {{3}} y su carta de instrucciones. Se firman una sola vez y respaldan los créditos que tomes con el Pasaporte SuCasa. Al quedar firmados te enviaremos los documentos del crédito.\n\nEste enlace es personal. No lo compartas.",
       "example": {
         "body_text": [
           [
             "María Pérez",
             "5",
-            "PS-000012",
-            "https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/credito-pagare.php?id=12&token=EJEMPLO_NO_VALIDO"
+            "PS-000012"
           ]
         ]
       }
@@ -20,6 +19,19 @@
     {
       "type": "FOOTER",
       "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Revisar y firmar",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "control-servicios-inmobiliarios/public/credito-pagare.php?id=12&token=EJEMPLO_NO_VALIDO"
+          ]
+        }
+      ]
     }
   ]
 }

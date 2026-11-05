@@ -369,7 +369,8 @@ La definición para la API está en `whatsapp-credito-documentos-template.json`.
 
 - Nombre exacto: `scm_credito_pagare_firma_v2`.
 - Categoría: **Utilidad** (`UTILITY`). Idioma: **Español (Colombia)** (`es_CO`). Variables: **numéricas**.
-- Encabezado: ninguno. Pie de página: `SKC SuCasa Inmobiliaria`. Botones: ninguno.
+- Encabezado: ninguno. Pie de página: `SKC SuCasa Inmobiliaria`.
+- Botón: **Visitar sitio web** con URL **dinámica**. Texto `Revisar y firmar`, URL `https://sucasainmobiliaria.com.co/{{1}}`. Ejemplo: `control-servicios-inmobiliarios/public/credito-pagare.php?id=12&token=EJEMPLO_NO_VALIDO`.
 
 ```text
 Hola {{1}}.
@@ -377,8 +378,6 @@ Hola {{1}}.
 La solicitud de crédito No. {{2}} fue aprobada.
 
 Para continuar, revisa y firma electrónicamente el pagaré No. {{3}} y su carta de instrucciones. Se firman una sola vez y respaldan los créditos que tomes con el Pasaporte SuCasa. Al quedar firmados te enviaremos los documentos del crédito.
-
-Revisar y firmar: {{4}}
 
 Este enlace es personal. No lo compartas.
 ```
@@ -388,6 +387,6 @@ Este enlace es personal. No lo compartas.
 | 1 | Quien firma | María Pérez |
 | 2 | Número del crédito | 5 |
 | 3 | Número del pagaré | PS-000012 |
-| 4 | Enlace personal para firmar | https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/credito-pagare.php?id=12&token=EJEMPLO_NO_VALIDO |
+| Botón {{1}} | Enlace personal para firmar, sin el dominio | control-servicios-inmobiliarios/public/credito-pagare.php?id=12&token=EJEMPLO_NO_VALIDO |
 
 La definición para la API está en `whatsapp-credito-pagare-firma-v2-template.json`.
