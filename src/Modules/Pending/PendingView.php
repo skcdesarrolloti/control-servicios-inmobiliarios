@@ -623,7 +623,7 @@ final class PendingView
     $createdTs = $this->ts($ticket['cct_created'] ?? $ticket['fecha'] ?? null);
     $updatedTs = $this->ts($ticket['fecha_actualizacion'] ?? null);
     $total = $createdTs > 0 ? $this->durationSince($createdTs) : '';
-    $sinActualizar = ($updatedTs > 0 || $createdTs > 0) ? $this->durationSince($updatedTs > 0 ? $updatedTs : $createdTs) : '';
+    $sinActualizar = \SCM\Support\CaseUpdateStatus::evaluate($ticket)['label'];
     $estadoNorm = strtolower(trim($estado));
     $statusBucket = 'abiertos';
     if (in_array($estadoNorm, ['cerrado', 'cerrada', 'finalizado', 'finalizada'], true)) {

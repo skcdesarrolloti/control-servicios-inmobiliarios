@@ -151,8 +151,8 @@ trait TableRowsConcern
         ? '<span class="scm-magnitude-badge" style="background:#dc2626;">Con perturbaci&oacute;n</span>'
         : '<span class="scm-magnitude-badge scm-magnitude-empty">Sin perturbaci&oacute;n</span>';
       $tiempoEjecucion = $this->humanDurationSince($createdTs);
-      $baseUpdateTs = $updatedTs > 0 ? $updatedTs : $createdTs;
-      $tiempoSinActualizar = $this->humanDurationSince($baseUpdateTs);
+      $estadoActualizacion = \SCM\Support\CaseUpdateStatus::evaluate($row);
+      $tiempoSinActualizar = $estadoActualizacion['label'];
 
       $ticketDocumentsHtml = $this->renderTicketRootAttachmentsSection([$row['imagenes'] ?? '', $row['imagen'] ?? '', $row['evidencia'] ?? ''], $row['archivos'] ?? '', 'scm-sec-documentos');
 
@@ -235,11 +235,7 @@ trait TableRowsConcern
       if ($tiempoEjecucion !== '' && $tiempoEjecucion !== '-') {
         $timingPills .= '<span class="scm-timing-badge scm-timing-ejecucion" title="Tiempo en ejecución"><span class="material-symbols-outlined text-[13px]">hourglass_top</span> En ejec: ' . esc_html($tiempoEjecucion) . '</span>';
       }
-      if ($tiempoSinActualizar !== '' && $tiempoSinActualizar !== '-') {
-        $timingPills .= '<span class="scm-timing-badge scm-timing-inactivo" title="Tiempo sin actualizar"><span class="material-symbols-outlined text-[13px]">history</span> Sin act: ' . esc_html($tiempoSinActualizar) . '</span>';
-      } else {
-        $timingPills .= '<span class="scm-timing-badge scm-timing-ok"><span class="material-symbols-outlined text-[13px]">verified</span> Al día</span>';
-      }
+      $timingPills .= \SCM\Support\CaseUpdateStatus::pills($estadoActualizacion);
       $timingPills .= '</div>';
 
       $cotChip = ($idCotz !== '')

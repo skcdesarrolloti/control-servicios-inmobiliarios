@@ -307,7 +307,8 @@ final class GenericTicketsCardView
     $creado = $creadoTs > 0 ? (string) call_user_func($this->formatDateTime, $creadoTs) : '-';
     $updatedTs = (int) call_user_func($this->parseTs, $row['fecha_actualizacion'] ?? '');
     $tiempoEjecucion = (string) call_user_func($this->humanDurationSince, $creadoTs);
-    $tiempoSinActualizar = (string) call_user_func($this->humanDurationSince, $updatedTs > 0 ? $updatedTs : $creadoTs);
+    $estadoActualizacion = \SCM\Support\CaseUpdateStatus::evaluate($row);
+    $tiempoSinActualizar = $estadoActualizacion['label'];
     $temaLabel = $temaRaw !== '' ? $temaRaw : '-';
     $magnitudCasoBadge = $this->renderMagnitudeBadge($magnitudCasoRaw);
     $perturbacionKey = strtolower($perturbacionRaw);
@@ -514,11 +515,7 @@ final class GenericTicketsCardView
     if ($tiempoEjecucion !== '' && $tiempoEjecucion !== '-') {
       $timingPills .= '<span class="scm-timing-badge scm-timing-ejecucion" title="Tiempo en ejecución"><span class="material-symbols-outlined text-[13px]">hourglass_top</span> En ejec: ' . esc_html($tiempoEjecucion) . '</span>';
     }
-    if ($tiempoSinActualizar !== '' && $tiempoSinActualizar !== '-') {
-      $timingPills .= '<span class="scm-timing-badge scm-timing-inactivo" title="Tiempo sin actualizar"><span class="material-symbols-outlined text-[13px]">history</span> Sin act: ' . esc_html($tiempoSinActualizar) . '</span>';
-    } else {
-      $timingPills .= '<span class="scm-timing-badge scm-timing-ok"><span class="material-symbols-outlined text-[13px]">verified</span> Al día</span>';
-    }
+    $timingPills .= \SCM\Support\CaseUpdateStatus::pills($estadoActualizacion);
     $timingPills .= '</div>';
 
     $showCotChip = in_array($effectiveTabKey, ['mantenimiento', 'preventiva'], true);

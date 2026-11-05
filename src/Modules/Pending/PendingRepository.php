@@ -607,6 +607,7 @@ final class PendingRepository
       'fecha',
       'fecha_actualizacion',
       'cct_created',
+      'cct_modified',
       'id_revision_preventiva',
       'id_revision_correctiva',
       'id_cotizacion_mantenimiento',

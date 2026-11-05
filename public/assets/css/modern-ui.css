@@ -5738,6 +5738,12 @@ body,
   border: 1px solid #d1fae5 !important;
 }
 
+#scm-app .scm-timing-atrasado {
+  color: #b91c1c !important;
+  background: #fef2f2 !important;
+  border: 1px solid #fee2e2 !important;
+}
+
 /* Subtítulo del Modal (En ejecución & Sin actualizar) */
 #scm-app .scm-meta-bit-ejecucion {
   color: #1d4ed8 !important;
