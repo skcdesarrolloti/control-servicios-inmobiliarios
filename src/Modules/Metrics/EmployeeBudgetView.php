@@ -49,7 +49,8 @@ final class EmployeeBudgetView
     if (!empty($compliance['reviews'])) {
       foreach (array_keys(self::REVIEWS) as $type) $sections .= self::reviewCard($type, $compliance['stats'] ?? null, $vista, $report['year'], $report['month']);
     }
-    if (!empty($compliance['cases'])) $sections .= self::casesCard($compliance['case_summary'] ?? null);
+    // Casos al día es una foto del corte: no tiene acumulado.
+    if (!empty($compliance['cases']) && $vista !== 'acumulado') $sections .= self::casesCard($compliance['case_summary'] ?? null);
 
     $activities = $report['activities'];
     if ($activities === []) {

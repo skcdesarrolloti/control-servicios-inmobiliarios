@@ -97,6 +97,7 @@ $check('no incluye meses posteriores', false, str_contains($monthly, '>Nov<'));
 $check('casos por tema', true, str_contains($monthly, 'Por tema'));
 $accumulated = (new EmployeeBudgetView())->render($only, 'acumulado');
 $check('vista acumulada', true, str_contains($accumulated, '142 realizadas ÷ 176 a realizar (142 realizadas + 34 pendientes) = 80.7%'));
+$check('casos solo en la vista mes', [true, false], [str_contains($monthly, 'Cumplimiento casos al día'), str_contains($accumulated, 'Cumplimiento casos al día')]);
 $check('el acumulado no trae el mes a mes', false, str_contains($accumulated, 'Mes a mes'));
 $check('reportes sin el dato', true, str_contains((new EmployeeBudgetView())->render(['year' => 2026, 'month' => 10, 'activities' => [], 'compliance' => ['reviews' => true, 'stats' => null, 'cases' => false]]), 'Reportes no entregó'));
 
