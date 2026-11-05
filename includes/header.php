@@ -307,6 +307,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'metricas_preventivas';
   } elseif (in_array($tabParam, ['metricas_servicios_publicos', 'scm-panel-metricas-servicios-publicos'], true)) {
     $current_page = 'metricas_servicios_publicos';
+  } elseif (in_array($tabParam, ['mis_presupuestos', 'scm-panel-mis-presupuestos'], true)) {
+    $current_page = 'mis_presupuestos';
   } elseif (in_array($tabParam, ['metricas_crecimiento', 'crecimiento', 'scm-panel-metricas-crecimiento'], true)) {
     $current_page = 'metricas_crecimiento';
   } elseif (in_array($tabParam, ['credito_propietario', 'metricas_creditos', 'creditos', 'scm-panel-credito-propietario'], true)) {
@@ -833,6 +835,16 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=metricas_crecimiento',
         'icon' => 'trending_up',
         'perms' => ['metricas_crecimiento'],
+      ],
+      'mis_presupuestos' => [
+        'key' => 'mis_presupuestos',
+        'group' => 'Mis presupuestos y ejecuciones',
+        'label' => 'Mis presupuestos y ejecuciones',
+        'description' => 'Cómo vas frente a tus metas',
+        'panel_id' => 'scm-panel-mis-presupuestos',
+        'url' => $baseUrl . '/index.php?tab=mis_presupuestos',
+        'icon' => 'query_stats',
+        'perms' => ['mis_presupuestos'],
       ],
     ],
   ],

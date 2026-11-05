@@ -30,6 +30,10 @@ trait HandlesMetricsPanels
   {
     $this->verifyCsrf();
     $report = sanitize_key((string) ($_POST['report'] ?? ''));
+    if ($report === \SCM\Modules\Metrics\EmployeeBudgetView::REPORT) {
+      $this->respondEmployeeBudget();
+      return;
+    }
     // Cada informe tiene su propio permiso (Métricas › Revisión preventiva, Servicios públicos, Crecimiento).
     $reportTab = ['preventiva' => 'metricas_preventivas', 'servicios' => 'metricas_servicios_publicos', 'crecimiento' => 'metricas_crecimiento'][$report] ?? '';
     if ($reportTab === '' || !$this->canAccessDashboardTab($reportTab)) {
@@ -65,6 +69,26 @@ trait HandlesMetricsPanels
     } catch (\Throwable $exception) {
       error_log('[maintenance-metrics] ' . $exception->getMessage());
       $this->jsonFail('No se pudieron cargar las métricas.');
+    }
+  }
+
+  /** Siempre lee al funcionario de la sesión: el id no llega desde el navegador. */
+  private function respondEmployeeBudget(): void
+  {
+    if (!$this->canAccessDashboardTab('mis_presupuestos')) {
+      $this->jsonFail('No tienes presupuestos para consultar.');
+    }
+    $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
+    $currentYear = (int) $today->format('Y');
+    $year = max($currentYear - 1, min($currentYear, (int) ($_POST['year'] ?? $currentYear)));
+    $lastMonth = $year === $currentYear ? (int) $today->format('n') : 12;
+    $month = max(1, min($lastMonth, (int) ($_POST['month'] ?? $lastMonth)));
+    try {
+      $report = \SCM\Modules\Metrics\EmployeeBudgetReport::remote()->build(\SCM\Core\Auth::employeeId(), $year, $month);
+      $this->jsonOk(['html' => (new \SCM\Modules\Metrics\EmployeeBudgetView())->render($report)]);
+    } catch (\Throwable $exception) {
+      error_log('[employee-budget] ' . $exception->getMessage());
+      $this->jsonFail('No se pudo cargar tu información desde Reportes.');
     }
   }
 

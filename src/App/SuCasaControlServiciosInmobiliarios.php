@@ -1225,16 +1225,36 @@ final class SuCasaControlServiciosInmobiliarios
   }
 
   /** @return array<int,string> */
+  private ?bool $hasEmployeeBudget = null;
+
   private function currentDashboardAllowedTabs(): array
   {
     $cargo = Auth::userCargo();
     $permissions = $this->dashboardPermissionsConfig();
     $allTabs = array_keys($this->dashboardPermissionTabs());
     if ($cargo === '' || !array_key_exists($cargo, $permissions)) {
-      return $this->dashboardPermissionCompatibilityTabs($allTabs);
+      return $this->withEmployeeBudgetTab($this->dashboardPermissionCompatibilityTabs($allTabs));
     }
     $allowed = !empty($permissions[$cargo]) ? $permissions[$cargo] : ['mis_tickets'];
-    return $this->dashboardPermissionCompatibilityTabs($allowed);
+    return $this->withEmployeeBudgetTab($this->dashboardPermissionCompatibilityTabs($allowed));
+  }
+
+  /** Mis presupuestos no depende del cargo: lo ve quien tenga presupuesto este año. */
+  private function withEmployeeBudgetTab(array $tabs): array
+  {
+    if ($this->hasEmployeeBudget === null) {
+      try {
+        $year = (int) (new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota')))->format('Y');
+        $this->hasEmployeeBudget = \SCM\Modules\Metrics\EmployeeBudgetReport::hasBudget($this->db, Auth::employeeId(), $year);
+      } catch (\Throwable $exception) {
+        error_log('[employee-budget] ' . $exception->getMessage());
+        $this->hasEmployeeBudget = false;
+      }
+    }
+    if ($this->hasEmployeeBudget) {
+      $tabs[] = 'mis_presupuestos';
+    }
+    return array_values(array_unique($tabs));
   }
 
   private function canAccessDashboardTab(string $tab): bool

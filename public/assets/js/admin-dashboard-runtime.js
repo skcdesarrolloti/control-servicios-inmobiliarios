@@ -26218,6 +26218,7 @@
         activePanel.id !== "scm-panel-metricas-preventivas" &&
         activePanel.id !== "scm-panel-metricas-servicios-publicos" &&
         activePanel.id !== "scm-panel-metricas-crecimiento" &&
+        activePanel.id !== "scm-panel-mis-presupuestos" &&
         activePanel.id !== "scm-panel-credito-propietario" &&
         activePanel.id !== "scm-panel-herramienta-pse" &&
         activePanel.id !== "scm-panel-herramienta-mora" &&
@@ -26257,7 +26258,7 @@
         }
         return Promise.resolve();
       }
-      if (activePanel.id === "scm-panel-metricas-preventivas" || activePanel.id === "scm-panel-metricas-servicios-publicos" || activePanel.id === "scm-panel-metricas-crecimiento") {
+      if (activePanel.id === "scm-panel-mis-presupuestos" || activePanel.id === "scm-panel-metricas-preventivas" || activePanel.id === "scm-panel-metricas-servicios-publicos" || activePanel.id === "scm-panel-metricas-crecimiento") {
         return loadMaintenanceMetrics(activePanel.querySelector("[data-maint-metrics]"), false);
       }
       // Herramientas: admin-tools.js carga el archivador PSE y la tasa SFC al abrir cada panel.
