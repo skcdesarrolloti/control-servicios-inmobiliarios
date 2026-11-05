@@ -1239,9 +1239,13 @@ final class SuCasaControlServiciosInmobiliarios
     return $this->withEmployeeBudgetTab($this->dashboardPermissionCompatibilityTabs($allowed));
   }
 
-  /** Mis presupuestos no depende del cargo: lo ve quien tenga presupuesto este año. */
+  /** Mis presupuestos no depende del cargo: lo ve quien tenga presupuesto este año o acceso a Métricas. */
   private function withEmployeeBudgetTab(array $tabs): array
   {
+    if (in_array('metricas', $tabs, true)) {
+      $tabs[] = 'mis_presupuestos';
+      return array_values(array_unique($tabs));
+    }
     if ($this->hasEmployeeBudget === null) {
       try {
         $year = (int) (new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota')))->format('Y');

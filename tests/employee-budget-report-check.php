@@ -59,6 +59,11 @@ $check('el mes a mes llega hasta el mes elegido', false, str_contains($html, '>M
 $empty = (new EmployeeBudgetView())->render(['year' => 2026, 'month' => 2, 'activities' => []]);
 $check('sin presupuestos', true, str_contains($empty, 'No tienes presupuestos'));
 
+$untouched = new EmployeeBudgetReport(static function (array $requests): array {
+  throw new \LogicException('No debe consultar Reportes sin funcionario.');
+});
+$check('sin funcionario no consulta a todos', [], $untouched->build('', 2026, 2)['activities']);
+
 $failed = new EmployeeBudgetReport(static fn(array $requests): array => [null]);
 try {
   $failed->build('1', 2026, 1);

@@ -37,6 +37,8 @@ final class EmployeeBudgetReport
   /** @return array{year:int,month:int,activities:array<int,array<string,mixed>>} */
   public function build(string $employeeId, int $year, int $month): array
   {
+    // Sin id, Reportes devolvería los presupuestos de todos los funcionarios.
+    if (trim($employeeId) === '') return ['year' => $year, 'month' => $month, 'activities' => []];
     $budget = ($this->fetch)([['route' => 'presupuestos/list', 'year' => $year, 'id_empleado' => $employeeId]])[0] ?? null;
     if (!is_array($budget) || empty($budget['success'])) {
       throw new \RuntimeException('Reportes no entregó los presupuestos.');
