@@ -76,7 +76,7 @@ trait HandlesMetricsPanels
   private function respondEmployeeBudget(): void
   {
     if (!$this->canAccessDashboardTab('mis_presupuestos')) {
-      $this->jsonFail('No tienes presupuestos para consultar.');
+      $this->jsonFail('No tienes permiso para ver métricas.');
     }
     $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
     $currentYear = (int) $today->format('Y');

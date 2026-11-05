@@ -374,6 +374,7 @@ final class SuCasaControlServiciosInmobiliarios
       'metricas_desocupaciones' => 'Desocupaciones',
       'metricas_ocupaciones_vs' => 'Ocupaciones vs Desocupaciones',
       'metricas_crecimiento' => 'Crecimiento de la empresa',
+      'mis_presupuestos' => 'Mis presupuestos y ejecuciones',
       'credito_propietario' => 'Créditos a propietarios',
       'herramienta_pse' => 'Generar PSE',
       'herramienta_mora' => 'Calculadora de mora',
@@ -1225,40 +1226,16 @@ final class SuCasaControlServiciosInmobiliarios
   }
 
   /** @return array<int,string> */
-  private ?bool $hasEmployeeBudget = null;
-
   private function currentDashboardAllowedTabs(): array
   {
     $cargo = Auth::userCargo();
     $permissions = $this->dashboardPermissionsConfig();
     $allTabs = array_keys($this->dashboardPermissionTabs());
     if ($cargo === '' || !array_key_exists($cargo, $permissions)) {
-      return $this->withEmployeeBudgetTab($this->dashboardPermissionCompatibilityTabs($allTabs));
+      return $this->dashboardPermissionCompatibilityTabs($allTabs);
     }
     $allowed = !empty($permissions[$cargo]) ? $permissions[$cargo] : ['mis_tickets'];
-    return $this->withEmployeeBudgetTab($this->dashboardPermissionCompatibilityTabs($allowed));
-  }
-
-  /** Mis presupuestos no depende del cargo: lo ve quien tenga presupuesto este año o acceso a Métricas. */
-  private function withEmployeeBudgetTab(array $tabs): array
-  {
-    if (in_array('metricas', $tabs, true)) {
-      $tabs[] = 'mis_presupuestos';
-      return array_values(array_unique($tabs));
-    }
-    if ($this->hasEmployeeBudget === null) {
-      try {
-        $year = (int) (new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota')))->format('Y');
-        $this->hasEmployeeBudget = \SCM\Modules\Metrics\EmployeeBudgetReport::hasBudget($this->db, Auth::employeeId(), $year);
-      } catch (\Throwable $exception) {
-        error_log('[employee-budget] ' . $exception->getMessage());
-        $this->hasEmployeeBudget = false;
-      }
-    }
-    if ($this->hasEmployeeBudget) {
-      $tabs[] = 'mis_presupuestos';
-    }
-    return array_values(array_unique($tabs));
+    return $this->dashboardPermissionCompatibilityTabs($allowed);
   }
 
   private function canAccessDashboardTab(string $tab): bool

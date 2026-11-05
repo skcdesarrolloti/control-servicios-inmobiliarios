@@ -1974,6 +1974,7 @@ trait RendersDashboard
         'metricas_desocupaciones' => '',
         'metricas_ocupaciones_vs' => '',
         'metricas_crecimiento' => '',
+        'mis_presupuestos' => '',
       ]],
     ];
     $tabGroups = [];

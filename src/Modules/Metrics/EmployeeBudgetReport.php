@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace SCM\Modules\Metrics;
 
-use SCM\Core\Database;
-
 /**
  * Presupuesto y ejecución del funcionario autenticado.
  * Las metas y la ejecución salen de Reportes: Control no replica esa lógica.
@@ -25,13 +23,6 @@ final class EmployeeBudgetReport
   public static function remote(): self
   {
     return new self(static fn(array $requests): array => self::fetchAll($requests));
-  }
-
-  public static function hasBudget(Database $db, string $employeeId, int $year): bool
-  {
-    if ($employeeId === '') return false;
-    $table = $db->table('jet_cct_presupuestos');
-    return (bool) $db->getRow("SELECT 1 AS found FROM `{$table}` WHERE `year` = ? AND `id_empleado` = ? LIMIT 1", [$year, $employeeId]);
   }
 
   /** @return array{year:int,month:int,activities:array<int,array<string,mixed>>} */
