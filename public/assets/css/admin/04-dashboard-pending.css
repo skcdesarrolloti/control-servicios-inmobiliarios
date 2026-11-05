@@ -16652,3 +16652,310 @@ html.scm-lease-modal-open {
   overflow: visible !important;
   padding: 0 !important;
 }
+
+/* Calendarios de Inicio (Mi calendario, Equipo, Vencimientos) adaptables.
+   Va al final porque varias reglas base de .scm-home-calendar no llevan @media y anulaban la vista apilada. */
+#scm-app .scm-home-calendar .scm-calendar-day-card .scm-calendar-events {
+  /* Sin esto el grid reparte la altura disponible y recorta las tarjetas con sus botones. */
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+
+/* Semana y Dia se desplazan cuando no caben; el overflow oculto del mes dejaba inaccesibles los ultimos dias. */
+#scm-app .scm-home-calendar .scm-calendar-panel--week .scm-calendar-month-grid,
+#scm-app .scm-home-calendar .scm-calendar-panel--day .scm-calendar-month-grid {
+  overflow: auto;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-head > div:first-child {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+#scm-app .scm-home-calendar .scm-calendar-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (min-width: 1101px) {
+  /* El header del panel es fijo: la columna lateral se detiene debajo de él. */
+  #scm-app .scm-home-calendar .scm-calendar-side-rail {
+    max-height: calc(100vh - 156px);
+    top: 140px;
+  }
+
+  /* Filtrar y Limpiar en la misma fila de los selectores, sin dejar media tarjeta vacía. */
+  #scm-app .scm-home-calendar .scm-calendar-filter-card .scm-actions {
+    grid-column: -2;
+    grid-row: 1;
+  }
+}
+
+@media (min-width: 1101px) and (max-height: 899px) {
+  /* En portátiles la columna no cabe fija: fluye con la página en vez de dejar una lista diminuta. */
+  #scm-app .scm-home-calendar .scm-calendar-side-rail {
+    max-height: none;
+    position: static;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-day-card .scm-calendar-events {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 1100px) {
+  #scm-app .scm-home-calendar .scm-calendar-layout {
+    gap: 16px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-board-card {
+    min-height: 0;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-side-rail {
+    max-height: none;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-side-rail .scm-calendar-day-card {
+    flex: 0 0 auto;
+    scroll-margin-top: 136px;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-day-card .scm-calendar-events {
+    overflow: visible;
+    padding-right: 0 !important;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-head-actions {
+    justify-content: flex-start;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-filter-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-panel--personal .scm-calendar-filter-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-filter-card .scm-actions {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (pointer: coarse) {
+  /* Con el dedo se desplaza la cuadrícula; tocar un horario sigue creando el evento. */
+  #scm-app .scm-home-calendar .scm-calendar-time-grid {
+    touch-action: pan-x pan-y;
+  }
+}
+
+@media (max-width: 720px) {
+  #scm-app .scm-home-calendar .scm-calendar-section-tabs {
+    display: grid;
+    gap: 4px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0 0 12px;
+    padding: 6px !important;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-section-tab {
+    justify-content: center;
+    min-width: 0;
+    padding: 8px 6px !important;
+    white-space: normal;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-section-tab:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-section-tab.active::after {
+    display: none;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-panel {
+    gap: 12px;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-head,
+  #scm-app .scm-home-calendar .scm-calendar-card {
+    padding: 14px !important;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-head > div:first-child {
+    flex-basis: 100%;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-head h3 {
+    font-size: 20px;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-head-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-head-actions > * {
+    min-width: 0;
+    width: 100%;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-head-actions > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-kpis {
+    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-kpis .scm-kpi {
+    min-width: 0;
+    padding: 10px !important;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-kpis .scm-kpi-label {
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-kpis .scm-kpi-value {
+    font-size: 22px;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-filter-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-layer-chip {
+    font-size: 11px;
+    min-height: 32px;
+    padding: 6px 9px !important;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-layer-group {
+    gap: 6px;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-board-card .scm-calendar-card-head > div:first-child {
+    min-width: 0;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-month-actions {
+    display: grid;
+    gap: 4px;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    width: 100%;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-month-actions .scm-case-work-btn {
+    min-width: 0;
+    width: 100%;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-view-switch {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* Mes compacto de 7 columnas: el detalle del día queda en la agenda de abajo. */
+  #scm-app .scm-home-calendar .scm-calendar-panel:not(.scm-calendar-panel--week):not(.scm-calendar-panel--day) .scm-calendar-weekdays {
+    display: grid;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-weekdays span {
+    font-size: 10px;
+    letter-spacing: 0;
+    padding: 6px 0 !important;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-month-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-day {
+    align-items: center;
+    gap: 3px;
+    min-height: 52px;
+    padding: 5px 2px !important;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-day-number {
+    font-size: 13px;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-day .scm-calendar-day-pill,
+  #scm-app .scm-home-calendar .scm-calendar-day .scm-calendar-day-holiday,
+  #scm-app .scm-home-calendar .scm-calendar-day .scm-calendar-day-more {
+    display: none;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-day-events-count {
+    align-items: center;
+    align-self: center;
+    background: #0f1e36;
+    color: #ffffff;
+    display: inline-flex;
+    font-size: 0;
+    height: 16px;
+    justify-content: center;
+    min-width: 16px;
+    padding: 0 4px;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-day-events-count:empty {
+    display: none;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-day-events-count::before {
+    content: attr(data-count);
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-time-grid {
+    grid-template-columns: 44px repeat(7, minmax(84px, 1fr));
+    min-width: 640px;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-time-grid--day {
+    grid-template-columns: 44px minmax(0, 1fr);
+    min-width: 0;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-time-gutter {
+    font-size: 10px;
+    padding: 7px 4px !important;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-day-card > .scm-calendar-card-head {
+    align-items: flex-start;
+    flex-direction: row;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-day-card > .scm-calendar-card-head > div {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-day-card > .scm-calendar-card-head > button {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-event-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-event-actions > * {
+    min-width: 0;
+    width: 100%;
+  }
+}

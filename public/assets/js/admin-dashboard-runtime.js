@@ -3410,6 +3410,20 @@
         });
       }
 
+      // Tras un toque el navegador emite un click en ese punto, donde ya estara el popover recien abierto.
+      function ignoreNextTapClick() {
+        function ignoreClick(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          stop();
+        }
+        function stop() {
+          document.removeEventListener("click", ignoreClick, true);
+        }
+        document.addEventListener("click", ignoreClick, true);
+        setTimeout(stop, 500);
+      }
+
       function bindTimeGridInteractions(grid) {
         if (!grid) return;
         grid.addEventListener("pointerdown", function (event) {
@@ -3459,6 +3473,7 @@
           }
           updateWeekSelection(grid, finalSelection.date, finalSelection.start, finalSelection.end);
           weekSlotSelection = null;
+          if (event.pointerType !== "mouse") ignoreNextTapClick();
           openWeekQuickPopover(finalSelection, event);
         });
         grid.addEventListener("pointercancel", function () {
@@ -3584,7 +3599,7 @@
           html += '<button type="button" class="' + classes + '" data-scm-calendar-day="' + escHtml(key) + '">';
           html += '<span class="scm-calendar-day-number">' + String(cellDate.getDate()) + "</span>";
           if (holiday) html += '<span class="scm-calendar-day-holiday">Festivo · ' + escHtml(holiday) + "</span>";
-          html += '<span class="scm-calendar-day-events-count">' + (dayEvents.length ? dayEvents.length + (isDueCalendar ? " venc." : visibleCalendarItemWord(dayEvents.length)) : "") + "</span>";
+          html += '<span class="scm-calendar-day-events-count" data-count="' + String(dayEvents.length) + '">' + (dayEvents.length ? dayEvents.length + (isDueCalendar ? " venc." : visibleCalendarItemWord(dayEvents.length)) : "") + "</span>";
           dayEvents.slice(0, 3).forEach(function (row) {
             if (isDueCalendar) {
               var dueTheme = dueTypeTheme(row);
@@ -3602,6 +3617,11 @@
             selectedDay = btn.getAttribute("data-scm-calendar-day") || selectedDay;
             renderCalendarGrid();
             renderSelectedDay();
+            // Con la agenda apilada debajo del mes, llevar al funcionario a los eventos del día elegido
+            var dayCard = panel.querySelector(".scm-calendar-day-card");
+            if (dayCard && window.matchMedia("(max-width: 1100px)").matches) {
+              dayCard.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
           });
         });
       }
