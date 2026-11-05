@@ -38,4 +38,16 @@ $check('sin fechas', ['label' => '', 'status' => ''], CaseUpdateStatus::evaluate
 $pills = CaseUpdateStatus::pills(['label' => '2 días hábiles', 'status' => 'atrasado']);
 $check('pill atrasado', true, str_contains($pills, 'Atrasado') && str_contains($pills, 'Sin act: 2 días hábiles'));
 
+$nowTs = (new DateTimeImmutable($now, new DateTimeZone('America/Bogota')))->getTimestamp();
+[$sql, $args] = CaseUpdateStatus::filterSql('atrasado', 't.', '?', $limits, $nowTs);
+$check('placeholders', substr_count($sql, '?'), count($args));
+$check('compara con el corte', true, str_contains($sql, 't.cct_modified') && str_contains($sql, '< ?'));
+$check('estado inválido sin filtro', null, CaseUpdateStatus::filterSql('', 't.', '?', $limits, $nowTs));
+
+// El corte separa exactamente lo que evaluate() considera al día y atrasado.
+$cutoff = end($args);
+$before = (new DateTimeImmutable($cutoff, new DateTimeZone('America/Bogota')))->modify('-1 second')->format('Y-m-d H:i:s');
+$check('en el corte sigue al día', 'al_dia', CaseUpdateStatus::evaluate($case('Revisión preventiva', $cutoff), $limits, $now)['status']);
+$check('un segundo antes atrasado', 'atrasado', CaseUpdateStatus::evaluate($case('Revisión preventiva', $before), $limits, $now)['status']);
+
 echo "Case update status checks passed\n";

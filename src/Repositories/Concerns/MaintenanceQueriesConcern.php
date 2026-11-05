@@ -325,12 +325,10 @@ trait MaintenanceQueriesConcern
       }
     }
 
-    if ($filters['fAtraso'] !== '') {
-      $days = (int) $filters['fAtraso'];
-      if ($days > 0) {
-        $where[] = 'COALESCE(t.fecha, 0) <= %d';
-        $args[] = time() - ($days * 86400);
-      }
+    $updateFilter = \SCM\Support\CaseUpdateStatus::filterSql((string) ($filters['fEstadoActualizacion'] ?? ''), 't.', '%s');
+    if ($updateFilter !== null) {
+      $where[] = $updateFilter[0];
+      array_push($args, ...$updateFilter[1]);
     }
 
     if ($filters['fSinActualizar'] !== '') {

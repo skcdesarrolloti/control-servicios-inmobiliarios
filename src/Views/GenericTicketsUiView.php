@@ -926,12 +926,11 @@ final class GenericTicketsUiView
                 <option value="has" <?php selected((string) ($p['fDanos'] ?? ''), 'has'); ?>>Con da&ntilde;os</option>
                 <option value="none" <?php selected((string) ($p['fDanos'] ?? ''), 'none'); ?>>Sin da&ntilde;os</option>
               </select></div><?php endif; ?>
-          <?php if (!$myCasesForm): ?><div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>atraso">Atraso desde creacion</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>atraso" name="<?php echo esc_attr($prefix); ?>atraso">
-              <option value="">Todos</option>
-              <option value="3" <?php selected((string) ($p['fAtraso'] ?? ''), '3'); ?>>+3 dias</option>
-              <option value="5" <?php selected((string) ($p['fAtraso'] ?? ''), '5'); ?>>+5 dias</option>
-              <option value="10" <?php selected((string) ($p['fAtraso'] ?? ''), '10'); ?>>+10 dias</option>
-            </select></div>
+          <?php if (!$myCasesForm): ?><?php if (in_array($baseTabKey, ['mantenimiento', 'mant', 'preventiva'], true)): ?><div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>estado_actualizacion">Estado de actualizaci&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>estado_actualizacion" name="<?php echo esc_attr($prefix); ?>estado_actualizacion" class="select select-bordered select-sm scm-select">
+                  <option value="">Todos</option>
+                  <option value="al_dia" <?php selected(($p['fEstadoActualizacion'] ?? ''), 'al_dia'); ?>>Al d&iacute;a</option>
+                  <option value="atrasado" <?php selected(($p['fEstadoActualizacion'] ?? ''), 'atrasado'); ?>>Atrasado</option>
+                </select></div><?php endif; ?>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>sin_actualizar">Sin actualizar desde gestion</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>sin_actualizar" name="<?php echo esc_attr($prefix); ?>sin_actualizar">
               <option value="">Todos</option>
               <option value="1" <?php selected((string) ($p['fSinActualizar'] ?? ''), '1'); ?>>+1 dia</option>

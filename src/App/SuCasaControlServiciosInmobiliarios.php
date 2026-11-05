@@ -2147,12 +2147,11 @@ final class SuCasaControlServiciosInmobiliarios
               <option value="">Todos</option><?php foreach (($filterOptions["cotizacion_estado"] ?? []) as $cotEstadoOpt): ?><option value="<?php echo esc_attr((string)$cotEstadoOpt); ?>" <?php selected((string)($p["fCotizacionEstado"] ?? ""), (string)$cotEstadoOpt); ?>><?php echo esc_html((string)$cotEstadoOpt); ?></option><?php endforeach; ?>
             </select></div>
           <?= \SCM\Support\CaseFilterFields::financing($prefix, $p) ?>
-          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>atraso">Atraso desde creaci&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>atraso" name="<?php echo esc_attr($prefix); ?>atraso" class="select select-bordered select-sm scm-select">
-              <option value="">Todos</option>
-              <option value="3" <?php selected(($p['fAtraso'] ?? ''), '3'); ?>>+3 d&iacute;as</option>
-              <option value="5" <?php selected(($p['fAtraso'] ?? ''), '5'); ?>>+5 d&iacute;as</option>
-              <option value="10" <?php selected(($p['fAtraso'] ?? ''), '10'); ?>>+10 d&iacute;as</option>
-            </select></div>
+          <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>estado_actualizacion">Estado de actualizaci&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>estado_actualizacion" name="<?php echo esc_attr($prefix); ?>estado_actualizacion" class="select select-bordered select-sm scm-select">
+                  <option value="">Todos</option>
+                  <option value="al_dia" <?php selected(($p['fEstadoActualizacion'] ?? ''), 'al_dia'); ?>>Al d&iacute;a</option>
+                  <option value="atrasado" <?php selected(($p['fEstadoActualizacion'] ?? ''), 'atrasado'); ?>>Atrasado</option>
+                </select></div>
           <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>sin_actualizar">Sin actualizar desde gesti&oacute;n</label><select id="<?php echo esc_attr($prefix); ?>sin_actualizar" name="<?php echo esc_attr($prefix); ?>sin_actualizar" class="select select-bordered select-sm scm-select">
               <option value="">Todos</option>
               <option value="1" <?php selected(($p['fSinActualizar'] ?? ''), '1'); ?>>+1 d&iacute;a</option>

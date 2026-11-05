@@ -508,7 +508,7 @@ trait RendersDashboard
       'guide'   => [
         'enabled' => true,
         'title'   => 'Guia de uso',
-        'html'    => '<ul><li>Usa filtros para acotar resultados.</li><li>Atraso desde creacion = dias transcurridos desde que se creo el caso.</li><li>Sin actualizar desde gestion = dias desde la ultima actualizacion o seguimiento.</li></ul>',
+        'html'    => '<ul><li>Usa filtros para acotar resultados.</li><li>Estado de actualizacion = casos de mantenimiento y preventivos al dia o atrasados segun Configurar Vencimientos.</li><li>Sin actualizar desde gestion = dias desde la ultima actualizacion o seguimiento.</li></ul>',
       ],
       'actions' => [
         'mant'            => self::AJAX_ACTION,
@@ -1178,11 +1178,10 @@ trait RendersDashboard
                   <option value="">Todos</option><?php foreach (($filterOptions["cotizacion_estado"] ?? []) as $cotEstadoOpt): ?><option value="<?php echo esc_attr((string)$cotEstadoOpt); ?>" <?php selected((string)($params["fCotizacionEstado"] ?? ""), (string)$cotEstadoOpt); ?>><?php echo esc_html((string)$cotEstadoOpt); ?></option><?php endforeach; ?>
                 </select></div>
                 <?= \SCM\Support\CaseFilterFields::financing('scm_', $params) ?>
-              <div class="scm-field"><label for="scm_atraso">ATRASO DESDE CREACIÓN</label><select id="scm_atraso" name="scm_atraso" class="select select-bordered select-sm scm-select">
+              <div class="scm-field"><label for="scm_estado_actualizacion">ESTADO DE ACTUALIZACIÓN</label><select id="scm_estado_actualizacion" name="scm_estado_actualizacion" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option>
-                  <option value="3" <?php selected(($params['fAtraso'] ?? ''), '3'); ?>>+3 d&iacute;as</option>
-                  <option value="5" <?php selected(($params['fAtraso'] ?? ''), '5'); ?>>+5 d&iacute;as</option>
-                  <option value="10" <?php selected(($params['fAtraso'] ?? ''), '10'); ?>>+10 d&iacute;as</option>
+                  <option value="al_dia" <?php selected(($params['fEstadoActualizacion'] ?? ''), 'al_dia'); ?>>Al d&iacute;a</option>
+                  <option value="atrasado" <?php selected(($params['fEstadoActualizacion'] ?? ''), 'atrasado'); ?>>Atrasado</option>
                 </select></div>
               <div class="scm-field"><label for="scm_sin_actualizar">SIN ACTUALIZAR DESDE GESTIÓN</label><select id="scm_sin_actualizar" name="scm_sin_actualizar" class="select select-bordered select-sm scm-select">
                   <option value="">Todos</option>
@@ -2656,7 +2655,7 @@ trait RendersDashboard
   /** Filtros que "Mis casos" no muestra; se anulan para que un enlace viejo no filtre a escondidas. */
   private function strip_my_tickets_hidden_filters(array $params): array
   {
-    foreach (['fTema', 'fAsunto', 'fAtraso', 'fSinActualizar', 'fTuvoSeguimiento', 'fEjecutado'] as $key) {
+    foreach (['fTema', 'fAsunto', 'fEstadoActualizacion', 'fSinActualizar', 'fTuvoSeguimiento', 'fEjecutado'] as $key) {
       $params[$key] = '';
     }
     $params['fSort'] = 'created_desc';

@@ -57,7 +57,7 @@ final class ServiciosInmobiliariosFilters
       'fBarrio' => $this->value($input, $prefix . 'barrio'),
       'fAseguradora' => $this->value($input, $prefix . 'aseguradora'),
       'fBusqueda' => $this->value($input, $prefix . 'busqueda'),
-      'fAtraso' => $this->value($input, $prefix . 'atraso'),
+      'fEstadoActualizacion' => $this->value($input, $prefix . 'estado_actualizacion'),
       'fSinActualizar' => $this->value($input, $prefix . 'sin_actualizar'),
       'fTuvoSeguimiento' => $this->value($input, $prefix . 'tuvo_seguimiento'),
       'fSort' => $this->sortValue($input, $prefix . 'sort'),

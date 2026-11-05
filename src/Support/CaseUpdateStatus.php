@@ -70,6 +70,54 @@ final class CaseUpdateStatus
     ];
   }
 
+  /** Primera fecha que sigue al día: los días hábiles solo aumentan hacia atrás en el tiempo. */
+  private static function cutoff(int $limit, int $now): string
+  {
+    $older = $now - (($limit + 1) * 86400 * 3);
+    $newer = $now;
+    while ($newer - $older > 1) {
+      $middle = intdiv($older + $newer, 2);
+      if (\SkcColombiaBusinessCalendar::elapsedDays($middle, $now) <= $limit) {
+        $newer = $middle;
+      } else {
+        $older = $middle;
+      }
+    }
+    return (new \DateTimeImmutable('@' . $newer))
+      ->setTimezone(new \DateTimeZone(\SkcColombiaBusinessCalendar::TIMEZONE))
+      ->format('Y-m-d H:i:s');
+  }
+
+  /**
+   * Condición SQL del filtro Al día / Atrasado. Solo incluye casos de mantenimiento y preventivos.
+   *
+   * @param string $prefix alias de la tabla con punto, o vacío
+   * @param string $placeholder '%s' o '?', según la consulta
+   * @return array{0:string,1:array<int,string>}|null
+   */
+  public static function filterSql(string $status, string $prefix, string $placeholder, ?array $limits = null, ?int $now = null): ?array
+  {
+    if (!in_array($status, ['al_dia', 'atrasado'], true)) {
+      return null;
+    }
+    $limits ??= self::limits();
+    $now ??= time();
+    $topic = "LOWER(TRIM(COALESCE({$prefix}tema_ayuda, '')))";
+    $base = "COALESCE(NULLIF({$prefix}cct_modified, '0000-00-00 00:00:00'), {$prefix}cct_created)";
+    $operator = $status === 'al_dia' ? '>=' : '<';
+    $topics = TicketsRepository::MAINTENANCE_TOPICS;
+    $marks = implode(', ', array_fill(0, count($topics), $placeholder));
+    $sql = "(({$topic} IN ({$marks}) AND {$base} {$operator} {$placeholder})"
+      . " OR (({$topic} LIKE {$placeholder} OR {$topic} LIKE {$placeholder}) AND {$base} {$operator} {$placeholder}))";
+    $args = array_merge($topics, [
+      self::cutoff($limits['mantenimiento'], $now),
+      'revision preventiva%',
+      'revisión preventiva%',
+      self::cutoff($limits['preventiva'], $now),
+    ]);
+    return [$sql, $args];
+  }
+
   /** @param array{label:string,status:string} $status */
   public static function pills(array $status): string
   {

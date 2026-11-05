@@ -62,7 +62,7 @@ trait GenericQueryConcern
       'fEjecutado' => $prefix === 'scmpv_' ? $clean($input[$prefix . 'ejecutado'] ?? '') : '',
       '_scmExecutorKpis' => $prefix === 'scmpv_',
       'fPerturbacion' => $clean($input[$prefix . 'perturbacion'] ?? ''),
-      'fAtraso' => $clean($input[$prefix . 'atraso'] ?? ''),
+      'fEstadoActualizacion' => $clean($input[$prefix . 'estado_actualizacion'] ?? ''),
       'fSinActualizar' => $clean($input[$prefix . 'sin_actualizar'] ?? ''),
       'fTuvoSeguimiento' => $clean($input[$prefix . 'tuvo_seguimiento'] ?? ''),
       'fSort' => $this->normalize_generic_sort($clean($input[$prefix . 'sort'] ?? '')),
@@ -386,12 +386,10 @@ trait GenericQueryConcern
         }
       }
     }
-    if (!empty($p['fAtraso']) && is_numeric($p['fAtraso'])) {
-      $days = max(0, (int) $p['fAtraso']);
-      if ($days > 0) {
-        $where[] = '(UNIX_TIMESTAMP() - COALESCE(fecha, 0)) >= ?';
-        $args[] = $days * 86400;
-      }
+    $updateFilter = \SCM\Support\CaseUpdateStatus::filterSql((string) ($p['fEstadoActualizacion'] ?? ''), '', '?');
+    if ($updateFilter !== null) {
+      $where[] = $updateFilter[0];
+      array_push($args, ...$updateFilter[1]);
     }
     if (!empty($p['fSinActualizar']) && is_numeric($p['fSinActualizar'])) {
       $days = max(0, (int) $p['fSinActualizar']);
