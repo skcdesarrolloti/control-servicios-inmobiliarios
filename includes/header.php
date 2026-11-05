@@ -1023,11 +1023,11 @@ foreach ($rawNavItems as $k => $item) {
   <!-- ========================================== -->
   <!-- HEADER MAESTRO FIJO (APP SHELL)             -->
   <!-- ========================================== -->
-  <header class="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-[0_1px_8px_rgba(15,30,54,0.04)]">
+  <header class="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-[0_1px_8px_rgba(15,30,54,0.04)]" data-scm-header>
     <div class="w-full px-4 sm:px-6 lg:px-8">
 
       <!-- Fila 1: Marca, Búsqueda Global y Perfil (Altura 64px) -->
-      <div class="h-16 flex items-center justify-between gap-4">
+      <div class="h-16 flex items-center justify-between gap-4 scm-header-top" data-scm-header-top>
 
         <!-- Logotipo Oficial SuCasa & Branding Corporativo (Alto Contraste Stitch UI) -->
         <div class="flex items-center gap-3 shrink-0">
@@ -1054,17 +1054,18 @@ foreach ($rawNavItems as $k => $item) {
         <div class="flex-1" aria-hidden="true"></div>
 
         <!-- Acciones Rápidas & Perfil de Funcionario -->
-        <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div class="flex items-center gap-2 sm:gap-3 shrink-0 scm-header-actions" data-scm-header-actions>
 
           <!-- Botón de Acción Principal: + Nuevo Caso -->
           <button
             type="button"
             id="btn-global-nuevo-ticket"
+            title="Nuevo caso"
             onclick="window.dispatchEvent(new CustomEvent('scm:open-nuevo-ticket'))"
             class="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-[#0f1e36] text-white hover:bg-[#162846] font-semibold text-xs sm:text-sm shadow-sm hover:shadow transition-all active:scale-[0.98]"
           >
             <span class="material-symbols-outlined text-[18px]">add</span>
-            <span class="hidden md:inline">Nuevo Caso</span>
+            <span class="scm-header-label">Nuevo Caso</span>
           </button>
 
           <!-- Nota en el historial del contrato de arrendamiento -->
@@ -1076,7 +1077,7 @@ foreach ($rawNavItems as $k => $item) {
             class="scm-header-note-btn flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all active:scale-[0.98]"
           >
             <span class="material-symbols-outlined text-[18px]">note_add</span>
-            <span class="hidden md:inline">Añadir nota al contrato</span>
+            <span class="scm-header-label">Añadir nota al contrato</span>
           </button>
 
           <!-- Crédito a propietario sin cotización (liquidador de créditos); se oculta sin el permiso owner_credit_manage -->
@@ -1088,7 +1089,7 @@ foreach ($rawNavItems as $k => $item) {
             class="scm-header-note-btn flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all active:scale-[0.98]"
           >
             <span class="material-symbols-outlined text-[18px]">payments</span>
-            <span class="hidden md:inline">Solicitud de crédito</span>
+            <span class="scm-header-label">Solicitud de crédito</span>
           </button>
 
           <!-- Menú Desplegable Configuración Operativa -->
@@ -1102,8 +1103,8 @@ foreach ($rawNavItems as $k => $item) {
               aria-expanded="false"
             >
               <span class="material-symbols-outlined text-[20px]">settings</span>
-              <span class="hidden xl:inline">Configuración</span>
-              <span class="material-symbols-outlined text-[16px] text-slate-400">expand_more</span>
+              <span class="scm-header-label">Configuración</span>
+              <span class="material-symbols-outlined text-[16px] text-slate-400 scm-header-config-chevron">expand_more</span>
             </button>
             <div
               id="global-config-dropdown-menu"
@@ -1352,13 +1353,14 @@ foreach ($rawNavItems as $k => $item) {
             </div>
           </div>
 
-          <div class="h-6 w-px bg-slate-200 hidden sm:block"></div>
+          <div class="h-6 w-px bg-slate-200 scm-header-divider"></div>
 
           <!-- Perfil de Usuario & Menú Desplegable -->
           <div class="relative" id="user-profile-menu-container">
             <button
               type="button"
               id="user-profile-button"
+              title="<?php echo htmlspecialchars($userName, ENT_QUOTES, 'UTF-8'); ?>"
               class="flex items-center gap-2 p-1 pl-1.5 rounded-xl hover:bg-slate-100 transition-colors focus:outline-none"
               aria-haspopup="true"
               aria-expanded="false"
@@ -1371,11 +1373,11 @@ foreach ($rawNavItems as $k => $item) {
                   onerror="this.onerror=null; this.src='https://sucasainmobiliaria.com.co/wp-content/uploads/2026/06/cropped-ISOLOGO-WEB.png';"
                 >
               </div>
-              <div class="hidden lg:flex flex-col text-left">
+              <div class="flex flex-col text-left scm-header-user-text">
                 <span class="text-xs font-semibold text-slate-900 leading-tight"><?php echo htmlspecialchars($userName, ENT_QUOTES, 'UTF-8'); ?></span>
                 <span class="text-[10px] font-medium text-slate-500 leading-tight"><?php echo htmlspecialchars($userRole, ENT_QUOTES, 'UTF-8'); ?></span>
               </div>
-              <span class="material-symbols-outlined text-[18px] text-slate-400 hidden lg:inline">expand_more</span>
+              <span class="material-symbols-outlined text-[18px] text-slate-400 scm-header-user-chevron">expand_more</span>
             </button>
 
             <!-- Menú Flotante de Usuario (Cerrar sesión) -->
@@ -1384,7 +1386,7 @@ foreach ($rawNavItems as $k => $item) {
               class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50"
               role="menu"
             >
-              <div class="px-4 py-2 border-b border-slate-100 lg:hidden">
+              <div class="px-4 py-2 border-b border-slate-100 scm-header-user-fallback">
                 <p class="text-xs font-semibold text-slate-900"><?php echo htmlspecialchars($userName, ENT_QUOTES, 'UTF-8'); ?></p>
                 <p class="text-[10px] text-slate-500"><?php echo htmlspecialchars($userRole, ENT_QUOTES, 'UTF-8'); ?></p>
               </div>
@@ -1433,7 +1435,7 @@ foreach ($rawNavItems as $k => $item) {
         return $attrs;
       };
       ?>
-      <div class="h-12 flex items-center overflow-x-visible no-scrollbar border-t border-slate-100">
+      <div class="h-12 flex items-center overflow-x-visible no-scrollbar border-t border-slate-100" data-scm-nav-row>
         <button type="button" class="scm-nav-toggle" data-scm-nav-toggle aria-expanded="false" aria-controls="scm-nav-mobile">
           <span class="material-symbols-outlined" aria-hidden="true">menu</span>
           <span>Menú</span>
@@ -1614,7 +1616,45 @@ foreach ($rawNavItems as $k => $item) {
         document.addEventListener('keydown', function (event) {
           if (event.key === 'Escape' && !panel.hidden) { setOpen(false); toggle.focus(); }
         });
-        window.addEventListener('resize', function () { if (window.innerWidth >= 1200 && !panel.hidden) setOpen(false); });
+
+        // El ancho del header depende de los permisos, del funcionario y de la fuente: se mide el
+        // contenido real y se aplica el primer nivel de compactación en el que cabe.
+        var header = toggle.closest('[data-scm-header]');
+        var topRow = header.querySelector('[data-scm-header-top]');
+        var navRow = header.querySelector('[data-scm-nav-row]');
+        var nav = header.querySelector('[data-scm-main-nav]');
+        function firstFittingLevel(prefix, maxLevel, fits) {
+          for (var level = 0; level <= maxLevel; level++) {
+            for (var step = 1; step <= maxLevel; step++) {
+              header.classList.toggle(prefix + step, step <= level);
+            }
+            if (fits()) return level;
+          }
+          return maxLevel + 1;
+        }
+        function fitHeader() {
+          firstFittingLevel('scm-top-fit-', 5, function () { return topRow.scrollWidth <= topRow.clientWidth; });
+          header.classList.remove('scm-nav-collapsed');
+          var navLevel = firstFittingLevel('scm-nav-fit-', 3, function () { return nav.offsetWidth <= navRow.clientWidth; });
+          var collapsed = navLevel > 3;
+          header.classList.toggle('scm-nav-collapsed', collapsed);
+          if (!collapsed && !panel.hidden) setOpen(false);
+        }
+        var fitFrame = 0;
+        function scheduleFit() {
+          if (fitFrame) return;
+          fitFrame = window.requestAnimationFrame(function () { fitFrame = 0; fitHeader(); });
+        }
+        fitHeader();
+        // Los permisos pueden ocultar botones en tiempo de ejecución y cambiar el ancho de las filas.
+        if (window.ResizeObserver) {
+          var fitObserver = new ResizeObserver(scheduleFit);
+          [header, nav, header.querySelector('[data-scm-header-actions]')].forEach(function (element) { fitObserver.observe(element); });
+        } else {
+          window.addEventListener('resize', scheduleFit);
+        }
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(scheduleFit);
+        window.addEventListener('load', scheduleFit);
       })();
     </script>
   </header>

@@ -232,7 +232,11 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
           if (dropdownMenu) dropdownMenu.classList.add('hidden');
           if (configDropdown) configDropdown.classList.add('hidden');
           if (notifDropdown) notifDropdown.classList.add('hidden');
-          menu.classList.remove('hidden');
+          menu.classList.remove('hidden', 'is-aligned-right');
+          // Sin espacio a la derecha, el menú se alinea con el borde derecho de su píldora
+          if (menu.getBoundingClientRect().right > document.documentElement.clientWidth - 8) {
+            menu.classList.add('is-aligned-right');
+          }
           container.classList.add('open');
           trigger.setAttribute('aria-expanded', 'true');
         }
@@ -246,6 +250,26 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
 
         container.addEventListener('mouseenter', openNavDropdown);
         container.addEventListener('mouseleave', closeNavDropdown);
+
+        // El submenú lateral se abre hacia el lado con espacio y se sube si no cabe en la altura
+        container.querySelectorAll('[data-scm-dropdown-sub]').forEach(function (sub) {
+          const submenu = sub.querySelector('.scm-dropdown-submenu');
+          if (!submenu) return;
+          function placeSubmenu() {
+            sub.classList.remove('is-flipped');
+            submenu.style.top = '';
+            const rect = submenu.getBoundingClientRect();
+            if (rect.right > document.documentElement.clientWidth - 8) {
+              sub.classList.add('is-flipped');
+            }
+            const overflowBottom = rect.bottom - (window.innerHeight - 8);
+            if (overflowBottom > 0) {
+              submenu.style.top = (-6 - overflowBottom) + 'px';
+            }
+          }
+          sub.addEventListener('mouseenter', placeSubmenu);
+          sub.addEventListener('focusin', placeSubmenu);
+        });
 
         trigger.addEventListener('click', function (e) {
           e.preventDefault();

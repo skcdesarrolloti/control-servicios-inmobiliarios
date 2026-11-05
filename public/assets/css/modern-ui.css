@@ -5914,8 +5914,8 @@ body,
   }
 }
 
-/* Menú principal responsive: por debajo de 1200px la fila de píldoras no cabe y se
-   reemplaza por el botón "Menú" con un panel desplegable (mismas opciones). */
+/* Menú principal responsive: el script del header mide si las píldoras caben (ver scm-nav-fit-*);
+   si ni compactadas caben, se reemplazan por el botón "Menú" con un panel desplegable. */
 .scm-nav-toggle {
   display: none;
   align-items: center;
@@ -5990,18 +5990,84 @@ body,
 .scm-nav-mobile-link.is-active { background: #0f1e36; color: #ffffff; font-weight: 600; }
 .scm-nav-mobile-link.is-active .material-symbols-outlined { color: #ffffff; }
 
-@media (max-width: 1199px) {
-  [data-scm-main-nav] { display: none !important; }
-  .scm-nav-toggle { display: inline-flex; }
+/* Header adaptable. Niveles acumulativos que aplica el script del header al medir el contenido:
+   scm-top-fit-1..5 compactan la fila superior; scm-nav-fit-1..3 compactan las píldoras y
+   scm-nav-collapsed las cambia por el botón "Menú". Sin transiciones de tamaño: alterarían la medición. */
+[data-scm-header] .scm-header-actions button,
+[data-scm-main-nav] .nav-tab-pill {
+  transition-property: background-color, border-color, color, box-shadow, transform;
 }
-@media (min-width: 1200px) {
-  .scm-nav-mobile { display: none !important; }
+[data-scm-header] .scm-header-actions button > .material-symbols-outlined,
+[data-scm-main-nav] > .nav-tab-pill > .material-symbols-outlined,
+[data-scm-main-nav] .nav-tab-dropdown-btn > .material-symbols-outlined {
+  flex: none;
+  width: 1em;
+  overflow: hidden;
+}
+.scm-header-user-text { max-width: 11rem; }
+.scm-header-user-text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scm-header-user-fallback { display: none; }
+
+.scm-top-fit-1 #btn-global-configuracion .scm-header-label { display: none; }
+.scm-top-fit-2 .scm-header-user-text,
+.scm-top-fit-2 .scm-header-user-chevron { display: none; }
+.scm-top-fit-2 .scm-header-user-fallback { display: block; }
+.scm-top-fit-3 .scm-header-note-btn .scm-header-label { display: none; }
+.scm-top-fit-3 .scm-header-note-btn { padding-left: 0.6rem; padding-right: 0.6rem; }
+.scm-top-fit-4 .scm-header-brand-text { display: none; }
+.scm-top-fit-5 .scm-header-top { gap: 0.5rem; }
+.scm-top-fit-5 .scm-header-top > [aria-hidden="true"] { display: none; }
+.scm-top-fit-5 .scm-header-actions { gap: 0.25rem; }
+.scm-top-fit-5 .scm-header-divider,
+.scm-top-fit-5 .scm-header-config-chevron,
+.scm-top-fit-5 #btn-global-nuevo-ticket .scm-header-label { display: none; }
+.scm-top-fit-5 #btn-global-nuevo-ticket,
+.scm-top-fit-5 #btn-global-configuracion,
+.scm-top-fit-5 .scm-header-note-btn { padding: 0.45rem; }
+.scm-top-fit-5 #btn-global-notificaciones { padding: 0.3rem; }
+.scm-top-fit-5 #user-profile-button { padding: 0.125rem; }
+
+.scm-nav-fit-1 [data-scm-main-nav] { gap: 0.125rem; }
+.scm-nav-fit-1 [data-scm-main-nav] > .nav-tab-pill,
+.scm-nav-fit-1 [data-scm-main-nav] .nav-tab-dropdown-btn { padding-left: 0.6rem; padding-right: 0.6rem; }
+.scm-nav-fit-2 [data-scm-main-nav] > .nav-tab-pill > .material-symbols-outlined,
+.scm-nav-fit-2 [data-scm-main-nav] .nav-tab-dropdown-btn > .material-symbols-outlined:first-child { display: none; }
+.scm-nav-fit-3 [data-scm-main-nav] .scm-dropdown-chevron { display: none; }
+
+.scm-nav-collapsed [data-scm-main-nav] { display: none !important; }
+.scm-nav-collapsed .scm-nav-toggle { display: inline-flex; }
+[data-scm-header]:not(.scm-nav-collapsed) .scm-nav-mobile { display: none !important; }
+
+/* Desplegables: nunca más altos ni más anchos que la ventana */
+.scm-dropdown-menu.is-aligned-right { left: auto; right: 0; }
+.scm-dropdown-sub.is-flipped > .scm-dropdown-submenu {
+  left: auto;
+  right: 100%;
+  padding-left: 0;
+  padding-right: 6px;
+}
+.scm-dropdown-menu:not(:has(.scm-dropdown-sub)) > div,
+#global-config-dropdown-menu {
+  max-height: calc(100vh - 7.5rem);
+  overflow-y: auto;
 }
 @media (max-width: 640px) {
+  #global-config-dropdown-menu,
+  #global-notifications-dropdown-menu {
+    position: fixed;
+    top: 4rem;
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+    max-height: calc(100vh - 5rem);
+    margin-top: 0;
+    overflow-y: auto;
+  }
   .scm-header-search { display: none !important; }
-}
-@media (max-width: 480px) {
-  .scm-header-brand-text { display: none !important; }
 }
 
 /* Botón "Añadir nota al contrato" del header */
