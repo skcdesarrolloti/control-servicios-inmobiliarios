@@ -1146,6 +1146,10 @@
         { name: "no_prorroga_contrato_dias", label: "Solicitud de no prórroga", note: "Días calendario desde la solicitud para responderla.", min: 1, max: 120, fallback: 3 },
         { name: "contratos_anexos_sin_enviar_dias", label: "Contratos sin enviar", note: "Días calendario desde la entrega para enviar los anexos.", min: 1, max: 120, fallback: 3 },
       ] },
+      { title: "Actualización de casos", icon: "update", fields: [
+        { name: "casos_mantenimiento_actualizacion_dias", label: "Casos de mantenimiento", note: "Días hábiles máximos desde la última modificación para contar como al día en Reportes.", min: 1, max: 120, fallback: 7 },
+        { name: "casos_preventiva_actualizacion_dias", label: "Casos preventivos", note: "Días hábiles máximos desde la última modificación para contar como al día en Reportes.", min: 1, max: 120, fallback: 5 },
+      ] },
       { title: "Órdenes de mantenimiento", icon: "engineering", fields: [
         { name: "ordenes_sin_respuesta_dias", label: "Órdenes sin respuesta", note: "Días calendario desde la creación de la orden para aprobarla o desaprobarla.", min: 1, max: 120, fallback: 3 },
       ] },

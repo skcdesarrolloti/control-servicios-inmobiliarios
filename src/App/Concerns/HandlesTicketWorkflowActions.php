@@ -2037,6 +2037,8 @@ trait HandlesTicketWorkflowActions
       'no_prorroga_contrato_dias' => $this->adminDueDaysFromPost('no_prorroga_contrato_dias', 3, 1, 120),
       'ordenes_sin_respuesta_dias' => $this->adminDueDaysFromPost('ordenes_sin_respuesta_dias', 3, 1, 120),
       'contratos_anexos_sin_enviar_dias' => $this->adminDueDaysFromPost('contratos_anexos_sin_enviar_dias', 3, 1, 120),
+      'casos_mantenimiento_actualizacion_dias' => $this->adminDueDaysFromPost('casos_mantenimiento_actualizacion_dias', 7, 1, 120),
+      'casos_preventiva_actualizacion_dias' => $this->adminDueDaysFromPost('casos_preventiva_actualizacion_dias', 5, 1, 120),
     ];
 
     try {
@@ -2065,6 +2067,8 @@ trait HandlesTicketWorkflowActions
       'no_prorroga_contrato_dias' => 3,
       'ordenes_sin_respuesta_dias' => 3,
       'contratos_anexos_sin_enviar_dias' => 3,
+      'casos_mantenimiento_actualizacion_dias' => 7,
+      'casos_preventiva_actualizacion_dias' => 5,
     ];
 
     try {
@@ -2087,6 +2091,8 @@ trait HandlesTicketWorkflowActions
       'no_prorroga_contrato_dias' => $this->adminDueClampDays($stored['no_prorroga_contrato_dias'] ?? $defaults['no_prorroga_contrato_dias'], 1, 120, $defaults['no_prorroga_contrato_dias']),
       'ordenes_sin_respuesta_dias' => $this->adminDueClampDays($stored['ordenes_sin_respuesta_dias'] ?? $defaults['ordenes_sin_respuesta_dias'], 1, 120, $defaults['ordenes_sin_respuesta_dias']),
       'contratos_anexos_sin_enviar_dias' => $this->adminDueClampDays($stored['contratos_anexos_sin_enviar_dias'] ?? $defaults['contratos_anexos_sin_enviar_dias'], 1, 120, $defaults['contratos_anexos_sin_enviar_dias']),
+      'casos_mantenimiento_actualizacion_dias' => $this->adminDueClampDays($stored['casos_mantenimiento_actualizacion_dias'] ?? $defaults['casos_mantenimiento_actualizacion_dias'], 1, 120, $defaults['casos_mantenimiento_actualizacion_dias']),
+      'casos_preventiva_actualizacion_dias' => $this->adminDueClampDays($stored['casos_preventiva_actualizacion_dias'] ?? $defaults['casos_preventiva_actualizacion_dias'], 1, 120, $defaults['casos_preventiva_actualizacion_dias']),
     ];
   }
 
