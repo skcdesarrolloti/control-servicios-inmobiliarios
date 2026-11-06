@@ -3,7 +3,7 @@
 
   // Métricas › Casos: los casos llegan en una sola petición y los filtros (mes, rango de
   // fechas, tema, departamento, funcionario) y las tablas se calculan en el navegador.
-  var CACHE_KEY = "scm-case-metrics-v1";
+  var CACHE_KEY = "scm-case-metrics-v2";
   var CACHE_TTL_MS = 5 * 60 * 1000;
   var MONTHS_LONG = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
   // Colores categóricos en orden fijo (paleta validada: CVD y visión normal pasan; el contraste
@@ -15,6 +15,14 @@
     { key: "Cerrado", label: "Cerrados", color: "#eda100" },
   ];
   var SERIES_COLOR = "#2a78d6";
+  var OLD_DAYS = 30;
+  var AGE_BUCKETS = [
+    { label: "Hasta 7 días", max: 7 },
+    { label: "8 a 30 días", max: 30 },
+    { label: "31 a 90 días", max: 90 },
+    { label: "Más de 90 días", max: Infinity },
+  ];
+  var BRIEF_ICONS = { bad: "error", warn: "schedule", good: "check_circle" };
   var MONTHS_SHORT = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   var numberFormat = new Intl.NumberFormat("es-CO");
 
@@ -24,7 +32,11 @@
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
   function num(value) { return numberFormat.format(value || 0); }
+  function count(value, one, many) { return num(value) + " " + (value === 1 ? one : many); }
   function pct(part, total) { return total ? Math.round((part / total) * 100) + "%" : "—"; }
+  function ageDays(row) {
+    return row.fecha ? Math.max(0, Math.floor((Date.now() - Date.parse(row.fecha + "T00:00:00")) / 86400000)) : null;
+  }
   function formatDay(iso) {
     return Number(iso.slice(8, 10)) + " " + MONTHS_LONG[Number(iso.slice(5, 7)) - 1].slice(0, 3) + " " + iso.slice(0, 4);
   }
@@ -67,6 +79,7 @@
     var status = module.querySelector("[data-scm-case-status]");
     var updatedEl = module.querySelector("[data-scm-case-updated]");
     var exportBtn = module.querySelector("[data-scm-case-export]");
+    var compliance = module.querySelector("[data-scm-case-compliance]");
     var inputs = {};
     module.querySelectorAll("[data-scm-case-filter]").forEach(function (input) {
       inputs[input.getAttribute("data-scm-case-filter")] = input;
@@ -125,6 +138,8 @@
 
     function apply(snapshot) {
       var dict = snapshot.dictionaries || {};
+      compliance.innerHTML = snapshot.compliance_html ? "<p>Foto de Reportes · no cambia con los filtros</p>" + snapshot.compliance_html : "";
+      compliance.hidden = !snapshot.compliance_html;
       var names = snapshot.funcionarios || {};
       state.data = {
         generatedAt: snapshot.generated_at || 0,
@@ -138,6 +153,7 @@
             departamento: dict.departamento[values[3]] || "",
             funcionario: values[4] || "",
             fecha: values[5] || "",
+            cerrado: values[6] || "",
           };
         }),
       };
@@ -211,14 +227,13 @@
       });
     }
 
-    function filteredRows() {
-      var range = period();
+    // Tema, departamento y funcionario: el periodo no aplica a lo que se mide "hoy".
+    function scopedRows() {
       var tema = inputs.tema.value;
       var departamento = inputs.departamento.value;
       var funcionario = inputs.funcionario.value;
       return state.data.rows.filter(function (row) {
-        return row.fecha && row.fecha >= range.from && row.fecha <= range.to &&
-          (!tema || row.tema === tema) &&
+        return (!tema || row.tema === tema) &&
           (!departamento || row.departamento === departamento) &&
           (!funcionario || row.funcionario === funcionario);
       });
@@ -237,6 +252,11 @@
     function kpi(label, value, note, tone) {
       return '<article class="scm-cm-kpi' + (tone ? " is-" + tone : "") + '"><span>' + esc(label) + "</span><strong>" + esc(value) +
         "</strong>" + (note ? "<small>" + esc(note) + "</small>" : "") + "</article>";
+    }
+    function brief(lines) {
+      return '<section class="scm-cm-brief" aria-label="Lectura rápida"><h2>Lectura rápida</h2><ul>' + lines.map(function (line) {
+        return '<li class="is-' + line.tone + '"><span class="material-symbols-outlined" aria-hidden="true">' + BRIEF_ICONS[line.tone] + "</span><span>" + esc(line.text) + "</span></li>";
+      }).join("") + "</ul></section>";
     }
     function card(title, body, aside) {
       return '<section class="scm-cm-card is-wide"><header><h2>' + esc(title) + "</h2>" + (aside || "") + "</header>" + body + "</section>";
@@ -311,17 +331,20 @@
       return html;
     }
 
-    // Casos por tema: barras horizontales de una sola serie, 8 temas y "Otros".
-    function topicChart(topicRows) {
-      if (!topicRows.length) return '<div class="scm-cm-empty">Sin casos.</div>';
-      var shown = topicRows.slice(0, 8);
-      var rest = topicRows.slice(8).reduce(function (sum, item) { return sum + item.total; }, 0);
-      if (rest) shown = shown.concat([{ label: "Otros", total: rest, abiertos: null }]);
-      var max = Math.max.apply(null, shown.map(function (item) { return item.total; })) || 1;
-      return '<ul class="scm-cc-hbars">' + shown.map(function (item) {
-        return '<li><span class="scm-cc-hlabel" title="' + esc(item.label) + '">' + esc(item.label) + '</span><span class="scm-cc-htrack"><span class="scm-cc-stack" style="width:' +
-          ((item.total / max) * 100).toFixed(2) + '%"><span class="scm-cc-seg" style="flex:1;background:' + SERIES_COLOR + '" data-tip="' +
-          esc(item.label + ": " + num(item.total) + " casos" + (item.abiertos === null ? "" : " · " + num(item.abiertos) + " abiertos")) + '"></span></span><b>' + num(item.total) + "</b></span></li>";
+    // Casos abiertos por antigüedad: barras horizontales de una sola serie.
+    function agingChart(openRows) {
+      if (!openRows.length) return '<div class="scm-cm-empty">No hay casos abiertos.</div>';
+      var buckets = AGE_BUCKETS.map(function (bucket) { return { label: bucket.label, max: bucket.max, total: 0 }; });
+      openRows.forEach(function (row) {
+        var age = ageDays(row);
+        if (age === null) return;
+        buckets.filter(function (bucket) { return age <= bucket.max; })[0].total += 1;
+      });
+      var max = Math.max.apply(null, buckets.map(function (bucket) { return bucket.total; })) || 1;
+      return '<ul class="scm-cc-hbars">' + buckets.map(function (bucket) {
+        return '<li><span class="scm-cc-hlabel">' + esc(bucket.label) + '</span><span class="scm-cc-htrack"><span class="scm-cc-stack" style="width:' +
+          ((bucket.total / max) * 100).toFixed(2) + '%"><span class="scm-cc-seg" style="flex:1;background:' + SERIES_COLOR + '" data-tip="' +
+          esc(bucket.label + ": " + count(bucket.total, "caso", "casos")) + '"></span></span><b>' + num(bucket.total) + "</b></span></li>";
       }).join("") + "</ul>";
     }
 
@@ -340,58 +363,88 @@
       updatedEl.textContent = state.data.generatedAt
         ? "Datos de las " + new Date(state.data.generatedAt * 1000).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
         : "";
-      var rows = filteredRows();
+      var scoped = scopedRows();
+      var rows = scoped.filter(function (row) { return row.fecha && row.fecha >= range.from && row.fecha <= range.to; });
       var totals = tally(rows);
+      var closed = scoped.filter(function (row) { return row.cerrado && row.cerrado >= range.from && row.cerrado <= range.to; }).length;
+      var balance = totals.total - closed;
+      var openRows = scoped.filter(function (row) { return row.estado === "Nuevo" || row.estado === "En proceso"; });
+      var oldOpen = openRows.filter(function (row) { return ageDays(row) > OLD_DAYS; });
+      var postponed = scoped.filter(function (row) { return row.estado === "Postergado"; }).length;
 
-      var html = '<div class="scm-cm-kpis scm-cm-kpis-6">';
-      html += kpi("Casos creados", num(totals.total), "Creados en " + range.label, "stock");
-      html += kpi("Abiertos", num(totals.abiertos), pct(totals.abiertos, totals.total) + " · nuevos y en proceso", "ocup");
-      html += kpi("Nuevos", num(totals.Nuevo), pct(totals.Nuevo, totals.total) + " del total");
-      html += kpi("En proceso", num(totals["En proceso"]), pct(totals["En proceso"], totals.total) + " del total");
-      html += kpi("Postergados", num(totals.Postergado), pct(totals.Postergado, totals.total) + " del total");
-      html += kpi("Cerrados", num(totals.Cerrado), pct(totals.Cerrado, totals.total) + " del total", "good");
-      html += "</div>";
-
-      html += '<section class="scm-cm-card is-wide"><header><h2>Casos creados · ' + esc(range.label) + "</h2></header>" + timelineChart(rows, range) + "</section>";
-
-      // Por funcionario.
+      var html = "";
       var byEmployee = groupBy(rows, "funcionario");
-      state.byEmployee = Object.keys(byEmployee).map(function (id) {
-        var counts = tally(byEmployee[id]);
+      var openByEmployee = groupBy(openRows, "funcionario");
+      var ids = {};
+      Object.keys(byEmployee).concat(Object.keys(openByEmployee)).forEach(function (id) { ids[id] = true; });
+      state.byEmployee = Object.keys(ids).map(function (id) {
+        var counts = tally(byEmployee[id] || []);
+        var open = openByEmployee[id] || [];
         counts.id = id;
         counts.label = employeeLabel(id);
+        counts.hoy = open.length;
+        counts.viejos = open.filter(function (row) { return ageDays(row) > OLD_DAYS; }).length;
         return counts;
-      }).sort(function (a, b) { return b.abiertos - a.abiertos || b.total - a.total || a.label.localeCompare(b.label, "es"); });
-      var stateHeads = STATES.map(function (s) { return '<th class="is-num">' + s.label + "</th>"; }).join("");
-      var employeeTable = state.byEmployee.length
-        ? '<div class="scm-cm-table-wrap"><table class="scm-cm-table"><thead><tr><th>Funcionario</th><th class="is-num">Total</th><th class="is-num">Abiertos</th>' + stateHeads +
-          '<th class="is-num">% cerrados</th></tr></thead><tbody>' +
-          state.byEmployee.map(function (item) {
-            return "<tr><td>" + (item.id
-              ? '<button type="button" class="scm-cm-link" data-scm-case-employee="' + esc(item.id) + '" title="Filtrar por este funcionario">' + esc(item.label) + "</button>"
-              : '<span class="scm-cm-muted">Sin funcionario</span>') +
-              '</td><td class="is-num is-total">' + num(item.total) + '</td><td class="is-num">' + num(item.abiertos) + "</td>" +
-              STATES.map(function (s) { return '<td class="is-num">' + num(item[s.key]) + "</td>"; }).join("") +
-              '<td class="is-num">' + pct(item.Cerrado, item.total) + "</td></tr>";
-          }).join("") +
-          '</tbody><tfoot><tr><td>Total</td><td class="is-num is-total">' + num(totals.total) + '</td><td class="is-num">' + num(totals.abiertos) + "</td>" +
-          STATES.map(function (s) { return '<td class="is-num">' + num(totals[s.key]) + "</td>"; }).join("") +
-          '<td class="is-num">' + pct(totals.Cerrado, totals.total) + "</td></tr></tfoot></table></div>"
-        : '<div class="scm-cm-empty">No hay casos con estos filtros.</div>';
+      }).sort(function (a, b) { return b.hoy - a.hoy || b.total - a.total || a.label.localeCompare(b.label, "es"); });
       var byTopic = groupBy(rows, "tema");
       var topicRows = Object.keys(byTopic).map(function (key) {
         var counts = tally(byTopic[key]);
         counts.label = key || "Sin tema";
         return counts;
       }).sort(function (a, b) { return b.total - a.total; });
-      html += '<div class="scm-cm-grid">';
-      html += '<section class="scm-cm-card"><header><h2>Estado por funcionario</h2></header>' + employeeChart(state.byEmployee) + "</section>";
-      html += '<section class="scm-cm-card"><header><h2>Casos por tema</h2></header>' + topicChart(topicRows) + "</section>";
-      html += "</div>";
-      html += card("Casos por funcionario", employeeTable, '<p class="scm-cm-hint">Toca un funcionario para filtrar</p>');
+      var openByTopic = groupBy(openRows, "tema");
+      var topTopic = Object.keys(openByTopic).filter(Boolean).sort(function (a, b) { return openByTopic[b].length - openByTopic[a].length; })[0];
 
-      // Por estado administrativo y por tema.
+      var lines = [];
+      lines.push({ tone: oldOpen.length ? "bad" : "good", text: count(openRows.length, "caso abierto", "casos abiertos") + " hoy" +
+        (oldOpen.length ? "; " + num(oldOpen.length) + " (" + pct(oldOpen.length, openRows.length) + ") llevan más de " + OLD_DAYS + " días." : ".") });
+      lines.push({ tone: balance > 0 ? "warn" : "good", text: "En " + range.label + " se crearon " + num(totals.total) + " y se cerraron " + num(closed) +
+        (balance === 0 ? ": la carga se mantiene." : ": la carga " + (balance > 0 ? "subió" : "bajó") + " en " + num(Math.abs(balance)) + ".") });
+      var topEmployee = state.byEmployee[0];
+      if (topEmployee && topEmployee.hoy) {
+        lines.push({ tone: "warn", text: "Más carga: " + topEmployee.label + " con " + count(topEmployee.hoy, "abierto", "abiertos") +
+          (topTopic ? " · tema con más abiertos: " + topTopic + " (" + num(openByTopic[topTopic].length) + ")." : ".") });
+      }
+      if (postponed) lines.push({ tone: "warn", text: count(postponed, "caso postergado", "casos postergados") + " que no cuentan como abiertos." });
+      html += brief(lines);
+
+      html += '<div class="scm-cm-kpis scm-cm-kpis-6">';
+      html += kpi("Casos creados", num(totals.total), "Creados en " + range.label, "stock");
+      html += kpi("Cerrados", num(closed), "En " + range.label + ", sin importar cuándo se crearon", "good");
+      html += kpi("Balance", (balance > 0 ? "+" : "") + num(balance), balance > 0 ? "Entran más de los que salen" : "Salen tantos o más de los que entran", balance > 0 ? "bad" : "good");
+      html += kpi("Abiertos hoy", num(openRows.length), "Nuevos y en proceso, de cualquier fecha", "ocup");
+      html += kpi("Más de " + OLD_DAYS + " días", num(oldOpen.length), pct(oldOpen.length, openRows.length) + " de los abiertos hoy", oldOpen.length ? "bad" : "good");
+      html += kpi("Postergados hoy", num(postponed), "No cuentan como abiertos");
+      html += "</div>";
+
       html += '<div class="scm-cm-grid">';
+      html += '<section class="scm-cm-card"><header><h2>Estado de los creados en el periodo</h2></header>' +
+        employeeChart([Object.assign({ label: "Creados" }, totals)]) + "</section>";
+      html += '<section class="scm-cm-card"><header><h2>Antigüedad de los abiertos hoy</h2></header>' + agingChart(openRows) + "</section>";
+      html += "</div>";
+
+      html += '<section class="scm-cm-card is-wide"><header><h2>Casos creados · ' + esc(range.label) + "</h2></header>" + timelineChart(rows, range) + "</section>";
+
+      var stateHeads = STATES.map(function (s) { return '<th class="is-num">' + s.label + "</th>"; }).join("");
+      var employeeTable = state.byEmployee.length
+        ? '<div class="scm-cm-table-wrap"><table class="scm-cm-table"><thead><tr><th>Funcionario</th><th class="is-num">Abiertos hoy</th><th class="is-num">Más de ' + OLD_DAYS + ' días</th><th class="is-num">Creados</th>' + stateHeads +
+          '<th class="is-num">% cerrados</th></tr></thead><tbody>' +
+          state.byEmployee.map(function (item) {
+            return "<tr><td>" + (item.id
+              ? '<button type="button" class="scm-cm-link" data-scm-case-employee="' + esc(item.id) + '" title="Filtrar por este funcionario">' + esc(item.label) + "</button>"
+              : '<span class="scm-cm-muted">Sin funcionario</span>') +
+              '</td><td class="is-num is-total">' + num(item.hoy) + '</td><td class="is-num">' + num(item.viejos) + '</td><td class="is-num">' + num(item.total) + "</td>" +
+              STATES.map(function (s) { return '<td class="is-num">' + num(item[s.key]) + "</td>"; }).join("") +
+              '<td class="is-num">' + pct(item.Cerrado, item.total) + "</td></tr>";
+          }).join("") +
+          '</tbody><tfoot><tr><td>Total</td><td class="is-num is-total">' + num(openRows.length) + '</td><td class="is-num">' + num(oldOpen.length) + '</td><td class="is-num">' + num(totals.total) + "</td>" +
+          STATES.map(function (s) { return '<td class="is-num">' + num(totals[s.key]) + "</td>"; }).join("") +
+          '<td class="is-num">' + pct(totals.Cerrado, totals.total) + "</td></tr></tfoot></table></div>"
+        : '<div class="scm-cm-empty">No hay casos con estos filtros.</div>';
+
+      // Por funcionario y por estado administrativo.
+      html += '<div class="scm-cm-grid">';
+      html += '<section class="scm-cm-card"><header><h2>Estado por funcionario</h2></header>' + employeeChart(state.byEmployee.filter(function (item) { return item.total; })) + "</section>";
       var byAdm = groupBy(rows, "adm");
       var admRows = Object.keys(byAdm).map(function (key) { return { label: key || "Sin estado administrativo", count: byAdm[key].length, empty: !key }; })
         .sort(function (a, b) { return a.empty - b.empty || b.count - a.count; });
@@ -402,16 +455,19 @@
               '</td><td class="is-num">' + pct(item.count, totals.total) + "</td></tr>";
           }).join("") + "</tbody></table></div>"
         : '<div class="scm-cm-empty">Sin casos.</div>') + "</section>";
+      html += "</div>";
 
-      html += '<section class="scm-cm-card"><header><h2>Por tema</h2></header>' + (topicRows.length
-        ? '<div class="scm-cm-table-wrap"><table class="scm-cm-table"><thead><tr><th>Tema</th><th class="is-num">Total</th><th class="is-num">Abiertos</th><th class="is-num">Postergados</th><th class="is-num">Cerrados</th></tr></thead><tbody>' +
+      html += card("Casos por funcionario", employeeTable, '<p class="scm-cm-hint">Las dos primeras columnas son de hoy; las demás, de los creados en el periodo. Toca un funcionario para filtrar.</p>');
+
+      html += card("Casos por tema", topicRows.length
+        ? '<div class="scm-cm-table-wrap"><table class="scm-cm-table"><thead><tr><th>Tema</th><th class="is-num">Creados</th><th class="is-num">Abiertos</th><th class="is-num">Postergados</th><th class="is-num">Cerrados</th></tr></thead><tbody>' +
           topicRows.map(function (item) {
             return "<tr><td>" + esc(item.label) + '</td><td class="is-num is-total">' + num(item.total) + '</td><td class="is-num">' + num(item.abiertos) +
               '</td><td class="is-num">' + num(item.Postergado) + '</td><td class="is-num">' + num(item.Cerrado) + "</td></tr>";
           }).join("") + "</tbody></table></div>"
-        : '<div class="scm-cm-empty">Sin casos.</div>') + "</section>";
-      html += "</div>";
+        : '<div class="scm-cm-empty">Sin casos.</div>');
 
+      html += '<p class="scm-cm-note"><span class="material-symbols-outlined" aria-hidden="true">info</span>Los casos no guardan fecha de cierre: «Cerrados» usa la última actualización del caso cerrado, y la antigüedad se mide desde su creación.</p>';
       if (state.data.excluded) {
         html += '<p class="scm-cm-note"><span class="material-symbols-outlined" aria-hidden="true">info</span>' +
           esc("Solo se cuentan los funcionarios configurados en los filtros del panel; " + num(state.data.excluded) + " casos de otros funcionarios no se incluyen.") + "</p>";
@@ -426,9 +482,9 @@
 
     function exportCsv() {
       if (!state.data) return;
-      var lines = [["Funcionario", "Total", "Abiertos", "Nuevos", "En proceso", "Postergados", "Cerrados"]];
+      var lines = [["Funcionario", "Abiertos hoy", "Más de " + OLD_DAYS + " días", "Creados", "Nuevos", "En proceso", "Postergados", "Cerrados"]];
       state.byEmployee.forEach(function (item) {
-        lines.push([item.label, item.total, item.abiertos, item.Nuevo, item["En proceso"], item.Postergado, item.Cerrado]);
+        lines.push([item.label, item.hoy, item.viejos, item.total, item.Nuevo, item["En proceso"], item.Postergado, item.Cerrado]);
       });
       var csv = "﻿" + lines.map(function (line) {
         return line.map(function (cell) {

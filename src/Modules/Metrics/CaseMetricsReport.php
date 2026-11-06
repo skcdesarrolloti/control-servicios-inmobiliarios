@@ -11,6 +11,7 @@ use SCM\Support\FuncionarioOptions;
 
 /**
  * Métricas de casos: estado actual de los casos según su fecha de creación.
+ * Los casos no guardan fecha de cierre: se usa la última actualización de los cerrados.
  *
  * Solo cuenta los casos de los funcionarios configurados para los filtros del panel
  * (los mismos cargos que usan los filtros de funcionario); el resto se informa aparte.
@@ -21,7 +22,7 @@ use SCM\Support\FuncionarioOptions;
  */
 final class CaseMetricsReport
 {
-  public const COLUMNS = ['estado', 'estado_administrativo', 'tema', 'departamento', 'funcionario', 'fecha'];
+  public const COLUMNS = ['estado', 'estado_administrativo', 'tema', 'departamento', 'funcionario', 'fecha', 'cerrado'];
 
   private Database $db;
   private DateTimeZone $timezone;
@@ -37,7 +38,7 @@ final class CaseMetricsReport
   {
     $table = $this->db->table('jet_cct_tickets');
     $rows = $this->db->getResults(
-      "SELECT `estado`, `estado_administrativo`, `tema_ayuda`, `departamento`, `id_empleado`, `fecha`, `cct_created`
+      "SELECT `estado`, `estado_administrativo`, `tema_ayuda`, `departamento`, `id_empleado`, `fecha`, `fecha_actualizacion`, `cct_created`
        FROM `{$table}`
        WHERE LOWER(TRIM(COALESCE(`cct_status`, 'publish'))) = 'publish'"
     );
@@ -68,6 +69,7 @@ final class CaseMetricsReport
         $encode('departamento', self::clean($row['departamento'] ?? '')),
         $employeeId,
         $this->date($row['fecha'] ?? null, $row['cct_created'] ?? null),
+        self::clean($row['estado'] ?? '') === 'Cerrado' ? $this->date($row['fecha_actualizacion'] ?? null, null) : null,
       ];
     }
 

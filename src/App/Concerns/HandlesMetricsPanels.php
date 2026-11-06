@@ -18,7 +18,10 @@ trait HandlesMetricsPanels
       $this->jsonFail('No tienes permiso para ver métricas.');
     }
     try {
-      $this->jsonOk((new CaseMetricsReport($this->db))->snapshot());
+      $snapshot = (new CaseMetricsReport($this->db))->snapshot();
+      $today = (new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota')))->format('Y-m-d');
+      $snapshot['compliance_html'] = \SCM\Modules\Metrics\EmployeeBudgetView::casesCard(\SCM\Modules\Metrics\EmployeeBudgetReport::remote()->caseSummary($today), true);
+      $this->jsonOk($snapshot);
     } catch (\Throwable $exception) {
       error_log('[case-metrics] ' . $exception->getMessage());
       $this->jsonFail('No se pudieron cargar las métricas de casos.');
@@ -50,6 +53,7 @@ trait HandlesMetricsPanels
       } elseif ($report === 'servicios') {
         $payload = $this->get_pending_controller()->buildServiciosPublicosPayload([]);
         $data = $metrics->publicServices($fromTs, $toTs, (array) ($payload['items'] ?? []), (array) ($payload['configuration_items'] ?? []));
+        $data += $this->reviewCompliance($to);
       } else {
         $payload = $this->get_pending_controller()->buildPreventivasPayload([]);
         $settings = $this->adminDueCalendarSettings();
@@ -64,12 +68,21 @@ trait HandlesMetricsPanels
           if (strtolower((string) ($event['estado'] ?? '')) === 'vencido') $queues[$key]['overdue']++;
         }
         $data = $metrics->preventive($fromTs, $toTs, (array) ($payload['items'] ?? []), $queues);
+        $data += $this->reviewCompliance($to);
       }
       $this->jsonOk(['html' => (new \SCM\Modules\Metrics\MaintenanceMetricsView())->render($report, $data, $from, $to), 'from' => $from, 'to' => $to]);
     } catch (\Throwable $exception) {
       error_log('[maintenance-metrics] ' . $exception->getMessage());
       $this->jsonFail('No se pudieron cargar las métricas.');
     }
+  }
+
+  /** Cumplimiento del mes en que termina el periodo. @return array{stats:?array,statsYear:int,statsMonth:int} */
+  private function reviewCompliance(string $to): array
+  {
+    $year = (int) substr($to, 0, 4);
+    $month = (int) substr($to, 5, 2);
+    return ['stats' => \SCM\Modules\Metrics\EmployeeBudgetReport::remote()->reviewStats($year, $month), 'statsYear' => $year, 'statsMonth' => $month];
   }
 
   /** Siempre lee al funcionario de la sesión: el id no llega desde el navegador. */

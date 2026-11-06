@@ -72,20 +72,54 @@ final class EmployeeBudgetReport
     $reviews = in_array($cargoId, self::REVIEW_CARGOS, true) && !in_array($employeeId, self::REVIEW_EXCLUDED_EMPLOYEES, true);
     $cases = $cargoId === self::CASES_CARGO;
     $requests = [];
-    if ($reviews) $requests['stats'] = ['route' => 'compensacion/revisiones-stats', 'mes_num' => $month, 'year' => $year];
-    if ($cases) $requests['cases'] = ['route' => 'historial', 'tipo' => 'tickets', 'fecha_ref' => $date, 'fallback_forward' => 1, 'casos_al_dia' => 1, 'temas' => implode(',', self::CASE_TOPICS)];
+    if ($reviews) $requests['stats'] = self::reviewRequest($year, $month);
+    if ($cases) $requests['cases'] = self::caseRequest($date);
     $keys = array_keys($requests);
     $responses = $requests ? array_values(($this->fetch)(array_values($requests))) : [];
     $results = $keys ? array_combine($keys, array_pad($responses, count($keys), null)) : [];
 
     $stats = $results['stats'] ?? null;
-    $rows = $results['cases']['data'] ?? null;
     return [
       'reviews' => $reviews,
       'stats' => is_array($stats) && !empty($stats['success']) ? $stats : null,
       'cases' => $cases,
-      'case_summary' => is_array($rows) && $rows !== [] ? self::summarizeCases($rows) : null,
+      'case_summary' => self::caseResult($results['cases'] ?? null),
     ];
+  }
+
+  /**
+   * Cumplimiento de revisiones para Métricas: las mismas cifras de Mis presupuestos, sin depender del cargo.
+   * Sin corte no hay pendientes y el porcentaje saldría 100 %, así que se trata como dato no disponible.
+   */
+  public function reviewStats(int $year, int $month): ?array
+  {
+    $stats = ($this->fetch)([self::reviewRequest($year, $month)])[0] ?? null;
+    return is_array($stats) && !empty($stats['success']) && !empty($stats['fecha_corte']) ? $stats : null;
+  }
+
+  /** Casos al día para Métricas: la misma foto de Reportes que usa Mis presupuestos. */
+  public function caseSummary(string $date): ?array
+  {
+    return self::caseResult(($this->fetch)([self::caseRequest($date)])[0] ?? null);
+  }
+
+  /** @return array<string,scalar> */
+  private static function reviewRequest(int $year, int $month): array
+  {
+    return ['route' => 'compensacion/revisiones-stats', 'mes_num' => $month, 'year' => $year];
+  }
+
+  /** @return array<string,scalar> */
+  private static function caseRequest(string $date): array
+  {
+    return ['route' => 'historial', 'tipo' => 'tickets', 'fecha_ref' => $date, 'fallback_forward' => 1, 'casos_al_dia' => 1, 'temas' => implode(',', self::CASE_TOPICS)];
+  }
+
+  private static function caseResult(?array $response): ?array
+  {
+    $rows = $response['data'] ?? null;
+    if (!is_array($rows) || $rows === []) return null;
+    return self::summarizeCases($rows) + ['cut' => (string) ($response['fecha_snapshot_ref'] ?? '')];
   }
 
   /** @param array<int,array<string,mixed>> $rows una fila por funcionario del historial de tickets */

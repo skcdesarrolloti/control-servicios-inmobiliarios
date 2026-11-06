@@ -23,7 +23,7 @@ final class MetricsPanelsView
         <div class="scm-cm-head-copy">
           <p class="scm-cm-kicker">Métricas</p>
           <h1 id="scm-case-metrics-title">Casos</h1>
-          <p class="scm-cm-subtitle">Casos creados en el periodo y su estado actual, por estado administrativo, tema y funcionario.</p>
+          <p class="scm-cm-subtitle">Si los casos están al día, cuánta carga hay hoy y cuántos se crean y se cierran en el periodo.</p>
         </div>
         <div class="scm-cm-head-actions">
           <span class="scm-cm-updated" data-scm-case-updated></span>
@@ -35,6 +35,8 @@ final class MetricsPanelsView
           </button>
         </div>
       </header>
+
+      <div class="scm-cm-compliance" data-scm-case-compliance hidden></div>
 
       <form class="scm-cm-filters scm-qm-filters" onsubmit="return false;">
         <div class="scm-cm-field scm-qm-period">

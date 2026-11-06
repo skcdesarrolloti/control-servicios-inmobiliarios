@@ -47,7 +47,7 @@ final class EmployeeBudgetView
     $compliance = $report['compliance'] ?? [];
     $sections = '';
     if (!empty($compliance['reviews'])) {
-      foreach (array_keys(self::REVIEWS) as $type) $sections .= self::reviewCard($type, $compliance['stats'] ?? null, $vista, $report['year'], $report['month']);
+      foreach (array_keys(self::REVIEWS) as $type) $sections .= self::reviewCard($type, $compliance['stats'] ?? null, $vista, $report['year'], $report['month'], true);
     }
     // Casos al día es una foto del corte: no tiene acumulado.
     if (!empty($compliance['cases']) && $vista !== 'acumulado') $sections .= self::casesCard($compliance['case_summary'] ?? null);
@@ -99,7 +99,30 @@ final class EmployeeBudgetView
     return $html . '</div>';
   }
 
-  private static function reviewCard(string $type, ?array $stats, string $vista, int $year, int $month): string
+  /** Vista del gerente: acumulado y mes lado a lado. */
+  public static function reviewCompliance(string $type, ?array $stats, int $year, int $month): string
+  {
+    $cards = self::reviewCard($type, $stats, 'acumulado', $year, $month, false);
+    if (!is_array($stats[$type] ?? null)) return $cards;
+    return '<div class="!sp-grid !sp-grid-cols-1 xl:!sp-grid-cols-2 !sp-gap-4">' . $cards . self::reviewCard($type, $stats, 'mes', $year, $month, false) . '</div>';
+  }
+
+  public static function reviewComplianceHistory(string $type, ?array $stats, int $month): string
+  {
+    return is_array($stats[$type] ?? null) ? self::reviewHistory((array) ($stats[$type]['serie'] ?? []), $month, self::REVIEWS[$type][1]) : '';
+  }
+
+  public static function reviewMinimum(string $type): int
+  {
+    return self::REVIEWS[$type][1];
+  }
+
+  public static function missingForMinimum(int $done, int $total, int $minimum): int
+  {
+    return max(0, (int) ceil($total * $minimum / 100) - $done);
+  }
+
+  private static function reviewCard(string $type, ?array $stats, string $vista, int $year, int $month, bool $withHistory): string
   {
     [$title, $minimum, $rule] = self::REVIEWS[$type];
     $open = '<section class="' . UI::CARD . ' !sp-p-5 !sp-space-y-4"><h3 class="!sp-m-0 !sp-text-sm !sp-font-bold">' . V::e($title) . '</h3>';
@@ -115,7 +138,7 @@ final class EmployeeBudgetView
     $pending = (int) ($figures['pendientes'] ?? 0);
     $total = (int) ($figures['total'] ?? 0);
     $pct = (float) ($figures['porcentaje'] ?? 0);
-    $closed = $cut !== '' && sprintf('%04d-%02d', $year, $month) < substr($cut, 0, 7);
+    $closed = sprintf('%04d-%02d', $year, $month) < (new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota')))->format('Y-m');
     $pctLabel = number_format($pct, 1, '.', '') . '%';
 
     $cells = $monthly
@@ -130,7 +153,7 @@ final class EmployeeBudgetView
     $explanation = $monthly ? 'Cada revisión cuenta en el mes en que vencía y solo suma si se hizo a tiempo. Las hechas tarde suman en el acumulado.' : $rule;
     $period = $monthly ? self::MONTHS[$month] . ' ' . $year : 'Acumulado ' . $year;
 
-    $html = $open . self::summaryHead($period, $pct >= $minimum);
+    $html = $open . self::summaryHead($period, $pct >= $minimum ? 'ok' : ($monthly && !$closed ? 'running' : 'miss'));
     $html .= '<div><strong class="!sp-block !sp-text-3xl !sp-font-extrabold">' . V::e($pctLabel) . '</strong><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">' . V::e(self::shortfall($done, $total, $minimum, $monthly && $closed)) . '</p></div>';
     $html .= self::thresholdBar($pct, $minimum);
     $html .= '<div class="!sp-flex !sp-flex-wrap !sp-gap-3">';
@@ -139,20 +162,25 @@ final class EmployeeBudgetView
     }
     $html .= '</div>';
     $html .= '<div class="!sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-px-4 !sp-py-3 !sp-text-xs !sp-text-service-muted !sp-space-y-1"><strong class="!sp-block !sp-text-service-navy">Cómo se calcula</strong><p class="!sp-m-0">' . V::e($formula) . '</p><p class="!sp-m-0">' . V::e($explanation) . '</p><p class="!sp-m-0 !sp-text-[10px]">' . V::e($note) . '</p></div>';
-    if ($monthly) $html .= self::reviewHistory((array) ($data['serie'] ?? []), $month, $minimum);
+    if ($monthly && $withHistory) $html .= self::reviewHistory((array) ($data['serie'] ?? []), $month, $minimum);
     return $html . '</section>';
   }
 
-  private static function summaryHead(string $period, bool $meets): string
+  /** Un mes abierto todavía no incumple: las revisiones cuentan a tiempo hasta su cierre. */
+  private static function summaryHead(string $period, string $state): string
   {
-    $badge = $meets ? '!sp-bg-emerald-50 !sp-text-emerald-800' : '!sp-bg-rose-50 !sp-text-rose-800';
-    return '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2"><strong class="!sp-text-sm !sp-font-semibold">' . V::e($period) . '</strong><span class="!sp-rounded-full !sp-px-3 !sp-py-1 !sp-text-xs !sp-font-semibold ' . $badge . '">' . ($meets ? '✓ Cumple' : '✕ No cumple') . '</span></div>';
+    [$badge, $label] = [
+      'ok' => ['!sp-bg-emerald-50 !sp-text-emerald-800', '✓ Cumple'],
+      'running' => ['!sp-bg-amber-50 !sp-text-amber-800', '◷ Mes en curso'],
+      'miss' => ['!sp-bg-rose-50 !sp-text-rose-800', '✕ No cumple'],
+    ][$state];
+    return '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2"><strong class="!sp-text-sm !sp-font-semibold">' . V::e($period) . '</strong><span class="!sp-rounded-full !sp-px-3 !sp-py-1 !sp-text-xs !sp-font-semibold ' . $badge . '">' . $label . '</span></div>';
   }
 
   private static function shortfall(int $done, int $total, int $minimum, bool $closed): string
   {
     if ($total === 0) return 'No hay revisiones por realizar.';
-    $missing = max(0, (int) ceil($total * $minimum / 100) - $done);
+    $missing = self::missingForMinimum($done, $total, $minimum);
     if ($missing === 0) return "Se alcanzó el mínimo de {$minimum}%.";
     if ($closed) return "Mes cerrado por debajo del mínimo de {$minimum}%.";
     return $missing === 1 ? "Falta 1 revisión para llegar al {$minimum}%." : "Faltan {$missing} revisiones para llegar al {$minimum}%.";
@@ -178,18 +206,23 @@ final class EmployeeBudgetView
       $label = mb_substr(self::MONTHS[$number], 0, 3, 'UTF-8');
       $rows[] = [$number === $month ? '<strong>' . V::e($label) . '</strong>' : V::e($label), (string) (int) ($item['total'] ?? 0), (string) (int) ($item['realizadas'] ?? 0), (string) (int) ($item['tarde'] ?? 0), (string) (int) ($item['pendientes'] ?? 0), '<strong class="' . $tone . '">' . number_format($pct, 1, '.', '') . '%</strong>'];
     }
-    return V::table('Mes a mes', '', ['Mes', 'Total a realizar', 'A tiempo', 'Tarde', 'Pendientes', 'Cumplimiento'], $rows);
+    return V::table('Cumplimiento mes a mes', '', ['Mes', 'Total a realizar', 'A tiempo', 'Tarde', 'Pendientes', 'Cumplimiento'], $rows);
   }
 
-  private static function casesCard(?array $summary): string
+  /** @param bool $collapsed en Casos el detalle se pliega para no alejar los filtros */
+  public static function casesCard(?array $summary, bool $collapsed = false): string
   {
     $open = '<section class="' . UI::CARD . ' !sp-p-5 !sp-space-y-4"><h3 class="!sp-m-0 !sp-text-sm !sp-font-bold">Cumplimiento casos al día</h3>';
     if ($summary === null) return $open . '<p class="!sp-m-0 !sp-text-xs !sp-text-service-muted">Reportes no entregó este cumplimiento.</p></section>';
 
     $pct = (float) $summary['pct'];
-    $html = $open . self::summaryHead('Casos al día con actualización', $pct >= self::CASES_MINIMUM);
-    $html .= '<div><strong class="!sp-block !sp-text-3xl !sp-font-extrabold">' . V::e(number_format($pct, 1, '.', '') . '%') . '</strong><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">' . (int) $summary['on_time'] . ' de ' . (int) $summary['total'] . ' casos de mantenimiento y preventivos, de todos los funcionarios.</p></div>';
+    $missing = self::missingForMinimum((int) $summary['on_time'], (int) $summary['total'], self::CASES_MINIMUM);
+    $gap = $missing === 0 ? 'Se alcanzó el mínimo de ' . self::CASES_MINIMUM . '%.' : ($missing === 1 ? 'Falta 1 caso por poner al día' : "Faltan {$missing} casos por poner al día") . ' para llegar al ' . self::CASES_MINIMUM . '%.';
+    $cut = (string) ($summary['cut'] ?? '');
+    $html = $open . self::summaryHead('Casos al día con actualización', $pct >= self::CASES_MINIMUM ? 'ok' : 'miss');
+    $html .= '<div><strong class="!sp-block !sp-text-3xl !sp-font-extrabold">' . V::e(number_format($pct, 1, '.', '') . '%') . '</strong><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">' . (int) $summary['on_time'] . ' de ' . (int) $summary['total'] . ' casos de mantenimiento y preventivos, de todos los funcionarios. ' . V::e($gap) . '</p></div>';
     $html .= self::thresholdBar($pct, self::CASES_MINIMUM);
+    $html .= '<p class="!sp-m-0 !sp-text-[10px] !sp-text-service-muted">Un caso está al día si se actualizó dentro del límite de Configurar Vencimientos.' . ($cut !== '' ? ' Corte ' . V::e($cut) . '.' : '') . '</p>';
 
     $employees = [];
     foreach ($summary['by_employee'] as $employee) {
@@ -198,10 +231,9 @@ final class EmployeeBudgetView
     }
     $topics = array_map(static fn(array $topic): array => self::caseRow($topic), $summary['by_topic']);
     $head = ['Casos', 'Al día', 'Atrasados', 'Cumplimiento'];
-    $html .= '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-2 !sp-gap-4">';
-    $html .= V::table('Por funcionario', '', array_merge(['Funcionario'], $head), $employees);
-    $html .= V::table('Por tema', '', array_merge(['Tema'], $head), $topics);
-    return $html . '</div></section>';
+    $tables = '<div class="!sp-grid !sp-grid-cols-1 lg:!sp-grid-cols-2 !sp-gap-4 !sp-mt-3">' . V::table('Por funcionario', '', array_merge(['Funcionario'], $head), $employees) . V::table('Por tema', '', array_merge(['Tema'], $head), $topics) . '</div>';
+    $html .= $collapsed ? '<details><summary class="!sp-cursor-pointer !sp-text-xs !sp-font-semibold">Ver por funcionario y por tema</summary>' . $tables . '</details>' : $tables;
+    return $html . '</section>';
   }
 
   private static function caseRow(array $line, bool $nested = false): array

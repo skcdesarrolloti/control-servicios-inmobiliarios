@@ -95,36 +95,34 @@ final class MaintenanceMetricsReport
    */
   public function publicServices(int $fromTs, int $toTs, array $pendingItems, array $configurationItems): array
   {
-    $todayTs = (new \DateTimeImmutable('today', $this->timezone))->getTimestamp();
-    $month = (new \DateTimeImmutable('now', $this->timezone))->format('Y-m');
-    $pending = ['total' => count($pendingItems), 'overdue' => 0, 'month' => 0, 'unconfigured' => count($configurationItems)];
-    foreach ($pendingItems as $item) {
-      $due = (int) ($item['due'] ?? 0);
-      if ($due > 0 && $due < $todayTs) $pending['overdue']++;
-      if ($due > 0 && date('Y-m', $due) === $month) $pending['month']++;
-    }
+    [$pending, $aging, $overdueRows] = $this->servicesPending($pendingItems);
+    $pending['unconfigured'] = count($configurationItems);
 
     $table = $this->db->table('jet_cct_revisiones_servicios');
     $columns = $this->schema->getTableColumns($table);
-    $pick = array_values(array_intersect(['_ID', 'fecha', 'cct_created', 'realizado_por', 'resultado_tiempo_luz', 'resultado_tiempo_agua', 'resultado_tiempo_gas', 'resultado_valores_luz', 'resultado_valores_agua', 'resultado_valores_gas'], $columns));
+    $pick = array_values(array_intersect(['_ID', 'id_contrato', 'tipo', 'fecha', 'cct_created', 'realizado_por', 'resultado_tiempo_luz', 'resultado_tiempo_agua', 'resultado_tiempo_gas', 'resultado_valores_luz', 'resultado_valores_agua', 'resultado_valores_gas'], $columns));
     $rows = $pick ? $this->rowsInPeriod($table, $columns, $pick, $fromTs, $toTs) : [];
+    usort($rows, static fn(array $a, array $b): int => (int) $a['_scm_ts'] <=> (int) $b['_scm_ts']);
 
-    $reviews = ['total' => count($rows), 'none' => 0, 'debt' => 0] + array_fill_keys(array_keys(self::STATUSES), 0);
+    $reviews = ['total' => count($rows), 'during' => 0, 'none' => 0, 'debt' => 0] + array_fill_keys(array_keys(self::STATUSES), 0);
     $services = [];
     foreach (self::SERVICES as $key => $label) $services[$key] = ['label' => $label, 'reviewed' => 0, 'debt' => 0] + array_fill_keys(array_keys(self::STATUSES), 0);
     $staff = [];
     $trend = [];
     $rank = ['' => 0, 'al_dia' => 1, 'm30' => 2, 'm60' => 3, 'critico' => 4];
+    // Un contrato revisado varias veces debe una sola vez: vale su saldo más reciente.
+    $lastDebt = [];
     foreach ($rows as $row) {
       $worst = '';
+      $contract = trim((string) ($row['id_contrato'] ?? '')) ?: 'revision-' . $row['_ID'];
+      if (str_contains(self::lower($row['tipo'] ?? ''), 'durante')) $reviews['during']++;
       foreach (self::SERVICES as $key => $label) {
         $status = self::status((string) ($row['resultado_tiempo_' . $key] ?? ''));
         if ($status === '') continue;
         $amount = $status === 'al_dia' ? 0 : ContractMovementsReport::parseMoney($row['resultado_valores_' . $key] ?? null);
         $services[$key]['reviewed']++;
         $services[$key][$status]++;
-        $services[$key]['debt'] += $amount;
-        $reviews['debt'] += $amount;
+        $lastDebt[$key][$contract] = $amount;
         if ($rank[$status] > $rank[$worst]) $worst = $status;
       }
       $worst === '' ? $reviews['none']++ : $reviews[$worst]++;
@@ -138,6 +136,11 @@ final class MaintenanceMetricsReport
       $trend[$bucket]['total']++;
       if (in_array($worst, ['m30', 'm60'], true)) $trend[$bucket]['mora']++;
       if ($worst === 'critico') $trend[$bucket]['critico']++;
+    }
+
+    foreach ($lastDebt as $key => $amounts) {
+      $services[$key]['debt'] = array_sum($amounts);
+      $reviews['debt'] += $services[$key]['debt'];
     }
 
     $critical = ['created' => 0, 'open' => 0, 'overdue' => 0, 'closed' => 0, 'open_now' => 0, 'overdue_now' => 0];
@@ -156,7 +159,45 @@ final class MaintenanceMetricsReport
       }
     }
 
-    return ['pending' => $pending, 'reviews' => $reviews, 'services' => $services, 'staff' => self::topStaff($staff), 'trend' => self::sortTrend($trend), 'critical' => $critical];
+    return ['pending' => $pending, 'aging' => $aging, 'late' => $overdueRows, 'reviews' => $reviews, 'services' => $services, 'staff' => self::topStaff($staff), 'trend' => self::sortTrend($trend), 'critical' => $critical];
+  }
+
+  /**
+   * Una revisión cuenta a tiempo hasta el cierre de su mes, igual que en Reportes: vencida es la de meses anteriores.
+   * Las de años anteriores van aparte porque Reportes solo mide el año en curso.
+   * @return array{0:array<string,int>,1:array<string,int>,2:array<int,array<string,mixed>>}
+   */
+  private function servicesPending(array $items): array
+  {
+    [$monthStart, $nextMonth, $yearStart] = $this->monthBounds();
+    $now = time();
+    $pending = ['base' => count($items), 'overdue' => 0, 'overdue_year' => 0, 'overdue_old' => 0, 'month' => 0];
+    $aging = ['d30' => 0, 'd60' => 0, 'd90' => 0, 'older' => 0];
+    $late = [];
+    foreach ($items as $item) {
+      $due = (int) ($item['due'] ?? 0);
+      if ($due <= 0 || $due >= $nextMonth) continue;
+      if ($due >= $monthStart) {
+        $pending['month']++;
+        continue;
+      }
+      $pending['overdue']++;
+      $pending[$due >= $yearStart ? 'overdue_year' : 'overdue_old']++;
+      $days = (int) floor(($now - $due) / 86400);
+      $aging[$days <= 30 ? 'd30' : ($days <= 60 ? 'd60' : ($days <= 90 ? 'd90' : 'older'))]++;
+      $row = (array) ($item['row'] ?? []);
+      $late[] = ['contract' => (string) ($row['contrato'] ?? ''), 'address' => (string) ($row['direccion'] ?? ''), 'tenant' => (string) ($row['arrendatario'] ?? ''), 'due' => $due, 'days' => $days];
+    }
+    usort($late, static fn(array $a, array $b): int => $a['due'] <=> $b['due']);
+    return [$pending, $aging, array_slice($late, 0, 10)];
+  }
+
+  /** @return array{0:int,1:int,2:int} inicio del mes, inicio del mes siguiente e inicio del año */
+  private function monthBounds(): array
+  {
+    $today = new \DateTimeImmutable('today', $this->timezone);
+    $month = $today->modify('first day of this month');
+    return [$month->getTimestamp(), $month->modify('+1 month')->getTimestamp(), $today->setDate((int) $today->format('Y'), 1, 1)->getTimestamp()];
   }
 
   /**
@@ -165,8 +206,13 @@ final class MaintenanceMetricsReport
    */
   public function preventive(int $fromTs, int $toTs, array $pendingItems, array $queues): array
   {
-    $pending = ['total' => count($pendingItems), 'without_case' => 0];
-    foreach ($pendingItems as $item) if (empty($item['ticket'])) $pending['without_case']++;
+    [$monthStart, $nextMonth] = $this->monthBounds();
+    $pending = ['total' => count($pendingItems), 'overdue' => 0, 'month' => 0, 'later' => 0, 'without_case' => 0];
+    foreach ($pendingItems as $item) {
+      if (empty($item['ticket'])) $pending['without_case']++;
+      $due = (int) ($item['due'] ?? 0);
+      $pending[$due >= $nextMonth ? 'later' : ($due >= $monthStart ? 'month' : 'overdue')]++;
+    }
 
     $table = $this->db->table('jet_cct_revision_preventiva');
     $columns = $this->schema->getTableColumns($table);
@@ -174,7 +220,8 @@ final class MaintenanceMetricsReport
     $rows = $pick ? $this->rowsInPeriod($table, $columns, $pick, $fromTs, $toTs) : [];
 
     $quotesByReview = $this->preventiveQuotes($rows);
-    $reviews = ['total' => count($rows), 'sent' => 0, 'unsent' => 0, 'damages' => 0, 'no_damages' => 0, 'with_quote' => 0, 'without_quote' => 0];
+    $reviews = ['total' => count($rows), 'sent' => 0, 'unsent' => 0, 'damages' => 0, 'no_damages' => 0, 'with_quote' => 0, 'without_quote' => 0, 'send_days' => null];
+    $sendDays = [];
     $quotes = ['total' => 0, 'aprobada' => 0, 'esperando' => 0, 'sin_enviar' => 0, 'desaprobada' => 0, 'quoted' => 0, 'approved_value' => 0, 'admin' => 0, 'admin_pending' => 0];
     $staff = [];
     $trend = [];
@@ -183,6 +230,8 @@ final class MaintenanceMetricsReport
       $sent = in_array(self::lower($row['se_envio'] ?? ''), ['si', 'sí'], true) || (int) ($row['fecha_envio'] ?? 0) > 0;
       $damages = in_array(self::lower($row['encontro_danos'] ?? ''), ['si', 'sí'], true);
       $sent ? $reviews['sent']++ : $reviews['unsent']++;
+      $sentAt = (int) ($row['fecha_envio'] ?? 0);
+      if ($sentAt >= (int) $row['_scm_ts']) $sendDays[] = ($sentAt - (int) $row['_scm_ts']) / 86400;
       $damages ? $reviews['damages']++ : $reviews['no_damages']++;
       $reviewQuotes = $quotesByReview[(int) $row['_ID']] ?? [];
       if ($damages) {
@@ -211,6 +260,11 @@ final class MaintenanceMetricsReport
       $trend[$bucket]['total']++;
       if ($damages) $trend[$bucket]['damages']++;
       if ($sent) $trend[$bucket]['sent']++;
+    }
+
+    if ($sendDays) {
+      sort($sendDays);
+      $reviews['send_days'] = (int) round($sendDays[(int) floor((count($sendDays) - 1) / 2)]);
     }
 
     return ['pending' => $pending, 'queues' => $queues, 'reviews' => $reviews, 'quotes' => $quotes, 'staff' => self::topStaff($staff), 'trend' => self::sortTrend($trend)];

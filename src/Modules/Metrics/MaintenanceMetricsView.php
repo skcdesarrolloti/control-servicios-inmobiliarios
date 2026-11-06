@@ -9,11 +9,11 @@ use SCM\Modules\Pending\PublicServicesUi as UI;
 /** Métricas › Servicios públicos y Métricas › Mantenimiento › Revisión preventiva (Tailwind sp-). */
 final class MaintenanceMetricsView
 {
-  private const PENDING_NOTE = 'El periodo aplica a revisiones, resultados, daños, cotizaciones y casos creados. Pendientes, sin cita y sin enviar muestran la situación actual.';
+  private const PENDING_NOTE = 'El cumplimiento se lee del mes en que termina el periodo. El periodo aplica a revisiones, resultados, daños, cotizaciones y casos creados. La situación actual no cambia con el periodo.';
   /** report => [title, subtitle, icon, period note, template]. */
   public const REPORTS = [
-    'servicios' => ['Revisiones de servicios públicos', 'Pendientes, revisiones realizadas por resultado, deuda reportada y casos críticos de 72 horas.', 'drop', self::PENDING_NOTE, 'public-services'],
-    'preventiva' => ['Revisión preventiva', 'Pendientes, citas, revisiones realizadas, daños, cotizaciones y administración ganada.', 'check', self::PENDING_NOTE, 'preventive'],
+    'servicios' => ['Revisiones de servicios públicos', 'Si cumplimos la meta, qué hay que atender hoy, qué encontraron las revisiones y cuánta deuda se reportó.', 'drop', self::PENDING_NOTE, 'public-services'],
+    'preventiva' => ['Revisión preventiva', 'Si cumplimos la meta, dónde se frenan las pendientes y cuánto dejan los daños encontrados.', 'check', self::PENDING_NOTE, 'preventive'],
     'crecimiento' => ['Crecimiento de la empresa', 'Aumentos de canon y de administración generados con las cartas de aumento.', 'refresh', 'El periodo aplica a la fecha de las cartas de aumento. La cartera administrada muestra los contratos entregados hoy.', 'growth'],
   ];
 
@@ -54,6 +54,31 @@ final class MaintenanceMetricsView
       $html .= '<li class="!sp-flex !sp-items-center !sp-gap-2 !sp-text-[10px]"><span class="!sp-w-2.5 !sp-h-2.5 !sp-rounded-full ' . $bg . '" aria-hidden="true"></span><span class="!sp-text-service-muted">' . self::e($label) . '</span><strong class="!sp-ml-auto">' . (int) $value . ' · ' . self::pct((int) $value, $total) . '</strong></li>';
     }
     return $html . '</ul></div>';
+  }
+
+  /** "Lectura rápida": cada frase lleva ícono además del color. @param array<int,array{tone:string,text:string}> $lines */
+  public static function brief(array $lines): string
+  {
+    $tones = ['bad' => ['alert', '!sp-text-rose-600'], 'warn' => ['clock', '!sp-text-amber-600'], 'good' => ['check', '!sp-text-emerald-700']];
+    $html = '<section class="' . UI::CARD . ' !sp-p-5" aria-label="Lectura rápida"><h3 class="!sp-m-0 !sp-text-sm !sp-font-bold">Lectura rápida</h3><ul class="!sp-list-none !sp-m-0 !sp-mt-3 !sp-p-0 !sp-space-y-2">';
+    foreach ($lines as $line) {
+      [$icon, $tone] = $tones[$line['tone']];
+      $html .= '<li class="!sp-flex !sp-items-start !sp-gap-2 !sp-text-xs">' . UI::icon($icon, '!sp-w-4 !sp-h-4 !sp-shrink-0 ' . $tone) . '<span>' . self::e($line['text']) . '</span></li>';
+    }
+    return $html . '</ul></section>';
+  }
+
+  /** Embudo de una sola serie. @param array<int,array{0:string,1:int,2:string}> $steps [label, value, note] */
+  public static function funnel(string $title, array $steps): string
+  {
+    $max = max(1, ...array_column($steps, 1));
+    $html = '<div class="' . UI::CARD . ' !sp-p-5"><h3 class="!sp-m-0 !sp-mb-3 !sp-text-sm !sp-font-bold">' . self::e($title) . '</h3><ol class="!sp-list-none !sp-m-0 !sp-p-0 !sp-space-y-3">';
+    foreach ($steps as [$label, $value, $note]) {
+      $width = $value > 0 ? max(2, (int) round($value * 100 / $max)) : 0;
+      $html .= '<li><div class="!sp-flex !sp-flex-wrap !sp-justify-between !sp-gap-2 !sp-text-[10px]"><span class="!sp-text-service-muted">' . self::e($label) . '</span><span>' . ($note !== '' ? '<span class="!sp-text-service-muted">' . self::e($note) . ' · </span>' : '') . '<strong>' . (int) $value . '</strong></span></div>'
+        . '<span class="!sp-block !sp-h-2 !sp-mt-1 !sp-rounded-full !sp-bg-slate-100 !sp-overflow-hidden"><span class="!sp-block !sp-h-full !sp-rounded-full !sp-bg-service-navy" style="width:' . $width . '%"></span></span></li>';
+    }
+    return $html . '</ol></div>';
   }
 
   /** Simple table card. @param array<int,string> $head @param array<int,array<int,string>> $rows already-escaped cells */
