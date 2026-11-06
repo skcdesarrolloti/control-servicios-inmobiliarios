@@ -55,6 +55,10 @@ final class CompletionView
     $selectedExecutor = (string) ($formPayload['executor'] ?? $executor);
     $selectedSigner = (string) ($formPayload['signer']['role'] ?? '');
     $signerName = (string) ($formPayload['signer']['name'] ?? '');
+    // Un contacto personalizado se conserva al editar; si no, se muestra el registrado vigente.
+    $registeredSigner = (array) ($context['contacts'][$selectedSigner] ?? []);
+    $signerEmail = (string) (!empty($formPayload['signer']['custom_email']) ? $formPayload['signer']['email'] : ($registeredSigner['email'] ?? ''));
+    $signerPhone = (string) (!empty($formPayload['signer']['custom_phone']) ? $formPayload['signer']['phone'] : ($registeredSigner['phone'] ?? ''));
     $selectedChannels = (array) ($formPayload['channels'] ?? []);
     // Por defecto la invitación y la copia firmada salen por correo y WhatsApp.
     $selectedChannel = count($selectedChannels) !== 1 ? 'both' : (string) $selectedChannels[0];
@@ -102,7 +106,7 @@ final class CompletionView
         <article class="scm-acta-record">
           <div class="scm-acta-meta"><h3><?= $act['status'] === 'superseded' ? 'Versión firmada anterior · Registro #' : 'Acta de satisfacción #' ?><?= self::e($act['id']) ?></h3><strong class="scm-acta-status" data-acta-status="<?= self::e($act['status']) ?>"><?= self::e(['pending' => 'Acta sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada', 'superseded' => 'Versión firmada anterior'][$act['status']] ?? $act['status']) ?></strong></div>
           <?php if ($act['status'] === 'pending'): ?><p class="scm-acta-help">También puedes consultarla y administrarla desde <strong>Actividades administrativas → Actas de satisfacción</strong>.</p><?php endif; ?>
-          <p>Firmante: <strong><?= self::e($payload['signer']['name']) ?></strong> · <?= self::e(CompletionPolicy::ROLES[$payload['signer']['role']]) ?><br><?= self::e($payload['signer']['email']) ?> · <?= self::e($payload['signer']['phone']) ?></p>
+          <p>Firmante: <strong><?= self::e($payload['signer']['name']) ?></strong> · <?= self::e(CompletionPolicy::ROLES[$payload['signer']['role']]) ?><br><?= self::e($payload['signer']['email']) ?> · <?= self::e($payload['signer']['phone']) ?><?php if (!empty($payload['signer']['custom_email']) || !empty($payload['signer']['custom_phone'])): ?><br><small>Contacto usado solo en esta acta; los datos registrados de la persona no cambiaron.</small><?php endif; ?></p>
           <?php
             $recordSource = is_array($payload['source'] ?? null) ? $payload['source'] : [];
           ?>
@@ -141,11 +145,11 @@ final class CompletionView
             <label>¿Quién realizó la solución? *<select name="executor" required><option value="">Seleccionar responsable</option><?php foreach ($executorOptions as $role => $label): ?><option value="<?= self::e($role) ?>" <?= $selectedExecutor === $role ? 'selected' : '' ?>><?= self::e($label) ?></option><?php endforeach; ?></select></label>
             <label>¿A quién se solicita la firma? *<select name="signer_role" required data-acta-signer><option value="">Seleccionar firmante</option><?php foreach ($context['contacts'] as $role => $contact): ?><option value="<?= self::e($role) ?>" data-name="<?= self::e($contact['name']) ?>" data-email="<?= self::e($contact['email']) ?>" data-phone="<?= self::e($contact['phone']) ?>" <?= $selectedSigner === $role ? 'selected' : '' ?> <?= !$contact['available'] ? 'disabled' : '' ?>><?= self::e($contact['label']) ?><?= !$contact['available'] ? ' — falta contacto para verificación' : ' · ' . self::e($contact['name']) ?></option><?php endforeach; ?></select></label>
             <label>Nombre completo de la persona que firma *<input name="signer_name" maxlength="160" required autocomplete="off" data-acta-signer-name value="<?= self::e($signerName) ?>"></label>
-            <label>Correo registrado para recibir la firma<input type="email" readonly data-acta-signer-email value="<?= self::e($formPayload['signer']['email'] ?? '') ?>"></label>
-            <label>WhatsApp registrado<input type="tel" readonly data-acta-signer-phone value="<?= self::e($formPayload['signer']['phone'] ?? '') ?>"></label>
+            <label>Correo para recibir la firma<input type="email" name="signer_email" maxlength="160" autocomplete="off" data-acta-signer-email value="<?= self::e($signerEmail) ?>"></label>
+            <label>WhatsApp para recibir la firma<input type="tel" name="signer_phone" maxlength="30" autocomplete="off" data-acta-signer-phone value="<?= self::e($signerPhone) ?>"></label>
             <label>Enviar invitación y copia firmada por *<select name="channels[]" required><option value="both" <?= $selectedChannel === 'both' ? 'selected' : '' ?>>Correo y WhatsApp</option><option value="email" <?= $selectedChannel === 'email' ? 'selected' : '' ?>>Solo correo</option><option value="whatsapp" <?= $selectedChannel === 'whatsapp' ? 'selected' : '' ?>>Solo WhatsApp</option></select></label>
           </div>
-          <p class="scm-acta-help">Solo se usan los contactos registrados. Para empresas o copropiedades, indica el nombre de quien firma en su representación. El destinatario confirma su nombre y verifica un código antes del cierre.</p>
+          <p class="scm-acta-help">El correo y el WhatsApp se cargan del registro. Si piden que llegue a otro contacto, cámbialos aquí: aplica solo a esta acta y no modifica los datos registrados de la persona. Si firmará otra persona, cambia también el nombre. Para empresas o copropiedades, indica el nombre de quien firma en su representación. El destinatario confirma su nombre y verifica un código antes del cierre.</p>
           <?php if (CompletionDelivery::otpTemplate() === ''): ?><p class="scm-acta-notice">El enlace puede enviarse por WhatsApp, pero el código se enviará por correo hasta configurar la plantilla de autenticación de WhatsApp. El firmante necesita correo válido.</p><?php endif; ?>
           <h3>2. Daños encontrados y soluciones realizadas</h3>
           <div data-acta-items><?php foreach ($formItems as $index => $item): ?><?= $this->item((int) $index, is_array($item) ? $item : []) ?><?php endforeach; ?></div>

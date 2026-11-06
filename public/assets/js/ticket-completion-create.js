@@ -181,6 +181,8 @@
     if (overwriteName || !nameField.value) {
       nameField.value = option && option.dataset.name ? option.dataset.name : "";
     }
+    // Solo al cambiar de firmante: el servidor ya pinta el contacto, que puede ser propio de esta acta.
+    if (!overwriteName) return;
     form.querySelector("[data-acta-signer-email]").value = option && option.dataset.email ? option.dataset.email : "";
     form.querySelector("[data-acta-signer-phone]").value = option && option.dataset.phone ? option.dataset.phone : "";
   }

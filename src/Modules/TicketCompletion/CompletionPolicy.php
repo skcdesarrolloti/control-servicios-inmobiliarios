@@ -28,6 +28,33 @@ final class CompletionPolicy
     return preg_match('/^[1-9]\d{9,14}$/D', $digits) ? '+' . $digits : '';
   }
 
+  /**
+   * Destino de la firma para esta acta. Lo escrito en el formulario solo vive en el acta:
+   * nunca se devuelve a los datos registrados de la persona.
+   *
+   * @param array{email?:string,phone?:string} $contact Contacto registrado
+   * @return array{email:string,phone:string,custom_email:bool,custom_phone:bool}
+   */
+  public static function signerDestination(array $input, array $contact): array
+  {
+    $registeredEmail = trim((string) ($contact['email'] ?? ''));
+    $registeredPhone = trim((string) ($contact['phone'] ?? ''));
+    $email = array_key_exists('signer_email', $input) ? (is_string($input['signer_email']) ? trim($input['signer_email']) : '') : $registeredEmail;
+    $rawPhone = array_key_exists('signer_phone', $input) ? (is_string($input['signer_phone']) ? trim($input['signer_phone']) : '') : $registeredPhone;
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      throw new \DomainException('El correo para recibir la firma no es válido.');
+    }
+    $phone = $rawPhone === '' ? '' : self::phone($rawPhone);
+    if ($rawPhone !== '' && $phone === '') {
+      throw new \DomainException('El WhatsApp para recibir la firma no es válido. Escribe un celular personal, por ejemplo 300 123 4567 o +57 300 123 4567.');
+    }
+    return [
+      'email' => $email, 'phone' => $phone,
+      'custom_email' => mb_strtolower($email) !== mb_strtolower($registeredEmail),
+      'custom_phone' => $phone !== $registeredPhone,
+    ];
+  }
+
   public static function executionState(string $executor): string
   {
     if (!isset(self::EXECUTORS[$executor])) {

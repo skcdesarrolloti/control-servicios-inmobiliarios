@@ -707,7 +707,7 @@ final class CompletionService
       $sourceText = (($payload['source']['flow'] ?? '') === 'approved_quote' && trim((string) ($payload['source']['quote_id'] ?? '')) !== '')
         ? ' Asociada a la cotización aprobada #' . trim((string) $payload['source']['quote_id']) . '.'
         : '';
-      $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' generada.' . $sourceText . ' Solución por ' . CompletionPolicy::EXECUTORS[$payload['executor']] . '. Pendiente de firma de ' . htmlspecialchars($payload['signer']['name'], ENT_QUOTES, 'UTF-8') . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta</a>. El caso permanece abierto en “' . $payload['pending_admin_state'] . '” y el reporte aún no se cobra.', $actor['name'], $actor['employee_id']);
+      $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' generada.' . $sourceText . ' Solución por ' . CompletionPolicy::EXECUTORS[$payload['executor']] . '. Pendiente de firma de ' . htmlspecialchars($payload['signer']['name'], ENT_QUOTES, 'UTF-8') . '. <a href="' . htmlspecialchars($this->viewUrl($id), ENT_QUOTES, 'UTF-8') . '">Ver acta</a>. El caso permanece abierto en “' . $payload['pending_admin_state'] . '” y el reporte aún no se cobra.' . $this->customDestinationNote($payload), $actor['name'], $actor['employee_id']);
       return $this->repo->act($id);
     });
     try { return $this->notify($act); }
@@ -788,7 +788,7 @@ final class CompletionService
       }
       $this->repo->updateTicket($ticketId, ['estado' => 'En proceso', 'estado_administrativo' => $payload['pending_admin_state'], 'ejecutado' => CompletionPolicy::EXECUTORS[$payload['executor']]]);
       \SCM\Support\CaseWorkStart::markIfEmpty($this->repo->db, $ticketId, $now);
-      $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' editada. Se invalidaron códigos anteriores y se solicitó nueva firma de ' . htmlspecialchars($payload['signer']['name'], ENT_QUOTES, 'UTF-8') . '. El caso permanece abierto en “' . $payload['pending_admin_state'] . '”.', $actor['name'], $actor['employee_id']);
+      $this->repo->audit($ticketId, 'Acta de satisfacción #' . $id . ' editada. Se invalidaron códigos anteriores y se solicitó nueva firma de ' . htmlspecialchars($payload['signer']['name'], ENT_QUOTES, 'UTF-8') . '. El caso permanece abierto en “' . $payload['pending_admin_state'] . '”.' . $this->customDestinationNote($payload), $actor['name'], $actor['employee_id']);
       return $this->repo->act($id);
     });
     try { return $this->notify($act, false, true); }
@@ -918,12 +918,16 @@ final class CompletionService
     if ($channels === ['both']) { $channels = ['email', 'whatsapp']; }
     if (!is_array($channels) || !$channels || array_diff($channels, ['email', 'whatsapp'])) { throw new \DomainException('Selecciona correo, WhatsApp o ambos.'); }
     $channels = array_values(array_unique($channels));
+    $destination = CompletionPolicy::signerDestination($input, $contact);
     foreach ($channels as $channel) {
-      if (($channel === 'email' && !filter_var($contact['email'], FILTER_VALIDATE_EMAIL)) || ($channel === 'whatsapp' && $contact['phone'] === '')) {
+      if (($channel === 'email' && $destination['email'] === '') || ($channel === 'whatsapp' && $destination['phone'] === '')) {
         throw new \DomainException($channel === 'whatsapp'
-          ? 'El firmante no tiene celular registrado para WhatsApp. Elige "Solo correo" o registra el celular.'
-          : 'El firmante no tiene un correo válido. Elige "Solo WhatsApp" o registra el correo.');
+          ? 'Falta el WhatsApp para recibir la firma. Elige "Solo correo" o escribe el celular.'
+          : 'Falta el correo para recibir la firma. Elige "Solo WhatsApp" o escribe el correo.');
       }
+    }
+    if ($this->verificationChannels($destination) === []) {
+      throw new \DomainException('Indica un correo o WhatsApp válido para que el firmante reciba su código de verificación.');
     }
     $signerName = CompletionPolicy::text($input['signer_name'] ?? '', 'nombre de quien firma', 160);
     $items = CompletionPolicy::items($input['items'] ?? null);
@@ -964,7 +968,7 @@ final class CompletionService
       'property' => (string) ($ticket['inmueble'] ?? ''), 'address' => (string) ($ticket['direccion'] ?? ''),
       'contract' => (string) ($ticket['contrato'] ?? ''), 'executor' => $executor, 'pending_admin_state' => $pendingAdminState,
       'items' => $items, 'observations' => $observations, 'created_at' => $createdAt,
-      'signer' => ['role' => $role, 'name' => $signerName, 'contact_name' => $contact['name'], 'email' => $contact['email'], 'phone' => $contact['phone']],
+      'signer' => ['role' => $role, 'name' => $signerName, 'contact_name' => $contact['name'], 'email' => $destination['email'], 'phone' => $destination['phone'], 'custom_email' => $destination['custom_email'], 'custom_phone' => $destination['custom_phone']],
       'actor' => $actor, 'contacts' => $context['contacts'],
       'source' => $source,
       'property_meta' => $propertyMeta,
@@ -985,6 +989,18 @@ final class CompletionService
         'fecha_ticket' => (string) ($ticket['fecha'] ?? ''),
       ],
     ];
+  }
+
+  /** Deja constancia en el historial, con el dato enmascarado, de que el envío no fue al contacto registrado. */
+  private function customDestinationNote(array $payload): string
+  {
+    $signer = (array) ($payload['signer'] ?? []);
+    $labels = $this->verificationChannels($signer);
+    $parts = array_filter([
+      !empty($signer['custom_email']) ? ($labels['email'] ?? 'correo retirado') : '',
+      !empty($signer['custom_phone']) ? ($labels['whatsapp'] ?? 'WhatsApp retirado') : '',
+    ]);
+    return $parts ? ' Envío a un contacto distinto al registrado, solo para esta acta (' . htmlspecialchars(implode('; ', $parts), ENT_QUOTES, 'UTF-8') . ').' : '';
   }
 
   /** @return array{flow:string,quote_id:string} */

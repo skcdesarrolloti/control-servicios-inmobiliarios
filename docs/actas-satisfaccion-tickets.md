@@ -6,9 +6,12 @@ Desde **Ver caso → Acta de solución y firma**, el funcionario indica quién r
 la solución (inmobiliaria, propietario, arrendatario o copropiedad), registra uno o varios pares
 daño/solución y las observaciones, y selecciona quién firma. Ejecutor y firmante
 pueden ser diferentes. Los contactos se obtienen del ticket; para copropiedad se usa
-también su registro relacionado por `_ID`. No se acepta un correo arbitrario
-desde el formulario. Para personas jurídicas se indica el nombre del representante
-que firmará en el correo registrado.
+también su registro relacionado por `_ID`. El funcionario puede cambiar el correo y
+el WhatsApp de envío solo para esa acta: se guardan en el `payload` del acta
+(`signer.email`, `signer.phone`, `signer.custom_email`, `signer.custom_phone`), no
+modifican el ticket ni los datos registrados de la persona y el cambio queda en el
+historial del caso con el dato enmascarado. Para personas jurídicas se indica el
+nombre del representante que firmará.
 
 El tipo de inmueble del acta se toma primero del contrato relacionado. Si está
 vacío, se consulta la ficha del inmueble web mediante `id_inmueble_data` o el
@@ -88,10 +91,11 @@ a `jet_cct_actas_de_satisfaccion`: esa CCT continúa siendo el hito final creado
 al firmar. Tampoco se requiere una tabla adicional para fotos ni una migración nueva.
 
 El funcionario selecciona **Correo, WhatsApp o ambos** para la invitación y la
-copia firmada. No se aceptan contactos arbitrarios desde el formulario.
+copia firmada. El código de verificación solo se envía al contacto guardado en el acta
+(registrado o cambiado para esa acta); la persona firmante no puede cambiarlo.
 
 La persona abre `public/ticket-acta.php` con su enlace personal, revisa el documento,
-solicita un código al contacto registrado, escribe nombre y documento, dibuja la
+solicita un código al contacto del acta, escribe nombre y documento, dibuja la
 firma con el dedo/mouse y acepta expresamente. Hay alternativa de teclado:
 Espacio inicia/finaliza el trazo, y las flechas dibujan. El enlace permite leer el
 documento; por sí solo **no permite firmar**. No debe compartirse.
