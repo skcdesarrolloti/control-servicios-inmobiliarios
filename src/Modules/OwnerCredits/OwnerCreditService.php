@@ -1339,6 +1339,20 @@ final class OwnerCreditService
     return $credit;
   }
 
+  /**
+   * Lo que falta atender en créditos, para las alertas y el calendario: solicitudes sin decidir y créditos con la
+   * respuesta enviada que no se han ingresado a contabilidad, los más antiguos primero.
+   * @return array{requests:list<array<string,mixed>>,accounting:list<array<string,mixed>>}
+   */
+  public function pendingAttention(): array
+  {
+    $this->ensureSchema();
+    return [
+      'requests' => $this->db->getResults("SELECT * FROM `{$this->table()}` WHERE `status` = 'pendiente' ORDER BY `created_at`, `id` LIMIT 500"),
+      'accounting' => $this->db->getResults("SELECT * FROM `{$this->table()}` WHERE `status` IN ('aprobado', 'pagado') AND `response_sent_at` > 0 AND (`accounting_at` IS NULL OR `accounting_at` = 0) ORDER BY `response_sent_at`, `id` LIMIT 500"),
+    ];
+  }
+
   /** Ya se le envió la respuesta al propietario y falta registrarlo en contabilidad. */
   public static function accountingPending(array $credit): bool
   {

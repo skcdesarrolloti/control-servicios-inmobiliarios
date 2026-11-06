@@ -399,6 +399,62 @@ trait HandlesOwnerCredits
     }
   }
 
+  /**
+   * Grupos de la alerta de créditos, según las alertas marcadas para el cargo.
+   * @param list<string> $keys @return list<array<string,mixed>>
+   */
+  private function ownerCreditAlertGroups(array $keys): array
+  {
+    $pending = $this->ownerCreditService()->pendingAttention();
+    $age = static function (int $ts): string {
+      $days = max(0, (int) floor((time() - $ts) / 86400));
+      return $days === 0 ? 'Hoy' : 'Hace ' . $days . ' día' . ($days === 1 ? '' : 's');
+    };
+    $where = static fn(array $row): string => 'Contrato #' . $row['contract_code'] . ((string) $row['property'] !== '' ? ' · Inmueble ' . $row['property'] : '');
+    $money = static fn($value): string => '$' . number_format((float) $value, 0, ',', '.');
+    $groups = [];
+    if (in_array('credito_solicitudes', $keys, true) && $pending['requests'] !== []) {
+      $groups[] = ['key' => 'credito_solicitudes', 'label' => 'Solicitudes de crédito', 'hint' => 'Sin aprobar ni rechazar', 'icon' => 'request_quote', 'count' => count($pending['requests']), 'rows' => array_map(static fn(array $row): array => [
+        'date' => date('d/m/Y', (int) $row['created_at']), 'title' => 'Crédito #' . $row['id'] . ' · ' . $row['owner_name'],
+        'meta' => $money($row['requested_amount']) . ((int) $row['requested_term'] > 0 ? ' a ' . (int) $row['requested_term'] . ' meses' : '') . ' · ' . $row['purpose'] . ' · ' . $where($row),
+        'badge' => $age((int) $row['created_at']), 'action' => ['type' => 'owner_credit_open', 'id' => (int) $row['id']], 'button' => 'Ver solicitud',
+      ], $pending['requests'])];
+    }
+    if (in_array('credito_contabilidad', $keys, true) && $pending['accounting'] !== []) {
+      $groups[] = ['key' => 'credito_contabilidad', 'label' => 'Créditos sin ingresar a contabilidad', 'hint' => 'Con la respuesta ya enviada', 'icon' => 'account_balance', 'count' => count($pending['accounting']), 'rows' => array_map(static fn(array $row): array => [
+        'date' => date('d/m/Y', (int) $row['response_sent_at']), 'title' => 'Crédito #' . $row['id'] . ' · ' . $row['owner_name'],
+        'meta' => $money($row['approved_amount']) . ' a ' . (int) $row['approved_term'] . ' meses · ' . $where($row),
+        'badge' => $age((int) $row['response_sent_at']), 'action' => ['type' => 'owner_credit_detail', 'id' => (int) $row['id']], 'button' => 'Ver crédito',
+      ], $pending['accounting'])];
+    }
+    return $groups;
+  }
+
+  /** Vencimientos de créditos para el calendario: las mismas filas de la alerta, con su plazo. @return list<array<string,mixed>> */
+  private function adminDueOwnerCreditItems(array $settings, int $fromTs, int $toTs): array
+  {
+    $pending = $this->ownerCreditService()->pendingAttention();
+    $items = [];
+    $add = function (array $row, string $type, string $group, string $color, int $baseTs, int $days, string $title, string $description, string $view) use (&$items, $fromTs, $toTs): void {
+      if ($baseTs <= 0) return;
+      $dueTs = (int) strtotime('+' . $days . ' days', (int) strtotime(date('Y-m-d 00:00:00', $baseTs)));
+      $calendarTs = $this->adminDueCalendarPlacementTimestamp($dueTs, $fromTs, $toTs);
+      if ($calendarTs <= 0) return;
+      $items[] = $this->adminDueEvent(['id' => $type . '-' . $row['id'], 'type' => $type, 'group' => $group, 'title' => $title, 'description' => $description, 'color' => $color,
+        'base_ts' => $baseTs, 'due_ts' => $dueTs, 'calendar_ts' => $calendarTs, 'days_limit' => $days, 'case' => ['owner_credit_id' => (string) (int) $row['id'], 'owner_credit_view' => $view]]);
+    };
+    $money = static fn($value): string => '$' . number_format((float) $value, 0, ',', '.');
+    foreach ($pending['requests'] as $row) {
+      $add($row, 'credito_solicitud_pendiente', 'Solicitudes de crédito', '#4f46e5', (int) $row['created_at'], (int) $settings['creditos_solicitud_dias'],
+        'Crédito #' . $row['id'] . ' sin decidir · ' . $row['owner_name'], 'Solicitud por ' . $money($row['requested_amount']) . ', contrato #' . $row['contract_code'] . '. Vence ' . (int) $settings['creditos_solicitud_dias'] . ' día(s) después de la solicitud.', 'open');
+    }
+    foreach ($pending['accounting'] as $row) {
+      $add($row, 'credito_contabilidad_pendiente', 'Créditos sin ingresar a contabilidad', '#059669', (int) $row['response_sent_at'], (int) $settings['creditos_contabilidad_dias'],
+        'Crédito #' . $row['id'] . ' sin ingresar a contabilidad · ' . $row['owner_name'], 'Aprobado por ' . $money($row['approved_amount']) . ', contrato #' . $row['contract_code'] . '. Vence ' . (int) $settings['creditos_contabilidad_dias'] . ' día(s) después de enviar la respuesta.', 'detail');
+    }
+    return $items;
+  }
+
   /** Condiciones, documentos y contabilidad de un crédito aprobado, sin abrir el liquidador. */
   public function ajax_handler_owner_credit_detail(): void
   {

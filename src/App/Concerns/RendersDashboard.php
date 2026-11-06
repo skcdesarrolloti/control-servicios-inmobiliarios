@@ -557,6 +557,7 @@ trait RendersDashboard
         'public_services_liquidator_generate' => self::AJAX_PUBLIC_SERVICES_LIQUIDATOR_GENERATE,
         'reportes_administrativos_pendientes' => self::AJAX_REPORTES_ADMINISTRATIVOS_PENDIENTES,
         'admin_due_calendar' => self::AJAX_ADMIN_DUE_CALENDAR,
+        'dashboard_alerts' => self::AJAX_DASHBOARD_ALERTS,
         'admin_due_case' => self::AJAX_ADMIN_DUE_CASE,
         'admin_due_settings_save' => self::AJAX_ADMIN_DUE_SETTINGS_SAVE,
         'contratos_arrendamiento' => self::AJAX_CONTRATOS_ARRENDAMIENTO,
@@ -709,6 +710,7 @@ trait RendersDashboard
         'enabled' => $this->shouldShowAdminDuePopup(),
         'cargoIds' => $adminDuePopupCargoIds,
       ],
+      'alertPopup' => ['enabled' => $this->dashboardAlertKeysForCurrentCargo() !== []],
       'session' => [
         'loginUrl' => rtrim((string) SCM_BASE_URL, '/') . '/login.php',
         'idleTimeoutSeconds' => defined('SCM_SESSION_IDLE_TIMEOUT') ? (int) SCM_SESSION_IDLE_TIMEOUT : 7200,
@@ -1999,13 +2001,6 @@ trait RendersDashboard
         $selectedEmployeeCargoIds[$cargoId] = true;
       }
     }
-    $selectedAdminDuePopupCargoIds = [];
-    foreach ($adminDuePopupCargoIds as $cargoId) {
-      $cargoId = trim((string) $cargoId);
-      if ($cargoId !== '') {
-        $selectedAdminDuePopupCargoIds[$cargoId] = true;
-      }
-    }
     $allActionKeys = [];
     $cargoIds = array_values(array_filter(array_map(static fn(array $cargo): string => trim((string) ($cargo['id'] ?? '')), $cargos)));
     $selectedPermissionCargo = in_array(Auth::userCargo(), $cargoIds, true) ? Auth::userCargo() : ($cargoIds[0] ?? '');
@@ -2056,7 +2051,7 @@ trait RendersDashboard
             </aside>
 
             <div class="scm-perm-main">
-              <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; $cargoName = trim((string) ($cargo['name'] ?? ($cargo['label'] ?? ''))); $cargoName = $cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId); $cargoTotal = trim((string) ($cargo['total'] ?? '')); $isSelectedCargo = isset($selectedEmployeeCargoIds[$cargoId]); $isSelectedPopupCargo = isset($selectedAdminDuePopupCargoIds[$cargoId]); ?>
+              <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; $cargoName = trim((string) ($cargo['name'] ?? ($cargo['label'] ?? ''))); $cargoName = $cargoName !== '' ? $cargoName : ('Cargo ' . $cargoId); $cargoTotal = trim((string) ($cargo['total'] ?? '')); $isSelectedCargo = isset($selectedEmployeeCargoIds[$cargoId]); ?>
                 <header class="scm-perm-cargo-head" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
                   <div>
                     <h4><?php echo esc_html($cargoName); ?></h4>
@@ -2066,10 +2061,6 @@ trait RendersDashboard
                     <label class="scm-permissions-check scm-perm-switch scm-funcionario-cargo-check<?php echo $isSelectedCargo ? ' is-checked' : ''; ?>" title="Aparece en filtros de funcionario, traslados, calendario, responsables y notificaciones internas. No cambia permisos de acceso.">
                       <input type="checkbox" name="employee_cargo_ids[]" value="<?php echo esc_attr($cargoId); ?>" <?php checked($isSelectedCargo); ?>>
                       <span><b>Funcionario operativo</b><small>Visible en filtros, traslados y responsables</small></span>
-                    </label>
-                    <label class="scm-permissions-check scm-perm-switch scm-due-popup-cargo-check<?php echo $isSelectedPopupCargo ? ' is-checked' : ''; ?>" title="Muestra el aviso de vencimientos administrativos al entrar al panel.">
-                      <input type="checkbox" name="admin_due_popup_cargo_ids[]" value="<?php echo esc_attr($cargoId); ?>" <?php checked($isSelectedPopupCargo); ?>>
-                      <span><b>Popup de vencimientos</b><small>Aviso al entrar al panel</small></span>
                     </label>
                   </div>
                 </header>
@@ -2085,6 +2076,9 @@ trait RendersDashboard
                       <span class="material-symbols-outlined" aria-hidden="true">smart_button</span>Acciones <em data-scm-perm-pane-count="actions"></em>
                     </button>
                   <?php endif; ?>
+                  <button type="button" role="tab" class="scm-perm-pane-btn" aria-selected="false" data-scm-perm-pane="alerts">
+                    <span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>Alertas <em data-scm-perm-pane-count="alerts"></em>
+                  </button>
                 </div>
                 <label class="scm-perm-search scm-perm-filter">
                   <span class="material-symbols-outlined" aria-hidden="true">filter_list</span>
@@ -2145,6 +2139,31 @@ trait RendersDashboard
                   <?php endforeach; ?>
                 </div>
               <?php endif; ?>
+              <div class="scm-perm-pane" data-scm-perm-pane-body="alerts" hidden>
+                <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowedAlerts = $this->dashboardAlertPermissions()[$cargoId] ?? []; ?>
+                  <section class="scm-permission-card scm-permission-action-card" data-scm-perm-kind="alerts" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
+                    <div class="scm-permission-card-head">
+                      <p>Popups que ver&aacute; este cargo al entrar a Inicio, para que no se le olvide hacer algo. <span data-scm-perm-card-count></span></p>
+                      <button type="button" class="scm-permission-select-all" data-scm-perm-all="<?php echo esc_attr($cargoId); ?>">Marcar todo</button>
+                    </div>
+                    <div class="scm-permission-options">
+                      <?php foreach ($this->dashboardAlertCatalog() as $alertGroup): ?>
+                        <div class="scm-permissions-option-group" data-scm-perm-group>
+                          <div class="scm-permissions-option-group-title"><span><?php echo esc_html($alertGroup['label']); ?></span><button type="button" class="scm-perm-group-toggle" data-scm-perm-group-all>Marcar grupo</button></div>
+                          <div class="scm-permissions-option-group-grid">
+                            <?php foreach ($alertGroup['items'] as $alertKey => $alertItem): $isDueAlert = $alertKey === self::ALERT_ADMIN_DUE; $isChecked = $isDueAlert ? in_array($cargoId, $adminDuePopupCargoIds, true) : in_array($alertKey, $allowedAlerts, true); ?>
+                              <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>" title="<?php echo esc_attr($alertItem['hint']); ?>">
+                                <input type="checkbox" name="<?php echo $isDueAlert ? 'admin_due_popup_cargo_ids[]' : 'alert_permissions[' . esc_attr($cargoId) . '][]'; ?>" value="<?php echo esc_attr($isDueAlert ? $cargoId : $alertKey); ?>" <?php checked($isChecked); ?>>
+                                <span><?php echo esc_html($alertItem['label']); ?><small class="scm-permissions-check-hint"><?php echo esc_html($alertItem['hint']); ?></small></span>
+                              </label>
+                            <?php endforeach; ?>
+                          </div>
+                        </div>
+                      <?php endforeach; ?>
+                    </div>
+                  </section>
+                <?php endforeach; ?>
+              </div>
               <p class="scm-perm-empty" data-scm-perm-filter-empty hidden>Ning&uacute;n permiso coincide con el filtro.</p>
             </div>
           </div>
@@ -2893,6 +2912,8 @@ trait RendersDashboard
             <label class="scm-calendar-due-chip scm-calendar-due-chip--no-prorroga-contrato"><input type="checkbox" name="due_type" value="no_prorroga_contrato_pendiente" checked><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><strong>No prórroga de contrato</strong></label>
             <label class="scm-calendar-due-chip scm-calendar-due-chip--cotizacion-sin-enviar"><input type="checkbox" name="due_type" value="orden_mantenimiento_sin_respuesta" checked><span class="material-symbols-outlined" aria-hidden="true">engineering</span><strong>Órdenes sin respuesta</strong></label>
             <label class="scm-calendar-due-chip scm-calendar-due-chip--ticket-preventiva-sin-cita"><input type="checkbox" name="due_type" value="contrato_anexos_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">forward_to_inbox</span><strong>Contratos sin enviar</strong></label>
+            <label class="scm-calendar-due-chip scm-calendar-due-chip--preventiva-cita-sin-realizar"><input type="checkbox" name="due_type" value="credito_solicitud_pendiente" checked><span class="material-symbols-outlined" aria-hidden="true">request_quote</span><span>Solicitudes de cr&eacute;dito</span></label>
+            <label class="scm-calendar-due-chip scm-calendar-due-chip--ticket-preventiva-sin-cita"><input type="checkbox" name="due_type" value="credito_contabilidad_pendiente" checked><span class="material-symbols-outlined" aria-hidden="true">account_balance</span><span>Cr&eacute;ditos sin contabilidad</span></label>
           </form>
         </section>
       <?php endif; ?>

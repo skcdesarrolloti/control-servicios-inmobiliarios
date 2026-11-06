@@ -80,6 +80,9 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_PUBLIC_SERVICES_LIQUIDATOR_GENERATE = 'scm_liquidador_servicios_publicos_generar';
   const AJAX_REPORTES_ADMINISTRATIVOS_PENDIENTES = 'scm_reportes_administrativos_pendientes';
   const AJAX_ADMIN_DUE_CALENDAR = 'scm_admin_due_calendar';
+  const AJAX_DASHBOARD_ALERTS = 'scm_dashboard_alerts';
+  /** Alerta que ya existía: conserva su propio ajuste (`admin_due_popup_cargo_ids`) y su popup. */
+  const ALERT_ADMIN_DUE = 'admin_due';
   const AJAX_ADMIN_DUE_CASE = 'scm_admin_due_case';
   const AJAX_ADMIN_DUE_SETTINGS_SAVE = 'scm_admin_due_settings_save';
   const AJAX_CONTRATOS_ARRENDAMIENTO = 'scm_contratos_arrendamiento';
@@ -1124,6 +1127,53 @@ final class SuCasaControlServiciosInmobiliarios
     }
     ksort($out);
     return $out;
+  }
+
+  /**
+   * Alertas que se activan por cargo en Permisos por cargo › Alertas. Para crear una: agrégala aquí y devuelve sus grupos
+   * en ajax_handler_dashboard_alerts. Nacen apagadas: cada cargo las activa.
+   * @return list<array{label:string,items:array<string,array{label:string,hint:string}>}>
+   */
+  private function dashboardAlertCatalog(): array
+  {
+    return [
+      ['label' => 'Inicio', 'items' => [
+        self::ALERT_ADMIN_DUE => ['label' => 'Vencimientos administrativos', 'hint' => 'Popup al entrar al panel. Requiere ver cotizaciones o preventivas.'],
+      ]],
+      ['label' => 'Créditos a propietarios', 'items' => [
+        'credito_solicitudes' => ['label' => 'Solicitudes de crédito', 'hint' => 'Solicitudes sin aprobar ni rechazar. Requiere ver Créditos a propietarios.'],
+        'credito_contabilidad' => ['label' => 'Créditos sin ingresar a contabilidad', 'hint' => 'Créditos con la respuesta enviada y sin marcar. Requiere ver Créditos a propietarios.'],
+      ]],
+    ];
+  }
+
+  /** @return array<string,list<string>> cargo => alertas activas */
+  private function dashboardAlertPermissions(): array
+  {
+    return $this->sanitizeDashboardAlertPermissions(\SCM\Core\App::settings()->get('dashboard_alert_permissions', []));
+  }
+
+  /** @param mixed $raw @return array<string,list<string>> */
+  private function sanitizeDashboardAlertPermissions($raw): array
+  {
+    $keys = [];
+    foreach ($this->dashboardAlertCatalog() as $group) $keys += $group['items'];
+    unset($keys[self::ALERT_ADMIN_DUE]);
+    $cargos = array_flip(array_map(static fn(array $cargo): string => trim((string) ($cargo['id'] ?? '')), $this->getDashboardCargoOptions()));
+    $clean = [];
+    foreach (is_array($raw) ? $raw : [] as $cargo => $selected) {
+      $cargo = trim((string) $cargo);
+      if (!isset($cargos[$cargo]) || !is_array($selected)) continue;
+      $clean[$cargo] = array_values(array_unique(array_filter(array_map('strval', $selected), static fn(string $key): bool => isset($keys[$key]))));
+    }
+    ksort($clean);
+    return $clean;
+  }
+
+  /** @return list<string> */
+  private function dashboardAlertKeysForCurrentCargo(): array
+  {
+    return $this->dashboardAlertPermissions()[trim((string) Auth::userCargo())] ?? [];
   }
 
   /** @return array<int,string> */

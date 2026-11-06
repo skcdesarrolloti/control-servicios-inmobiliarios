@@ -405,6 +405,16 @@ trait HandlesTicketWorkflowActions
       }
       $adminDuePopupCargoIds = $this->sanitizeAdminDuePopupCargoIds($decodedDuePopupCargoIds);
     }
+    $alertPermissions = $this->dashboardAlertPermissions();
+    if (array_key_exists('alert_permissions', $_POST)) {
+      try {
+        $decodedAlerts = json_decode(stripslashes((string) ($_POST['alert_permissions'] ?? '{}')), true, 512, JSON_THROW_ON_ERROR);
+      } catch (\JsonException $exception) {
+        $this->jsonFail('Las alertas por cargo no son validas.');
+        return;
+      }
+      $alertPermissions = $this->sanitizeDashboardAlertPermissions($decodedAlerts);
+    }
 
     \SCM\Core\App::settings()->set('dashboard_tab_permissions', $permissions, Auth::userId());
     // Desde aquí las pestañas guardadas ya usan las opciones separadas del menú (sin traducir el formato anterior).
@@ -422,6 +432,7 @@ trait HandlesTicketWorkflowActions
     }
     \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
     \SCM\Core\App::settings()->set('admin_due_popup_cargo_ids', $adminDuePopupCargoIds, Auth::userId());
+    \SCM\Core\App::settings()->set('dashboard_alert_permissions', $alertPermissions, Auth::userId());
     \SCM\Core\App::settings()->refresh();
     $this->clearDashboardPerformanceCache('dashboard-filter-options-v4');
     $this->clearDashboardPerformanceCache('dashboard-filter-options-v5');
@@ -1905,6 +1916,23 @@ trait HandlesTicketWorkflowActions
     ]);
   }
 
+  /** Alertas del cargo actual para el popup de Inicio. Cada alerta nueva agrega aquí sus grupos. */
+  public function ajax_handler_dashboard_alerts(): void
+  {
+    $this->verifyCsrf();
+    try {
+      $keys = $this->dashboardAlertKeysForCurrentCargo();
+      $groups = [];
+      if (array_intersect(['credito_solicitudes', 'credito_contabilidad'], $keys) !== [] && $this->canAccessDashboardTab('credito_propietario')) {
+        $groups = array_merge($groups, $this->ownerCreditAlertGroups($keys));
+      }
+      $this->jsonOk(['groups' => $groups]);
+    } catch (\Throwable $error) {
+      error_log('[dashboard-alerts] ' . $error->getMessage());
+      $this->jsonFail('No se pudieron cargar las alertas.');
+    }
+  }
+
   public function ajax_handler_admin_due_calendar(): void
   {
     $this->verifyCsrf();
@@ -1916,6 +1944,7 @@ trait HandlesTicketWorkflowActions
       && !$this->canAccessDashboardTab('vencimientos')
       && !$this->canAccessDashboardTab('ordenes_mantenimiento')
       && !$this->canAccessDashboardTab('contratos_arrendamiento')
+      && !$this->canAccessDashboardTab('credito_propietario')
       && !$this->canUseDashboardAction('case_respond')
     ) {
       $this->jsonFail('No tienes permiso para ver vencimientos administrativos.');
@@ -2037,6 +2066,8 @@ trait HandlesTicketWorkflowActions
       'no_prorroga_contrato_dias' => $this->adminDueDaysFromPost('no_prorroga_contrato_dias', 3, 1, 120),
       'ordenes_sin_respuesta_dias' => $this->adminDueDaysFromPost('ordenes_sin_respuesta_dias', 3, 1, 120),
       'contratos_anexos_sin_enviar_dias' => $this->adminDueDaysFromPost('contratos_anexos_sin_enviar_dias', 3, 1, 120),
+      'creditos_solicitud_dias' => $this->adminDueDaysFromPost('creditos_solicitud_dias', 3, 1, 120),
+      'creditos_contabilidad_dias' => $this->adminDueDaysFromPost('creditos_contabilidad_dias', 3, 1, 120),
       'casos_mantenimiento_actualizacion_dias' => $this->adminDueDaysFromPost('casos_mantenimiento_actualizacion_dias', 7, 1, 120),
       'casos_preventiva_actualizacion_dias' => $this->adminDueDaysFromPost('casos_preventiva_actualizacion_dias', 5, 1, 120),
     ];
@@ -2067,6 +2098,8 @@ trait HandlesTicketWorkflowActions
       'no_prorroga_contrato_dias' => 3,
       'ordenes_sin_respuesta_dias' => 3,
       'contratos_anexos_sin_enviar_dias' => 3,
+      'creditos_solicitud_dias' => 3,
+      'creditos_contabilidad_dias' => 3,
       'casos_mantenimiento_actualizacion_dias' => 7,
       'casos_preventiva_actualizacion_dias' => 5,
     ];
@@ -2091,6 +2124,8 @@ trait HandlesTicketWorkflowActions
       'no_prorroga_contrato_dias' => $this->adminDueClampDays($stored['no_prorroga_contrato_dias'] ?? $defaults['no_prorroga_contrato_dias'], 1, 120, $defaults['no_prorroga_contrato_dias']),
       'ordenes_sin_respuesta_dias' => $this->adminDueClampDays($stored['ordenes_sin_respuesta_dias'] ?? $defaults['ordenes_sin_respuesta_dias'], 1, 120, $defaults['ordenes_sin_respuesta_dias']),
       'contratos_anexos_sin_enviar_dias' => $this->adminDueClampDays($stored['contratos_anexos_sin_enviar_dias'] ?? $defaults['contratos_anexos_sin_enviar_dias'], 1, 120, $defaults['contratos_anexos_sin_enviar_dias']),
+      'creditos_solicitud_dias' => $this->adminDueClampDays($stored['creditos_solicitud_dias'] ?? $defaults['creditos_solicitud_dias'], 1, 120, $defaults['creditos_solicitud_dias']),
+      'creditos_contabilidad_dias' => $this->adminDueClampDays($stored['creditos_contabilidad_dias'] ?? $defaults['creditos_contabilidad_dias'], 1, 120, $defaults['creditos_contabilidad_dias']),
       'casos_mantenimiento_actualizacion_dias' => $this->adminDueClampDays($stored['casos_mantenimiento_actualizacion_dias'] ?? $defaults['casos_mantenimiento_actualizacion_dias'], 1, 120, $defaults['casos_mantenimiento_actualizacion_dias']),
       'casos_preventiva_actualizacion_dias' => $this->adminDueClampDays($stored['casos_preventiva_actualizacion_dias'] ?? $defaults['casos_preventiva_actualizacion_dias'], 1, 120, $defaults['casos_preventiva_actualizacion_dias']),
     ];
@@ -2167,6 +2202,9 @@ trait HandlesTicketWorkflowActions
     }
     if ($this->canAccessDashboardTab('contratos_arrendamiento')) {
       $items = array_merge($items, $this->adminDueLeaseAnnexItems($settings, $fromTs, $toTs));
+    }
+    if ($this->canAccessDashboardTab('credito_propietario')) {
+      $items = array_merge($items, $this->adminDueOwnerCreditItems($settings, $fromTs, $toTs));
     }
 
     usort($items, static function (array $a, array $b): int {

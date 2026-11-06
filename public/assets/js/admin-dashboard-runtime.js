@@ -210,6 +210,7 @@
       actions.contrato_ultima_preventiva || "";
     var actionPreventivasPendientes = actions.preventivas_pendientes || "";
     var actionAdminDueCalendar = actions.admin_due_calendar || "";
+    var actionDashboardAlerts = actions.dashboard_alerts || "";
     var actionAdminDueCase = actions.admin_due_case || "";
     var actionAdminDueSettingsSave = actions.admin_due_settings_save || "";
     var actionActasSatisfaccion = actions.actas_satisfaccion || "";
@@ -316,6 +317,9 @@
     var dashboardDuePopupShown = {};
     var dashboardDuePopupPromise = null;
     var dashboardDuePopupRestoreAfterCase = false;
+    var alertPopupConfig = runtime.alertPopup || {};
+    var dashboardAlertsShown = {};
+    var dashboardDueActionTaken = false;
     var funcionarioBridgeMode = false;
     try {
       var initialBridgeParams = new URL(window.location.href).searchParams;
@@ -616,6 +620,8 @@
       if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
       if (type === "orden_mantenimiento_sin_respuesta") return "Órdenes de mantenimiento sin respuesta";
       if (type === "contrato_anexos_sin_enviar") return "Contratos de arrendamiento sin enviar";
+      if (type === "credito_solicitud_pendiente") return "Solicitudes de crédito";
+      if (type === "credito_contabilidad_pendiente") return "Créditos sin ingresar a contabilidad";
       return type || "Vencimientos";
     }
 
@@ -1153,6 +1159,10 @@
       { title: "Órdenes de mantenimiento", icon: "engineering", fields: [
         { name: "ordenes_sin_respuesta_dias", label: "Órdenes sin respuesta", note: "Días calendario desde la creación de la orden para aprobarla o desaprobarla.", min: 1, max: 120, fallback: 3 },
       ] },
+      { title: "Créditos a propietarios", icon: "request_quote", fields: [
+        { name: "creditos_solicitud_dias", label: "Solicitudes de crédito", note: "Días calendario desde la solicitud para aprobarla o rechazarla.", min: 1, max: 120, fallback: 3 },
+        { name: "creditos_contabilidad_dias", label: "Ingreso a contabilidad", note: "Días calendario desde el envío de la respuesta para ingresarlo a contabilidad.", min: 1, max: 120, fallback: 3 },
+      ] },
     ];
 
     function standaloneDueSettingsModalHtml(settings) {
@@ -1243,6 +1253,100 @@
         });
     }
 
+    // Popup de alertas por cargo (Permisos por cargo › Alertas): grupos que devuelve el servidor, cada uno con sus filas.
+    function dashboardAlertActionHtml(row) {
+      var ui = DUE_POPUP_UI;
+      var action = row && row.action ? row.action : {};
+      var id = escHtml(String(action.id || ""));
+      var label = escHtml(row.button || "Ver");
+      if (action.type === "owner_credit_open") return '<button type="button" class="' + ui.secondary + '" data-owner-credit-open data-credit-id="' + id + '">' + label + "</button>";
+      if (action.type === "owner_credit_detail") return '<button type="button" class="' + ui.secondary + '" data-owner-credit-detail data-credit-id="' + id + '">' + label + "</button>";
+      return "";
+    }
+
+    function dashboardAlertsPopupHtml(groups) {
+      var ui = DUE_POPUP_UI;
+      var total = groups.reduce(function (sum, group) { return sum + Number(group.count || 0); }, 0);
+      var cards = groups.map(function (group) {
+        return '<div class="' + ui.card + ' !sp-p-4 !sp-flex !sp-items-start !sp-justify-between !sp-gap-3">' +
+          '<div><span class="' + ui.label + ' !sp-text-service-muted">' + escHtml(group.label || "Alerta") + '</span><strong class="!sp-block !sp-mt-2 !sp-text-3xl !sp-font-extrabold !sp-text-rose-600">' + escHtml(String(group.count || 0)) + '</strong><small class="!sp-block !sp-mt-1 !sp-text-[11px] !sp-text-service-muted">' + escHtml(group.hint || "") + "</small></div>" +
+          '<span class="material-symbols-outlined !sp-p-2 !sp-rounded-lg !sp-bg-rose-50 !sp-text-rose-600" aria-hidden="true">' + escHtml(group.icon || "notifications") + "</span></div>";
+      }).join("");
+      var sections = groups.map(function (group) {
+        var rows = Array.isArray(group.rows) ? group.rows : [];
+        var list = rows.slice(0, 18).map(function (row) {
+          return '<div data-scm-alert-row class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[110px_minmax(0,1fr)_auto_auto] !sp-items-center !sp-gap-3 !sp-px-4 !sp-py-3 !sp-m-0 !sp-bg-white !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100">' +
+            '<strong class="!sp-inline-flex !sp-justify-center !sp-rounded-lg !sp-bg-slate-50 !sp-border !sp-border-solid !sp-border-slate-200 !sp-px-2 !sp-py-1.5 !sp-text-[11px] !sp-font-semibold !sp-text-service-navy !sp-whitespace-nowrap">' + escHtml(row.date || "-") + "</strong>" +
+            '<span class="!sp-min-w-0"><span class="!sp-block !sp-truncate !sp-text-xs !sp-font-semibold !sp-text-service-navy">' + escHtml(row.title || "") + '</span><small class="!sp-block !sp-truncate !sp-text-[11px] !sp-text-service-muted">' + escHtml(row.meta || "") + "</small></span>" +
+            '<em class="!sp-not-italic !sp-justify-self-start !sp-rounded-full !sp-px-2.5 !sp-py-1 !sp-text-[10px] !sp-font-semibold !sp-whitespace-nowrap !sp-bg-amber-50 !sp-text-amber-700">' + escHtml(row.badge || "") + "</em>" +
+            dashboardAlertActionHtml(row) + "</div>";
+        }).join("");
+        var more = rows.length > 18 ? '<p class="!sp-m-0 !sp-px-4 !sp-py-3 !sp-text-[11px] !sp-font-semibold !sp-text-amber-700">+' + escHtml(String(rows.length - 18)) + " adicionales.</p>" : "";
+        return '<section class="' + ui.card + ' !sp-overflow-hidden" data-scm-alert-group="' + escHtml(group.key || "") + '"><div class="!sp-px-4 !sp-py-3 !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><h4 class="!sp-m-0 !sp-text-sm !sp-font-bold">' + escHtml(group.label || "Alerta") + '</h4></div><div class="!sp-max-h-[292px] !sp-overflow-y-auto">' + list + "</div>" + more + "</section>";
+      }).join("");
+      return '<div class="!sp-font-sans !sp-text-service-navy !sp-text-left">' +
+        '<header class="!sp-bg-service-navy !sp-text-white !sp-px-5 !sp-py-5 sm:!sp-px-6 !sp-flex !sp-items-start !sp-justify-between !sp-gap-3">' +
+        '<div class="!sp-flex !sp-items-start !sp-gap-3"><span class="material-symbols-outlined !sp-p-2.5 !sp-rounded-xl !sp-bg-service-yellow/20 !sp-text-service-yellow" aria-hidden="true">notifications_active</span>' +
+        '<div><span class="!sp-inline-flex !sp-rounded-full !sp-bg-service-yellow/20 !sp-text-service-yellow !sp-px-3 !sp-py-1 !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide">Control preventivo · SKC SuCasa Inmobiliaria</span>' +
+        '<h3 class="!sp-m-0 !sp-mt-2 !sp-text-xl sm:!sp-text-2xl !sp-font-bold !sp-text-white">Alertas pendientes</h3>' +
+        '<p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-blue-100">' + escHtml(String(total)) + " tarea(s) por atender.</p></div></div></header>" +
+        '<div class="!sp-bg-service-background !sp-p-4 sm:!sp-p-6 !sp-space-y-5 !sp-overflow-y-auto !sp-max-h-[calc(100vh-300px)] sm:!sp-max-h-[calc(100vh-220px)]">' +
+        '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-3">' + cards + "</div>" + sections + "</div>" +
+        '<footer class="!sp-bg-white !sp-px-5 !sp-py-4 sm:!sp-px-6 !sp-flex !sp-flex-wrap !sp-justify-end !sp-gap-2 !sp-border-0 !sp-border-t !sp-border-solid !sp-border-slate-200">' +
+        '<button type="button" class="' + ui.secondary + ' !sp-px-4 !sp-py-2.5 !sp-text-xs" data-scm-dashboard-alert-close>Cerrar</button></footer></div>';
+    }
+
+    function maybeShowDashboardAlertsPopup(source) {
+      source = source || "login";
+      if (funcionarioBridgeMode || !alertPopupConfig.enabled || dashboardAlertsShown[source]) return Promise.resolve();
+      if (!shouldAutoShowDashboardDuePopup(source) || !window.Swal || !ajaxUrl || !actionDashboardAlerts) return Promise.resolve();
+      return dashboardAction(actionDashboardAlerts, {})
+        .then(function (data) {
+          var groups = data && Array.isArray(data.groups) ? data.groups : [];
+          if (!shouldAutoShowDashboardDuePopup(source) || dashboardAlertsShown[source]) return;
+          dashboardAlertsShown[source] = true;
+          if (!groups.length || window.Swal.isVisible()) return;
+          return window.Swal.fire({
+            title: "",
+            html: dashboardAlertsPopupHtml(groups),
+            target: root,
+            width: "min(1024px, 96vw)",
+            padding: 0,
+            showCloseButton: false,
+            showConfirmButton: false,
+            showCancelButton: false,
+            buttonsStyling: false,
+            customClass: { popup: "scm-due-entry-swal" },
+            didOpen: function () {
+              var popup = window.Swal.getPopup();
+              if (!popup) return;
+              popup.addEventListener("click", function (event) {
+                // Los botones del crédito los atiende admin-owner-credits.js al llegar el clic al documento.
+                if (event.target && event.target.closest && event.target.closest("[data-scm-dashboard-alert-close], [data-owner-credit-open], [data-owner-credit-detail]")) window.Swal.close();
+              });
+            },
+          });
+        })
+        .catch(function (error) {
+          console.warn("No se pudieron cargar las alertas del cargo.", error);
+        });
+    }
+
+    // Primero vencimientos y, al cerrarlo, las alertas: Swal muestra un popup a la vez. Si el funcionario fue a atender algo
+    // desde vencimientos, las alertas esperan a que vuelva a Inicio.
+    function maybeShowDashboardEntryPopups(source) {
+      dashboardDueActionTaken = false;
+      return Promise.resolve(maybeShowDashboardDuePopup(source)).then(function () {
+        if (dashboardDueActionTaken || dashboardDuePopupRestoreAfterCase) return;
+        return maybeShowDashboardAlertsPopup(source);
+      });
+    }
+
+    root.addEventListener("click", function (event) {
+      var button = event.target && event.target.closest ? event.target.closest(".scm-due-entry-swal button") : null;
+      if (button && !button.matches("[data-scm-dashboard-due-close], [data-scm-dashboard-alert-close]")) dashboardDueActionTaken = true;
+    }, true);
+
     function loadDashboardDuePopupRows() {
       if (dashboardDuePopupPromise) return dashboardDuePopupPromise;
       if (!ajaxUrl || !actionAdminDueCalendar) return Promise.resolve([]);
@@ -1290,7 +1394,10 @@
           if (!shouldAutoShowDashboardDuePopup(source) || dashboardDuePopupShown[source]) return;
           dashboardDuePopupShown[source] = true;
           payload = payload || {};
-          var rows = Array.isArray(payload.rows) ? payload.rows : [];
+          // Los créditos van en el popup de alertas, que se activa por cargo.
+          var rows = (Array.isArray(payload.rows) ? payload.rows : []).filter(function (row) {
+            return String(row.tipo_vencimiento || "").indexOf("credito_") !== 0;
+          });
           var summaryGroups = Array.isArray(payload.summaryGroups) ? payload.summaryGroups : [];
           var summaryTotal = summaryGroups.reduce(function (total, group) {
             return total + Math.max(0, Number(group && group.count ? group.count : 0));
@@ -1377,14 +1484,16 @@
       window.setTimeout(function () {
         if (root.querySelector("#scm-case-modal.open")) return;
         delete dashboardDuePopupShown["case-return"];
-        maybeShowDashboardDuePopup("case-return");
+        delete dashboardAlertsShown["case-return"];
+        maybeShowDashboardEntryPopups("case-return");
       }, 160);
     });
 
     root.addEventListener("scm:home-summary-selected", function () {
       delete dashboardDuePopupShown["home-manual"];
+      delete dashboardAlertsShown["home-manual"];
       refreshDashboardDueNavBadge();
-      maybeShowDashboardDuePopup("home-manual");
+      maybeShowDashboardEntryPopups("home-manual");
     });
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
@@ -2101,6 +2210,8 @@
           no_prorroga_contrato_pendiente: { color: "#7c3aed", bg: "#f5f3ff", text: "#6d28d9", border: "#ddd6fe" },
           orden_mantenimiento_sin_respuesta: { color: "#ea580c", bg: "#fff7ed", text: "#c2410c", border: "#fed7aa" },
           contrato_anexos_sin_enviar: { color: "#0d9488", bg: "#f0fdfa", text: "#0f766e", border: "#99f6e4" },
+          credito_solicitud_pendiente: { color: "#4f46e5", bg: "#eef2ff", text: "#4338ca", border: "#c7d2fe" },
+          credito_contabilidad_pendiente: { color: "#059669", bg: "#ecfdf5", text: "#047857", border: "#a7f3d0" },
         };
         var theme = themes[key] || { color: "#475569", bg: "#f8fafc", text: "#334155", border: "#cbd5e1" };
         if (typeof rowOrType !== "string" && rowOrType && rowOrType.color) {
@@ -2797,7 +2908,7 @@
           (Number(row.dias_vencido || 0) > 0 ? '<span>' + escHtml(String(row.dias_vencido)) + " dia(s) vencido</span>" : "") +
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
-          (caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Ver caso · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn" data-scm-open-admin-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Crear caso</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn" data-scm-open-public-services-review data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>'))) +
+          (caseData.owner_credit_id ? dueCreditButtonHtml(caseData) : caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Ver caso · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn" data-scm-open-admin-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Crear caso</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn" data-scm-open-public-services-review data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>'))) +
           '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div></div></article>";
       }
 
@@ -3688,6 +3799,8 @@
           cotizacion_enviada_sin_respuesta: 0,
           orden_mantenimiento_sin_respuesta: 0,
           contrato_anexos_sin_enviar: 0,
+          credito_solicitud_pendiente: 0,
+          credito_contabilidad_pendiente: 0,
         };
         rows.forEach(function (row) {
           var type = String(row.tipo_vencimiento || "");
@@ -3711,7 +3824,15 @@
         if (type === "cotizacion_enviada_sin_respuesta") return "Cotizaciones sin respuesta";
         if (type === "orden_mantenimiento_sin_respuesta") return "Órdenes de mantenimiento sin respuesta";
         if (type === "contrato_anexos_sin_enviar") return "Contratos de arrendamiento sin enviar";
+        if (type === "credito_solicitud_pendiente") return "Solicitudes de crédito";
+        if (type === "credito_contabilidad_pendiente") return "Créditos sin ingresar a contabilidad";
         return type || "Vencimientos";
+      }
+
+      // Botón de un vencimiento de crédito: lo atiende admin-owner-credits.js.
+      function dueCreditButtonHtml(caseData, extraClass) {
+        var attr = String(caseData.owner_credit_view || "") === "detail" ? "data-owner-credit-detail" : "data-owner-credit-open";
+        return '<button type="button" class="scm-case-work-btn' + (extraClass || "") + '" ' + attr + ' data-credit-id="' + escHtml(caseData.owner_credit_id) + '">Ver crédito</button>';
       }
 
       function renderDueBreakdown(rows) {
@@ -3738,7 +3859,7 @@
               '<strong>' + escHtml(row.fecha_vencimiento || "-") + "</strong>" +
               '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
               '<em>' + escHtml(row.estado || "Pendiente") + "</em>" +
-              (canOpen ? '<button type="button" class="scm-case-work-btn scm-calendar-due-breakdown-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : "") +
+              (caseData.owner_credit_id ? dueCreditButtonHtml(caseData, " scm-calendar-due-breakdown-case") : canOpen ? '<button type="button" class="scm-case-work-btn scm-calendar-due-breakdown-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : "") +
               '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + String(caseData.case_source_html || "") + "</div>" +
               "</div>";
           }).join("");
@@ -11667,6 +11788,16 @@
           })
           .filter(Boolean);
       }
+      function collectAlertPermissions() {
+        var alerts = {};
+        form.querySelectorAll('.scm-permission-card[data-scm-perm-kind="alerts"]').forEach(function (card) {
+          alerts[card.getAttribute("data-permission-cargo")] = Array.prototype.slice
+            .call(card.querySelectorAll('input[type="checkbox"]:checked'))
+            .filter(function (input) { return /^alert_permissions\[/.test(input.name); })
+            .map(function (input) { return String(input.value || "").trim(); });
+        });
+        return alerts;
+      }
       function collectAdminDuePopupCargoIds() {
         return Array.prototype.slice
           .call(form.querySelectorAll('input[type="checkbox"][name="admin_due_popup_cargo_ids[]"]:checked'))
@@ -11757,6 +11888,7 @@
         fd.append("action_permissions", JSON.stringify(collectActionPermissions()));
         fd.append("employee_cargo_ids", JSON.stringify(collectEmployeeCargoIds()));
         fd.append("admin_due_popup_cargo_ids", JSON.stringify(collectAdminDuePopupCargoIds()));
+        fd.append("alert_permissions", JSON.stringify(collectAlertPermissions()));
         fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
           .then(function (r) {
             return r.json();
@@ -26567,7 +26699,7 @@
           loadActiveLazyPanelWithFeedback();
           if ((tab.getAttribute("data-tab") || "") === "scm-panel-inicio") {
             refreshDashboardDueNavBadge();
-            maybeShowDashboardDuePopup("home-tab");
+            maybeShowDashboardEntryPopups("home-tab");
           }
         }, 0);
       });
@@ -26728,7 +26860,7 @@
     loadActiveLazyPanel();
     refreshDashboardDueNavBadge();
     window.setTimeout(function () {
-      maybeShowDashboardDuePopup("login");
+      maybeShowDashboardEntryPopups("login");
     }, 0);
 
     root.addEventListener("submit", function (e) {

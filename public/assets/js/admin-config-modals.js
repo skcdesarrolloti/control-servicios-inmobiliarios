@@ -44,7 +44,7 @@
         var card = form.querySelector('.scm-permission-card[data-scm-perm-kind="tabs"][data-permission-cargo="' + cardId + '"]');
         badge.textContent = card ? countLabel(checksOf(card)) + " pestañas" : "";
       });
-      ["tabs", "actions"].forEach(function (kind) {
+      ["tabs", "actions", "alerts"].forEach(function (kind) {
         var card = form.querySelector('.scm-permission-card[data-scm-perm-kind="' + kind + '"][data-permission-cargo="' + id + '"]');
         var target = form.querySelector('[data-scm-perm-pane-count="' + kind + '"]');
         if (target) target.textContent = card ? countLabel(checksOf(card)) : "";
