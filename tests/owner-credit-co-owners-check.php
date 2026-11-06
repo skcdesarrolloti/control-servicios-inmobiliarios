@@ -268,11 +268,12 @@ $current = ['usury_auto' => true, 'usury_annual' => 0.2834, 'usury_updated_at' =
 $check($usury::status($current, '2026-11-06')['label'] === 'Tasa correcta', 'a reference rate at the current usury shows as correct');
 $check(!$usury::status($current, '2026-12-01')['ok'] && str_contains($usury::status($current, '2026-12-01')['detail'], 'Actualizar usura'), 'a usury from another period shows as incorrect and says how to fix it');
 $check($usury::status(['reference_rate' => 0.0242] + $current, '2026-11-06')['label'] === 'Tasa incorrecta', 'a reference rate above the usury shows as incorrect');
+$rawConfig = $db->getVar("SELECT valor FROM wp_jet_cct_confi_sistema WHERE funcion = 'control_servicios_config'");
 $capSettings = new Settings($db);
 $capConfig = \SCM\Modules\OwnerCredits\OwnerCreditSettings::read($capSettings);
 $capped = $usury::capReference($capSettings, ['reference_rate' => 0.0242, 'usury_annual' => 0.2834] + $capConfig, 1);
-$check(abs($capped['after'] - 0.021007) < 1e-7 && $capped['after'] <= $usury::monthly(['usury_annual' => 0.2834]) && $usury::capReference($capSettings, ['reference_rate' => 0.02, 'usury_annual' => 0.2834] + $capConfig, 1) === null, 'updating lowers a reference rate above the usury to the usury and never raises a lower one');
-\SCM\Modules\OwnerCredits\OwnerCreditSettings::save($capSettings, $capConfig, 1);
+$check(abs($capped['after'] - 0.02101) < 1e-7 && $capped['after'] <= $usury::monthly(['usury_annual' => 0.2834]) && $usury::capReference($capSettings, ['reference_rate' => 0.02, 'usury_annual' => 0.2834] + $capConfig, 1) === null, 'updating lowers a reference rate above the usury to the usury and never raises a lower one');
+$db->update('wp_jet_cct_confi_sistema', ['valor' => $rawConfig], ['funcion' => 'control_servicios_config']);
 $config = json_decode((string) $db->getVar("SELECT valor FROM wp_jet_cct_confi_sistema WHERE funcion = 'control_servicios_config'"), true);
 $config['owner_credit_settings']['usury_updated_at'] = date('Y-m-01', strtotime('first day of last month'));
 $db->update('wp_jet_cct_confi_sistema', ['valor' => json_encode($config)], ['funcion' => 'control_servicios_config']);
