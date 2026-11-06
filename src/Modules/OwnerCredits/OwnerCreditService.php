@@ -1410,6 +1410,9 @@ final class OwnerCreditService
       $ts = self::timestamp($filters[$key] ?? '');
       if ($ts > 0) { $where[] = "`created_at` {$op} ?"; $args[] = $key === 'to' ? $ts + 86399 : $ts; }
     }
+    $accounting = (string) ($filters['accounting'] ?? '');
+    if ($accounting === 'pendiente') $where[] = "`status` IN ('aprobado', 'pagado') AND `response_sent_at` > 0 AND (`accounting_at` IS NULL OR `accounting_at` = 0)";
+    elseif ($accounting === 'ingresado') $where[] = '`accounting_at` > 0';
     $search = trim((string) ($filters['search'] ?? ''));
     if ($search !== '') {
       $like = '%' . $this->db->escapeLike($search) . '%';
@@ -1420,6 +1423,7 @@ final class OwnerCreditService
     $totals = array_fill_keys(array_keys(self::STATUSES), 0);
     $approvedAmount = 0.0;
     $outstanding = 0.0;
+    $paid = 0.0;
     $interest = 0.0;
     foreach ($rows as &$row) {
       $totals[$row['status']] = ($totals[$row['status']] ?? 0) + 1;
@@ -1432,6 +1436,9 @@ final class OwnerCreditService
         $row['balance'] = $this->balance($row);
         $outstanding += $row['balance'];
       }
+      // Capital de las cuotas ya vencidas: lo real se descuenta y contabiliza en SIMI.
+      if ($row['status'] === 'pagado') $paid += (float) $row['approved_amount'];
+      if ($row['status'] === 'aprobado') $paid += max(0.0, (float) $row['approved_amount'] - $row['balance']);
     }
     unset($row);
     // Pagaré firmado del beneficiario: sirve para todos sus créditos, así que se muestra en cada fila.
@@ -1448,6 +1455,7 @@ final class OwnerCreditService
         'count' => count($rows),
         'approved_amount' => $approvedAmount,
         'outstanding' => $outstanding,
+        'paid' => $paid,
         'interest' => $interest,
         'approval_rate' => $decided > 0 ? ($totals['aprobado'] + $totals['pagado']) / $decided : null,
       ],

@@ -272,6 +272,17 @@ $check(in_array($accountingId, array_map('intval', array_column($attention['acco
 $service->setAccounting($accountingId, true, $actor);
 $check(!in_array($accountingId, array_map('intval', array_column($service->pendingAttention()['accounting'], 'id')), true), 'marking a credit removes it from the accounting alert');
 $service->setAccounting($accountingId, false, $actor);
+$pendingList = array_map('intval', array_column($service->report(['accounting' => 'pendiente'])['rows'], 'id'));
+$check(in_array($accountingId, $pendingList, true) && !in_array($accountingId, array_map('intval', array_column($service->report(['accounting' => 'ingresado'])['rows'], 'id')), true), 'the list filters the credits pending in accounting');
+$service->setAccounting($accountingId, true, $actor);
+$check(in_array($accountingId, array_map('intval', array_column($service->report(['accounting' => 'ingresado'])['rows'], 'id')), true) && !in_array($accountingId, array_map('intval', array_column($service->report(['accounting' => 'pendiente'])['rows'], 'id')), true), 'a marked credit moves to the entered filter');
+$service->setAccounting($accountingId, false, $actor);
+$paidTotals = $service->report(['search' => '']);
+$approvedSum = array_sum(array_map(static fn(array $row): float => in_array($row['status'], ['aprobado', 'pagado'], true) ? (float) $row['approved_amount'] : 0.0, $paidTotals['rows']));
+$check(abs($paidTotals['totals']['paid'] + $paidTotals['totals']['outstanding'] - $approvedSum) < 0.01, 'paid plus outstanding adds up to the approved capital');
+$db->update('wp_scm_owner_credits', ['first_payment_ts' => strtotime('-1 month -2 days')], ['id' => $accountingId]);
+$midTotals = $service->report(['search' => ''])['totals'];
+$check($midTotals['paid'] > 0, 'each due installment moves capital to paid');
 $listRow = (new OwnerCreditView())->report($service->report(['search' => '']), true, true);
 $check(str_contains($listRow, 'data-owner-credit-detail data-credit-id="' . $accountingId . '"') && str_contains($listRow, 'Pendiente de contabilidad') && str_contains($listRow, 'Ver crédito') && str_contains($listRow, 'data-owner-credit-detail="documentos"'), 'an approved credit shows Ver crédito, Documentos and its accounting state in the list');
 $creditSource = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');

@@ -54,6 +54,7 @@ final class OwnerCreditView
       . '<div class="' . $ui::CARD . ' !sp-p-5"><div class="!sp-flex !sp-flex-wrap !sp-justify-between !sp-items-center !sp-gap-2 !sp-pb-3 !sp-mb-4 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><h3 class="!sp-m-0 !sp-flex !sp-gap-2 !sp-items-center !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide">' . $ui::icon('filter') . 'Filtros · Créditos</h3><span class="!sp-text-[10px] !sp-text-service-muted">"Solicitud de crédito" y su configuración están en el encabezado del panel</span></div>'
       . '<form data-owner-credit-filters autocomplete="off"><div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-4 !sp-gap-4">'
       . $field('Estado', '<select class="' . $ui::INPUT . '" name="status">' . $status . '</select>')
+      . $field('Contabilidad', '<select class="' . $ui::INPUT . '" name="accounting"><option value="">Todos</option><option value="pendiente">Pendiente de contabilidad</option><option value="ingresado">Ingresado a contabilidad</option></select>')
       . $field('Solicitado desde', '<input class="' . $ui::INPUT . '" type="date" name="from">')
       . $field('Solicitado hasta', '<input class="' . $ui::INPUT . '" type="date" name="to">')
       . $field('Buscar', '<input class="' . $ui::INPUT . '" name="search" placeholder="Contrato, propietario, inmueble o cotización">')
@@ -71,12 +72,13 @@ final class OwnerCreditView
       . '<span class="!sp-p-2 !sp-rounded-lg !sp-bg-service-lilac !sp-text-service-blue">' . self::icon($icon, '!sp-w-4 !sp-h-4') . '</span>'
       . '<div class="!sp-min-w-0"><p class="!sp-m-0 !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">' . self::e($label) . '</p><strong class="!sp-block !sp-mt-1 !sp-text-lg !sp-text-service-navy">' . $value . '</strong>'
       . ($hint !== '' ? '<p class="!sp-m-0 !sp-mt-0.5 !sp-text-[10px] !sp-text-service-muted">' . self::e($hint) . '</p>' : '') . '</div></article>';
-    $html = '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 xl:!sp-grid-cols-5 !sp-gap-4 !sp-mb-5" data-owner-credit-total="' . (int) $t['count'] . '">'
+    $html = '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-3 !sp-gap-4 !sp-mb-5" data-owner-credit-total="' . (int) $t['count'] . '">'
       . $metric('Solicitudes', (string) $t['count'], $t['pendiente'] . ' pendientes de evaluar', 'document')
       . $metric('Aprobados', (string) ($t['aprobado'] + $t['pagado']), $t['rechazado'] . ' rechazados', 'check')
       . $metric('Tasa de aprobación', $t['approval_rate'] === null ? '—' : number_format($t['approval_rate'] * 100, 0) . ' %', 'Sobre créditos decididos', 'chart')
       . $metric('Monto aprobado', self::money($t['approved_amount']), 'Intereses: ' . self::money($t['interest']), 'cash')
       . $metric('Saldo vigente', self::money($t['outstanding']), $t['aprobado'] . ' créditos por pagar', 'clock')
+      . $metric('Saldo pagado', self::money($t['paid']), 'Según cuotas vencidas', 'check')
       . '</div>';
     $html .= '<div class="' . $ui::CARD . '"><div class="!sp-p-4"><h3 class="!sp-m-0 !sp-font-bold !sp-text-sm">Créditos registrados</h3><p class="!sp-m-0 !sp-mt-1 !sp-text-[10px] !sp-text-service-muted">Ábrelos en el liquidador para evaluarlos, ver su tabla de amortización o cerrarlos.</p></div>';
     if ($report['rows'] === []) return $html . '<p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">No hay créditos con los filtros actuales.</p></div>';
