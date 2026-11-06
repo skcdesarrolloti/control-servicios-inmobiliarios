@@ -13,7 +13,13 @@ El modal **Permisos por cargo** tiene tres secciones:
 2. Devuelve sus grupos en `ajax_handler_dashboard_alerts`: `key`, `label`, `hint`, `icon`, `count` y `rows` (`date`, `title`, `meta`, `badge`, `button`, `action`). Valida también el permiso de ver esa información.
 3. Si la fila abre algo nuevo, agrega su `action.type` en `dashboardAlertActionHtml` (`admin-dashboard-runtime.js`).
 
-Vencimientos sale primero y las alertas al cerrarlo, porque Swal muestra un popup a la vez.
+Vencimientos sale primero y las alertas al cerrarlo, porque Swal muestra un popup a la vez. Salen al entrar a Inicio, en cada clic en Inicio y cada hora en cualquier pestaña, sin interrumpir a quien está escribiendo o tiene un popup abierto. Cerrarlos pide confirmación.
+
+## Recordatorio diario
+
+En **Alertas › Recordatorio diario** se activa por cargo el correo y el WhatsApp. Sale de lunes a sábado, sin festivos, desde las 9:00 a. m. de Colombia, con las tareas del calendario de vencimientos de ese cargo que ya vencieron o vencen hoy. Quien no tiene tareas no recibe nada.
+
+Lo ejecuta `bin/queue-worker.php`. Si producción solo corre el worker global de shared-notifications, crea un cron cada 15 minutos con `bin/send-daily-task-reminder.php`: solo envía una vez al día y después de las 12:00 m. ya no sale. La plantilla de WhatsApp es `scm_recordatorio_tareas_v1` (`docs/whatsapp-recordatorio-tareas-template.json`).
 
 ## Acciones nuevas
 

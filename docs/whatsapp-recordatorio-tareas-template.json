@@ -1,0 +1,38 @@
+{
+  "name": "scm_recordatorio_tareas_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "parameter_format": "POSITIONAL",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}.\n\nHoy tienes {{2}} tarea(s) pendiente(s) en el panel:\n\n{{3}}\n\nEntra al panel y atiéndelas para que no se sigan atrasando.",
+      "example": {
+        "body_text": [
+          [
+            "María Pérez",
+            "3",
+            "2 Solicitudes de crédito; 1 Cotizaciones sin enviar"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Ver mis tareas",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "control-servicios-inmobiliarios/public/index.php?tab=due"
+          ]
+        }
+      ]
+    }
+  ]
+}

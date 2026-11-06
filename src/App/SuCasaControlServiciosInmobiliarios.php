@@ -15,6 +15,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesDeliveryReviewActions;
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   use \SCM\App\Concerns\HandlesOwnerCredits;
+  use \SCM\App\Concerns\HandlesDailyTaskReminder;
   use \SCM\App\Concerns\HandlesTools;
   use \SCM\App\Concerns\HandlesAdministrativeReports;
   use \SCM\App\Concerns\HandlesMaintenanceOrdersPanel;
@@ -83,6 +84,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_DASHBOARD_ALERTS = 'scm_dashboard_alerts';
   /** Alerta que ya existía: conserva su propio ajuste (`admin_due_popup_cargo_ids`) y su popup. */
   const ALERT_ADMIN_DUE = 'admin_due';
+  const ALERT_REMINDER_EMAIL = 'recordatorio_correo';
+  const ALERT_REMINDER_WHATSAPP = 'recordatorio_whatsapp';
   const AJAX_ADMIN_DUE_CASE = 'scm_admin_due_case';
   const AJAX_ADMIN_DUE_SETTINGS_SAVE = 'scm_admin_due_settings_save';
   const AJAX_CONTRATOS_ARRENDAMIENTO = 'scm_contratos_arrendamiento';
@@ -1144,6 +1147,10 @@ final class SuCasaControlServiciosInmobiliarios
         'credito_solicitudes' => ['label' => 'Solicitudes de crédito', 'hint' => 'Solicitudes sin aprobar ni rechazar. Requiere ver Créditos a propietarios.'],
         'credito_contabilidad' => ['label' => 'Créditos sin ingresar a contabilidad', 'hint' => 'Créditos con la respuesta enviada y sin marcar. Requiere ver Créditos a propietarios.'],
       ]],
+      ['label' => 'Recordatorio diario · 9:00 a. m.', 'items' => [
+        self::ALERT_REMINDER_EMAIL => ['label' => 'Por correo', 'hint' => 'Lunes a sábado, sin festivos, con las tareas vencidas o que vencen hoy en el calendario del cargo.'],
+        self::ALERT_REMINDER_WHATSAPP => ['label' => 'Por WhatsApp', 'hint' => 'Mismo resumen por WhatsApp, con la plantilla scm_recordatorio_tareas_v1.'],
+      ]],
     ];
   }
 
@@ -1170,10 +1177,10 @@ final class SuCasaControlServiciosInmobiliarios
     return $clean;
   }
 
-  /** @return list<string> */
+  /** Alertas de popup del cargo actual; el recordatorio diario no es un popup. @return list<string> */
   private function dashboardAlertKeysForCurrentCargo(): array
   {
-    return $this->dashboardAlertPermissions()[trim((string) Auth::userCargo())] ?? [];
+    return array_values(array_diff($this->dashboardAlertPermissions()[trim((string) Auth::userCargo())] ?? [], [self::ALERT_REMINDER_EMAIL, self::ALERT_REMINDER_WHATSAPP]));
   }
 
   /** @return array<int,string> */
@@ -1274,7 +1281,12 @@ final class SuCasaControlServiciosInmobiliarios
   /** @return array<int,string> */
   private function currentDashboardAllowedTabs(): array
   {
-    $cargo = Auth::userCargo();
+    return $this->dashboardTabsForCargo((string) Auth::userCargo());
+  }
+
+  /** Pestañas de un cargo, con o sin sesión (el recordatorio diario corre sin usuario). @return array<int,string> */
+  private function dashboardTabsForCargo(string $cargo): array
+  {
     $permissions = $this->dashboardPermissionsConfig();
     $allTabs = array_keys($this->dashboardPermissionTabs());
     if ($cargo === '' || !array_key_exists($cargo, $permissions)) {
@@ -1315,7 +1327,12 @@ final class SuCasaControlServiciosInmobiliarios
   /** @return array<int,string> */
   private function currentDashboardAllowedActions(): array
   {
-    $cargo = Auth::userCargo();
+    return $this->dashboardActionsForCargo((string) Auth::userCargo());
+  }
+
+  /** @return array<int,string> */
+  private function dashboardActionsForCargo(string $cargo): array
+  {
     $permissions = $this->dashboardActionPermissionsConfig();
     $allActions = $this->dashboardActionPermissionKeys();
     if ($cargo === '' || !array_key_exists($cargo, $permissions)) {

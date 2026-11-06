@@ -27,7 +27,8 @@ const harness = (groupsJson) => `
   const root = document.querySelector('#scm-app');
   const escHtml = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
   var funcionarioBridgeMode = false, ajaxUrl = '/ajax', actionDashboardAlerts = 'scm_dashboard_alerts';
-  var alertPopupConfig = { enabled: true }, dashboardAlertsShown = {}, dashboardDueActionTaken = false, dashboardDuePopupRestoreAfterCase = false;
+  var alertPopupConfig = { enabled: true }, duePopupConfig = { enabled: false }, dashboardAlertsShown = {}, dashboardDuePopupShown = {}, dashboardDueActionTaken = false, dashboardDuePopupRestoreAfterCase = false;
+  var DASHBOARD_REMINDER_EVERY_MS = 3600000, DASHBOARD_REMINDER_STORAGE_KEY = 'scm-dashboard-reminder-at', dashboardReminderAt = 0;
   window.calls = [];
   window.log = [];
   window.config = alertPopupConfig;
@@ -61,6 +62,8 @@ const harness = (groupsJson) => `
   ${ui}
   ${popup}
   window.entry = maybeShowDashboardEntryPopups;
+  window.tick = dashboardReminderTick;
+  window.setReminderAt = v => { dashboardReminderAt = v; };
 `;
 
 (async () => {
@@ -94,8 +97,32 @@ const harness = (groupsJson) => `
   await page.click('[data-scm-dashboard-due-close]');
   await page.waitForSelector('[data-scm-alert-group]');
   assert.deepEqual(await page.evaluate(() => window.log), ['due', 'alerts']);
+  // Cerrar pide confirmación y recuerda las tareas; cancelar conserva el popup.
   await page.click('[data-scm-dashboard-alert-close]');
-  console.log('OK the alerts open after closing the due popup');
+  assert.match(await page.textContent('[data-scm-popup-close-confirm]'), /¿Estás seguro de cerrar\?.*informativo.*tareas pendientes/);
+  await page.click('[data-scm-popup-close-no]');
+  assert.equal(await page.locator('[data-scm-popup-close-confirm]').count(), 0);
+  assert.equal(await page.locator('.scm-due-entry-swal').count(), 1, 'keeping it open leaves the popup');
+  await page.click('[data-scm-dashboard-alert-close]');
+  await page.click('[data-scm-popup-close-yes]');
+  assert.equal(await page.locator('.scm-due-entry-swal').count(), 0);
+  console.log('OK the alerts open after closing the due popup and closing asks to confirm');
+
+  // Cada hora vuelve a salir, sin importar si ya salió; antes de la hora no.
+  await page.evaluate(() => { window.resetShown(); window.log = []; window.dueOpen = false; window.tick(); });
+  await page.waitForTimeout(50);
+  assert.deepEqual(await page.evaluate(() => window.log), [], 'it does not repeat before the hour');
+  await page.evaluate(() => { window.setReminderAt(Date.now() - 3600001); window.tick(); });
+  await page.waitForSelector('[data-scm-alert-group]');
+  assert.deepEqual(await page.evaluate(() => window.log), ['alerts'], 'after an hour it shows again');
+  await page.click('[data-scm-dashboard-alert-close]');
+  await page.click('[data-scm-popup-close-yes]');
+  // Si el funcionario está escribiendo, espera.
+  await page.evaluate(() => { window.log = []; window.setReminderAt(Date.now() - 3600001); document.querySelector('#scm-app').insertAdjacentHTML('beforeend', '<input id="typing">'); document.getElementById('typing').focus(); window.tick(); });
+  await page.waitForTimeout(50);
+  assert.deepEqual(await page.evaluate(() => window.log), [], 'it does not interrupt someone typing');
+  await page.evaluate(() => { document.getElementById('typing').remove(); window.dueOpen = true; });
+  console.log('OK the reminder repeats every hour without interrupting');
 
   await page.evaluate(() => { window.resetShown(); window.log = []; window.entry('login'); });
   await page.waitForSelector('[data-scm-dashboard-due-open-calendar]');
@@ -106,7 +133,11 @@ const harness = (groupsJson) => `
 
   await page.evaluate(() => { window.resetShown(); window.log = []; window.dueOpen = false; window.config.enabled = false; window.entry('login'); });
   await page.waitForTimeout(50);
-  assert.deepEqual(await page.evaluate(() => [window.log, window.calls.length]), [[], 2], 'a cargo without alerts does not query them');
+  assert.deepEqual(await page.evaluate(() => window.log), [], 'a cargo without alerts sees nothing');
+  const callsBefore = await page.evaluate(() => window.calls.length);
+  await page.evaluate(() => { window.resetShown(); window.entry('login'); });
+  await page.waitForTimeout(50);
+  assert.equal(await page.evaluate(() => window.calls.length), callsBefore, 'a cargo without alerts does not query them');
   console.log('OK a cargo without alerts does not see or query them');
 
   await open([]);

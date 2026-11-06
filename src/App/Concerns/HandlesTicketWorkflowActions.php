@@ -2160,10 +2160,48 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @param array<string,int> $settings @return array<int,array<string,mixed>> */
-  private function adminDueCalendarItems(array $settings, int $fromTs, int $toTs): array
+  /** Tipos de vencimiento que maneja cada pestaña del panel. */
+  private const ADMIN_DUE_TYPES_BY_TAB = [
+    'servicios_publicos_pendientes' => ['servicios_publicos_critico'],
+    'cotizaciones_mantenimiento' => ['cotizacion_sin_enviar', 'cotizacion_enviada_sin_respuesta'],
+    'preventivas_pendientes' => ['preventiva_sin_enviar', 'ticket_preventiva_sin_cita', 'preventiva_cita_sin_realizar'],
+    'contractual' => ['terminacion_contrato_pendiente', 'no_prorroga_contrato_pendiente'],
+    'ordenes_mantenimiento' => ['orden_mantenimiento_sin_respuesta'],
+    'contratos_arrendamiento' => ['contrato_anexos_sin_enviar'],
+    'credito_propietario' => ['credito_solicitud_pendiente', 'credito_contabilidad_pendiente'],
+  ];
+
+  /** @return list<string> */
+  private function adminDueAllTypes(): array
+  {
+    return array_merge(...array_values(self::ADMIN_DUE_TYPES_BY_TAB));
+  }
+
+  /**
+   * Tipos de vencimiento que ve un cargo: los del calendario, sus filtros y el recordatorio diario salen de esta lista.
+   * Sin argumentos usa los permisos del usuario en sesión. @return list<string>
+   */
+  private function adminDueAllowedTypes(?callable $canTab = null, ?bool $caseRespond = null): array
+  {
+    $canTab ??= fn(string $tab): bool => $this->canAccessDashboardTab($tab);
+    $types = [];
+    foreach (self::ADMIN_DUE_TYPES_BY_TAB as $tab => $tabTypes) {
+      if ($canTab($tab)) array_push($types, ...$tabTypes);
+    }
+    // Quien responde casos también atiende las solicitudes contractuales, aunque no tenga la pestaña.
+    if (!in_array('terminacion_contrato_pendiente', $types, true) && ($caseRespond ?? $this->canUseDashboardAction('case_respond'))) {
+      array_push($types, ...self::ADMIN_DUE_TYPES_BY_TAB['contractual']);
+    }
+    return $types;
+  }
+
+  /** @param list<string>|null $types tipos a incluir; sin indicar, los del usuario en sesión */
+  private function adminDueCalendarItems(array $settings, int $fromTs, int $toTs, ?array $types = null): array
   {
     $items = [];
-    if ($this->canAccessDashboardTab('servicios_publicos_pendientes')) {
+    $types ??= $this->adminDueAllowedTypes();
+    $wants = static fn(string $type): bool => in_array($type, $types, true);
+    if ($wants('servicios_publicos_critico')) {
       $critical = new \SCM\Modules\Pending\PublicServicesCritical($this->db);
       if ($critical->available()) foreach ($this->db->getResults('SELECT * FROM `' . $critical->table() . '` WHERE status <> ? ORDER BY deadline_at', ['verified']) as $row) {
         $row=$critical->case((int)$row['review_id']);
@@ -2187,23 +2225,23 @@ trait HandlesTicketWorkflowActions
         $items[]=$item;
       }
     }
-    if ($this->canAccessDashboardTab('cotizaciones_mantenimiento')) {
+    if ($wants('cotizacion_sin_enviar')) {
       $items = array_merge($items, $this->adminDueQuoteItems($settings, $fromTs, $toTs));
     }
-    if ($this->canAccessDashboardTab('preventivas_pendientes')) {
+    if ($wants('preventiva_sin_enviar')) {
       $items = array_merge($items, $this->adminDuePreventivaItems($settings, $fromTs, $toTs));
       $items = array_merge($items, $this->adminDuePreventivaTicketItems($settings, $fromTs, $toTs));
     }
-    if ($this->canAccessDashboardTab('contractual') || $this->canUseDashboardAction('case_respond')) {
+    if ($wants('terminacion_contrato_pendiente')) {
       $items = array_merge($items, $this->adminDueContractRequestItems($settings, $fromTs, $toTs));
     }
-    if ($this->canAccessDashboardTab('ordenes_mantenimiento')) {
+    if ($wants('orden_mantenimiento_sin_respuesta')) {
       $items = array_merge($items, $this->adminDueMaintenanceOrderItems($settings, $fromTs, $toTs));
     }
-    if ($this->canAccessDashboardTab('contratos_arrendamiento')) {
+    if ($wants('contrato_anexos_sin_enviar')) {
       $items = array_merge($items, $this->adminDueLeaseAnnexItems($settings, $fromTs, $toTs));
     }
-    if ($this->canAccessDashboardTab('credito_propietario')) {
+    if ($wants('credito_solicitud_pendiente')) {
       $items = array_merge($items, $this->adminDueOwnerCreditItems($settings, $fromTs, $toTs));
     }
 

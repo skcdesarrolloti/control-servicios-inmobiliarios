@@ -78,9 +78,13 @@ const sectionHtml = section => '<button class="scm-calendar-section-tab" data-ca
     const before = await page.evaluate(() => popupCount);
     await page.evaluate(async () => {resolveDue({rows:[{}]});await popupRequest;});
     assert.equal(await page.evaluate(() => popupCount), before);
-    for (const query of ['?tab=ini&subtab=mine', '?tab=ini&scm_subtab=team', '?tab=inicio', '?scm_tab=ini', '?tab=abiertos', '?tab=vencimientos', '?']) {
+    for (const query of ['?tab=ini&subtab=mine', '?tab=ini&scm_subtab=team', '?tab=inicio', '?scm_tab=ini', '?tab=abiertos', '?tab=vencimientos']) {
       assert.equal(await page.evaluate(query => {history.replaceState({}, '', query);return shouldAutoShowDashboardDuePopup('home-tab');}, query), false, query);
     }
+    // Sin pestaña en la URL también es Inicio: así se llega al iniciar sesión y desde el logo.
+    assert.equal(await page.evaluate(() => {history.replaceState({}, '', '?');return shouldAutoShowDashboardDuePopup('login');}), true);
+    // El recordatorio de cada hora no depende de la pestaña donde esté el funcionario.
+    assert.equal(await page.evaluate(() => {history.replaceState({}, '', '?tab=abiertos');return shouldAutoShowDashboardDuePopup('hourly');}), true);
     // Native contract buttons also write their own tab route.
     await page.locator('.scm-main-tabs [data-tab="scm-panel-actividades-contractuales"]').click();
     for (const section of sections.filter(section => section.startsWith('contract'))) {

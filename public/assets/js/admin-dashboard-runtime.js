@@ -320,6 +320,9 @@
     var alertPopupConfig = runtime.alertPopup || {};
     var dashboardAlertsShown = {};
     var dashboardDueActionTaken = false;
+    var DASHBOARD_REMINDER_EVERY_MS = 3600000;
+    var DASHBOARD_REMINDER_STORAGE_KEY = "scm-dashboard-reminder-at";
+    var dashboardReminderAt = 0;
     var funcionarioBridgeMode = false;
     try {
       var initialBridgeParams = new URL(window.location.href).searchParams;
@@ -340,11 +343,14 @@
     }
 
     function shouldAutoShowDashboardDuePopup(source) {
+      // El recordatorio de cada hora sale en cualquier pestaña; dashboardReminderBusy decide si es buen momento.
+      if (source === "hourly") return true;
       try {
         var params = new URL(window.location.href).searchParams;
         var tab = String(params.get("tab") || "").trim().toLowerCase();
         var subtab = String(params.get("subtab") || params.get("scm_subtab") || "").trim();
-        return tab === "ini" && subtab === "" && isDashboardHomePanelActive();
+        // Sin pestaña en la URL también es Inicio: así se entra al iniciar sesión y desde el logo.
+        return (tab === "ini" || (tab === "" && !params.has("scm_tab"))) && subtab === "" && isDashboardHomePanelActive();
       } catch (_duePopupUrlError) {
         return false;
       }
@@ -1296,6 +1302,56 @@
         '<button type="button" class="' + ui.secondary + ' !sp-px-4 !sp-py-2.5 !sp-text-xs" data-scm-dashboard-alert-close>Cerrar</button></footer></div>';
     }
 
+    // Cerrar pide confirmación: el popup recuerda las tareas y no debe cerrarse por accidente.
+    function dashboardConfirmPopupClose(popup) {
+      var footer = popup && popup.querySelector("footer");
+      if (!footer || footer.querySelector("[data-scm-popup-close-confirm]")) return;
+      var ui = DUE_POPUP_UI;
+      var bar = document.createElement("div");
+      bar.className = "!sp-w-full !sp-flex !sp-flex-wrap !sp-items-center !sp-justify-end !sp-gap-3 !sp-p-3 !sp-rounded-lg !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200 !sp-text-left";
+      bar.setAttribute("data-scm-popup-close-confirm", "");
+      bar.setAttribute("role", "alertdialog");
+      bar.innerHTML = '<span class="!sp-flex-1 !sp-min-w-[200px] !sp-text-xs !sp-text-service-navy"><b>¿Estás seguro de cerrar?</b> Recuerda que esto es informativo: recuerda realizar tus tareas pendientes.</span>' +
+        '<button type="button" class="' + ui.secondary + '" data-scm-popup-close-no>Seguir viendo</button>' +
+        '<button type="button" class="' + ui.secondary + '" data-scm-popup-close-yes>Sí, cerrar</button>';
+      footer.insertBefore(bar, footer.firstChild);
+      bar.querySelector("[data-scm-popup-close-no]").addEventListener("click", function () { bar.remove(); });
+      bar.querySelector("[data-scm-popup-close-yes]").addEventListener("click", function () { window.Swal.close(); });
+      bar.querySelector("[data-scm-popup-close-yes]").focus();
+    }
+
+    function dashboardReminderLastAt() {
+      try {
+        return Math.max(dashboardReminderAt, Number(window.localStorage.getItem(DASHBOARD_REMINDER_STORAGE_KEY)) || 0);
+      } catch (_storageError) {
+        return dashboardReminderAt;
+      }
+    }
+
+    // Se guarda en el navegador para que recargar o tener dos pestañas abiertas no adelante el siguiente aviso.
+    function markDashboardReminderShown() {
+      dashboardReminderAt = Date.now();
+      try {
+        window.localStorage.setItem(DASHBOARD_REMINDER_STORAGE_KEY, String(dashboardReminderAt));
+      } catch (_storageError) {}
+    }
+
+    // No interrumpe: si está escribiendo, tiene un caso o un popup abierto, o no está en esta pestaña, espera.
+    function dashboardReminderBusy() {
+      if (document.hidden || (window.Swal && window.Swal.isVisible())) return true;
+      if (document.body.classList.contains("scm-cia-modal-open") || root.querySelector("#scm-case-modal.open, .scm-modal.open, [role='dialog'].open")) return true;
+      var active = document.activeElement;
+      return !!(active && active.matches && active.matches("input, textarea, select, [contenteditable='true']"));
+    }
+
+    function dashboardReminderTick() {
+      if (funcionarioBridgeMode || (!duePopupConfig.enabled && !alertPopupConfig.enabled)) return;
+      if (Date.now() - dashboardReminderLastAt() < DASHBOARD_REMINDER_EVERY_MS || dashboardReminderBusy()) return;
+      delete dashboardDuePopupShown.hourly;
+      delete dashboardAlertsShown.hourly;
+      maybeShowDashboardEntryPopups("hourly");
+    }
+
     function maybeShowDashboardAlertsPopup(source) {
       source = source || "login";
       if (funcionarioBridgeMode || !alertPopupConfig.enabled || dashboardAlertsShown[source]) return Promise.resolve();
@@ -1316,13 +1372,18 @@
             showConfirmButton: false,
             showCancelButton: false,
             buttonsStyling: false,
+            allowOutsideClick: false,
+            allowEscapeKey: false,
             customClass: { popup: "scm-due-entry-swal" },
             didOpen: function () {
               var popup = window.Swal.getPopup();
               if (!popup) return;
               popup.addEventListener("click", function (event) {
+                var target = event.target && event.target.closest ? event.target : null;
+                if (!target) return;
+                if (target.closest("[data-scm-dashboard-alert-close]")) { dashboardConfirmPopupClose(popup); return; }
                 // Los botones del crédito los atiende admin-owner-credits.js al llegar el clic al documento.
-                if (event.target && event.target.closest && event.target.closest("[data-scm-dashboard-alert-close], [data-owner-credit-open], [data-owner-credit-detail]")) window.Swal.close();
+                if (target.closest("[data-owner-credit-open], [data-owner-credit-detail]")) window.Swal.close();
               });
             },
           });
@@ -1335,6 +1396,9 @@
     // Primero vencimientos y, al cerrarlo, las alertas: Swal muestra un popup a la vez. Si el funcionario fue a atender algo
     // desde vencimientos, las alertas esperan a que vuelva a Inicio.
     function maybeShowDashboardEntryPopups(source) {
+      // Clic en Inicio llega dos veces (la pestaña y el menú): el segundo no reemplaza el popup que ya está abierto.
+      if (window.Swal && window.Swal.isVisible()) return Promise.resolve();
+      markDashboardReminderShown();
       dashboardDueActionTaken = false;
       return Promise.resolve(maybeShowDashboardDuePopup(source)).then(function () {
         if (dashboardDueActionTaken || dashboardDuePopupRestoreAfterCase) return;
@@ -1344,7 +1408,7 @@
 
     root.addEventListener("click", function (event) {
       var button = event.target && event.target.closest ? event.target.closest(".scm-due-entry-swal button") : null;
-      if (button && !button.matches("[data-scm-dashboard-due-close], [data-scm-dashboard-alert-close]")) dashboardDueActionTaken = true;
+      if (button && !button.matches("[data-scm-dashboard-due-close], [data-scm-dashboard-alert-close], [data-scm-popup-close-no], [data-scm-popup-close-yes]")) dashboardDueActionTaken = true;
     }, true);
 
     function loadDashboardDuePopupRows() {
@@ -1413,6 +1477,8 @@
             showConfirmButton: false,
             showCancelButton: false,
             buttonsStyling: false,
+            allowOutsideClick: false,
+            allowEscapeKey: false,
             customClass: {
               popup: "scm-due-entry-swal",
             },
@@ -1467,7 +1533,7 @@
                   : null;
                 if (closeBtn && popup.contains(closeBtn)) {
                   event.preventDefault();
-                  window.Swal.close();
+                  dashboardConfirmPopupClose(popup);
                 }
               });
             },
@@ -26699,6 +26765,9 @@
           loadActiveLazyPanelWithFeedback();
           if ((tab.getAttribute("data-tab") || "") === "scm-panel-inicio") {
             refreshDashboardDueNavBadge();
+            // Cada clic en Inicio vuelve a mostrarlos, no solo el primero de la sesión.
+            delete dashboardDuePopupShown["home-tab"];
+            delete dashboardAlertsShown["home-tab"];
             maybeShowDashboardEntryPopups("home-tab");
           }
         }, 0);
@@ -26862,6 +26931,7 @@
     window.setTimeout(function () {
       maybeShowDashboardEntryPopups("login");
     }, 0);
+    window.setInterval(dashboardReminderTick, 60000);
 
     root.addEventListener("submit", function (e) {
       var contractsEndingImport = e.target && e.target.closest

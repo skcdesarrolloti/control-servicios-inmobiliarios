@@ -43,6 +43,11 @@ try {
     error_log('[contract_receipts] ' . $exception->getMessage());
   }
   (new \SCM\Modules\Pending\PublicServicesCritical($scmDb))->run(30);
+  try {
+    (new \SCM\App\SuCasaControlServiciosInmobiliarios($scmDb))->processDailyTaskReminder();
+  } catch (\Throwable $exception) {
+    error_log('[daily-task-reminder] ' . $exception->getMessage());
+  }
   $bridge = new \SCM\Support\SharedNotificationsBridge($scmDb);
   if (!$bridge->isAvailable()) {
     throw new \RuntimeException($bridge->lastError() !== '' ? $bridge->lastError() : 'No se pudo iniciar shared-notifications.');
