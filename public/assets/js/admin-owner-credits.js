@@ -65,6 +65,10 @@
       modal.addEventListener("keydown", function (event) {
         event.stopPropagation();
         if (event.key === "Escape" && !closeDialog()) closeModal();
+        if (event.key === "Enter" && event.target.matches && event.target.matches("[data-owner-credit-reference-rate]")) {
+          event.preventDefault();
+          event.target.blur();
+        }
         if (event.key === "Enter" && event.target.matches && event.target.matches("[data-owner-credit-search-query]")) {
           event.preventDefault();
           searchContracts(event.target.closest("[data-owner-credit-new-form]"));
@@ -635,14 +639,12 @@
         simulate(form);
         return;
       }
-      // Tasas desde el liquidador: volver a consultar la usura o guardar la tasa de referencia; recarga el crédito.
+      // Volver a consultar la usura desde el liquidador: se guarda sola y recarga el crédito.
       var rateAction = form && target.closest("[data-owner-credit-rate-action]");
       if (rateAction) {
-        var ratesBox = rateAction.closest("[data-owner-credit-rates]");
         var rateData = new FormData();
         rateData.set("mode", rateAction.getAttribute("data-owner-credit-rate-action"));
-        if (form.elements.reference_rate) rateData.set("reference_rate", form.elements.reference_rate.value);
-        promissoryAction(ratesBox, "scm_owner_credit_rate", rateData, form.getAttribute("data-credit-id"), "data-owner-credit-rates-status");
+        promissoryAction(rateAction.closest("[data-owner-credit-rates]"), "scm_owner_credit_rate", rateData, form.getAttribute("data-credit-id"), "data-owner-credit-rates-status");
         return;
       }
       if (form && target.closest("[data-owner-credit-pdf]")) {
@@ -817,6 +819,14 @@
         signers.set("credit_id", form.getAttribute("data-credit-id"));
         box.querySelectorAll("[data-owner-credit-promissory-signer]:checked").forEach(function (input) { signers.append("signers[]", input.value); });
         promissoryAction(box, "scm_owner_credit_promissory_signers", signers, form.getAttribute("data-credit-id"));
+        return;
+      }
+      // La tasa de referencia se guarda al salir del campo (o con Enter) y recarga el liquidador.
+      if (form && event.target.matches("[data-owner-credit-reference-rate]")) {
+        var reference = new FormData();
+        reference.set("mode", "reference");
+        reference.set("reference_rate", event.target.value);
+        promissoryAction(event.target.closest("[data-owner-credit-rates]"), "scm_owner_credit_rate", reference, form.getAttribute("data-credit-id"), "data-owner-credit-rates-status");
         return;
       }
       // Cambiar a quién es el crédito o su contrato principal se guarda y recarga el liquidador.

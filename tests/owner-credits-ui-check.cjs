@@ -15,7 +15,7 @@ $w = ['credit'=>['id'=>12,'status'=>'pendiente','quote_id'=>574,'owner_name'=>'P
 'contract'=>['id'=>7,'code'=>'817','estado'=>'Entregado','inicio_ts'=>0,'fin_ts'=>0,'aseguradora'=>'','siniestrado'=>false],'income_source'=>'','income_defaults'=>['gross'=>1075000,'deductions'=>['comision'=>142800,'garantia'=>0,'poliza_servicios'=>50000,'otros'=>0]],'settings'=>$s,'evaluation'=>$ev,
 'conditions'=>['amount'=>893723,'term'=>12,'rate'=>0.023,'payment'=>86070,'total_interest'=>139117],'schedule'=>[],'policies'=>[],'policies_ok'=>true,'other_credits'=>[],'events'=>[],
 'owners'=>[['key'=>'mandato_1','name'=>'Primer Dueño','document'=>'111','current'=>false],['key'=>'mandato_2','name'=>'Segunda Dueña','document'=>'222','current'=>true]]];
-echo (new OwnerCreditView())->workspace($w, true, true);`;
+echo (new OwnerCreditView(true))->workspace($w, true, true);`;
 (async () => {
   const workspace = execFileSync('php', ['-r', fixture], { cwd: root, encoding: 'utf8' });
   const browser = await chromium.launch({headless:true, executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
@@ -152,6 +152,18 @@ echo (new OwnerCreditView())->workspace($w, true, true);`;
   assert.equal((await page.evaluate(() => window.calls)).find(c => c.action === 'scm_owner_credit_rate').mode, 'usury');
   await page.waitForFunction(() => (document.querySelector('[data-owner-credit-rates-status]') || {}).textContent === 'Usura actualizada.');
   console.log('OK the usury rate is refreshed from the liquidator and the credit reloads');
+
+  // La tasa se ve en verde o rojo al cargar y la de referencia se guarda sola, sin botón.
+  assert.match(await page.textContent('[data-owner-credit-rate-state]'), /Tasa (correcta|incorrecta)/);
+  assert.equal(await page.$('[data-owner-credit-rate-action="reference"]'), null, 'there is no save button for the reference rate');
+  const reopens = (await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_open').length;
+  await page.fill('[data-owner-credit-reference-rate]', '2,05');
+  await page.press('[data-owner-credit-reference-rate]', 'Enter');
+  await page.waitForFunction((n) => window.calls.filter(c => c.action === 'scm_owner_credit_open').length === n + 1, reopens);
+  const savedRate = (await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_rate').pop();
+  assert.equal(savedRate.mode, 'reference');
+  assert.equal(savedRate.reference_rate, '2,05');
+  console.log('OK the reference rate saves by itself and the rate state shows on load');
 
   assert.equal(await page.isVisible('[name="note"]'), false, 'the note is hidden while every policy is met and nothing changed');
   await page.click('[data-owner-credit-decide="aprobado"]');

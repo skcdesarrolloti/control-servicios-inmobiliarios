@@ -67,6 +67,49 @@ final class OwnerCreditUsuryRate
     return 'La tasa de usura guardada no está vigente hoy (' . date('d/m/Y', (int) strtotime($today)) . '): rige del ' . $date($from) . ' al ' . $date($to) . '. ' . $how . ' antes de aprobar.';
   }
 
+  /** Usura mes vencido equivalente a la efectiva anual guardada. @param array<string,mixed> $config */
+  public static function monthly(array $config): float
+  {
+    return (1 + (float) ($config['usury_annual'] ?? 0)) ** (1 / 12) - 1;
+  }
+
+  /**
+   * Semáforo del liquidador: la tasa está bien si la usura guardada rige hoy y la tasa de referencia no la supera.
+   * @param array<string,mixed> $config OwnerCreditSettings::read()
+   * @return array{ok:bool,label:string,detail:string}
+   */
+  public static function status(array $config, ?string $today = null): array
+  {
+    $auto = !empty($config['usury_auto']);
+    $fine = static fn(float $rate): string => number_format($rate * 100, 4, ',', '.') . ' %';
+    if (self::staleMessage($config, $today) !== '') {
+      return ['ok' => false, 'label' => 'Tasa incorrecta', 'detail' => $auto ? 'La usura guardada ya no está vigente. Pulsa "Actualizar usura".' : 'La usura manual ya no está vigente. Escríbela en Configuración.'];
+    }
+    $reference = (float) ($config['reference_rate'] ?? 0);
+    $usury = self::monthly($config);
+    if ($reference > $usury + 1e-9) {
+      return ['ok' => false, 'label' => 'Tasa incorrecta', 'detail' => 'La tasa de referencia (' . $fine($reference) . ') supera la usura (' . $fine($usury) . ' mensual).'];
+    }
+    return ['ok' => true, 'label' => 'Tasa correcta', 'detail' => 'La tasa de referencia no supera la usura vigente' . ($auto ? ' según datos.gov.co.' : ' (manual).')];
+  }
+
+  /**
+   * Deja la tasa de referencia en la usura si la supera: la baja, nunca la sube, porque subirla le cobra más al
+   * propietario y eso lo decide quien configura créditos. Devuelve el valor anterior y el nuevo, o null si no cambió.
+   * @param array<string,mixed> $config OwnerCreditSettings::read()
+   * @return array{before:float,after:float}|null
+   */
+  public static function capReference(Settings $settings, array $config, int $userId): ?array
+  {
+    $before = (float) $config['reference_rate'];
+    $usury = self::monthly($config);
+    if ($before <= $usury + 1e-9) return null;
+    // A 4 decimales hacia abajo: redondear hacia arriba dejaría la referencia otra vez sobre la usura.
+    $config['reference_rate'] = number_format(floor($usury * 1000000) / 10000, 4, '.', '') . '%';
+    $saved = OwnerCreditSettings::save($settings, $config, $userId);
+    return ['before' => $before, 'after' => (float) $saved['reference_rate']];
+  }
+
   /**
    * Fila vigente hoy (o la más reciente ya iniciada).
    * @param list<array<string,mixed>> $rows

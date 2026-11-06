@@ -524,8 +524,8 @@ final class OwnerCreditView
   }
 
   /**
-   * Debajo de las condiciones: tasa de referencia y usura vigente con su fecha. Quien decide puede volver a consultar
-   * la usura; quien configura créditos puede cambiar la tasa de referencia sin salir del liquidador.
+   * Debajo de las condiciones: semáforo de la tasa, tasa de referencia y usura vigente con su fecha. Quien decide puede
+   * volver a consultar la usura; quien configura créditos cambia la tasa de referencia en el campo y se guarda sola.
    * @param array<string,mixed> $work
    */
   private function rateInfo(array $work, bool $editable): string
@@ -542,12 +542,16 @@ final class OwnerCreditView
       $actions .= !empty($settings['usury_auto']) ? '<button type="button" class="' . $ui::SECONDARY . ' !sp-text-[10px]" data-owner-credit-rate-action="usury">' . $ui::icon('refresh', '!sp-w-3 !sp-h-3') . 'Actualizar usura</button>' : '';
       if ($this->canConfigure) {
         $actions .= '<label class="!sp-flex !sp-items-center !sp-gap-2 !sp-text-[10px] !sp-text-service-muted">Tasa de referencia (%)'
-          . '<input class="' . $ui::INPUT . ' !sp-h-8 !sp-w-24 !sp-bg-white" name="reference_rate" inputmode="decimal" value="' . self::e(number_format((float) $settings['reference_rate'] * 100, 2, ',', '')) . '" aria-label="Nueva tasa de referencia N.M.V"></label>'
-          . '<button type="button" class="' . $ui::NAVY . ' !sp-text-[10px]" data-owner-credit-rate-action="reference">Guardar tasa de referencia</button>';
+          . '<input class="' . $ui::INPUT . ' !sp-h-8 !sp-w-24 !sp-bg-white" name="reference_rate" inputmode="decimal" value="' . self::e(number_format((float) $settings['reference_rate'] * 100, 4, ',', '')) . '" aria-label="Nueva tasa de referencia N.M.V" data-owner-credit-reference-rate></label>';
       }
     }
+    // Solo mientras se estudia: un crédito ya decidido conserva sus condiciones aunque la usura cambie.
+    $state = OwnerCreditUsuryRate::status($settings);
+    $badge = $editable ? '<p class="!sp-m-0 !sp-mb-2 !sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2 !sp-text-[11px]" data-owner-credit-rate-state="' . ($state['ok'] ? 'ok' : 'bad') . '">'
+      . '<span class="!sp-rounded-full !sp-border !sp-border-solid !sp-px-2 !sp-py-0.5 !sp-font-bold ' . ($state['ok'] ? '!sp-bg-emerald-50 !sp-text-emerald-700 !sp-border-emerald-200' : '!sp-bg-red-50 !sp-text-red-700 !sp-border-red-200') . '">' . self::e($state['label']) . '</span>'
+      . '<span class="' . ($state['ok'] ? '!sp-text-emerald-700' : '!sp-text-red-700 !sp-font-semibold') . '">' . self::e($state['detail']) . '</span></p>' : '';
     return '<div class="!sp-mt-4 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-slate-50 !sp-p-3" data-owner-credit-rates>'
-      . '<p class="' . self::NOTE . '">' . $text . '</p>'
+      . $badge . '<p class="' . self::NOTE . '">' . $text . '</p>'
       . ((string) ($settings['usury_sync_error'] ?? '') !== '' ? '<p class="' . self::NOTE . ' !sp-mt-1 !sp-text-red-700">No se pudo actualizar la usura: ' . self::e($settings['usury_sync_error']) . ' Se usa la última tasa guardada.</p>' : '')
       . ($actions !== '' ? '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2 !sp-mt-2">' . $actions . '</div>' : '')
       . '<p class="!sp-m-0 !sp-mt-1 !sp-text-[11px]" data-owner-credit-rates-status role="status" aria-live="polite"></p></div>';

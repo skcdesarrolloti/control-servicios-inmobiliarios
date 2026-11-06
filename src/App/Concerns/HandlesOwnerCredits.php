@@ -176,8 +176,9 @@ trait HandlesOwnerCredits
   }
 
   /**
-   * Tasas desde el liquidador: "usury" vuelve a consultar la usura en datos.gov.co (quien decide créditos);
-   * "reference" cambia la tasa de referencia de Configuración (solo con permiso de configurar créditos).
+   * Tasas desde el liquidador: "usury" vuelve a consultar la usura en datos.gov.co (quien decide créditos) y, con
+   * permiso de configurar, baja la tasa de referencia si la nueva usura la deja por encima; "reference" cambia la tasa
+   * de referencia de Configuración (solo con permiso de configurar créditos).
    */
   public function ajax_handler_owner_credit_rate(): void
   {
@@ -194,13 +195,23 @@ trait HandlesOwnerCredits
         $settings['reference_rate'] = rtrim($value, '% ') . '%';
         $saved = OwnerCreditSettings::save(App::settings(), $settings, Auth::userId());
         error_log('[owner-credit-rate] reference ' . $before . ' -> ' . $saved['reference_rate'] . ' by ' . Auth::userId());
-        $this->jsonOk(['message' => 'Tasa de referencia: ' . $percent($before) . ' → ' . $percent((float) $saved['reference_rate']) . ' N.M.V.']);
+        $this->jsonOk(['message' => 'Tasa de referencia guardada: ' . $percent($before, 4) . ' → ' . $percent((float) $saved['reference_rate'], 4) . ' N.M.V.']);
       }
       $this->requireDashboardAction('owner_credit_decide', 'Tu cargo no tiene permiso para actualizar la tasa de usura.');
       if (!OwnerCreditSettings::read(App::settings())['usury_auto']) throw new \DomainException('La usura está en modo manual: cámbiala en Configuración › Créditos a propietarios.');
       $settings = OwnerCreditUsuryRate::sync(App::settings(), true);
       if ((string) $settings['usury_sync_error'] !== '') throw new \DomainException('No se pudo actualizar la usura: ' . $settings['usury_sync_error'] . ' Se conserva la última tasa.');
-      $this->jsonOk(['message' => 'Usura actualizada: ' . $percent((float) $settings['usury_annual']) . ' E.A.' . OwnerCreditService::usuryPeriod($settings) . '.']);
+      $message = 'Usura actualizada: ' . $percent((float) $settings['usury_annual']) . ' E.A.' . OwnerCreditService::usuryPeriod($settings) . '.';
+      if ($this->canUseDashboardAction('owner_credit_configure')) {
+        $capped = OwnerCreditUsuryRate::capReference(App::settings(), $settings, Auth::userId());
+        if ($capped !== null) {
+          error_log('[owner-credit-rate] reference capped ' . $capped['before'] . ' -> ' . $capped['after'] . ' by ' . Auth::userId());
+          $message .= ' Tasa de referencia bajada a la usura: ' . $percent($capped['before'], 4) . ' → ' . $percent($capped['after'], 4) . ' N.M.V.';
+        }
+      } elseif ((float) $settings['reference_rate'] > OwnerCreditUsuryRate::monthly($settings) + 1e-9) {
+        $message .= ' La tasa de referencia sigue sobre la usura: pídele a quien configura créditos que la baje.';
+      }
+      $this->jsonOk(['message' => $message]);
     } catch (\Throwable $error) {
       $this->ownerCreditFail($error, 'No se pudo actualizar la tasa.');
     }

@@ -55,7 +55,7 @@ final class OwnerCreditCoOwnersTestPdo extends PDO
 
 $pdo = new OwnerCreditCoOwnersTestPdo();
 $db = new Database($pdo, 'wp_');
-$pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema(_ID INTEGER PRIMARY KEY, funcion TEXT, valor TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema(_ID INTEGER PRIMARY KEY, funcion TEXT, valor TEXT, cct_author_id INTEGER, cct_modified TEXT, departamento TEXT)');
 $pdo->exec("INSERT INTO wp_jet_cct_confi_sistema(funcion, valor) VALUES ('control_servicios_config', '" . json_encode(['owner_credit_settings' => ['usury_auto' => false, 'usury_annual' => 0.2859, 'usury_updated_at' => date('Y-m-01'), 'reference_rate' => 0.019, 'require_promissory' => false, 'max_term' => 24, 'income_months' => 3]]) . "')");
 $pdo->exec('CREATE TABLE wp_scm_owner_credits(id INTEGER PRIMARY KEY AUTOINCREMENT, quote_id INTEGER UNIQUE, ticket_id TEXT DEFAULT "", contract_id INTEGER DEFAULT 0, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", address TEXT DEFAULT "", owner_id TEXT DEFAULT "", owner_name TEXT DEFAULT "", owner_email TEXT DEFAULT "", owner_phone TEXT DEFAULT "", purpose TEXT DEFAULT "", status TEXT DEFAULT "pendiente", requested_amount REAL DEFAULT 0, requested_term INTEGER DEFAULT 0, vacancy TEXT DEFAULT "Baja", gross_income REAL DEFAULT 0, deductions_json TEXT, net_income REAL DEFAULT 0, max_amount REAL DEFAULT 0, max_months INTEGER DEFAULT 0, approved_amount REAL, approved_term INTEGER, approved_rate REAL, monthly_payment REAL, total_interest REAL, first_payment_ts INTEGER, policy_json TEXT, evaluation_json TEXT, policy_override INTEGER DEFAULT 0, decision_note TEXT, decided_by_id TEXT DEFAULT "", decided_by_name TEXT DEFAULT "", decided_at INTEGER, closed_at INTEGER, created_by_id TEXT DEFAULT "", created_by_name TEXT DEFAULT "", created_at INTEGER, updated_at INTEGER)');
 $pdo->exec('CREATE TABLE wp_scm_owner_credit_sources(id INTEGER PRIMARY KEY AUTOINCREMENT, credit_id INTEGER, contract_id INTEGER, contract_code TEXT DEFAULT "", property TEXT DEFAULT "", net_income REAL DEFAULT 0, end_ts INTEGER, is_primary INTEGER DEFAULT 0, created_at INTEGER)');
@@ -245,7 +245,7 @@ $discountInput = ['rate' => '1,9', 'rate_discount' => '1.50', 'amount' => '$200.
 $discounted = $service->workspace($discountId, $discountInput);
 $check($near($discounted['conditions']['rate'] * 10000, 0.019 * 0.985 * 10000) && $near($discounted['conditions']['base_rate'] * 10000, 190) && in_array('descuento', array_column($discounted['adjustments'], 'key'), true), 'the discount lowers the base rate and is listed among the changes');
 $discountHtml = (new OwnerCreditView(true))->workspace($discounted, true, true);
-$check(str_contains($discountHtml, 'name="rate_discount"') && str_contains($discountHtml, '<option value="1.50" selected>') && str_contains($discountHtml, 'data-owner-credit-results-below') && str_contains($discountHtml, 'data-owner-credit-rate-action="reference"') && str_contains($discountHtml, 'name="reference_rate"'), 'the liquidator shows the discount select, the blocks below and, with permission, the reference rate field');
+$check(str_contains($discountHtml, 'name="rate_discount"') && str_contains($discountHtml, '<option value="1.50" selected>') && str_contains($discountHtml, 'data-owner-credit-results-below') && str_contains($discountHtml, 'data-owner-credit-reference-rate') && !str_contains($discountHtml, 'Guardar tasa de referencia') && str_contains($discountHtml, 'name="reference_rate"'), 'the liquidator shows the discount select, the blocks below and, with permission, the reference rate field');
 $check(!str_contains((new OwnerCreditView(false))->workspace($discounted, true, true), 'name="reference_rate"'), 'without the configure permission the reference rate is not editable from the liquidator');
 $service->decide($discountId, 'aprobado', $discountInput + ['note' => $note], $actor);
 $discountCredit = $service->find($discountId);
@@ -263,6 +263,16 @@ $check($usury::staleMessage(['usury_auto' => true, 'usury_updated_at' => '2026-1
   && str_contains($usury::staleMessage(['usury_auto' => true, 'usury_updated_at' => '2026-10-01', 'usury_valid_until' => '2026-10-31'], '2026-11-03'), 'Actualizar usura')
   && $usury::staleMessage(['usury_auto' => false, 'usury_updated_at' => '2026-11-01', 'usury_valid_until' => ''], '2026-11-30') === ''
   && str_contains($usury::staleMessage(['usury_auto' => false, 'usury_updated_at' => '2026-10-15', 'usury_valid_until' => '2026-12-31'], '2026-11-01'), 'Configuración'), 'the usury is current only inside its period (manual: until the end of its month)');
+// Semáforo del liquidador: verde si la usura rige hoy y la referencia no la supera; rojo en caso contrario.
+$current = ['usury_auto' => true, 'usury_annual' => 0.2834, 'usury_updated_at' => '2026-11-01', 'usury_valid_until' => '2026-11-30', 'reference_rate' => 0.021007];
+$check($usury::status($current, '2026-11-06')['label'] === 'Tasa correcta', 'a reference rate at the current usury shows as correct');
+$check(!$usury::status($current, '2026-12-01')['ok'] && str_contains($usury::status($current, '2026-12-01')['detail'], 'Actualizar usura'), 'a usury from another period shows as incorrect and says how to fix it');
+$check($usury::status(['reference_rate' => 0.0242] + $current, '2026-11-06')['label'] === 'Tasa incorrecta', 'a reference rate above the usury shows as incorrect');
+$capSettings = new Settings($db);
+$capConfig = \SCM\Modules\OwnerCredits\OwnerCreditSettings::read($capSettings);
+$capped = $usury::capReference($capSettings, ['reference_rate' => 0.0242, 'usury_annual' => 0.2834] + $capConfig, 1);
+$check(abs($capped['after'] - 0.021007) < 1e-7 && $capped['after'] <= $usury::monthly(['usury_annual' => 0.2834]) && $usury::capReference($capSettings, ['reference_rate' => 0.02, 'usury_annual' => 0.2834] + $capConfig, 1) === null, 'updating lowers a reference rate above the usury to the usury and never raises a lower one');
+\SCM\Modules\OwnerCredits\OwnerCreditSettings::save($capSettings, $capConfig, 1);
 $config = json_decode((string) $db->getVar("SELECT valor FROM wp_jet_cct_confi_sistema WHERE funcion = 'control_servicios_config'"), true);
 $config['owner_credit_settings']['usury_updated_at'] = date('Y-m-01', strtotime('first day of last month'));
 $db->update('wp_jet_cct_confi_sistema', ['valor' => json_encode($config)], ['funcion' => 'control_servicios_config']);
