@@ -17,14 +17,8 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
   <footer class="mt-auto border-t border-slate-200/80 bg-white/70 backdrop-blur-xs py-5">
     <div class="w-full px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
       
-      <!-- Marca y Derechos -->
-      <div class="flex items-center gap-2">
-        <span class="font-semibold text-slate-700">SKC SuCasa Inmobiliaria</span>
-        <span>•</span>
-        <span>Sistema de Control y Operaciones Inmobiliarias</span>
-        <span>•</span>
-        <span>&copy; <?php echo date('Y'); ?> Todos los derechos reservados.</span>
-      </div>
+      <!-- Derechos -->
+      <span class="text-center">&copy; <?php echo date('Y'); ?> Todos los derechos reservados.</span>
 
       <!-- Enlaces y Versión -->
       <div class="flex items-center gap-4 text-[11px]">

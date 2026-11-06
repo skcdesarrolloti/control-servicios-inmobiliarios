@@ -16934,21 +16934,6 @@ html.scm-lease-modal-open {
     padding: 7px 4px !important;
   }
 
-  #scm-app .scm-home-calendar .scm-calendar-day-card > .scm-calendar-card-head {
-    align-items: flex-start;
-    flex-direction: row;
-  }
-
-  #scm-app .scm-home-calendar .scm-calendar-day-card > .scm-calendar-card-head > div {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  #scm-app .scm-home-calendar .scm-calendar-day-card > .scm-calendar-card-head > button {
-    flex: 0 0 auto;
-    width: auto;
-  }
-
   #scm-app .scm-home-calendar .scm-calendar-event-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -16957,5 +16942,23 @@ html.scm-lease-modal-open {
   #scm-app .scm-home-calendar .scm-calendar-event-actions > * {
     min-width: 0;
     width: 100%;
+  }
+}
+
+/* 760px y !important: modern-ui.css pone .scm-case-work-btn al 100% hasta ese ancho y dejaba el título en 0px. */
+@media (max-width: 760px) {
+  #scm-app .scm-home-calendar .scm-calendar-day-card > .scm-calendar-card-head {
+    align-items: flex-start;
+    flex-direction: row;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-day-card > .scm-calendar-card-head > div {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  #scm-app .scm-home-calendar .scm-calendar-day-card > .scm-calendar-card-head > button {
+    flex: 0 0 auto;
+    width: auto !important;
   }
 }
