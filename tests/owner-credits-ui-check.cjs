@@ -27,13 +27,15 @@ echo (new OwnerCreditView(true))->workspace($w, true, true);`;
     window.fetch = (url, opts) => {
       const body = Object.fromEntries(opts.body.entries());
       window.calls.push(body);
-      if (body.action === 'scm_owner_credit_pdf') {
+      if (body.action === 'scm_owner_credit_pdf' || body.action === 'scm_owner_credit_document') {
         return new Promise(r => setTimeout(() => r({ headers: { get: () => 'application/pdf' }, blob: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })) }), 400));
       }
       const data = body.action === 'scm_owner_credit_open' ? { title: 'Crédito #12 · Pendiente', html: workspace }
         : body.action === 'scm_owner_credit_simulate' ? { results_html: '<p data-sim>recalculado ' + body.amount + '</p>', results_below_html: '<p data-sim-below>abajo ' + (body.rate_discount || '') + '</p>', schedule_html: '<p>tabla</p>' }
         : body.action === 'scm_owner_credit_decide' ? { message: 'Crédito aprobado.' }
         : body.action === 'scm_owner_credit_rate' ? { message: 'Usura actualizada.' }
+        : body.action === 'scm_owner_credit_detail' ? { title: 'Crédito #12 · Aprobado', html: '<div data-owner-credit-detail-box><section data-owner-credit-detail-documents><button data-owner-credit-detail-doc="carta" data-credit-id="12">Ver carta</button></section><section><div data-owner-credit-actions><button data-owner-credit-accounting="1" data-credit-id="12">Marcar</button></div><p data-owner-credit-accounting-status></p></section></div>' }
+        : body.action === 'scm_owner_credit_accounting' ? { message: 'Crédito marcado como ingresado a contabilidad.' }
         : body.action === 'scm_owner_credit_prepayment' ? { html: '<p data-prepay-result>abono ' + body.prepay_amount + ' el ' + body.prepay_date + '</p>' } : {};
       return Promise.resolve({ json: () => Promise.resolve({ success: true, data }) });
     };
@@ -140,6 +142,8 @@ echo (new OwnerCreditView(true))->workspace($w, true, true);`;
   const pdfCall = (await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_pdf').pop();
   assert.equal(pdfCall.gross, '$19.250.000', 'the document is generated with what is on screen');
   assert.equal(pdfCall.credit_id, '12');
+  const pdfHeight = await page.evaluate(() => document.querySelector('[data-owner-credit-modal] [role=dialog]').getBoundingClientRect().height);
+  assert.ok(pdfHeight > 500, 'the PDF viewer fills the popup, got ' + pdfHeight);
   await page.click('[data-owner-credit-pdf-close]');
   assert.match(await page.textContent('[data-owner-credit-pdf]'), /Ver documento del crédito/);
   console.log('OK Ver documento del crédito shows "Generando PDF…" until the PDF arrives');
@@ -164,6 +168,31 @@ echo (new OwnerCreditView(true))->workspace($w, true, true);`;
   assert.equal(savedRate.mode, 'reference');
   assert.equal(savedRate.reference_rate, '2,05');
   console.log('OK the reference rate saves by itself and the rate state shows on load');
+
+  // Crédito aprobado: popup propio; el visor no queda en una franja aunque el popup tenga poco contenido.
+  await page.evaluate(() => {
+    const button = document.createElement('button');
+    button.setAttribute('data-owner-credit-detail', 'documentos');
+    button.setAttribute('data-credit-id', '12');
+    button.textContent = 'Documentos';
+    document.querySelector('#scm-app').appendChild(button);
+    button.click();
+    button.remove();
+  });
+  await page.waitForSelector('[data-owner-credit-detail-doc="carta"]');
+  await page.click('[data-owner-credit-detail-doc="carta"]');
+  await page.waitForSelector('[data-owner-credit-pdf-viewer] iframe');
+  assert.ok(await page.evaluate(() => document.querySelector('[data-owner-credit-modal] [role=dialog]').getBoundingClientRect().height) > 500, 'a document from the credit popup opens at full height');
+  const detailDoc = (await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_document').pop();
+  assert.equal(detailDoc.kind, 'carta');
+  await page.click('[data-owner-credit-pdf-close]');
+  await page.click('[data-owner-credit-accounting="1"]');
+  await page.click('[data-owner-credit-confirm-yes]');
+  await page.waitForFunction(() => (document.querySelector('[data-owner-credit-accounting-status]') || {}).textContent === 'Crédito marcado como ingresado a contabilidad.');
+  assert.equal((await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_accounting').pop().done, '1');
+  console.log('OK the approved credit popup shows documents and marks accounting after confirming');
+  await page.evaluate(() => { document.querySelector('[data-owner-credit-open]') || document.querySelector('#scm-app').insertAdjacentHTML('beforeend', '<button data-owner-credit-open data-quote-id="574"></button>'); document.querySelector('#scm-app [data-owner-credit-open]').click(); });
+  await page.waitForSelector('[data-owner-credit-form]');
 
   assert.equal(await page.isVisible('[name="note"]'), false, 'the note is hidden while every policy is met and nothing changed');
   await page.click('[data-owner-credit-decide="aprobado"]');

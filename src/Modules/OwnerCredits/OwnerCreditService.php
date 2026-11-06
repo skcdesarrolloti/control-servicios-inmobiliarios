@@ -364,6 +364,12 @@ final class OwnerCreditService
       $this->db->pdo()->exec("CREATE INDEX idx_beneficiary_type ON `{$this->table()}` (beneficiary_type)");
       $this->schema = new SchemaInspector($this->db);
     }
+    // Ingreso a contabilidad: lo marca el funcionario después de registrar el crédito (el panel no contabiliza).
+    if (!$this->schema->columnExists($this->table(), 'accounting_at')) {
+      $this->db->pdo()->exec("ALTER TABLE `{$this->table()}` ADD COLUMN accounting_at BIGINT NULL");
+      $this->db->pdo()->exec("ALTER TABLE `{$this->table()}` ADD COLUMN accounting_by VARCHAR(190) NOT NULL DEFAULT ''");
+      $this->schema = new SchemaInspector($this->db);
+    }
     // Respuesta al propietario (carta, pagaré firmado y plan de pagos): cuándo se envió y a quién.
     if (!$this->schema->columnExists($this->table(), 'response_sent_at')) {
       $this->db->pdo()->exec("ALTER TABLE `{$this->table()}` ADD COLUMN response_sent_at BIGINT NULL");
@@ -1331,6 +1337,31 @@ final class OwnerCreditService
     $credit = $this->find($id) ?? $credit;
     $this->recordHistories($credit, 'Crédito ' . strtolower(self::STATUSES[$status]), 'Crédito #' . $id . ' marcado como ' . strtolower(self::STATUSES[$status]) . '. ' . $note, $actor);
     return $credit;
+  }
+
+  /** Ya se le envió la respuesta al propietario y falta registrarlo en contabilidad. */
+  public static function accountingPending(array $credit): bool
+  {
+    return in_array((string) ($credit['status'] ?? ''), ['aprobado', 'pagado'], true) && (int) ($credit['response_sent_at'] ?? 0) > 0 && (int) ($credit['accounting_at'] ?? 0) <= 0;
+  }
+
+  /**
+   * Marca o desmarca el ingreso a contabilidad, con trazabilidad en el crédito, el contrato y el inmueble. No cambia el
+   * estado ni el saldo del crédito: es solo el aviso de que el funcionario ya lo registró.
+   * @return array<string,mixed> crédito actualizado
+   */
+  public function setAccounting(int $id, bool $done, array $actor): array
+  {
+    $this->ensureSchema();
+    $credit = $this->find($id);
+    if ($credit === null) throw new \DomainException('El crédito ya no existe.');
+    if (!in_array($credit['status'], ['aprobado', 'pagado'], true) || (int) ($credit['response_sent_at'] ?? 0) <= 0) throw new \DomainException('Solo se ingresan a contabilidad los créditos aprobados con su respuesta enviada.');
+    if ($done === ((int) ($credit['accounting_at'] ?? 0) > 0)) return $credit;
+    $name = (string) ($actor['name'] ?? '');
+    $this->db->update($this->table(), $this->schema->filterTableData($this->table(), ['accounting_at' => $done ? time() : null, 'accounting_by' => $done ? mb_substr($name, 0, 190) : '']), ['id' => $id]);
+    $this->event($id, $done ? 'contabilidad' : 'contabilidad_quitada', $actor, ['nota' => $done ? 'Ingresado a contabilidad.' : 'Se quitó la marca de ingresado a contabilidad.']);
+    $this->recordHistories($credit, $done ? 'Crédito ingresado a contabilidad' : 'Crédito pendiente de contabilidad', 'Crédito #' . $id . ($done ? ' ingresado a contabilidad.' : ': se quitó la marca de ingresado a contabilidad.'), $actor);
+    return $this->find($id) ?? $credit;
   }
 
   /**

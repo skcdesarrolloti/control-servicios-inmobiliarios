@@ -97,15 +97,95 @@ final class OwnerCreditView
         . '<td class="' . $td . ' !sp-whitespace-nowrap">' . ($approved ? self::money($row['monthly_payment']) : '—') . '</td>'
         . '<td class="' . $td . ' !sp-whitespace-nowrap">' . ($row['balance'] !== null ? self::money($row['balance']) : '—') . '</td>'
         . '<td class="' . $td . '">' . self::status((string) $row['status']) . ((int) $row['policy_override'] === 1 ? $small('Fuera de política') : '')
-        . ($row['status'] === 'aprobado' ? $small((int) ($row['response_sent_at'] ?? 0) > 0 ? 'Respuesta enviada ' . date('d/m/Y', (int) $row['response_sent_at']) : ((int) ($row['promissory_id'] ?? 0) > 0 ? 'Respuesta por enviar' : 'Firma de documentos')) : '') . '</td>'
+        . ($row['status'] === 'aprobado' ? $small((int) ($row['response_sent_at'] ?? 0) > 0 ? 'Respuesta enviada ' . date('d/m/Y', (int) $row['response_sent_at']) : ((int) ($row['promissory_id'] ?? 0) > 0 ? 'Respuesta por enviar' : 'Firma de documentos')) : '')
+        . self::accountingTag($row) . '</td>'
         . '<td class="' . $td . ' !sp-whitespace-nowrap">' . date('d/m/Y', (int) $row['created_at']) . ((int) $row['decided_at'] > 0 ? $small('Decidido ' . date('d/m/Y', (int) $row['decided_at'])) : '') . '</td>'
         . '<td class="' . $td . '"><div class="!sp-flex !sp-flex-wrap !sp-gap-2" data-owner-credit-actions>'
-        . ($canOpen ? '<button type="button" class="' . $ui::NAVY . ' !sp-whitespace-nowrap" data-owner-credit-open data-credit-id="' . (int) $row['id'] . '">' . $ui::icon('eye', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . 'Ver solicitud</button>' : '')
-        . ($canOpen && (int) ($row['promissory_id'] ?? 0) > 0 ? '<button type="button" class="' . $ui::SECONDARY . ' !sp-whitespace-nowrap" data-owner-credit-list-promissory="' . (int) $row['promissory_id'] . '" data-number="' . self::e($row['promissory_number']) . '" data-owner="' . self::e($row['owner_name']) . '" title="' . self::e('Pagaré ' . $row['promissory_number'] . ' firmado') . '">' . $ui::icon('document', '!sp-w-3 !sp-h-3') . 'Pagaré</button>' : '')
+        . ($canOpen && $approved ? '<button type="button" class="' . $ui::NAVY . ' !sp-whitespace-nowrap" data-owner-credit-detail data-credit-id="' . (int) $row['id'] . '">' . $ui::icon('eye', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . 'Ver crédito</button>'
+          . '<button type="button" class="' . $ui::SECONDARY . ' !sp-whitespace-nowrap" data-owner-credit-detail="documentos" data-credit-id="' . (int) $row['id'] . '">' . $ui::icon('document', '!sp-w-3 !sp-h-3') . 'Documentos</button>' : '')
+        . ($canOpen && !$approved ? '<button type="button" class="' . $ui::NAVY . ' !sp-whitespace-nowrap" data-owner-credit-open data-credit-id="' . (int) $row['id'] . '">' . $ui::icon('eye', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . 'Ver solicitud</button>' : '')
+        . ($canOpen && !$approved && (int) ($row['promissory_id'] ?? 0) > 0 ? '<button type="button" class="' . $ui::SECONDARY . ' !sp-whitespace-nowrap" data-owner-credit-list-promissory="' . (int) $row['promissory_id'] . '" data-number="' . self::e($row['promissory_number']) . '" data-owner="' . self::e($row['owner_name']) . '" title="' . self::e('Pagaré ' . $row['promissory_number'] . ' firmado') . '">' . $ui::icon('document', '!sp-w-3 !sp-h-3') . 'Pagaré</button>' : '')
         . ($canVoid && $row['status'] === 'pendiente' ? '<button type="button" class="!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-3 !sp-py-2 !sp-rounded-lg !sp-bg-white !sp-border !sp-border-solid !sp-border-red-200 !sp-text-red-700 !sp-text-xs !sp-font-semibold !sp-whitespace-nowrap !sp-cursor-pointer hover:!sp-bg-red-50" data-owner-credit-void data-credit-id="' . (int) $row['id'] . '">' . $ui::icon('close', '!sp-w-3 !sp-h-3') . 'Anular</button>' : '')
         . '</div></td></tr>';
     }
     return $html . '</tbody></table></div></div>';
+  }
+
+  /** Etiqueta de contabilidad del listado; vacía hasta que se envía la respuesta. @param array<string,mixed> $row */
+  private static function accountingTag(array $row): string
+  {
+    $at = (int) ($row['accounting_at'] ?? 0);
+    if ($at > 0) return '<small class="!sp-block !sp-mt-0.5 !sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Ingresado a contabilidad ' . date('d/m/Y', $at) . '</small>';
+    return OwnerCreditService::accountingPending($row) ? '<small class="!sp-block !sp-mt-0.5 !sp-text-[10px] !sp-font-semibold !sp-text-amber-800">Pendiente de contabilidad</small>' : '';
+  }
+
+  /**
+   * Popup de un crédito aprobado: sus condiciones, los documentos enviados y el ingreso a contabilidad, sin el liquidador.
+   * @param array<string,mixed> $work OwnerCreditService::workspace()
+   */
+  public function detail(array $work, bool $canAccount): string
+  {
+    $ui = UI::class;
+    $credit = $work['credit'];
+    $id = (int) $credit['id'];
+    $date = static fn(int $ts): string => $ts > 0 ? date('d/m/Y', $ts) : 'Sin fecha';
+    $amount = (float) $credit['approved_amount'];
+    $interest = (float) $credit['total_interest'];
+    $pairs = [
+      'Propietario' => (string) $credit['owner_name'],
+      'Documento' => (string) ($credit['owner_document'] ?? ''),
+      'Contrato' => '#' . $credit['contract_code'],
+      'Inmueble' => trim((string) $credit['property'] . ((string) $credit['address'] !== '' ? ' · ' . $credit['address'] : '')),
+      'Destinación' => (string) $credit['purpose'],
+      'Solicitado' => self::money($credit['requested_amount']) . ((int) $credit['requested_term'] > 0 ? ' a ' . (int) $credit['requested_term'] . ' meses' : ''),
+      'Total de intereses' => self::money($interest),
+      'Total a pagar' => self::money($amount + $interest),
+      'Primera cuota' => $date((int) ($work['first_payment_ts'] ?? 0)),
+      'Última cuota' => $date((int) ($work['last_payment_ts'] ?? 0)),
+      'Aprobó' => (string) $credit['decided_by_name'],
+      'Fecha de aprobación' => $date((int) $credit['decided_at']),
+      'Respuesta enviada' => $date((int) ($credit['response_sent_at'] ?? 0)),
+    ];
+    $rows = '';
+    foreach ($pairs as $label => $value) {
+      if (trim($value) === '') continue;
+      $rows .= '<div class="!sp-min-w-0"><dt class="!sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">' . self::e($label) . '</dt><dd class="!sp-m-0 !sp-mt-0.5 !sp-text-[11px] !sp-font-semibold !sp-text-service-navy !sp-break-words">' . self::e($value) . '</dd></div>';
+    }
+    $note = trim((string) $credit['decision_note']);
+    $conditions = '<section class="' . self::SECTION . '"><div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-3"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('cash') . 'Condiciones del crédito</h4>' . self::status((string) $credit['status']) . '</div>'
+      . '<div class="!sp-grid !sp-grid-cols-2 lg:!sp-grid-cols-4 !sp-gap-3 !sp-mb-4">'
+      . self::tile('Valor aprobado', self::money($amount), 'key') . self::tile('Cuota mensual', self::money($credit['monthly_payment']), 'key')
+      . self::tile('Plazo', (int) $credit['approved_term'] . ' meses') . self::tile('Tasa N.M.V', self::fine((float) $credit['approved_rate'])) . '</div>'
+      . '<dl class="!sp-m-0 !sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-3 !sp-gap-3">' . $rows . '</dl>'
+      . ((int) $credit['policy_override'] === 1 ? '<p class="' . self::NOTE . ' !sp-mt-3 !sp-text-amber-800 !sp-font-semibold">Aprobado fuera de política.</p>' : '')
+      . ($note !== '' ? '<p class="' . self::NOTE . ' !sp-mt-2 !sp-whitespace-pre-wrap">' . self::e($note) . '</p>' : '') . '</section>';
+
+    $view = static fn(string $attrs, string $label): string => '<button type="button" class="' . $ui::SECONDARY . ' !sp-whitespace-nowrap" data-credit-id="' . $id . '" ' . $attrs . '>' . $ui::icon('eye', '!sp-w-3 !sp-h-3') . self::e($label) . '</button>';
+    $doc = static fn(string $title, string $hint, string $action): string => '<li class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-3 !sp-py-2 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0"><span class="!sp-min-w-0"><b class="!sp-block !sp-text-[11px] !sp-text-service-navy">' . self::e($title) . '</b><span class="!sp-text-[10px] !sp-text-service-muted">' . self::e($hint) . '</span></span>' . $action . '</li>';
+    $documents = $doc('Carta de aprobación', 'Condiciones aprobadas y forma de pago.', $view('data-owner-credit-detail-doc="carta"', 'Ver carta'));
+    foreach ((array) ($work['promissory']['owners'] ?? []) as $owner) {
+      if (empty($owner['required'])) continue;
+      $signed = $owner['status'] === 'firmado';
+      $documents .= $doc('Pagaré y carta de instrucciones · ' . $owner['name'], $signed ? $owner['number'] . ' · firmado el ' . $date((int) $owner['signed_at']) . '.' : 'Pendiente de firma.',
+        $signed ? $view('data-owner-credit-detail-doc="pagare" data-promissory-id="' . (int) $owner['promissory_id'] . '" data-number="' . self::e($owner['number']) . '"', 'Ver pagaré') : '');
+    }
+    $documents .= $doc('Condiciones y plan de pagos', 'Tabla de amortización completa.', $view('data-owner-credit-detail-doc="plan"', 'Ver plan de pagos'));
+    $documents = '<section class="' . self::SECTION . '" data-owner-credit-detail-documents><h4 class="' . self::H4 . ' !sp-mb-1">' . self::icon('document') . 'Documentos enviados</h4><ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $documents . '</ul></section>';
+
+    $at = (int) ($credit['accounting_at'] ?? 0);
+    $sent = (int) ($credit['response_sent_at'] ?? 0) > 0;
+    $state = $at > 0 ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Ingresado</span>' : ($sent ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-amber-800">Pendiente</span>' : '');
+    $text = $at > 0 ? 'Ingresado el ' . date('d/m/Y g:i a', $at) . ((string) ($credit['accounting_by'] ?? '') !== '' ? ' por ' . $credit['accounting_by'] : '') . '.'
+      : ($sent ? 'Márcalo cuando el crédito quede registrado en SIMI y en contabilidad. El panel no contabiliza: esta marca solo avisa que ya se hizo.' : 'Se podrá marcar cuando se envíe la respuesta al propietario.');
+    $action = !$canAccount || !$sent ? '' : ($at > 0
+      ? '<button type="button" class="' . $ui::SECONDARY . '" data-owner-credit-accounting="0" data-credit-id="' . $id . '">Quitar marca</button>'
+      : '<button type="button" class="' . $ui::PRIMARY . '" data-owner-credit-accounting="1" data-credit-id="' . $id . '">' . $ui::icon('check', '!sp-w-3.5 !sp-h-3.5') . 'Marcar como ingresado</button>');
+    $accounting = '<section class="' . self::SECTION . '" data-owner-credit-accounting-box><div class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-2 !sp-mb-1"><h4 class="' . self::H4 . ' !sp-mb-0">' . self::icon('check') . 'Contabilidad</h4>' . $state . '</div>'
+      . '<p class="' . self::NOTE . '">' . self::e($text) . '</p>' . ($action !== '' ? '<div class="!sp-flex !sp-justify-end !sp-mt-3" data-owner-credit-actions>' . $action . '</div>' : '')
+      . '<p class="!sp-m-0 !sp-mt-1 !sp-text-[11px]" data-owner-credit-accounting-status role="status" aria-live="polite"></p></section>';
+
+    return '<div class="!sp-flex !sp-flex-col !sp-gap-4 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6" data-owner-credit-detail-box>' . $conditions . $documents . $accounting
+      . '<div class="!sp-flex !sp-justify-end"><button type="button" class="' . $ui::SECONDARY . '" data-owner-credit-open data-credit-id="' . $id . '">Abrir liquidador</button></div></div>';
   }
 
   /** @param array<string,mixed> $work */

@@ -84,6 +84,7 @@
       box.querySelector("[data-owner-credit-body]").innerHTML = html;
       // Un visor de PDF que quedó abierto al cerrar el popup no debe tapar el contenido nuevo.
       box.querySelectorAll("[data-owner-credit-pdf-viewer]").forEach(function (viewer) { viewer.remove(); });
+      box.querySelector("[role=dialog]").style.height = "";
       box.hidden = false;
       document.body.classList.add("scm-cia-modal-open");
       // El foco va al diálogo (no al botón cerrar): Tab recorre el formulario desde el inicio.
@@ -111,6 +112,18 @@
 
     function setLoading(element, loading) {
       if (element) element.style.opacity = loading ? "0.55" : "";
+    }
+
+    // Crédito aprobado: condiciones, documentos y contabilidad, sin el liquidador.
+    function openDetail(creditId, focus) {
+      showModal("Cargando…", "Condiciones del crédito.", message("Cargando crédito…"));
+      return post("scm_owner_credit_detail", { credit_id: creditId })
+        .then(function (data) {
+          showModal(data.title || "Crédito", "Condiciones aprobadas, documentos enviados y contabilidad.", data.html || "");
+          var section = focus === "documentos" && modal.querySelector("[data-owner-credit-detail-documents]");
+          if (section) section.scrollIntoView({ block: "start" });
+        })
+        .catch(function (error) { showModal("No se pudo abrir", "", message(error.message, "error")); });
     }
 
     function openCredit(params) {
@@ -529,7 +542,11 @@
         '<div class="!sp-flex !sp-gap-2" data-owner-credit-pdf-actions><button type="button" class="' + UI.secondary + '" data-owner-credit-pdf-close>' + escapeHtml(options.back) + "</button></div></div>" +
         '<div class="!sp-flex-1 !sp-flex !sp-flex-col !sp-items-center !sp-justify-center !sp-gap-3 !sp-font-sans !sp-text-service-navy" data-owner-credit-pdf-body role="status" aria-live="polite">' +
         spinner("!sp-w-8 !sp-h-8") + '<strong class="!sp-text-sm">Generando PDF…</strong><span class="' + UI.note + '">Suele tardar unos segundos.</span></div>';
-      box.querySelector("[role=dialog]").appendChild(viewer);
+      // El visor se ajusta al popup: sin esta altura, un popup vacío lo deja en una franja.
+      var dialog = box.querySelector("[role=dialog]");
+      var dialogHeight = dialog.style.height;
+      dialog.style.height = "94vh";
+      dialog.appendChild(viewer);
       var url = "";
       var closed = false;
       var restore = function () {
@@ -540,6 +557,7 @@
       viewer.querySelector("[data-owner-credit-pdf-close]").addEventListener("click", function () {
         closed = true;
         viewer.remove();
+        dialog.style.height = dialogHeight;
         if (url) URL.revokeObjectURL(url);
         restore();
         if (options.onClose) options.onClose();
@@ -606,6 +624,55 @@
           post("scm_owner_credit_void", { credit_id: voidButton.getAttribute("data-credit-id") })
             .then(function () { loadReport(true); })
             .catch(function (error) { voidButton.disabled = false; showModal("No se pudo anular", "", message(error.message, "error")); });
+        });
+        return;
+      }
+
+      var detail = target.closest("[data-owner-credit-detail]");
+      if (detail) {
+        event.preventDefault();
+        openDetail(detail.getAttribute("data-credit-id"), detail.getAttribute("data-owner-credit-detail"));
+        return;
+      }
+
+      var detailDoc = target.closest("[data-owner-credit-detail-doc]");
+      if (detailDoc) {
+        event.preventDefault();
+        var detailId = detailDoc.getAttribute("data-credit-id");
+        var detailKind = detailDoc.getAttribute("data-owner-credit-detail-doc");
+        var detailRequest = new FormData();
+        if (detailKind === "pagare") {
+          var detailNumber = detailDoc.getAttribute("data-number") || "";
+          detailRequest.set("promissory_id", detailDoc.getAttribute("data-promissory-id"));
+          showPdf(detailDoc, { title: "Pagaré " + detailNumber + " firmado", back: "Volver al crédito", action: "scm_owner_credit_promissory_pdf", data: detailRequest, filename: "pagare-" + detailNumber + "-firmado.pdf" });
+          return;
+        }
+        detailRequest.set("credit_id", detailId);
+        detailRequest.set("kind", detailKind);
+        showPdf(detailDoc, { title: (detailKind === "carta" ? "Carta de aprobación" : "Condiciones y plan de pagos") + " · Crédito #" + detailId, back: "Volver al crédito", action: "scm_owner_credit_document", data: detailRequest, filename: (detailKind === "carta" ? "carta-aprobacion" : "condiciones-plan-de-pagos") + "-credito-" + detailId + ".pdf" });
+        return;
+      }
+
+      var accounting = target.closest("[data-owner-credit-accounting]");
+      if (accounting) {
+        event.preventDefault();
+        var accountingDone = accounting.getAttribute("data-owner-credit-accounting");
+        var accountingId = accounting.getAttribute("data-credit-id");
+        askConfirm(accounting, accountingDone === "1" ? "¿Confirmas que el crédito #" + accountingId + " ya quedó ingresado a contabilidad? Queda registrado con tu nombre." : "¿Quitar la marca de ingresado a contabilidad del crédito #" + accountingId + "? Vuelve a quedar pendiente.", function () {
+          accounting.disabled = true;
+          post("scm_owner_credit_accounting", { credit_id: accountingId, done: accountingDone })
+            .then(function (data) {
+              loadReport(true);
+              return openDetail(accountingId).then(function () {
+                var status = modal.querySelector("[data-owner-credit-accounting-status]");
+                if (status) { status.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-font-semibold !sp-text-emerald-700"; status.textContent = data.message || "Listo."; }
+              });
+            })
+            .catch(function (error) {
+              accounting.disabled = false;
+              var status = modal.querySelector("[data-owner-credit-accounting-status]");
+              if (status) { status.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-font-semibold !sp-text-red-700"; status.textContent = error.message; }
+            });
         });
         return;
       }

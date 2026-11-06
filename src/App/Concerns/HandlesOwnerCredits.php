@@ -399,6 +399,42 @@ trait HandlesOwnerCredits
     }
   }
 
+  /** Condiciones, documentos y contabilidad de un crédito aprobado, sin abrir el liquidador. */
+  public function ajax_handler_owner_credit_detail(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canViewOwnerCredits()) $this->jsonFail('No tienes permiso para ver créditos.');
+    try {
+      $id = (int) ($_POST['credit_id'] ?? 0);
+      $service = $this->ownerCreditService();
+      $service->ensureSchema();
+      $work = $service->workspace($id);
+      if (!in_array($work['credit']['status'], ['aprobado', 'pagado'], true)) throw new \DomainException('Las condiciones existen para créditos aprobados.');
+      $this->jsonOk(['title' => 'Crédito #' . $id . ' · ' . OwnerCreditService::STATUSES[$work['credit']['status']], 'html' => (new OwnerCreditView())->detail($work, $this->canMarkOwnerCreditAccounting())]);
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo abrir el crédito.');
+    }
+  }
+
+  /** Quien gestiona créditos también puede marcarlos; el permiso propio es para contabilidad, que no los gestiona. */
+  private function canMarkOwnerCreditAccounting(): bool
+  {
+    return $this->canUseDashboardAction('owner_credit_accounting') || $this->canUseDashboardAction('owner_credit_manage');
+  }
+
+  public function ajax_handler_owner_credit_accounting(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canMarkOwnerCreditAccounting()) $this->jsonFail('Tu cargo no tiene permiso para marcar créditos en contabilidad.');
+    try {
+      $done = (string) ($_POST['done'] ?? '') === '1';
+      $this->ownerCreditService()->setAccounting((int) ($_POST['credit_id'] ?? 0), $done, $this->ticketCompletionActor());
+      $this->jsonOk(['message' => $done ? 'Crédito marcado como ingresado a contabilidad.' : 'Se quitó la marca de contabilidad.']);
+    } catch (\Throwable $error) {
+      $this->ownerCreditFail($error, 'No se pudo actualizar la marca de contabilidad.');
+    }
+  }
+
   public function ajax_handler_owner_credit_close(): void
   {
     $this->verifyCsrf();

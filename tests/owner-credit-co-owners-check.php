@@ -247,6 +247,28 @@ $check($requestEvent->invoke($service, ['purpose' => OwnerCreditSettings::REPAIR
 $check($requestEvent->invoke($service, $freeByCoOwner) === OwnerCreditService::EVENT_FREE_REQUESTED, 'a free investment request goes to its own list');
 $check($requestEvent->invoke($service, ['purpose' => 'Cuotas de administración', 'quote_id' => 0]) === OwnerCreditService::EVENT_REQUESTED && $requestEvent->invoke($service, ['purpose' => 'Servicios públicos', 'quote_id' => 0]) === OwnerCreditService::EVENT_REQUESTED, 'services and HOA fees go to the property list');
 $db->update('wp_jet_cct_confi_sistema', ['valor' => $rawLists], ['funcion' => 'control_servicios_config']);
+// Crédito aprobado: se ve sin el liquidador y se marca el ingreso a contabilidad, con trazabilidad.
+$accountingId = $service->createManual(20, 200000, 3, 'Libre inversión', $actor, '', 'mandato_1');
+try {
+  $service->setAccounting($accountingId, true, $actor);
+  $check(false, 'a credit without a sent response cannot be marked as accounted');
+} catch (DomainException $error) {
+  $check(str_contains($error->getMessage(), 'contabilidad'), 'a credit without a sent response cannot be marked as accounted');
+}
+$db->update('wp_scm_owner_credits', ['status' => 'aprobado', 'response_sent_at' => time(), 'approved_amount' => 200000, 'approved_term' => 3, 'approved_rate' => 0.019, 'monthly_payment' => 70000, 'total_interest' => 10000, 'decided_by_name' => 'Analista QA', 'decided_at' => time()], ['id' => $accountingId]);
+$check(OwnerCreditService::accountingPending($service->find($accountingId)), 'a credit with its response sent is pending in accounting');
+$pendingDetail = (new OwnerCreditView())->detail($service->workspace($accountingId), true);
+$check(str_contains($pendingDetail, 'Condiciones del crédito') && str_contains($pendingDetail, 'data-owner-credit-detail-doc="carta"') && str_contains($pendingDetail, 'data-owner-credit-detail-doc="plan"') && str_contains($pendingDetail, 'data-owner-credit-accounting="1"') && !str_contains($pendingDetail, 'name="reference_rate"'), 'the credit popup shows the conditions, the documents and the accounting mark without the liquidator');
+$check(!str_contains((new OwnerCreditView())->detail($service->workspace($accountingId), false), 'data-owner-credit-accounting="1"'), 'without permission the accounting button is hidden');
+$accounted = $service->setAccounting($accountingId, true, $actor);
+$check((int) $accounted['accounting_at'] > 0 && $accounted['accounting_by'] === (string) $actor['name'] && !OwnerCreditService::accountingPending($accounted) && $accounted['status'] === 'aprobado', 'marking as accounted saves who and when and does not change the credit status');
+$accountingEvents = $db->getResults("SELECT action FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action LIKE 'contabilidad%'", [$accountingId]);
+$service->setAccounting($accountingId, true, $actor);
+$check(count($accountingEvents) === 1 && count($db->getResults("SELECT action FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action LIKE 'contabilidad%'", [$accountingId])) === 1, 'marking twice leaves a single trace');
+$cleared = $service->setAccounting($accountingId, false, $actor);
+$check((int) ($cleared['accounting_at'] ?? 0) === 0 && OwnerCreditService::accountingPending($cleared) && count($db->getResults("SELECT action FROM wp_scm_owner_credit_events WHERE credit_id = ? AND action = 'contabilidad_quitada'", [$accountingId])) === 1, 'the mark can be removed and leaves a trace');
+$listRow = (new OwnerCreditView())->report($service->report(['search' => '']), true, true);
+$check(str_contains($listRow, 'data-owner-credit-detail data-credit-id="' . $accountingId . '"') && str_contains($listRow, 'Pendiente de contabilidad') && str_contains($listRow, 'Ver crédito') && str_contains($listRow, 'data-owner-credit-detail="documentos"'), 'an approved credit shows Ver crédito, Documentos and its accounting state in the list');
 $creditSource = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
 $appSource = (string) file_get_contents(dirname(__DIR__) . '/src/App/SuCasaControlServiciosInmobiliarios.php');
 $check(str_contains($creditSource, 'notifyInternal((int) $credit[\'id\'], $this->creditEvent($credit), $title') && str_contains($creditSource, 'notifyStaffWhatsapp($this->creditEvent($credit), $credit, \'scm_credito_propietario_respuesta_funcionario_v1\'') && str_contains($creditSource, 'emailsForAction($this->db, $staffEvent)') && str_contains($creditSource, 'contactsForAction($this->db, $staffEvent)'), 'the decision and the response go to the same list as the request');

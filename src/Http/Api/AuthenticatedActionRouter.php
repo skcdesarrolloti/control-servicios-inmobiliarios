@@ -75,6 +75,8 @@ final class AuthenticatedActionRouter
       'scm_owner_credit_promissory_pdf' => 'ajax_handler_owner_credit_promissory_pdf',
       'scm_owner_credit_response_send' => 'ajax_handler_owner_credit_response_send',
       'scm_owner_credit_document' => 'ajax_handler_owner_credit_document',
+      'scm_owner_credit_detail' => 'ajax_handler_owner_credit_detail',
+      'scm_owner_credit_accounting' => 'ajax_handler_owner_credit_accounting',
       'scm_owner_credit_pdf' => 'ajax_handler_owner_credit_pdf',
       'scm_owner_credit_simulation_pdf' => 'ajax_handler_owner_credit_simulation_pdf',
       'scm_owner_credit_decide' => 'ajax_handler_owner_credit_decide',
