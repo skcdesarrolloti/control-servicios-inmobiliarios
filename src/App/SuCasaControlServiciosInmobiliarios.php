@@ -577,34 +577,24 @@ final class SuCasaControlServiciosInmobiliarios
         'label' => 'Créditos a propietarios',
         'items' => [
           'credito_propietario_solicitado' => [
-            'label' => 'Solicitud de crédito: inmueble',
-            'description' => 'Solicitudes de servicios públicos o cuotas de administración, registradas en el panel o por Guardian. Avisa el valor, el plazo, la destinación y quién la registró para revisarla en el liquidador. También recibe las de las otras dos listas de solicitud mientras no tengan funcionarios. El WhatsApp se activa en la configuración de créditos.',
+            'label' => 'Créditos de inmueble',
+            'description' => 'Créditos de servicios públicos o cuotas de administración, registrados en el panel o por Guardian: la solicitud, la aprobación o el rechazo y la respuesta con los documentos adjuntos. También recibe los de las otras dos listas de créditos mientras no tengan funcionarios. El WhatsApp se activa en la configuración de créditos.',
             'channel' => 'Email y WhatsApp en cola',
           ],
           'credito_propietario_cotizacion' => [
-            'label' => 'Solicitud de crédito: reparaciones y mantenimiento',
-            'description' => 'Solicitudes de reparaciones y mantenimiento: las que nacen de una cotización con financiación Sí y las registradas en el panel o por Guardian. Avisa el valor, el plazo y, si viene de una cotización, el caso y quién registró la respuesta. El WhatsApp se activa en la configuración de créditos.',
+            'label' => 'Créditos de reparaciones y mantenimiento',
+            'description' => 'Créditos de reparaciones y mantenimiento, los que nacen de una cotización con financiación Sí y los registrados en el panel o por Guardian: la solicitud, la aprobación o el rechazo y la respuesta con los documentos adjuntos. El WhatsApp se activa en la configuración de créditos.',
             'channel' => 'Email y WhatsApp en cola',
           ],
           'credito_propietario_libre_inversion' => [
-            'label' => 'Solicitud de crédito: libre inversión',
-            'description' => 'Solicitudes de libre inversión, registradas en el panel o por Guardian. Avisa el valor, el plazo, la destinación y quién la registró para revisarla en el liquidador. El WhatsApp se activa en la configuración de créditos.',
+            'label' => 'Créditos de libre inversión',
+            'description' => 'Créditos de libre inversión, registrados en el panel o por Guardian: la solicitud, la aprobación o el rechazo y la respuesta con los documentos adjuntos. El WhatsApp se activa en la configuración de créditos.',
             'channel' => 'Email y WhatsApp en cola',
           ],
           'credito_propietario_pagare_firmado' => [
             'label' => 'Pagaré firmado',
             'description' => 'Cuando un propietario firma desde su enlace el pagaré en blanco y la carta de instrucciones. Se firma una sola vez por persona; con la firma, sus créditos aprobados envían la respuesta.',
             'channel' => 'Email interno en cola',
-          ],
-          'credito_propietario_decidido' => [
-            'label' => 'Crédito aprobado o rechazado',
-            'description' => 'Cuando un funcionario aprueba o rechaza un crédito desde el liquidador, con las condiciones y la justificación si se aprobó fuera de política. El WhatsApp se activa en la configuración de créditos.',
-            'channel' => 'Email y WhatsApp en cola',
-          ],
-          'credito_propietario_respuesta' => [
-            'label' => 'Respuesta de crédito enviada',
-            'description' => 'Cuando el propietario firma el pagaré de un crédito aprobado (o si ya lo tenía firmado al aprobar, o se reenvía desde el liquidador). El correo lleva adjuntos la carta de aprobación, el pagaré firmado y las condiciones con el plan de pagos; por WhatsApp llega un mensaje por documento si está activo en la configuración de créditos.',
-            'channel' => 'Email y WhatsApp en cola',
           ],
         ],
       ],

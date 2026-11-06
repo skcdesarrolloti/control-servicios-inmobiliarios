@@ -19,15 +19,15 @@ use SCM\Support\SmsQueue;
  * servicios públicos de JetEngine).
  *
  * Flujo: la cotización queda con financiación "Sí" → se crea la solicitud (pendiente) y se avisa al evento interno
- * de su destinación (ver requestEvent). El funcionario abre el liquidador, revisa las políticas (contrato
+ * de su destinación (ver creditEvent). El funcionario abre el liquidador, revisa las políticas (contrato
  * vigente, siniestro, préstamos activos, tope por ingreso neto, usura) y aprueba o rechaza; si aprueba
  * incumpliendo alguna política debe justificarlo. La decisión queda en el historial del crédito, del caso y
- * del contrato y del inmueble y se avisa al evento `credito_propietario_decidido`.
+ * del contrato y del inmueble y se avisa a los funcionarios de esa misma lista.
  *
  * Etapas del liquidador: Solicitud → Estudio (pendiente) → Firma de documentos → Respuesta. Al aprobar se envía el
  * pagaré y la carta de instrucciones a quien no los tenga firmados; cuando quedan firmados (o si ya lo estaban) se
  * envía la respuesta: carta de aprobación, pagaré firmado y condiciones con el plan de pagos, al propietario y a los funcionarios de
- * `credito_propietario_respuesta`. Un rechazo es su propia respuesta. Un crédito aprobado se marca después como
+ * la misma lista. Un rechazo es su propia respuesta. Un crédito aprobado se marca después como
  * pagado o se anula.
  */
 final class OwnerCreditService
@@ -63,12 +63,13 @@ final class OwnerCreditService
     'poliza_servicios' => 'Póliza de servicios públicos',
     'otros' => 'Otros descuentos',
   ];
-  /** Solicitud por destinación, venga de donde venga: inmueble (servicios y cuotas), reparaciones o libre inversión. */
+  /**
+   * Listas de funcionarios por destinación, venga de donde venga el crédito: inmueble (servicios y cuotas), reparaciones
+   * o libre inversión. Cada una recibe la solicitud, la decisión y la respuesta con los documentos.
+   */
   public const EVENT_REQUESTED = 'credito_propietario_solicitado';
   public const EVENT_REPAIR_REQUESTED = 'credito_propietario_cotizacion';
   public const EVENT_FREE_REQUESTED = 'credito_propietario_libre_inversion';
-  public const EVENT_DECIDED = 'credito_propietario_decidido';
-  public const EVENT_RESPONSE = 'credito_propietario_respuesta';
   public const STAGES = ['solicitud' => 'Solicitud', 'estudio' => 'Estudio', 'firma' => 'Firma de documentos', 'respuesta' => 'Respuesta'];
   /** Plantillas de WhatsApp de la respuesta, con el PDF en el encabezado: una por documento, o una sola con todos unidos. */
   public const RESPONSE_TEMPLATES = [
@@ -1114,7 +1115,7 @@ final class OwnerCreditService
   /**
    * Respuesta de un crédito aprobado con sus documentos firmados: correo con la carta de aprobación, el pagaré firmado
    * y las condiciones con el plan de pagos adjuntos, y un WhatsApp por documento (la plantilla con encabezado de documento solo lleva un
-   * PDF). Los mismos documentos van a los funcionarios de "Respuesta de crédito enviada". Se puede reenviar.
+   * PDF). Los mismos documentos van a los funcionarios de la lista del crédito (creditEvent). Se puede reenviar.
    * @return array{email:int,whatsapp:int,internal:int,internal_whatsapp:int,documents:list<string>}
    */
   public function sendResponse(int $id, array $actor): array
@@ -1179,18 +1180,19 @@ final class OwnerCreditService
           foreach ($whatsappDocuments as $index => $document) $queued['whatsapp'] += $this->responseWhatsapp((string) $recipient['phone'], $name, $document, $params($document, $name ?: 'Propietario'), 'owner-credit-response-wa:' . $id . ':' . $now . ':' . $index . $suffix, $id);
         }
       }
-      $copies = InternalNotificationRecipients::emailsForAction($this->db, self::EVENT_RESPONSE);
+      $staffEvent = $this->creditEvent($credit);
+      $copies = InternalNotificationRecipients::emailsForAction($this->db, $staffEvent);
       if ($copies !== []) {
         $url = self::panelUrl($id);
         $details = 'Se envió al propietario ' . $credit['owner_name'] . ' la respuesta del crédito #' . $id . ' (' . $money($credit['approved_amount']) . ' a ' . (int) $credit['approved_term'] . ' meses, cuota ' . $money($credit['monthly_payment']) . ') con: ' . implode(', ', $queued['documents']) . '.';
         $queued['internal'] = $email->enqueue($copies, 'Respuesta enviada: ' . $title, EmailTemplate::render('Respuesta de crédito enviada', '<p>' . EmailTemplate::e($details) . '</p>', ['buttons' => [['url' => $url, 'label' => 'Abrir crédito #' . $id]]]), [
-          'source_module' => self::EVENT_RESPONSE, 'internal_action' => self::EVENT_RESPONSE, 'internal_cc' => $copies, 'payload' => ['attachments' => $attachments],
-          'dedupe_key' => 'internal-admin:' . self::EVENT_RESPONSE . ':' . $id . ':' . $now, 'meta' => ['event' => self::EVENT_RESPONSE],
+          'source_module' => $staffEvent, 'internal_action' => $staffEvent, 'internal_cc' => $copies, 'payload' => ['attachments' => $attachments],
+          'dedupe_key' => 'internal-admin:' . $staffEvent . ':respuesta:' . $id . ':' . $now, 'meta' => ['event' => $staffEvent],
         ]);
       }
       if ($settings['notify_staff_whatsapp']) {
         $sent = [];
-        foreach (InternalNotificationRecipients::contactsForAction($this->db, self::EVENT_RESPONSE) as $contact) {
+        foreach (InternalNotificationRecipients::contactsForAction($this->db, $staffEvent) as $contact) {
           $phone = preg_replace('/\D+/', '', (string) ($contact['phone'] ?? '')) ?? '';
           if ($phone === '' || isset($sent[$phone])) continue;
           $sent[$phone] = true;
@@ -2396,7 +2398,7 @@ final class OwnerCreditService
   }
 
   /**
-   * Aviso de una solicitud nueva (o reabierta) a los funcionarios de su destinación (requestEvent). La que nace al
+   * Aviso de una solicitud nueva (o reabierta) a los funcionarios de su destinación (creditEvent). La que nace al
    * responder una cotización dice además cuál es y quién la respondió.
    * @param array{employee_id?:string,name?:string} $actor quien registró la solicitud o la respuesta de la cotización
    */
@@ -2410,7 +2412,7 @@ final class OwnerCreditService
     $reference = 'solicitado:' . $id . ':' . (int) $credit['updated_at'];
     $quoteId = (int) $credit['quote_id'];
     $signer = $this->requestSigner($credit, $actor);
-    $action = $this->requestEvent($credit);
+    $action = $this->creditEvent($credit);
     if ($quoteId > 0) {
       $ticket = trim((string) $credit['ticket_id']);
       $this->notifyInternal($id, $action, 'Crédito solicitado al responder la cotización #' . $quoteId,
@@ -2428,10 +2430,10 @@ final class OwnerCreditService
   }
 
   /**
-   * Lista de "Notificaciones internas" que recibe la solicitud según su destinación. Si esa lista aún no tiene
-   * funcionarios va a la de "Solicitud de crédito", para que ninguna solicitud se quede sin aviso.
+   * Lista de "Notificaciones internas" del crédito según su destinación: recibe la solicitud, la decisión y la respuesta.
+   * Si esa lista aún no tiene funcionarios va a la de inmueble, para que ningún crédito se quede sin aviso.
    */
-  private function requestEvent(array $credit): string
+  private function creditEvent(array $credit): string
   {
     $purpose = trim((string) ($credit['purpose'] ?? ''));
     $action = match (true) {
@@ -2602,7 +2604,7 @@ final class OwnerCreditService
     $title = $approved ? 'Crédito aprobado' : 'Solicitud de crédito no aprobada';
     $summary = $this->decisionSummary($credit);
     $queued = ['email' => 0, 'whatsapp' => 0, 'internal' => 0, 'internal_whatsapp' => 0];
-    $queued['internal'] = $this->notifyInternal((int) $credit['id'], self::EVENT_DECIDED, $title . ' #' . $credit['id'] . ' · contrato ' . $credit['contract_code'], $summary . ' Decidió: ' . $credit['decided_by_name'] . '.', 'decidido:' . $credit['id']);
+    $queued['internal'] = $this->notifyInternal((int) $credit['id'], $this->creditEvent($credit), $title . ' #' . $credit['id'] . ' · contrato ' . $credit['contract_code'], $summary . ' Decidió: ' . $credit['decided_by_name'] . '.', 'decidido:' . $credit['id']);
     $money = static fn($value): string => '$' . number_format((float) $value, 0, ',', '.');
     // Respuesta a los funcionarios: plantilla corta scm_credito_propietario_respuesta_funcionario_v1.
     $result = $approved ? ((int) $credit['policy_override'] === 1 ? 'Aprobado fuera de política' : 'Aprobado') : 'No aprobado';
@@ -2612,7 +2614,7 @@ final class OwnerCreditService
     $contract = (string) $credit['contract_code'] . ((string) $credit['property'] !== '' ? ' · Inmueble ' . $credit['property'] : '');
     $decidedBy = (string) $credit['decided_by_name'] ?: 'el panel';
     $signer = $this->funcionarioSigner(trim((string) $credit['decided_by_id']), trim((string) $credit['decided_by_name']));
-    $queued['internal_whatsapp'] = $this->notifyStaffWhatsapp(self::EVENT_DECIDED, $credit, 'scm_credito_propietario_respuesta_funcionario_v1',
+    $queued['internal_whatsapp'] = $this->notifyStaffWhatsapp($this->creditEvent($credit), $credit, 'scm_credito_propietario_respuesta_funcionario_v1',
       static fn(string $name, callable $clean): array => [$name, $clean($result, 60), $clean($credit['owner_name'], 120), $clean($detail, 300), $clean($contract, 80), $clean($decidedBy, 80)],
       'Crédito ' . mb_strtolower($result) . ': ' . $credit['owner_name'] . ', ' . $detail . ', contrato ' . $contract . '. Decidió ' . $decidedBy . '.');
     // Aprobado: el propietario recibe la respuesta con los documentos cuando firma el pagaré (sendResponse).

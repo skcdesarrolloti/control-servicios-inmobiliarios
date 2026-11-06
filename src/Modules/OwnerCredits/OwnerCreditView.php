@@ -364,7 +364,7 @@ final class OwnerCreditView
       . ($sentAt > 0 ? '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Enviada</span>' : '<span class="!sp-text-[10px] !sp-font-semibold !sp-text-amber-800">Sin enviar</span>') . '</div>'
       . self::guide('respuesta', [
         'Qué recibe el propietario' => 'Un correo con la carta de aprobación, el pagaré y la carta de instrucciones firmados y las condiciones con el plan de pagos adjuntos. Por WhatsApp llega un mensaje por documento, porque cada plantilla con documento lleva un solo PDF.',
-        'Funcionarios' => 'Los de Notificaciones internas › Créditos a propietarios › Respuesta de crédito enviada reciben el correo con los mismos adjuntos y, si está activo en Configuración, los WhatsApp.',
+        'Funcionarios' => 'Los de la lista de este crédito en Notificaciones internas › Créditos a propietarios (inmueble, reparaciones o libre inversión) reciben el correo con los mismos adjuntos y, si está activo en Configuración, los WhatsApp.',
         'Cuándo sale' => 'Sola, cuando el propietario firma el pagaré (o al aprobar si ya lo tenía firmado). También se puede enviar o reenviar desde aquí.',
       ])
       . '<ul class="!sp-m-0 !sp-p-0 !sp-list-none">' . $rows . '</ul>'

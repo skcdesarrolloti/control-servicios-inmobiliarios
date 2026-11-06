@@ -91,7 +91,7 @@ Envía la plantilla a revisión y espera a que aparezca **Aprobada**. Después a
 
 ## Plantilla para funcionarios al aprobar o rechazar
 
-Mensaje corto a los **funcionarios de Notificaciones internas › Créditos a propietarios › Crédito aprobado o rechazado** cuando un analista decide en el liquidador. Solo se envía si en **Configuración** de créditos está activo **WhatsApp a funcionarios**; el correo interno sale siempre. Las solicitudes nuevas usan `scm_credito_propietario_solicitud_funcionario_v1` (más abajo).
+Mensaje corto a los **funcionarios de la lista del crédito en Notificaciones internas › Créditos a propietarios** (inmueble, reparaciones o libre inversión) cuando un analista decide en el liquidador. Solo se envía si en **Configuración** de créditos está activo **WhatsApp a funcionarios**; el correo interno sale siempre. Las solicitudes nuevas usan `scm_credito_propietario_solicitud_funcionario_v1` (más abajo).
 
 Reemplaza a `scm_credito_propietario_funcionario_v2`, que mezclaba solicitudes y decisiones en un mensaje genérico; ya no se usa y se puede eliminar de Meta.
 
@@ -195,7 +195,7 @@ Los funcionarios reciben un correo cuando el pagaré queda firmado si en **Notif
 
 ## Plantilla para funcionarios al llegar una solicitud
 
-Mensaje corto a los funcionarios de **Solicitud de crédito** (manual) o **Solicitud de crédito desde cotización**, según el origen. Solo se envía si en **Configuración** de créditos está activo **WhatsApp a funcionarios**.
+Mensaje corto a los funcionarios de la lista del crédito según su destinación: **Créditos de inmueble**, **Créditos de reparaciones y mantenimiento** o **Créditos de libre inversión**. Solo se envía si en **Configuración** de créditos está activo **WhatsApp a funcionarios**.
 
 - Nombre exacto: `scm_credito_propietario_solicitud_funcionario_v1`.
 - Categoría: **Utilidad** (`UTILITY`). Sin lenguaje de oferta ("aprovecha", "preaprobado"): Meta la reclasificaría como marketing.
@@ -234,7 +234,7 @@ La definición para la API está en `whatsapp-credito-propietario-solicitud-func
 
 ## Plantillas de la respuesta con documentos
 
-Cuando el propietario firma el pagaré de un crédito aprobado (o al aprobar, si ya lo tenía firmado), el panel le envía la **respuesta**: un correo con los tres PDF adjuntos y, por WhatsApp, **un mensaje por documento**, porque una plantilla con encabezado de documento solo lleva un PDF. Los mismos mensajes van a los funcionarios de **Notificaciones internas › Créditos a propietarios › Respuesta de crédito enviada** (en {{1}} va el nombre del funcionario).
+Cuando el propietario firma el pagaré de un crédito aprobado (o al aprobar, si ya lo tenía firmado), el panel le envía la **respuesta**: un correo con los tres PDF adjuntos y, por WhatsApp, **un mensaje por documento**, porque una plantilla con encabezado de documento solo lleva un PDF. Los mismos mensajes van a los funcionarios de la lista del crédito en **Notificaciones internas › Créditos a propietarios** (en {{1}} va el nombre del funcionario).
 
 - WhatsApp al propietario: **Configuración › WhatsApp al propietario con la respuesta**.
 - WhatsApp a funcionarios: **Configuración › WhatsApp a funcionarios**.

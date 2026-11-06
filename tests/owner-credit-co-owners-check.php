@@ -237,7 +237,7 @@ $freeByCoOwner = $service->find($service->createManual(20, 200000, 3, 'Libre inv
 $check($requestRecipient->invoke($service, $repairByCoOwner)['key'] === 'mandato_1', 'a property credit request goes only to the principal owner, even if a co-owner asked');
 $check($requestRecipient->invoke($service, $freeByCoOwner)['name'] === $freeByCoOwner['owner_name'], 'a free investment request goes to its beneficiary');
 // Cada destinación tiene su lista; una lista sin funcionarios cae en la de inmueble para que nadie se quede sin aviso.
-$requestEvent = new ReflectionMethod(OwnerCreditService::class, 'requestEvent');
+$requestEvent = new ReflectionMethod(OwnerCreditService::class, 'creditEvent');
 $check($requestEvent->invoke($service, $repairByCoOwner) === OwnerCreditService::EVENT_REQUESTED && $requestEvent->invoke($service, $freeByCoOwner) === OwnerCreditService::EVENT_REQUESTED, 'a list without staff falls back to the general request list');
 $listsSettings = new Settings($db);
 $rawLists = $db->getVar("SELECT valor FROM wp_jet_cct_confi_sistema WHERE funcion = 'control_servicios_config'");
@@ -247,6 +247,10 @@ $check($requestEvent->invoke($service, ['purpose' => OwnerCreditSettings::REPAIR
 $check($requestEvent->invoke($service, $freeByCoOwner) === OwnerCreditService::EVENT_FREE_REQUESTED, 'a free investment request goes to its own list');
 $check($requestEvent->invoke($service, ['purpose' => 'Cuotas de administración', 'quote_id' => 0]) === OwnerCreditService::EVENT_REQUESTED && $requestEvent->invoke($service, ['purpose' => 'Servicios públicos', 'quote_id' => 0]) === OwnerCreditService::EVENT_REQUESTED, 'services and HOA fees go to the property list');
 $db->update('wp_jet_cct_confi_sistema', ['valor' => $rawLists], ['funcion' => 'control_servicios_config']);
+$creditSource = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
+$appSource = (string) file_get_contents(dirname(__DIR__) . '/src/App/SuCasaControlServiciosInmobiliarios.php');
+$check(str_contains($creditSource, 'notifyInternal((int) $credit[\'id\'], $this->creditEvent($credit), $title') && str_contains($creditSource, 'notifyStaffWhatsapp($this->creditEvent($credit), $credit, \'scm_credito_propietario_respuesta_funcionario_v1\'') && str_contains($creditSource, 'emailsForAction($this->db, $staffEvent)') && str_contains($creditSource, 'contactsForAction($this->db, $staffEvent)'), 'the decision and the response go to the same list as the request');
+$check(!str_contains($appSource, "'credito_propietario_decidido'") && !str_contains($appSource, "'credito_propietario_respuesta'"), 'the two general lists leave Notificaciones internas');
 $hoaState = $service->promissoryState($service->find($service->createManual(20, 300000, 6, 'Cuotas de administración', $actor, '', 'mandato_1')));
 $check($hoaState['locked'] && count($hoaState['required']) === 3, 'an HOA fees credit is signed by every co-owner');
 $freeState = $service->promissoryState($service->find($service->createManual(20, 300000, 6, 'Libre inversión', $actor, '', 'mandato_1')));
