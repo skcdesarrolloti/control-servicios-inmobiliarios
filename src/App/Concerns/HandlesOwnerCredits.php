@@ -55,7 +55,7 @@ trait HandlesOwnerCredits
     try {
       $filters = [];
       foreach (['status', 'accounting', 'from', 'to', 'search'] as $key) $filters[$key] = trim(sanitize_text_field(wp_unslash((string) ($_POST[$key] ?? ''))));
-      $this->jsonOk(['html' => (new OwnerCreditView())->report($this->ownerCreditService()->report($filters), true, $this->canUseDashboardAction('owner_credit_manage'))]);
+      $this->jsonOk(['html' => (new OwnerCreditView())->report($this->ownerCreditService()->report($filters), true, $this->canUseDashboardAction('owner_credit_manage'), $this->canMarkOwnerCreditAccounting())]);
     } catch (\Throwable $error) {
       $this->ownerCreditFail($error, 'No se pudieron cargar los créditos.');
     }

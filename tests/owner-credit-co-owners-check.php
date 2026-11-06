@@ -284,6 +284,11 @@ $db->update('wp_scm_owner_credits', ['first_payment_ts' => strtotime('-1 month -
 $midTotals = $service->report(['search' => ''])['totals'];
 $check($midTotals['paid'] > 0, 'each due installment moves capital to paid');
 $listRow = (new OwnerCreditView())->report($service->report(['search' => '']), true, true);
+$withMark = (new OwnerCreditView())->report($service->report(['search' => '']), true, true, true);
+$check(str_contains($withMark, 'data-owner-credit-accounting-list data-credit-id="' . $accountingId . '"') && !str_contains($listRow, 'Marcar en contabilidad'), 'the list offers the accounting mark only with permission');
+$service->setAccounting($accountingId, true, $actor);
+$check(!str_contains((new OwnerCreditView())->report($service->report(['search' => '']), true, true, true), 'data-owner-credit-accounting-list data-credit-id="' . $accountingId . '"'), 'a marked credit no longer offers the button');
+$service->setAccounting($accountingId, false, $actor);
 $check(str_contains($listRow, 'data-owner-credit-detail data-credit-id="' . $accountingId . '"') && str_contains($listRow, 'Pendiente de contabilidad') && str_contains($listRow, 'Ver crédito') && str_contains($listRow, 'data-owner-credit-detail="documentos"'), 'an approved credit shows Ver crédito, Documentos and its accounting state in the list');
 $creditSource = (string) file_get_contents(dirname(__DIR__) . '/src/Modules/OwnerCredits/OwnerCreditService.php');
 $appSource = (string) file_get_contents(dirname(__DIR__) . '/src/App/SuCasaControlServiciosInmobiliarios.php');

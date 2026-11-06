@@ -669,11 +669,14 @@
         event.preventDefault();
         var accountingDone = accounting.getAttribute("data-owner-credit-accounting");
         var accountingId = accounting.getAttribute("data-credit-id");
+        // Desde el listado solo se recarga la lista: no hace falta abrir el crédito.
+        var accountingFromList = accounting.hasAttribute("data-owner-credit-accounting-list");
         askConfirm(accounting, accountingDone === "1" ? "¿Confirmas que el crédito #" + accountingId + " ya quedó ingresado a contabilidad? Queda registrado con tu nombre." : "¿Quitar la marca de ingresado a contabilidad del crédito #" + accountingId + "? Vuelve a quedar pendiente.", function () {
           accounting.disabled = true;
           post("scm_owner_credit_accounting", { credit_id: accountingId, done: accountingDone })
             .then(function (data) {
               loadReport(true);
+              if (accountingFromList) return;
               return openDetail(accountingId).then(function () {
                 var status = modal.querySelector("[data-owner-credit-accounting-status]");
                 if (status) { status.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-font-semibold !sp-text-emerald-700"; status.textContent = data.message || "Listo."; }
@@ -681,6 +684,7 @@
             })
             .catch(function (error) {
               accounting.disabled = false;
+              if (accountingFromList) { showModal("No se pudo marcar", "", message(error.message, "error")); return; }
               var status = modal.querySelector("[data-owner-credit-accounting-status]");
               if (status) { status.className = "!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-font-semibold !sp-text-red-700"; status.textContent = error.message; }
             });

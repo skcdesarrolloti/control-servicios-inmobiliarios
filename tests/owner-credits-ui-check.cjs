@@ -192,6 +192,20 @@ echo (new OwnerCreditView(true))->workspace($w, true, true);`;
   assert.equal((await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_accounting').pop().done, '1');
   console.log('OK the approved credit popup shows documents and marks accounting after confirming');
 
+  // Desde el listado: confirma, marca y recarga la lista sin abrir el crédito.
+  const opensBeforeList = (await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_detail').length;
+  await page.evaluate(() => {
+    document.querySelector('#scm-app').insertAdjacentHTML('beforeend', '<div id="list-row"><div data-owner-credit-actions><button id="list-mark" data-owner-credit-accounting="1" data-owner-credit-accounting-list data-credit-id="7">Marcar en contabilidad</button></div></div>');
+    document.getElementById('list-mark').click();
+  });
+  await page.waitForSelector('#list-row [data-owner-credit-confirm-yes]');
+  await page.click('#list-row [data-owner-credit-confirm-yes]', { force: true });
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'scm_owner_credit_accounting' && c.credit_id === '7'));
+  await page.waitForTimeout(50);
+  assert.equal((await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_detail').length, opensBeforeList, 'marking from the list does not open the credit');
+  await page.evaluate(() => document.getElementById('list-row').remove());
+  console.log('OK the accounting mark works from the list');
+
   // Desde alertas y calendario: lleva a la pestaña de créditos y abre el crédito; sin esa marca se queda donde está.
   const tabClicks = await page.evaluate(async () => {
     const app = document.querySelector('#scm-app');
