@@ -230,6 +230,23 @@ $check($sev['share']['mode'] === 'reparaciones' && array_column($sev['other_cont
 $check((int) $sev['longest_months'] === \SCM\Modules\OwnerCredits\OwnerCreditCalculator::monthsUntil(time(), (int) strtotime('+5 years')) && (int) $sev['longest_months'] > (int) $sev['contract_months'], 'a property credit takes its maximum term from the longest owner contract');
 $servicesState = $service->promissoryState($service->find($servicesId));
 $check($servicesState['locked'] && $servicesState['required'] === ['mandato_1', 'mandato_2', 'mandato_3'], 'a public services credit is signed by every co-owner');
+// La solicitud se confirma a una sola persona: libre inversión, a su beneficiario; crédito del inmueble, al principal.
+$requestRecipient = new ReflectionMethod(OwnerCreditService::class, 'requestRecipient');
+$repairByCoOwner = $service->find($service->createManual(20, 200000, 3, OwnerCreditSettings::REPAIR_PURPOSE, $actor, '', 'mandato_2'));
+$freeByCoOwner = $service->find($service->createManual(20, 200000, 3, 'Libre inversión', $actor, '', 'mandato_2'));
+$check($requestRecipient->invoke($service, $repairByCoOwner)['key'] === 'mandato_1', 'a property credit request goes only to the principal owner, even if a co-owner asked');
+$check($requestRecipient->invoke($service, $freeByCoOwner)['name'] === $freeByCoOwner['owner_name'], 'a free investment request goes to its beneficiary');
+// Cada destinación tiene su lista; una lista sin funcionarios cae en la de inmueble para que nadie se quede sin aviso.
+$requestEvent = new ReflectionMethod(OwnerCreditService::class, 'requestEvent');
+$check($requestEvent->invoke($service, $repairByCoOwner) === OwnerCreditService::EVENT_REQUESTED && $requestEvent->invoke($service, $freeByCoOwner) === OwnerCreditService::EVENT_REQUESTED, 'a list without staff falls back to the general request list');
+$listsSettings = new Settings($db);
+$rawLists = $db->getVar("SELECT valor FROM wp_jet_cct_confi_sistema WHERE funcion = 'control_servicios_config'");
+$listsSettings->set(\SCM\Support\InternalNotificationRecipients::SETTINGS_KEY, [OwnerCreditService::EVENT_REPAIR_REQUESTED => [1], OwnerCreditService::EVENT_FREE_REQUESTED => [2], OwnerCreditService::EVENT_REQUESTED => [3]]);
+$check($requestEvent->invoke($service, $repairByCoOwner) === OwnerCreditService::EVENT_REPAIR_REQUESTED, 'a manual repair request goes to the repairs list');
+$check($requestEvent->invoke($service, ['purpose' => OwnerCreditSettings::REPAIR_PURPOSE, 'quote_id' => 574]) === OwnerCreditService::EVENT_REPAIR_REQUESTED, 'a quote request goes to the repairs list');
+$check($requestEvent->invoke($service, $freeByCoOwner) === OwnerCreditService::EVENT_FREE_REQUESTED, 'a free investment request goes to its own list');
+$check($requestEvent->invoke($service, ['purpose' => 'Cuotas de administración', 'quote_id' => 0]) === OwnerCreditService::EVENT_REQUESTED && $requestEvent->invoke($service, ['purpose' => 'Servicios públicos', 'quote_id' => 0]) === OwnerCreditService::EVENT_REQUESTED, 'services and HOA fees go to the property list');
+$db->update('wp_jet_cct_confi_sistema', ['valor' => $rawLists], ['funcion' => 'control_servicios_config']);
 $hoaState = $service->promissoryState($service->find($service->createManual(20, 300000, 6, 'Cuotas de administración', $actor, '', 'mandato_1')));
 $check($hoaState['locked'] && count($hoaState['required']) === 3, 'an HOA fees credit is signed by every co-owner');
 $freeState = $service->promissoryState($service->find($service->createManual(20, 300000, 6, 'Libre inversión', $actor, '', 'mandato_1')));

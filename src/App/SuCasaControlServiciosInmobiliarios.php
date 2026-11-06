@@ -577,13 +577,18 @@ final class SuCasaControlServiciosInmobiliarios
         'label' => 'Créditos a propietarios',
         'items' => [
           'credito_propietario_solicitado' => [
-            'label' => 'Solicitud de crédito',
-            'description' => 'Cuando se registra una solicitud desde Nueva solicitud de crédito. Avisa el valor, el plazo, la destinación y quién la registró para revisarla en el liquidador. El WhatsApp se activa en la configuración de créditos.',
+            'label' => 'Solicitud de crédito: inmueble',
+            'description' => 'Solicitudes de servicios públicos o cuotas de administración, registradas en el panel o por Guardian. Avisa el valor, el plazo, la destinación y quién la registró para revisarla en el liquidador. También recibe las de las otras dos listas de solicitud mientras no tengan funcionarios. El WhatsApp se activa en la configuración de créditos.',
             'channel' => 'Email y WhatsApp en cola',
           ],
           'credito_propietario_cotizacion' => [
-            'label' => 'Solicitud de crédito desde cotización',
-            'description' => 'Cuando una cotización queda con financiación Sí al responderla (o al cambiarla desde el panel). Avisa la cotización, el caso, el valor y quién registró la respuesta para revisarla en el liquidador. El WhatsApp se activa en la configuración de créditos.',
+            'label' => 'Solicitud de crédito: reparaciones y mantenimiento',
+            'description' => 'Solicitudes de reparaciones y mantenimiento: las que nacen de una cotización con financiación Sí y las registradas en el panel o por Guardian. Avisa el valor, el plazo y, si viene de una cotización, el caso y quién registró la respuesta. El WhatsApp se activa en la configuración de créditos.',
+            'channel' => 'Email y WhatsApp en cola',
+          ],
+          'credito_propietario_libre_inversion' => [
+            'label' => 'Solicitud de crédito: libre inversión',
+            'description' => 'Solicitudes de libre inversión, registradas en el panel o por Guardian. Avisa el valor, el plazo, la destinación y quién la registró para revisarla en el liquidador. El WhatsApp se activa en la configuración de créditos.',
             'channel' => 'Email y WhatsApp en cola',
           ],
           'credito_propietario_pagare_firmado' => [
