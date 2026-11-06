@@ -100,6 +100,11 @@ const harness = (groupsJson) => `
   // Cerrar pide confirmación y recuerda las tareas; cancelar conserva el popup.
   await page.click('[data-scm-dashboard-alert-close]');
   assert.match(await page.textContent('[data-scm-popup-close-confirm]'), /¿Estás seguro de cerrar\?.*informativo.*tareas pendientes/);
+  // Se ve centrada aunque la lista sea larga, sin tener que bajar en el popup.
+  const confirmBox = await page.locator('[data-scm-popup-close-yes]').boundingBox();
+  assert.ok(confirmBox.y > 100 && confirmBox.y + confirmBox.height < 800, 'the confirmation stays in the middle of the screen, got y=' + confirmBox.y);
+  assert.equal(await page.evaluate(() => { const box = document.querySelector('[data-scm-popup-close-yes]').getBoundingClientRect(); return document.elementFromPoint(box.x + 2, box.y + 2).closest('[data-scm-popup-close-yes]') !== null; }), true, 'nothing covers the confirmation');
+  if (process.env.SCM_CONFIRM_SHOT) await page.screenshot({ path: process.env.SCM_CONFIRM_SHOT });
   await page.click('[data-scm-popup-close-no]');
   assert.equal(await page.locator('[data-scm-popup-close-confirm]').count(), 0);
   assert.equal(await page.locator('.scm-due-entry-swal').count(), 1, 'keeping it open leaves the popup');

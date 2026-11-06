@@ -1302,22 +1302,27 @@
         '<button type="button" class="' + ui.secondary + ' !sp-px-4 !sp-py-2.5 !sp-text-xs" data-scm-dashboard-alert-close>Cerrar</button></footer></div>';
     }
 
-    // Cerrar pide confirmación: el popup recuerda las tareas y no debe cerrarse por accidente.
+    // Cerrar pide confirmación en una ventana centrada sobre el popup: en el pie quedaba fuera de vista con listas largas.
     function dashboardConfirmPopupClose(popup) {
-      var footer = popup && popup.querySelector("footer");
-      if (!footer || footer.querySelector("[data-scm-popup-close-confirm]")) return;
+      if (!popup || popup.querySelector("[data-scm-popup-close-confirm]")) return;
       var ui = DUE_POPUP_UI;
-      var bar = document.createElement("div");
-      bar.className = "!sp-w-full !sp-flex !sp-flex-wrap !sp-items-center !sp-justify-end !sp-gap-3 !sp-p-3 !sp-rounded-lg !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200 !sp-text-left";
-      bar.setAttribute("data-scm-popup-close-confirm", "");
-      bar.setAttribute("role", "alertdialog");
-      bar.innerHTML = '<span class="!sp-flex-1 !sp-min-w-[200px] !sp-text-xs !sp-text-service-navy"><b>¿Estás seguro de cerrar?</b> Recuerda que esto es informativo: recuerda realizar tus tareas pendientes.</span>' +
-        '<button type="button" class="' + ui.secondary + '" data-scm-popup-close-no>Seguir viendo</button>' +
-        '<button type="button" class="' + ui.secondary + '" data-scm-popup-close-yes>Sí, cerrar</button>';
-      footer.insertBefore(bar, footer.firstChild);
-      bar.querySelector("[data-scm-popup-close-no]").addEventListener("click", function () { bar.remove(); });
-      bar.querySelector("[data-scm-popup-close-yes]").addEventListener("click", function () { window.Swal.close(); });
-      bar.querySelector("[data-scm-popup-close-yes]").focus();
+      var overlay = document.createElement("div");
+      overlay.style.cssText = "position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.55);";
+      overlay.setAttribute("data-scm-popup-close-confirm", "");
+      overlay.setAttribute("role", "alertdialog");
+      overlay.setAttribute("aria-modal", "true");
+      overlay.setAttribute("aria-label", "Confirmar cierre");
+      overlay.innerHTML = '<div class="' + ui.card + ' !sp-p-6 !sp-text-center !sp-font-sans !sp-text-service-navy" style="width:min(440px,100%);">' +
+        '<span class="material-symbols-outlined !sp-p-2.5 !sp-rounded-xl !sp-bg-amber-50 !sp-text-amber-600" aria-hidden="true">notifications_active</span>' +
+        '<h4 class="!sp-m-0 !sp-mt-3 !sp-text-lg !sp-font-bold">¿Estás seguro de cerrar?</h4>' +
+        '<p class="!sp-m-0 !sp-mt-2 !sp-text-sm !sp-text-service-muted">Recuerda que esto es informativo: recuerda realizar tus tareas pendientes.</p>' +
+        '<div class="!sp-flex !sp-flex-wrap !sp-justify-center !sp-gap-2 !sp-mt-5">' +
+        '<button type="button" class="' + ui.secondary + ' !sp-px-4 !sp-py-2.5 !sp-text-xs" data-scm-popup-close-no>Seguir viendo</button>' +
+        '<button type="button" class="' + ui.primary + '" data-scm-popup-close-yes>Sí, cerrar</button></div></div>';
+      popup.appendChild(overlay);
+      overlay.querySelector("[data-scm-popup-close-no]").addEventListener("click", function () { overlay.remove(); });
+      overlay.querySelector("[data-scm-popup-close-yes]").addEventListener("click", function () { window.Swal.close(); });
+      overlay.querySelector("[data-scm-popup-close-no]").focus();
     }
 
     function dashboardReminderLastAt() {
