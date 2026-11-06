@@ -1265,8 +1265,8 @@
       var action = row && row.action ? row.action : {};
       var id = escHtml(String(action.id || ""));
       var label = escHtml(row.button || "Ver");
-      if (action.type === "owner_credit_open") return '<button type="button" class="' + ui.secondary + '" data-owner-credit-open data-credit-id="' + id + '">' + label + "</button>";
-      if (action.type === "owner_credit_detail") return '<button type="button" class="' + ui.secondary + '" data-owner-credit-detail data-credit-id="' + id + '">' + label + "</button>";
+      if (action.type === "owner_credit_open") return '<button type="button" class="' + ui.secondary + '" data-owner-credit-open data-owner-credit-go-tab data-credit-id="' + id + '">' + label + "</button>";
+      if (action.type === "owner_credit_detail") return '<button type="button" class="' + ui.secondary + '" data-owner-credit-detail data-owner-credit-go-tab data-credit-id="' + id + '">' + label + "</button>";
       return "";
     }
 
@@ -3903,7 +3903,7 @@
       // Botón de un vencimiento de crédito: lo atiende admin-owner-credits.js.
       function dueCreditButtonHtml(caseData, extraClass) {
         var attr = String(caseData.owner_credit_view || "") === "detail" ? "data-owner-credit-detail" : "data-owner-credit-open";
-        return '<button type="button" class="scm-case-work-btn' + (extraClass || "") + '" ' + attr + ' data-credit-id="' + escHtml(caseData.owner_credit_id) + '">Ver crédito</button>';
+        return '<button type="button" class="scm-case-work-btn' + (extraClass || "") + '" ' + attr + ' data-owner-credit-go-tab data-credit-id="' + escHtml(caseData.owner_credit_id) + '">Ver crédito</button>';
       }
 
       function renderDueBreakdown(rows) {

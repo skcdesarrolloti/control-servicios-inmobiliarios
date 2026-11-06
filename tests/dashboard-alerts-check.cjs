@@ -83,6 +83,7 @@ const harness = (groupsJson) => `
   assert.equal(await page.locator('[data-scm-alert-group="credito_solicitudes"] [data-scm-alert-row]').count(), 18, 'the list is capped like the due popup');
   assert.match(await page.textContent('[data-scm-alert-group="credito_solicitudes"]'), /\+2 adicionales/);
   assert.equal(await page.getAttribute('[data-owner-credit-open]', 'data-credit-id'), '1');
+  assert.equal(await page.locator('[data-owner-credit-go-tab]').count(), 19, 'every alert button goes to the credits tab');
   assert.equal(await page.getAttribute('[data-owner-credit-detail]', 'data-credit-id'), '2');
   assert.match(await page.textContent('.scm-due-entry-swal'), /21 tarea\(s\) por atender/);
   console.log('OK the alerts popup lists each group with its action buttons');

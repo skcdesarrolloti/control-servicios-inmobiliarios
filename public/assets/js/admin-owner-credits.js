@@ -114,6 +114,15 @@
       if (element) element.style.opacity = loading ? "0.55" : "";
     }
 
+    // Desde las alertas y el calendario el crédito se abre en su pestaña, para seguir trabajando allí al cerrarlo.
+    function goToCreditsTab(button) {
+      if (!button.hasAttribute("data-owner-credit-go-tab")) return;
+      var nativeTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-credito-propietario"]');
+      var link = document.querySelector('.nav-tab-pill[data-tab-key="credito_propietario"]');
+      // Sin la pestaña en esta página el enlace recargaría y se perdería el crédito: se abre aquí mismo.
+      if (nativeTab && link) link.click();
+    }
+
     // Crédito aprobado: condiciones, documentos y contabilidad, sin el liquidador.
     function openDetail(creditId, focus) {
       showModal("Cargando…", "Condiciones del crédito.", message("Cargando crédito…"));
@@ -611,6 +620,7 @@
         event.preventDefault();
         event.stopPropagation();
         var creditId = open.getAttribute("data-credit-id");
+        goToCreditsTab(open);
         openCredit(creditId ? { credit_id: creditId } : { quote_id: open.getAttribute("data-quote-id") || "" });
         return;
       }
@@ -631,6 +641,7 @@
       var detail = target.closest("[data-owner-credit-detail]");
       if (detail) {
         event.preventDefault();
+        goToCreditsTab(detail);
         openDetail(detail.getAttribute("data-credit-id"), detail.getAttribute("data-owner-credit-detail"));
         return;
       }

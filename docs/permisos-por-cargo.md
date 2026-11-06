@@ -19,7 +19,7 @@ Vencimientos sale primero y las alertas al cerrarlo, porque Swal muestra un popu
 
 En **Alertas › Recordatorio diario** se activa por cargo el correo y el WhatsApp. Sale de lunes a sábado, sin festivos, desde las 9:00 a. m. de Colombia, con las tareas del calendario de vencimientos de ese cargo que ya vencieron o vencen hoy. Quien no tiene tareas no recibe nada.
 
-Lo ejecuta `bin/queue-worker.php`. Si producción solo corre el worker global de shared-notifications, crea un cron cada 15 minutos con `bin/send-daily-task-reminder.php`: solo envía una vez al día y después de las 12:00 m. ya no sale. La plantilla de WhatsApp es `scm_recordatorio_tareas_v1` (`docs/whatsapp-recordatorio-tareas-template.json`).
+Producción corre el worker global `shared-notifications/worker-hostinger.php`, que solo entrega la cola: hace falta un cron propio cada 15 minutos con `bin/send-daily-task-reminder.php` (`bin/queue-worker.php` también lo ejecuta, si se llega a usar). Solo envía una vez al día y después de las 12:00 m. ya no sale. La plantilla de WhatsApp es `scm_recordatorio_tareas_v1` (`docs/whatsapp-recordatorio-tareas-template.json`).
 
 ## Acciones nuevas
 

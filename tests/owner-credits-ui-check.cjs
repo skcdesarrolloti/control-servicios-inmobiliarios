@@ -191,6 +191,22 @@ echo (new OwnerCreditView(true))->workspace($w, true, true);`;
   await page.waitForFunction(() => (document.querySelector('[data-owner-credit-accounting-status]') || {}).textContent === 'Crédito marcado como ingresado a contabilidad.');
   assert.equal((await page.evaluate(() => window.calls)).filter(c => c.action === 'scm_owner_credit_accounting').pop().done, '1');
   console.log('OK the approved credit popup shows documents and marks accounting after confirming');
+
+  // Desde alertas y calendario: lleva a la pestaña de créditos y abre el crédito; sin esa marca se queda donde está.
+  const tabClicks = await page.evaluate(async () => {
+    const app = document.querySelector('#scm-app');
+    app.insertAdjacentHTML('beforeend', '<div class="scm-main-tabs"><button class="scm-tab" data-tab="scm-panel-credito-propietario"></button></div><a class="nav-tab-pill" data-tab-key="credito_propietario" href="#"></a><button id="plain-detail" data-owner-credit-detail data-credit-id="12"></button><button id="go-detail" data-owner-credit-detail data-owner-credit-go-tab data-credit-id="12"></button>');
+    window.tabClicks = 0;
+    document.querySelector('.nav-tab-pill').addEventListener('click', e => { e.preventDefault(); window.tabClicks += 1; });
+    document.getElementById('plain-detail').click();
+    const plain = window.tabClicks;
+    document.getElementById('go-detail').click();
+    return [plain, window.tabClicks];
+  });
+  assert.deepEqual(tabClicks, [0, 1]);
+  await page.waitForSelector('[data-owner-credit-detail-box]');
+  await page.evaluate(() => { ['plain-detail', 'go-detail'].forEach(id => document.getElementById(id).remove()); document.querySelector('.scm-main-tabs').remove(); document.querySelector('.nav-tab-pill').remove(); });
+  console.log('OK a credit opened from alerts or the calendar goes to its tab');
   await page.evaluate(() => { document.querySelector('[data-owner-credit-open]') || document.querySelector('#scm-app').insertAdjacentHTML('beforeend', '<button data-owner-credit-open data-quote-id="574"></button>'); document.querySelector('#scm-app [data-owner-credit-open]').click(); });
   await page.waitForSelector('[data-owner-credit-form]');
 
