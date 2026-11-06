@@ -137,6 +137,10 @@ $failed = array_column(array_filter($secondWork['policies'], static fn(array $p)
 // Crédito del inmueble (#900): las deudas de la propietaria pesan sobre él (el crédito vigente del #817). Sin documento
 // no se encuentran sus demás contratos, como en un crédito personal.
 $check(in_array('prestamos', $failed, true) && in_array((int) $credit['id'], $secondWork['preapproval']['credits'], true) && in_array('siniestro', $failed, true) && in_array('vigencia', $failed, true) && $secondWork['evaluation']['share']['mode'] === 'reparaciones', 'a repair request counts the owner debts on her other contracts, and flags siniestro and contract about to expire');
+$current = array_values(array_filter($secondWork['policies'], static fn(array $p): bool => $p['key'] === 'sin_credito_vigente'))[0];
+$check(!$current['ok'] && str_contains($current['detail'], 'Tiene crédito vigente #' . (int) $credit['id']) && !$secondWork['policies_ok'], 'another current credit breaks the policy, so approving needs a justification');
+$otherRow = array_values(array_filter($secondWork['other_credits'], static fn(array $row): bool => (int) $row['id'] === (int) $credit['id']))[0];
+$check((float) $otherRow['approved_amount'] > 0 && abs((float) $otherRow['balance'] - (float) $otherRow['approved_amount']) < 0.01 && $otherRow['installments_due'] === 0, 'the other credits list shows the balance and how many installments are due');
 $usury = array_values(array_filter($secondWork['policies'], static fn(array $p): bool => $p['key'] === 'usura'))[0];
 $check($usury['ok'] && str_contains($usury['detail'], '28,59 % E.A.'), 'usury policy compares against the effective annual rate');
 $high = $service->workspace((int) $second['id'], ['rate' => '2,2']);

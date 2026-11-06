@@ -706,13 +706,21 @@ final class OwnerCreditView
       . '</section>';
   }
 
+  /** Si otro crédito sigue vigente o ya se pagó: el saldo sale de las cuotas vencidas, no de lo descontado en SIMI. @param array<string,mixed> $row */
+  private static function creditProgress(array $row): string
+  {
+    if ($row['status'] === 'pagado') return '<span class="!sp-w-full !sp-text-[10px] !sp-font-semibold !sp-text-emerald-700">Pagado · ' . (int) $row['approved_term'] . ' de ' . (int) $row['approved_term'] . ' cuotas vencidas</span>';
+    if ($row['status'] !== 'aprobado') return '';
+    return '<span class="!sp-w-full !sp-text-[10px] !sp-font-semibold !sp-text-amber-800">Vigente · saldo ' . self::money((float) $row['balance']) . ' · ' . (int) $row['installments_due'] . ' de ' . (int) $row['approved_term'] . ' cuotas vencidas</span>';
+  }
+
   /** @param array<string,mixed> $work */
   private function history(array $work): string
   {
     $item = '!sp-py-2 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0 !sp-text-[11px]';
     $others = '';
     foreach ($work['other_credits'] as $row) {
-      $others .= '<li class="' . $item . ' !sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2"><b>#' . (int) $row['id'] . '</b> Contrato ' . self::e($row['contract_code']) . ' ' . self::status((string) $row['status']) . ' <span class="!sp-text-service-muted">' . self::money((float) ($row['approved_amount'] ?? 0) ?: (float) $row['requested_amount']) . ' · ' . date('d/m/Y', (int) $row['created_at']) . '</span></li>';
+      $others .= '<li class="' . $item . ' !sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2"><b>#' . (int) $row['id'] . '</b> Contrato ' . self::e($row['contract_code']) . ' ' . self::status((string) $row['status']) . ' <span class="!sp-text-service-muted">' . self::money((float) ($row['approved_amount'] ?? 0) ?: (float) $row['requested_amount']) . ' · ' . date('d/m/Y', (int) $row['created_at']) . '</span>' . self::creditProgress($row) . '</li>';
     }
     $labels = ['solicitado' => 'Solicitud registrada', 'reabierto' => 'Solicitud reabierta', 'aprobado' => 'Aprobado', 'rechazado' => 'Rechazado', 'pagado' => 'Marcado como pagado', 'anulado' => 'Anulado', 'fecha_fin' => 'Fecha fin del contrato corregida', 'beneficiario' => 'Beneficiario cambiado', 'contrato_principal' => 'Contrato principal cambiado', 'pagare_firmantes' => 'Firmantes del pagaré', 'pagare_enviado' => 'Pagaré enviado para firmar', 'pagare_anulado' => 'Pagaré anulado', 'respuesta_enviada' => 'Respuesta enviada'];
     $events = '';

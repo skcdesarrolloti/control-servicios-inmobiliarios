@@ -2292,6 +2292,12 @@ final class OwnerCreditService
       ['key' => 'vigencia', 'label' => 'Contrato no próximo a vencer', 'ok' => (int) $evaluation['longest_months'] >= $minMonths && (int) $evaluation['longest_months'] > 0, 'detail' => (int) $evaluation['longest_months'] > 0 ? $evaluation['longest_months'] . ' meses hasta el fin del contrato ' . (count($all) > 1 ? 'más largo, #' . $longest['contrato'] . ' ' : '') . '(' . ($longest['fin'] ?: 'sin fecha') . '). Mínimo: ' . $minMonths . '.' : 'Ningún contrato tiene meses de vigencia.'],
       ['key' => 'plazo', 'label' => 'Plazo dentro de la vigencia', 'ok' => $term > 0 && $term <= (int) ($evaluation['term_limit'] ?? $evaluation['max_months']), 'detail' => 'Plazo ' . $term . ' meses; máximo ' . (int) ($evaluation['term_limit'] ?? $evaluation['max_months']) . ' (' . self::termBasis($evaluation) . ').'],
       ['key' => 'siniestro', 'label' => 'Contrato no siniestrado', 'ok' => $siniestroOk, 'detail' => $siniestroDetail],
+      ['key' => 'sin_credito_vigente', 'label' => 'Sin otro crédito vigente', 'ok' => !$analyst['has_credits'], 'detail' => match (true) {
+        $analyst['has_credits'] && $others !== [] => 'Tiene crédito vigente ' . $credits . ' con saldo de ' . $money((float) $preapproval['outstanding']) . ': para aprobar otro escribe la justificación.',
+        $analyst['has_credits'] => 'El analista indicó créditos vigentes por fuera del sistema: para aprobar escribe la justificación.',
+        $others !== [] => 'El analista indicó que no tiene créditos vigentes, aunque el sistema registra ' . $credits . '.',
+        default => 'No tiene otros créditos vigentes.',
+      }],
       ['key' => 'prestamos', 'label' => 'Valor dentro del cupo disponible', 'ok' => $amount <= $available + 0.5 && !($analyst['has_credits'] && $others === []), 'detail' => $creditsDetail],
       ['key' => 'monto', 'label' => 'Valor dentro del tope', 'ok' => $amount > 0 && $amount <= $evaluation['max_amount'] + 0.5, 'detail' => $money($amount) . ' de un tope de ' . $money($evaluation['max_amount']) . ' (' . (int) $settings['income_months'] . ' × ingreso neto' . (($evaluation['other_contracts'] ?? []) !== [] ? ' de ' . (count($evaluation['other_contracts']) + 1) . ' contratos, ' . $money($evaluation['total_net_income']) : '') . ').'],
       ['key' => 'tasa_minima', 'label' => 'Tasa dentro del descuento máximo', 'ok' => $rate >= (float) $evaluation['policy_rate'] - 1e-9, 'detail' => 'Tasa ' . $percent($rate) . ' mensual; referencia ' . $percent((float) $settings['reference_rate']) . ' con descuento máximo de ' . $percent((float) $settings['policy_discount']) . ' = mínimo ' . $percent((float) $evaluation['policy_rate']) . '.'],
@@ -2367,7 +2373,16 @@ final class OwnerCreditService
     if ($owner !== '') { $where[] = '`owner_id` = ?'; $args[] = $owner; }
     if ($where === []) { $where[] = '`contract_id` = ?'; $args[] = (int) $credit['contract_id']; }
     $args[] = (int) $credit['id'];
-    return array_values($this->db->getResults("SELECT `id`, `status`, `contract_code`, `approved_amount`, `approved_term`, `approved_rate`, `monthly_payment`, `first_payment_ts`, `requested_amount`, `created_at` FROM `{$this->table()}` WHERE (" . implode(' OR ', $where) . ') AND `id` <> ? ORDER BY `id` DESC', $args));
+    $rows = $this->db->getResults("SELECT `id`, `status`, `contract_code`, `approved_amount`, `approved_term`, `approved_rate`, `monthly_payment`, `first_payment_ts`, `requested_amount`, `created_at` FROM `{$this->table()}` WHERE (" . implode(' OR ', $where) . ') AND `id` <> ? ORDER BY `id` DESC', $args);
+    // Cómo va cada crédito: el saldo y las cuotas salen del plan por fechas, igual que en el listado.
+    return array_values(array_map(function (array $row): array {
+      if ($row['status'] === 'pagado') return $row + ['balance' => 0.0, 'installments_due' => (int) $row['approved_term']];
+      if ($row['status'] !== 'aprobado') return $row;
+      $first = (int) $row['first_payment_ts'];
+      $due = 0;
+      while ($first > 0 && $due < (int) $row['approved_term'] && self::installmentTs($first, $due + 1) <= time()) $due++;
+      return $row + ['balance' => $this->balance($row), 'installments_due' => $due];
+    }, $rows));
   }
 
   /** @return list<array<string,mixed>> */
