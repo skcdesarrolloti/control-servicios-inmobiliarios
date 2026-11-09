@@ -297,7 +297,7 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'contratos_arrendamiento';
   } elseif (in_array($tabParam, ['administrativas', 'actividades_administrativas', 'scm-panel-actividades-administrativas'], true)) {
     $current_page = 'administrativas';
-  } elseif (in_array($tabParam, ['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'metricas_por_terminar', 'metricas_aumentos'], true)) {
+  } elseif (in_array($tabParam, ['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'metricas_por_terminar', 'metricas_aumentos', 'cartera_ocupaciones', 'cartera_desocupaciones'], true)) {
     $current_page = $tabParam;
   } elseif (in_array($tabParam, ['metricas', 'dashboard', 'metricas_casos', 'scm-panel-metricas', 'scm-panel-metricas-casos'], true)) {
     $current_page = 'dashboard';
@@ -617,6 +617,46 @@ $rawNavItems = [
         'icon' => 'verified_user',
         'perms' => ['auditoria_canon_aseguradoras'],
       ],
+      'cartera_ocupaciones' => [
+        'key' => 'cartera_ocupaciones',
+        'label' => 'Ocupaciones',
+        'description' => 'Contratos nuevos por periodo',
+        'panel_id' => 'scm-panel-movimientos-contratos',
+        'subtab' => 'ocupaciones',
+        'url' => $baseUrl . '/index.php?tab=cartera_ocupaciones',
+        'icon' => 'login',
+        'perms' => ['cartera_ocupaciones'],
+      ],
+      'cartera_desocupaciones' => [
+        'key' => 'cartera_desocupaciones',
+        'label' => 'Desocupaciones',
+        'description' => 'Contratos terminados por periodo',
+        'panel_id' => 'scm-panel-movimientos-contratos',
+        'subtab' => 'desocupaciones',
+        'url' => $baseUrl . '/index.php?tab=cartera_desocupaciones',
+        'icon' => 'logout',
+        'perms' => ['cartera_desocupaciones'],
+      ],
+      'metricas_por_terminar' => [
+        'key' => 'metricas_por_terminar',
+        'label' => 'Contratos por terminar',
+        'description' => 'Casos de recibo por fecha de terminación',
+        'panel_id' => 'scm-panel-movimientos-contratos',
+        'subtab' => 'por_terminar',
+        'url' => $baseUrl . '/index.php?tab=metricas_por_terminar',
+        'icon' => 'event_busy',
+        'perms' => ['metricas_por_terminar'],
+      ],
+      'metricas_aumentos' => [
+        'key' => 'metricas_aumentos',
+        'label' => 'Aumentos',
+        'description' => 'Contratos con aumento por mes y año',
+        'panel_id' => 'scm-panel-movimientos-contratos',
+        'subtab' => 'aumentos',
+        'url' => $baseUrl . '/index.php?tab=metricas_aumentos',
+        'icon' => 'price_change',
+        'perms' => ['metricas_aumentos'],
+      ],
     ],
   ],
   'contractuales' => [
@@ -833,30 +873,6 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=ocupaciones_vs_desocupaciones',
         'icon' => 'compare_arrows',
         'perms' => ['metricas_ocupaciones_vs'],
-      ],
-      'metricas_por_terminar' => [
-        'key' => 'metricas_por_terminar',
-        'group' => 'Contratos',
-        'group_icon' => 'contract',
-        'label' => 'Contratos por terminar',
-        'description' => 'Casos de recibo por fecha de terminación',
-        'panel_id' => 'scm-panel-movimientos-contratos',
-        'subtab' => 'por_terminar',
-        'url' => $baseUrl . '/index.php?tab=metricas_por_terminar',
-        'icon' => 'event_busy',
-        'perms' => ['metricas_por_terminar'],
-      ],
-      'metricas_aumentos' => [
-        'key' => 'metricas_aumentos',
-        'group' => 'Contratos',
-        'group_icon' => 'contract',
-        'label' => 'Aumentos',
-        'description' => 'Contratos con aumento por mes y año',
-        'panel_id' => 'scm-panel-movimientos-contratos',
-        'subtab' => 'aumentos',
-        'url' => $baseUrl . '/index.php?tab=metricas_aumentos',
-        'icon' => 'price_change',
-        'perms' => ['metricas_aumentos'],
       ],
       'metricas_crecimiento' => [
         'key' => 'metricas_crecimiento',

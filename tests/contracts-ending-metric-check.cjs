@@ -113,6 +113,16 @@ const shell = (view) => `<div id="scm-app"><div class="scm-tab-panel active"><se
   assert.equal(await page.inputValue('[data-scm-cm-filter="month"]'), String(month), 'coming back returns to the current month');
   console.log('OK switching views keeps each period');
 
+  // Desde Actividades de cartera, la URL y el menú se quedan en cartera aunque sea la misma vista de Métricas.
+  const tabParam = () => page.evaluate(() => new URL(window.location.href).searchParams.get('tab'));
+  await page.evaluate(() => { const url = new URL(window.location.href); url.searchParams.set('tab', 'cartera_ocupaciones'); window.history.replaceState({}, '', url.toString()); });
+  await page.click('[data-scm-subview-target="ocupaciones"]');
+  assert.equal(await page.textContent('[data-scm-cm-title]'), 'Ocupaciones');
+  assert.equal(await tabParam(), 'cartera_ocupaciones', 'the cartera route is kept');
+  await page.click('[data-scm-subview-target="aumentos"]');
+  assert.equal(await tabParam(), 'metricas_aumentos', 'other views use their own route');
+  console.log('OK the cartera options keep their own route');
+
   assert.deepEqual(errors, []);
   await browser.close();
   console.log('Contracts ending metric checks passed.');

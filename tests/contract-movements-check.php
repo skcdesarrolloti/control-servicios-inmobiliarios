@@ -14,7 +14,7 @@ $check = static function (bool $condition, string $message): void {
 };
 
 // El header se evalúa antes del autoload, igual que en contract-activities-navigation-check.
-foreach (['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'metricas_por_terminar', 'metricas_aumentos', 'metricas'] as $route) {
+foreach (['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'metricas_por_terminar', 'metricas_aumentos', 'cartera_ocupaciones', 'cartera_desocupaciones', 'metricas'] as $route) {
   $_GET = ['tab' => $route];
   $current_page = '';
   ob_start();
@@ -22,12 +22,17 @@ foreach (['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'met
   ob_end_clean();
   $menu = $rawNavItems['metricas'];
   $check($menu['type'] === 'dropdown' && $menu['label'] === 'Métricas', 'Métricas debe ser un desplegable.');
-  $check(array_keys($menu['children']) === ['dashboard', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'metricas_por_terminar', 'metricas_aumentos', 'metricas_crecimiento', 'mis_presupuestos'], 'El desplegable de métricas no tiene las vistas pedidas.');
-  $check(array_column($menu['children'], 'group') === ['Casos', 'Mantenimiento', 'Mantenimiento', 'Servicios públicos', 'Contratos', 'Contratos', 'Contratos', 'Contratos', 'Contratos', 'Contratos', 'Mis presupuestos y ejecuciones'], 'Las vistas de métricas se agrupan por tema.');
+  $check(array_keys($menu['children']) === ['dashboard', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'metricas_crecimiento', 'mis_presupuestos'], 'El desplegable de métricas no tiene las vistas pedidas.');
+  $check(array_column($menu['children'], 'group') === ['Casos', 'Mantenimiento', 'Mantenimiento', 'Servicios públicos', 'Contratos', 'Contratos', 'Contratos', 'Contratos', 'Mis presupuestos y ejecuciones'], 'Las vistas de métricas se agrupan por tema.');
+  $cartera = $rawNavItems['cartera']['children'];
+  $check(array_keys($cartera) === ['gestiones_cobro', 'auditoria_canon_aseguradoras', 'cartera_ocupaciones', 'cartera_desocupaciones', 'metricas_por_terminar', 'metricas_aumentos'], 'Actividades de cartera no tiene las vistas pedidas.');
+  foreach (['cartera_ocupaciones' => 'ocupaciones', 'cartera_desocupaciones' => 'desocupaciones', 'metricas_por_terminar' => 'por_terminar', 'metricas_aumentos' => 'aumentos'] as $key => $subtab) {
+    $check($cartera[$key]['panel_id'] === 'scm-panel-movimientos-contratos' && $cartera[$key]['subtab'] === $subtab && $cartera[$key]['perms'] === [$key] && str_ends_with($cartera[$key]['url'], '?tab=' . $key), 'Ítem de cartera mal conectado: ' . $key);
+  }
   $check($current_page === ($route === 'metricas' ? 'dashboard' : $route), 'Al recargar se marca el ítem equivocado para ' . $route);
-  foreach (['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'metricas_por_terminar', 'metricas_aumentos'] as $key) {
+  foreach (['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones'] as $key) {
     $item = $menu['children'][$key];
-    $check($item['panel_id'] === 'scm-panel-movimientos-contratos' && $item['perms'] === [['ocupaciones' => 'metricas_ocupaciones', 'desocupaciones' => 'metricas_desocupaciones', 'ocupaciones_vs_desocupaciones' => 'metricas_ocupaciones_vs', 'metricas_por_terminar' => 'metricas_por_terminar', 'metricas_aumentos' => 'metricas_aumentos'][$key]], 'Ítem mal conectado: ' . $key);
+    $check($item['panel_id'] === 'scm-panel-movimientos-contratos' && $item['perms'] === [['ocupaciones' => 'metricas_ocupaciones', 'desocupaciones' => 'metricas_desocupaciones', 'ocupaciones_vs_desocupaciones' => 'metricas_ocupaciones_vs'][$key]], 'Ítem mal conectado: ' . $key);
     $check(str_ends_with($item['url'], '?tab=' . $key), 'La ruta debe usar tab=' . $key);
   }
 }
@@ -115,7 +120,7 @@ $check($increases[3]['tipo_aumento'] === 'admin' && $increases[3]['anterior'] ==
 $check($increases[4]['anterior'] === 4180800 && $increases[4]['nuevo'] === 4477637 && $increases[4]['fecha'] === '2026-11-09' && $increases[4]['vigencia'] === '', 'El valor guardado en la carta manda y la vigencia igual a la carta no se repite.');
 $check($increases[5]['anterior'] === 0 && $increases[5]['diferencia'] === null && $increases[5]['porcentaje'] === null, 'Sin datos no se inventa el valor anterior.');
 
-foreach (['ocupaciones' => 'ocupaciones', 'desocupaciones' => 'desocupaciones', 'ocupaciones_vs_desocupaciones' => 'comparativo', 'metricas_por_terminar' => 'por_terminar', 'metricas_aumentos' => 'aumentos', 'metricas' => 'ocupaciones'] as $tab => $view) {
+foreach (['ocupaciones' => 'ocupaciones', 'desocupaciones' => 'desocupaciones', 'ocupaciones_vs_desocupaciones' => 'comparativo', 'metricas_por_terminar' => 'por_terminar', 'metricas_aumentos' => 'aumentos', 'cartera_ocupaciones' => 'ocupaciones', 'cartera_desocupaciones' => 'desocupaciones', 'metricas' => 'ocupaciones'] as $tab => $view) {
   $check(ContractMovementsView::viewFromTab($tab) === $view, 'Vista inicial incorrecta para ' . $tab);
 }
 $shell = (new ContractMovementsView())->renderShell('comparativo');

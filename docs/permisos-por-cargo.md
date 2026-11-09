@@ -21,11 +21,13 @@ Vencimientos sale primero y después cada tema, uno al cerrar el otro, porque Sw
 
 El popup **Contratos por desocupar** (alerta `contratos_por_desocupar`) lista los casos de **Recibo de inmuebles** cuya `fecha_terminacion_contrato` cae en el mes en curso (`ContractReceiptCases`), separados en **Por recibir** (caso abierto) y **Ya cerrados**. La casilla del cargo basta para verlo, porque cartera lo necesita sin acceso a contratos ni métricas.
 
-**Métricas › Contratos por terminar** (`metricas_por_terminar`) usa los mismos casos, pero solo los que faltan por recibir: caso abierto y contrato que no figure como recibido. Abre en el mes en curso.
+**Actividades de cartera › Contratos por terminar** (`metricas_por_terminar`) usa los mismos casos, pero solo los que faltan por recibir: caso abierto y contrato que no figure como recibido. Abre en el mes en curso.
 
-**Métricas › Aumentos** (`metricas_aumentos`) lista las cartas de aumento por su fecha (`ContractIncreases`), con el valor anterior y el nuevo, y abre en el mes en curso. `valor_canon` del contrato no cambia con la carta, por eso los valores salen de ella. Las cartas antiguas no guardan el valor anterior: se toma el de la carta previa o se calcula con el porcentaje, marcado como *calculado*.
+**Actividades de cartera › Aumentos** (`metricas_aumentos`) lista las cartas de aumento por su fecha (`ContractIncreases`), con el valor anterior y el nuevo, y abre en el mes en curso. `valor_canon` del contrato no cambia con la carta, por eso los valores salen de ella. Las cartas antiguas no guardan el valor anterior: se toma el de la carta previa o se calcula con el porcentaje, marcado como *calculado*.
 
-Hasta que se guarden los permisos, estas dos vistas las ve quien ve Desocupaciones.
+Actividades de cartera también ofrece **Ocupaciones** y **Desocupaciones** (`cartera_ocupaciones`, `cartera_desocupaciones`): son las mismas vistas de Métricas con su propio permiso, para que cartera las vea sin tener Métricas.
+
+Estas cuatro opciones están en el grupo Actividades de cartera. Hasta que se guarden los permisos, las ve quien ya tiene Gestiones de Cobro o Auditoría Canon y Aseguradoras.
 
 ## Recordatorio diario
 

@@ -43,6 +43,8 @@
       subtitle: "Aumentos de canon y administración según las cartas de aumento, con el valor anterior y el nuevo para facturar.",
     },
   };
+  // Actividades de cartera abre estas vistas con su propia opción de menú; la URL y el menú deben quedarse ahí.
+  var CARTERA_TABS = { ocupaciones: "cartera_ocupaciones", desocupaciones: "cartera_desocupaciones" };
   // Vistas que se consultan por mes: abren en el mes en curso.
   var MONTH_VIEWS = { por_terminar: true, aumentos: true };
 
@@ -1013,6 +1015,7 @@
       var tab = VIEWS[state.view].tab;
       try {
         var url = new URL(window.location.href);
+        if (url.searchParams.get("tab") === CARTERA_TABS[state.view]) tab = CARTERA_TABS[state.view];
         if (url.searchParams.get("tab") !== tab) {
           url.searchParams.set("tab", tab);
           window.history.replaceState({}, "", url.toString());

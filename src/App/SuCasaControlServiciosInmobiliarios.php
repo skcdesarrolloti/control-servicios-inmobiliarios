@@ -381,6 +381,8 @@ final class SuCasaControlServiciosInmobiliarios
       'metricas_ocupaciones' => 'Ocupaciones',
       'metricas_desocupaciones' => 'Desocupaciones',
       'metricas_ocupaciones_vs' => 'Ocupaciones vs Desocupaciones',
+      'cartera_ocupaciones' => 'Ocupaciones',
+      'cartera_desocupaciones' => 'Desocupaciones',
       'metricas_por_terminar' => 'Contratos por terminar',
       'metricas_aumentos' => 'Aumentos',
       'metricas_crecimiento' => 'Crecimiento de la empresa',
@@ -398,9 +400,9 @@ final class SuCasaControlServiciosInmobiliarios
   private const DERIVED_DASHBOARD_TABS = [
     'calendario_actividades' => ['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble'],
     'actividades_contractuales' => ['contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga'],
-    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_por_terminar', 'metricas_aumentos', 'metricas_crecimiento'],
-    // Panel compartido de ocupaciones y desocupaciones (una consulta para todas sus vistas).
-    'metricas_contratos' => ['metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_por_terminar', 'metricas_aumentos'],
+    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento'],
+    // Panel compartido de ocupaciones y desocupaciones (una consulta para todas sus vistas), también desde Actividades de cartera.
+    'metricas_contratos' => ['metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_por_terminar', 'metricas_aumentos', 'cartera_ocupaciones', 'cartera_desocupaciones'],
   ];
 
   private function canManageDashboardPermissions(): bool
@@ -844,16 +846,16 @@ final class SuCasaControlServiciosInmobiliarios
     // "Ocupaciones y desocupaciones" se guardó un tiempo como una sola opción; ahora son tres.
     foreach ($raw as $cargo => $tabs) {
       if (in_array('metricas_contratos', (array) $tabs, true)) {
-        $raw[$cargo] = array_merge((array) $tabs, self::DERIVED_DASHBOARD_TABS['metricas_contratos']);
+        $raw[$cargo] = array_merge((array) $tabs, ['metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs']);
       }
       // Créditos a propietarios se guardó primero como "metricas_creditos".
       if (in_array('metricas_creditos', (array) $raw[$cargo], true)) {
         $raw[$cargo] = array_merge((array) $raw[$cargo], ['credito_propietario']);
       }
-      // Contratos por terminar y Aumentos son nuevas: mientras no se guarden permisos que las conozcan, las ve quien ve Desocupaciones.
-      foreach (['metricas_por_terminar', 'metricas_aumentos'] as $newMetricTab) {
-        if (!in_array($newMetricTab, $knownTabs, true) && in_array('metricas_desocupaciones', (array) $raw[$cargo], true)) {
-          $raw[$cargo] = array_merge((array) $raw[$cargo], [$newMetricTab]);
+      // Estas opciones de cartera son nuevas: mientras no se guarden permisos que las conozcan, las ve quien ya tiene Actividades de cartera.
+      foreach (['cartera_ocupaciones', 'cartera_desocupaciones', 'metricas_por_terminar', 'metricas_aumentos'] as $newCarteraTab) {
+        if (!in_array($newCarteraTab, $knownTabs, true) && array_intersect(['gestiones_cobro', 'auditoria_canon_aseguradoras'], (array) $raw[$cargo]) !== []) {
+          $raw[$cargo] = array_merge((array) $raw[$cargo], [$newCarteraTab]);
         }
       }
       // Hojas de cierre es nueva: mientras no se guarden permisos que la conozcan, la ve quien ve contratos o servicios.

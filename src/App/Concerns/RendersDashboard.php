@@ -206,6 +206,8 @@ trait RendersDashboard
       'ocupaciones_vs_desocupaciones' => 'scm-panel-movimientos-contratos',
       'metricas_por_terminar' => 'scm-panel-movimientos-contratos',
       'metricas_aumentos' => 'scm-panel-movimientos-contratos',
+      'cartera_ocupaciones' => 'scm-panel-movimientos-contratos',
+      'cartera_desocupaciones' => 'scm-panel-movimientos-contratos',
       'scm-panel-movimientos-contratos' => 'scm-panel-movimientos-contratos',
       'contract_owners' => 'scm-panel-funcionario-contratos',
       'scm-panel-funcionario-contratos' => 'scm-panel-funcionario-contratos',
@@ -1420,10 +1422,10 @@ trait RendersDashboard
           <?php
           // Abre la vista pedida si el cargo la tiene; si no, la primera que tenga.
           $contractMovementsView = \SCM\Modules\ContractMovements\ContractMovementsView::viewFromTab($tabKey);
-          $contractMovementsTabs = ['ocupaciones' => 'metricas_ocupaciones', 'desocupaciones' => 'metricas_desocupaciones', 'comparativo' => 'metricas_ocupaciones_vs', 'por_terminar' => 'metricas_por_terminar', 'aumentos' => 'metricas_aumentos'];
-          if (!in_array($contractMovementsTabs[$contractMovementsView] ?? '', $dashboardAllowedTabs, true)) {
-            foreach ($contractMovementsTabs as $movementView => $movementTab) {
-              if (in_array($movementTab, $dashboardAllowedTabs, true)) { $contractMovementsView = $movementView; break; }
+          $contractMovementsTabs = ['ocupaciones' => ['metricas_ocupaciones', 'cartera_ocupaciones'], 'desocupaciones' => ['metricas_desocupaciones', 'cartera_desocupaciones'], 'comparativo' => ['metricas_ocupaciones_vs'], 'por_terminar' => ['metricas_por_terminar'], 'aumentos' => ['metricas_aumentos']];
+          if (array_intersect($contractMovementsTabs[$contractMovementsView] ?? [], $dashboardAllowedTabs) === []) {
+            foreach ($contractMovementsTabs as $movementView => $movementTabs) {
+              if (array_intersect($movementTabs, $dashboardAllowedTabs) !== []) { $contractMovementsView = $movementView; break; }
             }
           }
           echo (new \SCM\Modules\ContractMovements\ContractMovementsView())->renderShell($contractMovementsView);
@@ -1966,6 +1968,10 @@ trait RendersDashboard
       ['label' => 'Actividades de cartera', 'tabs' => [
         'gestiones_cobro' => '',
         'auditoria_canon_aseguradoras' => '',
+        'cartera_ocupaciones' => '',
+        'cartera_desocupaciones' => '',
+        'metricas_por_terminar' => '',
+        'metricas_aumentos' => '',
       ]],
       ['label' => 'Actividades contractuales', 'tabs' => [
         'contratos_arrendamiento' => '',
@@ -1990,8 +1996,6 @@ trait RendersDashboard
         'metricas_ocupaciones' => '',
         'metricas_desocupaciones' => '',
         'metricas_ocupaciones_vs' => '',
-        'metricas_por_terminar' => '',
-        'metricas_aumentos' => '',
         'metricas_crecimiento' => '',
         'mis_presupuestos' => '',
       ]],

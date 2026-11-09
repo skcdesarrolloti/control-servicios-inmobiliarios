@@ -17,6 +17,8 @@ final class ContractMovementsView
   /** Traduce el parámetro `tab` de la URL a la vista interna del panel. */
   public static function viewFromTab(string $tab): string
   {
+    // Actividades de cartera abre las mismas vistas con su propia opción de menú.
+    $tab = preg_replace('/^cartera_/', '', $tab) ?? $tab;
     foreach (self::VIEWS as $view => $def) {
       if ($tab === $def['tab'] || $tab === $view) {
         return $view;
@@ -35,7 +37,7 @@ final class ContractMovementsView
     <section class="scm-cm" data-scm-contract-movements data-initial-view="<?php echo $h($initialView); ?>" aria-labelledby="scm-cm-title">
       <header class="scm-cm-head">
         <div class="scm-cm-head-copy">
-          <p class="scm-cm-kicker">Métricas · Contratos de arrendamiento</p>
+          <p class="scm-cm-kicker">Contratos de arrendamiento</p>
           <h1 id="scm-cm-title" data-scm-cm-title><?php echo $h(self::VIEWS[$initialView]['label']); ?></h1>
           <p class="scm-cm-subtitle" data-scm-cm-subtitle></p>
         </div>
