@@ -308,6 +308,9 @@ try {
   check(str_starts_with($letterJob['subject'],'Aviso previo de revisión antes de la desocupación del inmueble - Contrato ') && !str_contains((string) json_encode($letterJob),'id_ticket='),'Tenant receipt letter uses its own title without the internal case link');
   check(($letterJob['meta']['documents'][0]['url'] ?? '')==='https://example.invalid/signed-letter.pdf','Queued letter must retain signed PDF link');
   check($letterJob['payload']['cc']===['test@example.invalid'],'Configured internal employee receives CC of the same signed letter');
+  $pdo->beginTransaction(); $internalReceipt=$letterProbe->createAdministrativeTicket($letterInput,[],[],['empleado']); $pdo->commit();
+  $internalJob=json_decode((string)$db->getVar('SELECT payload FROM test_jobs WHERE dedupe_key LIKE ?',['ticket_admin_created_'.$internalReceipt['ticket_id'].':%']),true);
+  check(str_starts_with((string)($internalJob['subject']??''),'Recibo de inmueble · Contrato ') && str_ends_with((string)$internalJob['subject'],' · Caso #'.$internalReceipt['ticket_id']) && str_contains($internalJob['message_html'],'Se ha creado un caso de recibo de inmueble.') && !str_contains($internalJob['message_html'],'caso administrativo'),'Internal receipt email identifies the receipt in subject and body');
   check(\SharedNotifications\NotificationQueue::$constructions===1,'All transactions must reuse the prewarmed queue');
   $probe->writable=false;
   check(!callEndpoint(fn()=>$probe->ajax_handler_contracts_ending_import_apply())->ok,'Read-only users cannot import');

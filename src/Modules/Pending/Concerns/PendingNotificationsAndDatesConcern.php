@@ -48,6 +48,11 @@ trait PendingNotificationsAndDatesConcern
       $subject = \SCM\Modules\Contracts\ContractRetentionEmail::subject($ticketId);
       $content = \SCM\Modules\Contracts\ContractRetentionEmail::content($ticketId, $ticketPayload);
     }
+    if ($mode !== 'preventiva' && in_array(mb_strtolower(trim((string) ($ticketPayload['tema_ayuda'] ?? '')), 'UTF-8'), ['recibo de inmuebles', 'recibo de inmueble'], true)) {
+      $receiptContract = trim((string) ($ticketPayload['contrato'] ?? ''));
+      $subject = 'Recibo de inmueble' . ($receiptContract !== '' ? ' · Contrato ' . $receiptContract : '') . ' · Caso #' . $ticketId;
+      $content = str_replace('Se ha creado un caso administrativo.', 'Se ha creado un caso de recibo de inmueble.', $content);
+    }
 
     $jobs = [];
     $adminAction = '';
