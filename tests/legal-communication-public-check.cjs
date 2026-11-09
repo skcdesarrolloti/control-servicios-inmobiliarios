@@ -26,7 +26,7 @@ const markup = `<main class="lcp-page"><div class="lcp-actions"><button class="l
   assert.equal(await page.textContent('[data-lcp-title]'), 'acta.pdf');
   assert.equal(browser.contexts()[0].pages().length, pages, 'the document opens in the same page');
   await page.click('[data-lcp-close]');
-  assert.equal(await page.locator('[data-lcp-body] iframe').count(), 0);
+  await page.waitForFunction(() => !document.querySelector('[data-lcp-body] iframe'));
   await page.click('[data-lcp-file*="b.docx"]');
   assert.match(await page.textContent('[data-lcp-body]'), /Descargar/);
   assert.equal(await page.getAttribute('[data-lcp-download]', 'href'), 'https://panel.test/b.docx');

@@ -295,6 +295,30 @@ $service->saveType($tutela['id'], 'Tutela', false);
 $check(!in_array('Tutela', array_column($service->types(true), 'name'), true), 'Un tipo inactivo deja de ofrecerse.');
 $handlersSource = (string) file_get_contents(dirname(__DIR__) . '/src/App/Concerns/HandlesLegalCases.php');
 $check(!preg_match('/ajax_handler_legal_case_(?:communication_)?(?:edit|delete|update)\b/', $handlersSource), 'No existe acción para editar o borrar comunicaciones.');
+// --- Constancias
+$fullComm = $comms->communication($communicationId);
+$pdfHtml = \SCM\Modules\LegalCases\LegalCasePdf::communicationHtml($fullComm, 'Ana <Contractual>');
+$check(str_contains($pdfHtml, 'Aceptado por el servidor') && str_contains($pdfHtml, 'no los certifica') && str_contains($pdfHtml, 'Número inválido') && str_contains($pdfHtml, $hash) && str_contains($pdfHtml, 'abogado@example.com'), 'La constancia trae estados, destinatarios, hash y la aclaración de entrega.');
+$check(str_contains($pdfHtml, 'Ana &lt;Contractual&gt;') && !str_contains($pdfHtml, '<script') && substr_count($pdfHtml, 'Contenido enviado a') === 3, 'Escapa los datos y muestra el contenido de cada destinatario una sola vez.');
+$casePdf = \SCM\Modules\LegalCases\LegalCasePdf::caseHtml($service->detail($caseId), $comms->forCase($caseId), 'Ana');
+$check(str_contains($casePdf, 'Línea de tiempo') && str_contains($casePdf, 'Comunicación enviada') && str_contains($casePdf, 'SKC SuCasa Inmobiliaria') && !str_contains($casePdf, 'ucursal'), 'La constancia del caso es completa y no muestra sucursal.');
+
+// --- Recordatorios
+$dueId = $service->create(['name' => 'Vence pronto', 'due_date' => '2026-12-10', 'opened_date' => '2026-12-01', 'contract_id' => 0, 'property' => '', 'address' => ''] + $base, [], $actor);
+$forDue = static fn(string $today): array => array_values(array_filter($service->pendingDueReminders($today), static fn(array $item): bool => $item['case']['id'] === $dueId));
+$check($forDue('2026-12-06') === [], 'Más de tres días antes no avisa.');
+$soon = $forDue('2026-12-07');
+$check(count($soon) === 1 && $soon[0]['stage'] === 'proxima', 'Avisa tres días antes.');
+$service->event($dueId, 'recordatorio_fecha_limite', ['id' => '', 'name' => 'Sistema'], ['fecha_limite' => '2026-12-10', 'etapa' => 'proxima']);
+$check($forDue('2026-12-08') === [], 'No repite el aviso.');
+$check($forDue('2026-12-10')[0]['stage'] === 'vencimiento' && $forDue('2026-12-15')[0]['stage'] === 'vencimiento', 'Avisa al cumplirse, también si ese día no corrió.');
+$service->event($dueId, 'recordatorio_fecha_limite', ['id' => '', 'name' => 'Sistema'], ['fecha_limite' => '2026-12-10', 'etapa' => 'vencimiento']);
+$check($forDue('2026-12-11') === [], 'El aviso de vencimiento sale una vez.');
+$service->update($dueId, ['name' => 'Vence pronto', 'due_date' => '2026-12-20', 'opened_date' => '2026-12-01', 'contract_id' => 0, 'property' => '', 'address' => ''] + $base, $actor);
+$check(count($forDue('2026-12-18')) === 1, 'Si cambia la fecha vuelve a avisar.');
+$service->changeStatus($dueId, 'cerrado', '', $actor);
+$check($forDue('2026-12-18') === [] && !in_array($dueId, array_column(array_column($service->pendingDueReminders('2026-12-30'), 'case'), 'id'), true), 'Un caso cerrado no avisa.');
+
 array_map('unlink', glob($uploadDir . '/*') ?: []);
 rmdir($uploadDir);
 

@@ -59,6 +59,7 @@ final class DueTypesProbe
   private function adminDueContractRequestItems(array $s, int $f, int $t): array { return [['tipo_vencimiento' => 'terminacion_contrato_pendiente'], ['tipo_vencimiento' => 'no_prorroga_contrato_pendiente']]; }
   private function adminDueMaintenanceOrderItems(array $s, int $f, int $t): array { return []; }
   private function adminDueLeaseAnnexItems(array $s, int $f, int $t): array { return []; }
+  private function adminDueLegalCaseItems(int $f, int $t): array { return [['tipo_vencimiento' => 'caso_juridico_fecha_limite']]; }
   private function adminDueOwnerCreditItems(array $s, int $f, int $t): array { return [['tipo_vencimiento' => 'credito_solicitud_pendiente'], ['tipo_vencimiento' => 'credito_contabilidad_pendiente']]; }
 }
 $probe = new DueTypesProbe();
@@ -87,7 +88,7 @@ $check($probe->types([], true) === ['terminacion_contrato_pendiente', 'no_prorro
 $check(count($probe->types(['contractual'], true)) === 2, 'the contract types are not duplicated');
 $dashboard = (string) file_get_contents(dirname(__DIR__) . '/src/App/Concerns/RendersDashboard.php');
 preg_match_all('/<\?php if \(in_array\(\'([a-z_]+)\', \$dueAllowedTypes, true\)\): \?><label class="scm-calendar-due-chip/', $dashboard, $chips);
-$check(count($chips[1]) === 12 && array_diff($probe->all(), $chips[1]) === [] && array_diff($chips[1], $probe->all()) === [], 'every calendar filter depends on the permission map');
+$check(count($chips[1]) === 13 && array_diff($probe->all(), $chips[1]) === [] && array_diff($chips[1], $probe->all()) === [], 'every calendar filter depends on the permission map');
 
 $template = json_decode((string) file_get_contents(dirname(__DIR__) . '/docs/whatsapp-recordatorio-tareas-template.json'), true);
 $check($template['name'] === DailyTaskReminder::TEMPLATE && substr_count($template['components'][0]['text'], '{{') === 3, 'the template has the three body variables the panel sends');

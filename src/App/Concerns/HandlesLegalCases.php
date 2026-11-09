@@ -6,10 +6,14 @@ namespace SCM\App\Concerns;
 
 use SCM\Core\App;
 use SCM\Core\Auth;
+use SCM\Modules\LegalCases\LegalCasePdf;
 use SCM\Modules\LegalCases\LegalCaseService;
 use SCM\Modules\LegalCases\LegalCommunicationService;
 use SCM\Modules\LegalCases\LegalDeliveryGateway;
 use SCM\Modules\PublicTickets\PublicTicketsService;
+use SCM\Support\ColombiaBusinessCalendar;
+use SCM\Support\EmailQueue;
+use SCM\Support\EmailTemplate;
 use SCM\Support\FuncionarioOptions;
 use SCM\Support\SchemaInspector;
 
@@ -217,6 +221,104 @@ trait HandlesLegalCases
     } catch (\Throwable $error) {
       $this->legalCaseFail($error, 'No se pudieron cargar las comunicaciones.');
     }
+  }
+
+  private function legalCasePdfOutput(string $bytes, string $filename): void
+  {
+    if (ob_get_level() > 0) ob_end_clean();
+    header_remove('Content-Type');
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . $filename . '"');
+    header('Content-Length: ' . (string) strlen($bytes));
+    header('Cache-Control: private, max-age=0, must-revalidate');
+    echo $bytes;
+    exit;
+  }
+
+  public function ajax_handler_legal_case_pdf(): void
+  {
+    $service = $this->legalCaseService();
+    $this->requireDashboardAction('legal_case_export', 'Tu cargo no tiene permiso para exportar.');
+    try {
+      $id = (int) ($_POST['case_id'] ?? 0);
+      $actor = $this->legalCaseActor();
+      $communications = $this->legalCommunicationService($service)->forCase($id);
+      $bytes = LegalCasePdf::caseBytes($service->detail($id), $communications, $actor['name']);
+      $service->event($id, 'pdf_exportado', $actor, ['documento' => 'Caso completo']);
+    } catch (\Throwable $error) {
+      $this->legalCaseFail($error, 'No se pudo generar el PDF del caso.');
+    }
+    $this->legalCasePdfOutput($bytes, strtolower(LegalCaseService::code($id)) . '.pdf');
+  }
+
+  public function ajax_handler_legal_case_communication_pdf(): void
+  {
+    $service = $this->legalCaseService();
+    $this->requireDashboardAction('legal_case_export', 'Tu cargo no tiene permiso para exportar.');
+    try {
+      $id = (int) ($_POST['communication_id'] ?? 0);
+      $actor = $this->legalCaseActor();
+      $communication = $this->legalCommunicationService($service)->communication($id);
+      $bytes = LegalCasePdf::communicationBytes($communication, $actor['name']);
+      $service->event((int) $communication['case_id'], 'pdf_exportado', $actor, ['documento' => 'Comunicación: ' . $communication['subject']]);
+    } catch (\Throwable $error) {
+      $this->legalCaseFail($error, 'No se pudo generar la constancia.');
+    }
+    $this->legalCasePdfOutput($bytes, 'comunicacion-' . $id . '.pdf');
+  }
+
+  /** Calendario de vencimientos: los mismos casos sin cerrar con fecha límite. @return list<array<string,mixed>> */
+  private function adminDueLegalCaseItems(int $fromTs, int $toTs): array
+  {
+    $service = new LegalCaseService($this->db, App::settings());
+    $service->ensureSchema();
+    $items = [];
+    foreach ($service->openWithDueDate() as $case) {
+      $dueTs = (int) strtotime($case['due_date'] . ' 00:00:00');
+      $calendarTs = $this->adminDueCalendarPlacementTimestamp($dueTs, $fromTs, $toTs);
+      if ($calendarTs <= 0) continue;
+      $items[] = $this->adminDueEvent(['id' => 'caso_juridico_fecha_limite-' . $case['id'], 'type' => 'caso_juridico_fecha_limite', 'group' => 'Casos jurídicos', 'title' => $case['code'] . ' · ' . $case['name'], 'description' => 'Responsable: ' . $case['responsible_name'] . ($case['next_action'] !== '' ? '. Próxima acción: ' . $case['next_action'] : ''), 'color' => '#7c3aed',
+        'base_ts' => (int) strtotime($case['opened_date'] . ' 00:00:00'), 'due_ts' => $dueTs, 'calendar_ts' => $calendarTs, 'case' => ['legal_case_id' => (string) $case['id']]]);
+    }
+    return $items;
+  }
+
+  /**
+   * Aviso al responsable antes de la fecha límite. Corre con el cron del recordatorio diario, desde las 9:00 a. m. en días
+   * hábiles; el evento registrado evita repetirlo. Las copias salen de Notificaciones internas.
+   * @return array{queued:int,skipped:int}
+   */
+  public function processLegalCaseReminders(?\DateTimeImmutable $now = null): array
+  {
+    $now ??= new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota'));
+    $result = ['queued' => 0, 'skipped' => 0];
+    if ((int) $now->format('G') < 9 || !ColombiaBusinessCalendar::isBusinessDay($now->format('Y-m-d'))) return $result;
+    $service = new LegalCaseService($this->db, App::settings());
+    $service->ensureSchema();
+    $people = array_column($service->responsibles(), null, 'id');
+    $system = ['id' => '', 'name' => 'Sistema'];
+    $emails = new EmailQueue($this->db);
+    foreach ($service->pendingDueReminders($now->format('Y-m-d')) as $reminder) {
+      $case = $reminder['case'];
+      $isDue = $reminder['stage'] === 'vencimiento';
+      $title = $isDue ? 'Fecha límite cumplida · ' . $case['code'] : 'Fecha límite próxima · ' . $case['code'];
+      $url = rtrim((string) SCM_BASE_URL, '/') . '/index.php?tab=casos_juridicos&scm_legal_case=' . $case['id'];
+      $body = '<p>El caso <strong>' . EmailTemplate::e($case['code'] . ' · ' . $case['name']) . '</strong> ' . ($isDue ? 'llegó a su' : 'está próximo a su') . ' fecha límite: <strong>' . EmailTemplate::e($case['due_date']) . '</strong>.</p>' . ($case['next_action'] !== '' ? '<p>Próxima acción: ' . EmailTemplate::e($case['next_action']) . '</p>' : '');
+      $email = (string) ($people[$case['responsible_id']]['email'] ?? '');
+      try {
+        $queued = $emails->enqueue(filter_var($email, FILTER_VALIDATE_EMAIL) ? [$email] : [], $title, EmailTemplate::render($title, $body, ['buttons' => [['url' => $url, 'label' => 'Ver caso']]]), ['source_module' => 'casos_juridicos', 'internal_action' => 'caso_juridico_fecha_limite', 'destination_name' => $case['responsible_name'], 'dedupe_key' => 'legal-case-due:' . $case['id'] . ':' . $case['due_date'] . ':' . $reminder['stage'], 'meta' => ['event' => 'caso_juridico_fecha_limite']]);
+        if ($queued > 0) {
+          $service->event((int) $case['id'], 'recordatorio_fecha_limite', $system, ['fecha_limite' => $case['due_date'], 'etapa' => $reminder['stage']]);
+          $result['queued'] += $queued;
+        } else {
+          $result['skipped']++;
+        }
+      } catch (\Throwable $error) {
+        error_log('[legal-case-reminder] ' . $case['code'] . ': ' . $error->getMessage());
+        $result['skipped']++;
+      }
+    }
+    return $result;
   }
 
   private function legalCaseConfigService(): LegalCaseService

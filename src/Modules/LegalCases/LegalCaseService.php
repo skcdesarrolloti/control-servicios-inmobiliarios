@@ -20,6 +20,7 @@ final class LegalCaseService
   public const STATUSES = ['abierto' => 'Abierto', 'en_tramite' => 'En trámite', 'cerrado' => 'Cerrado'];
   public const ROLES = ['propietario' => 'Propietario', 'arrendatario' => 'Arrendatario', 'tercero' => 'Tercero'];
   public const PER_PAGE = 25;
+  public const REMINDER_DAYS = 3;
   private const DEFAULT_TYPES = ['Siniestro', 'Reclamación', 'PQR', 'Jurídico', 'No prórroga', 'Otro'];
 
   /** Tablas ya verificadas en esta petición. */
@@ -502,6 +503,34 @@ final class LegalCaseService
     $tenantName = trim((string) ($contract['arrendatario'] ?? ''));
     if ($tenantName !== '') $parties[] = ['role' => 'arrendatario', 'name' => $tenantName, 'company' => '', 'document' => trim((string) ($contract['documento_arrendatario'] ?? '')), 'email' => (string) $tenant['email'], 'phone' => (string) $tenant['phone'], 'source' => 'contrato'];
     return $parties;
+  }
+
+  /** Casos sin cerrar con fecha límite, para el calendario de vencimientos. @return list<array<string,mixed>> */
+  public function openWithDueDate(): array
+  {
+    $rows = $this->db->getResults("SELECT c.*, t.`name` AS type_name FROM `{$this->table()}` c LEFT JOIN `{$this->table('case_types')}` t ON t.`id` = c.`type_id` WHERE c.`status` <> 'cerrado' AND c.`due_date` <> '' ORDER BY c.`due_date`");
+    return array_map(fn(array $row): array => $this->present($row), $rows);
+  }
+
+  /**
+   * Recordatorios por enviar: uno tres días antes y otro al cumplirse la fecha. Si la fecha cambia, vuelven a salir.
+   * @return list<array{case:array<string,mixed>,stage:string}>
+   */
+  public function pendingDueReminders(string $today): array
+  {
+    $limit = (new \DateTimeImmutable($today))->modify('+' . self::REMINDER_DAYS . ' days')->format('Y-m-d');
+    $pending = [];
+    foreach ($this->openWithDueDate() as $case) {
+      if ($case['due_date'] > $limit) continue;
+      $stage = $case['due_date'] <= $today ? 'vencimiento' : 'proxima';
+      $sent = false;
+      foreach ($this->db->getCol("SELECT `details_json` FROM `{$this->table('case_events')}` WHERE `case_id` = ? AND `action` = 'recordatorio_fecha_limite'", [$case['id']]) as $json) {
+        $details = json_decode((string) $json, true);
+        if (($details['fecha_limite'] ?? '') === $case['due_date'] && ($details['etapa'] ?? '') === $stage) $sent = true;
+      }
+      if (!$sent) $pending[] = ['case' => $case, 'stage' => $stage];
+    }
+    return $pending;
   }
 
   /** @return list<array{code:string,address:string}> */

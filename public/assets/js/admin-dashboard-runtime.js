@@ -629,6 +629,7 @@
       if (type === "contrato_anexos_sin_enviar") return "Contratos de arrendamiento sin enviar";
       if (type === "credito_solicitud_pendiente") return "Solicitudes de crédito";
       if (type === "credito_contabilidad_pendiente") return "Créditos sin ingresar a contabilidad";
+      if (type === "caso_juridico_fecha_limite") return "Casos jurídicos · fecha límite";
       return type || "Vencimientos";
     }
 
@@ -2284,6 +2285,7 @@
           contrato_anexos_sin_enviar: { color: "#0d9488", bg: "#f0fdfa", text: "#0f766e", border: "#99f6e4" },
           credito_solicitud_pendiente: { color: "#4f46e5", bg: "#eef2ff", text: "#4338ca", border: "#c7d2fe" },
           credito_contabilidad_pendiente: { color: "#059669", bg: "#ecfdf5", text: "#047857", border: "#a7f3d0" },
+          caso_juridico_fecha_limite: { color: "#7c3aed", bg: "#f5f3ff", text: "#6d28d9", border: "#ddd6fe" },
         };
         var theme = themes[key] || { color: "#475569", bg: "#f8fafc", text: "#334155", border: "#cbd5e1" };
         if (typeof rowOrType !== "string" && rowOrType && rowOrType.color) {
@@ -2980,7 +2982,7 @@
           (Number(row.dias_vencido || 0) > 0 ? '<span>' + escHtml(String(row.dias_vencido)) + " dia(s) vencido</span>" : "") +
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
-          (caseData.owner_credit_id ? dueCreditButtonHtml(caseData) : caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Ver caso · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn" data-scm-open-admin-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Crear caso</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn" data-scm-open-public-services-review data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>'))) +
+          (caseData.legal_case_id ? dueLegalCaseButtonHtml(caseData, "") : caseData.owner_credit_id ? dueCreditButtonHtml(caseData) : caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Ver caso · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn" data-scm-open-admin-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Crear caso</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn" data-scm-open-public-services-review data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>'))) +
           '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div></div></article>";
       }
 
@@ -3873,6 +3875,7 @@
           contrato_anexos_sin_enviar: 0,
           credito_solicitud_pendiente: 0,
           credito_contabilidad_pendiente: 0,
+          caso_juridico_fecha_limite: 0,
         };
         rows.forEach(function (row) {
           var type = String(row.tipo_vencimiento || "");
@@ -3898,9 +3901,13 @@
         if (type === "contrato_anexos_sin_enviar") return "Contratos de arrendamiento sin enviar";
         if (type === "credito_solicitud_pendiente") return "Solicitudes de crédito";
         if (type === "credito_contabilidad_pendiente") return "Créditos sin ingresar a contabilidad";
+        if (type === "caso_juridico_fecha_limite") return "Casos jurídicos · fecha límite";
         return type || "Vencimientos";
       }
 
+      function dueLegalCaseButtonHtml(caseData, extraClass) {
+        return '<a class="scm-case-work-btn' + extraClass + '" href="index.php?tab=casos_juridicos&scm_legal_case=' + encodeURIComponent(caseData.legal_case_id) + '">Ver caso</a>';
+      }
       // Botón de un vencimiento de crédito: lo atiende admin-owner-credits.js.
       function dueCreditButtonHtml(caseData, extraClass) {
         var attr = String(caseData.owner_credit_view || "") === "detail" ? "data-owner-credit-detail" : "data-owner-credit-open";
@@ -3931,7 +3938,7 @@
               '<strong>' + escHtml(row.fecha_vencimiento || "-") + "</strong>" +
               '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
               '<em>' + escHtml(row.estado || "Pendiente") + "</em>" +
-              (caseData.owner_credit_id ? dueCreditButtonHtml(caseData, " scm-calendar-due-breakdown-case") : canOpen ? '<button type="button" class="scm-case-work-btn scm-calendar-due-breakdown-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : "") +
+              (caseData.legal_case_id ? dueLegalCaseButtonHtml(caseData, " scm-calendar-due-breakdown-case") : caseData.owner_credit_id ? dueCreditButtonHtml(caseData, " scm-calendar-due-breakdown-case") : canOpen ? '<button type="button" class="scm-case-work-btn scm-calendar-due-breakdown-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : "") +
               '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + String(caseData.case_source_html || "") + "</div>" +
               "</div>";
           }).join("");

@@ -1956,6 +1956,7 @@ trait HandlesTicketWorkflowActions
       && !$this->canAccessDashboardTab('ordenes_mantenimiento')
       && !$this->canAccessDashboardTab('contratos_arrendamiento')
       && !$this->canAccessDashboardTab('credito_propietario')
+      && !$this->canAccessDashboardTab('casos_juridicos')
       && !$this->canUseDashboardAction('case_respond')
     ) {
       $this->jsonFail('No tienes permiso para ver vencimientos administrativos.');
@@ -2180,6 +2181,7 @@ trait HandlesTicketWorkflowActions
     'ordenes_mantenimiento' => ['orden_mantenimiento_sin_respuesta'],
     'contratos_arrendamiento' => ['contrato_anexos_sin_enviar'],
     'credito_propietario' => ['credito_solicitud_pendiente', 'credito_contabilidad_pendiente'],
+    'casos_juridicos' => ['caso_juridico_fecha_limite'],
   ];
 
   /** Permisos por cargo › Alertas: cargo => tipos. Un cargo que no se ha guardado conserva todos los de sus pestañas. */
@@ -2208,6 +2210,7 @@ trait HandlesTicketWorkflowActions
       'contrato_anexos_sin_enviar' => 'Contratos sin enviar',
       'credito_solicitud_pendiente' => 'Solicitudes de crédito',
       'credito_contabilidad_pendiente' => 'Créditos sin contabilidad',
+      'caso_juridico_fecha_limite' => 'Casos jurídicos · fecha límite',
     ];
   }
 
@@ -2311,6 +2314,9 @@ trait HandlesTicketWorkflowActions
     }
     if ($wants('credito_solicitud_pendiente', 'credito_contabilidad_pendiente')) {
       $items = array_merge($items, $this->adminDueOwnerCreditItems($settings, $fromTs, $toTs));
+    }
+    if ($wants('caso_juridico_fecha_limite')) {
+      $items = array_merge($items, $this->adminDueLegalCaseItems($fromTs, $toTs));
     }
     $items = array_values(array_filter($items, static fn(array $item): bool => in_array((string) ($item['tipo_vencimiento'] ?? ''), $types, true)));
 

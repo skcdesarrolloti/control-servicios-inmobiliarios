@@ -408,6 +408,13 @@ final class LegalCommunicationService
     ];
   }
 
+  /** @return list<array<string,mixed>> */
+  public function forCase(int $caseId): array
+  {
+    $ids = $this->db->getCol("SELECT `id` FROM `{$this->table('communications')}` WHERE `case_id` = ? ORDER BY `id`", [$caseId]);
+    return array_map(fn($id): array => $this->communication((int) $id), $ids);
+  }
+
   /** @param array<string,mixed> $row @return array<string,mixed> */
   private function presentCommunication(array $row): array
   {

@@ -64,6 +64,8 @@ final class AuthenticatedActionRouter
       'scm_legal_case_reply' => 'ajax_handler_legal_case_reply',
       'scm_legal_case_documents' => 'ajax_handler_legal_case_documents',
       'scm_legal_case_preview' => 'ajax_handler_legal_case_preview',
+      'scm_legal_case_pdf' => 'ajax_handler_legal_case_pdf',
+      'scm_legal_case_communication_pdf' => 'ajax_handler_legal_case_communication_pdf',
       'scm_legal_case_send' => 'ajax_handler_legal_case_send',
       'scm_legal_case_communication' => 'ajax_handler_legal_case_communication',
       'scm_legal_case_communications' => 'ajax_handler_legal_case_communications',

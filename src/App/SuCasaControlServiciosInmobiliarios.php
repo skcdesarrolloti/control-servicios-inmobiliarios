@@ -581,6 +581,16 @@ final class SuCasaControlServiciosInmobiliarios
           ],
         ],
       ],
+      'casos_juridicos' => [
+        'label' => 'Casos jurídicos',
+        'items' => [
+          'caso_juridico_fecha_limite' => [
+            'label' => 'Fecha límite de casos jurídicos',
+            'description' => 'Copia del recordatorio que recibe el responsable del caso tres días antes de la fecha límite y cuando se cumple.',
+            'channel' => 'Email interno en cola',
+          ],
+        ],
+      ],
       'creditos_propietarios' => [
         'label' => 'Créditos a propietarios',
         'items' => [

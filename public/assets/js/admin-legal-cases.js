@@ -5,11 +5,11 @@
   var MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   var EVENT_ICONS = {
     caso_creado: "add_circle", caso_editado: "edit", estado_cambiado: "swap_horiz", parte_agregada: "person_add", parte_retirada: "person_remove",
-    nota: "sticky_note_2", respuesta_registrada: "reply", documento: "attach_file", comunicacion_enviada: "send", pdf_exportado: "picture_as_pdf",
+    nota: "sticky_note_2", respuesta_registrada: "reply", documento: "attach_file", comunicacion_enviada: "send", pdf_exportado: "picture_as_pdf", recordatorio_fecha_limite: "alarm",
   };
   var EVENT_TITLES = {
     caso_creado: "Caso creado", caso_editado: "Caso editado", estado_cambiado: "Cambio de estado", parte_agregada: "Parte agregada", parte_retirada: "Parte retirada",
-    nota: "Nota interna", respuesta_registrada: "Respuesta recibida", documento: "Documentos cargados", comunicacion_enviada: "Comunicación enviada", pdf_exportado: "Constancia exportada",
+    nota: "Nota interna", respuesta_registrada: "Respuesta recibida", documento: "Documentos cargados", comunicacion_enviada: "Comunicación enviada", pdf_exportado: "Constancia exportada", recordatorio_fecha_limite: "Recordatorio de fecha límite",
   };
 
   var TIMELINE_FILTERS = [["todo", "Todo"], ["comunicaciones", "Comunicaciones"], ["respuestas", "Respuestas"], ["notas", "Notas"], ["documentos", "Documentos"], ["estados", "Estados"], ["bitacora", "Bitácora"]];
@@ -51,6 +51,7 @@
     var canManage = module.getAttribute("data-can-manage") === "1";
     var canSend = module.getAttribute("data-can-send") === "1";
     var canConfig = module.getAttribute("data-can-config") === "1";
+    var canExport = module.getAttribute("data-can-export") === "1";
     var commFiltersEl = module.querySelector("[data-scm-lc-comm-filters]");
     var commListEl = module.querySelector("[data-scm-lc-comm-list]");
     var commPagerEl = module.querySelector("[data-scm-lc-comm-pager]");
@@ -60,6 +61,9 @@
     var kpisEl = module.querySelector("[data-scm-lc-kpis]");
     var pagerEl = module.querySelector("[data-scm-lc-pager]");
     var modalsEl = module.querySelector("[data-scm-lc-modals]");
+    // Fuera del panel: Configuración se abre desde cualquier pestaña y un panel oculto escondería el popup.
+    modalsEl.classList.add("scm-lc");
+    root.appendChild(modalsEl);
     var filtersEl = module.querySelector("[data-scm-lc-filters]");
     var state = { boot: null, page: 1, loading: null, modals: [], commPage: 1, commLoaded: false, view: "cases" };
     var searchTimer = 0;
@@ -174,9 +178,35 @@
         fillFilters();
         Object.keys(selected).forEach(function (key) { filtersEl.elements[key].value = selected[key]; });
         if (panel) panel.setAttribute("data-scm-loaded", "1");
+        openLinkedCase();
         return loadList();
       }).catch(function (error) { setStatus(error.message, "error"); }).then(function () { state.loading = null; });
       return state.loading;
+    }
+
+    // Enlaces del correo de recordatorio y del calendario de vencimientos.
+    function openLinkedCase() {
+      var id = Number(new URLSearchParams(window.location.search).get("scm_legal_case") || 0);
+      if (id > 0 && !state.linkedOpened) {
+        state.linkedOpened = true;
+        openDetail(id);
+      }
+    }
+
+    function viewPdf(title, action, fields, filename, onDone) {
+      var modal = openModal(title, '<p class="scm-lc-hint">Generando el PDF…</p>', true);
+      var body = new FormData();
+      body.append("action", action);
+      body.append("nonce", runtime.nonce || "");
+      Object.keys(fields).forEach(function (key) { body.append(key, fields[key]); });
+      fetch(runtime.ajaxUrl || "", { method: "POST", body: body, credentials: "same-origin" }).then(function (response) {
+        if ((response.headers.get("Content-Type") || "").indexOf("application/pdf") === 0) return response.blob();
+        return response.json().then(function (json) { throw new Error((json && json.data && json.data.message) || "No se pudo generar el PDF."); });
+      }).then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        modal.body.innerHTML = '<iframe class="scm-lc-preview" title="' + esc(title) + '" src="' + url + '"></iframe><div class="scm-lc-form-actions"><a class="scm-lc-btn" download="' + esc(filename) + '" href="' + url + '">Descargar</a></div>';
+        if (onDone) onDone();
+      }).catch(function (error) { modal.body.innerHTML = '<p class="scm-lc-form-error">' + esc(error.message) + "</p>"; });
     }
 
     function renderList(data) {
@@ -365,6 +395,8 @@
         case "parte_agregada":
         case "parte_retirada": return esc(details.nombre) + " · " + esc(details.rol);
         case "nota": return '<div class="scm-lc-event-text">' + esc(details.texto) + "</div>";
+        case "pdf_exportado": return esc(details.documento);
+        case "recordatorio_fecha_limite": return "Fecha límite: " + esc(formatDate(details.fecha_limite));
         case "comunicacion_enviada": return "<strong>" + esc(details.asunto) + "</strong><br>" + esc((details.canales || []).join(" y ")) + " · Para: " + esc((details.destinatarios || []).join(", ")) + (details.communication_id ? '<br><button type="button" class="scm-lc-link" data-scm-lc-comm="' + Number(details.communication_id) + '">Ver comunicación</button>' : "");
         case "respuesta_registrada": return "De " + esc(details.remitente) + " · " + esc(details.canal) + " · recibida el " + esc(formatDate(details.fecha_recepcion)) + (details.asunto ? "<br><strong>" + esc(details.asunto) + "</strong>" : "") + '<div class="scm-lc-event-text">' + esc(details.texto) + "</div>";
         default: return "";
@@ -468,6 +500,7 @@
       modal.setTitle(item.code + " · " + item.name);
       var actions = '<div class="scm-lc-actions">'
         + (canManage ? '<button type="button" class="scm-lc-btn" data-scm-lc-edit>Editar</button><button type="button" class="scm-lc-btn" data-scm-lc-status-open>Cambiar estado</button>' : "")
+        + (canExport ? '<button type="button" class="scm-lc-btn" data-scm-lc-export>Exportar PDF</button>' : "")
         + (canSend ? '<button type="button" class="scm-lc-btn scm-lc-btn-primary" data-scm-lc-compose>Nueva comunicación</button>' : "")
         + "</div>";
       modal.body.innerHTML = '<div class="scm-lc-section-head"><span class="scm-lc-badge is-' + esc(item.status) + '">' + esc(item.status_label) + "</span>" + actions + "</div>"
@@ -504,6 +537,7 @@
         if (target.closest("[data-scm-lc-status-open]")) openStatusForm(data.case, modal);
         if (target.closest("[data-scm-lc-party-new]")) openPartyForm(data.case, modal);
         if (target.closest("[data-scm-lc-compose]")) openCompose(data, modal);
+        if (target.closest("[data-scm-lc-export]")) viewPdf("Constancia " + data.case.code, "scm_legal_case_pdf", { case_id: id }, data.case.code.toLowerCase() + ".pdf", function () { reloadDetail(modal, id); });
         if (target.closest("[data-scm-lc-note]")) openNoteForm(data.case, modal);
         if (target.closest("[data-scm-lc-reply]")) openReplyForm(data.case, modal);
         if (target.closest("[data-scm-lc-upload]")) openDocumentsForm(data.case, modal);
@@ -761,7 +795,7 @@
       request("scm_legal_case_communication", { communication_id: id }).then(function (data) {
         modal.setTitle(data.case_code + " · " + data.subject);
         var first = data.recipients[0];
-        modal.body.innerHTML = '<dl class="scm-lc-info">' + info("Enviada por", data.sender_name) + info("Fecha", formatDateTime(data.created_at)) + info("Canales", data.channels.join(" y ")) + info("Respuestas a", data.reply_to || "No aplica") + (data.whatsapp_template ? info("Plantilla WhatsApp", data.whatsapp_template) : "") + "</dl>"
+        modal.body.innerHTML = (canExport ? '<div class="scm-lc-form-actions"><button type="button" class="scm-lc-btn" data-scm-lc-comm-export>Constancia PDF</button></div>' : "") + '<dl class="scm-lc-info">' + info("Enviada por", data.sender_name) + info("Fecha", formatDateTime(data.created_at)) + info("Canales", data.channels.join(" y ")) + info("Respuestas a", data.reply_to || "No aplica") + (data.whatsapp_template ? info("Plantilla WhatsApp", data.whatsapp_template) : "") + "</dl>"
           + '<section class="scm-lc-section"><h3>Destinatarios y estado</h3><table class="scm-lc-table"><thead><tr><th>Destinatario</th><th>Canal</th><th>Estado</th><th>Contenido</th></tr></thead><tbody>' + data.recipients.map(function (person, index) {
             return "<tr><td>" + esc(person.name) + "<small>" + esc(person.destination) + (person.kind === "cc" ? " · Copia" : "") + '</small></td><td data-label="Canal">' + esc(person.channel_label) + '</td><td data-label="Estado">' + statusBadge(person.status, person.status_label) + "<small>" + esc(person.accepted_at ? formatDateTime(person.accepted_at) : "") + "</small><small>" + esc(person.error) + "</small><small>" + esc(person.provider_id) + '</small></td><td data-label="Contenido"><button type="button" class="scm-lc-link" data-scm-lc-rendered="' + index + '">Ver</button></td></tr>';
           }).join("") + '</tbody></table><p class="scm-lc-hint">"Aceptado por el servidor" significa que el correo o Meta recibieron el mensaje. No confirma que haya llegado ni que se haya leído.</p></section>'
@@ -775,6 +809,7 @@
         modal.body.addEventListener("click", function (event) {
           var button = event.target.closest("[data-scm-lc-rendered]");
           if (button) showRendered(data.recipients[Number(button.getAttribute("data-scm-lc-rendered"))]);
+          if (event.target.closest("[data-scm-lc-comm-export]")) viewPdf("Constancia de comunicación", "scm_legal_case_communication_pdf", { communication_id: id }, "comunicacion-" + id + ".pdf");
         });
       }).catch(function (error) { modal.body.innerHTML = '<p class="scm-lc-form-error">' + esc(error.message) + "</p>"; });
     }
@@ -894,8 +929,8 @@
       if (canConfig && event.target.closest("[data-legal-case-settings]")) openSettings();
     });
 
-    // --- Eventos del panel
-    module.addEventListener("click", function (event) {
+    // --- Eventos del panel (los popups viven fuera del módulo)
+    function onModuleClick(event) {
       var target = event.target;
       if (target.closest("[data-scm-lc-refresh]")) {
         load(true);
@@ -918,7 +953,9 @@
         state.page = Number(page.getAttribute("data-scm-lc-page"));
         loadList();
       }
-    });
+    }
+    module.addEventListener("click", onModuleClick);
+    modalsEl.addEventListener("click", onModuleClick);
     function onFilterChange() {
       window.clearTimeout(searchTimer);
       searchTimer = window.setTimeout(function () {

@@ -37,6 +37,11 @@ const detail = {
     window.SCMAdminCore = { parseRuntime: () => ({ ajaxUrl: '/ajax', nonce: 'n1' }) };
     window.fetch = (url, opts) => {
       if (url === 'about:blank') return Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })) });
+      if (['scm_legal_case_pdf', 'scm_legal_case_communication_pdf'].includes(opts.body.get('action'))) {
+        window.calls.push(Object.fromEntries(opts.body.entries()));
+        if (window.failPdf) return Promise.resolve({ headers: { get: () => 'application/json' }, json: () => Promise.resolve({ success: false, data: { message: 'Verifica el servicio de PDF.' } }) });
+        return Promise.resolve({ headers: { get: () => 'application/pdf' }, blob: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })) });
+      }
       const body = {};
       opts.body.forEach((value, key) => { if (!(key in body)) body[key] = value; else body[key] = [].concat(body[key], value); });
       window.calls.push(body);
@@ -234,6 +239,41 @@ const detail = {
   await page.keyboard.press('Escape');
   await page.click('[data-scm-lc-view-btn="cases"]');
   console.log('OK settings: case types and templates');
+
+  // Configuración se abre desde cualquier pestaña: con el panel oculto el popup debe verse igual.
+  await page.evaluate(() => { document.querySelector('.scm-tab-panel').style.display = 'none'; });
+  await page.click('#settings');
+  await page.waitForSelector('[data-scm-lc-template-edit="6"]', { state: 'visible' });
+  assert.ok((await page.locator('.scm-lc-modal-card').boundingBox()).width > 300, 'popup is visible over another tab');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => { document.querySelector('.scm-tab-panel').style.display = ''; });
+  console.log('OK settings open from another tab');
+
+  await page.click('[data-scm-lc-open="1"]');
+  await page.waitForSelector('[data-scm-lc-export]');
+  await page.click('[data-scm-lc-export]');
+  await page.waitForFunction(() => (document.querySelector('iframe.scm-lc-preview') || {}).src?.startsWith('blob:'));
+  assert.equal(await topModal().locator('a[download="caso-0001.pdf"]').count(), 1);
+  assert.equal((await lastCall('scm_legal_case_pdf')).case_id, '1');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => { window.failPdf = true; });
+  await page.click('[data-scm-lc-export]');
+  await page.waitForSelector('.scm-lc-form-error');
+  assert.match(await topModal().textContent(), /servicio de PDF/);
+  await page.evaluate(() => { window.failPdf = false; });
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.click('[data-scm-lc-view-btn="comms"]');
+  await page.waitForSelector('[data-scm-lc-comm="4"]');
+  await page.click('[data-scm-lc-comm="4"]');
+  await page.waitForSelector('[data-scm-lc-comm-export]');
+  await page.click('[data-scm-lc-comm-export]');
+  await page.waitForFunction(() => (document.querySelector('iframe.scm-lc-preview') || {}).src?.startsWith('blob:'));
+  assert.equal((await lastCall('scm_legal_case_communication_pdf')).communication_id, '4');
+  await page.keyboard.press('Escape');
+  await page.click('.scm-lc-modal [data-scm-lc-close]');
+  await page.click('[data-scm-lc-view-btn="cases"]');
+  console.log('OK PDF evidence for the case and for a communication');
 
   await page.click('[data-scm-lc-open="1"]');
   await page.waitForSelector('.scm-lc-timeline');

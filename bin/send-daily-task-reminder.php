@@ -7,7 +7,9 @@ require dirname(__DIR__) . '/bootstrap/app.php';
 $lock = fopen(sys_get_temp_dir() . '/scm-daily-task-reminder.lock', 'c');
 if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) { echo "Recordatorio ya en ejecución.\n"; exit; }
 try {
-  echo json_encode((new \SCM\App\SuCasaControlServiciosInmobiliarios($scmDb))->processDailyTaskReminder(), JSON_UNESCAPED_UNICODE) . PHP_EOL;
+  $app = new \SCM\App\SuCasaControlServiciosInmobiliarios($scmDb);
+  echo json_encode($app->processDailyTaskReminder(), JSON_UNESCAPED_UNICODE) . PHP_EOL;
+  echo json_encode($app->processLegalCaseReminders(), JSON_UNESCAPED_UNICODE) . PHP_EOL;
 } catch (Throwable $error) {
   fwrite(STDERR, $error->getMessage() . PHP_EOL);
   exit(1);

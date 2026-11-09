@@ -21,7 +21,7 @@ En **Alertas › Recordatorio diario** se activa por cargo el correo y el WhatsA
 
 ## Vencimientos por cargo
 
-En **Alertas** cada cargo tiene dos grupos con los 12 tipos de vencimiento (`adminDueTypeLabels()`):
+En **Alertas** cada cargo tiene dos grupos con los 13 tipos de vencimiento (`adminDueTypeLabels()`):
 
 - **Vencimientos que atiende** (`dashboard_due_type_permissions`): decide el calendario, sus filtros, el contador y el popup. El tipo también exige la pestaña en `ADMIN_DUE_TYPES_BY_TAB`. Los resúmenes del popup siguen a sus tipos: *Preventivas pendientes* a los de preventivas y *Servicios públicos pendientes* a *Servicios críticos*.
 - **Tipos que entran en el recordatorio diario** (`dashboard_due_reminder_types`): recorta lo anterior solo para el correo y el WhatsApp, que siguen siendo un único mensaje al día por funcionario.
