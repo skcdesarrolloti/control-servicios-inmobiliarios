@@ -3,15 +3,18 @@
 
   // Los contratos llegan en una sola petición y todo lo demás (vistas, filtros,
   // drill-down por mes, tablas y CSV) se calcula aquí, sin volver al servidor.
-  var CACHE_KEY = "scm-contract-movements-v5";
+  var CACHE_KEY = "scm-contract-movements-v6";
   var CACHE_TTL_MS = 10 * 60 * 1000;
   var PAGE_SIZE = 15;
   var MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   var MONTHS_LONG = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   var STATE_LABELS = { entregado: "Entregado", por_recibir: "Por recibir", recibido: "Recibido" };
   var SIMI_FILTERS = { "": "Auditoría SIMI: todas", Correcto: "Correcto", Incorrecto: "Incorrecto", pendiente: "Sin auditar" };
-  var EXIT_FILTERS = { "": "Situación: todas", salida: "Con aviso de salida", sin_aviso: "Sin aviso de salida", continua: "Renuevan o no salen" };
-  var EXIT_BADGES = { salida: "is-bad", sin_aviso: "is-muted", continua: "is-simi-ok" };
+  var INCREASE_LABELS = { canon: "Canon", admin: "Administración" };
+  var SUB_FILTERS = {
+    por_terminar: { "": "Estado: todos", abierto: "Por recibir", cerrado: "Ya cerrados" },
+    aumentos: { "": "Tipo: todos", canon: "Canon", admin: "Administración" },
+  };
   var FILTER_LABELS = { estado: "Estado actual", funcionario: "Funcionario", tipo: "Tipo", destinacion: "Destinación", arrendatario: "Arrendatario", inmueble: "Inmueble", contrato: "Contrato" };
   var TEXT_FILTERS = ["arrendatario", "inmueble", "contrato"];
   var VIEWS = {
@@ -33,9 +36,16 @@
     por_terminar: {
       title: "Contratos por terminar",
       tab: "metricas_por_terminar",
-      subtitle: "Contratos entregados o por recibir según su fecha fin, separando los que tienen aviso de salida de los que aún pueden prorrogarse.",
+      subtitle: "Casos de recibo según la fecha de terminación que registró el área contractual.",
+    },
+    aumentos: {
+      title: "Aumentos",
+      tab: "metricas_aumentos",
+      subtitle: "Aumentos de canon y administración según las cartas de aumento, con el valor anterior y el nuevo para facturar.",
     },
   };
+  // Vistas que se consultan por mes: abren en el mes en curso.
+  var MONTH_VIEWS = { por_terminar: true, aumentos: true };
 
   var numberFormat = new Intl.NumberFormat("es-CO");
   var moneyFormat = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
@@ -109,7 +119,6 @@
     var columns = snapshot.columns || [];
     var names = snapshot.funcionarios || {};
     var years = {};
-    var endingYears = {};
     var options = { funcionario: {}, tipo: {}, destinacion: {} };
     var rows = (snapshot.rows || []).map(function (values) {
       var row = {};
@@ -125,18 +134,46 @@
       row.permanencia = row.ingreso && row.egreso
         ? Math.max(0, Math.round((Date.parse(row.egreso) - Date.parse(row.ingreso)) / (30.4375 * 86400000)))
         : null;
-      row.ending = !!row.fin && row.estado !== "recibido";
-      row.finY = row.ending ? Number(row.fin.slice(0, 4)) : 0;
-      row.finM = row.ending ? Number(row.fin.slice(5, 7)) : 0;
       if (row.ingY) years[row.ingY] = true;
       if (row.egY && row.estado === "recibido") years[row.egY] = true;
-      if (row.finY) endingYears[row.finY] = true;
       if (row.funcionario) options.funcionario[row.funcionario] = row.funcionarioNombre;
       ["tipo", "destinacion"].forEach(function (key) {
         if (row[key]) options[key][row[key]] = row[key];
       });
       return row;
     });
+    // Casos de recibo y cartas de aumento toman del contrato lo que no guardan, para usar los mismos filtros.
+    var byId = {};
+    var byCode = {};
+    rows.forEach(function (row) {
+      byId[String(row.id)] = row;
+      if (row.contrato) byCode[row.contrato] = row;
+    });
+    function linkToContract(items, dateKey) {
+      var itemYears = {};
+      var linked = (items || []).map(function (item) {
+        var contract = byId[item.id_contrato] || byCode[item.contrato] || {};
+        var date = item[dateKey];
+        var out = Object.assign({}, item, {
+          funcionario: contract.funcionario || "",
+          funcionarioNombre: contract.funcionarioNombre || "",
+          tipo: contract.tipo || "",
+          destinacion: contract.destinacion || "",
+          canon: contract.canon || 0,
+          admin: contract.admin || 0,
+          inmueble: item.inmueble || contract.inmueble || "",
+          direccion: item.direccion || contract.direccion || "",
+          arrendatario: item.arrendatario || contract.arrendatario || "",
+          periodY: Number(date.slice(0, 4)),
+          periodM: Number(date.slice(5, 7)),
+        });
+        itemYears[out.periodY] = true;
+        return out;
+      });
+      return { items: linked, years: Object.keys(itemYears).map(Number).sort(function (a, b) { return b - a; }) };
+    }
+    var receipts = linkToContract(snapshot.receipts, "fin");
+    var increases = linkToContract(snapshot.increases, "fecha");
     var sortedOptions = {};
     Object.keys(options).forEach(function (key) {
       sortedOptions[key] = Object.keys(options[key])
@@ -149,7 +186,10 @@
       simiEnabled: !!snapshot.simi_enabled,
       correctable: Array.isArray(snapshot.correctable) ? snapshot.correctable : [],
       years: Object.keys(years).map(Number).sort(function (a, b) { return b - a; }),
-      endingYears: Object.keys(endingYears).map(Number).sort(function (a, b) { return b - a; }),
+      receipts: receipts.items,
+      receiptYears: receipts.years,
+      increases: increases.items,
+      increaseYears: increases.years,
       options: sortedOptions,
     };
   }
@@ -216,10 +256,9 @@
     var state = {
       view: initialView,
       filters: emptyFilters(),
-      // Lo que importa de los contratos por terminar es el mes en curso.
-      month: initialView === "por_terminar" ? new Date().getMonth() + 1 : 0,
+      month: MONTH_VIEWS[initialView] ? new Date().getMonth() + 1 : 0,
       simi: "",
-      exit: "",
+      sub: "",
       page: 1,
       data: null,
       pending: null,
@@ -293,9 +332,11 @@
       render();
     }
 
-    // Por terminar mira hacia adelante: sus años salen de la fecha fin, no de los movimientos ya ocurridos.
+    // Cada vista ofrece los años que tienen datos suyos.
     function viewYears() {
-      return state.view === "por_terminar" ? state.data.endingYears : state.data.years;
+      if (state.view === "por_terminar") return state.data.receiptYears;
+      if (state.view === "aumentos") return state.data.increaseYears;
+      return state.data.years;
     }
 
     function fillYears() {
@@ -331,7 +372,7 @@
       clearBtn.disabled = !dirty;
     }
 
-    function baseRows() {
+    function baseRows(list) {
       var f = state.filters;
       var tenant = fold(f.arrendatario);
       var property = fold(f.inmueble);
@@ -340,7 +381,7 @@
       var estado = state.view === "ocupaciones" ? f.estado : "";
       // El filtro de auditoría SIMI vive en el detalle de ocupaciones/desocupaciones y también mueve los KPI.
       var simi = state.view === "comparativo" ? "" : state.simi;
-      return state.data.rows.filter(function (row) {
+      return (list || state.data.rows).filter(function (row) {
         return (!estado || row.estado === estado) &&
           (!simi || (simi === "pendiente" ? !row.estado_simi : row.estado_simi === simi)) &&
           (!f.funcionario || row.funcionario === f.funcionario) &&
@@ -377,6 +418,7 @@
       var html = renderChips();
       html += state.view === "comparativo" ? renderComparison()
         : state.view === "por_terminar" ? renderEnding()
+        : state.view === "aumentos" ? renderIncreases()
         : renderMovements(state.view === "ocupaciones" ? "ocup" : "desoc");
       content.innerHTML = html;
       kpiSlot.innerHTML = state.kpiHtml || "";
@@ -490,76 +532,127 @@
         '<span class="material-symbols-outlined" aria-hidden="true">expand_more</span></summary>' + body + "</details>";
     }
 
-    function renderEnding() {
-      var rows = baseRows().filter(function (row) { return row.ending; });
+    function sumOf(list, key) {
+      return list.reduce(function (sum, row) { return sum + (row[key] || 0); }, 0);
+    }
+
+    function periodOf(list) {
       var year = selectedYear();
-      var period = year ? rows.filter(function (row) { return row.finY === year; }) : rows;
-      var shown = year && state.month ? period.filter(function (row) { return row.finM === state.month; }) : period;
-      var periodLabel = year ? (state.month ? MONTHS_LONG[state.month - 1] + " " + year : String(year)) : "todos los años";
-      var today = todayIso();
-      var countOf = function (list, situacion) {
-        return list.filter(function (row) { return row.situacion === situacion; }).length;
+      var period = year ? list.filter(function (row) { return row.periodY === year; }) : list;
+      return {
+        year: year,
+        period: period,
+        shown: year && state.month ? period.filter(function (row) { return row.periodM === state.month; }) : period,
+        label: year ? (state.month ? MONTHS_LONG[state.month - 1] + " " + year : String(year)) : "todos los años",
       };
-      var canon = 0;
-      shown.forEach(function (row) { canon += row.canon || 0; });
-      var exits = shown.filter(function (row) { return row.situacion === "salida"; });
-      var exitCanon = 0;
-      exits.forEach(function (row) { exitCanon += row.canon || 0; });
+    }
+
+    // Resumen por mes del año elegido; tocar un mes filtra el detalle.
+    function monthlyCard(year, period, heads, cellsOf) {
+      if (!year) return "";
+      var months = MONTHS_LONG.map(function (label, index) {
+        return { month: index + 1, label: label, list: period.filter(function (row) { return row.periodM === index + 1; }) };
+      }).filter(function (item) { return item.list.length; });
+      if (!months.length) return "";
+      return card("Resumen mensual " + year, '<div class="scm-cm-table-wrap"><table class="scm-cm-table"><thead><tr><th>Mes</th>' +
+        heads.map(function (head) { return '<th class="is-num">' + esc(head) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+        months.map(function (item) {
+          return '<tr class="' + (state.month === item.month ? "is-active" : "") + '"><td><button type="button" class="scm-cm-link" data-scm-cm-pick="month" data-value="' + item.month + '">' + esc(item.label) + "</button></td>" +
+            cellsOf(item.list).map(function (cell) { return '<td class="is-num">' + esc(cell) + "</td>"; }).join("") + "</tr>";
+        }).join("") + "</tbody></table></div>", "is-wide", '<p class="scm-cm-hint">Toca un mes para filtrar</p>');
+    }
+
+    function subFilterHtml() {
+      var options = SUB_FILTERS[state.view];
+      return '<div class="scm-cm-detail-tools"><select class="scm-cm-simi-filter" data-scm-cm-sub-filter aria-label="Filtrar el detalle">' + Object.keys(options).map(function (key) {
+        return '<option value="' + key + '"' + (state.sub === key ? " selected" : "") + ">" + esc(options[key]) + "</option>";
+      }).join("") + "</select></div>";
+    }
+
+    function renderEnding() {
+      var scope = periodOf(baseRows(state.data.receipts));
+      var shown = scope.shown;
+      var today = todayIso();
+      var open = shown.filter(function (row) { return row.abierto; });
+      var canon = sumOf(shown, "canon");
       var kpis = '<div class="scm-cm-kpis scm-cm-kpis-6">';
-      kpis += kpi("Por terminar", num(shown.length), esc(year ? periodLabel : "Histórico completo"), "desoc");
+      kpis += kpi("Contratos por terminar", num(shown.length), esc(scope.year ? scope.label : "Histórico completo"), "desoc");
+      kpis += kpi("Por recibir", num(open.length), "Caso de recibo abierto", open.length ? "bad" : "");
+      kpis += kpi("Ya cerrados", num(shown.length - open.length), "Caso de recibo cerrado", "good");
+      kpis += kpi("Fecha vencida sin recibir", num(open.filter(function (row) { return row.fin < today; }).length), "Caso abierto con la fecha ya pasada", "stock");
       kpis += kpi("Canon que termina", compactMoney(canon), esc(money(canon) + " mensual"));
-      kpis += kpi("Con aviso de salida", num(exits.length), esc(compactMoney(exitCanon) + " de canon"), exits.length ? "bad" : "");
-      kpis += kpi("Sin aviso de salida", num(countOf(shown, "sin_aviso")), "Pueden prorrogarse");
-      kpis += kpi("Renuevan o no salen", num(countOf(shown, "continua")), "Registrado en Contratos por terminar", "good");
-      kpis += kpi("Fecha fin vencida", num(shown.filter(function (row) { return row.fin < today; }).length), "Siguen sin recibir", "stock");
+      kpis += kpi("Administración que termina", compactMoney(sumOf(shown, "admin")), esc(money(sumOf(shown, "admin")) + " mensual"));
       state.kpiHtml = kpis + "</div>";
 
-      var html = "";
-      if (year) {
-        var months = MONTHS_LONG.map(function (label, index) {
-          var list = period.filter(function (row) { return row.finM === index + 1; });
-          var monthCanon = 0;
-          list.forEach(function (row) { monthCanon += row.canon || 0; });
-          return { month: index + 1, label: label, total: list.length, exits: countOf(list, "salida"), open: countOf(list, "sin_aviso"), stays: countOf(list, "continua"), canon: monthCanon };
-        }).filter(function (row) { return row.total; });
-        if (months.length) {
-          html += card("Resumen mensual " + year, '<div class="scm-cm-table-wrap"><table class="scm-cm-table"><thead><tr><th>Mes</th><th class="is-num">Por terminar</th><th class="is-num">Con aviso de salida</th><th class="is-num">Sin aviso</th><th class="is-num">Renuevan o no salen</th><th class="is-num">Canon</th></tr></thead><tbody>' +
-            months.map(function (row) {
-              return '<tr class="' + (state.month === row.month ? "is-active" : "") + '"><td><button type="button" class="scm-cm-link" data-scm-cm-pick="month" data-value="' + row.month + '">' + esc(row.label) + '</button></td><td class="is-num">' + num(row.total) +
-                '</td><td class="is-num">' + num(row.exits) + '</td><td class="is-num">' + num(row.open) + '</td><td class="is-num">' + num(row.stays) + '</td><td class="is-num">' + money(row.canon) + "</td></tr>";
-            }).join("") + "</tbody></table></div>", "is-wide", '<p class="scm-cm-hint">Toca un mes para filtrar</p>');
-        }
-      }
-
+      var html = monthlyCard(scope.year, scope.period, ["Contratos", "Por recibir", "Ya cerrados", "Canon"], function (list) {
+        var pending = list.filter(function (row) { return row.abierto; }).length;
+        return [num(list.length), num(pending), num(list.length - pending), money(sumOf(list, "canon"))];
+      });
       state.detailKind = "ending";
-      state.detailEvents = shown.filter(function (row) { return !state.exit || row.situacion === state.exit; })
+      state.detailEvents = shown.filter(function (row) { return !state.sub || (state.sub === "abierto") === row.abierto; })
         .sort(function (a, b) { return a.fin < b.fin ? -1 : a.fin > b.fin ? 1 : 0; })
         .map(function (row) { return { row: row, date: row.fin }; });
-      html += card("Detalle · " + periodLabel, "<div data-scm-cm-detail></div>", "is-wide",
-        '<div class="scm-cm-detail-tools"><select class="scm-cm-simi-filter" data-scm-cm-exit-filter aria-label="Filtrar por situación">' + Object.keys(EXIT_FILTERS).map(function (key) {
-          return '<option value="' + key + '"' + (state.exit === key ? " selected" : "") + ">" + esc(EXIT_FILTERS[key]) + "</option>";
-        }).join("") + "</select></div>");
-      return html;
+      return html + card("Detalle · " + scope.label, "<div data-scm-cm-detail></div>", "is-wide", subFilterHtml());
     }
 
     function endingTableHtml(slice, events) {
+      var rows = events.map(function (event) { return event.row; });
       var today = todayIso();
-      var sumCanon = 0;
-      var sumAdmin = 0;
-      events.forEach(function (event) {
-        sumCanon += event.row.canon || 0;
-        sumAdmin += event.row.admin || 0;
-      });
-      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr><th>Fin contrato</th><th>Contrato</th><th>Inmueble</th><th>Dirección</th><th>Arrendatario</th><th>Tipo</th><th>Destinación</th><th>Funcionario</th><th>Estado actual</th><th>Situación</th>' +
+      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr><th>Fecha terminación</th><th>Caso</th><th>Contrato</th><th>Inmueble</th><th>Dirección</th><th>Arrendatario</th><th>Tipo</th><th>Destinación</th><th>Funcionario</th><th>Estado</th>' +
         '<th class="is-num">Canon</th><th class="is-num">Administración</th><th class="is-num">Total</th></tr></thead><tbody>' +
         slice.map(function (event) {
           var row = event.row;
-          return "<tr><td>" + esc(formatDate(row.fin)) + (row.fin < today ? '<small class="scm-cm-source is-bad">Fecha fin vencida</small>' : "") + "</td><td>" + esc(row.contrato) + "</td><td>" + esc(row.inmueble) +
+          return "<tr><td>" + esc(formatDate(row.fin)) + (row.abierto && row.fin < today ? '<small class="scm-cm-source is-bad">Fecha vencida</small>' : "") + "</td><td>" + esc(row.caso) + "</td><td>" + esc(row.contrato) + "</td><td>" + esc(row.inmueble) +
             '</td><td class="is-address">' + esc(row.direccion) + '</td><td class="is-name">' + esc(row.arrendatario) + "</td><td>" + esc(row.tipo || "—") + "</td><td>" + esc(row.destinacion || "—") + "</td><td>" + esc(row.funcionarioNombre || "—") +
-            '</td><td><span class="scm-cm-badge is-' + row.estado + '">' + esc(STATE_LABELS[row.estado] || row.estado) + '</span></td><td><span class="scm-cm-badge ' + (EXIT_BADGES[row.situacion] || "is-muted") + '">' + esc(row.situacion_detalle || "—") + "</span></td>" +
+            '</td><td><span class="scm-cm-badge ' + (row.abierto ? "is-por_recibir" : "is-simi-ok") + '">' + esc(row.estado) + "</span></td>" +
             '<td class="is-num">' + esc(money(row.canon)) + '</td><td class="is-num">' + (row.admin ? esc(money(row.admin)) : '<span class="scm-cm-muted">No aplica</span>') + '</td><td class="is-num is-total">' + esc(money((row.canon || 0) + (row.admin || 0))) + "</td></tr>";
         }).join("") +
-        '</tbody><tfoot><tr><td colspan="10">Total · ' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) + '</td><td class="is-num">' + esc(money(sumCanon)) + '</td><td class="is-num">' + esc(money(sumAdmin)) + '</td><td class="is-num is-total">' + esc(money(sumCanon + sumAdmin)) + "</td></tr></tfoot></table></div>";
+        '</tbody><tfoot><tr><td colspan="10">Total · ' + esc(num(rows.length) + (rows.length === 1 ? " contrato" : " contratos")) + '</td><td class="is-num">' + esc(money(sumOf(rows, "canon"))) + '</td><td class="is-num">' + esc(money(sumOf(rows, "admin"))) + '</td><td class="is-num is-total">' + esc(money(sumOf(rows, "canon") + sumOf(rows, "admin"))) + "</td></tr></tfoot></table></div>";
+    }
+
+    function renderIncreases() {
+      var scope = periodOf(baseRows(state.data.increases));
+      var shown = scope.shown;
+      var ofType = function (list, type) { return list.filter(function (row) { return row.tipo_aumento === type; }); };
+      var canon = ofType(shown, "canon");
+      var admin = ofType(shown, "admin");
+      var contracts = {};
+      shown.forEach(function (row) { contracts[row.id_contrato || row.contrato] = true; });
+      var withPercent = shown.filter(function (row) { return row.porcentaje; });
+      var kpis = '<div class="scm-cm-kpis scm-cm-kpis-6">';
+      kpis += kpi("Contratos con aumento", num(Object.keys(contracts).length), esc(scope.year ? scope.label : "Histórico completo"), "ocup");
+      kpis += kpi("Aumentos de canon", num(canon.length), esc("Nuevo total " + compactMoney(sumOf(canon, "nuevo"))));
+      kpis += kpi("Aumentos de administración", num(admin.length), esc("Nuevo total " + compactMoney(sumOf(admin, "nuevo"))));
+      kpis += kpi("Canon adicional al mes", money(sumOf(canon, "diferencia")), "Diferencia frente al valor anterior", "good");
+      kpis += kpi("Administración adicional al mes", money(sumOf(admin, "diferencia")), "Diferencia frente al valor anterior", "good");
+      kpis += kpi("Incremento promedio", withPercent.length ? decimalFormat.format(sumOf(withPercent, "porcentaje") / withPercent.length) + "%" : "—", esc(num(withPercent.length) + " con porcentaje"), "stock");
+      state.kpiHtml = kpis + "</div>";
+
+      var html = monthlyCard(scope.year, scope.period, ["Canon", "Administración", "Canon adicional", "Administración adicional"], function (list) {
+        var monthCanon = ofType(list, "canon");
+        var monthAdmin = ofType(list, "admin");
+        return [num(monthCanon.length), num(monthAdmin.length), money(sumOf(monthCanon, "diferencia")), money(sumOf(monthAdmin, "diferencia"))];
+      });
+      state.detailKind = "increase";
+      state.detailEvents = shown.filter(function (row) { return !state.sub || row.tipo_aumento === state.sub; })
+        .sort(function (a, b) { return a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0; })
+        .map(function (row) { return { row: row, date: row.fecha }; });
+      return html + card("Detalle · " + scope.label, "<div data-scm-cm-detail></div>", "is-wide", subFilterHtml());
+    }
+
+    function increaseTableHtml(slice, events) {
+      var rows = events.map(function (event) { return event.row; });
+      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr><th>Fecha carta</th><th>Rige desde</th><th>Tipo</th><th>Contrato</th><th>Inmueble</th><th>Dirección</th><th>Arrendatario</th><th>Destinación</th><th>Funcionario</th>' +
+        '<th class="is-num">Valor anterior</th><th class="is-num">Valor nuevo</th><th class="is-num">Diferencia</th><th class="is-num">%</th><th>Retroactivo</th></tr></thead><tbody>' +
+        slice.map(function (event) {
+          var row = event.row;
+          return "<tr><td>" + esc(formatDate(row.fecha)) + "</td><td>" + esc(formatDate(row.vigencia || row.fecha)) + '</td><td><span class="scm-cm-badge ' + (row.tipo_aumento === "canon" ? "is-entregado" : "is-por_recibir") + '">' + esc(INCREASE_LABELS[row.tipo_aumento]) + "</span></td><td>" + esc(row.contrato) + "</td><td>" + esc(row.inmueble) +
+            '</td><td class="is-address">' + esc(row.direccion) + '</td><td class="is-name">' + esc(row.arrendatario) + "</td><td>" + esc(row.destinacion || "—") + "</td><td>" + esc(row.funcionarioNombre || "—") +
+            '</td><td class="is-num">' + (row.anterior ? esc(money(row.anterior)) + (row.calculado ? '<small class="scm-cm-source">calculado</small>' : "") : '<span class="scm-cm-muted">Sin dato</span>') + '</td><td class="is-num is-total">' + esc(money(row.nuevo)) +
+            '</td><td class="is-num">' + (row.diferencia == null ? '<span class="scm-cm-muted">—</span>' : esc(money(row.diferencia))) + '</td><td class="is-num">' + (row.porcentaje ? esc(decimalFormat.format(row.porcentaje)) + "%" : '<span class="scm-cm-muted">—</span>') +
+            '</td><td class="is-simi-obs"' + (row.retroactivo ? ' title="' + esc(row.retroactivo) + '"' : "") + ">" + (row.retroactivo ? esc(row.retroactivo) : '<span class="scm-cm-muted">—</span>') + "</td></tr>";
+        }).join("") +
+        '</tbody><tfoot><tr><td colspan="9">Total · ' + esc(num(rows.length) + (rows.length === 1 ? " aumento" : " aumentos")) + '</td><td class="is-num">' + esc(money(sumOf(rows, "anterior"))) + '</td><td class="is-num is-total">' + esc(money(sumOf(rows, "nuevo"))) + '</td><td class="is-num">' + esc(money(sumOf(rows, "diferencia"))) + "</td><td></td><td></td></tr></tfoot></table></div>";
     }
 
     function pagerHtml(total, pages) {
@@ -594,11 +687,11 @@
       state.page = Math.min(Math.max(1, state.page), pages);
       var slice = events.slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE);
       if (!slice.length) {
-        holder.innerHTML = '<div class="scm-cm-empty">' + (state.simi ? "Ningún contrato coincide con el filtro de auditoría SIMI." : state.detailKind === "ending" ? "Ningún contrato termina en este periodo con estos filtros." : "No hay movimientos en este periodo.") + "</div>";
+        holder.innerHTML = '<div class="scm-cm-empty">' + (state.simi ? "Ningún contrato coincide con el filtro de auditoría SIMI." : state.detailKind === "ending" ? "Ningún contrato termina en este periodo con estos filtros." : state.detailKind === "increase" ? "No hay aumentos en este periodo con estos filtros." : "No hay movimientos en este periodo.") + "</div>";
         return;
       }
-      if (state.detailKind === "ending") {
-        holder.innerHTML = endingTableHtml(slice, events) + pagerHtml(events.length, pages);
+      if (state.detailKind === "ending" || state.detailKind === "increase") {
+        holder.innerHTML = (state.detailKind === "ending" ? endingTableHtml : increaseTableHtml)(slice, events) + pagerHtml(events.length, pages);
         return;
       }
       var isDesoc = state.detailKind === "desoc";
@@ -889,12 +982,19 @@
         });
         name = "ocupaciones-vs-desocupaciones-" + year;
       } else if (state.view === "por_terminar") {
-        lines = [["Fin contrato", "Contrato", "Inmueble", "Direccion", "Arrendatario", "Tipo inmueble", "Destinacion", "Funcionario", "Estado", "Situacion", "Canon", "Administracion", "Total"]];
+        lines = [["Fecha terminacion", "Caso", "Contrato", "Inmueble", "Direccion", "Arrendatario", "Tipo inmueble", "Destinacion", "Funcionario", "Estado", "Canon", "Administracion", "Total"]];
         state.detailEvents.forEach(function (event) {
           var row = event.row;
-          lines.push([row.fin, row.contrato, row.inmueble, row.direccion, row.arrendatario, row.tipo, row.destinacion, row.funcionarioNombre, STATE_LABELS[row.estado] || row.estado, row.situacion_detalle, row.canon, row.admin || 0, (row.canon || 0) + (row.admin || 0)]);
+          lines.push([row.fin, row.caso, row.contrato, row.inmueble, row.direccion, row.arrendatario, row.tipo, row.destinacion, row.funcionarioNombre, row.estado, row.canon, row.admin || 0, (row.canon || 0) + (row.admin || 0)]);
         });
         name = "contratos-por-terminar-" + year + (state.month ? "-" + String(state.month).padStart(2, "0") : "");
+      } else if (state.view === "aumentos") {
+        lines = [["Fecha carta", "Rige desde", "Tipo", "Contrato", "Inmueble", "Direccion", "Arrendatario", "Destinacion", "Funcionario", "Valor anterior", "Valor anterior calculado", "Valor nuevo", "Diferencia", "Porcentaje", "Retroactivo"]];
+        state.detailEvents.forEach(function (event) {
+          var row = event.row;
+          lines.push([row.fecha, row.vigencia || row.fecha, INCREASE_LABELS[row.tipo_aumento], row.contrato, row.inmueble, row.direccion, row.arrendatario, row.destinacion, row.funcionarioNombre, row.anterior || "", row.calculado ? "Si" : "No", row.nuevo, row.diferencia == null ? "" : row.diferencia, row.porcentaje == null ? "" : row.porcentaje, row.retroactivo]);
+        });
+        name = "aumentos-" + year + (state.month ? "-" + String(state.month).padStart(2, "0") : "");
       } else {
         var isDesoc = state.view === "desocupaciones";
         lines = [["Fecha del movimiento", "Fecha entrega", "Fecha recibo", "Fin contrato", "Contrato", "Inmueble", "Direccion", "Arrendatario",
@@ -960,16 +1060,16 @@
     function resetDrill() {
       state.page = 1;
       state.simi = "";
-      state.exit = "";
+      state.sub = "";
     }
 
     function enterView(view) {
-      var leavingEnding = state.view === "por_terminar";
+      var leavingMonthView = MONTH_VIEWS[state.view];
       state.view = view;
-      if (view === "por_terminar") {
+      if (MONTH_VIEWS[view]) {
         state.filters.year = String(new Date().getFullYear());
         state.month = new Date().getMonth() + 1;
-      } else if (leavingEnding) {
+      } else if (leavingMonthView) {
         state.month = 0;
       }
       if (state.data) fillYears();
@@ -1057,8 +1157,8 @@
         render();
         return;
       }
-      if (event.target.matches("[data-scm-cm-exit-filter]")) {
-        state.exit = event.target.value;
+      if (event.target.matches("[data-scm-cm-sub-filter]")) {
+        state.sub = event.target.value;
         state.page = 1;
         render();
         return;

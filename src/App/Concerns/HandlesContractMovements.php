@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace SCM\App\Concerns;
 
 use SCM\Core\Auth;
-use SCM\Modules\ContractMovements\ContractExitSignals;
 use SCM\Modules\ContractMovements\ContractMovementsReport;
+use SCM\Modules\ContractMovements\ContractReceiptCases;
 use SCM\Modules\ContractMovements\ContractSimiAudit;
 
 trait HandlesContractMovements
@@ -15,9 +15,7 @@ trait HandlesContractMovements
   private function contractMoveOutAlertGroups(): array
   {
     $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
-    $year = (int) $today->format('Y');
-    $month = (int) $today->format('n');
-    return ContractExitSignals::alertGroups((new ContractMovementsReport($this->db))->endingInMonth($year, $month, $today), $year, $month);
+    return ContractReceiptCases::alertGroups((new ContractReceiptCases($this->db))->inMonth((int) $today->format('Y'), (int) $today->format('n')), $today);
   }
 
   public function ajax_handler_contract_movements(): void

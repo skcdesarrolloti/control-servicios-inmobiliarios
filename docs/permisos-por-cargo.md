@@ -19,13 +19,13 @@ Vencimientos sale primero y después cada tema, uno al cerrar el otro, porque Sw
 
 ## Contratos por desocupar
 
-El popup **Contratos por desocupar** (alerta `contratos_por_desocupar`) lista los contratos `Entregado` o `Por recibir` cuya fecha fin cae en el mes en curso. La casilla del cargo basta para verlo, porque cartera lo necesita sin acceso a contratos ni métricas. `ContractExitSignals` separa cada contrato en:
+El popup **Contratos por desocupar** (alerta `contratos_por_desocupar`) lista los casos de **Recibo de inmuebles** cuya `fecha_terminacion_contrato` cae en el mes en curso (`ContractReceiptCases`), separados en **Por recibir** (caso abierto) y **Ya cerrados**. La casilla del cargo basta para verlo, porque cartera lo necesita sin acceso a contratos ni métricas.
 
-- **Con aviso de salida**: estado `Por recibir`, o caso de recibo, terminación o no prórroga del mismo ciclo.
-- **Sin aviso de salida**: termina, pero nadie ha informado qué va a pasar. Puede prorrogarse.
-- **Continúa**: renovación al 100 % o no salida reportada en Contratos por terminar. No sale en el popup.
+**Métricas › Contratos por terminar** (`metricas_por_terminar`) usa los mismos casos y abre en el mes en curso.
 
-**Métricas › Contratos por terminar** (`metricas_por_terminar`) usa la misma clasificación y abre en el mes en curso. Hasta que se guarden los permisos, la ve quien ve Desocupaciones.
+**Métricas › Aumentos** (`metricas_aumentos`) lista las cartas de aumento por su fecha (`ContractIncreases`), con el valor anterior y el nuevo, y abre en el mes en curso. `valor_canon` del contrato no cambia con la carta, por eso los valores salen de ella. Las cartas antiguas no guardan el valor anterior: se toma el de la carta previa o se calcula con el porcentaje, marcado como *calculado*.
+
+Hasta que se guarden los permisos, estas dos vistas las ve quien ve Desocupaciones.
 
 ## Recordatorio diario
 

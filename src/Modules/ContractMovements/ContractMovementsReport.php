@@ -22,7 +22,8 @@ use SCM\Support\SchemaInspector;
  * - Desocupación: contrato Recibido en su fecha de recibo o, si falta, en el
  *   fin del contrato.
  * - Por desocupar: contrato Por recibir con su fin de contrato previsto.
- * - Por terminar: contrato Entregado o Por recibir según su fin, con su situación (ContractExitSignals).
+ * - Por terminar: casos de recibo según la fecha de terminación que registra contractual (ContractReceiptCases).
+ * - Aumentos: cartas de aumento de canon y administración (ContractIncreases).
  * Los desistidos y los que siguen por entregar nunca ocuparon el inmueble.
  */
 final class ContractMovementsReport
@@ -53,8 +54,6 @@ final class ContractMovementsReport
     'obs_simi',
     'derechos',
     'tasa_admin',
-    'situacion',
-    'situacion_detalle',
   ];
 
   private const STATES = [
@@ -106,11 +105,10 @@ final class ContractMovementsReport
        ORDER BY c.`_ID` ASC"
     );
 
-    $signals = (new ContractExitSignals($this->db))->forContracts($rows);
     $out = [];
     $employeeIds = [];
     foreach ($rows as $row) {
-      $mapped = $this->mapRow($row + ($signals[(int) ($row['_ID'] ?? 0)] ?? []));
+      $mapped = $this->mapRow($row);
       if ($mapped === null) {
         continue;
       }
@@ -123,51 +121,13 @@ final class ContractMovementsReport
     return [
       'columns' => self::COLUMNS,
       'rows' => $out,
+      'receipts' => (new ContractReceiptCases($this->db))->all(),
+      'increases' => (new ContractIncreases($this->db))->all(),
       'funcionarios' => $this->employeeNames(array_keys($employeeIds)),
       'simi_enabled' => $simiEnabled,
       'correctable' => ContractSimiAudit::correctableKeys($this->db, $schema),
       'generated_at' => time(),
     ];
-  }
-
-  /**
-   * Contratos activos que terminan en el mes, por fecha. Consulta aparte del snapshot: el popup sale cada hora.
-   * @return list<array{fin:string,contrato:string,inmueble:string,direccion:string,arrendatario:string,situacion:string,detalle:string,dias:int}>
-   */
-  public function endingInMonth(int $year, int $month, DateTimeImmutable $today): array
-  {
-    $from = new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month), $this->timezone);
-    $fromTs = $from->getTimestamp();
-    $toTs = $from->modify('first day of next month')->getTimestamp() - 1;
-    $table = $this->db->table('jet_cct_contratos_arrendamiento');
-    $rows = $this->db->getResults(
-      "SELECT `_ID`, `contrato`, `estado`, `fin_contrato`, `direccion`, `arrendatario`, `inmueble`
-       FROM `{$table}`
-       WHERE LOWER(TRIM(COALESCE(`estado`, ''))) IN ('entregado', 'por recibir')
-         AND (`fin_contrato` BETWEEN ? AND ? OR `fin_contrato` BETWEEN ? AND ?)",
-      [$fromTs, $toTs, $fromTs * 1000, $toTs * 1000]
-    );
-    $signals = (new ContractExitSignals($this->db))->forContracts($rows);
-    $out = [];
-    foreach ($rows as $row) {
-      $end = $this->date($row['fin_contrato'] ?? null);
-      $signal = $signals[(int) $row['_ID']] ?? null;
-      if ($end === null || $signal === null) {
-        continue;
-      }
-      $out[] = [
-        'fin' => $end,
-        'contrato' => $this->text($row['contrato'] ?? ''),
-        'inmueble' => trim((string) ($row['inmueble'] ?? '')),
-        'direccion' => $this->text($row['direccion'] ?? ''),
-        'arrendatario' => $this->text($row['arrendatario'] ?? ''),
-        'situacion' => $signal['situacion'],
-        'detalle' => $signal['detalle'],
-        'dias' => (int) round(((new DateTimeImmutable($end, $this->timezone))->getTimestamp() - $today->getTimestamp()) / 86400),
-      ];
-    }
-    usort($out, static fn(array $a, array $b): int => [$a['fin'], $a['contrato']] <=> [$b['fin'], $b['contrato']]);
-    return $out;
   }
 
   /**
@@ -225,8 +185,6 @@ final class ContractMovementsReport
       trim((string) ($row['observaciones_estado_simi'] ?? '')),
       ContractSimiAudit::parsePercent($row['derechos_inmobiliarios'] ?? null),
       ContractSimiAudit::parsePercent($row['tasa_administracion'] ?? null),
-      (string) ($row['situacion'] ?? ''),
-      (string) ($row['detalle'] ?? ''),
     ];
   }
 
@@ -281,6 +239,12 @@ final class ContractMovementsReport
 
   private function date($value): ?string
   {
+    return self::isoDate($value);
+  }
+
+  /** Fecha CCT (segundos o milisegundos) en Y-m-d de Colombia; null si falta o es basura. */
+  public static function isoDate($value): ?string
+  {
     $raw = trim((string) ($value ?? ''));
     if ($raw === '' || preg_match('/^\d+$/', $raw) !== 1) {
       return null;
@@ -292,7 +256,7 @@ final class ContractMovementsReport
     if ($ts < self::MIN_VALID_TS) {
       return null;
     }
-    return (new DateTimeImmutable('@' . $ts))->setTimezone($this->timezone)->format('Y-m-d');
+    return (new DateTimeImmutable('@' . $ts))->setTimezone(new DateTimeZone('America/Bogota'))->format('Y-m-d');
   }
 
   private function text($value): string

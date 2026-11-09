@@ -11,6 +11,7 @@ final class ContractMovementsView
     'desocupaciones' => ['label' => 'Desocupaciones', 'icon' => 'logout', 'tab' => 'desocupaciones'],
     'comparativo' => ['label' => 'Ocupaciones vs Desocupaciones', 'icon' => 'compare_arrows', 'tab' => 'ocupaciones_vs_desocupaciones'],
     'por_terminar' => ['label' => 'Contratos por terminar', 'icon' => 'event_busy', 'tab' => 'metricas_por_terminar'],
+    'aumentos' => ['label' => 'Aumentos', 'icon' => 'price_change', 'tab' => 'metricas_aumentos'],
   ];
 
   /** Traduce el parámetro `tab` de la URL a la vista interna del panel. */
