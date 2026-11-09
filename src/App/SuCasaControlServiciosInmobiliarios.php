@@ -1172,16 +1172,19 @@ final class SuCasaControlServiciosInmobiliarios
   private function dashboardAlertCatalog(): array
   {
     return [
-      ['label' => 'Inicio', 'items' => [
-        self::ALERT_ADMIN_DUE => ['label' => 'Vencimientos administrativos', 'hint' => 'Popup al entrar al panel. Requiere ver cotizaciones o preventivas.'],
-        self::ALERT_DUE_VIEW_ALL => ['label' => 'Ver todos los vencimientos en su pestaña', 'hint' => 'La pestaña Vencimientos muestra todos los tipos para conocer el total, aunque no los atienda. El popup y el recordatorio siguen con lo marcado.'],
+      ['label' => 'Popup general', 'items' => [
+        self::ALERT_ADMIN_DUE => ['label' => 'Vencimientos administrativos', 'hint' => 'Popup al entrar al panel con todos los vencimientos que atiende el cargo. Requiere ver cotizaciones o preventivas.'],
       ]],
+      ['label' => 'Popups por tema', 'items' => $this->adminDueThemeAlertCatalog()],
       ['label' => 'Créditos a propietarios', 'items' => [
         'credito_solicitudes' => ['label' => 'Solicitudes de crédito', 'hint' => 'Solicitudes sin aprobar ni rechazar. Requiere ver Créditos a propietarios.'],
         'credito_contabilidad' => ['label' => 'Créditos sin ingresar a contabilidad', 'hint' => 'Créditos con la respuesta enviada y sin marcar. Requiere ver Créditos a propietarios.'],
       ]],
       ['label' => 'Contratos', 'items' => [
         'contratos_por_desocupar' => ['label' => 'Contratos por desocupar del mes', 'hint' => 'Popup propio con los casos de recibo cuya fecha de terminación cae en el mes. Esta casilla basta para verlo.'],
+      ]],
+      ['label' => 'Pestaña Vencimientos', 'items' => [
+        self::ALERT_DUE_VIEW_ALL => ['label' => 'Ver todos los vencimientos en su pestaña', 'hint' => 'La pestaña Vencimientos muestra todos los tipos para conocer el total, aunque no los atienda. El popup y el recordatorio siguen con lo marcado.'],
       ]],
       ['label' => 'Recordatorio diario · 9:00 a. m.', 'items' => [
         self::ALERT_REMINDER_EMAIL => ['label' => 'Por correo', 'hint' => 'Lunes a sábado, sin festivos, con las tareas vencidas o que vencen hoy en el calendario del cargo.'],

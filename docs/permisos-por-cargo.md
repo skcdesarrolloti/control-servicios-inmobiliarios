@@ -17,6 +17,8 @@ Para que la alerta tenga su propio popup, el grupo lleva `popup` con el título 
 
 Vencimientos sale primero y después cada tema, uno al cerrar el otro, porque Swal muestra un popup a la vez. Si el funcionario va a atender algo desde un popup, los siguientes esperan a que vuelva a Inicio. Salen al entrar a Inicio, en cada clic en Inicio y cada hora en cualquier pestaña, sin interrumpir a quien está escribiendo o tiene un popup abierto. La hora se cuenta desde la última vez que los popups pudieron salir: cargar otra pestaña no la reinicia. Cerrarlos pide confirmación.
 
+**Popups por tema** (`ADMIN_DUE_THEME_POPUPS`): Preventivas, Servicios públicos, Mantenimiento, Contractual y Casos jurídicos. Cada uno se activa por cargo y muestra lo vencido o para hoy de los tipos que el cargo atiende, con el total del cargo en las tarjetas y en la lista solo lo asignado a quien entra. Si el cargo tiene el popup general, los temas no salen, para no repetir tareas.
+
 La alerta **Ver todos los vencimientos en su pestaña** (`vencimientos_ver_todos`) hace que la pestaña Vencimientos muestre todos los tipos, con sus filtros y totales, aunque el cargo no los atienda ni tenga esas pestañas. No cambia el popup ni el recordatorio diario, y no abre ningún popup por sí sola.
 
 La pestaña Vencimientos también lista, con su filtro, las **Preventivas pendientes** y los **Servicios públicos pendientes** que el popup solo resume. Con todos los filtros marcados, su tarjeta **En control** es igual al globo del menú: lo vencido más todas las revisiones de servicios públicos pendientes, aunque aún no venzan. Con **Ver todos**, el globo cuenta lo mismo que la pestaña desde que carga la página, y el popup sigue con lo que atiende el cargo.

@@ -1297,6 +1297,7 @@
       }).join("");
       var sections = groups.map(function (group) {
         var rows = Array.isArray(group.rows) ? group.rows : [];
+        if (!rows.length) return ""; // Popups por tema: el tipo cuenta en su tarjeta aunque nada esté asignado a quien entra.
         var visibleRows = group.show_all ? rows : rows.slice(0, 18);
         var list = visibleRows.map(function (row) {
           return '<div data-scm-alert-row class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[110px_minmax(0,1fr)_auto_auto] !sp-items-center !sp-gap-3 !sp-px-4 !sp-py-3 !sp-m-0 !sp-bg-white !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100">' +

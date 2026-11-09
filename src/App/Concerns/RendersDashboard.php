@@ -2185,11 +2185,14 @@ trait RendersDashboard
                         <div class="scm-permissions-option-group" data-scm-perm-group>
                           <div class="scm-permissions-option-group-title"><span><?php echo esc_html($dueTitle); ?></span><button type="button" class="scm-perm-group-toggle" data-scm-perm-group-all>Marcar grupo</button></div>
                           <div class="scm-permissions-option-group-grid">
-                            <?php foreach ($this->adminDueTypeLabels() as $dueType => $dueLabel): $isChecked = in_array($dueType, $dueSelected, true); ?>
-                              <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>" title="<?php echo esc_attr($dueHint); ?>">
-                                <input type="checkbox" name="<?php echo esc_attr($dueField . '[' . $cargoId . '][]'); ?>" value="<?php echo esc_attr($dueType); ?>" <?php checked($isChecked); ?>>
-                                <span><?php echo esc_html($dueLabel); ?></span>
-                              </label>
+                            <?php foreach ($this->adminDueTypeLabelsByTheme() as $dueTheme => $dueThemeLabels): ?>
+                              <div class="scm-permissions-subgroup"><?php echo esc_html($dueTheme); ?></div>
+                              <?php foreach ($dueThemeLabels as $dueType => $dueLabel): $isChecked = in_array($dueType, $dueSelected, true); ?>
+                                <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>" title="<?php echo esc_attr($dueHint); ?>">
+                                  <input type="checkbox" name="<?php echo esc_attr($dueField . '[' . $cargoId . '][]'); ?>" value="<?php echo esc_attr($dueType); ?>" <?php checked($isChecked); ?>>
+                                  <span><?php echo esc_html($dueLabel); ?></span>
+                                </label>
+                              <?php endforeach; ?>
                             <?php endforeach; ?>
                           </div>
                         </div>

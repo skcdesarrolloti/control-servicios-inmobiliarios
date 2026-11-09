@@ -46,6 +46,13 @@ const popup = slice(runtime, '    // Popup de alertas por cargo', '    function 
   });
 }
 
+// Un tipo sin tareas asignadas a quien entra conserva su tarjeta, pero no deja una lista vacía.
+{
+  const popupHtml = new Function('escHtml', ui + slice(runtime, '    function dashboardAlertActionHtml(row)', '    // Cerrar pide confirmación') + '; return dashboardAlertsPopupHtml;')(String);
+  const html = popupHtml({ title: 'Mantenimiento', groups: [{ key: 'sin_filas', label: 'Sin asignar', count: 4, rows: [] }, { key: 'con_filas', label: 'Asignadas', count: 1, rows: [{ title: 'Cotización' }] }] });
+  assert.ok(html.includes('Sin asignar') && !html.includes('data-scm-alert-group="sin_filas"') && html.includes('data-scm-alert-group="con_filas"'), 'a type with no assigned rows keeps its card without an empty list');
+}
+
 const rows = n => Array.from({ length: n }, (_, i) => ({ date: '06/11/2026', title: 'Crédito #' + (i + 1) + ' · ROYNER PROPIETARIO', meta: '$500.000 a 10 meses · Libre inversión · Contrato #3000', badge: 'Hace 2 días', action: { type: i % 2 ? 'owner_credit_detail' : 'owner_credit_open', id: i + 1 }, button: i % 2 ? 'Ver crédito' : 'Ver solicitud' }));
 const groups = [
   { key: 'credito_solicitudes', label: 'Solicitudes de crédito', hint: 'Sin aprobar ni rechazar', icon: 'request_quote', count: 20, rows: rows(20) },

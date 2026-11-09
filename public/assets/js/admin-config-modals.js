@@ -79,6 +79,7 @@
           label.hidden = !match;
           if (match) shown += 1;
         });
+        each(group, ".scm-permissions-subgroup", function (title) { title.hidden = !!query; });
         group.hidden = shown === 0;
         visible += shown;
       });

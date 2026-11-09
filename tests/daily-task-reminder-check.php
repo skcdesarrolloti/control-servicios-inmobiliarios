@@ -56,6 +56,8 @@ final class DueTypesProbe
   public function calendarTab(): array { return $this->adminDueTypesForCalendarTab(); }
   public function summaryTypes(array $types, bool $ignoreTabs = false): array { return $this->adminDueSummaryTypes($types, $ignoreTabs); }
   private function canAccessDashboardTab(string $tab): bool { return false; }
+  public function themeLabels(): array { return $this->adminDueTypeLabelsByTheme(); }
+  public function themeGroups(array $keys, array $items, string $employee, bool $canOpenTab): array { return $this->adminDueThemeGroups(array_intersect_key(self::ADMIN_DUE_THEME_POPUPS, array_flip($keys)), $items, $employee, $canOpenTab); }
   private function adminDueCanSeeAllTypes(): bool { return $this->seeAll; }
   private function adminDueTypesForCurrentCargo(): array { return ['cotizacion_sin_enviar']; }
   public function assigned(array $items, string $employee): array { return array_column($this->adminDueMarkAssigned($items, $employee), 'asignado'); }
@@ -83,6 +85,24 @@ $check($probe->configured('due', '4', $both) === [], 'a saved cargo with nothing
 $check($probe->configured('due', '3', ['preventiva_sin_enviar']) === [], 'checking a type does not grant it without its tab');
 $check($probe->sanitize(['3' => ['cotizacion_sin_enviar', 'inventado'], '99' => ['cotizacion_sin_enviar'], '13' => []]) === ['3' => ['cotizacion_sin_enviar'], '13' => []], 'saving drops unknown cargos and types and keeps empty lists');
 $check(array_keys($probe->labels()) !== [] && array_diff($probe->all(), array_keys($probe->labels())) === [] && array_diff(array_keys($probe->labels()), $probe->all()) === [], 'every due type has a label in the permissions modal');
+
+// Popups por tema: cada tipo en un solo tema; lo futuro no sale y la lista es de quien entra, con el total del cargo.
+$themed = array_merge(...array_values(array_map('array_keys', $probe->themeLabels())));
+$check(count($themed) === count(array_unique($themed)) && array_diff(array_keys($probe->labels()), $themed) === [], 'every due type belongs to exactly one theme');
+$tomorrow = date('Y-m-d', strtotime('+1 day'));
+$themeItems = [
+  ['tipo_vencimiento' => 'cotizacion_sin_enviar', 'titulo' => 'Mía', 'fecha_vencimiento' => '2026-01-05', 'dias_vencido' => 9, 'responsable_id' => '77'],
+  ['tipo_vencimiento' => 'cotizacion_sin_enviar', 'titulo' => 'Ajena', 'fecha_vencimiento' => '2026-01-06', 'dias_vencido' => 8, 'responsable_id' => '88'],
+  ['tipo_vencimiento' => 'cotizacion_sin_enviar', 'titulo' => 'Futura', 'fecha_vencimiento' => $tomorrow, 'dias_vencido' => 0, 'responsable_id' => '77'],
+  ['tipo_vencimiento' => 'servicios_publicos_pendientes', 'titulo' => 'Revisión', 'fecha_vencimiento' => $tomorrow, 'dias_vencido' => 0, 'cuenta_pendiente' => 1],
+  ['tipo_vencimiento' => 'preventiva_sin_enviar', 'titulo' => 'Otro tema', 'fecha_vencimiento' => '2026-01-05', 'dias_vencido' => 9, 'responsable_id' => '77'],
+];
+$themeGroups = $probe->themeGroups(['tema_mantenimiento', 'tema_servicios_publicos'], $themeItems, '77', true);
+$check(array_column($themeGroups, 'popup') === ['Servicios públicos', 'Mantenimiento'], 'only the active themes come back, each as its own popup');
+$check($themeGroups[1]['count'] === 2 && array_column($themeGroups[1]['rows'], 'title') === ['Mía'], 'the count is the cargo total and the list only the assigned tasks, without future ones');
+$check($themeGroups[1]['rows'][0]['badge'] === '9 días vencido' && $themeGroups[1]['popup_action']['tab'] === 'vencimientos', 'a row says how late it is and the popup opens the due tab');
+$check($themeGroups[0]['count'] === 1 && $themeGroups[0]['rows'] === [], 'a pending public service counts even if nobody owns it');
+$check($probe->themeGroups(['tema_mantenimiento'], $themeItems, '77', false)[0]['popup_action'] === null, 'without the due tab the popup has no button');
 
 // Ver todos solo amplía la pestaña Vencimientos; el popup pide lo suyo y la casilla no enciende popups.
 $check($probe->summaryTypes(['preventiva_sin_enviar', 'servicios_publicos_critico'], true) === ['preventiva_pendiente', 'servicios_publicos_pendientes'], 'the summary groups follow the types they belong to');

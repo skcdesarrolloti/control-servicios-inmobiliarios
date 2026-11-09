@@ -1933,7 +1933,7 @@ trait HandlesTicketWorkflowActions
     $this->verifyCsrf();
     try {
       $keys = $this->dashboardAlertKeysForCurrentCargo();
-      $groups = [];
+      $groups = $this->adminDueThemeAlertGroups($keys);
       if (array_intersect(['credito_solicitudes', 'credito_contabilidad'], $keys) !== [] && $this->canAccessDashboardTab('credito_propietario')) {
         $groups = array_merge($groups, array_map(static fn(array $group): array => $group + ['popup' => 'Créditos a propietarios'], $this->ownerCreditAlertGroups($keys)));
       }
@@ -2250,6 +2250,15 @@ trait HandlesTicketWorkflowActions
   private const ADMIN_DUE_TYPE_SETTING = 'dashboard_due_type_permissions';
   private const ADMIN_DUE_REMINDER_SETTING = 'dashboard_due_reminder_types';
 
+  /** Popups por tema: cada cargo activa los suyos y ve solo los tipos que atiende. */
+  private const ADMIN_DUE_THEME_POPUPS = [
+    'tema_preventivas' => ['label' => 'Preventivas', 'icon' => 'home_repair_service', 'types' => ['preventiva_pendiente', 'ticket_preventiva_sin_cita', 'preventiva_cita_sin_realizar', 'preventiva_sin_enviar']],
+    'tema_servicios_publicos' => ['label' => 'Servicios públicos', 'icon' => 'bolt', 'types' => ['servicios_publicos_critico', 'servicios_publicos_pendientes']],
+    'tema_mantenimiento' => ['label' => 'Mantenimiento', 'icon' => 'engineering', 'types' => ['cotizacion_sin_enviar', 'cotizacion_enviada_sin_respuesta', 'orden_mantenimiento_sin_respuesta']],
+    'tema_contractual' => ['label' => 'Contractual', 'icon' => 'contract_edit', 'types' => ['terminacion_contrato_pendiente', 'no_prorroga_contrato_pendiente', 'contrato_anexos_sin_enviar']],
+    'tema_juridicos' => ['label' => 'Casos jurídicos', 'icon' => 'gavel', 'types' => ['caso_juridico_fecha_limite']],
+  ];
+
   /** @return list<string> */
   private function adminDueAllTypes(): array
   {
@@ -2274,6 +2283,87 @@ trait HandlesTicketWorkflowActions
       'credito_contabilidad_pendiente' => 'Créditos sin contabilidad',
       'caso_juridico_fecha_limite' => 'Casos jurídicos · fecha límite',
     ];
+  }
+
+  /** Las casillas de tipos, con los mismos temas de los popups. @return array<string,array<string,string>> */
+  private function adminDueTypeLabelsByTheme(): array
+  {
+    $labels = $this->adminDueTypeLabels();
+    $byTheme = [];
+    foreach (self::ADMIN_DUE_THEME_POPUPS as $theme) {
+      $byTheme[$theme['label']] = array_intersect_key($labels, array_flip($theme['types']));
+    }
+    $byTheme['Créditos a propietarios'] = array_intersect_key($labels, array_flip(self::ADMIN_DUE_TYPES_BY_TAB['credito_propietario']));
+    return $byTheme;
+  }
+
+  /** @return array<string,array{label:string,hint:string}> */
+  private function adminDueThemeAlertCatalog(): array
+  {
+    return array_map(static fn(array $theme): array => [
+      'label' => $theme['label'],
+      'hint' => 'Popup propio con lo vencido o para hoy de este tema, si el cargo lo atiende. No sale si el cargo tiene el popup general.',
+    ], self::ADMIN_DUE_THEME_POPUPS);
+  }
+
+  /** El popup general ya contiene todo: quien lo tiene no recibe además los popups por tema. @param list<string> $keys @return list<array<string,mixed>> */
+  private function adminDueThemeAlertGroups(array $keys): array
+  {
+    $themes = array_intersect_key(self::ADMIN_DUE_THEME_POPUPS, array_flip($keys));
+    if ($themes === [] || $this->shouldShowAdminDuePopup()) {
+      return [];
+    }
+    $types = array_values(array_intersect($this->adminDueTypesForCurrentCargo(), array_merge(...array_column($themes, 'types'))));
+    [$fromTs, $toTs] = $this->adminDueCalendarRange([]);
+    $items = array_merge(
+      $this->adminDueCalendarItems($this->adminDueCalendarSettings(), $fromTs, $toTs, $types),
+      $this->adminDueCalendarSummaryItems($fromTs, $toTs, $this->adminDueSummaryTypes($types))
+    );
+    return $this->adminDueThemeGroups($themes, $items, $this->current_employee_id(), $this->canAccessDashboardTab('vencimientos'));
+  }
+
+  /**
+   * Un grupo por tipo: el total es del cargo y la lista, como en el popup general, solo lo asignado a quien entra.
+   * @param array<string,array{label:string,icon:string,types:list<string>}> $themes
+   * @param list<array<string,mixed>> $items
+   * @return list<array<string,mixed>>
+   */
+  private function adminDueThemeGroups(array $themes, array $items, string $employeeId, bool $canOpenTab): array
+  {
+    $today = date('Y-m-d');
+    $open = array_values(array_filter($items, static fn(array $item): bool => !empty($item['cuenta_pendiente']) || (string) ($item['fecha_vencimiento'] ?? '') <= $today));
+    $open = $this->adminDueMarkAssigned($open, $employeeId);
+    usort($open, static fn(array $a, array $b): int => (int) ($b['dias_vencido'] ?? 0) <=> (int) ($a['dias_vencido'] ?? 0));
+    $labels = $this->adminDueTypeLabels() + ['preventiva_pendiente' => 'Preventivas pendientes', 'servicios_publicos_pendientes' => 'Servicios públicos pendientes'];
+    $row = static function (array $item) use ($today): array {
+      $due = (string) ($item['fecha_vencimiento'] ?? '');
+      $days = (int) ($item['dias_vencido'] ?? 0);
+      return [
+        'date' => $due !== '' ? date('d/m/Y', strtotime($due) ?: 0) : '-',
+        'title' => (string) ($item['titulo'] ?? 'Vencimiento'),
+        'meta' => (string) ($item['descripcion'] ?? ''),
+        'badge' => $days > 0 ? $days . ($days === 1 ? ' día vencido' : ' días vencido') : ($due === $today ? 'Vence hoy' : 'Pendiente'),
+      ];
+    };
+
+    $groups = [];
+    foreach ($themes as $theme) {
+      $themeItems = array_values(array_filter($open, static fn(array $item): bool => in_array((string) ($item['tipo_vencimiento'] ?? ''), $theme['types'], true)));
+      $note = count($themeItems) . ' tarea(s) del cargo. La lista muestra las asignadas a ti.';
+      foreach ($theme['types'] as $type) {
+        $typeItems = array_values(array_filter($themeItems, static fn(array $item): bool => (string) ($item['tipo_vencimiento'] ?? '') === $type));
+        if ($typeItems === []) {
+          continue;
+        }
+        $groups[] = [
+          'key' => $type, 'label' => $labels[$type], 'hint' => 'En control del cargo', 'icon' => $theme['icon'], 'count' => count($typeItems),
+          'popup' => $theme['label'], 'popup_note' => $note,
+          'popup_action' => $canOpenTab ? ['label' => 'Ver vencimientos', 'tab' => 'vencimientos'] : null,
+          'rows' => array_map($row, array_values(array_filter($typeItems, static fn(array $item): bool => !empty($item['asignado'])))),
+        ];
+      }
+    }
+    return $groups;
   }
 
   /**
