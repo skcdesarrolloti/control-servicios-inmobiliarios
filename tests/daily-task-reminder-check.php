@@ -54,6 +54,8 @@ final class DueTypesProbe
   public function items(array $types): array { return array_column($this->adminDueCalendarItems([], 0, 1, $types), 'tipo_vencimiento'); }
   public bool $seeAll = false;
   public function calendarTab(): array { return $this->adminDueTypesForCalendarTab(); }
+  public function summaryTypes(array $types, bool $ignoreTabs = false): array { return $this->adminDueSummaryTypes($types, $ignoreTabs); }
+  private function canAccessDashboardTab(string $tab): bool { return false; }
   private function adminDueCanSeeAllTypes(): bool { return $this->seeAll; }
   private function adminDueTypesForCurrentCargo(): array { return ['cotizacion_sin_enviar']; }
   public function assigned(array $items, string $employee): array { return array_column($this->adminDueMarkAssigned($items, $employee), 'asignado'); }
@@ -83,6 +85,9 @@ $check($probe->sanitize(['3' => ['cotizacion_sin_enviar', 'inventado'], '99' => 
 $check(array_keys($probe->labels()) !== [] && array_diff($probe->all(), array_keys($probe->labels())) === [] && array_diff(array_keys($probe->labels()), $probe->all()) === [], 'every due type has a label in the permissions modal');
 
 // Ver todos solo amplía la pestaña Vencimientos; el popup pide lo suyo y la casilla no enciende popups.
+$check($probe->summaryTypes(['preventiva_sin_enviar', 'servicios_publicos_critico'], true) === ['preventiva_pendiente', 'servicios_publicos_pendientes'], 'the summary groups follow the types they belong to');
+$check($probe->summaryTypes(['cotizacion_sin_enviar'], true) === [], 'a cargo without those types does not list the summary groups');
+$check($probe->summaryTypes(['preventiva_sin_enviar', 'servicios_publicos_critico']) === [], 'without see-all the summary groups still need their tab');
 $check($probe->calendarTab() === ['cotizacion_sin_enviar'], 'without the permission the tab shows what the cargo attends');
 $probe->seeAll = true;
 $check($probe->calendarTab() === $probe->all(), 'with the permission the tab shows every type');

@@ -17,6 +17,22 @@ const slice = (text, from, to) => {
 };
 const ui = slice(runtime, '    var DUE_POPUP_UI = {', '    function dashboardDueEntryPopupHtml(');
 const popup = slice(runtime, '    // Popup de alertas por cargo', '    function loadDashboardDuePopupRows() {');
+
+// Pestaña Vencimientos: "En control" y el globo cuentan igual, y una revisión de servicios públicos no se cuenta dos veces.
+{
+  const dueCounts = slice(runtime, '    // En control: lo vencido', '    function updateDashboardDueNavBadge(');
+  const { dashboardDueStats, dashboardDueTotal } = new Function('dashboardDateKey', dueCounts + '; return { dashboardDueStats, dashboardDueTotal };')(() => '2026-11-09');
+  const dueRows = [
+    { estado: 'Vencido', fecha_vencimiento: '2026-11-01' },
+    { estado: 'Pendiente', fecha_vencimiento: '2026-11-09' },
+    { estado: 'Pendiente', fecha_vencimiento: '2026-11-20' },
+    { estado: 'Pendiente', fecha_vencimiento: '2026-11-09', cuenta_pendiente: 1 },
+  ];
+  assert.deepEqual(dashboardDueStats(dueRows), { total: 4, vencidos: 2, hoy: 1 }, 'pending public service reviews count as controlled, not as due today');
+  assert.equal(dashboardDueTotal(dueRows), dashboardDueStats(dueRows).vencidos, 'the tab badge equals its En control card');
+  assert.equal(dashboardDueTotal(dueRows.slice(0, 3), [{ count: 3, count_pending: true }]), 4, 'the popup keeps adding its summary groups');
+}
+
 const rows = n => Array.from({ length: n }, (_, i) => ({ date: '06/11/2026', title: 'Crédito #' + (i + 1) + ' · ROYNER PROPIETARIO', meta: '$500.000 a 10 meses · Libre inversión · Contrato #3000', badge: 'Hace 2 días', action: { type: i % 2 ? 'owner_credit_detail' : 'owner_credit_open', id: i + 1 }, button: i % 2 ? 'Ver crédito' : 'Ver solicitud' }));
 const groups = [
   { key: 'credito_solicitudes', label: 'Solicitudes de crédito', hint: 'Sin aprobar ni rechazar', icon: 'request_quote', count: 20, rows: rows(20) },

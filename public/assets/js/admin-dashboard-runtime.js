@@ -633,6 +633,15 @@
       return type || "Vencimientos";
     }
 
+    // En control: lo vencido y lo que cuenta aunque no haya vencido (revisiones de servicios públicos).
+    function dashboardDueRowControlled(row) {
+      return String(row.estado || "").toLowerCase() === "vencido" || !!row.cuenta_pendiente;
+    }
+
+    function dashboardDueRowDueToday(row, todayKey) {
+      return !row.cuenta_pendiente && String(row.fecha_vencimiento || "").slice(0, 10) === todayKey;
+    }
+
     function dashboardDueStats(rows) {
       rows = Array.isArray(rows) ? rows : [];
       var todayKey = dashboardDateKey(new Date());
@@ -642,8 +651,8 @@
         hoy: 0,
       };
       rows.forEach(function (row) {
-        if (String(row.estado || "").toLowerCase() === "vencido") stats.vencidos += 1;
-        if (String(row.fecha_vencimiento || "").slice(0, 10) === todayKey) stats.hoy += 1;
+        if (dashboardDueRowControlled(row)) stats.vencidos += 1;
+        if (dashboardDueRowDueToday(row, todayKey)) stats.hoy += 1;
       });
       return stats;
     }
@@ -2068,7 +2077,7 @@
       var calendarEventsRaw = [];
       var calendarEvents = [];
       var calendarDueAllEvents = [];
-      var calendarDueSummaryGroups = [];
+      var calendarDueBadgeTypes = [];
       var calendarPendingRows = [];
       var calendarDueStats = null;
       var calendarDueSettings = {};
@@ -2870,7 +2879,9 @@
         if (isDueCalendar) {
           var dueStats = computeDueStats(rows || calendarEvents);
           var dueTotal = Number(dueStats.total || 0);
-          var dueNavTotal = dashboardDueTotal(calendarDueAllEvents, calendarDueSummaryGroups);
+          var dueNavTotal = dashboardDueTotal(calendarDueAllEvents.filter(function (row) {
+            return calendarDueBadgeTypes.indexOf(String(row.tipo_vencimiento || "")) !== -1;
+          }));
           if (totalEl) totalEl.textContent = String(dueTotal);
           if (pendingEl) pendingEl.textContent = String(dueTotal);
           if (doneEl) doneEl.textContent = String(Number(dueStats.vencidos || 0));
@@ -3009,11 +3020,17 @@
         });
       }
 
+      // Vencimientos sin caso todavía: se crea el caso preventivo o se abre la revisión de servicios públicos.
+      function dueNoCaseButtonHtml(row, caseData, extraClass) {
+        var isCreateTicket = String(caseData.admin_ticket_create || "") === "1";
+        if (!isCreateTicket && String(caseData.public_services_review || "") !== "1") return "";
+        var attr = isCreateTicket ? "data-scm-open-admin-ticket" : "data-scm-open-public-services-review";
+        return '<button type="button" class="scm-case-work-btn' + extraClass + '" ' + attr + ' data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + ">" + (isCreateTicket ? "Crear caso" : "Ver revisión") + "</button>";
+      }
+
       function dueEventCardHtml(row) {
         var caseData = row && row.case ? row.case : {};
         var sourceHtml = String(caseData.case_source_html || "").trim();
-        var isCreateTicket = String(caseData.admin_ticket_create || "") === "1";
-        var isPublicServices = String(caseData.public_services_review || "") === "1";
         var canOpen = sourceHtml !== "";
         var overdue = String(row.estado || "").toLowerCase() === "vencido";
         var theme = dueTypeTheme(row);
@@ -3030,7 +3047,7 @@
           (Number(row.dias_vencido || 0) > 0 ? '<span>' + escHtml(String(row.dias_vencido)) + " dia(s) vencido</span>" : "") +
           "</div>" +
           '<div class="scm-calendar-event-actions">' +
-          (caseData.legal_case_id ? dueLegalCaseButtonHtml(caseData, "") : caseData.owner_credit_id ? dueCreditButtonHtml(caseData) : caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Ver caso · 72 horas</button>' : isCreateTicket ? '<button type="button" class="scm-case-work-btn" data-scm-open-admin-ticket data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Crear caso</button>' : (isPublicServices ? '<button type="button" class="scm-case-work-btn" data-scm-open-public-services-review data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver revisión</button>' : (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>'))) +
+          (caseData.legal_case_id ? dueLegalCaseButtonHtml(caseData, "") : caseData.owner_credit_id ? dueCreditButtonHtml(caseData) : caseData.critical_review_id ? '<button type="button" class="scm-case-work-btn" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Ver caso · 72 horas</button>' : dueNoCaseButtonHtml(row, caseData, "") || (canOpen ? '<button type="button" class="scm-case-work-btn scm-btn-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : '<button type="button" class="scm-case-work-btn" disabled>Sin caso asociado</button>')) +
           '</div><div class="scm-case-source" aria-hidden="true" style="display:none;">' + sourceHtml + "</div></div></article>";
       }
 
@@ -3928,8 +3945,8 @@
         rows.forEach(function (row) {
           var type = String(row.tipo_vencimiento || "");
           if (Object.prototype.hasOwnProperty.call(stats, type)) stats[type] += 1;
-          if (String(row.estado || "").toLowerCase() === "vencido") stats.vencidos += 1;
-          if (String(row.fecha_vencimiento || "").slice(0, 10) === todayKey) stats.hoy += 1;
+          if (dashboardDueRowControlled(row)) stats.vencidos += 1;
+          if (dashboardDueRowDueToday(row, todayKey)) stats.hoy += 1;
         });
         return stats;
       }
@@ -3986,7 +4003,7 @@
               '<strong>' + escHtml(row.fecha_vencimiento || "-") + "</strong>" +
               '<span>' + escHtml(row.titulo || "Vencimiento") + "</span>" +
               '<em>' + escHtml(row.estado || "Pendiente") + "</em>" +
-              (caseData.legal_case_id ? dueLegalCaseButtonHtml(caseData, " scm-calendar-due-breakdown-case") : caseData.owner_credit_id ? dueCreditButtonHtml(caseData, " scm-calendar-due-breakdown-case") : canOpen ? '<button type="button" class="scm-case-work-btn scm-calendar-due-breakdown-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : "") +
+              (caseData.legal_case_id ? dueLegalCaseButtonHtml(caseData, " scm-calendar-due-breakdown-case") : caseData.owner_credit_id ? dueCreditButtonHtml(caseData, " scm-calendar-due-breakdown-case") : dueNoCaseButtonHtml(row, caseData, " scm-calendar-due-breakdown-case") || (canOpen ? '<button type="button" class="scm-case-work-btn scm-calendar-due-breakdown-case" data-scm-due-open-case data-due-type="' + escHtml(row.tipo_vencimiento || "") + '"' + dueCaseAttrsHtml(caseData) + '>Ver caso</button>' : "")) +
               '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + String(caseData.case_source_html || "") + "</div>" +
               "</div>";
           }).join("");
@@ -4070,7 +4087,7 @@
       function renderDueCalendar(payload) {
         payload = payload || {};
         calendarDueAllEvents = extractRows(payload.eventos || payload.items || payload);
-        calendarDueSummaryGroups = Array.isArray(payload.summary_groups) ? payload.summary_groups : [];
+        calendarDueBadgeTypes = Array.isArray(payload.badge_types) ? payload.badge_types : [];
         calendarEvents = filterDueRows(calendarDueAllEvents);
         calendarDueStats = computeDueStats(calendarEvents);
         applyDueSettings(payload.settings || {});
@@ -4091,7 +4108,7 @@
           .catch(function (err) {
             calendarEvents = [];
             calendarDueAllEvents = [];
-            calendarDueSummaryGroups = [];
+            calendarDueBadgeTypes = [];
             calendarDueStats = null;
             renderKpis(calendarEvents);
             renderUpcoming();

@@ -1973,11 +1973,19 @@ trait HandlesTicketWorkflowActions
     $seeAll = !$forPopup && $this->adminDueCanSeeAllTypes();
     $types = $forPopup ? $this->adminDueTypesForCurrentCargo() : $this->adminDueTypesForCalendarTab();
     $items = $this->adminDueCalendarItems($settings, $fromTs, $toTs, $types);
+    // Los resúmenes (preventivas y servicios públicos pendientes): el popup los cuenta y la pestaña los lista.
+    $withSummary = !empty($_POST['include_summary']);
+    $summaryTypes = $this->adminDueSummaryTypes($types, $seeAll);
+    $summaryGroups = $withSummary && $forPopup ? $this->adminDueCalendarSummaryGroups($fromTs, $toTs, $summaryTypes) : [];
+    if ($withSummary && !$forPopup) {
+      $items = array_merge($items, $this->adminDueCalendarSummaryItems($fromTs, $toTs, $summaryTypes));
+    }
     $stats = $this->adminDueCalendarStats($items);
-    $summaryGroups = !empty($_POST['include_summary']) ? $this->adminDueCalendarSummaryGroups($fromTs, $toTs, $types, $seeAll) : [];
     if ($forPopup) {
       $items = $this->adminDueMarkAssigned($items, $this->current_employee_id());
     }
+    // El globo de la pestaña sigue lo que el cargo atiende, aunque la lista muestre todos los tipos.
+    $attendedTypes = $this->adminDueTypesForCurrentCargo();
 
     $this->jsonOk([
       'settings' => $settings,
@@ -1987,6 +1995,7 @@ trait HandlesTicketWorkflowActions
       'stats' => $stats,
       'summary_groups' => $summaryGroups,
       'allowed_types' => $types,
+      'badge_types' => array_merge($attendedTypes, $this->adminDueSummaryTypes($attendedTypes)),
     ]);
   }
 
@@ -2476,13 +2485,34 @@ trait HandlesTicketWorkflowActions
     ];
   }
 
-  /** @return array<int,array<string,mixed>> */
-  /** @param list<string> $types @param bool $ignoreTabs ver todos los vencimientos no depende de tener cada pestaña */
-  private function adminDueCalendarSummaryGroups(int $fromTs, int $toTs, array $types, bool $ignoreTabs = false): array
+  /** @param list<string> $types @param bool $ignoreTabs ver todos los vencimientos no depende de tener cada pestaña @return list<string> */
+  private function adminDueSummaryTypes(array $types, bool $ignoreTabs = false): array
+  {
+    $summaryTypes = [];
+    if (array_intersect(self::ADMIN_DUE_TYPES_BY_TAB['preventivas_pendientes'], $types) !== [] && ($ignoreTabs || $this->canAccessDashboardTab('preventivas_pendientes'))) {
+      $summaryTypes[] = 'preventiva_pendiente';
+    }
+    if (in_array('servicios_publicos_critico', $types, true) && ($ignoreTabs || $this->canAccessDashboardTab('servicios_publicos_pendientes'))) {
+      $summaryTypes[] = 'servicios_publicos_pendientes';
+    }
+    return $summaryTypes;
+  }
+
+  /** @param list<string> $summaryTypes @return array<int,array<string,mixed>> */
+  private function adminDueCalendarSummaryItems(int $fromTs, int $toTs, array $summaryTypes): array
+  {
+    return array_merge(
+      in_array('preventiva_pendiente', $summaryTypes, true) ? $this->adminDuePreventivasPendientesItems($fromTs, $toTs) : [],
+      in_array('servicios_publicos_pendientes', $summaryTypes, true) ? $this->adminDueServiciosPublicosItems($fromTs, $toTs) : []
+    );
+  }
+
+  /** @param list<string> $summaryTypes @return array<int,array<string,mixed>> */
+  private function adminDueCalendarSummaryGroups(int $fromTs, int $toTs, array $summaryTypes): array
   {
     $groups = [];
 
-    if (array_intersect(self::ADMIN_DUE_TYPES_BY_TAB['preventivas_pendientes'], $types) !== [] && ($ignoreTabs || $this->canAccessDashboardTab('preventivas_pendientes'))) {
+    if (in_array('preventiva_pendiente', $summaryTypes, true)) {
       $groups[] = $this->adminDueCalendarSummaryGroup(
         'preventiva_pendiente',
         'Preventivas pendientes',
@@ -2491,7 +2521,7 @@ trait HandlesTicketWorkflowActions
       );
     }
 
-    if (in_array('servicios_publicos_critico', $types, true) && ($ignoreTabs || $this->canAccessDashboardTab('servicios_publicos_pendientes'))) {
+    if (in_array('servicios_publicos_pendientes', $summaryTypes, true)) {
       $groups[] = $this->adminDueCalendarSummaryGroup(
         'servicios_publicos_pendientes',
         'Servicios públicos pendientes',
@@ -2902,7 +2932,7 @@ trait HandlesTicketWorkflowActions
         'calendar_ts' => $calendarTs,
         'days_limit' => 0,
         'case' => $this->adminDueLightCaseDataFromServiciosPublicos($row, $item),
-      ]);
+      ]) + ['cuenta_pendiente' => 1]; // Entra en control aunque aún no haya vencido.
     }
     return $items;
   }

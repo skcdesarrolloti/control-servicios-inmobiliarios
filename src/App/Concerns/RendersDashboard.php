@@ -2863,7 +2863,7 @@ trait RendersDashboard
       <?php if ($showKpis): ?>
       <div class="scm-calendar-kpis">
         <div class="scm-kpi"><div class="scm-kpi-label"><?php echo $view === 'pending' ? 'Total vencimientos' : 'Pendientes'; ?></div><div class="scm-kpi-value" data-scm-calendar-pending>0</div></div>
-        <div class="scm-kpi"><div class="scm-kpi-label"><?php echo $view === 'pending' ? 'Vencidos' : 'Realizados'; ?></div><div class="scm-kpi-value" data-scm-calendar-done>0</div></div>
+        <div class="scm-kpi"><div class="scm-kpi-label"><?php echo $view === 'pending' ? 'En control' : 'Realizados'; ?></div><div class="scm-kpi-value" data-scm-calendar-done>0</div></div>
         <div class="scm-kpi"><div class="scm-kpi-label"><?php echo $view === 'pending' ? 'Vencen hoy' : 'Hoy'; ?></div><div class="scm-kpi-value" data-scm-calendar-today>0</div></div>
       </div>
       <?php endif; ?>
@@ -2936,8 +2936,11 @@ trait RendersDashboard
             </div>
           </div>
           <?php $dueAllowedTypes = $this->adminDueTypesForCalendarTab(); ?>
+          <?php $dueSummaryTypes = $this->adminDueSummaryTypes($dueAllowedTypes, $this->adminDueCanSeeAllTypes()); ?>
           <form class="scm-calendar-due-type-filter" data-scm-calendar-due-type-filter autocomplete="off">
             <?php if (in_array('servicios_publicos_critico', $dueAllowedTypes, true)): ?><label class="scm-calendar-due-chip scm-calendar-due-chip--no-prorroga-contrato"><input type="checkbox" name="due_type" value="servicios_publicos_critico" checked><span class="material-symbols-outlined" aria-hidden="true">warning</span><strong>Servicios críticos · 72 horas</strong></label><?php endif; ?>
+            <?php if (in_array('servicios_publicos_pendientes', $dueSummaryTypes, true)): ?><label class="scm-calendar-due-chip scm-calendar-due-chip--preventiva-sin-enviar"><input type="checkbox" name="due_type" value="servicios_publicos_pendientes" checked><span class="material-symbols-outlined" aria-hidden="true">bolt</span><strong>Servicios públicos pendientes</strong></label><?php endif; ?>
+            <?php if (in_array('preventiva_pendiente', $dueSummaryTypes, true)): ?><label class="scm-calendar-due-chip scm-calendar-due-chip--ticket-preventiva-sin-cita"><input type="checkbox" name="due_type" value="preventiva_pendiente" checked><span class="material-symbols-outlined" aria-hidden="true">home_repair_service</span><strong>Preventivas pendientes</strong></label><?php endif; ?>
             <?php if (in_array('preventiva_sin_enviar', $dueAllowedTypes, true)): ?><label class="scm-calendar-due-chip scm-calendar-due-chip--preventiva-sin-enviar"><input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><strong>Preventivas sin enviar</strong></label><?php endif; ?>
             <?php if (in_array('ticket_preventiva_sin_cita', $dueAllowedTypes, true)): ?><label class="scm-calendar-due-chip scm-calendar-due-chip--ticket-preventiva-sin-cita"><input type="checkbox" name="due_type" value="ticket_preventiva_sin_cita" checked><span class="material-symbols-outlined" aria-hidden="true">event_busy</span><strong>Casos sin cita preventiva</strong></label><?php endif; ?>
             <?php if (in_array('preventiva_cita_sin_realizar', $dueAllowedTypes, true)): ?><label class="scm-calendar-due-chip scm-calendar-due-chip--preventiva-cita-sin-realizar"><input type="checkbox" name="due_type" value="preventiva_cita_sin_realizar" checked><span class="material-symbols-outlined" aria-hidden="true">pending_actions</span><strong>Preventivas con cita sin realizar</strong></label><?php endif; ?>

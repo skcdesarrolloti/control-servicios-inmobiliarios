@@ -19,6 +19,8 @@ Vencimientos sale primero y después cada tema, uno al cerrar el otro, porque Sw
 
 La alerta **Ver todos los vencimientos en su pestaña** (`vencimientos_ver_todos`) hace que la pestaña Vencimientos muestre todos los tipos, con sus filtros y totales, aunque el cargo no los atienda ni tenga esas pestañas. No cambia el popup, su contador ni el recordatorio diario, y no abre ningún popup por sí sola.
 
+La pestaña Vencimientos también lista, con su filtro, las **Preventivas pendientes** y los **Servicios públicos pendientes** que el popup solo resume. Con todos los filtros marcados, su tarjeta **En control** es igual al globo del menú: lo vencido más todas las revisiones de servicios públicos pendientes, aunque aún no venzan. El globo sigue lo que atiende el cargo, también con **Ver todos**.
+
 En el popup de Vencimientos, las tarjetas por tipo son las que el cargo atiende (un tipo desmarcado no aparece, uno marcado sin pendientes sale en 0). La lista **Casos con mayor tiempo de atraso** muestra solo los asignados a quien entra: el `id_empleado` del caso, igual que Mis casos, o el responsable directo cuando no hay caso (anexos de contrato, casos jurídicos). Los totales siguen siendo los del cargo.
 
 ## Contratos por desocupar
