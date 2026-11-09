@@ -242,12 +242,12 @@ final class AdministrativeNotificationsService
         'header_media_url' => \home_url('assets/img/whatsapp-factura-disponible.jpg'),
         'header_required' => true,
       ],
-      'scm_mes_generado_pago_v1' => [
-        'name' => 'scm_mes_generado_pago_v1',
+      'scm_cupon_disponible_v2' => [
+        'name' => 'scm_cupon_disponible_v2',
         'label' => 'Mes generado para pago',
         'language' => 'es_CO',
         'description' => 'Aviso para arrendatarios cuando el cupón de pago del mes fue generado.',
-        'body' => "Estimado(a) {{1}}, tu mes ha sido generado exitosamente.\n\nHemos generado tu cupón de pago, el cual cuenta con 4 fechas establecidas cada mes:\n📅 12 de cada mes\n📅 22 de cada mes\n📅 26 de cada mes\n📅 31 de cada mes\n\nEn el cupón encontrarás el valor específico correspondiente a cada fecha. Te agradecemos revisar tu cupón mensual y realizar el pago en la fecha y por el valor allí establecidos.\n\nPuedes realizar el pago a través del botón de pago disponible o por ventanilla en Banco Caja Social, ingresando tu cédula o NIT sin dígito de verificación.\n\nCuando realices tu pago, por favor envíanos el soporte para validarlo en el sistema.\n\nEstoy para servirte.\n\nAtentamente,\n{{2}}\n\n🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro Bot Guardián desde el botón de abajo.",
+        'body' => "Estimado(a) *{{1}}*, tu mes ha sido generado exitosamente.\n\nHemos generado tu cupón de pago, el cual cuenta con 4 fechas establecidas cada mes:\n\n📅 12 de cada mes\n📅 22 de cada mes\n📅 26 de cada mes\n📅 31 de cada mes\n\nEn el cupón encontrarás el valor específico correspondiente a cada fecha. Te agradecemos revisar tu cupón mensual y realizar el pago en la fecha y por el valor allí establecidos.\n\n*Puedes realizar el pago a través del botón de pago disponible o por ventanilla en Banco Caja Social, ingresando tu cédula o NIT sin dígito de verificación.*\n\nCuando realices tu pago, por favor envíanos el soporte para validarlo en el sistema.\n\nAtentamente,\n*{{2}}*\n\n🤖 ¿Dudas, quejas o inconvenientes? Escríbele a nuestro Bot Guardián desde el botón de abajo.",
         'variables' => ['Nombre del arrendatario', 'Firma del funcionario: Nombre - Cargo - Celular'],
         'actors' => array_merge($arrendatarios, $funcionarios),
         'email_template' => 'scm_email_cupon_disponible_v1',
@@ -5607,7 +5607,7 @@ final class AdministrativeNotificationsService
       'scm_factura_disponible_v1' => 'scm_factura_disponible_v2',
       'cupones' => 'scm_arrendatario_fecha_pago_v1',
       'scm_cupon_disponible_v1' => 'scm_arrendatario_fecha_pago_v1',
-      'scm_cupon_disponible_v2' => 'scm_arrendatario_fecha_pago_v1',
+      'scm_mes_generado_pago_v1' => 'scm_cupon_disponible_v2',
       'scm_arrendatario_fecha_cobro_v1' => 'scm_arrendatario_fecha_pago_v1',
       'scm_aviso_siniestro_v1' => 'scm_aviso_siniestro_v2',
     ];
