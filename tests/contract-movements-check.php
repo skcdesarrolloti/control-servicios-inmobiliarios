@@ -98,6 +98,7 @@ $check(array_unique(array_column($alerts, 'popup')) === ['Contratos por desocupa
 $check($alerts[0]['rows'][0]['date'] === '20/11/2026' && $alerts[0]['rows'][0]['title'] === 'Contrato #10 · Ana' && $alerts[0]['rows'][0]['badge'] === 'Faltan 11 días' && str_contains($alerts[0]['rows'][0]['meta'], 'Caso #9002'), 'La fila dice qué día termina y cuál es el caso.');
 $check($alerts[1]['rows'][0]['badge'] === 'Cerrado' && $alerts[1]['rows'][1]['badge'] === 'Recibido', 'Lo cerrado muestra su estado.');
 $check(ContractReceiptCases::alertGroups([], $today) === [], 'Sin casos no hay popup.');
+$check($alerts[0]['popup_action'] === null && ContractReceiptCases::alertGroups($cases, $today, true)[0]['popup_action'] === ['label' => 'Ver contratos por terminar', 'tab' => 'metricas_por_terminar'], 'El botón a la vista solo sale con permiso.');
 
 // Aumentos: el valor anterior sale de la carta y, en las antiguas, de la carta previa o del porcentaje.
 $ts = static fn(string $date): int => (new DateTimeImmutable($date, new DateTimeZone('America/Bogota')))->getTimestamp();

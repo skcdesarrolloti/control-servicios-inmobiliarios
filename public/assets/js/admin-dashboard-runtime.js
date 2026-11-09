@@ -1303,6 +1303,7 @@
         '<div class="!sp-bg-service-background !sp-p-4 sm:!sp-p-6 !sp-space-y-5 !sp-overflow-y-auto !sp-max-h-[calc(100vh-300px)] sm:!sp-max-h-[calc(100vh-220px)]">' +
         '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-3">' + cards + "</div>" + sections + "</div>" +
         '<footer class="!sp-bg-white !sp-px-5 !sp-py-4 sm:!sp-px-6 !sp-flex !sp-flex-wrap !sp-justify-end !sp-gap-2 !sp-border-0 !sp-border-t !sp-border-solid !sp-border-slate-200">' +
+        (alertPopup.action ? '<button type="button" class="' + ui.primary + '" data-scm-dashboard-alert-go="' + escHtml(alertPopup.action.tab) + '">' + escHtml(alertPopup.action.label) + "</button>" : "") +
         '<button type="button" class="' + ui.secondary + ' !sp-px-4 !sp-py-2.5 !sp-text-xs" data-scm-dashboard-alert-close>Cerrar</button></footer></div>';
     }
 
@@ -1368,12 +1369,25 @@
         var title = group.popup || "Alertas pendientes";
         var alertPopup = popups.filter(function (item) { return item.title === title; })[0];
         if (!alertPopup) {
-          alertPopup = { title: title, note: group.popup_note || "", groups: [] };
+          alertPopup = { title: title, note: group.popup_note || "", action: group.popup_action || null, groups: [] };
           popups.push(alertPopup);
         }
         alertPopup.groups.push(group);
       });
       return popups;
+    }
+
+    // Usa la misma opción del menú, que ya sabe abrir el panel y su vista.
+    function openDashboardAlertTab(tab) {
+      window.Swal.close();
+      var item = document.querySelector('.nav-tab-dropdown-item[data-tab-key="' + tab + '"]');
+      if (item) {
+        item.click();
+        return;
+      }
+      var url = new URL(window.location.href);
+      url.searchParams.set("tab", tab);
+      window.location.href = url.toString();
     }
 
     // Swal muestra uno a la vez: el siguiente sale al cerrar. Si el funcionario fue a atender algo, los demás esperan.
@@ -1399,6 +1413,8 @@
             var target = event.target && event.target.closest ? event.target : null;
             if (!target) return;
             if (target.closest("[data-scm-dashboard-alert-close]")) { dashboardConfirmPopupClose(popup); return; }
+            var goButton = target.closest("[data-scm-dashboard-alert-go]");
+            if (goButton) { openDashboardAlertTab(goButton.getAttribute("data-scm-dashboard-alert-go")); return; }
             // Los botones del crédito los atiende admin-owner-credits.js al llegar el clic al documento.
             if (target.closest("[data-owner-credit-open], [data-owner-credit-detail]")) window.Swal.close();
           });
@@ -1429,7 +1445,8 @@
     function maybeShowDashboardEntryPopups(source) {
       // Clic en Inicio llega dos veces (la pestaña y el menú): el segundo no reemplaza el popup que ya está abierto.
       if (window.Swal && window.Swal.isVisible()) return Promise.resolve();
-      markDashboardReminderShown();
+      // Cargar una página fuera de Inicio no muestra popups, así que tampoco reinicia la cuenta de la hora.
+      if (shouldAutoShowDashboardDuePopup(source)) markDashboardReminderShown();
       dashboardDueActionTaken = false;
       return Promise.resolve(maybeShowDashboardDuePopup(source)).then(function () {
         if (dashboardDueActionTaken || dashboardDuePopupRestoreAfterCase) return;

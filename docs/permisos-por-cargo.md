@@ -13,9 +13,9 @@ El modal **Permisos por cargo** tiene tres secciones:
 2. Devuelve sus grupos en `ajax_handler_dashboard_alerts`: `key`, `label`, `hint`, `icon`, `count` y `rows` (`date`, `title`, `meta`, `badge`, `button`, `action`). Valida también el permiso de ver esa información.
 3. Si la fila abre algo nuevo, agrega su `action.type` en `dashboardAlertActionHtml` (`admin-dashboard-runtime.js`).
 
-Para que la alerta tenga su propio popup, el grupo lleva `popup` con el título del tema; los grupos con el mismo `popup` van juntos. `popup_note` reemplaza el subtítulo y `show_all` muestra todas las filas en lugar de las primeras 18.
+Para que la alerta tenga su propio popup, el grupo lleva `popup` con el título del tema; los grupos con el mismo `popup` van juntos. `popup_note` reemplaza el subtítulo, `show_all` muestra todas las filas en lugar de las primeras 18 y `popup_action` (`label`, `tab`) agrega un botón que abre esa opción del menú; envíalo solo si el cargo tiene la pestaña.
 
-Vencimientos sale primero y después cada tema, uno al cerrar el otro, porque Swal muestra un popup a la vez. Si el funcionario va a atender algo desde un popup, los siguientes esperan a que vuelva a Inicio. Salen al entrar a Inicio, en cada clic en Inicio y cada hora en cualquier pestaña, sin interrumpir a quien está escribiendo o tiene un popup abierto. Cerrarlos pide confirmación.
+Vencimientos sale primero y después cada tema, uno al cerrar el otro, porque Swal muestra un popup a la vez. Si el funcionario va a atender algo desde un popup, los siguientes esperan a que vuelva a Inicio. Salen al entrar a Inicio, en cada clic en Inicio y cada hora en cualquier pestaña, sin interrumpir a quien está escribiendo o tiene un popup abierto. La hora se cuenta desde la última vez que los popups pudieron salir: cargar otra pestaña no la reinicia. Cerrarlos pide confirmación.
 
 ## Contratos por desocupar
 

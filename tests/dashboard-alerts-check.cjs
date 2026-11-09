@@ -34,7 +34,9 @@ const harness = (groupsJson) => `
   window.config = alertPopupConfig;
   window.setRestore = v => { dashboardDuePopupRestoreAfterCase = v; };
   window.resetShown = () => { dashboardAlertsShown = {}; };
-  const shouldAutoShowDashboardDuePopup = () => true;
+  let onHome = true;
+  window.setOnHome = v => { onHome = v; };
+  const shouldAutoShowDashboardDuePopup = source => source === 'hourly' || onHome;
   const dashboardAction = (action) => { window.calls.push(action); return Promise.resolve({ groups: ${groupsJson} }); };
   let closeCurrent = null;
   window.Swal = {
@@ -127,8 +129,20 @@ const harness = (groupsJson) => `
   await page.evaluate(() => { window.log = []; window.setReminderAt(Date.now() - 3600001); document.querySelector('#scm-app').insertAdjacentHTML('beforeend', '<input id="typing">'); document.getElementById('typing').focus(); window.tick(); });
   await page.waitForTimeout(50);
   assert.deepEqual(await page.evaluate(() => window.log), [], 'it does not interrupt someone typing');
-  await page.evaluate(() => { document.getElementById('typing').remove(); window.dueOpen = true; });
+  await page.evaluate(() => { document.getElementById('typing').remove(); });
   console.log('OK the reminder repeats every hour without interrupting');
+
+  // Cargar una página fuera de Inicio no muestra popups y no debe reiniciar la hora.
+  await page.evaluate(() => { window.resetShown(); window.log = []; window.setOnHome(false); window.setReminderAt(Date.now() - 3600001); window.entry('login'); });
+  await page.waitForTimeout(50);
+  assert.deepEqual(await page.evaluate(() => window.log), [], 'nothing shows outside Inicio');
+  await page.evaluate(() => { window.tick(); });
+  await page.waitForSelector('[data-scm-alert-group]');
+  assert.deepEqual(await page.evaluate(() => window.log), ['alerts'], 'the hour was not restarted by loading another tab');
+  await page.click('[data-scm-dashboard-alert-close]');
+  await page.click('[data-scm-popup-close-yes]');
+  await page.evaluate(() => { window.setOnHome(true); window.dueOpen = true; });
+  console.log('OK loading another tab does not restart the hour');
 
   await page.evaluate(() => { window.resetShown(); window.log = []; window.entry('login'); });
   await page.waitForSelector('[data-scm-dashboard-due-open-calendar]');
@@ -181,6 +195,28 @@ const harness = (groupsJson) => `
   await page.waitForTimeout(100);
   assert.deepEqual(await page.evaluate(() => window.log), ['alerts'], 'going to work on a credit leaves the next theme waiting');
   console.log('OK each theme opens its own popup, in order');
+
+  // El botón del popup va a la vista por la misma opción del menú y deja esperando los siguientes temas.
+  const withView = contracts.map(group => ({ ...group, popup_action: { label: 'Ver contratos por terminar', tab: 'metricas_por_terminar' } }));
+  await open(withView.concat(credits.map(group => ({ ...group, popup: 'Otro tema' }))));
+  await page.evaluate(() => {
+    document.body.insertAdjacentHTML('beforeend', '<a class="nav-tab-dropdown-item" data-tab-key="metricas_por_terminar" href="#destino">Menu</a>');
+    window.menuClicks = 0;
+    document.querySelector('.nav-tab-dropdown-item').addEventListener('click', (event) => { event.preventDefault(); window.menuClicks++; });
+    window.entry('login');
+  });
+  await page.waitForSelector('[data-scm-dashboard-alert-go="metricas_por_terminar"]');
+  assert.match(await page.textContent('[data-scm-dashboard-alert-go]'), /Ver contratos por terminar/);
+  await page.click('[data-scm-dashboard-alert-go]');
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator('.scm-due-entry-swal').count(), 0, 'the popup closes without asking to confirm');
+  assert.equal(await page.evaluate(() => window.menuClicks), 1, 'it opens the view through the menu option');
+  assert.deepEqual(await page.evaluate(() => window.log), ['alerts'], 'the next theme waits while the view is open');
+  await open(contracts);
+  await page.evaluate(() => { window.entry('login'); });
+  await page.waitForSelector('[data-scm-alert-group]');
+  assert.equal(await page.locator('[data-scm-dashboard-alert-go]').count(), 0, 'without permission for the view there is no button');
+  console.log('OK the popup button opens its view');
 
   // Pestaña Alertas: mismo conteo y selector de cargo que Pestañas y Acciones.
   const paneHtml = `<form id="scm-permissions-form" data-scm-perm-form>

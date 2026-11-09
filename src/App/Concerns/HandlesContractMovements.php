@@ -15,7 +15,7 @@ trait HandlesContractMovements
   private function contractMoveOutAlertGroups(): array
   {
     $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
-    return ContractReceiptCases::alertGroups((new ContractReceiptCases($this->db))->inMonth((int) $today->format('Y'), (int) $today->format('n')), $today);
+    return ContractReceiptCases::alertGroups((new ContractReceiptCases($this->db))->inMonth((int) $today->format('Y'), (int) $today->format('n')), $today, $this->canAccessDashboardTab('metricas_por_terminar'));
   }
 
   public function ajax_handler_contract_movements(): void

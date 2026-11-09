@@ -74,7 +74,7 @@ final class ContractReceiptCases
    * @param list<array<string,mixed>> $cases
    * @return list<array<string,mixed>> Grupos del popup: lo que falta por recibir y lo que ya se cerró en el mes.
    */
-  public static function alertGroups(array $cases, DateTimeImmutable $today): array
+  public static function alertGroups(array $cases, DateTimeImmutable $today, bool $canOpenView = false): array
   {
     if ($cases === []) {
       return [];
@@ -103,6 +103,7 @@ final class ContractReceiptCases
         $groups[] = [
           'key' => $key, 'label' => $label, 'hint' => $hint, 'icon' => $icon, 'count' => count($items),
           'popup' => 'Contratos por desocupar', 'popup_note' => $note, 'show_all' => true,
+          'popup_action' => $canOpenView ? ['label' => 'Ver contratos por terminar', 'tab' => 'metricas_por_terminar'] : null,
           'rows' => array_map($row, $items),
         ];
       }
