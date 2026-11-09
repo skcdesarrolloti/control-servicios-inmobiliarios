@@ -381,6 +381,7 @@ final class SuCasaControlServiciosInmobiliarios
       'metricas_ocupaciones' => 'Ocupaciones',
       'metricas_desocupaciones' => 'Desocupaciones',
       'metricas_ocupaciones_vs' => 'Ocupaciones vs Desocupaciones',
+      'metricas_por_terminar' => 'Contratos por terminar',
       'metricas_crecimiento' => 'Crecimiento de la empresa',
       'mis_presupuestos' => 'Mis presupuestos y ejecuciones',
       'credito_propietario' => 'Créditos a propietarios',
@@ -396,9 +397,9 @@ final class SuCasaControlServiciosInmobiliarios
   private const DERIVED_DASHBOARD_TABS = [
     'calendario_actividades' => ['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble'],
     'actividades_contractuales' => ['contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga'],
-    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento'],
-    // Panel compartido de ocupaciones y desocupaciones (una consulta para sus tres vistas).
-    'metricas_contratos' => ['metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs'],
+    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_por_terminar', 'metricas_crecimiento'],
+    // Panel compartido de ocupaciones y desocupaciones (una consulta para todas sus vistas).
+    'metricas_contratos' => ['metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_por_terminar'],
   ];
 
   private function canManageDashboardPermissions(): bool
@@ -848,6 +849,10 @@ final class SuCasaControlServiciosInmobiliarios
       if (in_array('metricas_creditos', (array) $raw[$cargo], true)) {
         $raw[$cargo] = array_merge((array) $raw[$cargo], ['credito_propietario']);
       }
+      // Contratos por terminar es nueva: mientras no se guarden permisos que la conozcan, la ve quien ve Desocupaciones.
+      if (!in_array('metricas_por_terminar', $knownTabs, true) && in_array('metricas_desocupaciones', (array) $raw[$cargo], true)) {
+        $raw[$cargo] = array_merge((array) $raw[$cargo], ['metricas_por_terminar']);
+      }
       // Hojas de cierre es nueva: mientras no se guarden permisos que la conozcan, la ve quien ve contratos o servicios.
       if (!in_array('hojas_cierre', $knownTabs, true) && array_intersect(['contratos_arrendamiento', 'servicios_publicos_pendientes'], (array) $raw[$cargo]) !== []) {
         $raw[$cargo] = array_merge((array) $raw[$cargo], ['hojas_cierre']);
@@ -1167,6 +1172,9 @@ final class SuCasaControlServiciosInmobiliarios
       ['label' => 'Créditos a propietarios', 'items' => [
         'credito_solicitudes' => ['label' => 'Solicitudes de crédito', 'hint' => 'Solicitudes sin aprobar ni rechazar. Requiere ver Créditos a propietarios.'],
         'credito_contabilidad' => ['label' => 'Créditos sin ingresar a contabilidad', 'hint' => 'Créditos con la respuesta enviada y sin marcar. Requiere ver Créditos a propietarios.'],
+      ]],
+      ['label' => 'Contratos', 'items' => [
+        'contratos_por_desocupar' => ['label' => 'Contratos por desocupar del mes', 'hint' => 'Popup propio con los contratos que terminan en el mes y su día, separando los que tienen aviso de salida. Esta casilla basta para verlo.'],
       ]],
       ['label' => 'Recordatorio diario · 9:00 a. m.', 'items' => [
         self::ALERT_REMINDER_EMAIL => ['label' => 'Por correo', 'hint' => 'Lunes a sábado, sin festivos, con las tareas vencidas o que vencen hoy en el calendario del cargo.'],

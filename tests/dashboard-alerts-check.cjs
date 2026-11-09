@@ -152,6 +152,36 @@ const harness = (groupsJson) => `
   assert.equal(await page.locator('.scm-due-entry-swal').count(), 0, 'nothing pending shows nothing');
   console.log('OK nothing pending shows no popup');
 
+  // Cada tema es su propio popup: salen en orden, cada uno con su título, y si va a atender algo el resto espera.
+  const contracts = [
+    { key: 'contratos_por_desocupar', label: 'Por desocupar este mes', hint: 'Con aviso de salida', icon: 'logout', count: 25, popup: 'Contratos por desocupar', popup_note: '26 contratos terminan en noviembre de 2026.', show_all: true, rows: rows(25).map(row => ({ date: '20/11/2026', title: row.title, meta: 'Inmueble 501', badge: 'Recibo de inmueble' })) },
+    { key: 'contratos_sin_aviso', label: 'Terminan sin aviso de salida', hint: 'Pueden prorrogarse', icon: 'event_upcoming', count: 1, popup: 'Contratos por desocupar', popup_note: '26 contratos terminan en noviembre de 2026.', show_all: true, rows: rows(1).map(row => ({ date: '21/11/2026', title: row.title, meta: 'Inmueble 502', badge: 'Faltan 12 días' })) },
+  ];
+  const credits = groups.map(group => ({ ...group, popup: 'Créditos a propietarios' }));
+  await open(credits.concat(contracts));
+  await page.evaluate(() => { window.entry('login'); });
+  await page.waitForSelector('[data-scm-alert-group="credito_solicitudes"]');
+  assert.match(await page.textContent('.scm-due-entry-swal h3'), /Créditos a propietarios/);
+  assert.equal(await page.locator('[data-scm-alert-group="contratos_por_desocupar"]').count(), 0, 'each theme stays in its own popup');
+  await page.click('[data-scm-dashboard-alert-close]');
+  await page.click('[data-scm-popup-close-yes]');
+  await page.waitForSelector('[data-scm-alert-group="contratos_por_desocupar"]');
+  assert.match(await page.textContent('.scm-due-entry-swal h3'), /Contratos por desocupar/);
+  assert.match(await page.textContent('.scm-due-entry-swal header'), /26 contratos terminan en noviembre de 2026/);
+  assert.equal(await page.locator('[data-scm-alert-group="contratos_por_desocupar"] [data-scm-alert-row]').count(), 25, 'cartera sees every contract of the month');
+  assert.equal(await page.locator('[data-scm-alert-group="contratos_sin_aviso"]').count(), 1, 'groups of the same theme stay together');
+  assert.deepEqual(await page.evaluate(() => window.log), ['alerts', 'alerts']);
+  if (process.env.SCM_CONTRACTS_SHOT) await page.screenshot({ path: process.env.SCM_CONTRACTS_SHOT });
+  await page.click('[data-scm-dashboard-alert-close]');
+  await page.click('[data-scm-popup-close-yes]');
+  assert.equal(await page.locator('.scm-due-entry-swal').count(), 0);
+  await page.evaluate(() => { window.resetShown(); window.log = []; window.entry('login'); });
+  await page.waitForSelector('[data-owner-credit-detail]');
+  await page.click('[data-owner-credit-detail]');
+  await page.waitForTimeout(100);
+  assert.deepEqual(await page.evaluate(() => window.log), ['alerts'], 'going to work on a credit leaves the next theme waiting');
+  console.log('OK each theme opens its own popup, in order');
+
   // Pestaña Alertas: mismo conteo y selector de cargo que Pestañas y Acciones.
   const paneHtml = `<form id="scm-permissions-form" data-scm-perm-form>
     <select id="scm-permissions-cargo"><option value="13" selected>13</option></select>

@@ -13,7 +13,19 @@ El modal **Permisos por cargo** tiene tres secciones:
 2. Devuelve sus grupos en `ajax_handler_dashboard_alerts`: `key`, `label`, `hint`, `icon`, `count` y `rows` (`date`, `title`, `meta`, `badge`, `button`, `action`). Valida también el permiso de ver esa información.
 3. Si la fila abre algo nuevo, agrega su `action.type` en `dashboardAlertActionHtml` (`admin-dashboard-runtime.js`).
 
-Vencimientos sale primero y las alertas al cerrarlo, porque Swal muestra un popup a la vez. Salen al entrar a Inicio, en cada clic en Inicio y cada hora en cualquier pestaña, sin interrumpir a quien está escribiendo o tiene un popup abierto. Cerrarlos pide confirmación.
+Para que la alerta tenga su propio popup, el grupo lleva `popup` con el título del tema; los grupos con el mismo `popup` van juntos. `popup_note` reemplaza el subtítulo y `show_all` muestra todas las filas en lugar de las primeras 18.
+
+Vencimientos sale primero y después cada tema, uno al cerrar el otro, porque Swal muestra un popup a la vez. Si el funcionario va a atender algo desde un popup, los siguientes esperan a que vuelva a Inicio. Salen al entrar a Inicio, en cada clic en Inicio y cada hora en cualquier pestaña, sin interrumpir a quien está escribiendo o tiene un popup abierto. Cerrarlos pide confirmación.
+
+## Contratos por desocupar
+
+El popup **Contratos por desocupar** (alerta `contratos_por_desocupar`) lista los contratos `Entregado` o `Por recibir` cuya fecha fin cae en el mes en curso. La casilla del cargo basta para verlo, porque cartera lo necesita sin acceso a contratos ni métricas. `ContractExitSignals` separa cada contrato en:
+
+- **Con aviso de salida**: estado `Por recibir`, o caso de recibo, terminación o no prórroga del mismo ciclo.
+- **Sin aviso de salida**: termina, pero nadie ha informado qué va a pasar. Puede prorrogarse.
+- **Continúa**: renovación al 100 % o no salida reportada en Contratos por terminar. No sale en el popup.
+
+**Métricas › Contratos por terminar** (`metricas_por_terminar`) usa la misma clasificación y abre en el mes en curso. Hasta que se guarden los permisos, la ve quien ve Desocupaciones.
 
 ## Recordatorio diario
 

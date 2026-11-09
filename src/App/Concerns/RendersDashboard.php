@@ -204,6 +204,7 @@ trait RendersDashboard
       'ocupaciones' => 'scm-panel-movimientos-contratos',
       'desocupaciones' => 'scm-panel-movimientos-contratos',
       'ocupaciones_vs_desocupaciones' => 'scm-panel-movimientos-contratos',
+      'metricas_por_terminar' => 'scm-panel-movimientos-contratos',
       'scm-panel-movimientos-contratos' => 'scm-panel-movimientos-contratos',
       'contract_owners' => 'scm-panel-funcionario-contratos',
       'scm-panel-funcionario-contratos' => 'scm-panel-funcionario-contratos',
@@ -1416,9 +1417,9 @@ trait RendersDashboard
       <?php if (in_array('metricas_contratos', $dashboardAllowedTabs, true)): ?>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-movimientos-contratos' ? ' active' : ''; ?>" id="scm-panel-movimientos-contratos" data-permission-tab="metricas_contratos" data-scm-loaded="0">
           <?php
-          // Abre la vista pedida si el cargo la tiene; si no, la primera de las tres que tenga.
+          // Abre la vista pedida si el cargo la tiene; si no, la primera que tenga.
           $contractMovementsView = \SCM\Modules\ContractMovements\ContractMovementsView::viewFromTab($tabKey);
-          $contractMovementsTabs = ['ocupaciones' => 'metricas_ocupaciones', 'desocupaciones' => 'metricas_desocupaciones', 'comparativo' => 'metricas_ocupaciones_vs'];
+          $contractMovementsTabs = ['ocupaciones' => 'metricas_ocupaciones', 'desocupaciones' => 'metricas_desocupaciones', 'comparativo' => 'metricas_ocupaciones_vs', 'por_terminar' => 'metricas_por_terminar'];
           if (!in_array($contractMovementsTabs[$contractMovementsView] ?? '', $dashboardAllowedTabs, true)) {
             foreach ($contractMovementsTabs as $movementView => $movementTab) {
               if (in_array($movementTab, $dashboardAllowedTabs, true)) { $contractMovementsView = $movementView; break; }
@@ -1988,6 +1989,7 @@ trait RendersDashboard
         'metricas_ocupaciones' => '',
         'metricas_desocupaciones' => '',
         'metricas_ocupaciones_vs' => '',
+        'metricas_por_terminar' => '',
         'metricas_crecimiento' => '',
         'mis_presupuestos' => '',
       ]],

@@ -297,7 +297,7 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'contratos_arrendamiento';
   } elseif (in_array($tabParam, ['administrativas', 'actividades_administrativas', 'scm-panel-actividades-administrativas'], true)) {
     $current_page = 'administrativas';
-  } elseif (in_array($tabParam, ['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones'], true)) {
+  } elseif (in_array($tabParam, ['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'metricas_por_terminar'], true)) {
     $current_page = $tabParam;
   } elseif (in_array($tabParam, ['metricas', 'dashboard', 'metricas_casos', 'scm-panel-metricas', 'scm-panel-metricas-casos'], true)) {
     $current_page = 'dashboard';
@@ -833,6 +833,18 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=ocupaciones_vs_desocupaciones',
         'icon' => 'compare_arrows',
         'perms' => ['metricas_ocupaciones_vs'],
+      ],
+      'metricas_por_terminar' => [
+        'key' => 'metricas_por_terminar',
+        'group' => 'Contratos',
+        'group_icon' => 'contract',
+        'label' => 'Contratos por terminar',
+        'description' => 'Fin de contrato por mes y su situación',
+        'panel_id' => 'scm-panel-movimientos-contratos',
+        'subtab' => 'por_terminar',
+        'url' => $baseUrl . '/index.php?tab=metricas_por_terminar',
+        'icon' => 'event_busy',
+        'perms' => ['metricas_por_terminar'],
       ],
       'metricas_crecimiento' => [
         'key' => 'metricas_crecimiento',

@@ -1272,8 +1272,9 @@
       return "";
     }
 
-    function dashboardAlertsPopupHtml(groups) {
+    function dashboardAlertsPopupHtml(alertPopup) {
       var ui = DUE_POPUP_UI;
+      var groups = alertPopup.groups;
       var total = groups.reduce(function (sum, group) { return sum + Number(group.count || 0); }, 0);
       var cards = groups.map(function (group) {
         return '<div class="' + ui.card + ' !sp-p-4 !sp-flex !sp-items-start !sp-justify-between !sp-gap-3">' +
@@ -1282,22 +1283,23 @@
       }).join("");
       var sections = groups.map(function (group) {
         var rows = Array.isArray(group.rows) ? group.rows : [];
-        var list = rows.slice(0, 18).map(function (row) {
+        var visibleRows = group.show_all ? rows : rows.slice(0, 18);
+        var list = visibleRows.map(function (row) {
           return '<div data-scm-alert-row class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[110px_minmax(0,1fr)_auto_auto] !sp-items-center !sp-gap-3 !sp-px-4 !sp-py-3 !sp-m-0 !sp-bg-white !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100">' +
             '<strong class="!sp-inline-flex !sp-justify-center !sp-rounded-lg !sp-bg-slate-50 !sp-border !sp-border-solid !sp-border-slate-200 !sp-px-2 !sp-py-1.5 !sp-text-[11px] !sp-font-semibold !sp-text-service-navy !sp-whitespace-nowrap">' + escHtml(row.date || "-") + "</strong>" +
             '<span class="!sp-min-w-0"><span class="!sp-block !sp-truncate !sp-text-xs !sp-font-semibold !sp-text-service-navy">' + escHtml(row.title || "") + '</span><small class="!sp-block !sp-truncate !sp-text-[11px] !sp-text-service-muted">' + escHtml(row.meta || "") + "</small></span>" +
             '<em class="!sp-not-italic !sp-justify-self-start !sp-rounded-full !sp-px-2.5 !sp-py-1 !sp-text-[10px] !sp-font-semibold !sp-whitespace-nowrap !sp-bg-amber-50 !sp-text-amber-700">' + escHtml(row.badge || "") + "</em>" +
             dashboardAlertActionHtml(row) + "</div>";
         }).join("");
-        var more = rows.length > 18 ? '<p class="!sp-m-0 !sp-px-4 !sp-py-3 !sp-text-[11px] !sp-font-semibold !sp-text-amber-700">+' + escHtml(String(rows.length - 18)) + " adicionales.</p>" : "";
+        var more = rows.length > visibleRows.length ? '<p class="!sp-m-0 !sp-px-4 !sp-py-3 !sp-text-[11px] !sp-font-semibold !sp-text-amber-700">+' + escHtml(String(rows.length - visibleRows.length)) + " adicionales.</p>" : "";
         return '<section class="' + ui.card + ' !sp-overflow-hidden" data-scm-alert-group="' + escHtml(group.key || "") + '"><div class="!sp-px-4 !sp-py-3 !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><h4 class="!sp-m-0 !sp-text-sm !sp-font-bold">' + escHtml(group.label || "Alerta") + '</h4></div><div class="!sp-max-h-[292px] !sp-overflow-y-auto">' + list + "</div>" + more + "</section>";
       }).join("");
       return '<div class="!sp-font-sans !sp-text-service-navy !sp-text-left">' +
         '<header class="!sp-bg-service-navy !sp-text-white !sp-px-5 !sp-py-5 sm:!sp-px-6 !sp-flex !sp-items-start !sp-justify-between !sp-gap-3">' +
         '<div class="!sp-flex !sp-items-start !sp-gap-3"><span class="material-symbols-outlined !sp-p-2.5 !sp-rounded-xl !sp-bg-service-yellow/20 !sp-text-service-yellow" aria-hidden="true">notifications_active</span>' +
         '<div><span class="!sp-inline-flex !sp-rounded-full !sp-bg-service-yellow/20 !sp-text-service-yellow !sp-px-3 !sp-py-1 !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide">Control preventivo · SKC SuCasa Inmobiliaria</span>' +
-        '<h3 class="!sp-m-0 !sp-mt-2 !sp-text-xl sm:!sp-text-2xl !sp-font-bold !sp-text-white">Alertas pendientes</h3>' +
-        '<p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-blue-100">' + escHtml(String(total)) + " tarea(s) por atender.</p></div></div></header>" +
+        '<h3 class="!sp-m-0 !sp-mt-2 !sp-text-xl sm:!sp-text-2xl !sp-font-bold !sp-text-white">' + escHtml(alertPopup.title) + "</h3>" +
+        '<p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-blue-100">' + escHtml(alertPopup.note || String(total) + " tarea(s) por atender.") + "</p></div></div></header>" +
         '<div class="!sp-bg-service-background !sp-p-4 sm:!sp-p-6 !sp-space-y-5 !sp-overflow-y-auto !sp-max-h-[calc(100vh-300px)] sm:!sp-max-h-[calc(100vh-220px)]">' +
         '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-3">' + cards + "</div>" + sections + "</div>" +
         '<footer class="!sp-bg-white !sp-px-5 !sp-py-4 sm:!sp-px-6 !sp-flex !sp-flex-wrap !sp-justify-end !sp-gap-2 !sp-border-0 !sp-border-t !sp-border-solid !sp-border-slate-200">' +
@@ -1359,6 +1361,53 @@
       maybeShowDashboardEntryPopups("hourly");
     }
 
+    // El servidor marca el tema de cada grupo; cada tema es su propio popup, en el orden en que llegan.
+    function dashboardAlertPopups(groups) {
+      var popups = [];
+      groups.forEach(function (group) {
+        var title = group.popup || "Alertas pendientes";
+        var alertPopup = popups.filter(function (item) { return item.title === title; })[0];
+        if (!alertPopup) {
+          alertPopup = { title: title, note: group.popup_note || "", groups: [] };
+          popups.push(alertPopup);
+        }
+        alertPopup.groups.push(group);
+      });
+      return popups;
+    }
+
+    // Swal muestra uno a la vez: el siguiente sale al cerrar. Si el funcionario fue a atender algo, los demás esperan.
+    function showDashboardAlertPopups(popups) {
+      if (!popups.length || window.Swal.isVisible()) return;
+      return window.Swal.fire({
+        title: "",
+        html: dashboardAlertsPopupHtml(popups[0]),
+        target: root,
+        width: "min(1024px, 96vw)",
+        padding: 0,
+        showCloseButton: false,
+        showConfirmButton: false,
+        showCancelButton: false,
+        buttonsStyling: false,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        customClass: { popup: "scm-due-entry-swal" },
+        didOpen: function () {
+          var popup = window.Swal.getPopup();
+          if (!popup) return;
+          popup.addEventListener("click", function (event) {
+            var target = event.target && event.target.closest ? event.target : null;
+            if (!target) return;
+            if (target.closest("[data-scm-dashboard-alert-close]")) { dashboardConfirmPopupClose(popup); return; }
+            // Los botones del crédito los atiende admin-owner-credits.js al llegar el clic al documento.
+            if (target.closest("[data-owner-credit-open], [data-owner-credit-detail]")) window.Swal.close();
+          });
+        },
+      }).then(function () {
+        if (!dashboardDueActionTaken) return showDashboardAlertPopups(popups.slice(1));
+      });
+    }
+
     function maybeShowDashboardAlertsPopup(source) {
       source = source || "login";
       if (funcionarioBridgeMode || !alertPopupConfig.enabled || dashboardAlertsShown[source]) return Promise.resolve();
@@ -1368,32 +1417,7 @@
           var groups = data && Array.isArray(data.groups) ? data.groups : [];
           if (!shouldAutoShowDashboardDuePopup(source) || dashboardAlertsShown[source]) return;
           dashboardAlertsShown[source] = true;
-          if (!groups.length || window.Swal.isVisible()) return;
-          return window.Swal.fire({
-            title: "",
-            html: dashboardAlertsPopupHtml(groups),
-            target: root,
-            width: "min(1024px, 96vw)",
-            padding: 0,
-            showCloseButton: false,
-            showConfirmButton: false,
-            showCancelButton: false,
-            buttonsStyling: false,
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            customClass: { popup: "scm-due-entry-swal" },
-            didOpen: function () {
-              var popup = window.Swal.getPopup();
-              if (!popup) return;
-              popup.addEventListener("click", function (event) {
-                var target = event.target && event.target.closest ? event.target : null;
-                if (!target) return;
-                if (target.closest("[data-scm-dashboard-alert-close]")) { dashboardConfirmPopupClose(popup); return; }
-                // Los botones del crédito los atiende admin-owner-credits.js al llegar el clic al documento.
-                if (target.closest("[data-owner-credit-open], [data-owner-credit-detail]")) window.Swal.close();
-              });
-            },
-          });
+          return showDashboardAlertPopups(dashboardAlertPopups(groups));
         })
         .catch(function (error) {
           console.warn("No se pudieron cargar las alertas del cargo.", error);

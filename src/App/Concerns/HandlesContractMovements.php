@@ -5,11 +5,21 @@ declare(strict_types=1);
 namespace SCM\App\Concerns;
 
 use SCM\Core\Auth;
+use SCM\Modules\ContractMovements\ContractExitSignals;
 use SCM\Modules\ContractMovements\ContractMovementsReport;
 use SCM\Modules\ContractMovements\ContractSimiAudit;
 
 trait HandlesContractMovements
 {
+  /** @return list<array<string,mixed>> Grupos del popup Contratos por desocupar: los del mes en curso en Colombia. */
+  private function contractMoveOutAlertGroups(): array
+  {
+    $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
+    $year = (int) $today->format('Y');
+    $month = (int) $today->format('n');
+    return ContractExitSignals::alertGroups((new ContractMovementsReport($this->db))->endingInMonth($year, $month, $today), $year, $month);
+  }
+
   public function ajax_handler_contract_movements(): void
   {
     $this->verifyCsrf();

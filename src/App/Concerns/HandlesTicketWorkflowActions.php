@@ -1935,7 +1935,11 @@ trait HandlesTicketWorkflowActions
       $keys = $this->dashboardAlertKeysForCurrentCargo();
       $groups = [];
       if (array_intersect(['credito_solicitudes', 'credito_contabilidad'], $keys) !== [] && $this->canAccessDashboardTab('credito_propietario')) {
-        $groups = array_merge($groups, $this->ownerCreditAlertGroups($keys));
+        $groups = array_merge($groups, array_map(static fn(array $group): array => $group + ['popup' => 'Créditos a propietarios'], $this->ownerCreditAlertGroups($keys)));
+      }
+      // La casilla del cargo es el permiso: cartera lo necesita sin tener acceso a contratos ni métricas.
+      if (in_array('contratos_por_desocupar', $keys, true)) {
+        $groups = array_merge($groups, $this->contractMoveOutAlertGroups());
       }
       $this->jsonOk(['groups' => $groups]);
     } catch (\Throwable $error) {

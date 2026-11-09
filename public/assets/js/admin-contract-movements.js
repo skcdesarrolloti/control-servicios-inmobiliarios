@@ -3,13 +3,15 @@
 
   // Los contratos llegan en una sola petición y todo lo demás (vistas, filtros,
   // drill-down por mes, tablas y CSV) se calcula aquí, sin volver al servidor.
-  var CACHE_KEY = "scm-contract-movements-v4";
+  var CACHE_KEY = "scm-contract-movements-v5";
   var CACHE_TTL_MS = 10 * 60 * 1000;
   var PAGE_SIZE = 15;
   var MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   var MONTHS_LONG = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   var STATE_LABELS = { entregado: "Entregado", por_recibir: "Por recibir", recibido: "Recibido" };
   var SIMI_FILTERS = { "": "Auditoría SIMI: todas", Correcto: "Correcto", Incorrecto: "Incorrecto", pendiente: "Sin auditar" };
+  var EXIT_FILTERS = { "": "Situación: todas", salida: "Con aviso de salida", sin_aviso: "Sin aviso de salida", continua: "Renuevan o no salen" };
+  var EXIT_BADGES = { salida: "is-bad", sin_aviso: "is-muted", continua: "is-simi-ok" };
   var FILTER_LABELS = { estado: "Estado actual", funcionario: "Funcionario", tipo: "Tipo", destinacion: "Destinación", arrendatario: "Arrendatario", inmueble: "Inmueble", contrato: "Contrato" };
   var TEXT_FILTERS = ["arrendatario", "inmueble", "contrato"];
   var VIEWS = {
@@ -27,6 +29,11 @@
       title: "Ocupaciones vs Desocupaciones",
       tab: "ocupaciones_vs_desocupaciones",
       subtitle: "Balance entre inmuebles que se arriendan y los que se desocupan, con el inventario arrendado al cierre de cada periodo.",
+    },
+    por_terminar: {
+      title: "Contratos por terminar",
+      tab: "metricas_por_terminar",
+      subtitle: "Contratos entregados o por recibir según su fecha fin, separando los que tienen aviso de salida de los que aún pueden prorrogarse.",
     },
   };
 
@@ -102,6 +109,7 @@
     var columns = snapshot.columns || [];
     var names = snapshot.funcionarios || {};
     var years = {};
+    var endingYears = {};
     var options = { funcionario: {}, tipo: {}, destinacion: {} };
     var rows = (snapshot.rows || []).map(function (values) {
       var row = {};
@@ -117,8 +125,12 @@
       row.permanencia = row.ingreso && row.egreso
         ? Math.max(0, Math.round((Date.parse(row.egreso) - Date.parse(row.ingreso)) / (30.4375 * 86400000)))
         : null;
+      row.ending = !!row.fin && row.estado !== "recibido";
+      row.finY = row.ending ? Number(row.fin.slice(0, 4)) : 0;
+      row.finM = row.ending ? Number(row.fin.slice(5, 7)) : 0;
       if (row.ingY) years[row.ingY] = true;
       if (row.egY && row.estado === "recibido") years[row.egY] = true;
+      if (row.finY) endingYears[row.finY] = true;
       if (row.funcionario) options.funcionario[row.funcionario] = row.funcionarioNombre;
       ["tipo", "destinacion"].forEach(function (key) {
         if (row[key]) options[key][row[key]] = row[key];
@@ -137,6 +149,7 @@
       simiEnabled: !!snapshot.simi_enabled,
       correctable: Array.isArray(snapshot.correctable) ? snapshot.correctable : [],
       years: Object.keys(years).map(Number).sort(function (a, b) { return b - a; }),
+      endingYears: Object.keys(endingYears).map(Number).sort(function (a, b) { return b - a; }),
       options: sortedOptions,
     };
   }
@@ -199,11 +212,14 @@
       selects[select.getAttribute("data-scm-cm-filter")] = select;
     });
 
+    var initialView = VIEWS[module.getAttribute("data-initial-view")] ? module.getAttribute("data-initial-view") : "ocupaciones";
     var state = {
-      view: VIEWS[module.getAttribute("data-initial-view")] ? module.getAttribute("data-initial-view") : "ocupaciones",
+      view: initialView,
       filters: emptyFilters(),
-      month: 0,
+      // Lo que importa de los contratos por terminar es el mes en curso.
+      month: initialView === "por_terminar" ? new Date().getMonth() + 1 : 0,
       simi: "",
+      exit: "",
       page: 1,
       data: null,
       pending: null,
@@ -268,8 +284,8 @@
 
     function applySnapshot(snapshot) {
       state.data = parseSnapshot(snapshot);
-      if (state.filters.year && state.data.years.indexOf(Number(state.filters.year)) === -1 && state.data.years.length) {
-        state.filters.year = String(state.data.years[0]);
+      if (state.filters.year && viewYears().indexOf(Number(state.filters.year)) === -1 && viewYears().length) {
+        state.filters.year = String(viewYears()[0]);
       }
       fillSelects();
       setStatus("");
@@ -277,11 +293,20 @@
       render();
     }
 
-    function fillSelects() {
-      var data = state.data;
-      selects.year.innerHTML = '<option value="">Todos los años</option>' + data.years.map(function (year) {
+    // Por terminar mira hacia adelante: sus años salen de la fecha fin, no de los movimientos ya ocurridos.
+    function viewYears() {
+      return state.view === "por_terminar" ? state.data.endingYears : state.data.years;
+    }
+
+    function fillYears() {
+      selects.year.innerHTML = '<option value="">Todos los años</option>' + viewYears().map(function (year) {
         return '<option value="' + year + '">' + year + "</option>";
       }).join("");
+    }
+
+    function fillSelects() {
+      var data = state.data;
+      fillYears();
       ["funcionario", "tipo", "destinacion"].forEach(function (key) {
         var first = selects[key].options[0] ? selects[key].options[0].outerHTML : '<option value="">Todos</option>';
         selects[key].innerHTML = first + data.options[key].map(function (option) {
@@ -350,7 +375,9 @@
       });
       syncSelects();
       var html = renderChips();
-      html += state.view === "comparativo" ? renderComparison() : renderMovements(state.view === "ocupaciones" ? "ocup" : "desoc");
+      html += state.view === "comparativo" ? renderComparison()
+        : state.view === "por_terminar" ? renderEnding()
+        : renderMovements(state.view === "ocupaciones" ? "ocup" : "desoc");
       content.innerHTML = html;
       kpiSlot.innerHTML = state.kpiHtml || "";
       renderDetail();
@@ -463,6 +490,88 @@
         '<span class="material-symbols-outlined" aria-hidden="true">expand_more</span></summary>' + body + "</details>";
     }
 
+    function renderEnding() {
+      var rows = baseRows().filter(function (row) { return row.ending; });
+      var year = selectedYear();
+      var period = year ? rows.filter(function (row) { return row.finY === year; }) : rows;
+      var shown = year && state.month ? period.filter(function (row) { return row.finM === state.month; }) : period;
+      var periodLabel = year ? (state.month ? MONTHS_LONG[state.month - 1] + " " + year : String(year)) : "todos los años";
+      var today = todayIso();
+      var countOf = function (list, situacion) {
+        return list.filter(function (row) { return row.situacion === situacion; }).length;
+      };
+      var canon = 0;
+      shown.forEach(function (row) { canon += row.canon || 0; });
+      var exits = shown.filter(function (row) { return row.situacion === "salida"; });
+      var exitCanon = 0;
+      exits.forEach(function (row) { exitCanon += row.canon || 0; });
+      var kpis = '<div class="scm-cm-kpis scm-cm-kpis-6">';
+      kpis += kpi("Por terminar", num(shown.length), esc(year ? periodLabel : "Histórico completo"), "desoc");
+      kpis += kpi("Canon que termina", compactMoney(canon), esc(money(canon) + " mensual"));
+      kpis += kpi("Con aviso de salida", num(exits.length), esc(compactMoney(exitCanon) + " de canon"), exits.length ? "bad" : "");
+      kpis += kpi("Sin aviso de salida", num(countOf(shown, "sin_aviso")), "Pueden prorrogarse");
+      kpis += kpi("Renuevan o no salen", num(countOf(shown, "continua")), "Registrado en Contratos por terminar", "good");
+      kpis += kpi("Fecha fin vencida", num(shown.filter(function (row) { return row.fin < today; }).length), "Siguen sin recibir", "stock");
+      state.kpiHtml = kpis + "</div>";
+
+      var html = "";
+      if (year) {
+        var months = MONTHS_LONG.map(function (label, index) {
+          var list = period.filter(function (row) { return row.finM === index + 1; });
+          var monthCanon = 0;
+          list.forEach(function (row) { monthCanon += row.canon || 0; });
+          return { month: index + 1, label: label, total: list.length, exits: countOf(list, "salida"), open: countOf(list, "sin_aviso"), stays: countOf(list, "continua"), canon: monthCanon };
+        }).filter(function (row) { return row.total; });
+        if (months.length) {
+          html += card("Resumen mensual " + year, '<div class="scm-cm-table-wrap"><table class="scm-cm-table"><thead><tr><th>Mes</th><th class="is-num">Por terminar</th><th class="is-num">Con aviso de salida</th><th class="is-num">Sin aviso</th><th class="is-num">Renuevan o no salen</th><th class="is-num">Canon</th></tr></thead><tbody>' +
+            months.map(function (row) {
+              return '<tr class="' + (state.month === row.month ? "is-active" : "") + '"><td><button type="button" class="scm-cm-link" data-scm-cm-pick="month" data-value="' + row.month + '">' + esc(row.label) + '</button></td><td class="is-num">' + num(row.total) +
+                '</td><td class="is-num">' + num(row.exits) + '</td><td class="is-num">' + num(row.open) + '</td><td class="is-num">' + num(row.stays) + '</td><td class="is-num">' + money(row.canon) + "</td></tr>";
+            }).join("") + "</tbody></table></div>", "is-wide", '<p class="scm-cm-hint">Toca un mes para filtrar</p>');
+        }
+      }
+
+      state.detailKind = "ending";
+      state.detailEvents = shown.filter(function (row) { return !state.exit || row.situacion === state.exit; })
+        .sort(function (a, b) { return a.fin < b.fin ? -1 : a.fin > b.fin ? 1 : 0; })
+        .map(function (row) { return { row: row, date: row.fin }; });
+      html += card("Detalle · " + periodLabel, "<div data-scm-cm-detail></div>", "is-wide",
+        '<div class="scm-cm-detail-tools"><select class="scm-cm-simi-filter" data-scm-cm-exit-filter aria-label="Filtrar por situación">' + Object.keys(EXIT_FILTERS).map(function (key) {
+          return '<option value="' + key + '"' + (state.exit === key ? " selected" : "") + ">" + esc(EXIT_FILTERS[key]) + "</option>";
+        }).join("") + "</select></div>");
+      return html;
+    }
+
+    function endingTableHtml(slice, events) {
+      var today = todayIso();
+      var sumCanon = 0;
+      var sumAdmin = 0;
+      events.forEach(function (event) {
+        sumCanon += event.row.canon || 0;
+        sumAdmin += event.row.admin || 0;
+      });
+      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr><th>Fin contrato</th><th>Contrato</th><th>Inmueble</th><th>Dirección</th><th>Arrendatario</th><th>Tipo</th><th>Destinación</th><th>Funcionario</th><th>Estado actual</th><th>Situación</th>' +
+        '<th class="is-num">Canon</th><th class="is-num">Administración</th><th class="is-num">Total</th></tr></thead><tbody>' +
+        slice.map(function (event) {
+          var row = event.row;
+          return "<tr><td>" + esc(formatDate(row.fin)) + (row.fin < today ? '<small class="scm-cm-source is-bad">Fecha fin vencida</small>' : "") + "</td><td>" + esc(row.contrato) + "</td><td>" + esc(row.inmueble) +
+            '</td><td class="is-address">' + esc(row.direccion) + '</td><td class="is-name">' + esc(row.arrendatario) + "</td><td>" + esc(row.tipo || "—") + "</td><td>" + esc(row.destinacion || "—") + "</td><td>" + esc(row.funcionarioNombre || "—") +
+            '</td><td><span class="scm-cm-badge is-' + row.estado + '">' + esc(STATE_LABELS[row.estado] || row.estado) + '</span></td><td><span class="scm-cm-badge ' + (EXIT_BADGES[row.situacion] || "is-muted") + '">' + esc(row.situacion_detalle || "—") + "</span></td>" +
+            '<td class="is-num">' + esc(money(row.canon)) + '</td><td class="is-num">' + (row.admin ? esc(money(row.admin)) : '<span class="scm-cm-muted">No aplica</span>') + '</td><td class="is-num is-total">' + esc(money((row.canon || 0) + (row.admin || 0))) + "</td></tr>";
+        }).join("") +
+        '</tbody><tfoot><tr><td colspan="10">Total · ' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) + '</td><td class="is-num">' + esc(money(sumCanon)) + '</td><td class="is-num">' + esc(money(sumAdmin)) + '</td><td class="is-num is-total">' + esc(money(sumCanon + sumAdmin)) + "</td></tr></tfoot></table></div>";
+    }
+
+    function pagerHtml(total, pages) {
+      var html = '<div class="scm-cm-pager"><span>' + esc(num(total) + (total === 1 ? " contrato" : " contratos")) + "</span>";
+      if (pages > 1) {
+        html += '<div><button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-cm-page="' + (state.page - 1) + '"' + (state.page === 1 ? " disabled" : "") +
+          '>Anterior</button><span>Página ' + state.page + " de " + pages + '</span><button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-cm-page="' +
+          (state.page + 1) + '"' + (state.page === pages ? " disabled" : "") + ">Siguiente</button></div>";
+      }
+      return html + "</div>";
+    }
+
     // Lista del detalle (ya con todos los filtros, incluido SIMI); el informe usa la misma.
     function visibleEvents() {
       return state.detailEvents;
@@ -485,7 +594,11 @@
       state.page = Math.min(Math.max(1, state.page), pages);
       var slice = events.slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE);
       if (!slice.length) {
-        holder.innerHTML = '<div class="scm-cm-empty">' + (state.simi ? "Ningún contrato coincide con el filtro de auditoría SIMI." : "No hay movimientos en este periodo.") + "</div>";
+        holder.innerHTML = '<div class="scm-cm-empty">' + (state.simi ? "Ningún contrato coincide con el filtro de auditoría SIMI." : state.detailKind === "ending" ? "Ningún contrato termina en este periodo con estos filtros." : "No hay movimientos en este periodo.") + "</div>";
+        return;
+      }
+      if (state.detailKind === "ending") {
+        holder.innerHTML = endingTableHtml(slice, events) + pagerHtml(events.length, pages);
         return;
       }
       var isDesoc = state.detailKind === "desoc";
@@ -526,13 +639,7 @@
       html += '</tbody><tfoot><tr><td colspan="' + (isDesoc ? 13 : 12) + '">Total · ' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) +
         '</td><td class="is-num">' + esc(money(sumCanon)) + '</td><td class="is-num">' + esc(money(sumAdmin)) + '</td><td class="is-num is-total">' + esc(money(sumCanon + sumAdmin)) +
         "</td>" + (isDesoc ? "" : "<td></td>") + "<td></td><td></td></tr></tfoot></table></div>";
-      html += '<div class="scm-cm-pager"><span>' + esc(num(events.length) + (events.length === 1 ? " contrato" : " contratos")) + "</span>";
-      if (pages > 1) {
-        html += '<div><button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-cm-page="' + (state.page - 1) + '"' + (state.page === 1 ? " disabled" : "") +
-          '>Anterior</button><span>Página ' + state.page + " de " + pages + '</span><button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-cm-page="' +
-          (state.page + 1) + '"' + (state.page === pages ? " disabled" : "") + ">Siguiente</button></div>";
-      }
-      holder.innerHTML = html + "</div>";
+      holder.innerHTML = html + pagerHtml(events.length, pages);
     }
 
     function graceCell(row) {
@@ -781,6 +888,13 @@
           lines.push([row.periodo, row.oc, row.de, row.net, row.ratio == null ? "" : Math.round(row.ratio), row.canonOc, row.canonDe, row.canonNet, row.stock == null ? "" : row.stock]);
         });
         name = "ocupaciones-vs-desocupaciones-" + year;
+      } else if (state.view === "por_terminar") {
+        lines = [["Fin contrato", "Contrato", "Inmueble", "Direccion", "Arrendatario", "Tipo inmueble", "Destinacion", "Funcionario", "Estado", "Situacion", "Canon", "Administracion", "Total"]];
+        state.detailEvents.forEach(function (event) {
+          var row = event.row;
+          lines.push([row.fin, row.contrato, row.inmueble, row.direccion, row.arrendatario, row.tipo, row.destinacion, row.funcionarioNombre, STATE_LABELS[row.estado] || row.estado, row.situacion_detalle, row.canon, row.admin || 0, (row.canon || 0) + (row.admin || 0)]);
+        });
+        name = "contratos-por-terminar-" + year + (state.month ? "-" + String(state.month).padStart(2, "0") : "");
       } else {
         var isDesoc = state.view === "desocupaciones";
         lines = [["Fecha del movimiento", "Fecha entrega", "Fecha recibo", "Fin contrato", "Contrato", "Inmueble", "Direccion", "Arrendatario",
@@ -846,6 +960,19 @@
     function resetDrill() {
       state.page = 1;
       state.simi = "";
+      state.exit = "";
+    }
+
+    function enterView(view) {
+      var leavingEnding = state.view === "por_terminar";
+      state.view = view;
+      if (view === "por_terminar") {
+        state.filters.year = String(new Date().getFullYear());
+        state.month = new Date().getMonth() + 1;
+      } else if (leavingEnding) {
+        state.month = 0;
+      }
+      if (state.data) fillYears();
     }
 
     module.addEventListener("click", function (event) {
@@ -853,7 +980,7 @@
       if (viewButton) {
         var view = viewButton.getAttribute("data-scm-subview-target");
         if (VIEWS[view] && view !== state.view) {
-          state.view = view;
+          enterView(view);
           resetDrill();
           syncLocation();
           if (state.data) render();
@@ -884,7 +1011,7 @@
       }
       if (event.target.closest("[data-scm-cm-clear]")) {
         state.filters = emptyFilters();
-        if (state.data.years.indexOf(Number(state.filters.year)) === -1) state.filters.year = String(state.data.years[0] || "");
+        if (viewYears().indexOf(Number(state.filters.year)) === -1) state.filters.year = String(viewYears()[0] || "");
         state.month = 0;
         resetDrill();
         render();
@@ -926,6 +1053,12 @@
     module.addEventListener("change", function (event) {
       if (event.target.matches("[data-scm-cm-simi-filter]")) {
         state.simi = event.target.value;
+        state.page = 1;
+        render();
+        return;
+      }
+      if (event.target.matches("[data-scm-cm-exit-filter]")) {
+        state.exit = event.target.value;
         state.page = 1;
         render();
         return;
