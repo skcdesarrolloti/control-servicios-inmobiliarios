@@ -11,8 +11,8 @@ const caseRow = { id: 1, code: 'CASO-0001', name: '<b>Incendio</b> 401', type_id
 const detail = {
   case: caseRow,
   parties: [{ id: 3, role: 'propietario', role_label: 'Propietario', name: 'Pedro', company: '', document: '', email: 'p@example.com', phone: '' }],
-  events: [{ id: 1, action: 'caso_creado', actor_name: 'Ana', created_at: 1762000000, details: { responsable: 'Ana' } }, { id: 2, action: 'nota', actor_name: 'Ana', created_at: 1762000100, details: { texto: '<img src=x onerror=alert(1)>' } }],
-  documents: [],
+  events: [{ id: 1, action: 'caso_creado', actor_name: 'Ana', created_at: 1762000000, details: { responsable: 'Ana' } }, { id: 2, action: 'nota', actor_name: 'Ana', created_at: 1762000100, details: { texto: '<img src=x onerror=alert(1)>' } }, { id: 3, action: 'respuesta_registrada', actor_name: 'Ana', created_at: 1762000200, details: { remitente: 'Gigante', canal: 'Correo', fecha_recepcion: '2026-11-05', asunto: 'Re', texto: 'Aceptamos' } }],
+  documents: [{ id: 8, event_id: 3, name: 'carta.pdf', mime: 'application/pdf', bytes: 2048, sha256: 'abc', uploaded_by: 'Ana', created_at: 1762000200, url: 'about:blank' }],
 };
 
 (async () => {
@@ -26,6 +26,7 @@ const detail = {
     window.calls = [];
     window.SCMAdminCore = { parseRuntime: () => ({ ajaxUrl: '/ajax', nonce: 'n1' }) };
     window.fetch = (url, opts) => {
+      if (url === 'about:blank') return Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })) });
       const body = {};
       opts.body.forEach((value, key) => { if (!(key in body)) body[key] = value; else body[key] = [].concat(body[key], value); });
       window.calls.push(body);
@@ -111,7 +112,29 @@ const detail = {
   await page.waitForFunction(() => window.calls.some((call) => call.action === 'scm_legal_case_party_remove'));
   console.log('OK removing a party asks for confirmation');
 
+  assert.equal(await page.locator('.scm-lc-timeline .scm-lc-file').count(), 1, 'the reply shows its attachment');
+  await page.click('[data-scm-lc-timeline-filter="notas"]');
+  assert.equal(await page.locator('.scm-lc-event').count(), 1, 'timeline filter narrows the events');
+  await page.click('[data-scm-lc-timeline-filter="todo"]');
+  assert.equal(await page.locator('.scm-lc-event').count(), 3);
+  await page.click('.scm-lc-timeline [data-scm-lc-doc="8"]');
+  await page.waitForFunction(() => (document.querySelector('iframe.scm-lc-preview') || {}).src?.startsWith('blob:'));
+  console.log('OK PDF previews inside a popup from a local copy');
   await page.keyboard.press('Escape');
+  await page.click('[data-scm-lc-note]');
+  await page.locator('.scm-lc-modal >> nth=-1').locator('[name=text]').fill('Llamó el propietario');
+  await page.locator('.scm-lc-modal >> nth=-1').locator('[type=submit]').click();
+  await page.waitForFunction(() => window.calls.some((call) => call.action === 'scm_legal_case_note' && call.text === 'Llamó el propietario' && call.case_id === '1'));
+  await page.waitForFunction(() => document.querySelectorAll('.scm-lc-modal').length === 1);
+  await page.click('[data-scm-lc-reply]');
+  const reply = page.locator('.scm-lc-modal >> nth=-1');
+  await reply.locator('[name=from]').fill('Gigante');
+  await reply.locator('[name=body]').fill('Aceptamos');
+  await reply.locator('[type=submit]').click();
+  await page.waitForFunction(() => window.calls.some((call) => call.action === 'scm_legal_case_reply' && call.channel === 'Correo' && call.from === 'Gigante'));
+  await page.waitForFunction(() => document.querySelectorAll('.scm-lc-modal').length === 1);
+  console.log('OK notes, manual replies, documents and timeline filters');
+
   await page.keyboard.press('Escape');
   await page.setViewportSize({ width: 375, height: 760 });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

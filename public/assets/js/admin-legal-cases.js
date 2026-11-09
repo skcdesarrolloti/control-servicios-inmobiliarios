@@ -12,6 +12,8 @@
     nota: "Nota interna", respuesta_registrada: "Respuesta recibida", documento: "Documentos cargados", comunicacion_enviada: "Comunicación enviada", pdf_exportado: "Constancia exportada",
   };
 
+  var TIMELINE_FILTERS = [["todo", "Todo"], ["comunicaciones", "Comunicaciones"], ["respuestas", "Respuestas"], ["notas", "Notas"], ["documentos", "Documentos"], ["estados", "Estados"], ["bitacora", "Bitácora"]];
+
   function esc(value) {
     return String(value == null ? "" : value)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -357,8 +359,101 @@
         case "parte_agregada":
         case "parte_retirada": return esc(details.nombre) + " · " + esc(details.rol);
         case "nota": return '<div class="scm-lc-event-text">' + esc(details.texto) + "</div>";
+        case "respuesta_registrada": return "De " + esc(details.remitente) + " · " + esc(details.canal) + " · recibida el " + esc(formatDate(details.fecha_recepcion)) + (details.asunto ? "<br><strong>" + esc(details.asunto) + "</strong>" : "") + '<div class="scm-lc-event-text">' + esc(details.texto) + "</div>";
         default: return "";
       }
+    }
+
+    function fileSize(bytes) {
+      return bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(bytes / 1024)) + " KB";
+    }
+
+    function documentButton(item) {
+      return '<button type="button" class="scm-lc-file" data-scm-lc-doc="' + item.id + '"><span class="material-symbols-outlined" aria-hidden="true">description</span><span>' + esc(item.name) + "</span><small>" + esc(fileSize(item.bytes)) + "</small></button>";
+    }
+
+    function eventDocuments(event, documents) {
+      var linked = documents.filter(function (item) { return item.event_id === event.id; });
+      return linked.length ? '<div class="scm-lc-files">' + linked.map(documentButton).join("") + "</div>" : "";
+    }
+
+    function eventGroup(action) {
+      if (action === "comunicacion_enviada") return "comunicaciones";
+      if (action === "respuesta_registrada") return "respuestas";
+      if (action === "nota") return "notas";
+      if (action === "documento") return "documentos";
+      if (action === "estado_cambiado") return "estados";
+      return "bitacora";
+    }
+
+    function renderTimeline(data, filter) {
+      var events = data.events.filter(function (event) { return filter === "todo" || eventGroup(event.action) === filter; });
+      if (!events.length) return '<p class="scm-lc-hint">No hay registros de este tipo.</p>';
+      return '<ol class="scm-lc-timeline">' + events.map(function (event) {
+        return '<li class="scm-lc-event"><span class="scm-lc-event-icon"><span class="material-symbols-outlined" aria-hidden="true">' + esc(EVENT_ICONS[event.action] || "info") + '</span></span><div class="scm-lc-event-body"><strong>' + esc(EVENT_TITLES[event.action] || event.action) + '</strong><div class="scm-lc-event-meta">' + esc(event.actor_name) + " · " + esc(formatDateTime(event.created_at)) + "</div><div>" + eventBody(event) + "</div>" + eventDocuments(event, data.documents) + "</div></li>";
+      }).join("") + "</ol>";
+    }
+
+    function previewDocument(item) {
+      var isPdf = item.mime === "application/pdf";
+      var preview = isPdf
+        ? '<iframe class="scm-lc-preview" title="' + esc(item.name) + '"></iframe>'
+        : item.mime.indexOf("image/") === 0
+          ? '<img class="scm-lc-preview-image" alt="' + esc(item.name) + '" src="' + esc(item.url) + '">'
+          : '<p class="scm-lc-hint">Este tipo de archivo no se puede ver aquí. Descárgalo para abrirlo.</p>';
+      var modal = openModal(item.name, preview + '<p class="scm-lc-hint">Cargado por ' + esc(item.uploaded_by) + " · " + esc(formatDateTime(item.created_at)) + '<br>SHA-256: <code>' + esc(item.sha256) + '</code></p><div class="scm-lc-form-actions"><a class="scm-lc-btn" download href="' + esc(item.url) + '">Descargar</a></div>', true);
+      if (!isPdf) return;
+      // file.php responde con CSP sandbox, que impide al visor de PDF del navegador abrirlo directo en un iframe.
+      fetch(item.url, { credentials: "same-origin" }).then(function (response) {
+        if (!response.ok) throw new Error("No disponible");
+        return response.blob();
+      }).then(function (blob) {
+        var objectUrl = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+        var frame = modal.body.querySelector("iframe");
+        if (frame) frame.src = objectUrl;
+      }).catch(function () { formError(modal.body, "No se pudo cargar la vista previa. Descarga el archivo."); });
+    }
+
+    function submitForm(modal, form, action, extra, after) {
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var body = new FormData(form);
+        Object.keys(extra).forEach(function (key) { body.append(key, extra[key]); });
+        var submit = form.querySelector('[type="submit"]');
+        submit.disabled = true;
+        request(action, body).then(function () {
+          modal.close();
+          return after();
+        }).catch(function (error) {
+          submit.disabled = false;
+          formError(form, error.message);
+        });
+      });
+    }
+
+    var FORM_ACTIONS = '<div class="scm-lc-form-actions"><button type="button" class="scm-lc-btn" data-scm-lc-close>Cancelar</button><button type="submit" class="scm-lc-btn scm-lc-btn-primary">Guardar</button></div>';
+    var FILE_INPUT = '<input type="file" name="files[]" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.jpg,.jpeg,.png,.webp">';
+
+    function openNoteForm(item, detailModal) {
+      var modal = openModal("Nota interna · " + item.code, '<form class="scm-lc-form"><label class="scm-lc-field"><span>Nota</span><textarea name="text" maxlength="5000" required></textarea></label><p class="scm-lc-hint">Las notas no se envían a nadie.</p>' + FORM_ACTIONS + "</form>");
+      submitForm(modal, modal.body.querySelector("form"), "scm_legal_case_note", { case_id: item.id }, function () { return reloadDetail(detailModal, item.id); });
+    }
+
+    function openReplyForm(item, detailModal) {
+      var channels = ["Correo", "WhatsApp", "Físico", "Otro"].map(function (name) { return { value: name, label: name }; });
+      var modal = openModal("Registrar respuesta · " + item.code, '<form class="scm-lc-form" autocomplete="off"><div class="scm-lc-grid">'
+        + '<label class="scm-lc-field"><span>Llegó por</span><select name="channel" required>' + options(channels, "Correo") + "</select></label>"
+        + '<label class="scm-lc-field"><span>Fecha de recepción</span><input type="date" name="received_date" required max="' + today() + '" value="' + today() + '"></label>'
+        + '<label class="scm-lc-field scm-lc-field-full"><span>Quién respondió</span><input name="from" maxlength="190" required></label>'
+        + '<label class="scm-lc-field scm-lc-field-full"><span>Asunto (opcional)</span><input name="subject" maxlength="255"></label>'
+        + '<label class="scm-lc-field scm-lc-field-full"><span>Contenido de la respuesta</span><textarea name="body" maxlength="20000" required></textarea></label>'
+        + '<label class="scm-lc-field scm-lc-field-full"><span>Adjuntos (opcional)</span>' + FILE_INPUT + "</label></div>" + FORM_ACTIONS + "</form>");
+      submitForm(modal, modal.body.querySelector("form"), "scm_legal_case_reply", { case_id: item.id }, function () { return reloadDetail(detailModal, item.id); });
+    }
+
+    function openDocumentsForm(item, detailModal) {
+      var modal = openModal("Cargar documentos · " + item.code, '<form class="scm-lc-form"><label class="scm-lc-field"><span>Archivos (máximo 10)</span>' + FILE_INPUT.replace("<input", "<input required") + "</label>" + FORM_ACTIONS + "</form>");
+      submitForm(modal, modal.body.querySelector("form"), "scm_legal_case_documents", { case_id: item.id }, function () { return reloadDetail(detailModal, item.id); });
     }
 
     function renderDetail(modal, data) {
@@ -375,9 +470,10 @@
           return '<div class="scm-lc-party"><div><strong>' + esc(party.name) + "</strong><small>" + esc(party.role_label) + (party.company ? " · " + esc(party.company) : "") + "</small><small>" + esc(party.email || "Sin correo") + " · " + esc(party.phone || "Sin celular") + "</small></div>"
             + (canManage ? '<button type="button" class="scm-lc-icon-btn" data-scm-lc-party-remove="' + party.id + '" data-name="' + esc(party.name) + '" aria-label="Retirar a ' + esc(party.name) + '"><span class="material-symbols-outlined" aria-hidden="true">person_remove</span></button>' : "") + "</div>";
         }).join("") : '<p class="scm-lc-hint">Este caso no tiene partes.</p>') + "</div></section>"
-        + '<section class="scm-lc-section"><h3>Línea de tiempo</h3><ol class="scm-lc-timeline">' + data.events.map(function (event) {
-          return '<li class="scm-lc-event"><span class="scm-lc-event-icon"><span class="material-symbols-outlined" aria-hidden="true">' + esc(EVENT_ICONS[event.action] || "info") + '</span></span><div class="scm-lc-event-body"><strong>' + esc(EVENT_TITLES[event.action] || event.action) + '</strong><div class="scm-lc-event-meta">' + esc(event.actor_name) + " · " + esc(formatDateTime(event.created_at)) + "</div><div>" + eventBody(event) + "</div></div></li>";
-        }).join("") + "</ol></section>";
+        + '<section class="scm-lc-section"><h3>Documentos</h3>' + (data.documents.length ? '<div class="scm-lc-files">' + data.documents.map(documentButton).join("") + "</div>" : '<p class="scm-lc-hint">Aún no hay documentos.</p>') + "</section>"
+        + '<section class="scm-lc-section"><div class="scm-lc-section-head"><h3>Línea de tiempo</h3>' + (canManage ? '<div class="scm-lc-actions"><button type="button" class="scm-lc-btn scm-lc-btn-sm" data-scm-lc-note>Nota interna</button><button type="button" class="scm-lc-btn scm-lc-btn-sm" data-scm-lc-reply>Registrar respuesta</button><button type="button" class="scm-lc-btn scm-lc-btn-sm" data-scm-lc-upload>Cargar documentos</button></div>' : "") + "</div>"
+        + '<div class="scm-lc-chips" role="group" aria-label="Filtrar la línea de tiempo">' + TIMELINE_FILTERS.map(function (filter) { return '<button type="button" class="scm-lc-chip' + (filter[0] === "todo" ? " is-active" : "") + '" data-scm-lc-timeline-filter="' + filter[0] + '">' + filter[1] + "</button>"; }).join("") + "</div>"
+        + '<div data-scm-lc-timeline>' + renderTimeline(data, "todo") + "</div></section>";
       modal.data = data;
     }
 
@@ -399,6 +495,19 @@
         if (target.closest("[data-scm-lc-edit]")) openCaseForm(data.case, function () { reloadDetail(modal, id); });
         if (target.closest("[data-scm-lc-status-open]")) openStatusForm(data.case, modal);
         if (target.closest("[data-scm-lc-party-new]")) openPartyForm(data.case, modal);
+        if (target.closest("[data-scm-lc-note]")) openNoteForm(data.case, modal);
+        if (target.closest("[data-scm-lc-reply]")) openReplyForm(data.case, modal);
+        if (target.closest("[data-scm-lc-upload]")) openDocumentsForm(data.case, modal);
+        var doc = target.closest("[data-scm-lc-doc]");
+        if (doc) {
+          var docId = Number(doc.getAttribute("data-scm-lc-doc"));
+          previewDocument(data.documents.filter(function (item) { return item.id === docId; })[0]);
+        }
+        var chip = target.closest("[data-scm-lc-timeline-filter]");
+        if (chip) {
+          modal.body.querySelectorAll("[data-scm-lc-timeline-filter]").forEach(function (other) { other.classList.toggle("is-active", other === chip); });
+          modal.body.querySelector("[data-scm-lc-timeline]").innerHTML = renderTimeline(data, chip.getAttribute("data-scm-lc-timeline-filter"));
+        }
         var remove = target.closest("[data-scm-lc-party-remove]");
         if (remove) {
           confirmAction("Retirar parte", "¿Retirar a " + remove.getAttribute("data-name") + " de este caso? Las comunicaciones ya enviadas se conservan.", "Retirar", function () {

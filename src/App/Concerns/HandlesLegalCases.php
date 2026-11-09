@@ -84,6 +84,57 @@ trait HandlesLegalCases
     return is_array($decoded) ? array_values(array_filter($decoded, 'is_array')) : [];
   }
 
+  /** Guarda los archivos del campo (las fotos se comprimen); si uno no sirve se detiene para avisar cuál. @return list<array<string,mixed>> */
+  private function legalCaseUploads(string $field): array
+  {
+    $raw = $_FILES[$field] ?? null;
+    if (!is_array($raw) || !is_array($raw['name'] ?? null)) return [];
+    $indexes = array_values(array_filter(array_keys($raw['name']), static fn($index): bool => (int) ($raw['error'][$index] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE));
+    if (count($indexes) > self::LEGAL_CASE_MAX_FILES) throw new \DomainException('Puedes cargar máximo ' . self::LEGAL_CASE_MAX_FILES . ' archivos a la vez.');
+    $stored = [];
+    foreach ($indexes as $index) {
+      $name = trim(sanitize_text_field((string) $raw['name'][$index]));
+      $result = $this->storedFiles()->storeUploadedFile(['name' => $name, 'type' => (string) ($raw['type'][$index] ?? ''), 'tmp_name' => (string) ($raw['tmp_name'][$index] ?? ''), 'error' => (int) $raw['error'][$index], 'size' => (int) ($raw['size'][$index] ?? 0)]);
+      if ($result === null) throw new \DomainException("No se pudo guardar «{$name}». Revisa el tipo y el tamaño del archivo.");
+      $stored[] = $result + ['original_name' => $name];
+    }
+    return $stored;
+  }
+
+  public function ajax_handler_legal_case_note(): void
+  {
+    $service = $this->legalCaseManageService();
+    try {
+      $service->addNote((int) ($_POST['case_id'] ?? 0), $this->legalCaseText('text'), $this->legalCaseActor());
+      $this->jsonOk(['message' => 'Nota guardada.']);
+    } catch (\Throwable $error) {
+      $this->legalCaseFail($error, 'No se pudo guardar la nota.');
+    }
+  }
+
+  public function ajax_handler_legal_case_reply(): void
+  {
+    $service = $this->legalCaseManageService();
+    try {
+      $input = ['channel' => $this->legalCasePost('channel'), 'from' => $this->legalCasePost('from'), 'subject' => $this->legalCasePost('subject'), 'received_date' => $this->legalCasePost('received_date'), 'body' => $this->legalCaseText('body')];
+      $service->addManualReply((int) ($_POST['case_id'] ?? 0), $input, $this->legalCaseUploads('files'), $this->legalCaseActor());
+      $this->jsonOk(['message' => 'Respuesta registrada.']);
+    } catch (\Throwable $error) {
+      $this->legalCaseFail($error, 'No se pudo registrar la respuesta.');
+    }
+  }
+
+  public function ajax_handler_legal_case_documents(): void
+  {
+    $service = $this->legalCaseManageService();
+    try {
+      $service->addDocuments((int) ($_POST['case_id'] ?? 0), $this->legalCaseUploads('files'), $this->legalCaseActor());
+      $this->jsonOk(['message' => 'Documentos cargados.']);
+    } catch (\Throwable $error) {
+      $this->legalCaseFail($error, 'No se pudieron cargar los documentos.');
+    }
+  }
+
   public function ajax_handler_legal_case_bootstrap(): void
   {
     $service = $this->legalCaseService();

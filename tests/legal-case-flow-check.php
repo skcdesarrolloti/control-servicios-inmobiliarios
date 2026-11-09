@@ -138,6 +138,22 @@ $service->addNote($id, 'Nota privada', $actor);
 $fails(static fn() => $service->addNote($id, '   ', $actor), 'Escribe la nota');
 $fails(static fn() => $service->detail(9999), 'no existe');
 
+$file = ['original_name' => 'carta.pdf', 'name' => 'abc_1.pdf', 'mime' => 'application/pdf', 'bytes' => 2048, 'sha256' => str_repeat('a', 64)];
+$reply = ['channel' => 'Correo', 'from' => 'Gigante', 'subject' => 'Re: daño', 'received_date' => date('Y-m-d'), 'body' => 'Aceptamos'];
+$service->addManualReply($id, $reply, [$file], $actor);
+$detail = $service->detail($id);
+$last = $detail['events'][count($detail['events']) - 1];
+$check($last['action'] === 'respuesta_registrada' && $last['details']['texto'] === 'Aceptamos' && $detail['documents'][0]['event_id'] === $last['id'] && $detail['documents'][0]['sha256'] === str_repeat('a', 64), 'La respuesta queda en la línea de tiempo con su adjunto y hash.');
+$fails(static fn() => $service->addManualReply($id, ['channel' => 'Paloma'] + $reply, [], $actor), 'por dónde llegó');
+$fails(static fn() => $service->addManualReply($id, ['from' => ''] + $reply, [], $actor), 'quién respondió');
+$fails(static fn() => $service->addManualReply($id, ['received_date' => date('Y-m-d', strtotime('+2 days'))] + $reply, [], $actor), 'futura');
+$fails(static fn() => $service->addManualReply($id, ['body' => ''] + $reply, [], $actor), 'contenido');
+$service->addDocuments($id, [$file], $actor);
+$detail = $service->detail($id);
+$last = $detail['events'][count($detail['events']) - 1];
+$check($last['action'] === 'documento' && $last['details']['archivos'] === ['carta.pdf'] && count($detail['documents']) === 2, 'Los documentos cargados dejan evento.');
+$fails(static fn() => $service->addDocuments($id, [], $actor), 'al menos un archivo');
+
 $root = dirname(__DIR__);
 foreach (['legal_case_manage', 'legal_case_send', 'legal_case_config', 'legal_case_export'] as $action) {
   $check(str_contains((string) file_get_contents($root . '/src/App/SuCasaControlServiciosInmobiliarios.php'), "'{$action}' =>"), "La acción {$action} está en el catálogo.");
