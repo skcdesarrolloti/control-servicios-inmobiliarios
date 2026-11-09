@@ -52,6 +52,8 @@ final class DueTypesProbe
   public function configured(string $setting, string $cargo, array $types): array { return $this->adminDueTypesConfiguredFor($setting, $cargo, $types); }
   public function sanitize($raw): array { return $this->sanitizeAdminDueTypeMap($raw); }
   public function items(array $types): array { return array_column($this->adminDueCalendarItems([], 0, 1, $types), 'tipo_vencimiento'); }
+  public function assigned(array $items, string $employee): array { return array_column($this->adminDueMarkAssigned($items, $employee), 'asignado'); }
+  private function adminDueTicketOwners(array $refs): array { return array_intersect_key(['10' => '77', '11' => '88', '12' => ''], array_flip($refs)); }
   private function getDashboardCargoOptions(): array { return [['id' => '3'], ['id' => '13']]; }
   private function adminDueQuoteItems(array $s, int $f, int $t): array { return [['tipo_vencimiento' => 'cotizacion_sin_enviar'], ['tipo_vencimiento' => 'cotizacion_enviada_sin_respuesta']]; }
   private function adminDuePreventivaItems(array $s, int $f, int $t): array { return [['tipo_vencimiento' => 'preventiva_sin_enviar']]; }
@@ -75,6 +77,18 @@ $check($probe->configured('due', '4', $both) === [], 'a saved cargo with nothing
 $check($probe->configured('due', '3', ['preventiva_sin_enviar']) === [], 'checking a type does not grant it without its tab');
 $check($probe->sanitize(['3' => ['cotizacion_sin_enviar', 'inventado'], '99' => ['cotizacion_sin_enviar'], '13' => []]) === ['3' => ['cotizacion_sin_enviar'], '13' => []], 'saving drops unknown cargos and types and keeps empty lists');
 $check(array_keys($probe->labels()) !== [] && array_diff($probe->all(), array_keys($probe->labels())) === [] && array_diff(array_keys($probe->labels()), $probe->all()) === [], 'every due type has a label in the permissions modal');
+
+// Lista del popup: el caso manda; sin caso o sin funcionario en el caso, su responsable directo.
+$assignedItems = [
+  ['case' => ['ticket_pk' => '10']],
+  ['case' => ['ticket_pk' => '11'], 'responsable_id' => '77'],
+  ['case' => [], 'ticket_ref' => '10'],
+  ['case' => ['ticket_pk' => '12', 'empleado_id' => '77']],
+  ['case' => [], 'responsable_id' => '77'],
+  ['case' => [], 'responsable_id' => ''],
+];
+$check($probe->assigned($assignedItems, '77') === [true, false, true, true, true, false], 'only the cases of the person are marked as assigned');
+$check($probe->assigned([['case' => ['ticket_pk' => '12']], ['case' => [], 'responsable_id' => '']], '') === [false, false], 'a session without employee id owns nothing, even unassigned cases');
 
 // Cada tipo se puede desmarcar por separado, aunque salga de la misma consulta que otro.
 $check($probe->items(['cotizacion_enviada_sin_respuesta']) === ['cotizacion_enviada_sin_respuesta'], 'a quote type works without its sibling');

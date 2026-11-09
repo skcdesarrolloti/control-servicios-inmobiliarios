@@ -278,7 +278,7 @@ trait HandlesLegalCases
       $calendarTs = $this->adminDueCalendarPlacementTimestamp($dueTs, $fromTs, $toTs);
       if ($calendarTs <= 0) continue;
       $items[] = $this->adminDueEvent(['id' => 'caso_juridico_fecha_limite-' . $case['id'], 'type' => 'caso_juridico_fecha_limite', 'group' => 'Casos jurídicos', 'title' => $case['code'] . ' · ' . $case['name'], 'description' => 'Responsable: ' . $case['responsible_name'] . ($case['next_action'] !== '' ? '. Próxima acción: ' . $case['next_action'] : ''), 'color' => '#7c3aed',
-        'base_ts' => (int) strtotime($case['opened_date'] . ' 00:00:00'), 'due_ts' => $dueTs, 'calendar_ts' => $calendarTs, 'case' => ['legal_case_id' => (string) $case['id']]]);
+        'base_ts' => (int) strtotime($case['opened_date'] . ' 00:00:00'), 'due_ts' => $dueTs, 'calendar_ts' => $calendarTs, 'case' => ['legal_case_id' => (string) $case['id']], 'responsible_id' => (string) ($case['responsible_id'] ?? '')]);
     }
     return $items;
   }

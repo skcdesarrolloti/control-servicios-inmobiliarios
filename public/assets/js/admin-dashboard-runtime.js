@@ -992,7 +992,7 @@
       label: "!sp-block !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide",
     };
 
-    function dashboardDueEntryPopupHtml(rows, summaryGroups) {
+    function dashboardDueEntryPopupHtml(rows, summaryGroups, allowedTypes) {
       var ui = DUE_POPUP_UI;
       rows = Array.isArray(rows) ? rows.slice() : [];
       summaryGroups = Array.isArray(summaryGroups) ? summaryGroups : [];
@@ -1043,7 +1043,10 @@
       });
       // Tipos que abren su pestaña o sub-pestaña desde openAdministrativeActivityTab.
       var tabTypes = ["servicios_publicos_critico", "ticket_preventiva_sin_cita", "preventiva_cita_sin_realizar", "preventiva_sin_enviar", "cotizacion_sin_enviar", "cotizacion_enviada_sin_respuesta", "orden_mantenimiento_sin_respuesta", "contrato_anexos_sin_enviar"];
-      var groupHtml = groupOrder.map(function (type) {
+      // Un tipo que el cargo no atiende no se muestra; uno que atiende y está al día sí sale en 0.
+      var groupHtml = groupOrder.filter(function (type) {
+        return !Array.isArray(allowedTypes) || allowedTypes.indexOf(type) !== -1 || groups[type] !== undefined;
+      }).map(function (type) {
         var summaryGroup = summaryByType[type] || {};
         var count = Number(groups[type] || 0);
         var targetTab = String(summaryGroup.target_tab || (type === "terminacion_contrato_pendiente" ? "contract_termination" : type === "no_prorroga_contrato_pendiente" ? "contract_non_renewal" : tabTypes.indexOf(type) !== -1 ? type : ""));
@@ -1064,7 +1067,9 @@
         var monthIndex = Math.max(0, Math.min(11, Number(match[2]) - 1));
         return match[3] + " " + months[monthIndex] + " " + match[1];
       }
-      var detailRows = rows.slice(0, 18).map(function (row) {
+      // Los conteos son los del cargo; la lista de casos, solo los asignados a quien entra.
+      var assignedRows = rows.filter(function (row) { return row.asignado; });
+      var detailRows = assignedRows.slice(0, 18).map(function (row) {
         var caseData = row && row.case ? row.case : {};
         var sourceHtml = String(caseData.case_source_html || "").trim();
         var isCreateTicket = String(caseData.admin_ticket_create || "") === "1";
@@ -1091,9 +1096,9 @@
           "</div>";
       }).join("");
       if (!detailRows) {
-        detailRows = '<p class="!sp-m-0 !sp-p-6 !sp-text-center !sp-text-xs !sp-text-service-muted">Usa los accesos del resumen para revisar las pestañas correspondientes.</p>';
+        detailRows = '<p class="!sp-m-0 !sp-p-6 !sp-text-center !sp-text-xs !sp-text-service-muted">' + (rows.length ? "No tienes casos asignados en esta lista." : "Usa los accesos del resumen para revisar las pestañas correspondientes.") + "</p>";
       }
-      var more = rows.length > 18 ? '<p class="!sp-m-0 !sp-text-[11px] !sp-font-semibold !sp-text-amber-700">+' + escHtml(String(rows.length - 18)) + " vencimiento(s) adicionales en el calendario.</p>" : "";
+      var more = assignedRows.length > 18 ? '<p class="!sp-m-0 !sp-text-[11px] !sp-font-semibold !sp-text-amber-700">+' + escHtml(String(assignedRows.length - 18)) + " vencimiento(s) adicionales en el calendario.</p>" : "";
       var kpi = function (label, value, note, icon, tone) {
         return '<div class="' + ui.card + ' !sp-p-4 !sp-flex !sp-items-start !sp-justify-between !sp-gap-3">' +
           '<div><span class="' + ui.label + " " + tone.text + '">' + label + '</span><strong class="!sp-block !sp-mt-2 !sp-text-3xl !sp-font-extrabold ' + tone.text + '">' + escHtml(String(value || 0)) + '</strong><small class="!sp-block !sp-mt-1 !sp-text-[10px] !sp-text-service-muted">' + note + "</small></div>" +
@@ -1116,8 +1121,8 @@
         '<section><h4 class="!sp-m-0 !sp-mb-3 !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">En control por tipo de tarea pendiente</h4>' +
         '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-3 !sp-gap-3">' + groupHtml + "</div></section>" +
         '<section class="' + ui.card + ' !sp-overflow-hidden">' +
-        '<div class="!sp-flex !sp-flex-wrap !sp-items-end !sp-justify-between !sp-gap-2 !sp-px-4 !sp-py-3 !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><div><h4 class="!sp-m-0 !sp-text-sm !sp-font-bold">Casos con mayor tiempo de atraso</h4><p class="!sp-m-0 !sp-mt-0.5 !sp-text-[10px] !sp-text-service-muted">Ordenados por antigüedad de vencimiento</p></div>' +
-        '<span class="!sp-rounded-full !sp-bg-slate-50 !sp-border !sp-border-solid !sp-border-slate-200 !sp-px-3 !sp-py-1 !sp-text-[10px] !sp-font-semibold !sp-text-service-muted">Mostrando ' + escHtml(String(Math.min(rows.length, 18))) + " de " + escHtml(String(rows.length)) + "</span></div>" +
+        '<div class="!sp-flex !sp-flex-wrap !sp-items-end !sp-justify-between !sp-gap-2 !sp-px-4 !sp-py-3 !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><div><h4 class="!sp-m-0 !sp-text-sm !sp-font-bold">Casos con mayor tiempo de atraso</h4><p class="!sp-m-0 !sp-mt-0.5 !sp-text-[10px] !sp-text-service-muted">Asignados a ti · ordenados por antigüedad de vencimiento</p></div>' +
+        '<span class="!sp-rounded-full !sp-bg-slate-50 !sp-border !sp-border-solid !sp-border-slate-200 !sp-px-3 !sp-py-1 !sp-text-[10px] !sp-font-semibold !sp-text-service-muted">Mostrando ' + escHtml(String(Math.min(assignedRows.length, 18))) + " de " + escHtml(String(assignedRows.length)) + "</span></div>" +
         '<div class="!sp-max-h-[292px] !sp-overflow-y-auto">' + detailRows + "</div></section>" +
         more +
         "</div>" +
@@ -1474,6 +1479,7 @@
         return {
           rows: rows,
           summaryGroups: Array.isArray(data.summary_groups) ? data.summary_groups : [],
+          allowedTypes: Array.isArray(data.allowed_types) ? data.allowed_types : null,
         };
       }).then(function (payload) {
         payload = payload || {};
@@ -1517,7 +1523,7 @@
           if (!rows.length && !summaryTotal) return;
           return window.Swal.fire({
             title: "",
-            html: dashboardDueEntryPopupHtml(rows, summaryGroups),
+            html: dashboardDueEntryPopupHtml(rows, summaryGroups, payload.allowedTypes),
             target: root,
             width: "min(1024px, 96vw)",
             padding: 0,

@@ -218,6 +218,20 @@ const harness = (groupsJson) => `
   assert.equal(await page.locator('[data-scm-dashboard-alert-go]').count(), 0, 'without permission for the view there is no button');
   console.log('OK the popup button opens its view');
 
+  // Popup de Vencimientos: las tarjetas siguen a lo que atiende el cargo y la lista, a los casos de la persona.
+  const dueHtml = (dueRows, summary, allowed) => page.evaluate(({ uiSource, source, dueRows, summary, allowed }) => {
+    const helpers = 'var escHtml = v => String(v); var dashboardDueStats = r => ({ total: r.length, vencidos: r.length, hoy: 0 }); var dashboardDueGroupControlled = g => g.vencidos || 0; var dashboardDueTypeLabel = t => "tipo:" + t + ";"; var dashboardDueCaseAttrsHtml = () => "";';
+    return new Function('r', 's', 'a', helpers + uiSource + source + '; return dashboardDueEntryPopupHtml(r, s, a);')(dueRows, summary, allowed);
+  }, { uiSource: ui, source: slice(runtime, '    function dashboardDueEntryPopupHtml(', '    function openDashboardDueCalendar('), dueRows, summary, allowed });
+  const dueRow = (titulo, tipo_vencimiento, asignado) => ({ titulo, tipo_vencimiento, asignado, estado: 'Vencido', dias_vencido: 3, fecha_vencimiento: '2026-11-01', case: {} });
+  let due = await dueHtml([dueRow('Mio', 'cotizacion_sin_enviar', true), dueRow('Ajeno', 'cotizacion_sin_enviar', false), dueRow('Orden', 'orden_mantenimiento_sin_respuesta', false)], [], ['cotizacion_sin_enviar', 'orden_mantenimiento_sin_respuesta', 'preventiva_sin_enviar']);
+  assert.ok(due.includes('Mio') && !due.includes('Ajeno') && due.includes('Mostrando 1 de 1'), 'the list only has the cases assigned to the person');
+  assert.ok(due.includes('tipo:preventiva_sin_enviar;'), 'a type the cargo attends with nothing pending stays in 0');
+  assert.ok(!due.includes('tipo:cotizacion_enviada_sin_respuesta;') && !due.includes('tipo:contrato_anexos_sin_enviar;') && !due.includes('tipo:preventiva_pendiente;'), 'unchecked types are hidden, not shown in 0');
+  due = await dueHtml([dueRow('Ajeno', 'cotizacion_sin_enviar', false)], [], ['cotizacion_sin_enviar']);
+  assert.ok(!due.includes('Ajeno') && due.includes('No tienes casos asignados') && due.includes('tipo:cotizacion_sin_enviar;'), 'with nothing assigned the summary stays and the list says so');
+  console.log('OK the due popup hides unchecked types and lists only assigned cases');
+
   // Pestaña Alertas: mismo conteo y selector de cargo que Pestañas y Acciones.
   const paneHtml = `<form id="scm-permissions-form" data-scm-perm-form>
     <select id="scm-permissions-cargo"><option value="13" selected>13</option></select>

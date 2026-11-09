@@ -1970,9 +1970,12 @@ trait HandlesTicketWorkflowActions
     $settings = $this->adminDueCalendarSettings();
     $items = $this->adminDueCalendarItems($settings, $fromTs, $toTs);
     $stats = $this->adminDueCalendarStats($items);
-    $summaryGroups = !empty($_POST['include_summary'])
-      ? $this->adminDueCalendarSummaryGroups($fromTs, $toTs)
-      : [];
+    // Solo el popup de Inicio pide el resumen: ahí la lista de casos es la de quien consulta.
+    $forPopup = !empty($_POST['include_summary']);
+    $summaryGroups = $forPopup ? $this->adminDueCalendarSummaryGroups($fromTs, $toTs) : [];
+    if ($forPopup) {
+      $items = $this->adminDueMarkAssigned($items, $this->current_employee_id());
+    }
 
     $this->jsonOk([
       'settings' => $settings,
@@ -1981,7 +1984,53 @@ trait HandlesTicketWorkflowActions
       'items' => $items,
       'stats' => $stats,
       'summary_groups' => $summaryGroups,
+      'allowed_types' => $this->adminDueTypesForCurrentCargo(),
     ]);
+  }
+
+  /**
+   * Marca los vencimientos del funcionario: el `id_empleado` de su caso, igual que Mis casos. Lo que no tiene caso
+   * (anexos de contrato, casos jurídicos) usa su responsable directo.
+   * @param list<array<string,mixed>> $items
+   * @return list<array<string,mixed>>
+   */
+  private function adminDueMarkAssigned(array $items, string $employeeId): array
+  {
+    $refOf = static fn(array $item): string => trim((string) (($item['case']['ticket_pk'] ?? '') ?: ($item['ticket_ref'] ?? '')));
+    $refs = array_values(array_unique(array_filter(array_map($refOf, $items), static fn(string $ref): bool => $ref !== '')));
+    $owners = $refs !== [] ? $this->adminDueTicketOwners($refs) : [];
+    foreach ($items as &$item) {
+      $owner = $owners[$refOf($item)] ?? '';
+      if ($owner === '') {
+        $owner = trim((string) (($item['responsable_id'] ?? '') ?: ($item['case']['empleado_id'] ?? '')));
+      }
+      $item['asignado'] = $employeeId !== '' && $owner === $employeeId;
+    }
+    unset($item);
+    return $items;
+  }
+
+  /**
+   * @param list<string> $refs Número interno o número visible del caso.
+   * @return array<string,string> Referencia del caso => id_empleado.
+   */
+  private function adminDueTicketOwners(array $refs): array
+  {
+    $table = $this->db->table('jet_cct_tickets');
+    $placeholders = implode(',', array_fill(0, count($refs), '?'));
+    $rows = $this->db->getResults(
+      "SELECT `_ID`, TRIM(COALESCE(`id_ticket`, '')) AS id_ticket, TRIM(COALESCE(`id_empleado`, '')) AS id_empleado FROM `{$table}` WHERE `_ID` IN ({$placeholders}) OR TRIM(COALESCE(`id_ticket`, '')) IN ({$placeholders})",
+      array_merge($refs, $refs)
+    );
+    $owners = [];
+    foreach ($rows as $row) {
+      if ($row['id_ticket'] !== '') $owners[$row['id_ticket']] = $row['id_empleado'];
+    }
+    // El número interno manda si coincide con el número visible de otro caso.
+    foreach ($rows as $row) {
+      $owners[(string) $row['_ID']] = $row['id_empleado'];
+    }
+    return $owners;
   }
 
   public function ajax_handler_admin_due_case(): void
@@ -2561,6 +2610,7 @@ trait HandlesTicketWorkflowActions
         'due_ts' => (int) $dueTs,
         'calendar_ts' => $calendarTs,
         'days_limit' => $days,
+        'ticket_ref' => $ticket,
       ]);
     }
     return $items;
@@ -2604,6 +2654,7 @@ trait HandlesTicketWorkflowActions
         'due_ts' => (int) $dueTs,
         'calendar_ts' => $calendarTs,
         'days_limit' => $days,
+        'responsible_id' => (string) ($row['id_empleado'] ?? ''),
       ]);
     }
     return $items;
@@ -2907,6 +2958,8 @@ trait HandlesTicketWorkflowActions
       'dias_transcurridos' => $baseTs > 0 ? $this->adminDueElapsedDays($baseTs) : 0,
       'dias_vencido' => $daysOverdue,
       'case' => is_array($data['case'] ?? null) ? $data['case'] : [],
+      'ticket_ref' => trim((string) ($data['ticket_ref'] ?? '')),
+      'responsable_id' => trim((string) ($data['responsible_id'] ?? '')),
     ];
   }
 
