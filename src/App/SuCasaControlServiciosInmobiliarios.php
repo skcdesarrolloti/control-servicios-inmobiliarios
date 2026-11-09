@@ -87,6 +87,7 @@ final class SuCasaControlServiciosInmobiliarios
   const ALERT_ADMIN_DUE = 'admin_due';
   const ALERT_REMINDER_EMAIL = 'recordatorio_correo';
   const ALERT_REMINDER_WHATSAPP = 'recordatorio_whatsapp';
+  const ALERT_DUE_VIEW_ALL = 'vencimientos_ver_todos';
   const AJAX_ADMIN_DUE_CASE = 'scm_admin_due_case';
   const AJAX_ADMIN_DUE_SETTINGS_SAVE = 'scm_admin_due_settings_save';
   const AJAX_CONTRATOS_ARRENDAMIENTO = 'scm_contratos_arrendamiento';
@@ -1173,6 +1174,7 @@ final class SuCasaControlServiciosInmobiliarios
     return [
       ['label' => 'Inicio', 'items' => [
         self::ALERT_ADMIN_DUE => ['label' => 'Vencimientos administrativos', 'hint' => 'Popup al entrar al panel. Requiere ver cotizaciones o preventivas.'],
+        self::ALERT_DUE_VIEW_ALL => ['label' => 'Ver todos los vencimientos en su pestaña', 'hint' => 'La pestaña Vencimientos muestra todos los tipos para conocer el total, aunque no los atienda. El popup y el recordatorio siguen con lo marcado.'],
       ]],
       ['label' => 'Créditos a propietarios', 'items' => [
         'credito_solicitudes' => ['label' => 'Solicitudes de crédito', 'hint' => 'Solicitudes sin aprobar ni rechazar. Requiere ver Créditos a propietarios.'],
@@ -1214,7 +1216,7 @@ final class SuCasaControlServiciosInmobiliarios
   /** Alertas de popup del cargo actual; el recordatorio diario no es un popup. @return list<string> */
   private function dashboardAlertKeysForCurrentCargo(): array
   {
-    return array_values(array_diff($this->dashboardAlertPermissions()[trim((string) Auth::userCargo())] ?? [], [self::ALERT_REMINDER_EMAIL, self::ALERT_REMINDER_WHATSAPP]));
+    return array_values(array_diff($this->dashboardAlertPermissions()[trim((string) Auth::userCargo())] ?? [], [self::ALERT_REMINDER_EMAIL, self::ALERT_REMINDER_WHATSAPP, self::ALERT_DUE_VIEW_ALL]));
   }
 
   /** @return array<int,string> */

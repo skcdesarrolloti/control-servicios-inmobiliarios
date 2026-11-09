@@ -52,6 +52,10 @@ final class DueTypesProbe
   public function configured(string $setting, string $cargo, array $types): array { return $this->adminDueTypesConfiguredFor($setting, $cargo, $types); }
   public function sanitize($raw): array { return $this->sanitizeAdminDueTypeMap($raw); }
   public function items(array $types): array { return array_column($this->adminDueCalendarItems([], 0, 1, $types), 'tipo_vencimiento'); }
+  public bool $seeAll = false;
+  public function calendarTab(): array { return $this->adminDueTypesForCalendarTab(); }
+  private function adminDueCanSeeAllTypes(): bool { return $this->seeAll; }
+  private function adminDueTypesForCurrentCargo(): array { return ['cotizacion_sin_enviar']; }
   public function assigned(array $items, string $employee): array { return array_column($this->adminDueMarkAssigned($items, $employee), 'asignado'); }
   private function adminDueTicketOwners(array $refs): array { return array_intersect_key(['10' => '77', '11' => '88', '12' => ''], array_flip($refs)); }
   private function getDashboardCargoOptions(): array { return [['id' => '3'], ['id' => '13']]; }
@@ -77,6 +81,16 @@ $check($probe->configured('due', '4', $both) === [], 'a saved cargo with nothing
 $check($probe->configured('due', '3', ['preventiva_sin_enviar']) === [], 'checking a type does not grant it without its tab');
 $check($probe->sanitize(['3' => ['cotizacion_sin_enviar', 'inventado'], '99' => ['cotizacion_sin_enviar'], '13' => []]) === ['3' => ['cotizacion_sin_enviar'], '13' => []], 'saving drops unknown cargos and types and keeps empty lists');
 $check(array_keys($probe->labels()) !== [] && array_diff($probe->all(), array_keys($probe->labels())) === [] && array_diff(array_keys($probe->labels()), $probe->all()) === [], 'every due type has a label in the permissions modal');
+
+// Ver todos solo amplía la pestaña Vencimientos; el popup pide lo suyo y la casilla no enciende popups.
+$check($probe->calendarTab() === ['cotizacion_sin_enviar'], 'without the permission the tab shows what the cargo attends');
+$probe->seeAll = true;
+$check($probe->calendarTab() === $probe->all(), 'with the permission the tab shows every type');
+$app = (string) file_get_contents(dirname(__DIR__) . '/src/App/SuCasaControlServiciosInmobiliarios.php');
+$workflow = (string) file_get_contents(dirname(__DIR__) . '/src/App/Concerns/HandlesTicketWorkflowActions.php');
+$runtime = (string) file_get_contents(dirname(__DIR__) . '/public/assets/js/admin-dashboard-runtime.js');
+$check(str_contains($app, 'self::ALERT_REMINDER_WHATSAPP, self::ALERT_DUE_VIEW_ALL]') , 'the see-all box does not switch on the alerts popup');
+$check(str_contains($workflow, "\$forPopup ? \$this->adminDueTypesForCurrentCargo() : \$this->adminDueTypesForCalendarTab()") && substr_count($runtime, 'popup: "1"') === 1, 'only the popup and its counter ask for the marked types');
 
 // Lista del popup: el caso manda; sin caso o sin funcionario en el caso, su responsable directo.
 $assignedItems = [

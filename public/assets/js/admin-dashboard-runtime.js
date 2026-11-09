@@ -1472,6 +1472,7 @@
         fecha_inicio: range.from,
         fecha_fin: range.to,
         include_summary: "1",
+        popup: "1",
       }).then(function (data) {
         var rows = Array.isArray(data.eventos)
           ? data.eventos

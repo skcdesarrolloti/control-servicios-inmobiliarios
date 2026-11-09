@@ -1968,11 +1968,13 @@ trait HandlesTicketWorkflowActions
 
     [$fromTs, $toTs] = $this->adminDueCalendarRange($_POST);
     $settings = $this->adminDueCalendarSettings();
-    $items = $this->adminDueCalendarItems($settings, $fromTs, $toTs);
+    // El popup y su contador siguen lo que el cargo atiende; la pestaña puede ver todo con su permiso.
+    $forPopup = !empty($_POST['popup']);
+    $seeAll = !$forPopup && $this->adminDueCanSeeAllTypes();
+    $types = $forPopup ? $this->adminDueTypesForCurrentCargo() : $this->adminDueTypesForCalendarTab();
+    $items = $this->adminDueCalendarItems($settings, $fromTs, $toTs, $types);
     $stats = $this->adminDueCalendarStats($items);
-    // Solo el popup de Inicio pide el resumen: ahí la lista de casos es la de quien consulta.
-    $forPopup = !empty($_POST['include_summary']);
-    $summaryGroups = $forPopup ? $this->adminDueCalendarSummaryGroups($fromTs, $toTs) : [];
+    $summaryGroups = !empty($_POST['include_summary']) ? $this->adminDueCalendarSummaryGroups($fromTs, $toTs, $types, $seeAll) : [];
     if ($forPopup) {
       $items = $this->adminDueMarkAssigned($items, $this->current_employee_id());
     }
@@ -1984,7 +1986,7 @@ trait HandlesTicketWorkflowActions
       'items' => $items,
       'stats' => $stats,
       'summary_groups' => $summaryGroups,
-      'allowed_types' => $this->adminDueTypesForCurrentCargo(),
+      'allowed_types' => $types,
     ]);
   }
 
@@ -2284,6 +2286,17 @@ trait HandlesTicketWorkflowActions
     return $this->adminDueTypesConfiguredFor(self::ADMIN_DUE_TYPE_SETTING, (string) Auth::userCargo(), $this->adminDueAllowedTypes());
   }
 
+  private function adminDueCanSeeAllTypes(): bool
+  {
+    return in_array(self::ALERT_DUE_VIEW_ALL, $this->dashboardAlertPermissions()[trim((string) Auth::userCargo())] ?? [], true);
+  }
+
+  /** Pestaña Vencimientos: con el permiso muestra todos los tipos, para conocer el total. @return list<string> */
+  private function adminDueTypesForCalendarTab(): array
+  {
+    return $this->adminDueCanSeeAllTypes() ? $this->adminDueAllTypes() : $this->adminDueTypesForCurrentCargo();
+  }
+
   /** @param mixed $raw @return array<string,list<string>> */
   private function sanitizeAdminDueTypeMap($raw): array
   {
@@ -2464,12 +2477,12 @@ trait HandlesTicketWorkflowActions
   }
 
   /** @return array<int,array<string,mixed>> */
-  private function adminDueCalendarSummaryGroups(int $fromTs, int $toTs): array
+  /** @param list<string> $types @param bool $ignoreTabs ver todos los vencimientos no depende de tener cada pestaña */
+  private function adminDueCalendarSummaryGroups(int $fromTs, int $toTs, array $types, bool $ignoreTabs = false): array
   {
     $groups = [];
-    $types = $this->adminDueTypesForCurrentCargo();
 
-    if (array_intersect(self::ADMIN_DUE_TYPES_BY_TAB['preventivas_pendientes'], $types) !== [] && $this->canAccessDashboardTab('preventivas_pendientes')) {
+    if (array_intersect(self::ADMIN_DUE_TYPES_BY_TAB['preventivas_pendientes'], $types) !== [] && ($ignoreTabs || $this->canAccessDashboardTab('preventivas_pendientes'))) {
       $groups[] = $this->adminDueCalendarSummaryGroup(
         'preventiva_pendiente',
         'Preventivas pendientes',
@@ -2478,7 +2491,7 @@ trait HandlesTicketWorkflowActions
       );
     }
 
-    if (in_array('servicios_publicos_critico', $types, true) && $this->canAccessDashboardTab('servicios_publicos_pendientes')) {
+    if (in_array('servicios_publicos_critico', $types, true) && ($ignoreTabs || $this->canAccessDashboardTab('servicios_publicos_pendientes'))) {
       $groups[] = $this->adminDueCalendarSummaryGroup(
         'servicios_publicos_pendientes',
         'Servicios públicos pendientes',

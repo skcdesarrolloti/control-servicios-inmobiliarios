@@ -17,6 +17,8 @@ Para que la alerta tenga su propio popup, el grupo lleva `popup` con el título 
 
 Vencimientos sale primero y después cada tema, uno al cerrar el otro, porque Swal muestra un popup a la vez. Si el funcionario va a atender algo desde un popup, los siguientes esperan a que vuelva a Inicio. Salen al entrar a Inicio, en cada clic en Inicio y cada hora en cualquier pestaña, sin interrumpir a quien está escribiendo o tiene un popup abierto. La hora se cuenta desde la última vez que los popups pudieron salir: cargar otra pestaña no la reinicia. Cerrarlos pide confirmación.
 
+La alerta **Ver todos los vencimientos en su pestaña** (`vencimientos_ver_todos`) hace que la pestaña Vencimientos muestre todos los tipos, con sus filtros y totales, aunque el cargo no los atienda ni tenga esas pestañas. No cambia el popup, su contador ni el recordatorio diario, y no abre ningún popup por sí sola.
+
 En el popup de Vencimientos, las tarjetas por tipo son las que el cargo atiende (un tipo desmarcado no aparece, uno marcado sin pendientes sale en 0). La lista **Casos con mayor tiempo de atraso** muestra solo los asignados a quien entra: el `id_empleado` del caso, igual que Mis casos, o el responsable directo cuando no hay caso (anexos de contrato, casos jurídicos). Los totales siguen siendo los del cargo.
 
 ## Contratos por desocupar

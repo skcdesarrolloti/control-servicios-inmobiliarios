@@ -2935,7 +2935,7 @@ trait RendersDashboard
               <p>Filtra el calendario por el control que necesitas revisar.</p>
             </div>
           </div>
-          <?php $dueAllowedTypes = $this->adminDueTypesForCurrentCargo(); ?>
+          <?php $dueAllowedTypes = $this->adminDueTypesForCalendarTab(); ?>
           <form class="scm-calendar-due-type-filter" data-scm-calendar-due-type-filter autocomplete="off">
             <?php if (in_array('servicios_publicos_critico', $dueAllowedTypes, true)): ?><label class="scm-calendar-due-chip scm-calendar-due-chip--no-prorroga-contrato"><input type="checkbox" name="due_type" value="servicios_publicos_critico" checked><span class="material-symbols-outlined" aria-hidden="true">warning</span><strong>Servicios críticos · 72 horas</strong></label><?php endif; ?>
             <?php if (in_array('preventiva_sin_enviar', $dueAllowedTypes, true)): ?><label class="scm-calendar-due-chip scm-calendar-due-chip--preventiva-sin-enviar"><input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><strong>Preventivas sin enviar</strong></label><?php endif; ?>
