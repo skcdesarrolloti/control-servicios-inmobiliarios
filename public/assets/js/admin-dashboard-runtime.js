@@ -152,6 +152,7 @@
         rent_increase_letter_create: "[data-rent-increase-open]",
         owner_credit_manage: "[data-owner-credit-new]",
         owner_credit_configure: "[data-owner-credit-settings]",
+        legal_case_config: "[data-legal-case-settings]",
         cleaning_configure: "[data-cleaning-settings]",
         quote_fee_configure: "[data-quote-fee-settings]",
         collection_import: "[data-scm-portfolio-import]",

@@ -69,7 +69,7 @@ final class LegalCaseService
         attachments_json MEDIUMTEXT NOT NULL, sender_id VARCHAR(40) NOT NULL DEFAULT '', sender_name VARCHAR(190) NOT NULL DEFAULT '', created_at BIGINT NOT NULL, KEY idx_case (case_id), KEY idx_created (created_at)",
       'communication_recipients' => "id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, communication_id BIGINT UNSIGNED NOT NULL, party_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
         kind VARCHAR(5) NOT NULL DEFAULT 'to', channel VARCHAR(10) NOT NULL, name VARCHAR(190) NOT NULL DEFAULT '', destination VARCHAR(190) NOT NULL,
-        rendered_subject VARCHAR(255) NOT NULL DEFAULT '', rendered_html MEDIUMTEXT NOT NULL, whatsapp_params MEDIUMTEXT NULL, dedupe_key VARCHAR(120) NOT NULL DEFAULT '',
+        rendered_subject VARCHAR(255) NOT NULL DEFAULT '', rendered_html MEDIUMTEXT NOT NULL, sent_html MEDIUMTEXT NOT NULL, whatsapp_params MEDIUMTEXT NULL, dedupe_key VARCHAR(120) NOT NULL DEFAULT '',
         status VARCHAR(20) NOT NULL DEFAULT 'en_cola', provider_message_id VARCHAR(190) NOT NULL DEFAULT '', last_error VARCHAR(500) NOT NULL DEFAULT '', accepted_at BIGINT NULL, checked_at BIGINT NULL,
         KEY idx_communication (communication_id), KEY idx_destination (destination), KEY idx_dedupe (dedupe_key)",
       'templates' => "id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(120) NOT NULL, subject VARCHAR(255) NOT NULL DEFAULT '', body_html MEDIUMTEXT NOT NULL,
@@ -90,6 +90,21 @@ final class LegalCaseService
   {
     $rows = $this->db->getResults("SELECT `id`, `name`, `active` FROM `{$this->table('case_types')}`" . ($onlyActive ? ' WHERE `active` = 1' : '') . ' ORDER BY `name`');
     return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'name' => (string) $row['name'], 'active' => (int) $row['active'] === 1], $rows);
+  }
+
+  /** Los tipos no se borran: los casos existentes conservan el suyo y solo dejan de ofrecerse. */
+  public function saveType(int $id, string $name, bool $active): void
+  {
+    $name = trim($name);
+    if ($name === '' || mb_strlen($name) > 120) throw new \DomainException('Escribe el nombre del tipo (máximo 120 caracteres).');
+    $duplicate = $this->db->getVar("SELECT `id` FROM `{$this->table('case_types')}` WHERE LOWER(`name`) = LOWER(?) AND `id` <> ? LIMIT 1", [$name, $id]);
+    if ($duplicate !== null) throw new \DomainException('Ya existe un tipo con ese nombre.');
+    if ($id > 0) {
+      if ($this->typeName($id) === '') throw new \DomainException('El tipo no existe.');
+      $this->db->update($this->table('case_types'), ['name' => $name, 'active' => $active ? 1 : 0], ['id' => $id]);
+      return;
+    }
+    $this->db->insert($this->table('case_types'), ['name' => $name, 'active' => $active ? 1 : 0, 'created_at' => time()]);
   }
 
   /** @return list<array{id:string,name:string,email:string,phone:string,cargo:string}> */
@@ -368,7 +383,7 @@ final class LegalCaseService
   }
 
   /** @param array<string,mixed> $file @param array<string,string> $actor */
-  private function insertDocument(int $caseId, int $eventId, array $file, array $actor): int
+  public function insertDocument(int $caseId, int $eventId, array $file, array $actor): int
   {
     $this->db->insert($this->table('case_documents'), [
       'case_id' => $caseId, 'event_id' => $eventId, 'original_name' => mb_substr((string) $file['original_name'], 0, 255), 'stored_name' => (string) $file['name'],

@@ -1,0 +1,38 @@
+{
+  "name": "scm_comunicacion_caso_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}.\n\nSKC SuCasa Inmobiliaria te envió una comunicación relacionada con el caso {{2}}.\n\nAsunto: {{3}}\n\nConsulta el contenido completo y sus documentos desde el botón.\n\nAtentamente,\n{{4}}",
+      "example": {
+        "body_text": [
+          [
+            "María Pérez",
+            "CASO-0001",
+            "Requerimiento por daños en el apartamento 401",
+            "Royner Guardo - Asistente de Desarrollo TI - Cel. 3015232054"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Ver comunicación",
+          "url": "https://sucasainmobiliaria.com.co/{{1}}",
+          "example": [
+            "https://sucasainmobiliaria.com.co/comunicacion-caso.php?numero=1&expires=1893456000&sig=ejemplo"
+          ]
+        }
+      ]
+    }
+  ]
+}

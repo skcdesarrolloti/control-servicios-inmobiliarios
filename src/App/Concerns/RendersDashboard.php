@@ -1409,7 +1409,7 @@ trait RendersDashboard
 
       <?php if (in_array('casos_juridicos', $dashboardAllowedTabs, true)): ?>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-casos-juridicos' ? ' active' : ''; ?>" id="scm-panel-casos-juridicos" data-permission-tab="casos_juridicos" data-scm-loaded="0">
-          <?php echo (new \SCM\Modules\LegalCases\LegalCaseView())->renderShell(in_array('legal_case_manage', $dashboardAllowedActions, true)); ?>
+          <?php echo (new \SCM\Modules\LegalCases\LegalCaseView())->renderShell(['manage' => in_array('legal_case_manage', $dashboardAllowedActions, true), 'send' => in_array('legal_case_send', $dashboardAllowedActions, true), 'config' => in_array('legal_case_config', $dashboardAllowedActions, true), 'export' => in_array('legal_case_export', $dashboardAllowedActions, true)], $assetBaseUrl . 'assets/vendor/quill/quill.js', $assetBaseUrl . 'assets/vendor/quill/quill.snow.css'); ?>
         </div>
       <?php endif; ?>
 

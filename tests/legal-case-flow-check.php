@@ -154,6 +154,150 @@ $last = $detail['events'][count($detail['events']) - 1];
 $check($last['action'] === 'documento' && $last['details']['archivos'] === ['carta.pdf'] && count($detail['documents']) === 2, 'Los documentos cargados dejan evento.');
 $fails(static fn() => $service->addDocuments($id, [], $actor), 'al menos un archivo');
 
+// --- Comunicaciones
+define('SCM_APP_SECRET', 'secreto-de-prueba');
+define('SCM_BASE_URL', 'https://sucasainmobiliaria.com.co/panel');
+
+/** Cola en memoria: comprueba qué se encola sin enviar nada. */
+final class FakeGateway extends \SCM\Modules\LegalCases\LegalDeliveryGateway
+{
+  public array $emails = [];
+  public array $whatsapp = [];
+  public bool $failWhatsApp = false;
+  public array $queue = [];
+  public function ready(): bool { return true; }
+  public function email(string $to, string $subject, string $html, array $options): bool { $this->emails[] = compact('to', 'subject', 'html', 'options'); return true; }
+  public function whatsapp(string $phone, string $name, string $message, array $meta): bool { if ($this->failWhatsApp) return false; $this->whatsapp[] = compact('phone', 'name', 'message', 'meta'); return true; }
+  public function lookup(string $dedupePrefix): ?array { return $this->queue[$dedupePrefix] ?? null; }
+}
+
+use SCM\Modules\LegalCases\LegalCommunicationService;
+use SCM\Modules\LegalCases\LegalHtmlSanitizer;
+
+$clean = LegalHtmlSanitizer::clean('<p onclick="x()">Hola&nbsp;<script>alert(1)</script><strong style="color:red">ñandú</strong><img src=x onerror=alert(1)><a href="javascript:alert(1)">malo</a> <a href="https://x.co/a">bien</a></p><div>suelto</div>');
+$check(!preg_match('/script|onclick|onerror|style=|javascript|<img|<div/i', $clean) && str_contains($clean, '<a href="https://x.co/a" rel="noopener noreferrer" target="_blank">bien</a>') && str_contains($clean, 'malo') && str_contains($clean, 'suelto'), 'El sanitizador deja solo lo permitido.');
+$check(str_contains(html_entity_decode($clean, ENT_QUOTES, 'UTF-8'), 'ñandú') && str_contains($clean, 'Hola '), 'Conserva acentos y normaliza espacios duros.');
+$check(LegalHtmlSanitizer::isEmpty('<p> <br></p>') && !LegalHtmlSanitizer::isEmpty('<p>x</p>'), 'Detecta contenido vacío.');
+
+$uploadDir = sys_get_temp_dir() . '/legal-case-test-' . bin2hex(random_bytes(4));
+mkdir($uploadDir);
+$stored = str_repeat('b', 24) . '_1.pdf';
+file_put_contents($uploadDir . '/' . $stored, '%PDF-prueba');
+$hash = hash_file('sha256', $uploadDir . '/' . $stored);
+$files = new \SCM\Support\StoredFileService($uploadDir, SCM_BASE_URL, SCM_APP_SECRET, 1048576);
+$gateway = new FakeGateway($db);
+$comms = new LegalCommunicationService($db, $service, $files, $gateway);
+
+$caseId = $service->create($base, $service->contractParties(9), $actor);
+$service->addDocuments($caseId, [['original_name' => 'acta.pdf', 'name' => $stored, 'mime' => 'application/pdf', 'bytes' => 11, 'sha256' => $hash]], $actor);
+$detail = $service->detail($caseId);
+$owner = $detail['parties'][0];
+$tenant = $detail['parties'][1];
+$docId = $detail['documents'][0]['id'];
+$send = ['channels' => ['email', 'whatsapp'], 'subject' => 'Aviso {{codigo_caso}} para {{nombre_destinatario}}', 'body' => '<p>Señor(a) {{nombre_destinatario}}, contrato {{numero_contrato}} en {{direccion_inmueble}}.<script>x</script></p>', 'template_id' => 0, 'document_ids' => [$docId],
+  'recipients' => [['party_id' => $owner['id'], 'kind' => 'to', 'email' => 'falso@example.com'], ['party_id' => $tenant['id'], 'kind' => 'to'], ['name' => 'Abogado <b>', 'email' => 'abogado@example.com', 'kind' => 'cc'], ['name' => '', 'email' => 'ADICIONAL@example.com', 'kind' => 'to']]];
+
+$preview = $comms->preview($caseId, $send, $actor);
+$check($gateway->emails === [] && (int) $db->getVar('SELECT COUNT(*) FROM wp_scm_legal_communications') === 0, 'La vista previa no guarda ni encola.');
+$check($preview['subject'] === 'Aviso ' . LegalCaseService::code($caseId) . ' para Pedro Dueño' && $preview['email_count'] === 3 && $preview['whatsapp_count'] === 2 && str_contains($preview['html'], 'contrato C-100'), 'La vista previa muestra el resultado real.');
+
+$result = $comms->send($caseId, $send, [], $actor);
+$check($result['email'] === 3 && $result['whatsapp'] === 2, 'Encola un correo y un WhatsApp por destinatario.');
+$check($gateway->emails[0]['to'] === 'pedro@example.com', 'Usa el correo de la parte guardada, no el que manda el navegador.');
+$check($gateway->emails[0]['options']['payload']['reply_to'] === 'ana@example.com', 'Las respuestas van al correo del funcionario.');
+$check($gateway->emails[0]['options']['payload']['cc'] === ['abogado@example.com'] && $gateway->emails[1]['options']['payload']['cc'] === [], 'La copia va una sola vez.');
+$check($gateway->emails[0]['options']['payload']['attachments'][0]['name'] === 'acta.pdf' && is_readable($gateway->emails[0]['options']['payload']['attachments'][0]['path']), 'Adjunta el archivo real.');
+$check(!str_contains($gateway->emails[0]['html'], '<script') && str_contains($gateway->emails[0]['html'], 'Señor(a) Pedro Dueño') || str_contains(html_entity_decode($gateway->emails[0]['html'], ENT_QUOTES, 'UTF-8'), 'Señor(a) Pedro Dueño'), 'Personaliza el contenido por destinatario sin scripts.');
+$check($gateway->emails[1]['subject'] === 'Aviso ' . LegalCaseService::code($caseId) . ' para Laura Inquilina', 'El asunto también se personaliza.');
+$check($gateway->emails[2]['to'] === 'adicional@example.com', 'Acepta destinatarios escritos a mano.');
+
+$wa = $gateway->whatsapp[0]['meta'];
+$bodyParams = array_column($wa['template_components'][0]['parameters'], 'text');
+$check($wa['template_name'] === 'scm_comunicacion_caso_v1' && count($bodyParams) === 4 && $bodyParams[3] === 'Ana Contractual - Contractual - Cel. 3001112222', 'WhatsApp usa la plantilla y la firma con guiones y celular nacional.');
+$suffix = $wa['template_components'][1]['parameters'][0]['text'];
+$check(str_starts_with($suffix, 'panel/comunicacion-caso.php?numero='), 'El botón lleva la ruta relativa al dominio de la plantilla.');
+parse_str((string) parse_url($suffix, PHP_URL_QUERY), $query);
+$check(LegalCommunicationService::validLink((int) $query['numero'], (int) $query['expires'], $query['sig']), 'El enlace del botón es válido.');
+$check(!LegalCommunicationService::validLink((int) $query['numero'] + 1, (int) $query['expires'], $query['sig']), 'Cambiar el número invalida el enlace.');
+$check(!LegalCommunicationService::validLink((int) $query['numero'], time() - 5, LegalCommunicationService::linkSignature((int) $query['numero'], time() - 5)), 'Un enlace vencido no sirve.');
+$public = $comms->publicView((int) $query['numero']);
+$check(str_contains(html_entity_decode($public['html'], ENT_QUOTES, 'UTF-8'), 'Pedro Dueño') && $public['attachments'][0]['name'] === 'acta.pdf', 'La vista pública muestra el contenido de ese destinatario.');
+$check(!str_contains(json_encode($public), 'sucursal'), 'La vista pública no incluye sucursal.');
+$check(str_contains(html_entity_decode($public['html'], ENT_QUOTES, 'UTF-8'), 'SKC SuCasa Inmobiliaria'), 'La firma usa el nombre corporativo.');
+
+$communicationId = $result['communication_id'];
+$row = $db->getRow('SELECT * FROM wp_scm_legal_communications WHERE id = ?', [$communicationId]);
+$check($row['sender_id'] === '5007' && $row['whatsapp_template'] === 'scm_comunicacion_caso_v1' && json_decode($row['attachments_json'], true)[0]['sha256'] === $hash, 'Guarda quién envió, la plantilla y el hash de los adjuntos.');
+$recipients = $db->getResults('SELECT * FROM wp_scm_legal_communication_recipients WHERE communication_id = ? ORDER BY id', [$communicationId]);
+$check(count($recipients) === 6 && count(array_filter($recipients, static fn($r) => $r['kind'] === 'cc')) === 1 && $recipients[0]['sent_html'] !== '' && json_decode($recipients[2]['whatsapp_params'], true)['template'] === 'scm_comunicacion_caso_v1', 'Guarda cada destinatario con el contenido exacto.');
+$events = $service->detail($caseId)['events'];
+$last = $events[count($events) - 1];
+$check($last['action'] === 'comunicacion_enviada' && $last['details']['communication_id'] === $communicationId, 'La comunicación entra a la línea de tiempo.');
+
+$prefix = $recipients[0]['dedupe_key'];
+$gateway->queue[$prefix] = ['status' => 'sent', 'error' => '', 'sent_at' => 1762000000, 'provider_id' => ''];
+$waPrefix = $recipients[2]['dedupe_key'];
+$gateway->queue[$waPrefix] = ['status' => 'failed', 'error' => 'Número inválido', 'sent_at' => 0, 'provider_id' => ''];
+$view = $comms->communication($communicationId);
+$check($view['recipients'][0]['status'] === 'enviado' && $view['recipients'][0]['status_label'] === 'Aceptado por el servidor' && $view['recipients'][1]['status'] === 'enviado', 'El estado llega de la cola y alcanza también a la copia.');
+$check($view['recipients'][2]['status'] === 'fallido' && $view['recipients'][2]['error'] === 'Número inválido', 'Registra los fallos.');
+$before = $db->getRow('SELECT rendered_html, sent_html, destination FROM wp_scm_legal_communication_recipients WHERE id = ?', [$recipients[0]['id']]);
+$gateway->queue[$prefix]['status'] = 'failed';
+$comms->communication($communicationId);
+$check($db->getVar('SELECT status FROM wp_scm_legal_communication_recipients WHERE id = ?', [$recipients[0]['id']]) === 'enviado' && $db->getRow('SELECT rendered_html, sent_html, destination FROM wp_scm_legal_communication_recipients WHERE id = ?', [$recipients[0]['id']]) === $before, 'Un estado final no se reescribe y el contenido no cambia.');
+
+$counts = static fn(): array => [(int) $db->getVar('SELECT COUNT(*) FROM wp_scm_legal_communications'), (int) $db->getVar('SELECT COUNT(*) FROM wp_scm_legal_case_events')];
+$snapshot = $counts();
+$gateway->failWhatsApp = true;
+$fails(static fn() => $comms->send($caseId, $send, [], $actor), 'No se envió nada');
+$gateway->failWhatsApp = false;
+$check($counts() === $snapshot, 'Si un destinatario falla al encolar, se revierte todo.');
+
+$fails(static fn() => $comms->send($caseId, ['channels' => []] + $send, [], $actor), 'al menos un canal');
+$fails(static fn() => $comms->send($caseId, ['subject' => ''] + $send, [], $actor), 'asunto');
+$fails(static fn() => $comms->send($caseId, ['body' => '<p> </p>'] + $send, [], $actor), 'contenido');
+$fails(static fn() => $comms->send($caseId, ['body' => '<p>{{inventada}}</p>'] + $send, [], $actor), 'Variable no reconocida');
+$fails(static fn() => $comms->send($caseId, ['recipients' => []] + $send, [], $actor), 'destinatario principal');
+$fails(static fn() => $comms->send($caseId, ['recipients' => [['party_id' => 99999]]] + $send, [], $actor), 'ya no está');
+$fails(static fn() => $comms->send($caseId, ['recipients' => [['email' => 'x@example.com', 'kind' => 'cc']]] + $send, [], $actor), 'destinatario principal');
+$fails(static fn() => $comms->send($caseId, ['recipients' => [['phone' => '3001112222', 'kind' => 'to'], ['email' => 'x@example.com', 'kind' => 'cc']], 'channels' => ['whatsapp']] + $send, [], $actor), 'no se puede poner en copia');
+$fails(static fn() => $comms->send($caseId, ['recipients' => [['name' => 'Solo correo', 'email' => 'x@example.com']], 'channels' => ['whatsapp']] + $send, [], $actor), 'no tiene datos de contacto');
+$fails(static fn() => $comms->send($caseId, ['recipients' => [['email' => 'malo']]] + $send, [], $actor), 'no es válido');
+$fails(static fn() => $comms->send($caseId, ['document_ids' => [99999]] + $send, [], $actor), 'no pertenece al caso');
+$fails(static fn() => $comms->send($caseId, $send, [], ['email' => ''] + $actor), 'correo válido');
+$noContract = $service->create(['contract_id' => 0, 'property' => '', 'address' => ''] + $base, [['role' => 'tercero', 'name' => 'T', 'email' => 't@example.com']], $actor);
+$fails(static fn() => $comms->send($noContract, ['document_ids' => [], 'recipients' => [['email' => 't@example.com']]] + $send, [], $actor), 'no tiene contrato');
+file_put_contents($uploadDir . '/' . $stored, 'alterado');
+$fails(static fn() => $comms->send($caseId, $send, [], $actor), 'cambió desde que se cargó');
+unlink($uploadDir . '/' . $stored);
+$fails(static fn() => $comms->send($caseId, $send, [], $actor), 'No se encontró el archivo');
+$check($counts()[0] === $snapshot[0], 'Lo rechazado no deja comunicaciones.');
+
+$soloWa = $comms->send($caseId, ['channels' => ['whatsapp'], 'document_ids' => [], 'recipients' => [['party_id' => $tenant['id']]]] + $send, [], ['email' => ''] + $actor);
+$check($soloWa['email'] === 0 && $soloWa['whatsapp'] === 1, 'Solo WhatsApp no exige correo del funcionario.');
+
+$check($comms->list(['recipient' => 'abogado'])['total'] === 1 && $comms->list(['recipient' => 'nadie'])['total'] === 0, 'Busca comunicaciones por destinatario.');
+$check($comms->list(['case' => (string) $caseId])['total'] === 2 && $comms->list(['channel' => 'email'])['total'] === 1 && $comms->list(['channel' => 'whatsapp'])['total'] === 2, 'Filtra por caso y canal.');
+$check($comms->list(['from' => date('Y-m-d', strtotime('+2 days'))])['total'] === 0 && $comms->list(['to' => date('Y-m-d', strtotime('+2 days'))])['total'] === 2, 'Filtra por fechas.');
+$fails(static fn() => $comms->list(['from' => 'ayer']), 'fecha del filtro');
+$listed = $comms->list(['channel' => 'email'])['rows'][0];
+$check($listed['failed'] === 1 && $listed['recipients'] === ['Pedro Dueño', 'Laura Inquilina', 'adicional@example.com'], 'Resume destinatarios y fallos.');
+
+$templateId = $comms->saveTemplate(0, ['name' => 'Requerimiento', 'subject' => 'Caso {{codigo_caso}}', 'body' => '<p onclick="x">{{fecha}}</p>', 'active' => true], $actor);
+$check(!str_contains($comms->templates(true)[0]['body_html'], 'onclick'), 'Las plantillas se sanitizan.');
+$comms->saveTemplate($templateId, ['name' => 'Requerimiento', 'subject' => 'x', 'body' => '<p>y</p>', 'active' => false], $actor);
+$check($comms->templates(true) === [] && count($comms->templates()) === 1, 'Una plantilla inactiva deja de ofrecerse.');
+$fails(static fn() => $comms->saveTemplate(0, ['name' => 'X', 'subject' => '', 'body' => '<p>{{otra}}</p>'], $actor), 'Variable no reconocida');
+$service->saveType(0, 'Tutela', true);
+$fails(static fn() => $service->saveType(0, 'tutela', true), 'Ya existe');
+$tutela = array_values(array_filter($service->types(), static fn($t) => $t['name'] === 'Tutela'))[0];
+$service->saveType($tutela['id'], 'Tutela', false);
+$check(!in_array('Tutela', array_column($service->types(true), 'name'), true), 'Un tipo inactivo deja de ofrecerse.');
+$handlersSource = (string) file_get_contents(dirname(__DIR__) . '/src/App/Concerns/HandlesLegalCases.php');
+$check(!preg_match('/ajax_handler_legal_case_(?:communication_)?(?:edit|delete|update)\b/', $handlersSource), 'No existe acción para editar o borrar comunicaciones.');
+array_map('unlink', glob($uploadDir . '/*') ?: []);
+rmdir($uploadDir);
+
 $root = dirname(__DIR__);
 foreach (['legal_case_manage', 'legal_case_send', 'legal_case_config', 'legal_case_export'] as $action) {
   $check(str_contains((string) file_get_contents($root . '/src/App/SuCasaControlServiciosInmobiliarios.php'), "'{$action}' =>"), "La acción {$action} está en el catálogo.");

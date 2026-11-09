@@ -120,6 +120,26 @@ body.scm-lc-modal-open { overflow: hidden; }
 #scm-app .scm-lc-preview-image { display: block; max-width: 100%; max-height: 65vh; margin: 0 auto; border-radius: 10px; }
 #scm-app .scm-lc-hint code { font-size: 11px; overflow-wrap: anywhere; }
 
+#scm-app .scm-lc-view { display: flex; flex-direction: column; gap: 14px; }
+#scm-app .scm-lc-view[hidden] { display: none; }
+#scm-app .scm-lc-channels { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 0; padding: 0; border: 0; font-size: 13px; }
+#scm-app .scm-lc-channels legend { padding: 0 0 4px; font-size: 12px; font-weight: 600; color: #334155; }
+#scm-app .scm-lc-channels label, #scm-app .scm-lc-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+#scm-app .scm-lc-check-list { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+#scm-app .scm-lc-check-list small { color: var(--lc-muted); }
+#scm-app .scm-lc-editor { min-height: 220px; background: #fff; font-size: 14px; }
+#scm-app .scm-lc-editor .ql-editor { min-height: 200px; }
+#scm-app .scm-lc-letter { padding: 14px 16px; border: 1px solid var(--lc-line); border-radius: 10px; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+#scm-app .scm-lc-letter h3 { margin: 0 0 10px; font-size: 15px; }
+#scm-app .scm-lc-letter p { margin: 0 0 10px; }
+#scm-app .scm-lc-letter ul, #scm-app .scm-lc-letter ol { margin: 0 0 10px; padding-left: 22px; }
+#scm-app .scm-lc-letter a { text-decoration: underline; }
+#scm-app .scm-lc-hash-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13px; overflow-wrap: anywhere; }
+#scm-app .scm-lc-hash-list small { display: block; font-size: 11px; color: var(--lc-muted); }
+#scm-app .scm-lc-badge.is-comm-en_cola { background: #fef3c7; color: #92400e; }
+#scm-app .scm-lc-badge.is-comm-enviado { background: #d1fae5; color: #065f46; }
+#scm-app .scm-lc-badge.is-comm-fallido { background: #ffe4e6; color: #9f1239; }
+
 @media (max-width: 720px) {
   #scm-app .scm-lc-field-wide { grid-column: 1 / -1; }
   #scm-app .scm-lc-search { grid-template-columns: 1fr; }

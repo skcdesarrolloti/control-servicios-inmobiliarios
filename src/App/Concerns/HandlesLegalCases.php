@@ -7,6 +7,8 @@ namespace SCM\App\Concerns;
 use SCM\Core\App;
 use SCM\Core\Auth;
 use SCM\Modules\LegalCases\LegalCaseService;
+use SCM\Modules\LegalCases\LegalCommunicationService;
+use SCM\Modules\LegalCases\LegalDeliveryGateway;
 use SCM\Modules\PublicTickets\PublicTicketsService;
 use SCM\Support\FuncionarioOptions;
 use SCM\Support\SchemaInspector;
@@ -135,6 +137,128 @@ trait HandlesLegalCases
     }
   }
 
+  private function legalCommunicationService(LegalCaseService $service): LegalCommunicationService
+  {
+    return new LegalCommunicationService($this->db, $service, $this->storedFiles(), new LegalDeliveryGateway($this->db));
+  }
+
+  /** El cuerpo llega con HTML: LegalHtmlSanitizer lo limpia con lista blanca en el servicio. @return array<string,mixed> */
+  private function legalCommunicationInput(): array
+  {
+    $list = static function (string $key): array {
+      $decoded = json_decode(wp_unslash((string) ($_POST[$key] ?? '[]')), true);
+      return is_array($decoded) ? array_values($decoded) : [];
+    };
+    return ['channels' => $list('channels'), 'recipients' => $list('recipients'), 'document_ids' => $list('document_ids'), 'subject' => $this->legalCasePost('subject'), 'body' => wp_unslash((string) ($_POST['body'] ?? '')), 'template_id' => (int) ($_POST['template_id'] ?? 0)];
+  }
+
+  public function ajax_handler_legal_case_preview(): void
+  {
+    $service = $this->legalCaseService();
+    $this->requireDashboardAction('legal_case_send', 'Tu cargo no tiene permiso para enviar comunicaciones.');
+    try {
+      $this->jsonOk($this->legalCommunicationService($service)->preview((int) ($_POST['case_id'] ?? 0), $this->legalCommunicationInput(), $this->legalCaseActor()));
+    } catch (\Throwable $error) {
+      $this->legalCaseFail($error, 'No se pudo preparar la vista previa.');
+    }
+  }
+
+  /** Con el recibo por request_id, un doble clic o un reintento de red devuelve el mismo envío en vez de repetirlo. */
+  public function ajax_handler_legal_case_send(): void
+  {
+    $service = $this->legalCaseService();
+    $this->requireDashboardAction('legal_case_send', 'Tu cargo no tiene permiso para enviar comunicaciones.');
+    $requestId = (string) ($_POST['request_id'] ?? '');
+    if (preg_match('/^[a-f0-9-]{36}$/D', $requestId) !== 1) $this->jsonFail('Identificador de solicitud inválido. Abre nuevamente el formulario.');
+    $directory = SCM_STORAGE_PATH . '/data/legal-communication-receipts';
+    if (!is_dir($directory) && !@mkdir($directory, 0750, true) && !is_dir($directory)) $this->jsonFail('No se pudo iniciar el envío.');
+    $receipt = fopen($directory . '/' . hash('sha256', Auth::employeeId() . ':' . $requestId) . '.json', 'c+');
+    if (!$receipt || !flock($receipt, LOCK_EX)) $this->jsonFail('No se pudo bloquear la solicitud. Intenta nuevamente.');
+    $result = null;
+    $failure = null;
+    try {
+      $saved = json_decode((string) stream_get_contents($receipt), true);
+      if (is_array($saved) && !empty($saved['communication_id'])) {
+        $result = $saved;
+      } else {
+        $result = $this->legalCommunicationService($service)->send((int) ($_POST['case_id'] ?? 0), $this->legalCommunicationInput(), $this->legalCaseUploads('files'), $this->legalCaseActor());
+        rewind($receipt);
+        ftruncate($receipt, 0);
+        fwrite($receipt, (string) json_encode($result));
+        fflush($receipt);
+      }
+    } catch (\Throwable $error) {
+      $failure = $error;
+    } finally {
+      flock($receipt, LOCK_UN);
+      fclose($receipt);
+    }
+    if ($failure !== null) $this->legalCaseFail($failure, 'No se pudo enviar la comunicación. No se envió nada.');
+    $this->jsonOk($result + ['message' => 'Comunicación enviada a la cola.']);
+  }
+
+  public function ajax_handler_legal_case_communication(): void
+  {
+    $service = $this->legalCaseService();
+    try {
+      $this->jsonOk($this->legalCommunicationService($service)->communication((int) ($_POST['communication_id'] ?? 0)));
+    } catch (\Throwable $error) {
+      $this->legalCaseFail($error, 'No se pudo abrir la comunicación.');
+    }
+  }
+
+  public function ajax_handler_legal_case_communications(): void
+  {
+    $service = $this->legalCaseService();
+    try {
+      $filters = [];
+      foreach (['recipient', 'case', 'channel', 'from', 'to'] as $key) $filters[$key] = $this->legalCasePost($key);
+      $this->jsonOk($this->legalCommunicationService($service)->list($filters, (int) ($_POST['page'] ?? 1)));
+    } catch (\Throwable $error) {
+      $this->legalCaseFail($error, 'No se pudieron cargar las comunicaciones.');
+    }
+  }
+
+  private function legalCaseConfigService(): LegalCaseService
+  {
+    $service = $this->legalCaseService();
+    $this->requireDashboardAction('legal_case_config', 'Tu cargo no tiene permiso para configurar los casos jurídicos.');
+    return $service;
+  }
+
+  public function ajax_handler_legal_case_config(): void
+  {
+    $service = $this->legalCaseConfigService();
+    try {
+      $this->jsonOk(['types' => $service->types(), 'templates' => $this->legalCommunicationService($service)->templates(), 'variables' => LegalCommunicationService::VARIABLES]);
+    } catch (\Throwable $error) {
+      $this->legalCaseFail($error, 'No se pudo cargar la configuración.');
+    }
+  }
+
+  public function ajax_handler_legal_case_type_save(): void
+  {
+    $service = $this->legalCaseConfigService();
+    try {
+      $service->saveType((int) ($_POST['id'] ?? 0), $this->legalCasePost('name'), $this->legalCasePost('active') === '1');
+      $this->jsonOk(['message' => 'Tipo guardado.']);
+    } catch (\Throwable $error) {
+      $this->legalCaseFail($error, 'No se pudo guardar el tipo.');
+    }
+  }
+
+  public function ajax_handler_legal_case_template_save(): void
+  {
+    $service = $this->legalCaseConfigService();
+    try {
+      $input = ['name' => $this->legalCasePost('name'), 'subject' => $this->legalCasePost('subject'), 'body' => wp_unslash((string) ($_POST['body'] ?? '')), 'active' => $this->legalCasePost('active') === '1'];
+      $this->legalCommunicationService($service)->saveTemplate((int) ($_POST['id'] ?? 0), $input, $this->legalCaseActor());
+      $this->jsonOk(['message' => 'Plantilla guardada.']);
+    } catch (\Throwable $error) {
+      $this->legalCaseFail($error, 'No se pudo guardar la plantilla.');
+    }
+  }
+
   public function ajax_handler_legal_case_bootstrap(): void
   {
     $service = $this->legalCaseService();
@@ -145,6 +269,8 @@ trait HandlesLegalCases
         'statuses' => LegalCaseService::STATUSES,
         'roles' => LegalCaseService::ROLES,
         'employee_id' => Auth::employeeId(),
+        'templates' => $this->legalCommunicationService($service)->templates(true),
+        'variables' => LegalCommunicationService::VARIABLES,
       ]);
     } catch (\Throwable $error) {
       $this->legalCaseFail($error, 'No se pudo cargar el módulo.');

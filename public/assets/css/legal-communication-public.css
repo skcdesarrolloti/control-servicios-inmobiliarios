@@ -1,0 +1,45 @@
+/* Vista pública de una comunicación de Casos jurídicos */
+:root { --lcp-navy: #061d49; --lcp-line: #e2e8f0; --lcp-muted: #64748b; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #f8fafc; color: #1e293b; font: 15px/1.6 Arial, Helvetica, sans-serif; }
+.lcp-page { max-width: 760px; margin: 0 auto; padding: 24px 16px 40px; }
+.lcp-actions { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.lcp-button { display: inline-block; padding: 8px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--lcp-navy); font: 600 13px Arial, Helvetica, sans-serif; text-decoration: none; cursor: pointer; }
+.lcp-card { padding: 28px; border: 1px solid var(--lcp-line); border-radius: 10px; background: #fff; overflow-wrap: anywhere; }
+.lcp-brand { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #f59120; }
+.lcp-card h1 { margin: 0 0 16px; font-size: 22px; line-height: 1.3; color: var(--lcp-navy); }
+.lcp-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 0 0 20px; padding: 12px 0; border-top: 1px solid var(--lcp-line); border-bottom: 1px solid var(--lcp-line); }
+.lcp-meta dt { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--lcp-muted); }
+.lcp-meta dd { margin: 0; }
+.lcp-letter p { margin: 0 0 12px; }
+.lcp-letter h2, .lcp-letter h3, .lcp-letter h4 { margin: 18px 0 8px; color: var(--lcp-navy); }
+.lcp-letter blockquote { margin: 0 0 12px; padding-left: 12px; border-left: 3px solid var(--lcp-line); color: #475569; }
+.lcp-attachments { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--lcp-line); }
+.lcp-attachments h2 { margin: 0 0 8px; font-size: 15px; color: var(--lcp-navy); }
+.lcp-attachments ul { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.lcp-file { width: 100%; padding: 9px 12px; border: 1px solid var(--lcp-line); border-radius: 8px; background: #fff; color: var(--lcp-navy); font: 14px Arial, Helvetica, sans-serif; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.lcp-file small { color: var(--lcp-muted); }
+.lcp-dialog { width: min(920px, calc(100vw - 24px)); height: min(86vh, 900px); padding: 0; border: 0; border-radius: 10px; }
+.lcp-dialog[open] { display: flex; flex-direction: column; }
+.lcp-dialog::backdrop { background: rgba(6, 29, 73, .55); }
+.lcp-dialog header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--lcp-line); overflow-wrap: anywhere; }
+.lcp-dialog [data-lcp-body] { flex: 1; min-height: 0; padding: 0; text-align: center; overflow: auto; }
+.lcp-dialog iframe { display: block; width: 100%; height: 100%; border: 0; }
+.lcp-dialog img { max-width: 100%; }
+.lcp-dialog p { padding: 24px; }
+@media (max-width: 520px) { .lcp-card { padding: 18px; } .lcp-card h1 { font-size: 19px; } }
+@media print {
+  @page { size: letter; margin: 15mm; }
+  body { background: #fff; font-size: 11pt; line-height: 1.4; }
+  .lcp-page { max-width: none; padding: 0; }
+  .lcp-actions, .lcp-dialog { display: none !important; }
+  .lcp-card { padding: 0; border: 0; }
+  .lcp-card h1 { font-size: 15pt; margin-bottom: 8px; }
+  .lcp-meta { grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; padding: 6px 0; }
+  .lcp-meta dt { font-size: 8pt; }
+  .lcp-letter p { margin-bottom: 6px; }
+  .lcp-letter > p:last-child, .lcp-attachments, .lcp-attachments li, .lcp-meta { break-inside: avoid; page-break-inside: avoid; }
+  .lcp-attachments { margin-top: 10px; padding-top: 8px; }
+  .lcp-attachments h2 { font-size: 11pt; margin-bottom: 4px; }
+  .lcp-file { padding: 2px 0; border: 0; font-size: 10pt; }
+}

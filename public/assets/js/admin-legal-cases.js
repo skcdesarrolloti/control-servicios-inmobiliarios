@@ -49,13 +49,19 @@
 
     var panel = module.closest(".scm-tab-panel");
     var canManage = module.getAttribute("data-can-manage") === "1";
+    var canSend = module.getAttribute("data-can-send") === "1";
+    var canConfig = module.getAttribute("data-can-config") === "1";
+    var commFiltersEl = module.querySelector("[data-scm-lc-comm-filters]");
+    var commListEl = module.querySelector("[data-scm-lc-comm-list]");
+    var commPagerEl = module.querySelector("[data-scm-lc-comm-pager]");
+    var commStatusEl = module.querySelector("[data-scm-lc-comm-status]");
     var statusEl = module.querySelector("[data-scm-lc-status]");
     var listEl = module.querySelector("[data-scm-lc-list]");
     var kpisEl = module.querySelector("[data-scm-lc-kpis]");
     var pagerEl = module.querySelector("[data-scm-lc-pager]");
     var modalsEl = module.querySelector("[data-scm-lc-modals]");
     var filtersEl = module.querySelector("[data-scm-lc-filters]");
-    var state = { boot: null, page: 1, loading: null, modals: [] };
+    var state = { boot: null, page: 1, loading: null, modals: [], commPage: 1, commLoaded: false, view: "cases" };
     var searchTimer = 0;
 
     function setStatus(message, tone) {
@@ -359,6 +365,7 @@
         case "parte_agregada":
         case "parte_retirada": return esc(details.nombre) + " · " + esc(details.rol);
         case "nota": return '<div class="scm-lc-event-text">' + esc(details.texto) + "</div>";
+        case "comunicacion_enviada": return "<strong>" + esc(details.asunto) + "</strong><br>" + esc((details.canales || []).join(" y ")) + " · Para: " + esc((details.destinatarios || []).join(", ")) + (details.communication_id ? '<br><button type="button" class="scm-lc-link" data-scm-lc-comm="' + Number(details.communication_id) + '">Ver comunicación</button>' : "");
         case "respuesta_registrada": return "De " + esc(details.remitente) + " · " + esc(details.canal) + " · recibida el " + esc(formatDate(details.fecha_recepcion)) + (details.asunto ? "<br><strong>" + esc(details.asunto) + "</strong>" : "") + '<div class="scm-lc-event-text">' + esc(details.texto) + "</div>";
         default: return "";
       }
@@ -459,9 +466,10 @@
     function renderDetail(modal, data) {
       var item = data.case;
       modal.setTitle(item.code + " · " + item.name);
-      var actions = canManage
-        ? '<div class="scm-lc-actions"><button type="button" class="scm-lc-btn" data-scm-lc-edit>Editar</button><button type="button" class="scm-lc-btn" data-scm-lc-status-open>Cambiar estado</button></div>'
-        : "";
+      var actions = '<div class="scm-lc-actions">'
+        + (canManage ? '<button type="button" class="scm-lc-btn" data-scm-lc-edit>Editar</button><button type="button" class="scm-lc-btn" data-scm-lc-status-open>Cambiar estado</button>' : "")
+        + (canSend ? '<button type="button" class="scm-lc-btn scm-lc-btn-primary" data-scm-lc-compose>Nueva comunicación</button>' : "")
+        + "</div>";
       modal.body.innerHTML = '<div class="scm-lc-section-head"><span class="scm-lc-badge is-' + esc(item.status) + '">' + esc(item.status_label) + "</span>" + actions + "</div>"
         + '<dl class="scm-lc-info">' + info("Tipo", item.type_name) + info("Responsable", item.responsible_name) + info("Contrato", item.contract_code || "Sin contrato") + info("Inmueble", [item.property, item.address].filter(Boolean).join(" · ") || "Sin inmueble") + info("Apertura", formatDate(item.opened_date)) + info("Fecha límite", item.due_date ? formatDate(item.due_date) : "Sin fecha") + info("Próxima acción", item.next_action || "Sin definir") + "</dl>"
         + (item.description ? '<div class="scm-lc-section"><h3>Descripción</h3><div class="scm-lc-description">' + esc(item.description) + "</div></div>" : "")
@@ -495,6 +503,7 @@
         if (target.closest("[data-scm-lc-edit]")) openCaseForm(data.case, function () { reloadDetail(modal, id); });
         if (target.closest("[data-scm-lc-status-open]")) openStatusForm(data.case, modal);
         if (target.closest("[data-scm-lc-party-new]")) openPartyForm(data.case, modal);
+        if (target.closest("[data-scm-lc-compose]")) openCompose(data, modal);
         if (target.closest("[data-scm-lc-note]")) openNoteForm(data.case, modal);
         if (target.closest("[data-scm-lc-reply]")) openReplyForm(data.case, modal);
         if (target.closest("[data-scm-lc-upload]")) openDocumentsForm(data.case, modal);
@@ -557,10 +566,350 @@
       });
     }
 
+    // --- Editor enriquecido: se carga solo cuando alguien lo abre.
+    function loadQuill() {
+      if (window.Quill) return Promise.resolve();
+      if (state.quill) return state.quill;
+      state.quill = new Promise(function (resolve, reject) {
+        var link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = module.getAttribute("data-quill-css");
+        document.head.appendChild(link);
+        var script = document.createElement("script");
+        script.src = module.getAttribute("data-quill-js");
+        script.onload = resolve;
+        script.onerror = function () {
+          state.quill = null;
+          reject(new Error("No se pudo cargar el editor. Recarga la página."));
+        };
+        document.head.appendChild(script);
+      });
+      return state.quill;
+    }
+
+    function mountEditor(holder, html) {
+      var quill = new window.Quill(holder, { theme: "snow", modules: { toolbar: [[{ header: [2, 3, false] }], ["bold", "italic", "underline"], [{ list: "ordered" }, { list: "bullet" }], ["blockquote", "link"], ["clean"]] } });
+      if (html) quill.clipboard.dangerouslyPasteHTML(html);
+      return quill;
+    }
+
+    function insertVariable(quill, name) {
+      var range = quill.getSelection(true);
+      var text = "{{" + name + "}}";
+      quill.insertText(range.index, text, "user");
+      quill.setSelection(range.index + text.length, 0, "user");
+    }
+
+    function variableChips(variables) {
+      return '<div class="scm-lc-chips" role="group" aria-label="Insertar variable">' + variables.map(function (name) { return '<button type="button" class="scm-lc-chip" data-scm-lc-var="' + esc(name) + '">{{' + esc(name) + "}}</button>"; }).join("") + "</div>";
+    }
+
+    function requestId() {
+      if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+      var bytes = window.crypto.getRandomValues(new Uint8Array(16));
+      var hex = Array.prototype.map.call(bytes, function (byte) { return byte.toString(16).padStart(2, "0"); }).join("");
+      return hex.slice(0, 8) + "-" + hex.slice(8, 12) + "-" + hex.slice(12, 16) + "-" + hex.slice(16, 20) + "-" + hex.slice(20);
+    }
+
+    // --- Nueva comunicación
+    function openCompose(data, detailModal) {
+      var item = data.case;
+      var manual = [];
+      var html = '<form class="scm-lc-form" autocomplete="off">'
+        + '<section class="scm-lc-section"><h3>Destinatarios</h3>'
+        + (data.parties.length ? '<table class="scm-lc-table"><thead><tr><th>Parte</th><th>Contacto</th><th>Incluir como</th></tr></thead><tbody>' + data.parties.map(function (party) {
+          return '<tr><td>' + esc(party.name) + "<small>" + esc(party.role_label) + '</small></td><td data-label="Contacto">' + esc(party.email || "Sin correo") + "<small>" + esc(party.phone || "Sin celular") + '</small></td><td data-label="Incluir"><select data-scm-lc-party="' + party.id + '" aria-label="Incluir a ' + esc(party.name) + '"><option value="">No incluir</option><option value="to">Para</option><option value="cc">Copia</option></select></td></tr>';
+        }).join("") + "</tbody></table>" : '<p class="scm-lc-hint">El caso no tiene partes; agrega destinatarios abajo.</p>')
+        + '<div class="scm-lc-parties" data-scm-lc-manual-list></div>'
+        + '<details><summary>Escribir otro destinatario</summary><div class="scm-lc-grid"><label class="scm-lc-field"><span>Nombre</span><input data-scm-lc-manual="name" maxlength="190"></label><label class="scm-lc-field"><span>Correo</span><input type="email" data-scm-lc-manual="email" maxlength="190"></label><label class="scm-lc-field"><span>Celular</span><input data-scm-lc-manual="phone" maxlength="40"></label><label class="scm-lc-field"><span>Incluir como</span><select data-scm-lc-manual="kind"><option value="to">Para</option><option value="cc">Copia</option></select></label></div><div class="scm-lc-form-actions"><button type="button" class="scm-lc-btn scm-lc-btn-sm" data-scm-lc-manual-add>Agregar destinatario</button></div></details>'
+        + '<p class="scm-lc-hint">Las copias reciben el mensaje del primer destinatario con correo.</p></section>'
+        + '<section class="scm-lc-section"><h3>Mensaje</h3><div class="scm-lc-grid">'
+        + '<label class="scm-lc-field"><span>Plantilla (opcional)</span><select data-scm-lc-template>' + options(state.boot.templates.map(function (template) { return { value: template.id, label: template.name }; }), "", "Sin plantilla") + "</select></label>"
+        + '<fieldset class="scm-lc-channels"><legend>Canales</legend><label><input type="checkbox" data-scm-lc-channel="email" checked> Correo</label><label><input type="checkbox" data-scm-lc-channel="whatsapp"> WhatsApp</label></fieldset>'
+        + '<label class="scm-lc-field scm-lc-field-full"><span>Asunto</span><input name="subject" maxlength="200" required></label></div>'
+        + variableChips(state.boot.variables)
+        + '<div class="scm-lc-editor" data-scm-lc-editor></div>'
+        + '<p class="scm-lc-hint">Las respuestas por correo llegan a tu buzón. Por WhatsApp se envía un aviso con enlace para leer el mensaje completo.</p></section>'
+        + '<section class="scm-lc-section"><h3>Adjuntos</h3>'
+        + (data.documents.length ? '<div class="scm-lc-check-list">' + data.documents.map(function (doc) { return '<label><input type="checkbox" data-scm-lc-attach="' + doc.id + '"> ' + esc(doc.name) + " <small>" + esc(fileSize(doc.bytes)) + "</small></label>"; }).join("") + "</div>" : "")
+        + '<label class="scm-lc-field"><span>Cargar archivos nuevos</span>' + FILE_INPUT + "</label></section>"
+        + '<div class="scm-lc-form-actions"><button type="button" class="scm-lc-btn" data-scm-lc-close>Cancelar</button><button type="submit" class="scm-lc-btn scm-lc-btn-primary" disabled>Revisar y enviar</button></div></form>';
+      var modal = openModal("Nueva comunicación · " + item.code, html, true);
+      var form = modal.body.querySelector("form");
+      var submit = form.querySelector('[type="submit"]');
+      var uuid = requestId();
+      var quill = null;
+
+      loadQuill().then(function () {
+        quill = mountEditor(form.querySelector("[data-scm-lc-editor]"), "");
+        submit.disabled = false;
+      }).catch(function (error) { formError(form, error.message); });
+
+      function renderManual() {
+        form.querySelector("[data-scm-lc-manual-list]").innerHTML = manual.map(function (person, index) {
+          return '<div class="scm-lc-party"><div><strong>' + esc(person.name || person.email || person.phone) + "</strong><small>" + (person.kind === "cc" ? "Copia" : "Para") + " · " + esc([person.email, person.phone].filter(Boolean).join(" · ")) + '</small></div><button type="button" class="scm-lc-icon-btn" data-scm-lc-manual-remove="' + index + '" aria-label="Quitar"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div>';
+        }).join("");
+      }
+
+      function applyTemplate(template) {
+        form.elements.subject.value = template.subject;
+        quill.setText("");
+        quill.clipboard.dangerouslyPasteHTML(template.body_html);
+      }
+
+      function fields() {
+        var channels = Array.prototype.filter.call(form.querySelectorAll("[data-scm-lc-channel]"), function (box) { return box.checked; }).map(function (box) { return box.getAttribute("data-scm-lc-channel"); });
+        var recipients = Array.prototype.filter.call(form.querySelectorAll("[data-scm-lc-party]"), function (select) { return select.value; }).map(function (select) { return { party_id: Number(select.getAttribute("data-scm-lc-party")), kind: select.value }; }).concat(manual);
+        var documents = Array.prototype.filter.call(form.querySelectorAll("[data-scm-lc-attach]"), function (box) { return box.checked; }).map(function (box) { return Number(box.getAttribute("data-scm-lc-attach")); });
+        var body = new FormData();
+        body.append("case_id", item.id);
+        body.append("channels", JSON.stringify(channels));
+        body.append("recipients", JSON.stringify(recipients));
+        body.append("document_ids", JSON.stringify(documents));
+        body.append("subject", form.elements.subject.value);
+        body.append("body", quill.getSemanticHTML());
+        body.append("template_id", form.querySelector("[data-scm-lc-template]").value || 0);
+        return body;
+      }
+
+      form.addEventListener("click", function (event) {
+        var target = event.target;
+        var variable = target.closest("[data-scm-lc-var]");
+        if (variable && quill) return insertVariable(quill, variable.getAttribute("data-scm-lc-var"));
+        if (target.closest("[data-scm-lc-manual-add]")) {
+          var person = {};
+          form.querySelectorAll("[data-scm-lc-manual]").forEach(function (field) { person[field.getAttribute("data-scm-lc-manual")] = field.value.trim(); });
+          if (!person.email && !person.phone) return formError(form, "Escribe el correo o el celular del destinatario.");
+          manual.push(person);
+          form.querySelectorAll("input[data-scm-lc-manual]").forEach(function (field) { field.value = ""; });
+          return renderManual();
+        }
+        var removeManual = target.closest("[data-scm-lc-manual-remove]");
+        if (removeManual) {
+          manual.splice(Number(removeManual.getAttribute("data-scm-lc-manual-remove")), 1);
+          return renderManual();
+        }
+        return undefined;
+      });
+      form.querySelector("[data-scm-lc-template]").addEventListener("change", function (event) {
+        var select = event.target;
+        var template = state.boot.templates.filter(function (candidate) { return String(candidate.id) === select.value; })[0];
+        if (!template || !quill) return;
+        if (quill.getText().trim() === "" && form.elements.subject.value.trim() === "") return applyTemplate(template);
+        openReplaceConfirm(template, select);
+      });
+
+      function openReplaceConfirm(template, select) {
+        var confirmModal = openModal("Usar plantilla", "<p>Se reemplazarán el asunto y el contenido que ya escribiste.</p>" + '<div class="scm-lc-form-actions"><button type="button" class="scm-lc-btn" data-scm-lc-close>Conservar lo escrito</button><button type="button" class="scm-lc-btn scm-lc-btn-primary" data-scm-lc-accept>Reemplazar</button></div>');
+        confirmModal.body.querySelector("[data-scm-lc-close]").addEventListener("click", function () { select.value = ""; });
+        confirmModal.body.querySelector("[data-scm-lc-accept]").addEventListener("click", function () {
+          applyTemplate(template);
+          confirmModal.close();
+        });
+      }
+
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var holder = form.querySelector(".scm-lc-form-error");
+        if (holder) holder.remove();
+        submit.disabled = true;
+        request("scm_legal_case_preview", fields()).then(function (preview) {
+          submit.disabled = false;
+          openSendReview(preview, function () {
+            var body = fields();
+            body.append("request_id", uuid);
+            Array.prototype.forEach.call(form.querySelector('input[type="file"]').files, function (file) { body.append("files[]", file); });
+            return request("scm_legal_case_send", body).then(function () {
+              modal.close();
+              loadList();
+              if (state.commLoaded) loadComms();
+              return reloadDetail(detailModal, item.id);
+            });
+          });
+        }).catch(function (error) {
+          submit.disabled = false;
+          formError(form, error.message);
+        });
+      });
+    }
+
+    function openSendReview(preview, onConfirm) {
+      var parts = [];
+      if (preview.email_count) parts.push(preview.email_count + (preview.email_count === 1 ? " correo" : " correos"));
+      if (preview.whatsapp_count) parts.push(preview.whatsapp_count + " WhatsApp");
+      var modal = openModal("Revisar antes de enviar", '<p><strong>' + esc(parts.join(" y ")) + "</strong> a: " + esc(preview.recipients.map(function (person) { return person.name; }).join(", ")) + (preview.cc.length ? "<br>Copia: " + esc(preview.cc.join(", ")) : "") + (preview.reply_to ? "<br>Las respuestas llegarán a: " + esc(preview.reply_to) : "") + "</p>"
+        + '<p class="scm-lc-hint">Vista previa para ' + esc(preview.addressee) + ". Una vez enviada, la comunicación no se puede editar ni borrar.</p>"
+        + '<article class="scm-lc-letter"><h3>' + esc(preview.subject) + "</h3>" + preview.html + "</article>"
+        + '<div class="scm-lc-form-actions"><button type="button" class="scm-lc-btn" data-scm-lc-close>Volver a editar</button><button type="button" class="scm-lc-btn scm-lc-btn-primary" data-scm-lc-accept>Confirmar envío</button></div>', true);
+      var button = modal.body.querySelector("[data-scm-lc-accept]");
+      button.addEventListener("click", function () {
+        button.disabled = true;
+        onConfirm().then(function () { modal.close(); }).catch(function (error) {
+          button.disabled = false;
+          formError(modal.body, error.message);
+        });
+      });
+    }
+
+    // --- Comunicaciones enviadas
+    function statusBadge(status, label) {
+      return '<span class="scm-lc-badge is-comm-' + esc(status) + '">' + esc(label) + "</span>";
+    }
+
+    function openCommunication(id) {
+      var modal = openModal("Cargando comunicación…", '<p class="scm-lc-hint">Cargando…</p>', true);
+      request("scm_legal_case_communication", { communication_id: id }).then(function (data) {
+        modal.setTitle(data.case_code + " · " + data.subject);
+        var first = data.recipients[0];
+        modal.body.innerHTML = '<dl class="scm-lc-info">' + info("Enviada por", data.sender_name) + info("Fecha", formatDateTime(data.created_at)) + info("Canales", data.channels.join(" y ")) + info("Respuestas a", data.reply_to || "No aplica") + (data.whatsapp_template ? info("Plantilla WhatsApp", data.whatsapp_template) : "") + "</dl>"
+          + '<section class="scm-lc-section"><h3>Destinatarios y estado</h3><table class="scm-lc-table"><thead><tr><th>Destinatario</th><th>Canal</th><th>Estado</th><th>Contenido</th></tr></thead><tbody>' + data.recipients.map(function (person, index) {
+            return "<tr><td>" + esc(person.name) + "<small>" + esc(person.destination) + (person.kind === "cc" ? " · Copia" : "") + '</small></td><td data-label="Canal">' + esc(person.channel_label) + '</td><td data-label="Estado">' + statusBadge(person.status, person.status_label) + "<small>" + esc(person.accepted_at ? formatDateTime(person.accepted_at) : "") + "</small><small>" + esc(person.error) + "</small><small>" + esc(person.provider_id) + '</small></td><td data-label="Contenido"><button type="button" class="scm-lc-link" data-scm-lc-rendered="' + index + '">Ver</button></td></tr>';
+          }).join("") + '</tbody></table><p class="scm-lc-hint">"Aceptado por el servidor" significa que el correo o Meta recibieron el mensaje. No confirma que haya llegado ni que se haya leído.</p></section>'
+          + (data.attachments.length ? '<section class="scm-lc-section"><h3>Adjuntos</h3><ul class="scm-lc-hash-list">' + data.attachments.map(function (file) { return '<li><a href="' + esc(file.url) + '" download>' + esc(file.name) + "</a><small>SHA-256: " + esc(file.sha256) + "</small></li>"; }).join("") + "</ul></section>" : "")
+          + '<section class="scm-lc-section"><h3>Contenido enviado</h3><p class="scm-lc-hint" data-scm-lc-rendered-who></p><article class="scm-lc-letter" data-scm-lc-rendered-body></article></section>';
+        function showRendered(person) {
+          modal.body.querySelector("[data-scm-lc-rendered-who]").textContent = person.name + " · " + person.channel_label + " · " + person.subject;
+          modal.body.querySelector("[data-scm-lc-rendered-body]").innerHTML = person.html;
+        }
+        showRendered(first);
+        modal.body.addEventListener("click", function (event) {
+          var button = event.target.closest("[data-scm-lc-rendered]");
+          if (button) showRendered(data.recipients[Number(button.getAttribute("data-scm-lc-rendered"))]);
+        });
+      }).catch(function (error) { modal.body.innerHTML = '<p class="scm-lc-form-error">' + esc(error.message) + "</p>"; });
+    }
+
+    function loadComms() {
+      var fields = {};
+      new FormData(commFiltersEl).forEach(function (value, key) { fields[key] = value; });
+      fields.page = state.commPage;
+      commStatusEl.hidden = false;
+      commStatusEl.className = "scm-lc-status";
+      commStatusEl.textContent = "Cargando comunicaciones…";
+      return request("scm_legal_case_communications", fields).then(function (data) {
+        state.commPage = data.page;
+        state.commLoaded = true;
+        commStatusEl.hidden = true;
+        commPagerEl.innerHTML = "";
+        if (!data.rows.length) {
+          commListEl.innerHTML = '<p class="scm-lc-empty">No hay comunicaciones con estos filtros.</p>';
+          return;
+        }
+        commListEl.innerHTML = '<table class="scm-lc-table"><thead><tr><th>Comunicación</th><th>Caso</th><th>Destinatarios</th><th>Canal</th><th>Estado</th></tr></thead><tbody>' + data.rows.map(function (row) {
+          var summary = row.failed ? statusBadge("fallido", row.failed + " fallido(s)") : row.queued ? statusBadge("en_cola", row.queued + " en cola") : statusBadge("enviado", "Aceptado");
+          return '<tr><td><button type="button" class="scm-lc-link" data-scm-lc-comm="' + row.id + '">' + esc(row.subject) + "</button><small>" + esc(row.sender_name) + " · " + esc(formatDateTime(row.created_at)) + '</small></td><td data-label="Caso"><button type="button" class="scm-lc-link" data-scm-lc-open="' + row.case_id + '">' + esc(row.case_code) + '</button></td><td data-label="Para">' + esc(row.recipients.join(", ")) + '</td><td data-label="Canal">' + esc(row.channels.join(" y ")) + '</td><td data-label="Estado">' + summary + "</td></tr>";
+        }).join("") + "</tbody></table>";
+        commPagerEl.innerHTML = "<span>" + data.total + (data.total === 1 ? " comunicación" : " comunicaciones") + " · Página " + data.page + " de " + data.pages + "</span>"
+          + '<button type="button" class="scm-lc-btn scm-lc-btn-sm" data-scm-lc-comm-page="' + (data.page - 1) + '"' + (data.page <= 1 ? " disabled" : "") + ">Anterior</button>"
+          + '<button type="button" class="scm-lc-btn scm-lc-btn-sm" data-scm-lc-comm-page="' + (data.page + 1) + '"' + (data.page >= data.pages ? " disabled" : "") + ">Siguiente</button>";
+      }).catch(function (error) {
+        commStatusEl.hidden = false;
+        commStatusEl.className = "scm-lc-status is-error";
+        commStatusEl.textContent = error.message;
+      });
+    }
+
+    function switchView(view) {
+      state.view = view;
+      module.querySelectorAll("[data-scm-lc-view]").forEach(function (section) { section.hidden = section.getAttribute("data-scm-lc-view") !== view; });
+      module.querySelectorAll("[data-scm-lc-view-btn]").forEach(function (button) { button.classList.toggle("is-active", button.getAttribute("data-scm-lc-view-btn") === view); });
+      if (view === "comms" && !state.commLoaded) loadComms();
+    }
+
+    // --- Configuración › Casos jurídicos (menú del encabezado)
+    function openSettings() {
+      var modal = openModal("Configuración de casos jurídicos", '<p class="scm-lc-hint">Cargando…</p>', true);
+      function refresh() {
+        return request("scm_legal_case_config", {}).then(function (data) {
+          modal.config = data;
+          modal.body.innerHTML = '<section class="scm-lc-section"><div class="scm-lc-section-head"><h3>Tipos de caso</h3><button type="button" class="scm-lc-btn scm-lc-btn-sm" data-scm-lc-type-new>Nuevo tipo</button></div><div class="scm-lc-parties">' + data.types.map(function (type) {
+            return '<div class="scm-lc-party"><div><strong>' + esc(type.name) + "</strong><small>" + (type.active ? "Activo" : "Inactivo") + '</small></div><button type="button" class="scm-lc-btn scm-lc-btn-sm" data-scm-lc-type-edit="' + type.id + '">Editar</button></div>';
+          }).join("") + '</div></section><section class="scm-lc-section"><div class="scm-lc-section-head"><h3>Plantillas de comunicación</h3><button type="button" class="scm-lc-btn scm-lc-btn-sm" data-scm-lc-template-new>Nueva plantilla</button></div><div class="scm-lc-parties">' + (data.templates.length ? data.templates.map(function (template) {
+            return '<div class="scm-lc-party"><div><strong>' + esc(template.name) + "</strong><small>" + (template.active ? "Activa" : "Inactiva") + '</small></div><button type="button" class="scm-lc-btn scm-lc-btn-sm" data-scm-lc-template-edit="' + template.id + '">Editar</button></div>';
+          }).join("") : '<p class="scm-lc-hint">Aún no hay plantillas.</p>') + "</div></section>";
+        }).catch(function (error) { modal.body.innerHTML = '<p class="scm-lc-form-error">' + esc(error.message) + "</p>"; });
+      }
+      function afterSave() {
+        // Los formularios y filtros abiertos deben ver los tipos y plantillas nuevos.
+        return Promise.all([refresh(), load(true)]);
+      }
+      modal.body.addEventListener("click", function (event) {
+        var target = event.target;
+        var data = modal.config;
+        if (!data) return;
+        var editType = target.closest("[data-scm-lc-type-edit]");
+        if (target.closest("[data-scm-lc-type-new]") || editType) {
+          var typeId = editType ? Number(editType.getAttribute("data-scm-lc-type-edit")) : 0;
+          openTypeForm(data.types.filter(function (type) { return type.id === typeId; })[0] || null, afterSave);
+        }
+        var editTemplate = target.closest("[data-scm-lc-template-edit]");
+        if (target.closest("[data-scm-lc-template-new]") || editTemplate) {
+          var templateId = editTemplate ? Number(editTemplate.getAttribute("data-scm-lc-template-edit")) : 0;
+          openTemplateForm(data.templates.filter(function (template) { return template.id === templateId; })[0] || null, data.variables, afterSave);
+        }
+      });
+      refresh();
+    }
+
+    function activeBox(checked) {
+      return '<label class="scm-lc-check"><input type="checkbox" name="active" value="1"' + (checked ? " checked" : "") + "> Activo</label>";
+    }
+
+    function openTypeForm(type, after) {
+      var modal = openModal(type ? "Editar tipo" : "Nuevo tipo", '<form class="scm-lc-form" autocomplete="off"><label class="scm-lc-field"><span>Nombre</span><input name="name" maxlength="120" required value="' + esc(type ? type.name : "") + '"></label>' + activeBox(type ? type.active : true) + FORM_ACTIONS + "</form>");
+      submitForm(modal, modal.body.querySelector("form"), "scm_legal_case_type_save", { id: type ? type.id : 0 }, after);
+    }
+
+    function openTemplateForm(template, variables, after) {
+      var modal = openModal(template ? "Editar plantilla" : "Nueva plantilla", '<form class="scm-lc-form" autocomplete="off"><label class="scm-lc-field"><span>Nombre</span><input name="name" maxlength="120" required value="' + esc(template ? template.name : "") + '"></label><label class="scm-lc-field"><span>Asunto</span><input name="subject" maxlength="200" value="' + esc(template ? template.subject : "") + '"></label>' + variableChips(variables) + '<div class="scm-lc-editor" data-scm-lc-editor></div>' + activeBox(template ? template.active : true) + FORM_ACTIONS + "</form>", true);
+      var form = modal.body.querySelector("form");
+      var submit = form.querySelector('[type="submit"]');
+      var quill = null;
+      submit.disabled = true;
+      loadQuill().then(function () {
+        quill = mountEditor(form.querySelector("[data-scm-lc-editor]"), template ? template.body_html : "");
+        submit.disabled = false;
+      }).catch(function (error) { formError(form, error.message); });
+      form.addEventListener("click", function (event) {
+        var variable = event.target.closest("[data-scm-lc-var]");
+        if (variable && quill) insertVariable(quill, variable.getAttribute("data-scm-lc-var"));
+      });
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var body = new FormData(form);
+        body.append("id", template ? template.id : 0);
+        body.append("body", quill.getSemanticHTML());
+        submit.disabled = true;
+        request("scm_legal_case_template_save", body).then(function () {
+          modal.close();
+          return after();
+        }).catch(function (error) {
+          submit.disabled = false;
+          formError(form, error.message);
+        });
+      });
+    }
+
+    document.addEventListener("click", function (event) {
+      if (canConfig && event.target.closest("[data-legal-case-settings]")) openSettings();
+    });
+
     // --- Eventos del panel
     module.addEventListener("click", function (event) {
       var target = event.target;
-      if (target.closest("[data-scm-lc-refresh]")) load(true);
+      if (target.closest("[data-scm-lc-refresh]")) {
+        load(true);
+        if (state.commLoaded) loadComms();
+      }
+      var viewButton = target.closest("[data-scm-lc-view-btn]");
+      if (viewButton) switchView(viewButton.getAttribute("data-scm-lc-view-btn"));
+      var comm = target.closest("[data-scm-lc-comm]");
+      if (comm) openCommunication(Number(comm.getAttribute("data-scm-lc-comm")));
+      var commPage = target.closest("[data-scm-lc-comm-page]");
+      if (commPage && !commPage.disabled) {
+        state.commPage = Number(commPage.getAttribute("data-scm-lc-comm-page"));
+        loadComms();
+      }
       if (target.closest("[data-scm-lc-new]") && state.boot) openCaseForm(null, openDetail);
       var open = target.closest("[data-scm-lc-open]");
       if (open) openDetail(Number(open.getAttribute("data-scm-lc-open")));
@@ -579,6 +928,16 @@
     }
     filtersEl.addEventListener("input", onFilterChange);
     filtersEl.addEventListener("change", onFilterChange);
+    var commTimer = 0;
+    function onCommFilterChange() {
+      window.clearTimeout(commTimer);
+      commTimer = window.setTimeout(function () {
+        state.commPage = 1;
+        loadComms();
+      }, 300);
+    }
+    commFiltersEl.addEventListener("input", onCommFilterChange);
+    commFiltersEl.addEventListener("change", onCommFilterChange);
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && state.modals.length) state.modals[state.modals.length - 1].close();
     });
@@ -588,6 +947,10 @@
 
   function boot() {
     document.querySelectorAll("#scm-app").forEach(init);
+    // Sin la pestaña no hay módulo que atienda la opción del menú Configuración.
+    if (!document.querySelector("[data-scm-legal-cases]")) {
+      document.querySelectorAll("[data-legal-case-settings]").forEach(function (button) { button.hidden = true; });
+    }
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot, { once: true });
