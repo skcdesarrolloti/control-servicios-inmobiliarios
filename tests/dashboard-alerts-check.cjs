@@ -31,6 +31,19 @@ const popup = slice(runtime, '    // Popup de alertas por cargo', '    function 
   assert.deepEqual(dashboardDueStats(dueRows), { total: 4, vencidos: 2, hoy: 1 }, 'pending public service reviews count as controlled, not as due today');
   assert.equal(dashboardDueTotal(dueRows), dashboardDueStats(dueRows).vencidos, 'the tab badge equals its En control card');
   assert.equal(dashboardDueTotal(dueRows.slice(0, 3), [{ count: 3, count_pending: true }]), 4, 'the popup keeps adding its summary groups');
+
+  // Con "Ver todos" el globo sale de lo que lista la pestaña, sin mostrar antes el número del popup.
+  const dueLoader = slice(runtime, '    function loadDashboardDuePopupRows() {', '    function refreshDashboardDueNavBadge(');
+  const badgeAfterLoad = seesAll => {
+    const badge = [];
+    const action = (_, params) => Promise.resolve(params.popup ? { eventos: [{ estado: 'Vencido' }], sees_all_types: seesAll } : { eventos: [{ estado: 'Vencido' }, { estado: 'Vencido' }, { estado: 'Pendiente', cuenta_pendiente: 1 }] });
+    const load = new Function('ajaxUrl', 'actionAdminDueCalendar', 'dashboardMonthRange', 'dashboardAction', 'dashboardDueTotal', 'updateDashboardDueNavBadge', 'var dashboardDuePopupPromise = null;' + dueLoader + '; return loadDashboardDuePopupRows;')('/ajax', 'due', () => ({ from: '2026-11-01', to: '2026-11-30' }), action, dashboardDueTotal, total => badge.push(total));
+    return load().then(() => new Promise(resolve => setTimeout(resolve))).then(() => badge);
+  };
+  Promise.all([badgeAfterLoad(true), badgeAfterLoad(false)]).then(([all, attended]) => {
+    assert.deepEqual(all, [3], 'with see-all the badge counts what the tab lists');
+    assert.deepEqual(attended, [1], 'without see-all the badge counts what the popup counts');
+  });
 }
 
 const rows = n => Array.from({ length: n }, (_, i) => ({ date: '06/11/2026', title: 'Crédito #' + (i + 1) + ' · ROYNER PROPIETARIO', meta: '$500.000 a 10 meses · Libre inversión · Contrato #3000', badge: 'Hace 2 días', action: { type: i % 2 ? 'owner_credit_detail' : 'owner_credit_open', id: i + 1 }, button: i % 2 ? 'Ver crédito' : 'Ver solicitud' }));

@@ -1490,16 +1490,31 @@
           rows: rows,
           summaryGroups: Array.isArray(data.summary_groups) ? data.summary_groups : [],
           allowedTypes: Array.isArray(data.allowed_types) ? data.allowed_types : null,
+          seesAllTypes: !!data.sees_all_types,
         };
       }).then(function (payload) {
         payload = payload || {};
-        updateDashboardDueNavBadge(dashboardDueTotal(payload.rows, payload.summaryGroups));
+        if (payload.seesAllTypes) updateDueNavBadgeFromTab(range);
+        else updateDashboardDueNavBadge(dashboardDueTotal(payload.rows, payload.summaryGroups));
         return payload;
       }).catch(function (error) {
         dashboardDuePopupPromise = null;
         throw error;
       });
       return dashboardDuePopupPromise;
+    }
+
+    // Con "Ver todos" la pestaña lista más que el popup: el globo cuenta lo de la pestaña, sin hacer esperar al popup.
+    function updateDueNavBadgeFromTab(range) {
+      dashboardAction(actionAdminDueCalendar, {
+        fecha_inicio: range.from,
+        fecha_fin: range.to,
+        include_summary: "1",
+      }).then(function (data) {
+        updateDashboardDueNavBadge(dashboardDueTotal(data.eventos));
+      }).catch(function (error) {
+        console.warn("No se pudo cargar el contador de vencimientos administrativos.", error);
+      });
     }
 
     function refreshDashboardDueNavBadge() {
@@ -2077,7 +2092,6 @@
       var calendarEventsRaw = [];
       var calendarEvents = [];
       var calendarDueAllEvents = [];
-      var calendarDueBadgeTypes = [];
       var calendarPendingRows = [];
       var calendarDueStats = null;
       var calendarDueSettings = {};
@@ -2879,9 +2893,7 @@
         if (isDueCalendar) {
           var dueStats = computeDueStats(rows || calendarEvents);
           var dueTotal = Number(dueStats.total || 0);
-          var dueNavTotal = dashboardDueTotal(calendarDueAllEvents.filter(function (row) {
-            return calendarDueBadgeTypes.indexOf(String(row.tipo_vencimiento || "")) !== -1;
-          }));
+          var dueNavTotal = dashboardDueTotal(calendarDueAllEvents);
           if (totalEl) totalEl.textContent = String(dueTotal);
           if (pendingEl) pendingEl.textContent = String(dueTotal);
           if (doneEl) doneEl.textContent = String(Number(dueStats.vencidos || 0));
@@ -4087,7 +4099,6 @@
       function renderDueCalendar(payload) {
         payload = payload || {};
         calendarDueAllEvents = extractRows(payload.eventos || payload.items || payload);
-        calendarDueBadgeTypes = Array.isArray(payload.badge_types) ? payload.badge_types : [];
         calendarEvents = filterDueRows(calendarDueAllEvents);
         calendarDueStats = computeDueStats(calendarEvents);
         applyDueSettings(payload.settings || {});
@@ -4108,7 +4119,6 @@
           .catch(function (err) {
             calendarEvents = [];
             calendarDueAllEvents = [];
-            calendarDueBadgeTypes = [];
             calendarDueStats = null;
             renderKpis(calendarEvents);
             renderUpcoming();

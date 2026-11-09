@@ -1984,8 +1984,6 @@ trait HandlesTicketWorkflowActions
     if ($forPopup) {
       $items = $this->adminDueMarkAssigned($items, $this->current_employee_id());
     }
-    // El globo de la pestaña sigue lo que el cargo atiende, aunque la lista muestre todos los tipos.
-    $attendedTypes = $this->adminDueTypesForCurrentCargo();
 
     $this->jsonOk([
       'settings' => $settings,
@@ -1995,7 +1993,7 @@ trait HandlesTicketWorkflowActions
       'stats' => $stats,
       'summary_groups' => $summaryGroups,
       'allowed_types' => $types,
-      'badge_types' => array_merge($attendedTypes, $this->adminDueSummaryTypes($attendedTypes)),
+      'sees_all_types' => $this->adminDueCanSeeAllTypes(),
     ]);
   }
 
