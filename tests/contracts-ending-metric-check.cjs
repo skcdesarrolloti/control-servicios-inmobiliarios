@@ -15,12 +15,13 @@ const receipt = (id, fin, abierto, estado) => ({ caso: String(9000 + id), id_con
 const increase = (id, fecha, tipo, anterior, nuevo, extra = {}) => ({ fecha, vigencia: '', tipo_aumento: tipo, id_contrato: String(id), contrato: String(1000 + id), inmueble: String(500 + id), direccion: 'CL ' + id, arrendatario: 'Inquilino ' + id, anterior, nuevo, diferencia: nuevo - anterior, porcentaje: 5, calculado: false, retroactivo: '', ...extra });
 const snapshot = {
   columns,
-  rows: [contract(1, '7', 2000000), contract(2, '7', 1500000), contract(3, '8', 1000000), contract(4, '8', 900000)],
+  rows: [contract(1, '7', 2000000), contract(2, '7', 1500000), contract(3, '8', 1000000), contract(4, '8', 900000), Object.assign(contract(5, '8', 800000), { 2: 'recibido' })],
   receipts: [
     receipt(1, iso(year, month, 15), true, 'Por recibir'),
     receipt(2, iso(year, month, 16), false, 'Recibido'),
     receipt(3, iso(year, month, 20), true, 'Por recibir'),
     receipt(4, iso(nextY, nextM, 3), true, 'Por recibir'),
+    receipt(5, iso(year, month, 21), true, 'Por recibir'),
   ],
   increases: [
     increase(1, iso(year, month, 2), 'canon', 2000000, 2100000),
@@ -67,28 +68,20 @@ const shell = (view) => `<div id="scm-app"><div class="scm-tab-panel active"><se
   assert.equal(await page.textContent('[data-scm-cm-title]'), 'Contratos por terminar');
   assert.equal(await page.inputValue('[data-scm-cm-filter="month"]'), String(month), 'it opens on the current month');
   let values = await kpis();
-  assert.equal(values['Contratos por terminar'], '3', 'only the receipt cases of the month count');
-  assert.equal(values['Por recibir'], '2');
-  assert.equal(values['Ya cerrados'], '1');
-  assert.deepEqual(await column(2), ['1001', '1002', '1003'], 'the detail is ordered by the receipt date');
-  assert.deepEqual(await column(1), ['9001', '9002', '9003'], 'each row shows its case');
+  assert.equal(values['Contratos por terminar'], '2', 'closed cases and contracts already received do not count');
+  assert.deepEqual(await column(2), ['1001', '1003'], 'only open cases show, ordered by the receipt date');
+  assert.deepEqual(await column(1), ['9001', '9003'], 'each row shows its case');
   assert.match(await page.textContent('[data-scm-cm-detail] tbody tr:first-child'), /Ana Funcionaria/, 'contract data fills what the case does not have');
-  console.log('OK Contratos por terminar lists the receipt cases of the month');
+  assert.doesNotMatch(await page.textContent('[data-scm-cm-content]'), /Resumen mensual|Recibido/, 'there is no monthly summary nor received contracts');
+  assert.equal(await page.locator('[data-scm-cm-sub-filter]').count(), 0, 'everything listed is pending, so there is no status filter');
+  console.log('OK Contratos por terminar only lists what is still to be received');
 
-  await page.selectOption('[data-scm-cm-sub-filter]', 'cerrado');
-  assert.deepEqual(await column(2), ['1002'], 'the status filter narrows the detail');
-  assert.equal((await kpis())['Contratos por terminar'], '3', 'the filter does not change the summary');
   await page.selectOption('[data-scm-cm-filter="funcionario"]', '8');
-  values = await kpis();
-  assert.equal(values['Contratos por terminar'], '1', 'the shared filters apply to the receipt cases');
+  assert.equal((await kpis())['Contratos por terminar'], '1', 'the shared filters apply to the receipt cases');
   await page.selectOption('[data-scm-cm-filter="funcionario"]', '');
-  await page.click('[data-scm-cm-pick="month"][data-value="' + month + '"]');
-  assert.equal(await page.inputValue('[data-scm-cm-filter="month"]'), '', 'tapping the month again shows the whole year');
-  if (nextY === year) {
-    await page.click('[data-scm-cm-pick="month"][data-value="' + nextM + '"]');
-    assert.deepEqual(await column(2), ['1004'], 'tapping a month filters the detail');
-  }
-  console.log('OK the filters and the monthly summary narrow the cases');
+  await page.selectOption('[data-scm-cm-filter="month"]', '');
+  assert.equal((await kpis())['Contratos por terminar'], nextY === year ? '3' : '2', 'without a month it shows the whole year');
+  console.log('OK the filters narrow the cases');
 
   await page.click('[data-scm-subview-target="aumentos"]');
   assert.equal(await page.textContent('[data-scm-cm-title]'), 'Aumentos');
@@ -108,7 +101,7 @@ const shell = (view) => `<div id="scm-app"><div class="scm-tab-panel active"><se
   await page.selectOption('[data-scm-cm-filter="month"]', '');
   await page.selectOption('[data-scm-cm-sub-filter]', '');
   assert.equal((await kpis())['Aumentos de canon'], nextY === year ? '3' : '2', 'without a month it shows the whole year');
-  assert.ok(await page.locator('[data-scm-cm-pick="month"]').count() >= 1, 'the monthly summary is available');
+  assert.doesNotMatch(await page.textContent('[data-scm-cm-content]'), /Resumen mensual/, 'there is no monthly summary');
   if (process.env.SCM_INCREASES_SHOT) await page.screenshot({ path: process.env.SCM_INCREASES_SHOT, fullPage: true });
   console.log('OK Aumentos shows the increases by month and year');
 

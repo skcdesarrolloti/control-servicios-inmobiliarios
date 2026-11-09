@@ -12,7 +12,6 @@
   var SIMI_FILTERS = { "": "Auditoría SIMI: todas", Correcto: "Correcto", Incorrecto: "Incorrecto", pendiente: "Sin auditar" };
   var INCREASE_LABELS = { canon: "Canon", admin: "Administración" };
   var SUB_FILTERS = {
-    por_terminar: { "": "Estado: todos", abierto: "Por recibir", cerrado: "Ya cerrados" },
     aumentos: { "": "Tipo: todos", canon: "Canon", admin: "Administración" },
   };
   var FILTER_LABELS = { estado: "Estado actual", funcionario: "Funcionario", tipo: "Tipo", destinacion: "Destinación", arrendatario: "Arrendatario", inmueble: "Inmueble", contrato: "Contrato" };
@@ -36,7 +35,7 @@
     por_terminar: {
       title: "Contratos por terminar",
       tab: "metricas_por_terminar",
-      subtitle: "Casos de recibo según la fecha de terminación que registró el área contractual.",
+      subtitle: "Contratos por recibir con caso de recibo abierto, según la fecha de terminación que registró el área contractual.",
     },
     aumentos: {
       title: "Aumentos",
@@ -149,10 +148,13 @@
       byId[String(row.id)] = row;
       if (row.contrato) byCode[row.contrato] = row;
     });
+    function contractOf(item) {
+      return byId[item.id_contrato] || byCode[item.contrato] || {};
+    }
     function linkToContract(items, dateKey) {
       var itemYears = {};
-      var linked = (items || []).map(function (item) {
-        var contract = byId[item.id_contrato] || byCode[item.contrato] || {};
+      var linked = items.map(function (item) {
+        var contract = contractOf(item);
         var date = item[dateKey];
         var out = Object.assign({}, item, {
           funcionario: contract.funcionario || "",
@@ -172,8 +174,11 @@
       });
       return { items: linked, years: Object.keys(itemYears).map(Number).sort(function (a, b) { return b - a; }) };
     }
-    var receipts = linkToContract(snapshot.receipts, "fin");
-    var increases = linkToContract(snapshot.increases, "fecha");
+    // Por terminar solo muestra lo que falta por recibir: caso abierto y contrato que no figure ya como recibido.
+    var receipts = linkToContract((snapshot.receipts || []).filter(function (item) {
+      return item.abierto && contractOf(item).estado !== "recibido";
+    }), "fin");
+    var increases = linkToContract(snapshot.increases || [], "fecha");
     var sortedOptions = {};
     Object.keys(options).forEach(function (key) {
       sortedOptions[key] = Object.keys(options[key])
@@ -541,25 +546,9 @@
       var period = year ? list.filter(function (row) { return row.periodY === year; }) : list;
       return {
         year: year,
-        period: period,
         shown: year && state.month ? period.filter(function (row) { return row.periodM === state.month; }) : period,
         label: year ? (state.month ? MONTHS_LONG[state.month - 1] + " " + year : String(year)) : "todos los años",
       };
-    }
-
-    // Resumen por mes del año elegido; tocar un mes filtra el detalle.
-    function monthlyCard(year, period, heads, cellsOf) {
-      if (!year) return "";
-      var months = MONTHS_LONG.map(function (label, index) {
-        return { month: index + 1, label: label, list: period.filter(function (row) { return row.periodM === index + 1; }) };
-      }).filter(function (item) { return item.list.length; });
-      if (!months.length) return "";
-      return card("Resumen mensual " + year, '<div class="scm-cm-table-wrap"><table class="scm-cm-table"><thead><tr><th>Mes</th>' +
-        heads.map(function (head) { return '<th class="is-num">' + esc(head) + "</th>"; }).join("") + "</tr></thead><tbody>" +
-        months.map(function (item) {
-          return '<tr class="' + (state.month === item.month ? "is-active" : "") + '"><td><button type="button" class="scm-cm-link" data-scm-cm-pick="month" data-value="' + item.month + '">' + esc(item.label) + "</button></td>" +
-            cellsOf(item.list).map(function (cell) { return '<td class="is-num">' + esc(cell) + "</td>"; }).join("") + "</tr>";
-        }).join("") + "</tbody></table></div>", "is-wide", '<p class="scm-cm-hint">Toca un mes para filtrar</p>');
     }
 
     function subFilterHtml() {
@@ -573,41 +562,38 @@
       var scope = periodOf(baseRows(state.data.receipts));
       var shown = scope.shown;
       var today = todayIso();
-      var open = shown.filter(function (row) { return row.abierto; });
       var canon = sumOf(shown, "canon");
+      var countOf = function (destination) {
+        return shown.filter(function (row) { return row.destinacion === destination; }).length;
+      };
       var kpis = '<div class="scm-cm-kpis scm-cm-kpis-6">';
       kpis += kpi("Contratos por terminar", num(shown.length), esc(scope.year ? scope.label : "Histórico completo"), "desoc");
-      kpis += kpi("Por recibir", num(open.length), "Caso de recibo abierto", open.length ? "bad" : "");
-      kpis += kpi("Ya cerrados", num(shown.length - open.length), "Caso de recibo cerrado", "good");
-      kpis += kpi("Fecha vencida sin recibir", num(open.filter(function (row) { return row.fin < today; }).length), "Caso abierto con la fecha ya pasada", "stock");
+      kpis += kpi("Fecha vencida sin recibir", num(shown.filter(function (row) { return row.fin < today; }).length), "La fecha ya pasó y sigue abierto", "stock");
       kpis += kpi("Canon que termina", compactMoney(canon), esc(money(canon) + " mensual"));
       kpis += kpi("Administración que termina", compactMoney(sumOf(shown, "admin")), esc(money(sumOf(shown, "admin")) + " mensual"));
+      kpis += kpi("Vivienda", num(countOf("Vivienda")), "");
+      kpis += kpi("Comercio", num(countOf("Comercio")), "");
       state.kpiHtml = kpis + "</div>";
 
-      var html = monthlyCard(scope.year, scope.period, ["Contratos", "Por recibir", "Ya cerrados", "Canon"], function (list) {
-        var pending = list.filter(function (row) { return row.abierto; }).length;
-        return [num(list.length), num(pending), num(list.length - pending), money(sumOf(list, "canon"))];
-      });
       state.detailKind = "ending";
-      state.detailEvents = shown.filter(function (row) { return !state.sub || (state.sub === "abierto") === row.abierto; })
+      state.detailEvents = shown.slice()
         .sort(function (a, b) { return a.fin < b.fin ? -1 : a.fin > b.fin ? 1 : 0; })
         .map(function (row) { return { row: row, date: row.fin }; });
-      return html + card("Detalle · " + scope.label, "<div data-scm-cm-detail></div>", "is-wide", subFilterHtml());
+      return card("Detalle · " + scope.label, "<div data-scm-cm-detail></div>", "is-wide");
     }
 
     function endingTableHtml(slice, events) {
       var rows = events.map(function (event) { return event.row; });
       var today = todayIso();
-      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr><th>Fecha terminación</th><th>Caso</th><th>Contrato</th><th>Inmueble</th><th>Dirección</th><th>Arrendatario</th><th>Tipo</th><th>Destinación</th><th>Funcionario</th><th>Estado</th>' +
+      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr><th>Fecha terminación</th><th>Caso</th><th>Contrato</th><th>Inmueble</th><th>Dirección</th><th>Arrendatario</th><th>Tipo</th><th>Destinación</th><th>Funcionario</th>' +
         '<th class="is-num">Canon</th><th class="is-num">Administración</th><th class="is-num">Total</th></tr></thead><tbody>' +
         slice.map(function (event) {
           var row = event.row;
-          return "<tr><td>" + esc(formatDate(row.fin)) + (row.abierto && row.fin < today ? '<small class="scm-cm-source is-bad">Fecha vencida</small>' : "") + "</td><td>" + esc(row.caso) + "</td><td>" + esc(row.contrato) + "</td><td>" + esc(row.inmueble) +
+          return "<tr><td>" + esc(formatDate(row.fin)) + (row.fin < today ? '<small class="scm-cm-source is-bad">Fecha vencida</small>' : "") + "</td><td>" + esc(row.caso) + "</td><td>" + esc(row.contrato) + "</td><td>" + esc(row.inmueble) +
             '</td><td class="is-address">' + esc(row.direccion) + '</td><td class="is-name">' + esc(row.arrendatario) + "</td><td>" + esc(row.tipo || "—") + "</td><td>" + esc(row.destinacion || "—") + "</td><td>" + esc(row.funcionarioNombre || "—") +
-            '</td><td><span class="scm-cm-badge ' + (row.abierto ? "is-por_recibir" : "is-simi-ok") + '">' + esc(row.estado) + "</span></td>" +
-            '<td class="is-num">' + esc(money(row.canon)) + '</td><td class="is-num">' + (row.admin ? esc(money(row.admin)) : '<span class="scm-cm-muted">No aplica</span>') + '</td><td class="is-num is-total">' + esc(money((row.canon || 0) + (row.admin || 0))) + "</td></tr>";
+            '</td><td class="is-num">' + esc(money(row.canon)) + '</td><td class="is-num">' + (row.admin ? esc(money(row.admin)) : '<span class="scm-cm-muted">No aplica</span>') + '</td><td class="is-num is-total">' + esc(money((row.canon || 0) + (row.admin || 0))) + "</td></tr>";
         }).join("") +
-        '</tbody><tfoot><tr><td colspan="10">Total · ' + esc(num(rows.length) + (rows.length === 1 ? " contrato" : " contratos")) + '</td><td class="is-num">' + esc(money(sumOf(rows, "canon"))) + '</td><td class="is-num">' + esc(money(sumOf(rows, "admin"))) + '</td><td class="is-num is-total">' + esc(money(sumOf(rows, "canon") + sumOf(rows, "admin"))) + "</td></tr></tfoot></table></div>";
+        '</tbody><tfoot><tr><td colspan="9">Total · ' + esc(num(rows.length) + (rows.length === 1 ? " contrato" : " contratos")) + '</td><td class="is-num">' + esc(money(sumOf(rows, "canon"))) + '</td><td class="is-num">' + esc(money(sumOf(rows, "admin"))) + '</td><td class="is-num is-total">' + esc(money(sumOf(rows, "canon") + sumOf(rows, "admin"))) + "</td></tr></tfoot></table></div>";
     }
 
     function renderIncreases() {
@@ -628,16 +614,11 @@
       kpis += kpi("Incremento promedio", withPercent.length ? decimalFormat.format(sumOf(withPercent, "porcentaje") / withPercent.length) + "%" : "—", esc(num(withPercent.length) + " con porcentaje"), "stock");
       state.kpiHtml = kpis + "</div>";
 
-      var html = monthlyCard(scope.year, scope.period, ["Canon", "Administración", "Canon adicional", "Administración adicional"], function (list) {
-        var monthCanon = ofType(list, "canon");
-        var monthAdmin = ofType(list, "admin");
-        return [num(monthCanon.length), num(monthAdmin.length), money(sumOf(monthCanon, "diferencia")), money(sumOf(monthAdmin, "diferencia"))];
-      });
       state.detailKind = "increase";
       state.detailEvents = shown.filter(function (row) { return !state.sub || row.tipo_aumento === state.sub; })
         .sort(function (a, b) { return a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0; })
         .map(function (row) { return { row: row, date: row.fecha }; });
-      return html + card("Detalle · " + scope.label, "<div data-scm-cm-detail></div>", "is-wide", subFilterHtml());
+      return card("Detalle · " + scope.label, "<div data-scm-cm-detail></div>", "is-wide", subFilterHtml());
     }
 
     function increaseTableHtml(slice, events) {
@@ -982,10 +963,10 @@
         });
         name = "ocupaciones-vs-desocupaciones-" + year;
       } else if (state.view === "por_terminar") {
-        lines = [["Fecha terminacion", "Caso", "Contrato", "Inmueble", "Direccion", "Arrendatario", "Tipo inmueble", "Destinacion", "Funcionario", "Estado", "Canon", "Administracion", "Total"]];
+        lines = [["Fecha terminacion", "Caso", "Contrato", "Inmueble", "Direccion", "Arrendatario", "Tipo inmueble", "Destinacion", "Funcionario", "Canon", "Administracion", "Total"]];
         state.detailEvents.forEach(function (event) {
           var row = event.row;
-          lines.push([row.fin, row.caso, row.contrato, row.inmueble, row.direccion, row.arrendatario, row.tipo, row.destinacion, row.funcionarioNombre, row.estado, row.canon, row.admin || 0, (row.canon || 0) + (row.admin || 0)]);
+          lines.push([row.fin, row.caso, row.contrato, row.inmueble, row.direccion, row.arrendatario, row.tipo, row.destinacion, row.funcionarioNombre, row.canon, row.admin || 0, (row.canon || 0) + (row.admin || 0)]);
         });
         name = "contratos-por-terminar-" + year + (state.month ? "-" + String(state.month).padStart(2, "0") : "");
       } else if (state.view === "aumentos") {
