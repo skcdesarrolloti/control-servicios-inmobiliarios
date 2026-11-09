@@ -23,6 +23,8 @@ final class AdministrativeReportsService
   public const PER_PAGE = 40;
   public const COMPANY_NAME = 'SOLUCIONES COMERCIALES Y CONSTRUCTIVAS S.A.S.';
   public const COMPANY_NIT = '900623242-4';
+  /** Cuentas del panel comercial en la misma tabla: sus números de reporte son de otra tabla y nunca se tocan aquí. */
+  public const COMMERCIAL_ACCOUNT_PREFIX = 'CCO-';
 
   private SchemaInspector $schema;
 
@@ -312,6 +314,12 @@ final class AdministrativeReportsService
     ];
   }
 
+  private static function administrativeOnly(string $alias = ''): string
+  {
+    $column = ($alias !== '' ? $alias . '.' : '') . '`numero_cuenta`';
+    return "COALESCE({$column}, '') NOT LIKE '" . self::COMMERCIAL_ACCOUNT_PREFIX . "%'";
+  }
+
   private function accountSelect(): string
   {
     return 'SELECT c.*' . $this->staffNameSelect() . " FROM `{$this->accountsTable()}` c" . $this->staffJoin('c');
@@ -322,10 +330,10 @@ final class AdministrativeReportsService
   {
     $result = ['items' => [], 'counts' => ['total' => 0, 'pagadas' => 0, 'pendientes' => 0], 'totals' => ['pendiente' => 0, 'pagado' => 0]];
     if (!$this->accountsAvailable()) return $result;
-    $where = '';
+    $where = ' WHERE ' . self::administrativeOnly('c');
     $args = [];
     if ($employeeId !== '') {
-      $where = " WHERE TRIM(COALESCE(c.`id_empleado`, '')) = ?";
+      $where .= " AND TRIM(COALESCE(c.`id_empleado`, '')) = ?";
       $args[] = $employeeId;
     }
     $numero = mb_strtolower(trim((string) ($filters['numero'] ?? '')), 'UTF-8');
@@ -353,7 +361,7 @@ final class AdministrativeReportsService
   public function account(int $id): ?array
   {
     if ($id <= 0 || !$this->accountsAvailable()) return null;
-    $row = $this->db->getRow($this->accountSelect() . ' WHERE c.`_ID` = ? LIMIT 1', [$id]);
+    $row = $this->db->getRow($this->accountSelect() . ' WHERE c.`_ID` = ? AND ' . self::administrativeOnly('c') . ' LIMIT 1', [$id]);
     if (!is_array($row)) return null;
     $account = self::presentAccount($row);
     $account['reportes'] = [];
@@ -380,10 +388,10 @@ final class AdministrativeReportsService
     $pdo->beginTransaction();
     try {
       $reportIds = [];
-      foreach ($this->db->getResults("SELECT `reportes_incluidos` FROM `{$this->accountsTable()}` WHERE `_ID` IN ({$placeholders})", $ids) as $row) {
+      foreach ($this->db->getResults("SELECT `reportes_incluidos` FROM `{$this->accountsTable()}` WHERE `_ID` IN ({$placeholders}) AND " . self::administrativeOnly(), $ids) as $row) {
         $reportIds = array_merge($reportIds, self::parseIds($row['reportes_incluidos'] ?? ''));
       }
-      $stmt = $pdo->prepare("UPDATE `{$this->accountsTable()}` SET `fue_pagada` = 'Pagada' WHERE `_ID` IN ({$placeholders}) AND COALESCE(`fue_pagada`, '') <> 'Pagada'");
+      $stmt = $pdo->prepare("UPDATE `{$this->accountsTable()}` SET `fue_pagada` = 'Pagada' WHERE `_ID` IN ({$placeholders}) AND COALESCE(`fue_pagada`, '') <> 'Pagada' AND " . self::administrativeOnly());
       $stmt->execute($ids);
       $result['accounts'] = $stmt->rowCount();
       $result['report_ids'] = self::cleanIds($reportIds);
