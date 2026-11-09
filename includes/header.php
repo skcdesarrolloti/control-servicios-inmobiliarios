@@ -240,7 +240,7 @@ if (empty($current_page) || $current_page === 'tickets') {
     if ($subtabParam === '') $subtabParam = 'contracts-ending';
   }
 
-  $sectionTabPages = ['mine' => 'mine', 'team' => 'team', 'due' => 'due', 'property_history' => 'property_history', 'contracts_ending' => 'contracts_ending', 'contract_termination' => 'contract_termination', 'contract_non_renewal' => 'contract_non_renewal', 'contract_owners' => 'contract_owners'];
+  $sectionTabPages = ['mine' => 'mine', 'team' => 'team', 'due' => 'due', 'property_history' => 'property_history', 'contracts_ending' => 'contracts_ending', 'contract_termination' => 'contract_termination', 'contract_non_renewal' => 'contract_non_renewal', 'contract_owners' => 'contract_owners', 'casos_juridicos' => 'casos_juridicos'];
   if (isset($sectionTabPages[$tabParam])) {
     $current_page = $sectionTabPages[$tabParam];
   } elseif (in_array($tabParam, ['abiertos', 'scm-panel-abiertos'], true)) {
@@ -672,6 +672,15 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=contract_owners',
         'icon' => 'manage_accounts',
         'perms' => ['funcionario_contratos'],
+      ],
+      'casos_juridicos' => [
+        'key' => 'casos_juridicos',
+        'label' => 'Casos jurídicos',
+        'description' => 'Expedientes y comunicaciones a terceros',
+        'panel_id' => 'scm-panel-casos-juridicos',
+        'url' => $baseUrl . '/index.php?tab=casos_juridicos',
+        'icon' => 'gavel',
+        'perms' => ['casos_juridicos'],
       ],
     ],
   ],

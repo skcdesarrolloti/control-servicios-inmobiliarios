@@ -1,0 +1,122 @@
+/* Actividades contractuales · Casos jurídicos */
+#scm-app .scm-lc {
+  --lc-navy: #0f1e36;
+  --lc-line: #e2e8f0;
+  --lc-muted: #64748b;
+  --lc-soft: #f8fafc;
+  --lc-good: #047857;
+  --lc-warn: #b45309;
+  --lc-bad: #be123c;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  color: #0b1c30;
+}
+#scm-app .scm-lc-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--lc-line); }
+#scm-app .scm-lc-kicker { margin: 0 0 2px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--lc-muted); }
+#scm-app .scm-lc-head h1 { margin: 0; font-size: 24px; font-weight: 700; color: #0f172a; }
+#scm-app .scm-lc-subtitle { margin: 4px 0 0; max-width: 760px; font-size: 13px; color: var(--lc-muted); }
+#scm-app .scm-lc-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+#scm-app .scm-lc-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--lc-line); border-radius: 12px; background: #fff; color: #334155; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+#scm-app .scm-lc-btn .material-symbols-outlined { font-size: 18px; }
+#scm-app .scm-lc-btn:hover:not(:disabled) { background: var(--lc-soft); border-color: #cbd5e1; }
+#scm-app .scm-lc-btn:disabled { opacity: .5; cursor: not-allowed; }
+#scm-app .scm-lc-btn-primary { border-color: var(--lc-navy); background: var(--lc-navy); color: #fff; }
+#scm-app .scm-lc-btn-primary:hover:not(:disabled) { background: #162846; border-color: #162846; }
+#scm-app .scm-lc-btn-sm { padding: 5px 10px; border-radius: 10px; font-size: 11.5px; }
+#scm-app .scm-lc-btn-danger { color: var(--lc-bad); }
+#scm-app .scm-lc-icon-btn { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 10px; background: transparent; color: var(--lc-muted); cursor: pointer; }
+#scm-app .scm-lc-icon-btn:hover { background: #f1f5f9; }
+
+#scm-app .scm-lc-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+#scm-app .scm-lc-kpi { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--lc-line); border-radius: 12px; background: #fff; }
+#scm-app .scm-lc-kpi strong { font-size: 22px; font-weight: 700; }
+#scm-app .scm-lc-kpi span { font-size: 12px; color: var(--lc-muted); }
+#scm-app .scm-lc-kpi.is-bad strong { color: var(--lc-bad); }
+#scm-app .scm-lc-kpi.is-warn strong { color: var(--lc-warn); }
+
+#scm-app .scm-lc-filters, #scm-app .scm-lc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+#scm-app .scm-lc-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 12px; font-weight: 600; color: #334155; }
+#scm-app .scm-lc-field-wide { grid-column: span 2; }
+#scm-app .scm-lc-field-full { grid-column: 1 / -1; }
+#scm-app .scm-lc-field input, #scm-app .scm-lc-field select, #scm-app .scm-lc-field textarea { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #0b1c30; font-size: 13px; font-weight: 400; }
+#scm-app .scm-lc-field textarea { min-height: 90px; resize: vertical; }
+#scm-app .scm-lc-hint { margin: 0; font-size: 12px; font-weight: 400; color: var(--lc-muted); }
+
+#scm-app .scm-lc-status { padding: 10px 12px; border-radius: 10px; background: var(--lc-soft); font-size: 13px; color: var(--lc-muted); }
+#scm-app .scm-lc-status[hidden] { display: none; }
+#scm-app .scm-lc-status.is-error, #scm-app .scm-lc-form-error { background: #fff1f2; color: var(--lc-bad); }
+#scm-app .scm-lc-form-error { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+
+#scm-app .scm-lc-table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--lc-line); border-radius: 12px; background: #fff; font-size: 13px; overflow: hidden; }
+#scm-app .scm-lc-table th { padding: 10px 12px; background: var(--lc-soft); border-bottom: 1px solid var(--lc-line); text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--lc-muted); }
+#scm-app .scm-lc-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+#scm-app .scm-lc-table tr:last-child td { border-bottom: 0; }
+#scm-app .scm-lc-table small { display: block; margin-top: 2px; font-size: 12px; color: var(--lc-muted); }
+#scm-app .scm-lc-link { padding: 0; border: 0; background: none; color: var(--lc-navy); font-weight: 700; text-align: left; cursor: pointer; text-decoration: underline; }
+#scm-app .scm-lc-empty { padding: 32px 16px; border: 1px dashed var(--lc-line); border-radius: 12px; text-align: center; font-size: 13px; color: var(--lc-muted); }
+
+#scm-app .scm-lc-badge { display: inline-block; padding: 2px 9px; border-radius: 999px; background: #e2e8f0; color: #334155; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+#scm-app .scm-lc-badge.is-abierto { background: #dbeafe; color: #1e40af; }
+#scm-app .scm-lc-badge.is-en_tramite { background: #fef3c7; color: #92400e; }
+#scm-app .scm-lc-badge.is-cerrado { background: #e2e8f0; color: #475569; }
+#scm-app .scm-lc-overdue { color: var(--lc-bad); font-weight: 700; }
+
+#scm-app .scm-lc-pager { display: flex; align-items: center; justify-content: flex-end; gap: 10px; font-size: 12px; color: var(--lc-muted); }
+
+#scm-app .scm-lc-modal { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 16px; }
+#scm-app .scm-lc-modal-backdrop { position: absolute; inset: 0; background: rgba(15, 30, 54, .45); }
+#scm-app .scm-lc-modal-card { position: relative; display: flex; flex-direction: column; width: min(640px, 100%); max-height: calc(100vh - 32px); border-radius: 16px; background: #fff; box-shadow: 0 24px 60px rgba(15, 30, 54, .3); }
+#scm-app .scm-lc-modal-card.is-wide { width: min(1040px, 100%); }
+#scm-app .scm-lc-modal-card > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--lc-line); }
+#scm-app .scm-lc-modal-card h2 { margin: 0; font-size: 16px; font-weight: 700; }
+#scm-app .scm-lc-modal-body { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px 20px; overflow-y: auto; font-size: 13px; }
+#scm-app .scm-lc-modal-body p { margin: 0; }
+#scm-app .scm-lc-form { display: flex; flex-direction: column; gap: 14px; }
+#scm-app .scm-lc-form-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+body.scm-lc-modal-open { overflow: hidden; }
+
+#scm-app .scm-lc-section { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--lc-line); border-radius: 12px; }
+#scm-app .scm-lc-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+#scm-app .scm-lc-section h3 { margin: 0; font-size: 13.5px; font-weight: 700; }
+#scm-app .scm-lc-search { display: grid; grid-template-columns: 150px 1fr auto; gap: 8px; align-items: end; }
+#scm-app .scm-lc-results { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+#scm-app .scm-lc-result { padding: 8px 10px; border: 1px solid var(--lc-line); border-radius: 10px; background: #fff; text-align: left; font-size: 12.5px; cursor: pointer; }
+#scm-app .scm-lc-result:hover { background: var(--lc-soft); }
+#scm-app .scm-lc-result small { display: block; color: var(--lc-muted); }
+#scm-app .scm-lc-selected { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 10px; background: #ecfdf5; font-size: 12.5px; }
+
+#scm-app .scm-lc-parties { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+#scm-app .scm-lc-party { display: flex; justify-content: space-between; gap: 8px; padding: 10px; border: 1px solid var(--lc-line); border-radius: 10px; font-size: 12.5px; min-width: 0; }
+#scm-app .scm-lc-party div { min-width: 0; overflow-wrap: anywhere; }
+#scm-app .scm-lc-party small { display: block; color: var(--lc-muted); }
+
+#scm-app .scm-lc-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 0; }
+#scm-app .scm-lc-info dt { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--lc-muted); }
+#scm-app .scm-lc-info dd { margin: 2px 0 0; font-size: 13px; overflow-wrap: anywhere; }
+#scm-app .scm-lc-description { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+#scm-app .scm-lc-timeline { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0; list-style: none; }
+#scm-app .scm-lc-event { position: relative; display: grid; grid-template-columns: 32px 1fr; gap: 10px; padding-bottom: 14px; }
+#scm-app .scm-lc-event:not(:last-child)::before { content: ""; position: absolute; left: 15px; top: 32px; bottom: 0; width: 2px; background: var(--lc-line); }
+#scm-app .scm-lc-event-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9; color: #475569; }
+#scm-app .scm-lc-event-icon .material-symbols-outlined { font-size: 17px; }
+#scm-app .scm-lc-event-body { min-width: 0; overflow-wrap: anywhere; }
+#scm-app .scm-lc-event-body strong { font-size: 13px; }
+#scm-app .scm-lc-event-meta { font-size: 12px; color: var(--lc-muted); }
+#scm-app .scm-lc-event-text { margin-top: 4px; white-space: pre-wrap; }
+
+@media (max-width: 720px) {
+  #scm-app .scm-lc-field-wide { grid-column: 1 / -1; }
+  #scm-app .scm-lc-search { grid-template-columns: 1fr; }
+  #scm-app .scm-lc-table, #scm-app .scm-lc-table tbody, #scm-app .scm-lc-table tr, #scm-app .scm-lc-table td { display: block; width: 100%; }
+  #scm-app .scm-lc-table thead { display: none; }
+  #scm-app .scm-lc-table tr { padding: 8px 0; border-bottom: 1px solid var(--lc-line); }
+  #scm-app .scm-lc-table tr:last-child { border-bottom: 0; }
+  #scm-app .scm-lc-table td { padding: 4px 12px; border: 0; }
+  #scm-app .scm-lc-table td[data-label]::before { content: attr(data-label) ": "; font-weight: 600; color: var(--lc-muted); }
+  #scm-app .scm-lc-modal { padding: 0; }
+  #scm-app .scm-lc-modal-card, #scm-app .scm-lc-modal-card.is-wide { width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+}

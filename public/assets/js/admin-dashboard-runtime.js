@@ -26439,6 +26439,7 @@
         activePanel.id !== "scm-panel-metricas" &&
         activePanel.id !== "scm-panel-movimientos-contratos" &&
         activePanel.id !== "scm-panel-funcionario-contratos" &&
+        activePanel.id !== "scm-panel-casos-juridicos" &&
         activePanel.id !== "scm-panel-metricas-casos" &&
         activePanel.id !== "scm-panel-metricas-cotizaciones" &&
         activePanel.id !== "scm-panel-metricas-preventivas" &&
@@ -26499,6 +26500,13 @@
         var creditsModule = activePanel.querySelector("[data-scm-owner-credits]");
         if (creditsModule) {
           creditsModule.dispatchEvent(new CustomEvent("scm:load-owner-credits"));
+        }
+        return Promise.resolve();
+      }
+      if (activePanel.id === "scm-panel-casos-juridicos") {
+        var legalCasesModule = activePanel.querySelector("[data-scm-legal-cases]");
+        if (legalCasesModule) {
+          legalCasesModule.dispatchEvent(new CustomEvent("scm:load-legal-cases"));
         }
         return Promise.resolve();
       }

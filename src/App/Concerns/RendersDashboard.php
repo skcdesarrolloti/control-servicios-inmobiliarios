@@ -207,6 +207,8 @@ trait RendersDashboard
       'scm-panel-movimientos-contratos' => 'scm-panel-movimientos-contratos',
       'contract_owners' => 'scm-panel-funcionario-contratos',
       'scm-panel-funcionario-contratos' => 'scm-panel-funcionario-contratos',
+      'casos_juridicos' => 'scm-panel-casos-juridicos',
+      'scm-panel-casos-juridicos' => 'scm-panel-casos-juridicos',
       'postergados' => 'scm-panel-postergados',
       'scm-panel-postergados' => 'scm-panel-postergados',
       'cerrados' => 'scm-panel-cerrados',
@@ -421,6 +423,7 @@ trait RendersDashboard
       'scm-panel-credito-propietario' => 'credito_propietario',
       'scm-panel-movimientos-contratos' => 'metricas_contratos',
       'scm-panel-funcionario-contratos' => 'funcionario_contratos',
+      'scm-panel-casos-juridicos' => 'casos_juridicos',
       'scm-panel-herramienta-pse' => 'herramienta_pse',
       'scm-panel-herramienta-mora' => 'herramienta_mora',
       'scm-panel-herramienta-mercado' => 'herramienta_mercado',
@@ -775,6 +778,7 @@ trait RendersDashboard
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/delivery-review.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/delivery-review.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/contract-movements.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/contract-movements.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/contract-ownership.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/contract-ownership.css'))); ?>" media="all">
+    <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/legal-cases.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/legal-cases.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/owner-net-income.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/owner-net-income.css'))); ?>" media="all">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js" defer></script>
@@ -867,6 +871,7 @@ trait RendersDashboard
             if ($panelId === 'scm-panel-metricas-crecimiento') $tabLabel = 'Crecimiento de la empresa';
             if ($panelId === 'scm-panel-credito-propietario') $tabLabel = 'Créditos a propietarios';
             if ($panelId === 'scm-panel-funcionario-contratos') $tabLabel = 'Funcionario de contratos';
+            if ($panelId === 'scm-panel-casos-juridicos') $tabLabel = 'Casos jurídicos';
             if ($panelId === 'scm-panel-inicio') $tabLabel = 'Calendario';
           }
           ?>
@@ -1402,6 +1407,12 @@ trait RendersDashboard
         </div>
       <?php endif; ?>
 
+      <?php if (in_array('casos_juridicos', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-casos-juridicos' ? ' active' : ''; ?>" id="scm-panel-casos-juridicos" data-permission-tab="casos_juridicos" data-scm-loaded="0">
+          <?php echo (new \SCM\Modules\LegalCases\LegalCaseView())->renderShell(in_array('legal_case_manage', $dashboardAllowedActions, true)); ?>
+        </div>
+      <?php endif; ?>
+
       <?php if (in_array('metricas_contratos', $dashboardAllowedTabs, true)): ?>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-movimientos-contratos' ? ' active' : ''; ?>" id="scm-panel-movimientos-contratos" data-permission-tab="metricas_contratos" data-scm-loaded="0">
           <?php
@@ -1542,6 +1553,7 @@ trait RendersDashboard
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-quote-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-quote-metrics.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-quote-quality.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-quote-quality.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-ownership.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-ownership.js'))); ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-legal-cases.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-legal-cases.js'))); ?>" defer></script>
     <script src="<?php echo $guideJsUrl; ?>" defer></script>
     <script src="<?php echo $damageJsUrl; ?>" defer></script>
 <?php
@@ -1959,6 +1971,7 @@ trait RendersDashboard
         'solicitudes_terminacion' => '',
         'solicitudes_no_prorroga' => '',
         'funcionario_contratos' => '',
+        'casos_juridicos' => '',
       ]],
       ['label' => 'Notificaciones', 'tabs' => ['notificaciones' => '']],
       ['label' => 'Herramientas', 'tabs' => [

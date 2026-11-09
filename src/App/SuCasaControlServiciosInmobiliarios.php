@@ -33,6 +33,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesContractNotes;
   use \SCM\App\Concerns\HandlesAutologinLinks;
   use \SCM\App\Concerns\HandlesContractOwnership;
+  use \SCM\App\Concerns\HandlesLegalCases;
   use \SCM\App\Concerns\HandlesMetricsPanels;
   use \SCM\App\Concerns\RendersPublicPqr;
   use \SCM\App\Concerns\RendersDashboard;
@@ -173,7 +174,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
-  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'owner_credit_accounting', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure', 'quote_reset_dev', 'closing_sheet_respond'];
+  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'owner_credit_accounting', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure', 'quote_reset_dev', 'closing_sheet_respond', 'legal_case_manage', 'legal_case_send', 'legal_case_config', 'legal_case_export'];
   /** Herramientas de pruebas: hasta guardar permisos solo las tiene el cargo de desarrollo (Asistente de Desarrollo TI). */
   const DEVELOPER_DEFAULT_ACTIONS = ['quote_reset_dev'];
   const DEVELOPER_CARGOS = ['13'];
@@ -366,6 +367,7 @@ final class SuCasaControlServiciosInmobiliarios
       'solicitudes_terminacion' => 'Solicitudes de terminación de contrato',
       'solicitudes_no_prorroga' => 'Solicitudes de no prórroga de contrato',
       'funcionario_contratos' => 'Funcionario de contratos',
+      'casos_juridicos' => 'Casos jurídicos',
       'servicios_publicos_pendientes' => 'Revisiones de Servicios Públicos',
       'liquidador_servicios_publicos' => 'Liquidador de Servicios',
       'reportes_administrativos_pendientes' => 'Reportes Administrativos',
@@ -997,6 +999,15 @@ final class SuCasaControlServiciosInmobiliarios
           'closing_sheet_edit' => 'Editar hoja de cierre de negocio',
           'closing_sheet_review' => 'Hacer la revisión de servicios públicos antes de la ocupación (hoja de cierre)',
           'closing_sheet_respond' => 'Aprobar o no aprobar hojas de cierre',
+        ],
+      ],
+      'casos_juridicos' => [
+        'label' => 'Casos jurídicos',
+        'items' => [
+          'legal_case_manage' => 'Crear y gestionar casos jurídicos (partes, notas, documentos y estados)',
+          'legal_case_send' => 'Enviar comunicaciones a terceros desde un caso jurídico',
+          'legal_case_config' => 'Configurar tipos y plantillas de casos jurídicos',
+          'legal_case_export' => 'Exportar a PDF casos y comunicaciones',
         ],
       ],
     ];

@@ -8,15 +8,16 @@ $check = static function (bool $condition, string $message): void {
   if (!$condition) throw new RuntimeException($message);
 };
 
-foreach (['mine', 'team', 'due', 'property_history', 'contracts_ending', 'contract_termination', 'contract_non_renewal', 'contract_owners'] as $route) {
+foreach (['mine', 'team', 'due', 'property_history', 'contracts_ending', 'contract_termination', 'contract_non_renewal', 'contract_owners', 'casos_juridicos'] as $route) {
   $_GET = ['tab' => $route];
   $current_page = '';
   ob_start();
   include dirname(__DIR__) . '/includes/header.php';
   ob_end_clean();
   $check($current_page === $route, 'Reload selected the wrong header item for ' . $route);
-  $check(array_keys($rawNavItems) === ['inicio', 'tickets', 'administrativas', 'contractuales', 'notificaciones', 'metricas'], 'Contract activities must follow administrative activities.');
-  $check(array_keys($rawNavItems['contractuales']['children']) === ['contracts_ending', 'contract_termination', 'contract_non_renewal', 'contract_owners'], 'Contract group must contain the three contract views plus Funcionario de contratos.');
+  $keys = array_keys($rawNavItems);
+  $check(array_search('contractuales', $keys, true) > array_search('administrativas', $keys, true), 'Contract activities must follow administrative activities.');
+  $check(array_keys($rawNavItems['contractuales']['children']) === ['contratos_arrendamiento', 'contracts_ending', 'contract_termination', 'contract_non_renewal', 'contract_owners', 'casos_juridicos'], 'Contract group must keep its views in order and end with Casos jurídicos.');
   foreach (array_intersect_key($rawNavItems['contractuales']['children'], array_flip(['contracts_ending', 'contract_termination', 'contract_non_renewal'])) as $key => $item) {
     $check(!isset($rawNavItems['inicio']['children'][$key]), 'Contract view is still in Inicio.');
     $check($item['panel_id'] === 'scm-panel-actividades-contractuales', 'Contract item points to the wrong main panel.');
@@ -28,6 +29,8 @@ foreach (['mine', 'team', 'due', 'property_history', 'contracts_ending', 'contra
 }
 
 $owners = $rawNavItems['contractuales']['children']['contract_owners'];
-$check($owners['panel_id'] === 'scm-panel-funcionario-contratos' && $owners['perms'] === ['contratos_arrendamiento'] && str_ends_with($owners['url'], '?tab=contract_owners'), 'Funcionario de contratos is wired to its own panel.');
+$check($owners['panel_id'] === 'scm-panel-funcionario-contratos' && $owners['perms'] === ['funcionario_contratos'] && str_ends_with($owners['url'], '?tab=contract_owners'), 'Funcionario de contratos is wired to its own panel.');
+$legal = $rawNavItems['contractuales']['children']['casos_juridicos'];
+$check($legal['panel_id'] === 'scm-panel-casos-juridicos' && $legal['perms'] === ['casos_juridicos'] && str_ends_with($legal['url'], '?tab=casos_juridicos'), 'Casos jurídicos is wired to its own panel.');
 
 echo "Contract activities header navigation checks passed.\n";

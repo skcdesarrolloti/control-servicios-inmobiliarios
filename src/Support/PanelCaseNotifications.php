@@ -64,7 +64,7 @@ final class PanelCaseNotifications
     return preg_match('/^[1-9][0-9]{10,14}$/D', $digits) ? '+' . $digits : '';
   }
 
-  private function contact(array $contract, string $role): array
+  public function contact(array $contract, string $role): array
   {
     $record = [];
     $table = $this->db->table('jet_cct_' . ($role === 'propietario' ? 'propietarios' : ($role === 'arrendatario' ? 'arrendatarios' : 'copropiedades')));
