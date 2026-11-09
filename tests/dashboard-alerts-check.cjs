@@ -174,6 +174,21 @@ const harness = (groupsJson) => `
   assert.equal(await page.locator('[name="alert_permissions[13][]"]').first().isVisible(), true, 'the alerts pane opens');
   console.log('OK the Alertas pane opens and counts its options');
 
+  // Lo que se guarda por cargo: cada campo por separado, con las listas vacías incluidas.
+  const runtimeSource = fs.readFileSync(path.join(root, 'public/assets/js/admin-dashboard-runtime.js'), 'utf8');
+  const collector = runtimeSource.match(/function collectAlertCardValues\(field\) \{[\s\S]*?\n      \}/);
+  assert.ok(collector, 'the alert card collector exists');
+  assert.match(runtimeSource, /\["alert_permissions", "due_type_permissions", "due_reminder_types"\]/, 'the three alert fields are saved');
+  const collected = await page.evaluate((source) => {
+    const form = document.querySelector('form');
+    const card = form.querySelector('[data-scm-perm-kind="alerts"]');
+    card.insertAdjacentHTML('beforeend', '<input type="checkbox" name="due_type_permissions[13][]" value="cotizacion_sin_enviar" checked><input type="checkbox" name="due_type_permissions[13][]" value="preventiva_sin_enviar">');
+    const collect = new Function('form', source + '; return collectAlertCardValues;')(form);
+    return { types: collect('due_type_permissions'), reminder: collect('due_reminder_types') };
+  }, collector[0]);
+  assert.deepEqual(collected, { types: { 13: ['cotizacion_sin_enviar'] }, reminder: { 13: [] } });
+  console.log('OK due types are collected per cargo, keeping empty lists');
+
   const phpSource = fs.readFileSync(path.join(root, 'src/App/Concerns/RendersDashboard.php'), 'utf8');
   assert.ok(!phpSource.includes('<b>Popup de vencimientos</b>'), 'the switch moved to the Alertas pane');
   assert.ok(phpSource.includes('data-scm-perm-pane-body="alerts"') && phpSource.includes('value="credito_contabilidad_pendiente"'), 'the Alertas pane and the calendar chips exist');

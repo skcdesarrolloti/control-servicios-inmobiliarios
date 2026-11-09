@@ -48,8 +48,39 @@ final class DueTypesProbe
     return $this->adminDueAllowedTypes(static fn(string $tab): bool => in_array($tab, $tabs, true), $respond);
   }
   public function all(): array { return $this->adminDueAllTypes(); }
+  public function labels(): array { return $this->adminDueTypeLabels(); }
+  public function configured(string $setting, string $cargo, array $types): array { return $this->adminDueTypesConfiguredFor($setting, $cargo, $types); }
+  public function sanitize($raw): array { return $this->sanitizeAdminDueTypeMap($raw); }
+  public function items(array $types): array { return array_column($this->adminDueCalendarItems([], 0, 1, $types), 'tipo_vencimiento'); }
+  private function getDashboardCargoOptions(): array { return [['id' => '3'], ['id' => '13']]; }
+  private function adminDueQuoteItems(array $s, int $f, int $t): array { return [['tipo_vencimiento' => 'cotizacion_sin_enviar'], ['tipo_vencimiento' => 'cotizacion_enviada_sin_respuesta']]; }
+  private function adminDuePreventivaItems(array $s, int $f, int $t): array { return [['tipo_vencimiento' => 'preventiva_sin_enviar']]; }
+  private function adminDuePreventivaTicketItems(array $s, int $f, int $t): array { return [['tipo_vencimiento' => 'ticket_preventiva_sin_cita'], ['tipo_vencimiento' => 'preventiva_cita_sin_realizar']]; }
+  private function adminDueContractRequestItems(array $s, int $f, int $t): array { return [['tipo_vencimiento' => 'terminacion_contrato_pendiente'], ['tipo_vencimiento' => 'no_prorroga_contrato_pendiente']]; }
+  private function adminDueMaintenanceOrderItems(array $s, int $f, int $t): array { return []; }
+  private function adminDueLeaseAnnexItems(array $s, int $f, int $t): array { return []; }
+  private function adminDueOwnerCreditItems(array $s, int $f, int $t): array { return [['tipo_vencimiento' => 'credito_solicitud_pendiente'], ['tipo_vencimiento' => 'credito_contabilidad_pendiente']]; }
 }
 $probe = new DueTypesProbe();
+
+// Vencimientos por cargo: un cargo sin guardar conserva todo; lo guardado manda, también si quedó vacío.
+$settings = (new ReflectionClass(\SCM\Core\Settings::class))->newInstanceWithoutConstructor();
+(new ReflectionProperty(\SCM\Core\App::class, 'settings'))->setValue(null, $settings);
+(new ReflectionProperty(\SCM\Core\Settings::class, 'data'))->setValue($settings, ['due' => ['3' => ['cotizacion_sin_enviar'], '4' => []]]);
+$both = ['cotizacion_sin_enviar', 'preventiva_sin_enviar'];
+$check($probe->configured('due', '13', $both) === $both, 'a cargo never saved keeps the types of its tabs');
+$check($probe->configured('due', '3', $both) === ['cotizacion_sin_enviar'], 'a saved cargo only keeps what is checked');
+$check($probe->configured('due', '4', $both) === [], 'a saved cargo with nothing checked sees nothing');
+$check($probe->configured('due', '3', ['preventiva_sin_enviar']) === [], 'checking a type does not grant it without its tab');
+$check($probe->sanitize(['3' => ['cotizacion_sin_enviar', 'inventado'], '99' => ['cotizacion_sin_enviar'], '13' => []]) === ['3' => ['cotizacion_sin_enviar'], '13' => []], 'saving drops unknown cargos and types and keeps empty lists');
+$check(array_keys($probe->labels()) !== [] && array_diff($probe->all(), array_keys($probe->labels())) === [] && array_diff(array_keys($probe->labels()), $probe->all()) === [], 'every due type has a label in the permissions modal');
+
+// Cada tipo se puede desmarcar por separado, aunque salga de la misma consulta que otro.
+$check($probe->items(['cotizacion_enviada_sin_respuesta']) === ['cotizacion_enviada_sin_respuesta'], 'a quote type works without its sibling');
+$check($probe->items(['preventiva_cita_sin_realizar']) === ['preventiva_cita_sin_realizar'], 'a preventive type works without its siblings');
+$check($probe->items(['no_prorroga_contrato_pendiente']) === ['no_prorroga_contrato_pendiente'], 'a contract type works without its sibling');
+$check($probe->items(['credito_contabilidad_pendiente']) === ['credito_contabilidad_pendiente'], 'a credit type works without its sibling');
+$check($probe->items([]) === [], 'no types means no tasks');
 $check($probe->types(['credito_propietario'], false) === ['credito_solicitud_pendiente', 'credito_contabilidad_pendiente'], 'a credits cargo only sees the credit types');
 $check($probe->types([], false) === [], 'a cargo without those tabs sees no due types');
 $check($probe->types([], true) === ['terminacion_contrato_pendiente', 'no_prorroga_contrato_pendiente'], 'who responds cases keeps the contract requests');

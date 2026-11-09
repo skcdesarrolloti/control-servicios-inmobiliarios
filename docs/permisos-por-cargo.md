@@ -19,6 +19,15 @@ Vencimientos sale primero y las alertas al cerrarlo, porque Swal muestra un popu
 
 En **Alertas › Recordatorio diario** se activa por cargo el correo y el WhatsApp. Sale de lunes a sábado, sin festivos, desde las 9:00 a. m. de Colombia, con las tareas del calendario de vencimientos de ese cargo que ya vencieron o vencen hoy. Quien no tiene tareas no recibe nada.
 
+## Vencimientos por cargo
+
+En **Alertas** cada cargo tiene dos grupos con los 12 tipos de vencimiento (`adminDueTypeLabels()`):
+
+- **Vencimientos que atiende** (`dashboard_due_type_permissions`): decide el calendario, sus filtros, el contador y el popup. El tipo también exige la pestaña en `ADMIN_DUE_TYPES_BY_TAB`. Los resúmenes del popup siguen a sus tipos: *Preventivas pendientes* a los de preventivas y *Servicios públicos pendientes* a *Servicios críticos*.
+- **Tipos que entran en el recordatorio diario** (`dashboard_due_reminder_types`): recorta lo anterior solo para el correo y el WhatsApp, que siguen siendo un único mensaje al día por funcionario.
+
+Un cargo que nunca se ha guardado conserva todos los tipos de sus pestañas. Al guardar, lo desmarcado queda desmarcado, y un tipo nuevo nace apagado para los cargos ya guardados.
+
 Producción corre el worker global `shared-notifications/worker-hostinger.php`, que solo entrega la cola: hace falta un cron propio cada 15 minutos con `bin/send-daily-task-reminder.php` (`bin/queue-worker.php` también lo ejecuta, si se llega a usar). Solo envía una vez al día y después de las 12:00 m. ya no sale. La plantilla de WhatsApp es `scm_recordatorio_tareas_v1` (`docs/whatsapp-recordatorio-tareas-template.json`).
 
 ## Acciones nuevas

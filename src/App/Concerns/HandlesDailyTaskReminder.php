@@ -50,6 +50,7 @@ trait HandlesDailyTaskReminder
       $personChannels = $channels[$cargo] ?? [];
       if ($personChannels === []) continue;
       $types = $this->adminDueAllowedTypes(fn(string $tab): bool => in_array($tab, $this->dashboardTabsForCargo($cargo), true), in_array('case_respond', $this->dashboardActionsForCargo($cargo), true));
+      $types = $this->adminDueTypesConfiguredFor(self::ADMIN_DUE_REMINDER_SETTING, $cargo, $this->adminDueTypesConfiguredFor(self::ADMIN_DUE_TYPE_SETTING, $cargo, $types));
       $groups = DailyTaskReminder::groups(array_values(array_filter($items, static fn(array $item): bool => in_array((string) $item['tipo_vencimiento'], $types, true))));
       if ($groups === []) { $result['skipped_empty']++; continue; }
       $name = (string) $person['name'];

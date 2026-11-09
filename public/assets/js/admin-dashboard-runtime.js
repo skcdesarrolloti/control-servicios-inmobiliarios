@@ -11859,15 +11859,16 @@
           })
           .filter(Boolean);
       }
-      function collectAlertPermissions() {
-        var alerts = {};
+      // Por cargo y con listas vacías incluidas: un cargo sin nada marcado se guarda así, no como "sin configurar".
+      function collectAlertCardValues(field) {
+        var values = {};
         form.querySelectorAll('.scm-permission-card[data-scm-perm-kind="alerts"]').forEach(function (card) {
-          alerts[card.getAttribute("data-permission-cargo")] = Array.prototype.slice
+          values[card.getAttribute("data-permission-cargo")] = Array.prototype.slice
             .call(card.querySelectorAll('input[type="checkbox"]:checked'))
-            .filter(function (input) { return /^alert_permissions\[/.test(input.name); })
+            .filter(function (input) { return input.name.indexOf(field + "[") === 0; })
             .map(function (input) { return String(input.value || "").trim(); });
         });
-        return alerts;
+        return values;
       }
       function collectAdminDuePopupCargoIds() {
         return Array.prototype.slice
@@ -11959,7 +11960,9 @@
         fd.append("action_permissions", JSON.stringify(collectActionPermissions()));
         fd.append("employee_cargo_ids", JSON.stringify(collectEmployeeCargoIds()));
         fd.append("admin_due_popup_cargo_ids", JSON.stringify(collectAdminDuePopupCargoIds()));
-        fd.append("alert_permissions", JSON.stringify(collectAlertPermissions()));
+        ["alert_permissions", "due_type_permissions", "due_reminder_types"].forEach(function (field) {
+          fd.append(field, JSON.stringify(collectAlertCardValues(field)));
+        });
         fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
           .then(function (r) {
             return r.json();

@@ -2143,7 +2143,7 @@ trait RendersDashboard
                 <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowedAlerts = $this->dashboardAlertPermissions()[$cargoId] ?? []; ?>
                   <section class="scm-permission-card scm-permission-action-card" data-scm-perm-kind="alerts" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
                     <div class="scm-permission-card-head">
-                      <p>Popups que ver&aacute; este cargo al entrar a Inicio, para que no se le olvide hacer algo. <span data-scm-perm-card-count></span></p>
+                      <p>Popups, vencimientos y recordatorio diario de este cargo, para que no se le olvide hacer algo. <span data-scm-perm-card-count></span></p>
                       <button type="button" class="scm-permission-select-all" data-scm-perm-all="<?php echo esc_attr($cargoId); ?>">Marcar todo</button>
                     </div>
                     <div class="scm-permission-options">
@@ -2155,6 +2155,19 @@ trait RendersDashboard
                               <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>" title="<?php echo esc_attr($alertItem['hint']); ?>">
                                 <input type="checkbox" name="<?php echo $isDueAlert ? 'admin_due_popup_cargo_ids[]' : 'alert_permissions[' . esc_attr($cargoId) . '][]'; ?>" value="<?php echo esc_attr($isDueAlert ? $cargoId : $alertKey); ?>" <?php checked($isChecked); ?>>
                                 <span><?php echo esc_html($alertItem['label']); ?><small class="scm-permissions-check-hint"><?php echo esc_html($alertItem['hint']); ?></small></span>
+                              </label>
+                            <?php endforeach; ?>
+                          </div>
+                        </div>
+                      <?php endforeach; ?>
+                      <?php foreach (['due_type_permissions' => [self::ADMIN_DUE_TYPE_SETTING, 'Vencimientos que atiende · calendario, filtros y popup', 'También requiere ver la pestaña de ese tipo.'], 'due_reminder_types' => [self::ADMIN_DUE_REMINDER_SETTING, 'Tipos que entran en el recordatorio diario', 'Solo aplica a los vencimientos que atiende el cargo.']] as $dueField => [$dueSetting, $dueTitle, $dueHint]): $dueSelected = $this->adminDueTypesConfiguredFor($dueSetting, $cargoId, $this->adminDueAllTypes()); ?>
+                        <div class="scm-permissions-option-group" data-scm-perm-group>
+                          <div class="scm-permissions-option-group-title"><span><?php echo esc_html($dueTitle); ?></span><button type="button" class="scm-perm-group-toggle" data-scm-perm-group-all>Marcar grupo</button></div>
+                          <div class="scm-permissions-option-group-grid">
+                            <?php foreach ($this->adminDueTypeLabels() as $dueType => $dueLabel): $isChecked = in_array($dueType, $dueSelected, true); ?>
+                              <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>" title="<?php echo esc_attr($dueHint); ?>">
+                                <input type="checkbox" name="<?php echo esc_attr($dueField . '[' . $cargoId . '][]'); ?>" value="<?php echo esc_attr($dueType); ?>" <?php checked($isChecked); ?>>
+                                <span><?php echo esc_html($dueLabel); ?></span>
                               </label>
                             <?php endforeach; ?>
                           </div>
@@ -2901,7 +2914,7 @@ trait RendersDashboard
               <p>Filtra el calendario por el control que necesitas revisar.</p>
             </div>
           </div>
-          <?php $dueAllowedTypes = $this->adminDueAllowedTypes(); ?>
+          <?php $dueAllowedTypes = $this->adminDueTypesForCurrentCargo(); ?>
           <form class="scm-calendar-due-type-filter" data-scm-calendar-due-type-filter autocomplete="off">
             <?php if (in_array('servicios_publicos_critico', $dueAllowedTypes, true)): ?><label class="scm-calendar-due-chip scm-calendar-due-chip--no-prorroga-contrato"><input type="checkbox" name="due_type" value="servicios_publicos_critico" checked><span class="material-symbols-outlined" aria-hidden="true">warning</span><strong>Servicios críticos · 72 horas</strong></label><?php endif; ?>
             <?php if (in_array('preventiva_sin_enviar', $dueAllowedTypes, true)): ?><label class="scm-calendar-due-chip scm-calendar-due-chip--preventiva-sin-enviar"><input type="checkbox" name="due_type" value="preventiva_sin_enviar" checked><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><strong>Preventivas sin enviar</strong></label><?php endif; ?>

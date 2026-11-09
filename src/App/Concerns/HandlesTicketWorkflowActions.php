@@ -415,6 +415,16 @@ trait HandlesTicketWorkflowActions
       }
       $alertPermissions = $this->sanitizeDashboardAlertPermissions($decodedAlerts);
     }
+    $dueTypeMaps = [];
+    foreach (['due_type_permissions' => self::ADMIN_DUE_TYPE_SETTING, 'due_reminder_types' => self::ADMIN_DUE_REMINDER_SETTING] as $field => $setting) {
+      if (!array_key_exists($field, $_POST)) continue;
+      try {
+        $dueTypeMaps[$setting] = $this->sanitizeAdminDueTypeMap(json_decode(stripslashes((string) $_POST[$field]), true, 512, JSON_THROW_ON_ERROR));
+      } catch (\JsonException $exception) {
+        $this->jsonFail('Los vencimientos por cargo no son validos.');
+        return;
+      }
+    }
 
     \SCM\Core\App::settings()->set('dashboard_tab_permissions', $permissions, Auth::userId());
     // Desde aquí las pestañas guardadas ya usan las opciones separadas del menú (sin traducir el formato anterior).
@@ -433,6 +443,7 @@ trait HandlesTicketWorkflowActions
     \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
     \SCM\Core\App::settings()->set('admin_due_popup_cargo_ids', $adminDuePopupCargoIds, Auth::userId());
     \SCM\Core\App::settings()->set('dashboard_alert_permissions', $alertPermissions, Auth::userId());
+    foreach ($dueTypeMaps as $setting => $map) \SCM\Core\App::settings()->set($setting, $map, Auth::userId());
     \SCM\Core\App::settings()->refresh();
     $this->clearDashboardPerformanceCache('dashboard-filter-options-v4');
     $this->clearDashboardPerformanceCache('dashboard-filter-options-v5');
@@ -2171,10 +2182,64 @@ trait HandlesTicketWorkflowActions
     'credito_propietario' => ['credito_solicitud_pendiente', 'credito_contabilidad_pendiente'],
   ];
 
+  /** Permisos por cargo › Alertas: cargo => tipos. Un cargo que no se ha guardado conserva todos los de sus pestañas. */
+  private const ADMIN_DUE_TYPE_SETTING = 'dashboard_due_type_permissions';
+  private const ADMIN_DUE_REMINDER_SETTING = 'dashboard_due_reminder_types';
+
   /** @return list<string> */
   private function adminDueAllTypes(): array
   {
     return array_merge(...array_values(self::ADMIN_DUE_TYPES_BY_TAB));
+  }
+
+  /** Nombres de los tipos, iguales a los filtros del calendario. @return array<string,string> */
+  private function adminDueTypeLabels(): array
+  {
+    return [
+      'servicios_publicos_critico' => 'Servicios críticos · 72 horas',
+      'preventiva_sin_enviar' => 'Preventivas sin enviar',
+      'ticket_preventiva_sin_cita' => 'Casos sin cita preventiva',
+      'preventiva_cita_sin_realizar' => 'Preventivas con cita sin realizar',
+      'cotizacion_sin_enviar' => 'Cotizaciones sin enviar',
+      'cotizacion_enviada_sin_respuesta' => 'Cotizaciones sin respuesta',
+      'terminacion_contrato_pendiente' => 'Terminación de contrato',
+      'no_prorroga_contrato_pendiente' => 'No prórroga de contrato',
+      'orden_mantenimiento_sin_respuesta' => 'Órdenes sin respuesta',
+      'contrato_anexos_sin_enviar' => 'Contratos sin enviar',
+      'credito_solicitud_pendiente' => 'Solicitudes de crédito',
+      'credito_contabilidad_pendiente' => 'Créditos sin contabilidad',
+    ];
+  }
+
+  /**
+   * Recorta $types a lo marcado para el cargo en $setting.
+   * @param list<string> $types @return list<string>
+   */
+  private function adminDueTypesConfiguredFor(string $setting, string $cargo, array $types): array
+  {
+    $map = \SCM\Core\App::settings()->get($setting, []);
+    if (!is_array($map) || !is_array($map[$cargo] ?? null)) return $types;
+    return array_values(array_intersect($types, array_map('strval', $map[$cargo])));
+  }
+
+  /** @return list<string> */
+  private function adminDueTypesForCurrentCargo(): array
+  {
+    return $this->adminDueTypesConfiguredFor(self::ADMIN_DUE_TYPE_SETTING, (string) Auth::userCargo(), $this->adminDueAllowedTypes());
+  }
+
+  /** @param mixed $raw @return array<string,list<string>> */
+  private function sanitizeAdminDueTypeMap($raw): array
+  {
+    $cargos = array_flip(array_map(static fn(array $cargo): string => trim((string) ($cargo['id'] ?? '')), $this->getDashboardCargoOptions()));
+    $clean = [];
+    foreach (is_array($raw) ? $raw : [] as $cargo => $selected) {
+      $cargo = trim((string) $cargo);
+      if (!isset($cargos[$cargo]) || !is_array($selected)) continue;
+      $clean[$cargo] = array_values(array_intersect($this->adminDueAllTypes(), array_map('strval', $selected)));
+    }
+    ksort($clean);
+    return $clean;
   }
 
   /**
@@ -2199,8 +2264,9 @@ trait HandlesTicketWorkflowActions
   private function adminDueCalendarItems(array $settings, int $fromTs, int $toTs, ?array $types = null): array
   {
     $items = [];
-    $types ??= $this->adminDueAllowedTypes();
-    $wants = static fn(string $type): bool => in_array($type, $types, true);
+    $types ??= $this->adminDueTypesForCurrentCargo();
+    // Cada consulta trae varios tipos: se ejecuta si el cargo atiende alguno y al final se deja solo lo suyo.
+    $wants = static fn(string ...$group): bool => array_intersect($group, $types) !== [];
     if ($wants('servicios_publicos_critico')) {
       $critical = new \SCM\Modules\Pending\PublicServicesCritical($this->db);
       if ($critical->available()) foreach ($this->db->getResults('SELECT * FROM `' . $critical->table() . '` WHERE status <> ? ORDER BY deadline_at', ['verified']) as $row) {
@@ -2225,14 +2291,16 @@ trait HandlesTicketWorkflowActions
         $items[]=$item;
       }
     }
-    if ($wants('cotizacion_sin_enviar')) {
+    if ($wants('cotizacion_sin_enviar', 'cotizacion_enviada_sin_respuesta')) {
       $items = array_merge($items, $this->adminDueQuoteItems($settings, $fromTs, $toTs));
     }
     if ($wants('preventiva_sin_enviar')) {
       $items = array_merge($items, $this->adminDuePreventivaItems($settings, $fromTs, $toTs));
+    }
+    if ($wants('ticket_preventiva_sin_cita', 'preventiva_cita_sin_realizar')) {
       $items = array_merge($items, $this->adminDuePreventivaTicketItems($settings, $fromTs, $toTs));
     }
-    if ($wants('terminacion_contrato_pendiente')) {
+    if ($wants('terminacion_contrato_pendiente', 'no_prorroga_contrato_pendiente')) {
       $items = array_merge($items, $this->adminDueContractRequestItems($settings, $fromTs, $toTs));
     }
     if ($wants('orden_mantenimiento_sin_respuesta')) {
@@ -2241,9 +2309,10 @@ trait HandlesTicketWorkflowActions
     if ($wants('contrato_anexos_sin_enviar')) {
       $items = array_merge($items, $this->adminDueLeaseAnnexItems($settings, $fromTs, $toTs));
     }
-    if ($wants('credito_solicitud_pendiente')) {
+    if ($wants('credito_solicitud_pendiente', 'credito_contabilidad_pendiente')) {
       $items = array_merge($items, $this->adminDueOwnerCreditItems($settings, $fromTs, $toTs));
     }
+    $items = array_values(array_filter($items, static fn(array $item): bool => in_array((string) ($item['tipo_vencimiento'] ?? ''), $types, true)));
 
     usort($items, static function (array $a, array $b): int {
       $date = strcmp((string) ($a['fecha_inicio'] ?? ''), (string) ($b['fecha_inicio'] ?? ''));
@@ -2339,8 +2408,9 @@ trait HandlesTicketWorkflowActions
   private function adminDueCalendarSummaryGroups(int $fromTs, int $toTs): array
   {
     $groups = [];
+    $types = $this->adminDueTypesForCurrentCargo();
 
-    if ($this->canAccessDashboardTab('preventivas_pendientes')) {
+    if (array_intersect(self::ADMIN_DUE_TYPES_BY_TAB['preventivas_pendientes'], $types) !== [] && $this->canAccessDashboardTab('preventivas_pendientes')) {
       $groups[] = $this->adminDueCalendarSummaryGroup(
         'preventiva_pendiente',
         'Preventivas pendientes',
@@ -2349,7 +2419,7 @@ trait HandlesTicketWorkflowActions
       );
     }
 
-    if ($this->canAccessDashboardTab('servicios_publicos_pendientes')) {
+    if (in_array('servicios_publicos_critico', $types, true) && $this->canAccessDashboardTab('servicios_publicos_pendientes')) {
       $groups[] = $this->adminDueCalendarSummaryGroup(
         'servicios_publicos_pendientes',
         'Servicios públicos pendientes',
