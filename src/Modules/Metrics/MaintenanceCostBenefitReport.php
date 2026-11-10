@@ -15,8 +15,8 @@ use SCM\Modules\ContractMovements\ContractMovementsReport;
  *
  * - Ingreso `cotizaciones`: administración (sin IVA) de las cotizaciones `Aprobada`, en el mes de su fecha
  *   de respuesta; es la misma "Administración ganada" de Métricas › Cotizaciones.
- * - Ingreso `contratos`: comisión (canon × % de administración) de cada mes vigente y derechos (canon × %
- *   de derechos) en el mes de entrega. Se calcula con el canon actual: el contrato no guarda su historial.
+ * - Ingreso `contratos`: cada contrato cuenta una vez, en el mes de su `fecha_entrega`: un mes de comisión
+ *   (canon × % de administración) y los derechos (canon × % de derechos).
  * - Gasto: servicio + transporte de los reportes administrativos de la vista, en el mes de la fecha del
  *   reporte, esté o no pagado: los reportes no guardan la fecha en que se pagaron. Lo que no corresponde
  *   a la vista no cuenta; su total se informa aparte.
@@ -26,7 +26,7 @@ use SCM\Modules\ContractMovements\ContractMovementsReport;
 final class MaintenanceCostBenefitReport
 {
   public const INCOME_COLUMNS = ['id', 'ticket', 'contrato', 'inmueble', 'tipo', 'fecha', 'total', 'admin'];
-  public const CONTRACT_COLUMNS = ['id', 'contrato', 'inmueble', 'ingreso', 'egreso', 'canon', 'tasa', 'derechos'];
+  public const CONTRACT_COLUMNS = ['id', 'contrato', 'inmueble', 'entrega', 'canon', 'tasa', 'derechos'];
   public const EXPENSE_COLUMNS = ['id', 'ticket', 'inmueble', 'categoria', 'funcionario', 'fecha', 'servicio', 'transporte', 'total', 'estado'];
   private const LIBIA = 'Libia Correa Rivera';
   private const ALVARO = 'Alvaro Florez De Oro';
@@ -73,12 +73,12 @@ final class MaintenanceCostBenefitReport
     foreach ($source['rows'] as $values) {
       $row = array_combine($source['columns'], $values);
       if ($config['income'] === 'contratos') {
-        if ($row['ingreso'] === null) {
+        if ($row['entrega'] === null) {
           $undated['income_count']++;
           continue;
         }
         if (empty($row['tasa_admin']) && empty($row['derechos'])) $contractsWithoutRate++;
-        $contracts[] = [$row['id'], $row['contrato'], $row['inmueble'], $row['ingreso'], $row['egreso'], (int) $row['canon'], (float) $row['tasa_admin'], (float) $row['derechos']];
+        $contracts[] = [$row['id'], $row['contrato'], $row['inmueble'], $row['entrega'], (int) $row['canon'], (float) $row['tasa_admin'], (float) $row['derechos']];
         continue;
       }
       if ($row['estado'] !== 'Aprobada') continue;

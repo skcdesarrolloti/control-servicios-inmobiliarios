@@ -38,13 +38,12 @@ const delivery = {
   income_source: 'contratos',
   income_columns: maintenance.income_columns,
   income: [],
-  contract_columns: ['id', 'contrato', 'inmueble', 'ingreso', 'egreso', 'canon', 'tasa', 'derechos'],
+  contract_columns: ['id', 'contrato', 'inmueble', 'entrega', 'canon', 'tasa', 'derechos'],
   contracts: [
-    [1, '1001', '501', `${year - 1}-06-10`, null, 2000000, 10, 5],
-    [2, '1002', '502', day(month, 3), null, 1000000, 10, 50],
-    [3, '1003', '503', `${year - 1}-01-10`, `${year - 1}-03-20`, 3000000, 10, 5],
-    [4, '1004', '504', day(month, 4), null, 900000, 0, 0],
-  ],
+    [1, '1001', '501', `${year - 1}-06-10`, 2000000, 10, 5],
+    [2, '1002', '502', day(month, 3), 1000000, 10, 50],
+    [4, '1004', '504', day(month, 4), 900000, 0, 0],
+  ].concat(previous !== month ? [[5, '1005', '505', day(previous, 8), 2000000, 10, 5]] : []),
   contracts_without_rate: 1,
   expense_columns: expenseColumns,
   expense: [
@@ -142,26 +141,25 @@ const delivery = {
 
   await open('entrega_recibo');
   values = await kpis();
-  assert.equal(digits(values.Ingresos), String(200000 + 100000 + 500000), 'one month of commission on both contracts plus the rights of the contract delivered this month');
+  assert.equal(digits(values.Ingresos), String(100000 + 500000), 'only the contracts delivered this month count: one commission plus their rights');
   assert.equal(digits(values.Gastos), '200000');
   await page.selectOption('[data-scm-cb-filter="tipo"]', 'Recibo');
   values = await kpis();
   assert.equal(digits(values.Gastos), '50000', 'the type filter narrows the expense');
-  assert.equal(digits(values.Ingresos), String(200000 + 100000 + 500000), 'the type filter does not change the income');
+  assert.equal(digits(values.Ingresos), String(100000 + 500000), 'the type filter does not change the income');
   await page.selectOption('[data-scm-cb-filter="tipo"]', '');
   assert.equal(await page.locator('[data-scm-cb-kind]').count(), 0, 'delivery has no maintenance tabs');
   assert.match(await page.textContent('[data-scm-cb-content]'), /Gastos de Libia Correa Rivera\./);
   assert.match(await page.textContent('[data-scm-cb-content]'), /1 contrato no tiene % de administración ni de derechos/);
   assert.match(await page.textContent('[data-scm-cb-content]'), /1 contrato sin fecha de entrega/);
-  assert.equal(await page.locator('[data-scm-cb-detail] tbody tr').count(), 2, 'contracts without income are not listed; the closed one is out of the period');
+  assert.equal(await page.locator('[data-scm-cb-detail] tbody tr').count(), 2, 'only contracts delivered in the period are listed');
   assert.match(await page.textContent('[data-scm-cb-detail] thead'), /Comisión.*Derechos/);
   assert.match(await page.textContent('[data-scm-cb-content]'), /Detalle de .*\(mes actual\)/, 'the detail names its period');
-  assert.match(await page.textContent('[data-scm-cb-detail]'), /Lista los contratos vigentes en el periodo/, 'it explains why older contracts appear');
+  assert.match(await page.textContent('[data-scm-cb-detail]'), /Lista los contratos con fecha de entrega en el periodo/, 'it says which contracts are listed');
 
   await page.click('[data-scm-cb-mode="anual"]');
   values = await kpis();
-  const commission = month * 200000 + 100000;
-  assert.equal(digits(values.Ingresos), String(commission + 500000), 'the year counts each elapsed month of commission once');
+  assert.equal(digits(values.Ingresos), String(600000 + (previous !== month ? 300000 : 0)), 'the year adds each contract once, in its delivery month');
   assert.match(await page.textContent('.scm-qm-monthly thead'), /Contratos/);
   if (process.env.SCM_SCREENSHOT) await page.screenshot({ path: process.env.SCM_SCREENSHOT, fullPage: true });
 

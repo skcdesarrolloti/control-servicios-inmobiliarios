@@ -5,7 +5,7 @@
   // Cada vista (data-scope) trae todas sus filas en una sola petición y los periodos, indicadores,
   // detalle y CSV se calculan en el navegador.
   // - Ingreso: administración de las cotizaciones aprobadas por fecha de respuesta o, en entrega y recibo,
-  //   comisión de cada mes vigente y derechos del mes de entrega de los contratos.
+  //   un mes de comisión y los derechos de cada contrato, en el mes de su fecha de entrega.
   // - Gasto: servicio y transporte de los reportes administrativos de la vista, por fecha del reporte.
   // Periodo: mes actual, un mes, un año o acumulado de un mes a otro; siempre es un rango de meses (YYYY-MM).
   var MONTHS_LONG = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -176,7 +176,7 @@
         row.kind = row.tipo.toLowerCase();
         years[row.fecha.slice(0, 4)] = true;
       });
-      (contracts || []).forEach(function (row) { years[row.ingreso.slice(0, 4)] = true; });
+      (contracts || []).forEach(function (row) { years[row.entrega.slice(0, 4)] = true; });
       expense.forEach(function (row) {
         years[row.fecha.slice(0, 4)] = true;
         types[row.categoria] = true;
@@ -202,20 +202,15 @@
       render();
     }
 
-    // Comisión de cada mes vigente del periodo y derechos si el contrato se entregó dentro del periodo.
+    // Solo los contratos con fecha de entrega en el periodo: cada uno suma un mes de comisión y sus derechos.
     function contractIncome(p) {
-      var months = monthRange(p.from, p.to).filter(function (ym) { return ym <= currentMonth; });
-      var out = [];
-      state.data.contracts.forEach(function (contract) {
-        var start = contract.ingreso.slice(0, 7);
-        var end = contract.egreso ? contract.egreso.slice(0, 7) : currentMonth;
-        var active = months.filter(function (ym) { return ym >= start && ym <= end; }).length;
-        var commission = Math.round(active * contract.canon * contract.tasa / 100);
-        var rights = inPeriod(contract.ingreso, p) && start <= currentMonth ? Math.round(contract.canon * contract.derechos / 100) : 0;
-        if (!commission && !rights) return;
-        out.push({ id: contract.id, contrato: contract.contrato, inmueble: contract.inmueble, fecha: contract.ingreso, canon: contract.canon, meses: active, comision: commission, derechos: rights, admin: commission + rights, blob: contract.blob });
+      return state.data.contracts.filter(function (contract) {
+        return inPeriod(contract.entrega, p) && contract.entrega.slice(0, 7) <= currentMonth;
+      }).map(function (contract) {
+        var commission = Math.round(contract.canon * contract.tasa / 100);
+        var rights = Math.round(contract.canon * contract.derechos / 100);
+        return { id: contract.id, contrato: contract.contrato, inmueble: contract.inmueble, fecha: contract.entrega, canon: contract.canon, comision: commission, derechos: rights, admin: commission + rights, blob: contract.blob };
       });
-      return out;
     }
 
     // Pestañas de mantenimiento: General suma todo; Correctiva y Preventiva separan cotizaciones y reportes.
@@ -460,12 +455,12 @@
 
     function contractDetail(slice, rows) {
       var sum = rows.reduce(function (out, row) { out.commission += row.comision; out.rights += row.derechos; out.total += row.admin; return out; }, { commission: 0, rights: 0, total: 0 });
-      return '<p class="scm-cb-note is-table">Lista los contratos vigentes en el periodo: cada uno suma la comisión de sus meses vigentes, aunque se haya entregado antes. Los derechos solo suman si se entregó en el periodo.</p>' +
+      return '<p class="scm-cb-note is-table">Lista los contratos con fecha de entrega en el periodo: cada uno suma un mes de comisión y sus derechos.</p>' +
         '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr><th>Contrato</th><th>Entrega</th><th>Inmueble</th>' +
-        '<th class="is-num">Canon</th><th class="is-num">Meses en el periodo</th><th class="is-num">Comisión</th><th class="is-num">Derechos</th><th class="is-num">Total</th></tr></thead><tbody>' + slice.map(function (row) {
+        '<th class="is-num">Canon</th><th class="is-num">Comisión</th><th class="is-num">Derechos</th><th class="is-num">Total</th></tr></thead><tbody>' + slice.map(function (row) {
           return "<tr><td><strong>" + esc(row.contrato || "#" + row.id) + "</strong></td><td>" + esc(formatDay(row.fecha)) + "</td><td>" + esc(row.inmueble || "—") + "</td>" +
-            cash(row.canon) + count(row.meses) + cash(row.comision) + cash(row.derechos) + cash(row.admin, " is-total") + "</tr>";
-        }).join("") + '</tbody><tfoot><tr><td colspan="5">Total</td><td class="is-num">' + esc(money(sum.commission)) + '</td><td class="is-num">' + esc(money(sum.rights)) + '</td><td class="is-num is-total">' + esc(money(sum.total)) + "</td></tr></tfoot></table></div>";
+            cash(row.canon) + cash(row.comision) + cash(row.derechos) + cash(row.admin, " is-total") + "</tr>";
+        }).join("") + '</tbody><tfoot><tr><td colspan="4">Total</td><td class="is-num">' + esc(money(sum.commission)) + '</td><td class="is-num">' + esc(money(sum.rights)) + '</td><td class="is-num is-total">' + esc(money(sum.total)) + "</td></tr></tfoot></table></div>";
     }
 
     function incomeDetail(slice, rows) {

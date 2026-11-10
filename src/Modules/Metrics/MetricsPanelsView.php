@@ -16,7 +16,7 @@ final class MetricsPanelsView
   private const MAINTENANCE_KINDS = ['general' => ['General', 'balance'], 'correctiva' => ['Correctiva', 'build'], 'preventiva' => ['Preventiva', 'pending_actions']];
   /** Título y descripción de cada vista de MaintenanceCostBenefitReport::SCOPES. */
   private const COST_VIEWS = [
-    'entrega_recibo' => ['Costo entrega y recibo', 'Lo que se le paga mes a mes a la auxiliar de entrega y recibo, frente a los ingresos por comisión y derechos de los contratos.'],
+    'entrega_recibo' => ['Costo entrega y recibo', 'Lo que se le paga mes a mes a la auxiliar de entrega y recibo, frente a la comisión y los derechos de los contratos entregados en el periodo.'],
     'mantenimiento' => ['Costo-beneficio mantenimiento', 'Compara la administración ganada en cotizaciones aprobadas con lo que se paga por revisiones correctivas y preventivas.'],
   ];
 
