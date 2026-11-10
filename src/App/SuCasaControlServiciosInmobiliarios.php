@@ -1576,6 +1576,34 @@ final class SuCasaControlServiciosInmobiliarios
     return hash_equals(self::deliveryReviewPublicSignature($reviewId, $expires), trim($signature));
   }
 
+  public static function inventoryPublicUrl(int $inventoryId): string
+  {
+    $base = defined('SCM_BASE_URL') ? rtrim((string) SCM_BASE_URL, '/') : '';
+    return ($base !== '' ? $base . '/' : '') . 'inventario.php?numero=' . rawurlencode((string) $inventoryId);
+  }
+
+  /** Enlace para destinatarios sin sesión. Va en anexos y cartas del contrato, por eso dura cinco años. */
+  public static function signedInventoryPublicUrl(int $inventoryId, ?int $expires = null): string
+  {
+    $expires = $expires && $expires > time() ? $expires : (time() + 1825 * 86400);
+    return self::inventoryPublicUrl($inventoryId)
+      . '&expires=' . rawurlencode((string) $expires)
+      . '&sig=' . rawurlencode(self::inventoryPublicSignature($inventoryId, $expires));
+  }
+
+  public static function inventoryPublicSignature(int $inventoryId, int $expires): string
+  {
+    return hash_hmac('sha256', 'inventario|' . $inventoryId . '|' . $expires, (string) SCM_APP_SECRET);
+  }
+
+  public static function inventoryPublicSignatureValid(int $inventoryId, int $expires, string $signature): bool
+  {
+    if ($inventoryId <= 0 || $expires <= time() || trim($signature) === '') {
+      return false;
+    }
+    return hash_equals(self::inventoryPublicSignature($inventoryId, $expires), trim($signature));
+  }
+
   public static function defaultCorrectiveReviewUrl(): string
   {
     $base = defined('SCM_BASE_URL') ? rtrim((string) SCM_BASE_URL, '/') : '';

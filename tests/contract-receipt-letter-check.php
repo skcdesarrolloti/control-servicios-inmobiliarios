@@ -19,7 +19,7 @@ $output = (new \SCM\Modules\Pending\TicketPdfGenerator())->generate('administrat
 ]);
 $pdf = $output['acta_desocupacion'] ?? [];
 $bytes = file_get_contents($pdf['path']);
-if (!str_starts_with($bytes, '%PDF-') || !str_contains($bytes, 'synthetic-only') || !str_contains($bytes, 'inventario-inmueble/?numero=845')) throw new RuntimeException('Letter must link the photo record and the inventory.');
+if (!str_starts_with($bytes, '%PDF-') || !str_contains($bytes, 'synthetic-only') || !str_contains($bytes, 'inventario.php?numero=845')) throw new RuntimeException('Letter must link the photo record and the inventory.');
 copy($pdf['path'], $directory . '/letter.pdf');
 unlink($pdf['path']);
 echo "PASS: receipt letter with configured contacts, contract date, photographic record and inventory links. No messages sent. PDF: {$directory}/letter.pdf\n";

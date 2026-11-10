@@ -51,7 +51,7 @@ final class EntregaTimelineMap
         'done_field'          => 'entrega_inventario_fecha',
         'elapsed_from_fields' => ['entrega_rev_fecha'],
         'elapsed_from_label'  => 'Revisión antes de la entrega',
-        'link_url'            => 'https://sucasainmobiliaria.com.co/inventario-inmueble/?numero={id_inventario_entrega}',
+        'link_url'            => 'inventario.php?numero={id_inventario_entrega}',
         'empty_text'          => 'Sin inventario registrado',
       ],
       [

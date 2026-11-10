@@ -1255,7 +1255,7 @@ trait HandlesPreventiveReviewActions
           <?php foreach ($summary as $label => $value): ?><div><span><?= $h($label) ?></span><strong><?= $h($value) ?></strong></div><?php endforeach; ?>
         </div>
         <div class="scm-prev-links">
-          <?php if ($inventoryId !== ''): ?><button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-title="Inventario del inmueble" data-iframe-url="https://sucasainmobiliaria.com.co/inventario-inmueble/?numero=<?= $h(rawurlencode($inventoryId)) ?>">Ver inventario</button><?php else: ?><span class="scm-prev-muted">El contrato no tiene inventario vinculado.</span><?php endif; ?>
+          <?php if ($inventoryId !== ''): ?><button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-title="Inventario del inmueble" data-iframe-url="<?= $h(self::inventoryPublicUrl((int) $inventoryId)) ?>">Ver inventario</button><?php else: ?><span class="scm-prev-muted">El contrato no tiene inventario vinculado.</span><?php endif; ?>
           <?php if (preg_match('#^https?://#i', $photoAlbum)): ?><button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-title="Registro fotográfico" data-iframe-url="<?= $h($photoAlbum) ?>">Ver registro fotográfico</button><?php else: ?><span class="scm-prev-muted">El contrato no tiene registro fotográfico.</span><?php endif; ?>
         </div>
       </section>

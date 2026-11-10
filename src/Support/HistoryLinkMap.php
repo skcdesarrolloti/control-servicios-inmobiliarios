@@ -35,7 +35,7 @@ final class HistoryLinkMap
 
       // Inmueble / inventario
       'id_inmueble' => ['label' => 'Ver inmueble en web', 'base' => 'https://sucasainmobiliaria.com.co/inmuebles/inmueble-'],
-      'id_inventario' => ['label' => 'Ver inventario inmueble', 'base' => 'https://sucasainmobiliaria.com.co/inventario-inmueble/?numero='],
+      'id_inventario' => ['label' => 'Ver inventario inmueble', 'base' => $baseUrl . 'inventario.php?numero='],
 
       // Cotizaciones
       'id_cotizacion_mantenimiento' => ['label' => 'Ver cotizacion de mantenimiento', 'base' => 'cotizacion-mantenimiento.php?numero='],

@@ -258,7 +258,7 @@ final class TicketPdfGenerator
     }
     $inventario = $this->value($ticket, 'id_inventario', '');
     if ($inventario !== '' && $inventario !== '0') {
-      $pdf->linkText('Consultar inventario del inmueble', 'https://sucasainmobiliaria.com.co/inventario-inmueble/?numero=' . rawurlencode($inventario));
+      $pdf->linkText('Consultar inventario del inmueble', \SCM\App\SuCasaControlServiciosInmobiliarios::signedInventoryPublicUrl((int) $inventario));
     } else {
       $pdf->paragraph('El contrato no tiene inventario vinculado.');
     }

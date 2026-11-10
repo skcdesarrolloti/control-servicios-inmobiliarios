@@ -147,7 +147,7 @@ final class LeaseAnnexesDocument
       'Acta de bienvenida' => [$act, true],
       'Contrato de arrendamiento' => [(string) ($contract['contrato_arrendamiento'] ?? ''), true],
       'Registro fotográfico' => [(string) ($contract['registro_fotografico'] ?? ''), false],
-      'Inventario del inmueble' => [self::idUrl($wp . 'inventario-inmueble/?numero=', $contract['id_inventario'] ?? ''), true],
+      'Inventario del inmueble' => [ctype_digit(trim((string) ($contract['id_inventario'] ?? ''))) ? \SCM\App\SuCasaControlServiciosInmobiliarios::signedInventoryPublicUrl((int) $contract['id_inventario']) : '', true],
       'Acta de entrega' => [self::idUrl($wp . 'acta-de-entrega/?numero=', $contract['id_acta_entrega'] ?? ''), true],
       'Contrato de mandato' => [self::idUrl($wp . 'contrato-de-mandato/?numero=', $contract['id_contrato_mandato'] ?? ''), true],
     ];

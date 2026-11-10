@@ -9,7 +9,6 @@ use SCM\Support\HtmlPdfRenderer;
 final class ReceiptNoticeDocument
 {
   public const TITLE = 'Aviso previo de revisión antes de la desocupación del inmueble';
-  private const INVENTORY_URL = 'https://sucasainmobiliaria.com.co/inventario-inmueble/?numero=';
 
   /**
    * @param array<string,mixed> $ticket
@@ -77,7 +76,7 @@ final class ReceiptNoticeDocument
     return '<section class="scm-acta-receipt-section scm-receipt-notice-links"><h2>3. Registro fotográfico e inventario</h2>'
       . '<table class="scm-acta-receipt-data"><tbody>'
       . '<tr><th scope="row">Registro fotográfico</th><td>' . ($isUrl ? $link($photosUrl, 'Consultar registro fotográfico del inmueble') : 'No hay registro fotográfico disponible en el contrato.') . '</td></tr>'
-      . '<tr><th scope="row">Inventario del inmueble</th><td>' . ($hasInventory ? $link(self::INVENTORY_URL . rawurlencode($inventoryId), 'Consultar inventario #' . $inventoryId) : 'El contrato no tiene inventario vinculado.') . '</td></tr>'
+      . '<tr><th scope="row">Inventario del inmueble</th><td>' . ($hasInventory ? $link(\SCM\App\SuCasaControlServiciosInmobiliarios::signedInventoryPublicUrl((int) $inventoryId), 'Consultar inventario #' . $inventoryId) : 'El contrato no tiene inventario vinculado.') . '</td></tr>'
       . '</tbody></table></section>';
   }
 

@@ -65,7 +65,7 @@ final class LeaseAnnexesService
   {
     $sources = [
       'acta_entrega' => ['id_acta_entrega', 'jet_cct_actas_de_entrega', 'https://sucasainmobiliaria.com.co/acta-de-entrega/?numero='],
-      'inventario' => ['id_inventario', 'jet_cct_inventario', 'https://sucasainmobiliaria.com.co/inventario-inmueble/?numero='],
+      'inventario' => ['id_inventario', 'jet_cct_inventario', (defined('SCM_BASE_URL') ? rtrim((string) SCM_BASE_URL, '/') . '/' : '') . 'inventario.php?numero='],
     ];
     $out = [];
     foreach ($sources as $key => [$field, $tableName, $base]) {

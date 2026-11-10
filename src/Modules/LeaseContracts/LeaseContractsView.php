@@ -278,7 +278,7 @@ final class LeaseContractsView
       ['Acta de bienvenida codeudor 4', 'acta_codeudor_4', '', false],
       ['Contrato de arrendamiento', 'contrato_arrendamiento', '', false],
       ['Contrato de mandato', 'id_contrato_mandato', $wp . 'contrato-de-mandato/?numero=', false],
-      ['Inventario del inmueble', 'id_inventario', $wp . 'inventario-inmueble/?numero=', false],
+      ['Inventario del inmueble', 'id_inventario', $base . 'inventario.php?numero=', false],
       ['Acta de entrega', 'id_acta_entrega', $wp . 'acta-de-entrega/?numero=', false],
       ['Revisión antes de la ocupación', 'id_revision_entrega', $base . 'revision-entrega.php?numero=', false],
       ['Acta de recibo', 'id_acta_recibo', $wp . 'acta-de-recibo/?numero=', false],
