@@ -39,7 +39,21 @@ El estado viaja como un solo JSON: un inventario amoblado supera `max_input_vars
 
 ## Formulario
 
-- Secciones según el tipo de inmueble (`InventorySchema::profile`): cambian qué se muestra y cómo se llama, no las columnas.
+- Secciones según el tipo de inmueble (`InventorySchema::profile`), en este orden:
+  - Apartamento (y apartaestudio): balcón, elementos principales, sala, cocina, patio / área de labores, habitaciones y baños
+    por piso y tipo, garaje, depósito, eléctricos.
+  - Casa: terraza en lugar de balcón y "Patio".
+  - Local: elementos principales, sala, cocina, baños, garaje, eléctricos y bodega.
+  - Oficina: elementos principales, sala, cocina, baños, garaje y eléctricos.
+  - Bodega: lo mismo de la oficina, más la sección Oficina.
+  Garaje y depósito aparecen cuando el paso Datos dice que tiene parqueadero o depósito. Cualquier otra sección se puede
+  agregar a mano y se muestra siempre si ya tiene filas.
+- Pisos: con varios pisos se indica cuántas habitaciones y baños hay en cada piso. Cada uno guarda su piso (`piso_habitacion_*`,
+  `piso_bano_*`) y su tipo (`tipos_espacios`, JSON). En las áreas comunes cada fila guarda su piso (`piso_<sufijo>` dentro de la fila).
+- Eléctricos: lo que se registra como eléctrico en cualquier sección (tomas, interruptores, lámparas, apliques…, comparado
+  con el glosario 668 en singular o plural) se copia solo a Elementos eléctricos al guardar, con el lugar donde está. Esas
+  copias llevan `origen_electricos` en la fila y se recalculan en cada edición; a mano solo se agrega lo que no está en ninguna
+  sección (contador, caja de fusibles).
 - Sugerencias: glosarios más lo aprendido de los últimos 150 inventarios Nuevo (`storage/data/inventory-suggestions.json`, semanal).
 - Dictado: requiere `MINIMAX_API_KEY` en el `.env` del servidor (la misma del asistente de crear caso). Con el plan de suscripción
   se usa `MiniMax-M3.1-Flash`; se cambia con `MINIMAX_INVENTORY_MODEL`. El navegador envía WAV porque MiniMax no acepta webm.
@@ -55,6 +69,9 @@ las ve quien ve casos de entrega) y `herramienta_duplicar_inventario` (hay que a
 ```bash
 php bin/cct-add-fields.php inventario informacion_adicional_del_inmueble_tab cantidad_pisos="Cantidad de pisos" --aplicar
 php bin/cct-add-fields.php inventario complementarios_tab incluir_anexos="Incluir en anexos del contrato" id_reporte_administrativo="Reporte administrativo" --aplicar
+php bin/cct-add-fields.php inventario inventario balcon:repeater="Balcón" terraza:repeater="Terraza" deposito_inventario:repeater="Depósito" bodega:repeater="Bodega" oficina:repeater="Oficina" --aplicar
+php bin/cct-add-fields.php inventario muebles_enseres_tab balcon_muebles:repeater="Balcón (muebles)" terraza_muebles:repeater="Terraza (muebles)" deposito_inventario_muebles:repeater="Depósito (muebles)" bodega_muebles:repeater="Bodega (muebles)" oficina_muebles:repeater="Oficina (muebles)" --aplicar
+php bin/cct-add-fields.php inventario informacion_adicional_del_inmueble_tab tipos_espacios:textarea="Tipo de cada habitación y baño" --aplicar
 ```
 
 Pruebas: `php tests/inventory-public-check.php`, `php tests/inventory-flow-check.php` y `node tests/inventory-form-check.cjs`.

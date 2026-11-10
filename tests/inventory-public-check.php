@@ -12,7 +12,7 @@ use SCM\Modules\Inventory\InventorySchema;
 $assert = static function (bool $ok, string $message): void { if (!$ok) throw new RuntimeException($message); };
 
 // Bloque de columnas reales del CCT usadas por el documento.
-$columns = ['cct_status','fecha','fecha_entrega','propietario','direccion','contrato','arrendatario','inmueble','tipo_de_inmueble','categoria_inventario','tipo_inventario','cantidad_pisos','cantidad_habitaciones','cantidad_banos','tiene_parqueadero','tipo_parqueadero','numero_parqueadero','tiene_deposito','depositos','registro_fotografico','fecha_linderos','conjunto_lin','torre_lin','inmueble_lin','parqueadero_lin','deposito_lin','observaciones','servicios_publicos','luz','agua','gas','medidor_luz','medidor_agua','medidor_gas','tiene_delegado','delegado','correo_delegado','celular_delegado','correo_arrendatario','celular_arrendatario','coordinador','email_coordinador','celular_coordinador','creador','email_creador','celular_creador','sucursal'];
+$columns = ['cct_status','tipos_espacios','fecha','fecha_entrega','propietario','direccion','contrato','arrendatario','inmueble','tipo_de_inmueble','categoria_inventario','tipo_inventario','cantidad_pisos','cantidad_habitaciones','cantidad_banos','tiene_parqueadero','tipo_parqueadero','numero_parqueadero','tiene_deposito','depositos','registro_fotografico','fecha_linderos','conjunto_lin','torre_lin','inmueble_lin','parqueadero_lin','deposito_lin','observaciones','servicios_publicos','luz','agua','gas','medidor_luz','medidor_agua','medidor_gas','tiene_delegado','delegado','correo_delegado','celular_delegado','correo_arrendatario','celular_arrendatario','coordinador','email_coordinador','celular_coordinador','creador','email_creador','celular_creador','sucursal'];
 foreach (InventorySchema::sections() as $key => $section) {
   $columns[] = $key; $columns[] = $section['furniture'];
   if ($section['floor'] !== '') { $columns[] = $section['floor']; $columns[] = $section['details']; }
@@ -51,7 +51,7 @@ foreach (['Inventario #' . $furnished, 'Sala, comedor y hall', 'Puertas', 'Mader
 $assert(!str_contains($html, 'SUCURSAL-OCULTA'), 'El documento no debe mostrar la sucursal.');
 $assert(!str_contains($html, '<script>x'), 'El documento debe escapar los datos.');
 $assert(!str_contains($html, 'Tipo de material</th><th>Estado</th><th>Observaciones</th></tr></thead><tbody><tr><td>Sofá'), 'Muebles no lleva columna de material.');
-$assert(!str_contains($html, 'Habitación principal'), 'Las secciones vacías no se muestran.');
+$assert(!str_contains($html, 'Habitación 1'), 'Las secciones vacías no se muestran.');
 
 $old = (string) $view->render($legacy)['content'];
 $assert(!str_contains($old, 'a:1:{'), 'El tipo serializado antiguo no se muestra.');
@@ -67,9 +67,37 @@ $assert(!App::inventoryPublicSignatureValid(56, (int) $query['expires'], (string
 $assert(!App::inventoryPublicSignatureValid(55, time() - 10, App::inventoryPublicSignature(55, time() - 10)), 'Una firma vencida se rechaza.');
 
 // Perfiles y cobro.
-$local = InventorySchema::profile('Local');
-$assert($local['labels']['habitacion_dos'] === 'Área u oficina 2' && in_array('bano_emergencia', $local['hidden'], true), 'Perfil comercial incorrecto.');
+// Secciones por tipo de inmueble.
+$order = static fn(string $type): array => InventorySchema::orderedKeys(InventorySchema::profile($type), 2, 1);
+$assert($order('Apartamento') === ['balcon', 'elementos_principales', 'sala', 'cocina_o_cafeteria', 'patio', 'habitacion_principal', 'habitacion_dos', 'bano_principal', 'garaje', 'deposito_inventario', 'elementos_electricos', 'otros'], 'Apartamento: ' . implode(',', $order('Apartamento')));
+$assert($order('Casa')[0] === 'terraza' && !in_array('balcon', $order('Casa'), true) && InventorySchema::profile('Casa')['labels']['patio'] === 'Patio', 'Casa con terraza y patio.');
+$assert($order('Local') === ['elementos_principales', 'sala', 'cocina_o_cafeteria', 'bano_principal', 'garaje', 'elementos_electricos', 'bodega', 'otros'], 'Local: ' . implode(',', $order('Local')));
+$assert($order('Oficina') === ['elementos_principales', 'sala', 'cocina_o_cafeteria', 'bano_principal', 'garaje', 'elementos_electricos', 'otros'], 'Oficina: ' . implode(',', $order('Oficina')));
+$assert(in_array('oficina', $order('Bodega'), true) && !in_array('bodega', $order('Bodega'), true), 'Bodega con oficina.');
+$assert(InventorySchema::profile('Local')['max_rooms'] === 0 && in_array('patio', InventorySchema::profile('Local')['hidden'], true), 'Un local no tiene habitaciones ni patio.');
+$assert(InventorySchema::profile('Apartamento')['requires']['deposito_inventario'] === 'tiene_deposito', 'El depósito depende de la respuesta del paso Datos.');
 $assert(InventorySchema::profile('Apartaestudio')['max_rooms'] === 1, 'Perfil apartaestudio incorrecto.');
+
+// Eléctricos: singular, plural y tildes.
+foreach (['Tomas', 'Toma doble', 'Interruptor', 'Lámparas', 'Apliques', 'Ojo de buey', 'Caja de fusibles'] as $name) {
+  $assert(InventorySchema::isElectrical($name, []), 'Debe ser eléctrico: ' . $name);
+}
+foreach (['Puerta', 'Pisos', 'Tomatera', 'Paredes'] as $name) {
+  $assert(!InventorySchema::isElectrical($name, []), 'No es eléctrico: ' . $name);
+}
+$assert(InventorySchema::sectionTitle('habitacion_dos', InventorySchema::profile('Casa'), ['habitacion_dos' => 'Estudio'], '2', 2) === 'Habitación 2 · Estudio · Piso 2', 'Título de habitación por piso y tipo.');
+$assert(InventorySchema::sectionTitle('bano_principal', InventorySchema::profile('Casa'), [], '1', 1) === 'Baño 1', 'Un piso no muestra el piso.');
+
+// Inmueble de dos pisos: cada habitación con su tipo y piso, y las áreas comunes con columna de piso.
+$twoFloors = $insert([
+  'cct_status' => 'publish', 'tipo_de_inmueble' => 'Casa', 'categoria_inventario' => 'No amoblado', 'tipo_inventario' => 'Nuevo', 'cantidad_pisos' => '2',
+  'tipos_espacios' => json_encode(['habitacion_principal' => 'Principal', 'habitacion_dos' => 'Estudio']), 'piso_habitacion_principal' => '1', 'piso_habitacion_dos' => '2',
+  'habitacion_dos' => InventorySchema::rowsToStored([['d' => 'Closet', 'c' => '1', 'm' => 'Madera', 'e' => 'Bueno', 'o' => '']], 'habitacion_dos'),
+  'sala' => InventorySchema::rowsToStored([['d' => 'Pisos', 'c' => '1', 'm' => 'Cerámica', 'e' => 'Bueno', 'o' => '', 'p' => '2']], 'sala'),
+]);
+$two = (string) $view->render($twoFloors)['content'];
+$assert(str_contains($two, 'Habitación 2 · Estudio · Piso 2') && str_contains($two, '<th>Piso</th>') && str_contains($two, '<h3>Sala, comedor y hall</h3>'), 'Documento de dos pisos.');
+$assert(strpos($two, '<h3>Sala, comedor y hall</h3>') < strpos($two, 'Habitación 2'), 'Sigue el orden de la casa.');
 $assert(InventorySchema::profile('Lote')['labels']['elementos_principales'] === 'Cerramiento y accesos', 'Perfil lote incorrecto.');
 $assert(InventorySchema::doubleCharge('Amoblado', 1) && InventorySchema::doubleCharge('No amoblado', 2) && !InventorySchema::doubleCharge('No amoblado', 1), 'Regla de doble cobro incorrecta.');
 

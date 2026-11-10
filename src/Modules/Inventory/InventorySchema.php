@@ -20,13 +20,21 @@ final class InventorySchema
   public const GLOSSARY_PARKING = 1011;
   public const GLOSSARY_SERVICES = 1003;
   public const GLOSSARY_AGREEMENTS = 853;
+  public const GLOSSARY_ELECTRICAL = 668;
   public const FURNISHED = 'Amoblado';
   public const NEW_TYPE = 'Nuevo';
+  public const ELECTRICAL = 'elementos_electricos';
+  /** Clave de fila que marca un elemento eléctrico copiado desde otra sección (se recalcula al guardar). */
+  public const ELECTRICAL_SOURCE = 'origen_electricos';
+  public const ROOM_TYPES = ['Principal', 'Secundaria', 'Estudio', 'De servicio'];
+  public const BATH_TYPES = ['Principal', 'Social', 'Privado', 'Auxiliar', 'De servicio'];
+  /** Eléctricos que no están en el glosario 668 pero aparecen en los glosarios de los espacios. */
+  private const EXTRA_ELECTRICAL = ['Telefonos', 'Citofonos', 'Interruptores', 'Tomas', 'Rosetas', 'Contador luz', 'Caja de fusibles', 'Lamparas', 'Apliques', 'Plafon', 'Ojo de buey', 'Bombillo', 'Tomacorriente'];
 
   private const ROOM_WORDS = ['principal', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez'];
 
   /**
-   * Secciones en el orden del formulario. `suffix` es el sufijo de las claves de cada fila (descripcion_<suffix>…).
+   * Secciones del inventario. `suffix` es el sufijo de las claves de cada fila (descripcion_<suffix>…).
    *
    * @return array<string,array{label:string,group:string,glossary:int,suffix:string,furniture:string,furniture_suffix:string,floor:string,details:string,index:int}>
    */
@@ -36,25 +44,30 @@ final class InventorySchema
       'label' => $label, 'group' => $group, 'glossary' => $glossary, 'suffix' => $suffix, 'furniture' => $furniture,
       'furniture_suffix' => $furnitureSuffix, 'floor' => $floor, 'details' => $details, 'index' => $index,
     ];
+    $general = static fn(string $key, string $label, int $glossary): array => $section($label, 'general', $glossary, $key, $key . '_muebles', $key . '_muebles');
     $sections = [
+      'balcon' => $general('balcon', 'Balcón', 679),
+      'terraza' => $general('terraza', 'Terraza', 679),
       'elementos_principales' => $section('Elementos principales', 'general', 667, 'principales', 'elementos_principales_muebles', 'principales_muebles'),
-      'sala' => $section('Sala, comedor y hall', 'general', 669, 'sala', 'sala_muebles', 'sala_muebles'),
-      'cocina_o_cafeteria' => $section('Cocina o cafetería', 'general', 675, 'cocina_o_cafeteria', 'cocina_o_cafeteria_muebles', 'cocina_o_cafeteria_muebles'),
-      'patio' => $section('Patio y/o zona de labores', 'general', 679, 'patio', 'patio_muebles', 'patio_muebles'),
+      'sala' => $general('sala', 'Sala, comedor y hall', 669),
+      'cocina_o_cafeteria' => $general('cocina_o_cafeteria', 'Cocina o cafetería', 675),
+      'patio' => $general('patio', 'Patio y/o zona de labores', 679),
       'bano_emergencia' => $section('Baño de emergencia', 'general', 674, 'bano_emergencia', 'bano_emergencia_muebles', 'bano_emergencia_muebles', 'piso_bano_emergencia', 'detalles_bano_emergencia'),
     ];
-    $names = self::ROOM_WORDS;
-    foreach ($names as $position => $word) {
+    foreach (self::ROOM_WORDS as $position => $word) {
       $key = 'habitacion_' . $word;
-      $sections[$key] = $section('Habitación ' . $word, 'habitacion', 676, $key, $key . '_muebles', $key . '_muebles', 'piso_' . $key, 'detalles_' . $key, $position + 1);
+      $sections[$key] = $section('Habitación ' . ($position + 1), 'habitacion', 676, $key, $key . '_muebles', $key . '_muebles', 'piso_' . $key, 'detalles_' . $key, $position + 1);
     }
-    foreach ($names as $position => $word) {
+    foreach (self::ROOM_WORDS as $position => $word) {
       $key = 'bano_' . $word;
-      $sections[$key] = $section('Baño ' . $word, 'bano', 677, $key, $key . '_muebles', $key . '_muebles', 'piso_' . $key, 'detalles_' . $key, $position + 1);
+      $sections[$key] = $section('Baño ' . ($position + 1), 'bano', 677, $key, $key . '_muebles', $key . '_muebles', 'piso_' . $key, 'detalles_' . $key, $position + 1);
     }
-    $sections['garaje'] = $section('Garaje', 'general', 678, 'garaje', 'garaje_muebles', 'garaje_muebles');
-    $sections['elementos_electricos'] = $section('Elementos eléctricos', 'general', 668, 'electricos', 'elementos_electricos_muebles', 'electricos_muebles');
-    $sections['otros'] = $section('Otros', 'general', 0, 'otros', 'otros_muebles', 'otros_muebles');
+    $sections['garaje'] = $general('garaje', 'Garaje', 678);
+    $sections['deposito_inventario'] = $general('deposito_inventario', 'Depósito', 678);
+    $sections['bodega'] = $general('bodega', 'Bodega', 678);
+    $sections['oficina'] = $general('oficina', 'Oficina', 669);
+    $sections[self::ELECTRICAL] = $section('Elementos eléctricos', 'general', self::GLOSSARY_ELECTRICAL, 'electricos', 'elementos_electricos_muebles', 'electricos_muebles');
+    $sections['otros'] = $general('otros', 'Otros', 0);
     return $sections;
   }
 
@@ -89,50 +102,84 @@ final class InventorySchema
   }
 
   /**
-   * Qué secciones muestra el formulario y cómo se llaman según el tipo de inmueble. Las columnas no cambian: un local
-   * guarda sus oficinas en habitacion_* y las muestra como "Área u oficina".
+   * Secciones de cada tipo de inmueble y su orden. "habitaciones" y "banos" se expanden según la cantidad.
+   * `requires` oculta una sección mientras la pregunta del paso Datos no sea "Si". Lo que no está en `order` se puede
+   * agregar a mano desde el formulario y siempre se muestra si ya tiene filas.
    *
-   * @return array{key:string,rooms_label:string,baths_label:string,labels:array<string,string>,hidden:list<string>,max_rooms:int,max_baths:int}
+   * @return array{key:string,order:list<string>,labels:array<string,string>,requires:array<string,string>,hidden:list<string>,rooms_label:string,baths_label:string,max_rooms:int,max_baths:int}
    */
   public static function profile(string $propertyType): array
   {
-    $type = self::normalizeText($propertyType);
-    $commercial = in_array($type, ['local', 'oficina', 'hotel', 'consultorio'], true);
-    $base = ['key' => 'residencial', 'rooms_label' => 'Habitaciones', 'baths_label' => 'Baños', 'labels' => [], 'hidden' => [], 'max_rooms' => self::MAX_ROOMS, 'max_baths' => self::MAX_ROOMS];
-    if ($type === 'apartaestudio') {
-      return ['key' => 'apartaestudio', 'max_rooms' => 1, 'max_baths' => 2, 'hidden' => ['bano_emergencia', 'garaje']] + $base;
-    }
-    if ($type === 'lote' || $type === 'casa lote') {
-      if ($type === 'casa lote') {
-        return ['key' => 'casa_lote'] + $base;
-      }
+    $type = self::normalize($propertyType);
+    $requires = ['garaje' => 'tiene_parqueadero', 'deposito_inventario' => 'tiene_deposito'];
+    $residential = ['elementos_principales', 'sala', 'cocina_o_cafeteria', 'patio', 'habitaciones', 'banos', 'garaje', 'deposito_inventario', self::ELECTRICAL, 'otros'];
+    $commercial = ['elementos_principales', 'sala', 'cocina_o_cafeteria', 'banos', 'garaje', self::ELECTRICAL];
+    $build = static function (string $key, array $order, array $labels = [], int $rooms = self::MAX_ROOMS, int $baths = self::MAX_ROOMS) use ($requires): array {
+      $hidden = array_values(array_filter(array_keys(self::sections()), static fn(string $section): bool => self::sections()[$section]['group'] === 'general' && !in_array($section, $order, true)));
       return [
-        'key' => 'lote', 'rooms_label' => 'Construcciones', 'baths_label' => 'Baños', 'max_rooms' => 2, 'max_baths' => 1,
-        'labels' => ['elementos_principales' => 'Cerramiento y accesos', 'otros' => 'Construcciones y otros elementos'],
-        'hidden' => ['sala', 'cocina_o_cafeteria', 'patio', 'bano_emergencia', 'garaje'],
-      ] + $base;
-    }
-    if ($commercial || $type === 'bodega') {
-      $labels = [
-        'sala' => $type === 'bodega' ? 'Área de bodega' : 'Área principal o recepción',
-        'cocina_o_cafeteria' => 'Cafetería o cocineta',
-        'patio' => 'Zona de servicio',
+        'key' => $key, 'order' => $order, 'labels' => $labels, 'requires' => $requires, 'hidden' => $hidden,
+        'rooms_label' => 'Habitaciones', 'baths_label' => 'Baños', 'max_rooms' => $rooms, 'max_baths' => $baths,
       ];
-      foreach (self::sections() as $key => $section) {
-        if ($section['group'] === 'habitacion') {
-          $labels[$key] = 'Área u oficina ' . $section['index'];
-        } elseif ($section['group'] === 'bano') {
-          $labels[$key] = 'Baño ' . $section['index'];
-        }
-      }
-      return ['key' => $type === 'bodega' ? 'bodega' : 'comercial', 'rooms_label' => 'Áreas u oficinas', 'labels' => $labels, 'hidden' => ['bano_emergencia']] + $base;
-    }
-    return $base;
+    };
+    $commercialLabels = ['sala' => 'Sala', 'cocina_o_cafeteria' => 'Cocina o cafetería'];
+    return match (true) {
+      $type === 'casa' || $type === 'casa lote' => $build('casa', ['terraza', ...$residential], ['patio' => 'Patio']),
+      $type === 'apartaestudio' => $build('apartaestudio', ['balcon', ...$residential], ['patio' => 'Patio / área de labores'], 1, 2),
+      in_array($type, ['local', 'hotel'], true) => $build('local', [...$commercial, 'bodega', 'otros'], $commercialLabels, 0),
+      in_array($type, ['oficina', 'consultorio'], true) => $build('oficina', [...$commercial, 'otros'], $commercialLabels, 0),
+      $type === 'bodega' => $build('bodega', [...$commercial, 'oficina', 'otros'], $commercialLabels, 0),
+      $type === 'lote' => $build('lote', ['elementos_principales', self::ELECTRICAL, 'otros'], ['elementos_principales' => 'Cerramiento y accesos', 'otros' => 'Construcciones y otros elementos'], 0, 1),
+      default => $build('apartamento', ['balcon', ...$residential], ['patio' => 'Patio / área de labores']),
+    };
   }
 
+  /** Nombre de la sección para el tipo de inmueble. */
   public static function sectionLabel(string $key, array $profile): string
   {
     return (string) ($profile['labels'][$key] ?? self::sections()[$key]['label'] ?? $key);
+  }
+
+  /**
+   * Título completo: las habitaciones y baños llevan su tipo y, si hay varios pisos, el piso.
+   *
+   * @param array<string,string> $types
+   */
+  public static function sectionTitle(string $key, array $profile, array $types, string $floor, int $floors): string
+  {
+    $section = self::sections()[$key] ?? null;
+    $label = self::sectionLabel($key, $profile);
+    if ($section === null || $section['group'] === 'general') {
+      return $label;
+    }
+    $type = trim((string) ($types[$key] ?? ''));
+    $parts = [$label];
+    if ($type !== '') $parts[] = $type;
+    if ($floors > 1) $parts[] = 'Piso ' . self::floorNumber($floor);
+    return implode(' · ', $parts);
+  }
+
+  /** Claves en el orden del perfil, con habitaciones y baños expandidos. @return list<string> */
+  public static function orderedKeys(array $profile, int $rooms, int $baths): array
+  {
+    $keys = [];
+    foreach ($profile['order'] as $item) {
+      if ($item === 'habitaciones' || $item === 'banos') {
+        $group = $item === 'habitaciones' ? 'habitacion' : 'bano';
+        $count = $item === 'habitaciones' ? min($rooms, $profile['max_rooms']) : min($baths, $profile['max_baths']);
+        foreach (self::sections() as $key => $section) {
+          if ($section['group'] === $group && $section['index'] <= $count) $keys[] = $key;
+        }
+      } else {
+        $keys[] = $item;
+      }
+    }
+    return $keys;
+  }
+
+  /** Tipo por defecto: la primera es la principal. */
+  public static function defaultRoomType(string $group, int $index): string
+  {
+    return $index === 1 ? 'Principal' : ($group === 'bano' ? 'Social' : 'Secundaria');
   }
 
   /** Cantidad de pisos válida o 1. */
@@ -142,13 +189,37 @@ final class InventorySchema
     return max(1, min(self::MAX_FLOORS, $floors));
   }
 
+  /** Piso guardado como número; los textos antiguos ("2do", "Primer") se leen como su número o como piso 1. */
+  public static function floorNumber(mixed $value): int
+  {
+    return self::floors($value);
+  }
+
   /** El servicio se cobra doble si es amoblado o tiene 2 pisos o más. Con ambas condiciones se duplica una sola vez. */
   public static function doubleCharge(string $category, mixed $floors): bool
   {
     return strcasecmp(trim($category), self::FURNISHED) === 0 || self::floors($floors) >= 2;
   }
 
-  /** Filas guardadas → filas neutrales {d,c,m,e,o}. @return list<array{d:string,c:string,m:string,e:string,o:string}> */
+  /**
+   * ¿El elemento es eléctrico? Compara singular y plural sin tildes ("Toma" = "Tomas", "Lámpara" = "Lamparas").
+   *
+   * @param list<string> $catalog glosario de elementos eléctricos
+   */
+  public static function isElectrical(string $description, array $catalog): bool
+  {
+    $value = self::stem($description);
+    if ($value === '') return false;
+    foreach (array_merge($catalog, self::EXTRA_ELECTRICAL) as $item) {
+      $stem = self::stem($item);
+      if ($stem !== '' && ($value === $stem || str_starts_with($value, $stem . ' '))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Filas guardadas → filas neutrales {d,c,m,e,o,p,src}. @return list<array{d:string,c:string,m:string,e:string,o:string,p:string,src:string}> */
   public static function rowsFromStored(mixed $raw, string $suffix): array
   {
     $out = [];
@@ -160,9 +231,10 @@ final class InventorySchema
         'e' => self::rowText($row['estado_' . $suffix] ?? ''),
         'o' => self::rowText($row['observaciones_' . $suffix] ?? ''),
       ];
-      if (implode('', $item) !== '') {
-        $out[] = $item;
+      if (implode('', $item) === '') {
+        continue;
       }
+      $out[] = $item + ['p' => self::rowText($row['piso_' . $suffix] ?? ''), 'src' => self::rowText($row[self::ELECTRICAL_SOURCE] ?? '')];
     }
     return $out;
   }
@@ -181,6 +253,12 @@ final class InventorySchema
       }
       $item['estado_' . $suffix] = (string) ($row['e'] ?? '');
       $item['observaciones_' . $suffix] = (string) ($row['o'] ?? '');
+      if (($row['p'] ?? '') !== '') {
+        $item['piso_' . $suffix] = (string) $row['p'];
+      }
+      if (($row['src'] ?? '') !== '') {
+        $item[self::ELECTRICAL_SOURCE] = (string) $row['src'];
+      }
       $stored[] = $item;
     }
     return \SCM\Modules\DeliveryReview\DeliveryReviewForm::storeRows($stored);
@@ -194,9 +272,20 @@ final class InventorySchema
     return trim(html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
   }
 
-  private static function normalizeText(string $value): string
+  private static function stem(string $value): string
+  {
+    $words = preg_split('/\s+/', self::normalize($value)) ?: [];
+    $words = array_map(static function (string $word): string {
+      if (strlen($word) > 4 && str_ends_with($word, 'es') && preg_match('/[rnld]es$/', $word) === 1) return substr($word, 0, -2);
+      if (strlen($word) > 3 && str_ends_with($word, 's')) return substr($word, 0, -1);
+      return $word;
+    }, array_filter($words));
+    return implode(' ', $words);
+  }
+
+  private static function normalize(string $value): string
   {
     $value = mb_strtolower(trim($value), 'UTF-8');
-    return strtr($value, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u']);
+    return strtr($value, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ü' => 'u']);
   }
 }

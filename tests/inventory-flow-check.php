@@ -244,6 +244,26 @@ $assert($voiceRows[1]['d'] === 'Mesón' && $voiceRows[1]['e'] === 'Bueno' && $vo
 $assert(\SCM\Modules\Inventory\InventoryVoiceAssistant::parseRows('[{"d":"Sofá","m":"Cuero"}]', [], true)[0]['m'] === '', 'Muebles sin material.');
 try { \SCM\Modules\Inventory\InventoryVoiceAssistant::parseRows('no es json', [], false); $assert(false, 'Debe rechazar texto sin filas.'); } catch (DomainException) {}
 
+// Pisos, tipos y eléctricos copiados desde las secciones.
+$input = json_decode($payload(['tipo_de_inmueble' => 'Casa', 'cantidad_pisos' => '2', 'cantidad_habitaciones' => '2', 'tipos' => ['habitacion_principal' => 'Principal', 'habitacion_dos' => 'Inventado']], [
+  'sala' => ['rows' => [['d' => 'Tomas', 'c' => '4', 'p' => '2'], ['d' => 'Pisos', 'c' => 'Todo el inmueble', 'p' => '9']]],
+  'habitacion_dos' => ['floor' => '2', 'rows' => [['d' => 'Interruptores', 'c' => '1']]],
+  'elementos_electricos' => ['rows' => [['d' => 'Contador luz', 'c' => '1'], ['d' => 'Copia vieja', 'c' => '1', 'src' => 'sala']]],
+]), true);
+$parsed = InventoryInput::parse($input, ['types' => ['Nuevo'], 'categories' => ['No amoblado'], 'electrical' => ['Tomas', 'Interruptores', 'Contador luz']], true);
+$electric = InventorySchema::rowsFromStored($parsed['columns']['elementos_electricos'], 'electricos');
+$assert(array_column($electric, 'd') === ['Contador luz', 'Copia vieja', 'Tomas (Sala, comedor y hall)', 'Interruptores (Habitación 2 · Secundaria · Piso 2)'], 'Eléctricos: ' . json_encode(array_column($electric, 'd'), JSON_UNESCAPED_UNICODE));
+$assert($electric[1]['src'] === '' && $electric[2]['src'] === 'sala' && $electric[2]['c'] === '4', 'Solo las copias quedan marcadas con su origen.');
+$sala = InventorySchema::rowsFromStored($parsed['columns']['sala'], 'sala');
+$assert($sala[0]['p'] === '2' && $sala[1]['p'] === '2', 'El piso de cada fila queda dentro de la cantidad de pisos.');
+$assert($parsed['columns']['piso_habitacion_dos'] === '2' && json_decode($parsed['columns']['tipos_espacios'], true) === ['habitacion_principal' => 'Principal', 'habitacion_dos' => 'Secundaria', 'bano_principal' => 'Principal'], 'Tipos y pisos: ' . $parsed['columns']['tipos_espacios']);
+$reloaded = $app->state($parsed['columns'] + ['cantidad_pisos' => '2']);
+$assert(array_column($reloaded['sections']['elementos_electricos']['rows'], 'd') === ['Contador luz', 'Copia vieja'], 'Al editar, las copias se recalculan y no se duplican.');
+$assert($reloaded['data']['habitacion_pisos'] === [1, 1] && $reloaded['data']['tipos']['habitacion_dos'] === 'Secundaria', 'Habitaciones por piso al editar.');
+$single = InventoryInput::parse(json_decode($payload(['tipo_de_inmueble' => 'Local', 'cantidad_habitaciones' => '3'], ['habitacion_principal' => ['rows' => [['d' => 'Puerta']]], 'sala' => ['rows' => [['d' => 'Pisos', 'p' => '3']]]]), true), ['types' => ['Nuevo'], 'categories' => ['No amoblado']], true);
+$assert($single['columns']['cantidad_habitaciones'] === '' && $single['columns']['habitacion_principal'] === '', 'Un local no guarda habitaciones.');
+$assert(InventorySchema::rowsFromStored($single['columns']['sala'], 'sala')[0]['p'] === '', 'Con un piso las filas no llevan piso.');
+
 // Listado de Proceso de entrega.
 $list = new class($db) {
   use \SCM\App\Concerns\HandlesInventoryActions;

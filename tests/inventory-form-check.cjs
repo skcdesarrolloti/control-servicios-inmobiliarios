@@ -14,14 +14,15 @@ const css = ['preventive-review.css', 'inventory-form.css'].map(file => fs.readF
 const shots = process.env.INVENTORY_SHOTS || '';
 
 const section = (key, label, group = 'general', index = 0, glossary = ['Puertas', 'Pisos']) => ({ key, label, group, index, glossary, floor: group !== 'general' });
-const residential = { key: 'residencial', rooms_label: 'Habitaciones', baths_label: 'Baños', labels: {}, hidden: [], max_rooms: 10, max_baths: 10 };
+const residential = { key: 'apartamento', rooms_label: 'Habitaciones', baths_label: 'Baños', labels: {}, requires: { garaje: 'tiene_parqueadero' }, order: ['balcon', 'elementos_principales', 'sala', 'habitaciones', 'banos', 'garaje', 'elementos_electricos', 'otros'], max_rooms: 10, max_baths: 10 };
 const config = {
   editing: false, additional: false, inventoryId: 0, version: '', hasReport: false,
   state: { data: { tipo_inventario: 'Nuevo', categoria_inventario: 'No amoblado', tipo_de_inmueble: 'Apartamento', contrato: '900', inmueble: '77', direccion: 'Calle 1', registro_fotografico: 'https://drive.google.com/x', arrendatario: 'A', correo_arrendatario: 'a@example.invalid', celular_arrendatario: '300', tiene_parqueadero: 'No', tiene_deposito: 'No', tiene_delegado: '', fecha_linderos: '2026-10-02', cantidad_pisos: '1', cantidad_habitaciones: '1', cantidad_banos: '1', con_transporte: 'Si', servicios: [], acuerdos: [] }, boundaries: { inmueble_lin: [{ norte: 'Pasillo' }] }, sections: {}, furniture: {} },
   catalog: {
-    sections: [section('elementos_principales', 'Elementos principales'), section('sala', 'Sala, comedor y hall'), section('bano_emergencia', 'Baño de emergencia'), section('habitacion_principal', 'Habitación principal', 'habitacion', 1), section('habitacion_dos', 'Habitación dos', 'habitacion', 2), section('bano_principal', 'Baño principal', 'bano', 1), section('otros', 'Otros', 'general', 0, [])],
+    sections: [section('balcon', 'Balcón'), section('elementos_principales', 'Elementos principales'), section('sala', 'Sala, comedor y hall'), section('bano_emergencia', 'Baño de emergencia'), section('habitacion_principal', 'Habitación 1', 'habitacion', 1), section('habitacion_dos', 'Habitación 2', 'habitacion', 2), section('bano_principal', 'Baño 1', 'bano', 1), section('garaje', 'Garaje'), section('bodega', 'Bodega'), section('elementos_electricos', 'Elementos eléctricos', 'general', 0, ['Tomas', 'Contador luz']), section('otros', 'Otros', 'general', 0, [])],
+    roomTypes: ['Principal', 'Secundaria', 'Estudio', 'De servicio'], bathTypes: ['Principal', 'Social', 'Privado', 'Auxiliar', 'De servicio'], electrical: ['Tomas', 'Interruptores', 'Contador luz'],
     boundaries: [{ key: 'inmueble_lin', label: 'Inmueble', suffix: 'inmueble', sides: ['norte', 'sur'], multiple: false, when: '', required: true }, { key: 'parqueadero_lin', label: 'Parqueadero', suffix: 'parqueadero', sides: ['norte'], multiple: true, when: 'tiene_parqueadero', required: false }],
-    profiles: { '': residential, Apartamento: residential, Local: { ...residential, key: 'comercial', rooms_label: 'Áreas u oficinas', labels: { habitacion_principal: 'Área u oficina 1', sala: 'Área principal o recepción' }, hidden: ['bano_emergencia'] } },
+    profiles: { '': residential, Apartamento: residential, Local: { ...residential, key: 'local', labels: { sala: 'Sala' }, order: ['elementos_principales', 'sala', 'banos', 'garaje', 'elementos_electricos', 'bodega', 'otros'], max_rooms: 0 } },
     types: ['Nuevo', 'Anterior'], categories: ['No amoblado', 'Amoblado'], states: ['Bueno', 'Regular', 'Malo'], parking: ['Asignado', 'Privado'], services: ['Agua', 'Gas', 'Energia'], agreements: { Propietario: 'acuerdos_precontractuales_pro' },
     suggestions: { sala: { items: ['Ventanas'], materials: { Ventanas: ['Aluminio', 'PVC'] }, quantities: { Ventanas: '3' } } },
   },
@@ -83,7 +84,7 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
 
     await open();
     assert.equal(await page.textContent('.scm-case-submodal-title'), 'Inventario del inmueble');
-    assert.deepEqual(await chips(), ['Datos', 'Linderos', 'Elementos principales', 'Sala, comedor y hall', 'Baño de emergencia', 'Habitación principal', 'Baño principal', 'Otros', 'Cierre']);
+    assert.deepEqual(await chips(), ['Datos', 'Linderos', 'Balcón', 'Elementos principales', 'Sala, comedor y hall', 'Habitación 1 · Principal', 'Baño 1 · Principal', 'Elementos eléctricos', 'Otros', 'Cierre']);
     if (shots) await page.screenshot({ path: path.join(shots, 'inv-1-datos.png'), fullPage: true });
 
     // Condicionales y secciones según la cantidad y el tipo de inmueble.
@@ -93,14 +94,25 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     await page.selectOption('select[data-b="tipo_parqueadero"]', 'Privado');
     await page.fill('input[data-b="parqueaderos"]', '1');
     await page.fill('input[data-b="numero_parqueadero"]', '12');
+    assert.ok((await chips()).includes('Garaje'), 'Garage appears once there is parking');
     await page.selectOption('select[data-b="cantidad_habitaciones"]', '2');
-    assert.ok((await chips()).includes('Habitación dos'), 'A second room adds its section');
+    assert.ok((await chips()).includes('Habitación 2 · Secundaria'), 'A second room adds its section with a default type');
     await page.selectOption('select[data-b="tipo_de_inmueble"]', 'Local');
     let names = await chips();
-    assert.ok(names.includes('Área u oficina 1') && names.includes('Área principal o recepción'), 'Commercial labels');
-    assert.ok(!names.includes('Baño de emergencia'), 'Hidden section for a local');
+    assert.deepEqual(names, ['Datos', 'Linderos', 'Elementos principales', 'Sala', 'Baño 1 · Principal', 'Garaje', 'Elementos eléctricos', 'Bodega', 'Otros', 'Cierre'], 'Local sections');
+    assert.equal(await page.locator('select[data-b="cantidad_habitaciones"]').count(), 0, 'A local has no rooms');
     assert.equal(await page.locator('[data-extra-section] option', { hasText: 'Baño de emergencia' }).count(), 1, 'Hidden section can be added back');
     await page.selectOption('select[data-b="tipo_de_inmueble"]', 'Apartamento');
+
+    // Dos pisos: habitaciones por piso y piso por fila en las áreas comunes.
+    await page.selectOption('select[data-b="cantidad_pisos"]', '2');
+    await page.selectOption('select[data-room-count="habitacion:0"]', '1');
+    await page.selectOption('select[data-room-count="habitacion:1"]', '1');
+    names = await chips();
+    assert.ok(names.includes('Habitación 1 · Principal · Piso 1') && names.includes('Habitación 2 · Secundaria · Piso 2'), 'Rooms by floor: ' + names.join(' | '));
+    await go('Habitación 2');
+    await page.selectOption('select[data-room-type="habitacion_dos"]', 'Estudio');
+    assert.ok((await chips()).includes('Habitación 2 · Estudio · Piso 2'), 'Room type in the title');
 
     // Sugerencias: material y cantidad aprendidos.
     await go('Sala, comedor');
@@ -108,6 +120,7 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="m"]'), 'Aluminio');
     assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="c"]'), '3');
     assert.equal(await page.locator('[data-add-item="Ventanas"]').count(), 0, 'A used suggestion leaves the chips');
+    await page.selectOption('[data-rows="sections:sala"] [data-f="p"]', '2');
     await page.locator('[data-rows="sections:sala"] [data-state="Regular"]').click();
     await page.locator('[data-rows="sections:sala"] [data-f="o"]').fill('Vidrio "rayado"');
     if (shots) await page.screenshot({ path: path.join(shots, 'inv-2-seccion.png'), fullPage: true });
@@ -118,8 +131,17 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     assert.equal(saves().length, 1, 'Debounced into one save');
     assert.ok(saves()[0].payload.includes('Vidrio \\"rayado\\"'), 'Draft holds the row');
 
+    // Un eléctrico registrado en una sección se agrega solo a Elementos eléctricos.
+    await page.locator('[data-row-add]').click();
+    await page.locator('[data-rows="sections:sala"] [data-row="1"] [data-f="d"]').fill('Tomas');
+    await go('Elementos eléctricos');
+    assert.ok((await page.textContent('.scm-inv-auto')).includes('Tomas'), 'Electrical item copied from the section');
+    assert.ok((await chips()).some(c => c.startsWith('Elementos eléctricos') && c.endsWith('1')), 'Counted in the electrical chip');
+    await go('Sala, comedor');
+    await page.locator('[data-rows="sections:sala"] [data-row="1"] [data-row-remove]').click();
+
     // Copiar filas entre secciones.
-    await go('Habitación principal');
+    await go('Habitación 1');
     await page.selectOption('[data-copy-from]', 'sala');
     assert.equal(await page.locator('[data-rows="sections:habitacion_principal"] [data-row]').count(), 1, 'Rows copied');
     await page.locator('[data-row-remove]').click();
@@ -153,6 +175,9 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     assert.ok(created, 'Create was sent');
     const sent = JSON.parse(created.payload);
     assert.equal(sent.sections.sala.rows[0].e, 'Regular');
+    assert.equal(sent.sections.sala.rows[0].p, '2', 'Row floor is sent');
+    assert.equal(sent.sections.habitacion_dos.floor, '2', 'Room floor is sent');
+    assert.equal(sent.data.tipos.habitacion_dos, 'Estudio', 'Room type is sent');
     assert.equal(sent.sections.sala.rows[0].o, 'Vidrio "rayado"');
     assert.equal(sent.furniture.sala[0].d, 'Sofá');
     assert.equal(sent.data.con_transporte, 'No');

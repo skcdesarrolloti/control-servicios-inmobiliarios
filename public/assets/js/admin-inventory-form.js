@@ -70,18 +70,98 @@
     function isYes(key) {
       return d(key) === "Si";
     }
+    function floorsCount() {
+      return Math.max(1, Math.min(10, Number(d("cantidad_pisos")) || 1));
+    }
+    function countField(group) {
+      return group === "habitacion" ? "cantidad_habitaciones" : "cantidad_banos";
+    }
+    // Cantidad por piso. Si no cuadra con el total (cambió la cantidad de pisos), todo queda en el piso 1.
+    function roomCounts(group) {
+      var total = Number(d(countField(group))) || 0;
+      var counts = (Array.isArray(state.data[group + "_pisos"]) ? state.data[group + "_pisos"] : []).map(Number).slice(0, floorsCount());
+      while (counts.length < floorsCount()) counts.push(0);
+      if (counts.reduce(function (a, b) { return a + b; }, 0) !== total) {
+        counts = counts.map(function () { return 0; });
+        counts[0] = total;
+      }
+      return counts;
+    }
+    // Cada habitación y baño toma su piso según la cantidad indicada por piso, y un tipo por defecto.
+    function syncRooms() {
+      state.data.tipos = state.data.tipos && typeof state.data.tipos === "object" && !Array.isArray(state.data.tipos) ? state.data.tipos : {};
+      ["habitacion", "bano"].forEach(function (group) {
+        var counts = roomCounts(group);
+        state.data[group + "_pisos"] = counts;
+        var index = 1;
+        counts.forEach(function (count, floor) {
+          for (var i = 0; i < count; i++, index++) {
+            var section = catalog.sections.find(function (s) { return s.group === group && s.index === index; });
+            if (!section) continue;
+            state.sections[section.key].floor = String(floor + 1);
+            if (!state.data.tipos[section.key]) state.data.tipos[section.key] = index === 1 ? "Principal" : group === "bano" ? "Social" : "Secundaria";
+          }
+        });
+      });
+    }
     function sectionLabel(section) {
-      return profile().labels[section.key] || section.label;
+      var base = profile().labels[section.key] || section.label;
+      if (section.group === "general") return base;
+      var parts = [base];
+      if (state.data.tipos && state.data.tipos[section.key]) parts.push(state.data.tipos[section.key]);
+      if (floorsCount() > 1) parts.push("Piso " + (state.sections[section.key].floor || "1"));
+      return parts.join(" · ");
     }
     function visibleSections() {
-      var rooms = Number(d("cantidad_habitaciones")) || 0;
-      var baths = Number(d("cantidad_banos")) || 0;
-      var hidden = profile().hidden || [];
-      return catalog.sections.filter(function (section) {
-        if (section.group === "habitacion") return section.index <= rooms;
-        if (section.group === "bano") return section.index <= baths;
-        return hidden.indexOf(section.key) === -1 || state.sections[section.key].rows.length > 0 || extraSections.indexOf(section.key) !== -1;
+      var p = profile();
+      var byKey = {};
+      catalog.sections.forEach(function (s) { byKey[s.key] = s; });
+      var keys = [];
+      p.order.forEach(function (item) {
+        if (item === "habitaciones" || item === "banos") {
+          var group = item === "habitaciones" ? "habitacion" : "bano";
+          var count = Math.min(Number(d(countField(group))) || 0, item === "habitaciones" ? p.max_rooms : p.max_baths);
+          catalog.sections.forEach(function (s) { if (s.group === group && s.index <= count) keys.push(s.key); });
+        } else if (byKey[item]) {
+          var need = (p.requires || {})[item];
+          if (!need || isYes(need) || state.sections[item].rows.length || extraSections.indexOf(item) !== -1) keys.push(item);
+        }
       });
+      // Secciones fuera del tipo que ya tienen filas o que se agregaron a mano: antes de "Otros".
+      catalog.sections.forEach(function (s) {
+        if (s.group !== "general" || keys.indexOf(s.key) !== -1 || p.order.indexOf(s.key) !== -1) return;
+        if (state.sections[s.key].rows.length || extraSections.indexOf(s.key) !== -1) {
+          var at = keys.indexOf("otros");
+          keys.splice(at === -1 ? keys.length : at, 0, s.key);
+        }
+      });
+      return keys.map(function (k) { return byKey[k]; });
+    }
+    function stem(value) {
+      return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().split(/\s+/).filter(Boolean).map(function (word) {
+        if (word.length > 4 && /[rnld]es$/.test(word)) return word.slice(0, -2);
+        if (word.length > 3 && /s$/.test(word)) return word.slice(0, -1);
+        return word;
+      }).join(" ");
+    }
+    // Misma regla que InventorySchema::isElectrical en el servidor.
+    function isElectrical(name) {
+      var value = stem(name);
+      if (!value) return false;
+      return (catalog.electrical || []).concat(["Telefonos", "Citofonos", "Interruptores", "Tomas", "Rosetas", "Contador luz", "Caja de fusibles", "Lamparas", "Apliques", "Plafon", "Ojo de buey", "Bombillo", "Tomacorriente"]).some(function (item) {
+        var s = stem(item);
+        return s && (value === s || value.indexOf(s + " ") === 0);
+      });
+    }
+    function electricalFromSections() {
+      var out = [];
+      visibleSections().forEach(function (section) {
+        if (section.key === "elementos_electricos") return;
+        state.sections[section.key].rows.forEach(function (row) {
+          if (isElectrical(row.d)) out.push({ row: row, where: sectionLabel(section) });
+        });
+      });
+      return out;
     }
     function hiddenGeneralSections() {
       var visible = visibleSections().map(function (s) { return s.key; });
@@ -90,7 +170,7 @@
     function panes() {
       var list = [{ id: "datos", label: "Datos" }, { id: "linderos", label: "Linderos" }];
       visibleSections().forEach(function (section) {
-        list.push({ id: "s:" + section.key, label: sectionLabel(section), section: section, count: state.sections[section.key].rows.length });
+        list.push({ id: "s:" + section.key, label: sectionLabel(section), section: section, count: state.sections[section.key].rows.length + (section.key === "elementos_electricos" ? electricalFromSections().length : 0) });
       });
       if (isFurnished()) list.push({ id: "muebles", label: "Muebles y enseres" });
       list.push({ id: "cierre", label: "Cierre" });
@@ -155,8 +235,8 @@
         select("Tipo de inmueble", "tipo_de_inmueble", Object.keys(catalog.profiles).filter(Boolean), { rerender: true }) +
         input("Tipo de negocio", "tipo_negocio") + input("Destinación", "destinacion") +
         select("Cantidad de pisos", "cantidad_pisos", range(1, 10), { rerender: true }) +
-        select(p.rooms_label, "cantidad_habitaciones", range(0, p.max_rooms), { rerender: true }) +
-        select(p.baths_label, "cantidad_banos", range(0, p.max_baths), { rerender: true }) +
+        roomCountFields("habitacion", p.rooms_label, p.max_rooms) +
+        roomCountFields("bano", p.baths_label, p.max_baths) +
         select("¿Tiene parqueadero?", "tiene_parqueadero", ["Si", "No"], { required: true, rerender: true }) +
         (isYes("tiene_parqueadero") ? select("Tipo de parqueadero", "tipo_parqueadero", catalog.parking, { required: true }) + input("Cantidad", "parqueaderos", { required: true }) + input("# Parqueadero", "numero_parqueadero", { required: true, placeholder: "Separa con coma si son varios" }) : "") +
         select("¿Tiene depósito?", "tiene_deposito", ["Si", "No"], { required: true, rerender: true }) +
@@ -168,6 +248,16 @@
         (isYes("tiene_delegado") ? input("Delegado", "delegado", { required: true }) + input("Documento del delegado", "cedula_delegado") + input("Correo del delegado", "correo_delegado", { required: true, type: "email" }) + input("Celular del delegado", "celular_delegado", { required: true, type: "tel" }) : "") +
         "</div></div>";
       return html;
+    }
+
+    // Con un piso, un total; con varios, cuántas habitaciones o baños hay en cada piso.
+    function roomCountFields(group, label, max) {
+      if (!max) return "";
+      if (floorsCount() === 1) return select(label, countField(group), range(0, max), { rerender: true });
+      return roomCounts(group).map(function (count, floor) {
+        return '<label class="scm-inv-field"><span>' + esc(label) + " · piso " + (floor + 1) + '</span><select data-room-count="' + group + ":" + floor + '">' +
+          range(0, max).map(function (n) { return '<option value="' + n + '"' + (Number(n) === count ? " selected" : "") + ">" + n + "</option>"; }).join("") + "</select></label>";
+      }).join("");
     }
 
     function paneBoundaries() {
@@ -333,7 +423,9 @@
       var suggestion = section ? suggestionsFor(section) : null;
       var materials = suggestion && suggestion.materials[row.d] ? suggestion.materials[row.d] : [];
       var listId = "scm-inv-m-" + key + "-" + index;
-      return '<div class="scm-inv-row" data-row="' + index + '">' +
+      var withFloor = material && section && section.group === "general" && floorsCount() > 1;
+      return '<div class="scm-inv-row' + (withFloor ? " has-floor" : "") + '" data-row="' + index + '">' +
+        (withFloor ? '<select class="scm-inv-p" data-f="p" aria-label="Piso">' + range(1, floorsCount()).map(function (n) { return '<option value="' + n + '"' + (String(row.p || "1") === n ? " selected" : "") + ">Piso " + n + "</option>"; }).join("") + "</select>" : "") +
         '<input class="scm-inv-d" data-f="d" value="' + esc(row.d) + '" placeholder="Elemento" list="scm-inv-desc-' + esc(key) + '" aria-label="Descripción">' +
         '<input class="scm-inv-c" data-f="c" value="' + esc(row.c) + '" placeholder="Cant." list="scm-inv-qty" aria-label="Cantidad">' +
         (material ? '<input class="scm-inv-m" data-f="m" value="' + esc(row.m) + '" placeholder="Material" list="' + listId + '" aria-label="Tipo de material"><datalist id="' + listId + '">' + materials.map(function (m) { return '<option value="' + esc(m) + '">'; }).join("") + "</datalist>" : "") +
@@ -356,7 +448,12 @@
       var multiFloor = Number(d("cantidad_pisos")) > 1;
       var others = visibleSections().filter(function (s) { return s.key !== section.key && state.sections[s.key].rows.length; });
       var html = '<div class="scm-inv-card"><h4>' + esc(sectionLabel(section)) + '</h4>';
-      if (section.floor && (multiFloor || entry.floor || entry.details)) {
+      if (section.group !== "general") {
+        var types = section.group === "habitacion" ? catalog.roomTypes : catalog.bathTypes;
+        html += '<div class="scm-inv-grid"><label class="scm-inv-field"><span>Tipo</span><select data-room-type="' + esc(section.key) + '">' +
+          types.map(function (t) { return '<option value="' + esc(t) + '"' + (state.data.tipos[section.key] === t ? " selected" : "") + ">" + esc(t) + "</option>"; }).join("") + "</select></label>" +
+          '<label class="scm-inv-field is-wide"><span>Detalles de ubicación</span><input data-entry="details" value="' + esc(entry.details) + '"></label></div>';
+      } else if (section.floor && (multiFloor || entry.floor || entry.details)) {
         html += '<div class="scm-inv-grid"><label class="scm-inv-field"><span>Piso</span><input data-entry="floor" value="' + esc(entry.floor) + '"></label>' +
           '<label class="scm-inv-field is-wide"><span>Detalles de ubicación</span><input data-entry="details" value="' + esc(entry.details) + '"></label></div>';
       }
@@ -372,8 +469,16 @@
       }
       html += voicePanel("sections:" + section.key);
       html += '<datalist id="scm-inv-desc-' + esc(section.key) + '">' + suggestion.names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join("") + "</datalist>";
+      if (section.key === "elementos_electricos") {
+        var auto = electricalFromSections();
+        html += auto.length
+          ? '<div class="scm-inv-auto"><b>Se agregan solos desde las otras secciones (' + auto.length + "):</b><ul>" + auto.map(function (item) {
+              return "<li>" + esc(item.row.d) + " · " + esc(item.row.c || "-") + " · " + esc(item.row.e || "Bueno") + " <small>(" + esc(item.where) + ")</small></li>";
+            }).join("") + "</ul><small>Se cambian desde la sección donde se registraron. Aquí agrega solo lo que no esté en ninguna sección, como el contador o la caja de fusibles.</small></div>"
+          : '<p class="scm-inv-hint">Las tomas, interruptores, lámparas y demás eléctricos que registres en las otras secciones se agregan aquí solos.</p>';
+      }
       if (entry.rows.length) {
-        html += '<div class="scm-inv-head"><span>Elemento</span><span>Cant.</span><span>Material</span><span>Estado</span><span>Observaciones</span><span></span></div>';
+        html += '<div class="scm-inv-head' + (section.group === "general" && multiFloor ? " has-floor" : "") + '">' + (section.group === "general" && multiFloor ? "<span>Piso</span>" : "") + '<span>Elemento</span><span>Cant.</span><span>Material</span><span>Estado</span><span>Observaciones</span><span></span></div>';
       } else {
         html += '<p class="scm-inv-hint">Toca los elementos de arriba para registrarlos o carga «Copiar de» otra sección.</p>';
       }
@@ -426,6 +531,7 @@
     }
 
     function render() {
+      syncRooms();
       var list = panes();
       if (!list.some(function (p) { return p.id === paneId; })) paneId = "datos";
       var index = list.findIndex(function (p) { return p.id === paneId; });
@@ -634,7 +740,7 @@
     }
     function newRow(name, section) {
       var suggestion = section ? suggestionsFor(section) : null;
-      return { d: name || "", c: suggestion && suggestion.quantities[name] ? suggestion.quantities[name] : "1", m: suggestion && suggestion.materials[name] && suggestion.materials[name][0] ? suggestion.materials[name][0] : "", e: "Bueno", o: "Ninguna" };
+      return { p: "1", d: name || "", c: suggestion && suggestion.quantities[name] ? suggestion.quantities[name] : "1", m: suggestion && suggestion.materials[name] && suggestion.materials[name][0] ? suggestion.materials[name][0] : "", e: "Bueno", o: "Ninguna" };
     }
 
     form.addEventListener("input", function (event) {
@@ -662,6 +768,18 @@
         var at = list.indexOf(target.value);
         if (target.checked && at === -1) list.push(target.value);
         if (!target.checked && at !== -1) list.splice(at, 1);
+        render();
+        changed();
+      } else if (target.dataset.roomCount) {
+        var rc = target.dataset.roomCount.split(":");
+        var counts = roomCounts(rc[0]);
+        counts[Number(rc[1])] = Number(target.value) || 0;
+        state.data[rc[0] + "_pisos"] = counts;
+        state.data[countField(rc[0])] = String(counts.reduce(function (a, b) { return a + b; }, 0));
+        render();
+        changed();
+      } else if (target.dataset.roomType) {
+        state.data.tipos[target.dataset.roomType] = target.value;
         render();
         changed();
       } else if (target.hasAttribute("data-rerender")) {
@@ -738,6 +856,8 @@
               var field = s.group === "habitacion" ? "cantidad_habitaciones" : "cantidad_banos";
               if (Number(d(field)) < s.index) state.data[field] = String(s.index);
             });
+            state.data.habitacion_pisos = null;
+            state.data.bano_pisos = null;
             render();
             changed();
             helpers.message("Elementos cargados. Revísalos antes de guardar.", false);

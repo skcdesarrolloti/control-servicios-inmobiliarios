@@ -23,7 +23,19 @@ final class CctFieldInstaller
     'text' => ['text', 'text DEFAULT NULL', []],
     'textarea' => ['textarea', 'text DEFAULT NULL', []],
     'fecha' => ['date', 'bigint(20) DEFAULT NULL', ['is_timestamp' => true]],
+    // Repetidor de inventario: descripcion_, cantidad_, tipo_de_material_, estado_ y observaciones_ + nombre de la columna.
+    'repeater' => ['repeater', 'longtext DEFAULT NULL', ['repeater_collapsed' => true]],
   ];
+
+  /** Subcampos del repetidor con el mismo patrón de nombres que los repetidores del inventario. @return list<array<string,mixed>> */
+  public static function repeaterFields(string $name): array
+  {
+    $fields = [];
+    foreach (['descripcion' => ['Descripcion', 'textarea'], 'cantidad' => ['Cantidad', 'text'], 'tipo_de_material' => ['Tipo de material', 'textarea'], 'estado' => ['Estado', 'text'], 'observaciones' => ['Observaciones', 'textarea']] as $prefix => [$title, $type]) {
+      $fields[] = ['title' => $title, 'name' => $prefix . '_' . $name, 'type' => $type, 'id' => random_int(1000, 9999), 'options_source' => 'manual'];
+    }
+    return $fields;
+  }
 
   public function __construct(private Database $db, private string $backupDir)
   {
@@ -79,7 +91,7 @@ final class CctFieldInstaller
       $usedIds[$id] = true;
       $final[] = [
         'title' => $title, 'name' => $name, 'object_type' => 'field', 'width' => '100%', 'options' => [],
-        'repeater-fields' => [], 'type' => self::TYPES[$type][0], 'id' => $id, 'isNested' => true, 'options_source' => 'manual',
+        'repeater-fields' => $type === 'repeater' ? self::repeaterFields($name) : [], 'type' => self::TYPES[$type][0], 'id' => $id, 'isNested' => true, 'options_source' => 'manual',
       ] + self::TYPES[$type][2];
     }
     $final = self::organize($final, array_map('array_keys', $groups), $removeTabs);

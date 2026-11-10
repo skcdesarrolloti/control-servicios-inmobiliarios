@@ -15,7 +15,7 @@ final class InventoryInput
 
   /**
    * @param array<string,mixed> $payload
-   * @param array{types:list<string>,categories:list<string>} $options
+   * @param array{types:list<string>,categories:list<string>,electrical?:list<string>} $options
    * @return array{columns:array<string,string|int>,with_transport:bool,services:list<string>}
    */
   public static function parse(array $payload, array $options, bool $requirePhotos): array
@@ -59,22 +59,57 @@ final class InventoryInput
     $furnished = strcasecmp($category, InventorySchema::FURNISHED) === 0;
     $sections = is_array($payload['sections'] ?? null) ? $payload['sections'] : [];
     $furniture = is_array($payload['furniture'] ?? null) ? $payload['furniture'] : [];
+    $profile = InventorySchema::profile((string) $columns['tipo_de_inmueble']);
+    $rooms = min($rooms, $profile['max_rooms']);
+    $baths = min($baths, $profile['max_baths']);
+    $columns['cantidad_habitaciones'] = $rooms > 0 ? (string) $rooms : '';
+    $columns['cantidad_banos'] = $baths > 0 ? (string) $baths : '';
+    $rawTypes = is_array($data['tipos'] ?? null) ? $data['tipos'] : [];
+    $types = [];
+    $kept = [];
     $total = 0;
     foreach (InventorySchema::sections() as $key => $section) {
-      $visible = $section['group'] === 'general'
+      $room = $section['group'] !== 'general';
+      $visible = !$room
         || ($section['group'] === 'habitacion' && $section['index'] <= $rooms)
         || ($section['group'] === 'bano' && $section['index'] <= $baths);
       $entry = $visible && is_array($sections[$key] ?? null) ? $sections[$key] : [];
-      $rows = self::rows($entry['rows'] ?? [], true);
-      $total += count($rows);
-      $columns[$key] = InventorySchema::rowsToStored($rows, $section['suffix']);
+      // En un inmueble de varios pisos cada elemento de las áreas comunes dice en qué piso está.
+      $rows = self::rows($entry['rows'] ?? [], true, $floors > 1 && !$room, $floors);
+      if ($key !== InventorySchema::ELECTRICAL) {
+        $total += count($rows);
+        $columns[$key] = InventorySchema::rowsToStored($rows, $section['suffix']);
+      }
+      $kept[$key] = $rows;
       if ($section['floor'] !== '') {
-        $columns[$section['floor']] = self::clean($entry['floor'] ?? '', 60);
+        $columns[$section['floor']] = $room && $visible ? (string) min($floors, InventorySchema::floorNumber($entry['floor'] ?? 1)) : self::clean($entry['floor'] ?? '', 60);
         $columns[$section['details']] = self::clean($entry['details'] ?? '', 2000);
       }
-      $furnitureRows = $furnished && $visible ? self::rows($furniture[$key] ?? [], false) : [];
+      if ($room && $visible) {
+        $roomType = self::clean($rawTypes[$key] ?? '', 40);
+        $allowed = $section['group'] === 'habitacion' ? InventorySchema::ROOM_TYPES : InventorySchema::BATH_TYPES;
+        $types[$key] = in_array($roomType, $allowed, true) ? $roomType : InventorySchema::defaultRoomType($section['group'], $section['index']);
+      }
+      $furnitureRows = $furnished && $visible ? self::rows($furniture[$key] ?? [], false, false, $floors) : [];
       $columns[$section['furniture']] = InventorySchema::rowsToStored($furnitureRows, $section['furniture_suffix'], false);
     }
+    $columns['tipos_espacios'] = $types !== [] ? (string) json_encode($types, JSON_UNESCAPED_UNICODE) : '';
+
+    // Los eléctricos registrados en cualquier sección se copian a Elementos eléctricos con el lugar donde están.
+    $electrical = $kept[InventorySchema::ELECTRICAL];
+    $total += count($electrical);
+    $catalog = $options['electrical'] ?? [];
+    foreach ($kept as $key => $rows) {
+      if ($key === InventorySchema::ELECTRICAL) continue;
+      $section = InventorySchema::sections()[$key];
+      $title = InventorySchema::sectionTitle($key, $profile, $types, (string) ($columns[$section['floor']] ?? ''), $floors);
+      foreach ($rows as $row) {
+        if (InventorySchema::isElectrical($row['d'], $catalog)) {
+          $electrical[] = ['d' => $row['d'] . ' (' . $title . ')', 'src' => $key] + $row;
+        }
+      }
+    }
+    $columns[InventorySchema::ELECTRICAL] = InventorySchema::rowsToStored(array_slice($electrical, 0, InventorySchema::MAX_ROWS * 4), 'electricos');
     if ($total === 0) {
       throw new \DomainException('Registra al menos un elemento en el inventario.');
     }
@@ -159,8 +194,8 @@ final class InventoryInput
     return $out;
   }
 
-  /** @return list<array{d:string,c:string,m:string,e:string,o:string}> */
-  private static function rows(mixed $raw, bool $material): array
+  /** @return list<array{d:string,c:string,m:string,e:string,o:string,p:string}> */
+  private static function rows(mixed $raw, bool $material, bool $withFloor = false, int $floors = 1): array
   {
     $rows = [];
     foreach (is_array($raw) ? $raw : [] as $row) {
@@ -174,6 +209,7 @@ final class InventoryInput
         'm' => $material ? self::clean($row['m'] ?? '', 500) : '',
         'e' => in_array($state, self::STATES, true) ? $state : 'Bueno',
         'o' => self::clean($row['o'] ?? '', 2000) ?: 'Ninguna',
+        'p' => $withFloor ? (string) min($floors, InventorySchema::floorNumber($row['p'] ?? 1)) : '',
       ];
       if (count($rows) >= InventorySchema::MAX_ROWS) break;
     }

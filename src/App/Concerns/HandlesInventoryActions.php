@@ -148,6 +148,7 @@ trait HandlesInventoryActions
     return [
       'types' => DeliveryReviewForm::glossary($this->db, InventorySchema::GLOSSARY_TYPE) ?: ['Nuevo', 'Anterior'],
       'categories' => DeliveryReviewForm::glossary($this->db, InventorySchema::GLOSSARY_CATEGORY) ?: ['No amoblado', 'Amoblado'],
+      'electrical' => DeliveryReviewForm::glossary($this->db, InventorySchema::GLOSSARY_ELECTRICAL),
     ];
   }
 
@@ -607,9 +608,13 @@ trait HandlesInventoryActions
     $bathMax = 0;
     foreach (InventorySchema::sections() as $key => $section) {
       $rows = InventorySchema::rowsFromStored($row[$key] ?? '', $section['suffix']);
+      if ($key === InventorySchema::ELECTRICAL) {
+        // Los copiados desde otras secciones se recalculan al guardar.
+        $rows = array_values(array_filter($rows, static fn(array $item): bool => $item['src'] === ''));
+      }
       $sections[$key] = [
         'rows' => $rows,
-        'floor' => $section['floor'] !== '' ? trim((string) ($row[$section['floor']] ?? '')) : '',
+        'floor' => $section['floor'] === '' ? '' : ($section['group'] !== 'general' ? (string) InventorySchema::floorNumber($row[$section['floor']] ?? 1) : trim((string) ($row[$section['floor']] ?? ''))),
         'details' => $section['details'] !== '' ? trim((string) ($row[$section['details']] ?? '')) : '',
       ];
       $furniture[$key] = InventorySchema::rowsFromStored($row[$section['furniture']] ?? '', $section['furniture_suffix']);
@@ -620,6 +625,19 @@ trait HandlesInventoryActions
     }
     $data['cantidad_habitaciones'] = (string) max((int) $data['cantidad_habitaciones'], $roomMax);
     $data['cantidad_banos'] = (string) max((int) $data['cantidad_banos'], $bathMax);
+    $types = json_decode((string) ($row['tipos_espacios'] ?? ''), true);
+    $data['tipos'] = is_array($types) ? $types : [];
+    // Habitaciones y baños por piso, según el piso guardado en cada uno.
+    $floors = InventorySchema::floors($data['cantidad_pisos']);
+    foreach (['habitacion' => ['cantidad_habitaciones', 'habitacion_pisos'], 'bano' => ['cantidad_banos', 'bano_pisos']] as $group => [$field, $target]) {
+      $counts = array_fill(0, $floors, 0);
+      foreach (InventorySchema::sections() as $key => $section) {
+        if ($section['group'] === $group && $section['index'] <= (int) $data[$field]) {
+          $counts[min($floors, InventorySchema::floorNumber($sections[$key]['floor'])) - 1]++;
+        }
+      }
+      $data[$target] = $counts;
+    }
     return ['data' => $data, 'boundaries' => $boundaries, 'sections' => $sections, 'furniture' => $furniture];
   }
 
@@ -704,6 +722,9 @@ trait HandlesInventoryActions
       'parking' => DeliveryReviewForm::glossary($this->db, InventorySchema::GLOSSARY_PARKING),
       'services' => DeliveryReviewForm::glossary($this->db, InventorySchema::GLOSSARY_SERVICES) ?: ['Agua', 'Gas', 'Energia'],
       'agreements' => InventorySchema::agreements(),
+      'roomTypes' => InventorySchema::ROOM_TYPES,
+      'bathTypes' => InventorySchema::BATH_TYPES,
+      'electrical' => $options['electrical'],
       'suggestions' => (new InventorySuggestions($this->db, SCM_STORAGE_PATH . '/data/inventory-suggestions.json'))->all(),
     ];
   }

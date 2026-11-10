@@ -10,7 +10,8 @@ require dirname(__DIR__) . '/bootstrap/app.php';
 //   php bin/cct-add-fields.php cierres arrendatario_tab correo_2="Correo 2" fecha_firma:fecha="Fecha de firma"
 //   php bin/cct-add-fields.php cierres arrendatario_tab correo_2="Correo 2" --aplicar
 //
-// Tipos: text (por defecto), textarea, fecha (fecha guardada como timestamp, columna bigint).
+// Tipos: text (por defecto), textarea, fecha (fecha guardada como timestamp, columna bigint) y repeater (repetidor de
+// inventario con descripcion_, cantidad_, tipo_de_material_, estado_ y observaciones_ + columna; columna longtext).
 
 use SCM\Support\CctFieldInstaller;
 

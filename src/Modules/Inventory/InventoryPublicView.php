@@ -137,18 +137,23 @@ final class InventoryPublicView
   private function elements(array $row, array $profile): string
   {
     $html = '';
-    foreach (InventorySchema::sections() as $key => $section) {
+    $floors = InventorySchema::floors($row['cantidad_pisos'] ?? 1);
+    $types = json_decode((string) ($row['tipos_espacios'] ?? ''), true);
+    foreach ($this->orderedSections($profile) as $key) {
+      $section = InventorySchema::sections()[$key];
       $rows = InventorySchema::rowsFromStored($row[$key] ?? '', $section['suffix']);
       if ($rows === []) {
         continue;
       }
-      $head = '';
+      $room = $section['group'] !== 'general';
       $floor = $section['floor'] !== '' ? $this->text($row[$section['floor']] ?? '') : '';
       $details = $section['details'] !== '' ? $this->text($row[$section['details']] ?? '') : '';
-      if ($floor !== '' || $details !== '') {
-        $head = '<p class="scm-inv-note">' . $this->h(implode(' · ', array_filter([$floor !== '' ? 'Piso: ' . $floor : '', $details]))) . '</p>';
-      }
-      $html .= '<div class="scm-inv-block"><h3>' . $this->h(InventorySchema::sectionLabel($key, $profile)) . '</h3>' . $head . $this->table($rows, true) . '</div>';
+      // Un piso escrito a mano en inventarios antiguos ("2do") se muestra tal cual; el número ya va en el título.
+      $notes = array_filter([$floor !== '' && (!$room || ($floors === 1 && !ctype_digit($floor))) ? 'Piso: ' . $floor : '', $details]);
+      $head = $notes !== [] ? '<p class="scm-inv-note">' . $this->h(implode(' · ', $notes)) . '</p>' : '';
+      $title = InventorySchema::sectionTitle($key, $profile, is_array($types) ? $types : [], $floor, $floors);
+      $byFloor = $floors > 1 && !$room && array_filter(array_column($rows, 'p')) !== [];
+      $html .= '<div class="scm-inv-block"><h3>' . $this->h($title) . '</h3>' . $head . $this->table($rows, true, $byFloor) . '</div>';
     }
     return $html === '' ? '' : '<section class="scm-corrective-public-card scm-inv-section"><h2>Inventario del inmueble</h2>' . $html . '</section>';
   }
@@ -157,7 +162,8 @@ final class InventoryPublicView
   private function furniture(array $row, array $profile): string
   {
     $html = '';
-    foreach (InventorySchema::sections() as $key => $section) {
+    foreach ($this->orderedSections($profile) as $key) {
+      $section = InventorySchema::sections()[$key];
       $rows = InventorySchema::rowsFromStored($row[$section['furniture']] ?? '', $section['furniture_suffix']);
       if ($rows !== []) {
         $html .= '<div class="scm-inv-block"><h3>' . $this->h(InventorySchema::sectionLabel($key, $profile)) . '</h3>' . $this->table($rows, false) . '</div>';
@@ -166,13 +172,25 @@ final class InventoryPublicView
     return $html === '' ? '' : '<section class="scm-corrective-public-card scm-inv-section"><h2>Muebles y enseres</h2>' . $html . '</section>';
   }
 
-  /** @param list<array<string,string>> $rows */
-  private function table(array $rows, bool $material): string
+  /** Orden del tipo de inmueble y, al final, cualquier otra sección que tenga datos. @return list<string> */
+  private function orderedSections(array $profile): array
   {
-    $head = '<tr><th>Descripción</th><th>Cantidad</th>' . ($material ? '<th>Tipo de material</th>' : '') . '<th>Estado</th><th>Observaciones</th></tr>';
+    $keys = InventorySchema::orderedKeys($profile, InventorySchema::MAX_ROOMS, InventorySchema::MAX_ROOMS);
+    foreach (array_keys(InventorySchema::sections()) as $key) {
+      if (!in_array($key, $keys, true)) {
+        $keys[] = $key;
+      }
+    }
+    return $keys;
+  }
+
+  /** @param list<array<string,string>> $rows */
+  private function table(array $rows, bool $material, bool $byFloor = false): string
+  {
+    $head = '<tr>' . ($byFloor ? '<th>Piso</th>' : '') . '<th>Descripción</th><th>Cantidad</th>' . ($material ? '<th>Tipo de material</th>' : '') . '<th>Estado</th><th>Observaciones</th></tr>';
     $body = '';
     foreach ($rows as $item) {
-      $body .= '<tr><td>' . $this->h($item['d']) . '</td><td>' . $this->h($item['c']) . '</td>'
+      $body .= '<tr>' . ($byFloor ? '<td>' . $this->h($item['p'] ?? '') . '</td>' : '') . '<td>' . $this->h($item['d']) . '</td><td>' . $this->h($item['c']) . '</td>'
         . ($material ? '<td>' . $this->h($item['m']) . '</td>' : '')
         . '<td>' . $this->h($item['e']) . '</td><td>' . $this->h($item['o']) . '</td></tr>';
     }

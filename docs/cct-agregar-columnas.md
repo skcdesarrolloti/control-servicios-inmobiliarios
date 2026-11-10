@@ -31,8 +31,9 @@ php bin/cct-add-fields.php contratos_arrendamiento propietario_tab correo_2="Cor
 php bin/cct-add-fields.php contratos_arrendamiento propietario_tab correo_2="Correo 2" fecha_firma:fecha="Fecha de firma" --aplicar
 ```
 
-- Tipos: `text` (por defecto, columna `text`), `textarea` (columna `text`) y `fecha` (fecha guardada como timestamp,
-  columna `bigint(20)`, como `fin_contrato`).
+- Tipos: `text` (por defecto, columna `text`), `textarea` (columna `text`), `fecha` (fecha guardada como timestamp,
+  columna `bigint(20)`, como `fin_contrato`) y `repeater` (columna `longtext`, con los subcampos de los repetidores del
+  inventario: `descripcion_`, `cantidad_`, `tipo_de_material_`, `estado_` y `observaciones_` + nombre de la columna).
 - Nombre de columna: minúsculas, números y `_`.
 - Lo que ya existe se salta: el comando se puede repetir sin efecto. Un campo que ya está en su pestaña no se mueve; uno que está en otra pestaña se mueve al final de
   la indicada (solo cambia el orden de la definición, no la columna ni los datos).
