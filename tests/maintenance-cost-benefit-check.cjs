@@ -26,6 +26,9 @@ const snapshot = {
     [8, '11', '502', 'Revision preventiva', 'Luis', day(month, 4), 80000, 20000, 100000, 'en_cobro'],
   ].concat(previous !== month ? [[9, '12', '503', 'Otro', 'Luis', day(previous, 6), 90000, 10000, 100000, 'sin_cobrar']] : []),
   undated: { income_count: 1, income_value: 30000, expense_count: 0, expense_value: 0 },
+  employees: ['Libia Correa Rivera', 'Alvaro Florez De Oro'],
+  excluded: { count: 4, value: 70000 },
+  employees_not_found: [],
   generated_at: Math.floor(Date.now() / 1000),
 };
 
@@ -54,6 +57,7 @@ const snapshot = {
   assert.equal(digits(values.Pagado), '100000');
   assert.equal(digits(values['En cuenta de cobro']), '100000');
   assert.match(await page.textContent('[data-scm-cb-content]'), /1 cotización aprobada sin fecha de respuesta/, 'undated rows are reported');
+  assert.match(await page.textContent('[data-scm-cb-content]'), /Gastos de Libia Correa Rivera y Alvaro Florez De Oro\. En todo el historial no se cuentan 4 reportes de otros funcionarios/, 'it says whose expenses count and what was left out');
   assert.equal(await page.isHidden('[data-scm-cb-export]'), true, 'a single month has no monthly export');
 
   await page.click('[data-scm-cb-mode="anual"]');

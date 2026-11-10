@@ -176,7 +176,7 @@ final class MetricsPanelsView
         <div class="scm-cm-head-copy">
           <p class="scm-cm-kicker">Métricas · Mantenimiento</p>
           <h1 id="scm-cost-benefit-title">Costo-beneficio</h1>
-          <p class="scm-cm-subtitle">Compara la administración ganada en cotizaciones aprobadas con lo que cobran los funcionarios en reportes administrativos y cuentas de cobro.</p>
+          <p class="scm-cm-subtitle">Compara la administración ganada en cotizaciones aprobadas con lo que cobran los funcionarios de mantenimiento en reportes administrativos y cuentas de cobro.</p>
         </div>
         <div class="scm-cm-head-actions">
           <span class="scm-cm-updated" data-scm-cb-updated></span>

@@ -165,7 +165,10 @@
         years[row.fecha.slice(0, 4)] = true;
         types[row.categoria] = true;
       });
-      state.data = { income: income, expense: expense, undated: snapshot.undated || {}, generatedAt: snapshot.generated_at || 0 };
+      state.data = {
+        income: income, expense: expense, undated: snapshot.undated || {}, employees: snapshot.employees || [], excluded: snapshot.excluded || {},
+        employeesNotFound: snapshot.employees_not_found || [], generatedAt: snapshot.generated_at || 0,
+      };
       var currentYear = yearSelect.value;
       yearSelect.innerHTML = Object.keys(years).sort().reverse().map(function (year) {
         return '<option value="' + esc(year) + '">' + esc(year) + "</option>";
@@ -252,7 +255,7 @@
       html += kpi("En cuenta de cobro", money(s.en_cobro), "Cobrados, pendientes de pago", "stock");
       html += kpi("Sin cobrar", money(s.sin_cobrar), "Aún no están en una cuenta de cobro");
       html += "</div>";
-      html += undatedNote();
+      html += employeesNote() + undatedNote();
 
       // Mes a mes: los meses del año o del acumulado; no aplica a un mes suelto.
       state.monthly = p.months.map(function (ym) {
@@ -287,6 +290,14 @@
 
       content.innerHTML = html;
       updateDetail();
+    }
+
+    function employeesNote() {
+      var excluded = state.data.excluded;
+      var note = "Gastos de " + state.data.employees.join(" y ") + ".";
+      if (excluded.count) note += " En todo el historial no se cuentan " + num(excluded.count) + (excluded.count === 1 ? " reporte" : " reportes") + " de otros funcionarios (" + money(excluded.value) + ").";
+      if (state.data.employeesNotFound.length) note += " No se encontraron reportes de " + state.data.employeesNotFound.join(" ni de ") + ".";
+      return '<p class="scm-cb-note">' + esc(note) + "</p>";
     }
 
     function undatedNote() {
