@@ -33,7 +33,7 @@ final class MaintenanceCostBenefitReport
   public const SCOPES = [
     'entrega_recibo' => [
       'tab' => 'metricas_costo_entrega_recibo', 'panel' => 'scm-panel-metricas-costo-entrega-recibo', 'income' => 'contratos',
-      'employees' => [self::LIBIA], 'types' => [], 'note' => 'Gastos de ' . self::LIBIA . '.',
+      'employees' => [self::LIBIA], 'types' => ['entrega', 'recibo'], 'note' => 'Gastos de ' . self::LIBIA . ' en entregas y recibos.',
     ],
     'mantenimiento' => [
       'tab' => 'metricas_costo_beneficio', 'panel' => 'scm-panel-metricas-costo-beneficio', 'income' => 'cotizaciones',

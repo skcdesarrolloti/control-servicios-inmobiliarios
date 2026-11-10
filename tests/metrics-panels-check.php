@@ -273,11 +273,14 @@ $delivery = $costBenefit->build('entrega_recibo', ['columns' => $contractColumns
   $contractRow(['id' => 2, 'contrato' => '1002', 'ingreso' => '2026-02-10', 'canon' => 900000]),
   $contractRow(['id' => 3, 'contrato' => '1003', 'ingreso' => null, 'canon' => 800000, 'tasa_admin' => 10.0]),
 ]], [
-  ['id' => 30, 'fecha' => 1792167812, 'categoria' => 'Otro'] + $reportBase,
-  ['id' => 31, 'fecha' => 1792167812, 'funcionario' => 'Alvaro Florez De Oro'] + $reportBase,
+  ['id' => 30, 'fecha' => 1792167812, 'categoria' => 'Revision entrega'] + $reportBase,
+  ['id' => 31, 'fecha' => 1792167812, 'funcionario' => 'Alvaro Florez De Oro', 'categoria' => 'Revision entrega'] + $reportBase,
+  ['id' => 32, 'fecha' => 1792167812, 'categoria' => 'Recibo'] + $reportBase,
+  ['id' => 33, 'fecha' => 1792167812, 'categoria' => 'Revision antes de la ocupacion'] + $reportBase,
+  ['id' => 34, 'fecha' => 1792167812, 'categoria' => 'Otros servicios'] + $reportBase,
 ]);
 $check($delivery['income_source'] === 'contratos' && array_column($delivery['contracts'], 0) === [1, 2] && $delivery['contracts_without_rate'] === 1 && $delivery['undated']['income_count'] === 1, 'Entrega y recibo usa los contratos e informa los que no tienen tasa o fecha.');
-$check(array_column($delivery['expense'], 0) === [30] && $delivery['excluded']['count'] === 1, 'Entrega y recibo cuenta todos los reportes de Libia y solo los de ella.');
+$check(array_column($delivery['expense'], 0) === [30, 32] && $delivery['excluded']['count'] === 3, 'Entrega y recibo solo cuenta las entregas y recibos de Libia.');
 $shell = $view->renderCostBenefitShell('mantenimiento');
 foreach (['actual', 'mes', 'anual', 'acumulado'] as $mode) {
   $check(str_contains($shell, 'data-scm-cb-mode="' . $mode . '"'), 'Costo-beneficio ofrece el periodo ' . $mode . '.');

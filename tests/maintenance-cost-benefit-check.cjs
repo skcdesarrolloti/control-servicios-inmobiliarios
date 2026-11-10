@@ -95,6 +95,11 @@ const delivery = {
   const yearExpense = previous !== month ? 300000 : 200000;
   assert.equal(digits(values.Ingresos), String(yearIncome), 'the year adds every month');
   assert.equal(digits(values.Gastos), String(yearExpense));
+  const yearRows = previous !== month ? 3 : 2;
+  assert.equal(await page.locator('[data-scm-cb-detail] tbody tr').count(), yearRows, 'the income detail follows the period');
+  await page.click('[data-scm-cb-view="gastos"]');
+  assert.equal(await page.locator('[data-scm-cb-detail] tbody tr').count(), yearRows, 'the expense detail follows the period');
+  await page.click('[data-scm-cb-view="ingresos"]');
   assert.equal(await page.isHidden('[data-scm-cb-export]'), false, 'the year exports its months');
   assert.equal(await page.locator('.scm-cc-col').count(), month, 'the chart shows only elapsed months');
   assert.equal(await page.locator('.scm-cc-bar i').count(), 1, 'only the tallest bar carries a value');
@@ -129,6 +134,8 @@ const delivery = {
   assert.match(await page.textContent('[data-scm-cb-content]'), /1 contrato sin fecha de entrega/);
   assert.equal(await page.locator('[data-scm-cb-detail] tbody tr').count(), 2, 'contracts without income are not listed; the closed one is out of the period');
   assert.match(await page.textContent('[data-scm-cb-detail] thead'), /Comisión.*Derechos/);
+  assert.match(await page.textContent('[data-scm-cb-content]'), /Detalle de .*\(mes actual\)/, 'the detail names its period');
+  assert.match(await page.textContent('[data-scm-cb-detail]'), /Lista los contratos vigentes en el periodo/, 'it explains why older contracts appear');
 
   await page.click('[data-scm-cb-mode="anual"]');
   values = await kpis();

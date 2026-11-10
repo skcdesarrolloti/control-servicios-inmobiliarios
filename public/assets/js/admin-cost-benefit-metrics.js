@@ -315,6 +315,7 @@
       html += '<section class="scm-cm-card"><header><h2>Gasto por tipo</h2></header>' + typeTable(groupExpense(expense, "categoria"), s.expense) + "</section>";
       html += "</div>";
 
+      html += '<h3 class="scm-qm-section">Detalle de ' + esc(p.label) + "</h3>";
       var views = [["ingresos", "Ingresos", income.length], ["gastos", "Gastos", expense.length]];
       html += '<section class="scm-cm-card is-wide"><header><div class="scm-qm-views" role="tablist">' + views.map(function (view) {
         return '<button type="button" role="tab" class="scm-qm-view' + (state.view === view[0] ? " is-active" : "") + '" aria-selected="' + (state.view === view[0]) +
@@ -443,8 +444,9 @@
 
     function contractDetail(slice, rows) {
       var sum = rows.reduce(function (out, row) { out.commission += row.comision; out.rights += row.derechos; out.total += row.admin; return out; }, { commission: 0, rights: 0, total: 0 });
-      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr><th>Contrato</th><th>Entrega</th><th>Inmueble</th>' +
-        '<th class="is-num">Canon</th><th class="is-num">Meses</th><th class="is-num">Comisión</th><th class="is-num">Derechos</th><th class="is-num">Total</th></tr></thead><tbody>' + slice.map(function (row) {
+      return '<p class="scm-cb-note is-table">Lista los contratos vigentes en el periodo: cada uno suma la comisión de sus meses vigentes, aunque se haya entregado antes. Los derechos solo suman si se entregó en el periodo.</p>' +
+        '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr><th>Contrato</th><th>Entrega</th><th>Inmueble</th>' +
+        '<th class="is-num">Canon</th><th class="is-num">Meses en el periodo</th><th class="is-num">Comisión</th><th class="is-num">Derechos</th><th class="is-num">Total</th></tr></thead><tbody>' + slice.map(function (row) {
           return "<tr><td><strong>" + esc(row.contrato || "#" + row.id) + "</strong></td><td>" + esc(formatDay(row.fecha)) + "</td><td>" + esc(row.inmueble || "—") + "</td>" +
             cash(row.canon) + count(row.meses) + cash(row.comision) + cash(row.derechos) + cash(row.admin, " is-total") + "</tr>";
         }).join("") + '</tbody><tfoot><tr><td colspan="5">Total</td><td class="is-num">' + esc(money(sum.commission)) + '</td><td class="is-num">' + esc(money(sum.rights)) + '</td><td class="is-num is-total">' + esc(money(sum.total)) + "</td></tr></tfoot></table></div>";
