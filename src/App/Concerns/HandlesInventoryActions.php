@@ -9,6 +9,8 @@ use SCM\Modules\DeliveryReview\DeliveryReviewForm;
 use SCM\Modules\Inventory\DeliveryProcessView;
 use SCM\Modules\Inventory\InventoryBilling;
 use SCM\Modules\Inventory\InventoryDraftStore;
+use SCM\Modules\Inventory\InventoryDuplicator;
+use SCM\Modules\Inventory\InventoryVoiceAssistant;
 use SCM\Modules\Inventory\InventoryInput;
 use SCM\Modules\Inventory\InventorySchema;
 use SCM\Modules\Inventory\InventorySuggestions;
@@ -841,8 +843,126 @@ trait HandlesInventoryActions
     $this->jsonOk(['html' => $html, 'total' => $total]);
   }
 
+  /** Herramientas › Duplicar inventario: vista previa y copia hacia el contrato de otro caso. */
+  public function ajax_handler_inventory_duplicate(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('herramienta_duplicar_inventario')) {
+      $this->jsonFail('No tienes permiso para duplicar inventarios.');
+    }
+    $ticketId = (int) ($_POST['ticket_pk'] ?? 0);
+    $sourceId = (int) ($_POST['inventario_id'] ?? 0);
+    $schema = $this->inventorySchema();
+    $table = $this->db->table('jet_cct_inventario');
+    $source = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? AND COALESCE(`cct_status`, 'publish') = 'publish' LIMIT 1", [$sourceId]);
+    if (!$source) {
+      $this->jsonFail('No se encontró el inventario origen.');
+    }
+    try {
+      $context = $this->inventoryContext($ticketId);
+    } catch (\DomainException $error) {
+      $this->jsonFail($error->getMessage());
+    }
+    $contract = $context['contract'];
+    if ((int) ($contract['_ID'] ?? 0) <= 0) {
+      $this->jsonFail('El caso destino no tiene contrato.');
+    }
+    $principalId = $this->correctiveReviewDigits($contract['id_inventario'] ?? '');
+    $additional = $principalId !== '' && $this->inventoryExists($principalId, $context['inventories']);
+    if ((string) ($_POST['operation'] ?? 'preview') !== 'execute') {
+      $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+      $line = static fn(string $label, $value): string => '<li><span>' . $h($label) . '</span><strong>' . $h(trim((string) $value) !== '' ? $value : '-') . '</strong></li>';
+      $this->jsonOk(['html' => '<div class="scm-inv-dup"><div><h4>Origen: inventario #' . $sourceId . '</h4><ul>'
+        . $line('Contrato', $source['contrato'] ?? '') . $line('Inmueble', $source['inmueble'] ?? '') . $line('Dirección', $source['direccion'] ?? '')
+        . $line('Categoría', $source['categoria_inventario'] ?? '') . $line('Elementos que se copian', InventoryDuplicator::elementCount($source))
+        . '</ul></div><div><h4>Destino: caso #' . $ticketId . '</h4><ul>'
+        . $line('Contrato', $contract['contrato'] ?? '') . $line('Inmueble', $contract['inmueble'] ?? '') . $line('Dirección', $contract['direccion'] ?? '')
+        . $line('Arrendatario', $contract['arrendatario'] ?? '') . $line('Propietario', $contract['propietario'] ?? '') . '</ul></div></div>'
+        . '<p class="scm-inv-hint">' . ($additional
+          ? 'Este contrato ya tiene el inventario #' . $h($principalId) . ': la copia quedará como inventario adicional y también irá en los anexos.'
+          : 'La copia quedará como inventario principal del contrato y del caso. Las partes, servicios y linderos se toman del contrato destino. No genera reporte administrativo.') . '</p>']);
+    }
+    $actor = $this->ticketCompletionActor();
+    $employeeId = $this->correctiveReviewFirstText([$actor['employee_id'] ?? '', Auth::userId()]);
+    $now = time();
+    $row = InventoryDuplicator::build($source, $contract, $context['ticket'], ['name' => (string) ($actor['name'] ?? Auth::user()), 'email' => (string) ($actor['email'] ?? ''), 'phone' => (string) ($actor['phone'] ?? ''), 'employee_id' => $employeeId], $now);
+    $pdo = $this->db->pdo();
+    try {
+      $pdo->beginTransaction();
+      if (!$this->db->insert($table, $schema->filterTableData($table, $row))) {
+        throw new \DomainException('No fue posible copiar el inventario.');
+      }
+      $newId = (int) $this->db->lastInsertId();
+      if (!$additional) {
+        $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
+        $this->db->update($contractTable, $schema->filterTableData($contractTable, ['id_inventario' => (string) $newId]), ['_ID' => (int) $contract['_ID']]);
+        $ticketTable = $this->db->table('jet_cct_tickets');
+        $this->db->update($ticketTable, $schema->filterTableData($ticketTable, ['id_inventario' => (string) $newId, 'estado_inventario' => 'Si', 'estado' => 'En proceso', 'estado_administrativo' => CompletionPolicy::EXECUTION_STATE, 'fecha_actualizacion' => $now]), ['_ID' => $ticketId]);
+      }
+      $this->inventoryHistory($schema, $ticketId, $newId, $actor, $employeeId, 'Se ha elaborado el inventario antes de la ocupación de acuerdo al proceso de entrega, a partir del inventario #' . $sourceId . '. Procederemos a enviarlo al momento de la entrega.', '', '');
+      $pdo->commit();
+    } catch (\Throwable $error) {
+      if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      error_log('[inventario-duplicar] ' . $error->getMessage());
+      $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No fue posible copiar el inventario.');
+    }
+    $this->jsonOk(['message' => 'Se creó el inventario #' . $newId . ($additional ? ' como adicional del contrato.' : ' como principal del contrato.'), 'id' => $newId, 'url' => self::inventoryPublicUrl($newId)]);
+  }
+
+  /** Dictado: audio o texto → filas propuestas. No guarda nada; el funcionario revisa y acepta. No lleva ticket_pk para no bloquear el caso mientras responde MiniMax. */
+  public function ajax_handler_inventory_voice(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('inventory_manage')) {
+      $this->jsonFail('No tienes permiso para gestionar inventarios.');
+    }
+    if (!$this->canAccessDeliveryReview((int) ($_POST['case_ticket'] ?? 0))) {
+      http_response_code(403);
+      $this->jsonFail('No tienes permiso para este caso.');
+    }
+    $assistant = new InventoryVoiceAssistant();
+    if (!$assistant->available()) {
+      $this->jsonFail('El dictado está pendiente de activar con la clave de MiniMax en el servidor.');
+    }
+    $limiter = new \SCM\Support\FileRateLimiter(SCM_STORAGE_PATH . '/data/rate-limits');
+    if (!$limiter->consume('inventory-voice:employee:' . Auth::employeeId(), 40, 600) || !$limiter->consume('inventory-voice:global', 300, 3600)) {
+      $this->jsonFail('Se alcanzó el límite de dictados. Espera unos minutos o registra las filas a mano.');
+    }
+    [$kind, $key] = array_pad(explode(':', (string) ($_POST['target'] ?? ''), 2), 2, '');
+    $section = InventorySchema::sections()[$key] ?? null;
+    if ($section === null || !in_array($kind, ['sections', 'furniture'], true)) {
+      $this->jsonFail('La sección del dictado no es válida.');
+    }
+    $furniture = $kind === 'furniture';
+    $catalog = !$furniture && $section['glossary'] > 0 ? DeliveryReviewForm::glossary($this->db, $section['glossary']) : [];
+    $label = $section['label'] . ($furniture ? ' (muebles y enseres)' : '');
+    try {
+      $text = mb_substr(trim(strip_tags((string) ($_POST['text'] ?? ''))), 0, InventoryVoiceAssistant::MAX_TEXT, 'UTF-8');
+      if ($text === '') {
+        $file = $_FILES['audio'] ?? null;
+        $tmp = is_array($file) ? (string) ($file['tmp_name'] ?? '') : '';
+        if (!is_array($file) || (int) ($file['error'] ?? 1) !== UPLOAD_ERR_OK || !is_uploaded_file($tmp) || (int) $file['size'] > InventoryVoiceAssistant::MAX_AUDIO_BYTES) {
+          throw new \DomainException('No se recibió el audio o es demasiado largo. Graba máximo dos minutos.');
+        }
+        $header = (string) file_get_contents($tmp, false, null, 0, 12);
+        if (!str_starts_with($header, 'RIFF') || substr($header, 8, 4) !== 'WAVE') {
+          throw new \DomainException('El formato del audio no es válido.');
+        }
+        $text = $assistant->transcribe($tmp);
+      }
+      $this->jsonOk(['text' => $text, 'rows' => $assistant->structure($text, $label, $catalog, $furniture)]);
+    } catch (\DomainException $error) {
+      if ($error->getCode() === InventoryVoiceAssistant::TRANSCRIPTION_FAILED) {
+        $this->jsonOk(['transcription_failed' => true, 'message' => $error->getMessage()]);
+      }
+      $this->jsonFail($error->getMessage());
+    }
+  }
+
   private function canUseInventoryVoice(): bool
   {
-    return false;
+    return (new InventoryVoiceAssistant())->available();
   }
 }

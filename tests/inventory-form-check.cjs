@@ -30,12 +30,14 @@ const config = {
 const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-inventory-form><script type="application/json" data-inventory-config>' + JSON.stringify(cfg).replace(/</g, '\\u003c') + '</script><div data-inventory-root></div><span data-corrective-review-message></span></form></div>';
 
 (async () => {
-  const browser = await chromium.launch({ headless: true, executablePath: process.env.EDGE_PATH || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' });
+  const browser = await chromium.launch({ headless: true, executablePath: process.env.EDGE_PATH || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
   try {
     const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
     const errors = [];
     const posts = [];
     let serverDraft = null;
+    let voiceReply = {};
+    let audioHeader = '';
     page.on('pageerror', e => errors.push(e.message));
     await page.route('https://panel.test/', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><head><meta charset="utf-8"><style>' + css + '</style></head><body><div id="app"><div id="modal"><div id="sub"><h3 class="scm-case-submodal-title"></h3><div class="scm-case-submodal-body"></div></div></div><button id="case" data-ticket-pk="5"></button></div></body></html>' }));
     await page.route('https://panel.test/api.php', async route => {
@@ -45,6 +47,13 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
       const operation = field('operation');
       posts.push({ action, operation, payload: field('payload'), revision: field('revision') });
       let data;
+      if (action === 'scm_inventario_voz') {
+        const buffer = route.request().postDataBuffer();
+        const at = buffer.indexOf('RIFF');
+        audioHeader = at >= 0 ? buffer.slice(at, at + 4).toString() + buffer.slice(at + 8, at + 12).toString() : '';
+        await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: voiceReply }) });
+        return;
+      }
       if (action === 'scm_inventario_borrador') {
         data = operation === 'get' ? { draft: serverDraft } : operation === 'save' ? { status: 'saved', revision: Number(field('revision')) + 1 } : { status: 'deleted' };
       } else {
@@ -163,6 +172,34 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     await page.fill('input[data-b="direccion"]', 'Ya restaurado');
     await page.waitForFunction(() => /Guardado/.test(document.querySelector('[data-draft-status]').textContent), null, { timeout: 8000 });
     assert.equal(saves().at(-1).revision, '7', 'Save continues from the draft revision');
+
+    // Dictado: graba, envía WAV (MiniMax no acepta webm), muestra lo entendido y agrega solo lo aceptado.
+    config.voice = true;
+    serverDraft = null;
+    voiceReply = { text: 'dos tomas y una puerta', rows: [{ d: 'Tomas', c: '2', m: 'Plástico', e: 'Bueno', o: 'Ninguna' }, { d: 'Puerta', c: '1', m: 'Madera', e: 'Malo', o: 'Rota' }] };
+    await open();
+    await go('Sala, comedor');
+    await page.locator('[data-voice-start="sections:sala"]').click();
+    await page.locator('[data-voice-stop]').waitFor();
+    await page.waitForTimeout(700);
+    await page.locator('[data-voice-stop]').click();
+    await page.locator('[data-voice-accept]').waitFor({ timeout: 15000 });
+    assert.equal(audioHeader, 'RIFFWAVE', 'Sends a WAV file');
+    assert.ok((await page.textContent('.scm-inv-voice')).includes('dos tomas y una puerta'), 'Shows what was understood');
+    assert.equal(await page.locator('[data-rows="sections:sala"] [data-row]').count(), 0, 'Nothing is added before accepting');
+    await page.locator('[data-voice-row="0"]').uncheck();
+    await page.locator('[data-voice-accept]').click();
+    assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="d"]'), 'Puerta', 'Adds only the accepted row');
+    assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="o"]'), 'Rota');
+    voiceReply = { transcription_failed: true, message: 'MiniMax no pudo transcribir el audio.' };
+    await page.locator('[data-voice-start="sections:sala"]').click();
+    await page.locator('[data-voice-stop]').waitFor();
+    await page.waitForTimeout(500);
+    await page.locator('[data-voice-stop]').click();
+    await page.locator('.scm-inv-voice.is-error').waitFor({ timeout: 15000 });
+    assert.ok((await page.textContent('.scm-inv-voice')).includes('dictado del teléfono'), 'Offers browser dictation');
+    await page.locator('[data-voice-cancel]').click();
+    config.voice = false;
 
     // Vista de celular sin desborde horizontal.
     await page.setViewportSize({ width: 390, height: 800 });

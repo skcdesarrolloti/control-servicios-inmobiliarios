@@ -331,6 +331,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'herramienta_mercado';
   } elseif (in_array($tabParam, ['herramienta_aseo', 'calculadora_aseo', 'aseo', 'scm-panel-herramienta-aseo'], true)) {
     $current_page = 'herramienta_aseo';
+  } elseif (in_array($tabParam, ['herramienta_duplicar_inventario', 'scm-panel-herramienta-duplicar-inventario'], true)) {
+    $current_page = 'herramienta_duplicar_inventario';
   } elseif (in_array($tabParam, ['herramienta_ingreso_neto', 'simulador_ingreso_neto', 'ingreso_neto', 'scm-panel-herramienta-ingreso-neto'], true)) {
     $current_page = 'herramienta_ingreso_neto';
   } else {
@@ -811,6 +813,15 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=herramienta_aseo',
         'icon' => 'cleaning_services',
         'perms' => ['herramienta_aseo'],
+      ],
+      'herramienta_duplicar_inventario' => [
+        'key' => 'herramienta_duplicar_inventario',
+        'label' => 'Duplicar inventario',
+        'description' => 'Copia un inventario hacia otro contrato',
+        'panel_id' => 'scm-panel-herramienta-duplicar-inventario',
+        'url' => $baseUrl . '/index.php?tab=herramienta_duplicar_inventario',
+        'icon' => 'content_copy',
+        'perms' => ['herramienta_duplicar_inventario'],
       ],
       'herramienta_ingreso_neto' => [
         'key' => 'herramienta_ingreso_neto',

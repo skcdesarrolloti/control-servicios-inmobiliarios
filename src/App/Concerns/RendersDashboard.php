@@ -203,6 +203,8 @@ trait RendersDashboard
       'calculadora_aseo' => 'scm-panel-herramienta-aseo',
       'aseo' => 'scm-panel-herramienta-aseo',
       'scm-panel-herramienta-aseo' => 'scm-panel-herramienta-aseo',
+      'herramienta_duplicar_inventario' => 'scm-panel-herramienta-duplicar-inventario',
+      'scm-panel-herramienta-duplicar-inventario' => 'scm-panel-herramienta-duplicar-inventario',
       'herramienta_ingreso_neto' => 'scm-panel-herramienta-ingreso-neto',
       'simulador_ingreso_neto' => 'scm-panel-herramienta-ingreso-neto',
       'ingreso_neto' => 'scm-panel-herramienta-ingreso-neto',
@@ -453,6 +455,7 @@ trait RendersDashboard
       'scm-panel-herramienta-mora' => 'herramienta_mora',
       'scm-panel-herramienta-mercado' => 'herramienta_mercado',
       'scm-panel-herramienta-aseo' => 'herramienta_aseo',
+      'scm-panel-herramienta-duplicar-inventario' => 'herramienta_duplicar_inventario',
       'scm-panel-herramienta-ingreso-neto' => 'herramienta_ingreso_neto',
     ];
     if ($initialTab !== '') {
@@ -557,6 +560,8 @@ trait RendersDashboard
         'revision_entrega' => self::AJAX_DELIVERY_REVIEW,
         'inventario' => self::AJAX_INVENTORY,
         'inventory_draft' => self::AJAX_INVENTORY_DRAFT,
+        'inventory_voice' => self::AJAX_INVENTORY_VOICE,
+        'inventory_duplicate' => self::AJAX_INVENTORY_DUPLICATE,
         'delete_cotizacion' => self::AJAX_DELETE_COTIZACION,
         'approve_cotizacion' => self::AJAX_APPROVE_COTIZACION,
         'cotizacion_form_context' => self::AJAX_COTIZACION_FORM_CONTEXT,
@@ -1533,6 +1538,11 @@ trait RendersDashboard
           <?php echo (new \SCM\Modules\Tools\ToolsView())->cleaning($this->canSeeCleaningInternal(), (new \SCM\Modules\Tools\CleaningSettings($this->db))->read()); ?>
         </div>
         <?php endif; ?>
+        <?php if (in_array('herramienta_duplicar_inventario', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-herramienta-duplicar-inventario' ? ' active' : ''; ?>" id="scm-panel-herramienta-duplicar-inventario" data-permission-tab="herramienta_duplicar_inventario">
+          <?php echo (new \SCM\Modules\Tools\ToolsView())->duplicateInventory(); ?>
+        </div>
+        <?php endif; ?>
         <?php if (in_array('herramienta_ingreso_neto', $dashboardAllowedTabs, true)): ?>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-herramienta-ingreso-neto' ? ' active' : ''; ?>" id="scm-panel-herramienta-ingreso-neto" data-permission-tab="herramienta_ingreso_neto" data-scm-loaded="0">
           <?php echo \SCM\Modules\Tools\OwnerPreapprovalView::render(new \SCM\Modules\Tools\OwnerPreapprovalService($this->db)); ?>
@@ -2040,6 +2050,7 @@ trait RendersDashboard
         'herramienta_mora' => '',
         'herramienta_mercado' => '',
         'herramienta_aseo' => '',
+        'herramienta_duplicar_inventario' => '',
       ]],
       ['label' => 'Métricas', 'tabs' => [
         'metricas_casos' => '',

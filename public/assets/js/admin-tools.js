@@ -107,6 +107,8 @@
     if (market) initMarket(market, post, createToolModal(root, "Ficha del inmueble"));
     var cleaning = root.querySelector('[data-scm-tool="cleaning"]');
     if (cleaning) initCleaning(cleaning, request, post);
+    var duplicate = root.querySelector('[data-scm-tool="duplicate-inventory"]');
+    if (duplicate) initDuplicateInventory(duplicate, post);
     initCleaningSettings(root, post);
     initQuoteFeeSettings(root, post);
     // Si la página abrió directo en una herramienta, el runtime pudo pedir la carga antes de este script.
@@ -1832,6 +1834,47 @@
   }
 
   // ── Calculadora de aseo (antes plugin "Calculadora de Aseo Universal") ─────────────────────────
+  // Duplicar inventario: primero muestra qué se copia y hacia dónde; solo copia al confirmar.
+  function initDuplicateInventory(module, post) {
+    var form = module.querySelector("[data-duplicate-form]");
+    var status = module.querySelector("[data-duplicate-status]");
+    var preview = module.querySelector("[data-duplicate-preview]");
+    function say(text, error) {
+      status.textContent = text || "";
+      status.style.color = error ? "#b42318" : "";
+    }
+    function send(operation) {
+      var data = new FormData(form);
+      data.set("operation", operation);
+      return post("scm_inventario_duplicar", data);
+    }
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      say("Consultando…");
+      preview.innerHTML = "";
+      send("preview").then(function (result) {
+        say("");
+        preview.innerHTML = result.html + '<button type="button" class="scm-inv-tool" data-duplicate-confirm>Crear copia</button>';
+      }).catch(function (error) { say(error.message, true); });
+    });
+    form.addEventListener("input", function () { preview.innerHTML = ""; });
+    preview.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-duplicate-confirm]");
+      if (!button) return;
+      button.disabled = true;
+      say("Copiando…");
+      send("execute").then(function (result) {
+        preview.innerHTML = "";
+        form.reset();
+        say(result.message);
+      }).catch(function (error) {
+        button.disabled = false;
+        say(error.message, true);
+      });
+    });
+  }
+
   // El cálculo y los PDF se hacen en el servidor (CleaningCalculator / CleaningQuotePdf); los costos y
   // utilidades solo llegan con el permiso de vista interna.
   function initCleaning(module, request, post) {

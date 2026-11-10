@@ -37,6 +37,7 @@
     var ticket = helpers.caseBtn.dataset.ticketPk || "";
     var localKey = ["scm", "inventario", (document.querySelector("[data-scm-draft-user]") || { dataset: {} }).dataset.scmDraftUser || "", ticket, config.inventoryId || "nuevo"].join(":");
     var draft = { ready: false, blocked: false, revision: 0, last: "", timer: 0, saving: false, stopped: false };
+    var voice = { target: "", mode: "", text: "", rows: [], message: "", dictation: false, recorder: null, stream: null, recognition: null, timer: 0, heard: "" };
 
     function normalize() {
       state.data = state.data || {};
@@ -190,6 +191,144 @@
       return '<label class="scm-inv-field"><span>' + esc(label) + '</span><input data-boundary="' + esc(group) + ":" + index + ":" + side + '" value="' + esc(row[side] || "") + '"></label>';
     }
 
+    // Dictado ---------------------------------------------------------------
+    function voiceButton(target) {
+      if (!config.voice) return "";
+      return '<button type="button" class="scm-inv-tool scm-inv-voice-btn" data-voice-start="' + esc(target) + '"' + (voice.mode === "recording" || voice.mode === "processing" ? " disabled" : "") + ">🎤 Dictar</button>";
+    }
+    function voicePanel(target) {
+      if (voice.target !== target) return "";
+      if (voice.mode === "recording") {
+        return '<div class="scm-inv-voice is-recording" role="status"><span>Te escucho. Di cada elemento con su cantidad, material y estado.</span><button type="button" class="scm-acta-button" data-voice-stop>Terminar</button><button type="button" class="scm-acta-button scm-acta-secondary" data-voice-cancel>Cancelar</button></div>';
+      }
+      if (voice.mode === "processing") return '<div class="scm-inv-voice" role="status"><span>Organizando lo dictado…</span></div>';
+      if (voice.mode === "error") return '<div class="scm-inv-voice is-error" role="alert"><span>' + esc(voice.message) + '</span><button type="button" class="scm-acta-button scm-acta-secondary" data-voice-cancel>Cerrar</button></div>';
+      if (voice.mode !== "review") return "";
+      var furniture = target.indexOf("furniture:") === 0;
+      return '<div class="scm-inv-voice"><p><b>Se entendió:</b> ' + esc(voice.text) + "</p>" +
+        (voice.rows.length ? '<ul class="scm-inv-voice-rows">' + voice.rows.map(function (row, index) {
+          return '<li><label><input type="checkbox" data-voice-row="' + index + '" checked> <b>' + esc(row.d) + "</b> · " + esc(row.c || "-") + (furniture ? "" : " · " + esc(row.m || "sin material")) + " · " + esc(row.e) + " · " + esc(row.o) + "</label></li>";
+        }).join("") + "</ul>" : "<p>No se encontraron elementos en el dictado.</p>") +
+        '<div class="scm-inv-voice-actions">' + (voice.rows.length ? '<button type="button" class="scm-acta-button" data-voice-accept>Agregar seleccionadas</button>' : "") + '<button type="button" class="scm-acta-button scm-acta-secondary" data-voice-cancel>Descartar</button></div></div>';
+    }
+    function voiceSet(mode, message) {
+      voice.mode = mode;
+      voice.message = message || "";
+      render();
+    }
+    function voiceRelease() {
+      window.clearTimeout(voice.timer);
+      if (voice.stream) voice.stream.getTracks().forEach(function (track) { track.stop(); });
+      voice.stream = null;
+      voice.recorder = null;
+      voice.recognition = null;
+    }
+    function voiceClose() {
+      voiceRelease();
+      voice.target = "";
+      voice.mode = "";
+      voice.rows = [];
+    }
+    function voiceSend(fields) {
+      voiceSet("processing");
+      var data = new FormData();
+      data.set("action", (runtime.actions && runtime.actions.inventory_voice) || "scm_inventario_voz");
+      data.set("nonce", runtime.nonce || "");
+      data.set("case_ticket", ticket);
+      data.set("target", voice.target);
+      Object.keys(fields).forEach(function (key) { data.set(key, fields[key]); });
+      fetch(runtime.ajaxUrl || "api.php", { method: "POST", body: data, credentials: "same-origin", headers: { Accept: "application/json" } })
+        .then(function (response) { return response.json(); })
+        .then(function (json) {
+          if (!json || !json.success) throw new Error((json && json.data && json.data.message) || "No se pudo procesar el dictado.");
+          if (json.data.transcription_failed) {
+            voice.dictation = !!speechRecognitionClass();
+            voiceSet("error", json.data.message + (voice.dictation ? " Toca Dictar otra vez para usar el dictado del teléfono." : " Registra las filas a mano."));
+            return;
+          }
+          voice.text = json.data.text || "";
+          voice.rows = json.data.rows || [];
+          voiceSet("review");
+        })
+        .catch(function (error) { voiceSet("error", error.message); });
+    }
+    function speechRecognitionClass() {
+      return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    }
+    function startDictation() {
+      var Recognition = speechRecognitionClass();
+      var recognition = new Recognition();
+      recognition.lang = "es-CO";
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      voice.heard = "";
+      recognition.onresult = function (event) {
+        for (var i = event.resultIndex; i < event.results.length; i++) voice.heard += " " + event.results[i][0].transcript;
+      };
+      recognition.onerror = function () { voiceSet("error", "No se pudo usar el dictado. Revisa el permiso del micrófono."); };
+      recognition.onend = function () {
+        if (voice.mode !== "recording") return;
+        voice.recognition = null;
+        if (voice.heard.trim()) voiceSend({ text: voice.heard.trim() });
+        else voiceSet("error", "No se escuchó nada. Intenta otra vez.");
+      };
+      voice.recognition = recognition;
+      recognition.start();
+      voiceSet("recording");
+    }
+    function startRecording() {
+      if (!navigator.mediaDevices || !window.MediaRecorder) {
+        if (speechRecognitionClass()) { startDictation(); return; }
+        voiceSet("error", "Este navegador no permite grabar audio. Registra las filas a mano.");
+        return;
+      }
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+        var chunks = [];
+        var recorder = new MediaRecorder(stream);
+        voice.stream = stream;
+        voice.recorder = recorder;
+        recorder.ondataavailable = function (event) { if (event.data && event.data.size) chunks.push(event.data); };
+        recorder.onstop = function () {
+          if (voice.mode !== "recording") return;
+          var blob = new Blob(chunks, { type: recorder.mimeType });
+          voiceRelease();
+          voiceSet("processing");
+          toWav(blob).then(function (wav) { voiceSend({ audio: new File([wav], "dictado.wav", { type: "audio/wav" }) }); })
+            .catch(function () { voiceSet("error", "No se pudo preparar el audio. Intenta otra vez."); });
+        };
+        recorder.start();
+        voice.timer = window.setTimeout(function () { if (recorder.state === "recording") recorder.stop(); }, 120000);
+        voiceSet("recording");
+      }).catch(function () { voiceSet("error", "No se pudo usar el micrófono. Revisa el permiso del navegador."); });
+    }
+    // MiniMax no acepta el webm que graban los navegadores: se envía WAV mono de 16 kHz.
+    function toWav(blob) {
+      var Context = window.AudioContext || window.webkitAudioContext;
+      return blob.arrayBuffer().then(function (buffer) {
+        var context = new Context();
+        return context.decodeAudioData(buffer).then(function (decoded) { context.close(); return decoded; });
+      }).then(function (decoded) {
+        var offline = new OfflineAudioContext(1, Math.max(1, Math.ceil(decoded.duration * 16000)), 16000);
+        var source = offline.createBufferSource();
+        source.buffer = decoded;
+        source.connect(offline.destination);
+        source.start();
+        return offline.startRendering();
+      }).then(function (rendered) {
+        var samples = rendered.getChannelData(0);
+        var view = new DataView(new ArrayBuffer(44 + samples.length * 2));
+        function text(offset, value) { for (var i = 0; i < value.length; i++) view.setUint8(offset + i, value.charCodeAt(i)); }
+        text(0, "RIFF"); view.setUint32(4, 36 + samples.length * 2, true); text(8, "WAVE"); text(12, "fmt ");
+        view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, 16000, true);
+        view.setUint32(28, 32000, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); text(36, "data"); view.setUint32(40, samples.length * 2, true);
+        for (var i = 0; i < samples.length; i++) {
+          var value = Math.max(-1, Math.min(1, samples[i]));
+          view.setInt16(44 + i * 2, value < 0 ? value * 32768 : value * 32767, true);
+        }
+        return view.buffer;
+      });
+    }
+
     function rowHtml(kind, key, row, index, material, section) {
       var suggestion = section ? suggestionsFor(section) : null;
       var materials = suggestion && suggestion.materials[row.d] ? suggestion.materials[row.d] : [];
@@ -223,6 +362,7 @@
       }
       html += '<div class="scm-inv-tools">' +
         '<button type="button" class="scm-inv-tool" data-row-add>+ Fila</button>' +
+        voiceButton("sections:" + section.key) +
         (entry.rows.length ? '<button type="button" class="scm-inv-tool" data-all-good>Todo en Bueno</button>' : "") +
         (others.length ? '<label class="scm-inv-copy"><span>Copiar de</span><select data-copy-from><option value=""></option>' + others.map(function (s) { return '<option value="' + esc(s.key) + '">' + esc(sectionLabel(s)) + "</option>"; }).join("") + "</select></label>" : "") +
         "</div>";
@@ -230,6 +370,7 @@
         html += '<div class="scm-inv-chips"><span>Agregar:</span>' + pending.slice(0, 40).map(function (n) { return '<button type="button" data-add-item="' + esc(n) + '">' + esc(n) + "</button>"; }).join("") +
           '<button type="button" class="is-all" data-add-all>Agregar todos</button></div>';
       }
+      html += voicePanel("sections:" + section.key);
       html += '<datalist id="scm-inv-desc-' + esc(section.key) + '">' + suggestion.names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join("") + "</datalist>";
       if (entry.rows.length) {
         html += '<div class="scm-inv-head"><span>Elemento</span><span>Cant.</span><span>Material</span><span>Estado</span><span>Observaciones</span><span></span></div>';
@@ -244,9 +385,9 @@
       var html = '<p class="scm-inv-hint">Registra los muebles y enseres en el lugar donde están. Solo se guardan las secciones con filas.</p>';
       visibleSections().forEach(function (section) {
         var rows = state.furniture[section.key];
-        html += '<details class="scm-inv-card scm-inv-furniture"' + (rows.length ? " open" : "") + '><summary>' + esc(sectionLabel(section)) + ' <small>' + rows.length + "</small></summary>" +
+        html += '<details class="scm-inv-card scm-inv-furniture"' + (rows.length || voice.target === "furniture:" + section.key ? " open" : "") + '><summary>' + esc(sectionLabel(section)) + ' <small>' + rows.length + "</small></summary>" +
           rowsBlock("furniture", section.key, rows, false, null) +
-          '<button type="button" class="scm-inv-tool" data-furniture-add="' + esc(section.key) + '">+ Mueble o enser</button></details>';
+          '<button type="button" class="scm-inv-tool" data-furniture-add="' + esc(section.key) + '">+ Mueble o enser</button>' + voiceButton("furniture:" + section.key) + voicePanel("furniture:" + section.key) + "</details>";
       });
       return html;
     }
@@ -317,6 +458,7 @@
     }
 
     function go(id) {
+      if (voice.mode !== "recording") voiceClose();
       paneId = id;
       render();
       var top = root.querySelector("[data-pane-nav]");
@@ -607,6 +749,40 @@
       if (button.dataset.boundaryRemove) {
         var bp = button.dataset.boundaryRemove.split(":");
         state.boundaries[bp[0]].splice(Number(bp[1]), 1);
+        render();
+        changed();
+        return;
+      }
+      if (button.dataset.voiceStart) {
+        voice.target = button.dataset.voiceStart;
+        voice.rows = [];
+        if (voice.dictation && speechRecognitionClass()) startDictation();
+        else startRecording();
+        return;
+      }
+      if (button.hasAttribute("data-voice-stop")) {
+        if (voice.recognition) voice.recognition.stop();
+        else if (voice.recorder && voice.recorder.state === "recording") voice.recorder.stop();
+        return;
+      }
+      if (button.hasAttribute("data-voice-cancel")) {
+        var pending = voice.recognition;
+        voice.mode = "";
+        if (pending) pending.abort();
+        else if (voice.recorder && voice.recorder.state === "recording") voice.recorder.stop();
+        voiceClose();
+        render();
+        return;
+      }
+      if (button.hasAttribute("data-voice-accept")) {
+        var picked = voice.rows.filter(function (row, position) {
+          var box = root.querySelector('[data-voice-row="' + position + '"]');
+          return box && box.checked;
+        });
+        var targetParts = voice.target.split(":");
+        var targetRows = targetParts[0] === "sections" ? state.sections[targetParts[1]].rows : state.furniture[targetParts[1]];
+        picked.forEach(function (row) { targetRows.push(row); });
+        voiceClose();
         render();
         changed();
         return;

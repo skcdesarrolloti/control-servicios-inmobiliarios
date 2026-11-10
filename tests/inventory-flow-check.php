@@ -15,6 +15,7 @@ use SCM\Modules\Inventory\InventorySuggestions;
 use SCM\Modules\Inventory\InventoryDraftStore;
 
 $assert = static function (bool $ok, string $message): void { if (!$ok) throw new RuntimeException($message); };
+final class JsonDone extends RuntimeException { public function __construct(public array $data) { parent::__construct('json'); } }
 
 // Tarifa -------------------------------------------------------------------
 $config = ['salario' => '1750905', 'dias_trabajo' => '30', 'porcentaje_smlmv_entre_rec' => '1.31', 'valor_transporte' => '4000'];
@@ -72,6 +73,12 @@ $app = new class($db, $inspector) {
   private function preventiveReviewBranch(array $t, array $c): array { return ['nombre_contractual' => 'Coordinadora']; }
   private function deliveryReviewSetPostMeta(int $id, string $key, $value): void { $this->meta[$id][$key] = $value; }
   private function format_cop_currency($v): string { return '$' . number_format((float) $v, 0, ',', '.'); }
+  private function verifyCsrf(): void {}
+  private function canAccessDashboardTab(string $tab): bool { return true; }
+  private function jsonOk(array $data): never { throw new JsonDone($data); }
+  private function jsonFail(string $message): never { throw new DomainException($message); }
+  public static function inventoryPublicUrl(int $id): string { return 'inventario.php?numero=' . $id; }
+  public function duplicate(): array { try { $this->ajax_handler_inventory_duplicate(); } catch (JsonDone $done) { return $done->data; } throw new RuntimeException('Sin respuesta.'); }
   public function create(int $ticket): array { return $this->inventoryCreate($ticket); }
   public function update(int $ticket, int $id): array { return $this->inventoryUpdate($ticket, $id); }
   public function remove(int $ticket, int $id): array { return $this->inventoryDelete($ticket, $id); }
@@ -195,6 +202,47 @@ $assert($store->get('u', 1, 0)['payload'] === ['otro' => 2], 'Lectura del borrad
 $assert($store->get('otro', 1, 0) === null, 'Cada funcionario ve solo lo suyo.');
 $store->delete('u', 1, 0);
 $assert($store->get('u', 1, 0) === null, 'Borrado.');
+
+// Duplicador: vista previa sin escribir, copia y contrato destino.
+$db->insert('wp_jet_cct_contratos_arrendamiento', ['contrato' => '901', 'inmueble' => '500', 'id_inmueble' => '600', 'arrendatario' => 'Nuevo Arrendatario', 'documento_arrendatario' => '123', 'direccion' => 'Destino', 'servicios_publicos' => serialize(['Agua'])]);
+$db->insert('wp_jet_cct_tickets', ['id_contrato' => '2', 'estado_administrativo' => 'Nuevo']);
+$dupApp = new class($db, $inspector) {
+  use \SCM\App\Concerns\HandlesInventoryActions;
+  public function __construct(public \SCM\Core\Database $db, private \SCM\Support\SchemaInspector $inspector) {}
+  private function inventorySchema(): \SCM\Support\SchemaInspector { return $this->inspector; }
+  private function correctiveReviewTicket(int $id): array { return $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=?', [$id]) ?? []; }
+  private function correctiveReviewContract(array $t): array { return $this->db->getRow('SELECT * FROM wp_jet_cct_contratos_arrendamiento WHERE _ID=?', [(int) $t['id_contrato']]) ?? []; }
+  private function correctiveReviewProperty(array $t, array $c): array { return []; }
+  private function correctiveReviewFirstText(array $v): string { foreach ($v as $x) { if (trim((string) $x) !== '') return trim((string) $x); } return ''; }
+  private function correctiveReviewDigits($v): string { return preg_replace('/\D/', '', (string) $v) ?? ''; }
+  private function ticketCompletionActor(): array { return ['name' => 'Funcionario', 'email' => 'f@example.invalid', 'phone' => '300', 'employee_id' => '89']; }
+  private function verifyCsrf(): void {}
+  private function canAccessDashboardTab(string $tab): bool { return true; }
+  private function jsonOk(array $data): never { throw new JsonDone($data); }
+  private function jsonFail(string $message): never { throw new DomainException($message); }
+  public static function inventoryPublicUrl(int $id): string { return 'inventario.php?numero=' . $id; }
+  public function duplicate(): array { try { $this->ajax_handler_inventory_duplicate(); } catch (JsonDone $done) { return $done->data; } throw new RuntimeException('Sin respuesta.'); }
+};
+$before = (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_inventario');
+$_POST = ['inventario_id' => '4', 'ticket_pk' => '2', 'operation' => 'preview'];
+$preview = $dupApp->duplicate();
+$assert(str_contains($preview['html'], 'Nuevo Arrendatario') && str_contains($preview['html'], 'principal') && (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_inventario') === $before, 'La vista previa no escribe.');
+$_POST['operation'] = 'execute';
+$copied = $dupApp->duplicate();
+$new = $inv((int) $copied['id']);
+$assert($new['arrendatario'] === 'Nuevo Arrendatario' && $new['cedula_arrendatario'] === '123' && $new['direccion'] === 'Destino' && $new['id_contrato'] === '2' && $new['id_ticket'] === '2' && $new['tipo_inventario'] === 'Nuevo' && $new['se_envio'] === 'Si', 'Datos del contrato destino.');
+$assert($new['sala'] === $inv(4)['sala'] && $new['cct_author_id'] === '89' && ($new['id_reporte_administrativo'] ?? '') === '', 'Copia los elementos, con el autor real y sin reporte.');
+$targetTicket = $db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=2');
+$assert($targetTicket['id_inventario'] === (string) $copied['id'] && $targetTicket['estado_administrativo'] === 'En ejecucion', 'Vincula el caso con el estado vigente.');
+$second = $dupApp->duplicate();
+$assert(str_contains($second['message'], 'adicional') && $db->getRow('SELECT id_inventario FROM wp_jet_cct_contratos_arrendamiento WHERE _ID=2')['id_inventario'] === (string) $copied['id'], 'Una segunda copia no reemplaza al principal.');
+
+// Dictado: lo que devuelve la IA se limpia y se ajusta al catálogo.
+$voiceRows = \SCM\Modules\Inventory\InventoryVoiceAssistant::parseRows("<think>pensando [1]</think>```json\n[{\"d\":\"griferia\",\"c\":2,\"m\":\"Cromo\",\"e\":\"REGULAR\",\"o\":\"\"},{\"d\":\"\"},{\"d\":\"<b>Mesón</b>\",\"e\":\"Excelente\",\"o\":\"Rayón\"}]\n```", ['Griferia', 'Puerta'], false);
+$assert(count($voiceRows) === 2 && $voiceRows[0] === ['d' => 'Griferia', 'c' => '2', 'm' => 'Cromo', 'e' => 'Regular', 'o' => 'Ninguna'], 'Normaliza la fila: ' . json_encode($voiceRows, JSON_UNESCAPED_UNICODE));
+$assert($voiceRows[1]['d'] === 'Mesón' && $voiceRows[1]['e'] === 'Bueno' && $voiceRows[1]['o'] === 'Rayón', 'Limpia etiquetas y estados desconocidos.');
+$assert(\SCM\Modules\Inventory\InventoryVoiceAssistant::parseRows('[{"d":"Sofá","m":"Cuero"}]', [], true)[0]['m'] === '', 'Muebles sin material.');
+try { \SCM\Modules\Inventory\InventoryVoiceAssistant::parseRows('no es json', [], false); $assert(false, 'Debe rechazar texto sin filas.'); } catch (DomainException) {}
 
 // Listado de Proceso de entrega.
 $list = new class($db) {

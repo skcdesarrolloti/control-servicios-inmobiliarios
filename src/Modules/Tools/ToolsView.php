@@ -320,6 +320,18 @@ final class ToolsView
       . '</form>';
   }
 
+  public function duplicateInventory(): string
+  {
+    $ui = \SCM\Modules\Pending\PublicServicesUi::class;
+    return '<div class="!sp-font-sans !sp-text-service-navy !sp-bg-service-background !sp-p-3 sm:!sp-p-5 !sp-space-y-5" data-scm-tool="duplicate-inventory">'
+      . $this->header('content_copy', 'Duplicar inventario', 'Copia los elementos de un inventario hacia el contrato de otro caso de entrega.')
+      . '<section class="' . $ui::CARD . ' !sp-p-5 !sp-space-y-4"><form class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-3 !sp-gap-4 !sp-items-end" data-duplicate-form novalidate>'
+      . $this->field('Inventario origen (número)', '<input class="' . $ui::INPUT . '" type="number" min="1" name="inventario_id" required>')
+      . $this->field('Caso destino (número interno)', '<input class="' . $ui::INPUT . '" type="number" min="1" name="ticket_pk" required>')
+      . '<button type="submit" class="' . $ui::NAVY . '">Previsualizar</button></form>'
+      . '<p class="!sp-m-0 !sp-text-xs" data-duplicate-status role="status"></p><div data-duplicate-preview></div></section></div>';
+  }
+
   private function header(string $icon, string $title, string $subtitle, string $aside = ''): string
   {
     return '<header class="' . UI::CARD . ' !sp-p-5 !sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-4">'

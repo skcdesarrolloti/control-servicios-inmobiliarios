@@ -142,6 +142,8 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_INVENTORY => 'ajax_handler_inventory',
       SuCasaControlServiciosInmobiliarios::AJAX_INVENTORY_DRAFT => 'ajax_handler_inventory_draft',
       SuCasaControlServiciosInmobiliarios::AJAX_DELIVERY_PROCESS_LIST => 'ajax_handler_delivery_process_list',
+      SuCasaControlServiciosInmobiliarios::AJAX_INVENTORY_DUPLICATE => 'ajax_handler_inventory_duplicate',
+      SuCasaControlServiciosInmobiliarios::AJAX_INVENTORY_VOICE => 'ajax_handler_inventory_voice',
       SuCasaControlServiciosInmobiliarios::AJAX_CONTACTS_UPDATE => 'ajax_handler_contacts_update',
       SuCasaControlServiciosInmobiliarios::AJAX_PREVENTIVAS_PENDIENTES => 'ajax_handler_preventivas_pendientes',
       SuCasaControlServiciosInmobiliarios::AJAX_SERVICIOS_PUBLICOS_PENDIENTES => 'ajax_handler_servicios_publicos_pendientes',

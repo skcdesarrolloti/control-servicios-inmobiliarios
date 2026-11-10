@@ -54,6 +54,19 @@
 .scm-inv-footer { position: sticky; bottom: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; padding: 10px 2px; background: #fff; border-top: 1px solid #e2e8f0; }
 .scm-inv-saved { margin-right: auto; color: #64748b; font-size: 12px; }
 
+.scm-inv-voice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; padding: 10px; border: 1px solid #bfdbfe; border-radius: 8px; background: #eff6ff; color: #1e3a8a; font-size: 13px; }
+.scm-inv-voice > span, .scm-inv-voice > p { flex: 1 1 240px; margin: 0; }
+.scm-inv-voice.is-recording { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
+.scm-inv-voice.is-error { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
+.scm-inv-voice-rows { flex: 1 1 100%; margin: 0; padding: 0; list-style: none; }
+.scm-inv-voice-rows li { padding: 3px 0; }
+.scm-inv-voice-actions { display: flex; gap: 8px; }
+.scm-inv-dup { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 10px; font-size: 13px; }
+.scm-inv-dup h4 { margin: 0 0 6px; }
+.scm-inv-dup ul { margin: 0; padding: 0; list-style: none; }
+.scm-inv-dup li { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px solid #f1f5f9; }
+.scm-inv-dup strong { text-align: right; overflow-wrap: anywhere; }
+
 @media (max-width: 760px) {
   .scm-inv-head { display: none; }
   .scm-inv-row, .scm-inv-furniture .scm-inv-row { grid-template-columns: 1fr 72px; padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; }

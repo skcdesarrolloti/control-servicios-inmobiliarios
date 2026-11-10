@@ -72,6 +72,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_INVENTORY = 'scm_inventario';
   const AJAX_INVENTORY_DRAFT = 'scm_inventario_borrador';
   const AJAX_DELIVERY_PROCESS_LIST = 'scm_proceso_entrega_listar';
+  const AJAX_INVENTORY_DUPLICATE = 'scm_inventario_duplicar';
+  const AJAX_INVENTORY_VOICE = 'scm_inventario_voz';
   const AJAX_CONTACTS_UPDATE = 'scm_actualizar_contactos';
   const AJAX_ENTREGA         = 'scm_entrega';
   const AJAX_PREVENTIVA      = 'scm_preventiva';
@@ -404,6 +406,7 @@ final class SuCasaControlServiciosInmobiliarios
       'herramienta_mora' => 'Calculadora de mora',
       'herramienta_mercado' => 'Calculadora de mercado',
       'herramienta_aseo' => 'Calculadora de aseo',
+      'herramienta_duplicar_inventario' => 'Duplicar inventario',
       'herramienta_ingreso_neto' => 'Simulador de ingreso neto del propietario',
     ];
   }
