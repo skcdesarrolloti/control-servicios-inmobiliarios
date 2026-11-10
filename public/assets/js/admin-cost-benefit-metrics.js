@@ -1,10 +1,12 @@
 (function () {
   "use strict";
 
-  // Métricas › Mantenimiento › Costo-beneficio: todas las filas llegan en una sola petición y los
-  // periodos, indicadores, detalle y CSV se calculan en el navegador.
-  // - Ingreso: administración de las cotizaciones aprobadas, por fecha de respuesta.
-  // - Gasto: servicio y transporte de los reportes administrativos, por fecha del reporte.
+  // Métricas › Mantenimiento: Costo entrega y recibo, Costo-beneficio mantenimiento y área contractual.
+  // Cada vista (data-scope) trae todas sus filas en una sola petición y los periodos, indicadores,
+  // detalle y CSV se calculan en el navegador.
+  // - Ingreso: administración de las cotizaciones aprobadas por fecha de respuesta o, en entrega y recibo,
+  //   comisión de cada mes vigente y derechos del mes de entrega de los contratos.
+  // - Gasto: servicio y transporte de los reportes administrativos de la vista, por fecha del reporte.
   // Periodo: mes actual, un mes, un año o acumulado de un mes a otro; siempre es un rango de meses (YYYY-MM).
   var MONTHS_LONG = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   var MONTHS_SHORT = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -60,8 +62,12 @@
   function ratio(income, expense) { return expense > 0 ? income / expense : null; }
   function ratioText(value) { return value === null ? "—" : ratioFormat.format(value); }
   function summarize(income, expense) {
-    var out = { income: 0, quotes: income.length, expense: 0, reports: expense.length, service: 0, transport: 0, pagado: 0, en_cobro: 0, sin_cobrar: 0 };
-    income.forEach(function (row) { out.income += row.admin || 0; });
+    var out = { income: 0, commission: 0, rights: 0, quotes: income.length, expense: 0, reports: expense.length, service: 0, transport: 0, pagado: 0, en_cobro: 0, sin_cobrar: 0 };
+    income.forEach(function (row) {
+      out.income += row.admin || 0;
+      out.commission += row.comision || 0;
+      out.rights += row.derechos || 0;
+    });
     expense.forEach(function (row) {
       out.expense += row.total || 0;
       out.service += row.servicio || 0;
@@ -93,9 +99,13 @@
   }
 
   function init(root) {
-    var module = root.querySelector("[data-scm-cost-benefit]");
     var core = window.SCMAdminCore;
-    if (!module || !core || module.dataset.cbInit === "1") return;
+    if (!core) return;
+    root.querySelectorAll("[data-scm-cost-benefit]").forEach(function (module) { initModule(root, module, core); });
+  }
+
+  function initModule(root, module, core) {
+    if (module.dataset.cbInit === "1") return;
     var runtime = core.parseRuntime(root);
     if (!runtime) return;
     module.dataset.cbInit = "1";
@@ -129,6 +139,7 @@
       var body = new FormData();
       body.append("action", action);
       body.append("nonce", runtime.nonce || "");
+      body.append("scope", module.getAttribute("data-scope") || "");
       return fetch(runtime.ajaxUrl || "", { method: "POST", body: body, credentials: "same-origin" })
         .then(function (response) {
           return response.json().catch(function () { throw new Error("El servidor devolvió una respuesta no válida."); });
@@ -156,18 +167,20 @@
 
     function apply(snapshot) {
       var income = rowsToObjects(snapshot.income_columns || [], snapshot.income, ["id", "ticket", "contrato", "inmueble"]);
+      var contracts = snapshot.income_source === "contratos" ? rowsToObjects(snapshot.contract_columns || [], snapshot.contracts, ["id", "contrato", "inmueble"]) : null;
       var expense = rowsToObjects(snapshot.expense_columns || [], snapshot.expense, ["id", "ticket", "inmueble", "funcionario", "categoria"]);
       var years = {};
       var types = {};
       years[currentMonth.slice(0, 4)] = true;
       income.forEach(function (row) { years[row.fecha.slice(0, 4)] = true; });
+      (contracts || []).forEach(function (row) { years[row.ingreso.slice(0, 4)] = true; });
       expense.forEach(function (row) {
         years[row.fecha.slice(0, 4)] = true;
         types[row.categoria] = true;
       });
       state.data = {
-        income: income, expense: expense, undated: snapshot.undated || {}, employees: snapshot.employees || [], excluded: snapshot.excluded || {},
-        employeesNotFound: snapshot.employees_not_found || [], generatedAt: snapshot.generated_at || 0,
+        income: income, contracts: contracts, contractsWithoutRate: snapshot.contracts_without_rate || 0, expense: expense, undated: snapshot.undated || {},
+        expenseNote: snapshot.expense_note || "", excluded: snapshot.excluded || {}, employeesNotFound: snapshot.employees_not_found || [], generatedAt: snapshot.generated_at || 0,
       };
       var currentYear = yearSelect.value;
       yearSelect.innerHTML = Object.keys(years).sort().reverse().map(function (year) {
@@ -183,6 +196,26 @@
       setStatus("");
       if (panel) panel.setAttribute("data-scm-loaded", "1");
       render();
+    }
+
+    // Comisión de cada mes vigente del periodo y derechos si el contrato se entregó dentro del periodo.
+    function contractIncome(p) {
+      var months = monthRange(p.from, p.to).filter(function (ym) { return ym <= currentMonth; });
+      var out = [];
+      state.data.contracts.forEach(function (contract) {
+        var start = contract.ingreso.slice(0, 7);
+        var end = contract.egreso ? contract.egreso.slice(0, 7) : currentMonth;
+        var active = months.filter(function (ym) { return ym >= start && ym <= end; }).length;
+        var commission = Math.round(active * contract.canon * contract.tasa / 100);
+        var rights = inPeriod(contract.ingreso, p) && start <= currentMonth ? Math.round(contract.canon * contract.derechos / 100) : 0;
+        if (!commission && !rights) return;
+        out.push({ id: contract.id, contrato: contract.contrato, inmueble: contract.inmueble, fecha: contract.ingreso, canon: contract.canon, meses: active, comision: commission, derechos: rights, admin: commission + rights, blob: contract.blob });
+      });
+      return out;
+    }
+
+    function incomeFor(p) {
+      return state.data.contracts ? contractIncome(p) : state.data.income.filter(function (row) { return inPeriod(row.fecha, p); });
     }
 
     function expenseRows() {
@@ -235,14 +268,16 @@
         ? "Datos de las " + new Date(state.data.generatedAt * 1000).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
         : "";
       var expenses = expenseRows();
-      var income = state.data.income.filter(function (row) { return inPeriod(row.fecha, p); });
+      var income = incomeFor(p);
       var expense = expenses.filter(function (row) { return inPeriod(row.fecha, p); });
       var s = summarize(income, expense);
       state.lists = { ingresos: income, gastos: expense };
 
       var html = '<h3 class="scm-qm-section">Resultado de ' + esc(p.label) + "</h3>";
       html += '<div class="scm-cm-kpis">';
-      html += kpi("Ingresos", money(s.income), "Administración ganada · " + num(s.quotes) + (s.quotes === 1 ? " cotización aprobada" : " cotizaciones aprobadas"), "ocup");
+      html += kpi("Ingresos", money(s.income), state.data.contracts
+        ? "Comisión " + money(s.commission) + " + derechos " + money(s.rights) + " · " + num(s.quotes) + (s.quotes === 1 ? " contrato" : " contratos")
+        : "Administración ganada · " + num(s.quotes) + (s.quotes === 1 ? " cotización aprobada" : " cotizaciones aprobadas"), "ocup");
       html += kpi("Gastos", money(s.expense), (type ? "Solo " + type + " · " : "Pagos a funcionarios · ") + num(s.reports) + (s.reports === 1 ? " reporte" : " reportes"), "desoc");
       html += kpi("Beneficio neto", money(s.net), "Ingresos menos gastos", s.net < 0 ? "bad" : "good");
       html += kpi("Relación beneficio/costo", ratioText(s.ratio), s.ratio === null ? "No hay gastos en el periodo" : "Por cada $1 de gasto ingresan $" + ratioText(s.ratio), s.ratio === null ? "" : s.ratio < 1 ? "bad" : "good");
@@ -261,7 +296,7 @@
       state.monthly = p.months.map(function (ym) {
         var range = { from: ym, to: ym };
         var monthly = summarize(
-          state.data.income.filter(function (row) { return inPeriod(row.fecha, range); }),
+          incomeFor(range),
           expenses.filter(function (row) { return inPeriod(row.fecha, range); })
         );
         monthly.month = ym;
@@ -294,16 +329,18 @@
 
     function employeesNote() {
       var excluded = state.data.excluded;
-      var note = "Gastos de " + state.data.employees.join(" y ") + ".";
-      if (excluded.count) note += " En todo el historial no se cuentan " + num(excluded.count) + (excluded.count === 1 ? " reporte" : " reportes") + " de otros funcionarios (" + money(excluded.value) + ").";
+      var note = state.data.expenseNote;
+      if (excluded.count) note += " En todo el historial no se cuentan " + num(excluded.count) + (excluded.count === 1 ? " reporte" : " reportes") + " que no corresponden a esta vista (" + money(excluded.value) + ").";
       if (state.data.employeesNotFound.length) note += " No se encontraron reportes de " + state.data.employeesNotFound.join(" ni de ") + ".";
+      if (state.data.contractsWithoutRate) note += " " + num(state.data.contractsWithoutRate) + (state.data.contractsWithoutRate === 1 ? " contrato no tiene" : " contratos no tienen") + " % de administración ni de derechos y no suman ingreso.";
       return '<p class="scm-cb-note">' + esc(note) + "</p>";
     }
 
     function undatedNote() {
       var undated = state.data.undated;
       var parts = [];
-      if (undated.income_count) parts.push(num(undated.income_count) + (undated.income_count === 1 ? " cotización aprobada" : " cotizaciones aprobadas") + " sin fecha de respuesta (" + money(undated.income_value) + ")");
+      if (undated.income_count && state.data.contracts) parts.push(num(undated.income_count) + (undated.income_count === 1 ? " contrato" : " contratos") + " sin fecha de entrega");
+      if (undated.income_count && !state.data.contracts) parts.push(num(undated.income_count) + (undated.income_count === 1 ? " cotización aprobada" : " cotizaciones aprobadas") + " sin fecha de respuesta (" + money(undated.income_value) + ")");
       if (undated.expense_count) parts.push(num(undated.expense_count) + (undated.expense_count === 1 ? " reporte" : " reportes") + " sin fecha (" + money(undated.expense_value) + ")");
       return parts.length ? '<p class="scm-cb-note">No entran en ningún periodo: ' + esc(parts.join(" y ")) + ".</p>" : "";
     }
@@ -331,6 +368,8 @@
       }).join("") + "</div></div>";
     }
 
+    function incomeUnit() { return state.data.contracts ? "Contratos" : "Cotizaciones"; }
+
     function cash(value, cls) {
       return '<td class="is-num' + (cls || "") + '">' + (value ? money(value) : '<span class="scm-cm-muted">—</span>') + "</td>";
     }
@@ -347,7 +386,7 @@
           count(m.quotes) + cash(m.income) + count(m.reports) + cash(m.expense) + cash(m.net, m.net < 0 ? " is-bad" : " is-total") +
           '<td class="is-num">' + ratioText(m.ratio) + "</td></tr>";
       }).join("");
-      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-qm-monthly"><thead><tr><th>Mes</th><th class="is-num">Cotizaciones</th><th class="is-num">Ingresos</th>' +
+      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-qm-monthly"><thead><tr><th>Mes</th><th class="is-num">' + incomeUnit() + '</th><th class="is-num">Ingresos</th>' +
         '<th class="is-num">Reportes</th><th class="is-num">Gastos</th><th class="is-num">Beneficio neto</th><th class="is-num">Relación B/C</th></tr></thead><tbody>' + body +
         '</tbody><tfoot><tr><td>Total</td><td class="is-num">' + num(total.quotes) + '</td><td class="is-num">' + money(total.income) + '</td><td class="is-num">' + num(total.reports) +
         '</td><td class="is-num">' + money(total.expense) + '</td><td class="is-num' + (total.net < 0 ? " is-bad" : " is-total") + '">' + money(total.net) +
@@ -388,7 +427,7 @@
       var pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
       state.page = Math.min(Math.max(1, state.page), pages);
       var slice = rows.slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE);
-      var html = state.view === "ingresos" ? incomeDetail(slice, rows) : expenseDetail(slice, rows);
+      var html = state.view === "gastos" ? expenseDetail(slice, rows) : state.data.contracts ? contractDetail(slice, rows) : incomeDetail(slice, rows);
       html += '<div class="scm-cm-pager"><span>' + esc(num(rows.length) + (rows.length === 1 ? " registro" : " registros")) + "</span>";
       if (pages > 1) {
         html += '<div><button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-cb-page="' + (state.page - 1) + '"' + (state.page === 1 ? " disabled" : "") +
@@ -400,6 +439,15 @@
 
     function caseCell(ticket) {
       return "<td>" + (ticket ? "#" + esc(ticket) : '<span class="scm-cm-muted">—</span>') + "</td>";
+    }
+
+    function contractDetail(slice, rows) {
+      var sum = rows.reduce(function (out, row) { out.commission += row.comision; out.rights += row.derechos; out.total += row.admin; return out; }, { commission: 0, rights: 0, total: 0 });
+      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr><th>Contrato</th><th>Entrega</th><th>Inmueble</th>' +
+        '<th class="is-num">Canon</th><th class="is-num">Meses</th><th class="is-num">Comisión</th><th class="is-num">Derechos</th><th class="is-num">Total</th></tr></thead><tbody>' + slice.map(function (row) {
+          return "<tr><td><strong>" + esc(row.contrato || "#" + row.id) + "</strong></td><td>" + esc(formatDay(row.fecha)) + "</td><td>" + esc(row.inmueble || "—") + "</td>" +
+            cash(row.canon) + count(row.meses) + cash(row.comision) + cash(row.derechos) + cash(row.admin, " is-total") + "</tr>";
+        }).join("") + '</tbody><tfoot><tr><td colspan="5">Total</td><td class="is-num">' + esc(money(sum.commission)) + '</td><td class="is-num">' + esc(money(sum.rights)) + '</td><td class="is-num is-total">' + esc(money(sum.total)) + "</td></tr></tfoot></table></div>";
     }
 
     function incomeDetail(slice, rows) {
@@ -424,7 +472,7 @@
     }
 
     function exportCsv() {
-      var lines = [["Mes", "Cotizaciones aprobadas", "Ingresos", "Reportes", "Gastos", "Beneficio neto", "Relacion beneficio/costo"]];
+      var lines = [["Mes", state.data.contracts ? "Contratos" : "Cotizaciones aprobadas", "Ingresos", "Reportes", "Gastos", "Beneficio neto", "Relacion beneficio/costo"]];
       state.monthly.forEach(function (m) {
         lines.push([m.name, m.quotes, m.income, m.reports, m.expense, m.net, m.ratio === null ? "" : m.ratio.toFixed(2).replace(".", ",")]);
       });
@@ -436,7 +484,7 @@
       }).join("\r\n");
       var link = document.createElement("a");
       link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-      link.download = "costo-beneficio-mantenimiento-" + String(state.periodTitle || "").replace(/[^0-9a-z]+/gi, "-").toLowerCase() + ".csv";
+      link.download = "costo-" + module.getAttribute("data-scope") + "-" + String(state.periodTitle || "").replace(/[^0-9a-z]+/gi, "-").toLowerCase() + ".csv";
       document.body.appendChild(link);
       link.click();
       setTimeout(function () { URL.revokeObjectURL(link.href); link.remove(); }, 0);

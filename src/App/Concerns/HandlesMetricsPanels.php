@@ -131,11 +131,13 @@ trait HandlesMetricsPanels
   public function ajax_handler_maintenance_cost_benefit(): void
   {
     $this->verifyCsrf();
-    if (!$this->canAccessDashboardTab('metricas_costo_beneficio')) {
+    $scope = sanitize_key((string) ($_POST['scope'] ?? ''));
+    $config = \SCM\Modules\Metrics\MaintenanceCostBenefitReport::SCOPES[$scope] ?? null;
+    if ($config === null || !$this->canAccessDashboardTab($config['tab'])) {
       $this->jsonFail('No tienes permiso para ver métricas.');
     }
     try {
-      $this->jsonOk((new \SCM\Modules\Metrics\MaintenanceCostBenefitReport($this->db))->snapshot());
+      $this->jsonOk((new \SCM\Modules\Metrics\MaintenanceCostBenefitReport($this->db))->snapshot($scope));
     } catch (\Throwable $exception) {
       error_log('[maintenance-cost-benefit] ' . $exception->getMessage());
       $this->jsonFail('No se pudo cargar el costo-beneficio.');

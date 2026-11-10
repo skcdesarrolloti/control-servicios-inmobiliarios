@@ -379,7 +379,9 @@ final class SuCasaControlServiciosInmobiliarios
       'metricas_casos' => 'Casos',
       'metricas_cotizaciones' => 'Cotizaciones',
       'metricas_preventivas' => 'Revisión preventiva',
-      'metricas_costo_beneficio' => 'Costo-beneficio de mantenimiento',
+      'metricas_costo_entrega_recibo' => 'Costo entrega y recibo',
+      'metricas_costo_beneficio' => 'Costo-beneficio mantenimiento',
+      'metricas_costo_contractual' => 'Costo-beneficio área contractual',
       'metricas_servicios_publicos' => 'Revisiones de servicios públicos',
       'metricas_ocupaciones' => 'Ocupaciones',
       'metricas_desocupaciones' => 'Desocupaciones',
@@ -399,11 +401,14 @@ final class SuCasaControlServiciosInmobiliarios
     ];
   }
 
+  /** Vistas que muestran lo que cobra cada funcionario. */
+  private const COST_METRIC_TABS = ['metricas_costo_entrega_recibo', 'metricas_costo_beneficio', 'metricas_costo_contractual'];
+
   /** Opciones que, si alguna está permitida, habilitan el panel o la verificación agrupada. */
   private const DERIVED_DASHBOARD_TABS = [
     'calendario_actividades' => ['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble'],
     'actividades_contractuales' => ['contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga'],
-    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_costo_beneficio', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento'],
+    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_costo_entrega_recibo', 'metricas_costo_beneficio', 'metricas_costo_contractual', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento'],
     // Panel compartido de ocupaciones y desocupaciones (una consulta para todas sus vistas), también desde Actividades de cartera.
     'metricas_contratos' => ['metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_por_terminar', 'metricas_aumentos', 'cartera_ocupaciones', 'cartera_desocupaciones'],
   ];
@@ -869,9 +874,9 @@ final class SuCasaControlServiciosInmobiliarios
       if (!in_array('herramienta_ingreso_neto', $knownTabs, true) && in_array('credito_propietario', (array) $raw[$cargo], true)) {
         $raw[$cargo] = array_merge((array) $raw[$cargo], ['herramienta_ingreso_neto']);
       }
-      // Costo-beneficio muestra lo que cobra cada funcionario: mientras no se guarden permisos que la conozcan, solo la ven quienes administran permisos.
-      if (!in_array('metricas_costo_beneficio', $knownTabs, true) && in_array((string) $cargo, $this->dashboardPermissionAdminCargos(), true)) {
-        $raw[$cargo] = array_merge((array) $raw[$cargo], ['metricas_costo_beneficio']);
+      // Las vistas de costo muestran lo que cobra cada funcionario: mientras no se guarden permisos que las conozcan, solo las ven quienes administran permisos.
+      if (in_array((string) $cargo, $this->dashboardPermissionAdminCargos(), true)) {
+        $raw[$cargo] = array_merge((array) $raw[$cargo], array_diff(self::COST_METRIC_TABS, $knownTabs));
       }
     }
     return $this->sanitizeDashboardPermissions($raw);
@@ -905,7 +910,7 @@ final class SuCasaControlServiciosInmobiliarios
     }
     if (isset($selected['contratos_arrendamiento'])) $selected['funcionario_contratos'] = 'funcionario_contratos';
     if (isset($selected['metricas'])) {
-      foreach (array_diff(self::DERIVED_DASHBOARD_TABS['metricas'], ['metricas_costo_beneficio']) as $tabKey) $selected[$tabKey] = $tabKey;
+      foreach (array_diff(self::DERIVED_DASHBOARD_TABS['metricas'], self::COST_METRIC_TABS) as $tabKey) $selected[$tabKey] = $tabKey;
     }
     unset($selected['calendario_actividades'], $selected['metricas']);
     return array_values($selected);

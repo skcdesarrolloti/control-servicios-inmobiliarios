@@ -8,24 +8,42 @@ use DateTimeImmutable;
 use DateTimeZone;
 use SCM\Core\Database;
 use SCM\Modules\AdministrativeReports\AdministrativeReportsService;
+use SCM\Modules\ContractMovements\ContractMovementsReport;
 
 /**
- * Costo-beneficio del área de mantenimiento.
+ * Vistas de costo de Métricas › Mantenimiento. Cada una define su ingreso y qué reportes son su gasto.
  *
- * - Ingreso: administración (sin IVA) de las cotizaciones `Aprobada`, en el mes de su fecha de respuesta;
- *   es la misma "Administración ganada" de Métricas › Cotizaciones.
- * - Gasto: lo que cobran los funcionarios de EXPENSE_EMPLOYEES en reportes administrativos (servicio +
- *   transporte), en el mes de la fecha del reporte, esté o no pagado: los reportes no guardan la fecha
- *   en que se pagaron. Los demás funcionarios no cuentan; su total se informa aparte.
+ * - Ingreso `cotizaciones`: administración (sin IVA) de las cotizaciones `Aprobada`, en el mes de su fecha
+ *   de respuesta; es la misma "Administración ganada" de Métricas › Cotizaciones.
+ * - Ingreso `contratos`: comisión (canon × % de administración) de cada mes vigente y derechos (canon × %
+ *   de derechos) en el mes de entrega. Se calcula con el canon actual: el contrato no guarda su historial.
+ * - Gasto: servicio + transporte de los reportes administrativos de la vista, en el mes de la fecha del
+ *   reporte, esté o no pagado: los reportes no guardan la fecha en que se pagaron. Lo que no corresponde
+ *   a la vista no cuenta; su total se informa aparte.
  *
  * Devuelve todas las filas en una sola respuesta para calcular los periodos en el navegador.
  */
 final class MaintenanceCostBenefitReport
 {
   public const INCOME_COLUMNS = ['id', 'ticket', 'contrato', 'inmueble', 'categoria', 'fecha', 'total', 'admin'];
+  public const CONTRACT_COLUMNS = ['id', 'contrato', 'inmueble', 'ingreso', 'egreso', 'canon', 'tasa', 'derechos'];
   public const EXPENSE_COLUMNS = ['id', 'ticket', 'inmueble', 'categoria', 'funcionario', 'fecha', 'servicio', 'transporte', 'total', 'estado'];
-  /** Únicos funcionarios cuyos reportes cuentan como gasto del área. */
-  public const EXPENSE_EMPLOYEES = ['Libia Correa Rivera', 'Alvaro Florez De Oro'];
+  private const LIBIA = 'Libia Correa Rivera';
+  private const ALVARO = 'Alvaro Florez De Oro';
+  public const SCOPES = [
+    'entrega_recibo' => [
+      'tab' => 'metricas_costo_entrega_recibo', 'panel' => 'scm-panel-metricas-costo-entrega-recibo', 'income' => 'contratos',
+      'employees' => [self::LIBIA], 'types' => [], 'note' => 'Gastos de ' . self::LIBIA . '.',
+    ],
+    'mantenimiento' => [
+      'tab' => 'metricas_costo_beneficio', 'panel' => 'scm-panel-metricas-costo-beneficio', 'income' => 'cotizaciones',
+      'employees' => [self::ALVARO], 'types' => ['correctiva', 'preventiva'], 'note' => 'Gastos de ' . self::ALVARO . ' en revisiones correctivas y preventivas.',
+    ],
+    'contractual' => [
+      'tab' => 'metricas_costo_contractual', 'panel' => 'scm-panel-metricas-costo-contractual', 'income' => 'cotizaciones',
+      'employees' => [self::LIBIA, self::ALVARO], 'types' => [], 'note' => 'Gastos de ' . self::LIBIA . ' y ' . self::ALVARO . '.',
+    ],
+  ];
 
   private DateTimeZone $timezone;
 
@@ -35,47 +53,60 @@ final class MaintenanceCostBenefitReport
   }
 
   /** @return array<string,mixed> */
-  public function snapshot(): array
+  public function snapshot(string $scope): array
   {
-    return $this->build(
-      (new QuoteMetricsReport($this->db))->snapshot(),
-      (new AdministrativeReportsService($this->db))->allReports()
-    );
+    $income = self::SCOPES[$scope]['income'] === 'contratos'
+      ? (new ContractMovementsReport($this->db))->snapshot()
+      : (new QuoteMetricsReport($this->db))->snapshot();
+    return $this->build($scope, $income, (new AdministrativeReportsService($this->db))->allReports());
   }
 
   /**
-   * @param array{columns:list<string>,rows:list<list<mixed>>} $quotes snapshot de QuoteMetricsReport
+   * @param array{columns:list<string>,rows:list<list<mixed>>} $source snapshot de cotizaciones o de contratos, según la vista
    * @param list<array<string,mixed>> $reports reportes de AdministrativeReportsService::allReports()
    * @return array<string,mixed>
    */
-  public function build(array $quotes, array $reports): array
+  public function build(string $scope, array $source, array $reports): array
   {
-    $income = [];
-    $expense = [];
+    $config = self::SCOPES[$scope];
     $undated = ['income_count' => 0, 'income_value' => 0, 'expense_count' => 0, 'expense_value' => 0];
+    $income = [];
+    $contracts = [];
+    $contractsWithoutRate = 0;
 
-    foreach ($quotes['rows'] as $values) {
-      $quote = array_combine($quotes['columns'], $values);
-      if ($quote['estado'] !== 'Aprobada') continue;
-      if ($quote['respuesta'] === null) {
-        $undated['income_count']++;
-        $undated['income_value'] += (int) $quote['admin'];
+    foreach ($source['rows'] as $values) {
+      $row = array_combine($source['columns'], $values);
+      if ($config['income'] === 'contratos') {
+        if ($row['ingreso'] === null) {
+          $undated['income_count']++;
+          continue;
+        }
+        if (empty($row['tasa_admin']) && empty($row['derechos'])) $contractsWithoutRate++;
+        $contracts[] = [$row['id'], $row['contrato'], $row['inmueble'], $row['ingreso'], $row['egreso'], (int) $row['canon'], (float) $row['tasa_admin'], (float) $row['derechos']];
         continue;
       }
-      $income[] = [$quote['id'], $quote['ticket'], $quote['contrato'], $quote['inmueble'], $quote['categoria'], $quote['respuesta'], $quote['total'], $quote['admin']];
+      if ($row['estado'] !== 'Aprobada') continue;
+      if ($row['respuesta'] === null) {
+        $undated['income_count']++;
+        $undated['income_value'] += (int) $row['admin'];
+        continue;
+      }
+      $income[] = [$row['id'], $row['ticket'], $row['contrato'], $row['inmueble'], $row['categoria'], $row['respuesta'], $row['total'], $row['admin']];
     }
 
-    $pendingEmployees = array_combine(array_map([self::class, 'nameKey'], self::EXPENSE_EMPLOYEES), self::EXPENSE_EMPLOYEES);
-    $allowedEmployees = $pendingEmployees;
+    $allowedEmployees = array_combine(array_map([self::class, 'nameKey'], $config['employees']), $config['employees']);
+    $pendingEmployees = $allowedEmployees;
+    $expense = [];
     $excluded = ['count' => 0, 'value' => 0];
     foreach ($reports as $report) {
       $employeeKey = self::nameKey((string) $report['funcionario']);
-      if (!isset($allowedEmployees[$employeeKey])) {
+      $allowed = isset($allowedEmployees[$employeeKey]);
+      if ($allowed) unset($pendingEmployees[$employeeKey]);
+      if (!$allowed || !self::matchesType($config['types'], (string) $report['categoria'])) {
         $excluded['count']++;
         $excluded['value'] += (int) $report['total'];
         continue;
       }
-      unset($pendingEmployees[$employeeKey]);
       $date = $this->date((int) $report['fecha']);
       if ($date === null) {
         $undated['expense_count']++;
@@ -90,16 +121,31 @@ final class MaintenanceCostBenefitReport
     }
 
     return [
+      'income_source' => $config['income'],
       'income_columns' => self::INCOME_COLUMNS,
       'income' => $income,
+      'contract_columns' => self::CONTRACT_COLUMNS,
+      'contracts' => $contracts,
+      'contracts_without_rate' => $contractsWithoutRate,
       'expense_columns' => self::EXPENSE_COLUMNS,
       'expense' => $expense,
       'undated' => $undated,
-      'employees' => self::EXPENSE_EMPLOYEES,
+      'expense_note' => $config['note'],
       'excluded' => $excluded,
       'employees_not_found' => array_values($pendingEmployees),
       'generated_at' => time(),
     ];
+  }
+
+  /** @param list<string> $types fragmentos del tipo de reporte; sin fragmentos cuenta cualquiera */
+  private static function matchesType(array $types, string $category): bool
+  {
+    if ($types === []) return true;
+    $category = self::nameKey($category);
+    foreach ($types as $type) {
+      if (str_contains($category, $type)) return true;
+    }
+    return false;
   }
 
   /** Compara nombres sin importar mayúsculas, tildes ni espacios de más. */

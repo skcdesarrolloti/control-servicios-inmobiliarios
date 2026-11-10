@@ -12,6 +12,12 @@ final class MetricsPanelsView
 {
   /** Periodos comunes a Casos y Cotizaciones. */
   private const PERIOD_MODES = ['actual' => 'Mes actual', 'mes' => 'Por mes', 'anual' => 'Anual', 'acumulado' => 'Acumulado'];
+  /** Título y descripción de cada vista de MaintenanceCostBenefitReport::SCOPES. */
+  private const COST_VIEWS = [
+    'entrega_recibo' => ['Costo entrega y recibo', 'Lo que se le paga mes a mes a la auxiliar de entrega y recibo, frente a los ingresos por comisión y derechos de los contratos.'],
+    'mantenimiento' => ['Costo-beneficio mantenimiento', 'Compara la administración ganada en cotizaciones aprobadas con lo que se paga por revisiones correctivas y preventivas.'],
+    'contractual' => ['Costo-beneficio área contractual', 'Compara la administración ganada en cotizaciones aprobadas con lo que cobran los funcionarios del área en reportes administrativos y cuentas de cobro.'],
+  ];
 
   public function renderCasesShell(): string
   {
@@ -164,19 +170,21 @@ final class MetricsPanelsView
     return (string) ob_get_clean();
   }
 
-  public function renderCostBenefitShell(): string
+  public function renderCostBenefitShell(string $scope): string
   {
     $now = new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota'));
     $year = $now->format('Y');
     $currentMonth = $now->format('Y-m');
+    [$title, $subtitle] = self::COST_VIEWS[$scope];
+    $titleId = 'scm-cost-benefit-title-' . $scope;
     ob_start();
 ?>
-    <section class="scm-cm scm-cost-benefit" data-scm-cost-benefit data-current-month="<?php echo $currentMonth; ?>" aria-labelledby="scm-cost-benefit-title">
+    <section class="scm-cm scm-cost-benefit" data-scm-cost-benefit data-scope="<?php echo $scope; ?>" data-current-month="<?php echo $currentMonth; ?>" aria-labelledby="<?php echo $titleId; ?>">
       <header class="scm-cm-head">
         <div class="scm-cm-head-copy">
           <p class="scm-cm-kicker">Métricas · Mantenimiento</p>
-          <h1 id="scm-cost-benefit-title">Costo-beneficio</h1>
-          <p class="scm-cm-subtitle">Compara la administración ganada en cotizaciones aprobadas con lo que cobran los funcionarios de mantenimiento en reportes administrativos y cuentas de cobro.</p>
+          <h1 id="<?php echo $titleId; ?>"><?php echo htmlspecialchars($title, ENT_QUOTES, 'UTF-8'); ?></h1>
+          <p class="scm-cm-subtitle"><?php echo htmlspecialchars($subtitle, ENT_QUOTES, 'UTF-8'); ?></p>
         </div>
         <div class="scm-cm-head-actions">
           <span class="scm-cm-updated" data-scm-cb-updated></span>

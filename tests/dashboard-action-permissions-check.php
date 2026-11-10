@@ -78,7 +78,7 @@ $_SESSION['scm_user_cargo'] = '5';
 $tabs = $invoke('currentDashboardAllowedTabs');
 $check(!array_diff(['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble', 'solicitudes_terminacion', 'funcionario_contratos', 'metricas_casos', 'metricas_crecimiento', 'ordenes_mantenimiento'], $tabs), 'legacy permissions keep every option the cargo used to see');
 $check(!array_diff(['calendario_actividades', 'actividades_contractuales', 'metricas'], $tabs), 'grouped panels stay enabled through their options');
-$check(!in_array('metricas_costo_beneficio', $tabs, true), 'legacy metrics permission does not reveal what each employee bills');
+$check(!array_intersect(['metricas_costo_entrega_recibo', 'metricas_costo_beneficio', 'metricas_costo_contractual'], $tabs), 'legacy metrics permission does not reveal what each employee bills');
 $_SESSION['scm_user_cargo'] = '6';
 $tabs = $invoke('currentDashboardAllowedTabs');
 $check(in_array('mi_calendario', $tabs, true) && !in_array('metricas_casos', $tabs, true) && !in_array('funcionario_contratos', $tabs, true), 'legacy cargo without metrics or contracts does not gain them');
