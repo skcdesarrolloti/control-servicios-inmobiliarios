@@ -37,6 +37,10 @@ trait HandlesMetricsPanels
       $this->respondEmployeeBudget();
       return;
     }
+    if ($report === \SCM\Modules\Metrics\EmployeeBudgetView::TEAM_REPORT) {
+      $this->respondTeamBudget();
+      return;
+    }
     // Cada informe tiene su propio permiso (Métricas › Revisión preventiva, Servicios públicos, Crecimiento).
     $reportTab = ['preventiva' => 'metricas_preventivas', 'servicios' => 'metricas_servicios_publicos', 'crecimiento' => 'metricas_crecimiento'][$report] ?? '';
     if ($reportTab === '' || !$this->canAccessDashboardTab($reportTab)) {
@@ -91,23 +95,48 @@ trait HandlesMetricsPanels
     if (!$this->canAccessDashboardTab('mis_presupuestos')) {
       $this->jsonFail('No tienes permiso para ver métricas.');
     }
+    $this->sendEmployeeBudget(\SCM\Core\Auth::employeeId(), \SCM\Core\Auth::userCargo(), '', 'No se pudo cargar tu información desde Reportes.');
+  }
+
+  /** El id llega del navegador: solo se atiende si es uno de los funcionarios configurados en filtros. */
+  private function respondTeamBudget(): void
+  {
+    if (!$this->canAccessDashboardTab('presupuestos_funcionarios')) {
+      $this->jsonFail('No tienes permiso para ver métricas.');
+    }
+    $employeeId = trim(sanitize_text_field(wp_unslash((string) ($_POST['funcionario'] ?? ''))));
+    if ($employeeId === '') {
+      $this->jsonOk(['html' => \SCM\Modules\Metrics\EmployeeBudgetView::employeePrompt()]);
+      return;
+    }
+    foreach (\SCM\Support\FuncionarioOptions::panelFuncionarios($this->db) as $employee) {
+      if ((string) $employee['id'] === $employeeId) {
+        $this->sendEmployeeBudget($employeeId, (string) $employee['id_cargo'], (string) $employee['name'], 'No se pudo cargar la información del funcionario desde Reportes.');
+        return;
+      }
+    }
+    $this->jsonFail('El funcionario no está configurado en los filtros.');
+  }
+
+  /** @param string $employeeName vacío cuando el funcionario consulta lo suyo */
+  private function sendEmployeeBudget(string $employeeId, string $cargoId, string $employeeName, string $failure): void
+  {
     $today = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota'));
     $currentYear = (int) $today->format('Y');
     $year = max($currentYear - 1, min($currentYear, (int) ($_POST['year'] ?? $currentYear)));
     $lastMonth = $year === $currentYear ? (int) $today->format('n') : 12;
     $month = max(1, min($lastMonth, (int) ($_POST['month'] ?? $lastMonth)));
     try {
-      $employeeId = \SCM\Core\Auth::employeeId();
       $remote = \SCM\Modules\Metrics\EmployeeBudgetReport::remote();
       $report = $remote->build($employeeId, $year, $month);
       $lastDay = $today->setDate($year, $month, 1)->modify('last day of this month');
       $cutDate = ($lastDay > $today ? $today : $lastDay)->format('Y-m-d');
-      $report['compliance'] = $remote->compliance($employeeId, \SCM\Core\Auth::userCargo(), $year, $month, $cutDate);
+      $report['compliance'] = $remote->compliance($employeeId, $cargoId, $year, $month, $cutDate);
       $vista = (string) ($_POST['vista'] ?? 'mes') === 'acumulado' ? 'acumulado' : 'mes';
-      $this->jsonOk(['html' => (new \SCM\Modules\Metrics\EmployeeBudgetView())->render($report, $vista)]);
+      $this->jsonOk(['html' => (new \SCM\Modules\Metrics\EmployeeBudgetView())->render($report, $vista, $employeeName)]);
     } catch (\Throwable $exception) {
       error_log('[employee-budget] ' . $exception->getMessage());
-      $this->jsonFail('No se pudo cargar tu información desde Reportes.');
+      $this->jsonFail($failure);
     }
   }
 

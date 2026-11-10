@@ -59,6 +59,12 @@ $check('el mes a mes llega hasta el mes elegido', false, str_contains($html, '>M
 $empty = (new EmployeeBudgetView())->render(['year' => 2026, 'month' => 2, 'activities' => []]);
 $check('sin presupuestos', true, str_contains($empty, 'No tienes presupuestos'));
 
+$check('sin presupuestos de otro funcionario', true, str_contains((new EmployeeBudgetView())->render(['year' => 2026, 'month' => 2, 'activities' => []], 'mes', 'Ana & Co'), 'Ana &amp; Co no tiene presupuestos'));
+$check('habla del funcionario consultado', [true, false], [str_contains($teamHtml = (new EmployeeBudgetView())->render($data, 'mes', 'Ana'), 'Cómo va en febrero'), str_contains($teamHtml, 'Cómo vas en')]);
+$teamShell = (new EmployeeBudgetView())->shell(2026, 2, [['id' => '2871', 'name' => 'Ana']]);
+$check('la consulta por funcionario tiene su reporte y su filtro', [true, true, true], [str_contains($teamShell, 'data-maint-metrics="' . EmployeeBudgetView::TEAM_REPORT . '"'), str_contains($teamShell, 'name="funcionario"'), str_contains($teamShell, '<option value="2871">Ana</option>')]);
+$check('mis presupuestos no trae el filtro', false, str_contains((new EmployeeBudgetView())->shell(2026, 2), 'name="funcionario"'));
+
 $untouched = new EmployeeBudgetReport(static function (array $requests): array {
   throw new \LogicException('No debe consultar Reportes sin funcionario.');
 });

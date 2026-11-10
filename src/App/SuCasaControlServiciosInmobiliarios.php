@@ -391,6 +391,7 @@ final class SuCasaControlServiciosInmobiliarios
       'metricas_aumentos' => 'Aumentos',
       'metricas_crecimiento' => 'Crecimiento de la empresa',
       'mis_presupuestos' => 'Mis presupuestos y ejecuciones',
+      'presupuestos_funcionarios' => 'Presupuesto y ejecución de funcionario',
       'credito_propietario' => 'Créditos a propietarios',
       'herramienta_pse' => 'Generar PSE',
       'herramienta_mora' => 'Calculadora de mora',
@@ -873,9 +874,9 @@ final class SuCasaControlServiciosInmobiliarios
       if (!in_array('herramienta_ingreso_neto', $knownTabs, true) && in_array('credito_propietario', (array) $raw[$cargo], true)) {
         $raw[$cargo] = array_merge((array) $raw[$cargo], ['herramienta_ingreso_neto']);
       }
-      // Las vistas de costo muestran lo que cobra cada funcionario: mientras no se guarden permisos que las conozcan, solo las ven quienes administran permisos.
+      // Las vistas de costo y el presupuesto de otros funcionarios son sensibles: mientras no se guarden permisos que las conozcan, solo las ven quienes administran permisos.
       if (in_array((string) $cargo, $this->dashboardPermissionAdminCargos(), true)) {
-        $raw[$cargo] = array_merge((array) $raw[$cargo], array_diff(self::COST_METRIC_TABS, $knownTabs));
+        $raw[$cargo] = array_merge((array) $raw[$cargo], array_diff([...self::COST_METRIC_TABS, 'presupuestos_funcionarios'], $knownTabs));
       }
     }
     return $this->sanitizeDashboardPermissions($raw);

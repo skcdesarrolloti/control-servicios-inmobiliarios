@@ -7,10 +7,11 @@ namespace SCM\Modules\Metrics;
 use SCM\Modules\Metrics\MaintenanceMetricsView as V;
 use SCM\Modules\Pending\PublicServicesUi as UI;
 
-/** Métricas › Mis presupuestos y ejecuciones (Tailwind sp-). */
+/** Métricas › Presupuesto y ejecución: lo propio y la consulta por funcionario (Tailwind sp-). */
 final class EmployeeBudgetView
 {
   public const REPORT = 'mis_presupuestos';
+  public const TEAM_REPORT = 'presupuestos_funcionarios';
   private const REVIEWS = [
     'preventiva' => ['Cumplimiento revisiones preventivas', 80, 'Cada contrato entregado debe tener una revisión preventiva al año. Son pendientes los que vencen hasta el cierre del mes de corte; los entregados este año no cuentan.'],
     'servicios' => ['Cumplimiento revisión servicios públicos', 95, 'Cada contrato con servicios configurados se revisa cada 3 meses. Son pendientes los que vencen de enero al cierre del mes de corte, y solo cuentan las revisiones durante la ocupación.'],
@@ -18,19 +19,22 @@ final class EmployeeBudgetView
   private const CASES_MINIMUM = 85;
   private const MONTHS = [1 => 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-  public function shell(int $year, int $month): string
+  /** @param array<int,array<string,mixed>>|null $employees funcionarios a consultar; null muestra lo propio */
+  public function shell(int $year, int $month, ?array $employees = null): string
   {
+    $team = $employees !== null;
     ob_start();
 ?>
-    <div class="!sp-font-sans !sp-text-service-navy !sp-bg-service-background !sp-p-3 sm:!sp-p-5 !sp-space-y-5" data-maint-metrics="<?= V::e(self::REPORT) ?>">
+    <div class="!sp-font-sans !sp-text-service-navy !sp-bg-service-background !sp-p-3 sm:!sp-p-5 !sp-space-y-5" data-maint-metrics="<?= V::e($team ? self::TEAM_REPORT : self::REPORT) ?>">
       <header class="<?= UI::CARD ?> !sp-p-5 !sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-4">
         <div>
-          <h2 class="!sp-m-0 !sp-text-lg !sp-font-bold">Mis presupuestos y ejecuciones</h2>
-          <p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">Cómo vas frente a tus metas, mes a mes y en lo que va del año.</p>
+          <h2 class="!sp-m-0 !sp-text-lg !sp-font-bold"><?= $team ? 'Presupuesto y ejecución de funcionario' : 'Mis presupuestos y ejecuciones' ?></h2>
+          <p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted"><?= $team ? 'Cómo va cada funcionario frente a sus metas, mes a mes y en lo que va del año.' : 'Cómo vas frente a tus metas, mes a mes y en lo que va del año.' ?></p>
         </div>
         <button type="button" class="<?= UI::SECONDARY ?>" data-maint-metrics-refresh><?= UI::icon('refresh') ?>Actualizar</button>
       </header>
       <form class="<?= UI::CARD ?> !sp-p-5 !sp-flex !sp-flex-wrap !sp-items-end !sp-gap-4" data-maint-metrics-form>
+        <?php if ($team): ?><label><span class="<?= UI::LABEL ?>">Funcionario</span><select class="<?= UI::INPUT ?> !sp-w-80" name="funcionario"><option value="">Selecciona un funcionario</option><?php foreach ($employees as $employee): ?><option value="<?= V::e((string) $employee['id']) ?>"><?= V::e((string) $employee['name']) ?></option><?php endforeach; ?></select></label><?php endif; ?>
         <label><span class="<?= UI::LABEL ?>">Vista</span><select class="<?= UI::INPUT ?> !sp-w-36" name="vista"><option value="mes">Mes</option><option value="acumulado">Acumulado</option></select></label>
         <label><span class="<?= UI::LABEL ?>">Año</span><select class="<?= UI::INPUT ?> !sp-w-32" name="year"><?php for ($y = $year; $y >= $year - 1; $y--): ?><option value="<?= $y ?>"><?= $y ?></option><?php endfor; ?></select></label>
         <label><span class="<?= UI::LABEL ?>">Mes</span><select class="<?= UI::INPUT ?> !sp-w-44" name="month"><?php foreach (self::MONTHS as $number => $label): ?><option value="<?= $number ?>"<?= $number === $month ? ' selected' : '' ?>><?= V::e($label) ?></option><?php endforeach; ?></select></label>
@@ -41,8 +45,16 @@ final class EmployeeBudgetView
     return (string) ob_get_clean();
   }
 
-  /** @param array{year:int,month:int,activities:array<int,array<string,mixed>>} $report */
-  public function render(array $report, string $vista = 'mes'): string
+  public static function employeePrompt(): string
+  {
+    return '<div class="' . UI::CARD . ' !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">Selecciona un funcionario para ver sus presupuestos y ejecuciones.</div>';
+  }
+
+  /**
+   * @param array{year:int,month:int,activities:array<int,array<string,mixed>>} $report
+   * @param string $employeeName vacío cuando el funcionario consulta lo suyo
+   */
+  public function render(array $report, string $vista = 'mes', string $employeeName = ''): string
   {
     $compliance = $report['compliance'] ?? [];
     $sections = '';
@@ -55,7 +67,8 @@ final class EmployeeBudgetView
     $activities = $report['activities'];
     if ($activities === []) {
       if ($sections !== '') return '<div class="!sp-space-y-5">' . $sections . '</div>';
-      return '<div class="' . UI::CARD . ' !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">No tienes presupuestos cargados para ' . $report['year'] . '.</div>';
+      $owner = $employeeName === '' ? 'No tienes' : V::e($employeeName) . ' no tiene';
+      return '<div class="' . UI::CARD . ' !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">' . $owner . ' presupuestos cargados para ' . $report['year'] . '.</div>';
     }
     $monthName = self::MONTHS[$report['month']];
 
@@ -94,7 +107,7 @@ final class EmployeeBudgetView
     $html .= V::card('Metas cumplidas en el mes', $reached('month') . ' de ' . $total, $monthName, 'Llegaron al 100 % de la meta del mes', 'check', '!sp-text-emerald-700');
     $html .= V::card('Metas cumplidas acumuladas', $reached('accumulated') . ' de ' . $total, 'Acumulado', 'Llegaron al 100 % de enero a ' . mb_strtolower($monthName, 'UTF-8'), 'check', '!sp-text-emerald-700');
     $html .= '</div>';
-    $html .= V::table('Cómo vas en ' . mb_strtolower($monthName, 'UTF-8'), 'Meta y ejecución del mes y acumuladas desde enero.' . ($missing > 0 ? ' Sin dato: Reportes no entregó esa ejecución.' : ''), ['Actividad', 'Meta mes', 'Ejecutado mes', '% mes', 'Meta acumulada', 'Ejecutado acumulado', '% acumulado'], $summary);
+    $html .= V::table(($employeeName === '' ? 'Cómo vas en ' : 'Cómo va en ') . mb_strtolower($monthName, 'UTF-8'),'Meta y ejecución del mes y acumuladas desde enero.' . ($missing > 0 ? ' Sin dato: Reportes no entregó esa ejecución.' : ''), ['Actividad', 'Meta mes', 'Ejecutado mes', '% mes', 'Meta acumulada', 'Ejecutado acumulado', '% acumulado'], $summary);
     $html .= V::table('Mes a mes', 'Porcentaje de cumplimiento de cada mes.', $head, $history);
     return $html . '</div>';
   }

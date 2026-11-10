@@ -181,6 +181,8 @@ trait RendersDashboard
       'scm-panel-metricas-crecimiento' => 'scm-panel-metricas-crecimiento',
       'mis_presupuestos' => 'scm-panel-mis-presupuestos',
       'scm-panel-mis-presupuestos' => 'scm-panel-mis-presupuestos',
+      'presupuestos_funcionarios' => 'scm-panel-presupuestos-funcionarios',
+      'scm-panel-presupuestos-funcionarios' => 'scm-panel-presupuestos-funcionarios',
       'credito_propietario' => 'scm-panel-credito-propietario',
       'metricas_creditos' => 'scm-panel-credito-propietario',
       'creditos' => 'scm-panel-credito-propietario',
@@ -430,6 +432,7 @@ trait RendersDashboard
       'scm-panel-metricas-servicios-publicos' => 'metricas_servicios_publicos',
       'scm-panel-metricas-crecimiento' => 'metricas_crecimiento',
       'scm-panel-mis-presupuestos' => 'mis_presupuestos',
+      'scm-panel-presupuestos-funcionarios' => 'presupuestos_funcionarios',
       'scm-panel-credito-propietario' => 'credito_propietario',
       'scm-panel-movimientos-contratos' => 'metricas_contratos',
       'scm-panel-funcionario-contratos' => 'funcionario_contratos',
@@ -1446,6 +1449,12 @@ trait RendersDashboard
           <?php echo (new \SCM\Modules\Metrics\EmployeeBudgetView())->shell((int) $budgetToday->format('Y'), (int) $budgetToday->format('n')); ?>
         </div>
         <?php endif; ?>
+        <?php if (in_array('presupuestos_funcionarios', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-presupuestos-funcionarios' ? ' active' : ''; ?>" id="scm-panel-presupuestos-funcionarios" data-permission-tab="presupuestos_funcionarios" data-scm-loaded="0">
+          <?php $budgetToday = new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota')); ?>
+          <?php echo (new \SCM\Modules\Metrics\EmployeeBudgetView())->shell((int) $budgetToday->format('Y'), (int) $budgetToday->format('n'), FuncionarioOptions::panelFuncionarios($this->db)); ?>
+        </div>
+        <?php endif; ?>
       <?php if (in_array('metricas', $dashboardAllowedTabs, true)): ?>
         <?php $metricsPanelsView = new \SCM\Modules\Metrics\MetricsPanelsView(); ?>
         <?php if (in_array('metricas_casos', $dashboardAllowedTabs, true)): ?>
@@ -2015,6 +2024,7 @@ trait RendersDashboard
         'metricas_ocupaciones_vs' => '',
         'metricas_crecimiento' => '',
         'mis_presupuestos' => '',
+        'presupuestos_funcionarios' => 'Permite consultar las metas de los funcionarios configurados en filtros',
       ]],
     ];
     $tabGroups = [];

@@ -313,6 +313,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'metricas_servicios_publicos';
   } elseif (in_array($tabParam, ['mis_presupuestos', 'scm-panel-mis-presupuestos'], true)) {
     $current_page = 'mis_presupuestos';
+  } elseif (in_array($tabParam, ['presupuestos_funcionarios', 'scm-panel-presupuestos-funcionarios'], true)) {
+    $current_page = 'presupuestos_funcionarios';
   } elseif (in_array($tabParam, ['metricas_crecimiento', 'crecimiento', 'scm-panel-metricas-crecimiento'], true)) {
     $current_page = 'metricas_crecimiento';
   } elseif (in_array($tabParam, ['credito_propietario', 'metricas_creditos', 'creditos', 'scm-panel-credito-propietario'], true)) {
@@ -913,13 +915,26 @@ $rawNavItems = [
       ],
       'mis_presupuestos' => [
         'key' => 'mis_presupuestos',
-        'group' => 'Mis presupuestos y ejecuciones',
+        'group' => 'Presupuesto y ejecución',
+        'group_icon' => 'query_stats',
+        'group_description' => 'Metas y cumplimiento',
         'label' => 'Mis presupuestos y ejecuciones',
         'description' => 'Cómo vas frente a tus metas',
         'panel_id' => 'scm-panel-mis-presupuestos',
         'url' => $baseUrl . '/index.php?tab=mis_presupuestos',
         'icon' => 'query_stats',
         'perms' => ['mis_presupuestos'],
+      ],
+      'presupuestos_funcionarios' => [
+        'key' => 'presupuestos_funcionarios',
+        'group' => 'Presupuesto y ejecución',
+        'group_icon' => 'query_stats',
+        'label' => 'Presupuesto y ejecución de funcionario',
+        'description' => 'Consulta las metas de cada funcionario',
+        'panel_id' => 'scm-panel-presupuestos-funcionarios',
+        'url' => $baseUrl . '/index.php?tab=presupuestos_funcionarios',
+        'icon' => 'groups',
+        'perms' => ['presupuestos_funcionarios'],
       ],
     ],
   ],

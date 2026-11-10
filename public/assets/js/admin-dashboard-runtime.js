@@ -13110,8 +13110,11 @@
     });
     root.addEventListener("change", function (event) {
       // Por mes y Anual se recalculan al elegir; Acumulado espera a "Aplicar" para no recargar con cada extremo.
-      if (!event.target.matches('[data-maint-metrics-form] [name="month"], [data-maint-metrics-form] [name="year"], [data-maint-metrics-form] [name="vista"]')) return;
-      loadMaintenanceMetrics(event.target.closest("[data-maint-metrics]"), true);
+      if (!event.target.matches('[data-maint-metrics-form] [name="month"], [data-maint-metrics-form] [name="year"], [data-maint-metrics-form] [name="vista"], [data-maint-metrics-form] [name="funcionario"]')) return;
+      var metricsModule = event.target.closest("[data-maint-metrics]");
+      // Las cifras del funcionario anterior no deben quedar bajo el nuevo nombre mientras Reportes responde.
+      if (event.target.name === "funcionario") metricsModule.removeAttribute("data-loaded");
+      loadMaintenanceMetrics(metricsModule, true);
     });
 
     // Preventivas pendientes: sub-tabs (history and due-date queues) loaded through the same panel action.
@@ -26532,6 +26535,7 @@
         activePanel.id !== "scm-panel-metricas-servicios-publicos" &&
         activePanel.id !== "scm-panel-metricas-crecimiento" &&
         activePanel.id !== "scm-panel-mis-presupuestos" &&
+        activePanel.id !== "scm-panel-presupuestos-funcionarios" &&
         activePanel.id !== "scm-panel-credito-propietario" &&
         activePanel.id !== "scm-panel-herramienta-pse" &&
         activePanel.id !== "scm-panel-herramienta-mora" &&
@@ -26571,7 +26575,7 @@
         }
         return Promise.resolve();
       }
-      if (activePanel.id === "scm-panel-mis-presupuestos" || activePanel.id === "scm-panel-metricas-preventivas" || activePanel.id === "scm-panel-metricas-servicios-publicos" || activePanel.id === "scm-panel-metricas-crecimiento") {
+      if (activePanel.id === "scm-panel-mis-presupuestos" || activePanel.id === "scm-panel-presupuestos-funcionarios" || activePanel.id === "scm-panel-metricas-preventivas" || activePanel.id === "scm-panel-metricas-servicios-publicos" || activePanel.id === "scm-panel-metricas-crecimiento") {
         return loadMaintenanceMetrics(activePanel.querySelector("[data-maint-metrics]"), false);
       }
       // Herramientas: admin-tools.js carga el archivador PSE y la tasa SFC al abrir cada panel.
