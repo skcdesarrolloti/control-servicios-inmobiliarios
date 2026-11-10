@@ -122,7 +122,7 @@
     var toInput = module.querySelector('[data-scm-cb-filter="to"]');
     var typeSelect = module.querySelector('[data-scm-cb-filter="tipo"]');
     var currentMonth = module.getAttribute("data-current-month");
-    var state = { data: null, pending: null, mode: "actual", view: "ingresos", search: "", page: 1, monthly: [], detail: [], lists: null };
+    var state = { data: null, pending: null, mode: "actual", kind: "general", view: "ingresos", search: "", page: 1, monthly: [], detail: [], lists: null };
     var tooltip = document.createElement("div");
     tooltip.className = "scm-cc-tooltip";
     tooltip.setAttribute("role", "tooltip");
@@ -172,11 +172,15 @@
       var years = {};
       var types = {};
       years[currentMonth.slice(0, 4)] = true;
-      income.forEach(function (row) { years[row.fecha.slice(0, 4)] = true; });
+      income.forEach(function (row) {
+        row.kind = row.tipo.toLowerCase();
+        years[row.fecha.slice(0, 4)] = true;
+      });
       (contracts || []).forEach(function (row) { years[row.ingreso.slice(0, 4)] = true; });
       expense.forEach(function (row) {
         years[row.fecha.slice(0, 4)] = true;
         types[row.categoria] = true;
+        row.kind = normalize(row.categoria).indexOf("prevent") !== -1 ? "preventiva" : "correctiva";
       });
       state.data = {
         income: income, contracts: contracts, contractsWithoutRate: snapshot.contracts_without_rate || 0, expense: expense, undated: snapshot.undated || {},
@@ -214,13 +218,25 @@
       return out;
     }
 
+    // Pestañas de mantenimiento: General suma todo; Correctiva y Preventiva separan cotizaciones y reportes.
+    function matchesKind(row) { return state.kind === "general" || row.kind === state.kind; }
+    function kindSuffix() { return state.kind === "general" ? "" : " · " + state.kind + "s"; }
+    function setKind(kind) {
+      state.kind = kind;
+      module.querySelectorAll("[data-scm-cb-kind]").forEach(function (button) {
+        var active = button.getAttribute("data-scm-cb-kind") === kind;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+      });
+    }
+
     function incomeFor(p) {
-      return state.data.contracts ? contractIncome(p) : state.data.income.filter(function (row) { return inPeriod(row.fecha, p); });
+      return state.data.contracts ? contractIncome(p) : state.data.income.filter(function (row) { return matchesKind(row) && inPeriod(row.fecha, p); });
     }
 
     function expenseRows() {
       var type = typeSelect.value;
-      return state.data.expense.filter(function (row) { return !type || row.categoria === type; });
+      return state.data.expense.filter(function (row) { return matchesKind(row) && (!type || row.categoria === type); });
     }
 
     // Periodo elegido como rango de meses; `months` son las columnas del mes a mes, que solo aplica
@@ -273,7 +289,7 @@
       var s = summarize(income, expense);
       state.lists = { ingresos: income, gastos: expense };
 
-      var html = '<h3 class="scm-qm-section">Resultado de ' + esc(p.label) + "</h3>";
+      var html = '<h3 class="scm-qm-section">Resultado de ' + esc(p.label + kindSuffix()) + "</h3>";
       html += '<div class="scm-cm-kpis">';
       html += kpi("Ingresos", money(s.income), state.data.contracts
         ? "Comisión " + money(s.commission) + " + derechos " + money(s.rights) + " · " + num(s.quotes) + (s.quotes === 1 ? " contrato" : " contratos")
@@ -315,7 +331,7 @@
       html += '<section class="scm-cm-card"><header><h2>Gasto por tipo</h2></header>' + typeTable(groupExpense(expense, "categoria"), s.expense) + "</section>";
       html += "</div>";
 
-      html += '<h3 class="scm-qm-section">Detalle de ' + esc(p.label) + "</h3>";
+      html += '<h3 class="scm-qm-section">Detalle de ' + esc(p.label + kindSuffix()) + "</h3>";
       var views = [["ingresos", "Ingresos", income.length], ["gastos", "Gastos", expense.length]];
       html += '<section class="scm-cm-card is-wide"><header><div class="scm-qm-views" role="tablist">' + views.map(function (view) {
         return '<button type="button" role="tab" class="scm-qm-view' + (state.view === view[0] ? " is-active" : "") + '" aria-selected="' + (state.view === view[0]) +
@@ -454,10 +470,10 @@
 
     function incomeDetail(slice, rows) {
       var sum = rows.reduce(function (out, row) { out.total += row.total || 0; out.admin += row.admin || 0; return out; }, { total: 0, admin: 0 });
-      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr><th>Cotización</th><th>Aprobada</th><th>Caso</th><th>Contrato</th><th>Inmueble</th><th>Categoría</th>' +
+      return '<div class="scm-cm-table-wrap"><table class="scm-cm-table scm-cm-detail"><thead><tr><th>Cotización</th><th>Aprobada</th><th>Caso</th><th>Contrato</th><th>Inmueble</th><th>Tipo</th>' +
         '<th class="is-num">Valor total</th><th class="is-num">Administración</th><th></th></tr></thead><tbody>' + slice.map(function (row) {
           return '<tr class="scm-maintenance-quote-row" data-cotizacion-id="' + esc(row.id) + '" data-ticket="' + esc(row.ticket) + '" data-contract="' + esc(row.contrato) + '">' +
-            "<td><strong>#" + esc(row.id) + "</strong></td><td>" + esc(formatDay(row.fecha)) + "</td>" + caseCell(row.ticket) + "<td>" + esc(row.contrato || "—") + "</td><td>" + esc(row.inmueble || "—") + "</td><td>" + esc(row.categoria || "—") + "</td>" +
+            "<td><strong>#" + esc(row.id) + "</strong></td><td>" + esc(formatDay(row.fecha)) + "</td>" + caseCell(row.ticket) + "<td>" + esc(row.contrato || "—") + "</td><td>" + esc(row.inmueble || "—") + "</td><td>" + esc(row.tipo) + "</td>" +
             '<td class="is-num">' + esc(money(row.total)) + '</td><td class="is-num is-total">' + esc(money(row.admin)) + "</td>" +
             '<td class="is-actions"><button type="button" class="scm-cm-btn scm-cm-btn-ghost" data-scm-maintenance-quote-open-case data-cotizacion-id="' + esc(row.id) + '" data-ticket="' + esc(row.ticket) + '" data-contract="' + esc(row.contrato) + '">Ver caso</button></td></tr>';
         }).join("") + '</tbody><tfoot><tr><td colspan="6">Total</td><td class="is-num">' + esc(money(sum.total)) + '</td><td class="is-num is-total">' + esc(money(sum.admin)) + "</td><td></td></tr></tfoot></table></div>";
@@ -486,7 +502,7 @@
       }).join("\r\n");
       var link = document.createElement("a");
       link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-      link.download = "costo-" + module.getAttribute("data-scope") + "-" + String(state.periodTitle || "").replace(/[^0-9a-z]+/gi, "-").toLowerCase() + ".csv";
+      link.download = "costo-" + module.getAttribute("data-scope") + "-" + (state.kind === "general" ? "" : state.kind + "-") + String(state.periodTitle || "").replace(/[^0-9a-z]+/gi, "-").toLowerCase() + ".csv";
       document.body.appendChild(link);
       link.click();
       setTimeout(function () { URL.revokeObjectURL(link.href); link.remove(); }, 0);
@@ -511,6 +527,13 @@
     });
     module.addEventListener("click", function (event) {
       if (event.target.closest("[data-scm-cb-refresh]")) { load(true); return; }
+      var kind = event.target.closest("[data-scm-cb-kind]");
+      if (kind) {
+        setKind(kind.getAttribute("data-scm-cb-kind"));
+        state.page = 1;
+        render();
+        return;
+      }
       var mode = event.target.closest("[data-scm-cb-mode]");
       if (mode) {
         setMode(mode.getAttribute("data-scm-cb-mode"));

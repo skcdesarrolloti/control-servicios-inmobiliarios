@@ -25,7 +25,7 @@ use SCM\Modules\ContractMovements\ContractMovementsReport;
  */
 final class MaintenanceCostBenefitReport
 {
-  public const INCOME_COLUMNS = ['id', 'ticket', 'contrato', 'inmueble', 'categoria', 'fecha', 'total', 'admin'];
+  public const INCOME_COLUMNS = ['id', 'ticket', 'contrato', 'inmueble', 'tipo', 'fecha', 'total', 'admin'];
   public const CONTRACT_COLUMNS = ['id', 'contrato', 'inmueble', 'ingreso', 'egreso', 'canon', 'tasa', 'derechos'];
   public const EXPENSE_COLUMNS = ['id', 'ticket', 'inmueble', 'categoria', 'funcionario', 'fecha', 'servicio', 'transporte', 'total', 'estado'];
   private const LIBIA = 'Libia Correa Rivera';
@@ -87,7 +87,7 @@ final class MaintenanceCostBenefitReport
         $undated['income_value'] += (int) $row['admin'];
         continue;
       }
-      $income[] = [$row['id'], $row['ticket'], $row['contrato'], $row['inmueble'], $row['categoria'], $row['respuesta'], $row['total'], $row['admin']];
+      $income[] = [$row['id'], $row['ticket'], $row['contrato'], $row['inmueble'], $row['tipo'], $row['respuesta'], $row['total'], $row['admin']];
     }
 
     $allowedEmployees = array_combine(array_map([self::class, 'nameKey'], $config['employees']), $config['employees']);

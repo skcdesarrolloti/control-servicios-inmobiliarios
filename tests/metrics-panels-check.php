@@ -74,6 +74,8 @@ $row = $quoteReport->mapRow($quoteBase + ['fecha_respuesta' => '0', 'ticket_resp
 $check($row[$cols['respuesta']] === '2026-10-16' && $row[$cols['respuesta_fuente']] === 'caso', 'Sin fecha de respuesta se usa la del caso.');
 $row = $quoteReport->mapRow(['se_envio' => 'No', 'fecha' => '0', 'cct_created' => '2026-09-02 10:00:00', 'fecha_respuesta' => '0', 'ticket_respuesta' => null] + $quoteBase);
 $check($row[$cols['enviada']] === 0 && $row[$cols['fecha']] === '2026-09-02' && $row[$cols['respuesta']] === null, 'Sin enviar, fecha desde cct_created y sin fecha de respuesta.');
+$check($row[$cols['tipo']] === 'Correctiva', 'Sin tipo de mantenimiento, la cotización es correctiva como en el resto del panel.');
+$check($quoteReport->mapRow($quoteBase + ['fecha_respuesta' => '0', 'ticket_respuesta' => '', 'tipo_mantenimiento' => 'Preventivo'])[$cols['tipo']] === 'Preventiva', 'Reconoce el tipo preventivo de la cotización.');
 
 $dashboard = (string) file_get_contents($root . '/src/App/Concerns/RendersDashboard.php');
 foreach (['id="scm-panel-metricas"', 'data-scm-contractual-reports', 'Gestión contractual', '+4.2%', 'Meta: 85%', 'REPORTES_GERENCIALES_URL'] as $removed) {
@@ -239,7 +241,7 @@ $quoteRow = static fn(array $values): array => array_map(static fn(string $colum
 $reportBase = ['id_ticket' => '10', 'inmueble' => '500', 'categoria' => 'Mantenimiento', 'funcionario' => 'Libia Correa Rivera', 'servicio' => 90000, 'transporte' => 10000, 'total' => 100000, 'exportado' => false, 'pagado' => false];
 $alvaroReport = ['funcionario' => 'Alvaro Florez De Oro', 'categoria' => 'Revision correctiva'];
 $built = $costBenefit->build('mantenimiento', ['columns' => $quoteColumns, 'rows' => [
-  $quoteRow(['id' => 1, 'estado' => 'Aprobada', 'respuesta' => '2026-10-16', 'total' => 500000, 'admin' => 50000, 'categoria' => 'Inicial']),
+  $quoteRow(['id' => 1, 'estado' => 'Aprobada', 'respuesta' => '2026-10-16', 'total' => 500000, 'admin' => 50000, 'tipo' => 'Preventiva']),
   $quoteRow(['id' => 2, 'estado' => 'Esperando respuesta', 'respuesta' => '2026-10-16', 'total' => 900000, 'admin' => 90000]),
   $quoteRow(['id' => 3, 'estado' => 'Aprobada', 'respuesta' => null, 'total' => 300000, 'admin' => 30000]),
 ]], [
@@ -252,6 +254,7 @@ $built = $costBenefit->build('mantenimiento', ['columns' => $quoteColumns, 'rows
 ]);
 $incomeIds = array_column($built['income'], array_search('id', $built['income_columns'], true));
 $check($incomeIds === [1] && $built['income'][0][array_search('fecha', $built['income_columns'], true)] === '2026-10-16' && $built['income'][0][array_search('admin', $built['income_columns'], true)] === 50000, 'El ingreso es la administración de las aprobadas, por fecha de respuesta.');
+$check($built['income'][0][array_search('tipo', $built['income_columns'], true)] === 'Preventiva', 'El ingreso indica si la cotización es correctiva o preventiva.');
 $check($built['undated'] === ['income_count' => 1, 'income_value' => 30000, 'expense_count' => 1, 'expense_value' => 40000], 'Lo que no tiene fecha se informa aparte: ' . json_encode($built['undated']));
 $stateColumn = array_search('estado', $built['expense_columns'], true);
 $check(array_column($built['expense'], $stateColumn) === ['sin_cobrar', 'en_cobro', 'pagado'], 'Cada gasto indica si está sin cobrar, en cuenta de cobro o pagado.');
@@ -282,6 +285,10 @@ $delivery = $costBenefit->build('entrega_recibo', ['columns' => $contractColumns
 $check($delivery['income_source'] === 'contratos' && array_column($delivery['contracts'], 0) === [1, 2] && $delivery['contracts_without_rate'] === 1 && $delivery['undated']['income_count'] === 1, 'Entrega y recibo usa los contratos e informa los que no tienen tasa o fecha.');
 $check(array_column($delivery['expense'], 0) === [30, 32] && $delivery['excluded']['count'] === 3, 'Entrega y recibo solo cuenta las entregas y recibos de Libia.');
 $shell = $view->renderCostBenefitShell('mantenimiento');
+foreach (['general', 'correctiva', 'preventiva'] as $kind) {
+  $check(str_contains($shell, 'data-scm-cb-kind="' . $kind . '"'), 'Mantenimiento tiene la pestaña ' . $kind . '.');
+}
+$check(!str_contains($view->renderCostBenefitShell('entrega_recibo'), 'data-scm-cb-kind'), 'Entrega y recibo no se divide por tipo de mantenimiento.');
 foreach (['actual', 'mes', 'anual', 'acumulado'] as $mode) {
   $check(str_contains($shell, 'data-scm-cb-mode="' . $mode . '"'), 'Costo-beneficio ofrece el periodo ' . $mode . '.');
 }

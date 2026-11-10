@@ -34,7 +34,7 @@ final class QuoteMetricsReport
   public const COLUMNS = [
     'id', 'ticket', 'contrato', 'inmueble', 'direccion', 'destinatario', 'categoria', 'estado', 'enviada',
     'fecha', 'respuesta', 'respuesta_fuente', 'total', 'admin', 'sugerida', 'sugerida_fuente', 'inmueble_caso',
-    'inmueble_fuente', 'contrato_caso', 'revisada',
+    'inmueble_fuente', 'contrato_caso', 'revisada', 'tipo',
   ];
   public const MAX_BATCH = 200;
   public const REVIEWS_SETTING = 'quote_response_reviews';
@@ -100,7 +100,7 @@ final class QuoteMetricsReport
     $tickets = $this->db->table('jet_cct_tickets');
     $hasTickets = $schema->tableExists($tickets);
     $fields = [];
-    foreach (['id_contrato' => 'quote_id_contrato', 'id_inmueble' => 'quote_id_inmueble'] as $column => $alias) {
+    foreach (['id_contrato' => 'quote_id_contrato', 'id_inmueble' => 'quote_id_inmueble', 'tipo_mantenimiento' => 'tipo_mantenimiento'] as $column => $alias) {
       $fields[] = ($schema->columnExists($table, $column) ? "c.`{$column}`" : "''") . " AS {$alias}";
     }
     foreach ([
@@ -299,6 +299,7 @@ final class QuoteMetricsReport
       $resolved['fuente'] ?? (preg_match('/^\d+$/', $caseProperty) === 1 ? 'caso' : ''),
       $resolved['contrato'] ?? '',
       $response !== null && $responseSource === 'cotizacion' && ($row['revisada'] ?? null) === $response ? 1 : 0,
+      stripos((string) ($row['tipo_mantenimiento'] ?? ''), 'prevent') !== false ? 'Preventiva' : 'Correctiva',
     ];
   }
 

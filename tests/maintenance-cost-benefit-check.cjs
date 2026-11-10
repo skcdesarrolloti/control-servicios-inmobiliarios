@@ -18,16 +18,16 @@ const expenseColumns = ['id', 'ticket', 'inmueble', 'categoria', 'funcionario', 
 
 const maintenance = {
   income_source: 'cotizaciones',
-  income_columns: ['id', 'ticket', 'contrato', 'inmueble', 'categoria', 'fecha', 'total', 'admin'],
+  income_columns: ['id', 'ticket', 'contrato', 'inmueble', 'tipo', 'fecha', 'total', 'admin'],
   income: [
-    [1, '10', '1001', '501', 'Inicial', day(month, 2), 1000000, 200000],
-    [2, '11', '1002', '502', 'Inicial', day(month, 3), 500000, 100000],
-  ].concat(previous !== month ? [[3, '12', '1003', '503', 'Nota', day(previous, 5), 400000, 50000]] : []),
+    [1, '10', '1001', '501', 'Correctiva', day(month, 2), 1000000, 200000],
+    [2, '11', '1002', '502', 'Preventiva', day(month, 3), 500000, 100000],
+  ].concat(previous !== month ? [[3, '12', '1003', '503', 'Correctiva', day(previous, 5), 400000, 50000]] : []),
   expense_columns: expenseColumns,
   expense: [
-    [7, '10', '501', 'Mantenimiento', 'Ana <img src=x onerror=alert(1)>', day(month, 2), 90000, 10000, 100000, 'pagado'],
+    [7, '10', '501', 'Revision correctiva', 'Ana <img src=x onerror=alert(1)>', day(month, 2), 90000, 10000, 100000, 'pagado'],
     [8, '11', '502', 'Revision preventiva', 'Luis', day(month, 4), 80000, 20000, 100000, 'en_cobro'],
-  ].concat(previous !== month ? [[9, '12', '503', 'Otro', 'Luis', day(previous, 6), 90000, 10000, 100000, 'sin_cobrar']] : []),
+  ].concat(previous !== month ? [[9, '12', '503', 'Revision correctiva', 'Luis', day(previous, 6), 90000, 10000, 100000, 'sin_cobrar']] : []),
   undated: { income_count: 1, income_value: 30000, expense_count: 0, expense_value: 0 },
   expense_note: 'Gastos de Alvaro Florez De Oro en revisiones correctivas y preventivas.',
   excluded: { count: 4, value: 70000 },
@@ -47,7 +47,10 @@ const delivery = {
   ],
   contracts_without_rate: 1,
   expense_columns: expenseColumns,
-  expense: [[30, '20', '501', 'Revision de entrega', 'Libia Correa Rivera', day(month, 2), 150000, 0, 150000, 'pagado']],
+  expense: [
+    [30, '20', '501', 'Revision entrega', 'Libia Correa Rivera', day(month, 2), 150000, 0, 150000, 'pagado'],
+    [31, '21', '502', 'Recibo', 'Libia Correa Rivera', day(month, 3), 50000, 0, 50000, 'sin_cobrar'],
+  ],
   undated: { income_count: 1, income_value: 0, expense_count: 0, expense_value: 0 },
   expense_note: 'Gastos de Libia Correa Rivera.',
   excluded: { count: 0, value: 0 },
@@ -107,12 +110,24 @@ const delivery = {
   await page.click(`.scm-cc-col[data-scm-cb-month="${currentMonth}"]`);
   assert.equal(digits((await kpis()).Ingresos), '300000', 'touching a month opens that month');
 
-  await page.selectOption('[data-scm-cb-filter="tipo"]', 'Mantenimiento');
+  assert.equal(await page.isHidden('[data-scm-cb-filter="tipo"]'), true, 'the tabs replace the type filter in maintenance');
+  assert.match(await page.textContent('[data-scm-cb-detail] thead'), /Tipo/);
+  assert.doesNotMatch(await page.textContent('[data-scm-cb-detail] thead'), /Categoría/, 'the income shows the maintenance type, not the quote category');
+  await page.click('[data-scm-cb-kind="correctiva"]');
   values = await kpis();
-  assert.equal(digits(values.Gastos), '100000', 'the type filter narrows the expense');
-  assert.equal(digits(values.Ingresos), '300000', 'the type filter does not change the income');
-  assert.equal(values['Relación beneficio/costo'], '3,00');
-  await page.selectOption('[data-scm-cb-filter="tipo"]', '');
+  assert.equal(digits(values.Ingresos), '200000', 'corrective tab keeps only corrective quotes');
+  assert.equal(digits(values.Gastos), '100000', 'corrective tab keeps only corrective reports');
+  assert.equal(values['Relación beneficio/costo'], '2,00');
+  assert.match(await page.textContent('[data-scm-cb-content]'), /Resultado de .* · correctivas/);
+  await page.click('[data-scm-cb-kind="preventiva"]');
+  values = await kpis();
+  assert.equal(digits(values.Ingresos), '100000', 'preventive tab keeps only preventive quotes');
+  assert.equal(digits(values.Gastos), '100000', 'preventive tab keeps only preventive reports');
+  assert.equal(await page.locator('[data-scm-cb-detail] tbody tr').count(), 1, 'the detail follows the tab');
+  await page.click('[data-scm-cb-kind="general"]');
+  values = await kpis();
+  assert.equal(digits(values.Ingresos), '300000', 'general adds both types');
+  assert.equal(digits(values.Gastos), '200000');
 
   assert.equal(await page.locator('[data-scm-cb-detail] [data-scm-maintenance-quote-open-case]').count(), 2, 'income rows open the case');
   await page.click('[data-scm-cb-view="gastos"]');
@@ -128,7 +143,13 @@ const delivery = {
   await open('entrega_recibo');
   values = await kpis();
   assert.equal(digits(values.Ingresos), String(200000 + 100000 + 500000), 'one month of commission on both contracts plus the rights of the contract delivered this month');
-  assert.equal(digits(values.Gastos), '150000');
+  assert.equal(digits(values.Gastos), '200000');
+  await page.selectOption('[data-scm-cb-filter="tipo"]', 'Recibo');
+  values = await kpis();
+  assert.equal(digits(values.Gastos), '50000', 'the type filter narrows the expense');
+  assert.equal(digits(values.Ingresos), String(200000 + 100000 + 500000), 'the type filter does not change the income');
+  await page.selectOption('[data-scm-cb-filter="tipo"]', '');
+  assert.equal(await page.locator('[data-scm-cb-kind]').count(), 0, 'delivery has no maintenance tabs');
   assert.match(await page.textContent('[data-scm-cb-content]'), /Gastos de Libia Correa Rivera\./);
   assert.match(await page.textContent('[data-scm-cb-content]'), /1 contrato no tiene % de administración ni de derechos/);
   assert.match(await page.textContent('[data-scm-cb-content]'), /1 contrato sin fecha de entrega/);

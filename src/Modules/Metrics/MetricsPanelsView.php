@@ -12,6 +12,8 @@ final class MetricsPanelsView
 {
   /** Periodos comunes a Casos y Cotizaciones. */
   private const PERIOD_MODES = ['actual' => 'Mes actual', 'mes' => 'Por mes', 'anual' => 'Anual', 'acumulado' => 'Acumulado'];
+  /** Pestañas de Costo-beneficio mantenimiento: etiqueta e ícono. */
+  private const MAINTENANCE_KINDS = ['general' => ['General', 'balance'], 'correctiva' => ['Correctiva', 'build'], 'preventiva' => ['Preventiva', 'pending_actions']];
   /** Título y descripción de cada vista de MaintenanceCostBenefitReport::SCOPES. */
   private const COST_VIEWS = [
     'entrega_recibo' => ['Costo entrega y recibo', 'Lo que se le paga mes a mes a la auxiliar de entrega y recibo, frente a los ingresos por comisión y derechos de los contratos.'],
@@ -196,6 +198,16 @@ final class MetricsPanelsView
         </div>
       </header>
 
+      <?php if ($scope === 'mantenimiento'): ?>
+        <div class="scm-cm-views" role="tablist" aria-label="Tipo de mantenimiento">
+          <?php foreach (self::MAINTENANCE_KINDS as $kind => [$kindLabel, $kindIcon]): ?>
+            <button type="button" role="tab" class="scm-cm-view<?php echo $kind === 'general' ? ' is-active' : ''; ?>" aria-selected="<?php echo $kind === 'general' ? 'true' : 'false'; ?>" data-scm-cb-kind="<?php echo $kind; ?>">
+              <span class="material-symbols-outlined" aria-hidden="true"><?php echo $kindIcon; ?></span><span><?php echo $kindLabel; ?></span>
+            </button>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+
       <form class="scm-cm-filters scm-qm-filters" onsubmit="return false;">
         <div class="scm-cm-field scm-qm-period">
           <span>Periodo</span>
@@ -221,7 +233,7 @@ final class MetricsPanelsView
           <span>Hasta</span>
           <input type="month" data-scm-cb-filter="to" value="<?php echo $currentMonth; ?>" max="<?php echo $currentMonth; ?>">
         </label>
-        <label class="scm-cm-field">
+        <label class="scm-cm-field"<?php echo $scope === 'mantenimiento' ? ' hidden' : ''; ?>>
           <span>Tipo de gasto</span>
           <select data-scm-cb-filter="tipo"><option value="">Todos</option></select>
         </label>
