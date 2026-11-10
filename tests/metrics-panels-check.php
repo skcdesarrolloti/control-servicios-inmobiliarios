@@ -232,4 +232,32 @@ $runtimeJs = (string) file_get_contents($root . '/public/assets/js/admin-dashboa
 $check(str_contains($maintenance, "'fecha_respuesta' => \$responseTs") && str_contains($maintenance, "'fecha_respuesta_cotizacion_mantenimiento' => \$responseTs") && str_contains($maintenance, 'no puede ser anterior a la creación de la cotización'), 'La aprobación desde el panel usa la fecha indicada.');
 $check(str_contains($runtimeJs, 'id="swal-approve-date"') && str_contains($runtimeJs, 'fd.append("fecha_aprobacion"'), 'El diálogo de aprobación pide la fecha.');
 
+// Costo-beneficio: ingreso por administración de aprobadas, gasto por reportes de funcionarios.
+$costBenefit = new \SCM\Modules\Metrics\MaintenanceCostBenefitReport($sqlite);
+$quoteColumns = QuoteMetricsReport::COLUMNS;
+$quoteRow = static fn(array $values): array => array_map(static fn(string $column) => $values[$column] ?? null, $quoteColumns);
+$reportBase = ['id_ticket' => '10', 'inmueble' => '500', 'categoria' => 'Mantenimiento', 'funcionario' => 'Ana', 'servicio' => 90000, 'transporte' => 10000, 'total' => 100000, 'exportado' => false, 'pagado' => false];
+$built = $costBenefit->build(['columns' => $quoteColumns, 'rows' => [
+  $quoteRow(['id' => 1, 'estado' => 'Aprobada', 'respuesta' => '2026-10-16', 'total' => 500000, 'admin' => 50000, 'categoria' => 'Inicial']),
+  $quoteRow(['id' => 2, 'estado' => 'Esperando respuesta', 'respuesta' => '2026-10-16', 'total' => 900000, 'admin' => 90000]),
+  $quoteRow(['id' => 3, 'estado' => 'Aprobada', 'respuesta' => null, 'total' => 300000, 'admin' => 30000]),
+]], [
+  ['id' => 7, 'fecha' => 1792167812] + $reportBase,
+  ['id' => 8, 'fecha' => 1792167812, 'exportado' => true] + $reportBase,
+  ['id' => 9, 'fecha' => 1792167812, 'exportado' => true, 'pagado' => true, 'categoria' => '', 'funcionario' => ''] + $reportBase,
+  ['id' => 10, 'fecha' => 0, 'total' => 40000] + $reportBase,
+]);
+$incomeIds = array_column($built['income'], array_search('id', $built['income_columns'], true));
+$check($incomeIds === [1] && $built['income'][0][array_search('fecha', $built['income_columns'], true)] === '2026-10-16' && $built['income'][0][array_search('admin', $built['income_columns'], true)] === 50000, 'El ingreso es la administración de las aprobadas, por fecha de respuesta.');
+$check($built['undated'] === ['income_count' => 1, 'income_value' => 30000, 'expense_count' => 1, 'expense_value' => 40000], 'Lo que no tiene fecha se informa aparte: ' . json_encode($built['undated']));
+$stateColumn = array_search('estado', $built['expense_columns'], true);
+$check(array_column($built['expense'], $stateColumn) === ['sin_cobrar', 'en_cobro', 'pagado'], 'Cada gasto indica si está sin cobrar, en cuenta de cobro o pagado.');
+$check($built['expense'][2][array_search('categoria', $built['expense_columns'], true)] === 'Sin tipo' && $built['expense'][2][array_search('funcionario', $built['expense_columns'], true)] === 'Sin funcionario', 'Tipo y funcionario vacíos se agrupan con un nombre visible.');
+$check($built['expense'][0][array_search('fecha', $built['expense_columns'], true)] === '2026-10-16', 'El gasto usa la fecha del reporte en hora Colombia.');
+$shell = $view->renderCostBenefitShell();
+foreach (['actual', 'mes', 'anual', 'acumulado'] as $mode) {
+  $check(str_contains($shell, 'data-scm-cb-mode="' . $mode . '"'), 'Costo-beneficio ofrece el periodo ' . $mode . '.');
+}
+$check(str_contains($dashboard, "'metricas_costo_beneficio' => 'scm-panel-metricas-costo-beneficio'") && str_contains($dashboard, 'renderCostBenefitShell') && str_contains($runtimeJs, '[data-scm-cost-benefit]'), 'Costo-beneficio tiene ruta, panel y carga diferida.');
+
 echo "Metrics panels checks passed.\n";

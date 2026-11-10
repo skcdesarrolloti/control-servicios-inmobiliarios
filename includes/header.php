@@ -305,6 +305,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'metricas_cotizaciones';
   } elseif (in_array($tabParam, ['metricas_preventivas', 'scm-panel-metricas-preventivas'], true)) {
     $current_page = 'metricas_preventivas';
+  } elseif (in_array($tabParam, ['metricas_costo_beneficio', 'scm-panel-metricas-costo-beneficio'], true)) {
+    $current_page = 'metricas_costo_beneficio';
   } elseif (in_array($tabParam, ['metricas_servicios_publicos', 'scm-panel-metricas-servicios-publicos'], true)) {
     $current_page = 'metricas_servicios_publicos';
   } elseif (in_array($tabParam, ['mis_presupuestos', 'scm-panel-mis-presupuestos'], true)) {
@@ -806,7 +808,7 @@ $rawNavItems = [
         'key' => 'metricas_cotizaciones',
         'group' => 'Mantenimiento',
         'group_icon' => 'build',
-        'group_description' => 'Cotizaciones y revisiones preventivas',
+        'group_description' => 'Cotizaciones, revisiones y costo-beneficio',
         'label' => 'Cotizaciones',
         'description' => 'Cotizaciones enviadas y aprobadas',
         'panel_id' => 'scm-panel-metricas-cotizaciones',
@@ -824,6 +826,17 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=metricas_preventivas',
         'icon' => 'pending_actions',
         'perms' => ['metricas_preventivas'],
+      ],
+      'metricas_costo_beneficio' => [
+        'key' => 'metricas_costo_beneficio',
+        'group' => 'Mantenimiento',
+        'group_icon' => 'build',
+        'label' => 'Costo-beneficio',
+        'description' => 'Ingresos frente a pagos a funcionarios',
+        'panel_id' => 'scm-panel-metricas-costo-beneficio',
+        'url' => $baseUrl . '/index.php?tab=metricas_costo_beneficio',
+        'icon' => 'balance',
+        'perms' => ['metricas_costo_beneficio'],
       ],
       'metricas_servicios_publicos' => [
         'key' => 'metricas_servicios_publicos',

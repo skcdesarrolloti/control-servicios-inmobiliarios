@@ -432,6 +432,10 @@
 #scm-app .scm-cc-col:hover { background: #eff6ff; }
 #scm-app .scm-cc-bar { position: relative; width: 100%; max-width: 28px; border-radius: 4px 4px 0 0; }
 #scm-app .scm-cc-bar i { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); padding-bottom: 2px; font-size: 10px; font-style: normal; font-weight: 700; color: #334155; }
+#scm-app .scm-cb-col { gap: 2px; }
+#scm-app .scm-cb-col .scm-cc-bar { max-width: 16px; }
+#scm-app .scm-cb-col .scm-cc-bar i { white-space: nowrap; }
+#scm-app .scm-cb-note { margin: 0; font-size: 12.5px; color: #475569; }
 #scm-app .scm-cc-axis { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 2px; font-size: 10px; text-align: center; color: var(--cm-muted); }
 #scm-app .scm-cc-axis span { overflow: visible; white-space: nowrap; }
 #scm-app .scm-cc-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 10px; font-size: 11.5px; color: #475569; }

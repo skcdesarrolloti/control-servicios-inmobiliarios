@@ -183,6 +183,18 @@ final class AdministrativeReportsService
     return $this->staffReady() ? ', f.nombre AS nombre_funcionario, f.documento AS documento_funcionario' : ", '' AS nombre_funcionario, '' AS documento_funcionario";
   }
 
+  /** Todos los reportes con el nombre del funcionario; sin `fecha` usan `cct_created`. @return array<int,array<string,mixed>> */
+  public function allReports(): array
+  {
+    if (!$this->available()) return [];
+    $rows = $this->db->getResults("SELECT r.*" . $this->staffNameSelect() . " FROM `{$this->reportsTable()}` r" . $this->staffJoin('r') . ' ORDER BY r.`_ID` DESC');
+    return array_map(static function (array $row): array {
+      $item = self::present($row);
+      if ($item['fecha'] === 0) $item['fecha'] = self::timestamp($row['cct_created'] ?? '');
+      return $item;
+    }, $rows);
+  }
+
   // Mis reportes --------------------------------------------------------------
 
   /** @return array{items:array<int,array<string,mixed>>,summary:array<string,int>,counts:array<string,int>} */

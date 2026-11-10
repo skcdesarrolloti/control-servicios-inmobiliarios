@@ -128,6 +128,20 @@ trait HandlesMetricsPanels
     }
   }
 
+  public function ajax_handler_maintenance_cost_benefit(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('metricas_costo_beneficio')) {
+      $this->jsonFail('No tienes permiso para ver métricas.');
+    }
+    try {
+      $this->jsonOk((new \SCM\Modules\Metrics\MaintenanceCostBenefitReport($this->db))->snapshot());
+    } catch (\Throwable $exception) {
+      error_log('[maintenance-cost-benefit] ' . $exception->getMessage());
+      $this->jsonFail('No se pudo cargar el costo-beneficio.');
+    }
+  }
+
   public function ajax_handler_quote_response_date(): void
   {
     $this->verifyCsrf();

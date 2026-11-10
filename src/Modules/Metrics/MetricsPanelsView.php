@@ -163,4 +163,67 @@ final class MetricsPanelsView
 <?php
     return (string) ob_get_clean();
   }
+
+  public function renderCostBenefitShell(): string
+  {
+    $now = new \DateTimeImmutable('now', new \DateTimeZone('America/Bogota'));
+    $year = $now->format('Y');
+    $currentMonth = $now->format('Y-m');
+    ob_start();
+?>
+    <section class="scm-cm scm-cost-benefit" data-scm-cost-benefit data-current-month="<?php echo $currentMonth; ?>" aria-labelledby="scm-cost-benefit-title">
+      <header class="scm-cm-head">
+        <div class="scm-cm-head-copy">
+          <p class="scm-cm-kicker">Métricas · Mantenimiento</p>
+          <h1 id="scm-cost-benefit-title">Costo-beneficio</h1>
+          <p class="scm-cm-subtitle">Compara la administración ganada en cotizaciones aprobadas con lo que cobran los funcionarios en reportes administrativos y cuentas de cobro.</p>
+        </div>
+        <div class="scm-cm-head-actions">
+          <span class="scm-cm-updated" data-scm-cb-updated></span>
+          <button type="button" class="scm-cm-btn" data-scm-cb-export disabled hidden>
+            <span class="material-symbols-outlined" aria-hidden="true">download</span><span>Exportar mes a mes</span>
+          </button>
+          <button type="button" class="scm-cm-btn" data-scm-cb-refresh>
+            <span class="material-symbols-outlined" aria-hidden="true">refresh</span><span>Actualizar</span>
+          </button>
+        </div>
+      </header>
+
+      <form class="scm-cm-filters scm-qm-filters" onsubmit="return false;">
+        <div class="scm-cm-field scm-qm-period">
+          <span>Periodo</span>
+          <div class="scm-qm-views" role="radiogroup" aria-label="Periodo">
+            <?php foreach (self::PERIOD_MODES as $mode => $label): ?>
+              <button type="button" role="radio" class="scm-qm-view<?php echo $mode === 'actual' ? ' is-active' : ''; ?>" aria-checked="<?php echo $mode === 'actual' ? 'true' : 'false'; ?>" data-scm-cb-mode="<?php echo $mode; ?>"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></button>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <label class="scm-cm-field" data-scm-cb-mode-field="mes" hidden>
+          <span>Mes</span>
+          <input type="month" data-scm-cb-filter="month" value="<?php echo $currentMonth; ?>" max="<?php echo $currentMonth; ?>">
+        </label>
+        <label class="scm-cm-field" data-scm-cb-mode-field="anual" hidden>
+          <span>Año</span>
+          <select data-scm-cb-filter="year"><option value="<?php echo $year; ?>"><?php echo $year; ?></option></select>
+        </label>
+        <label class="scm-cm-field" data-scm-cb-mode-field="acumulado" hidden>
+          <span>Desde</span>
+          <input type="month" data-scm-cb-filter="from" value="<?php echo $year; ?>-01" max="<?php echo $currentMonth; ?>">
+        </label>
+        <label class="scm-cm-field" data-scm-cb-mode-field="acumulado" hidden>
+          <span>Hasta</span>
+          <input type="month" data-scm-cb-filter="to" value="<?php echo $currentMonth; ?>" max="<?php echo $currentMonth; ?>">
+        </label>
+        <label class="scm-cm-field">
+          <span>Tipo de gasto</span>
+          <select data-scm-cb-filter="tipo"><option value="">Todos</option></select>
+        </label>
+      </form>
+
+      <div class="scm-cm-status" data-scm-cb-status role="status" aria-live="polite">Cargando costo-beneficio&hellip;</div>
+      <div class="scm-cm-content" data-scm-cb-content></div>
+    </section>
+<?php
+    return (string) ob_get_clean();
+  }
 }

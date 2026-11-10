@@ -78,6 +78,7 @@ $_SESSION['scm_user_cargo'] = '5';
 $tabs = $invoke('currentDashboardAllowedTabs');
 $check(!array_diff(['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble', 'solicitudes_terminacion', 'funcionario_contratos', 'metricas_casos', 'metricas_crecimiento', 'ordenes_mantenimiento'], $tabs), 'legacy permissions keep every option the cargo used to see');
 $check(!array_diff(['calendario_actividades', 'actividades_contractuales', 'metricas'], $tabs), 'grouped panels stay enabled through their options');
+$check(!in_array('metricas_costo_beneficio', $tabs, true), 'legacy metrics permission does not reveal what each employee bills');
 $_SESSION['scm_user_cargo'] = '6';
 $tabs = $invoke('currentDashboardAllowedTabs');
 $check(in_array('mi_calendario', $tabs, true) && !in_array('metricas_casos', $tabs, true) && !in_array('funcionario_contratos', $tabs, true), 'legacy cargo without metrics or contracts does not gain them');
@@ -94,6 +95,16 @@ $setSettings([
   'dashboard_tab_permissions_known_keys' => $tabKeys,
 ]);
 $check(!in_array('ordenes_mantenimiento', $invoke('currentDashboardAllowedTabs'), true), 'unchecking Órdenes is respected after saving');
+$knownBeforeCostBenefit = array_values(array_diff($tabKeys, ['metricas_costo_beneficio']));
+$setSettings(['dashboard_tab_permissions' => ['5' => ['metricas_cotizaciones'], '13' => ['abiertos']], 'dashboard_tab_permissions_known_keys' => $knownBeforeCostBenefit]);
+$_SESSION['scm_user_cargo'] = '13';
+$check(in_array('metricas_costo_beneficio', $invoke('currentDashboardAllowedTabs'), true), 'permission admins see cost-benefit until permissions are saved with it');
+$_SESSION['scm_user_cargo'] = '5';
+$check(!in_array('metricas_costo_beneficio', $invoke('currentDashboardAllowedTabs'), true), 'quote metrics access alone does not reveal cost-benefit');
+$setSettings(['dashboard_tab_permissions' => ['5' => ['metricas_cotizaciones'], '13' => ['abiertos']], 'dashboard_tab_permissions_known_keys' => $tabKeys]);
+$_SESSION['scm_user_cargo'] = '13';
+$check(!in_array('metricas_costo_beneficio', $invoke('currentDashboardAllowedTabs'), true), 'unchecking cost-benefit is respected after saving');
+$_SESSION['scm_user_cargo'] = '5';
 $setSettings(['dashboard_tab_permissions' => ['5' => ['metricas_contratos']], 'dashboard_tab_permissions_known_keys' => $tabKeys]);
 $tabs = $invoke('currentDashboardAllowedTabs');
 $check(!array_diff(['metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_contratos'], $tabs), 'the former single occupancy option becomes its three views');
