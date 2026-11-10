@@ -309,8 +309,6 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'metricas_costo_entrega_recibo';
   } elseif (in_array($tabParam, ['metricas_costo_beneficio', 'scm-panel-metricas-costo-beneficio'], true)) {
     $current_page = 'metricas_costo_beneficio';
-  } elseif (in_array($tabParam, ['metricas_costo_contractual', 'scm-panel-metricas-costo-contractual'], true)) {
-    $current_page = 'metricas_costo_contractual';
   } elseif (in_array($tabParam, ['metricas_servicios_publicos', 'scm-panel-metricas-servicios-publicos'], true)) {
     $current_page = 'metricas_servicios_publicos';
   } elseif (in_array($tabParam, ['mis_presupuestos', 'scm-panel-mis-presupuestos'], true)) {
@@ -852,17 +850,6 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=metricas_costo_beneficio',
         'icon' => 'balance',
         'perms' => ['metricas_costo_beneficio'],
-      ],
-      'metricas_costo_contractual' => [
-        'key' => 'metricas_costo_contractual',
-        'group' => 'Mantenimiento',
-        'group_icon' => 'build',
-        'label' => 'Costo-beneficio área contractual',
-        'description' => 'Pagos a funcionarios frente a ingresos',
-        'panel_id' => 'scm-panel-metricas-costo-contractual',
-        'url' => $baseUrl . '/index.php?tab=metricas_costo_contractual',
-        'icon' => 'handshake',
-        'perms' => ['metricas_costo_contractual'],
       ],
       'metricas_servicios_publicos' => [
         'key' => 'metricas_servicios_publicos',

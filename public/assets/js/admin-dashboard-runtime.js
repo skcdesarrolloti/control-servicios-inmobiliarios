@@ -26529,7 +26529,6 @@
         activePanel.id !== "scm-panel-metricas-preventivas" &&
         activePanel.id !== "scm-panel-metricas-costo-entrega-recibo" &&
         activePanel.id !== "scm-panel-metricas-costo-beneficio" &&
-        activePanel.id !== "scm-panel-metricas-costo-contractual" &&
         activePanel.id !== "scm-panel-metricas-servicios-publicos" &&
         activePanel.id !== "scm-panel-metricas-crecimiento" &&
         activePanel.id !== "scm-panel-mis-presupuestos" &&
@@ -26565,7 +26564,7 @@
       if (activePanel.id === "scm-panel-cotizaciones-mantenimiento") {
         return loadPanelOnce(activePanel, "cotizaciones_mantenimiento");
       }
-      if (activePanel.id === "scm-panel-metricas-casos" || activePanel.id === "scm-panel-metricas-cotizaciones" || activePanel.id === "scm-panel-metricas-costo-entrega-recibo" || activePanel.id === "scm-panel-metricas-costo-beneficio" || activePanel.id === "scm-panel-metricas-costo-contractual") {
+      if (activePanel.id === "scm-panel-metricas-casos" || activePanel.id === "scm-panel-metricas-cotizaciones" || activePanel.id === "scm-panel-metricas-costo-entrega-recibo" || activePanel.id === "scm-panel-metricas-costo-beneficio") {
         var metricsModule = activePanel.querySelector("[data-scm-case-metrics], [data-scm-quote-metrics], [data-scm-cost-benefit]");
         if (metricsModule) {
           metricsModule.dispatchEvent(new CustomEvent("scm:load-metrics"));

@@ -237,15 +237,16 @@ $costBenefit = new \SCM\Modules\Metrics\MaintenanceCostBenefitReport($sqlite);
 $quoteColumns = QuoteMetricsReport::COLUMNS;
 $quoteRow = static fn(array $values): array => array_map(static fn(string $column) => $values[$column] ?? null, $quoteColumns);
 $reportBase = ['id_ticket' => '10', 'inmueble' => '500', 'categoria' => 'Mantenimiento', 'funcionario' => 'Libia Correa Rivera', 'servicio' => 90000, 'transporte' => 10000, 'total' => 100000, 'exportado' => false, 'pagado' => false];
-$built = $costBenefit->build('contractual', ['columns' => $quoteColumns, 'rows' => [
+$alvaroReport = ['funcionario' => 'Alvaro Florez De Oro', 'categoria' => 'Revision correctiva'];
+$built = $costBenefit->build('mantenimiento', ['columns' => $quoteColumns, 'rows' => [
   $quoteRow(['id' => 1, 'estado' => 'Aprobada', 'respuesta' => '2026-10-16', 'total' => 500000, 'admin' => 50000, 'categoria' => 'Inicial']),
   $quoteRow(['id' => 2, 'estado' => 'Esperando respuesta', 'respuesta' => '2026-10-16', 'total' => 900000, 'admin' => 90000]),
   $quoteRow(['id' => 3, 'estado' => 'Aprobada', 'respuesta' => null, 'total' => 300000, 'admin' => 30000]),
 ]], [
-  ['id' => 7, 'fecha' => 1792167812] + $reportBase,
-  ['id' => 8, 'fecha' => 1792167812, 'exportado' => true] + $reportBase,
-  ['id' => 9, 'fecha' => 1792167812, 'exportado' => true, 'pagado' => true, 'categoria' => '', 'funcionario' => 'ÁLVARO  FLÓREZ DE ORO'] + $reportBase,
-  ['id' => 10, 'fecha' => 0, 'total' => 40000] + $reportBase,
+  ['id' => 7, 'fecha' => 1792167812] + $alvaroReport + $reportBase,
+  ['id' => 8, 'fecha' => 1792167812, 'exportado' => true] + $alvaroReport + $reportBase,
+  ['id' => 9, 'fecha' => 1792167812, 'exportado' => true, 'pagado' => true, 'categoria' => 'Revision preventiva', 'funcionario' => 'ÁLVARO  FLÓREZ DE ORO'] + $reportBase,
+  ['id' => 10, 'fecha' => 0, 'total' => 40000] + $alvaroReport + $reportBase,
   ['id' => 11, 'fecha' => 1792167812, 'total' => 70000, 'funcionario' => 'Elsie Johana Perez Kelly'] + $reportBase,
   ['id' => 12, 'fecha' => 1792167812, 'total' => 5000, 'funcionario' => ''] + $reportBase,
 ]);
@@ -254,10 +255,9 @@ $check($incomeIds === [1] && $built['income'][0][array_search('fecha', $built['i
 $check($built['undated'] === ['income_count' => 1, 'income_value' => 30000, 'expense_count' => 1, 'expense_value' => 40000], 'Lo que no tiene fecha se informa aparte: ' . json_encode($built['undated']));
 $stateColumn = array_search('estado', $built['expense_columns'], true);
 $check(array_column($built['expense'], $stateColumn) === ['sin_cobrar', 'en_cobro', 'pagado'], 'Cada gasto indica si está sin cobrar, en cuenta de cobro o pagado.');
-$check($built['expense'][2][array_search('categoria', $built['expense_columns'], true)] === 'Sin tipo', 'Un tipo vacío se agrupa con un nombre visible.');
-$check($built['excluded'] === ['count' => 2, 'value' => 75000] && count($built['expense']) === 3, 'Solo cuentan Libia y Alvaro, sin importar tildes ni mayúsculas; los demás se informan aparte: ' . json_encode($built['excluded']));
-$check($built['employees_not_found'] === [], 'Los dos funcionarios tienen reportes.');
-$check($costBenefit->build('contractual', ['columns' => $quoteColumns, 'rows' => []], [['id' => 7, 'fecha' => 1792167812] + $reportBase])['employees_not_found'] === ['Alvaro Florez De Oro'], 'Avisa si un funcionario no aparece en ningún reporte.');
+$check($built['excluded'] === ['count' => 2, 'value' => 75000] && count($built['expense']) === 3, 'Solo cuenta Alvaro, sin importar tildes ni mayúsculas; los demás se informan aparte: ' . json_encode($built['excluded']));
+$check($built['employees_not_found'] === [], 'El funcionario tiene reportes.');
+$check($costBenefit->build('mantenimiento', ['columns' => $quoteColumns, 'rows' => []], [['id' => 7, 'fecha' => 1792167812] + $reportBase])['employees_not_found'] === ['Alvaro Florez De Oro'], 'Avisa si un funcionario no aparece en ningún reporte.');
 $check($built['expense'][0][array_search('fecha', $built['expense_columns'], true)] === '2026-10-16', 'El gasto usa la fecha del reporte en hora Colombia.');
 $maintenance = $costBenefit->build('mantenimiento', ['columns' => $quoteColumns, 'rows' => []], [
   ['id' => 20, 'fecha' => 1792167812, 'funcionario' => 'Alvaro Florez De Oro', 'categoria' => 'Revision correctiva'] + $reportBase,
@@ -285,6 +285,6 @@ $shell = $view->renderCostBenefitShell('mantenimiento');
 foreach (['actual', 'mes', 'anual', 'acumulado'] as $mode) {
   $check(str_contains($shell, 'data-scm-cb-mode="' . $mode . '"'), 'Costo-beneficio ofrece el periodo ' . $mode . '.');
 }
-$check(str_contains($dashboard, "'metricas_costo_entrega_recibo' => 'scm-panel-metricas-costo-entrega-recibo'") && str_contains($dashboard, "'metricas_costo_contractual' => 'scm-panel-metricas-costo-contractual'") && str_contains($dashboard, 'renderCostBenefitShell($costScope)') && str_contains($runtimeJs, '[data-scm-cost-benefit]'), 'Costo-beneficio tiene ruta, panel y carga diferida.');
+$check(str_contains($dashboard, "'metricas_costo_entrega_recibo' => 'scm-panel-metricas-costo-entrega-recibo'") && str_contains($dashboard, "'metricas_costo_beneficio' => 'scm-panel-metricas-costo-beneficio'") && !str_contains($dashboard, 'metricas_costo_contractual') && str_contains($dashboard, 'renderCostBenefitShell($costScope)') && str_contains($runtimeJs, '[data-scm-cost-benefit]'), 'Costo-beneficio tiene ruta, panel y carga diferida.');
 
 echo "Metrics panels checks passed.\n";

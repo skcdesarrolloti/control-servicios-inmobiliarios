@@ -381,7 +381,6 @@ final class SuCasaControlServiciosInmobiliarios
       'metricas_preventivas' => 'Revisión preventiva',
       'metricas_costo_entrega_recibo' => 'Costo entrega y recibo',
       'metricas_costo_beneficio' => 'Costo-beneficio mantenimiento',
-      'metricas_costo_contractual' => 'Costo-beneficio área contractual',
       'metricas_servicios_publicos' => 'Revisiones de servicios públicos',
       'metricas_ocupaciones' => 'Ocupaciones',
       'metricas_desocupaciones' => 'Desocupaciones',
@@ -402,13 +401,13 @@ final class SuCasaControlServiciosInmobiliarios
   }
 
   /** Vistas que muestran lo que cobra cada funcionario. */
-  private const COST_METRIC_TABS = ['metricas_costo_entrega_recibo', 'metricas_costo_beneficio', 'metricas_costo_contractual'];
+  private const COST_METRIC_TABS = ['metricas_costo_entrega_recibo', 'metricas_costo_beneficio'];
 
   /** Opciones que, si alguna está permitida, habilitan el panel o la verificación agrupada. */
   private const DERIVED_DASHBOARD_TABS = [
     'calendario_actividades' => ['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble'],
     'actividades_contractuales' => ['contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga'],
-    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_costo_entrega_recibo', 'metricas_costo_beneficio', 'metricas_costo_contractual', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento'],
+    'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_costo_entrega_recibo', 'metricas_costo_beneficio', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento'],
     // Panel compartido de ocupaciones y desocupaciones (una consulta para todas sus vistas), también desde Actividades de cartera.
     'metricas_contratos' => ['metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_por_terminar', 'metricas_aumentos', 'cartera_ocupaciones', 'cartera_desocupaciones'],
   ];

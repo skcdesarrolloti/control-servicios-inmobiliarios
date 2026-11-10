@@ -174,8 +174,6 @@ trait RendersDashboard
       'scm-panel-metricas-costo-entrega-recibo' => 'scm-panel-metricas-costo-entrega-recibo',
       'metricas_costo_beneficio' => 'scm-panel-metricas-costo-beneficio',
       'scm-panel-metricas-costo-beneficio' => 'scm-panel-metricas-costo-beneficio',
-      'metricas_costo_contractual' => 'scm-panel-metricas-costo-contractual',
-      'scm-panel-metricas-costo-contractual' => 'scm-panel-metricas-costo-contractual',
       'metricas_servicios_publicos' => 'scm-panel-metricas-servicios-publicos',
       'scm-panel-metricas-servicios-publicos' => 'scm-panel-metricas-servicios-publicos',
       'metricas_crecimiento' => 'scm-panel-metricas-crecimiento',
@@ -383,7 +381,7 @@ trait RendersDashboard
     $canAccessAdministrativeCalendar = in_array('calendario_actividades', $dashboardAllowedTabs, true);
     $canAccessContractActivities = in_array('actividades_contractuales', $dashboardAllowedTabs, true);
     $firstMetricsPanel = 'scm-panel-metricas-casos';
-    foreach (['metricas_casos' => 'scm-panel-metricas-casos', 'metricas_cotizaciones' => 'scm-panel-metricas-cotizaciones', 'metricas_preventivas' => 'scm-panel-metricas-preventivas', 'metricas_costo_entrega_recibo' => 'scm-panel-metricas-costo-entrega-recibo', 'metricas_costo_beneficio' => 'scm-panel-metricas-costo-beneficio', 'metricas_costo_contractual' => 'scm-panel-metricas-costo-contractual', 'metricas_servicios_publicos' => 'scm-panel-metricas-servicios-publicos', 'metricas_contratos' => 'scm-panel-movimientos-contratos', 'metricas_crecimiento' => 'scm-panel-metricas-crecimiento'] as $metricTab => $metricPanel) {
+    foreach (['metricas_casos' => 'scm-panel-metricas-casos', 'metricas_cotizaciones' => 'scm-panel-metricas-cotizaciones', 'metricas_preventivas' => 'scm-panel-metricas-preventivas', 'metricas_costo_entrega_recibo' => 'scm-panel-metricas-costo-entrega-recibo', 'metricas_costo_beneficio' => 'scm-panel-metricas-costo-beneficio', 'metricas_servicios_publicos' => 'scm-panel-metricas-servicios-publicos', 'metricas_contratos' => 'scm-panel-movimientos-contratos', 'metricas_crecimiento' => 'scm-panel-metricas-crecimiento'] as $metricTab => $metricPanel) {
       if (in_array($metricTab, $dashboardAllowedTabs, true)) {
         $firstMetricsPanel = $metricPanel;
         break;
@@ -429,7 +427,6 @@ trait RendersDashboard
       'scm-panel-metricas-preventivas' => 'metricas_preventivas',
       'scm-panel-metricas-costo-entrega-recibo' => 'metricas_costo_entrega_recibo',
       'scm-panel-metricas-costo-beneficio' => 'metricas_costo_beneficio',
-      'scm-panel-metricas-costo-contractual' => 'metricas_costo_contractual',
       'scm-panel-metricas-servicios-publicos' => 'metricas_servicios_publicos',
       'scm-panel-metricas-crecimiento' => 'metricas_crecimiento',
       'scm-panel-mis-presupuestos' => 'mis_presupuestos',
@@ -2012,7 +2009,6 @@ trait RendersDashboard
         'metricas_preventivas' => '',
         'metricas_costo_entrega_recibo' => '',
         'metricas_costo_beneficio' => '',
-        'metricas_costo_contractual' => '',
         'metricas_servicios_publicos' => '',
         'metricas_ocupaciones' => '',
         'metricas_desocupaciones' => '',

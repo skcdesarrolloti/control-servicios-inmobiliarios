@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  // Métricas › Mantenimiento: Costo entrega y recibo, Costo-beneficio mantenimiento y área contractual.
+  // Métricas › Mantenimiento: Costo entrega y recibo y Costo-beneficio mantenimiento.
   // Cada vista (data-scope) trae todas sus filas en una sola petición y los periodos, indicadores,
   // detalle y CSV se calculan en el navegador.
   // - Ingreso: administración de las cotizaciones aprobadas por fecha de respuesta o, en entrega y recibo,

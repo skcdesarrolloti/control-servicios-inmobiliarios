@@ -39,10 +39,6 @@ final class MaintenanceCostBenefitReport
       'tab' => 'metricas_costo_beneficio', 'panel' => 'scm-panel-metricas-costo-beneficio', 'income' => 'cotizaciones',
       'employees' => [self::ALVARO], 'types' => ['correctiva', 'preventiva'], 'note' => 'Gastos de ' . self::ALVARO . ' en revisiones correctivas y preventivas.',
     ],
-    'contractual' => [
-      'tab' => 'metricas_costo_contractual', 'panel' => 'scm-panel-metricas-costo-contractual', 'income' => 'cotizaciones',
-      'employees' => [self::LIBIA, self::ALVARO], 'types' => [], 'note' => 'Gastos de ' . self::LIBIA . ' y ' . self::ALVARO . '.',
-    ],
   ];
 
   private DateTimeZone $timezone;
@@ -114,8 +110,7 @@ final class MaintenanceCostBenefitReport
         continue;
       }
       $expense[] = [
-        $report['id'], $report['id_ticket'], $report['inmueble'], $report['categoria'] !== '' ? $report['categoria'] : 'Sin tipo',
-        $report['funcionario'], $date,
+        $report['id'], $report['id_ticket'], $report['inmueble'], $report['categoria'], $report['funcionario'], $date,
         $report['servicio'], $report['transporte'], $report['total'], self::paymentState($report),
       ];
     }
@@ -137,10 +132,9 @@ final class MaintenanceCostBenefitReport
     ];
   }
 
-  /** @param list<string> $types fragmentos del tipo de reporte; sin fragmentos cuenta cualquiera */
+  /** @param list<string> $types fragmentos del tipo de reporte */
   private static function matchesType(array $types, string $category): bool
   {
-    if ($types === []) return true;
     $category = self::nameKey($category);
     foreach ($types as $type) {
       if (str_contains($category, $type)) return true;

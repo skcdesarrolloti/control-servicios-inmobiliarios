@@ -22,8 +22,8 @@ foreach (['ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'met
   ob_end_clean();
   $menu = $rawNavItems['metricas'];
   $check($menu['type'] === 'dropdown' && $menu['label'] === 'Métricas', 'Métricas debe ser un desplegable.');
-  $check(array_keys($menu['children']) === ['dashboard', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_costo_entrega_recibo', 'metricas_costo_beneficio', 'metricas_costo_contractual', 'metricas_servicios_publicos', 'ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'metricas_crecimiento', 'mis_presupuestos'], 'El desplegable de métricas no tiene las vistas pedidas.');
-  $check(array_column($menu['children'], 'group') === ['Casos', 'Mantenimiento', 'Mantenimiento', 'Mantenimiento', 'Mantenimiento', 'Mantenimiento', 'Servicios públicos', 'Contratos', 'Contratos', 'Contratos', 'Contratos', 'Mis presupuestos y ejecuciones'], 'Las vistas de métricas se agrupan por tema.');
+  $check(array_keys($menu['children']) === ['dashboard', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_costo_entrega_recibo', 'metricas_costo_beneficio', 'metricas_servicios_publicos', 'ocupaciones', 'desocupaciones', 'ocupaciones_vs_desocupaciones', 'metricas_crecimiento', 'mis_presupuestos'], 'El desplegable de métricas no tiene las vistas pedidas.');
+  $check(array_column($menu['children'], 'group') === ['Casos', 'Mantenimiento', 'Mantenimiento', 'Mantenimiento', 'Mantenimiento', 'Servicios públicos', 'Contratos', 'Contratos', 'Contratos', 'Contratos', 'Mis presupuestos y ejecuciones'], 'Las vistas de métricas se agrupan por tema.');
   $cartera = $rawNavItems['cartera']['children'];
   $check(array_keys($cartera) === ['gestiones_cobro', 'auditoria_canon_aseguradoras', 'cartera_ocupaciones', 'cartera_desocupaciones', 'metricas_por_terminar', 'metricas_aumentos'], 'Actividades de cartera no tiene las vistas pedidas.');
   foreach (['cartera_ocupaciones' => 'ocupaciones', 'cartera_desocupaciones' => 'desocupaciones', 'metricas_por_terminar' => 'por_terminar', 'metricas_aumentos' => 'aumentos'] as $key => $subtab) {
