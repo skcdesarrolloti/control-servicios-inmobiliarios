@@ -196,4 +196,31 @@ $assert($store->get('otro', 1, 0) === null, 'Cada funcionario ve solo lo suyo.')
 $store->delete('u', 1, 0);
 $assert($store->get('u', 1, 0) === null, 'Borrado.');
 
+// Listado de Proceso de entrega.
+$list = new class($db) {
+  use \SCM\App\Concerns\HandlesInventoryActions;
+  public array $out = [];
+  public function __construct(public \SCM\Core\Database $db) {}
+  private function verifyCsrf(): void {}
+  private function canAccessDashboardTab(string $tab): bool { return $tab !== 'revisiones_ocupacion'; }
+  private function canUseDashboardAction(string $action): bool { return true; }
+  private function jsonOk(array $data): void { $this->out = $data; }
+  private function jsonFail(string $message): never { throw new DomainException($message); }
+  public static function inventoryPublicUrl(int $id): string { return 'inventario.php?numero=' . $id; }
+  public static function deliveryReviewPublicUrl(int $id): string { return 'revision-entrega.php?numero=' . $id; }
+};
+$_POST = ['kind' => 'inventarios', 'tipo' => 'Nuevo', 'q' => 'Calle', 'page' => '1'];
+$list->ajax_handler_delivery_process_list();
+$assert($list->out['total'] === 1 && str_contains($list->out['html'], 'inventario.php?numero=') && str_contains($list->out['html'], 'data-delivery-process-edit'), 'Listado de inventarios: ' . json_encode($list->out['total']));
+$_POST = ['kind' => 'revisiones'];
+try { $list->ajax_handler_delivery_process_list(); $assert(false, 'Debe validar el permiso de la pestaña.'); } catch (DomainException) {}
+$assert(str_contains(\SCM\Modules\Inventory\DeliveryProcessView::shell('inventarios', 'x'), 'data-delivery-process="inventarios"'), 'Contenedor del listado.');
+
+// Anexos: el inventario adicional va con enlace firmado, después del principal.
+$annexes = \SCM\Modules\LeaseContracts\LeaseAnnexesDocument::annexes(['id_inventario' => '4', '_inventarios_adicionales' => [7]], 'propietario', 0);
+$labels = array_column($annexes, 'label');
+$position = array_search('Inventario del inmueble 2', $labels, true);
+$assert($position !== false && $labels[$position - 1] === 'Inventario del inmueble', 'Orden de los anexos: ' . implode(', ', $labels));
+$assert(str_contains($annexes[$position]['url'], 'inventario.php?numero=7&expires=') && str_contains($annexes[$position]['url'], '&sig='), 'El adicional va firmado.');
+
 echo "Inventory flow checks passed: fee, principal, second property, report cap, Anterior, edit, exported report, delete, validation, legacy, suggestions, drafts.\n";

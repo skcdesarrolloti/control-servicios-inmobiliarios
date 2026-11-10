@@ -40,7 +40,26 @@ final class LeaseAnnexesService
     if (!is_array($row)) {
       throw new \DomainException('Contrato no encontrado.');
     }
+    $row['_inventarios_adicionales'] = $this->additionalInventories($row);
     return $row;
+  }
+
+  /**
+   * Inventarios de otros inmuebles entregados en el mismo contrato. Solo los creados en el panel están marcados:
+   * los repetidos antiguos del contrato no se envían.
+   *
+   * @param array<string,mixed> $contract
+   * @return list<int>
+   */
+  private function additionalInventories(array $contract): array
+  {
+    $table = $this->db->table('jet_cct_inventario');
+    $contractId = trim((string) ($contract['_ID'] ?? ''));
+    if ($contractId === '' || !$this->schema->columnExists($table, 'incluir_anexos')) {
+      return [];
+    }
+    $ids = $this->db->getCol("SELECT `_ID` FROM `{$table}` WHERE `id_contrato` = ? AND `incluir_anexos` = 'Si' AND COALESCE(`cct_status`, 'publish') = 'publish' AND `_ID` <> ? ORDER BY `_ID` ASC", [$contractId, (int) ($contract['id_inventario'] ?? 0)]);
+    return array_map('intval', $ids);
   }
 
   /** @param array<string,mixed> $contract @return array<string,mixed> */
@@ -59,7 +78,7 @@ final class LeaseAnnexesService
    * El acta de entrega y el inventario son obligatorios en el envío: deben existir y estar publicados.
    *
    * @param array<string,mixed> $contract
-   * @return array{acta_entrega:array{id:string,exists:bool,url:string},inventario:array{id:string,exists:bool,url:string}}
+   * @return array{acta_entrega:array{id:string,exists:bool,url:string},inventario:array{id:string,exists:bool,url:string},inventarios_adicionales:list<array{id:string,exists:bool,url:string}>}
    */
   public function annexRecords(array $contract): array
   {
@@ -75,6 +94,7 @@ final class LeaseAnnexesService
         && (int) $this->db->getVar("SELECT COUNT(1) FROM `{$table}` WHERE `_ID` = ? AND COALESCE(`cct_status`, 'publish') = 'publish'", [(int) $id]) > 0;
       $out[$key] = ['id' => $id, 'exists' => $exists, 'url' => $exists ? $base . rawurlencode($id) : ''];
     }
+    $out['inventarios_adicionales'] = array_map(static fn(int $id): array => ['id' => (string) $id, 'exists' => true, 'url' => $sources['inventario'][2] . $id], $this->additionalInventories($contract));
     return $out;
   }
 

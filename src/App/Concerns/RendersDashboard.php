@@ -285,6 +285,10 @@ trait RendersDashboard
       'cartas de aumento' => 'scm-panel-cartas-aumento',
       'scm-panel-cartas-aumento' => 'scm-panel-cartas-aumento',
       'hojas_cierre' => 'scm-panel-hojas-cierre',
+      'revisiones_ocupacion' => 'scm-panel-revisiones-ocupacion',
+      'scm-panel-revisiones-ocupacion' => 'scm-panel-revisiones-ocupacion',
+      'inventarios_entrega' => 'scm-panel-inventarios-entrega',
+      'scm-panel-inventarios-entrega' => 'scm-panel-inventarios-entrega',
       'hojas-cierre' => 'scm-panel-hojas-cierre',
       'scm-panel-hojas-cierre' => 'scm-panel-hojas-cierre',
     ];
@@ -344,6 +348,14 @@ trait RendersDashboard
       'hojas_cierre' => [
         'panel' => 'scm-panel-hojas-cierre',
         'label' => $dashboardPermissionTabs['hojas_cierre'] ?? 'Hojas de cierre',
+      ],
+      'revisiones_ocupacion' => [
+        'panel' => 'scm-panel-revisiones-ocupacion',
+        'label' => $dashboardPermissionTabs['revisiones_ocupacion'] ?? 'Revisiones antes de la ocupación',
+      ],
+      'inventarios_entrega' => [
+        'panel' => 'scm-panel-inventarios-entrega',
+        'label' => $dashboardPermissionTabs['inventarios_entrega'] ?? 'Inventarios',
       ],
     ];
     $administrativePanelToTab = [];
@@ -1404,6 +1416,14 @@ trait RendersDashboard
               <?php echo \SCM\Modules\ClosingSheets\ClosingSheetPanelView::shell(self::AJAX_CLOSING_SHEET_LIST); ?>
             </div>
           <?php endif; ?>
+
+          <?php foreach (['revisiones_ocupacion' => ['scm-panel-revisiones-ocupacion', 'revisiones'], 'inventarios_entrega' => ['scm-panel-inventarios-entrega', 'inventarios']] as $deliveryTabKey => [$deliveryPanelId, $deliveryKind]): ?>
+            <?php if (in_array($deliveryTabKey, $allowedAdministrativeActivityTabs, true)): ?>
+              <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === $deliveryTabKey ? ' active' : ''; ?>" id="<?php echo esc_attr($deliveryPanelId); ?>" data-permission-tab="<?php echo esc_attr($deliveryTabKey); ?>" data-admin-activity-panel="<?php echo esc_attr($deliveryTabKey); ?>">
+                <?php echo \SCM\Modules\Inventory\DeliveryProcessView::shell($deliveryKind, self::AJAX_DELIVERY_PROCESS_LIST); ?>
+              </div>
+            <?php endif; ?>
+          <?php endforeach; ?>
         </div>
       </div>
 
@@ -1578,6 +1598,7 @@ trait RendersDashboard
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-tools.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-tools.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/owner-net-income.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/owner-net-income.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-administrative-reports.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-administrative-reports.js'))); ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-delivery-process.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-delivery-process.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-closing-sheets.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-closing-sheets.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-movements.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-movements.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-case-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-case-metrics.js'))); ?>" defer></script>
@@ -1989,6 +2010,10 @@ trait RendersDashboard
         'reportes_administrativos_pendientes' => '',
         'cartas_aumento' => '',
         'hojas_cierre' => '',
+      ]],
+      ['label' => 'Actividades administrativas', 'hint' => 'Proceso de entrega', 'tabs' => [
+        'revisiones_ocupacion' => '',
+        'inventarios_entrega' => '',
       ]],
       ['label' => 'Actividades administrativas', 'hint' => 'Créditos', 'tabs' => [
         'credito_propietario' => '',

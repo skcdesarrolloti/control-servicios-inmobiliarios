@@ -6,6 +6,7 @@ namespace SCM\App\Concerns;
 
 use SCM\Core\Auth;
 use SCM\Modules\DeliveryReview\DeliveryReviewForm;
+use SCM\Modules\Inventory\DeliveryProcessView;
 use SCM\Modules\Inventory\InventoryBilling;
 use SCM\Modules\Inventory\InventoryDraftStore;
 use SCM\Modules\Inventory\InventoryInput;
@@ -782,6 +783,62 @@ trait HandlesInventoryActions
     return '<form data-inventory-form' . ($editing ? ' data-inventory-editing' : '') . ' autocomplete="off" novalidate>'
       . '<script type="application/json" data-inventory-config>' . $json . '</script>'
       . '<div data-inventory-root></div><span data-corrective-review-message aria-live="polite"></span></form>';
+  }
+
+  /** Actividades administrativas › Proceso de entrega: listados paginados con búsqueda. */
+  public function ajax_handler_delivery_process_list(): void
+  {
+    $this->verifyCsrf();
+    $inventories = (string) ($_POST['kind'] ?? '') === 'inventarios';
+    if (!$this->canAccessDashboardTab($inventories ? 'inventarios_entrega' : 'revisiones_ocupacion')) {
+      $this->jsonFail('No tienes permiso para ver este listado.');
+    }
+    $table = $this->db->table($inventories ? 'jet_cct_inventario' : 'jet_cct_revision_entrega');
+    $columns = $inventories
+      ? ['_ID', 'fecha', 'cct_created', 'tipo_inventario', 'categoria_inventario', 'contrato', 'inmueble', 'direccion', 'arrendatario', 'id_ticket', 'creador']
+      : ['_ID', 'fecha', 'cct_created', 'contrato', 'inmueble', 'direccion', 'tip_inm', 'habitaciones', 'banos', 'id_ticket', 'creador'];
+    $text = static fn(string $key): string => mb_substr(trim(strip_tags(wp_unslash((string) ($_POST[$key] ?? '')))), 0, 120, 'UTF-8');
+    $where = ["COALESCE(`cct_status`, 'publish') = 'publish'"];
+    $args = [];
+    $search = $text('q');
+    if ($search !== '') {
+      $searchable = array_values(array_intersect($columns, ['_ID', 'id_ticket', 'contrato', 'inmueble', 'direccion', 'arrendatario', 'creador']));
+      $where[] = '(' . implode(' OR ', array_map(static fn(string $column): string => "CAST(`{$column}` AS CHAR) LIKE ?", $searchable)) . ')';
+      $args = array_fill(0, count($searchable), '%' . $search . '%');
+    }
+    if ($inventories) {
+      foreach (['tipo' => 'tipo_inventario', 'categoria' => 'categoria_inventario'] as $field => $column) {
+        $value = $text($field);
+        if ($value !== '') {
+          $where[] = "`{$column}` = ?";
+          $args[] = $value;
+        }
+      }
+    }
+    foreach (['desde' => '>=', 'hasta' => '<='] as $field => $operator) {
+      $date = $text($field);
+      if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1) {
+        $where[] = "DATE(`cct_created`) {$operator} ?";
+        $args[] = $date;
+      }
+    }
+    $condition = implode(' AND ', $where);
+    $perPage = 25;
+    try {
+      $total = (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` WHERE {$condition}", $args);
+      $pages = max(1, (int) ceil($total / $perPage));
+      $page = min(max(1, (int) ($_POST['page'] ?? 1)), $pages);
+      $offset = ($page - 1) * $perPage;
+      $select = implode(', ', array_map(static fn(string $column): string => "`{$column}`", $columns));
+      $rows = $this->db->getResults("SELECT {$select} FROM `{$table}` WHERE {$condition} ORDER BY `_ID` DESC LIMIT {$perPage} OFFSET {$offset}", $args);
+    } catch (\Throwable $error) {
+      error_log('[proceso-entrega] ' . $error->getMessage());
+      $this->jsonFail('No se pudo cargar el listado.');
+    }
+    $html = $inventories
+      ? DeliveryProcessView::inventories($rows, ['manage' => $this->canUseDashboardAction('inventory_manage')], $page, $pages, $total, static fn(int $id): string => self::inventoryPublicUrl($id))
+      : DeliveryProcessView::reviews($rows, $page, $pages, $total, static fn(int $id): string => self::deliveryReviewPublicUrl($id));
+    $this->jsonOk(['html' => $html, 'total' => $total]);
   }
 
   private function canUseInventoryVoice(): bool

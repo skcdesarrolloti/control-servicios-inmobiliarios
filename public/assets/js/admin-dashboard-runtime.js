@@ -14614,6 +14614,12 @@
       if (panelId === "scm-panel-hojas-cierre") {
         return "hojas_cierre";
       }
+      if (panelId === "scm-panel-revisiones-ocupacion") {
+        return "revisiones_ocupacion";
+      }
+      if (panelId === "scm-panel-inventarios-entrega") {
+        return "inventarios_entrega";
+      }
       return "";
     }
 
@@ -26721,6 +26727,16 @@
             adminReportsModule.dispatchEvent(new CustomEvent("scm:load-admin-reports"));
           }
           return loadPendingFormOnce(activeAdministrativePanel, "#sra_form");
+        }
+        if (
+          activeAdministrativePanel &&
+          (administrativeKey === "revisiones_ocupacion" || administrativeKey === "inventarios_entrega")
+        ) {
+          var deliveryProcessModule = activeAdministrativePanel.querySelector("[data-delivery-process]");
+          if (deliveryProcessModule) {
+            deliveryProcessModule.dispatchEvent(new CustomEvent("scm:load-delivery-process"));
+          }
+          return Promise.resolve();
         }
         if (
           activeAdministrativePanel &&

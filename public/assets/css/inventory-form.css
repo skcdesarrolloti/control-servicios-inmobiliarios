@@ -1,4 +1,7 @@
 /* Formulario nativo del inventario del inmueble (admin-inventory-form.js). */
+/* Popup abierto desde el listado de Proceso de entrega: no bloquea la pantalla mientras está cerrado. */
+.scm-inv-editor-host, .scm-inv-editor-host .scm-case-dialog { position: fixed; inset: 0; z-index: 99990; pointer-events: none; }
+#scm-app .scm-inv-editor-host .scm-case-submodal.open { pointer-events: auto; }
 .scm-inventory-review [data-inventory-form] { display: flex; flex-direction: column; gap: 10px; }
 .scm-inv-nav { position: sticky; top: 0; z-index: 3; display: flex; gap: 6px; padding: 8px 2px; overflow-x: auto; background: #fff; border-bottom: 1px solid #e2e8f0; scrollbar-width: thin; }
 .scm-inv-nav button { flex: 0 0 auto; padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; color: #334155; font-size: 12px; font-weight: 600; cursor: pointer; }

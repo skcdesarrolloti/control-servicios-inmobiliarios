@@ -430,8 +430,13 @@ final class LeaseContractCreationService
             'celular_destinatario' => $data['celular_propietario'], 'contrato' => $data['contrato'], 'inmueble' => $data['inmueble'], 'registro_fotografico' => $data['registro_fotografico'],
           ]);
         }
+        // También los inventarios de los otros inmuebles del contrato.
+        $inventoryIds = array_map('intval', $this->db->getCol("SELECT `_ID` FROM `{$this->db->table('jet_cct_inventario')}` WHERE `id_contrato` = ? AND COALESCE(`cct_status`, 'publish') = 'publish'", [(string) $contractId]));
         if (ctype_digit(trim((string) ($contract['id_inventario'] ?? '')))) {
-          $this->update('jet_cct_inventario', (int) $contract['id_inventario'], $parties + ['cedula_arrendatario' => $data['documento_arrendatario']]);
+          $inventoryIds[] = (int) $contract['id_inventario'];
+        }
+        foreach (array_unique($inventoryIds) as $inventoryId) {
+          $this->update('jet_cct_inventario', $inventoryId, $parties + ['cedula_arrendatario' => $data['documento_arrendatario']]);
         }
         for ($i = 1; $i <= $data['codebtors']; $i++) {
           $this->insert('jet_cct_codeudores', $sender, $nowSql, [

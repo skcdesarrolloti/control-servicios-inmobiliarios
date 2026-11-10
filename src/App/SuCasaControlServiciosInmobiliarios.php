@@ -71,6 +71,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_DELIVERY_REVIEW = 'scm_revision_entrega';
   const AJAX_INVENTORY = 'scm_inventario';
   const AJAX_INVENTORY_DRAFT = 'scm_inventario_borrador';
+  const AJAX_DELIVERY_PROCESS_LIST = 'scm_proceso_entrega_listar';
   const AJAX_CONTACTS_UPDATE = 'scm_actualizar_contactos';
   const AJAX_ENTREGA         = 'scm_entrega';
   const AJAX_PREVENTIVA      = 'scm_preventiva';
@@ -380,6 +381,8 @@ final class SuCasaControlServiciosInmobiliarios
       'auditoria_canon_aseguradoras' => 'Auditoría Canon y Aseguradoras',
       'cartas_aumento' => 'Cartas de Aumento',
       'hojas_cierre' => 'Hojas de Cierre',
+      'revisiones_ocupacion' => 'Revisiones antes de la ocupación',
+      'inventarios_entrega' => 'Inventarios',
       'metricas_casos' => 'Casos',
       'metricas_cotizaciones' => 'Cotizaciones',
       'metricas_preventivas' => 'Revisión preventiva',
@@ -868,6 +871,12 @@ final class SuCasaControlServiciosInmobiliarios
       foreach (['cartera_ocupaciones', 'cartera_desocupaciones', 'metricas_por_terminar', 'metricas_aumentos'] as $newCarteraTab) {
         if (!in_array($newCarteraTab, $knownTabs, true) && array_intersect(['gestiones_cobro', 'auditoria_canon_aseguradoras'], (array) $raw[$cargo]) !== []) {
           $raw[$cargo] = array_merge((array) $raw[$cargo], [$newCarteraTab]);
+        }
+      }
+      // Proceso de entrega es nuevo: mientras no se guarden permisos que lo conozcan, lo ve quien ve los casos de entrega.
+      foreach (['revisiones_ocupacion', 'inventarios_entrega'] as $deliveryTab) {
+        if (!in_array($deliveryTab, $knownTabs, true) && in_array('entrega', (array) $raw[$cargo], true)) {
+          $raw[$cargo] = array_merge((array) $raw[$cargo], [$deliveryTab]);
         }
       }
       // Hojas de cierre es nueva: mientras no se guarden permisos que la conozcan, la ve quien ve contratos o servicios.

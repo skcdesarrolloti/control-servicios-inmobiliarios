@@ -291,6 +291,10 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'cartas_aumento';
   } elseif (in_array($tabParam, ['hojas_cierre', 'hojas-cierre', 'scm-panel-hojas-cierre'], true)) {
     $current_page = 'hojas_cierre';
+  } elseif (in_array($tabParam, ['revisiones_ocupacion', 'scm-panel-revisiones-ocupacion'], true)) {
+    $current_page = 'revisiones_ocupacion';
+  } elseif (in_array($tabParam, ['inventarios_entrega', 'scm-panel-inventarios-entrega'], true)) {
+    $current_page = 'inventarios_entrega';
   } elseif (in_array($tabParam, ['liquidacion', 'liquidador', 'liquidador_servicios_publicos', 'scm-panel-liquidador-servicios-publicos'], true)) {
     $current_page = 'liquidador_servicios_publicos';
   } elseif (in_array($tabParam, ['contratos', 'contratos-arrendamiento', 'contratos_arrendamiento', 'scm-panel-contratos-arrendamiento'], true)) {
@@ -518,6 +522,33 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=preventivas_pendientes',
         'icon' => 'pending_actions',
         'perms' => ['preventivas_pendientes'],
+      ],
+      'revisiones_ocupacion' => [
+        'key' => 'revisiones_ocupacion',
+        'label' => 'Revisiones antes de la Ocupación',
+        'description' => 'Revisiones de los casos de entrega',
+        'group' => 'Proceso de Entrega',
+        'group_icon' => 'key',
+        'group_description' => 'Revisiones e inventarios de entrega',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-revisiones-ocupacion',
+        'admin_activity_key' => 'revisiones_ocupacion',
+        'url' => $baseUrl . '/index.php?tab=revisiones_ocupacion',
+        'icon' => 'key',
+        'perms' => ['revisiones_ocupacion'],
+      ],
+      'inventarios_entrega' => [
+        'key' => 'inventarios_entrega',
+        'label' => 'Inventarios',
+        'description' => 'Inventarios de los inmuebles entregados',
+        'group' => 'Proceso de Entrega',
+        'group_icon' => 'key',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-inventarios-entrega',
+        'admin_activity_key' => 'inventarios_entrega',
+        'url' => $baseUrl . '/index.php?tab=inventarios_entrega',
+        'icon' => 'inventory_2',
+        'perms' => ['inventarios_entrega'],
       ],
       'servicios_publicos_pendientes' => [
         'key' => 'servicios_publicos_pendientes',
