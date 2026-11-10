@@ -38,6 +38,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesMetricsPanels;
   use \SCM\App\Concerns\RendersPublicPqr;
   use \SCM\App\Concerns\RendersDashboard;
+  use \SCM\App\Concerns\HandlesInventoryActions;
 
   const AJAX_ACTION      = 'scm_filtrar';
   const AJAX_SEGUIMIENTO = 'scm_guardar_seguimiento';
@@ -68,6 +69,8 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CORRECTIVE_REVIEW = 'scm_revision_correctiva';
   const AJAX_PREVENTIVE_REVIEW = 'scm_revision_preventiva';
   const AJAX_DELIVERY_REVIEW = 'scm_revision_entrega';
+  const AJAX_INVENTORY = 'scm_inventario';
+  const AJAX_INVENTORY_DRAFT = 'scm_inventario_borrador';
   const AJAX_CONTACTS_UPDATE = 'scm_actualizar_contactos';
   const AJAX_ENTREGA         = 'scm_entrega';
   const AJAX_PREVENTIVA      = 'scm_preventiva';
@@ -943,6 +946,8 @@ final class SuCasaControlServiciosInmobiliarios
           'preventive_review_manage' => 'Gestionar revisión preventiva (casos preventivos)',
           'preventive_review_send' => 'Enviar revisión preventiva al propietario y arrendatario',
           'delivery_review_manage' => 'Gestionar revisión antes de la ocupación (casos de entrega)',
+          'inventory_manage' => 'Crear y editar inventarios (casos de entrega)',
+          'inventory_delete' => 'Eliminar inventarios',
           'case_contacts_edit' => 'Editar datos de contacto de arrendatario y propietario',
           'case_magnitude_calculate' => 'Calcular magnitud del daño (botón de los filtros)',
           'case_export_excel' => 'Exportar casos a Excel',

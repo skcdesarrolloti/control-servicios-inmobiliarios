@@ -3837,6 +3837,20 @@
       wizard: true,
       extras: bindDeliveryReviewForm,
     },
+    inventario: {
+      label: "Inventario del inmueble",
+      lower: "información del inventario",
+      actionKey: "inventario",
+      action: "scm_inventario",
+      formSelector: "[data-inventory-form]",
+      editAttr: "data-inventory-edit",
+      deleteAttr: "data-inventory-delete",
+      cancelAttr: "data-inventory-list",
+      newAttr: "data-inventory-new",
+      deleteTitle: "¿Eliminar el inventario #",
+      deleteText: "El inventario deja de estar disponible y se desvincula del caso y del contrato. Si su reporte administrativo no se ha exportado ni pagado, también se elimina.",
+      customForm: true,
+    },
   };
 
   // Revisión antes de la ocupación: campos condicionales, filas repetibles (linderos y espacios),
@@ -4397,7 +4411,7 @@
       });
       if (operation === "delete") {
         message("Eliminando " + cfg.lower + "…", false);
-      } else if (operation === "edit" || operation === "send_form") {
+      } else if (operation === "edit" || operation === "new" || operation === "send_form") {
         message("Cargando…", false);
       } else if (operation === "send") {
         message("Enviando " + cfg.lower + "…", false);
@@ -4487,6 +4501,11 @@
         body.removeEventListener("click", body._scmCorrectiveClickHandler);
       }
       body._scmCorrectiveClickHandler = function (event) {
+        if (cfg.newAttr && event.target.closest("[" + cfg.newAttr + "]")) {
+          event.preventDefault();
+          request("new");
+          return;
+        }
         var editBtn = event.target.closest("[" + cfg.editAttr + "]");
         if (editBtn && body.contains(editBtn)) {
           event.preventDefault();
@@ -4530,8 +4549,8 @@
           if (window.Swal && typeof window.Swal.fire === "function") {
             window.Swal.fire({
               icon: "warning",
-              title: "Eliminar revisión #" + reviewId + "?",
-              text:
+              title: cfg.deleteTitle ? cfg.deleteTitle + reviewId + "?" : "Eliminar revisión #" + reviewId + "?",
+              text: cfg.deleteText ||
                 "Esta acción borra el registro de la " +
                 cfg.lower +
                 " del caso" +
@@ -4579,6 +4598,10 @@
       Array.from(body.querySelectorAll(cfg.formSelector)).forEach(function (form) {
         if (form._scmCorrectiveBound) return;
         form._scmCorrectiveBound = true;
+        if (cfg.customForm) {
+          window.ScmInventoryForm.bind(form, { request: request, message: message, runtime: runtime, caseBtn: caseBtn });
+          return;
+        }
 
         function filesOf(input) {
           return Array.isArray(input._scmFiles)
@@ -10449,6 +10472,11 @@
             );
           }
         }
+        if (!isPublicPqr && isEntregaCase(btn) && statusBucket !== "cerrados" && canUseDashboardAction("inventory_manage")) {
+          complementaryActionButtons.push(
+            '<button type="button" class="scm-case-work-btn" data-scm-open-inventory><span class="material-symbols-outlined scm-btn-icon">inventory_2</span><div class="scm-btn-text"><span class="scm-btn-label">Crear o gestionar inventario</span><span class="scm-btn-sub">Inventario inicial del inmueble</span></div></button>',
+          );
+        }
         if (!isPublicPqr && (cotizacionUrl || cotizacionId)) {
           if (canUseDashboardAction("quote_manage")) {
             quoteActionButtons.push(
@@ -11492,6 +11520,14 @@
         .forEach(function (reviewBtn) {
           reviewBtn.addEventListener("click", function () {
             openPreventiveReviewEditor(modal, btn);
+          });
+        });
+
+      modal
+        .querySelectorAll("[data-scm-open-inventory]")
+        .forEach(function (inventoryBtn) {
+          inventoryBtn.addEventListener("click", function () {
+            openDamageReviewEditor(modal, btn, "inventario");
           });
         });
 

@@ -543,6 +543,8 @@ trait RendersDashboard
         'revision_correctiva' => self::AJAX_CORRECTIVE_REVIEW,
         'revision_preventiva' => self::AJAX_PREVENTIVE_REVIEW,
         'revision_entrega' => self::AJAX_DELIVERY_REVIEW,
+        'inventario' => self::AJAX_INVENTORY,
+        'inventory_draft' => self::AJAX_INVENTORY_DRAFT,
         'delete_cotizacion' => self::AJAX_DELETE_COTIZACION,
         'approve_cotizacion' => self::AJAX_APPROVE_COTIZACION,
         'cotizacion_form_context' => self::AJAX_COTIZACION_FORM_CONTEXT,
@@ -790,6 +792,7 @@ trait RendersDashboard
     <link rel="stylesheet" href="<?php echo $damageCssUrl; ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/preventive-review.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/preventive-review.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/delivery-review.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/delivery-review.css'))); ?>" media="all">
+    <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/inventory-form.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/inventory-form.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/contract-movements.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/contract-movements.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/contract-ownership.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/contract-ownership.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/legal-cases.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/legal-cases.css'))); ?>" media="all">
@@ -1565,6 +1568,7 @@ trait RendersDashboard
     </div>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/scm-photo-compress.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/scm-photo-compress.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/ticket-completion-form-state.js?v=' . SCM_VERSION); ?>" data-scm-draft-user="<?php echo self::h((string) \SCM\Core\Auth::userId()); ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-inventory-form.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-inventory-form.js'))); ?>" defer></script>
     <script src="<?php echo $jsUrl; ?>" defer></script>
     <script src="<?php echo $dashboardRuntimeJsUrl; ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-config-modals.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-config-modals.js'))); ?>" defer></script>
