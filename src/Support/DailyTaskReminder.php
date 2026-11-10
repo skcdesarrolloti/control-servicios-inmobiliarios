@@ -17,6 +17,8 @@ final class DailyTaskReminder
   public const LAST_HOUR = 12;
   public const LAST_DATE_SETTING = 'daily_task_reminder_last_date';
   public const TEMPLATE = 'scm_recordatorio_tareas_v1';
+  /** Meta admite 1024 caracteres en el cuerpo ya armado; el resto de la plantilla y el nombre caben en lo que sobra. */
+  public const SUMMARY_MAX = 800;
 
   public static function shouldRun(\DateTimeImmutable $now, string $lastDate): bool
   {
@@ -48,7 +50,7 @@ final class DailyTaskReminder
     $parts = [];
     foreach ($groups as $label => $items) $parts[] = count($items) . ' ' . $label;
     $text = implode('; ', $parts);
-    return mb_strlen($text) > 300 ? rtrim(mb_substr($text, 0, 297)) . '...' : $text;
+    return mb_strlen($text) > self::SUMMARY_MAX ? rtrim(mb_substr($text, 0, self::SUMMARY_MAX - 3)) . '...' : $text;
   }
 
   /** @param array<string,list<array<string,mixed>>> $groups */

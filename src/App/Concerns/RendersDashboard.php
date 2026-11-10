@@ -727,7 +727,7 @@ trait RendersDashboard
         'enabled' => $this->shouldShowAdminDuePopup(),
         'cargoIds' => $adminDuePopupCargoIds,
       ],
-      'alertPopup' => ['enabled' => $this->dashboardAlertKeysForCurrentCargo() !== []],
+      'alertPopup' => ['enabled' => $this->dashboardAlertKeysForCurrentCargo() !== [], 'tabs' => $this->dashboardAlertsByMenuTabForCurrentCargo()],
       'session' => [
         'loginUrl' => rtrim((string) SCM_BASE_URL, '/') . '/login.php',
         'idleTimeoutSeconds' => defined('SCM_SESSION_IDLE_TIMEOUT') ? (int) SCM_SESSION_IDLE_TIMEOUT : 7200,
@@ -2188,6 +2188,7 @@ trait RendersDashboard
                 </div>
               <?php endif; ?>
               <div class="scm-perm-pane" data-scm-perm-pane-body="alerts" hidden>
+                <?php $popupAlertKeys = $this->dashboardPopupAlertKeys(); $alertTabsConfig = $this->dashboardAlertTabs(); ?>
                 <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowedAlerts = $this->dashboardAlertPermissions()[$cargoId] ?? []; ?>
                   <section class="scm-permission-card scm-permission-action-card" data-scm-perm-kind="alerts" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
                     <div class="scm-permission-card-head">
@@ -2199,11 +2200,16 @@ trait RendersDashboard
                         <div class="scm-permissions-option-group" data-scm-perm-group>
                           <div class="scm-permissions-option-group-title"><span><?php echo esc_html($alertGroup['label']); ?></span><button type="button" class="scm-perm-group-toggle" data-scm-perm-group-all>Marcar grupo</button></div>
                           <div class="scm-permissions-option-group-grid">
-                            <?php foreach ($alertGroup['items'] as $alertKey => $alertItem): $isDueAlert = $alertKey === self::ALERT_ADMIN_DUE; $isChecked = $isDueAlert ? in_array($cargoId, $adminDuePopupCargoIds, true) : in_array($alertKey, $allowedAlerts, true); ?>
+                            <?php foreach ($alertGroup['items'] as $alertKey => $alertItem): $isDueAlert = $alertKey === self::ALERT_ADMIN_DUE; $isChecked = $isDueAlert ? in_array($cargoId, $adminDuePopupCargoIds, true) : in_array($alertKey, $allowedAlerts, true); $picksTabs = in_array((string) $alertKey, $popupAlertKeys, true); $alertTabKeys = $alertTabsConfig[$cargoId][$alertKey] ?? []; ?>
+                              <?php if ($picksTabs): ?><div class="scm-alert-option"><?php endif; ?>
                               <label class="scm-permissions-check<?php echo $isChecked ? ' is-checked' : ''; ?>" title="<?php echo esc_attr($alertItem['hint']); ?>">
                                 <input type="checkbox" name="<?php echo $isDueAlert ? 'admin_due_popup_cargo_ids[]' : 'alert_permissions[' . esc_attr($cargoId) . '][]'; ?>" value="<?php echo esc_attr($isDueAlert ? $cargoId : $alertKey); ?>" <?php checked($isChecked); ?>>
                                 <span><?php echo esc_html($alertItem['label']); ?><small class="scm-permissions-check-hint"><?php echo esc_html($alertItem['hint']); ?></small></span>
                               </label>
+                              <?php if ($picksTabs): ?>
+                                <button type="button" class="scm-alert-tabs-btn<?php echo $alertTabKeys !== [] ? ' is-set' : ''; ?>" data-scm-alert-tabs-open data-alert-label="<?php echo esc_attr($alertItem['label']); ?>" aria-haspopup="dialog"><?php echo esc_html(\SCM\Support\DashboardAlertTabs::summary(array_map(static fn(string $tab): string => (string) ($tabs[$tab] ?? $tab), $alertTabKeys))); ?></button>
+                                <input type="hidden" data-scm-alert-tabs-value data-cargo="<?php echo esc_attr($cargoId); ?>" data-alert="<?php echo esc_attr((string) $alertKey); ?>" value="<?php echo esc_attr(implode(',', $alertTabKeys)); ?>">
+                              </div><?php endif; ?>
                             <?php endforeach; ?>
                           </div>
                         </div>
@@ -2229,6 +2235,29 @@ trait RendersDashboard
                 <?php endforeach; ?>
               </div>
               <p class="scm-perm-empty" data-scm-perm-filter-empty hidden>Ning&uacute;n permiso coincide con el filtro.</p>
+            </div>
+          </div>
+          <div class="scm-alert-tabs-picker" data-scm-alert-tabs-picker role="dialog" aria-modal="true" aria-labelledby="scm-alert-tabs-title" hidden>
+            <div class="scm-alert-tabs-box">
+              <h4 id="scm-alert-tabs-title">Mostrar tambi&eacute;n en estas pesta&ntilde;as</h4>
+              <p class="scm-alert-tabs-name" data-scm-alert-tabs-name></p>
+              <p class="scm-alert-tabs-help">Sale al entrar a la pesta&ntilde;a, m&aacute;ximo una vez por hora en cada una, adem&aacute;s de Inicio y del aviso de cada hora. Solo aplica si la alerta est&aacute; activa y el cargo tiene esa pesta&ntilde;a.</p>
+              <div class="scm-alert-tabs-list">
+                <?php foreach ($tabGroups as $tabGroup): ?>
+                  <div class="scm-alert-tabs-group">
+                    <strong><?php echo esc_html($tabGroup['label'] . ($tabGroup['hint'] !== '' ? ' · ' . $tabGroup['hint'] : '')); ?></strong>
+                    <div class="scm-alert-tabs-grid">
+                      <?php foreach ($tabGroup['items'] as $tabKey => $tabItem): ?>
+                        <label><input type="checkbox" value="<?php echo esc_attr((string) $tabKey); ?>" data-scm-alert-tab><span><?php echo esc_html($tabItem['label']); ?></span></label>
+                      <?php endforeach; ?>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+              <div class="scm-alert-tabs-actions">
+                <button type="button" class="scm-alert-tabs-cancel" data-scm-alert-tabs-cancel>Cancelar</button>
+                <button type="button" class="scm-btn-primary btn btn-primary" data-scm-alert-tabs-apply>Aplicar</button>
+              </div>
             </div>
           </div>
           <div class="scm-permissions-actions">

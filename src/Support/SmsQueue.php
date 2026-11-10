@@ -44,7 +44,8 @@ final class SmsQueue
     }
 
     if (strlen($message) > 500) {
-      $message = substr($message, 0, 497) . '...';
+      // Por bytes y sin partir una letra con tilde: un carácter a medias hace fallar el guardado en la cola.
+      $message = mb_strcut($message, 0, 497, 'UTF-8') . '...';
     }
 
     $sourceModule = trim((string) ($meta['source_module'] ?? $meta['source'] ?? $meta['campaign_tag'] ?? 'control-servicios-inmobiliarios-whatsapp'));

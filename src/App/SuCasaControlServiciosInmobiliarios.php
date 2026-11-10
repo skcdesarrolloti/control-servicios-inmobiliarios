@@ -4,6 +4,7 @@ namespace SCM\App;
 
 use SCM\Core\Database;
 use SCM\Core\Auth;
+use SCM\Support\DashboardAlertTabs;
 use SCM\Support\FuncionarioOptions;
 
 final class SuCasaControlServiciosInmobiliarios
@@ -1231,6 +1232,35 @@ final class SuCasaControlServiciosInmobiliarios
   private function dashboardAlertKeysForCurrentCargo(): array
   {
     return array_values(array_diff($this->dashboardAlertPermissions()[trim((string) Auth::userCargo())] ?? [], [self::ALERT_REMINDER_EMAIL, self::ALERT_REMINDER_WHATSAPP, self::ALERT_DUE_VIEW_ALL]));
+  }
+
+  /** Alertas que son popups: las únicas que pueden salir también en otras pestañas. @return list<string> */
+  private function dashboardPopupAlertKeys(): array
+  {
+    $keys = [];
+    foreach ($this->dashboardAlertCatalog() as $group) $keys = array_merge($keys, array_map('strval', array_keys($group['items'])));
+    return array_values(array_diff($keys, [self::ALERT_REMINDER_EMAIL, self::ALERT_REMINDER_WHATSAPP, self::ALERT_DUE_VIEW_ALL]));
+  }
+
+  /** @param mixed $raw @return array<string,array<string,list<string>>> cargo => alerta => pestañas */
+  private function sanitizeDashboardAlertTabs($raw): array
+  {
+    $cargos = array_map(static fn(array $cargo): string => trim((string) ($cargo['id'] ?? '')), $this->getDashboardCargoOptions());
+    return DashboardAlertTabs::sanitize($raw, $cargos, $this->dashboardPopupAlertKeys(), array_keys($this->dashboardPermissionTabs()));
+  }
+
+  /** @return array<string,array<string,list<string>>> */
+  private function dashboardAlertTabs(): array
+  {
+    return $this->sanitizeDashboardAlertTabs(\SCM\Core\App::settings()->get(DashboardAlertTabs::SETTING, []));
+  }
+
+  /** @return array<string,list<string>> opción del menú => alertas activas del cargo que salen al entrar */
+  private function dashboardAlertsByMenuTabForCurrentCargo(): array
+  {
+    $active = $this->dashboardAlertKeysForCurrentCargo();
+    if ($this->shouldShowAdminDuePopup()) $active[] = self::ALERT_ADMIN_DUE;
+    return DashboardAlertTabs::byMenuTab($this->dashboardAlertTabs()[trim((string) Auth::userCargo())] ?? [], $active);
   }
 
   /** @return array<int,string> */

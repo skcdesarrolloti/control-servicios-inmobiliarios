@@ -44,6 +44,14 @@ const popup = slice(runtime, '    // Popup de alertas por cargo', '    function 
     assert.deepEqual(all, [3], 'with see-all the badge counts what the tab lists');
     assert.deepEqual(attended, [1], 'without see-all the badge counts what the popup counts');
   });
+
+  // Solo se comparte la consulta en curso: el popup de más tarde trae datos nuevos.
+  {
+    let requests = 0;
+    const load = new Function('ajaxUrl', 'actionAdminDueCalendar', 'dashboardMonthRange', 'dashboardAction', 'dashboardDueTotal', 'updateDashboardDueNavBadge', 'var dashboardDuePopupPromise = null;' + dueLoader + '; return loadDashboardDuePopupRows;')('/ajax', 'due', () => ({ from: '2026-11-01', to: '2026-11-30' }), () => { requests++; return Promise.resolve({ eventos: [] }); }, () => 0, () => {});
+    const inFlight = [load(), load()];
+    Promise.all(inFlight).then(() => { assert.equal(requests, 1, 'calls in flight share one request'); return load(); }).then(() => assert.equal(requests, 2, 'a later popup asks again'));
+  }
 }
 
 // Un tipo sin tareas asignadas a quien entra conserva su tarjeta, pero no deja una lista vacía.
@@ -65,6 +73,10 @@ const harness = (groupsJson) => `
   var funcionarioBridgeMode = false, ajaxUrl = '/ajax', actionDashboardAlerts = 'scm_dashboard_alerts';
   var alertPopupConfig = { enabled: true }, duePopupConfig = { enabled: false }, dashboardAlertsShown = {}, dashboardDuePopupShown = {}, dashboardDueActionTaken = false, dashboardDuePopupRestoreAfterCase = false;
   var DASHBOARD_REMINDER_EVERY_MS = 3600000, DASHBOARD_REMINDER_STORAGE_KEY = 'scm-dashboard-reminder-at', dashboardReminderAt = 0;
+  var DASHBOARD_TAB_ALERT_STORAGE_PREFIX = 'scm-dashboard-tab-alert-at:', dashboardTabAlertAt = {};
+  window.setTabAlertAt = (tab, v) => { dashboardTabAlertAt[tab] = v; };
+  window.getReminderAt = () => dashboardReminderAt;
+  window.payloads = [];
   window.calls = [];
   window.log = [];
   window.config = alertPopupConfig;
@@ -72,8 +84,8 @@ const harness = (groupsJson) => `
   window.resetShown = () => { dashboardAlertsShown = {}; };
   let onHome = true;
   window.setOnHome = v => { onHome = v; };
-  const shouldAutoShowDashboardDuePopup = source => source === 'hourly' || onHome;
-  const dashboardAction = (action) => { window.calls.push(action); return Promise.resolve({ groups: ${groupsJson} }); };
+  const shouldAutoShowDashboardDuePopup = source => source === 'hourly' || String(source).indexOf('tab-') === 0 || onHome;
+  const dashboardAction = (action, payload) => { window.calls.push(action); window.payloads.push(payload); return Promise.resolve({ groups: ${groupsJson} }); };
   let closeCurrent = null;
   window.Swal = {
     isVisible: () => !!closeCurrent,
@@ -101,6 +113,7 @@ const harness = (groupsJson) => `
   ${popup}
   window.entry = maybeShowDashboardEntryPopups;
   window.tick = dashboardReminderTick;
+  window.enterTab = maybeShowDashboardTabPopups;
   window.setReminderAt = v => { dashboardReminderAt = v; };
 `;
 
@@ -196,6 +209,33 @@ const harness = (groupsJson) => `
   assert.equal(await page.evaluate(() => window.calls.length), callsBefore, 'a cargo without alerts does not query them');
   console.log('OK a cargo without alerts does not see or query them');
 
+  // También mostrar en: al entrar sale solo lo de esa pestaña, una vez por hora, sin tocar el aviso general.
+  await open(groups);
+  await page.evaluate(() => { window.setOnHome(false); window.config.tabs = { cotizaciones_mantenimiento: ['credito_solicitudes'], ordenes_mantenimiento: ['admin_due'] }; window.setReminderAt(1234); window.enterTab('abiertos'); });
+  await page.waitForTimeout(50);
+  assert.deepEqual(await page.evaluate(() => window.log), [], 'a tab without configuration shows nothing');
+  await page.evaluate(() => { window.enterTab('cotizaciones_mantenimiento'); });
+  await page.waitForSelector('[data-scm-alert-group]');
+  assert.deepEqual(await page.evaluate(() => window.payloads), [{ tab: 'cotizaciones_mantenimiento' }], 'it asks only for the alerts of that tab');
+  assert.equal(await page.evaluate(() => window.getReminderAt()), 1234, 'it does not restart the general hour');
+  await page.click('[data-scm-dashboard-alert-close]');
+  await page.click('[data-scm-popup-close-yes]');
+  await page.evaluate(() => { window.log = []; window.enterTab('cotizaciones_mantenimiento'); });
+  await page.waitForTimeout(50);
+  assert.deepEqual(await page.evaluate(() => window.log), [], 'it does not repeat on every tab change');
+  await page.evaluate(() => { window.setTabAlertAt('cotizaciones_mantenimiento', Date.now() - 3600001); try { localStorage.clear(); } catch (e) {} window.enterTab('cotizaciones_mantenimiento'); });
+  await page.waitForSelector('[data-scm-alert-group]');
+  assert.deepEqual(await page.evaluate(() => window.log), ['alerts'], 'after an hour it shows again');
+  await page.click('[data-scm-dashboard-alert-close]');
+  await page.click('[data-scm-popup-close-yes]');
+  await page.evaluate(() => { window.log = []; window.payloads = []; window.dueOpen = true; window.enterTab('ordenes_mantenimiento'); });
+  await page.waitForSelector('[data-scm-dashboard-due-close]');
+  await page.click('[data-scm-dashboard-due-close]');
+  await page.waitForTimeout(50);
+  assert.deepEqual(await page.evaluate(() => [window.log, window.payloads]), [['due'], []], 'with only the general popup it does not query the other alerts');
+  await page.evaluate(() => { window.dueOpen = false; window.setOnHome(true); });
+  console.log('OK a popup can also show when entering a chosen tab');
+
   await open([]);
   await page.evaluate(() => { window.entry('login'); });
   await page.waitForTimeout(50);
@@ -278,7 +318,9 @@ const harness = (groupsJson) => `
       <label class="scm-permissions-check"><input type="checkbox" name="admin_due_popup_cargo_ids[]" value="13" checked></label>
       <label class="scm-permissions-check"><input type="checkbox" name="alert_permissions[13][]" value="credito_solicitudes"></label>
       <label class="scm-permissions-check"><input type="checkbox" name="alert_permissions[13][]" value="credito_contabilidad"></label>
-    </section></div></form>`;
+      <div><button type="button" data-scm-alert-tabs-open data-alert-label="Vencimientos">También en: ninguna pestaña</button><input type="hidden" data-scm-alert-tabs-value value=""></div>
+    </section></div>
+    <div data-scm-alert-tabs-picker hidden><p data-scm-alert-tabs-name></p><label><input type="checkbox" value="abiertos" data-scm-alert-tab><span>Casos abiertos</span></label><label><input type="checkbox" value="cerrados" data-scm-alert-tab><span>Casos cerrados</span></label><button type="button" data-scm-alert-tabs-cancel>C</button><button type="button" data-scm-alert-tabs-apply>A</button></div></form>`;
   const modalsSource = fs.readFileSync(path.join(root, 'public/assets/js/admin-config-modals.js'), 'utf8');
   assert.match(modalsSource, /\["tabs", "actions", "alerts"\]/, 'the pane count includes alerts');
   await page.setContent('<!doctype html><html><body><div id="scm-app">' + paneHtml + '</div></body></html>');
@@ -289,6 +331,27 @@ const harness = (groupsJson) => `
   await page.click('[data-scm-perm-pane="alerts"]');
   assert.equal(await page.locator('[name="alert_permissions[13][]"]').first().isVisible(), true, 'the alerts pane opens');
   console.log('OK the Alertas pane opens and counts its options');
+
+  // Selector "También mostrar en": no cuenta como permiso, cancelar no cambia nada y Aplicar deja el resumen.
+  const tabsValue = () => page.inputValue('[data-scm-alert-tabs-value]');
+  await page.click('[data-scm-alert-tabs-open]');
+  await page.check('[data-scm-alert-tab][value="abiertos"]');
+  assert.equal(await page.textContent('[data-scm-perm-pane-count="alerts"]'), '1/3', 'choosing a tab does not change the permission count');
+  await page.click('[data-scm-alert-tabs-cancel]');
+  assert.equal(await tabsValue(), '', 'cancel keeps the saved tabs');
+  await page.click('[data-scm-alert-tabs-open]');
+  assert.equal(await page.isChecked('[data-scm-alert-tab][value="abiertos"]'), false, 'reopening shows what is saved');
+  assert.equal(await page.textContent('[data-scm-alert-tabs-name]'), 'Vencimientos');
+  await page.check('[data-scm-alert-tab][value="abiertos"]');
+  await page.click('[data-scm-alert-tabs-apply]');
+  assert.equal(await tabsValue(), 'abiertos');
+  assert.equal(await page.textContent('[data-scm-alert-tabs-open]'), 'También en: Casos abiertos');
+  await page.click('[data-scm-alert-tabs-open]');
+  await page.check('[data-scm-alert-tab][value="cerrados"]');
+  await page.click('[data-scm-alert-tabs-apply]');
+  assert.equal(await page.textContent('[data-scm-alert-tabs-open]'), 'También en: 2 pestañas');
+  assert.equal(await tabsValue(), 'abiertos,cerrados');
+  console.log('OK the tab picker saves per alert without counting as a permission');
 
   // Lo que se guarda por cargo: cada campo por separado, con las listas vacías incluidas.
   const runtimeSource = fs.readFileSync(path.join(root, 'public/assets/js/admin-dashboard-runtime.js'), 'utf8');

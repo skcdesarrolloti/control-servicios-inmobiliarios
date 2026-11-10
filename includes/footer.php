@@ -386,6 +386,9 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
               }
               nativeTabBtn.click();
               window.scrollTo({ top: 0, behavior: 'instant' });
+              setTimeout(function () {
+                scmApp.dispatchEvent(new CustomEvent('scm:menu-tab-selected', { bubbles: true, detail: { tab: selectedTabKey } }));
+              }, 200);
               if (panelTarget === 'scm-panel-inicio' && selectedTabKey === 'inicio') {
                 setTimeout(function () {
                   scmApp.dispatchEvent(new CustomEvent('scm:home-summary-selected', { bubbles: true }));

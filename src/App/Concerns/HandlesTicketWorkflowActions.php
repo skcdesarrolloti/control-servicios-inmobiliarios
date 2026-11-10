@@ -415,6 +415,15 @@ trait HandlesTicketWorkflowActions
       }
       $alertPermissions = $this->sanitizeDashboardAlertPermissions($decodedAlerts);
     }
+    $alertTabs = $this->dashboardAlertTabs();
+    if (array_key_exists('alert_tabs', $_POST)) {
+      try {
+        $alertTabs = $this->sanitizeDashboardAlertTabs(json_decode(stripslashes((string) $_POST['alert_tabs']), true, 512, JSON_THROW_ON_ERROR));
+      } catch (\JsonException $exception) {
+        $this->jsonFail('Las pestañas de las alertas no son validas.');
+        return;
+      }
+    }
     $dueTypeMaps = [];
     foreach (['due_type_permissions' => self::ADMIN_DUE_TYPE_SETTING, 'due_reminder_types' => self::ADMIN_DUE_REMINDER_SETTING] as $field => $setting) {
       if (!array_key_exists($field, $_POST)) continue;
@@ -443,6 +452,7 @@ trait HandlesTicketWorkflowActions
     \SCM\Core\App::settings()->set(FuncionarioOptions::PANEL_CARGO_IDS_SETTING_KEY, $employeeCargoIds, Auth::userId());
     \SCM\Core\App::settings()->set('admin_due_popup_cargo_ids', $adminDuePopupCargoIds, Auth::userId());
     \SCM\Core\App::settings()->set('dashboard_alert_permissions', $alertPermissions, Auth::userId());
+    \SCM\Core\App::settings()->set(\SCM\Support\DashboardAlertTabs::SETTING, $alertTabs, Auth::userId());
     foreach ($dueTypeMaps as $setting => $map) \SCM\Core\App::settings()->set($setting, $map, Auth::userId());
     \SCM\Core\App::settings()->refresh();
     $this->clearDashboardPerformanceCache('dashboard-filter-options-v4');
@@ -1933,6 +1943,9 @@ trait HandlesTicketWorkflowActions
     $this->verifyCsrf();
     try {
       $keys = $this->dashboardAlertKeysForCurrentCargo();
+      // Al entrar a una pestaña salen solo las alertas configuradas para ella.
+      $tab = trim((string) ($_POST['tab'] ?? ''));
+      if ($tab !== '') $keys = array_values(array_intersect($keys, $this->dashboardAlertsByMenuTabForCurrentCargo()[$tab] ?? []));
       $groups = $this->adminDueThemeAlertGroups($keys);
       if (array_intersect(['credito_solicitudes', 'credito_contabilidad'], $keys) !== [] && $this->canAccessDashboardTab('credito_propietario')) {
         $groups = array_merge($groups, array_map(static fn(array $group): array => $group + ['popup' => 'Créditos a propietarios'], $this->ownerCreditAlertGroups($keys)));

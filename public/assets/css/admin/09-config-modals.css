@@ -358,6 +358,58 @@
   margin: 0;
   accent-color: #061d49;
 }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-option { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-option:has(> .scm-permissions-check[hidden]) { display: none; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-option > .scm-permissions-check { flex: 1; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-btn {
+  overflow: hidden;
+  padding: 4px 10px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-btn:hover { border-color: #9dacc7; color: #061d49; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-btn.is-set { border-style: solid; border-color: #9dacc7; background: #edf4ff; color: #061d49; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.55);
+}
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-picker[hidden] { display: none; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-box {
+  display: flex;
+  flex-direction: column;
+  width: min(720px, 100%);
+  max-height: min(640px, 100%);
+  padding: 20px;
+  border-radius: 16px;
+  background: #fff;
+  color: #061d49;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3);
+}
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-box h4 { margin: 0; font-size: 16px; font-weight: 700; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-name { margin: 4px 0 0; font-size: 13px; font-weight: 600; color: #ea580c; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-help { margin: 8px 0 12px; font-size: 12px; line-height: 1.45; color: #64748b; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-list { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-group { margin-bottom: 12px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-group strong { display: block; margin-bottom: 6px; font-size: 11px; font-weight: 700; color: #64748b; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 12px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-grid label { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12px; color: #334155; cursor: pointer; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-grid input { width: 15px; height: 15px; margin: 0; accent-color: #061d49; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-alert-tabs-cancel { padding: 8px 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #334155; font-size: 13px; font-weight: 600; cursor: pointer; }
 #scm-app #scm-permissions-form.scm-perm-form .scm-permissions-actions {
   display: flex;
   align-items: center;

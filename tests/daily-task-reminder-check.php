@@ -6,6 +6,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 require_once dirname(__DIR__) . '/src/App/Concerns/HandlesTicketWorkflowActions.php';
 
 use SCM\Support\DailyTaskReminder;
+use SCM\Support\DashboardAlertTabs;
 
 $failed = 0;
 $check = static function (bool $ok, string $message) use (&$failed): void {
@@ -35,7 +36,20 @@ $groups = DailyTaskReminder::groups($items);
 $check($groups['Solicitudes de crédito'][0]['titulo'] === 'Crédito #2', 'the most overdue task goes first');
 $summary = DailyTaskReminder::summary($groups);
 $check(str_contains($summary, '2 Solicitudes de crédito') && str_contains($summary, '1 Cotizaciones sin enviar') && !str_contains($summary, "\n"), 'the WhatsApp summary is one line, as templates require');
-$check(mb_strlen(DailyTaskReminder::summary(['Tarea ' . str_repeat('x', 400) => [[]]])) <= 300, 'the summary fits the template');
+$check(mb_strlen(DailyTaskReminder::summary(['Tarea ' . str_repeat('x', 2000) => [[]]])) <= DailyTaskReminder::SUMMARY_MAX, 'the summary fits the template');
+$allTypes = [];
+foreach (['Contratos de arrendamiento sin enviar', 'Órdenes de mantenimiento sin respuesta', 'Cotizaciones enviadas sin respuesta', 'Cotizaciones sin enviar', 'Preventivas sin enviar', 'Preventivas con cita sin realizar', 'Casos sin cita preventiva', 'Solicitudes de terminación de contrato', 'Solicitudes de no prórroga de contrato', 'Servicios públicos críticos · 72 horas', 'Solicitudes de crédito', 'Créditos sin ingresar a contabilidad', 'Casos jurídicos · fecha límite'] as $label) $allTypes[$label] = array_fill(0, 100, []);
+$fullSummary = DailyTaskReminder::summary($allTypes);
+$check(!str_ends_with($fullSummary, '...') && str_contains($fullSummary, '100 Casos jurídicos · fecha límite'), 'all thirteen task types fit without cutting the message');
+
+// También mostrar en: solo alertas, cargos y pestañas reales, y el popup sale con la opción del menú.
+$alertTabs = DashboardAlertTabs::sanitize(['13' => ['admin_due' => ['vencimientos', 'inventada', 'vencimientos'], 'recordatorio_correo' => ['abiertos'], 'tema_juridicos' => []], '99' => ['admin_due' => ['abiertos']]], ['13'], ['admin_due', 'tema_juridicos'], ['vencimientos', 'abiertos']);
+$check($alertTabs === ['13' => ['admin_due' => ['vencimientos']]], 'saving keeps only real popup alerts, cargos and tabs');
+$check(DashboardAlertTabs::byMenuTab(['admin_due' => ['vencimientos', 'abiertos'], 'tema_juridicos' => ['abiertos']], ['admin_due']) === ['due' => ['admin_due'], 'abiertos' => ['admin_due']], 'an inactive alert does not show and the permission key becomes the menu option');
+$header = (string) file_get_contents(dirname(__DIR__) . '/includes/header.php');
+$menuProbe = DashboardAlertTabs::byMenuTab(['a' => ['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble', 'contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga', 'funcionario_contratos', 'metricas_casos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs']], ['a']);
+$check(array_filter(array_keys($menuProbe), static fn(string $tab): bool => !str_contains($header, "'key' => '{$tab}'")) === [], 'every renamed tab points to a real menu option');
+$check(DashboardAlertTabs::summary([]) === 'También en: ninguna pestaña' && DashboardAlertTabs::summary(['Cotizaciones']) === 'También en: Cotizaciones' && DashboardAlertTabs::summary(['A', 'B']) === 'También en: 2 pestañas', 'the button says where the alert also shows');
 $body = DailyTaskReminder::emailBody('Ana <b>', $groups);
 $check(str_contains($body, 'Ana &lt;b&gt;') && str_contains($body, '<b>3</b> tareas') && str_contains($body, '5 días de atraso') && str_contains($body, 'vence hoy'), 'the email escapes names and lists the tasks');
 

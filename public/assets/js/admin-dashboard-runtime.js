@@ -324,6 +324,8 @@
     var DASHBOARD_REMINDER_EVERY_MS = 3600000;
     var DASHBOARD_REMINDER_STORAGE_KEY = "scm-dashboard-reminder-at";
     var dashboardReminderAt = 0;
+    var DASHBOARD_TAB_ALERT_STORAGE_PREFIX = "scm-dashboard-tab-alert-at:";
+    var dashboardTabAlertAt = {};
     var funcionarioBridgeMode = false;
     try {
       var initialBridgeParams = new URL(window.location.href).searchParams;
@@ -345,7 +347,8 @@
 
     function shouldAutoShowDashboardDuePopup(source) {
       // El recordatorio de cada hora sale en cualquier pestaña; dashboardReminderBusy decide si es buen momento.
-      if (source === "hourly") return true;
+      // Las alertas configuradas para una pestaña ya saben que están en ella.
+      if (source === "hourly" || String(source || "").indexOf("tab-") === 0) return true;
       try {
         var params = new URL(window.location.href).searchParams;
         var tab = String(params.get("tab") || "").trim().toLowerCase();
@@ -1439,11 +1442,11 @@
       });
     }
 
-    function maybeShowDashboardAlertsPopup(source) {
+    function maybeShowDashboardAlertsPopup(source, tab) {
       source = source || "login";
       if (funcionarioBridgeMode || !alertPopupConfig.enabled || dashboardAlertsShown[source]) return Promise.resolve();
       if (!shouldAutoShowDashboardDuePopup(source) || !window.Swal || !ajaxUrl || !actionDashboardAlerts) return Promise.resolve();
-      return dashboardAction(actionDashboardAlerts, {})
+      return dashboardAction(actionDashboardAlerts, tab ? { tab: tab } : {})
         .then(function (data) {
           var groups = data && Array.isArray(data.groups) ? data.groups : [];
           if (!shouldAutoShowDashboardDuePopup(source) || dashboardAlertsShown[source]) return;
@@ -1466,6 +1469,38 @@
       return Promise.resolve(maybeShowDashboardDuePopup(source)).then(function () {
         if (dashboardDueActionTaken || dashboardDuePopupRestoreAfterCase) return;
         return maybeShowDashboardAlertsPopup(source);
+      });
+    }
+
+    function dashboardTabAlertLastAt(tab) {
+      try {
+        return Math.max(dashboardTabAlertAt[tab] || 0, Number(window.localStorage.getItem(DASHBOARD_TAB_ALERT_STORAGE_PREFIX + tab)) || 0);
+      } catch (_storageError) {
+        return dashboardTabAlertAt[tab] || 0;
+      }
+    }
+
+    function markDashboardTabAlertShown(tab) {
+      dashboardTabAlertAt[tab] = Date.now();
+      try {
+        window.localStorage.setItem(DASHBOARD_TAB_ALERT_STORAGE_PREFIX + tab, String(dashboardTabAlertAt[tab]));
+      } catch (_storageError) {}
+    }
+
+    // "También mostrar en": cada pestaña cuenta su propia hora, para no reiniciar ni depender del aviso general.
+    function maybeShowDashboardTabPopups(tab) {
+      var keys = (alertPopupConfig.tabs || {})[tab];
+      if (funcionarioBridgeMode || !Array.isArray(keys) || !keys.length) return Promise.resolve();
+      if (Date.now() - dashboardTabAlertLastAt(tab) < DASHBOARD_REMINDER_EVERY_MS || dashboardReminderBusy()) return Promise.resolve();
+      var source = "tab-" + tab;
+      markDashboardTabAlertShown(tab);
+      delete dashboardDuePopupShown[source];
+      delete dashboardAlertsShown[source];
+      dashboardDueActionTaken = false;
+      var withDue = keys.indexOf("admin_due") !== -1;
+      return Promise.resolve(withDue ? maybeShowDashboardDuePopup(source) : null).then(function () {
+        if (keys.length === (withDue ? 1 : 0) || dashboardDueActionTaken || dashboardDuePopupRestoreAfterCase) return;
+        return maybeShowDashboardAlertsPopup(source, tab);
       });
     }
 
@@ -1497,6 +1532,8 @@
         payload = payload || {};
         if (payload.seesAllTypes) updateDueNavBadgeFromTab(range);
         else updateDashboardDueNavBadge(dashboardDueTotal(payload.rows, payload.summaryGroups));
+        // Solo se comparte la consulta en curso: cada popup posterior debe traer lo pendiente de ese momento.
+        dashboardDuePopupPromise = null;
         return payload;
       }).catch(function (error) {
         dashboardDuePopupPromise = null;
@@ -1640,6 +1677,10 @@
       delete dashboardAlertsShown["home-manual"];
       refreshDashboardDueNavBadge();
       maybeShowDashboardEntryPopups("home-manual");
+    });
+
+    root.addEventListener("scm:menu-tab-selected", function (event) {
+      maybeShowDashboardTabPopups(String((event.detail && event.detail.tab) || ""));
     });
     var calendarAppUrl = String(
       (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
@@ -12047,6 +12088,14 @@
         ["alert_permissions", "due_type_permissions", "due_reminder_types"].forEach(function (field) {
           fd.append(field, JSON.stringify(collectAlertCardValues(field)));
         });
+        var alertTabs = {};
+        form.querySelectorAll("[data-scm-alert-tabs-value]").forEach(function (input) {
+          if (!input.value) return;
+          var cargoId = input.getAttribute("data-cargo");
+          alertTabs[cargoId] = alertTabs[cargoId] || {};
+          alertTabs[cargoId][input.getAttribute("data-alert")] = input.value.split(",");
+        });
+        fd.append("alert_tabs", JSON.stringify(alertTabs));
         fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
           .then(function (r) {
             return r.json();
@@ -27036,6 +27085,8 @@
     refreshDashboardDueNavBadge();
     window.setTimeout(function () {
       maybeShowDashboardEntryPopups("login");
+      var mainNav = document.querySelector("[data-scm-main-nav]");
+      if (mainNav) maybeShowDashboardTabPopups(mainNav.getAttribute("data-scm-current-tab") || "");
     }, 0);
     window.setInterval(dashboardReminderTick, 60000);
 

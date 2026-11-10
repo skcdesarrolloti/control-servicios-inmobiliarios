@@ -124,7 +124,59 @@
       applyFilter();
     }
 
+    // "También mostrar en": un solo selector para todas las alertas; lo elegido queda en el campo oculto de cada una.
+    var tabsPicker = form.querySelector("[data-scm-alert-tabs-picker]");
+    var tabsOpener = null;
+    function tabChecks() {
+      return Array.prototype.slice.call(tabsPicker.querySelectorAll("[data-scm-alert-tab]"));
+    }
+    function openTabsPicker(button) {
+      tabsOpener = button;
+      var saved = button.parentNode.querySelector("[data-scm-alert-tabs-value]").value;
+      var selected = saved ? saved.split(",") : [];
+      tabChecks().forEach(function (input) { input.checked = selected.indexOf(input.value) !== -1; });
+      tabsPicker.querySelector("[data-scm-alert-tabs-name]").textContent = button.getAttribute("data-alert-label") || "";
+      tabsPicker.hidden = false;
+      tabsPicker.querySelector("[data-scm-alert-tabs-apply]").focus();
+    }
+    function closeTabsPicker() {
+      tabsPicker.hidden = true;
+      if (tabsOpener) tabsOpener.focus();
+      tabsOpener = null;
+    }
+    function applyTabsPicker() {
+      var chosen = tabChecks().filter(function (input) { return input.checked; });
+      tabsOpener.parentNode.querySelector("[data-scm-alert-tabs-value]").value = chosen.map(function (input) { return input.value; }).join(",");
+      var where = !chosen.length ? "ninguna pestaña" : (chosen.length === 1 ? chosen[0].parentNode.textContent.trim() : chosen.length + " pestañas");
+      tabsOpener.textContent = "También en: " + where;
+      tabsOpener.classList.toggle("is-set", chosen.length > 0);
+      closeTabsPicker();
+    }
+    if (tabsPicker) {
+      tabsPicker.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          event.stopPropagation();
+          closeTabsPicker();
+        } else if (event.key === "Enter" && event.target.matches("input")) {
+          event.preventDefault(); // Enter en una casilla no debe guardar todo el formulario.
+        }
+      });
+    }
+
     form.addEventListener("click", function (event) {
+      var tabsOpen = event.target.closest("[data-scm-alert-tabs-open]");
+      if (tabsOpen) {
+        openTabsPicker(tabsOpen);
+        return;
+      }
+      if (event.target.closest("[data-scm-alert-tabs-cancel]")) {
+        closeTabsPicker();
+        return;
+      }
+      if (event.target.closest("[data-scm-alert-tabs-apply]")) {
+        applyTabsPicker();
+        return;
+      }
       var pick = event.target.closest("[data-scm-perm-cargo-pick]");
       if (pick) {
         selectCargo(pick.getAttribute("data-scm-perm-cargo-pick"));

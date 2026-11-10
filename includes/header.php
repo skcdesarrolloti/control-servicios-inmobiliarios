@@ -1544,7 +1544,7 @@ foreach ($rawNavItems as $k => $item) {
           <span>Menú</span>
           <span class="material-symbols-outlined scm-nav-toggle-chevron" aria-hidden="true">expand_more</span>
         </button>
-        <nav class="flex items-center gap-1.5 py-1" aria-label="Pestañas principales del sistema" data-scm-main-nav>
+        <nav class="flex items-center gap-1.5 py-1" aria-label="Pestañas principales del sistema" data-scm-main-nav data-scm-current-tab="<?php echo htmlspecialchars((string) $current_page, ENT_QUOTES, 'UTF-8'); ?>">
           <?php foreach ($filteredNavItems as $tabKey => $tab): ?>
             <?php if ($tab['type'] === 'dropdown'): ?>
               <?php
