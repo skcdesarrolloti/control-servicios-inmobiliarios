@@ -220,13 +220,16 @@
       if (config.additional) {
         html += '<p class="scm-inv-hint">Este inventario es de <b>otro inmueble del mismo contrato</b>. Escribe sus datos; irá también en los anexos.</p>';
       }
+      if (config.receipt) {
+        html += '<p class="scm-inv-hint">Caso de recibo: el contrato no tenía inventario. Se registra como <b>Anterior</b>, no genera cobro ni se envía.</p>';
+      }
       if (config.previous && config.previous.length) {
         html += '<div class="scm-inv-card scm-inv-base"><label class="scm-inv-field is-wide"><span>Empezar desde otro inventario de este inmueble</span><select data-previous-source><option value="">No, empezar desde cero</option>' +
           config.previous.map(function (item) { return '<option value="' + esc(item.id) + '">' + esc(item.label) + "</option>"; }).join("") +
           '</select></label><button type="button" class="scm-acta-button scm-acta-secondary" data-load-previous>Cargar elementos</button></div>';
       }
       html += '<div class="scm-inv-card"><h4>Inventario</h4><div class="scm-inv-grid">' +
-        select("Tipo de inventario", "tipo_inventario", catalog.types, { required: true, rerender: true }) +
+        select("Tipo de inventario", "tipo_inventario", config.receipt ? ["Anterior"] : catalog.types, { required: true, rerender: true }) +
         select("Categoría", "categoria_inventario", catalog.categories, { required: true, rerender: true }) +
         input("Registro fotográfico (enlace)", "registro_fotografico", { required: !config.editing, wide: true, placeholder: "https://drive.google.com/..." }) +
         "</div></div>";

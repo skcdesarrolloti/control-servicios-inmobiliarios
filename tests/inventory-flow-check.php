@@ -37,7 +37,7 @@ $inventoryColumns = array_values(array_unique(array_merge($inventoryColumns, arr
 $tables = [
   'wp_jet_cct_inventario' => $inventoryColumns,
   'wp_jet_cct_contratos_arrendamiento' => ['id_inventario','direccion','arrendatario','documento_arrendatario','correo_arrendatario','celular_arrendatario','tiene_delegado','delegado','documento_delegado','correo_delegado','celular_delegado','luz','agua','gas','medidor_luz','medidor_agua','medidor_gas','registro_fotografico','servicios_publicos','tiene_parqueadero','tipo_parqueadero','parqueaderos','numero_parqueadero','tiene_deposito','depositos','fecha_linderos','conjunto_lin','torre_lin','inmueble_lin','parqueadero_lin','deposito_lin','acuerdos_precontractuales','contrato','inmueble','id_inmueble','id_propietario'],
-  'wp_jet_cct_tickets' => ['id_inventario','estado_inventario','estado_administrativo','fecha_actualizacion','nombre_empleado','correo_empleado','celular_empleado','reportes','tuvo_reporte','id_contrato','id_inmueble','id_revision_entrega','fecha'],
+  'wp_jet_cct_tickets' => ['tema_ayuda','id_inventario','estado_inventario','estado_administrativo','fecha_actualizacion','nombre_empleado','correo_empleado','celular_empleado','reportes','tuvo_reporte','id_contrato','id_inmueble','id_revision_entrega','fecha'],
   'wp_jet_cct_reportes_administrativos' => ['cct_status','cct_author_id','cct_created','cct_modified','id_ticket','id_empleado','creador','fecha','fecha_revision','fecha_ticket','fue_pagado','exportado','categoria','descripcion','valor','transporte','valor_mantenimiento','valor_revision','sucursal','contrato','inmueble','arrendatario','id_contrato','id_inmueble','id_rev_entrega','id_estudio_aseguradora','numero_solicitud'],
   'wp_jet_cct_historial_del_ticket' => ['cct_status','cct_author_id','cct_created','cct_modified','id_ticket','fecha','id_empleado','nombre','correo','celular','respuesta','id_inventario'],
   'wp_jet_cct_historial_del_inmueble' => ['cct_status','cct_author_id','cct_created','cct_modified','id_ticket','fecha','id_empleado','id_inmueble','tipo_reporte','observacion','funcionario'],
@@ -236,6 +236,51 @@ $targetTicket = $db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=2');
 $assert($targetTicket['id_inventario'] === (string) $copied['id'] && $targetTicket['estado_administrativo'] === 'En ejecucion', 'Vincula el caso con el estado vigente.');
 $second = $dupApp->duplicate();
 $assert(str_contains($second['message'], 'adicional') && $db->getRow('SELECT id_inventario FROM wp_jet_cct_contratos_arrendamiento WHERE _ID=2')['id_inventario'] === (string) $copied['id'], 'Una segunda copia no reemplaza al principal.');
+
+// Recibo: inventario Anterior solo si el contrato no tiene; sin cobro, sin anexos y sin cambiar el estado del caso.
+$db->insert('wp_jet_cct_contratos_arrendamiento', ['contrato' => '902', 'inmueble' => '88', 'id_inmueble' => '700', 'arrendatario' => 'Saliente']);
+$db->insert('wp_jet_cct_tickets', ['tema_ayuda' => 'Recibo de inmuebles', 'id_contrato' => '3', 'id_inmueble' => '700', 'estado_administrativo' => 'Nuevo']);
+$db->insert('wp_jet_cct_tickets', ['tema_ayuda' => 'Recibo de inmueble', 'id_contrato' => '1', 'estado_administrativo' => 'Nuevo']);
+$receiptApp = new class($db, $inspector) {
+  use \SCM\App\Concerns\HandlesInventoryActions;
+  public array $meta = [];
+  public function __construct(public \SCM\Core\Database $db, private \SCM\Support\SchemaInspector $inspector) {}
+  private function inventorySchema(): \SCM\Support\SchemaInspector { return $this->inspector; }
+  private function correctiveReviewTicket(int $id): array { return $this->db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=?', [$id]) ?? []; }
+  private function correctiveReviewContract(array $t): array { return $this->db->getRow('SELECT * FROM wp_jet_cct_contratos_arrendamiento WHERE _ID=?', [(int) $t['id_contrato']]) ?? []; }
+  private function correctiveReviewProperty(array $t, array $c): array { return []; }
+  private function correctiveReviewValidateContext(array $t, array $c, array $p): void {}
+  private function correctiveReviewFirstText(array $v): string { foreach ($v as $x) { if (trim((string) $x) !== '') return trim((string) $x); } return ''; }
+  private function correctiveReviewDigits($v): string { return preg_replace('/\D/', '', (string) $v) ?? ''; }
+  private function correctiveReviewSplitIds(string $r): array { return array_values(array_filter(array_map('trim', explode(',', $r)))); }
+  private function ticketCompletionActor(): array { return ['name' => 'Funcionario', 'email' => 'f@example.invalid', 'phone' => '300', 'employee_id' => '89']; }
+  private function preventiveReviewBranch(array $t, array $c): array { return []; }
+  private function deliveryReviewSetPostMeta(int $id, string $key, $value): void { $this->meta[$id][$key] = $value; }
+  private function format_cop_currency($v): string { return '$' . $v; }
+  public function create(int $ticket): array { return $this->inventoryCreate($ticket); }
+  public function update(int $ticket, int $id): array { return $this->inventoryUpdate($ticket, $id); }
+  public function guard(int $ticket, string $operation, int $id = 0): void { $this->inventoryGuardReceipt($this->inventoryContext($ticket), $operation, $id); }
+};
+$reportsBefore = (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_reportes_administrativos');
+$historyBefore = (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket');
+$receiptApp->guard(3, 'new');
+$_POST = ['payload' => $payload(['contrato' => '902', 'inmueble' => '88'])];
+$receipt = $receiptApp->create(3);
+$r = $inv((int) $receipt['review_id']);
+$receiptTicket = $db->getRow('SELECT * FROM wp_jet_cct_tickets WHERE _ID=3');
+$assert($r['tipo_inventario'] === 'Anterior' && $r['incluir_anexos'] === 'No' && $r['se_envio'] === 'No' && ($r['id_reporte_administrativo'] ?? '') === '', 'El de recibo es Anterior, fuera de anexos y sin reporte.');
+$assert((int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_reportes_administrativos') === $reportsBefore && !str_contains($receipt['message'], 'Reporte'), 'El de recibo no cobra.');
+$assert($db->getRow('SELECT id_inventario FROM wp_jet_cct_contratos_arrendamiento WHERE _ID=3')['id_inventario'] === $receipt['review_id'] && $receiptTicket['id_inventario'] === $receipt['review_id'], 'Queda vinculado al contrato y al caso.');
+$assert($receiptTicket['estado_administrativo'] === 'Nuevo', 'No cambia el estado administrativo del recibo.');
+$assert((int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket') === $historyBefore + 1, 'Deja trazabilidad en el caso.');
+try { $receiptApp->guard(3, 'create'); $assert(false, 'Solo uno por contrato en recibo.'); } catch (DomainException $e) { $assert(str_contains($e->getMessage(), 'ya tiene inventario'), $e->getMessage()); }
+$receiptApp->guard(3, 'edit', (int) $receipt['review_id']);
+$_POST = ['payload' => $payload(['contrato' => '902', 'inmueble' => '88']), 'version' => $r['cct_modified']];
+$receiptApp->update(3, (int) $receipt['review_id']);
+$assert($inv((int) $receipt['review_id'])['tipo_inventario'] === 'Anterior', 'Al editar sigue siendo Anterior.');
+try { $receiptApp->guard(4, 'new'); $assert(false, 'Contrato con inventario: no se crea desde recibo.'); } catch (DomainException) {}
+try { $receiptApp->guard(4, 'edit', 4); $assert(false, 'El de la entrega no se edita desde recibo.'); } catch (DomainException $e) { $assert(str_contains($e->getMessage(), 'caso de entrega'), $e->getMessage()); }
+$receiptApp->guard(1, 'new');
 
 // Dictado: lo que devuelve la IA se limpia y se ajusta al catálogo.
 $voiceRows = \SCM\Modules\Inventory\InventoryVoiceAssistant::parseRows("<think>pensando [1]</think>```json\n[{\"d\":\"griferia\",\"c\":2,\"m\":\"Cromo\",\"e\":\"REGULAR\",\"o\":\"\"},{\"d\":\"\"},{\"d\":\"<b>Mesón</b>\",\"e\":\"Excelente\",\"o\":\"Rayón\"}]\n```", ['Griferia', 'Puerta'], false);

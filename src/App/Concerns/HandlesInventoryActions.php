@@ -32,11 +32,12 @@ trait HandlesInventoryActions
     $ticketId = (int) ($_POST['ticket_pk'] ?? 0);
     $operation = trim((string) ($_POST['operation'] ?? 'read'));
     try {
-      if (!$this->canAccessDeliveryReview($ticketId)) {
+      if (!$this->canAccessInventoryCase($ticketId)) {
         http_response_code(403);
         $this->jsonFail('No tienes permiso para gestionar el inventario de este caso.');
       }
       $inventoryId = (int) ($_POST['review_id'] ?? 0);
+      $this->inventoryGuardReceipt($this->inventoryContext($ticketId), $operation, $inventoryId);
       $result = [];
       $mode = 'list';
       if ($operation === 'create') {
@@ -75,7 +76,7 @@ trait HandlesInventoryActions
       $this->jsonFail('No tienes permiso para gestionar inventarios.');
     }
     $ticketId = (int) ($_POST['ticket_pk'] ?? 0);
-    if (!$this->canAccessDeliveryReview($ticketId)) {
+    if (!$this->canAccessInventoryCase($ticketId)) {
       http_response_code(403);
       $this->jsonFail('No tienes permiso para este caso.');
     }
@@ -102,7 +103,58 @@ trait HandlesInventoryActions
     return new SchemaInspector($this->db);
   }
 
-  /** @return array{ticket:array<string,mixed>,contract:array<string,mixed>,property:array<string,mixed>,inventories:list<array<string,mixed>>} */
+  /** Casos de entrega (como la revisión antes de la ocupación) y casos de recibo, para el inventario anterior. */
+  private function canAccessInventoryCase(int $ticketId): bool
+  {
+    if ($this->canAccessDeliveryReview($ticketId)) {
+      return true;
+    }
+    return Auth::isLoggedIn() && $ticketId > 0 && $this->canAccessDashboardTab('recibo')
+      && $this->inventoryIsReceiptTicket($this->correctiveReviewTicket($ticketId));
+  }
+
+  /** @param array<string,mixed> $ticket */
+  private function inventoryIsReceiptTicket(array $ticket): bool
+  {
+    $normalize = static function (string $value): string {
+      $value = mb_strtolower(trim($value), 'UTF-8');
+      return strtr($value, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u']);
+    };
+    $topic = $normalize((string) ($ticket['tema_ayuda'] ?? ''));
+    if ($topic === '') {
+      return false;
+    }
+    $topics = (array) (\SCM\App\SuCasaControlServiciosInmobiliarios::configuredGenericTicketTabDefinitions()['recibo']['temas'] ?? []);
+    return in_array($topic, array_map(static fn($item): string => $normalize((string) $item), $topics), true);
+  }
+
+  /** @param array<string,mixed> $row */
+  private function inventoryFromCase(array $row, int $ticketId): bool
+  {
+    return (int) ($row['id_ticket'] ?? 0) === $ticketId;
+  }
+
+  /**
+   * En un caso de recibo solo se crea el inventario si el contrato no tiene ninguno, y solo se editan o eliminan los
+   * creados desde ese mismo caso: el de la entrega se gestiona en su caso.
+   *
+   * @param array<string,mixed> $context
+   */
+  private function inventoryGuardReceipt(array $context, string $operation, int $inventoryId): void
+  {
+    if (!$context['receipt']) {
+      return;
+    }
+    $ticketId = (int) ($context['ticket']['_ID'] ?? 0);
+    if (in_array($operation, ['new', 'create'], true) && $context['inventories'] !== []) {
+      throw new \DomainException('El contrato ya tiene inventario #' . $context['inventories'][0]['_ID'] . '. En los casos de recibo solo se crea cuando el contrato no tiene.');
+    }
+    if (in_array($operation, ['edit', 'update', 'delete'], true) && !$this->inventoryFromCase($this->inventoryTarget($context, $inventoryId), $ticketId)) {
+      throw new \DomainException('Este inventario se gestiona desde el caso de entrega donde se creó.');
+    }
+  }
+
+  /** @return array{ticket:array<string,mixed>,contract:array<string,mixed>,property:array<string,mixed>,inventories:list<array<string,mixed>>,receipt:bool} */
   private function inventoryContext(int $ticketId): array
   {
     $ticket = $this->correctiveReviewTicket($ticketId);
@@ -116,7 +168,7 @@ trait HandlesInventoryActions
     $where = '`id_ticket` = ?' . ($contractId !== '' ? ' OR `id_contrato` = ?' : '');
     $args = $contractId !== '' ? [(string) $ticketId, $contractId] : [(string) $ticketId];
     $inventories = $this->db->getResults("SELECT * FROM `{$table}` WHERE ({$where}) AND COALESCE(`cct_status`, 'publish') = 'publish' ORDER BY `_ID` ASC", $args);
-    return ['ticket' => $ticket, 'contract' => $contract, 'property' => $property, 'inventories' => $inventories];
+    return ['ticket' => $ticket, 'contract' => $contract, 'property' => $property, 'inventories' => $inventories, 'receipt' => $this->inventoryIsReceiptTicket($ticket)];
   }
 
   /** @param array<string,mixed> $context @return array<string,mixed> */
@@ -172,8 +224,13 @@ trait HandlesInventoryActions
     $contract = $context['contract'];
     $property = $context['property'];
     $this->correctiveReviewValidateContext($ticket, $contract, $property);
+    $receipt = $context['receipt'];
     $input = $this->inventoryInputFromRequest(true);
     $columns = $input['columns'];
+    if ($receipt) {
+      // Recibo de un contrato sin inventario: queda como Anterior, sin cobro y fuera de los anexos.
+      $columns['tipo_inventario'] = InventorySchema::PREVIOUS_TYPE;
+    }
     // El primer inventario es el del inmueble del contrato; los siguientes son de otros inmuebles entregados en el mismo contrato.
     $principalId = $this->correctiveReviewDigits($contract['id_inventario'] ?? '');
     $isAdditional = $principalId !== '' && $this->inventoryExists($principalId, $context['inventories']);
@@ -196,7 +253,7 @@ trait HandlesInventoryActions
       'fecha_entrega' => $now,
       'arrendador' => 'SKC SuCasa Inmobiliaria',
       'se_envio' => 'No',
-      'incluir_anexos' => 'Si',
+      'incluir_anexos' => $receipt ? 'No' : 'Si',
       'creador' => $actor['name'] ?? Auth::user(),
       'email_creador' => $actor['email'] ?? '',
       'celular_creador' => $actor['phone'] ?? '',
@@ -231,9 +288,11 @@ trait HandlesInventoryActions
         throw new \DomainException('El inventario se guardó sin identificador válido.');
       }
       if (!$isAdditional) {
-        $this->inventorySyncPrincipal($schema, $inventoryId, $columns, $ticket, $contract, $actor, $now);
+        $this->inventorySyncPrincipal($schema, $inventoryId, $columns, $ticket, $contract, $actor, $now, $receipt);
       }
-      if ((string) $columns['tipo_inventario'] === InventorySchema::NEW_TYPE) {
+      if ($receipt) {
+        $this->inventoryHistory($schema, $ticketId, $inventoryId, $actor, $employeeId, 'Se registró el inventario anterior #' . $inventoryId . ' del inmueble porque el contrato no tenía inventario.', $postId, 'Se registró el inventario anterior #' . $inventoryId . ' del inmueble en el proceso de recibo.');
+      } elseif ((string) $columns['tipo_inventario'] === InventorySchema::NEW_TYPE) {
         $this->inventoryHistory($schema, $ticketId, $inventoryId, $actor, $employeeId, 'Se ha elaborado el inventario antes de la ocupación de acuerdo al proceso de entrega. Procederemos a enviarlo al momento de la entrega.', $postId, 'Se ha realizado el inventario inicial a su inmueble.');
         $reportNote = $this->inventoryCreateReport($schema, $inventoryId, $insert + $data, $input['with_transport'], $ticket, $actor, $employeeId, $reviewId, $now, $nowSql);
       }
@@ -268,7 +327,7 @@ trait HandlesInventoryActions
    *
    * @param array<string,mixed> $columns @param array<string,mixed> $ticket @param array<string,mixed> $contract @param array<string,mixed> $actor
    */
-  private function inventorySyncPrincipal(SchemaInspector $schema, int $inventoryId, array $columns, array $ticket, array $contract, array $actor, int $now): void
+  private function inventorySyncPrincipal(SchemaInspector $schema, int $inventoryId, array $columns, array $ticket, array $contract, array $actor, int $now, bool $receipt = false): void
   {
     $contractTable = $this->db->table('jet_cct_contratos_arrendamiento');
     $contractId = (int) ($contract['_ID'] ?? 0);
@@ -287,7 +346,12 @@ trait HandlesInventoryActions
     if ($inventoryId > 0) {
       $ticketTable = $this->db->table('jet_cct_tickets');
       // Mismo cambio del JetForm con el estado vigente: los "En ejecucion por …" se retiraron (docs/ejecutado-caso.md).
-      $ticketUpdate = $schema->filterTableData($ticketTable, [
+      // En un caso de recibo el inventario anterior no avanza el caso: solo se vincula.
+      $ticketUpdate = $schema->filterTableData($ticketTable, $receipt ? [
+        'id_inventario' => (string) $inventoryId,
+        'estado_inventario' => 'Si',
+        'fecha_actualizacion' => $now,
+      ] : [
         'id_inventario' => (string) $inventoryId,
         'estado_inventario' => 'Si',
         'estado_administrativo' => CompletionPolicy::EXECUTION_STATE,
@@ -396,6 +460,9 @@ trait HandlesInventoryActions
     }
     $input = $this->inventoryInputFromRequest(false);
     $columns = $input['columns'];
+    if ($context['receipt']) {
+      $columns['tipo_inventario'] = InventorySchema::PREVIOUS_TYPE;
+    }
     $actor = $this->ticketCompletionActor();
     $employeeId = $this->correctiveReviewFirstText([$actor['employee_id'] ?? '', Auth::userId()]);
     $now = time();
@@ -406,7 +473,7 @@ trait HandlesInventoryActions
       $pdo->beginTransaction();
       $this->db->update($table, $schema->filterTableData($table, ['cct_modified' => $nowSql, 'id_empleado' => $employeeId] + $columns), ['_ID' => $inventoryId]);
       if ((string) ($context['contract']['id_inventario'] ?? '') === (string) $inventoryId) {
-        $this->inventorySyncPrincipal($schema, 0, $columns, $context['ticket'], $context['contract'], $actor, $now);
+        $this->inventorySyncPrincipal($schema, 0, $columns, $context['ticket'], $context['contract'], $actor, $now, $context['receipt']);
       }
       $reportNote = $this->inventoryAdjustReport($schema, $row, $columns, $input['with_transport'], $nowSql);
       $this->inventoryHistory($schema, $ticketId, $inventoryId, $actor, $employeeId, 'Se ha editado el inventario #' . $inventoryId . '.', '', '');
@@ -735,13 +802,19 @@ trait HandlesInventoryActions
     $h = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
     $inventories = $context['inventories'];
     $canDelete = $this->canUseDashboardAction('inventory_delete');
+    $receipt = $context['receipt'];
+    $ticketId = (int) ($context['ticket']['_ID'] ?? 0);
+    $fromDelivery = $receipt && array_filter($inventories, fn(array $row): bool => !$this->inventoryFromCase($row, $ticketId)) !== [];
     ob_start();
     ?>
     <div class="scm-acta scm-corrective-review scm-preventive-review scm-inventory-review">
       <?php if ($mode === 'list'): ?>
         <section class="scm-corrective-existing">
           <h3>Inventarios del contrato</h3>
-          <?php foreach ($inventories as $row): $id = (int) $row['_ID']; $principal = (string) ($context['contract']['id_inventario'] ?? '') === (string) $id; ?>
+          <?php if ($fromDelivery): ?>
+            <p class="scm-inv-hint">El contrato ya tiene inventario. En los casos de recibo solo se crea uno (tipo Anterior) cuando el contrato no tiene; el existente se edita desde el caso de entrega.</p>
+          <?php endif; ?>
+          <?php foreach ($inventories as $row): $id = (int) $row['_ID']; $principal = (string) ($context['contract']['id_inventario'] ?? '') === (string) $id; $manage = !$receipt || $this->inventoryFromCase($row, $ticketId); ?>
             <article>
               <div class="scm-corrective-existing-info">
                 <strong>Inventario #<?= $h((string) $id) ?><?= $principal ? ' · principal' : '' ?></strong>
@@ -751,12 +824,12 @@ trait HandlesInventoryActions
               </div>
               <div class="scm-corrective-existing-actions">
                 <button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-url="<?= $h(self::inventoryPublicUrl($id)) ?>" data-iframe-title="Inventario #<?= $h((string) $id) ?>">Ver</button>
-                <button type="button" class="scm-acta-button scm-acta-secondary" data-inventory-edit="<?= $h((string) $id) ?>">Editar</button>
-                <?php if ($canDelete): ?><button type="button" class="scm-acta-button scm-acta-danger" data-inventory-delete="<?= $h((string) $id) ?>">Eliminar</button><?php endif; ?>
+                <?php if ($manage): ?><button type="button" class="scm-acta-button scm-acta-secondary" data-inventory-edit="<?= $h((string) $id) ?>">Editar</button><?php endif; ?>
+                <?php if ($manage && $canDelete): ?><button type="button" class="scm-acta-button scm-acta-danger" data-inventory-delete="<?= $h((string) $id) ?>">Eliminar</button><?php endif; ?>
               </div>
             </article>
           <?php endforeach; ?>
-          <button type="button" class="scm-acta-button" data-inventory-new>Añadir inventario de otro inmueble del contrato</button>
+          <?php if (!$receipt): ?><button type="button" class="scm-acta-button" data-inventory-new>Añadir inventario de otro inmueble del contrato</button><?php endif; ?>
           <span data-corrective-review-message aria-live="polite"></span>
         </section>
       <?php else: ?>
@@ -784,6 +857,9 @@ trait HandlesInventoryActions
     if (!$editing) {
       $state['data']['tiene_delegado'] = '';
     }
+    if ($context['receipt']) {
+      $state['data']['tipo_inventario'] = InventorySchema::PREVIOUS_TYPE;
+    }
     $previous = [];
     if (!$editing) {
       foreach ($this->inventoryPreviousOptions($context) as $id => $label) {
@@ -793,6 +869,7 @@ trait HandlesInventoryActions
     $payload = [
       'editing' => $editing,
       'additional' => $additional,
+      'receipt' => $context['receipt'],
       'inventoryId' => (int) ($row['_ID'] ?? 0),
       'version' => (string) ($row['cct_modified'] ?? ''),
       'hasReport' => $reportId > 0,
@@ -939,7 +1016,7 @@ trait HandlesInventoryActions
     if (!$this->canUseDashboardAction('inventory_manage')) {
       $this->jsonFail('No tienes permiso para gestionar inventarios.');
     }
-    if (!$this->canAccessDeliveryReview((int) ($_POST['case_ticket'] ?? 0))) {
+    if (!$this->canAccessInventoryCase((int) ($_POST['case_ticket'] ?? 0))) {
       http_response_code(403);
       $this->jsonFail('No tienes permiso para este caso.');
     }

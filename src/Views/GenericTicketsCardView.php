@@ -443,7 +443,10 @@ final class GenericTicketsCardView
     $dataAttrs .= ' data-id-revision-preventiva="' . esc_attr($prevFirstId) . '"';
     $dataAttrs .= ' data-prev-se-envio="' . esc_attr((string) ($row['_scm_prev_se_envio'] ?? '')) . '"';
     $dataAttrs .= ' data-id-revision-entrega="' . esc_attr((string) call_user_func($this->firstIdValue, (string) ($row['id_revision_entrega'] ?? ''))) . '"';
-    $dataAttrs .= ' data-prev-encontro-danos="' . esc_attr((string) ($row['_scm_prev_encontro_danos'] ?? $row['se_encontraron_danos'] ?? '')) . '"';
+    // Recibo: el inventario anterior solo se crea si el contrato no tiene; el creado desde el caso se sigue gestionando ahí.
+    $dataAttrs .= ' data-contrato-inventario="' . esc_attr(trim((string) ($contratoData['id_inventario'] ?? ''))) . '"';
+    $dataAttrs .= ' data-id-inventario-caso="' . esc_attr(trim((string) ($row['id_inventario_entrega'] ?? ''))) . '"';
+    $dataAttrs .= ' data-prev-encontro-danos="'. esc_attr((string) ($row['_scm_prev_encontro_danos'] ?? $row['se_encontraron_danos'] ?? '')) . '"';
     $dataAttrs .= ' data-preventiva-no-access-count="' . esc_attr((string) $preventivaNoAccessCount) . '"';
     $dataAttrs .= ' data-ejecucion="' . esc_attr($tiempoEjecucion) . '"';
     $dataAttrs .= ' data-sin-actualizar="' . esc_attr($tiempoSinActualizar) . '"';

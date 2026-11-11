@@ -2880,6 +2880,18 @@
     return /^entregas? de inmuebles?$|^entrega$/.test(tema);
   }
 
+  // Casos de recibo de inmueble: permiten el inventario anterior cuando el contrato no tiene.
+  function isReciboCase(caseBtn) {
+    if (!caseBtn || !caseBtn.dataset) return false;
+    if (String(caseBtn.dataset.tabKey || "").toLowerCase() === "recibo") return true;
+    var tema = String(caseBtn.dataset.tema || "")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .trim();
+    return /^recibos? de inmuebles?$/.test(tema);
+  }
+
   function isPreventivaCase(caseBtn) {
     if (!caseBtn || !caseBtn.dataset) return false;
     var values = [
@@ -10492,6 +10504,18 @@
           complementaryActionButtons.push(
             '<button type="button" class="scm-case-work-btn" data-scm-open-inventory><span class="material-symbols-outlined scm-btn-icon">inventory_2</span><div class="scm-btn-text"><span class="scm-btn-label">Crear o gestionar inventario</span><span class="scm-btn-sub">Inventario inicial del inmueble</span></div></button>',
           );
+        } else if (!isPublicPqr && isReciboCase(btn) && statusBucket !== "cerrados" && canUseDashboardAction("inventory_manage")) {
+          // Solo si el contrato no tiene inventario, o para seguir gestionando el creado desde este caso.
+          var receiptCaseInventory = String(btn.dataset.idInventarioCaso || "").trim();
+          if (!String(btn.dataset.contratoInventario || "").trim() || receiptCaseInventory) {
+            complementaryActionButtons.push(
+              '<button type="button" class="scm-case-work-btn" data-scm-open-inventory><span class="material-symbols-outlined scm-btn-icon">inventory_2</span><div class="scm-btn-text"><span class="scm-btn-label">' +
+                (receiptCaseInventory ? "Gestionar inventario anterior" : "Crear inventario anterior") +
+                '</span><span class="scm-btn-sub">' +
+                (receiptCaseInventory ? "Inventario #" + escHtml(receiptCaseInventory) : "El contrato no tiene inventario · sin cobro ni env&iacute;o") +
+                "</span></div></button>",
+            );
+          }
         }
         if (!isPublicPqr && (cotizacionUrl || cotizacionId)) {
           if (canUseDashboardAction("quote_manage")) {

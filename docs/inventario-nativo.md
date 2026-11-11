@@ -8,6 +8,9 @@ el mismo CCT `inventario` con las mismas claves de fila, así que los inventario
 - **Caso de entrega**: *Acciones del caso → Complementarias → Crear o gestionar inventario*.
 - **Actividades administrativas → Proceso de entrega**: listados de *Revisiones antes de la ocupación* e *Inventarios*
   (ver y editar en popup).
+- **Caso de recibo**: *Complementarias → Crear inventario anterior*, solo si el contrato no tiene inventario (o para seguir
+  gestionando el creado desde ese caso). Queda tipo **Anterior**, sin reporte administrativo, con `incluir_anexos = No`,
+  y se vincula al contrato y al caso sin cambiar `estado_administrativo`. El inventario de la entrega no se edita desde el recibo.
 - **Herramientas → Duplicar inventario**: reemplaza el plugin *SKC Mapeador de Inventario*. Muestra una vista previa y copia
   los elementos hacia el contrato de otro caso. No genera reporte administrativo.
 - **Documento**: `inventario.php?numero=ID`. Con sesión del panel abre directo; sin sesión exige enlace firmado (`expires` + `sig`,

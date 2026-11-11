@@ -23,6 +23,8 @@ final class InventorySchema
   public const GLOSSARY_ELECTRICAL = 668;
   public const FURNISHED = 'Amoblado';
   public const NEW_TYPE = 'Nuevo';
+  /** Inventario de un inmueble ya ocupado (casos de recibo): no se cobra ni va en los anexos. */
+  public const PREVIOUS_TYPE = 'Anterior';
   public const ELECTRICAL = 'elementos_electricos';
   /** Clave de fila que marca un elemento eléctrico copiado desde otra sección (se recalcula al guardar). */
   public const ELECTRICAL_SOURCE = 'origen_electricos';
