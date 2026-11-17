@@ -2078,11 +2078,15 @@
   }
 
   // Configuración › Configuración hoja de cierre (ClosingSheetPolicyView; se oculta sin closing_sheet_policy_configure):
-  // políticas por ítem de la lista de chequeo, con el catálogo para leerlas completas, y archivos obligatorios.
+  // políticas por ítem de la lista de chequeo y archivos obligatorios. «Agregar política» abre un popup con el catálogo
+  // (buscar, leer completa y agregar); con permiso del Gestor organizacional, también editar o crear políticas con su
+  // mismo formulario (window.scmOrgPolicies, organization-manager.js).
   function initClosingPolicySettings(root, post) {
     var modal = null;
+    var picker = null;
     var catalog = [];
     var targetRow = null;
+    var pick = { id: null, filter: "todas", access: null };
 
     function ensureModal() {
       if (modal) return modal;
@@ -2102,7 +2106,6 @@
       });
       modal.addEventListener("click", onClick);
       modal.addEventListener("input", function (event) {
-        if (event.target.matches("[data-cpp-filter]")) renderList();
         var row = event.target.closest("[data-cpp-item]");
         if (row && event.target.matches("[data-cpp-note]")) markRow(row);
       });
@@ -2130,31 +2133,12 @@
         var row = remove.closest("[data-cpp-item]");
         remove.closest("[data-cpp-policy]").remove();
         markRow(row);
-        renderList();
         return;
       }
-      var pick = target.closest("[data-cpp-pick]");
-      if (pick) {
-        setTarget(pick.closest("[data-cpp-item]"));
-        var filter = modal.querySelector("[data-cpp-filter]");
-        filter.focus();
-        return;
-      }
+      var add = target.closest("[data-cpp-pick]");
+      if (add) return openPicker(add.closest("[data-cpp-item]"), null);
       var view = target.closest("[data-cpp-view]");
-      if (view) {
-        var id = view.closest("[data-cpp-policy]").getAttribute("data-cpp-policy");
-        var filterBox = modal.querySelector("[data-cpp-filter]");
-        filterBox.value = "#" + id;
-        renderList(id);
-        return;
-      }
-      var add = target.closest("[data-cpp-add-policy]");
-      if (add && targetRow) {
-        addPolicy(targetRow, parseInt(add.getAttribute("data-cpp-add-policy"), 10));
-        renderList();
-        return;
-      }
-      if (target.closest("[data-cpp-browser-close]")) setTarget(null);
+      if (view) openPicker(view.closest("[data-cpp-item]"), parseInt(view.closest("[data-cpp-policy]").getAttribute("data-cpp-policy"), 10));
     }
 
     function onSubmit(event) {
@@ -2184,22 +2168,6 @@
         });
     }
 
-    function setTarget(row) {
-      if (targetRow) targetRow.classList.remove("is-target");
-      targetRow = row;
-      var label = modal.querySelector("[data-cpp-target]");
-      label.textContent = "";
-      if (row) {
-        row.classList.add("is-target");
-        var strong = document.createElement("b");
-        strong.textContent = "Agregando a: ";
-        label.append(strong, row.querySelector(".cpp-text").textContent.trim());
-      } else {
-        label.textContent = "Elige un ítem con «Agregar política» para asignarle una, o lee el catálogo.";
-      }
-      renderList();
-    }
-
     function policy(id) {
       for (var i = 0; i < catalog.length; i += 1) if (catalog[i].id === id) return catalog[i];
       return null;
@@ -2209,52 +2177,17 @@
       return String(value || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
     }
 
-    // Catálogo: filtra por número, título o texto y muestra el texto completo de cada política.
-    function renderList(openId) {
-      var list = modal && modal.querySelector("[data-cpp-list]");
-      if (!list) return;
-      var term = plain(modal.querySelector("[data-cpp-filter]").value).trim();
-      var idTerm = term.replace(/^#/, "");
-      var assigned = targetRow ? Array.prototype.map.call(targetRow.querySelectorAll("[data-cpp-policy]"), function (chip) { return chip.getAttribute("data-cpp-policy"); }) : [];
-      var shown = catalog.filter(function (item) {
-        if (!term) return true;
-        if (/^\d+$/.test(idTerm)) return String(item.id) === idTerm;
-        return plain(item.title + " " + (item.code || "") + " " + item.text).indexOf(term) !== -1;
-      });
-      list.replaceChildren();
-      shown.slice(0, 120).forEach(function (item) {
-        var details = document.createElement("details");
-        // Versión para proveedores: por la audiencia del Gestor organizacional o, antes de migrar, por el sufijo «(Prov.)».
-        var provider = item.audience === "Proveedores" || /\(\s*prov/i.test(item.title);
-        details.className = "cpp-pol" + (provider ? " is-prov" : "");
-        details.open = openId !== undefined ? String(item.id) === String(openId) : shown.length <= 3;
-        var summary = document.createElement("summary");
-        summary.textContent = "#" + item.id + (item.code ? " · " + item.code : "") + " · " + item.title;
-        var text = document.createElement("p");
-        text.textContent = item.text || "Sin texto.";
-        details.append(summary, text);
-        if (targetRow) {
-          var button = document.createElement("button");
-          button.type = "button";
-          button.setAttribute("data-cpp-add-policy", String(item.id));
-          var already = assigned.indexOf(String(item.id)) !== -1;
-          button.disabled = already;
-          button.textContent = already ? "Ya está en este ítem" : "Agregar a este ítem";
-          details.appendChild(button);
-        }
-        list.appendChild(details);
-      });
-      if (!shown.length) {
-        var empty = document.createElement("p");
-        empty.className = "cpp-lead";
-        empty.textContent = "Ninguna política coincide con la búsqueda.";
-        list.appendChild(empty);
-      } else if (shown.length > 120) {
-        var more = document.createElement("p");
-        more.className = "cpp-lead";
-        more.textContent = "Se muestran 120 de " + shown.length + ". Escribe para filtrar.";
-        list.appendChild(more);
-      }
+    function short(title) {
+      return title.length > 48 ? title.slice(0, 47) + "…" : title;
+    }
+
+    // Versión para proveedores: por la audiencia del Gestor organizacional o, antes de migrar, por el sufijo «(Prov.)».
+    function isProvider(item) {
+      return item.audience === "Proveedores" || /\(\s*prov/i.test(item.title);
+    }
+
+    function assignedIds() {
+      return targetRow ? Array.prototype.map.call(targetRow.querySelectorAll("[data-cpp-policy]"), function (chip) { return parseInt(chip.getAttribute("data-cpp-policy"), 10); }) : [];
     }
 
     function markRow(row) {
@@ -2274,7 +2207,7 @@
       view.className = "cpp-chip-view";
       view.setAttribute("data-cpp-view", "");
       view.title = "Ver la política: " + item.title;
-      view.textContent = "#" + id + " · " + (item.title.length > 48 ? item.title.slice(0, 47) + "…" : item.title);
+      view.textContent = "#" + id + " · " + short(item.title);
       var remove = document.createElement("button");
       remove.type = "button";
       remove.className = "cpp-chip-x";
@@ -2286,6 +2219,323 @@
       markRow(row);
     }
 
+    // --- Popup «Agregar política» ----------------------------------------------------------------------------
+    function ensurePicker() {
+      if (picker) return picker;
+      picker = document.createElement("div");
+      picker.className = "scm-cia-modal cpp-pk-wrap";
+      picker.hidden = true;
+      picker.setAttribute("data-cpp-picker", "");
+      picker.innerHTML =
+        '<div class="scm-cia-modal-backdrop" data-cpp-picker-close></div>' +
+        '<section class="cpp-pk" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="scm-cpp-picker-title">' +
+        '<header class="cpp-pk-head"><div><p>Agregar política al ítem</p><h3 id="scm-cpp-picker-title" data-cpp-picker-title></h3></div>' +
+        '<button type="button" class="cpp-pk-x" data-cpp-picker-close aria-label="Cerrar">&times;</button></header>' +
+        '<div class="cpp-pk-tools"><input type="search" class="cpp-pk-search" placeholder="Buscar por número, código, título o texto" aria-label="Buscar política" data-cpp-picker-search>' +
+        '<div class="cpp-pk-chips" role="group" aria-label="Filtrar" data-cpp-picker-chips></div>' +
+        '<button type="button" class="cpp-pk-btn is-navy" data-cpp-picker-new hidden><span class="material-symbols-outlined" aria-hidden="true">add</span>Nueva política</button></div>' +
+        '<div class="cpp-pk-body"><div class="cpp-pk-list" role="listbox" aria-label="Políticas" data-cpp-picker-list></div>' +
+        '<article class="cpp-pk-view" aria-live="polite" data-cpp-picker-view></article></div>' +
+        '<footer class="cpp-pk-foot"><span role="status" data-cpp-picker-status></span><button type="button" class="cpp-pk-btn is-primary" data-cpp-picker-close>Listo</button></footer></section>';
+      root.appendChild(picker);
+      picker.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") { event.stopPropagation(); closePicker(); return; }
+        if (!event.target.matches("[data-cpp-picker-search]")) return;
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          var ids = visible().map(function (item) { return item.id; });
+          var at = ids.indexOf(pick.id) + (event.key === "ArrowDown" ? 1 : -1);
+          if (ids.length) select(ids[Math.max(0, Math.min(ids.length - 1, at))], true);
+        } else if (event.key === "Enter") {
+          event.preventDefault();
+          if (pick.id !== null) addFromPicker(pick.id);
+        }
+      });
+      picker.addEventListener("input", function (event) {
+        if (event.target.matches("[data-cpp-picker-search]")) renderPicker(true);
+      });
+      picker.addEventListener("click", onPickerClick);
+      return picker;
+    }
+
+    function onPickerClick(event) {
+      var target = event.target;
+      if (target.closest("[data-cpp-picker-close]")) return closePicker();
+      var chip = target.closest("[data-cpp-picker-filter]");
+      if (chip) {
+        pick.filter = chip.getAttribute("data-cpp-picker-filter");
+        return renderPicker(true);
+      }
+      var item = target.closest("[data-cpp-picker-item]");
+      if (item) return select(parseInt(item.getAttribute("data-cpp-picker-item"), 10), false);
+      var add = target.closest("[data-cpp-picker-add]");
+      if (add) return addFromPicker(parseInt(add.getAttribute("data-cpp-picker-add"), 10));
+      var drop = target.closest("[data-cpp-picker-remove]");
+      if (drop) {
+        var id = drop.getAttribute("data-cpp-picker-remove");
+        var chipEl = targetRow && targetRow.querySelector('[data-cpp-policy="' + id + '"]');
+        if (chipEl) chipEl.remove();
+        markRow(targetRow);
+        setStatus("Se quitó la política #" + id + " de este ítem.");
+        return renderPicker(false);
+      }
+      var bridge = window.scmOrgPolicies;
+      if (!bridge) return;
+      if (target.closest("[data-cpp-picker-new]")) bridge.create(onPolicySaved).catch(failed);
+      var edit = target.closest("[data-cpp-picker-edit]");
+      if (edit) bridge.edit(parseInt(edit.getAttribute("data-cpp-picker-edit"), 10), onPolicySaved).catch(failed);
+      var detail = target.closest("[data-cpp-picker-detail]");
+      if (detail) bridge.detail(parseInt(detail.getAttribute("data-cpp-picker-detail"), 10), onPolicySaved).catch(failed);
+    }
+
+    function failed(error) {
+      setStatus(error && error.message ? error.message : "No se pudo abrir el formulario de políticas.", true);
+    }
+
+    function setStatus(message, isError) {
+      var node = picker && picker.querySelector("[data-cpp-picker-status]");
+      if (!node) return;
+      node.textContent = message || "";
+      node.classList.toggle("is-error", !!isError);
+    }
+
+    function openPicker(row, focusId) {
+      if (!row) return;
+      ensurePicker();
+      targetRow = row;
+      pick.id = focusId;
+      pick.filter = "todas";
+      var heading = picker.querySelector("[data-cpp-picker-title]");
+      heading.textContent = row.querySelector(".cpp-text").textContent.trim();
+      heading.title = heading.textContent;
+      picker.querySelector("[data-cpp-picker-search]").value = "";
+      setStatus("");
+      renderPicker(focusId === null);
+      picker.hidden = false;
+      picker.querySelector("[data-cpp-picker-search]").focus();
+      if (focusId !== null) scrollToSelected();
+      // Editar y crear solo con el Gestor organizacional cargado y su permiso de gestión.
+      var bridge = window.scmOrgPolicies;
+      if (!pick.access && bridge && typeof bridge.access === "function") {
+        bridge.access().then(function (access) { pick.access = access || {}; renderPicker(false); }).catch(function () { pick.access = {}; });
+      }
+    }
+
+    function closePicker() {
+      if (!picker || picker.hidden) return;
+      picker.hidden = true;
+      var row = targetRow;
+      targetRow = null;
+      if (row) {
+        var button = row.querySelector("[data-cpp-pick]");
+        if (button) button.focus();
+      }
+    }
+
+    function filterCounts() {
+      var assigned = assignedIds();
+      var counts = { todas: catalog.length, asignadas: assigned.length, empleados: 0, proveedores: 0 };
+      catalog.forEach(function (item) { counts[isProvider(item) ? "proveedores" : "empleados"] += 1; });
+      return counts;
+    }
+
+    function visible() {
+      var term = plain(picker.querySelector("[data-cpp-picker-search]").value).trim();
+      var idTerm = term.replace(/^#/, "");
+      var assigned = assignedIds();
+      return catalog.filter(function (item) {
+        if (pick.filter === "asignadas" && assigned.indexOf(item.id) === -1) return false;
+        if (pick.filter === "empleados" && isProvider(item)) return false;
+        if (pick.filter === "proveedores" && !isProvider(item)) return false;
+        if (!term) return true;
+        if (/^\d+$/.test(idTerm)) return String(item.id) === idTerm;
+        return plain(item.title + " " + (item.code || "") + " " + item.text).indexOf(term) !== -1;
+      });
+    }
+
+    function badge(text, tone) {
+      var span = document.createElement("span");
+      span.className = "cpp-pk-badge" + (tone ? " is-" + tone : "");
+      span.textContent = text;
+      return span;
+    }
+
+    function badges(item, assigned) {
+      var out = [];
+      if (assigned.indexOf(item.id) !== -1) out.push(badge("En este ítem", "on"));
+      if (isProvider(item)) out.push(badge("Proveedores", "prov"));
+      if (item.state && item.state !== "Vigente") out.push(badge(item.state, "off"));
+      return out;
+    }
+
+    // Lista a la izquierda y lectura a la derecha. autoPick: al buscar o filtrar, se lee la primera que coincida.
+    function renderPicker(autoPick) {
+      if (!picker) return;
+      var assigned = assignedIds();
+      var counts = filterCounts();
+      var chips = picker.querySelector("[data-cpp-picker-chips]");
+      chips.replaceChildren();
+      [["todas", "Todas"], ["asignadas", "En este ítem"], ["empleados", "Empleados"], ["proveedores", "Proveedores"]].forEach(function (f) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "cpp-pk-chip";
+        button.setAttribute("data-cpp-picker-filter", f[0]);
+        button.setAttribute("aria-pressed", pick.filter === f[0] ? "true" : "false");
+        button.append(f[1] + " ");
+        var count = document.createElement("span");
+        count.textContent = String(counts[f[0]]);
+        button.appendChild(count);
+        chips.appendChild(button);
+      });
+      var shown = visible();
+      if (autoPick || (pick.id !== null && !shown.some(function (item) { return item.id === pick.id; }))) {
+        pick.id = shown.length ? shown[0].id : null;
+      }
+      var list = picker.querySelector("[data-cpp-picker-list]");
+      list.replaceChildren();
+      shown.slice(0, 200).forEach(function (item) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "cpp-pk-item";
+        button.setAttribute("role", "option");
+        button.setAttribute("data-cpp-picker-item", String(item.id));
+        button.setAttribute("aria-selected", item.id === pick.id ? "true" : "false");
+        var meta = document.createElement("small");
+        meta.textContent = "#" + item.id + (item.code ? " · " + item.code : "");
+        var title = document.createElement("strong");
+        title.textContent = item.title;
+        button.append(meta, title);
+        var tags = badges(item, assigned);
+        if (tags.length) {
+          var row = document.createElement("span");
+          row.className = "cpp-pk-badges";
+          tags.forEach(function (tag) { row.appendChild(tag); });
+          button.appendChild(row);
+        }
+        list.appendChild(button);
+      });
+      if (!shown.length) {
+        var empty = document.createElement("p");
+        empty.className = "cpp-pk-empty";
+        empty.textContent = pick.filter === "asignadas" ? "Este ítem todavía no tiene políticas." : "Ninguna política coincide con la búsqueda.";
+        list.appendChild(empty);
+      } else if (shown.length > 200) {
+        var more = document.createElement("p");
+        more.className = "cpp-pk-empty";
+        more.textContent = "Se muestran 200 de " + shown.length + ". Escribe para filtrar.";
+        list.appendChild(more);
+      }
+      picker.querySelector("[data-cpp-picker-new]").hidden = !(pick.access && pick.access.manage);
+      renderView(assigned);
+      // Si el botón con el foco se redibujó, el foco vuelve al popup (para que Escape y el teclado sigan funcionando).
+      var active = document.activeElement;
+      if (!picker.hidden && (!active || active === document.body)) {
+        (picker.querySelector('[data-cpp-picker-filter][aria-pressed="true"]:focus-visible') || picker.querySelector("[data-cpp-picker-search]")).focus();
+      }
+    }
+
+    function renderView(assigned) {
+      var view = picker.querySelector("[data-cpp-picker-view]");
+      view.replaceChildren();
+      var item = pick.id === null ? null : policy(pick.id);
+      if (!item) {
+        var hint = document.createElement("p");
+        hint.className = "cpp-pk-empty";
+        hint.textContent = "Elige una política de la lista para leerla completa.";
+        view.appendChild(hint);
+        return;
+      }
+      var meta = document.createElement("p");
+      meta.className = "cpp-pk-meta";
+      meta.textContent = "Política #" + item.id + (item.code ? " · " + item.code : "");
+      var title = document.createElement("h4");
+      title.textContent = item.title;
+      view.append(meta, title);
+      var tags = badges(item, assigned);
+      if (tags.length) {
+        var row = document.createElement("div");
+        row.className = "cpp-pk-badges";
+        tags.forEach(function (tag) { row.appendChild(tag); });
+        view.appendChild(row);
+      }
+      var text = document.createElement("div");
+      text.className = "cpp-pk-text";
+      text.textContent = item.text || "Sin texto.";
+      view.appendChild(text);
+      var actions = document.createElement("div");
+      actions.className = "cpp-pk-actions";
+      var already = assigned.indexOf(item.id) !== -1;
+      actions.appendChild(actionButton(already ? "Quitar de este ítem" : "Agregar a este ítem", already ? "remove" : "add", already ? "is-ghost" : "is-primary", already ? "data-cpp-picker-remove" : "data-cpp-picker-add", item.id));
+      if (pick.access && pick.access.manage) actions.appendChild(actionButton("Editar", "edit", "is-ghost", "data-cpp-picker-edit", item.id));
+      if (pick.access && pick.access.view) actions.appendChild(actionButton("Ficha, historial y lecturas", "history", "is-ghost", "data-cpp-picker-detail", item.id));
+      view.appendChild(actions);
+    }
+
+    function actionButton(label, iconName, tone, attr, id) {
+      var node = document.createElement("button");
+      node.type = "button";
+      node.className = "cpp-pk-btn " + tone;
+      node.setAttribute(attr, String(id));
+      var glyph = document.createElement("span");
+      glyph.className = "material-symbols-outlined";
+      glyph.setAttribute("aria-hidden", "true");
+      glyph.textContent = iconName;
+      node.append(glyph, label);
+      return node;
+    }
+
+    function select(id, scroll) {
+      pick.id = id;
+      picker.querySelectorAll("[data-cpp-picker-item]").forEach(function (node) {
+        node.setAttribute("aria-selected", node.getAttribute("data-cpp-picker-item") === String(id) ? "true" : "false");
+      });
+      renderView(assignedIds());
+      if (scroll) scrollToSelected();
+    }
+
+    function scrollToSelected() {
+      var node = picker.querySelector('[data-cpp-picker-item][aria-selected="true"]');
+      if (node && node.scrollIntoView) node.scrollIntoView({ block: "nearest" });
+    }
+
+    function addFromPicker(id) {
+      var item = policy(id);
+      if (!targetRow || !item) return;
+      if (assignedIds().indexOf(id) !== -1) return setStatus("La política #" + id + " ya está en este ítem.");
+      addPolicy(targetRow, id);
+      setStatus("Agregada: #" + id + " · " + short(item.title) + ". Recuerda guardar la configuración.");
+      renderPicker(false);
+    }
+
+    // Tras guardar en el formulario del Gestor: se recarga el catálogo, se actualizan los chips y, si es nueva, se
+    // agrega al ítem.
+    function onPolicySaved(result) {
+      var id = parseInt(result && result.id, 10);
+      return post("scm_closing_policy_settings", { mode: "catalog" }).then(function (data) {
+        catalog = Array.isArray(data.catalog) ? data.catalog : catalog;
+        var item = policy(id);
+        if (item && modal) {
+          modal.querySelectorAll('[data-cpp-policy="' + id + '"] [data-cpp-view]').forEach(function (view) {
+            view.title = "Ver la política: " + item.title;
+            view.textContent = "#" + id + " · " + short(item.title);
+          });
+        }
+        if (result && result.created && item && targetRow) {
+          addPolicy(targetRow, id);
+          setStatus("Política #" + id + " creada y agregada a este ítem. Recuerda guardar la configuración.");
+        } else if (item) {
+          setStatus("Política #" + id + " actualizada.");
+        }
+        if (picker && !picker.hidden) {
+          picker.querySelector("[data-cpp-picker-search]").value = "";
+          pick.filter = "todas";
+          pick.id = item ? id : pick.id;
+          renderPicker(false);
+          scrollToSelected();
+        }
+      }).catch(failed);
+    }
+
     function show(html) {
       var box = ensureModal();
       box.querySelector("[data-cpp-body]").innerHTML = html;
@@ -2295,7 +2545,6 @@
         catalog = [];
       }
       targetRow = null;
-      renderList();
       box.hidden = false;
       document.body.classList.add("scm-cia-modal-open");
       box.querySelector("section").focus();
@@ -2303,6 +2552,7 @@
 
     function close() {
       if (!modal) return;
+      closePicker();
       modal.hidden = true;
       document.body.classList.remove("scm-cia-modal-open");
     }

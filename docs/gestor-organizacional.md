@@ -129,8 +129,15 @@ TAR (12), TES (13), PDE (14), CONT (15), FCAP (16); sin área, GEN.
 - **Lectura** (`wp_gpo_politica_lecturas`): en Mi gestión cada funcionario confirma **Leí y entiendo** la versión
   vigente de las políticas de su cargo. Una nueva versión pide confirmarla otra vez. El botón **Lecturas** muestra quién
   confirmó y quién falta (funcionarios activos con un cargo de la política).
-- Los `_ID` nunca cambian: la hoja de cierre referencia políticas por `_ID` (`ClosingSheetPolicies`), y su catálogo
-  ahora también trae `code` y `audience` cuando existen las columnas.
+- Los `_ID` nunca cambian: la hoja de cierre referencia políticas por `_ID` (`ClosingSheetPolicies`). Su catálogo
+  también trae `code`, `audience` y `state` cuando existen las columnas.
+- **Puente para otros módulos** (`window.scmOrgPolicies`): ofrece `access()`, `create(onSaved)`, `edit(id, onSaved)`,
+  `newVersion(id, onSaved)` y `detail(id, onSaved)`.
+  - Abre el mismo formulario y la misma ficha del Gestor, encima del popup que lo llama, y llama `onSaved` con la
+    respuesta de `scm_org_save`.
+  - Lo usa **Configuración hoja de cierre › Agregar política**.
+  - Solo existe si el Gestor está en la página (permiso de la pestaña), y el servidor vuelve a validar
+    `org_manager_manage`.
 
 Todo se lee y escribe con `SchemaInspector`, así que el módulo funciona antes de crear las columnas (el formulario solo
 muestra los campos que existen y **Nueva versión** pide aplicar primero las columnas).

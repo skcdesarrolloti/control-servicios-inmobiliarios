@@ -192,6 +192,25 @@ const management = {
   assert.equal((await lastCall('scm_org_save')).nueva_version, '1');
   console.log('OK nueva versión pide el motivo');
 
+  // Puente para otros módulos (Configuración hoja de cierre › Agregar política): el formulario se abre encima de lo que
+  // haya (los popups pasan al final de la raíz) y devuelve el resultado del guardado.
+  assert.deepEqual(await page.evaluate(() => window.scmOrgPolicies.access()), { view: true, manage: true });
+  await page.evaluate(() => {
+    const other = document.createElement('div');
+    other.setAttribute('data-other-popup', '');
+    document.querySelector('#scm-app').appendChild(other);
+    window.bridgeSaved = null;
+    window.scmOrgPolicies.edit(47, (result) => { window.bridgeSaved = result; });
+  });
+  await page.waitForSelector('.scm-om-modal .ql-editor');
+  assert.equal(await page.evaluate(() => document.querySelector('#scm-app').lastElementChild.matches('[data-om-modals]')), true, 'Gestor popups go on top');
+  assert.match(await page.inputValue('.scm-om-modal [name=titulo]'), /Garantía/, 'loads the policy to edit');
+  await page.click('.scm-om-modal [data-om-save]');
+  await page.waitForFunction(() => window.bridgeSaved);
+  assert.equal(await page.evaluate(() => window.bridgeSaved.id), 99);
+  assert.equal((await lastCall('scm_org_save')).id, '47');
+  console.log('OK puente de políticas para otros módulos: edita encima y devuelve el resultado');
+
   // Eliminar: popup que nombra el registro y lo que le apunta.
   await page.click('[data-om-tab="cargos"]');
   await page.waitForSelector('[data-om-remove="5"]');

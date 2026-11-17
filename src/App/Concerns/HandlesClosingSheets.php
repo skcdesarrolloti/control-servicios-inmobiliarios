@@ -167,6 +167,11 @@ trait HandlesClosingSheets
     $policies = new ClosingSheetPolicies($this->db);
     try {
       $message = '';
+      if ((string) ($_POST['mode'] ?? '') === 'catalog') {
+        // Tras crear o editar una política desde el selector (formulario del Gestor organizacional): solo el catálogo,
+        // para no rehacer el formulario y perder lo que no se ha guardado.
+        $this->jsonOk(['catalog' => array_values($policies->policies())]);
+      }
       if ((string) ($_POST['mode'] ?? '') === 'save') {
         $input = json_decode(wp_unslash((string) ($_POST['rules'] ?? '')), true);
         if (!is_array($input)) {

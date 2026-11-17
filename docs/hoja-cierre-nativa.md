@@ -218,12 +218,22 @@ documento sugerido en «Cumple» sin archivo se marca de inmediato y entra en la
 estados que las incumplen ("No cumple" por defecto). Se configura en **Configuración › Configuración hoja de cierre**
 (permiso `closing_sheet_policy_configure`, solo administradores por defecto; setting `closing_sheet_policy_rules`):
 
-- pestaña **Políticas por ítem**, con un catálogo al lado para leer cada política completa (búsqueda por número, título
-  o texto) antes de asignarla;
+- pestaña **Políticas por ítem**. **Agregar política** (o tocar una política ya asignada) abre un popup encima de la
+  configuración:
+  - a la izquierda, la lista del catálogo, con búsqueda por número, código, título o texto y los filtros *Todas*,
+    *En este ítem*, *Empleados* y *Proveedores*;
+  - a la derecha, la política completa, con **Agregar a este ítem** o **Quitar de este ítem**. Enter agrega la que se
+    está leyendo y las flechas cambian de política.
+  - Con permiso del Gestor organizacional (`org_manager_manage`) también están **Editar** y **Nueva política**, y con
+    `org_manager_view`, la ficha con su historial y lecturas. Usan el mismo formulario del Gestor
+    (`window.scmOrgPolicies` en organization-manager.js). Al guardar, el catálogo se recarga
+    (`scm_closing_policy_settings` con `mode=catalog`), y la política nueva queda agregada al ítem. Los cambios del
+    ítem se guardan con **Guardar configuración**.
 - pestaña **Archivos obligatorios** (ver más abajo).
 
 Mientras no se guarde, rige `DEFAULT_RULES`, con las políticas para empleados. Las que dicen "(Prov.)" son la versión para
-**proveedores externos** (cargos 8 y 17), no provisionales; el catálogo las marca "para proveedores":
+**proveedores externos** (cargos 8 y 17), no provisionales. El catálogo las marca "Proveedores", y marca también las que
+no están vigentes (Borrador, Derogada):
 
 - facturas de servicios: #47 y #45; amparo integral: #47, #23 y #45;
 - servicios compartidos: #66; mora en servicios: #26 y #41; reparaciones: #41;

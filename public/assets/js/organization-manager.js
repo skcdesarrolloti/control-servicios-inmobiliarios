@@ -646,7 +646,8 @@
       return post("scm_org_list", { tipo: "politicas" }).then(function (data) { state.allPolicies = data.rows || []; return state.allPolicies; });
     }
 
-    function openPolicyForm(row, newVersion) {
+    /** onSaved(result) se llama tras guardar (lo usa el selector de políticas de la hoja de cierre). */
+    function openPolicyForm(row, newVersion, onSaved) {
       var editing = !!row;
       var modal = openModal({ title: newVersion ? "Nueva versión de la política" : (editing ? "Editar política" : "Nueva política"), kicker: "Políticas", size: "wide", body: '<p class="' + UI.muted + '">' + spinner() + " Cargando…</p>" });
       var recordPromise = editing ? post("scm_org_record", { tipo: "politicas", id: row._ID }).then(function (data) { return data.record; }) : Promise.resolve({});
@@ -714,7 +715,7 @@
           data.set("tipo", "politicas");
           data.set("id", editing ? r._ID : 0);
           if (newVersion) data.set("nueva_version", "1");
-          saveRecord("politicas", data, modal, event.currentTarget);
+          saveRecord("politicas", data, modal, event.currentTarget).then(function (result) { if (result && onSaved) onSaved(result); });
         });
       }).catch(function (error) { modal.body.innerHTML = '<p class="scm-om-form-error">' + esc(error.message) + "</p>"; });
     }
@@ -738,7 +739,7 @@
       return facts.length ? '<dl class="scm-om-facts">' + facts.join("") + "</dl>" : "";
     }
 
-    function openPolicyDetail(id, onRead) {
+    function openPolicyDetail(id, onRead, onSaved) {
       var modal = openModal({ title: "Política", kicker: "Políticas", size: "wide", body: '<p class="' + UI.muted + '">' + spinner() + " Cargando…</p>", actions: closeButton() });
       post("scm_org_policy_detail", { id: id }).then(function (data) {
         var r = data.record;
@@ -758,8 +759,8 @@
         modal.footer.addEventListener("click", function (event) {
           if (event.target.closest("[data-om-detail-history]")) openPolicyHistory(r._ID, r.titulo);
           if (event.target.closest("[data-om-detail-readers]")) openPolicyReaders(r._ID);
-          if (event.target.closest("[data-om-detail-edit]")) { modal.close(); openPolicyForm(r, false); }
-          if (event.target.closest("[data-om-detail-version]")) { modal.close(); openPolicyForm(r, true); }
+          if (event.target.closest("[data-om-detail-edit]")) { modal.close(); openPolicyForm(r, false, onSaved); }
+          if (event.target.closest("[data-om-detail-version]")) { modal.close(); openPolicyForm(r, true, onSaved); }
           var confirmBtn = event.target.closest("[data-om-confirm-read]");
           if (confirmBtn) {
             var done = busy(confirmBtn, "Confirmando…");
@@ -1341,6 +1342,18 @@
     window.scmMyViews = window.scmMyViews || {};
     window.scmMyViews.politicas = openMyPolicies;
     window.scmMyViews.funciones = openMyFunctions;
+    // Formulario de políticas del Gestor para otros módulos (Configuración hoja de cierre › Agregar política). Los popups
+    // se pasan al final de la raíz para quedar encima del popup que los abre. El servidor vuelve a validar el permiso.
+    function onTop(open) {
+      return boot().then(function () { root.appendChild(modalsEl); return open(); });
+    }
+    window.scmOrgPolicies = {
+      access: function () { return boot().then(function () { return { view: can.view, manage: can.manage }; }); },
+      create: function (onSaved) { return onTop(function () { openPolicyForm(null, false, onSaved); }); },
+      edit: function (id, onSaved) { return onTop(function () { openPolicyForm({ _ID: id }, false, onSaved); }); },
+      newVersion: function (id, onSaved) { return onTop(function () { openPolicyForm({ _ID: id }, true, onSaved); }); },
+      detail: function (id, onSaved) { return onTop(function () { openPolicyDetail(id, null, onSaved); }); },
+    };
     var urlView = new URLSearchParams(window.location.search).get("mi_vista");
     if (urlView === "politicas") openMyPolicies();
     if (urlView === "funciones") openMyFunctions();

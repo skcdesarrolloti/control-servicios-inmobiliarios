@@ -9,8 +9,8 @@ use SCM\Modules\Pending\PublicServicesUi as UI;
 /**
  * Configuración › Configuración hoja de cierre (public/assets/js/admin-tools.js, initClosingPolicySettings).
  * - Políticas por ítem: las políticas de wp_jet_cct_politicas que incumple cada ítem de la lista de chequeo, los estados
- *   que la incumplen y una regla escrita. Al lado, el catálogo de políticas con su texto completo para leerlas antes de
- *   asignarlas.
+ *   que la incumplen y una regla escrita. «Agregar política» abre un popup con el catálogo para buscar, leer completa y
+ *   agregar; con permiso del Gestor organizacional también se editan o crean políticas con su mismo formulario.
  * - Archivos obligatorios: qué documentos deben adjuntarse (o justificarse) cuando quedan en «Cumple».
  */
 final class ClosingSheetPolicyView
@@ -64,12 +64,8 @@ final class ClosingSheetPolicyView
       . '<button type="button" role="tab" class="is-active" data-cpp-tab="policies" aria-selected="true">Políticas por ítem</button>'
       . '<button type="button" role="tab" data-cpp-tab="files" aria-selected="false">Archivos obligatorios</button></nav>'
       . '<div class="!sp-flex-1 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6">'
-      . '<section data-cpp-panel="policies"><p class="cpp-lead">Cuando un ítem queda en un estado marcado aquí, la hoja avisa con la política, pide una justificación y quien aprueba la ve en rojo. Un ítem sin políticas ni regla escrita no avisa. Con <b>Agregar política</b> se abre el catálogo (' . count($catalog) . ' políticas) para leerlas completas antes de escoger.</p>'
-      . '<div class="cpp-layout"><div class="cpp-items">' . $policyRows . '</div>'
-      . '<aside class="cpp-browser" data-cpp-browser><header><strong data-cpp-browser-title>Catálogo de políticas</strong><button type="button" class="cpp-x" data-cpp-browser-close aria-label="Cerrar catálogo">×</button></header>'
-      . '<p class="cpp-target" data-cpp-target>Elige un ítem con <b>Agregar política</b> para asignarle una, o lee el catálogo.</p>'
-      . '<input class="' . UI::INPUT . '" type="search" placeholder="Buscar por número, título o texto" data-cpp-filter aria-label="Buscar política">'
-      . '<div class="cpp-list" data-cpp-list></div></aside></div></section>'
+      . '<section data-cpp-panel="policies"><p class="cpp-lead">Cuando un ítem queda en un estado marcado aquí, la hoja avisa con la política, pide una justificación y quien aprueba la ve en rojo. Un ítem sin políticas ni regla escrita no avisa. <b>Agregar política</b> abre el catálogo (' . count($catalog) . ' políticas) para buscarlas y leerlas completas antes de escoger; desde ahí también se editan o se crean, como en el Gestor organizacional. Toca una política del ítem para verla.</p>'
+      . '<div class="cpp-items">' . $policyRows . '</div></section>'
       . '<section data-cpp-panel="files" hidden><p class="cpp-lead">Marca los documentos cuyo archivo es <b>obligatorio</b> cuando el ítem queda en «Cumple». Si falta, la hoja pide decir por qué no se adjunta ahora (no se bloquea el negocio) y quien aprueba lo ve en rojo; al subirlo, la excepción desaparece. Los que no marques siguen siendo opcionales: solo se avisan al guardar.</p>'
       . '<div class="cpp-files-wrap">' . $fileRows . '</div></section>'
       . '</div>'
@@ -103,7 +99,6 @@ final class ClosingSheetPolicyView
       . '.cpp-tabs button{padding:8px 14px;border:0;border-bottom:3px solid transparent;background:none;font:inherit;font-size:12px;font-weight:700;color:#64748b;cursor:pointer}'
       . '.cpp-tabs button.is-active{border-bottom-color:#0f1e36;color:#0f1e36}'
       . '.cpp-lead{margin:0 0 12px;font-size:11px;line-height:1.55;color:#64748b}'
-      . '.cpp-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,380px);gap:14px;align-items:start}'
       . '.cpp-items{display:grid;gap:10px;min-width:0}'
       . '.cpp-group{border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:0 12px}'
       . '.cpp-group>summary{cursor:pointer;padding:10px 0;font-size:12px;font-weight:700}'
@@ -117,23 +112,47 @@ final class ClosingSheetPolicyView
       . '.cpp-pick .material-symbols-outlined{font-size:16px}'
       . '.cpp-states{display:flex;flex-direction:column;gap:2px;font-size:11px;white-space:nowrap}'
       . '.cpp-note{grid-column:1/-1}'
-      . '.cpp-browser{position:sticky;top:0;display:grid;gap:8px;max-height:70vh;padding:12px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}'
-      . '.cpp-browser header{display:flex;justify-content:space-between;align-items:center;font-size:12px}'
-      . '.cpp-x{border:0;background:none;font-size:18px;cursor:pointer;color:#64748b}'
-      . '.cpp-target{margin:0;padding:8px;border-radius:8px;background:#f8fafc;font-size:11px;color:#334155}'
-      . '.cpp-list{display:grid;gap:6px;overflow-y:auto;min-height:0}'
-      . '.cpp-pol{border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px}'
-      . '.cpp-pol summary{cursor:pointer;font-size:11px;font-weight:700;color:#0f1e36}'
-      . '.cpp-pol p{margin:6px 0;font-size:11px;line-height:1.55;white-space:pre-line;color:#334155}'
-      . '.cpp-pol button{padding:4px 10px;border:0;border-radius:6px;background:#0f1e36;color:#fff;font:inherit;font-size:11px;font-weight:700;cursor:pointer}'
-      . '.cpp-pol button[disabled]{background:#cbd5e1;cursor:default}'
-      . '.cpp-pol.is-prov summary::after{content:" · para proveedores";color:#b45309;font-weight:600}'
       . '.cpp-files-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}'
       . '.cpp-files{margin:0;padding:8px 12px 10px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}'
       . '.cpp-files legend{padding:0 4px;font-size:12px;font-weight:700}'
       . '.cpp-file{display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:11px;cursor:pointer}'
       . '.cpp-file input{margin-top:2px}.cpp-file small{display:block;color:#64748b;line-height:1.4}'
-      . '@media (max-width:900px){.cpp-layout{grid-template-columns:1fr}.cpp-browser{position:static;max-height:none}.cpp-row{grid-template-columns:1fr}.cpp-states{flex-direction:row;gap:12px}}'
+      . '@media (max-width:900px){.cpp-row{grid-template-columns:1fr}.cpp-states{flex-direction:row;gap:12px}}'
+      // Popup «Agregar política»: admin-tools.js lo agrega después de la configuración (queda encima por orden).
+      . '.cpp-pk{position:relative;display:flex;flex-direction:column;width:min(1080px,calc(100vw - 24px));height:min(760px,90vh);overflow:hidden;border:1px solid #cbd5e1;border-radius:18px;background:#f6f8fa;box-shadow:0 24px 70px rgba(6,29,73,.3);font-family:Poppins,sans-serif;color:#0f1e36;outline:none}'
+      . '.cpp-pk-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;background:#fff;border-bottom:1px solid #e2e8f0}'
+      . '.cpp-pk-head p{margin:0;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b}'
+      . '.cpp-pk-head h3{margin:2px 0 0;font-size:15px;font-weight:700;line-height:1.35;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}'
+      . '.cpp-pk-x{flex:none;width:36px;height:36px;border:1px solid #e2e8f0;border-radius:999px;background:#fff;color:#0f1e36;font-size:18px;cursor:pointer}'
+      . '.cpp-pk-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:12px 20px;background:#fff;border-bottom:1px solid #e2e8f0}'
+      . '.cpp-pk-search{flex:1 1 260px;min-width:0;padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;font-size:12px;color:#0f1e36;background:#fff}'
+      . '.cpp-pk-search:focus{outline:2px solid #f8cf4a;outline-offset:0;border-color:#0f1e36}'
+      . '.cpp-pk-chips{display:flex;flex-wrap:wrap;gap:6px}'
+      . '.cpp-pk-chip{padding:5px 10px;border:1px solid #cbd5e1;border-radius:999px;background:#fff;color:#334155;font:inherit;font-size:11px;font-weight:600;cursor:pointer}'
+      . '.cpp-pk-chip span{margin-left:2px;color:#64748b;font-weight:700}'
+      . '.cpp-pk-chip[aria-pressed="true"]{background:#0f1e36;border-color:#0f1e36;color:#fff}.cpp-pk-chip[aria-pressed="true"] span{color:#f8cf4a}'
+      . '.cpp-pk-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(260px,380px) minmax(0,1fr)}'
+      . '.cpp-pk-list{min-height:0;overflow-y:auto;padding:10px;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;gap:6px}'
+      . '.cpp-pk-item{display:flex;flex:none;flex-direction:column;align-items:flex-start;gap:3px;width:100%;padding:9px 11px;border:1px solid #e2e8f0;border-left:3px solid transparent;border-radius:10px;background:#fff;color:#0f1e36;font:inherit;text-align:left;cursor:pointer}'
+      . '.cpp-pk-item:hover{border-color:#94a3b8}'
+      . '.cpp-pk-item[aria-selected="true"]{border-color:#0f1e36;border-left-color:#f8cf4a;box-shadow:0 2px 8px rgba(15,30,54,.08)}'
+      . '.cpp-pk-item small{font-size:10px;font-weight:600;color:#64748b}.cpp-pk-item strong{font-size:12px;line-height:1.35}'
+      . '.cpp-pk-badges{display:flex;flex-wrap:wrap;gap:4px}'
+      . '.cpp-pk-badge{padding:2px 8px;border-radius:999px;background:#e2e8f0;color:#334155;font-size:10px;font-weight:700}'
+      . '.cpp-pk-badge.is-on{background:#dcfce7;color:#166534}.cpp-pk-badge.is-prov{background:#fef3c7;color:#92400e}.cpp-pk-badge.is-off{background:#fee2e2;color:#991b1b}'
+      . '.cpp-pk-view{min-height:0;overflow-y:auto;padding:18px 22px 0;display:flex;flex-direction:column;gap:10px}'
+      . '.cpp-pk-meta{margin:0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#64748b}'
+      . '.cpp-pk-view h4{margin:0;font-size:17px;line-height:1.35}'
+      . '.cpp-pk-text{padding:14px 16px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;font-size:12px;line-height:1.65;white-space:pre-line;color:#334155}'
+      . '.cpp-pk-actions{position:sticky;bottom:0;display:flex;flex-wrap:wrap;gap:8px;margin:auto -22px 0;padding:12px 22px;background:#f6f8fa;border-top:1px solid #e2e8f0}'
+      . '.cpp-pk-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid transparent;border-radius:10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}'
+      . '.cpp-pk-btn .material-symbols-outlined{font-size:18px}'
+      . '.cpp-pk-btn.is-primary{background:#f8cf4a;color:#0f1e36}.cpp-pk-btn.is-navy{background:#0f1e36;color:#fff}.cpp-pk-btn.is-ghost{background:#fff;border-color:#cbd5e1;color:#0f1e36}'
+      . '.cpp-pk-btn[hidden]{display:none}'
+      . '.cpp-pk-empty{margin:8px 4px;font-size:12px;color:#64748b}'
+      . '.cpp-pk-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;background:#fff;border-top:1px solid #e2e8f0}'
+      . '.cpp-pk-foot span{font-size:11px;font-weight:600;color:#047857}.cpp-pk-foot span.is-error{color:#b91c1c}'
+      . '@media (max-width:760px){.cpp-pk{height:94vh}.cpp-pk-body{grid-template-columns:1fr;grid-template-rows:minmax(0,40%) minmax(0,60%)}.cpp-pk-list{border-right:0;border-bottom:1px solid #e2e8f0}.cpp-pk-head,.cpp-pk-tools,.cpp-pk-foot{padding-left:16px;padding-right:16px}.cpp-pk-head h3{font-size:13px}.cpp-pk-tools{padding-top:10px;padding-bottom:10px}.cpp-pk-view{padding:14px 16px 0}.cpp-pk-actions{margin:auto -16px 0;padding:10px 16px}.cpp-pk-btn{padding:7px 11px;font-size:11px}}'
       . '</style>';
   }
 
