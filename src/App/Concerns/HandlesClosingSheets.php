@@ -10,6 +10,8 @@ use SCM\Modules\ClosingSheets\ClosingSheetDocuments;
 use SCM\Modules\ClosingSheets\ClosingSheetDocumentsView;
 use SCM\Modules\ClosingSheets\ClosingSheetFlowView;
 use SCM\Modules\ClosingSheets\ClosingSheetPanelView;
+use SCM\Modules\ClosingSheets\ClosingSheetPolicies;
+use SCM\Modules\ClosingSheets\ClosingSheetPolicyView;
 use SCM\Modules\ClosingSheets\ClosingSheetService;
 use SCM\Modules\ClosingSheets\ClosingSheetTenants;
 use SCM\Modules\ClosingSheets\ClosingSheetWorkflow;
@@ -155,6 +157,31 @@ trait HandlesClosingSheets
       $this->jsonFail($error instanceof \DomainException ? $error->getMessage() : 'No se pudo eliminar el documento. Intenta nuevamente.');
     }
     $this->jsonOk(['id' => $document['id'], 'message' => '«' . $document['name'] . '» se eliminó de la carpeta.']);
+  }
+
+  /** Configuración › Políticas de la hoja de cierre: políticas y estados que incumple cada ítem de la lista de chequeo. */
+  public function ajax_handler_closing_policy_settings(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('closing_sheet_policy_configure', 'Tu cargo no tiene permiso para configurar las políticas de la hoja de cierre.');
+    $policies = new ClosingSheetPolicies($this->db);
+    try {
+      $message = '';
+      if ((string) ($_POST['mode'] ?? '') === 'save') {
+        $input = json_decode(wp_unslash((string) ($_POST['rules'] ?? '')), true);
+        if (!is_array($input)) {
+          throw new \InvalidArgumentException('No se recibió la configuración.');
+        }
+        $saved = $policies->save($input, Auth::userId());
+        $message = 'Configuración guardada: ' . count($saved) . ' ítems con políticas. Aplica a las hojas que se guarden desde ahora.';
+      }
+      $this->jsonOk(['html' => ClosingSheetPolicyView::form($policies->rules(), $policies->policies()), 'message' => $message]);
+    } catch (\InvalidArgumentException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      error_log('[closing_policy_settings] ' . $error->getMessage());
+      $this->jsonFail('No se pudo guardar la configuración de políticas.');
+    }
   }
 
   /** Actividades administrativas › Hojas de cierre: pestañas por estado y tabla. */

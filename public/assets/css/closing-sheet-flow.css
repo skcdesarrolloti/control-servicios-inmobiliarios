@@ -15,6 +15,23 @@
 .csf-badge.is-done { background: #e2e8f0; color: #334155; }
 .csf-badge.is-off { background: #ffe4e6; color: #9f1239; }
 
+/* Excepciones a políticas de la lista de chequeo: en rojo para quien aprueba. */
+.csf-breaches { border: 2px solid #dc2626; border-left-width: 6px; background: #fef2f2; }
+.csf-page .csf-breaches h2 { display: flex; align-items: center; gap: 6px; color: #991b1b; }
+.csf-breach-lead { margin: 0 0 8px; color: #991b1b; font-weight: 600; }
+.csf-breach-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.csf-breach-list > li { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid #fecaca; border-radius: 10px; background: #fff; break-inside: avoid; page-break-inside: avoid; }
+.csf-breach-item { margin: 0; }
+.csf-breach-item small { display: block; color: var(--rp-muted); }
+.csf-breach-rule { margin: 0; color: #991b1b; font-weight: 700; }
+.csf-breach-list details summary { cursor: pointer; font-weight: 700; color: #7f1d1d; }
+.csf-breach-list details p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; }
+.csf-breach-why { margin: 0; padding: 8px 10px; border-radius: 8px; background: #fee2e2; color: #b91c1c; font-weight: 600; }
+.csf-breach-why.is-missing { background: #fff7ed; color: #9a3412; }
+.csf-breach-alert { display: flex; align-items: flex-start; gap: 6px; margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: #fee2e2; color: #b91c1c; font-weight: 700; }
+.csf-checklist > li.is-breach { margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 8px; background: #fef2f2; }
+.csf-checklist small.csf-breach-why { display: block; margin-top: 4px; }
+
 .csf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px 18px; margin: 0; }
 .csf-item { min-width: 0; }
 .csf-item.is-wide { grid-column: 1 / -1; }
@@ -154,4 +171,8 @@ dialog.csf-dialog:not([open]) { display: none; }
   .csf-chips { gap: 3px; margin-top: 2px; }
   .csf-chips li { padding: 1px 6px 1px 3px; gap: 3px; font-size: 9px; background: #fff; }
   .csf-chips .material-symbols-outlined { width: 14px; height: 14px; font-size: 10px; }
+  .csf-breaches { border-width: 1px; border-left-width: 4px; }
+  .csf-breach-list > li { padding: 4px 6px; gap: 2px; }
+  .csf-breach-list details p { display: none; }
+  .csf-breach-why { padding: 3px 6px; font-size: 10px; }
 }

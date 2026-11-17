@@ -1359,6 +1359,20 @@ foreach ($rawNavItems as $k => $item) {
                     <span class="scm-nav-item-desc">Salario, márgenes, insumos y transporte</span>
                   </span>
                 </button>
+                <!-- Políticas de la hoja de cierre: advertencias de la lista de chequeo; se oculta sin closing_sheet_policy_configure -->
+                <button
+                  type="button"
+                  data-scm-config-action="closing-policy-settings"
+                  data-closing-policy-settings
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">gpp_maybe</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Políticas de la hoja de cierre</span>
+                    <span class="scm-nav-item-desc">Advertencias y justificaciones de la lista de chequeo</span>
+                  </span>
+                </button>
                 <!-- Honorarios de cotización: variables del % de administración sugerido; se oculta sin quote_fee_configure -->
                 <button
                   type="button"

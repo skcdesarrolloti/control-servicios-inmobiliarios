@@ -86,7 +86,7 @@ final class ClosingSheetPageView
       </div>
 
       <div class="cs-step" data-cs-step="2" hidden>
-        <?= $this->checklist($options['estado_checklist'] ?? [], $values, $creating, $context['owners'], $page['documents'] ?? null) ?>
+        <?= $this->checklist($options['estado_checklist'] ?? [], $values, $creating, $context['owners'], $page['documents'] ?? null, $page['policies'] ?? [], $context['checklist_facts'] ?? []) ?>
         <div class="cs-actions">
           <button type="button" class="cs-secondary" data-cs-prev><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span> Anterior</button>
           <button type="submit" class="cs-primary"><span class="material-symbols-outlined" aria-hidden="true">save</span> <?= $creating ? 'Añadir hoja de cierre' : 'Guardar cambios' ?></button>
@@ -365,13 +365,19 @@ final class ClosingSheetPageView
    * propietario) y al final van los documentos adicionales.
    * @param list<string> $states @param array<string,mixed> $values @param list<array<string,mixed>> $owners
    * @param array{config:array{api:string,nonce:string,upload:string,delete:string,scope:array<string,int>},items:list<array<string,mixed>>}|null $documents
+   * @param array<string,array{states:list<string>,note:string,policies:list<array{id:int,title:string,text:string}>}> $policies ClosingSheetPolicies::forForm()
+   * @param array<string,mixed> $facts datos del mandato para sugerir estados (ClosingSheetService::checklistFacts)
    */
-  private function checklist(array $states, array $values, bool $creating, array $owners = [], ?array $documents = null): string
+  private function checklist(array $states, array $values, bool $creating, array $owners = [], ?array $documents = null, array $policies = [], array $facts = []): string
   {
     $states = $states !== [] ? $states : ['Cumple', 'No cumple', 'No aplica'];
     $files = ClosingSheetDocumentsView::byItem($documents['items'] ?? []);
     $owners = $owners !== [] ? $owners : [['index' => 1, 'name' => (string) ($values['propietario'] ?? '')]];
-    $html = '<p class="cs-note">Marca el estado de cada documento o requisito. La observación es opcional.'
+    // Datos para las sugerencias según el mandato y las advertencias de políticas (closing-sheet.js).
+    $data = json_encode(['policies' => $policies, 'facts' => $facts], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+    $html = '<script type="application/json" data-cs-checklist-data>' . $data . '</script>'
+      . '<p class="cs-note">Marca el estado de cada documento o requisito. La observación es opcional. Los estados <b>sugeridos</b> salen del mandato y de lo que escribiste en el paso 1: revísalos y cámbialos si no corresponden.'
+      . ($policies !== [] ? ' Si un ítem incumple una política, se avisa y hay que justificarlo: quien aprueba la hoja verá esa justificación.' : '')
       . ($documents !== null ? ' Adjunta el archivo de cada documento (PDF, foto, Word o Excel, máximo 10 MB). No es obligatorio, pero se avisa si un documento queda en «Cumple» sin archivo.' : '') . '</p>';
     if ($documents !== null) {
       $names = [];
@@ -397,12 +403,26 @@ final class ClosingSheetPageView
           }
           $slots = '<div class="cd-slots">' . $slots . '</div>';
         }
-        $rows .= '<div class="cs-check-item' . ($slots !== '' ? ' has-docs' : '') . '"><p>' . $this->e($text) . '</p>'
+        $policy = '';
+        if (isset($policies[$column])) {
+          $titles = array_map(static fn(array $one): string => $one['title'], $policies[$column]['policies']);
+          // Hoja anterior a la regla con el ítem ya en ese estado y sin justificación: no se exige mientras no cambie.
+          $legacy = !$creating && $state !== '' && in_array($state, $policies[$column]['states'], true) && trim((string) ($values['__justifications'][$column] ?? '')) === '' ? $state : '';
+          $policy = '<div class="cs-policy" data-cs-policy data-cs-field' . ($legacy !== '' ? ' data-cs-legacy="' . $this->e($legacy) . '"' : '') . ' hidden><p class="cs-policy-head"><span class="material-symbols-outlined" aria-hidden="true">gpp_bad</span> <span>Incumple '
+            . $this->e($titles !== [] ? (count($titles) === 1 ? 'la política ' : 'las políticas ') . implode(' · ', $titles) : $policies[$column]['note'])
+            . '</span> <button type="button" class="cs-link" data-cs-policy-open>Ver política</button></p>'
+            . '<label class="cs-label" for="cs_just_' . $this->e($column) . '">Justificación de la excepción <span class="cs-just-item">(' . $this->e(mb_strimwidth($text, 0, 60, '…', 'UTF-8')) . ')</span> <span class="cs-req" aria-hidden="true">*</span></label>'
+            . '<textarea class="cs-input" rows="2" id="cs_just_' . $this->e($column) . '" name="justificacion[' . $this->e($column) . ']" data-cs-justification maxlength="2000" placeholder="Por qué se acepta el negocio así (la ve quien aprueba la hoja)">'
+            . $this->e($values['__justifications'][$column] ?? '') . '</textarea></div>';
+        }
+        $rows .= '<div class="cs-check-item' . ($slots !== '' ? ' has-docs' : '') . '" data-cs-item="' . $this->e($column) . '"><p>' . $this->e($text) . '</p>'
           . '<select class="cs-input" name="' . $this->e($column) . '"' . ($required ? ' data-cs-required' : '') . ' aria-label="Estado"><option value="">Estado…</option>' . $this->optionTags(array_combine($states, $states), $state) . '</select>'
-          . '<textarea class="cs-input" rows="2" name="notas[' . $this->e($column) . ']" placeholder="Observación (opcional)">' . $this->e($values['__notes'][$column] ?? '') . '</textarea>' . $slots . '</div>';
+          . '<small class="cs-suggest" data-cs-suggest hidden></small>'
+          . '<textarea class="cs-input" rows="2" name="notas[' . $this->e($column) . ']" placeholder="Observación (opcional)">' . $this->e($values['__notes'][$column] ?? '') . '</textarea>' . $policy . $slots . '</div>';
       }
       $html .= '<fieldset class="cs-section"' . ($when !== null ? ' data-cs-when="' . $this->e(json_encode($when, JSON_UNESCAPED_UNICODE)) . '"' : '') . '><legend>' . $this->e($group) . '</legend>' . $rows . '</fieldset>';
     }
+    $html .= self::policyDialog();
     if ($documents === null) {
       return $html;
     }
@@ -412,6 +432,21 @@ final class ClosingSheetPageView
       . '<p>Puedes adjuntarlos ahora o guardar así y subirlos después desde la hoja o la carpeta del contrato.</p>'
       . '<div class="cs-actions"><button type="button" class="cs-secondary" data-cd-pending-go>Revisar</button><button type="button" class="cs-primary" data-cd-pending-save>Guardar sin esos archivos</button></div></div>';
     return '<div class="cd-root"' . ClosingSheetDocumentsView::rootAttributes($documents['config']) . '>' . $html . '</div>';
+  }
+
+  /** Ventana que avisa al marcar un estado que incumple una política (la llena closing-sheet.js). */
+  private static function policyDialog(): string
+  {
+    return '<dialog class="cs-policy-dialog" data-cs-policy-dialog aria-labelledby="cs_policy_title"><div class="cs-policy-box">'
+      . '<header><span class="material-symbols-outlined" aria-hidden="true">gpp_bad</span><div><p class="cs-policy-eyebrow">Advertencia</p><h2 id="cs_policy_title">Esta selección incumple una política</h2></div></header>'
+      . '<p class="cs-policy-item" data-cs-policy-item></p>'
+      . '<div class="cs-policy-list" data-cs-policy-list></div>'
+      . '<label class="cs-label" for="cs_policy_reason">Justificación de la excepción <span class="cs-req" aria-hidden="true">*</span></label>'
+      . '<textarea class="cs-input" id="cs_policy_reason" rows="3" maxlength="2000" data-cs-policy-reason placeholder="Por qué se acepta el negocio así. La ve en rojo quien aprueba la hoja."></textarea>'
+      . '<p class="cs-error" data-cs-policy-error hidden></p>'
+      . '<div class="cs-actions"><button type="button" class="cs-secondary" data-cs-policy-undo>Corregir selección</button>'
+      . '<button type="button" class="cs-primary cs-danger" data-cs-policy-accept>Continuar con la excepción</button></div>'
+      . '</div></dialog>';
   }
 
   /** @param array<string,mixed> $field @param array<string,mixed> $options @return array<string,string> valor => etiqueta */

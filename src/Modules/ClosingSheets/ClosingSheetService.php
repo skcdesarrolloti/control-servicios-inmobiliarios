@@ -200,6 +200,32 @@ final class ClosingSheetService
       'owners' => $this->owners($mandate, $ids, $closing),
       'mandate' => $mandate,
       'address' => trim((string) ($values['direccion'] ?? '')) ?: trim((string) ($mandate['direccion_fisica'] ?? $mandate['direccion'] ?? '')),
+      'checklist_facts' => $this->checklistFacts($mandate, $ids),
+    ];
+  }
+
+  /**
+   * Datos del mandato y del estudio con los que el formulario sugiere estados de la lista de chequeo (el resto sale de lo
+   * que se escribe en la hoja: servicios, propiedad horizontal, tipo de persona, días de gracia y meses).
+   * @param array<string,mixed> $mandate @param array<string,string> $ids
+   * @return array{accounts:array<string,bool>,internet:bool,telefono:bool,amparo:string,cobertura:int,bank:bool,study:bool}
+   */
+  private function checklistFacts(array $mandate, array $ids): array
+  {
+    $real = static function (mixed $value): bool {
+      $value = strtolower(preg_replace('/[^a-z0-9]/i', '', trim((string) $value)) ?? '');
+      return $value !== '' && !in_array($value, ['na', 'no', 'noaplica', 'ninguno', 'pte', 'pendiente', '0'], true);
+    };
+    $coverage = preg_match('/\d+/', (string) ($mandate['meses_cobertura_garantia'] ?? ''), $match) === 1 ? (int) $match[0] : 0;
+    $amparo = strtolower(trim((string) ($mandate['incluye_garantia_servicios'] ?? '')));
+    return [
+      'accounts' => ['Energia' => $real($mandate['energia'] ?? ''), 'Agua' => $real($mandate['agua'] ?? ''), 'Gas' => $real($mandate['gas'] ?? '')],
+      'internet' => $real($mandate['internet'] ?? ''),
+      'telefono' => $real($mandate['telefono'] ?? ''),
+      'amparo' => in_array($amparo, ['si', 'sí'], true) ? 'Si' : ($amparo === 'no' ? 'No' : ''),
+      'cobertura' => $coverage > 0 && $coverage <= 120 ? $coverage : 0,
+      'bank' => $real($mandate['numero_cuenta_1'] ?? ''),
+      'study' => $this->row('jet_cct_estudios_aseguradoras', $ids['id_estudio_aseguradora'] ?? '') !== [],
     ];
   }
 
@@ -337,6 +363,9 @@ final class ClosingSheetService
       }
       $values['tipo_persona_' . $who] = self::personType((string) ($values['tipo_persona_' . $who] ?? ''));
     }
+    // Excepciones a políticas de la lista de chequeo, con su justificación.
+    $values['__exceptions'] = ClosingSheetPolicies::decode((string) ($closing[ClosingSheetPolicies::COLUMN] ?? ''));
+    $values['__justifications'] = array_column($values['__exceptions'], 'justification', 'item');
     return $values;
   }
 
@@ -497,6 +526,7 @@ final class ClosingSheetService
       $owners = array_map(static fn(array $owner): array => array_merge($owner, $edited[(int) $owner['index']] ?? []), $context['owners']);
       $owners = $this->registerOwners($owners, $values['__percents'], $sender, $nowSql);
       $closingData = $this->closingColumns($values, $owners);
+      $closingData[ClosingSheetPolicies::COLUMN] = json_encode(array_map(static fn(array $entry): array => $entry['by'] === '' ? ['by' => $sender['name']] + $entry : $entry, $values['__exceptions']), JSON_UNESCAPED_UNICODE);
 
       if ($creating) {
         if ($this->recentDuplicate($ids, $now)) {
@@ -678,6 +708,11 @@ final class ClosingSheetService
         ? (string) ($saved[$notesColumn] ?? '')
         : self::checklistNotes(array_column($items, 2), $notes);
     }
+    // Ítems que incumplen una política: exigen justificación (quién y cuándo se completan al guardar).
+    [$values['__exceptions'], $policyErrors] = (new ClosingSheetPolicies($this->db))->collect(
+      $values, is_array($input['justificacion'] ?? null) ? $input['justificacion'] : [], $saved, $creating ? [] : (array) ($saved['__exceptions'] ?? []), '', time()
+    );
+    $errors = array_merge($errors, $policyErrors);
     try {
       $values['__percents'] = self::percents($context['owners'], is_array($input['porcentaje'] ?? null) ? $input['porcentaje'] : []);
     } catch (\InvalidArgumentException $error) {

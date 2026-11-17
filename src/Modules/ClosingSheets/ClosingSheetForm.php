@@ -186,20 +186,20 @@ final class ClosingSheetForm
       ['estado_factura_predial', 'Factura del predial', 'Factura del predial:'],
     ]],
     'ob_servicios_publicos' => ['Documentos de servicios públicos y conexos', null, [
-      ['estado_servicio_agua', 'Ultima Factura Servicio de Acueducto y Alcantarillado ( Anexar factura fisica - Estado de Pago ( Al dia- En Mora) especificar', 'Ultima Factura Servicio de Acueducto y Alcantarillado:'],
-      ['estado_servicio_energia', 'Ultima Factura Servicio de Energía ( Anexar factura fisica - Estado de Pago ( Al dia- En Mora) especificar)', 'Ultima Factura Servicio de Energía:'],
-      ['estado_servicio_gas', 'Ultima Factura Servicio de Gas ( Anexar factura fisica - Estado de Pago ( Al dia- En Mora) especificar)', 'Ultima Factura Servicio de Gas:'],
-      ['estado_servicio_internet', 'Ultima Factura Internet ( Anexar factura fisica - Estado de Pago ( Al dia- En Mora) especificar)', 'Ultima Factura Internet:'],
-      ['estado_servicio_telefonia', 'Ultima Factura Teléfono Fijo ( Anexar factura fisica - Estado de Pago ( Al dia- En Mora) especificar)', 'Ultima Factura Teléfono Fijo:'],
+      ['estado_servicio_agua', 'Última factura del servicio de acueducto y alcantarillado (anexar factura física; estado de pago: al día o en mora, especificar)', 'Ultima Factura Servicio de Acueducto y Alcantarillado:'],
+      ['estado_servicio_energia', 'Última factura del servicio de energía (anexar factura física; estado de pago: al día o en mora, especificar)', 'Ultima Factura Servicio de Energía:'],
+      ['estado_servicio_gas', 'Última factura del servicio de gas (anexar factura física; estado de pago: al día o en mora, especificar)', 'Ultima Factura Servicio de Gas:'],
+      ['estado_servicio_internet', 'Última factura de internet (anexar factura física; estado de pago: al día o en mora, especificar)', 'Ultima Factura Internet:'],
+      ['estado_servicio_telefonia', 'Última factura de teléfono fijo (anexar factura física; estado de pago: al día o en mora, especificar)', 'Ultima Factura Teléfono Fijo:'],
     ]],
     'ob_cumplimiento_servicio' => ['Cumplimiento de políticas referente a los Servicios Publicos', null, [
-      ['estado_amparo_integral', '¿Cuenta con el Amparo integral de Servicios Publicos?', '¿Cuenta con el Amparo integral de Servicios Publicos?'],
-      ['estado_servicios_compatidos', 'SI los servicios Publicos son compartidos , se va a instalar medidor interno? Exite autoriaxion para proceder a la instalcion? Especificar cual(es) son los servicios con estas condiciones', '¿Servicios Publicos son compartidos, se va a instalar medidor interno?'],
-      ['estado_mora_servicios', 'En caso de Presentarse Mora en los Servicios , Anexar documento donde autorice a que el pago lo Realice la Inmobilirira para descontar de los arriendos', 'En caso de Presentarse Mora en los Servicios:'],
+      ['estado_amparo_integral', '¿Cuenta con el amparo integral de servicios públicos?', '¿Cuenta con el Amparo integral de Servicios Publicos?'],
+      ['estado_servicios_compatidos', 'Si los servicios públicos son compartidos, ¿se va a instalar medidor interno? ¿Existe autorización para instalarlo? Especificar cuál(es) servicios tienen estas condiciones', '¿Servicios Publicos son compartidos, se va a instalar medidor interno?'],
+      ['estado_mora_servicios', 'En caso de presentarse mora en los servicios, anexar el documento donde se autorice a la inmobiliaria a pagarlos y descontarlos de los arriendos', 'En caso de Presentarse Mora en los Servicios:'],
     ]],
     'ob_cumplimiento_estado_inmueble' => ['Cumplimiento de políticas referente al Estado de Conservacion del inmueble', null, [
-      ['estado_requiere_reparacion', 'Requiere reparaciones ? Por cuenta del Propietario o por cuetna de la Inmobiliria o por el Arrendatario( Especificar)', '¿Requiere reparaciones?'],
-      ['estado_dias_gracia', 'Existen dias de Gracia para compesar reparaciones ( Especificar)', '¿Existen dias de Gracia?'],
+      ['estado_requiere_reparacion', '¿Requiere reparaciones? ¿Por cuenta del propietario, de la inmobiliaria o del arrendatario? (especificar)', '¿Requiere reparaciones?'],
+      ['estado_dias_gracia', '¿Existen días de gracia para compensar reparaciones? (especificar)', '¿Existen dias de Gracia?'],
     ]],
     'ob_documentos_propietario' => ['Documentos del Propietario', null, [
       ['estado_acreditacion_propietario', 'Documento que acredite la facultad para arrendar cuando no es el propietario', 'Documento que acredite la facultad para arrendar cuando no es el propietario'],
@@ -249,12 +249,12 @@ final class ClosingSheetForm
       ['estado_certificacion_copropiedad', 'Certificación Bancaria', 'Certificación Bancaria'],
       ['estado_cuota_copropiedad', 'Certificación que estipule el Monto de la Cuota de Administración', 'Certificación que estipule el Monto de la Cuota de Administración'],
       ['estado_paz_salvo_copropiedad', 'Certificación de Paz y Salvo Expedido por la Copropiedad', 'Certificación de Paz y Salvo Expedido por la Copropiedad'],
-      ['estado_encargado_copropiedad', '¿La Inmobiliria es la Encargada de hacer los Pagos a la Administracion?', '¿La Inmobiliaria es la Encargada de hacer los Pagos a la Administracion?'],
+      ['estado_encargado_copropiedad', '¿La inmobiliaria es la encargada de hacer los pagos a la administración?', '¿La Inmobiliaria es la Encargada de hacer los Pagos a la Administracion?'],
     ]],
     'ob_documentos_aseguradora_cierre' => ['Documentos de la Aseguradora y Hoja de Cierre', null, [
       ['estado_asegurable', 'Asegurable', 'Asegurable'],
       ['estado_cobertura', '¿El Asegurable tiene una Cobertura de 36 Meses?', '¿El Asegurable tiene una Cobertura de 36 Meses?'],
-      ['estado_termino_contrato', '¿El contrato es por el termino de 12 meses?', '¿El contrato es por el termino de 12 meses?'],
+      ['estado_termino_contrato', '¿El contrato es por un término mínimo de 12 meses?', '¿El contrato es por el termino de 12 meses?'],
     ]],
   ];
 

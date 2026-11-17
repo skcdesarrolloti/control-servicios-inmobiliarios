@@ -183,7 +183,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
-  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'owner_credit_accounting', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure', 'quote_reset_dev', 'closing_sheet_respond', 'legal_case_manage', 'legal_case_send', 'legal_case_config', 'legal_case_export'];
+  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'owner_credit_accounting', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure', 'quote_reset_dev', 'closing_sheet_respond', 'closing_sheet_policy_configure', 'legal_case_manage', 'legal_case_send', 'legal_case_config', 'legal_case_export'];
   /** Herramientas de pruebas: hasta guardar permisos solo las tiene el cargo de desarrollo (Asistente de Desarrollo TI). */
   const DEVELOPER_DEFAULT_ACTIONS = ['quote_reset_dev'];
   const DEVELOPER_CARGOS = ['13'];
@@ -1055,6 +1055,7 @@ final class SuCasaControlServiciosInmobiliarios
           'closing_sheet_review' => 'Hacer la revisión de servicios públicos antes de la ocupación (hoja de cierre)',
           'closing_sheet_respond' => 'Aprobar o no aprobar hojas de cierre',
           'closing_sheet_desist' => 'Desistir negocio desde la hoja de cierre (contrato No asignado, estudio, inmueble y caso de entrega)',
+          'closing_sheet_policy_configure' => 'Configurar las políticas de la lista de chequeo de la hoja de cierre (Configuración)',
         ],
       ],
       'casos_juridicos' => [

@@ -123,6 +123,7 @@ final class AuthenticatedActionRouter
       'scm_tools_preapproval_lookup' => 'ajax_handler_tools_preapproval_lookup',
       'scm_tools_preapproval_pdf' => 'ajax_handler_tools_preapproval_pdf',
       'scm_quote_fee_settings' => 'ajax_handler_quote_fee_settings',
+      'scm_closing_policy_settings' => 'ajax_handler_closing_policy_settings',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_ORDER_CONTEXT => 'ajax_handler_cotizacion_order_context',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_ORDER_SAVE => 'ajax_handler_cotizacion_order_save',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_BANK_SAVE => 'ajax_handler_cotizacion_bank_save',

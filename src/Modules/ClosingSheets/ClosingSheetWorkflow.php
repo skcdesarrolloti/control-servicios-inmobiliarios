@@ -218,7 +218,27 @@ final class ClosingSheetWorkflow
       ],
       'company' => $this->company((string) ($closing['sucursal'] ?? '')),
       'documents' => (new ClosingSheetDocuments($this->db))->forClosing($closingId),
+      'exceptions' => $this->exceptions($closing),
     ];
+  }
+
+  /** Aviso en rojo para quien aprueba si la hoja incumple políticas de la lista de chequeo. @param array<string,mixed> $closing */
+  private function breachNotice(array $closing): string
+  {
+    $count = count($this->exceptions($closing));
+    return $count === 0 ? '' : '<p style="margin:0 0 14px;padding:10px 12px;border-radius:8px;background:#fee2e2;color:#b91c1c;font-weight:700;line-height:1.5;">'
+      . 'La hoja incumple ' . ($count === 1 ? 'una política' : $count . ' políticas') . ' de la lista de chequeo. Las justificaciones están en rojo al inicio de la hoja: revísalas antes de aprobarla.</p>';
+  }
+
+  /** Excepciones a políticas de la lista de chequeo (un fallo no impide ver la hoja). @param array<string,mixed> $closing @return list<array<string,mixed>> */
+  private function exceptions(array $closing): array
+  {
+    try {
+      return (new ClosingSheetPolicies($this->db))->exceptions($closing);
+    } catch (\Throwable $error) {
+      error_log('[closing_sheet_policies] #' . (int) ($closing['_ID'] ?? 0) . ': ' . $error->getMessage());
+      return [];
+    }
   }
 
   /** Nombre, cargo y firma (imagen) de un funcionario, activo o no. @return array{name:string,cargo:string,signature:string} */
@@ -539,6 +559,7 @@ final class ClosingSheetWorkflow
       fn(string $name): string => self::p('Hola, <b>' . self::e($name) . '</b>.')
         . self::p('<b>' . self::e($actor['name']) . '</b> realizó la revisión de servicios públicos antes de la ocupación de la hoja de cierre <b>#' . $closingId . '</b> del ' . $where . ', con el arrendatario <b>' . self::e($closing['arrendatario'] ?? '') . '</b>.')
         . $table
+        . $this->breachNotice($closing)
         . self::p('La hoja quedó <b>' . self::e(self::STATUS_REVIEWED) . '</b>. El botón abre la hoja con tu usuario para aprobarla o no aprobarla, sin iniciar sesión. Vence en 30 días.'),
       'Responder hoja de cierre', self::TEMPLATE_TO_RESPOND,
       fn(string $name): array => [$name, '#' . $closingId, self::place($closing), $actor['name'], $summary],
@@ -609,6 +630,7 @@ final class ClosingSheetWorkflow
       return $this->notifyStaff(self::ACTION_TO_RESPOND, $closingId, ClosingSheetAccess::RESPOND, $subject,
         fn(string $name): string => self::p('Hola, <b>' . self::e($name) . '</b>.')
           . self::p('<b>' . self::e($editorName) . '</b> ' . ($approved ? 'editó' : 'corrigió') . ' la hoja de cierre <b>#' . $closingId . '</b> del ' . self::where($closing) . ', que ' . ($approved ? 'ya estaba aprobada' : 'no había sido aprobada') . '. Volvió a quedar <b>' . self::e(self::STATUS_REVIEWED) . '</b>' . ($approved ? ' y hay que aprobarla de nuevo' : '') . '. La revisión de servicios se conserva.')
+          . $this->breachNotice($closing)
           . self::p('El botón abre la hoja con tu usuario para responderla, sin iniciar sesión. Vence en 30 días.'),
         'Responder hoja de cierre', self::TEMPLATE_TO_RESPOND,
         fn(string $name): array => [$name, '#' . $closingId, self::place($closing), $editorName, $approved ? 'Hoja editada después de aprobarse' : 'Hoja corregida después de no aprobarse'],

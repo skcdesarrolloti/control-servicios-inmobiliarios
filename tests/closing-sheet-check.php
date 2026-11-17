@@ -64,7 +64,7 @@ foreach (ClosingSheetForm::CHECKLIST as $notes => [, , $items]) {
   $closingColumns[] = $notes;
   foreach ($items as [$column]) $closingColumns[] = $column;
 }
-$closingColumns = array_merge($closingColumns, $cct, ClosingSheetService::CONTEXT_IDS, ['id_empleado', 'creador', 'sucursal', 'fecha', 'estado', 'numero_solicitud', 'aseguradora', 'fecha_posible_entrega', 'ubicacion_llaves', 'persona_llaves', 'contacto_llaves', 'id_contrato_arrendamiento', 'medio', 'tarjeta_pph', 'nombre_pph', 'propietarios']);
+$closingColumns = array_merge($closingColumns, $cct, ClosingSheetService::CONTEXT_IDS, [\SCM\Modules\ClosingSheets\ClosingSheetPolicies::COLUMN, 'id_empleado', 'creador', 'sucursal', 'fecha', 'estado', 'numero_solicitud', 'aseguradora', 'fecha_posible_entrega', 'ubicacion_llaves', 'persona_llaves', 'contacto_llaves', 'id_contrato_arrendamiento', 'medio', 'tarjeta_pph', 'nombre_pph', 'propietarios']);
 for ($i = 1; $i <= 6; $i++) {
   $closingColumns[] = 'porcentaje_' . $i;
   foreach (ClosingSheetService::CO_OWNER_COLUMNS as $prefix) $closingColumns[] = $prefix . $i;
@@ -223,6 +223,31 @@ $check($closing['ob_documentos_juridicos'] === $edit['values']['ob_documentos_ju
 $check($closing['estado'] === 'Esperando respuesta' && $mandate['estado_hoja_cierre'] === 'Esperando respuesta' && $closing['dias_gracia'] === '15' && $closing['copropiedad'] === '' && $closing['porcentaje_2'] === '50', 'editing an approved sheet sends it back to be approved and saves the visible data');
 $check($mandate['dias_gracia'] === '15' && $mandate['propiedad_horizontal'] === 'No' && $mandate['copropiedad'] === 'Salvador de Bahía' && $mandate['porcentaje_2'] === '50' && $mandate['id_hoja_cierre'] === (string) $result['id'], 'edit updates the mandate without erasing hidden data');
 $check((int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket') === 1, 'edit does not repeat ticket history');
+
+// Políticas de la lista de chequeo: un ítem que incumple exige justificación, que queda guardada con quién la escribió.
+$breachInput = ['estado_amparo_integral' => 'No cumple', 'estado_termino_contrato' => 'No cumple'] + $editInput;
+$message = $fails(fn() => $service->save($breachInput, $sender, $result['id']), 'incumple una política');
+$check(str_contains($message, 'incumple una política') && (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_cierres WHERE estado_amparo_integral = ?', ['No cumple']) === 0, 'an item that breaks a policy needs a justification');
+$check($fails(fn() => $service->save(['justificacion' => ['estado_amparo_integral' => 'corta', 'estado_termino_contrato' => 'El propietario pidió 6 meses por venta del inmueble.']] + $breachInput, $sender, $result['id']), 'mínimo 10') !== 'no falló', 'a too short justification is rejected');
+$service->save(['justificacion' => ['estado_amparo_integral' => 'La afianzadora no ofrece el amparo en este estrato.', 'estado_termino_contrato' => 'El propietario pidió 6 meses por venta del inmueble.']] + $breachInput, $sender, $result['id']);
+$saved = \SCM\Modules\ClosingSheets\ClosingSheetPolicies::decode((string) $db->getVar('SELECT excepciones_politicas FROM wp_jet_cct_cierres WHERE _ID = ?', [$result['id']]));
+$check(array_column($saved, 'item') === ['estado_amparo_integral', 'estado_termino_contrato'] && $saved[0]['by'] === 'Kellys Roqueme' && $saved[0]['justification'] === 'La afianzadora no ofrece el amparo en este estrato.' && $saved[1]['note'] !== '', 'justifications are saved with who wrote them and the written rule');
+$again = $service->context([], $result['id']);
+$check($again['values']['__justifications']['estado_amparo_integral'] === 'La afianzadora no ofrece el amparo en este estrato.', 'edit loads the saved justifications');
+$service->save($breachInput, $sender, $result['id']);
+$check(count(\SCM\Modules\ClosingSheets\ClosingSheetPolicies::decode((string) $db->getVar('SELECT excepciones_politicas FROM wp_jet_cct_cierres WHERE _ID = ?', [$result['id']]))) === 2, 'an unchanged breach keeps its justification on a new edit');
+$exceptions = (new \SCM\Modules\ClosingSheets\ClosingSheetPolicies($db))->exceptions($db->getRow('SELECT * FROM wp_jet_cct_cierres WHERE _ID = ?', [$result['id']]));
+$check(count($exceptions) === 2 && $exceptions[0]['text'] !== '' && $exceptions[1]['justification'] === 'El propietario pidió 6 meses por venta del inmueble.', 'the approver gets each exception with its justification');
+$service->save(['estado_amparo_integral' => 'Cumple', 'estado_termino_contrato' => 'Cumple'] + $editInput, $sender, $result['id']);
+$check(\SCM\Modules\ClosingSheets\ClosingSheetPolicies::decode((string) $db->getVar('SELECT excepciones_politicas FROM wp_jet_cct_cierres WHERE _ID = ?', [$result['id']])) === [], 'a fixed item drops its exception');
+// Hoja anterior a la regla: el ítem que ya estaba en "No cumple" sin justificación no la exige mientras no cambie.
+$db->update('wp_jet_cct_cierres', ['estado_amparo_integral' => 'No cumple', 'excepciones_politicas' => ''], ['_ID' => $result['id']]);
+$service->save(['estado_amparo_integral' => 'No cumple'] + $editInput, $sender, $result['id']);
+$legacyBreach = (new \SCM\Modules\ClosingSheets\ClosingSheetPolicies($db))->exceptions($db->getRow('SELECT * FROM wp_jet_cct_cierres WHERE _ID = ?', [$result['id']]));
+$check(count($legacyBreach) === 1 && $legacyBreach[0]['justification'] === '', 'an older breach does not block the edit and is shown without justification');
+$db->update('wp_jet_cct_cierres', ['estado_amparo_integral' => 'Cumple'], ['_ID' => $result['id']]);
+$rules = \SCM\Modules\ClosingSheets\ClosingSheetPolicies::normalize(['estado_rut_pro' => ['policies' => ['45', 0], 'states' => ['No aplica', 'Otro'], 'note' => ' <b>x</b> '], 'no_existe' => ['policies' => [1], 'states' => ['No cumple']], 'estado_asegurable' => ['policies' => [7], 'states' => []]]);
+$check($rules === ['estado_rut_pro' => ['policies' => [45], 'states' => ['No aplica'], 'note' => 'x']], 'the policy settings keep only real items with a policy or rule and a breaking state');
 
 $check(ClosingSheetService::checklistNotes(['A:', 'B:'], ['', ' ']) === '', 'a group without notes stays empty');
 $legacy = "<p><b>Nombre del Administrador</b></p>\n<p><b>Correo Electrónico</b><br />\nno tiene &amp; no responde</p>\n";

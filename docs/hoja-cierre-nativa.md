@@ -190,6 +190,59 @@ Las columnas `observacion_respuesta` e `id_revision_servicios_publicos` de `cier
    - Acuerdos y referido PPH.
 2. **Lista de chequeo**: estado de 52 ítems y observación opcional. Al editar se cargan los estados y observaciones
    guardados; en hojas anteriores a la lista (antes de la #82) los ítems vacíos no son obligatorios.
+   Ver **Lista de chequeo: sugerencias y políticas**.
+
+## Lista de chequeo: sugerencias y políticas
+
+**Sugerencias.** No se oculta ningún ítem. Al pasar al paso 2, `closing-sheet.js` sugiere estados con los datos del
+mandato (`ClosingSheetService::checklistFacts`) y lo escrito en el paso 1. Solo llena ítems vacíos o que siguen con una
+sugerencia; lo que el funcionario elige no se toca. Si se vuelve al paso 1 y se cambia algo, las sugerencias que nadie
+tocó se recalculan. Cada una dice de dónde sale ("Sugerido: …").
+
+| Ítem | Sugerencia |
+| --- | --- |
+| Facturas de agua, energía y gas | "No aplica" si el servicio no está marcado; "Cumple" si el mandato o la hoja tiene su número |
+| Internet y teléfono fijo | "Cumple" o "No aplica" según el mandato (`NA`, `N/A` o vacío cuentan como que no tiene) |
+| Copropiedad (10 ítems) | "No aplica" sin propiedad horizontal; con ella, administrador, correo y teléfono en "Cumple" si están en la hoja |
+| Existencia y Cámara de Comercio | "No aplica" si todos los propietarios (o el arrendatario) son persona natural |
+| Días de gracia | según el campo de la hoja |
+| Amparo integral | `incluye_garantia_servicios` del mandato: Sí = "Cumple", No = "No cumple" |
+| Certificación bancaria del propietario | "Cumple" si el mandato tiene la cuenta |
+| Cobertura de 36 meses | el número de `meses_cobertura_garantia` del mandato |
+| Término del contrato | `meses_contrato` de la hoja: 12 o más = "Cumple"; menos = "No cumple" (el mínimo es 12) |
+| Asegurable | "Cumple" si la hoja tiene su estudio de aseguradora |
+
+**Políticas.** `ClosingSheetPolicies`. Cada ítem puede tener políticas de `wp_jet_cct_politicas`, una regla escrita y los
+estados que las incumplen ("No cumple" por defecto). Se configura en **Configuración › Políticas de la hoja de cierre**
+(permiso *Configurar las políticas de la lista de chequeo*, `closing_sheet_policy_configure`, solo administradores por
+defecto; setting `closing_sheet_policy_rules`). Mientras no se guarde, rige `DEFAULT_RULES`, con las versiones normales
+de las políticas, no las "(Prov.)":
+
+- facturas de servicios: #47 y #45; amparo integral: #47, #23 y #45;
+- servicios compartidos: #66; mora en servicios: #26 y #41; reparaciones: #41;
+- pagos de administración: #25 y #15; asegurable: #7 y #19; cobertura: #19 con la regla de 36 meses;
+- término del contrato: regla "El término mínimo del contrato de arrendamiento es de 12 meses" (no hay política en la
+  tabla).
+
+Al marcar a mano un estado que incumple, se abre una ventana en la misma página con la política y su texto:
+
+- **Corregir selección** (o Escape) vuelve al estado anterior.
+- **Continuar con la excepción** exige una justificación de al menos 10 caracteres.
+
+Un incumplimiento sugerido no abre la ventana, pero muestra la casilla de justificación en rojo. El servidor también
+exige la justificación. En hojas anteriores a la regla, un ítem que ya estaba en ese estado no la exige mientras no
+cambie.
+
+Las justificaciones se guardan en `excepciones_politicas` de `cierres` (JSON: ítem, estado, políticas, regla,
+justificación, quién y cuándo; columna creada con `bin/cct-add-fields.php`). Para quien aprueba, en `hoja-cierre-ver.php`:
+
+- al inicio de la hoja, un bloque rojo **Incumple N políticas** con cada ítem, la política (con su texto), la regla y la
+  justificación;
+- en la lista de chequeo, los ítems en rojo con su justificación;
+- sobre los botones de responder, un aviso rojo;
+- al aprobar, la confirmación lo repite.
+
+El aviso de **Hoja de cierre por responder** también dice cuántas políticas incumple.
 
 Los datos se leen de la base de datos (mandato, inmueble, copropiedad, propietario, arrendatario, estudio de
 aseguradora y ticket); no se usa la API REST de JetEngine.

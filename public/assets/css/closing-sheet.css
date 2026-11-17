@@ -134,3 +134,29 @@ textarea.cs-input { resize: vertical; }
   .cs-tenant-bar { flex-direction: column; }
   .cs-dialog-box footer { flex-direction: column-reverse; align-items: stretch; }
 }
+
+/* Lista de chequeo: sugerencias según el mandato y excepciones a políticas. */
+.cs-check-item .cs-suggest { grid-column: 1 / -1; margin-top: -4px; color: #1d4ed8; font-size: 12px; font-weight: 600; }
+.cs-check-item.is-breach { margin: 0 -10px; padding: 12px 10px; border-radius: 10px; background: #fef2f2; }
+.cs-check-item.is-breach select { border-color: #dc2626; color: #991b1b; font-weight: 700; }
+.cs-policy { grid-column: 1 / -1; display: grid; gap: 6px; padding: 10px 12px; border: 1px solid #fecaca; border-left: 4px solid #dc2626; border-radius: 10px; background: #fff; }
+.cs-policy-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; color: #991b1b; font-size: 13px; font-weight: 700; }
+.cs-policy-head .material-symbols-outlined { font-size: 18px; }
+.cs-policy .cs-label { color: #991b1b; }
+.cs-just-item { color: var(--rp-muted); font-weight: 500; }
+.cs-policy textarea { border-color: #fca5a5; }
+.cs-danger { background: #b91c1c; }
+.cs-policy-dialog:not([open]) { display: none; }
+.cs-policy-dialog { position: fixed; inset: 0; z-index: 70; width: min(620px, calc(100vw - 32px)); max-height: 90vh; margin: auto; padding: 0; overflow: auto; border: 0; border-radius: 16px; background: #fff; box-shadow: 0 20px 60px rgba(15, 30, 54, 0.35); }
+.cs-policy-dialog::backdrop { background: rgba(15, 23, 42, 0.55); }
+.cs-policy-box { display: grid; gap: 10px; padding: 18px; }
+.cs-policy-box header { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid #fecaca; color: #991b1b; }
+.cs-policy-box header .material-symbols-outlined { font-size: 30px; }
+.cs-policy-box h2 { margin: 0; font-size: 18px; }
+.cs-policy-eyebrow { margin: 0; font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.cs-policy-item { margin: 0; font-weight: 600; }
+.cs-policy-note { margin: 0; padding: 8px 10px; border-radius: 8px; background: #fef2f2; color: #991b1b; font-weight: 700; }
+.cs-policy-list { display: grid; gap: 8px; max-height: 40vh; overflow: auto; }
+.cs-policy-list details { padding: 8px 10px; border: 1px solid var(--rp-line); border-radius: 8px; }
+.cs-policy-list summary { cursor: pointer; font-weight: 700; }
+.cs-policy-list details p { margin: 8px 0 0; font-size: 13px; line-height: 1.55; white-space: pre-line; }

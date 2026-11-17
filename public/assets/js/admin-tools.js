@@ -111,6 +111,7 @@
     if (duplicate) initDuplicateInventory(duplicate, post);
     initCleaningSettings(root, post);
     initQuoteFeeSettings(root, post);
+    initClosingPolicySettings(root, post);
     // Si la página abrió directo en una herramienta, el runtime pudo pedir la carga antes de este script.
     [pse, mora, market].forEach(function (module) {
       var panel = module && module.closest(".scm-tab-panel");
@@ -2071,6 +2072,136 @@
       if (!event.target.closest || !event.target.closest("[data-cleaning-settings]")) return;
       event.preventDefault();
       post("scm_tools_cleaning_settings", {})
+        .then(function (data) { show(data.html || ""); })
+        .catch(function (error) { window.alert(error.message); });
+    });
+  }
+
+  // Configuración › Políticas de la hoja de cierre (ClosingSheetPolicyView; se oculta sin closing_sheet_policy_configure).
+  function initClosingPolicySettings(root, post) {
+    var modal = null;
+
+    function ensureModal() {
+      if (modal) return modal;
+      modal = document.createElement("div");
+      modal.className = "scm-cia-modal";
+      modal.hidden = true;
+      modal.innerHTML =
+        '<div class="scm-cia-modal-backdrop" data-cpp-close></div>' +
+        '<section tabindex="-1" class="!sp-relative !sp-outline-none !sp-flex !sp-flex-col !sp-w-[min(820px,calc(100vw-24px))] !sp-max-h-[92vh] !sp-overflow-hidden !sp-rounded-2xl !sp-bg-service-background !sp-border !sp-border-solid !sp-border-slate-200 !sp-shadow-2xl !sp-font-sans" role="dialog" aria-modal="true" aria-labelledby="scm-cpp-title">' +
+        '<header class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-4 !sp-px-4 sm:!sp-px-6 !sp-py-4 !sp-bg-white !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200">' +
+        '<div><p class="!sp-m-0 !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Configuración</p><h3 id="scm-cpp-title" class="!sp-m-0 !sp-text-lg !sp-font-bold !sp-text-service-navy">Políticas de la hoja de cierre</h3></div>' +
+        '<button type="button" class="!sp-flex !sp-items-center !sp-justify-center !sp-w-9 !sp-h-9 !sp-rounded-full !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-service-navy !sp-text-lg !sp-cursor-pointer hover:!sp-bg-slate-50" data-cpp-close aria-label="Cerrar">&times;</button></header>' +
+        '<div class="!sp-flex !sp-flex-col !sp-flex-1 !sp-min-h-0" data-cpp-body></div></section>';
+      root.appendChild(modal);
+      modal.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") close();
+        // Enter en el buscador agrega la política en lugar de guardar.
+        if (event.key === "Enter" && event.target.matches("[data-cpp-search]")) {
+          event.preventDefault();
+          addPolicy(event.target.closest("[data-cpp-item]"));
+        }
+      });
+      modal.addEventListener("click", function (event) {
+        if (event.target.closest("[data-cpp-close]")) return close();
+        var remove = event.target.closest("[data-cpp-remove]");
+        if (remove) {
+          var row = remove.closest("[data-cpp-item]");
+          remove.closest("[data-cpp-policy]").remove();
+          markRow(row);
+          return;
+        }
+        var add = event.target.closest("[data-cpp-add]");
+        if (add) addPolicy(add.closest("[data-cpp-item]"));
+      });
+      modal.addEventListener("input", function (event) {
+        var row = event.target.closest("[data-cpp-item]");
+        if (row && event.target.matches("[data-cpp-note]")) markRow(row);
+      });
+      modal.addEventListener("submit", function (event) {
+        var form = event.target.closest("[data-cpp-form]");
+        if (!form) return;
+        event.preventDefault();
+        var rules = {};
+        form.querySelectorAll("[data-cpp-item]").forEach(function (row) {
+          var policies = Array.prototype.map.call(row.querySelectorAll("[data-cpp-policy]"), function (chip) { return parseInt(chip.getAttribute("data-cpp-policy"), 10); });
+          var note = row.querySelector("[data-cpp-note]").value.trim();
+          var states = Array.prototype.filter.call(row.querySelectorAll("[data-cpp-state]"), function (box) { return box.checked; }).map(function (box) { return box.value; });
+          if ((policies.length || note) && states.length) rules[row.getAttribute("data-cpp-item")] = { policies: policies, states: states, note: note };
+        });
+        var statusNode = form.querySelector("[data-cpp-status]");
+        statusNode.textContent = "Guardando…";
+        post("scm_closing_policy_settings", { mode: "save", rules: JSON.stringify(rules) })
+          .then(function (data) {
+            show(data.html || "");
+            var done = modal.querySelector("[data-cpp-status]");
+            done.textContent = data.message || "";
+            done.classList.add("!sp-text-emerald-700", "!sp-font-semibold");
+          })
+          .catch(function (error) {
+            statusNode.textContent = error.message;
+            statusNode.classList.add("!sp-text-red-700", "!sp-font-semibold");
+          });
+      });
+      return modal;
+    }
+
+    function markRow(row) {
+      if (!row) return;
+      var active = row.querySelector("[data-cpp-policy]") || row.querySelector("[data-cpp-note]").value.trim() !== "";
+      row.classList.toggle("is-active", !!active);
+    }
+
+    function addPolicy(row) {
+      if (!row) return;
+      var search = row.querySelector("[data-cpp-search]");
+      var match = String(search.value || "").match(/#?\s*(\d+)/);
+      if (!match) return;
+      var id = parseInt(match[1], 10);
+      var option = Array.prototype.find.call(modal.querySelectorAll("#cpp-catalog option"), function (item) { return item.value.indexOf("#" + id + " · ") === 0; });
+      if (!option) {
+        search.setCustomValidity("No existe la política #" + id + ".");
+        search.reportValidity();
+        search.setCustomValidity("");
+        return;
+      }
+      if (!row.querySelector('[data-cpp-policy="' + id + '"]')) {
+        var title = option.value.replace(/^#\d+ · /, "");
+        var chip = document.createElement("span");
+        chip.className = "cpp-chip";
+        chip.setAttribute("data-cpp-policy", String(id));
+        chip.title = title;
+        chip.textContent = "#" + id + " · " + (title.length > 48 ? title.slice(0, 47) + "…" : title);
+        var remove = document.createElement("button");
+        remove.type = "button";
+        remove.setAttribute("data-cpp-remove", "");
+        remove.setAttribute("aria-label", "Quitar la política #" + id);
+        remove.textContent = "×";
+        chip.appendChild(remove);
+        row.querySelector("[data-cpp-chips]").appendChild(chip);
+      }
+      search.value = "";
+      markRow(row);
+    }
+
+    function show(html) {
+      var box = ensureModal();
+      box.querySelector("[data-cpp-body]").innerHTML = html;
+      box.hidden = false;
+      document.body.classList.add("scm-cia-modal-open");
+      box.querySelector("section").focus();
+    }
+
+    function close() {
+      if (!modal) return;
+      modal.hidden = true;
+      document.body.classList.remove("scm-cia-modal-open");
+    }
+
+    document.addEventListener("click", function (event) {
+      if (!event.target.closest || !event.target.closest("[data-closing-policy-settings]")) return;
+      event.preventDefault();
+      post("scm_closing_policy_settings", {})
         .then(function (data) { show(data.html || ""); })
         .catch(function (error) { window.alert(error.message); });
     });

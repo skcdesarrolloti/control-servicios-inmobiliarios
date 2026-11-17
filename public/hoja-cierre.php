@@ -93,6 +93,7 @@ echo (new ClosingSheetPageView())->render($context, $service->options(), [
   'favicon' => system_image('portal_favicon_url', SCM_DEFAULT_PORTAL_FAVICON_URL),
   'nonce' => $nonce,
   'action' => SuCasaControlServiciosInmobiliarios::AJAX_CLOSING_SHEET_SAVE,
+  'policies' => (new \SCM\Modules\ClosingSheets\ClosingSheetPolicies($db))->forForm(),
   'documents' => [
     'items' => $closingId > 0 ? $documents->forClosing($closingId) : $documents->pending($mandateId),
     'config' => [

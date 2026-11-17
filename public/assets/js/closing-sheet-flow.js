@@ -85,7 +85,11 @@
       if (state === "No aprobada" && !String(body.get("observacion") || "").trim()) {
         return showError(form, "Escribe por qué no se aprueba: lo recibe quien hizo la hoja para corregirla.");
       }
-      if (!window.confirm("¿Confirmas que la hoja queda " + String(state).toLowerCase() + "? Se avisará a quien la hizo.")) return;
+      var breaches = parseInt(form.getAttribute("data-csf-breaches") || "0", 10) || 0;
+      var warning = breaches > 0 && state === "Aprobada"
+        ? "La hoja incumple " + (breaches === 1 ? "una política" : breaches + " políticas") + " (las justificaciones están en rojo al inicio). "
+        : "";
+      if (!window.confirm(warning + "¿Confirmas que la hoja queda " + String(state).toLowerCase() + "? Se avisará a quien la hizo.")) return;
     }
     // Desistir negocio: la confirmación es una casilla dentro de la misma ventana.
     var check = form.querySelector("[data-csf-confirm-check]");

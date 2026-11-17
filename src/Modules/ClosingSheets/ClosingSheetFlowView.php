@@ -156,8 +156,10 @@ final class ClosingSheetFlowView
       $value = $values[$column] ?? '';
       $summary[] = [$label, self::amount(is_array($value) ? '' : (string) $value, $money)];
     }
+    $exceptions = $sheet['exceptions'] ?? [];
     $doc = self::docHeader($closing, $sheet['company'], $logo)
       . self::desistBlock($closing)
+      . self::exceptionsBlock($exceptions)
       . self::responseBlock($closing)
       . self::keyValues('Resumen del negocio', $summary, 'csf-summary')
       . self::keyValues('Datos del estudio y entrega', [
@@ -176,8 +178,8 @@ final class ClosingSheetFlowView
         $doc .= self::ownersBlock($sheet['owners'], $values);
       }
     }
-    $doc .= self::reviewBlock($sheet) . self::checklistBlock($values, $sheet['documents'] ?? [], $sheet['owners']) . self::signatures($sheet['signers']) . self::docFooter($sheet['company']);
-    return $html . '<article class="csf-doc">' . $doc . '</article>' . ($respond ? self::responseForm($hidden, $state) : '')
+    $doc .= self::reviewBlock($sheet) . self::checklistBlock($values, $sheet['documents'] ?? [], $sheet['owners'], array_column($exceptions, null, 'item')) . self::signatures($sheet['signers']) . self::docFooter($sheet['company']);
+    return $html . '<article class="csf-doc">' . $doc . '</article>' . ($respond ? self::responseForm($hidden, $state, count($exceptions)) : '')
       . ($desist ? self::desistDialog($hidden, $sheet['desist_reasons']) : '')
       . '<dialog class="csf-dialog" data-csf-dialog><header><strong>Revisión de servicios públicos</strong><button type="button" class="cs-secondary" data-csf-dialog-close>Cerrar</button></header><iframe title="Revisión de servicios públicos" referrerpolicy="no-referrer"></iframe></dialog>'
       . ClosingSheetDocumentsView::dialogs() . self::done();
@@ -271,11 +273,41 @@ final class ClosingSheetFlowView
       . ($note !== '' ? '<p class="csf-quote">' . nl2br(self::e($note)) . '</p>' : '') . '</section>';
   }
 
-  /** @param array<string,string> $hidden */
-  private static function responseForm(array $hidden, string $state): string
+  /**
+   * Excepciones a políticas de la lista de chequeo, en rojo y antes de todo, para quien aprueba.
+   * @param list<array<string,mixed>> $exceptions ClosingSheetPolicies::exceptions()
+   */
+  private static function exceptionsBlock(array $exceptions): string
   {
-    return '<form class="cs-section csf-respond" id="responder" data-csf-form data-csf-confirm method="post" novalidate><h2>Responder la hoja de cierre</h2>'
+    if ($exceptions === []) {
+      return '';
+    }
+    $rows = '';
+    foreach ($exceptions as $entry) {
+      $policies = '';
+      foreach ($entry['policies'] as $policy) {
+        $policies .= '<details><summary>Política #' . (int) $policy['id'] . ': ' . self::e($policy['title']) . '</summary>'
+          . ($policy['text'] !== '' ? '<p>' . nl2br(self::e($policy['text'])) . '</p>' : '') . '</details>';
+      }
+      $justification = trim((string) $entry['justification']);
+      $rows .= '<li><p class="csf-breach-item"><span class="csf-result is-bad">' . self::e($entry['state']) . '</span> <strong>' . self::e($entry['text']) . '</strong> <small>' . self::e($entry['group']) . '</small></p>'
+        . ($entry['note'] !== '' ? '<p class="csf-breach-rule">' . self::e($entry['note']) . '</p>' : '') . $policies
+        . ($justification !== ''
+          ? '<p class="csf-breach-why"><b>Justificación:</b> ' . nl2br(self::e($justification)) . ($entry['by'] !== '' ? ' <small>— ' . self::e($entry['by']) . ((int) $entry['at'] > 0 ? ', ' . self::e(self::date((int) $entry['at'])) : '') . '</small>' : '') . '</p>'
+          : '<p class="csf-breach-why is-missing"><b>Sin justificación</b> (la hoja se llenó antes de esta regla).</p>')
+        . '</li>';
+    }
+    $count = count($exceptions);
+    return '<section class="cs-section csf-breaches" role="alert"><h2><span class="material-symbols-outlined" aria-hidden="true">gpp_bad</span> Incumple ' . ($count === 1 ? 'una política' : $count . ' políticas') . '</h2>'
+      . '<p class="csf-breach-lead">Revisa cada excepción y su justificación antes de aprobar la hoja.</p><ul class="csf-breach-list">' . $rows . '</ul></section>';
+  }
+
+  /** @param array<string,string> $hidden */
+  private static function responseForm(array $hidden, string $state, int $breaches = 0): string
+  {
+    return '<form class="cs-section csf-respond" id="responder" data-csf-form data-csf-confirm data-csf-breaches="' . $breaches . '" method="post" novalidate><h2>Responder la hoja de cierre</h2>'
       . self::hidden($hidden + ['accion' => 'respuesta'])
+      . ($breaches > 0 ? '<p class="csf-breach-alert" role="alert"><span class="material-symbols-outlined" aria-hidden="true">gpp_bad</span> Esta hoja incumple ' . ($breaches === 1 ? 'una política' : $breaches . ' políticas') . '. Revisa las justificaciones en rojo al inicio de la hoja antes de aprobarla.</p>' : '')
       . ($state === ClosingSheetWorkflow::REJECTED ? '<p class="cs-note">No se había aprobado; quien la hizo la corrigió o vuelve a ponerla a consideración.</p>' : '')
       . '<label class="cs-label" for="csf_observacion">Observación <span class="cs-help">(obligatoria si no se aprueba; la recibe quien hizo la hoja)</span></label>'
       . '<textarea class="cs-input" id="csf_observacion" name="observacion" rows="3" maxlength="2000"></textarea>'
@@ -497,7 +529,8 @@ final class ClosingSheetFlowView
    * Lista de chequeo con los archivos de cada documento (se ven en la misma página) y los documentos adicionales.
    * @param array<string,mixed> $values @param list<array<string,mixed>> $documents @param list<array<string,mixed>> $owners
    */
-  private static function checklistBlock(array $values, array $documents = [], array $owners = []): string
+  /** @param array<string,array<string,mixed>> $exceptions ítem => excepción a política */
+  private static function checklistBlock(array $values, array $documents = [], array $owners = [], array $exceptions = []): string
   {
     $html = '';
     $counts = ['good' => 0, 'bad' => 0, 'muted' => 0];
@@ -527,7 +560,9 @@ final class ClosingSheetFlowView
         $tone = ClosingSheetDocumentsView::tone($state);
         $counts[$tone]++;
         $missing = $documents !== [] && $tone === 'good' && $attached === '' && isset(ClosingSheetForm::DOCUMENT_ITEMS[$column]) ? '<small class="cd-warn">Cumple, pero sin archivo en el panel.</small>' : '';
-        $rows .= '<li><span class="csf-result is-' . $tone . '">' . self::e($state !== '' ? $state : 'Sin estado') . '</span><div><p>' . self::e($text) . '</p>' . ($note !== '' ? '<small>' . nl2br(self::e($note)) . '</small>' : '') . $missing . $attached . '</div></li>';
+        $breach = $exceptions[$column] ?? null;
+        $why = $breach !== null ? '<small class="csf-breach-why">' . (trim((string) $breach['justification']) !== '' ? '<b>Excepción a política:</b> ' . nl2br(self::e($breach['justification'])) : '<b>Incumple una política</b> (sin justificación).') . '</small>' : '';
+        $rows .= '<li' . ($breach !== null ? ' class="is-breach"' : '') . '><span class="csf-result is-' . $tone . '">' . self::e($state !== '' ? $state : 'Sin estado') . '</span><div><p>' . self::e($text) . '</p>' . ($note !== '' ? '<small>' . nl2br(self::e($note)) . '</small>' : '') . $why . $missing . $attached . '</div></li>';
       }
       if ($rows !== '') {
         $html .= '<div class="csf-check-group"><h3>' . self::e($group) . '</h3><ul class="csf-checklist">' . $rows . '</ul></div>';

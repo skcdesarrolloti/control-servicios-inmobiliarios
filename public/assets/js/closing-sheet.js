@@ -145,9 +145,215 @@
         syncConditions();
         syncConditions();
         syncPercent();
+        syncPolicies();
       },
     })
     : null;
+
+  // ---------------------------------------------------------------- Lista de chequeo: sugerencias y políticas
+  // Los estados se sugieren con el mandato y lo escrito en el paso 1 (solo en ítems vacíos o que siguen sugeridos), y un
+  // ítem que incumple una política pide justificación: al marcarlo se abre la advertencia con la política.
+  const checklistData = (() => {
+    const node = form.querySelector("[data-cs-checklist-data]");
+    try {
+      return node ? JSON.parse(node.textContent || "{}") : {};
+    } catch (error) {
+      return {};
+    }
+  })();
+  const policyRules = checklistData.policies || {};
+  const facts = checklistData.facts || {};
+  const itemBox = (item) => form.querySelector(`[data-cs-item="${CSS.escape(item)}"]`);
+  const stateSelect = (item) => form.querySelector(`.cs-check-item select[name="${CSS.escape(item)}"]`);
+  const fieldValue = (name) => valuesOf(name)[0] || "";
+  const COPROPIEDAD = ["estado_nombre_administrador", "estado_correo_copropiedad", "estado_celular_copropiedad", "estado_reglamento_copropiedad", "estado_manual_copropiedad",
+    "estado_rut_copropiedad", "estado_certificacion_copropiedad", "estado_cuota_copropiedad", "estado_paz_salvo_copropiedad", "estado_encargado_copropiedad"];
+
+  function suggestions() {
+    const out = {};
+    const add = (item, state, why) => (out[item] = [state, why]);
+    const services = valuesOf("servicios_publicos");
+    const accounts = facts.accounts || {};
+    [["estado_servicio_agua", "Agua", "agua"], ["estado_servicio_energia", "Energia", "luz"], ["estado_servicio_gas", "Gas", "gas"]].forEach(([item, service, account]) => {
+      if (!services.includes(service)) add(item, "No aplica", "el servicio no está marcado en la hoja");
+      else if (accounts[service] || fieldValue(account)) add(item, "Cumple", "el mandato o la hoja tiene el número del servicio");
+    });
+    add("estado_servicio_internet", facts.internet ? "Cumple" : "No aplica", facts.internet ? "el mandato tiene internet" : "el mandato no tiene internet");
+    add("estado_servicio_telefonia", facts.telefono ? "Cumple" : "No aplica", facts.telefono ? "el mandato tiene teléfono fijo" : "el mandato no tiene teléfono fijo");
+    const ph = fieldValue("propiedad_horizontal");
+    if (ph === "No") {
+      COPROPIEDAD.forEach((item) => add(item, "No aplica", "no pertenece a propiedad horizontal"));
+    } else if (ph === "Si") {
+      [["estado_nombre_administrador", "administrador"], ["estado_correo_copropiedad", "correo_copropiedad"], ["estado_celular_copropiedad", "celular_copropiedad"]].forEach(([item, field]) => {
+        if (fieldValue(field)) add(item, "Cumple", "está en la sección Copropiedad");
+      });
+    }
+    const ownerTypes = [fieldValue("tipo_persona_propietario")].concat(
+      Array.from(form.querySelectorAll('[name^="copropietario["][name$="[tipo_persona]"]')).filter((input) => !input.disabled).map((input) => String(input.value || "").trim())
+    );
+    if (ownerTypes.every((type) => type === "Natural")) {
+      const why = ownerTypes.length > 1 ? "todos los propietarios son persona natural" : "el propietario es persona natural";
+      ["estado_certificado_empresa_pro", "estado_certificado_camara_pro"].forEach((item) => add(item, "No aplica", why));
+    }
+    if (fieldValue("tipo_persona_arrendatario") === "Natural") {
+      ["estado_certificado_empresa_arre", "estado_certificado_camara_arre"].forEach((item) => add(item, "No aplica", "el arrendatario es persona natural"));
+    }
+    const grace = parseFloat(fieldValue("dias_gracia").replace(",", ".")) || 0;
+    add("estado_dias_gracia", grace > 0 ? "Cumple" : "No aplica", grace > 0 ? "la hoja tiene días de gracia" : "la hoja no tiene días de gracia");
+    if (facts.amparo === "Si") add("estado_amparo_integral", "Cumple", "el mandato incluye la garantía de servicios públicos");
+    if (facts.amparo === "No") add("estado_amparo_integral", "No cumple", "el mandato no incluye la garantía de servicios públicos");
+    if (facts.bank) add("estado_bancaria_pro", "Cumple", "el mandato tiene la cuenta bancaria del propietario");
+    if (facts.cobertura) add("estado_cobertura", facts.cobertura >= 36 ? "Cumple" : "No cumple", `el mandato dice ${facts.cobertura} meses de cobertura`);
+    const months = parseInt(fieldValue("meses_contrato"), 10);
+    if (months > 0) add("estado_termino_contrato", months >= 12 ? "Cumple" : "No cumple", `la hoja dice ${months} meses (el mínimo es 12)`);
+    if (facts.study) add("estado_asegurable", "Cumple", "la hoja tiene el estudio de la aseguradora");
+    return out;
+  }
+
+  function showSuggestion(item, text) {
+    const tag = itemBox(item)?.querySelector("[data-cs-suggest]");
+    if (!tag) return;
+    tag.textContent = text ? "Sugerido: " + text + "." : "";
+    tag.hidden = !text;
+  }
+
+  function applySuggestions() {
+    const list = suggestions();
+    Object.keys(list).forEach((item) => {
+      const select = stateSelect(item);
+      const [state, why] = list[item];
+      // Solo ítems vacíos o que siguen con una sugerencia anterior; lo que eligió el funcionario no se toca.
+      if (!select || select.disabled || (select.value !== "" && select.dataset.csAuto !== "1")) return;
+      if (!Array.from(select.options).some((option) => option.value === state)) return;
+      select.value = state;
+      select.dataset.csAuto = "1";
+      select.dataset.prev = state;
+      showSuggestion(item, why);
+      syncPolicy(item);
+    });
+    // Sugerencias que ya no aplican (cambió el paso 1) se limpian si nadie las tocó.
+    form.querySelectorAll('.cs-check-item select[data-cs-auto="1"]').forEach((select) => {
+      if (list[select.name]) return;
+      select.value = "";
+      delete select.dataset.csAuto;
+      showSuggestion(select.name, "");
+      syncPolicy(select.name);
+    });
+  }
+
+  function syncPolicy(item) {
+    const rule = policyRules[item];
+    const box = itemBox(item);
+    const panel = box && box.querySelector("[data-cs-policy]");
+    if (!rule || !panel) return;
+    const select = stateSelect(item);
+    const on = !!select && !select.disabled && rule.states.includes(select.value);
+    panel.hidden = !on;
+    box.classList.toggle("is-breach", on);
+    const text = panel.querySelector("[data-cs-justification]");
+    // Una hoja anterior a la regla que conserva ese estado no exige justificación.
+    text.toggleAttribute("data-cs-required", on && panel.dataset.csLegacy !== select.value);
+  }
+  function syncPolicies() {
+    Object.keys(policyRules).forEach(syncPolicy);
+  }
+
+  // Ventana de advertencia (en la misma página).
+  const policyDialog = form.querySelector("[data-cs-policy-dialog]");
+  let pending = null;
+  function openDialog(dialog) {
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+  }
+  function closeDialog(dialog) {
+    if (typeof dialog.close === "function") dialog.close();
+    else dialog.removeAttribute("open");
+  }
+  function openPolicy(item, previous) {
+    const rule = policyRules[item];
+    const box = itemBox(item);
+    if (!rule || !box || !policyDialog) return;
+    pending = { item, previous };
+    const select = stateSelect(item);
+    policyDialog.querySelector("[data-cs-policy-item]").textContent = `«${box.querySelector("p").textContent.trim()}» queda en «${select.value}».`;
+    const list = policyDialog.querySelector("[data-cs-policy-list]");
+    list.replaceChildren();
+    if (rule.note) {
+      const note = document.createElement("p");
+      note.className = "cs-policy-note";
+      note.textContent = rule.note;
+      list.appendChild(note);
+    }
+    rule.policies.forEach((policy, index) => {
+      const details = document.createElement("details");
+      details.open = index === 0;
+      const summary = document.createElement("summary");
+      summary.textContent = `Política #${policy.id}: ${policy.title}`;
+      const text = document.createElement("p");
+      text.textContent = policy.text || "Sin texto en la tabla de políticas.";
+      details.append(summary, text);
+      list.appendChild(details);
+    });
+    const reason = policyDialog.querySelector("[data-cs-policy-reason]");
+    reason.value = box.querySelector("[data-cs-justification]")?.value || "";
+    policyDialog.querySelector("[data-cs-policy-error]").hidden = true;
+    openDialog(policyDialog);
+    reason.focus();
+  }
+  function undoPolicy() {
+    if (!pending) return;
+    const select = stateSelect(pending.item);
+    if (select) {
+      select.value = pending.previous;
+      select.dataset.prev = pending.previous;
+      syncPolicy(pending.item);
+      select.focus();
+    }
+    pending = null;
+    closeDialog(policyDialog);
+  }
+  if (policyDialog) {
+    policyDialog.addEventListener("click", (event) => {
+      if (event.target.closest("[data-cs-policy-undo]")) undoPolicy();
+      if (!event.target.closest("[data-cs-policy-accept]") || !pending) return;
+      const reason = policyDialog.querySelector("[data-cs-policy-reason]").value.trim();
+      const error = policyDialog.querySelector("[data-cs-policy-error]");
+      if (reason.length < 10) {
+        error.textContent = "Escribe la justificación (mínimo 10 caracteres). Si no hay razón, corrige la selección.";
+        error.hidden = false;
+        return;
+      }
+      const target = itemBox(pending.item)?.querySelector("[data-cs-justification]");
+      if (target) {
+        target.value = reason;
+        target.classList.remove("is-invalid");
+        target.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      pending = null;
+      closeDialog(policyDialog);
+    });
+    // Escape equivale a corregir la selección: no queda un incumplimiento sin haberlo aceptado.
+    policyDialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      undoPolicy();
+    });
+  }
+
+  form.addEventListener("focusin", (event) => {
+    const select = event.target.closest(".cs-check-item select");
+    if (select) select.dataset.prev = select.value;
+  });
+  form.addEventListener("change", (event) => {
+    const select = event.target.closest(".cs-check-item select");
+    if (!select) return;
+    delete select.dataset.csAuto;
+    showSuggestion(select.name, "");
+    syncPolicy(select.name);
+    const rule = policyRules[select.name];
+    if (rule && rule.states.includes(select.value) && select.dataset.prev !== select.value) openPolicy(select.name, select.dataset.prev || "");
+    select.dataset.prev = select.value;
+  });
+  syncPolicies();
 
   // Validación de un paso: requeridos visibles y porcentajes.
   function check(step) {
@@ -190,6 +396,9 @@
     form.querySelectorAll("[data-cs-step]").forEach((step) => (step.hidden = step.dataset.csStep !== String(number)));
     form.querySelectorAll("[data-cs-step-tab]").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.csStepTab === String(number)));
     syncConditions();
+    // Al llegar a la lista de chequeo se sugieren los estados con lo escrito en el paso 1.
+    if (String(number) === "2") applySuggestions();
+    syncPolicies();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   form.querySelector("[data-cs-next]")?.addEventListener("click", () => {
