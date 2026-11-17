@@ -35,6 +35,8 @@ php bin/cct-add-fields.php contratos_arrendamiento propietario_tab correo_2="Cor
   columna `bigint(20)`, como `fin_contrato`) y `repeater` (columna `longtext`, con los subcampos de los repetidores del
   inventario: `descripcion_`, `cantidad_`, `tipo_de_material_`, `estado_` y `observaciones_` + nombre de la columna).
 - Nombre de columna: minúsculas, números y `_`.
+- CCT sin pestañas (por ejemplo `politicas`): usar `-` como pestaña (o `CctFieldInstaller::NO_TAB` en un script); los
+  campos quedan sueltos como los demás. Ejemplo: `bin/add-policy-control-fields.php`.
 - Lo que ya existe se salta: el comando se puede repetir sin efecto. Un campo que ya está en su pestaña no se mueve; uno que está en otra pestaña se mueve al final de
   la indicada (solo cambia el orden de la definición, no la columna ni los datos).
 - Nunca cambia ni borra campos o columnas existentes.

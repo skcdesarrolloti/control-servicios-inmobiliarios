@@ -2219,15 +2219,17 @@
       var shown = catalog.filter(function (item) {
         if (!term) return true;
         if (/^\d+$/.test(idTerm)) return String(item.id) === idTerm;
-        return plain(item.title + " " + item.text).indexOf(term) !== -1;
+        return plain(item.title + " " + (item.code || "") + " " + item.text).indexOf(term) !== -1;
       });
       list.replaceChildren();
       shown.slice(0, 120).forEach(function (item) {
         var details = document.createElement("details");
-        details.className = "cpp-pol" + (/\(\s*prov/i.test(item.title) ? " is-prov" : "");
+        // Versión para proveedores: por la audiencia del Gestor organizacional o, antes de migrar, por el sufijo «(Prov.)».
+        var provider = item.audience === "Proveedores" || /\(\s*prov/i.test(item.title);
+        details.className = "cpp-pol" + (provider ? " is-prov" : "");
         details.open = openId !== undefined ? String(item.id) === String(openId) : shown.length <= 3;
         var summary = document.createElement("summary");
-        summary.textContent = "#" + item.id + " · " + item.title;
+        summary.textContent = "#" + item.id + (item.code ? " · " + item.code : "") + " · " + item.title;
         var text = document.createElement("p");
         text.textContent = item.text || "Sin texto.";
         details.append(summary, text);

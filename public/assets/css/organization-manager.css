@@ -1,0 +1,120 @@
+/*
+ * Gestor organizacional (organization-manager.js). Lo general usa las utilidades !sp- del panel
+ * (tailwind-services.css); aquí solo va lo que esas utilidades no cubren: tablas, insignias, selector múltiple
+ * con búsqueda, acordeones, texto enriquecido de las políticas y los popups.
+ */
+#scm-app .scm-om, #scm-app .scm-om-modal { --om-navy: #061d49; --om-blue: #1e3c76; --om-yellow: #f8cf4a; --om-muted: #5a6a85; --om-line: #e2e8f0; }
+
+#scm-app .scm-om-status { padding: 10px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; background: #eff6ff; color: var(--om-blue); }
+#scm-app .scm-om-status.is-error { background: #fef2f2; color: #991b1b; }
+#scm-app .scm-om-status.is-success { background: #ecfdf5; color: #065f46; }
+#scm-app .scm-om-status.is-warning { background: #fffbeb; color: #92400e; }
+
+/* Tablas */
+#scm-app .scm-om-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#scm-app .scm-om-table th { padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--om-muted); border-bottom: 1px solid var(--om-line); white-space: nowrap; background: #f8fafc; }
+#scm-app .scm-om-table td { padding: 10px 12px; vertical-align: top; border-bottom: 1px solid #f1f5f9; color: var(--om-navy); }
+#scm-app .scm-om-table tr:hover td { background: #f8fafc; }
+#scm-app .scm-om-table td.scm-om-actions { text-align: right; white-space: nowrap; }
+#scm-app .scm-om-title { font-weight: 700; font-size: 13px; }
+#scm-app .scm-om-sub { margin-top: 2px; color: var(--om-muted); font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
+#scm-app .scm-om-pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  #scm-app .scm-om-table thead { display: none; }
+  #scm-app .scm-om-table, #scm-app .scm-om-table tbody, #scm-app .scm-om-table tr, #scm-app .scm-om-table td { display: block; width: 100%; box-sizing: border-box; }
+  #scm-app .scm-om-table tr { border-bottom: 1px solid var(--om-line); padding: 6px 0; }
+  #scm-app .scm-om-table td { border: 0; padding: 4px 12px; }
+  #scm-app .scm-om-table td.scm-om-actions { text-align: left; }
+}
+
+/* Insignias y chips */
+#scm-app .scm-om-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; white-space: nowrap; background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
+#scm-app .scm-om-badge.is-code { background: var(--om-navy); color: #fff; border-color: var(--om-navy); font-family: ui-monospace, Consolas, monospace; }
+#scm-app .scm-om-badge.is-vigente, #scm-app .scm-om-badge.is-activo, #scm-app .scm-om-badge.is-leida { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+#scm-app .scm-om-badge.is-borrador, #scm-app .scm-om-badge.is-pendiente { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+#scm-app .scm-om-badge.is-derogada, #scm-app .scm-om-badge.is-inactivo { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+#scm-app .scm-om-badge.is-proveedores { background: #eef2ff; color: #3730a3; border-color: #c7d2fe; }
+#scm-app .scm-om-badge.is-ambos { background: #ecfeff; color: #155e75; border-color: #a5f3fc; }
+#scm-app .scm-om-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+#scm-app .scm-om-chip { display: inline-block; margin: 0 4px 4px 0; padding: 2px 8px; border-radius: 6px; background: #f2f3ff; color: var(--om-blue); font-size: 10.5px; font-weight: 600; }
+#scm-app .scm-om-rel { display: block; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--om-muted); margin: 2px 0; }
+
+/* Botones de icono y peligro */
+#scm-app .scm-om-icon-btn { display: inline-grid; place-items: center; width: 30px; height: 30px; margin-left: 2px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--om-navy); cursor: pointer; vertical-align: middle; }
+#scm-app .scm-om-icon-btn:hover { background: #f1f5f9; }
+#scm-app .scm-om-icon-btn.is-danger { color: #b91c1c; border-color: #fecaca; }
+#scm-app .scm-om-icon-btn.is-danger:hover { background: #fef2f2; }
+#scm-app .scm-om-icon-btn .material-symbols-outlined, #scm-app .scm-om .material-symbols-outlined, #scm-app .scm-om-modal .material-symbols-outlined { font-size: 18px; line-height: 1; }
+#scm-app .scm-om-btn-danger { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; border: 1px solid #b91c1c; border-radius: 8px; background: #b91c1c; color: #fff; font: 600 12px/1.2 Poppins, sans-serif; cursor: pointer; }
+#scm-app .scm-om-btn-danger:hover { background: #991b1b; }
+#scm-app .scm-om-btn-danger:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Selector múltiple con búsqueda */
+#scm-app .scm-om-ms { position: relative; }
+#scm-app .scm-om-ms-box { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 40px; padding: 4px 8px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; cursor: text; }
+#scm-app .scm-om-ms.is-open .scm-om-ms-box, #scm-app .scm-om-ms-box:focus-within { border-color: var(--om-navy); box-shadow: 0 0 0 2px var(--om-yellow); }
+#scm-app .scm-om-ms-chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 8px; border-radius: 6px; background: var(--om-navy); color: #fff; font-size: 11px; font-weight: 600; }
+#scm-app .scm-om-ms-chip button { border: 0; background: transparent; color: #fff; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+#scm-app .scm-om-ms-input { flex: 1 1 120px; min-width: 90px; border: 0 !important; outline: 0; background: transparent !important; box-shadow: none !important; font: 12px Poppins, sans-serif; color: var(--om-navy); padding: 4px 2px !important; height: auto !important; }
+#scm-app .scm-om-ms-list { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); max-height: 240px; overflow: auto; margin: 0; padding: 4px; list-style: none; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; box-shadow: 0 12px 30px rgba(6, 29, 73, .15); }
+#scm-app .scm-om-ms-list[hidden] { display: none; }
+#scm-app .scm-om-ms-option { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; font-size: 12px; cursor: pointer; color: var(--om-navy); }
+#scm-app .scm-om-ms-option:hover, #scm-app .scm-om-ms-option.is-active { background: #f1f5f9; }
+#scm-app .scm-om-ms-option[aria-selected="true"] { font-weight: 700; }
+#scm-app .scm-om-ms-option[aria-selected="true"]::before { content: "✓"; color: #047857; }
+#scm-app .scm-om-ms-empty { padding: 8px; font-size: 12px; color: var(--om-muted); }
+
+/* Acordeones de Mi gestión */
+#scm-app .scm-om-acc { border: 1px solid var(--om-line); border-radius: 12px; background: #fff; overflow: hidden; }
+#scm-app .scm-om-acc + .scm-om-acc { margin-top: 10px; }
+#scm-app .scm-om-acc > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; cursor: pointer; font-weight: 700; font-size: 13px; list-style: none; color: var(--om-navy); }
+#scm-app .scm-om-acc > summary::-webkit-details-marker { display: none; }
+#scm-app .scm-om-acc > summary::after { content: "expand_more"; font-family: "Material Symbols Outlined"; font-size: 20px; transition: transform .15s; }
+#scm-app .scm-om-acc[open] > summary { border-bottom: 1px solid var(--om-line); background: #f8fafc; }
+#scm-app .scm-om-acc[open] > summary::after { transform: rotate(180deg); }
+#scm-app .scm-om-acc-body { padding: 14px 16px; }
+#scm-app .scm-om-acc .scm-om-acc { border-radius: 10px; }
+#scm-app .scm-om-count { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: #f2f3ff; color: var(--om-blue); font-size: 11px; }
+#scm-app .scm-om-group-title { margin: 12px 0 6px; padding: 4px 8px; border-radius: 6px; background: #eff6ff; color: var(--om-blue); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+#scm-app .scm-om-item { padding: 10px 12px; margin-bottom: 8px; border: 1px solid #f1f5f9; border-left: 3px solid var(--om-blue); border-radius: 8px; background: #fff; }
+#scm-app .scm-om-item h4 { margin: 0 0 4px; font-size: 13px; color: var(--om-navy); }
+
+/* Texto enriquecido de políticas */
+#scm-app .scm-om-rich { font-size: 12.5px; line-height: 1.55; color: #1e293b; overflow-wrap: anywhere; }
+#scm-app .scm-om-rich p { margin: 0 0 8px; }
+#scm-app .scm-om-rich ul, #scm-app .scm-om-rich ol { margin: 0 0 8px; padding-left: 20px; }
+#scm-app .scm-om-rich h2, #scm-app .scm-om-rich h3, #scm-app .scm-om-rich h4 { margin: 10px 0 6px; font-size: 13.5px; color: var(--om-navy); }
+#scm-app .scm-om-rich blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid #cbd5e1; color: #475569; }
+#scm-app .scm-om-rich a { color: var(--om-blue); text-decoration: underline; }
+#scm-app .scm-om-editor .ql-container { min-height: 220px; font: 13px/1.5 Poppins, sans-serif; background: #fff; }
+#scm-app .scm-om-editor .ql-toolbar { background: #f8fafc; border-radius: 8px 8px 0 0; }
+#scm-app .scm-om-editor .ql-container { border-radius: 0 0 8px 8px; }
+
+/* Popups apilados */
+.scm-om-modal-open { overflow: hidden; }
+#scm-app .scm-om-modal { position: fixed; inset: 0; z-index: 99999; display: grid; place-items: center; padding: 16px; }
+#scm-app .scm-om-modal-backdrop { position: absolute; inset: 0; background: rgba(6, 29, 73, .55); backdrop-filter: blur(3px); }
+#scm-app .scm-om-modal-card { position: relative; display: flex; flex-direction: column; width: min(860px, calc(100vw - 24px)); max-height: 92vh; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 18px; background: #f6f8fa; box-shadow: 0 24px 70px rgba(6, 29, 73, .3); font-family: Poppins, sans-serif; color: var(--om-navy); }
+#scm-app .scm-om-modal-card.is-wide { width: min(1180px, calc(100vw - 24px)); }
+#scm-app .scm-om-modal-card.is-narrow { width: min(520px, calc(100vw - 24px)); }
+#scm-app .scm-om-modal-card > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; background: #fff; border-bottom: 1px solid var(--om-line); }
+#scm-app .scm-om-modal-card > header h3 { margin: 0; font-size: 16px; font-weight: 700; }
+#scm-app .scm-om-modal-card > header p { margin: 0; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--om-muted); }
+#scm-app .scm-om-modal-body { overflow: auto; padding: 18px 20px; }
+#scm-app .scm-om-modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 12px 20px; background: #fff; border-top: 1px solid var(--om-line); }
+#scm-app .scm-om-form-error { margin: 0 0 10px; padding: 8px 12px; border-radius: 8px; background: #fef2f2; color: #991b1b; font-size: 12px; font-weight: 600; }
+#scm-app .scm-om-notice { margin: 0 0 12px; padding: 10px 12px; border-radius: 8px; background: #fffbeb; color: #92400e; font-size: 12px; }
+#scm-app .scm-om-pdf { width: 100%; height: 72vh; border: 1px solid var(--om-line); border-radius: 8px; background: #fff; }
+#scm-app .scm-om-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px 14px; margin: 0 0 14px; }
+#scm-app .scm-om-facts dt { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--om-muted); }
+#scm-app .scm-om-facts dd { margin: 0; font-size: 12px; overflow-wrap: anywhere; }
+#scm-app .scm-om-field-label { display: block; margin-bottom: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--om-navy); }
+#scm-app .scm-om-field-label .is-required { color: #b91c1c; }
+#scm-app .scm-om-hint { margin: 4px 0 0; font-size: 11px; color: var(--om-muted); }
+#scm-app .scm-om-history details { border: 1px solid var(--om-line); border-radius: 8px; background: #fff; margin-bottom: 8px; }
+#scm-app .scm-om-history summary { padding: 10px 12px; cursor: pointer; font-size: 12px; }
+#scm-app .scm-om-history details > div { padding: 0 12px 12px; }
+#scm-app .scm-om-transfer-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+#scm-app .scm-om-log { padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+#scm-app .scm-om-log small { display: block; color: var(--om-muted); margin-top: 2px; overflow-wrap: anywhere; }
+#scm-app .scm-om-scroll { max-height: 420px; overflow: auto; border: 1px solid var(--om-line); border-radius: 8px; }

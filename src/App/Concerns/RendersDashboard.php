@@ -221,6 +221,8 @@ trait RendersDashboard
       'scm-panel-funcionario-contratos' => 'scm-panel-funcionario-contratos',
       'casos_juridicos' => 'scm-panel-casos-juridicos',
       'scm-panel-casos-juridicos' => 'scm-panel-casos-juridicos',
+      'gestor_organizacional' => 'scm-panel-gestor-organizacional',
+      'scm-panel-gestor-organizacional' => 'scm-panel-gestor-organizacional',
       'postergados' => 'scm-panel-postergados',
       'scm-panel-postergados' => 'scm-panel-postergados',
       'cerrados' => 'scm-panel-cerrados',
@@ -451,6 +453,7 @@ trait RendersDashboard
       'scm-panel-movimientos-contratos' => 'metricas_contratos',
       'scm-panel-funcionario-contratos' => 'funcionario_contratos',
       'scm-panel-casos-juridicos' => 'casos_juridicos',
+      'scm-panel-gestor-organizacional' => 'gestor_organizacional',
       'scm-panel-herramienta-pse' => 'herramienta_pse',
       'scm-panel-herramienta-mora' => 'herramienta_mora',
       'scm-panel-herramienta-mercado' => 'herramienta_mercado',
@@ -813,6 +816,7 @@ trait RendersDashboard
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/contract-movements.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/contract-movements.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/contract-ownership.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/contract-ownership.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/legal-cases.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/legal-cases.css'))); ?>" media="all">
+    <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/organization-manager.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/organization-manager.css'))); ?>" media="all">
     <link rel="stylesheet" href="<?php echo self::h($assetBaseUrl . 'assets/css/owner-net-income.css?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/css/owner-net-income.css'))); ?>" media="all">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js" defer></script>
@@ -906,6 +910,7 @@ trait RendersDashboard
             if ($panelId === 'scm-panel-credito-propietario') $tabLabel = 'Créditos a propietarios';
             if ($panelId === 'scm-panel-funcionario-contratos') $tabLabel = 'Funcionario de contratos';
             if ($panelId === 'scm-panel-casos-juridicos') $tabLabel = 'Casos jurídicos';
+            if ($panelId === 'scm-panel-gestor-organizacional') $tabLabel = 'Gestor organizacional';
             if ($panelId === 'scm-panel-inicio') $tabLabel = 'Calendario';
           }
           ?>
@@ -1455,6 +1460,12 @@ trait RendersDashboard
         </div>
       <?php endif; ?>
 
+      <?php if (in_array('gestor_organizacional', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-gestor-organizacional' ? ' active' : ''; ?>" id="scm-panel-gestor-organizacional" data-permission-tab="gestor_organizacional" data-scm-loaded="0">
+          <?php echo (new \SCM\Modules\OrganizationManager\OrganizationManagerView())->renderShell(['view' => in_array('org_manager_view', $dashboardAllowedActions, true), 'manage' => in_array('org_manager_manage', $dashboardAllowedActions, true), 'delete' => in_array('org_manager_delete', $dashboardAllowedActions, true), 'transfer' => in_array('org_manager_transfer', $dashboardAllowedActions, true), 'export' => in_array('org_manager_export', $dashboardAllowedActions, true)], Auth::user(), $assetBaseUrl . 'assets/vendor/quill/quill.js', $assetBaseUrl . 'assets/vendor/quill/quill.snow.css'); ?>
+        </div>
+      <?php endif; ?>
+
       <?php if (in_array('metricas_contratos', $dashboardAllowedTabs, true)): ?>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-movimientos-contratos' ? ' active' : ''; ?>" id="scm-panel-movimientos-contratos" data-permission-tab="metricas_contratos" data-scm-loaded="0">
           <?php
@@ -1617,6 +1628,7 @@ trait RendersDashboard
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-cost-benefit-metrics.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-cost-benefit-metrics.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-contract-ownership.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-contract-ownership.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-legal-cases.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-legal-cases.js'))); ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/organization-manager.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/organization-manager.js'))); ?>" defer></script>
     <script src="<?php echo $guideJsUrl; ?>" defer></script>
     <script src="<?php echo $damageJsUrl; ?>" defer></script>
 <?php

@@ -8,7 +8,7 @@ $check = static function (bool $condition, string $message): void {
   if (!$condition) throw new RuntimeException($message);
 };
 
-foreach (['mine', 'team', 'due', 'property_history', 'contracts_ending', 'contract_termination', 'contract_non_renewal', 'contract_owners', 'casos_juridicos'] as $route) {
+foreach (['mine', 'team', 'due', 'property_history', 'contracts_ending', 'contract_termination', 'contract_non_renewal', 'contract_owners', 'casos_juridicos', 'gestor_organizacional'] as $route) {
   $_GET = ['tab' => $route];
   $current_page = '';
   ob_start();
@@ -17,7 +17,7 @@ foreach (['mine', 'team', 'due', 'property_history', 'contracts_ending', 'contra
   $check($current_page === $route, 'Reload selected the wrong header item for ' . $route);
   $keys = array_keys($rawNavItems);
   $check(array_search('contractuales', $keys, true) > array_search('administrativas', $keys, true), 'Contract activities must follow administrative activities.');
-  $check(array_keys($rawNavItems['contractuales']['children']) === ['contratos_arrendamiento', 'contracts_ending', 'contract_termination', 'contract_non_renewal', 'contract_owners', 'casos_juridicos'], 'Contract group must keep its views in order and end with Casos jurídicos.');
+  $check(array_keys($rawNavItems['contractuales']['children']) === ['contratos_arrendamiento', 'contracts_ending', 'contract_termination', 'contract_non_renewal', 'contract_owners', 'casos_juridicos', 'gestor_organizacional'], 'Contract group must keep its views in order: Casos jurídicos and then Gestor organizacional.');
   foreach (array_intersect_key($rawNavItems['contractuales']['children'], array_flip(['contracts_ending', 'contract_termination', 'contract_non_renewal'])) as $key => $item) {
     $check(!isset($rawNavItems['inicio']['children'][$key]), 'Contract view is still in Inicio.');
     $check($item['panel_id'] === 'scm-panel-actividades-contractuales', 'Contract item points to the wrong main panel.');

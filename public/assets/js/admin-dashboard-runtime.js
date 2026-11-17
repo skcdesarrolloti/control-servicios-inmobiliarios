@@ -153,6 +153,10 @@
         owner_credit_manage: "[data-owner-credit-new]",
         owner_credit_configure: "[data-owner-credit-settings]",
         legal_case_config: "[data-legal-case-settings]",
+        org_manager_manage: "[data-om-manage]",
+        org_manager_delete: "[data-om-delete]",
+        org_manager_transfer: "[data-om-transfer]",
+        org_manager_export: "[data-om-export]",
         cleaning_configure: "[data-cleaning-settings]",
         quote_fee_configure: "[data-quote-fee-settings]",
         closing_sheet_policy_configure: "[data-closing-policy-settings]",
@@ -26583,6 +26587,7 @@
         activePanel.id !== "scm-panel-movimientos-contratos" &&
         activePanel.id !== "scm-panel-funcionario-contratos" &&
         activePanel.id !== "scm-panel-casos-juridicos" &&
+        activePanel.id !== "scm-panel-gestor-organizacional" &&
         activePanel.id !== "scm-panel-metricas-casos" &&
         activePanel.id !== "scm-panel-metricas-cotizaciones" &&
         activePanel.id !== "scm-panel-metricas-preventivas" &&
@@ -26653,6 +26658,13 @@
         var legalCasesModule = activePanel.querySelector("[data-scm-legal-cases]");
         if (legalCasesModule) {
           legalCasesModule.dispatchEvent(new CustomEvent("scm:load-legal-cases"));
+        }
+        return Promise.resolve();
+      }
+      if (activePanel.id === "scm-panel-gestor-organizacional") {
+        var orgManagerModule = activePanel.querySelector("[data-scm-org-manager]");
+        if (orgManagerModule) {
+          orgManagerModule.dispatchEvent(new CustomEvent("scm:load-org-manager"));
         }
         return Promise.resolve();
       }

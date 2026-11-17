@@ -41,9 +41,13 @@ final class CctFieldInstaller
   {
   }
 
+  /** Grupo para los campos sin pestaña (CCT sin accordion, como politicas): van al final de los campos sueltos del inicio. */
+  public const NO_TAB = '';
+
   /**
    * Revisa (y con $apply escribe) un CCT.
-   * @param array<string,array<string,array{0:string,1?:string}>> $groups pestaña => [columna => [título, tipo]]
+   * @param array<string,array<string,array{0:string,1?:string}>> $groups pestaña => [columna => [título, tipo]]; la pestaña
+   *        self::NO_TAB ('') deja los campos sin pestaña, como los demás campos de un CCT que no tiene pestañas.
    * @param list<string> $removeTabs pestañas propias que deben quitarse si quedan vacías
    * @return array{lines:list<string>,changed:bool}
    */
@@ -60,11 +64,12 @@ final class CctFieldInstaller
       throw new \RuntimeException("{$slug}: la definición de campos no se pudo leer; no se toca.");
     }
     $tabs = array_column(array_filter($metaFields, static fn($field): bool => ($field['object_type'] ?? '') === 'accordion'), 'name');
-    $missingTabs = array_diff(array_keys($groups), $tabs);
+    $missingTabs = array_diff(array_map('strval', array_keys($groups)), $tabs, [self::NO_TAB]);
     if ($missingTabs !== []) {
       throw new \RuntimeException("{$slug}: no existen las pestañas " . implode(', ', $missingTabs) . '. Pestañas: ' . implode(', ', $tabs));
     }
     $wanted = [];
+    $looseNames = array_flip(array_map('strval', array_keys($groups[self::NO_TAB] ?? [])));
     foreach ($groups as $fields) {
       foreach ($fields as $name => $spec) {
         if (preg_match('/^[a-z][a-z0-9_]{0,63}$/', $name) !== 1) {
@@ -91,7 +96,7 @@ final class CctFieldInstaller
       $usedIds[$id] = true;
       $final[] = [
         'title' => $title, 'name' => $name, 'object_type' => 'field', 'width' => '100%', 'options' => [],
-        'repeater-fields' => $type === 'repeater' ? self::repeaterFields($name) : [], 'type' => self::TYPES[$type][0], 'id' => $id, 'isNested' => true, 'options_source' => 'manual',
+        'repeater-fields' => $type === 'repeater' ? self::repeaterFields($name) : [], 'type' => self::TYPES[$type][0], 'id' => $id, 'isNested' => !isset($looseNames[$name]), 'options_source' => 'manual',
       ] + self::TYPES[$type][2];
     }
     $final = self::organize($final, array_map('array_keys', $groups), $removeTabs);
@@ -101,7 +106,7 @@ final class CctFieldInstaller
       "== {$slug} (definición #{$definition['id']}, " . count($metaFields) . ' campos)',
       '  Definición: ' . ($missingDefinition ? count($missingDefinition) . ' por agregar: ' . implode(', ', array_keys($missingDefinition)) : 'nada que agregar'),
       '  Columnas:   ' . ($missingColumns ? count($missingColumns) . ' por agregar: ' . implode(', ', array_keys($missingColumns)) : 'nada que agregar'),
-      '  Pestañas:   ' . ($reorder ? 'se ordenan en ' . implode(', ', array_keys($groups)) : 'en orden'),
+      '  Pestañas:   ' . ($reorder ? 'se ordenan en ' . implode(', ', array_map(static fn($tab): string => (string) $tab === self::NO_TAB ? '(sin pestaña)' : (string) $tab, array_keys($groups))) : 'en orden'),
     ];
     if (!$apply || (!$reorder && $missingColumns === [])) {
       return ['lines' => $lines, 'changed' => false];
@@ -279,7 +284,8 @@ final class CctFieldInstaller
     }
     $entries = [];
     $rest = [];
-    $tab = null;
+    // Los campos anteriores a la primera pestaña están "sin pestaña" (self::NO_TAB).
+    $tab = self::NO_TAB;
     foreach ($metaFields as $field) {
       $name = (string) ($field['name'] ?? '');
       if (($field['object_type'] ?? '') === 'accordion') {
@@ -292,16 +298,16 @@ final class CctFieldInstaller
       }
     }
     $out = [];
-    $flush = static function (?string $tab) use (&$out, $groups, $entries): void {
+    $flush = static function (string $tab) use (&$out, $groups, $entries): void {
       foreach ($groups[$tab] ?? [] as $name) {
         if (isset($entries[$name])) {
           $entry = $entries[$name];
-          $entry['isNested'] = true;
+          $entry['isNested'] = $tab !== self::NO_TAB;
           $out[] = $entry;
         }
       }
     };
-    $currentTab = null;
+    $currentTab = self::NO_TAB;
     foreach ($rest as $field) {
       if (($field['object_type'] ?? '') === 'accordion') {
         $flush($currentTab);

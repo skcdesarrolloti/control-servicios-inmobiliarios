@@ -186,7 +186,7 @@ final class ClosingSheetPolicies
   /**
    * Políticas de la tabla (todas o las pedidas), con el texto sin HTML.
    * @param list<int>|null $ids
-   * @return array<int,array{id:int,title:string,text:string}>
+   * @return array<int,array{id:int,title:string,text:string,code?:string,audience?:string}> code y audience solo si existen las columnas
    */
   public function policies(?array $ids = null): array
   {
@@ -194,7 +194,9 @@ final class ClosingSheetPolicies
     if (($ids !== null && $ids === []) || !$this->schema->tableExists($table)) {
       return [];
     }
-    $sql = "SELECT `_ID`, `titulo`, `politica` FROM `{$table}`";
+    // Código y audiencia del control documental (Gestor organizacional), si las columnas ya existen.
+    $extra = array_values(array_filter(['codigo', 'audiencia'], fn(string $column): bool => $this->schema->columnExists($table, $column)));
+    $sql = 'SELECT `_ID`, `titulo`, `politica`' . implode('', array_map(static fn(string $column): string => ", `{$column}`", $extra)) . " FROM `{$table}`";
     $params = [];
     if ($ids !== null) {
       $sql .= ' WHERE `_ID` IN (' . implode(',', array_fill(0, count($ids), '?')) . ')';
@@ -204,6 +206,9 @@ final class ClosingSheetPolicies
     foreach ($this->db->getResults($sql . ' ORDER BY `_ID`', $params) as $row) {
       $id = (int) $row['_ID'];
       $out[$id] = ['id' => $id, 'title' => self::clean((string) ($row['titulo'] ?? '')) ?: 'Política #' . $id, 'text' => self::clean((string) ($row['politica'] ?? ''))];
+      foreach ($extra as $column) {
+        $out[$id][$column === 'codigo' ? 'code' : 'audience'] = trim((string) ($row[$column] ?? ''));
+      }
     }
     return $out;
   }

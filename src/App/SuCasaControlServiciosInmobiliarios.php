@@ -35,6 +35,7 @@ final class SuCasaControlServiciosInmobiliarios
   use \SCM\App\Concerns\HandlesAutologinLinks;
   use \SCM\App\Concerns\HandlesContractOwnership;
   use \SCM\App\Concerns\HandlesLegalCases;
+  use \SCM\App\Concerns\HandlesOrganizationManager;
   use \SCM\App\Concerns\HandlesMetricsPanels;
   use \SCM\App\Concerns\RendersPublicPqr;
   use \SCM\App\Concerns\RendersDashboard;
@@ -183,7 +184,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
-  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'owner_credit_accounting', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure', 'quote_reset_dev', 'closing_sheet_respond', 'closing_sheet_policy_configure', 'legal_case_manage', 'legal_case_send', 'legal_case_config', 'legal_case_export'];
+  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'owner_credit_accounting', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure', 'quote_reset_dev', 'closing_sheet_respond', 'closing_sheet_policy_configure', 'legal_case_manage', 'legal_case_send', 'legal_case_config', 'legal_case_export', 'org_manager_view', 'org_manager_manage', 'org_manager_delete', 'org_manager_transfer', 'org_manager_export'];
   /** Herramientas de pruebas: hasta guardar permisos solo las tiene el cargo de desarrollo (Asistente de Desarrollo TI). */
   const DEVELOPER_DEFAULT_ACTIONS = ['quote_reset_dev'];
   const DEVELOPER_CARGOS = ['13'];
@@ -410,6 +411,9 @@ final class SuCasaControlServiciosInmobiliarios
       'herramienta_ingreso_neto' => 'Simulador de ingreso neto del propietario',
     ];
   }
+
+  /** Opción del menú que no se configura por cargo: Mi gestión es de todos (HandlesOrganizationManager). */
+  public const ORG_MANAGER_TAB = 'gestor_organizacional';
 
   /** Vistas que muestran lo que cobra cada funcionario. */
   private const COST_METRIC_TABS = ['metricas_costo_entrega_recibo', 'metricas_costo_beneficio'];
@@ -1067,6 +1071,17 @@ final class SuCasaControlServiciosInmobiliarios
           'legal_case_export' => 'Exportar a PDF casos y comunicaciones',
         ],
       ],
+      // Mi gestión (y la gestión de los cargos propios y a cargo) la tiene todo funcionario, sin permiso.
+      'gestor_organizacional' => [
+        'label' => 'Gestor organizacional',
+        'items' => [
+          'org_manager_view' => 'Gestor organizacional: ver áreas, cargos, políticas, procesos, funciones, compensaciones y funcionarios, la gestión de cualquier cargo, el historial y quién confirmó la lectura de cada política',
+          'org_manager_manage' => 'Gestor organizacional: crear y editar registros y publicar nuevas versiones de políticas',
+          'org_manager_delete' => 'Gestor organizacional: eliminar registros y desactivar funcionarios',
+          'org_manager_transfer' => 'Gestor organizacional: trasladar inmuebles, precaptaciones, retoques y tickets entre funcionarios',
+          'org_manager_export' => 'Gestor organizacional: exportar las políticas a PDF',
+        ],
+      ],
     ];
   }
 
@@ -1416,6 +1431,8 @@ final class SuCasaControlServiciosInmobiliarios
         $selected[$tabKey] = $tabKey;
       }
     }
+    // Gestor organizacional: todo funcionario ve Mi gestión; lo demás depende de los permisos por acción (org_manager_*).
+    $selected[self::ORG_MANAGER_TAB] = self::ORG_MANAGER_TAB;
     // Paneles agrupados (Inicio, Actividades contractuales, Métricas): se habilitan si alguna de sus opciones lo está.
     foreach (self::DERIVED_DASHBOARD_TABS as $derivedTab => $sourceTabs) {
       foreach ($sourceTabs as $sourceTab) {

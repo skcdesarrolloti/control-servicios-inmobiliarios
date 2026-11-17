@@ -10,6 +10,8 @@ require dirname(__DIR__) . '/bootstrap/app.php';
 //   php bin/cct-add-fields.php cierres arrendatario_tab correo_2="Correo 2" fecha_firma:fecha="Fecha de firma"
 //   php bin/cct-add-fields.php cierres arrendatario_tab correo_2="Correo 2" --aplicar
 //
+// En un CCT sin pestañas (por ejemplo politicas) usa "-" como pestaña: los campos quedan sueltos como los demás.
+//
 // Tipos: text (por defecto), textarea, fecha (fecha guardada como timestamp, columna bigint) y repeater (repetidor de
 // inventario con descripcion_, cantidad_, tipo_de_material_, estado_ y observaciones_ + columna; columna longtext).
 
@@ -63,7 +65,7 @@ if ($fields === []) {
 }
 
 try {
-  $result = (new CctFieldInstaller($db, dirname(__DIR__) . '/storage/data/cct-backups'))->run($slug, [$tab => $fields], $apply);
+  $result = (new CctFieldInstaller($db, dirname(__DIR__) . '/storage/data/cct-backups'))->run($slug, [($tab === '-' ? CctFieldInstaller::NO_TAB : $tab) => $fields], $apply);
   echo implode("\n", $result['lines']), "\n";
 } catch (Throwable $error) {
   fwrite(STDERR, $error->getMessage() . "\n");

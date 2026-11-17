@@ -240,7 +240,7 @@ if (empty($current_page) || $current_page === 'tickets') {
     if ($subtabParam === '') $subtabParam = 'contracts-ending';
   }
 
-  $sectionTabPages = ['mine' => 'mine', 'team' => 'team', 'due' => 'due', 'property_history' => 'property_history', 'contracts_ending' => 'contracts_ending', 'contract_termination' => 'contract_termination', 'contract_non_renewal' => 'contract_non_renewal', 'contract_owners' => 'contract_owners', 'casos_juridicos' => 'casos_juridicos'];
+  $sectionTabPages = ['mine' => 'mine', 'team' => 'team', 'due' => 'due', 'property_history' => 'property_history', 'contracts_ending' => 'contracts_ending', 'contract_termination' => 'contract_termination', 'contract_non_renewal' => 'contract_non_renewal', 'contract_owners' => 'contract_owners', 'casos_juridicos' => 'casos_juridicos', 'gestor_organizacional' => 'gestor_organizacional'];
   if (isset($sectionTabPages[$tabParam])) {
     $current_page = $sectionTabPages[$tabParam];
   } elseif (in_array($tabParam, ['abiertos', 'scm-panel-abiertos'], true)) {
@@ -760,6 +760,16 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=casos_juridicos',
         'icon' => 'gavel',
         'perms' => ['casos_juridicos'],
+      ],
+      // Todo funcionario lo ve (Mi gestión); el resto depende de los permisos por acción org_manager_*.
+      'gestor_organizacional' => [
+        'key' => 'gestor_organizacional',
+        'label' => 'Gestor organizacional',
+        'description' => 'Áreas, cargos, políticas y mi gestión',
+        'panel_id' => 'scm-panel-gestor-organizacional',
+        'url' => $baseUrl . '/index.php?tab=gestor_organizacional',
+        'icon' => 'account_tree',
+        'perms' => ['gestor_organizacional'],
       ],
     ],
   ],

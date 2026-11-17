@@ -1,0 +1,22 @@
+/* PDF del Gestor organizacional (políticas y reporte integral de gestión) */
+@page { size: letter; margin: 14mm 13mm; }
+.ord-page { margin: 0; color: #1e293b; font: 10pt/1.45 Arial, Helvetica, sans-serif; }
+.ord-head { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 3px solid #f8cf4a; }
+.ord-head p { margin: 0; font-size: 9pt; font-weight: 700; color: #475569; }
+.ord-head h1 { margin: 2px 0 0; font-size: 16pt; line-height: 1.2; color: #061d49; }
+.ord-group { margin-top: 14px; }
+.ord-group h2 { margin: 0 0 6px; padding: 5px 8px; background: #eff6ff; font-size: 11.5pt; color: #1e3c76; break-after: avoid; page-break-after: avoid; }
+.ord-group h2 small { float: right; font-size: 8.5pt; font-weight: 400; color: #475569; }
+.ord-item { padding: 6px 0 6px 8px; border-left: 2px solid #1e3c76; border-bottom: 1px solid #e2e8f0; margin-bottom: 6px; }
+.ord-item h3 { margin: 0 0 2px; font-size: 10.5pt; color: #061d49; break-after: avoid; page-break-after: avoid; }
+.ord-meta { margin: 2px 0; font-size: 8.5pt; color: #64748b; }
+.ord-label { margin: 6px 0 0; font-size: 7.5pt; font-weight: 700; text-transform: uppercase; color: #64748b; }
+.ord-pre { margin: 2px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ord-text p { margin: 0 0 5px; }
+.ord-text ul, .ord-text ol { margin: 0 0 5px; padding-left: 18px; }
+.ord-text h2, .ord-text h3, .ord-text h4 { margin: 6px 0 3px; font-size: 10pt; background: none; padding: 0; color: #061d49; }
+.ord-text blockquote { margin: 4px 0; padding-left: 8px; border-left: 2px solid #cbd5e1; color: #475569; }
+.ord-text a { color: #1e3c76; }
+.ord-empty { margin: 4px 0; color: #64748b; font-style: italic; }
+.ord-footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #cbd5e1; font-size: 8.5pt; color: #475569; }
+.ord-footer, .ord-head { break-inside: avoid; page-break-inside: avoid; }
