@@ -13,6 +13,7 @@
 .csf-badge.is-good { background: #dcfce7; color: #166534; }
 .csf-badge.is-bad { background: #fee2e2; color: #991b1b; }
 .csf-badge.is-done { background: #e2e8f0; color: #334155; }
+.csf-badge.is-off { background: #ffe4e6; color: #9f1239; }
 
 .csf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px 18px; margin: 0; }
 .csf-item { min-width: 0; }
@@ -67,6 +68,15 @@
 .csf-dialog::backdrop { background: rgba(15, 23, 42, 0.55); }
 .csf-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--rp-line); }
 .csf-dialog iframe { width: 100%; height: calc(100% - 58px); border: 0; }
+/* Sin soporte de <dialog> (Safari anterior a 15.4) la ventana solo se ve abierta y centrada. */
+dialog.csf-dialog:not([open]) { display: none; }
+.csf-desist-dialog { position: fixed; inset: 0; z-index: 60; width: min(560px, calc(100vw - 32px)); height: auto; max-height: 90vh; margin: auto; overflow: auto; background: #fff; }
+.csf-desist-body { display: grid; gap: 8px; padding: 14px 16px 16px; }
+.csf-desist-body .cs-note { margin: 0; }
+.csf-desist-list { margin: 0 0 6px; padding-left: 18px; color: var(--rp-ink); font-size: 13px; line-height: 1.5; }
+.csf-check { display: flex; align-items: flex-start; gap: 8px; margin-top: 4px; font-size: 13px; font-weight: 600; color: var(--rp-ink); }
+.csf-check input { margin-top: 3px; }
+.csf-response.is-off { border-left-color: #e11d48; }
 
 /* Hoja de cierre como documento (hoja-cierre-ver.php). */
 .csf-doc { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: clamp(16px, 3vw, 28px); border-radius: 22px; background: #fff; box-shadow: 0 10px 30px rgba(15, 30, 54, 0.08); }

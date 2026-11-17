@@ -161,6 +161,13 @@ final class LeaseAnnexesService
       throw $error;
     }
 
+    // La hoja de cierre ligada a este contrato queda "Desistida".
+    try {
+      (new \SCM\Modules\ClosingSheets\ClosingSheetDesist($this->db))->sync($contractId);
+    } catch (\Throwable $error) {
+      error_log('[lease_contract_desist_closing] #' . $contractId . ': ' . $error->getMessage());
+    }
+
     $internal = 0;
     $recipients = InternalNotificationRecipients::emailsForAction($this->db, self::DESIST_INTERNAL_ACTION);
     if ($recipients !== []) {

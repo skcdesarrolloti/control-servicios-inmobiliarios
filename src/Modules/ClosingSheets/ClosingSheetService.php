@@ -272,7 +272,8 @@ final class ClosingSheetService
       'ubicacion_llaves' => trim((string) ($study['ubicacion_llaves'] ?? '')),
       'persona_llaves' => trim((string) ($study['persona_llaves'] ?? '')),
       'contacto_llaves' => trim((string) ($study['contacto_llaves'] ?? '')),
-      'id_contrato_arrendamiento' => trim((string) ($study['id_contrato_mandato_arrendamiento'] ?? '')),
+      // Un contrato ya desistido (por ejemplo, tras un cambio de inmueble) no se liga a la hoja nueva.
+      'id_contrato_arrendamiento' => $this->activeContractId(trim((string) ($study['id_contrato_mandato_arrendamiento'] ?? ''))),
       'medio' => trim((string) ($ticket['medio'] ?? '')),
     ];
     foreach (self::SCHEDULES as $column) {
@@ -477,6 +478,9 @@ final class ClosingSheetService
   {
     $context = $this->context($input, $closingId);
     $creating = $context['mode'] === 'crear';
+    if (!$creating && $context['state'] === ClosingSheetWorkflow::DESISTED) {
+      throw new \DomainException('La hoja de cierre #' . $closingId . ' está desistida: no admite cambios.');
+    }
     if ($creating) {
       $context['ids']['id_arrendatario'] = $this->tenantId($context['ids']['id_arrendatario'], (string) ($input['documento_arrendatario'] ?? ''));
     }
@@ -565,6 +569,13 @@ final class ClosingSheetService
       error_log('[closing_sheet_notify] #' . $closingId . ': ' . $error->getMessage());
       return 0;
     }
+  }
+
+  /** El contrato del estudio, salvo que ya esté desistido. */
+  private function activeContractId(string $contractId): string
+  {
+    $contract = $this->row('jet_cct_contratos_arrendamiento', $contractId);
+    return $contract !== [] && strtolower(trim((string) ($contract['estado'] ?? ''))) === 'desistido' ? '' : $contractId;
   }
 
   /** Vista de la hoja en el panel (pide sesión; los avisos llevan el enlace firmado de cada funcionario). */

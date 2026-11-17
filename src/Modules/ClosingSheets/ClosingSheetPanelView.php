@@ -15,7 +15,7 @@ final class ClosingSheetPanelView
   private const TONES = [
     ClosingSheetService::STATUS_NEW => '!sp-bg-amber-100 !sp-text-amber-800', ClosingSheetWorkflow::STATUS_REVIEWED => '!sp-bg-blue-100 !sp-text-blue-800',
     ClosingSheetWorkflow::REJECTED => '!sp-bg-red-100 !sp-text-red-800', ClosingSheetWorkflow::APPROVED => '!sp-bg-emerald-100 !sp-text-emerald-800',
-    'Realizada' => '!sp-bg-slate-200 !sp-text-slate-700',
+    'Realizada' => '!sp-bg-slate-200 !sp-text-slate-700', ClosingSheetWorkflow::DESISTED => '!sp-bg-rose-50 !sp-text-rose-800',
   ];
 
   public static function shell(string $action): string

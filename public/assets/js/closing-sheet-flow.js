@@ -62,6 +62,16 @@
     done.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  // <dialog> con respaldo para Safari anterior a 15.4, que no tiene showModal.
+  function openDialog(dialog) {
+    if (!dialog) return;
+    if (typeof dialog.showModal === "function") dialog.showModal(); else dialog.setAttribute("open", "");
+  }
+  function closeDialog(dialog) {
+    if (!dialog) return;
+    if (typeof dialog.close === "function") dialog.close(); else dialog.removeAttribute("open");
+  }
+
   function submit(form, submitter) {
     var error = validate(form);
     if (error) return showError(form, error);
@@ -77,6 +87,11 @@
       }
       if (!window.confirm("¿Confirmas que la hoja queda " + String(state).toLowerCase() + "? Se avisará a quien la hizo.")) return;
     }
+    // Desistir negocio: la confirmación es una casilla dentro de la misma ventana.
+    var check = form.querySelector("[data-csf-confirm-check]");
+    if (check && !check.checked) {
+      return showError(form, "Marca la confirmación para desistir el negocio.");
+    }
     showError(form, "");
     var buttons = form.querySelectorAll("button[type=submit]");
     buttons.forEach(function (button) { button.disabled = true; });
@@ -90,6 +105,7 @@
         if (draft) draft.markSaved();
         // Dentro de la ventana del panel: avisa para recargar el listado de hojas de cierre.
         if (window.parent !== window) window.parent.postMessage({ type: "scm-closing-sheet-saved" }, window.location.origin);
+        closeDialog(form.closest("dialog"));
         showDone(json.data || {});
       })
       .catch(function (err) {
@@ -146,6 +162,17 @@
   document.addEventListener("click", function (event) {
     if (event.target.closest("[data-csf-print]")) {
       window.print();
+      return;
+    }
+    var desist = document.querySelector("[data-csf-desist-dialog]");
+    if (desist && event.target.closest("[data-csf-desist-open]")) {
+      openDialog(desist);
+      var reason = desist.querySelector("select");
+      if (reason) reason.focus();
+      return;
+    }
+    if (desist && event.target.closest("[data-csf-desist-close]")) {
+      closeDialog(desist);
       return;
     }
     var dialog = document.querySelector("[data-csf-dialog]");

@@ -17,12 +17,12 @@ final class ClosingSheetGate
 {
   /**
    * @param array<string,mixed> $params GET o POST
-   * @return array{actor:array<string,string>|null,access:array{purpose:string,employee_id:string}|null,session:bool,can:array{view:bool,review:bool,respond:bool,edit:bool},error:string}
+   * @return array{actor:array<string,string>|null,access:array{purpose:string,employee_id:string}|null,session:bool,can:array{view:bool,review:bool,respond:bool,edit:bool,desist:bool},error:string}
    */
   public static function resolve(Database $db, array $params, int $closingId): array
   {
     $workflow = new ClosingSheetWorkflow($db);
-    $out = ['actor' => null, 'access' => null, 'session' => false, 'can' => ['view' => false, 'review' => false, 'respond' => false, 'edit' => false], 'error' => ''];
+    $out = ['actor' => null, 'access' => null, 'session' => false, 'can' => ['view' => false, 'review' => false, 'respond' => false, 'edit' => false, 'desist' => false], 'error' => ''];
     $access = ClosingSheetAccess::verify($params, $closingId);
     if ($access !== null) {
       try {
@@ -44,6 +44,8 @@ final class ClosingSheetGate
       $out['can']['review'] = $out['can']['review'] || $app->canUseClosingSheetAction('closing_sheet_review');
       $out['can']['respond'] = $out['can']['respond'] || $app->canUseClosingSheetAction('closing_sheet_respond');
       $out['can']['edit'] = $app->canUseClosingSheetAction('closing_sheet_edit');
+      // Desistir solo con sesión del panel (los enlaces firmados son para revisar o responder).
+      $out['can']['desist'] = $app->canUseClosingSheetAction('closing_sheet_desist');
       if ($out['actor'] === null) {
         try {
           $out['actor'] = $workflow->actorByUser(Auth::userId());

@@ -11,12 +11,14 @@ Reemplaza los formularios JetForm "Añadir hoja de cierre de negocio", "Editar h
 | Aprobada / No aprobada | Se respondió (`hoja-cierre-ver.php`), con observación obligatoria si no se aprueba. | Notificaciones internas › **Hoja de cierre respondida** y quien hizo la hoja. |
 | Esperando respuesta (otra vez) | Se editó una hoja ya respondida (aprobada o no aprobada). Hay que aprobarla de nuevo; la revisión de servicios se conserva. | **Hoja de cierre por responder**. |
 | Realizada | Se creó el contrato desde "No asignado". | (sin cambios) |
+| Desistida | Se desistió el negocio desde la hoja, o el contrato o el estudio ya estaban desistidos (ver **Negocio desistido**). | Notificaciones internas › **Negocio desistido** y quien hizo la hoja (solo al desistir desde la hoja). |
 
 - La revisión se puede repetir mientras la hoja no esté aprobada.
 - La respuesta se puede cambiar mientras esté "No aprobada".
 - Editar una hoja que todavía no tiene revisión ("En verificacion de servicios") o que ya está "Esperando respuesta" no cambia su estado.
 - Una hoja aprobada no admite otra revisión ni otra respuesta. Si se edita, vuelve a "Esperando respuesta" y hay que aprobarla de nuevo (el formulario lo advierte antes de guardar).
 - Una hoja "Realizada" (ya tiene contrato) no muestra **Editar hoja**.
+- Una hoja "Desistida" no se puede editar, revisar, aprobar ni desistir otra vez (también lo bloquea el servidor).
 
 ## Enlaces sin iniciar sesión
 
@@ -80,6 +82,44 @@ No genera actas PDF, igual que el formulario anterior. El propietario recibe el 
 - El mandato: `estado_hoja_cierre`.
 - El historial del inmueble.
 
+## Negocio desistido
+
+`ClosingSheetDesist`. La hoja queda **Desistida** (opción agregada al glosario 1022 "Estado hoja de cierre", que usan
+`estado` de `cierres` y `estado_hoja_cierre` del mandato), con `razon_desistido`, `fecha_desistido` y `desistido_por`
+(columnas de la pestaña Administración, creadas con `bin/add-closing-sheet-desist.php`). En el listado tiene su pestaña.
+
+**Desistir desde la hoja.** Botón **Desistir negocio** en `hoja-cierre-ver.php`, en los estados En verificación, Esperando
+respuesta, No aprobada y Aprobada. Abre una ventana con el motivo (glosario 1463 "Razón de desistir"), una observación
+opcional y una casilla de confirmación. Replica el JetForm de WordPress "Desistir negocio" (`?id_estudio=`):
+
+| Qué | Cambio |
+| --- | --- |
+| Contrato "No asignado" (`id_contrato_arrendamiento` de la hoja o `id_contrato_mandato_arrendamiento` del estudio) | `estado = Desistido`, `razon_desistido`; historial del contrato |
+| Inmueble (meta `estado` del post y CCT `inmuebles`) | `En borrador` |
+| Estudio de aseguradora | `estado = Aprobado`, `estado_contrato = Desistido` y `razon_desistido`. Con *Cambio de inmueble*: `estado = Esperando respuesta` y `estado_contrato` vacío |
+| Caso de entrega (`id_ticket_entrega` del estudio) | `estado = Cerrado`, `estado_administrativo = Desistido` (lo hace el formulario), `fecha_actualizacion`; historial del caso |
+| Hoja y mandato | `Desistida`; el mandato solo si esa es su hoja actual (`id_hoja_cierre`) |
+| Historial del inmueble | motivo y observación |
+
+En lugar de los correos fijos del formulario se avisa por correo a Notificaciones internas › **Negocio desistido**
+(`negocio_desistido`) y a quien hizo la hoja, con su enlace a la hoja y a la ficha del inmueble.
+
+- Una hoja "Realizada" o cuyo contrato ya tiene número se desiste en Contratos de arrendamiento con **Marcar desistido**.
+- Permiso *Desistir negocio desde la hoja de cierre* (`closing_sheet_desist`), grupo Contratos de arrendamiento: todos los
+  cargos hasta que se guarden los permisos. Solo con sesión del panel; los enlaces firmados no lo permiten.
+
+**Desistidos por fuera de la hoja.** El formulario de WordPress y **Marcar desistido** no tocan la hoja. `sync()` la pasa a
+"Desistida" (`desistido_por` = "Automático: contrato desistido" o "Automático: estudio desistido", con el motivo del
+contrato o del estudio):
+
+- si la hoja tiene contrato, cuando el contrato está `Desistido`, aunque la hoja esté "Realizada" (contrato creado y
+  luego desistido);
+- si no tiene contrato, cuando el estudio tiene `estado_contrato = Desistido`. Con contrato manda el contrato: un estudio
+  puede decir "Desistido" con el contrato entregado.
+
+Corre al abrir el listado, al abrir la hoja y al marcar un contrato desistido en Contratos. Una hoja nueva no se liga a un
+contrato del estudio que ya esté desistido (por ejemplo, después de un cambio de inmueble).
+
 ## Avisos
 
 Salen siempre por correo y por WhatsApp, a quien tenga correo o celular:
@@ -94,6 +134,7 @@ Permisos nuevos, en el grupo Contratos de arrendamiento:
 
 - *Hacer la revisión de servicios públicos antes de la ocupación*: todos los cargos.
 - *Aprobar o no aprobar hojas de cierre*: solo cargos administradores por defecto.
+- *Desistir negocio desde la hoja de cierre*: todos los cargos.
 
 Las columnas `observacion_respuesta` e `id_revision_servicios_publicos` de `cierres` se crearon con `bin/cct-add-fields.php`.
 

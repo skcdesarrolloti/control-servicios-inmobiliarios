@@ -15,7 +15,7 @@ final class ClosingSheetFlowView
 {
   private const STATE_TONES = [
     ClosingSheetService::STATUS_NEW => 'warn', ClosingSheetWorkflow::STATUS_REVIEWED => 'info',
-    ClosingSheetWorkflow::APPROVED => 'good', ClosingSheetWorkflow::REJECTED => 'bad', 'Realizada' => 'done',
+    ClosingSheetWorkflow::APPROVED => 'good', ClosingSheetWorkflow::REJECTED => 'bad', 'Realizada' => 'done', ClosingSheetWorkflow::DESISTED => 'off',
   ];
 
   /**
@@ -130,14 +130,18 @@ final class ClosingSheetFlowView
     if ($can['review'] && ClosingSheetWorkflow::canReview($closing)) {
       $actions .= '<a class="cs-primary" href="' . self::e($links['review']) . '"><span class="material-symbols-outlined" aria-hidden="true">fact_check</span> ' . ($sheet['review'] !== null ? 'Repetir revisión de servicios' : 'Hacer revisión de servicios') . '</a>';
     }
-    // Editar una hoja aprobada la devuelve a "Esperando respuesta"; una realizada ya tiene contrato.
-    if ($can['edit'] && $state !== 'Realizada') {
+    // Editar una hoja aprobada la devuelve a "Esperando respuesta"; una realizada ya tiene contrato y una desistida no cambia.
+    if ($can['edit'] && !in_array($state, ['Realizada', ClosingSheetWorkflow::DESISTED], true)) {
       $actions .= '<a class="cs-secondary" href="' . self::e($links['edit']) . '"><span class="material-symbols-outlined" aria-hidden="true">edit</span> Editar hoja</a>';
     }
     // El formulario para responder va al final, después de leer la hoja; arriba solo un atajo hasta él.
     $respond = $can['respond'] && ClosingSheetWorkflow::canRespond($closing);
     if ($respond) {
       $actions = '<a class="cs-primary" href="#responder"><span class="material-symbols-outlined" aria-hidden="true">rate_review</span> Ir a responder</a>' . $actions;
+    }
+    $desist = !empty($can['desist']) && ClosingSheetDesist::canDesist($closing) && !empty($sheet['desist_reasons']);
+    if ($desist) {
+      $actions .= '<button type="button" class="cs-secondary csf-desist-open" data-csf-desist-open><span class="material-symbols-outlined" aria-hidden="true">block</span> Desistir negocio</button>';
     }
     $actions .= '<button type="button" class="cs-secondary" data-csf-print><span class="material-symbols-outlined" aria-hidden="true">print</span> Imprimir</button>';
 
@@ -153,6 +157,7 @@ final class ClosingSheetFlowView
       $summary[] = [$label, self::amount(is_array($value) ? '' : (string) $value, $money)];
     }
     $doc = self::docHeader($closing, $sheet['company'], $logo)
+      . self::desistBlock($closing)
       . self::responseBlock($closing)
       . self::keyValues('Resumen del negocio', $summary, 'csf-summary')
       . self::keyValues('Datos del estudio y entrega', [
@@ -173,6 +178,7 @@ final class ClosingSheetFlowView
     }
     $doc .= self::reviewBlock($sheet) . self::checklistBlock($values, $sheet['documents'] ?? [], $sheet['owners']) . self::signatures($sheet['signers']) . self::docFooter($sheet['company']);
     return $html . '<article class="csf-doc">' . $doc . '</article>' . ($respond ? self::responseForm($hidden, $state) : '')
+      . ($desist ? self::desistDialog($hidden, $sheet['desist_reasons']) : '')
       . '<dialog class="csf-dialog" data-csf-dialog><header><strong>Revisión de servicios públicos</strong><button type="button" class="cs-secondary" data-csf-dialog-close>Cerrar</button></header><iframe title="Revisión de servicios públicos" referrerpolicy="no-referrer"></iframe></dialog>'
       . ClosingSheetDocumentsView::dialogs() . self::done();
   }
@@ -276,6 +282,55 @@ final class ClosingSheetFlowView
       . '<p class="cs-error" data-csf-error role="alert" hidden></p>'
       . '<div class="cs-actions"><button type="submit" name="estado" value="' . self::e(ClosingSheetWorkflow::REJECTED) . '" class="cs-secondary csf-reject"><span class="material-symbols-outlined" aria-hidden="true">block</span> No aprobar</button>'
       . '<button type="submit" name="estado" value="' . self::e(ClosingSheetWorkflow::APPROVED) . '" class="cs-primary csf-approve"><span class="material-symbols-outlined" aria-hidden="true">verified</span> Aprobar</button></div></form>';
+  }
+
+  /** Negocio desistido: motivo, fecha y quién (o si se marcó sola porque el contrato o el estudio ya estaban desistidos). */
+  private static function desistBlock(array $closing): string
+  {
+    if (ClosingSheetWorkflow::state($closing) !== ClosingSheetWorkflow::DESISTED) {
+      return '';
+    }
+    $reason = trim((string) ($closing['razon_desistido'] ?? ''));
+    $who = trim((string) ($closing['desistido_por'] ?? ''));
+    $date = (int) ($closing['fecha_desistido'] ?? 0);
+    $auto = str_starts_with($who, 'Automático');
+    return '<section class="cs-section csf-response is-off"><h2>Negocio desistido</h2>'
+      . '<p><strong>' . self::e(ClosingSheetWorkflow::DESISTED) . '</strong>'
+      . ($auto ? ' porque ' . ($who === ClosingSheetDesist::AUTO_BY_STUDY ? 'el estudio de aseguradora' : 'el contrato de arrendamiento') . ' ya estaba desistido' : ($who !== '' ? ' por ' . self::e($who) : ''))
+      . ($date > 0 && !$auto ? ' el ' . self::e(self::date($date)) : '') . '.</p>'
+      . ($reason !== '' ? '<p class="csf-quote">Motivo: ' . nl2br(self::e($reason)) . '</p>' : '')
+      . '<p class="cs-note">Ya no se puede editar, revisar ni aprobar.</p></section>';
+  }
+
+  /**
+   * Ventana para desistir el negocio (replica el formulario "Desistir negocio" de WordPress).
+   * @param array<string,string> $hidden @param list<string> $reasons
+   */
+  private static function desistDialog(array $hidden, array $reasons): string
+  {
+    $options = '<option value="">Elige el motivo</option>';
+    foreach ($reasons as $reason) {
+      $options .= '<option value="' . self::e($reason) . '">' . self::e($reason) . '</option>';
+    }
+    return '<dialog class="csf-dialog csf-desist-dialog" data-csf-desist-dialog aria-labelledby="csf_desist_title">'
+      . '<form class="csf-desist" data-csf-form method="post" novalidate>'
+      . '<header><strong id="csf_desist_title">Desistir negocio</strong><button type="button" class="cs-secondary" data-csf-desist-close>Cerrar</button></header>'
+      . '<div class="csf-desist-body">' . self::hidden($hidden + ['accion' => 'desistir'])
+      . '<p class="cs-note">Al confirmar:</p><ul class="csf-desist-list">'
+      . '<li>el contrato "No asignado" del estudio queda <b>Desistido</b>;</li>'
+      . '<li>el inmueble vuelve a <b>En borrador</b> para revisarlo y publicarlo de nuevo;</li>'
+      . '<li>el estudio de aseguradora queda <b>Aprobado</b> con el contrato desistido (si es <b>' . self::e(ClosingSheetDesist::CHANGE_PROPERTY) . '</b>, vuelve a <b>Esperando respuesta</b>);</li>'
+      . '<li>el caso de entrega se cierra como <b>Desistido</b>;</li>'
+      . '<li>la hoja queda <b>' . self::e(ClosingSheetWorkflow::DESISTED) . '</b> y se avisa a Notificaciones internas › Negocio desistido.</li></ul>'
+      . '<label class="cs-label" for="csf_razon_desistido">Motivo <span class="cs-req" aria-hidden="true">*</span></label>'
+      . '<select class="cs-input" id="csf_razon_desistido" name="razon_desistido" data-csf-required required>' . $options . '</select>'
+      . '<label class="cs-label" for="csf_observacion_desistido">Observación <span class="cs-help">(opcional; va en el historial y en el aviso)</span></label>'
+      . '<textarea class="cs-input" id="csf_observacion_desistido" name="observacion" rows="3" maxlength="2000"></textarea>'
+      . '<label class="csf-check"><input type="checkbox" name="confirmar" value="1" data-csf-confirm-check> Confirmo que el negocio se desistió. No se puede deshacer desde el panel.</label>'
+      . '<p class="cs-error" data-csf-error role="alert" hidden></p>'
+      . '<div class="cs-actions"><button type="button" class="cs-secondary" data-csf-desist-close>Cancelar</button>'
+      . '<button type="submit" class="cs-primary csf-reject"><span class="material-symbols-outlined" aria-hidden="true">block</span> Desistir negocio</button></div>'
+      . '</div></form></dialog>';
   }
 
   private static function reviewBlock(array $sheet): string

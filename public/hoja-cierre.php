@@ -69,6 +69,10 @@ try {
   http_response_code(404);
   exit($error->getMessage());
 }
+if ($closingId > 0 && $context['state'] === \SCM\Modules\ClosingSheets\ClosingSheetWorkflow::DESISTED) {
+  http_response_code(409);
+  exit('La hoja de cierre #' . $closingId . ' está desistida: no admite cambios.');
+}
 
 $baseUrl = rtrim((string) SCM_BASE_URL, '/');
 $tenants = new ClosingSheetTenants($db);

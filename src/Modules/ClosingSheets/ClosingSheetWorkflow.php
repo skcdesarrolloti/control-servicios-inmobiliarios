@@ -34,6 +34,8 @@ final class ClosingSheetWorkflow
   public const STATUS_REVIEWED = 'Esperando respuesta';
   public const APPROVED = 'Aprobada';
   public const REJECTED = 'No aprobada';
+  /** Negocio desistido (desde la hoja, por el formulario de WordPress o con el contrato desistido): no admite cambios. */
+  public const DESISTED = 'Desistida';
   /** Estados en los que se puede hacer (o repetir) la revisión de servicios. */
   public const REVIEW_STATES = [ClosingSheetService::STATUS_NEW, self::STATUS_REVIEWED, self::REJECTED];
   /** Estados en los que se puede aprobar o no aprobar. */
@@ -42,7 +44,7 @@ final class ClosingSheetWorkflow
   public const RESUBMIT_STATES = [self::APPROVED, self::REJECTED];
 
   /** Pestañas del listado (hojas-cierre.php). */
-  public const LIST_STATES = [ClosingSheetService::STATUS_NEW, self::STATUS_REVIEWED, self::REJECTED, self::APPROVED, 'Realizada'];
+  public const LIST_STATES = [ClosingSheetService::STATUS_NEW, self::STATUS_REVIEWED, self::REJECTED, self::APPROVED, 'Realizada', self::DESISTED];
 
   public const ACTION_TO_RESPOND = 'hoja_cierre_por_responder';
   public const ACTION_RESPONDED = 'hoja_cierre_respondida';

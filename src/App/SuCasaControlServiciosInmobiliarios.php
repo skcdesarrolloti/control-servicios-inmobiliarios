@@ -591,6 +591,11 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Cuando se crea un contrato desde un registro "No asignado". Incluye el acta de notificación de ingreso y la carta a la copropiedad si aplica.',
             'channel' => 'Email interno en cola',
           ],
+          'negocio_desistido' => [
+            'label' => 'Negocio desistido (hoja de cierre)',
+            'description' => 'Cuando se desiste el negocio desde la hoja de cierre: el contrato No asignado queda desistido y el inmueble vuelve a En borrador para revisarlo y publicarlo. Quien hizo la hoja siempre recibe el aviso. Reemplaza los correos fijos del formulario de WordPress "Desistir negocio".',
+            'channel' => 'Email interno en cola',
+          ],
           'contrato_desistido' => [
             'label' => 'Contrato de arrendamiento desistido',
             'description' => 'Cuando se marca un contrato como desistido desde Contratos de arrendamiento, con el motivo y la observación.',
@@ -781,7 +786,7 @@ final class SuCasaControlServiciosInmobiliarios
       $selected = [];
       foreach ((array) $ids as $id) {
         $idKey = trim((string) ((int) $id));
-        $allowed = in_array($actionKey, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_recibo_manual','contrato_no_salida','nuevo_caso_panel','hoja_cierre_creada','hoja_cierre_por_responder','hoja_cierre_respondida'], true) ? $allActiveIds : $validFuncionarioIds;
+        $allowed = in_array($actionKey, ['servicios_publicos_critico','servicios_publicos_pago_reportado','servicios_publicos_critico_calendario','contrato_recibo_automatico','contrato_recibo_manual','contrato_no_salida','nuevo_caso_panel','hoja_cierre_creada','hoja_cierre_por_responder','hoja_cierre_respondida','negocio_desistido'], true) ? $allActiveIds : $validFuncionarioIds;
         if ($idKey !== '' && $idKey !== '0' && isset($allowed[$idKey])) {
           $selected[$idKey] = $idKey;
         }
@@ -1049,6 +1054,7 @@ final class SuCasaControlServiciosInmobiliarios
           'closing_sheet_edit' => 'Editar hoja de cierre de negocio',
           'closing_sheet_review' => 'Hacer la revisión de servicios públicos antes de la ocupación (hoja de cierre)',
           'closing_sheet_respond' => 'Aprobar o no aprobar hojas de cierre',
+          'closing_sheet_desist' => 'Desistir negocio desde la hoja de cierre (contrato No asignado, estudio, inmueble y caso de entrega)',
         ],
       ],
       'casos_juridicos' => [

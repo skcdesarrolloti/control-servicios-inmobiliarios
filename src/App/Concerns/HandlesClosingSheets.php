@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SCM\App\Concerns;
 
 use SCM\Core\Auth;
+use SCM\Modules\ClosingSheets\ClosingSheetDesist;
 use SCM\Modules\ClosingSheets\ClosingSheetDocuments;
 use SCM\Modules\ClosingSheets\ClosingSheetDocumentsView;
 use SCM\Modules\ClosingSheets\ClosingSheetFlowView;
@@ -166,6 +167,12 @@ trait HandlesClosingSheets
     $state = (string) wp_unslash((string) ($_POST['estado'] ?? ''));
     $query = mb_substr(trim(strip_tags(wp_unslash((string) ($_POST['q'] ?? '')))), 0, 120, 'UTF-8');
     try {
+      // Negocios desistidos por fuera de la hoja (formulario de WordPress o Contratos): la hoja queda "Desistida".
+      try {
+        (new ClosingSheetDesist($this->db))->sync();
+      } catch (\Throwable $error) {
+        error_log('[closing_sheet_desist_sync] ' . $error->getMessage());
+      }
       $workflow = new ClosingSheetWorkflow($this->db);
       if (!in_array($state, ClosingSheetWorkflow::LIST_STATES, true)) {
         // Al abrir: el primer estado con hojas pendientes (por responder, por revisar, no aprobadas).
