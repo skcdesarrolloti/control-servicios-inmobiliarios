@@ -322,7 +322,10 @@
         const item = slot.dataset.cdItem;
         const all = root.querySelectorAll(`[data-cd-slot][data-cd-item="${CSS.escape(item)}"]`);
         const empty = Array.from(all).every((node) => !node.querySelector("[data-cd-doc]"));
-        const warn = stateOf(slot) === "cumple" && empty && !slot.closest("[hidden]");
+        // Un obligatorio con su "por qué no se adjunta ahora" ya escrito no se vuelve a pedir al guardar.
+        const reason = slot.closest(".cs-check-item")?.querySelector("[data-cs-file-reason]");
+        const explained = !!reason && reason.value.trim().length >= 10;
+        const warn = stateOf(slot) === "cumple" && empty && !explained && !slot.closest("[hidden]");
         slot.querySelector("[data-cd-warn]").hidden = !warn;
         if (warn && !seen.has(item)) {
           seen.add(item);
@@ -336,6 +339,8 @@
       const list = missing();
       if (pending && !pending.hidden && !list.length) pending.hidden = true;
       refreshActors();
+      // La hoja recalcula los archivos obligatorios (closing-sheet.js).
+      if (form) form.dispatchEvent(new CustomEvent("cd:documents-change"));
     }
     if (!form) return;
     form.addEventListener("change", (event) => {

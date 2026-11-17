@@ -365,7 +365,8 @@ final class ClosingSheetService
     }
     // Excepciones a políticas de la lista de chequeo, con su justificación.
     $values['__exceptions'] = ClosingSheetPolicies::decode((string) ($closing[ClosingSheetPolicies::COLUMN] ?? ''));
-    $values['__justifications'] = array_column($values['__exceptions'], 'justification', 'item');
+    $values['__justifications'] = array_column(array_filter($values['__exceptions'], static fn(array $e): bool => ($e['kind'] ?? ClosingSheetPolicies::KIND_POLICY) === ClosingSheetPolicies::KIND_POLICY), 'justification', 'item');
+    $values['__file_justifications'] = array_column(array_filter($values['__exceptions'], static fn(array $e): bool => ($e['kind'] ?? '') === ClosingSheetPolicies::KIND_FILE), 'justification', 'item');
     return $values;
   }
 
@@ -601,6 +602,19 @@ final class ClosingSheetService
     }
   }
 
+  /** Ítems de la lista que ya tienen algún archivo (al crear, los subidos al mandato). @param array<string,mixed> $context @return list<string> */
+  private function itemsWithFiles(array $context, bool $creating): array
+  {
+    try {
+      $documents = new ClosingSheetDocuments($this->db);
+      $rows = $creating ? $documents->pending((int) ($context['ids']['id_contrato'] ?? 0)) : $documents->forClosing((int) ($context['closing_id'] ?? 0));
+    } catch (\Throwable $error) {
+      error_log('[closing_sheet_files] ' . $error->getMessage());
+      return [];
+    }
+    return array_values(array_unique(array_map(static fn(array $row): string => (string) ($row['item'] ?? ''), $rows)));
+  }
+
   /** El contrato del estudio, salvo que ya esté desistido. */
   private function activeContractId(string $contractId): string
   {
@@ -708,11 +722,14 @@ final class ClosingSheetService
         ? (string) ($saved[$notesColumn] ?? '')
         : self::checklistNotes(array_column($items, 2), $notes);
     }
-    // Ítems que incumplen una política: exigen justificación (quién y cuándo se completan al guardar).
-    [$values['__exceptions'], $policyErrors] = (new ClosingSheetPolicies($this->db))->collect(
-      $values, is_array($input['justificacion'] ?? null) ? $input['justificacion'] : [], $saved, $creating ? [] : (array) ($saved['__exceptions'] ?? []), '', time()
-    );
-    $errors = array_merge($errors, $policyErrors);
+    // Ítems que incumplen una política y archivos obligatorios que faltan: exigen justificación (quién se completa al guardar).
+    $policies = new ClosingSheetPolicies($this->db);
+    $savedEntries = $creating ? [] : (array) ($saved['__exceptions'] ?? []);
+    [$policyEntries, $policyErrors] = $policies->collect($values, is_array($input['justificacion'] ?? null) ? $input['justificacion'] : [], $saved, $savedEntries, '', time());
+    [$fileEntries, $fileErrors] = $policies->collectFiles($values, is_array($input['justificacion_archivo'] ?? null) ? $input['justificacion_archivo'] : [],
+      $this->itemsWithFiles($context, $creating), $saved, $savedEntries, '', time());
+    $values['__exceptions'] = array_merge($policyEntries, $fileEntries);
+    $errors = array_merge($errors, $policyErrors, $fileErrors);
     try {
       $values['__percents'] = self::percents($context['owners'], is_array($input['porcentaje'] ?? null) ? $input['porcentaje'] : []);
     } catch (\InvalidArgumentException $error) {

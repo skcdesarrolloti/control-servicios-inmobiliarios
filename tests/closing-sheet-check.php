@@ -85,7 +85,7 @@ $table('wp_jet_cct_estudios_aseguradoras', array_merge($cct, ['id_ticket', 'num_
 $table('wp_jet_cct_tickets', array_merge($cct, ['estado', 'estado_comercial', 'estado_administrativo', 'medio']));
 $table('wp_jet_cct_historial_del_inmueble', array_merge($cct, ['id_inmueble', 'id_inmueble_data', 'fecha', 'funcionario', 'id_empleado', 'tipo_reporte', 'observacion']));
 $table('wp_jet_cct_historial_del_ticket', array_merge($cct, ['id_ticket', 'id_empleado', 'nombre', 'correo', 'fecha', 'id_hoja_cierre', 'fue_editada', 'respuesta']));
-$pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema(_ID INTEGER PRIMARY KEY, funcion TEXT, valor TEXT)');
+$pdo->exec('CREATE TABLE wp_jet_cct_confi_sistema(_ID INTEGER PRIMARY KEY, funcion TEXT, valor TEXT, cct_status TEXT, cct_author_id TEXT, cct_created TEXT, cct_modified TEXT, departamento TEXT)');
 $pdo->exec('CREATE TABLE wp_posts(ID INTEGER PRIMARY KEY, post_type TEXT)');
 $pdo->exec('CREATE TABLE wp_postmeta(meta_id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, meta_key TEXT, meta_value TEXT)');
 $pdo->exec('CREATE TABLE wp_jet_post_types(id INTEGER PRIMARY KEY, status TEXT, meta_fields TEXT)');
@@ -121,6 +121,8 @@ $db->insert('wp_postmeta', ['post_id' => 151187, 'meta_key' => 'luz', 'meta_valu
 $service = new ClosingSheetService($db);
 $query = ['id_contrato' => '636', 'id_arrendatario' => '764', 'id_estudio_aseguradora' => '629', 'id_propietario' => '1970'];
 $sender = ['employee_id' => '1508', 'name' => 'Kellys Roqueme', 'email' => 'kellys@example.invalid', 'branch' => '1'];
+// El flujo general corre sin archivos obligatorios; se prueban aparte, al final de las políticas.
+(new \SCM\Modules\ClosingSheets\ClosingSheetPolicies($db))->saveFiles([]);
 
 // Precarga: ids que faltan en el enlace salen del mandato; datos del mandato, inmueble, copropiedad, estudio y ticket.
 $context = $service->context($query);
@@ -246,6 +248,21 @@ $service->save(['estado_amparo_integral' => 'No cumple'] + $editInput, $sender, 
 $legacyBreach = (new \SCM\Modules\ClosingSheets\ClosingSheetPolicies($db))->exceptions($db->getRow('SELECT * FROM wp_jet_cct_cierres WHERE _ID = ?', [$result['id']]));
 $check(count($legacyBreach) === 1 && $legacyBreach[0]['justification'] === '', 'an older breach does not block the edit and is shown without justification');
 $db->update('wp_jet_cct_cierres', ['estado_amparo_integral' => 'Cumple'], ['_ID' => $result['id']]);
+// Archivos obligatorios: un documento en «Cumple» sin archivo pide decir por qué; la excepción se ve mientras falte.
+$policies = new \SCM\Modules\ClosingSheets\ClosingSheetPolicies($db);
+$check($policies->saveFiles(['estado_documento_arre', 'no_existe', 'estado_amparo_integral']) === ['estado_documento_arre'] && $policies->requiredFiles() === ['estado_documento_arre'], 'only document items can be marked as required files');
+$service->save(['estado_documento_arre' => 'No aplica'] + $editInput, $sender, $result['id']);
+$message = $fails(fn() => $service->save(['estado_documento_arre' => 'Cumple'] + $editInput, $sender, $result['id']), 'archivo es obligatorio');
+$check(str_contains($message, 'archivo es obligatorio'), 'a required document in «Cumple» without a file needs a reason');
+$service->save(['estado_documento_arre' => 'Cumple', 'justificacion_archivo' => ['estado_documento_arre' => 'El arrendatario la envía el lunes.']] + $editInput, $sender, $result['id']);
+$row = $db->getRow('SELECT * FROM wp_jet_cct_cierres WHERE _ID = ?', [$result['id']]);
+$fileEntry = \SCM\Modules\ClosingSheets\ClosingSheetPolicies::decode((string) $row['excepciones_politicas']);
+$check(count($fileEntry) === 1 && $fileEntry[0]['kind'] === 'archivo' && $fileEntry[0]['justification'] === 'El arrendatario la envía el lunes.', 'the missing-file reason is saved as an exception');
+$check($service->context([], $result['id'])['values']['__file_justifications'] === ['estado_documento_arre' => 'El arrendatario la envía el lunes.'], 'edit loads the missing-file reason');
+$check(count($policies->exceptions($row, [])) === 1 && $policies->exceptions($row, [['item' => 'estado_documento_arre']]) === [], 'the approver sees it only while the file is missing');
+$service->save(['estado_documento_arre' => 'Cumple'] + $editInput, $sender, $result['id']);
+$check(count(\SCM\Modules\ClosingSheets\ClosingSheetPolicies::decode((string) $db->getVar('SELECT excepciones_politicas FROM wp_jet_cct_cierres WHERE _ID = ?', [$result['id']]))) === 1, 'the reason is kept on a new edit while the file is missing');
+$policies->saveFiles([]);
 $rules = \SCM\Modules\ClosingSheets\ClosingSheetPolicies::normalize(['estado_rut_pro' => ['policies' => ['45', 0], 'states' => ['No aplica', 'Otro'], 'note' => ' <b>x</b> '], 'no_existe' => ['policies' => [1], 'states' => ['No cumple']], 'estado_asegurable' => ['policies' => [7], 'states' => []]]);
 $check($rules === ['estado_rut_pro' => ['policies' => [45], 'states' => ['No aplica'], 'note' => 'x']], 'the policy settings keep only real items with a policy or rule and a breaking state');
 

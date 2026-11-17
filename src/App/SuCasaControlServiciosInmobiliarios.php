@@ -1055,7 +1055,7 @@ final class SuCasaControlServiciosInmobiliarios
           'closing_sheet_review' => 'Hacer la revisión de servicios públicos antes de la ocupación (hoja de cierre)',
           'closing_sheet_respond' => 'Aprobar o no aprobar hojas de cierre',
           'closing_sheet_desist' => 'Desistir negocio desde la hoja de cierre (contrato No asignado, estudio, inmueble y caso de entrega)',
-          'closing_sheet_policy_configure' => 'Configurar las políticas de la lista de chequeo de la hoja de cierre (Configuración)',
+          'closing_sheet_policy_configure' => 'Configuración hoja de cierre: políticas y archivos obligatorios de la lista de chequeo (Configuración)',
         ],
       ],
       'casos_juridicos' => [

@@ -290,15 +290,21 @@ final class ClosingSheetFlowView
           . ($policy['text'] !== '' ? '<p>' . nl2br(self::e($policy['text'])) . '</p>' : '') . '</details>';
       }
       $justification = trim((string) $entry['justification']);
-      $rows .= '<li><p class="csf-breach-item"><span class="csf-result is-bad">' . self::e($entry['state']) . '</span> <strong>' . self::e($entry['text']) . '</strong> <small>' . self::e($entry['group']) . '</small></p>'
-        . ($entry['note'] !== '' ? '<p class="csf-breach-rule">' . self::e($entry['note']) . '</p>' : '') . $policies
+      $file = ($entry['kind'] ?? '') === ClosingSheetPolicies::KIND_FILE;
+      $rows .= '<li><p class="csf-breach-item"><span class="csf-result is-bad">' . self::e($file ? 'Falta el archivo' : $entry['state']) . '</span> <strong>' . self::e($entry['text']) . '</strong> <small>' . self::e($entry['group']) . '</small></p>'
+        . ($file ? '<p class="csf-breach-rule">Está en «Cumple», pero el archivo obligatorio no se ha subido.</p>' : ($entry['note'] !== '' ? '<p class="csf-breach-rule">' . self::e($entry['note']) . '</p>' : '')) . $policies
         . ($justification !== ''
-          ? '<p class="csf-breach-why"><b>Justificación:</b> ' . nl2br(self::e($justification)) . ($entry['by'] !== '' ? ' <small>— ' . self::e($entry['by']) . ((int) $entry['at'] > 0 ? ', ' . self::e(self::date((int) $entry['at'])) : '') . '</small>' : '') . '</p>'
+          ? '<p class="csf-breach-why"><b>' . ($file ? 'Por qué no se adjuntó:' : 'Justificación:') . '</b> ' . nl2br(self::e($justification)) . ($entry['by'] !== '' ? ' <small>— ' . self::e($entry['by']) . ((int) $entry['at'] > 0 ? ', ' . self::e(self::date((int) $entry['at'])) : '') . '</small>' : '') . '</p>'
           : '<p class="csf-breach-why is-missing"><b>Sin justificación</b> (la hoja se llenó antes de esta regla).</p>')
         . '</li>';
     }
-    $count = count($exceptions);
-    return '<section class="cs-section csf-breaches" role="alert"><h2><span class="material-symbols-outlined" aria-hidden="true">gpp_bad</span> Incumple ' . ($count === 1 ? 'una política' : $count . ' políticas') . '</h2>'
+    $files = count(array_filter($exceptions, static fn(array $entry): bool => ($entry['kind'] ?? '') === ClosingSheetPolicies::KIND_FILE));
+    $policies = count($exceptions) - $files;
+    $parts = array_filter([
+      $policies > 0 ? ($policies === 1 ? 'una política incumplida' : $policies . ' políticas incumplidas') : '',
+      $files > 0 ? ($files === 1 ? 'un archivo obligatorio pendiente' : $files . ' archivos obligatorios pendientes') : '',
+    ]);
+    return '<section class="cs-section csf-breaches" role="alert"><h2><span class="material-symbols-outlined" aria-hidden="true">gpp_bad</span> ' . self::e(ucfirst(implode(' y ', $parts))) . '</h2>'
       . '<p class="csf-breach-lead">Revisa cada excepción y su justificación antes de aprobar la hoja.</p><ul class="csf-breach-list">' . $rows . '</ul></section>';
   }
 
@@ -307,7 +313,7 @@ final class ClosingSheetFlowView
   {
     return '<form class="cs-section csf-respond" id="responder" data-csf-form data-csf-confirm data-csf-breaches="' . $breaches . '" method="post" novalidate><h2>Responder la hoja de cierre</h2>'
       . self::hidden($hidden + ['accion' => 'respuesta'])
-      . ($breaches > 0 ? '<p class="csf-breach-alert" role="alert"><span class="material-symbols-outlined" aria-hidden="true">gpp_bad</span> Esta hoja incumple ' . ($breaches === 1 ? 'una política' : $breaches . ' políticas') . '. Revisa las justificaciones en rojo al inicio de la hoja antes de aprobarla.</p>' : '')
+      . ($breaches > 0 ? '<p class="csf-breach-alert" role="alert"><span class="material-symbols-outlined" aria-hidden="true">gpp_bad</span> Esta hoja tiene ' . ($breaches === 1 ? 'una excepción' : $breaches . ' excepciones') . ' (políticas incumplidas o archivos obligatorios pendientes). Revisa las justificaciones en rojo al inicio de la hoja antes de aprobarla.</p>' : '')
       . ($state === ClosingSheetWorkflow::REJECTED ? '<p class="cs-note">No se había aprobado; quien la hizo la corrigió o vuelve a ponerla a consideración.</p>' : '')
       . '<label class="cs-label" for="csf_observacion">Observación <span class="cs-help">(obligatoria si no se aprueba; la recibe quien hizo la hoja)</span></label>'
       . '<textarea class="cs-input" id="csf_observacion" name="observacion" rows="3" maxlength="2000"></textarea>'
@@ -561,7 +567,13 @@ final class ClosingSheetFlowView
         $counts[$tone]++;
         $missing = $documents !== [] && $tone === 'good' && $attached === '' && isset(ClosingSheetForm::DOCUMENT_ITEMS[$column]) ? '<small class="cd-warn">Cumple, pero sin archivo en el panel.</small>' : '';
         $breach = $exceptions[$column] ?? null;
-        $why = $breach !== null ? '<small class="csf-breach-why">' . (trim((string) $breach['justification']) !== '' ? '<b>Excepción a política:</b> ' . nl2br(self::e($breach['justification'])) : '<b>Incumple una política</b> (sin justificación).') . '</small>' : '';
+        $fileBreach = $breach !== null && ($breach['kind'] ?? '') === ClosingSheetPolicies::KIND_FILE;
+        $why = $breach !== null ? '<small class="csf-breach-why">' . (trim((string) $breach['justification']) !== ''
+          ? '<b>' . ($fileBreach ? 'Archivo obligatorio pendiente:' : 'Excepción a política:') . '</b> ' . nl2br(self::e($breach['justification']))
+          : '<b>Incumple una política</b> (sin justificación).') . '</small>' : '';
+        if ($fileBreach) {
+          $missing = '';
+        }
         $rows .= '<li' . ($breach !== null ? ' class="is-breach"' : '') . '><span class="csf-result is-' . $tone . '">' . self::e($state !== '' ? $state : 'Sin estado') . '</span><div><p>' . self::e($text) . '</p>' . ($note !== '' ? '<small>' . nl2br(self::e($note)) . '</small>' : '') . $why . $missing . $attached . '</div></li>';
       }
       if ($rows !== '') {

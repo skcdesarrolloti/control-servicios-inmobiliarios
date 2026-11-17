@@ -231,6 +231,7 @@
       showSuggestion(item, why);
       syncPolicy(item);
     });
+    syncFiles();
     // Sugerencias que ya no aplican (cambió el paso 1) se limpian si nadie las tocó.
     form.querySelectorAll('.cs-check-item select[data-cs-auto="1"]').forEach((select) => {
       if (list[select.name]) return;
@@ -263,7 +264,25 @@
   }
   function syncPolicies() {
     Object.keys(policyRules).forEach(syncPolicy);
+    syncFiles();
   }
+
+  // Archivo obligatorio: un documento en «Cumple» sin archivo pide decir por qué no se adjunta ahora.
+  function syncFile(box) {
+    const panel = box.querySelector("[data-cs-file-why]");
+    const select = box.querySelector("select");
+    if (!panel || !select) return;
+    const hasFile = box.querySelector("[data-cd-doc]") !== null;
+    const on = !select.disabled && select.value === "Cumple" && !hasFile;
+    panel.hidden = !on;
+    box.classList.toggle("is-file-missing", on);
+    panel.querySelector("[data-cs-file-reason]").toggleAttribute("data-cs-required", on && panel.dataset.csLegacy !== select.value);
+  }
+  function syncFiles() {
+    form.querySelectorAll("[data-cs-file-required]").forEach(syncFile);
+  }
+  // Al subir o quitar archivos (closing-documents.js).
+  form.addEventListener("cd:documents-change", syncFiles);
 
   // Ventana de advertencia (en la misma página).
   const policyDialog = form.querySelector("[data-cs-policy-dialog]");
@@ -357,6 +376,8 @@
     delete select.dataset.csAuto;
     showSuggestion(select.name, "");
     syncPolicy(select.name);
+    const fileBox = select.closest("[data-cs-file-required]");
+    if (fileBox) syncFile(fileBox);
     const rule = policyRules[select.name];
     if (rule && rule.states.includes(select.value) && select.dataset.prev !== select.value) openPolicy(select.name, select.dataset.prev || "");
     select.dataset.prev = select.value;

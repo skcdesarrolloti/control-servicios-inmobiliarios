@@ -86,7 +86,7 @@ final class ClosingSheetPageView
       </div>
 
       <div class="cs-step" data-cs-step="2" hidden>
-        <?= $this->checklist($options['estado_checklist'] ?? [], $values, $creating, $context['owners'], $page['documents'] ?? null, $page['policies'] ?? [], $context['checklist_facts'] ?? []) ?>
+        <?= $this->checklist($options['estado_checklist'] ?? [], $values, $creating, $context['owners'], $page['documents'] ?? null, $page['policies'] ?? [], $context['checklist_facts'] ?? [], $page['required_files'] ?? []) ?>
         <div class="cs-actions">
           <button type="button" class="cs-secondary" data-cs-prev><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span> Anterior</button>
           <button type="submit" class="cs-primary"><span class="material-symbols-outlined" aria-hidden="true">save</span> <?= $creating ? 'Añadir hoja de cierre' : 'Guardar cambios' ?></button>
@@ -367,8 +367,9 @@ final class ClosingSheetPageView
    * @param array{config:array{api:string,nonce:string,upload:string,delete:string,scope:array<string,int>},items:list<array<string,mixed>>}|null $documents
    * @param array<string,array{states:list<string>,note:string,policies:list<array{id:int,title:string,text:string}>}> $policies ClosingSheetPolicies::forForm()
    * @param array<string,mixed> $facts datos del mandato para sugerir estados (ClosingSheetService::checklistFacts)
+   * @param list<string> $requiredFiles ítems cuyo archivo es obligatorio en «Cumple» (ClosingSheetPolicies::requiredFiles)
    */
-  private function checklist(array $states, array $values, bool $creating, array $owners = [], ?array $documents = null, array $policies = [], array $facts = []): string
+  private function checklist(array $states, array $values, bool $creating, array $owners = [], ?array $documents = null, array $policies = [], array $facts = [], array $requiredFiles = []): string
   {
     $states = $states !== [] ? $states : ['Cumple', 'No cumple', 'No aplica'];
     $files = ClosingSheetDocumentsView::byItem($documents['items'] ?? []);
@@ -415,10 +416,20 @@ final class ClosingSheetPageView
             . '<textarea class="cs-input" rows="2" id="cs_just_' . $this->e($column) . '" name="justificacion[' . $this->e($column) . ']" data-cs-justification maxlength="2000" placeholder="Por qué se acepta el negocio así (la ve quien aprueba la hoja)">'
             . $this->e($values['__justifications'][$column] ?? '') . '</textarea></div>';
         }
-        $rows .= '<div class="cs-check-item' . ($slots !== '' ? ' has-docs' : '') . '" data-cs-item="' . $this->e($column) . '"><p>' . $this->e($text) . '</p>'
+        // Archivo obligatorio: en «Cumple» sin archivo se pide decir por qué no se adjunta ahora.
+        $fileWhy = '';
+        if ($slots !== '' && in_array($column, $requiredFiles, true)) {
+          $legacyFile = !$creating && $state === 'Cumple' && trim((string) ($values['__file_justifications'][$column] ?? '')) === '' ? 'Cumple' : '';
+          $fileWhy = '<div class="cs-policy cs-filewhy" data-cs-file-why data-cs-field' . ($legacyFile !== '' ? ' data-cs-legacy="Cumple"' : '') . ' hidden>'
+            . '<p class="cs-policy-head"><span class="material-symbols-outlined" aria-hidden="true">attach_file</span> <span>El archivo es obligatorio: adjúntalo o di por qué no se adjunta ahora.</span></p>'
+            . '<label class="cs-label" for="cs_file_' . $this->e($column) . '">Por qué no se adjunta ahora <span class="cs-just-item">(' . $this->e(mb_strimwidth($text, 0, 60, '…', 'UTF-8')) . ')</span> <span class="cs-req" aria-hidden="true">*</span></label>'
+            . '<textarea class="cs-input" rows="2" id="cs_file_' . $this->e($column) . '" name="justificacion_archivo[' . $this->e($column) . ']" data-cs-file-reason maxlength="2000" placeholder="Por ejemplo: el propietario lo envía el lunes (lo ve quien aprueba la hoja)">'
+            . $this->e($values['__file_justifications'][$column] ?? '') . '</textarea></div>';
+        }
+        $rows .= '<div class="cs-check-item' . ($slots !== '' ? ' has-docs' : '') . '" data-cs-item="' . $this->e($column) . '"' . ($fileWhy !== '' ? ' data-cs-file-required' : '') . '><p>' . $this->e($text) . ($fileWhy !== '' ? ' <span class="cs-file-req" title="Archivo obligatorio en «Cumple»">Archivo obligatorio</span>' : '') . '</p>'
           . '<select class="cs-input" name="' . $this->e($column) . '"' . ($required ? ' data-cs-required' : '') . ' aria-label="Estado"><option value="">Estado…</option>' . $this->optionTags(array_combine($states, $states), $state) . '</select>'
           . '<small class="cs-suggest" data-cs-suggest hidden></small>'
-          . '<textarea class="cs-input" rows="2" name="notas[' . $this->e($column) . ']" placeholder="Observación (opcional)">' . $this->e($values['__notes'][$column] ?? '') . '</textarea>' . $policy . $slots . '</div>';
+          . '<textarea class="cs-input" rows="2" name="notas[' . $this->e($column) . ']" placeholder="Observación (opcional)">' . $this->e($values['__notes'][$column] ?? '') . '</textarea>' . $policy . $slots . $fileWhy . '</div>';
       }
       $html .= '<fieldset class="cs-section"' . ($when !== null ? ' data-cs-when="' . $this->e(json_encode($when, JSON_UNESCAPED_UNICODE)) . '"' : '') . '><legend>' . $this->e($group) . '</legend>' . $rows . '</fieldset>';
     }

@@ -159,11 +159,11 @@ trait HandlesClosingSheets
     $this->jsonOk(['id' => $document['id'], 'message' => '«' . $document['name'] . '» se eliminó de la carpeta.']);
   }
 
-  /** Configuración › Políticas de la hoja de cierre: políticas y estados que incumple cada ítem de la lista de chequeo. */
+  /** Configuración › Configuración hoja de cierre: políticas por ítem de la lista de chequeo y archivos obligatorios. */
   public function ajax_handler_closing_policy_settings(): void
   {
     $this->verifyCsrf();
-    $this->requireDashboardAction('closing_sheet_policy_configure', 'Tu cargo no tiene permiso para configurar las políticas de la hoja de cierre.');
+    $this->requireDashboardAction('closing_sheet_policy_configure', 'Tu cargo no tiene permiso para la configuración de la hoja de cierre.');
     $policies = new ClosingSheetPolicies($this->db);
     try {
       $message = '';
@@ -172,10 +172,11 @@ trait HandlesClosingSheets
         if (!is_array($input)) {
           throw new \InvalidArgumentException('No se recibió la configuración.');
         }
-        $saved = $policies->save($input, Auth::userId());
-        $message = 'Configuración guardada: ' . count($saved) . ' ítems con políticas. Aplica a las hojas que se guarden desde ahora.';
+        $saved = $policies->save(is_array($input['rules'] ?? null) ? $input['rules'] : [], Auth::userId());
+        $files = $policies->saveFiles(is_array($input['files'] ?? null) ? $input['files'] : [], Auth::userId());
+        $message = 'Configuración guardada: ' . count($saved) . ' ítems con políticas y ' . count($files) . ' archivos obligatorios. Aplica a las hojas que se guarden desde ahora.';
       }
-      $this->jsonOk(['html' => ClosingSheetPolicyView::form($policies->rules(), $policies->policies()), 'message' => $message]);
+      $this->jsonOk(['html' => ClosingSheetPolicyView::form($policies->rules(), $policies->policies(), $policies->requiredFiles()), 'message' => $message]);
     } catch (\InvalidArgumentException $error) {
       $this->jsonFail($error->getMessage());
     } catch (\Throwable $error) {

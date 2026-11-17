@@ -1359,7 +1359,7 @@ foreach ($rawNavItems as $k => $item) {
                     <span class="scm-nav-item-desc">Salario, márgenes, insumos y transporte</span>
                   </span>
                 </button>
-                <!-- Políticas de la hoja de cierre: advertencias de la lista de chequeo; se oculta sin closing_sheet_policy_configure -->
+                <!-- Configuración hoja de cierre: políticas y archivos obligatorios de la lista de chequeo; se oculta sin closing_sheet_policy_configure -->
                 <button
                   type="button"
                   data-scm-config-action="closing-policy-settings"
@@ -1369,8 +1369,8 @@ foreach ($rawNavItems as $k => $item) {
                 >
                   <span class="material-symbols-outlined text-[18px] text-slate-500">gpp_maybe</span>
                   <span class="scm-nav-item-text">
-                    <span class="scm-nav-item-label">Políticas de la hoja de cierre</span>
-                    <span class="scm-nav-item-desc">Advertencias y justificaciones de la lista de chequeo</span>
+                    <span class="scm-nav-item-label">Configuración hoja de cierre</span>
+                    <span class="scm-nav-item-desc">Políticas y archivos obligatorios de la lista de chequeo</span>
                   </span>
                 </button>
                 <!-- Honorarios de cotización: variables del % de administración sugerido; se oculta sin quote_fee_configure -->

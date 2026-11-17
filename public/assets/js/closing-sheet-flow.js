@@ -87,7 +87,7 @@
       }
       var breaches = parseInt(form.getAttribute("data-csf-breaches") || "0", 10) || 0;
       var warning = breaches > 0 && state === "Aprobada"
-        ? "La hoja incumple " + (breaches === 1 ? "una política" : breaches + " políticas") + " (las justificaciones están en rojo al inicio). "
+        ? "La hoja tiene " + (breaches === 1 ? "una excepción" : breaches + " excepciones") + " en la lista de chequeo (las justificaciones están en rojo al inicio). "
         : "";
       if (!window.confirm(warning + "¿Confirmas que la hoja queda " + String(state).toLowerCase() + "? Se avisará a quien la hizo.")) return;
     }

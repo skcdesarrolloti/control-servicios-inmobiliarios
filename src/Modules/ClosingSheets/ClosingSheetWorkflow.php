@@ -217,8 +217,8 @@ final class ClosingSheetWorkflow
         ['role' => 'Gerencia', 'action' => 'Autorizó', 'date' => (int) ($closing['fecha_repuesta'] ?? 0)] + $this->signer((string) ($closing['id_aprobador'] ?? ''), (string) ($closing['aprobador'] ?? '')),
       ],
       'company' => $this->company((string) ($closing['sucursal'] ?? '')),
-      'documents' => (new ClosingSheetDocuments($this->db))->forClosing($closingId),
-      'exceptions' => $this->exceptions($closing),
+      'documents' => $documents = (new ClosingSheetDocuments($this->db))->forClosing($closingId),
+      'exceptions' => $this->exceptions($closing, $documents),
     ];
   }
 
@@ -227,14 +227,15 @@ final class ClosingSheetWorkflow
   {
     $count = count($this->exceptions($closing));
     return $count === 0 ? '' : '<p style="margin:0 0 14px;padding:10px 12px;border-radius:8px;background:#fee2e2;color:#b91c1c;font-weight:700;line-height:1.5;">'
-      . 'La hoja incumple ' . ($count === 1 ? 'una política' : $count . ' políticas') . ' de la lista de chequeo. Las justificaciones están en rojo al inicio de la hoja: revísalas antes de aprobarla.</p>';
+      . 'La hoja tiene ' . ($count === 1 ? 'una excepción' : $count . ' excepciones') . ' en la lista de chequeo (políticas incumplidas o archivos obligatorios pendientes). Las justificaciones están en rojo al inicio de la hoja: revísalas antes de aprobarla.</p>';
   }
 
   /** Excepciones a políticas de la lista de chequeo (un fallo no impide ver la hoja). @param array<string,mixed> $closing @return list<array<string,mixed>> */
-  private function exceptions(array $closing): array
+  private function exceptions(array $closing, ?array $documents = null): array
   {
     try {
-      return (new ClosingSheetPolicies($this->db))->exceptions($closing);
+      $documents ??= (new ClosingSheetDocuments($this->db))->forClosing((int) ($closing['_ID'] ?? 0));
+      return (new ClosingSheetPolicies($this->db))->exceptions($closing, $documents);
     } catch (\Throwable $error) {
       error_log('[closing_sheet_policies] #' . (int) ($closing['_ID'] ?? 0) . ': ' . $error->getMessage());
       return [];

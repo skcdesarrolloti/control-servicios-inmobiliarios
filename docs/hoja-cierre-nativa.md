@@ -215,10 +215,15 @@ documento sugerido en «Cumple» sin archivo se marca de inmediato y entra en la
 | Asegurable | "Cumple" si la hoja tiene su estudio de aseguradora |
 
 **Políticas.** `ClosingSheetPolicies`. Cada ítem puede tener políticas de `wp_jet_cct_politicas`, una regla escrita y los
-estados que las incumplen ("No cumple" por defecto). Se configura en **Configuración › Políticas de la hoja de cierre**
-(permiso *Configurar las políticas de la lista de chequeo*, `closing_sheet_policy_configure`, solo administradores por
-defecto; setting `closing_sheet_policy_rules`). Mientras no se guarde, rige `DEFAULT_RULES`, con las versiones normales
-de las políticas, no las "(Prov.)":
+estados que las incumplen ("No cumple" por defecto). Se configura en **Configuración › Configuración hoja de cierre**
+(permiso `closing_sheet_policy_configure`, solo administradores por defecto; setting `closing_sheet_policy_rules`):
+
+- pestaña **Políticas por ítem**, con un catálogo al lado para leer cada política completa (búsqueda por número, título
+  o texto) antes de asignarla;
+- pestaña **Archivos obligatorios** (ver más abajo).
+
+Mientras no se guarde, rige `DEFAULT_RULES`, con las políticas para empleados. Las que dicen "(Prov.)" son la versión para
+**proveedores externos** (cargos 8 y 17), no provisionales; el catálogo las marca "para proveedores":
 
 - facturas de servicios: #47 y #45; amparo integral: #47, #23 y #45;
 - servicios compartidos: #66; mora en servicios: #26 y #41; reparaciones: #41;
@@ -244,7 +249,21 @@ justificación, quién y cuándo; columna creada con `bin/cct-add-fields.php`). 
 - sobre los botones de responder, un aviso rojo;
 - al aprobar, la confirmación lo repite.
 
-El aviso de **Hoja de cierre por responder** también dice cuántas políticas incumple.
+El aviso de **Hoja de cierre por responder** también dice cuántas excepciones tiene.
+
+**Archivos obligatorios.** Por defecto (`DEFAULT_REQUIRED_FILES`, setting `closing_sheet_required_documents`):
+
+- son obligatorios: tradición, facturas de agua, energía y gas, autorización de mora, documentos del propietario
+  (facultad, existencia, cámara, identidad, RUT, certificación bancaria), existencia, cámara e identidad del
+  arrendatario y los codeudores, certificación bancaria y cuota de la copropiedad, y asegurable;
+- son opcionales: escritura, predial, internet, teléfono, RUT del arrendatario y los codeudores, reglamento, manual,
+  RUT y paz y salvo de la copropiedad.
+
+Si un obligatorio queda en «Cumple» sin archivo, el ítem pide **Por qué no se adjunta ahora** (no se bloquea el
+negocio). También lo exige el servidor, que revisa los archivos subidos al mandato (al crear) o a la hoja (al editar).
+La razón se guarda en `excepciones_politicas` (`kind: archivo`) y quien aprueba la ve en rojo mientras el archivo
+falte; al subirlo, deja de mostrarse. Los opcionales solo se avisan al guardar (**Guardar sin esos archivos**).
+En hojas anteriores, un documento que ya estaba en «Cumple» no pide la razón mientras no cambie.
 
 Los datos se leen de la base de datos (mandato, inmueble, copropiedad, propietario, arrendatario, estudio de
 aseguradora y ticket); no se usa la API REST de JetEngine.

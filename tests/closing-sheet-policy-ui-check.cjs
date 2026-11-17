@@ -47,6 +47,10 @@ const documents = fs.readFileSync(path.join(__dirname, '../public/assets/js/clos
     assert.equal(await energy.locator('[data-cd-add]').isEnabled(), true, 'attach stays enabled on a suggested item');
     assert.equal(await energy.locator('[data-cd-warn]').isVisible(), true, 'a suggested «Cumple» without a file is flagged right away');
     assert.equal(await page.locator('[data-cs-item="estado_servicio_gas"] [data-cd-warn]').isVisible(), false, '«No aplica» needs no file');
+    // Archivo obligatorio: en «Cumple» sin archivo pide decir por qué no se adjunta ahora.
+    assert.equal(await energy.locator('[data-cs-file-why]').isVisible(), true, 'a required file asks for a reason');
+    assert.equal(await energy.locator('[data-cs-file-reason]').getAttribute('data-cs-required'), '', 'and the reason is required');
+    assert.equal(await page.locator('[data-cs-item="estado_servicio_telefonia"] [data-cs-file-why]').count(), 0, 'an optional document has no reason box');
 
     // Volver al paso 1 y cambiar los meses: la sugerencia que nadie tocó se actualiza.
     await page.evaluate(() => { document.querySelector('[data-cs-step="1"]').hidden = false; document.querySelector('[data-cs-step="2"]').hidden = true; });
@@ -86,9 +90,11 @@ const documents = fs.readFileSync(path.join(__dirname, '../public/assets/js/clos
 
     // Al guardar se listan los documentos en «Cumple» sin archivo antes de enviar.
     await page.locator('.cs-check-item select').evaluateAll((selects) => selects.forEach((s) => { if (!s.value) s.value = 'No aplica'; }));
+    await page.fill('[data-cs-item="estado_servicio_energia"] [data-cs-file-reason]', 'El propietario la envía el lunes.');
     await page.click('button[type="submit"]');
     assert.equal(await page.locator('[data-cd-pending]').isVisible(), true, 'saving lists the documents in «Cumple» without a file');
-    assert.match(await page.locator('[data-cd-pending-list]').textContent(), /energía/i);
+    assert.match(await page.locator('[data-cd-pending-list]').textContent(), /teléfono/i, 'optional documents are listed');
+    assert.doesNotMatch(await page.locator('[data-cd-pending-list]').textContent(), /energía/i, 'a required document with its reason is not asked again');
 
     assert.deepEqual(errors, [], 'no script errors');
     console.log('Closing sheet policy UI checks passed.');

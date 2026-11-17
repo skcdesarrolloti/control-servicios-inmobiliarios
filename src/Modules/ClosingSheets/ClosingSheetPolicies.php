@@ -22,6 +22,23 @@ use SCM\Support\SchemaInspector;
 final class ClosingSheetPolicies
 {
   public const SETTING = 'closing_sheet_policy_rules';
+  /** Ítems con documento cuyo archivo es obligatorio cuando quedan en «Cumple». */
+  public const SETTING_FILES = 'closing_sheet_required_documents';
+  public const KIND_POLICY = 'politica';
+  public const KIND_FILE = 'archivo';
+  /**
+   * Por defecto: lo que sostiene el contrato y los pagos (identidad, RUT y cuenta del propietario, facturas de los servicios
+   * de la hoja, garantía, empresas). Opcionales: escritura, predial, internet, teléfono, RUT del arrendatario y codeudores,
+   * reglamento, manual, RUT y paz y salvo de la copropiedad.
+   */
+  public const DEFAULT_REQUIRED_FILES = [
+    'estado_certificado_tradicion', 'estado_servicio_agua', 'estado_servicio_energia', 'estado_servicio_gas', 'estado_mora_servicios',
+    'estado_acreditacion_propietario', 'estado_certificado_empresa_pro', 'estado_certificado_camara_pro', 'estado_documento_pro', 'estado_rut_pro', 'estado_bancaria_pro',
+    'estado_certificado_empresa_arre', 'estado_certificado_camara_arre', 'estado_documento_arre',
+    'estado_certificado_empresa_co1', 'estado_certificado_camara_co1', 'estado_documento_co1', 'estado_certificado_empresa_co2', 'estado_certificado_camara_co2', 'estado_documento_co2',
+    'estado_certificado_empresa_co3', 'estado_certificado_camara_co3', 'estado_documento_co3', 'estado_certificado_empresa_co4', 'estado_certificado_camara_co4', 'estado_documento_co4',
+    'estado_certificacion_copropiedad', 'estado_cuota_copropiedad', 'estado_asegurable',
+  ];
   public const COLUMN = 'excepciones_politicas';
   public const STATES = ['No cumple', 'No aplica'];
   public const MIN_JUSTIFICATION = 10;
@@ -89,6 +106,71 @@ final class ClosingSheetPolicies
     return $rules;
   }
 
+  /** Ítems con archivo obligatorio en «Cumple». @return list<string> */
+  public function requiredFiles(): array
+  {
+    $stored = (new Settings($this->db))->get(self::SETTING_FILES, null);
+    return is_array($stored) ? self::normalizeFiles($stored) : self::DEFAULT_REQUIRED_FILES;
+  }
+
+  /** @param array<mixed> $raw @return list<string> */
+  public static function normalizeFiles(array $raw): array
+  {
+    $wanted = array_map('strval', $raw);
+    return array_values(array_filter(array_keys(ClosingSheetForm::DOCUMENT_ITEMS), static fn(string $item): bool => in_array($item, $wanted, true)));
+  }
+
+  /** @param array<mixed> $raw @return list<string> */
+  public function saveFiles(array $raw, int $updatedBy = 0): array
+  {
+    $files = self::normalizeFiles($raw);
+    (new Settings($this->db))->set(self::SETTING_FILES, $files, $updatedBy);
+    return $files;
+  }
+
+  /**
+   * Archivos obligatorios: un ítem en «Cumple» sin archivo exige decir por qué no se adjunta ahora. Un ítem que ya estaba
+   * en «Cumple» en la hoja guardada sin esa justificación (hojas anteriores a la regla) no la exige mientras no cambie.
+   * @param array<string,mixed> $values @param array<mixed> $posted justificacion_archivo[ítem] @param list<string> $withFiles ítems con archivo
+   * @param array<string,mixed> $saved @param list<array<string,mixed>> $savedEntries
+   * @return array{0:list<array<string,mixed>>,1:list<string>}
+   */
+  public function collectFiles(array $values, array $posted, array $withFiles, array $saved, array $savedEntries, string $by, int $now): array
+  {
+    $items = self::items();
+    $previous = [];
+    foreach ($savedEntries as $entry) {
+      if (($entry['kind'] ?? '') === self::KIND_FILE) {
+        $previous[(string) ($entry['item'] ?? '')] = $entry;
+      }
+    }
+    $entries = [];
+    $errors = [];
+    foreach ($this->requiredFiles() as $item) {
+      if (!isset($items[$item]) || trim((string) ($values[$item] ?? '')) !== 'Cumple' || in_array($item, $withFiles, true)) {
+        continue;
+      }
+      $text = trim(mb_substr(strip_tags(str_replace("\r\n", "\n", (string) ($posted[$item] ?? ''))), 0, 2000, 'UTF-8'));
+      $before = $previous[$item] ?? null;
+      if ($text === '' && $before !== null) {
+        $text = (string) ($before['justification'] ?? '');
+      }
+      if (mb_strlen($text, 'UTF-8') < self::MIN_JUSTIFICATION) {
+        $legacy = $saved !== [] && trim((string) ($saved[$item] ?? '')) === 'Cumple' && $before === null;
+        if (!$legacy) {
+          $errors[] = 'Lista de chequeo: "' . mb_strimwidth($items[$item][1], 0, 70, '…', 'UTF-8') . '" está en «Cumple» y su archivo es obligatorio. Adjúntalo o escribe por qué no se adjunta ahora (mínimo ' . self::MIN_JUSTIFICATION . ' caracteres).';
+        }
+        continue;
+      }
+      $same = $before !== null && (string) ($before['justification'] ?? '') === $text;
+      $entries[] = [
+        'kind' => self::KIND_FILE, 'item' => $item, 'state' => 'Cumple', 'note' => 'Falta el archivo obligatorio.', 'policies' => [],
+        'justification' => $text, 'by' => $same ? (string) ($before['by'] ?? $by) : $by, 'at' => $same ? (int) ($before['at'] ?? $now) : $now,
+      ];
+    }
+    return [$entries, $errors];
+  }
+
   /** Ítems de la lista: columna del estado => [grupo, texto]. @return array<string,array{0:string,1:string}> */
   public static function items(): array
   {
@@ -147,22 +229,26 @@ final class ClosingSheetPolicies
   /**
    * Excepciones de una hoja para mostrarlas a quien aprueba: las guardadas con su justificación y, en hojas anteriores
    * a esta regla, los ítems que hoy incumplen sin justificación.
-   * @param array<string,mixed> $closing fila de cierres
-   * @return list<array{item:string,group:string,text:string,state:string,note:string,policies:list<array{id:int,title:string,text:string}>,justification:string,by:string,at:int}>
+   * Los archivos obligatorios justificados solo se muestran mientras sigan sin archivo ($documents de la hoja).
+   * @param array<string,mixed> $closing fila de cierres @param list<array<string,mixed>>|null $documents archivos de la hoja
+   * @return list<array{kind:string,item:string,group:string,text:string,state:string,note:string,policies:list<array{id:int,title:string,text:string}>,justification:string,by:string,at:int}>
    */
-  public function exceptions(array $closing): array
+  public function exceptions(array $closing, ?array $documents = null): array
   {
     $items = self::items();
     $saved = self::decode((string) ($closing[self::COLUMN] ?? ''));
     $rules = $this->forForm();
+    $withFiles = $documents === null ? [] : array_values(array_unique(array_map(static fn(array $doc): string => (string) ($doc['item'] ?? ''), $documents)));
     $out = [];
     foreach ($saved as $entry) {
       $item = (string) ($entry['item'] ?? '');
-      if (!isset($items[$item]) || trim((string) ($closing[$item] ?? '')) !== (string) ($entry['state'] ?? '')) {
+      $kind = (string) ($entry['kind'] ?? self::KIND_POLICY);
+      if (!isset($items[$item]) || trim((string) ($closing[$item] ?? '')) !== (string) ($entry['state'] ?? '')
+        || ($kind === self::KIND_FILE && in_array($item, $withFiles, true))) {
         continue;
       }
       $out[$item] = [
-        'item' => $item, 'group' => $items[$item][0], 'text' => $items[$item][1], 'state' => (string) $entry['state'],
+        'kind' => $kind, 'item' => $item, 'group' => $items[$item][0], 'text' => $items[$item][1], 'state' => (string) $entry['state'],
         'note' => (string) ($entry['note'] ?? ''), 'policies' => is_array($entry['policies'] ?? null) ? $entry['policies'] : [],
         'justification' => (string) ($entry['justification'] ?? ''), 'by' => (string) ($entry['by'] ?? ''), 'at' => (int) ($entry['at'] ?? 0),
       ];
@@ -170,7 +256,7 @@ final class ClosingSheetPolicies
     foreach ($rules as $item => $rule) {
       $state = trim((string) ($closing[$item] ?? ''));
       if (!isset($out[$item]) && isset($items[$item]) && in_array($state, $rule['states'], true)) {
-        $out[$item] = ['item' => $item, 'group' => $items[$item][0], 'text' => $items[$item][1], 'state' => $state, 'note' => $rule['note'], 'policies' => $rule['policies'], 'justification' => '', 'by' => '', 'at' => 0];
+        $out[$item] = ['kind' => self::KIND_POLICY, 'item' => $item, 'group' => $items[$item][0], 'text' => $items[$item][1], 'state' => $state, 'note' => $rule['note'], 'policies' => $rule['policies'], 'justification' => '', 'by' => '', 'at' => 0];
       }
     }
     // Texto vigente de cada política (lo guardado solo trae id y título).
@@ -203,7 +289,9 @@ final class ClosingSheetPolicies
     $items = self::items();
     $previous = [];
     foreach ($savedEntries as $entry) {
-      $previous[(string) ($entry['item'] ?? '')] = $entry;
+      if (($entry['kind'] ?? self::KIND_POLICY) === self::KIND_POLICY) {
+        $previous[(string) ($entry['item'] ?? '')] = $entry;
+      }
     }
     $entries = [];
     $errors = [];
@@ -226,7 +314,7 @@ final class ClosingSheetPolicies
       }
       $same = $before !== null && (string) ($before['state'] ?? '') === $state && (string) ($before['justification'] ?? '') === $text;
       $entries[] = [
-        'item' => $item, 'state' => $state, 'note' => $rule['note'],
+        'kind' => self::KIND_POLICY, 'item' => $item, 'state' => $state, 'note' => $rule['note'],
         'policies' => array_map(static fn(array $policy): array => ['id' => $policy['id'], 'title' => $policy['title']], $rule['policies']),
         'justification' => $text, 'by' => $same ? (string) ($before['by'] ?? $by) : $by, 'at' => $same ? (int) ($before['at'] ?? $now) : $now,
       ];

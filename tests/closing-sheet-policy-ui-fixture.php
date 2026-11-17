@@ -12,7 +12,7 @@ $checklist = (new ReflectionMethod($view, 'checklist'))->invoke($view, ['Cumple'
 ], [
   'estado_amparo_integral' => ['states' => ['No cumple'], 'note' => 'Todos los contratos deben incluir la garantía de servicios públicos.', 'policies' => [['id' => 47, 'title' => 'Garantía de Servicios Públicos', 'text' => 'Texto de la política 47.']]],
   'estado_termino_contrato' => ['states' => ['No cumple'], 'note' => 'El término mínimo del contrato de arrendamiento es de 12 meses.', 'policies' => []],
-], ['accounts' => ['Energia' => true, 'Agua' => false, 'Gas' => false], 'internet' => false, 'telefono' => true, 'amparo' => 'Si', 'cobertura' => 36, 'bank' => true, 'study' => true]);
+], ['accounts' => ['Energia' => true, 'Agua' => false, 'Gas' => false], 'internet' => false, 'telefono' => true, 'amparo' => 'Si', 'cobertura' => 36, 'bank' => true, 'study' => true], ['estado_servicio_energia']);
 
 echo '<form data-cs-form><p data-cs-error hidden></p>'
   . '<div data-cs-step="1">'
