@@ -8,6 +8,7 @@ const assert = require('node:assert/strict');
 
 const html = execFileSync('php', [path.join(__dirname, 'closing-sheet-policy-ui-fixture.php')], { encoding: 'utf8' });
 const script = fs.readFileSync(path.join(__dirname, '../public/assets/js/closing-sheet.js'), 'utf8');
+const documents = fs.readFileSync(path.join(__dirname, '../public/assets/js/closing-documents.js'), 'utf8');
 
 (async () => {
   const browser = await chromium.launch({ headless: true, executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' });
@@ -17,6 +18,8 @@ const script = fs.readFileSync(path.join(__dirname, '../public/assets/js/closing
     page.on('pageerror', (error) => errors.push(error.message));
     await page.setContent('<!doctype html><html><body>' + html + '</body></html>');
     await page.addScriptTag({ content: script });
+    await page.addScriptTag({ content: documents });
+    await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
     const state = (name) => page.locator(`.cs-check-item select[name="${name}"]`).inputValue();
 
     // Sugerencias al pasar a la lista de chequeo.
@@ -38,6 +41,12 @@ const script = fs.readFileSync(path.join(__dirname, '../public/assets/js/closing
     assert.equal(await page.locator('[data-cs-policy-dialog]').evaluate((d) => d.open), false, 'a suggestion does not pop the warning');
     assert.equal(await page.locator('[data-cs-item="estado_termino_contrato"] [data-cs-policy]').isVisible(), true, 'a suggested breach shows its justification box');
     assert.equal(await page.locator('[data-cs-item="estado_termino_contrato"] [data-cs-justification]').getAttribute('data-cs-required'), '', 'and the justification is required');
+
+    // Documentos: el botón Adjuntar sigue activo y un documento sugerido en «Cumple» sin archivo se marca enseguida.
+    const energy = page.locator('[data-cs-item="estado_servicio_energia"]');
+    assert.equal(await energy.locator('[data-cd-add]').isEnabled(), true, 'attach stays enabled on a suggested item');
+    assert.equal(await energy.locator('[data-cd-warn]').isVisible(), true, 'a suggested «Cumple» without a file is flagged right away');
+    assert.equal(await page.locator('[data-cs-item="estado_servicio_gas"] [data-cd-warn]').isVisible(), false, '«No aplica» needs no file');
 
     // Volver al paso 1 y cambiar los meses: la sugerencia que nadie tocó se actualiza.
     await page.evaluate(() => { document.querySelector('[data-cs-step="1"]').hidden = false; document.querySelector('[data-cs-step="2"]').hidden = true; });
@@ -74,6 +83,12 @@ const script = fs.readFileSync(path.join(__dirname, '../public/assets/js/closing
     await page.locator('.cs-check-item select[name="estado_cobertura"]').selectOption('No cumple');
     // estado_cobertura no tiene política en esta prueba: no abre nada.
     assert.equal(await page.locator('[data-cs-policy-dialog]').evaluate((d) => d.open), false, 'an item without a policy does not warn');
+
+    // Al guardar se listan los documentos en «Cumple» sin archivo antes de enviar.
+    await page.locator('.cs-check-item select').evaluateAll((selects) => selects.forEach((s) => { if (!s.value) s.value = 'No aplica'; }));
+    await page.click('button[type="submit"]');
+    assert.equal(await page.locator('[data-cd-pending]').isVisible(), true, 'saving lists the documents in «Cumple» without a file');
+    assert.match(await page.locator('[data-cd-pending-list]').textContent(), /energía/i);
 
     assert.deepEqual(errors, [], 'no script errors');
     console.log('Closing sheet policy UI checks passed.');

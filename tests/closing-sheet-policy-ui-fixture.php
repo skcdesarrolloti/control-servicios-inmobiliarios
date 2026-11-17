@@ -7,7 +7,9 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 $view = new SCM\Modules\ClosingSheets\ClosingSheetPageView();
-$checklist = (new ReflectionMethod($view, 'checklist'))->invoke($view, ['Cumple', 'No cumple', 'No aplica'], ['__notes' => [], '__justifications' => []], true, [], null, [
+$checklist = (new ReflectionMethod($view, 'checklist'))->invoke($view, ['Cumple', 'No cumple', 'No aplica'], ['__notes' => [], '__justifications' => []], true, [], [
+  'config' => ['api' => 'api.php', 'nonce' => 'n', 'upload' => 'up', 'delete' => 'del', 'scope' => ['mandate_id' => 636]], 'items' => [],
+], [
   'estado_amparo_integral' => ['states' => ['No cumple'], 'note' => 'Todos los contratos deben incluir la garantía de servicios públicos.', 'policies' => [['id' => 47, 'title' => 'Garantía de Servicios Públicos', 'text' => 'Texto de la política 47.']]],
   'estado_termino_contrato' => ['states' => ['No cumple'], 'note' => 'El término mínimo del contrato de arrendamiento es de 12 meses.', 'policies' => []],
 ], ['accounts' => ['Energia' => true, 'Agua' => false, 'Gas' => false], 'internet' => false, 'telefono' => true, 'amparo' => 'Si', 'cobertura' => 36, 'bank' => true, 'study' => true]);
@@ -21,4 +23,5 @@ echo '<form data-cs-form><p data-cs-error hidden></p>'
   . '<select name="tipo_persona_propietario"><option selected>Natural</option><option>Juridica</option></select>'
   . '<select name="tipo_persona_arrendatario"><option>Natural</option><option selected>Juridica</option></select>'
   . '<button type="button" data-cs-next>Siguiente</button></div>'
-  . '<div data-cs-step="2" hidden>' . $checklist . '<button type="submit">Guardar</button></div></form>';
+  . '<div data-cs-step="2" hidden>' . $checklist . '<p data-cs-error hidden></p><button type="submit">Guardar</button></div></form>'
+  . SCM\Modules\ClosingSheets\ClosingSheetDocumentsView::dialogs();

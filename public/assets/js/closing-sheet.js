@@ -239,6 +239,13 @@
       showSuggestion(select.name, "");
       syncPolicy(select.name);
     });
+    checklistChanged();
+  }
+
+  // Los estados cambiados por código no disparan "change": se avisa a los documentos (closing-documents.js) para que
+  // marquen los ítems en «Cumple» sin archivo y actualicen la barra de documentos.
+  function checklistChanged() {
+    form.dispatchEvent(new CustomEvent("cs:checklist-change"));
   }
 
   function syncPolicy(item) {
@@ -307,6 +314,7 @@
       select.value = pending.previous;
       select.dataset.prev = pending.previous;
       syncPolicy(pending.item);
+      checklistChanged();
       select.focus();
     }
     pending = null;

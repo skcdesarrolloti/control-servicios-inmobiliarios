@@ -197,7 +197,9 @@ Las columnas `observacion_respuesta` e `id_revision_servicios_publicos` de `cier
 **Sugerencias.** No se oculta ningún ítem. Al pasar al paso 2, `closing-sheet.js` sugiere estados con los datos del
 mandato (`ClosingSheetService::checklistFacts`) y lo escrito en el paso 1. Solo llena ítems vacíos o que siguen con una
 sugerencia; lo que el funcionario elige no se toca. Si se vuelve al paso 1 y se cambia algo, las sugerencias que nadie
-tocó se recalculan. Cada una dice de dónde sale ("Sugerido: …").
+tocó se recalculan. Cada una dice de dónde sale ("Sugerido: …"). **Adjuntar** sigue activo en todos los ítems, y un
+documento sugerido en «Cumple» sin archivo se marca de inmediato y entra en la lista de **Guardar sin esos archivos**
+(evento `cs:checklist-change` hacia `closing-documents.js`).
 
 | Ítem | Sugerencia |
 | --- | --- |

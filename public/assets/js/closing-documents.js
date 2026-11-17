@@ -341,6 +341,8 @@
     form.addEventListener("change", (event) => {
       if (event.target.matches("select")) sync();
     });
+    // Estados sugeridos o deshechos por closing-sheet.js (sin evento "change").
+    form.addEventListener("cs:checklist-change", sync);
     sync();
 
     let accepted = false;
