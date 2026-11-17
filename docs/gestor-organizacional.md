@@ -30,6 +30,20 @@ Código:
 La opción del menú no se configura por cargo: la tiene todo funcionario porque Mi gestión es de todos
 (`SuCasaControlServiciosInmobiliarios::ORG_MANAGER_TAB`). Lo demás depende de los permisos por acción.
 
+## Menú del usuario
+
+El menú con el nombre del funcionario (arriba a la derecha) tiene accesos de consulta personal, cada uno visible solo si
+el cargo tiene esa pestaña:
+
+| Acceso | Abre |
+| --- | --- |
+| Mis políticas | Gestor organizacional › Mi gestión, en la sección de políticas (`?tab=gestor_organizacional&seccion=politicas`) |
+| Mis funciones | Lo mismo, en la sección de funciones (`seccion=funciones`) |
+| Mis actividades | Inicio › Vencimientos: los casos y tareas del calendario (lo que llega en el recordatorio diario) |
+| Mis presupuestos | Métricas › Mis presupuestos y ejecuciones |
+
+`seccion` acepta `cargo`, `equipo`, `politicas`, `funciones`, `procesos` y `compensaciones`.
+
 ## Permisos
 
 Reemplazan la opción de WordPress `gpo_full_access_cargo_ids` (en producción: cargos 13, 11, 12, 14 y 7) y la pestaña

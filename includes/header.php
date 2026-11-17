@@ -1569,6 +1569,31 @@ foreach ($rawNavItems as $k => $item) {
                 <span class="material-symbols-outlined text-[16px] text-slate-500">assignment_ind</span>
                 Mis Casos Asignados
               </a>
+              <?php
+              // Consultas personales: Mi gestión del Gestor organizacional (políticas y funciones), las tareas del
+              // calendario de vencimientos (lo mismo del recordatorio diario) y el presupuesto propio. Cada una según su pestaña.
+              $userMenuLinks = [
+                ['perms' => ['gestor_organizacional'], 'icon' => 'policy', 'label' => 'Mis políticas', 'url' => $baseUrl . '/index.php?tab=gestor_organizacional&seccion=politicas', 'attrs' => ['data-panel-target' => 'scm-panel-gestor-organizacional', 'data-tab-key' => 'gestor_organizacional', 'data-org-focus' => 'politicas']],
+                ['perms' => ['gestor_organizacional'], 'icon' => 'checklist', 'label' => 'Mis funciones', 'url' => $baseUrl . '/index.php?tab=gestor_organizacional&seccion=funciones', 'attrs' => ['data-panel-target' => 'scm-panel-gestor-organizacional', 'data-tab-key' => 'gestor_organizacional', 'data-org-focus' => 'funciones']],
+                ['perms' => ['vencimientos'], 'icon' => 'calendar_month', 'label' => 'Mis actividades', 'url' => $baseUrl . '/index.php?tab=due', 'attrs' => ['data-panel-target' => 'scm-panel-inicio', 'data-tab-key' => 'due', 'data-subtab-target' => 'due']],
+                ['perms' => ['mis_presupuestos'], 'icon' => 'query_stats', 'label' => 'Mis presupuestos', 'url' => $baseUrl . '/index.php?tab=mis_presupuestos', 'attrs' => ['data-panel-target' => 'scm-panel-mis-presupuestos', 'data-tab-key' => 'mis_presupuestos']],
+              ];
+              foreach ($userMenuLinks as $link):
+                if (!$checkTabPerm($link['perms'])) continue;
+                $attrs = '';
+                foreach ($link['attrs'] as $name => $value) {
+                  $attrs .= ' ' . $name . '="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '"';
+                }
+              ?>
+              <a
+                href="<?php echo htmlspecialchars($link['url'], ENT_QUOTES, 'UTF-8'); ?>"<?php echo $attrs; ?>
+                class="nav-tab-pill flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+                role="menuitem"
+              >
+                <span class="material-symbols-outlined text-[16px] text-slate-500"><?php echo htmlspecialchars($link['icon'], ENT_QUOTES, 'UTF-8'); ?></span>
+                <?php echo htmlspecialchars($link['label'], ENT_QUOTES, 'UTF-8'); ?>
+              </a>
+              <?php endforeach; ?>
               <form method="post" action="<?php echo htmlspecialchars($baseUrl . '/logout.php', ENT_QUOTES, 'UTF-8'); ?>" class="m-0 p-0 border-t border-slate-100">
                 <?php
                 if (class_exists('\SCM\Core\App') && method_exists('\SCM\Core\App', 'csrf')) {

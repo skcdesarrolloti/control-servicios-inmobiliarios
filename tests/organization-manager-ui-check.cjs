@@ -94,6 +94,21 @@ const management = {
   assert.equal((await lastCall('scm_org_cargo_management')).id_cargo, '4', 'Mi equipo se carga al abrirlo');
   console.log('OK Mi gestión: secciones, filtros, equipo y confirmación de lectura');
 
+  // Menú del usuario: «Mis funciones» abre Mi gestión en esa sección aunque se esté en otra pestaña.
+  await page.click('[data-om-tab="politicas"]');
+  await page.waitForSelector('.scm-om-table');
+  await page.evaluate(() => {
+    const link = document.createElement('a');
+    link.href = '#';
+    link.setAttribute('data-org-focus', 'funciones');
+    link.addEventListener('click', (event) => event.preventDefault());
+    document.body.appendChild(link);
+    link.click();
+  });
+  await page.waitForSelector('[data-om-management] [data-om-section="funciones"][open]');
+  assert.equal(await page.locator('[data-om-tab="mi_gestion"][aria-selected="true"]').count(), 1, 'the user menu link opens Mi gestión');
+  console.log('OK Menú del usuario: Mis funciones abre su sección');
+
   // Políticas: listado con insignias y escape; detalle en popup con HTML limpio.
   await page.click('[data-om-tab="politicas"]');
   await page.waitForSelector('.scm-om-table');

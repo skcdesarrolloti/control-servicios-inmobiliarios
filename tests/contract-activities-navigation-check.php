@@ -33,4 +33,21 @@ $check($owners['panel_id'] === 'scm-panel-funcionario-contratos' && $owners['per
 $legal = $rawNavItems['contractuales']['children']['casos_juridicos'];
 $check($legal['panel_id'] === 'scm-panel-casos-juridicos' && $legal['perms'] === ['casos_juridicos'] && str_ends_with($legal['url'], '?tab=casos_juridicos'), 'Casos jurídicos is wired to its own panel.');
 
+// Menú del usuario: consultas personales según las pestañas permitidas del cargo.
+$_GET = ['tab' => 'mine'];
+$allowed_tabs = ['mine', 'gestor_organizacional', 'mis_presupuestos'];
+ob_start();
+include dirname(__DIR__) . '/includes/header.php';
+$html = (string) ob_get_clean();
+$menu = substr($html, (int) strpos($html, 'id="user-dropdown-menu"'), 6000);
+$check(str_contains($menu, 'Mis políticas') && str_contains($menu, 'data-org-focus="politicas"') && str_contains($menu, 'Mis funciones') && str_contains($menu, 'Mis presupuestos'), 'The user menu offers my policies, functions and budgets.');
+$check(!str_contains($menu, 'Mis actividades'), 'Mis actividades needs the Vencimientos tab.');
+$allowed_tabs = ['mine', 'vencimientos'];
+ob_start();
+include dirname(__DIR__) . '/includes/header.php';
+$menu = substr((string) ob_get_clean(), 0);
+$menu = substr($menu, (int) strpos($menu, 'id="user-dropdown-menu"'), 6000);
+$check(str_contains($menu, 'Mis actividades') && str_contains($menu, 'data-subtab-target="due"') && !str_contains($menu, 'Mis presupuestos') && !str_contains($menu, 'Mis políticas'), 'Each personal link follows its tab permission.');
+unset($allowed_tabs);
+
 echo "Contract activities header navigation checks passed.\n";

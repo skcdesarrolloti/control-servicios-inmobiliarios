@@ -343,8 +343,26 @@
       return state.loading;
     }
 
+    // Accesos del menú del usuario (Mis políticas, Mis funciones): abren Mi gestión en esa sección. Llegan por el enlace
+    // pulsado (window.scmOrgFocus) o, al entrar por URL, por ?seccion=.
+    var FOCUS_SECTIONS = ["cargo", "equipo", "politicas", "funciones", "procesos", "compensaciones"];
+    function takeFocus() {
+      var focus = String(window.scmOrgFocus || "");
+      window.scmOrgFocus = "";
+      if (!focus && !state.urlFocusUsed) {
+        state.urlFocusUsed = true;
+        focus = new URLSearchParams(window.location.search).get("seccion") || "";
+      }
+      return FOCUS_SECTIONS.indexOf(focus) !== -1 ? focus : "";
+    }
+
     function load() {
       boot().then(function () {
+        var focus = takeFocus();
+        if (focus) {
+          state.focus = focus;
+          return selectTab("mi_gestion");
+        }
         var first = module.querySelector("[data-om-tab]");
         if (!state.tab) selectTab(first ? first.getAttribute("data-om-tab") : "mi_gestion");
       }).catch(function (error) {
@@ -956,6 +974,14 @@
           + '<button type="button" class="' + UI.navy + '" data-om-management-pdf>' + icon("picture_as_pdf") + "Descargar gestión completa</button></div>"
           + '<div data-om-management>' + managementSections(data, true) + "</div>";
         bindManagement(body.querySelector("[data-om-management]"), data, true);
+        if (state.focus) {
+          var target = body.querySelector('[data-om-section="' + state.focus + '"]');
+          state.focus = "";
+          if (target) {
+            target.open = true;
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }
         body.querySelector("[data-om-management-pdf]").addEventListener("click", function () { viewPdf("Reporte integral de gestión", "scm_org_management_pdf", { id_cargo: 0 }, "gestion.pdf"); });
       }).catch(function (error) {
         body.innerHTML = '<p class="' + UI.empty + '">' + esc(error.message) + "</p>";
@@ -1182,6 +1208,14 @@
       if (event.key === "Escape" && state.modals.length) state.modals[state.modals.length - 1].close();
     });
     module.addEventListener("scm:load-org-manager", load);
+    // Antes de que el panel cambie de pestaña se guarda la sección pedida; si el panel ya estaba abierto, se recarga.
+    document.addEventListener("click", function (event) {
+      var link = event.target.closest && event.target.closest("[data-org-focus]");
+      if (!link) return;
+      window.scmOrgFocus = link.getAttribute("data-org-focus");
+      var current = module.closest(".scm-tab-panel");
+      if (current && current.classList.contains("active")) window.setTimeout(load, 0);
+    }, true);
     var panel = module.closest(".scm-tab-panel");
     if (panel && panel.classList.contains("active")) load();
   }
