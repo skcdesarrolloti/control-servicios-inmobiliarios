@@ -270,7 +270,9 @@
         return;
       }
       saveMessage("");
-      form.requestSubmit(submitter && submitter.isConnected ? submitter : undefined);
+      // requestSubmit no existe en Safari anterior a 16: se dispara el submit que maneja closing-sheet.js.
+      if (typeof form.requestSubmit === "function") form.requestSubmit(submitter && submitter.isConnected ? submitter : undefined);
+      else form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     }
 
     root.addEventListener("click", async (event) => {

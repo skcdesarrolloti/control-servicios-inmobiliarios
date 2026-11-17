@@ -156,8 +156,8 @@ $check($db->getVar('SELECT estado_hoja_cierre FROM wp_jet_cct_contrato_mandato W
 $check(ClosingSheetWorkflow::canReview($closing) && ClosingSheetWorkflow::canRespond($closing), 'a rejected sheet can be reviewed again or answered again');
 
 // Corrección: vuelve a quedar por responder.
-$check($workflow->resubmitIfRejected($closing, date('Y-m-d H:i:s')) && $workflow->closing(430)['estado'] === ClosingSheetWorkflow::STATUS_REVIEWED && $db->getVar('SELECT estado_hoja_cierre FROM wp_jet_cct_contrato_mandato WHERE _ID = 636') === ClosingSheetWorkflow::STATUS_REVIEWED, 'editing a rejected sheet sends it back to be answered');
-$check(!$workflow->resubmitIfRejected($workflow->closing(430), date('Y-m-d H:i:s')), 'only rejected sheets are sent back');
+$check($workflow->resubmitIfAnswered($closing, date('Y-m-d H:i:s')) === 'No aprobada' && $workflow->closing(430)['estado'] === ClosingSheetWorkflow::STATUS_REVIEWED && $db->getVar('SELECT estado_hoja_cierre FROM wp_jet_cct_contrato_mandato WHERE _ID = 636') === ClosingSheetWorkflow::STATUS_REVIEWED, 'editing a rejected sheet sends it back to be answered');
+$check($workflow->resubmitIfAnswered($workflow->closing(430), date('Y-m-d H:i:s')) === '', 'a sheet still waiting for its answer stays as it is');
 
 $workflow->respond(430, ['estado' => 'Aprobada', 'observacion' => ''], $said);
 $closing = $workflow->closing(430);
@@ -167,6 +167,10 @@ $check($fails(static fn() => $workflow->respond(430, ['estado' => 'No aprobada',
 // Listado.
 $listing = $workflow->listing('Aprobada', 'Carrera 32B');
 $check(count($listing['rows']) === 1 && $listing['counts']['Aprobada'] === 1 && $workflow->listing('Aprobada', '999')['rows'] === [], 'the list filters by state and search');
+
+// Editar una hoja aprobada: vuelve a "Esperando respuesta" (hay que aprobarla de nuevo) sin repetir la revisión.
+$check($workflow->resubmitIfAnswered($workflow->closing(430), date('Y-m-d H:i:s')) === 'Aprobada' && $workflow->closing(430)['estado'] === ClosingSheetWorkflow::STATUS_REVIEWED && $db->getVar('SELECT estado_hoja_cierre FROM wp_jet_cct_contrato_mandato WHERE _ID = 636') === ClosingSheetWorkflow::STATUS_REVIEWED && ClosingSheetWorkflow::canRespond($workflow->closing(430)), 'editing an approved sheet sends it back to be approved again');
+$workflow->respond(430, ['estado' => 'Aprobada', 'observacion' => ''], $said);
 
 // Avisos: con funcionarios en Notificaciones internas, los mensajes se arman hasta la cola (en SQLite la cola
 // compartida no se puede crear, así que el primer envío falla justo ahí).

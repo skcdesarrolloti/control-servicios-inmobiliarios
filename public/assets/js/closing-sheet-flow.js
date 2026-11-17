@@ -69,6 +69,9 @@
     if (submitter && submitter.name) body.set(submitter.name, submitter.value);
     if (form.hasAttribute("data-csf-confirm")) {
       var state = body.get("estado");
+      if (state !== "Aprobada" && state !== "No aprobada") {
+        return showError(form, "Elige si la hoja queda aprobada o no aprobada con los botones de abajo.");
+      }
       if (state === "No aprobada" && !String(body.get("observacion") || "").trim()) {
         return showError(form, "Escribe por qué no se aprueba: lo recibe quien hizo la hoja para corregirla.");
       }
@@ -123,11 +126,21 @@
     }
   });
 
+  // Safari anterior a 15.4 (iPhone/iPad sin actualizar) no trae event.submitter: sin él la respuesta llegaba sin
+  // "estado" y Aprobar no hacía nada. Se recuerda el botón pulsado para saber si fue Aprobar o No aprobar.
+  var lastSubmitter = null;
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest && event.target.closest("[data-csf-form] button[type=submit]");
+    if (button) lastSubmitter = button;
+  }, true);
+
   document.addEventListener("submit", function (event) {
     var form = event.target.closest("[data-csf-form]");
     if (!form) return;
     event.preventDefault();
-    submit(form, event.submitter || null);
+    var submitter = event.submitter || (lastSubmitter && form.contains(lastSubmitter) ? lastSubmitter : null);
+    lastSubmitter = null;
+    submit(form, submitter);
   });
 
   document.addEventListener("click", function (event) {

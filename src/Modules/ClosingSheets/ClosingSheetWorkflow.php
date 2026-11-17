@@ -22,7 +22,7 @@ use SCM\Support\SmsQueue;
  *    cuentas en el mandato, fechas de corte en el contrato de arrendamiento si ya existe, historial y contador del
  *    inmueble. La hoja queda "Esperando respuesta"; aviso al propietario y a "Hoja de cierre por responder".
  * 3. Respuesta: "Aprobada" o "No aprobada" con observación, en la hoja y en el mandato; aviso a "Hoja de cierre
- *    respondida" y a quien la creó. Si una hoja no aprobada se corrige, vuelve a "Esperando respuesta".
+ *    respondida" y a quien la creó. Si una hoja ya respondida (aprobada o no) se edita, vuelve a "Esperando respuesta".
  *
  * Los avisos internos salen de Notificaciones internas (sin correos fijos) y cada funcionario recibe su propio enlace
  * firmado (ClosingSheetAccess), para actuar sin iniciar sesión dejando su nombre como autor.
@@ -38,6 +38,8 @@ final class ClosingSheetWorkflow
   public const REVIEW_STATES = [ClosingSheetService::STATUS_NEW, self::STATUS_REVIEWED, self::REJECTED];
   /** Estados en los que se puede aprobar o no aprobar. */
   public const RESPOND_STATES = [self::STATUS_REVIEWED, self::REJECTED];
+  /** Estados que, al editar la hoja, vuelven a "Esperando respuesta" (hay que aprobarla de nuevo). */
+  public const RESUBMIT_STATES = [self::APPROVED, self::REJECTED];
 
   /** Pestañas del listado (hojas-cierre.php). */
   public const LIST_STATES = [ClosingSheetService::STATUS_NEW, self::STATUS_REVIEWED, self::REJECTED, self::APPROVED, 'Realizada'];
@@ -451,17 +453,19 @@ final class ClosingSheetWorkflow
   }
 
   /**
-   * Una hoja no aprobada que se corrige vuelve a "Esperando respuesta" (lo llama ClosingSheetService al editar, dentro
-   * de su transacción). Devuelve true si cambió.
+   * Una hoja ya respondida (aprobada o no) que se edita vuelve a "Esperando respuesta" para que la aprueben de nuevo;
+   * la revisión de servicios no se repite. Lo llama ClosingSheetService al editar, dentro de su transacción.
+   * Devuelve el estado que tenía si cambió, o '' si no (sin revisión todavía, o ya esperando respuesta).
    */
-  public function resubmitIfRejected(array $closing, string $nowSql): bool
+  public function resubmitIfAnswered(array $closing, string $nowSql): string
   {
-    if (self::state($closing) !== self::REJECTED) {
-      return false;
+    $state = self::state($closing);
+    if (!in_array($state, self::RESUBMIT_STATES, true)) {
+      return '';
     }
     $this->update('jet_cct_cierres', (int) $closing['_ID'], ['estado' => self::STATUS_REVIEWED, 'cct_modified' => $nowSql]);
     $this->update('jet_cct_contrato_mandato', (int) ($closing['id_contrato'] ?? 0), ['estado_hoja_cierre' => self::STATUS_REVIEWED, 'cct_modified' => $nowSql]);
-    return true;
+    return $state;
   }
 
   // ---------------------------------------------------------------- avisos
@@ -593,19 +597,20 @@ final class ClosingSheetWorkflow
     return $queued;
   }
 
-  /** Hoja no aprobada que se corrigió: se avisa otra vez a "Hoja de cierre por responder". */
-  public function notifyResubmitted(int $closingId, string $editorName): int
+  /** Hoja ya respondida que se editó: se avisa otra vez a "Hoja de cierre por responder". */
+  public function notifyResubmitted(int $closingId, string $editorName, string $previousState = self::REJECTED): int
   {
-    return $this->safely('resubmit', $closingId, function () use ($closingId, $editorName): int {
+    return $this->safely('resubmit', $closingId, function () use ($closingId, $editorName, $previousState): int {
       $closing = $this->closing($closingId);
-      $subject = 'Hoja de cierre #' . $closingId . ' corregida, por responder';
+      $approved = $previousState === self::APPROVED;
+      $subject = 'Hoja de cierre #' . $closingId . ($approved ? ' editada, por aprobar de nuevo' : ' corregida, por responder');
       return $this->notifyStaff(self::ACTION_TO_RESPOND, $closingId, ClosingSheetAccess::RESPOND, $subject,
         fn(string $name): string => self::p('Hola, <b>' . self::e($name) . '</b>.')
-          . self::p('<b>' . self::e($editorName) . '</b> corrigió la hoja de cierre <b>#' . $closingId . '</b> del ' . self::where($closing) . ', que no había sido aprobada. Volvió a quedar <b>' . self::e(self::STATUS_REVIEWED) . '</b>.')
+          . self::p('<b>' . self::e($editorName) . '</b> ' . ($approved ? 'editó' : 'corrigió') . ' la hoja de cierre <b>#' . $closingId . '</b> del ' . self::where($closing) . ', que ' . ($approved ? 'ya estaba aprobada' : 'no había sido aprobada') . '. Volvió a quedar <b>' . self::e(self::STATUS_REVIEWED) . '</b>' . ($approved ? ' y hay que aprobarla de nuevo' : '') . '. La revisión de servicios se conserva.')
           . self::p('El botón abre la hoja con tu usuario para responderla, sin iniciar sesión. Vence en 30 días.'),
         'Responder hoja de cierre', self::TEMPLATE_TO_RESPOND,
-        fn(string $name): array => [$name, '#' . $closingId, self::place($closing), $editorName, 'Hoja corregida después de no aprobarse'],
-        'Hoja de cierre #' . $closingId . ' corregida, por responder.', [], (string) time());
+        fn(string $name): array => [$name, '#' . $closingId, self::place($closing), $editorName, $approved ? 'Hoja editada después de aprobarse' : 'Hoja corregida después de no aprobarse'],
+        'Hoja de cierre #' . $closingId . ($approved ? ' editada, por aprobar de nuevo.' : ' corregida, por responder.'), [], (string) time());
     });
   }
 

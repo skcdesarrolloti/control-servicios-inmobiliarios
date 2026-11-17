@@ -194,6 +194,7 @@ final class ClosingSheetService
     return [
       'mode' => $closing !== [] ? 'editar' : 'crear',
       'closing_id' => $closingId,
+      'state' => trim((string) ($closing['estado'] ?? '')),
       'ids' => $ids,
       'values' => $values,
       'owners' => $this->owners($mandate, $ids, $closing),
@@ -470,7 +471,7 @@ final class ClosingSheetService
    * Guarda la hoja (crea si $closingId = 0).
    * @param array<string,mixed> $input POST ya limpio
    * @param array{employee_id:string,name:string,email:string,branch:string} $sender
-   * @return array{id:int,mode:string,url:string,edit_url:string,synced:list<string>,notified:int}
+   * @return array{id:int,mode:string,url:string,edit_url:string,synced:list<string>,resubmitted:bool,resubmitted_from:string,notified:int}
    */
   public function save(array $input, array $sender, int $closingId = 0): array
   {
@@ -510,8 +511,8 @@ final class ClosingSheetService
       } else {
         $current = $this->row('jet_cct_cierres', $closingId);
         $this->update('jet_cct_cierres', $closingId, $closingData + ['cct_modified' => $nowSql]);
-        // Una hoja no aprobada que se corrige vuelve a quedar por responder.
-        $resubmitted = (new ClosingSheetWorkflow($this->db))->resubmitIfRejected($current, $nowSql);
+        // Una hoja ya respondida (aprobada o no) que se edita vuelve a quedar por responder; la revisión se conserva.
+        $resubmittedFrom = (new ClosingSheetWorkflow($this->db))->resubmitIfAnswered($current, $nowSql);
       }
 
       $synced = $this->syncMandate($mandate, $values, $owners, $creating ? $closingId : 0, $nowSql);
@@ -541,7 +542,7 @@ final class ClosingSheetService
       }
       throw $error;
     }
-    $resubmitted ??= false;
+    $resubmittedFrom ??= '';
     $workflow = new ClosingSheetWorkflow($this->db);
     return [
       'id' => $closingId,
@@ -549,8 +550,9 @@ final class ClosingSheetService
       'url' => self::publicUrl($closingId),
       'edit_url' => 'hoja-cierre.php?' . http_build_query(['id_cierre' => $closingId], '', '&', PHP_QUERY_RFC3986),
       'synced' => $synced,
-      'resubmitted' => $resubmitted,
-      'notified' => $creating ? $this->notifySafely($closingId, $sender) : ($resubmitted ? $workflow->notifyResubmitted($closingId, $sender['name']) : 0),
+      'resubmitted' => $resubmittedFrom !== '',
+      'resubmitted_from' => $resubmittedFrom,
+      'notified' => $creating ? $this->notifySafely($closingId, $sender) : ($resubmittedFrom !== '' ? $workflow->notifyResubmitted($closingId, $sender['name'], $resubmittedFrom) : 0),
     ];
   }
 

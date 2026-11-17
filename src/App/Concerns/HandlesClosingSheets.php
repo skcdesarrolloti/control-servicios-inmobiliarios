@@ -54,7 +54,7 @@ trait HandlesClosingSheets
     $this->jsonOk([
       'title' => $creating ? 'Hoja de cierre #' . $result['id'] . ' creada' : 'Hoja de cierre #' . $result['id'] . ' actualizada',
       'message' => ($creating ? 'Quedó en "' . ClosingSheetService::STATUS_NEW . '" y se avisó al equipo para la revisión de servicios públicos.' : 'Los cambios quedaron guardados.')
-        . ($result['resubmitted'] ? ' Como no estaba aprobada, volvió a quedar "Esperando respuesta" y se avisó para responderla.' : '') . $synced,
+        . ($result['resubmitted'] ? ' Como ' . ($result['resubmitted_from'] === ClosingSheetWorkflow::APPROVED ? 'ya estaba aprobada' : 'no estaba aprobada') . ', volvió a quedar "Esperando respuesta" y se avisó para aprobarla de nuevo.' : '') . $synced,
       'url' => $result['url'],
       'edit_url' => $result['edit_url'],
       'id' => $result['id'],

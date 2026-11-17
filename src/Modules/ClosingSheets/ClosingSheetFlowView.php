@@ -130,7 +130,8 @@ final class ClosingSheetFlowView
     if ($can['review'] && ClosingSheetWorkflow::canReview($closing)) {
       $actions .= '<a class="cs-primary" href="' . self::e($links['review']) . '"><span class="material-symbols-outlined" aria-hidden="true">fact_check</span> ' . ($sheet['review'] !== null ? 'Repetir revisión de servicios' : 'Hacer revisión de servicios') . '</a>';
     }
-    if ($can['edit'] && !in_array($state, [ClosingSheetWorkflow::APPROVED, 'Realizada'], true)) {
+    // Editar una hoja aprobada la devuelve a "Esperando respuesta"; una realizada ya tiene contrato.
+    if ($can['edit'] && $state !== 'Realizada') {
       $actions .= '<a class="cs-secondary" href="' . self::e($links['edit']) . '"><span class="material-symbols-outlined" aria-hidden="true">edit</span> Editar hoja</a>';
     }
     // El formulario para responder va al final, después de leer la hoja; arriba solo un atajo hasta él.

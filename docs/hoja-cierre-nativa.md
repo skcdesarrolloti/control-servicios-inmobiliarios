@@ -9,12 +9,14 @@ Reemplaza los formularios JetForm "Añadir hoja de cierre de negocio", "Editar h
 | En verificacion de servicios | Se creó la hoja (`hoja-cierre.php`). | Notificaciones internas › **Hoja de cierre creada**, con su enlace para hacer la revisión. Copia a quien la creó. |
 | Esperando respuesta | Se registró la revisión de servicios antes de la ocupación (`revision-servicios-cierre.php`). | El propietario y los copropietarios (correo y, si está activo, WhatsApp). Notificaciones internas › **Hoja de cierre por responder**, con su enlace para responder. |
 | Aprobada / No aprobada | Se respondió (`hoja-cierre-ver.php`), con observación obligatoria si no se aprueba. | Notificaciones internas › **Hoja de cierre respondida** y quien hizo la hoja. |
-| Esperando respuesta (otra vez) | Se editó una hoja no aprobada. | **Hoja de cierre por responder**. |
+| Esperando respuesta (otra vez) | Se editó una hoja ya respondida (aprobada o no aprobada). Hay que aprobarla de nuevo; la revisión de servicios se conserva. | **Hoja de cierre por responder**. |
 | Realizada | Se creó el contrato desde "No asignado". | (sin cambios) |
 
 - La revisión se puede repetir mientras la hoja no esté aprobada.
 - La respuesta se puede cambiar mientras esté "No aprobada".
-- Una hoja aprobada no admite cambios.
+- Editar una hoja que todavía no tiene revisión ("En verificacion de servicios") o que ya está "Esperando respuesta" no cambia su estado.
+- Una hoja aprobada no admite otra revisión ni otra respuesta. Si se edita, vuelve a "Esperando respuesta" y hay que aprobarla de nuevo (el formulario lo advierte antes de guardar).
+- Una hoja "Realizada" (ya tiene contrato) no muestra **Editar hoja**.
 
 ## Enlaces sin iniciar sesión
 
@@ -51,7 +53,7 @@ En **Tipos de actas y enlaces › Generar enlace** se arma el enlace completo co
   - el cierre "Realizado por": quién elaboró, verificó y autorizó, con fecha y la imagen de `firma` de Funcionarios si existe;
   - el pie con los datos de la empresa.
 
-  Desde ahí se aprueba o no, se hace la revisión, se edita y se imprime. No lleva la barra superior del panel: el documento tiene su propio membrete. Se imprime en A4 sin botones ni formularios.
+  Desde ahí se aprueba o no, se hace la revisión, se edita y se imprime. El botón **Aprobar** / **No aprobar** no depende de `event.submitter` (Safari anterior a 15.4 no lo trae): se recuerda el botón pulsado. No lleva la barra superior del panel: el documento tiene su propio membrete. Se imprime en A4 sin botones ni formularios.
 - `revision-servicios-cierre.php?numero=<hoja>`: revisión de servicios antes de la ocupación. Por cada servicio pide NIC, póliza o contrato; medidor; fecha de corte; resultado en tiempo (glosario 998) y resultado en valores.
 - **Actividades Administrativas › Hojas de Cierre**, dentro del panel:
   - pestañas por estado con su cantidad y búsqueda;
@@ -166,8 +168,8 @@ aseguradora y ticket); no se usa la API REST de JetEngine.
   `estado_administrativo`) y su historial, CCT `inmuebles`, metas del post `inmuebles` y ficha del arrendatario (con
   tipo de persona y representante).
 - Correos al crear: funcionarios del evento **Notificaciones internas → Hoja de cierre creada** (cada uno con su enlace
-  para la revisión) y copia al creador. Editar no envía correos, salvo que la hoja estuviera "No aprobada": vuelve a
-  "Esperando respuesta" y se avisa a **Hoja de cierre por responder**.
+  para la revisión) y copia al creador. Editar no envía correos, salvo que la hoja estuviera "Aprobada" o "No aprobada": vuelve a
+  "Esperando respuesta" y se avisa a **Hoja de cierre por responder** para aprobarla de nuevo.
 
 ## Borrador automático
 

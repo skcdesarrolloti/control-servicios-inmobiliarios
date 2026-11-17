@@ -67,6 +67,9 @@ final class ClosingSheetPageView
       <?php foreach ($context['ids'] as $key => $value): ?><input type="hidden" name="<?= $h($key) ?>" value="<?= $h($value) ?>">
       <?php endforeach; ?>
 
+      <?php if (!$creating && in_array($context['state'] ?? '', ClosingSheetWorkflow::RESUBMIT_STATES, true)): ?>
+      <p class="cs-note cs-resubmit-note" role="status"><span class="material-symbols-outlined" aria-hidden="true">info</span> Esta hoja está <strong><?= $h($context['state']) ?></strong>. Al guardar los cambios vuelve a quedar <strong><?= $h(ClosingSheetWorkflow::STATUS_REVIEWED) ?></strong> y se avisa para aprobarla de nuevo. La revisión de servicios públicos se conserva.</p>
+      <?php endif; ?>
       <ol class="cs-steps" aria-label="Pasos">
         <li class="is-active" data-cs-step-tab="1"><span>1</span> Datos del negocio</li>
         <li data-cs-step-tab="2"><span>2</span> Lista de chequeo</li>

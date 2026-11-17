@@ -210,7 +210,7 @@ $check($ticket['estado'] === 'En proceso' && $ticket['estado_comercial'] === 'En
 $check($db->getVar('SELECT tipo_reporte FROM wp_jet_cct_historial_del_inmueble') === 'En cierre' && $db->getVar('SELECT nombre FROM wp_jet_cct_arrendatarios WHERE _ID = 764') === 'Juan Alberto Palacio' && $db->getVar('SELECT administrador FROM wp_jet_cct_copropiedades WHERE _ID = 273') === 'Daniel Ramírez', 'property history, tenant and building are updated');
 $check($fails(fn() => $service->save($input, $sender), 'hace un momento') !== 'no falló', 'a double submit does not create a second sheet');
 
-// Editar: sin lista de chequeo, sin cambiar el estado; lo oculto no borra el mandato.
+// Editar: lo oculto no borra el mandato. Una hoja aprobada vuelve a "Esperando respuesta" para aprobarla de nuevo.
 $db->update('wp_jet_cct_cierres', ['estado' => 'Aprobada'], ['_ID' => $result['id']]);
 $edit = $service->context([], $result['id']);
 $check($edit['mode'] === 'editar' && $edit['values']['dias_gracia'] === '30' && $edit['owners'][1]['percent'] === '40', 'edit loads the saved sheet and shares');
@@ -220,7 +220,7 @@ $service->save($editInput, $sender, $result['id']);
 $closing = $db->getRow('SELECT * FROM wp_jet_cct_cierres WHERE _ID = ?', [$result['id']]);
 $mandate = $db->getRow('SELECT * FROM wp_jet_cct_contrato_mandato WHERE _ID = 636');
 $check($closing['ob_documentos_juridicos'] === $edit['values']['ob_documentos_juridicos'] && $closing['estado_certificado_tradicion'] === 'No cumple', 'edit saves checklist states and keeps unchanged notes as they were');
-$check($closing['estado'] === 'Aprobada' && $closing['dias_gracia'] === '15' && $closing['copropiedad'] === '' && $closing['porcentaje_2'] === '50', 'edit keeps the status and saves the visible data');
+$check($closing['estado'] === 'Esperando respuesta' && $mandate['estado_hoja_cierre'] === 'Esperando respuesta' && $closing['dias_gracia'] === '15' && $closing['copropiedad'] === '' && $closing['porcentaje_2'] === '50', 'editing an approved sheet sends it back to be approved and saves the visible data');
 $check($mandate['dias_gracia'] === '15' && $mandate['propiedad_horizontal'] === 'No' && $mandate['copropiedad'] === 'Salvador de Bahía' && $mandate['porcentaje_2'] === '50' && $mandate['id_hoja_cierre'] === (string) $result['id'], 'edit updates the mandate without erasing hidden data');
 $check((int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket') === 1, 'edit does not repeat ticket history');
 
