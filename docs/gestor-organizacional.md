@@ -148,6 +148,16 @@ Encabezado «SKC SuCasa Inmobiliaria», sin sucursal y con «Generado por … el
 
 ## Aplicar en producción
 
+**Estado (2026-11-17):** pasos 1 a 4 aplicados.
+
+- Las 12 columnas de `politicas` existen.
+- Migración: 132 políticas de Empleados y 64 de Proveedores (48 con política base y 16 sin base). Ningún título conserva
+  el sufijo «(Prov.)».
+- Historial: 196 versiones iniciales.
+- Respaldo de las filas originales: `storage/data/cct-backups/politicas-migracion-20261117-120805.json`.
+
+Quedan pendientes los pasos 5 a 7.
+
 1. Ver el plan de columnas (no escribe):
 
    ```bash
