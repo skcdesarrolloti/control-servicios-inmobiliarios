@@ -21,11 +21,15 @@ Código:
 
 | Pestaña | Qué hace | Quién la ve |
 | --- | --- | --- |
-| **Mi gestión** | El cargo del funcionario y su perfil, **Mi equipo** (los cargos de `cargos_a_cargo`, que se cargan al abrirlos), mis políticas (con **Leí y entiendo**), mis funciones, los procesos de las áreas del cargo y mis compensaciones, agrupados por área y con buscador y filtro de área por sección. **Descargar gestión completa** genera el PDF. | Todo funcionario |
+| **Mi gestión** | El cargo del funcionario y su perfil, **Mi equipo** (los cargos de `cargos_a_cargo`, que se cargan al abrirlos), mis políticas (con **Leí y entiendo**) y mis funciones, agrupados por área y con buscador y filtro de área por sección. **Descargar gestión completa** genera el PDF. | Todo funcionario |
 | **Gestión por cargo** | Lo mismo para un cargo elegido, con su PDF. | Su propio cargo y los que tiene a cargo; cualquier cargo con *org_manager_view* |
-| **Áreas, Cargos, Políticas, Procesos, Funciones, Compensaciones, Funcionarios** | Listados con los filtros del plugin: título y detalle (con espera al escribir), área, cargo y activo; en políticas también estado, audiencia y «sin área». Crear, editar y eliminar en popups. Cargos tiene **Perfil**. | *org_manager_view* |
+| **Áreas, Cargos, Políticas, Funciones, Funcionarios** | Listados con los filtros del plugin: título y detalle (con espera al escribir), área, cargo y activo; en políticas también estado, audiencia y «sin área». Crear, editar y eliminar en popups. Cargos tiene **Perfil**. | *org_manager_view* |
 | **Traslados** | Pasa inmuebles (con su postmeta), precaptaciones, retoques y tickets de un funcionario a otro. | *org_manager_transfer* |
 | **Bitácora** | Quién creó, editó, eliminó o desactivó cada registro. | *org_manager_view* |
+
+**Procesos y compensaciones ya no se usan** (2026-11-17): no tienen pestaña, no salen en Mi gestión ni en el PDF de
+gestión, y el campo *Proceso* de una política solo aparece si ya tenía uno. Las tablas `wp_jet_cct_procesos` y
+`wp_jet_cct_compensaciones` y sus datos quedan intactos.
 
 La opción del menú no se configura por cargo: la tiene todo funcionario porque Mi gestión es de todos
 (`SuCasaControlServiciosInmobiliarios::ORG_MANAGER_TAB`). Lo demás depende de los permisos por acción.
@@ -37,12 +41,16 @@ el cargo tiene esa pestaña:
 
 | Acceso | Abre |
 | --- | --- |
-| Mis políticas | Gestor organizacional › Mi gestión, en la sección de políticas (`?tab=gestor_organizacional&seccion=politicas`) |
-| Mis funciones | Lo mismo, en la sección de funciones (`seccion=funciones`) |
-| Mis actividades | Inicio › Vencimientos: los casos y tareas del calendario (lo que llega en el recordatorio diario) |
+| Mis políticas | Popup propio sobre la vista actual: solo las políticas del funcionario, primero las que faltan por confirmar, con filtros (Por confirmar, Leídas, Todas), buscador, **Leer** y **Leí y entiendo**. |
+| Mis funciones | Popup propio: las funciones del cargo agrupadas por frecuencia, con buscador. |
+| Mis actividades | Popup propio: las tareas del calendario de vencimientos **asignadas a la persona** (lo mismo del recordatorio diario), separadas en Vencidas, Vencen hoy y Próximas este mes, con el botón para abrir cada caso; aparte, las del cargo sin responsable. Al cerrar un caso abierto desde ahí vuelve a la lista. |
 | Mis presupuestos | Métricas › Mis presupuestos y ejecuciones |
 
-`seccion` acepta `cargo`, `equipo`, `politicas`, `funciones`, `procesos` y `compensaciones`.
+Los tres popups los registran `organization-manager.js` (políticas, funciones) y `admin-dashboard-runtime.js`
+(actividades) en `window.scmMyViews`; `includes/footer.php` los abre desde el menú (`data-scm-my-view`). Si el panel no
+está en la página se sigue el enlace, que abre el mismo popup al cargar (`?mi_vista=politicas|funciones|actividades`).
+Cada popup tiene un botón para ir a la vista completa (Mi gestión o el calendario). Pruebas:
+`tests/organization-manager-ui-check.cjs` y `tests/my-activities-check.cjs`.
 
 ## Permisos
 

@@ -345,7 +345,7 @@
 
     // Accesos del menú del usuario (Mis políticas, Mis funciones): abren Mi gestión en esa sección. Llegan por el enlace
     // pulsado (window.scmOrgFocus) o, al entrar por URL, por ?seccion=.
-    var FOCUS_SECTIONS = ["cargo", "equipo", "politicas", "funciones", "procesos", "compensaciones"];
+    var FOCUS_SECTIONS = ["cargo", "equipo", "politicas", "funciones"];
     function takeFocus() {
       var focus = String(window.scmOrgFocus || "");
       window.scmOrgFocus = "";
@@ -670,7 +670,8 @@
         if (policyColumn("fecha_revision")) html += fieldWrap("Fecha de revisión", textInput("fecha_revision", r.fecha_revision, { type: "date" }));
         if (policyColumn("fecha_proxima_revision")) html += fieldWrap("Próxima revisión", textInput("fecha_proxima_revision", r.fecha_proxima_revision, { type: "date" }));
         if (policyColumn("categoria")) html += fieldWrap("Categoría", textInput("categoria", r.categoria, { maxlength: 120 }));
-        if (policyColumn("id_proceso")) html += fieldWrap("Proceso", select("id_proceso", c.procesos.map(function (p) { return [p.id, p.nombre]; }), r.id_proceso, "Sin proceso"));
+        // Procesos ya no se usan: el campo solo aparece si la política ya tenía uno.
+        if (policyColumn("id_proceso") && r.id_proceso) html += fieldWrap("Proceso", select("id_proceso", c.procesos.map(function (p) { return [p.id, p.nombre]; }), r.id_proceso, "Sin proceso"));
         html += fieldWrap("Texto de la política", '<div class="scm-om-editor"><div data-om-editor></div></div>', { required: true, wide: true }) + "</form>";
         modal.body.innerHTML = html;
         modal.el.querySelector(".scm-om-modal-card").insertAdjacentHTML("beforeend", '<footer class="scm-om-modal-actions">' + closeButton("Cancelar") + '<button type="button" class="' + UI.secondary + '" data-om-preview>' + icon("preview") + "Vista previa</button>"
@@ -895,12 +896,6 @@
       html += section("funciones", mine ? "Mis funciones" : "Funciones", "checklist", (data.funciones || []).length, groupedByArea(data.funciones || [], function (item) {
         return '<div class="scm-om-title scm-om-pre">' + esc(item.funcion) + "</div>" + (item.frecuencia ? '<div class="scm-om-sub">Frecuencia: ' + esc(item.frecuencia) + "</div>" : "");
       }, "Sin funciones asignadas."), false, true);
-      html += section("procesos", "Procesos del área", "account_tree", (data.procesos || []).length, groupedByArea(data.procesos || [], function (item) {
-        return "<h4>" + esc(item.nombre) + "</h4>" + (item.alcance ? '<div class="scm-om-sub">Alcance: ' + esc(item.alcance) + "</div>" : "") + (item.definicion ? '<div class="scm-om-sub">Definición: ' + esc(item.definicion) + "</div>" : "");
-      }, "Sin procesos asignados."), false, true);
-      html += section("compensaciones", mine ? "Mis compensaciones" : "Compensaciones", "payments", (data.compensaciones || []).length, groupedByArea(data.compensaciones || [], function (item) {
-        return '<div class="scm-om-title scm-om-pre">' + esc(item.base_compensacion) + "</div>" + (item.condicionado_a ? '<div class="scm-om-sub">Condicionado a: ' + esc(item.condicionado_a) + "</div>" : "");
-      }, "Sin compensaciones registradas."), false, true);
       return html;
     }
     function bindManagement(container, data, mine) {
@@ -970,7 +965,7 @@
       post("scm_org_my_management", {}).then(function (data) {
         if (state.tab !== "mi_gestion") return;
         body.innerHTML = '<div class="' + UI.card + ' !sp-p-4 !sp-mb-4 !sp-flex !sp-flex-col md:!sp-flex-row md:!sp-items-center !sp-justify-between !sp-gap-3">'
-          + '<div><p class="scm-om-rel">Mi gestión</p><p class="!sp-m-0 !sp-text-base !sp-font-bold">' + esc(data.funcionario.nombre) + '</p><p class="' + UI.muted + '">Tu cargo, tus políticas, funciones, procesos y compensaciones.</p></div>'
+          + '<div><p class="scm-om-rel">Mi gestión</p><p class="!sp-m-0 !sp-text-base !sp-font-bold">' + esc(data.funcionario.nombre) + '</p><p class="' + UI.muted + '">Tu cargo, tus políticas y tus funciones.</p></div>'
           + '<button type="button" class="' + UI.navy + '" data-om-management-pdf>' + icon("picture_as_pdf") + "Descargar gestión completa</button></div>"
           + '<div data-om-management>' + managementSections(data, true) + "</div>";
         bindManagement(body.querySelector("[data-om-management]"), data, true);
@@ -986,6 +981,139 @@
       }).catch(function (error) {
         body.innerHTML = '<p class="' + UI.empty + '">' + esc(error.message) + "</p>";
       });
+    }
+
+    // --- Mis políticas y Mis funciones (menú del usuario) -----------------------------------------------------
+    // Popups propios sobre la vista donde esté la persona: solo lo suyo, sin pestañas del Gestor ni acordeones.
+    function openMineInManager(section, modal) {
+      modal.close();
+      window.scmOrgFocus = section;
+      var link = document.querySelector('.nav-tab-pill[data-tab-key="gestor_organizacional"]');
+      var current = module.closest(".scm-tab-panel");
+      if (current && current.classList.contains("active")) load();
+      else if (link) link.click();
+    }
+    function mineFilters(filters) {
+      // Un solo filtro no aporta nada: queda solo la búsqueda.
+      return '<div class="scm-om-mine-tools"><div class="scm-om-mine-chips" role="group" aria-label="Filtrar"' + (filters.length < 2 ? " hidden" : "") + ">" + filters.map(function (f) {
+        return '<button type="button" class="scm-om-mine-chip" data-om-mine-filter="' + esc(f[0]) + '" aria-pressed="' + (f[3] ? "true" : "false") + '">' + esc(f[1]) + " <span>" + f[2] + "</span></button>";
+      }).join("") + '</div><input type="search" class="' + UI.input + ' !sp-max-w-[280px]" placeholder="Buscar…" aria-label="Buscar" data-om-mine-search></div>';
+    }
+    // Filtro (chips) y búsqueda sobre las filas [data-om-mine-item]; los grupos sin filas visibles se ocultan.
+    function bindMineFilters(modal) {
+      var pressed = modal.body.querySelector('[data-om-mine-filter][aria-pressed="true"]');
+      var current = pressed ? pressed.getAttribute("data-om-mine-filter") : "todas";
+      function apply() {
+        var term = fold((modal.body.querySelector("[data-om-mine-search]") || {}).value || "");
+        var shown = 0;
+        modal.body.querySelectorAll("[data-om-mine-item]").forEach(function (item) {
+          var ok = (current === "todas" || item.getAttribute("data-state") === current) && (!term || fold(item.textContent).indexOf(term) !== -1);
+          item.hidden = !ok;
+          if (ok) shown++;
+        });
+        modal.body.querySelectorAll("[data-om-mine-group]").forEach(function (group) {
+          group.hidden = !group.querySelector("[data-om-mine-item]:not([hidden])");
+        });
+        var empty = modal.body.querySelector("[data-om-mine-empty]");
+        if (empty) empty.hidden = shown > 0;
+      }
+      modal.body.addEventListener("input", function (event) { if (event.target.matches("[data-om-mine-search]")) apply(); });
+      modal.body.addEventListener("click", function (event) {
+        var chip = event.target.closest("[data-om-mine-filter]");
+        if (!chip) return;
+        current = chip.getAttribute("data-om-mine-filter");
+        modal.body.querySelectorAll("[data-om-mine-filter]").forEach(function (button) { button.setAttribute("aria-pressed", button === chip ? "true" : "false"); });
+        apply();
+      });
+      apply();
+      return apply;
+    }
+
+    function myPolicyRow(item) {
+      var stateBadge = item.leida ? badge("Leída", "leida") : badge("Por confirmar lectura", "pendiente");
+      return '<div class="scm-om-mine-row" data-om-mine-item data-state="' + (item.leida ? "leida" : "pendiente") + '" data-om-mine-policy="' + esc(item._ID) + '">'
+        + '<div class="scm-om-mine-main"><p class="scm-om-mine-title">' + esc(item.titulo) + "</p>"
+        + '<div class="scm-om-badges">' + badge(item.codigo, "code") + (policyColumn("version") ? badge("Versión " + (item.version || 1), "") : "") + stateBadge + "</div></div>"
+        + '<div class="scm-om-mine-actions"><button type="button" class="' + UI.secondary + '" data-om-mine-read="' + esc(item._ID) + '">' + icon("menu_book") + "Leer</button>"
+        + (item.leida ? "" : '<button type="button" class="' + UI.primary + '" data-om-mine-confirm="' + esc(item._ID) + '">' + icon("task_alt") + "Leí y entiendo</button>") + "</div></div>";
+    }
+
+    function openMyPolicies() {
+      var modal = openModal({ title: "Mis políticas", kicker: "Mi gestión", body: '<p class="' + UI.muted + '">' + spinner() + " Cargando tus políticas…</p>", actions: '<button type="button" class="' + UI.secondary + '" data-om-mine-manager>' + icon("open_in_new") + "Ver en Mi gestión</button>" + closeButton() });
+      modal.footer.querySelector("[data-om-mine-manager]").addEventListener("click", function () { openMineInManager("politicas", modal); });
+      boot().then(function () { return post("scm_org_my_management", {}); }).then(function (data) {
+        var policies = (data.politicas || []).slice().sort(function (a, b) {
+          if (!a.leida !== !b.leida) return a.leida ? 1 : -1;
+          return String(a.titulo || "").localeCompare(String(b.titulo || ""), "es");
+        });
+        var pending = policies.filter(function (p) { return !p.leida; }).length;
+        if (!policies.length) {
+          modal.body.innerHTML = '<p class="' + UI.empty + '">No tienes políticas asignadas a tu cargo.</p>';
+          return;
+        }
+        modal.body.innerHTML = '<p class="scm-om-mine-summary">' + (pending
+          ? "Tienes <strong>" + pending + "</strong> " + (pending === 1 ? "política" : "políticas") + " por confirmar de " + policies.length + ". Léelas y confirma con «Leí y entiendo»."
+          : "Confirmaste la lectura de tus " + policies.length + " políticas. Si alguna cambia de versión, te pediremos confirmarla de nuevo.") + "</p>"
+          + mineFilters([["pendiente", "Por confirmar", pending, pending > 0], ["leida", "Leídas", policies.length - pending, false], ["todas", "Todas", policies.length, pending === 0]])
+          + '<div class="scm-om-mine-list">' + policies.map(myPolicyRow).join("") + '<p class="' + UI.empty + '" data-om-mine-empty hidden>Nada coincide con el filtro.</p></div>';
+        var refresh = bindMineFilters(modal);
+        function markRow(id) {
+          var row = modal.body.querySelector('[data-om-mine-policy="' + id + '"]');
+          var item = policies.find(function (p) { return String(p._ID) === String(id); });
+          if (!row || !item || item.leida) return;
+          item.leida = "1";
+          row.outerHTML = myPolicyRow(item);
+          var left = policies.filter(function (p) { return !p.leida; }).length;
+          var chips = modal.body.querySelectorAll("[data-om-mine-filter] span");
+          if (chips.length === 3) { chips[0].textContent = left; chips[1].textContent = policies.length - left; }
+          var summary = modal.body.querySelector(".scm-om-mine-summary");
+          if (summary) summary.innerHTML = left ? "Tienes <strong>" + left + "</strong> " + (left === 1 ? "política" : "políticas") + " por confirmar de " + policies.length + "." : "Confirmaste la lectura de tus " + policies.length + " políticas.";
+          refresh();
+        }
+        modal.body.addEventListener("click", function (event) {
+          var read = event.target.closest("[data-om-mine-read]");
+          if (read) openPolicyDetail(read.getAttribute("data-om-mine-read"), function () { markRow(read.getAttribute("data-om-mine-read")); });
+          var quick = event.target.closest("[data-om-mine-confirm]");
+          if (!quick) return;
+          var id = quick.getAttribute("data-om-mine-confirm");
+          var item = policies.find(function (p) { return String(p._ID) === id; }) || {};
+          confirmModal({
+            title: "Confirmar lectura", kicker: "Mis políticas", confirm: "Leí y entiendo",
+            body: "<p class=\"!sp-text-sm\">Confirmas que leíste y entiendes la política <strong>«" + esc(item.titulo) + "»</strong> (versión " + esc(item.version || "1") + ").</p><p class=\"" + UI.muted + "\">Si la política cambia de versión se te pedirá confirmarla de nuevo.</p>",
+            onConfirm: function () { return post("scm_org_policy_confirm", { id: id }).then(function () { notify("success", "Lectura confirmada."); markRow(id); }); },
+          });
+        });
+      }).catch(function (error) { modal.body.innerHTML = '<p class="scm-om-form-error">' + esc(error.message) + "</p>"; });
+    }
+
+    function openMyFunctions() {
+      var modal = openModal({ title: "Mis funciones", kicker: "Mi gestión", body: '<p class="' + UI.muted + '">' + spinner() + " Cargando tus funciones…</p>", actions: '<button type="button" class="' + UI.secondary + '" data-om-mine-manager>' + icon("open_in_new") + "Ver en Mi gestión</button>" + closeButton() });
+      modal.footer.querySelector("[data-om-mine-manager]").addEventListener("click", function () { openMineInManager("funciones", modal); });
+      boot().then(function () { return post("scm_org_my_management", {}); }).then(function (data) {
+        var functions = data.funciones || [];
+        var cargos = (data.cargos || []).map(function (c) { return c.nombre_cargo; }).filter(Boolean);
+        if (!functions.length) {
+          modal.body.innerHTML = '<p class="' + UI.empty + '">Tu cargo no tiene funciones registradas.</p>';
+          return;
+        }
+        // Agrupadas por frecuencia (Diaria, Semanal…), en el orden en que aparecen; las que no la tienen van al final.
+        var groups = {};
+        var order = [];
+        functions.forEach(function (item) {
+          var key = String(item.frecuencia || "").trim() || "Sin frecuencia definida";
+          if (!groups[key]) { groups[key] = []; order.push(key); }
+          groups[key].push(item);
+        });
+        order.sort(function (a, b) { return (a === "Sin frecuencia definida") - (b === "Sin frecuencia definida"); });
+        modal.body.innerHTML = '<p class="scm-om-mine-summary">' + (cargos.length ? "Cargo: <strong>" + esc(cargos.join(", ")) + "</strong> · " : "") + functions.length + (functions.length === 1 ? " función" : " funciones") + ".</p>"
+          + mineFilters([["todas", "Todas", functions.length, true]].concat(order.length > 1 ? order.map(function (key) { return [key, key, groups[key].length, false]; }) : []))
+          + '<div class="scm-om-mine-list">' + order.map(function (key) {
+            return '<section data-om-mine-group><p class="scm-om-group-title">' + esc(key) + "</p><ol class=\"scm-om-mine-functions\">" + groups[key].map(function (item) {
+              return '<li data-om-mine-item data-state="' + esc(key) + '"><span class="scm-om-pre">' + esc(item.funcion) + "</span></li>";
+            }).join("") + "</ol></section>";
+          }).join("") + '<p class="' + UI.empty + '" data-om-mine-empty hidden>Nada coincide con la búsqueda.</p></div>';
+        bindMineFilters(modal);
+      }).catch(function (error) { modal.body.innerHTML = '<p class="scm-om-form-error">' + esc(error.message) + "</p>"; });
     }
 
     function renderCargoManagement() {
@@ -1208,14 +1336,14 @@
       if (event.key === "Escape" && state.modals.length) state.modals[state.modals.length - 1].close();
     });
     module.addEventListener("scm:load-org-manager", load);
-    // Antes de que el panel cambie de pestaña se guarda la sección pedida; si el panel ya estaba abierto, se recarga.
-    document.addEventListener("click", function (event) {
-      var link = event.target.closest && event.target.closest("[data-org-focus]");
-      if (!link) return;
-      window.scmOrgFocus = link.getAttribute("data-org-focus");
-      var current = module.closest(".scm-tab-panel");
-      if (current && current.classList.contains("active")) window.setTimeout(load, 0);
-    }, true);
+    // Menú del usuario: Mis políticas y Mis funciones (includes/footer.php llama window.scmMyViews[vista]). Si se entra
+    // por el enlace directo (?mi_vista=), se abren al cargar.
+    window.scmMyViews = window.scmMyViews || {};
+    window.scmMyViews.politicas = openMyPolicies;
+    window.scmMyViews.funciones = openMyFunctions;
+    var urlView = new URLSearchParams(window.location.search).get("mi_vista");
+    if (urlView === "politicas") openMyPolicies();
+    if (urlView === "funciones") openMyFunctions();
     var panel = module.closest(".scm-tab-panel");
     if (panel && panel.classList.contains("active")) load();
   }

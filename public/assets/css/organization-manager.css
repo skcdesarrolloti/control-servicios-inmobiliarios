@@ -118,3 +118,24 @@
 #scm-app .scm-om-log { padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
 #scm-app .scm-om-log small { display: block; color: var(--om-muted); margin-top: 2px; overflow-wrap: anywhere; }
 #scm-app .scm-om-scroll { max-height: 420px; overflow: auto; border: 1px solid var(--om-line); border-radius: 8px; }
+
+/* Mis políticas y Mis funciones (menú del usuario) */
+#scm-app .scm-om-mine-summary { margin: 0 0 12px; font-size: 12.5px; line-height: 1.5; }
+#scm-app .scm-om-mine-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+#scm-app .scm-om-mine-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+#scm-app .scm-om-mine-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 999px; background: #fff; color: var(--om-navy); font: 600 11px Poppins, sans-serif; cursor: pointer; }
+#scm-app .scm-om-mine-chip span { opacity: .75; }
+#scm-app .scm-om-mine-chip[aria-pressed="true"] { background: var(--om-navy); border-color: var(--om-navy); color: #fff; }
+#scm-app .scm-om-mine-chip:focus-visible { outline: 2px solid #f9c512; outline-offset: 2px; }
+#scm-app .scm-om-mine-list { display: flex; flex-direction: column; gap: 8px; }
+#scm-app .scm-om-mine-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 12px 14px; border: 1px solid var(--om-line); border-radius: 10px; background: #fff; }
+#scm-app .scm-om-mine-row[data-state="pendiente"] { border-left: 3px solid #f59e0b; }
+#scm-app .scm-om-mine-main { min-width: 0; flex: 1 1 320px; }
+#scm-app .scm-om-mine-title { margin: 0 0 6px; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+#scm-app .scm-om-mine-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+#scm-app .scm-om-mine-functions { margin: 0 0 6px; padding: 0; list-style: none; counter-reset: om-fn; display: flex; flex-direction: column; gap: 6px; }
+#scm-app .scm-om-mine-functions li { position: relative; padding: 10px 12px 10px 40px; border: 1px solid var(--om-line); border-radius: 10px; background: #fff; font-size: 12.5px; line-height: 1.5; counter-increment: om-fn; }
+#scm-app .scm-om-mine-functions li::before { content: counter(om-fn); position: absolute; left: 10px; top: 9px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 999px; background: #eef2f7; color: var(--om-navy); font-size: 10.5px; font-weight: 700; }
+#scm-app .scm-om-mine-row[hidden], #scm-app .scm-om-mine-functions li[hidden], #scm-app [data-om-mine-group][hidden] { display: none; }
+#scm-app .scm-om-mine-chips[hidden] { display: none; }
+#scm-app .scm-om-mine-tools input[type="search"] { flex: 1 1 220px; max-width: 320px; }

@@ -1009,6 +1009,25 @@
       label: "!sp-block !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide",
     };
 
+    // Tipos que abren su pestaña o sub-pestaña desde openAdministrativeActivityTab.
+    var DUE_POPUP_TAB_TYPES = ["servicios_publicos_critico", "ticket_preventiva_sin_cita", "preventiva_cita_sin_realizar", "preventiva_sin_enviar", "cotizacion_sin_enviar", "cotizacion_enviada_sin_respuesta", "orden_mantenimiento_sin_respuesta", "contrato_anexos_sin_enviar"];
+
+    // Botón de una tarea en los popups de vencimientos: abre el caso, la revisión, el crédito o la pestaña que la atiende.
+    function dashboardDueRowActionHtml(row) {
+      var ui = DUE_POPUP_UI;
+      var caseData = row && row.case ? row.case : {};
+      var dueType = escHtml(row.tipo_vencimiento || "");
+      if (caseData.critical_review_id) return '<button type="button" class="' + ui.secondary + '" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Ver caso · 72 horas</button>';
+      if (String(caseData.admin_ticket_create || "") === "1") return '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-create-ticket data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + ">Crear caso</button>";
+      if (String(caseData.public_services_review || "") === "1") return '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-open-services data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + ">Ver revisión</button>";
+      if (String(caseData.case_source_html || "").trim()) return '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-open-case data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + ">Ver caso</button>";
+      // Los créditos los atiende admin-owner-credits.js al llegar el clic al documento.
+      if (caseData.owner_credit_id) return '<button type="button" class="' + ui.secondary + '" ' + (String(caseData.owner_credit_view || "") === "detail" ? "data-owner-credit-detail" : "data-owner-credit-open") + ' data-owner-credit-go-tab data-credit-id="' + escHtml(caseData.owner_credit_id) + '">Ver crédito</button>';
+      if (caseData.legal_case_id) return '<a class="' + ui.secondary + ' !sp-no-underline" href="index.php?tab=casos_juridicos&scm_legal_case=' + encodeURIComponent(caseData.legal_case_id) + '">Ver caso</a>';
+      if (DUE_POPUP_TAB_TYPES.indexOf(String(row.tipo_vencimiento || "")) !== -1) return '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-open-admin-tab="' + dueType + '">Ver pestaña</button>';
+      return '<button type="button" class="' + ui.secondary + '" disabled>Sin caso</button>';
+    }
+
     function dashboardDueEntryPopupHtml(rows, summaryGroups, allowedTypes) {
       var ui = DUE_POPUP_UI;
       rows = Array.isArray(rows) ? rows.slice() : [];
@@ -1058,8 +1077,7 @@
       Object.keys(groups).forEach(function (type) {
         if (groupOrder.indexOf(type) === -1) groupOrder.push(type);
       });
-      // Tipos que abren su pestaña o sub-pestaña desde openAdministrativeActivityTab.
-      var tabTypes = ["servicios_publicos_critico", "ticket_preventiva_sin_cita", "preventiva_cita_sin_realizar", "preventiva_sin_enviar", "cotizacion_sin_enviar", "cotizacion_enviada_sin_respuesta", "orden_mantenimiento_sin_respuesta", "contrato_anexos_sin_enviar"];
+      var tabTypes = DUE_POPUP_TAB_TYPES;
       // Un tipo que el cargo no atiende no se muestra; uno que atiende y está al día sí sale en 0.
       var groupHtml = groupOrder.filter(function (type) {
         return !Array.isArray(allowedTypes) || allowedTypes.indexOf(type) !== -1 || groups[type] !== undefined;
@@ -1089,21 +1107,8 @@
       var detailRows = assignedRows.slice(0, 18).map(function (row) {
         var caseData = row && row.case ? row.case : {};
         var sourceHtml = String(caseData.case_source_html || "").trim();
-        var isCreateTicket = String(caseData.admin_ticket_create || "") === "1";
-        var isPublicServices = String(caseData.public_services_review || "") === "1";
         var daysLate = Number(row.dias_vencido || 0);
-        var dueType = escHtml(row.tipo_vencimiento || "");
-        var actionHtml = caseData.critical_review_id
-          ? '<button type="button" class="' + ui.secondary + '" data-services-critical-open="' + escHtml(caseData.critical_review_id) + '">Ver caso · 72 horas</button>'
-          : isCreateTicket
-            ? '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-create-ticket data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + ">Crear caso</button>"
-            : isPublicServices
-              ? '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-open-services data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + ">Ver revisión</button>"
-              : sourceHtml
-                ? '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-open-case data-due-type="' + dueType + '"' + dashboardDueCaseAttrsHtml(caseData) + ">Ver caso</button>"
-                : tabTypes.indexOf(String(row.tipo_vencimiento || "")) !== -1
-                  ? '<button type="button" class="' + ui.secondary + '" data-scm-dashboard-due-open-admin-tab="' + dueType + '">Ver pestaña</button>'
-                  : '<button type="button" class="' + ui.secondary + '" disabled>Sin caso</button>';
+        var actionHtml = dashboardDueRowActionHtml(row);
         return '<div data-scm-due-row class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-[110px_minmax(0,1fr)_auto_auto] !sp-items-center !sp-gap-3 !sp-px-4 !sp-py-3 !sp-m-0 !sp-bg-white !sp-rounded-none !sp-shadow-none !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0">' +
           '<strong class="!sp-inline-flex !sp-justify-center !sp-rounded-lg !sp-bg-slate-50 !sp-border !sp-border-solid !sp-border-slate-200 !sp-px-2 !sp-py-1.5 !sp-text-[11px] !sp-font-semibold !sp-text-service-navy !sp-whitespace-nowrap">' + escHtml(formatDuePopupDate(row.fecha_vencimiento || "-") + (row.fecha_vencimiento_hora ? " · " + row.fecha_vencimiento_hora : "")) + "</strong>" +
           '<span class="!sp-min-w-0 !sp-truncate !sp-text-xs !sp-font-semibold !sp-text-service-navy">' + escHtml(row.titulo || "Vencimiento") + "</span>" +
@@ -1567,6 +1572,62 @@
       });
     }
 
+    // Botones de los popups de vencimientos (el de entrada y Mis actividades). onClose decide cómo se cierra.
+    function bindDashboardDuePopupActions(popup, onClose) {
+      if (!popup) return;
+      popup.addEventListener("click", function (event) {
+        var caseBtn = event.target && event.target.closest
+          ? event.target.closest("[data-scm-dashboard-due-open-case]")
+          : null;
+        if (!caseBtn || !popup.contains(caseBtn)) return;
+        event.preventDefault();
+        dashboardOpenDueCase(caseBtn);
+      });
+      popup.addEventListener("click", function (event) {
+        var createTicketBtn = event.target && event.target.closest
+          ? event.target.closest("[data-scm-dashboard-due-create-ticket]")
+          : null;
+        if (!createTicketBtn || !popup.contains(createTicketBtn)) return;
+        event.preventDefault();
+        openAdminTicketModal(createTicketBtn);
+      });
+      popup.addEventListener("click", function (event) {
+        var servicesBtn = event.target && event.target.closest
+          ? event.target.closest("[data-scm-dashboard-due-open-services]")
+          : null;
+        if (!servicesBtn || !popup.contains(servicesBtn)) return;
+        event.preventDefault();
+        openPublicServicesReviewModal(servicesBtn);
+      });
+      popup.addEventListener("click", function (event) {
+        var adminTabBtn = event.target && event.target.closest
+          ? event.target.closest("[data-scm-dashboard-due-open-admin-tab]")
+          : null;
+        if (!adminTabBtn || !popup.contains(adminTabBtn)) return;
+        event.preventDefault();
+        window.Swal.close();
+        openAdministrativeActivityTab(adminTabBtn.getAttribute("data-scm-dashboard-due-open-admin-tab") || "");
+      });
+      popup.addEventListener("click", function (event) {
+        var calendarBtn = event.target && event.target.closest
+          ? event.target.closest("[data-scm-dashboard-due-open-calendar]")
+          : null;
+        if (calendarBtn && popup.contains(calendarBtn)) {
+          event.preventDefault();
+          window.Swal.close();
+          openDashboardDueCalendar();
+          return;
+        }
+        var closeBtn = event.target && event.target.closest
+          ? event.target.closest("[data-scm-dashboard-due-close]")
+          : null;
+        if (closeBtn && popup.contains(closeBtn)) {
+          event.preventDefault();
+          onClose(popup);
+        }
+      });
+    }
+
     function maybeShowDashboardDuePopup(source) {
       source = source || "login";
       if (funcionarioBridgeMode) return Promise.resolve();
@@ -1605,59 +1666,7 @@
               popup: "scm-due-entry-swal",
             },
             didOpen: function () {
-              var popup = window.Swal.getPopup();
-              if (!popup) return;
-              popup.addEventListener("click", function (event) {
-                var caseBtn = event.target && event.target.closest
-                  ? event.target.closest("[data-scm-dashboard-due-open-case]")
-                  : null;
-                if (!caseBtn || !popup.contains(caseBtn)) return;
-                event.preventDefault();
-                dashboardOpenDueCase(caseBtn);
-              });
-              popup.addEventListener("click", function (event) {
-                var createTicketBtn = event.target && event.target.closest
-                  ? event.target.closest("[data-scm-dashboard-due-create-ticket]")
-                  : null;
-                if (!createTicketBtn || !popup.contains(createTicketBtn)) return;
-                event.preventDefault();
-                openAdminTicketModal(createTicketBtn);
-              });
-              popup.addEventListener("click", function (event) {
-                var servicesBtn = event.target && event.target.closest
-                  ? event.target.closest("[data-scm-dashboard-due-open-services]")
-                  : null;
-                if (!servicesBtn || !popup.contains(servicesBtn)) return;
-                event.preventDefault();
-                openPublicServicesReviewModal(servicesBtn);
-              });
-              popup.addEventListener("click", function (event) {
-                var adminTabBtn = event.target && event.target.closest
-                  ? event.target.closest("[data-scm-dashboard-due-open-admin-tab]")
-                  : null;
-                if (!adminTabBtn || !popup.contains(adminTabBtn)) return;
-                event.preventDefault();
-                window.Swal.close();
-                openAdministrativeActivityTab(adminTabBtn.getAttribute("data-scm-dashboard-due-open-admin-tab") || "");
-              });
-              popup.addEventListener("click", function (event) {
-                var calendarBtn = event.target && event.target.closest
-                  ? event.target.closest("[data-scm-dashboard-due-open-calendar]")
-                  : null;
-                if (calendarBtn && popup.contains(calendarBtn)) {
-                  event.preventDefault();
-                  window.Swal.close();
-                  openDashboardDueCalendar();
-                  return;
-                }
-                var closeBtn = event.target && event.target.closest
-                  ? event.target.closest("[data-scm-dashboard-due-close]")
-                  : null;
-                if (closeBtn && popup.contains(closeBtn)) {
-                  event.preventDefault();
-                  dashboardConfirmPopupClose(popup);
-                }
-              });
+              bindDashboardDuePopupActions(window.Swal.getPopup(), function (popup) { dashboardConfirmPopupClose(popup); });
             },
           });
         })
@@ -1666,7 +1675,146 @@
         });
     }
 
+    // --- Mis actividades (menú del usuario): solo las tareas de quien entra, sin conteos del cargo ni calendario. ----
+    // Mismos datos que el popup de entrada (lo que atiende el cargo en el mes), pero lista lo asignado a la persona por
+    // urgencia y, aparte, lo del cargo que no tiene responsable. Al volver de un caso se abre de nuevo.
+    var myActivitiesRestore = false;
+
+    function myActivitiesBucket(row, todayKey) {
+      if (Number(row.dias_vencido || 0) > 0 || String(row.estado || "").toLowerCase() === "vencido" || row.cuenta_pendiente) return "vencidas";
+      return String(row.fecha_vencimiento || "").slice(0, 10) === todayKey ? "hoy" : "proximas";
+    }
+
+    function myActivitiesRowHtml(row) {
+      var caseData = row && row.case ? row.case : {};
+      var daysLate = Number(row.dias_vencido || 0);
+      var raw = String(row.fecha_vencimiento || "").slice(0, 10);
+      var parts = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      var date = parts ? parts[3] + "/" + parts[2] + "/" + parts[1] : "";
+      var when = daysLate > 0 ? daysLate + (daysLate === 1 ? " día de atraso" : " días de atraso") : (date ? "Vence " + date + (row.fecha_vencimiento_hora ? " · " + row.fecha_vencimiento_hora : "") : "Pendiente");
+      // Estilo en línea: las variantes sm:flex-row no están en la hoja compilada de servicios.
+      return '<div data-scm-due-row class="!sp-px-4 !sp-py-3 !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100 last:!sp-border-b-0" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;">' +
+        '<div class="!sp-min-w-0" style="flex:1 1 280px;"><p class="!sp-m-0 !sp-text-xs !sp-font-semibold !sp-text-service-navy !sp-break-words">' + escHtml(row.titulo || "Tarea") + "</p>" +
+        '<p class="!sp-m-0 !sp-mt-0.5 !sp-text-[11px] !sp-text-service-muted">' + escHtml(dashboardDueTypeLabel(String(row.tipo_vencimiento || ""))) + ' · <span class="' + (daysLate > 0 ? "!sp-text-rose-700 !sp-font-semibold" : "") + '">' + escHtml(when) + "</span></p></div>" +
+        '<div class="!sp-shrink-0">' + dashboardDueRowActionHtml(row) + "</div>" +
+        '<div class="scm-case-source" aria-hidden="true" style="display:none;">' + String(caseData.case_source_html || "").trim() + "</div>" +
+        "</div>";
+    }
+
+    function myActivitiesPopupHtml(rows) {
+      var ui = DUE_POPUP_UI;
+      var todayKey = dashboardDateKey(new Date());
+      rows = (Array.isArray(rows) ? rows : []).slice().sort(function (a, b) {
+        var late = Number(b.dias_vencido || 0) - Number(a.dias_vencido || 0);
+        return late !== 0 ? late : String(a.fecha_vencimiento || "").localeCompare(String(b.fecha_vencimiento || ""));
+      });
+      var mine = rows.filter(function (row) { return row.asignado; });
+      var unowned = rows.filter(function (row) { return !row.asignado && row.sin_responsable; });
+      var buckets = { vencidas: [], hoy: [], proximas: [] };
+      mine.forEach(function (row) { buckets[myActivitiesBucket(row, todayKey)].push(row); });
+      var sections = [
+        ["vencidas", "Vencidas", "!sp-text-rose-700", "!sp-bg-rose-50 !sp-text-rose-700"],
+        ["hoy", "Vencen hoy", "!sp-text-amber-700", "!sp-bg-amber-50 !sp-text-amber-800"],
+        ["proximas", "Próximas este mes", "!sp-text-service-navy", "!sp-bg-slate-100 !sp-text-service-navy"],
+      ];
+      var chip = function (key, label, count, active) {
+        return '<button type="button" data-my-activities-filter="' + key + '" aria-pressed="' + (active ? "true" : "false") + '" class="!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-3 !sp-py-1.5 !sp-rounded-full !sp-border !sp-border-solid !sp-text-[11px] !sp-font-semibold !sp-font-sans !sp-cursor-pointer ' + (active ? "!sp-bg-service-navy !sp-text-white !sp-border-service-navy" : "!sp-bg-white !sp-text-service-navy !sp-border-slate-200 hover:!sp-bg-slate-50") + '">' + label + ' <span class="!sp-opacity-80">' + count + "</span></button>";
+      };
+      var listHtml = sections.filter(function (section) { return buckets[section[0]].length; }).map(function (section) {
+        var list = buckets[section[0]];
+        return '<section data-my-activities-section="' + section[0] + '" class="' + ui.card + ' !sp-overflow-hidden">' +
+          '<h4 class="!sp-m-0 !sp-flex !sp-items-center !sp-justify-between !sp-px-4 !sp-py-2.5 !sp-text-xs !sp-font-bold ' + section[2] + ' !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100">' + section[1] +
+          '<span class="!sp-rounded-full !sp-px-2 !sp-py-0.5 !sp-text-[10px] ' + section[3] + '">' + list.length + "</span></h4>" +
+          list.map(myActivitiesRowHtml).join("") + "</section>";
+      }).join("");
+      if (!mine.length) {
+        listHtml = '<div class="' + ui.card + ' !sp-p-8 !sp-text-center"><span class="material-symbols-outlined !sp-text-emerald-600 !sp-text-[32px]" aria-hidden="true">task_alt</span>' +
+          '<p class="!sp-m-0 !sp-mt-2 !sp-text-sm !sp-font-semibold">Estás al día</p><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">No tienes tareas asignadas vencidas ni por vencer este mes.</p></div>';
+      }
+      var unownedHtml = unowned.length
+        ? '<details class="' + ui.card + ' !sp-overflow-hidden" data-my-activities-unowned><summary class="!sp-cursor-pointer !sp-px-4 !sp-py-3 !sp-text-xs !sp-font-semibold !sp-text-service-navy">Tareas del cargo sin responsable (' + unowned.length + ')<span class="!sp-block !sp-mt-0.5 !sp-text-[10px] !sp-font-normal !sp-text-service-muted">No están asignadas a nadie; las atiende quien tenga el cargo.</span></summary>' +
+          unowned.map(myActivitiesRowHtml).join("") + "</details>"
+        : "";
+      return '<div class="!sp-font-sans !sp-text-service-navy !sp-text-left">' +
+        '<header class="!sp-bg-service-navy !sp-text-white !sp-px-5 !sp-py-4 sm:!sp-px-6 !sp-flex !sp-items-start !sp-justify-between !sp-gap-3">' +
+        '<div class="!sp-flex !sp-items-center !sp-gap-3"><span class="material-symbols-outlined !sp-p-2 !sp-rounded-xl !sp-bg-service-yellow/20 !sp-text-service-yellow" aria-hidden="true">event_available</span>' +
+        '<div><h3 class="!sp-m-0 !sp-text-lg sm:!sp-text-xl !sp-font-bold !sp-text-white">Mis actividades</h3>' +
+        '<p class="!sp-m-0 !sp-mt-0.5 !sp-text-xs !sp-text-blue-100">Tus tareas asignadas, de la más atrasada a la más próxima.</p></div></div>' +
+        '<button type="button" class="!sp-w-9 !sp-h-9 !sp-shrink-0 !sp-rounded-lg !sp-border-0 !sp-bg-white/10 !sp-text-white !sp-text-xl !sp-cursor-pointer hover:!sp-bg-white/20 focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow" data-scm-dashboard-due-close aria-label="Cerrar">&times;</button>' +
+        "</header>" +
+        '<div class="!sp-bg-service-background !sp-p-4 sm:!sp-p-5 !sp-space-y-3 !sp-overflow-y-auto !sp-max-h-[calc(100vh-220px)]">' +
+        (mine.length ? '<div class="!sp-flex !sp-flex-wrap !sp-gap-2" role="group" aria-label="Filtrar">' + chip("todas", "Todas", mine.length, true) + chip("vencidas", "Vencidas", buckets.vencidas.length, false) + chip("hoy", "Hoy", buckets.hoy.length, false) + chip("proximas", "Próximas", buckets.proximas.length, false) + "</div>" : "") +
+        listHtml + unownedHtml +
+        "</div>" +
+        '<footer class="!sp-bg-white !sp-px-5 !sp-py-3 sm:!sp-px-6 !sp-flex !sp-flex-wrap !sp-justify-end !sp-gap-2 !sp-border-0 !sp-border-t !sp-border-solid !sp-border-slate-200">' +
+        '<button type="button" class="' + ui.secondary + ' !sp-px-4 !sp-py-2.5 !sp-text-xs" data-scm-dashboard-due-open-calendar><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">calendar_month</span> Ver calendario completo</button>' +
+        '<button type="button" class="' + ui.primary + '" data-scm-dashboard-due-close>Cerrar</button>' +
+        "</footer></div>";
+    }
+
+    function showMyActivitiesPopup() {
+      if (funcionarioBridgeMode || !window.Swal || !ajaxUrl || !actionAdminDueCalendar) return Promise.resolve();
+      myActivitiesRestore = false;
+      // Si había otro popup abierto, no se encadenan los siguientes al reemplazarlo.
+      dashboardDueActionTaken = true;
+      window.Swal.fire({ title: "", html: '<p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-font-sans !sp-text-service-muted">Cargando tus actividades…</p>', target: root, width: "min(760px, 96vw)", padding: 0, showConfirmButton: false, customClass: { popup: "scm-due-entry-swal" } });
+      return loadDashboardDuePopupRows().then(function (payload) {
+        window.Swal.fire({
+          title: "",
+          html: myActivitiesPopupHtml(payload && payload.rows),
+          target: root,
+          width: "min(760px, 96vw)",
+          padding: 0,
+          showCloseButton: false,
+          showConfirmButton: false,
+          buttonsStyling: false,
+          customClass: { popup: "scm-due-entry-swal scm-my-activities-swal" },
+          didOpen: function () {
+            var popup = window.Swal.getPopup();
+            if (!popup) return;
+            // Antes que bindDashboardDuePopupActions: al abrir un caso, cerrarlo devuelve a esta lista.
+            popup.addEventListener("click", function (event) {
+              var target = event.target && event.target.closest ? event.target : null;
+              if (!target) return;
+              if (target.closest("[data-scm-dashboard-due-open-case]")) myActivitiesRestore = true;
+              if (target.closest("[data-owner-credit-open], [data-owner-credit-detail]")) window.Swal.close();
+              var filter = target.closest("[data-my-activities-filter]");
+              if (!filter) return;
+              var key = filter.getAttribute("data-my-activities-filter");
+              popup.querySelectorAll("[data-my-activities-filter]").forEach(function (button) {
+                var active = button === filter;
+                button.setAttribute("aria-pressed", active ? "true" : "false");
+                ["!sp-bg-service-navy", "!sp-text-white", "!sp-border-service-navy"].forEach(function (cls) { button.classList.toggle(cls, active); });
+                ["!sp-bg-white", "!sp-text-service-navy", "!sp-border-slate-200"].forEach(function (cls) { button.classList.toggle(cls, !active); });
+              });
+              popup.querySelectorAll("[data-my-activities-section]").forEach(function (section) {
+                section.hidden = key !== "todas" && section.getAttribute("data-my-activities-section") !== key;
+              });
+            }, true);
+            bindDashboardDuePopupActions(popup, function () { window.Swal.close(); });
+          },
+        });
+      }).catch(function (error) {
+        window.Swal.close();
+        showToast("error", (error && error.message) || "No se pudieron cargar tus actividades.");
+      });
+    }
+
+    window.scmMyViews = window.scmMyViews || {};
+    window.scmMyViews.actividades = showMyActivitiesPopup;
+    try {
+      if (new URL(window.location.href).searchParams.get("mi_vista") === "actividades") window.setTimeout(showMyActivitiesPopup, 400);
+    } catch (_myViewUrlError) {}
+
     root.addEventListener("scm:case-modal-closed", function () {
+      if (myActivitiesRestore) {
+        myActivitiesRestore = false;
+        dashboardDuePopupRestoreAfterCase = false;
+        window.setTimeout(function () {
+          if (!root.querySelector("#scm-case-modal.open")) showMyActivitiesPopup();
+        }, 160);
+        return;
+      }
       if (!dashboardDuePopupRestoreAfterCase) return;
       dashboardDuePopupRestoreAfterCase = false;
       window.setTimeout(function () {

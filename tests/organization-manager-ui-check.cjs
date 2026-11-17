@@ -74,7 +74,7 @@ const management = {
 
   // Mi gestión: secciones, escape y «Leí y entiendo» con confirmación propia (sin diálogos del navegador).
   await page.waitForSelector('[data-om-section="politicas"]');
-  assert.equal(await page.locator('[data-om-tab]').count(), 11, 'todas las pestañas con todos los permisos');
+  assert.equal(await page.locator('[data-om-tab]').count(), 9, 'todas las pestañas con todos los permisos (sin procesos ni compensaciones)');
   assert.match(await page.textContent('[data-om-body]'), /Julián <b>/, 'el nombre se escapa');
   assert.equal(await page.locator('[data-om-section="politicas"][open]').count(), 1, 'con lecturas pendientes, Mis políticas se abre');
   assert.match(await page.textContent('[data-om-section="politicas"] summary'), /1 por confirmar/);
@@ -94,20 +94,37 @@ const management = {
   assert.equal((await lastCall('scm_org_cargo_management')).id_cargo, '4', 'Mi equipo se carga al abrirlo');
   console.log('OK Mi gestión: secciones, filtros, equipo y confirmación de lectura');
 
-  // Menú del usuario: «Mis funciones» abre Mi gestión en esa sección aunque se esté en otra pestaña.
+  assert.equal(await page.locator('[data-om-section="procesos"], [data-om-section="compensaciones"]').count(), 0, 'procesos y compensaciones ya no salen en Mi gestión');
+
+  // Menú del usuario: Mis políticas y Mis funciones son popups propios sobre la vista actual.
   await page.click('[data-om-tab="politicas"]');
   await page.waitForSelector('.scm-om-table');
-  await page.evaluate(() => {
-    const link = document.createElement('a');
-    link.href = '#';
-    link.setAttribute('data-org-focus', 'funciones');
-    link.addEventListener('click', (event) => event.preventDefault());
-    document.body.appendChild(link);
-    link.click();
-  });
+  await page.evaluate(() => window.scmMyViews.politicas());
+  await page.waitForSelector('.scm-om-modal .scm-om-mine-row');
+  assert.equal(await page.locator('.scm-om-modal [data-om-mine-item]:visible').count(), 1, 'Mis políticas abre en las pendientes por confirmar');
+  assert.match(await page.textContent('.scm-om-modal .scm-om-mine-summary'), /1.*por confirmar de 2/);
+  await page.click('.scm-om-modal [data-om-mine-filter="todas"]');
+  assert.equal(await page.locator('.scm-om-modal [data-om-mine-item]:visible').count(), 2, 'Todas muestra las dos');
+  await page.fill('.scm-om-modal [data-om-mine-search]', 'celular');
+  assert.equal(await page.locator('.scm-om-modal [data-om-mine-item]:visible').count(), 1, 'la búsqueda filtra');
+  await page.fill('.scm-om-modal [data-om-mine-search]', '');
+  await page.click('.scm-om-modal [data-om-mine-confirm="47"]');
+  await page.click('.scm-om-modal [data-om-accept]');
+  await page.waitForFunction(() => !document.querySelector('[data-om-mine-confirm="47"]'));
+  assert.equal(await page.locator('.scm-om-modal [data-om-mine-policy="47"] .scm-om-badge.is-leida').count(), 1, 'tras confirmar queda como leída');
+  assert.equal(await page.locator('[data-om-tab="politicas"][aria-selected="true"]').count(), 1, 'el popup no cambia la pestaña de debajo');
+  await page.click('.scm-om-modal [data-om-close].' + 'scm-om-icon-btn');
+  await page.waitForFunction(() => !document.querySelector('.scm-om-modal'));
+  await page.evaluate(() => window.scmMyViews.funciones());
+  await page.waitForSelector('.scm-om-modal .scm-om-mine-functions');
+  const fnText = await page.textContent('.scm-om-modal');
+  assert.match(fnText, /Revisar contratos/);
+  assert.match(fnText, /Semanal/);
+  assert.match(fnText, /Cargo: Coordinador/);
+  await page.click('.scm-om-modal [data-om-mine-manager]');
   await page.waitForSelector('[data-om-management] [data-om-section="funciones"][open]');
-  assert.equal(await page.locator('[data-om-tab="mi_gestion"][aria-selected="true"]').count(), 1, 'the user menu link opens Mi gestión');
-  console.log('OK Menú del usuario: Mis funciones abre su sección');
+  assert.equal(await page.locator('[data-om-tab="mi_gestion"][aria-selected="true"]').count(), 1, 'Ver en Mi gestión abre la sección');
+  console.log('OK Menú del usuario: popups de Mis políticas y Mis funciones');
 
   // Políticas: listado con insignias y escape; detalle en popup con HTML limpio.
   await page.click('[data-om-tab="politicas"]');

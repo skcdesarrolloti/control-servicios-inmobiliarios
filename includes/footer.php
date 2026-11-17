@@ -62,6 +62,21 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
         });
       }
 
+      // Mis políticas, Mis funciones y Mis actividades: popup propio sobre la vista actual (lo registran
+      // organization-manager.js y admin-dashboard-runtime.js en window.scmMyViews). Sin él, se sigue el enlace.
+      if (dropdownMenu) {
+        dropdownMenu.addEventListener('click', function (e) {
+          const link = e.target.closest('[data-scm-my-view]');
+          if (!link) return;
+          const open = (window.scmMyViews || {})[link.getAttribute('data-scm-my-view')];
+          if (typeof open !== 'function') return;
+          e.preventDefault();
+          dropdownMenu.classList.add('hidden');
+          if (profileBtn) profileBtn.setAttribute('aria-expanded', 'false');
+          open();
+        });
+      }
+
       if (configBtn && configDropdown) {
         configBtn.addEventListener('click', function (e) {
           e.stopPropagation();

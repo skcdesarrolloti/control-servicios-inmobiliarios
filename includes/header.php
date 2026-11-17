@@ -1570,12 +1570,13 @@ foreach ($rawNavItems as $k => $item) {
                 Mis Casos Asignados
               </a>
               <?php
-              // Consultas personales: Mi gestión del Gestor organizacional (políticas y funciones), las tareas del
-              // calendario de vencimientos (lo mismo del recordatorio diario) y el presupuesto propio. Cada una según su pestaña.
+              // Consultas personales, cada una según su pestaña. Mis políticas, Mis funciones y Mis actividades abren un popup
+              // propio sobre la vista actual (data-scm-my-view, ver includes/footer.php); el enlace sirve si el panel no está
+              // en la página. Mis presupuestos sigue abriendo su panel.
               $userMenuLinks = [
-                ['perms' => ['gestor_organizacional'], 'icon' => 'policy', 'label' => 'Mis políticas', 'url' => $baseUrl . '/index.php?tab=gestor_organizacional&seccion=politicas', 'attrs' => ['data-panel-target' => 'scm-panel-gestor-organizacional', 'data-tab-key' => 'gestor_organizacional', 'data-org-focus' => 'politicas']],
-                ['perms' => ['gestor_organizacional'], 'icon' => 'checklist', 'label' => 'Mis funciones', 'url' => $baseUrl . '/index.php?tab=gestor_organizacional&seccion=funciones', 'attrs' => ['data-panel-target' => 'scm-panel-gestor-organizacional', 'data-tab-key' => 'gestor_organizacional', 'data-org-focus' => 'funciones']],
-                ['perms' => ['vencimientos'], 'icon' => 'calendar_month', 'label' => 'Mis actividades', 'url' => $baseUrl . '/index.php?tab=due', 'attrs' => ['data-panel-target' => 'scm-panel-inicio', 'data-tab-key' => 'due', 'data-subtab-target' => 'due']],
+                ['perms' => ['gestor_organizacional'], 'icon' => 'policy', 'label' => 'Mis políticas', 'url' => $baseUrl . '/index.php?tab=gestor_organizacional&mi_vista=politicas', 'attrs' => ['data-scm-my-view' => 'politicas']],
+                ['perms' => ['gestor_organizacional'], 'icon' => 'checklist', 'label' => 'Mis funciones', 'url' => $baseUrl . '/index.php?tab=gestor_organizacional&mi_vista=funciones', 'attrs' => ['data-scm-my-view' => 'funciones']],
+                ['perms' => ['vencimientos'], 'icon' => 'calendar_month', 'label' => 'Mis actividades', 'url' => $baseUrl . '/index.php?tab=due&mi_vista=actividades', 'attrs' => ['data-scm-my-view' => 'actividades']],
                 ['perms' => ['mis_presupuestos'], 'icon' => 'query_stats', 'label' => 'Mis presupuestos', 'url' => $baseUrl . '/index.php?tab=mis_presupuestos', 'attrs' => ['data-panel-target' => 'scm-panel-mis-presupuestos', 'data-tab-key' => 'mis_presupuestos']],
               ];
               foreach ($userMenuLinks as $link):
@@ -1587,7 +1588,7 @@ foreach ($rawNavItems as $k => $item) {
               ?>
               <a
                 href="<?php echo htmlspecialchars($link['url'], ENT_QUOTES, 'UTF-8'); ?>"<?php echo $attrs; ?>
-                class="nav-tab-pill flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+                class="<?php echo isset($link['attrs']['data-panel-target']) ? 'nav-tab-pill ' : ''; ?>flex items-center gap-2 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
                 role="menuitem"
               >
                 <span class="material-symbols-outlined text-[16px] text-slate-500"><?php echo htmlspecialchars($link['icon'], ENT_QUOTES, 'UTF-8'); ?></span>

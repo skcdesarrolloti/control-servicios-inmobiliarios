@@ -40,14 +40,14 @@ ob_start();
 include dirname(__DIR__) . '/includes/header.php';
 $html = (string) ob_get_clean();
 $menu = substr($html, (int) strpos($html, 'id="user-dropdown-menu"'), 6000);
-$check(str_contains($menu, 'Mis políticas') && str_contains($menu, 'data-org-focus="politicas"') && str_contains($menu, 'Mis funciones') && str_contains($menu, 'Mis presupuestos'), 'The user menu offers my policies, functions and budgets.');
+$check(str_contains($menu, 'Mis políticas') && str_contains($menu, 'data-scm-my-view="politicas"') && str_contains($menu, 'Mis funciones') && str_contains($menu, 'Mis presupuestos'), 'The user menu offers my policies, functions and budgets.');
 $check(!str_contains($menu, 'Mis actividades'), 'Mis actividades needs the Vencimientos tab.');
 $allowed_tabs = ['mine', 'vencimientos'];
 ob_start();
 include dirname(__DIR__) . '/includes/header.php';
 $menu = substr((string) ob_get_clean(), 0);
 $menu = substr($menu, (int) strpos($menu, 'id="user-dropdown-menu"'), 6000);
-$check(str_contains($menu, 'Mis actividades') && str_contains($menu, 'data-subtab-target="due"') && !str_contains($menu, 'Mis presupuestos') && !str_contains($menu, 'Mis políticas'), 'Each personal link follows its tab permission.');
+$check(str_contains($menu, 'Mis actividades') && str_contains($menu, 'data-scm-my-view="actividades"') && str_contains($menu, 'mi_vista=actividades') && !str_contains($menu, 'Mis presupuestos') && !str_contains($menu, 'Mis políticas'), 'Each personal link follows its tab permission.');
 unset($allowed_tabs);
 
 echo "Contract activities header navigation checks passed.\n";

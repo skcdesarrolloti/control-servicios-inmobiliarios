@@ -2027,6 +2027,8 @@ trait HandlesTicketWorkflowActions
         $owner = trim((string) (($item['responsable_id'] ?? '') ?: ($item['case']['empleado_id'] ?? '')));
       }
       $item['asignado'] = $employeeId !== '' && $owner === $employeeId;
+      // Mis actividades lista aparte lo del cargo que no tiene responsable (créditos, por ejemplo).
+      $item['sin_responsable'] = $owner === '';
     }
     unset($item);
     return $items;

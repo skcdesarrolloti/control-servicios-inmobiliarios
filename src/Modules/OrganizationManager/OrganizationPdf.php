@@ -54,7 +54,7 @@ final class OrganizationPdf
   }
 
   /**
-   * Reporte integral de gestión: cargo, políticas, funciones, procesos y compensaciones.
+   * Reporte integral de gestión: cargo, políticas y funciones (procesos y compensaciones ya no se usan).
    * @param array<string,mixed> $data OrganizationRepository::managementForEmployee() o managementForCargo()
    */
   public static function managementHtml(array $data, string $generatedBy, string $person = ''): string
@@ -83,12 +83,6 @@ final class OrganizationPdf
       . '<div class="ord-text">' . (string) ($policy['html'] ?? '') . '</div>');
     $html .= $section('Funciones', $data['funciones'] ?? [], static fn(array $item): string => '<p class="ord-pre">' . self::e((string) ($item['funcion'] ?? '')) . '</p>'
       . (trim((string) ($item['frecuencia'] ?? '')) !== '' ? '<p class="ord-meta">Frecuencia: ' . self::e((string) $item['frecuencia']) . '</p>' : ''));
-    $html .= $section('Procesos', $data['procesos'] ?? [], static fn(array $item): string => '<h3>' . self::e((string) ($item['nombre'] ?? '')) . '</h3>'
-      . (trim((string) ($item['alcance'] ?? '')) !== '' ? '<p class="ord-label">Alcance</p><p class="ord-pre">' . self::e((string) $item['alcance']) . '</p>' : '')
-      . (trim((string) ($item['definicion'] ?? '')) !== '' ? '<p class="ord-label">Definición</p><p class="ord-pre">' . self::e((string) $item['definicion']) . '</p>' : '')
-      . (trim((string) ($item['entregable'] ?? '')) !== '' ? '<p class="ord-meta">Entregable: ' . self::e((string) $item['entregable']) . '</p>' : ''));
-    $html .= $section('Compensaciones', $data['compensaciones'] ?? [], static fn(array $item): string => '<p class="ord-pre"><strong>' . self::e((string) ($item['base_compensacion'] ?? '')) . '</strong></p>'
-      . (trim((string) ($item['condicionado_a'] ?? '')) !== '' ? '<p class="ord-meta">Condicionado a: ' . self::e((string) $item['condicionado_a']) . '</p>' : ''));
     return self::wrap($html, $generatedBy);
   }
 

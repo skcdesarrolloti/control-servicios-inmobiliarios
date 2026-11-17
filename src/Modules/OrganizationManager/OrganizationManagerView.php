@@ -12,16 +12,17 @@ use SCM\Modules\AdministrativeReports\AdministrativeReportsView;
  */
 final class OrganizationManagerView
 {
-  /** pestaña => [título, permiso necesario ('' = todos)] */
+  /**
+   * pestaña => [título, permiso necesario ('' = todos)]. Procesos y compensaciones ya no se usan: sin pestaña ni sección en
+   * Mi gestión; sus tablas y datos quedan intactos.
+   */
   public const TABS = [
     'mi_gestion' => ['Mi gestión', ''],
     'gestion_cargos' => ['Gestión por cargo', ''],
     'areas_organizacion' => ['Áreas', 'view'],
     'cargos' => ['Cargos', 'view'],
     'politicas' => ['Políticas', 'view'],
-    'procesos' => ['Procesos', 'view'],
     'funciones' => ['Funciones', 'view'],
-    'compensaciones' => ['Compensaciones', 'view'],
     'funcionarios' => ['Funcionarios', 'view'],
     'traslados' => ['Traslados', 'transfer'],
     'bitacora' => ['Bitácora', 'view'],
@@ -48,7 +49,7 @@ final class OrganizationManagerView
       . '<header class="!sp-flex !sp-flex-col md:!sp-flex-row md:!sp-items-end !sp-justify-between !sp-gap-3 !sp-pb-3 !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200">'
       . '<div><p class="!sp-m-0 !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Actividades contractuales</p>'
       . '<h2 id="scm-om-title" class="!sp-m-0 !sp-text-xl !sp-font-bold">Gestor organizacional</h2>'
-      . '<p class="!sp-m-0 !sp-text-xs !sp-text-service-muted">Áreas, cargos, políticas, procesos, funciones y compensaciones de SKC SuCasa Inmobiliaria, y la gestión de cada funcionario.</p></div>'
+      . '<p class="!sp-m-0 !sp-text-xs !sp-text-service-muted">Áreas, cargos, políticas y funciones de SKC SuCasa Inmobiliaria, y la gestión de cada funcionario.</p></div>'
       . '<span class="!sp-inline-flex !sp-items-center !sp-gap-2 !sp-px-3 !sp-py-1.5 !sp-rounded-full !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-xs !sp-font-semibold"><span class="material-symbols-outlined" aria-hidden="true">account_circle</span>' . $e($userName) . '</span>'
       . '</header>'
       . '<nav class="!sp-flex !sp-items-center !sp-gap-2 !sp-overflow-x-auto !sp-pb-1" role="tablist" aria-label="Gestor organizacional">' . $tabs . '</nav>'

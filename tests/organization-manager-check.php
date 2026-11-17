@@ -246,7 +246,7 @@ $pdfHtml = OrganizationPdf::policiesHtml([$repo->find('politicas', 47), $repo->f
 $check(str_contains($pdfHtml, 'SKC SuCasa Inmobiliaria') && str_contains($pdfHtml, 'Sin área asignada') && str_contains($pdfHtml, 'Ana &lt;Gerencia&gt;') && !str_contains($pdfHtml, '<script') && !str_contains($pdfHtml, 'ucursal'), 'El PDF de políticas agrupa por área, usa el nombre corporativo, escapa y no muestra sucursal.');
 $check(strpos($pdfHtml, 'Contractual') < strpos($pdfHtml, 'Sin área asignada') && substr_count($pdfHtml, 'class="ord-item"') === 3, 'Una política por bloque y las áreas en orden alfabético.');
 $mgmtHtml = OrganizationPdf::managementHtml($mine, 'Julián', 'Julián Coordinador');
-$check(str_contains($mgmtHtml, 'Reporte integral de gestión') && str_contains($mgmtHtml, 'Revisar contratos') && str_contains($mgmtHtml, 'Bono por renovación') && str_contains($mgmtHtml, 'Renovación de contratos'), 'El reporte integral trae cargo, políticas, funciones, procesos y compensaciones.');
+$check(str_contains($mgmtHtml, 'Reporte integral de gestión') && str_contains($mgmtHtml, 'Revisar contratos') && !str_contains($mgmtHtml, 'Bono por renovación') && !str_contains($mgmtHtml, 'Renovación de contratos'), 'El reporte integral trae cargo, políticas y funciones; procesos y compensaciones ya no se usan.');
 
 // --- Traslados ---------------------------------------------------------------------------------------------------------
 $db->insert('wp_jet_cct_inmuebles', ['_ID' => 1, 'codigo' => '500', 'funcionario' => 'Dilsa Arrendatario', 'id_funcionario' => '10', 'tipo_negocio' => 'Arriendo']);
