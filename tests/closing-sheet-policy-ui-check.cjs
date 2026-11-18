@@ -13,17 +13,35 @@ const documents = fs.readFileSync(path.join(__dirname, '../public/assets/js/clos
 (async () => {
   const browser = await chromium.launch({ headless: true, executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' });
   try {
-    const page = await browser.newPage();
+    const page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.setContent('<!doctype html><html><body>' + html + '</body></html>');
+    await page.addStyleTag({ path: path.join(__dirname, '../public/assets/css/closing-sheet.css') });
     await page.addScriptTag({ content: script });
     await page.addScriptTag({ content: documents });
     await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
     const state = (name) => page.locator(`.cs-check-item select[name="${name}"]`).inputValue();
 
+    // Cada ítem con política muestra siempre su guía: políticas, regla escrita y cuándo justificar.
+    const amparoGuide = page.locator('[data-cs-item="estado_amparo_integral"] [data-cs-rule]');
+    assert.match(await amparoGuide.textContent(), /Política: #47 · Garantía de Servicios Públicos/);
+    assert.match(await amparoGuide.textContent(), /Regla: Todos los contratos deben incluir/);
+    assert.match(await amparoGuide.textContent(), /Si queda en «No cumple», hay que justificarlo/);
+    const termGuide = page.locator('[data-cs-item="estado_termino_contrato"] [data-cs-rule]');
+    assert.equal(await termGuide.locator('[data-cs-rule-view]').count(), 0, 'a rule without policy shows only the rule');
+    assert.match(await termGuide.textContent(), /Regla: El término mínimo/);
+    assert.equal(await page.locator('[data-cs-item="estado_cobertura"] [data-cs-rule]').count(), 0, 'items without policy have no guide');
+
     // Sugerencias al pasar a la lista de chequeo.
     await page.click('[data-cs-next]');
+    assert.equal(await amparoGuide.isVisible(), true, 'the guide is visible before choosing a state');
+    await amparoGuide.locator('[data-cs-rule-view="47"]').click();
+    assert.equal(await page.locator('[data-cs-rule-dialog]').evaluate((d) => d.open), true, 'the policy opens in the same page');
+    assert.match(await page.locator('[data-cs-rule-list]').textContent(), /Texto de la política 47\./);
+    if (process.env.SCM_SHOTS) await page.screenshot({ path: path.join(process.env.SCM_SHOTS, 'hoja-ver-politica.png') });
+    await page.click('[data-cs-rule-close]');
+    assert.equal(await page.locator('[data-cs-rule-dialog]').evaluate((d) => d.open), false);
     assert.equal(await state('estado_servicio_energia'), 'Cumple', 'energy with its account is suggested as met');
     assert.equal(await state('estado_servicio_agua'), '', 'water without an account is left to the employee');
     assert.equal(await state('estado_servicio_gas'), 'No aplica', 'a service not in the sheet is not applicable');
@@ -80,6 +98,10 @@ const documents = fs.readFileSync(path.join(__dirname, '../public/assets/js/clos
     assert.equal(await page.locator('[data-cs-policy-dialog]').evaluate((d) => d.open), false);
     assert.equal(await page.locator('[data-cs-item="estado_amparo_integral"] [data-cs-justification]').inputValue(), 'La afianzadora no ofrece el amparo en este estrato.');
     assert.equal(await page.locator('[data-cs-item="estado_amparo_integral"]').evaluate((n) => n.classList.contains('is-breach')), true, 'the item is shown in red');
+    await page.click('[data-cs-item="estado_amparo_integral"] [data-cs-policy-open]');
+    assert.equal(await page.locator('[data-cs-rule-dialog]').evaluate((d) => d.open), true, '«Ver política» opens the policy');
+    await page.keyboard.press('Escape');
+    if (process.env.SCM_SHOTS) await page.locator('[data-cs-item="estado_amparo_integral"]').screenshot({ path: path.join(process.env.SCM_SHOTS, 'hoja-item-incumple.png') });
     assert.equal(await page.locator('[data-cs-item="estado_amparo_integral"] [data-cs-suggest]').isVisible(), false, 'a manual choice clears the suggestion');
 
     // Escape equivale a corregir.

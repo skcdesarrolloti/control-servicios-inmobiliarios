@@ -366,6 +366,44 @@
     });
   }
 
+  // Leer las políticas del ítem (enlaces de la guía y «Ver política» del recuadro de justificación).
+  const ruleDialog = form.querySelector("[data-cs-rule-dialog]");
+  function openRule(item, focusId) {
+    const rule = policyRules[item];
+    const box = itemBox(item);
+    if (!rule || !box || !ruleDialog) return;
+    ruleDialog.querySelector("[data-cs-rule-title]").textContent = box.querySelector("p").textContent.trim();
+    const list = ruleDialog.querySelector("[data-cs-rule-list]");
+    list.replaceChildren();
+    if (rule.note) {
+      const note = document.createElement("p");
+      note.className = "cs-policy-note";
+      note.textContent = `Regla: ${rule.note}`;
+      list.appendChild(note);
+    }
+    rule.policies.forEach((policy, index) => {
+      const details = document.createElement("details");
+      details.open = focusId ? String(policy.id) === String(focusId) : index === 0;
+      const summary = document.createElement("summary");
+      summary.textContent = `Política #${policy.id}: ${policy.title}`;
+      const text = document.createElement("p");
+      text.textContent = policy.text || "Sin texto en la tabla de políticas.";
+      details.append(summary, text);
+      list.appendChild(details);
+    });
+    openDialog(ruleDialog);
+    ruleDialog.querySelector("[data-cs-rule-close]").focus();
+  }
+  form.addEventListener("click", (event) => {
+    const link = event.target.closest("[data-cs-rule-view], [data-cs-policy-open]");
+    if (link) {
+      const box = link.closest("[data-cs-item]");
+      if (box) openRule(box.getAttribute("data-cs-item"), link.getAttribute("data-cs-rule-view"));
+      return;
+    }
+    if (ruleDialog && event.target.closest("[data-cs-rule-close]")) closeDialog(ruleDialog);
+  });
+
   form.addEventListener("focusin", (event) => {
     const select = event.target.closest(".cs-check-item select");
     if (select) select.dataset.prev = select.value;

@@ -139,6 +139,18 @@ textarea.cs-input { resize: vertical; }
 .cs-check-item .cs-suggest { grid-column: 1 / -1; margin-top: -4px; color: #1d4ed8; font-size: 12px; font-weight: 600; }
 .cs-check-item.is-breach { margin: 0 -10px; padding: 12px 10px; border-radius: 10px; background: #fef2f2; }
 .cs-check-item.is-breach select { border-color: #dc2626; color: #991b1b; font-weight: 700; }
+/* Guía del ítem, siempre a la vista: políticas, regla escrita y cuándo hay que justificar. */
+.cs-rule { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 8px; padding: 8px 12px; border: 1px solid #dbe3ef; border-left: 4px solid #94a3b8; border-radius: 10px; background: #f8fafc; color: #334155; font-size: 13px; line-height: 1.5; }
+.cs-rule > .material-symbols-outlined { flex: none; margin-top: 1px; font-size: 18px; color: #64748b; }
+.cs-rule-body { display: grid; gap: 3px; min-width: 0; }
+.cs-rule-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; }
+.cs-rule-link { padding: 1px 8px; border: 1px solid #c7d2fe; border-radius: 999px; background: #eef2ff; color: #1e3a8a; font: inherit; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
+.cs-rule-link:hover { background: #e0e7ff; text-decoration: underline; }
+.cs-rule-when { color: #64748b; font-size: 12px; }
+.cs-check-item.is-breach .cs-rule { border-color: #fecaca; border-left-color: #dc2626; background: #fff; }
+.cs-check-item.is-breach .cs-rule > .material-symbols-outlined { color: #dc2626; }
+.cs-rule-dialog .cs-policy-box header { border-bottom-color: var(--rp-line); color: var(--rp-navy); }
+.cs-rule-dialog .cs-policy-note { background: #f1f5f9; color: var(--rp-navy); }
 .cs-policy { grid-column: 1 / -1; display: grid; gap: 6px; padding: 10px 12px; border: 1px solid #fecaca; border-left: 4px solid #dc2626; border-radius: 10px; background: #fff; }
 .cs-policy-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; color: #991b1b; font-size: 13px; font-weight: 700; }
 .cs-policy-head .material-symbols-outlined { font-size: 18px; }

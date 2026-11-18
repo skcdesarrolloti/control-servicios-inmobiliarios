@@ -241,6 +241,11 @@ no están vigentes (Borrador, Derogada):
 - término del contrato: regla "El término mínimo del contrato de arrendamiento es de 12 meses" (no hay política en la
   tabla).
 
+En el formulario (crear y editar), cada ítem con políticas o regla muestra **siempre** una guía debajo del estado.
+La guía tiene las políticas (se leen completas en una ventana de la misma página), la regla escrita y en qué estados
+hay que justificar (`ClosingSheetPageView::ruleGuide`). Si el ítem incumple, la guía se pone en rojo y aparece el recuadro
+de justificación; su botón **Ver política** abre la misma ventana de lectura.
+
 Al marcar a mano un estado que incumple, se abre una ventana en la misma página con la política y su texto:
 
 - **Corregir selección** (o Escape) vuelve al estado anterior.

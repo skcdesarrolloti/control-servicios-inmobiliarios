@@ -405,13 +405,15 @@ final class ClosingSheetPageView
           $slots = '<div class="cd-slots">' . $slots . '</div>';
         }
         $policy = '';
+        $guide = '';
         if (isset($policies[$column])) {
           $titles = array_map(static fn(array $one): string => $one['title'], $policies[$column]['policies']);
+          $guide = self::ruleGuide($policies[$column]);
           // Hoja anterior a la regla con el ítem ya en ese estado y sin justificación: no se exige mientras no cambie.
           $legacy = !$creating && $state !== '' && in_array($state, $policies[$column]['states'], true) && trim((string) ($values['__justifications'][$column] ?? '')) === '' ? $state : '';
-          $policy = '<div class="cs-policy" data-cs-policy data-cs-field' . ($legacy !== '' ? ' data-cs-legacy="' . $this->e($legacy) . '"' : '') . ' hidden><p class="cs-policy-head"><span class="material-symbols-outlined" aria-hidden="true">gpp_bad</span> <span>Incumple '
-            . $this->e($titles !== [] ? (count($titles) === 1 ? 'la política ' : 'las políticas ') . implode(' · ', $titles) : $policies[$column]['note'])
-            . '</span> <button type="button" class="cs-link" data-cs-policy-open>Ver política</button></p>'
+          $policy = '<div class="cs-policy" data-cs-policy data-cs-field' . ($legacy !== '' ? ' data-cs-legacy="' . $this->e($legacy) . '"' : '') . ' hidden><p class="cs-policy-head"><span class="material-symbols-outlined" aria-hidden="true">gpp_bad</span> <span>Esta selección incumple '
+            . $this->e($titles !== [] ? (count($titles) === 1 ? 'la política' : 'las políticas') : 'la regla') . ' del ítem: justifícala.</span>'
+            . ($titles !== [] ? ' <button type="button" class="cs-link" data-cs-policy-open>Ver política</button>' : '') . '</p>'
             . '<label class="cs-label" for="cs_just_' . $this->e($column) . '">Justificación de la excepción <span class="cs-just-item">(' . $this->e(mb_strimwidth($text, 0, 60, '…', 'UTF-8')) . ')</span> <span class="cs-req" aria-hidden="true">*</span></label>'
             . '<textarea class="cs-input" rows="2" id="cs_just_' . $this->e($column) . '" name="justificacion[' . $this->e($column) . ']" data-cs-justification maxlength="2000" placeholder="Por qué se acepta el negocio así (la ve quien aprueba la hoja)">'
             . $this->e($values['__justifications'][$column] ?? '') . '</textarea></div>';
@@ -428,7 +430,7 @@ final class ClosingSheetPageView
         }
         $rows .= '<div class="cs-check-item' . ($slots !== '' ? ' has-docs' : '') . '" data-cs-item="' . $this->e($column) . '"' . ($fileWhy !== '' ? ' data-cs-file-required' : '') . '><p>' . $this->e($text) . ($fileWhy !== '' ? ' <span class="cs-file-req" title="Archivo obligatorio en «Cumple»">Archivo obligatorio</span>' : '') . '</p>'
           . '<select class="cs-input" name="' . $this->e($column) . '"' . ($required ? ' data-cs-required' : '') . ' aria-label="Estado"><option value="">Estado…</option>' . $this->optionTags(array_combine($states, $states), $state) . '</select>'
-          . '<small class="cs-suggest" data-cs-suggest hidden></small>'
+          . '<small class="cs-suggest" data-cs-suggest hidden></small>' . $guide
           . '<textarea class="cs-input" rows="2" name="notas[' . $this->e($column) . ']" placeholder="Observación (opcional)">' . $this->e($values['__notes'][$column] ?? '') . '</textarea>' . $policy . $slots . $fileWhy . '</div>';
       }
       $html .= '<fieldset class="cs-section"' . ($when !== null ? ' data-cs-when="' . $this->e(json_encode($when, JSON_UNESCAPED_UNICODE)) . '"' : '') . '><legend>' . $this->e($group) . '</legend>' . $rows . '</fieldset>';
@@ -445,7 +447,30 @@ final class ClosingSheetPageView
     return '<div class="cd-root"' . ClosingSheetDocumentsView::rootAttributes($documents['config']) . '>' . $html . '</div>';
   }
 
-  /** Ventana que avisa al marcar un estado que incumple una política (la llena closing-sheet.js). */
+  /**
+   * Siempre a la vista en el ítem: sus políticas (se leen completas en una ventana), la regla escrita y en qué estados
+   * hay que justificar.
+   * @param array{states:list<string>,note:string,policies:list<array{id:int,title:string,text:string}>} $rule
+   */
+  private static function ruleGuide(array $rule): string
+  {
+    $links = '';
+    foreach ($rule['policies'] as $one) {
+      $links .= '<button type="button" class="cs-rule-link" data-cs-rule-view="' . (int) $one['id'] . '" title="Leer la política completa">#' . (int) $one['id'] . ' · '
+        . htmlspecialchars(mb_strimwidth($one['title'], 0, 70, '…', 'UTF-8'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</button>';
+    }
+    $states = implode(' o ', array_map(static fn(string $state): string => '«' . $state . '»', $rule['states']));
+    return '<div class="cs-rule" data-cs-rule><span class="material-symbols-outlined" aria-hidden="true">policy</span><div class="cs-rule-body">'
+      . ($links !== '' ? '<div class="cs-rule-line"><b>' . (count($rule['policies']) === 1 ? 'Política' : 'Políticas') . ':</b> ' . $links . '</div>' : '')
+      . (trim($rule['note']) !== '' ? '<div class="cs-rule-line"><b>Regla:</b> ' . htmlspecialchars($rule['note'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div>' : '')
+      . ($states !== '' ? '<div class="cs-rule-when">Si queda en ' . htmlspecialchars($states, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ', hay que justificarlo.</div>' : '')
+      . '</div></div>';
+  }
+
+  /**
+   * Ventanas de la lista de chequeo (las llena closing-sheet.js): la advertencia al marcar un estado que incumple y la
+   * lectura de las políticas del ítem.
+   */
   private static function policyDialog(): string
   {
     return '<dialog class="cs-policy-dialog" data-cs-policy-dialog aria-labelledby="cs_policy_title"><div class="cs-policy-box">'
@@ -457,6 +482,11 @@ final class ClosingSheetPageView
       . '<p class="cs-error" data-cs-policy-error hidden></p>'
       . '<div class="cs-actions"><button type="button" class="cs-secondary" data-cs-policy-undo>Corregir selección</button>'
       . '<button type="button" class="cs-primary cs-danger" data-cs-policy-accept>Continuar con la excepción</button></div>'
+      . '</div></dialog>'
+      . '<dialog class="cs-policy-dialog cs-rule-dialog" data-cs-rule-dialog aria-labelledby="cs_rule_title"><div class="cs-policy-box">'
+      . '<header><span class="material-symbols-outlined" aria-hidden="true">policy</span><div><p class="cs-policy-eyebrow">Políticas del ítem</p><h2 id="cs_rule_title" data-cs-rule-title></h2></div></header>'
+      . '<div class="cs-policy-list" data-cs-rule-list></div>'
+      . '<div class="cs-actions"><button type="button" class="cs-primary" data-cs-rule-close>Cerrar</button></div>'
       . '</div></dialog>';
   }
 
