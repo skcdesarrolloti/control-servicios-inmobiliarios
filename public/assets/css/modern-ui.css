@@ -3638,6 +3638,21 @@ body,
   color: #475569 !important;
 }
 
+/* "Mis casos": solo se ven las categorías con casos del funcionario. */
+#scm-app .scm-my-ticket-category-tabs .scm-status-topic-tab[hidden] {
+  display: none !important;
+}
+
+#scm-app .scm-status-subtabs.scm-my-ticket-category-tabs {
+  margin-bottom: 0.35rem !important;
+}
+
+#scm-app .scm-my-ticket-category-note {
+  color: var(--scm-text-soft, #64748b);
+  font-size: 0.8rem;
+  margin: 0 0 1rem;
+}
+
 #scm-app .scm-my-ticket-state-tabs {
   display: flex;
   flex-wrap: wrap;

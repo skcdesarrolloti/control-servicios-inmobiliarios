@@ -20151,6 +20151,23 @@
                 myKpis.innerHTML = d.kpis_html;
                 root.dispatchEvent(new CustomEvent("scm:kpis-rendered"));
               }
+              // Solo se muestran las categorías con casos; el servidor ya abrió una que tenga casos.
+              if (Array.isArray(d.available_categories)) {
+                var myAvailable = d.available_categories;
+                var myCategory = typeof d.category === "string" ? d.category : "";
+                var myCategoryInput = tabForm ? tabForm.querySelector('[name="scm_my_categoria"]') : null;
+                if (myCategoryInput && myCategory) myCategoryInput.value = myCategory;
+                root.querySelectorAll('[data-my-tickets-category]').forEach(function(button) {
+                  var key = button.getAttribute('data-my-tickets-category');
+                  var selected = key === myCategory;
+                  button.hidden = myAvailable.indexOf(key) === -1;
+                  button.classList.toggle('active', selected);
+                  button.setAttribute('aria-selected', selected ? 'true' : 'false');
+                  button.tabIndex = selected ? 0 : -1;
+                });
+                var myNote = root.querySelector('[data-my-tickets-category-note]');
+                if (myNote) myNote.textContent = myAvailable.length ? "Solo aparecen las categorías en las que tienes casos asignados." : "Aún no tienes casos asignados en ninguna categoría.";
+              }
             }
             if (tabPanel) {
               tabPanel.setAttribute("data-scm-loaded", "1");
@@ -26519,9 +26536,13 @@
       return selectMyTicketsBucket("active", true);
     }
 
-    root.querySelectorAll('[data-my-tickets-category]').forEach(function(button, index, buttons) {
+    root.querySelectorAll('[data-my-tickets-category]').forEach(function(button) {
       button.addEventListener('click', function() { selectMyTicketsCategory(button.getAttribute('data-my-tickets-category')); });
       button.addEventListener('keydown', function(event) {
+        // Las flechas recorren solo las categorías visibles (las que tienen casos).
+        var buttons = Array.prototype.filter.call(root.querySelectorAll('[data-my-tickets-category]'), function(b) { return !b.hidden; });
+        var index = buttons.indexOf(button);
+        if (index < 0) return;
         var target = event.key === 'ArrowRight' ? (index + 1) % buttons.length : event.key === 'ArrowLeft' ? (index + buttons.length - 1) % buttons.length : event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : -1;
         if (target < 0) return;
         event.preventDefault();

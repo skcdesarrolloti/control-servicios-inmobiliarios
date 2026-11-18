@@ -19,7 +19,7 @@ const slice=(start,end,offset=0)=>{const a=source.indexOf(start,offset),b=source
       function setListLoading(el,busy){el.dataset.busy=String(busy);}
       function updateGenericKPI(key,name,value){var el=document.getElementById('scm-'+key+'-kpi-'+name);if(el)el.textContent=value;}
       function applyRevisionKpiVisibility(){} function applyBinaryFilterKpiVisibility(){} function applyCotizacionDependentFilters(){} function updateAdministrativeStatusOptions(){}
-      window.fetch=async function(url,options){var data=Object.fromEntries(options.body),bucket=data.scm_my_bucket;requests.push(data);var json={success:true,data:{cards:'<p>'+bucket+'</p>',count:bucket==='active'?'15':bucket==='postergados'?'2':'3',kpi_total:bucket==='active'?'15':bucket==='postergados'?'2':'3',pagination:'<button class="scm-page-btn-generic" data-page="2">2</button>'}};if(hold)return new Promise(resolve=>held.push(()=>resolve({json:async()=>json})));return {json:async()=>json};};
+      window.fetch=async function(url,options){var data=Object.fromEntries(options.body),bucket=data.scm_my_bucket;requests.push(data);var json={success:true,data:{cards:'<p>'+bucket+'</p>',count:bucket==='active'?'15':bucket==='postergados'?'2':'3',kpi_total:bucket==='active'?'15':bucket==='postergados'?'2':'3',pagination:'<button class="scm-page-btn-generic" data-page="2">2</button>',available_categories:window.available,category:window.available&&window.available.indexOf(data.scm_my_categoria)===-1?window.available[0]:data.scm_my_categoria}};if(hold)return new Promise(resolve=>held.push(()=>resolve({json:async()=>json})));return {json:async()=>json};};
       ${slice('    function makeTabFetcher(', '    function makeStatusFetcher(')}
       tabFetchers.mis_tickets=makeTabFetcher('mis_tickets','my-cases');
       ${slice('    function selectMyTicketsBucket(', '    function cssAttrValue(')}
@@ -81,7 +81,32 @@ const slice=(start,end,offset=0)=>{const a=source.indexOf(start,offset),b=source
     assert.equal(await page.locator('#scm-mis_tickets-kpi-magnitud-critico').count(),1);
     assert.equal(await page.locator('[aria-selected=true][data-my-tickets-category]').textContent(),'Preventiva');
     assert.equal(await page.locator('#scm_my_tema').count(),0,'topic filter removed');
-    assert.equal(await tabs.count(),3);assert.deepEqual(errors,[]);
+    assert.equal(await tabs.count(),3);
+    // Solo se ven las categorías con casos; la nota lo explica y las flechas saltan las ocultas.
+    assert.equal(await page.locator('[data-my-tickets-category-note]').textContent(),'Solo aparecen las categorías en las que tienes casos asignados.');
+    await page.evaluate(()=>{window.hold=false;window.available=['preventiva','contable'];});
+    await page.locator('[data-my-tickets-category=preventiva]').click();
+    await page.waitForFunction(()=>document.querySelector('[data-my-tickets-category=mantenimiento]').hidden);
+    assert.deepEqual(await page.locator('[data-my-tickets-category]:visible').allTextContents(),['Preventiva','Contable']);
+    await page.locator('[data-my-tickets-category=preventiva]').focus();await page.keyboard.press('ArrowRight');
+    await page.waitForFunction(()=>requests.at(-1).scm_my_categoria==='contable');
+    assert.equal(await page.locator('[aria-selected=true][data-my-tickets-category]').textContent(),'Contable');
+    await page.evaluate(()=>{window.available=['contable'];});
+    await page.locator('[data-my-tickets-status=postergados]').click();
+    await page.waitForFunction(()=>document.querySelector('[data-my-tickets-category=preventiva]').hidden);
+    await page.evaluate(()=>{window.available=['entrega'];});
+    await page.locator('[data-my-tickets-status=active]').click();
+    await page.waitForFunction(()=>document.querySelector('[aria-selected=true][data-my-tickets-category]').textContent==='Entrega');
+    assert.equal(await page.evaluate(()=>document.querySelector('[name="scm_my_categoria"]').value),'entrega','server fallback category syncs the form');
+    await page.evaluate(()=>{window.available=[];});
+    await page.locator('[data-my-tickets-status=cerrados]').click();
+    await page.waitForFunction(()=>document.querySelector('[data-my-tickets-category-note]').textContent.startsWith('Aún no'));
+    assert.equal(await page.locator('[data-my-tickets-category]:visible').count(),0);
+    fs.mkdirSync(path.join(__dirname,'../output/my-tickets'),{recursive:true});
+    await page.evaluate(()=>{window.available=['preventiva','contable'];});await page.locator('[data-my-tickets-status=active]').click();
+    await page.waitForFunction(()=>!document.querySelector('[data-my-tickets-category=preventiva]').hidden);
+    await page.setViewportSize({width:1100,height:900});await page.screenshot({path:path.join(__dirname,'../output/my-tickets/categories-1100.png')});
+    assert.deepEqual(errors,[]);
     console.log('PASS: initial/re-entry open status, tabs, KPIs, pagination, filters, keyboard, stale requests, notification popup and responsive layout. No network used.');
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -2094,6 +2094,12 @@ final class SuCasaControlServiciosInmobiliarios
     return $this->get_generic_tickets_module()->run_query_generic($temas, $p, $config, $includeRows);
   }
 
+  /** @param array<int,string> $categories @return array<string,int> */
+  private function my_tickets_category_counts(array $categories, string $employeeId, string $excludedDepartment = ''): array
+  {
+    return $this->get_generic_tickets_module()->my_tickets_category_counts($categories, $employeeId, $excludedDepartment);
+  }
+
   private function render_generic_cards(array $rows, array $config, string $tabKey, string $statusBucket = ''): string
   {
     return $this->get_generic_tickets_module()->render_generic_cards($rows, $config, $tabKey, $statusBucket);

@@ -735,6 +735,68 @@ trait GenericQueryConcern
   }
 
   /**
+   * Cuántos casos del funcionario hay en cada pestaña de "Mis casos", contando solo los que
+   * aparecen en Abiertos, Postergados o Cerrados (los desistidos abiertos no salen en ninguna).
+   * @param array<int,string> $categories
+   * @return array<string,int>
+   */
+  public function my_tickets_category_counts(array $categories, string $employeeId, string $excludedDepartment = ''): array
+  {
+    $counts = array_fill_keys($categories, 0);
+    $tabla = $this->db->table('jet_cct_tickets');
+    if ($categories === [] || $employeeId === '' || !$this->table_exists($tabla)) {
+      return $counts;
+    }
+
+    $selects = [];
+    $args = [];
+    foreach (array_values($categories) as $i => $category) {
+      $selects[] = 'SUM(CASE WHEN ' . $this->my_tickets_category_where_sql($tabla, (string) $category, $args) . " THEN 1 ELSE 0 END) AS c{$i}";
+    }
+
+    $where = [];
+    $empWhere = [];
+    foreach (['id_empleado', 'empleado'] as $candidate) {
+      if ($this->column_exists($tabla, $candidate)) {
+        $empWhere[] = "TRIM(COALESCE(`{$candidate}`, '')) = ?";
+        $args[] = $employeeId;
+      }
+    }
+    if ($empWhere === []) {
+      return $counts;
+    }
+    $where[] = '(' . implode(' OR ', $empWhere) . ')';
+
+    if ($excludedDepartment !== '' && $this->column_exists($tabla, 'departamento')) {
+      $where[] = "LOWER(TRIM(COALESCE(`departamento`, ''))) <> ?";
+      $args[] = mb_strtolower($excludedDepartment, 'UTF-8');
+    }
+
+    // Unión de los tres estados de run_query_generic: cerrados, postergados y abiertos no desistidos.
+    $estadoExpr = "LOWER(TRIM(COALESCE(`estado`, '')))";
+    $visible = ["{$estadoExpr} IN ('cerrado', 'resuelto', 'finalizado')"];
+    $adminCol = $this->detect_first_existing_column($tabla, ['estado_admin_ticket', 'estado_administrativo', 'estado_admin']);
+    $postCol = $this->detect_first_existing_column($tabla, ['estado_administrativo', 'estado_admin_ticket', 'estado_admin']);
+    if ($adminCol !== '') {
+      $adminExpr = "LOWER(TRIM(COALESCE(`{$adminCol}`, '')))";
+      $visible[] = "{$adminExpr} IN ('cerrado', 'resuelto', 'finalizado')";
+      $visible[] = "({$estadoExpr} IN ('nuevo', 'en proceso') AND {$adminExpr} <> 'desistido')";
+    } else {
+      $visible[] = "{$estadoExpr} IN ('nuevo', 'en proceso')";
+    }
+    if ($postCol !== '') {
+      $visible[] = "LOWER(TRIM(COALESCE(`{$postCol}`, ''))) IN ('postergado', 'postergada', 'postergados', 'en espera de respuesta')";
+    }
+    $where[] = '(' . implode(' OR ', $visible) . ')';
+
+    $row = $this->db->getRow('SELECT ' . implode(', ', $selects) . " FROM `{$tabla}` WHERE " . implode(' AND ', $where), $args);
+    foreach (array_values($categories) as $i => $category) {
+      $counts[$category] = (int) ($row["c{$i}"] ?? 0);
+    }
+    return $counts;
+  }
+
+  /**
    * @param array<int,string> $temas
    * @param array<int,mixed> $args
    */

@@ -187,7 +187,9 @@ trait HandlesMaintenanceActions
     $params['fEmpleado'] = $employeeId !== '' ? $employeeId : '__sin_funcionario__';
     $params['_scmStatusBucket'] = $this->myTicketsStatusBucket($_POST['scm_my_bucket'] ?? 'active');
     // La pestaña (Mantenimiento, Preventiva…) define el tema; el filtro "Tema" ya no se usa aquí.
-    $params['_scmMyCategory'] = $this->my_tickets_category($_POST['scm_my_categoria'] ?? 'mantenimiento');
+    // Si la categoría pedida ya no tiene casos (p. ej. se reasignaron), se abre la primera que sí tenga.
+    $availableCategories = $this->my_tickets_available_categories($employeeId);
+    $params['_scmMyCategory'] = $this->resolve_my_tickets_category($_POST['scm_my_categoria'] ?? 'mantenimiento', $availableCategories);
     $params = $this->strip_my_tickets_hidden_filters($params);
     $params['fEstado'] = '';
     $params['_scmExcludeDepartamento'] = 'Servicio al cliente';
@@ -201,6 +203,7 @@ trait HandlesMaintenanceActions
       'cards' => $this->render_generic_cards($rows, $config, 'mis_tickets', $params['_scmStatusBucket']),
       'status_bucket' => $params['_scmStatusBucket'],
       'category' => $params['_scmMyCategory'],
+      'available_categories' => $availableCategories,
       'kpis_html' => $this->render_my_tickets_kpis($params['_scmMyCategory'], $stats),
       'pagination' => $this->get_generic_tickets_module()->render_generic_pagination('mis_tickets', $pagination),
       'count' => (string) ($stats['total'] ?? 0),

@@ -99,7 +99,8 @@ trait RendersDashboard
     $myTicketsParams = $this->parse_params_generic($_GET, 'scm_my_');
     $myTicketsParams['fEmpleado'] = $currentEmployeeId !== '' ? $currentEmployeeId : '__sin_funcionario__';
     $myTicketsParams['_scmStatusBucket'] = 'active';
-    $myTicketsParams['_scmMyCategory'] = $this->my_tickets_category($_GET['scm_my_categoria'] ?? 'mantenimiento');
+    $myTicketsParams['_scmMyAvailableCategories'] = $this->my_tickets_available_categories($currentEmployeeId);
+    $myTicketsParams['_scmMyCategory'] = $this->resolve_my_tickets_category($_GET['scm_my_categoria'] ?? 'mantenimiento', $myTicketsParams['_scmMyAvailableCategories']);
     $myTicketsParams = $this->strip_my_tickets_hidden_filters($myTicketsParams);
     $myTicketsParams['fEstado'] = '';
     $myTicketsParams['_scmExcludeDepartamento'] = 'Servicio al cliente';
@@ -2815,6 +2816,23 @@ trait RendersDashboard
     return array_key_exists($category, $this->my_tickets_categories()) ? $category : 'mantenimiento';
   }
 
+  /** Claves de las pestañas de "Mis casos" en las que el funcionario tiene al menos un caso, en orden. */
+  private function my_tickets_available_categories(string $employeeId): array
+  {
+    if ($employeeId === '') {
+      return [];
+    }
+    $counts = $this->my_tickets_category_counts(array_keys($this->my_tickets_categories()), $employeeId, 'Servicio al cliente');
+    return array_keys(array_filter($counts, static fn(int $count): bool => $count > 0));
+  }
+
+  /** Si la categoría pedida no tiene casos, abre la primera que sí tenga. */
+  private function resolve_my_tickets_category($value, array $available): string
+  {
+    $category = $this->my_tickets_category($value);
+    return $available === [] || in_array($category, $available, true) ? $category : (string) $available[0];
+  }
+
   /** "Mis casos" muestra solo Total y "Magnitud del caso" en todas sus pestañas. */
   private function render_my_tickets_kpis(string $category, array $stats): string
   {
@@ -2847,12 +2865,18 @@ trait RendersDashboard
     $labels = ['active'=>'Abiertos', 'postergados'=>'Postergados', 'cerrados'=>'Cerrados'];
     $params['_scmStatusBucket'] = $bucket;
     $params['_scmMyCategory'] = $category;
+    // Solo se muestran las categorías con casos del funcionario; las demás quedan ocultas.
+    $available = is_array($params['_scmMyAvailableCategories'] ?? null) ? $params['_scmMyAvailableCategories'] : array_keys($categories);
     $categoryTabs = '<div class="scm-status-subtabs scm-my-ticket-category-tabs" role="tablist" aria-label="Categoría de mis casos"><div class="flex items-center gap-1.5 flex-wrap">';
     foreach ($categories as $key => $label) {
       $selected = $key === $category;
-      $categoryTabs .= '<button type="button" class="scm-status-topic-tab' . ($selected ? ' active' : '') . '" role="tab" aria-selected="' . ($selected ? 'true' : 'false') . '" tabindex="' . ($selected ? '0' : '-1') . '" data-my-tickets-category="' . esc_attr($key) . '">' . esc_html($label) . '</button>';
+      $hidden = !in_array($key, $available, true);
+      $categoryTabs .= '<button type="button" class="scm-status-topic-tab' . ($selected ? ' active' : '') . '" role="tab" aria-selected="' . ($selected ? 'true' : 'false') . '" tabindex="' . ($selected ? '0' : '-1') . '" data-my-tickets-category="' . esc_attr($key) . '"' . ($hidden ? ' hidden' : '') . '>' . esc_html($label) . '</button>';
     }
-    $categoryTabs .= '</div></div>';
+    $categoryTabs .= '</div></div>'
+      . '<p class="scm-my-ticket-category-note" data-my-tickets-category-note>'
+      . ($available === [] ? 'Aún no tienes casos asignados en ninguna categoría.' : 'Solo aparecen las categorías en las que tienes casos asignados.')
+      . '</p>';
     $tabs = '<div class="scm-my-ticket-state-tabs" role="tablist" aria-label="Estado de mis casos">';
     foreach ($labels as $key => $label) {
       $selected = $key === $bucket;
