@@ -7,6 +7,7 @@ namespace SCM\Modules\PublicTickets\Concerns;
 use SCM\Core\Database;
 use SCM\Support\EmailQueue;
 use SCM\Support\EmailTemplate;
+use SCM\Support\PublicCaseAccess;
 use SCM\Support\SchemaInspector;
 use SCM\Support\SmsQueue;
 
@@ -42,14 +43,13 @@ trait PublicTicketNotificationsConcern
     $solicitanteEmail = trim((string) ($contact['email'] ?? ''));
     $solicitantePhone = trim((string) ($contact['phone'] ?? ''));
 
-    $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
-    $subject = 'Nueva Solicitud #' . $logicalTicket . ' asignada';
+    $subject = 'Nueva solicitud #' . $logicalTicket . ' asignada';
     $contractLabel = '';
     if (is_array($contract)) {
       $contractLabel = trim((string) ($contract['contrato'] ?? $contract['_ID'] ?? ''));
     }
 
-    $content = '<p style="font-weight:600;margin:0 0 12px;">Se registro una nueva solicitud desde el portal de ' . EmailTemplate::e($actorLabel) . '.</p>';
+    $content = '<p style="font-weight:600;margin:0 0 12px;">Se registró una nueva solicitud de ' . EmailTemplate::e($actorLabel) . ' desde el portal web.</p>';
     $content .= '<p style="margin:4px 0;"><b>Solicitud:</b> #' . EmailTemplate::e($logicalTicket) . '</p>';
     if ($contractLabel !== '') {
       $content .= '<p style="margin:4px 0;"><b>Contrato:</b> ' . EmailTemplate::e($contractLabel) . '</p>';
@@ -61,7 +61,7 @@ trait PublicTicketNotificationsConcern
         $content .= '<p style="margin:4px 0;"><b>Inmueble:</b> ' . EmailTemplate::e($inmuebleLabel) . '</p>';
       }
       if ($direccionLabel !== '') {
-        $content .= '<p style="margin:4px 0;"><b>Direccion:</b> ' . EmailTemplate::e($direccionLabel) . '</p>';
+        $content .= '<p style="margin:4px 0;"><b>Dirección:</b> ' . EmailTemplate::e($direccionLabel) . '</p>';
       }
     }
     $content .= '<p style="margin:4px 0;"><b>Tipo de solicitud:</b> ' . EmailTemplate::e($tipoPqrs) . '</p>';
@@ -251,7 +251,7 @@ trait PublicTicketNotificationsConcern
     if (!empty($uniqueStaffEmails)) {
       foreach ($uniqueStaffEmails as $recipient) {
         $recipientName = trim((string) ($recipient['name'] ?? ''));
-        $recipientLabel = $recipientName !== '' ? $recipientName : 'Destinatario de la notificacion';
+        $recipientLabel = $recipientName !== '' ? $recipientName : 'Destinatario de la notificación';
         $recipientEmployeeId = trim((string) ($recipient['id_empleado'] ?? ''));
         $recipientScope = $this->normalizePublicPqrAccessScope((string) ($recipient['access_scope'] ?? 'assigned'));
         $urlEmployeeId = $recipientEmployeeId !== '' ? $recipientEmployeeId : $responsableId;
@@ -260,8 +260,9 @@ trait PublicTicketNotificationsConcern
           : '';
         $emailContent = $content;
         $emailContent .= '<p style="margin:4px 0;"><b>Responsable:</b> ' . EmailTemplate::e($themeResponsibleLabel) . '</p>';
+        $emailContent .= '<p style="margin:16px 0 0;">Abre la solicitud con el botón <b>Ver solicitud</b> para responderla en el panel.</p>';
         if ($recipientName !== '' && $recipientName !== $responsableLabel) {
-          $emailContent .= '<p style="margin:4px 0;"><b>Recibe esta notificacion:</b> ' . EmailTemplate::e($recipientLabel) . '</p>';
+          $emailContent .= '<p style="margin:4px 0;"><b>Recibe esta notificación:</b> ' . EmailTemplate::e($recipientLabel) . '</p>';
         }
         $buttons = [];
         if ($recipientPublicUrl !== '') {
@@ -272,7 +273,9 @@ trait PublicTicketNotificationsConcern
         }
 
         $html = EmailTemplate::render($subject, $emailContent, [
-          'ticket_url' => $ticketUrl,
+          // Correo individual: el enlace inicia la sesión del funcionario que lo recibe y abre el caso en el panel.
+          'ticket_url' => PublicCaseAccess::staffUrl($ticketPk, $recipientEmployeeId),
+          'ticket_label' => 'Ver solicitud',
           'buttons' => $buttons,
         ]);
 
@@ -312,7 +315,7 @@ trait PublicTicketNotificationsConcern
     foreach ($uniqueStaffPhones as $dest) {
       $phoneRaw = trim((string) ($dest['phone'] ?? ''));
       $destName = trim((string) ($dest['name'] ?? ''));
-      $destLabel = $destName !== '' ? $destName : 'Destinatario de la notificacion';
+      $destLabel = $destName !== '' ? $destName : 'Destinatario de la notificación';
       $destEmployeeId = trim((string) ($dest['id_empleado'] ?? ''));
       $destScope = $this->normalizePublicPqrAccessScope((string) ($dest['access_scope'] ?? 'assigned'));
       $urlEmployeeId = $destEmployeeId !== '' ? $destEmployeeId : $responsableId;
@@ -330,7 +333,7 @@ trait PublicTicketNotificationsConcern
         $smsMessage .= '*Notificado:* ' . $destLabel . "\n";
       }
       $smsMessage .= '*Solicitante:* ' . (string) $contact['name'] . "\n\n";
-      $smsMessage .= "*Ver solicitud:*\n" . $ticketUrl;
+      $smsMessage .= "*Ver solicitud:*\n" . PublicCaseAccess::staffUrl($ticketPk, $destEmployeeId);
       if ($publicRequestsUrl !== '') {
         $smsMessage .= "\n\n*" . ($destScope === 'all' ? 'Ver todas las solicitudes web:' : 'Ver solicitudes web filtradas:') . "*\n" . $publicRequestsUrl;
       }
@@ -341,25 +344,24 @@ trait PublicTicketNotificationsConcern
         'categoria_mensaje' => 'informacion',
         'campaign_tag' => 'pqr_portal_publico',
         'dedupe_key' => 'pqr_nueva_asignada:' . $logicalTicket,
-        'template_name' => 'pqr_nueva_asignada_v1',
+        // Misma plantilla aprobada de "caso asignado": su botón abre ?scm_case= con autologin del funcionario.
+        'template_name' => 'scm_caso_asignado_v1',
         'template_language' => 'es_CO',
         'template_components' => [
           [
             'type' => 'body',
-            'parameters' => [
-              ['type' => 'text', 'text' => $destLabel],
-              ['type' => 'text', 'text' => $logicalTicket],
-              ['type' => 'text', 'text' => $tipoPqrs],
-              ['type' => 'text', 'text' => $themeResponsibleLabel],
-              ['type' => 'text', 'text' => (string) $contact['name']],
-            ],
+            'parameters' => array_map(
+              static fn($value, int $limit): array => ['type' => 'text', 'text' => mb_substr(preg_replace('/\s+/u', ' ', trim((string) $value)) ?: 'Sin dato', 0, $limit)],
+              [$destLabel, $logicalTicket, $asunto, $tipoPqrs, $contractLabel !== '' ? $contractLabel : 'Sin número', $themeResponsibleLabel],
+              [80, 20, 200, 100, 50, 80]
+            ),
           ],
           [
             'type' => 'button',
             'sub_type' => 'url',
             'index' => '0',
             'parameters' => [
-              ['type' => 'text', 'text' => $logicalTicket],
+              ['type' => 'text', 'text' => PublicCaseAccess::staffReference($ticketPk, $destEmployeeId)],
             ],
           ],
         ],
@@ -369,16 +371,19 @@ trait PublicTicketNotificationsConcern
       }
     }
 
-    $confirmationSubject = 'Confirmacion PQR #' . $logicalTicket . ' recibido';
-    $confirmationContent = '<p style="font-weight:600;margin:0 0 12px;">Hemos recibido tu PQR y ya fue asignado a gestion interna.</p>';
-    $confirmationContent .= '<p style="margin:4px 0;"><b>PQR:</b> #' . EmailTemplate::e($logicalTicket) . '</p>';
-    $confirmationContent .= '<p style="margin:4px 0;"><b>Tipo PQR/Peticion:</b> ' . EmailTemplate::e($tipoPqrs) . '</p>';
+    // Confirmación al solicitante: su enlace abre la vista pública del caso (solo consulta).
+    $solicitanteName = trim((string) ($contact['name'] ?? ''));
+    $confirmationSubject = 'Recibimos tu solicitud #' . $logicalTicket;
+    $confirmationContent = '<p style="margin:0 0 12px;">Hola' . ($solicitanteName !== '' ? ' ' . EmailTemplate::e($solicitanteName) : '') . ', recibimos tu solicitud en SKC SuCasa Inmobiliaria y ya fue asignada a nuestro equipo para su gestión.</p>';
+    $confirmationContent .= '<p style="margin:4px 0;"><b>Solicitud:</b> #' . EmailTemplate::e($logicalTicket) . '</p>';
+    $confirmationContent .= '<p style="margin:4px 0;"><b>Tipo de solicitud:</b> ' . EmailTemplate::e($tipoPqrs) . '</p>';
     $confirmationContent .= '<p style="margin:4px 0;"><b>Asunto:</b> ' . EmailTemplate::e($asunto) . '</p>';
     if ($contractLabel !== '') {
       $confirmationContent .= '<p style="margin:4px 0;"><b>Contrato:</b> ' . EmailTemplate::e($contractLabel) . '</p>';
     }
-    $confirmationContent .= '<p style="margin:4px 0;"><b>Solicitante:</b> ' . EmailTemplate::e((string) $contact['name']) . '</p>';
-    $confirmationHtml = EmailTemplate::render($confirmationSubject, $confirmationContent, ['ticket_url' => $ticketUrl]);
+    $confirmationContent .= '<p style="margin:4px 0;"><b>Responsable:</b> ' . EmailTemplate::e($themeResponsibleLabel) . '</p>';
+    $confirmationContent .= '<p style="margin:16px 0 0;">Con el botón <b>Ver solicitud</b> puedes consultar su estado en cualquier momento.</p>';
+    $confirmationHtml = EmailTemplate::render($confirmationSubject, $confirmationContent, ['ticket_url' => PublicCaseAccess::url($ticketPk, in_array($actor, ['propietario', 'arrendatario', 'copropiedad'], true) ? $actor : 'publico'), 'ticket_label' => 'Ver solicitud']);
 
     if (empty($clienteOverride['enabled']) && $solicitanteEmail !== '' && filter_var($solicitanteEmail, FILTER_VALIDATE_EMAIL)) {
       $dedupKey = mb_strtolower($solicitanteEmail, 'UTF-8');
