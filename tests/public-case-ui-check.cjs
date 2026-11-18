@@ -20,16 +20,19 @@ $db = SCM\\Core\\App::db();
 $db->pdo()->exec('CREATE TEMPORARY TABLE '.chr(96).$db->table('jet_cct_tickets').chr(96).' (_ID BIGINT, asunto TEXT, descripcion TEXT, tema_ayuda TEXT, estado TEXT, contrato TEXT, inmueble TEXT, direccion TEXT, fecha BIGINT, nombre_empleado TEXT, imagenes TEXT, archivos TEXT, sucursal TEXT, correo_propietario TEXT, observacion_interna TEXT)');
 $files = SCM\\Support\\StoredFileService::fromRuntime();
 $db->insert($db->table('jet_cct_tickets'), ['_ID'=>1999999999,'asunto'=>'Revisar fuga en cocina','descripcion'=>"La llave de la cocina presenta una fuga.\\nSe requiere revisar la conexión y coordinar la visita.",'tema_ayuda'=>'Reparaciones necesarias','estado'=>'Nuevo','contrato'=>'QA801','inmueble'=>'SIMI8001','direccion'=>'Calle de ejemplo 123','fecha'=>time(),'nombre_empleado'=>'Consultor de prueba','imagenes'=>$files->urlFor(str_repeat('a',24).'_123.png'),'archivos'=>serialize([['nombre_archivo'=>'Soporte PDF','archivo'=>$files->urlFor(str_repeat('b',24).'_123.pdf')]]),'sucursal'=>'SECRET_BRANCH','correo_propietario'=>'SECRET_CONTACT','observacion_interna'=>'SECRET_NOTE']);
+// Historial (y en respuestas, la cola) en tablas temporales de esta conexión; nada llega a la base ni a la cola reales.
+$shared = require dirname('${repo}') . '/shared-notifications/config.php';
+$shadow = [$db->table('jet_cct_historial_del_ticket')];
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') array_push($shadow, $shared['queue']['queue_table'], $shared['queue']['attempts_table']);
+foreach ($shadow as $table) {
+  $sql = $db->getRow('SHOW CREATE TABLE '.chr(96).$table.chr(96))['Create Table'] ?? '';
+  if (!str_starts_with($sql, 'CREATE TABLE')) { http_response_code(500); exit; }
+  $db->pdo()->exec(preg_replace('/^CREATE TABLE /', 'CREATE TEMPORARY TABLE ', $sql));
+}
+$db->insert($db->table('jet_cct_historial_del_ticket'), ['cct_status'=>'publish','id_ticket'=>1999999999,'fecha'=>time()-3600,'nombre'=>'Consultor de prueba','correo'=>'SECRET_STAFF_EMAIL','celular'=>'SECRET_STAFF_PHONE','respuesta'=>'<p>Programamos la visita del técnico.</p><script>alert(1)</script>','imagen'=>$files->urlFor(str_repeat('c',24).'_123.png'),'id_empleado'=>'9002','cct_author_id'=>9002]);
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
-  // Respuestas: historial y cola en tablas temporales de esta conexión; nada llega a la base ni a la cola reales.
-  $shared = require dirname('${repo}') . '/shared-notifications/config.php';
-  foreach ([$db->table('jet_cct_historial_del_ticket'), $shared['queue']['queue_table'], $shared['queue']['attempts_table']] as $table) {
-    $sql = $db->getRow('SHOW CREATE TABLE '.chr(96).$table.chr(96))['Create Table'] ?? '';
-    if (!str_starts_with($sql, 'CREATE TABLE')) { http_response_code(500); exit; }
-    $db->pdo()->exec(preg_replace('/^CREATE TABLE /', 'CREATE TEMPORARY TABLE ', $sql));
-  }
   register_shutdown_function(static function () use ($db) {
-    $row = $db->getRow('SELECT COUNT(*) AS total, MAX(nombre) AS nombre FROM '.chr(96).$db->table('jet_cct_historial_del_ticket').chr(96));
+    $row = $db->getRow('SELECT COUNT(*) AS total, MAX(nombre) AS nombre FROM '.chr(96).$db->table('jet_cct_historial_del_ticket').chr(96)." WHERE nombre LIKE '%(Propietario)'");
     file_put_contents('${tempPosix}/history.json', json_encode($row));
   });
 }
@@ -89,8 +92,15 @@ require '${repo}/public/' . ($path === '/caso.php' ? 'caso.php' : 'index.php');
     assert(!text.includes('SECRET_'), 'public page omits sensitive internal fields');
     assert(!text.includes('Acceso funcionarios'), 'generic public links omit internal navigation');
     assert((await page.locator('body').evaluate(node => getComputedStyle(node).fontFamily)).includes('Poppins'));
-    assert.equal(await page.locator('[data-preview=image]').count(), 1);
-    await page.locator('[data-preview=image]').click();
+    const historyEntry = page.locator('.scm-public-case-entry');
+    assert.equal(await historyEntry.count(), 1, 'case history is visible to the recipient');
+    assert((await historyEntry.innerText()).includes('Programamos la visita del técnico.'), 'history shows the staff response as plain text');
+    assert.equal(await page.locator('script:not([src])').count(), 0, 'history never injects scripts');
+    assert.equal(await page.locator('[data-preview=image]').count(), 2, 'case evidence and history attachment can be previewed');
+    await page.locator('.scm-public-case-entry [data-preview=image]').click();
+    assert(await page.locator('dialog').isVisible(), 'history attachment opens inside same page');
+    await page.keyboard.press('Escape');
+    await page.locator('.scm-public-case-evidence [data-preview=image]').click();
     assert(await page.locator('dialog').isVisible(), 'image opens inside same page');
     assert.equal(await page.locator('[data-preview-body] img').count(), 1);
     await page.keyboard.press('Escape');

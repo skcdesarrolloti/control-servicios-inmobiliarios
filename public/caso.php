@@ -54,6 +54,12 @@ if (!in_array($method, ['GET', 'HEAD', 'POST'], true)) {
       if (!$ticket) { http_response_code(404); $error = 'El caso no está disponible.'; }
       else {
         $case = \SCM\Support\PublicCaseData::fromTicket($ticket);
+        $case['history'] = [];
+        try {
+          $case['history'] = \SCM\Support\PublicCaseData::history($db, $ticket);
+        } catch (Throwable $e) {
+          error_log('[public-case] No se pudo cargar el historial del caso #' . $route['id']);
+        }
         http_response_code(200);
         $csrfAction = 'public-case-reply-' . (int) $route['id'] . '-' . $route['audience'];
         $reply['enabled'] = PublicCaseReply::canReply($route['audience'], $ticket);

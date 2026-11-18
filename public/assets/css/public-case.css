@@ -19,8 +19,22 @@
 .scm-public-case-hint.is-error { color:#9f1239; }
 .scm-public-case-submit { border:0; border-radius:.625rem; background:#061d49; padding:.625rem 1.125rem; font:inherit; font-size:.875rem; font-weight:600; color:#fff; cursor:pointer; }
 .scm-public-case-submit:disabled { opacity:.6; cursor:wait; }
+.scm-public-case-timeline { list-style:none; margin:.875rem 0 0; padding:0; display:flex; flex-direction:column; gap:.75rem; }
+.scm-public-case-entry { border:1px solid #e2e8f0; border-left:4px solid #061d49; border-radius:.75rem; background:#fff; padding:.75rem 1rem; min-width:0; break-inside:avoid; }
+.scm-public-case-entry.is-external { border-left-color:#f59120; background:#fffaf3; }
+.scm-public-case-entry-head { display:flex; flex-wrap:wrap; justify-content:space-between; gap:.25rem .75rem; margin:0; font-size:.8125rem; color:#0f172a; }
+.scm-public-case-entry-head span { font-size:.75rem; color:#64748b; }
+.scm-public-case-entry-text { margin:.5rem 0 0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:.875rem; line-height:1.55; color:#334155; }
+.scm-public-case-entry-files { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.625rem; }
+.scm-public-case-entry-files button:has(img) { border:1px solid #e2e8f0; border-radius:.5rem; background:#f8fafc; padding:.25rem; cursor:zoom-in; }
+.scm-public-case-entry-files img { display:block; width:4.5rem; height:4.5rem; object-fit:cover; border-radius:.375rem; }
 @media print {
   .scm-public-case-reply, .scm-public-case-alert { display:none !important; }
+  .scm-public-case-timeline { gap:6px; margin-top:6px; }
+  .scm-public-case-entry { padding:6px 8px; border-radius:6px; break-inside:avoid; page-break-inside:avoid; }
+  .scm-public-case-entry-text { margin-top:3px; font-size:9pt; line-height:1.35; }
+  .scm-public-case-entry-files img { width:40px; height:40px; }
+  .scm-public-case-entry-files [data-preview="pdf"] { display:none !important; }
   @page { size:A4; margin:10mm; }
   .scm-public-case { background:white; font-size:10pt; }
   .scm-public-case main { min-height:0; display:block; padding:0; }

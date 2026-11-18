@@ -110,7 +110,18 @@ $check($notifier->notifyPanelResponse($ticket, 70501, 'Hola', 'Responsable', 'En
 $settings(false);
 $check($notifier->notifyPanelResponse($ticket, 70501, 'Hola', 'Responsable', 'En proceso', ['propietario'], '9003', 'qa-panel-4') === 0, 'disabled template sends no panel WhatsApp');
 
-// 4) Enlaces de los correos con copias y vista pública.
+// 4) Historial público: incluye la respuesta del actor guardada arriba, sin contactos ni HTML ejecutable.
+$publicHistory = SCM\Support\PublicCaseData::history($db, $ticket);
+$check(count($publicHistory) === 2 && $publicHistory[0]['author'] === 'Propietaria Ejemplo (Propietario)' && $publicHistory[0]['external'], 'public history lists replies in order and marks external authors');
+$check(str_contains($publicHistory[0]['text'], "Ya revisé.\n") && str_contains($publicHistory[0]['text'], '<script>'), 'stored reply is decoded back to the original plain text (escaped again by the view)');
+$entries = SCM\Support\PublicCaseData::historyFromRows([
+  ['nombre' => 'Funcionario', 'fecha' => '1790000000', 'correo' => 'SECRET_EMAIL', 'celular' => 'SECRET_PHONE', 'respuesta' => '<p>Hola</p><script>alert(1)</script>', 'imagen' => serialize(['https://evil.invalid/x.png', 'https://sucasainmobiliaria.com.co/wp-content/uploads/ok.png']), 'archivos' => serialize([['archivo' => 'https://evil.invalid/x.pdf']])],
+  ['nombre' => '', 'respuesta' => '   ', 'imagen' => ''],
+]);
+$check(count($entries) === 1 && !str_contains(json_encode($entries), 'SECRET_') && !str_contains($entries[0]['text'], 'alert'), 'history omits contacts, scripts and empty rows');
+$check(!$entries[0]['external'] && $entries[0]['images'] === ['https://sucasainmobiliaria.com.co/wp-content/uploads/ok.png'] && $entries[0]['documents'] === [], 'history attachments use the public allowlist');
+
+// 5) Enlaces de los correos con copias y vista pública.
 $check(PublicCaseAccess::route(explode('scm_case=', CaseReplyNotifications::emailCaseUrl(70501, 'arrendatario'))[1], false)['audience'] === 'arrendatario', 'tenant email link opens the tenant public view');
 $check(PublicCaseAccess::route(explode('scm_case=', CaseReplyNotifications::emailCaseUrl(70501, 'admin'))[1], false) === ['mode' => 'public', 'id' => 70501, 'audience' => 'funcionario'], 'copied staff emails keep a plain staff link without autologin');
 $render = static function (array $state, string $audience = 'propietario'): string {
