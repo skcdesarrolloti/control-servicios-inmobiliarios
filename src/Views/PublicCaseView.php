@@ -6,7 +6,8 @@ namespace SCM\Views;
 
 final class PublicCaseView
 {
-  public function render(?array $case, string $error = '', string $audience = 'publico'): void
+  /** @param array{enabled?:bool,closed?:bool,token?:string,error?:string,sent?:bool,text?:string,action?:string} $reply */
+  public function render(?array $case, string $error = '', string $audience = 'publico', array $reply = []): void
   {
     $e = static fn($v): string => htmlspecialchars((string) $v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $base = rtrim((string) SCM_BASE_URL, '/');
@@ -34,6 +35,22 @@ final class PublicCaseView
         <div class="scm-public-case-evidence mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3"><?php foreach ($case['images'] as $i => $url): ?><button type="button" data-preview="image" data-url="<?php echo $e($url); ?>" data-title="Evidencia <?php echo $i + 1; ?>" class="rounded-xl border border-slate-200 bg-slate-50 p-2 text-left focus:ring-2 focus:ring-slate-400"><img class="h-32 w-full rounded-lg object-contain" src="<?php echo $e($url); ?>" alt="Evidencia <?php echo $i + 1; ?>" loading="lazy"><span class="mt-2 block text-xs text-slate-600">Evidencia <?php echo $i + 1; ?></span></button><?php endforeach; ?></div>
         <div class="mt-3 flex flex-col gap-2"><?php foreach ($case['documents'] as $document): ?><button type="button" data-preview="pdf" data-url="<?php echo $e($document['url']); ?>" data-title="<?php echo $e($document['name']); ?>" class="scm-new-case-button break-all text-left"><?php echo $e($document['name']); ?></button><?php endforeach; ?></div>
       </section><?php endif; ?>
+      <?php if (!empty($reply['sent'])): ?><p role="status" class="scm-public-case-alert is-success"><b>Recibimos tu respuesta.</b> Ya le avisamos al funcionario a cargo del caso.</p><?php endif; ?>
+      <?php if (!empty($reply['enabled'])): ?>
+      <section class="scm-public-case-reply" aria-labelledby="scm-reply-title"><h2 id="scm-reply-title" class="text-sm font-semibold">Responder el caso</h2><p class="mt-1 text-xs text-slate-500">Tu respuesta queda registrada en el caso y le avisamos de inmediato al funcionario a cargo.</p>
+        <?php if (($reply['error'] ?? '') !== ''): ?><p role="alert" class="scm-public-case-alert is-error"><?php echo $e($reply['error']); ?></p><?php endif; ?>
+        <form method="post" action="<?php echo $e($reply['action'] ?? ''); ?>" enctype="multipart/form-data" data-reply-form class="scm-public-case-reply-form">
+          <input type="hidden" name="_csrf_token" value="<?php echo $e($reply['token'] ?? ''); ?>">
+          <label class="scm-public-case-field"><span>Tu respuesta</span><textarea name="respuesta" rows="5" required minlength="3" maxlength="<?php echo \SCM\Support\PublicCaseReply::MAX_TEXT; ?>" placeholder="Escribe aquí tu respuesta o la información que te solicitaron."><?php echo $e($reply['text'] ?? ''); ?></textarea></label>
+          <div class="scm-public-case-files">
+            <label class="scm-public-case-field"><span>Fotos (opcional, máximo <?php echo \SCM\Support\PublicCaseReply::MAX_IMAGES; ?>)</span><input type="file" name="imagenes[]" accept="image/jpeg,image/png,image/webp" multiple data-max-files="<?php echo \SCM\Support\PublicCaseReply::MAX_IMAGES; ?>"></label>
+            <label class="scm-public-case-field"><span>Documentos PDF (opcional, máximo <?php echo \SCM\Support\PublicCaseReply::MAX_DOCUMENTS; ?>)</span><input type="file" name="archivos[]" accept="application/pdf,.pdf" multiple data-max-files="<?php echo \SCM\Support\PublicCaseReply::MAX_DOCUMENTS; ?>"></label>
+          </div>
+          <p data-reply-feedback class="scm-public-case-hint" aria-live="polite">Cada archivo puede pesar hasta 10 MB y en total hasta 20 MB. Las fotos se comprimen al guardarse.</p>
+          <div><button type="submit" data-reply-submit class="scm-public-case-submit">Enviar respuesta</button></div>
+        </form>
+      </section>
+      <?php elseif (!empty($reply['closed']) && $audience !== 'funcionario'): ?><p class="scm-public-case-alert">Este caso está cerrado. Si necesitas algo adicional, comunícate con SKC SuCasa Inmobiliaria.</p><?php endif; ?>
       <?php if ($case['responsable'] !== ''): ?><footer class="scm-public-case-signoff border-t border-slate-200 pt-4"><p class="text-xs text-slate-500">Gestión a cargo de</p><p class="mt-1 text-sm font-semibold"><?php echo $e($case['responsable']); ?></p><p class="mt-1 text-xs text-slate-500">SKC SuCasa Inmobiliaria</p></footer><?php endif; ?>
     <?php endif; ?>
     </div>

@@ -8,6 +8,7 @@ const assert = require('node:assert/strict');
 (async () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'scm-public-case-'));
   const repo = path.resolve(__dirname, '..').replace(/\\/g, '/');
+  const tempPosix = temp.replace(/\\/g, '/');
   const router = path.join(temp, 'router.php');
   fs.writeFileSync(router, `<?php
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -19,6 +20,19 @@ $db = SCM\\Core\\App::db();
 $db->pdo()->exec('CREATE TEMPORARY TABLE '.chr(96).$db->table('jet_cct_tickets').chr(96).' (_ID BIGINT, asunto TEXT, descripcion TEXT, tema_ayuda TEXT, estado TEXT, contrato TEXT, inmueble TEXT, direccion TEXT, fecha BIGINT, nombre_empleado TEXT, imagenes TEXT, archivos TEXT, sucursal TEXT, correo_propietario TEXT, observacion_interna TEXT)');
 $files = SCM\\Support\\StoredFileService::fromRuntime();
 $db->insert($db->table('jet_cct_tickets'), ['_ID'=>1999999999,'asunto'=>'Revisar fuga en cocina','descripcion'=>"La llave de la cocina presenta una fuga.\\nSe requiere revisar la conexión y coordinar la visita.",'tema_ayuda'=>'Reparaciones necesarias','estado'=>'Nuevo','contrato'=>'QA801','inmueble'=>'SIMI8001','direccion'=>'Calle de ejemplo 123','fecha'=>time(),'nombre_empleado'=>'Consultor de prueba','imagenes'=>$files->urlFor(str_repeat('a',24).'_123.png'),'archivos'=>serialize([['nombre_archivo'=>'Soporte PDF','archivo'=>$files->urlFor(str_repeat('b',24).'_123.pdf')]]),'sucursal'=>'SECRET_BRANCH','correo_propietario'=>'SECRET_CONTACT','observacion_interna'=>'SECRET_NOTE']);
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+  // Respuestas: historial y cola en tablas temporales de esta conexión; nada llega a la base ni a la cola reales.
+  $shared = require dirname('${repo}') . '/shared-notifications/config.php';
+  foreach ([$db->table('jet_cct_historial_del_ticket'), $shared['queue']['queue_table'], $shared['queue']['attempts_table']] as $table) {
+    $sql = $db->getRow('SHOW CREATE TABLE '.chr(96).$table.chr(96))['Create Table'] ?? '';
+    if (!str_starts_with($sql, 'CREATE TABLE')) { http_response_code(500); exit; }
+    $db->pdo()->exec(preg_replace('/^CREATE TABLE /', 'CREATE TEMPORARY TABLE ', $sql));
+  }
+  register_shutdown_function(static function () use ($db) {
+    $row = $db->getRow('SELECT COUNT(*) AS total, MAX(nombre) AS nombre FROM '.chr(96).$db->table('jet_cct_historial_del_ticket').chr(96));
+    file_put_contents('${tempPosix}/history.json', json_encode($row));
+  });
+}
 $_SESSION['scm_logged_in'] = ($_GET['logged'] ?? '') !== '';
 $_SESSION['scm_last_activity'] = ($_GET['logged'] ?? '') === 'expired' ? 1 : time();
 require '${repo}/public/' . ($path === '/caso.php' ? 'caso.php' : 'index.php');
@@ -49,7 +63,11 @@ require '${repo}/public/' . ($path === '/caso.php' ? 'caso.php' : 'index.php');
     const direct = await fetch(base + '/caso.php?scm_case=' + fixture.reference + '&logged=1', {redirect: 'manual'});
     assert.equal(direct.headers.get('location'), base + '/?scm_case=1999999999');
     assert.equal((await fetch(url + '&logged=expired')).status, 200, 'expired session falls back to signed public view');
-    assert.equal((await fetch(url, {method: 'POST'})).status, 405, 'public endpoint is read-only');
+    const forged = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'respuesta=Sin+token'});
+    assert.equal(forged.status, 422, 'reply without CSRF token is rejected');
+    assert((await forged.text()).includes('No se pudo validar el envío'));
+    assert.equal(JSON.parse(fs.readFileSync(path.join(temp, 'history.json'), 'utf8')).total, 0, 'rejected reply writes nothing');
+    assert.equal((await fetch(url, {method: 'PUT'})).status, 405, 'other methods stay closed');
     for (const [audience, reference] of Object.entries(fixture.audiences)) {
       const response = await fetch(base + '/?scm_case=' + reference);
       const html = await response.text();
@@ -93,13 +111,26 @@ require '${repo}/public/' . ($path === '/caso.php' ? 'caso.php' : 'index.php');
     await page.pdf({path: path.join(output, 'print.pdf'), format: 'A4', preferCSSPageSize: true});
     assert.equal((fs.readFileSync(path.join(output, 'print.pdf'), 'latin1').match(/\/Type\s*\/Page\b/g) || []).length, 1, 'representative public case prints on one compact A4 page');
     await page.screenshot({path: path.join(output, 'print.png'), fullPage: true});
+    await page.emulateMedia({media: 'screen'});
+    await page.setViewportSize({width: 1280, height: 1000});
+    assert.equal(await page.locator('[data-reply-form]').isHidden(), false, 'external links can reply');
+    await page.goto(base + '/?scm_case=' + fixture.audiences.funcionario);
+    assert.equal(await page.locator('[data-reply-form]').count(), 0, 'staff links do not get the public reply form');
+    await page.goto(base + '/?scm_case=' + fixture.audiences.propietario);
+    await page.locator('textarea[name=respuesta]').fill('Ya revisé la cocina.\nQuedo atento a la visita.');
+    await Promise.all([page.waitForURL(/enviado=1/), page.locator('[data-reply-submit]').click()]);
+    assert(await page.locator('text=Recibimos tu respuesta').isVisible(), 'confirmation is shown after the redirect');
+    const saved = JSON.parse(fs.readFileSync(path.join(temp, 'history.json'), 'utf8'));
+    assert.equal(Number(saved.total), 1, 'reply is stored once');
+    assert.equal(saved.nombre, 'Propietario (Propietario)', 'reply is attributed to the signed audience');
+    await page.screenshot({path: path.join(output, 'reply-sent.png'), fullPage: true});
+    await page.goBack();
     assert.deepEqual(errors, [], 'no browser errors');
     console.log('PASS: signed public routing, panel session redirect, expiry, privacy, evidence previews, mobile and print');
   } finally {
     if (browser) await browser.close();
     server.kill();
     await new Promise(resolve => server.once('exit', resolve));
-    fs.unlinkSync(router);
-    fs.rmdirSync(temp);
+    fs.rmSync(temp, {recursive: true, force: true});
   }
 })().catch(error => { console.error(error); process.exitCode = 1; });

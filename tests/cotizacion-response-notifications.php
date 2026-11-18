@@ -105,7 +105,7 @@ namespace {
       $ticket = ['id_ticket' => '10841', 'solicitante' => 'Cliente', 'correo_solicitante' => 'cliente@example.test', 'correo_empleado' => 'responsable@example.test'];
       return $state === 'followup'
         ? $this->notifySeguimiento($ticket, 'Seguimiento de prueba', 'Funcionario', ['solicitante'])
-        : $this->notifyTicketResponse($ticket, '10841', 'Respuesta de prueba', 'Funcionario', $state, ['solicitante']);
+        : $this->notifyTicketResponse($ticket, '10841', 'Respuesta de prueba', 'Funcionario', $state, ['solicitante'])['email'];
     }
     private function resolveTicketTenantDisplayName(array $ticket): string { return 'Arrendatario de prueba'; }
   }

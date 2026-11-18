@@ -484,6 +484,11 @@ final class SuCasaControlServiciosInmobiliarios
             'description' => 'Cuando un funcionario responde un caso.',
             'channel' => 'Email interno en cola',
           ],
+          \SCM\Support\CaseReplyNotifications::INTERNAL_ACTION => [
+            'label' => 'Respuesta de un actor en la vista pública',
+            'description' => 'Cuando el propietario, arrendatario, copropiedad o solicitante responde desde el enlace del caso. El funcionario asignado siempre recibe el aviso; aquí se agregan copias. Cada uno recibe su correo y, al activar la plantilla de respuestas, WhatsApp con enlace que abre su sesión.',
+            'channel' => 'Correo y WhatsApp oficial configurable en cola',
+          ],
           'seguimiento_ticket' => [
             'label' => 'Agregar seguimiento',
             'description' => 'Cuando se registra un seguimiento en el caso.',

@@ -295,9 +295,10 @@ trait WorkflowCommandsConcern
       );
     }
 
-    $sent = $generatedNoAccessNotice === null
-      ? $this->notifyTicketResponse($ticket, $logicalTicket, $respuesta, $userName, $newEstado, $notifyTargets, $additionalEmails)
-      : 0;
+    $responseDelivery = $generatedNoAccessNotice === null
+      ? $this->notifyTicketResponse($ticket, $logicalTicket, $respuesta, $userName, $newEstado, $notifyTargets, $additionalEmails, (string) $employeeId)
+      : ['email' => 0, 'whatsapp' => 0];
+    $sent = $responseDelivery['email'];
     $noticeSent = 0;
     $noticeWhatsappSent = 0;
     if ($generatedNoAccessNotice !== null) {
@@ -331,9 +332,9 @@ trait WorkflowCommandsConcern
         . ($generatedNoAccessNotice !== null ? ' Comunicacion preventiva #' . $attemptNoAccessNotice . ' generada y anexada.' : '')
         . $extraMessage
         . (($sent + $noticeSent) > 0 ? ' Correos programados en cola: ' . ($sent + $noticeSent) . '.' : ' Sin correos programados.')
-        . ($noticeWhatsappSent > 0 ? ' WhatsApp programados en cola: ' . $noticeWhatsappSent . '.' : ''),
+        . (($noticeWhatsappSent + $responseDelivery['whatsapp']) > 0 ? ' WhatsApp programados en cola: ' . ($noticeWhatsappSent + $responseDelivery['whatsapp']) . '.' : ''),
       'emails_sent' => (string)($sent + $noticeSent),
-      'whatsapp_sent' => (string)$noticeWhatsappSent,
+      'whatsapp_sent' => (string)($noticeWhatsappSent + $responseDelivery['whatsapp']),
       'cot_rows' => $cotRows,
       'no_access_attempt' => (string)$attemptNoAccessNotice,
       'no_access_notice_url' => $generatedNoAccessNotice !== null ? (string)($generatedNoAccessNotice['url'] ?? '') : '',

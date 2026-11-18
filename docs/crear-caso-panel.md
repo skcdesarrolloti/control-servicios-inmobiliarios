@@ -75,6 +75,16 @@ La vista pública muestra título, estado, tema, contrato, SIMI, dirección, fec
 
 Cada formulario genera un identificador de solicitud. El servidor guarda el resultado bajo bloqueo en `storage/data/panel-case-receipts`; reintentos de la misma solicitud recuperan el caso creado sin repetir correos. Al guardar se invalidan y actualizan las métricas.
 
+## Respuestas del caso
+
+**Actor desde la vista pública.** Con un enlace de solicitante, propietario, arrendatario o copropiedad, y el caso sin cerrar, la vista muestra **Responder el caso**. Admite texto de máximo 3000 caracteres, 5 fotos (comprimidas al guardarse) y 3 PDF, con máximo 10 MB por archivo y 20 MB en total. Usa CSRF de un solo uso y permite 6 respuestas por hora por caso e IP. `PublicCaseReply` guarda la respuesta en `jet_cct_historial_del_ticket` con el nombre del actor según el enlace firmado, como `Nombre (Propietario)`, sin funcionario autor (`cct_author_id = 0`). No cambia `estado` ni `estado_administrativo`. Los enlaces de funcionario y los casos cerrados no muestran el formulario. La vista sigue sin publicar el historial.
+
+`CaseReplyNotifications::notifyActorReply()` avisa al responsable asignado y a las copias del evento **Respuesta de un actor en la vista pública** (`respuesta_caso_actor`) en Notificaciones internas. Cada uno recibe un correo individual sin copias, con la respuesta y el botón **Responder en el panel** con autologin. Con la plantilla de respuestas activa, también recibe WhatsApp.
+
+**Funcionario desde el panel.** El correo de respuesta y el de seguimiento ya no enlazan a `/ticket/?id_ticket=`: cada destinatario recibe la vista pública de su rol (solicitante, propietario o arrendatario). El funcionario y las copias reciben el enlace de funcionario sin autologin, porque esos correos llevan copias. Con la plantilla activa, `notifyPanelResponse()` envía WhatsApp a los actores marcados que tengan celular y al responsable asignado cuando responde otra persona. Las copias internas y los correos adicionales siguen solo por correo.
+
+Ambos sentidos usan `scm_caso_respuesta_v1`, que se activa con `reply_enabled = true` en `panel_case_notifications` cuando Meta la apruebe. Ver [crear-plantilla-whatsapp-respuesta-caso.md](crear-plantilla-whatsapp-respuesta-caso.md).
+
 ## Plantillas de WhatsApp
 
 En WhatsApp Manager crea estas dos plantillas para la misma cuenta de WhatsApp Business usada por el worker. Categoría propuesta: **Utilidad**; idioma: **Español (Colombia)**, código `es_CO`. Usa variables **numéricas/posicionales**, no variables con nombre. No agregues encabezado, archivos, pie de página ni respuestas rápidas. La categoría final y aprobación las decide Meta.

@@ -1,0 +1,40 @@
+{
+  "name": "scm_caso_respuesta_v1",
+  "language": "es_CO",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}.\n\nEl caso #{{2}} tiene una nueva respuesta de {{3}}.\n\n*Asunto:* {{4}}\n*Estado:* {{5}}\n*Respuesta:* {{6}}\n\nConsulta el caso completo y responde desde el botón.",
+      "example": {
+        "body_text": [
+          [
+            "María Pérez",
+            "10945",
+            "Propietario · Juan Gómez",
+            "Revisión de humedad en el baño",
+            "En proceso",
+            "Ya programamos la visita del técnico para el jueves en la mañana."
+          ]
+        ]
+      }
+    },
+    {
+      "type": "FOOTER",
+      "text": "SKC SuCasa Inmobiliaria"
+    },
+    {
+      "type": "BUTTONS",
+      "buttons": [
+        {
+          "type": "URL",
+          "text": "Ver caso",
+          "url": "https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/?scm_case={{1}}",
+          "example": [
+            "https://sucasainmobiliaria.com.co/control-servicios-inmobiliarios/public/?scm_case=10945.1893456000.propietario.ejemplo"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -12,12 +12,17 @@ use SCM\Support\SchemaInspector;
 
 trait NotificationDeliveryConcern
 {
-  private function notifyTicketResponse(array $ticket, string $logicalTicket, string $respuesta, string $userName, string $estado, array $notifyTargets = [], array $additionalEmails = []): int
+  /** @return array{email:int,whatsapp:int} */
+  private function notifyTicketResponse(array $ticket, string $logicalTicket, string $respuesta, string $userName, string $estado, array $notifyTargets = [], array $additionalEmails = [], string $responderEmployeeId = ''): array
   {
+    $ticketPk = (int) ($ticket['_ID'] ?? 0);
+    // WhatsApp a los actores marcados (y al responsable si responde otra persona) con la plantilla de respuesta del caso.
+    $whatsapp = $ticketPk > 0
+      ? (new \SCM\Support\CaseReplyNotifications($this->db))->notifyPanelResponse($ticket, $ticketPk, $respuesta, $userName, $estado, $this->normalizeTargets($notifyTargets), $responderEmployeeId, 'respuesta_ticket:' . $ticketPk . ':' . substr(hash('sha256', $estado . '|' . time() . '|' . $respuesta), 0, 16))
+      : 0;
     if (!$this->queue instanceof EmailQueue) {
-      return 0;
+      return ['email' => 0, 'whatsapp' => $whatsapp];
     }
-    $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
     $subject = $estado === 'Cerrado' ? 'Caso #' . $logicalTicket . ' cerrado' : 'Caso #' . $logicalTicket . ' con nueva respuesta';
     $sent = 0;
     foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets, [], 'respuesta_ticket', $additionalEmails) as $recipient) {
@@ -29,7 +34,8 @@ trait NotificationDeliveryConcern
           : 'Te informamos que el caso ha tenido una nueva respuesta.',
         'respuesta' => wp_kses_post($respuesta),
         'usuario' => EmailTemplate::e($userName),
-        'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver caso']]),
+        // Vista pública nueva según quien recibe; el correo lleva copias, así que el funcionario va sin autologin.
+        'botones' => EmailTemplate::buttons([['url' => $this->caseEmailUrl($ticket, $logicalTicket, $recipient['role'] ?? ''), 'label' => 'Ver caso']]),
       ]);
       $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, [
         'internal_action' => 'respuesta_ticket', 'internal_cc'=>$recipient['internal_cc']??[],
@@ -37,7 +43,16 @@ trait NotificationDeliveryConcern
         'meta' => ['event'=>'respuesta_ticket','id_ticket'=>$logicalTicket,'additional_email_recipients'=>$additionalEmails],
       ]);
     }
-    return $sent;
+    return ['email' => $sent, 'whatsapp' => $whatsapp];
+  }
+
+  /** Enlace firmado de la vista pública del caso; solo si falta el _ID se conserva la vista antigua. */
+  private function caseEmailUrl(array $ticket, string $logicalTicket, string $role): string
+  {
+    $ticketPk = (int) ($ticket['_ID'] ?? 0);
+    return $ticketPk > 0
+      ? \SCM\Support\CaseReplyNotifications::emailCaseUrl($ticketPk, $role)
+      : 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
   }
 
   /** @return array{email:int,whatsapp:int} */
@@ -143,7 +158,6 @@ trait NotificationDeliveryConcern
       return 0;
     }
     $logicalTicket = $this->firstNonEmpty([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '']);
-    $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
     $subject = ($action === 'postergar_ticket' ? 'Caso postergado #' : 'Nuevo seguimiento del caso #') . $logicalTicket;
     $sent = 0;
     foreach ($this->emailRecipientsForTargets($ticket, $notifyTargets, [], $action, $additionalEmails) as $recipient) {
@@ -153,7 +167,7 @@ trait NotificationDeliveryConcern
         'observacion' => wp_kses_post($observacion),
         'usuario' => EmailTemplate::e($userName),
         'fecha' => EmailTemplate::e(date('Y-m-d H:i')),
-        'botones' => EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver caso']]),
+        'botones' => EmailTemplate::buttons([['url' => $this->caseEmailUrl($ticket, $logicalTicket, $recipient['role'] ?? ''), 'label' => 'Ver caso']]),
       ]);
       $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, [
         'internal_action' => $action, 'internal_cc' => $recipient['internal_cc']??[],
@@ -172,7 +186,7 @@ trait NotificationDeliveryConcern
     $tenantEmail = trim((string)($ticket['correo_arrendatario'] ?? $ticket['correo_solicitante'] ?? ''));
     $tenantName = $this->resolveTicketTenantDisplayName($ticket);
     $noticeUrl = trim((string)($notice['url'] ?? ''));
-    $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
+    $ticketUrl = $this->caseEmailUrl($ticket, $logicalTicket, 'arrendatario');
     $subject = 'Acta de revision preventiva del caso #' . $logicalTicket;
 
     $content = '<p style="font-weight:500;margin:10px 0;">Apreciado(a) ' . EmailTemplate::e($tenantName) . ',</p>'

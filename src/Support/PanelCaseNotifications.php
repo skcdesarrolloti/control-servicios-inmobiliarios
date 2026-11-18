@@ -30,8 +30,11 @@ final class PanelCaseNotifications
       'assigned_template' => trim((string) ($raw['assigned_template'] ?? 'scm_caso_asignado_v1')),
       'external_template' => trim((string) ($raw['external_template'] ?? 'scm_caso_registrado_v1')),
       'language' => trim((string) ($raw['language'] ?? 'es_CO')),
+      // Respuestas del caso (panel → actores y vista pública → funcionario). Apagado hasta que Meta apruebe la plantilla.
+      'reply_enabled' => filter_var($raw['reply_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN),
+      'reply_template' => trim((string) ($raw['reply_template'] ?? 'scm_caso_respuesta_v1')),
     ];
-    foreach (['assigned_template', 'external_template'] as $key) {
+    foreach (['assigned_template', 'external_template', 'reply_template'] as $key) {
       if (!preg_match('/^[a-z0-9_]{1,512}$/D', $config[$key])) throw new \InvalidArgumentException('Usa nombres de plantillas de casos con minúsculas, números y guiones bajos.');
     }
     if (!preg_match('/^[a-z]{2}(?:_[A-Z]{2})?$/D', $config['language'])) throw new \InvalidArgumentException('Indica el código exacto del idioma de las plantillas, por ejemplo es_CO.');
