@@ -8,6 +8,14 @@ $check(SCM\Support\PublicCaseAccess::route($reference, true) === ['mode' => 'pan
 $staffReference = SCM\Support\PublicCaseAccess::reference(10945, null, 'funcionario');
 $check(SCM\Support\PublicCaseAccess::route($staffReference, false)['audience'] === 'funcionario', 'staff audience is signed into the link');
 $check(SCM\Support\PublicCaseAccess::route(str_replace('.funcionario.', '.propietario.', $staffReference), false)['mode'] === 'denied', 'audience cannot be changed without invalidating the signature');
+$loginReference = SCM\Support\PublicCaseAccess::staffReference(10945, '1047');
+$check(SCM\Support\PublicCaseAccess::route($loginReference, false) === ['mode' => 'login', 'id' => 10945, 'audience' => 'funcionario', 'employee_id' => '1047'], 'individual staff link carries a signed autologin');
+$check(SCM\Support\PublicCaseAccess::route($loginReference, true)['mode'] === 'panel', 'staff autologin link opens the panel when a session already exists');
+$check(SCM\Support\PublicCaseAccess::route(str_replace('.1047.', '.1048.', $loginReference), false)['mode'] === 'denied', 'autologin employee cannot be swapped without invalidating the signature');
+$check(SCM\Support\PublicCaseAccess::route(str_replace('.funcionario.1047.', '.funcionario.', $loginReference), false)['mode'] === 'denied', 'autologin signature cannot be reused as a plain staff link');
+$check(SCM\Support\PublicCaseAccess::route(str_replace('.funcionario.', '.propietario.', $loginReference), false)['mode'] === 'denied', 'only staff links can carry an employee');
+$check(SCM\Support\PublicCaseAccess::route(SCM\Support\PublicCaseAccess::reference(10945, time() - 1, 'funcionario', '1047'), false)['mode'] === 'denied', 'expired autologin link is denied');
+$check(SCM\Support\PublicCaseAccess::route(SCM\Support\PublicCaseAccess::staffReference(10945, 'bad id!'), false)['mode'] === 'public', 'invalid employee id falls back to a plain staff link');
 $expiry = time()+3600;
 $legacy = '10945.' . $expiry . '.' . hash_hmac('sha256', 'public_case_v1|10945|' . $expiry, SCM_APP_SECRET);
 $check(SCM\Support\PublicCaseAccess::route($legacy, false)['audience'] === 'publico', 'legacy signed links remain public without staff controls');

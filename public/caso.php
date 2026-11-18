@@ -16,6 +16,16 @@ header('X-Robots-Tag: noindex, nofollow');
 header("Content-Security-Policy: default-src 'none'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https:; script-src 'self'; frame-src 'self' https://sucasainmobiliaria.com.co; base-uri 'none'; form-action 'self'; frame-ancestors 'self'");
 $reference = is_string($_GET['scm_case'] ?? null) ? $_GET['scm_case'] : '';
 $route = PublicCaseAccess::route($reference, Auth::isLoggedIn());
+if ($route['mode'] === 'login' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
+  $route['mode'] = 'public';
+}
+if ($route['mode'] === 'login') {
+  // Enlace individual de funcionario: inicia su sesión y abre el caso en el panel para responder.
+  // Si ya no está activo, solo ve la consulta pública con el botón de acceso.
+  $route = (new Auth(App::db()))->loginByEmployeeId((string) $route['employee_id'])
+    ? ['mode' => 'panel', 'id' => $route['id'], 'audience' => 'funcionario']
+    : ['mode' => 'public', 'id' => $route['id'], 'audience' => 'funcionario'];
+}
 if ($route['mode'] === 'panel') {
   header('Location: ' . rtrim((string) SCM_BASE_URL, '/') . '/?scm_case=' . $route['id'], true, 302);
   exit;

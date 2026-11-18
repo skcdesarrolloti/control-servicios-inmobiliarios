@@ -104,9 +104,9 @@ final class PanelCaseNotifications
     if (!$queue) return ['whatsapp' => 0, 'details' => ['La cola de WhatsApp no está disponible; el aviso se envió solo por correo.']];
     $text = static fn(string $key, string $default = ''): string => trim((string) ($ticket[$key] ?? '')) !== '' ? trim((string) $ticket[$key]) : $default;
     $assignee = $text('nombre_empleado', 'Funcionario asignado');
-    $people = [['label' => 'Responsable', 'name' => $assignee, 'phone' => self::phone($text('celular_empleado')), 'role' => null]];
+    $people = [['label' => 'Responsable', 'name' => $assignee, 'phone' => self::phone($text('celular_empleado')), 'role' => null, 'employee_id' => $text('id_empleado')]];
     foreach (InternalNotificationRecipients::contactsForAction($this->db, $internalAction) as $contact) {
-      $people[] = ['label' => 'Funcionario', 'name' => (string) ($contact['name'] ?? ''), 'phone' => self::phone((string) ($contact['phone'] ?? '')), 'role' => null];
+      $people[] = ['label' => 'Funcionario', 'name' => (string) ($contact['name'] ?? ''), 'phone' => self::phone((string) ($contact['phone'] ?? '')), 'role' => null, 'employee_id' => (string) ($contact['employee_id'] ?? '')];
     }
     if ($notifyTenant) $people[] = ['label' => 'Arrendatario', 'name' => $text('arrendatario', 'Arrendatario'), 'phone' => self::phone($text('celular_arrendatario')), 'role' => 'arrendatario'];
 
@@ -136,7 +136,7 @@ final class PanelCaseNotifications
         $values = array_map($clean, $values, [80, 20, 200, 100, 50, 80]);
         $template = $config['assigned_template'];
         $components = [['type' => 'body', 'parameters' => array_map(static fn($v) => ['type' => 'text', 'text' => $v], $values)]];
-        $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => PublicCaseAccess::reference($id, null, 'funcionario')]]];
+        $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => PublicCaseAccess::staffReference($id, (string) ($person['employee_id'] ?? ''))]]];
       }
       try {
         $queuedId = $queue->enqueueWhatsAppOfficialTemplate($person['phone'], $template, $components, [
@@ -200,7 +200,7 @@ final class PanelCaseNotifications
         $values = [$person['name'], (string) $id, $title, $theme, (string) ($contract['contrato'] ?? 'Sin número'), $assignee['name']];
         $values = array_map(static fn($v, $limit) => mb_substr(preg_replace('/\s+/u', ' ', trim((string) $v)) ?: 'Sin dato', 0, $limit), $values, [80, 20, 200, 100, 50, 80]);
         $components = [['type' => 'body', 'parameters' => array_map(static fn($v) => ['type' => 'text', 'text' => $v], $values)]];
-        $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => PublicCaseAccess::reference($id, null, $external ? $person['role'] : 'funcionario')]]];
+        $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $external ? PublicCaseAccess::reference($id, null, $person['role']) : PublicCaseAccess::staffReference($id, (string) ($person['employee_id'] ?? ''))]]];
         $queuedId = $queue->enqueueWhatsAppOfficialTemplate($phone, $config[$external ? 'external_template' : 'assigned_template'], $components, [
           'project_code' => 'control-servicios-inmobiliarios', 'source_module' => 'nuevo_caso_panel',
           'destination_name' => $person['name'], 'template_language' => $config['language'], 'max_attempts' => 5,
