@@ -13,8 +13,29 @@
 .scm-public-case-field { display:flex; flex-direction:column; gap:.375rem; min-width:0; font-size:.75rem; font-weight:600; color:#475569; }
 .scm-public-case-field textarea { width:100%; min-height:7.5rem; resize:vertical; border:1px solid #cbd5e1; border-radius:.625rem; padding:.625rem .75rem; font:inherit; font-size:.875rem; font-weight:400; color:#0f172a; }
 .scm-public-case-field textarea:focus, .scm-public-case-field input:focus { outline:2px solid #f59120; outline-offset:1px; }
-.scm-public-case-field input[type="file"] { width:100%; max-width:100%; font-size:.8125rem; font-weight:400; color:#334155; }
-.scm-public-case-files { display:grid; grid-template-columns:repeat(auto-fit,minmax(14rem,1fr)); gap:.875rem; }
+.scm-public-case-media { position:relative; border:1.5px dashed #cbd5e1; border-radius:.875rem; background:#f8fafc; padding:1rem; transition:border-color .15s, background-color .15s; }
+.scm-public-case-media.is-dragging { border-color:#f59120; background:#fff7ed; }
+.scm-public-case-media-native { display:grid; grid-template-columns:repeat(auto-fit,minmax(13rem,1fr)); gap:.75rem; font-weight:500; }
+.scm-public-case-media-native label { display:flex; flex-direction:column; gap:.375rem; }
+.scm-public-case-media-native input { max-width:100%; font-size:.8125rem; }
+.scm-public-case-media.is-enhanced .scm-public-case-media-native { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+.scm-public-case-media-actions { display:flex; flex-wrap:wrap; gap:.5rem; }
+.scm-public-case-media-button { display:inline-flex; align-items:center; gap:.5rem; border:1px solid #cbd5e1; border-radius:.625rem; background:#fff; padding:.5rem .875rem; font:inherit; font-size:.8125rem; font-weight:600; color:#061d49; cursor:pointer; transition:border-color .15s, box-shadow .15s; }
+.scm-public-case-media-button:hover { border-color:#061d49; box-shadow:0 1px 2px rgb(15 23 42 / .08); }
+.scm-public-case-media-button:focus-visible { outline:2px solid #f59120; outline-offset:2px; }
+.scm-public-case-media-button svg { width:1.125rem; height:1.125rem; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.scm-public-case-media-help { margin:.625rem 0 0; font-size:.75rem; font-weight:400; color:#64748b; }
+.scm-public-case-media-list { list-style:none; margin:.875rem 0 0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(13rem,1fr)); gap:.5rem; }
+.scm-public-case-media-item { display:flex; align-items:center; gap:.625rem; min-width:0; border:1px solid #e2e8f0; border-radius:.625rem; background:#fff; padding:.375rem .5rem .375rem .375rem; }
+.scm-public-case-media-thumb { flex:none; display:grid; place-items:center; width:2.75rem; height:2.75rem; border-radius:.5rem; background:#f1f5f9; font-size:.625rem; font-weight:700; overflow:hidden; }
+.scm-public-case-media-thumb.is-pdf { background:#fee2e2; color:#b91c1c; }
+.scm-public-case-media-thumb img { width:100%; height:100%; object-fit:cover; }
+.scm-public-case-media-name { flex:1; min-width:0; display:flex; flex-direction:column; font-size:.75rem; font-weight:500; color:#0f172a; }
+.scm-public-case-media-name b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.scm-public-case-media-name small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.6875rem; font-weight:400; color:#64748b; }
+.scm-public-case-media-remove { flex:none; display:grid; place-items:center; width:1.75rem; height:1.75rem; border:0; border-radius:999px; background:transparent; color:#64748b; font-size:1.125rem; line-height:1; cursor:pointer; }
+.scm-public-case-media-remove:hover { background:#f1f5f9; color:#9f1239; }
+.scm-public-case-media-remove:focus-visible { outline:2px solid #f59120; }
 .scm-public-case-hint { margin:0; font-size:.75rem; color:#64748b; }
 .scm-public-case-hint.is-error { color:#9f1239; }
 .scm-public-case-submit { border:0; border-radius:.625rem; background:#061d49; padding:.625rem 1.125rem; font:inherit; font-size:.875rem; font-weight:600; color:#fff; cursor:pointer; }

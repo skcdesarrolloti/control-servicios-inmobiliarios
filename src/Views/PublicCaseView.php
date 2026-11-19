@@ -37,7 +37,7 @@ final class PublicCaseView
       </section><?php endif; ?>
       <section class="scm-public-case-history" aria-labelledby="scm-history-title"><h2 id="scm-history-title" class="text-sm font-semibold">Historial del caso</h2>
         <?php if (empty($case['history'])): ?><p class="mt-2 text-sm text-slate-500">Aún no hay respuestas registradas en este caso.</p>
-        <?php else: ?><ol class="scm-public-case-timeline"><?php foreach ($case['history'] as $h => $entry): ?>
+        <?php else: ?><ol class="scm-public-case-timeline"><?php foreach ($case['history'] as $entry): ?>
           <li class="scm-public-case-entry<?php echo $entry['external'] ? ' is-external' : ''; ?>">
             <p class="scm-public-case-entry-head"><b><?php echo $e($entry['author']); ?></b><?php if ($entry['date'] !== ''): ?><span><?php echo $e($entry['date']); ?></span><?php endif; ?></p>
             <?php if ($entry['text'] !== ''): ?><p class="scm-public-case-entry-text"><?php echo $e($entry['text']); ?></p><?php endif; ?>
@@ -51,9 +51,19 @@ final class PublicCaseView
         <form method="post" action="<?php echo $e($reply['action'] ?? ''); ?>" enctype="multipart/form-data" data-reply-form class="scm-public-case-reply-form">
           <input type="hidden" name="_csrf_token" value="<?php echo $e($reply['token'] ?? ''); ?>">
           <label class="scm-public-case-field"><span>Tu respuesta</span><textarea name="respuesta" rows="5" required minlength="3" maxlength="<?php echo \SCM\Support\PublicCaseReply::MAX_TEXT; ?>" placeholder="Escribe aquí tu respuesta o la información que te solicitaron."><?php echo $e($reply['text'] ?? ''); ?></textarea></label>
-          <div class="scm-public-case-files">
-            <label class="scm-public-case-field"><span>Fotos (opcional, máximo <?php echo \SCM\Support\PublicCaseReply::MAX_IMAGES; ?>)</span><input type="file" name="imagenes[]" accept="image/jpeg,image/png,image/webp" multiple data-max-files="<?php echo \SCM\Support\PublicCaseReply::MAX_IMAGES; ?>"></label>
-            <label class="scm-public-case-field"><span>Documentos PDF (opcional, máximo <?php echo \SCM\Support\PublicCaseReply::MAX_DOCUMENTS; ?>)</span><input type="file" name="archivos[]" accept="application/pdf,.pdf" multiple data-max-files="<?php echo \SCM\Support\PublicCaseReply::MAX_DOCUMENTS; ?>"></label>
+          <div class="scm-public-case-field"><span>Adjuntos (opcional)</span>
+            <div class="scm-public-case-media" data-media-drop>
+              <div class="scm-public-case-media-native">
+                <label>Fotos (máximo <?php echo \SCM\Support\PublicCaseReply::MAX_IMAGES; ?>)<input type="file" name="imagenes[]" accept="image/jpeg,image/png,image/webp" multiple data-media-input="image" data-max-files="<?php echo \SCM\Support\PublicCaseReply::MAX_IMAGES; ?>"></label>
+                <label>Documentos PDF (máximo <?php echo \SCM\Support\PublicCaseReply::MAX_DOCUMENTS; ?>)<input type="file" name="archivos[]" accept="application/pdf,.pdf" multiple data-media-input="pdf" data-max-files="<?php echo \SCM\Support\PublicCaseReply::MAX_DOCUMENTS; ?>"></label>
+              </div>
+              <div class="scm-public-case-media-actions" hidden>
+                <button type="button" class="scm-public-case-media-button" data-media-pick="image"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></svg>Agregar fotos</button>
+                <button type="button" class="scm-public-case-media-button" data-media-pick="pdf"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5Z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Agregar PDF</button>
+              </div>
+              <p class="scm-public-case-media-help" hidden>Arrastra los archivos aquí o pega una captura con Ctrl+V. Hasta <?php echo \SCM\Support\PublicCaseReply::MAX_IMAGES; ?> fotos y <?php echo \SCM\Support\PublicCaseReply::MAX_DOCUMENTS; ?> PDF.</p>
+              <ul class="scm-public-case-media-list" data-media-list hidden></ul>
+            </div>
           </div>
           <p data-reply-feedback class="scm-public-case-hint" aria-live="polite">Cada archivo puede pesar hasta 10 MB y en total hasta 20 MB. Las fotos se comprimen al guardarse.</p>
           <div><button type="submit" data-reply-submit class="scm-public-case-submit">Enviar respuesta</button></div>
