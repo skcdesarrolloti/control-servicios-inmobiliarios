@@ -179,7 +179,11 @@ const assert = require('node:assert/strict');
       await page.locator('[data-discard-draft]').click();
       await page.locator('[data-confirm-discard]').click();
     }
+    assert.equal(await page.locator('[data-search-title]').innerText(), 'Encuentra el contrato', 'step 1 starts with the contract wording');
     await page.locator('[data-search-by]').selectOption('copropiedad');
+    assert.equal(await page.locator('[data-search-title]').innerText(), 'Encuentra la copropiedad', 'step 1 title follows the search type');
+    assert.equal(await page.locator('[data-search-label]').innerText(), 'Nombre o NIT de la copropiedad', 'search label follows the search type');
+    assert.equal(await page.locator('[data-search]').getAttribute('placeholder'), 'Ej.: Torres del Mar o 900123456', 'search example follows the search type');
     await page.locator('[data-search]').fill('Torres');
     await page.locator('[data-search]').press('Enter');
     await page.locator('[data-results] button').click();

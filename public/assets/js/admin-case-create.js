@@ -96,10 +96,10 @@
       current.querySelector('[data-content]').innerHTML = `<form data-case-form class="flex flex-col gap-6">
         <div class="flex flex-wrap items-center justify-between gap-2"><p data-draft-status role="status" aria-live="polite" class="text-xs text-slate-500">El borrador se guardará en este navegador durante 24 horas.</p><button type="button" data-discard-draft class="text-xs font-semibold text-slate-500 underline">Descartar borrador</button></div>
         <div data-discard-confirm hidden class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700"><p>¿Descartar los datos y archivos de este borrador? Esta acción no se puede deshacer.</p><div class="mt-3 flex gap-2"><button type="button" data-confirm-discard class="scm-new-case-button">Sí, descartar</button><button type="button" data-keep-draft class="scm-new-case-button">Conservar borrador</button></div></div>
-        <section class="flex flex-col gap-3"><h3 class="scm-new-case-section"><span>1</span> Encuentra el contrato o la copropiedad</h3>
+        <section class="flex flex-col gap-3"><h3 class="scm-new-case-section"><span>1</span> <strong data-search-title class="font-semibold">Encuentra el contrato</strong></h3>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <label class="scm-new-case-label">Buscar por<select data-search-by>${option('contrato', 'Contrato')}${option('inmueble', 'Inmueble SIMI')}${option('propietario', 'Propietario')}${option('arrendatario', 'Arrendatario')}${option('copropiedad', 'Copropiedad (nombre o NIT)')}</select></label>
-            <label class="scm-new-case-label sm:col-span-2">Número, código o nombre<div class="flex gap-2"><input type="search" data-search maxlength="100" placeholder="Escribe al menos 2 caracteres" class="min-w-0 flex-1"><button type="button" data-search-button class="scm-new-case-button">Buscar</button></div></label>
+            <label class="scm-new-case-label">Buscar por<select data-search-by>${option('contrato', 'Contrato')}${option('inmueble', 'Inmueble SIMI')}${option('propietario', 'Propietario')}${option('arrendatario', 'Arrendatario')}${option('copropiedad', 'Copropiedad')}</select></label>
+            <label class="scm-new-case-label sm:col-span-2"><span data-search-label>Número del contrato</span><div class="flex gap-2"><input type="search" data-search maxlength="100" placeholder="Ej.: 1234" class="min-w-0 flex-1"><button type="button" data-search-button class="scm-new-case-button">Buscar</button></div></label>
           </div><p data-search-status role="status" aria-live="polite" class="text-xs text-slate-500">Busca y selecciona el contrato correspondiente.</p>
           <div data-results class="flex flex-col gap-2 max-h-56 overflow-y-auto"></div>
           <div data-selected hidden class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-slate-700"></div>
@@ -168,7 +168,22 @@
         current.querySelector('[data-create-action]').hidden = !visible || !assistantChoice;
         form.querySelector('[type=submit]').disabled = !visible || !assistantChoice;
       };
-      const invalidateSelection = () => { sequence++; resetAi(); assistantChoice = ''; selected = null; community = null; setAssistantChoice(''); summary.hidden = true; setContractStepsVisible(false); showError(''); results.replaceChildren(); status.textContent = searchBy.value === 'copropiedad' ? 'Busca y selecciona la copropiedad.' : 'Busca y selecciona el contrato correspondiente.'; };
+      // Paso 1: título, etiqueta, ejemplo y ayuda según lo elegido en "Buscar por".
+      const searchCopy = {
+        contrato: ['Encuentra el contrato', 'Número del contrato', 'Ej.: 1234', 'Busca y selecciona el contrato correspondiente.'],
+        inmueble: ['Encuentra el contrato por inmueble', 'Código o nombre del inmueble SIMI', 'Ej.: código SIMI del inmueble', 'Busca el inmueble y selecciona su contrato.'],
+        propietario: ['Encuentra el contrato por propietario', 'Nombre o documento del propietario', 'Ej.: Ana Pérez o 1045678901', 'Busca al propietario y selecciona el contrato.'],
+        arrendatario: ['Encuentra el contrato por arrendatario', 'Nombre o documento del arrendatario', 'Ej.: Luis Gómez o 1045678901', 'Busca al arrendatario y selecciona el contrato.'],
+        copropiedad: ['Encuentra la copropiedad', 'Nombre o NIT de la copropiedad', 'Ej.: Torres del Mar o 900123456', 'Busca y selecciona la copropiedad. Luego eliges si el caso es general o de un contrato.'],
+      };
+      const syncSearchCopy = () => {
+        const [title, label, placeholder, help] = searchCopy[searchBy.value] || searchCopy.contrato;
+        current.querySelector('[data-search-title]').textContent = title;
+        current.querySelector('[data-search-label]').textContent = label;
+        searchInput.placeholder = placeholder;
+        status.textContent = help;
+      };
+      const invalidateSelection = () => { sequence++; resetAi(); assistantChoice = ''; selected = null; community = null; setAssistantChoice(''); summary.hidden = true; setContractStepsVisible(false); showError(''); results.replaceChildren(); syncSearchCopy(); };
       // Copropiedad: caso general (sin contrato) o uno de sus contratos vinculados.
       const communityContract = () => community?.contracts?.find(item => String(item._ID) === String(summary.querySelector('[data-community-contract]')?.value || '')) || null;
       const selectCommunity = (item, contractId = '') => {
@@ -614,7 +629,7 @@
           if (!current.isConnected) return;
           if (saved?.version === 1 && saved.expires > Date.now()) {
             if (/^[a-f0-9-]{36}$/.test(saved.requestId)) requestId = saved.requestId;
-            searchInput.value = saved.query || ''; searchBy.value = saved.by || 'contrato';
+            searchInput.value = saved.query || ''; searchBy.value = saved.by || 'contrato'; syncSearchCopy();
             if (saved.community?._ID) {
               const data = new FormData();
               const nit = String(saved.community.nit || '').replace(/\D+/g, '');
@@ -623,7 +638,7 @@
                 const response = await api('scm_panel_case_search', data);
                 if (!current.isConnected) return;
                 const item = (response.communities || []).find(candidate => String(candidate._ID) === String(saved.community._ID));
-                if (item) { searchBy.value = 'copropiedad'; selectCommunity(item, saved.selected?._ID || ''); }
+                if (item) { searchBy.value = 'copropiedad'; syncSearchCopy(); selectCommunity(item, saved.selected?._ID || ''); }
               } catch (_) { /* Recover fields and files even when the community lookup must be retried. */ }
             } else if (saved.selected?._ID) {
               const data = new FormData();
@@ -655,7 +670,7 @@
         if (hasSelection() && String(selected?._ID || '') !== String(presetContract.id)) {
           status.textContent = 'Recuperamos un borrador con otro contrato. Descártalo o busca el contrato ' + presetContract.code + '.';
         } else if (!hasSelection() && String(presetContract.code || '').trim().length >= 2) {
-          searchBy.value = 'contrato'; searchInput.value = String(presetContract.code).trim();
+          searchBy.value = 'contrato'; syncSearchCopy(); searchInput.value = String(presetContract.code).trim();
           status.textContent = 'Buscando el contrato seleccionado…';
           const data = new FormData(); data.set('by', 'contrato'); data.set('query', searchInput.value);
           try {
