@@ -41,14 +41,16 @@ final class PanelCaseNotifications
     return $config;
   }
 
-  public function prepare(array $contract, array $assignee, array $input): array
+  /** @param array<string,mixed>|null $community Ficha de copropiedad elegida en el panel (con o sin contrato). */
+  public function prepare(array $contract, array $assignee, array $input, ?array $community = null): array
   {
     $roles = $input['notify_roles'] ?? [];
     if (!is_array($roles) || count($roles) > 3 || count(array_filter($roles, 'is_string')) !== count($roles) || array_diff($roles, array_keys(self::ROLES))) throw new \InvalidArgumentException('Selecciona destinatarios válidos para los avisos del caso.');
     $config = self::config();
     $external = [];
     foreach (array_unique($roles) as $role) {
-      $contact = $this->contact($contract, $role);
+      if ($contract === [] && $role !== 'copropiedad') throw new \InvalidArgumentException('Sin contrato solo se puede avisar a la copropiedad.');
+      $contact = $this->contact($contract, $role, $role === 'copropiedad' ? $community : null);
       if (!filter_var($contact['email'], FILTER_VALIDATE_EMAIL) || $contact['phone'] === '') {
         throw new \InvalidArgumentException('Actualiza el correo y celular de ' . self::ROLES[$role] . ' en el contrato o su ficha antes de notificarle.');
       }
@@ -67,12 +69,13 @@ final class PanelCaseNotifications
     return preg_match('/^[1-9][0-9]{10,14}$/D', $digits) ? '+' . $digits : '';
   }
 
-  public function contact(array $contract, string $role): array
+  public function contact(array $contract, string $role, ?array $record = null): array
   {
-    $record = [];
+    $known = $record !== null;
+    $record ??= [];
     $table = $this->db->table('jet_cct_' . ($role === 'propietario' ? 'propietarios' : ($role === 'arrendatario' ? 'arrendatarios' : 'copropiedades')));
     $id = trim((string) ($contract['id_' . $role] ?? ''));
-    if ($id !== '' && $this->schema->tableExists($table)) {
+    if (!$known && $id !== '' && $this->schema->tableExists($table)) {
       // Prefer the business identity, then the CCT primary key, without ambiguous OR matching.
       foreach (['id_' . $role, '_ID'] as $column) {
         if (!$this->schema->columnExists($table, $column)) continue;
@@ -168,7 +171,8 @@ final class PanelCaseNotifications
     $emailCount = 0;
     $whatsappCount = 0;
     $details = [];
-    $meta = ['ticket_id' => $id, 'contract_id' => (int) $contract['_ID'], 'created_by_employee_id' => $creator['employee_id'], 'assigned_employee_id' => $assignee['employee_id'], 'notify_roles' => array_column($plan['external'], 'role')];
+    $meta = ['ticket_id' => $id, 'contract_id' => (int) ($contract['_ID'] ?? 0), 'created_by_employee_id' => $creator['employee_id'], 'assigned_employee_id' => $assignee['employee_id'], 'notify_roles' => array_column($plan['external'], 'role')];
+    $contractLabel = trim((string) ($contract['contrato'] ?? '')) !== '' ? trim((string) $contract['contrato']) : ($contract === [] ? 'Sin contrato (caso general de la copropiedad)' : 'Sin número');
     $queue = (new SharedNotificationsBridge($this->db))->queue();
     if (!$queue) throw new \RuntimeException('La cola de notificaciones no está disponible.');
     $phones = [];
@@ -177,7 +181,7 @@ final class PanelCaseNotifications
       $email = strtolower($person['email']);
       if (!isset($emails[$email])) {
         $content = '<p>Hola ' . EmailTemplate::e($person['name']) . ', se registró el caso <b>#' . $id . '</b> en SKC SuCasa Inmobiliaria.</p>';
-        foreach (['Título' => $title, 'Tema' => $theme, 'Contrato' => $contract['contrato'] ?? '', 'Responsable' => $assignee['name']] as $label => $value) $content .= '<p><b>' . $label . ':</b> ' . EmailTemplate::e((string) $value) . '</p>';
+        foreach (['Título' => $title, 'Tema' => $theme, 'Contrato' => $contractLabel, 'Responsable' => $assignee['name']] as $label => $value) $content .= '<p><b>' . $label . ':</b> ' . EmailTemplate::e((string) $value) . '</p>';
         $content .= '<p>' . nl2br(EmailTemplate::e($description)) . '</p>';
         $count = (new EmailQueue($this->db))->enqueue($email, 'Caso #' . $id . ' registrado: ' . $title, EmailTemplate::render('Caso registrado', $content, ['ticket_url' => PublicCaseAccess::url($id, $person['role'])]), [
           'source_module' => 'nuevo_caso_panel', 'dedupe_key' => 'nuevo_caso_panel:' . $id . ':externo', 'meta' => $meta + ['recipient_role' => $person['role']],
@@ -200,7 +204,7 @@ final class PanelCaseNotifications
         $label = ($external ? self::ROLES[$person['role']] . ': ' : 'Funcionario: ') . $person['name'];
         if ($phone === '') { $details[] = $label . ' — sin WhatsApp: falta un celular válido en su ficha.'; continue; }
         if (isset($phones[$phone])) { $details[] = $label . ' — comparte celular con ' . $phones[$phone] . '; se encoló un solo mensaje para ese número.'; continue; }
-        $values = [$person['name'], (string) $id, $title, $theme, (string) ($contract['contrato'] ?? 'Sin número'), $assignee['name']];
+        $values = [$person['name'], (string) $id, $title, $theme, $contractLabel, $assignee['name']];
         $values = array_map(static fn($v, $limit) => mb_substr(preg_replace('/\s+/u', ' ', trim((string) $v)) ?: 'Sin dato', 0, $limit), $values, [80, 20, 200, 100, 50, 80]);
         $components = [['type' => 'body', 'parameters' => array_map(static fn($v) => ['type' => 'text', 'text' => $v], $values)]];
         $components[] = ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $external ? PublicCaseAccess::reference($id, null, $person['role']) : PublicCaseAccess::staffReference($id, (string) ($person['employee_id'] ?? ''))]]];

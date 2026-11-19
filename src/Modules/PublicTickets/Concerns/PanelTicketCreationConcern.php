@@ -91,6 +91,75 @@ trait PanelTicketCreationConcern
   }
 
   /**
+   * Copropiedades por nombre o NIT, cada una con sus contratos vinculados (id_copropiedad o NIT del contrato).
+   * @return list<array<string,mixed>>
+   */
+  public function searchPanelCopropiedades(string $query): array
+  {
+    if (mb_strlen(trim($query)) < 2 || mb_strlen($query) > 100) {
+      throw new \InvalidArgumentException('Escribe entre 2 y 100 caracteres del nombre o NIT de la copropiedad.');
+    }
+    $out = [];
+    foreach ($this->findCopropiedadRecords($query, 15) as $record) {
+      $out[] = $this->panelCopropiedadPayload($record) + ['contracts' => $this->panelCopropiedadContracts($record)];
+    }
+    return $out;
+  }
+
+  /** Ficha de copropiedad para el panel, o null si no existe. */
+  public function panelCopropiedad(int $id): ?array
+  {
+    return $this->findCopropiedadRecordById((string) $id);
+  }
+
+  private function panelCopropiedadPayload(array $record): array
+  {
+    $payload = [];
+    foreach (['_ID', 'copropiedad', 'nit', 'administrador', 'correo', 'contacto', 'direccion'] as $field) {
+      $payload[$field] = trim((string) ($record[$field] ?? ''));
+    }
+    return $payload;
+  }
+
+  /** @return list<array<string,mixed>> */
+  private function panelCopropiedadContracts(array $record): array
+  {
+    $table = $this->db->table('jet_cct_contratos_arrendamiento');
+    $where = [];
+    $args = [];
+    if ($this->schema->columnExists($table, 'id_copropiedad')) {
+      $where[] = "TRIM(CAST(`id_copropiedad` AS CHAR)) = ?";
+      $args[] = trim((string) ($record['_ID'] ?? ''));
+    }
+    $nits = $this->copropiedadNitVariants($record);
+    if ($nits !== [] && $this->schema->columnExists($table, 'nit_copropiedad')) {
+      $where[] = "REPLACE(REPLACE(REPLACE(TRIM(COALESCE(`nit_copropiedad`, '')), '.', ''), '-', ''), ' ', '') IN (" . implode(',', array_fill(0, count($nits), '?')) . ')';
+      array_push($args, ...$nits);
+    }
+    if ($where === []) return [];
+    $select = ['_ID'];
+    foreach (['contrato', 'inmueble', 'direccion', 'propietario', 'arrendatario', 'estado', 'fin_contrato'] as $column) {
+      if ($this->schema->columnExists($table, $column)) $select[] = $column;
+    }
+    return $this->db->getResults('SELECT `' . implode('`, `', $select) . "` FROM `{$table}` WHERE (" . implode(' OR ', $where) . ') ORDER BY `_ID` DESC LIMIT 60', $args);
+  }
+
+  private function contractBelongsToCopropiedad(array $contract, array $record): bool
+  {
+    if (trim((string) ($contract['id_copropiedad'] ?? '')) === trim((string) ($record['_ID'] ?? ''))) return true;
+    return in_array($this->normalizeDigits((string) ($contract['nit_copropiedad'] ?? '')), $this->copropiedadNitVariants($record), true);
+  }
+
+  /** NIT de la ficha en dígitos, con y sin dígito de verificación (los contratos suelen guardarlo sin él). @return list<string> */
+  private function copropiedadNitVariants(array $record): array
+  {
+    $raw = trim((string) ($record['nit'] ?? ''));
+    $variants = [$this->normalizeDigits($raw)];
+    if (preg_match('/^(.*\d)\s*-\s*\d$/', $raw, $match)) $variants[] = $this->normalizeDigits($match[1]);
+    return array_values(array_unique(array_filter($variants, static fn(string $nit): bool => strlen($nit) >= 6)));
+  }
+
+  /**
    * Contratos donde el documento (cédula o NIT, sin puntos ni espacios) es del propietario, arrendatario o
    * codeudores del contrato, de sus fichas de propietario/arrendatario o de uno de los propietarios del mandato.
    * @return list<array<string,mixed>>
@@ -174,10 +243,25 @@ trait PanelTicketCreationConcern
     if (!filter_var($assignee['email'], FILTER_VALIDATE_EMAIL)) {
       throw new \InvalidArgumentException('El responsable no tiene un correo válido. Actualiza su ficha antes de asignarlo.');
     }
-    $contract = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_contratos_arrendamiento') . '` WHERE `_ID` = ? LIMIT 1', [(int) ($input['contract_id'] ?? 0)]);
-    if (!$contract) throw new \InvalidArgumentException('Selecciona un contrato existente.');
+    // Contrato, copropiedad o ambos: la copropiedad puede radicar un caso general sin contrato.
+    $contractId = (int) ($input['contract_id'] ?? 0);
+    $communityId = (int) ($input['copropiedad_id'] ?? 0);
+    $contract = null;
+    if ($contractId > 0) {
+      $contract = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_contratos_arrendamiento') . '` WHERE `_ID` = ? LIMIT 1', [$contractId]) ?: null;
+      if (!$contract) throw new \InvalidArgumentException('Selecciona un contrato existente.');
+    }
+    $community = null;
+    if ($communityId > 0) {
+      $community = $this->panelCopropiedad($communityId);
+      if (!$community) throw new \InvalidArgumentException('Selecciona una copropiedad existente.');
+    }
+    if (!$contract && !$community) throw new \InvalidArgumentException('Selecciona un contrato o una copropiedad.');
+    if ($contract && $community && !$this->contractBelongsToCopropiedad($contract, $community)) {
+      throw new \InvalidArgumentException('El contrato seleccionado no pertenece a esa copropiedad.');
+    }
     $notifications = new PanelCaseNotifications($this->db, $this->schema);
-    $notificationPlan = $notifications->prepare($contract, $assignee, $input);
+    $notificationPlan = $notifications->prepare($contract ?? [], $assignee, $input, $community);
     $attachments = new PanelCaseAttachments();
     $attachments->validate($input);
     $tickets = $this->db->table('jet_cct_tickets');
@@ -196,7 +280,7 @@ trait PanelTicketCreationConcern
       $pdo->beginTransaction();
       $contact = ['name' => $creator['name'], 'email' => $creator['email'], 'phone' => $creator['phone'], 'indicativo' => '+57', 'actor_id' => $creator['employee_id']];
       $responsible = ['nombre' => $assignee['name'], 'correo' => $assignee['email'], 'celular' => $assignee['phone'], 'id_empleado' => $assignee['employee_id']];
-      $result = $this->insertTicket('funcionario', ['label' => 'Funcionario', 'medium' => 'Panel administrativo'], $theme, $department, $title, $description, [], $contact, $responsible, $contract, null, $creator['employee_id']);
+      $result = $this->insertTicket('funcionario', ['label' => 'Funcionario', 'medium' => 'Panel administrativo'], $theme, $department, $title, $description, $community ? ['copropiedad_record' => $community] : [], $contact, $responsible, $contract, null, $creator['employee_id']);
       if (empty($result['ok'])) throw new \RuntimeException('No se pudo guardar el caso.');
       $id = (int) $result['ticket_id'];
       $data = $this->schema->filterTableData($tickets, [
@@ -204,12 +288,18 @@ trait PanelTicketCreationConcern
         'archivos' => serialize($stored['documents']),
       ]);
       if ($data !== []) $this->db->update($tickets, $data, ['_ID' => $id]);
-      $this->insertPanelCaseHistory($id, $title, $creator, $assignee, $contract);
+      if ($contract) $this->insertPanelCaseHistory($id, $title, $creator, $assignee, $contract);
       $recipients = array_merge([$assignee['email']], InternalNotificationRecipients::emailsForAction($this->db, 'nuevo_caso_panel'));
       $recipients = array_values(array_unique(array_map('strtolower', $recipients)));
       $recipients = \SCM\Support\InternalEmailCopies::plan($recipients,InternalNotificationRecipients::emailsForAction($this->db,'nuevo_caso_panel'))['to'];
       $content = '<p>Se creó el caso <b>#' . $id . '</b> en SKC SuCasa Inmobiliaria.</p>';
-      foreach (['Título' => $title, 'Tema' => $theme, 'Departamento' => $department, 'Responsable' => $assignee['name'], 'Contrato' => $contract['contrato'] ?? '', 'Inmueble SIMI' => $contract['inmueble'] ?? '', 'Dirección' => $contract['direccion'] ?? '', 'Creado por' => $creator['name']] as $label => $value) {
+      $details = ['Título' => $title, 'Tema' => $theme, 'Departamento' => $department, 'Responsable' => $assignee['name']];
+      if ($community) $details['Copropiedad'] = trim((string) ($community['copropiedad'] ?? '')) . (trim((string) ($community['nit'] ?? '')) !== '' ? ' · NIT ' . trim((string) $community['nit']) : '');
+      $details += $contract
+        ? ['Contrato' => $contract['contrato'] ?? '', 'Inmueble SIMI' => $contract['inmueble'] ?? '', 'Dirección' => $contract['direccion'] ?? '']
+        : ['Contrato' => 'Caso general de la copropiedad (sin contrato)', 'Dirección' => $community['direccion'] ?? ''];
+      $details['Creado por'] = $creator['name'];
+      foreach ($details as $label => $value) {
         $content .= '<p><b>' . EmailTemplate::e($label) . ':</b> ' . EmailTemplate::e((string) $value) . '</p>';
       }
       $content .= '<p>' . nl2br(EmailTemplate::e($description)) . '</p><p>Adjuntos: ' . (count($stored['images']) + count($stored['documents'])) . '.</p>';
@@ -217,10 +307,10 @@ trait PanelTicketCreationConcern
       $queued = $this->emailQueue->enqueue($recipients, 'Nuevo caso #' . $id . ': ' . $title, EmailTemplate::render('Nuevo caso asignado', $content, ['ticket_url' => $url]), [
         'source_module' => 'nuevo_caso_panel', 'dedupe_key' => 'nuevo_caso_panel:' . $id,
         'internal_action'=>'nuevo_caso_panel',
-        'meta' => ['ticket_id' => $id, 'contract_id' => (int) $contract['_ID'], 'created_by_employee_id' => $creator['employee_id'], 'assigned_employee_id' => $assignee['employee_id']],
+        'meta' => ['ticket_id' => $id, 'contract_id' => (int) ($contract['_ID'] ?? 0), 'copropiedad_id' => (int) ($community['_ID'] ?? 0), 'created_by_employee_id' => $creator['employee_id'], 'assigned_employee_id' => $assignee['employee_id']],
       ]);
       if ($queued !== count($recipients)) throw new \RuntimeException('No se pudieron encolar todos los correos. El caso no se guardó; intenta nuevamente.');
-      $extra = $notifications->enqueue($notificationPlan, $id, $contract, $title, $description, $theme, $creator, $recipients);
+      $extra = $notifications->enqueue($notificationPlan, $id, $contract ?? [], $title, $description, $theme, $creator, $recipients);
       $pdo->commit();
       $queued += $extra['email'];
       return ['ticket_id' => $id, 'queued' => $queued, 'whatsapp_queued' => $extra['whatsapp'], 'notification_details' => $extra['details'], 'message' => 'Caso #' . $id . ' creado. Correos encolados: ' . $queued . '. WhatsApp encolados: ' . $extra['whatsapp'] . '. ' . $extra['warning']];

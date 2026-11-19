@@ -106,7 +106,17 @@ trait PublicPortalQueriesConcern
     $allowWithoutContract = (!empty($options['no_contract_commercial']) || !empty($options['all_by_solicitante']))
       && in_array($actor, ['propietario', 'arrendatario', 'copropiedad'], true);
 
-    if (!empty($config['requires_contract']) && !$allowWithoutContract) {
+    if ($actor === 'copropiedad' && str_starts_with($selectedId, 'copropiedad:') && !$allowWithoutContract) {
+      $community = $this->findCopropiedadRecordById(substr($selectedId, strlen('copropiedad:')));
+      if (!is_array($community)) {
+        return ['ok' => false, 'message' => 'Copropiedad no encontrada.', 'rows' => []];
+      }
+      if ($lookupValue !== '' && !$this->copropiedadRecordMatchesLookup($community, $lookupValue)) {
+        return ['ok' => false, 'message' => 'La copropiedad no coincide con la consulta realizada.', 'rows' => []];
+      }
+      // Caso general sin contrato: las solicitudes se buscan por la ficha de la copropiedad (id_solicitante).
+      $contract = ['_ID' => '', 'contrato' => '', 'id_copropiedad' => trim((string) ($community['_ID'] ?? ''))];
+    } elseif (!empty($config['requires_contract']) && !$allowWithoutContract) {
       $contract = $this->fetchContractById($selectedId);
       if (!is_array($contract)) {
         return ['ok' => false, 'message' => 'Contrato no encontrado.', 'rows' => []];

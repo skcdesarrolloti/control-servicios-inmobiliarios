@@ -160,6 +160,20 @@ trait TicketPersistenceConcern
       $data['id_cliente'] = $clientPk;
     }
 
+    // Copropiedad: su ficha (si la hay) y, como respaldo, el contrato o el contacto del solicitante.
+    $community = is_array($input['copropiedad_record'] ?? null) ? $input['copropiedad_record'] : null;
+    if ($actor === 'copropiedad' || $community !== null) {
+      $data = array_merge($data, $this->copropiedadTicketFields($community ?? [], $contract, $actor === 'copropiedad' ? $contact : []));
+      if (!is_array($contract) && $community !== null) {
+        foreach (['direccion', 'barrio'] as $field) {
+          $value = trim((string) ($community[$field] ?? ''));
+          if ($value !== '' && trim((string) ($data[$field] ?? '')) === '') {
+            $data[$field] = $value;
+          }
+        }
+      }
+    }
+
     $insertData = $this->schema->filterTableData($ticketsTable, $data);
     if (empty($insertData)) {
       return ['ok' => false, 'message' => 'No se pudo construir el payload del caso.'];
@@ -186,6 +200,34 @@ trait TicketPersistenceConcern
     }
 
     return ['ok' => true, 'ticket_id' => $ticketId];
+  }
+
+  /**
+   * Columnas de copropiedad del caso: ficha de jet_cct_copropiedades, luego contrato y contacto.
+   * @param array<string,mixed> $community
+   * @param array<string,mixed>|null $contract
+   * @param array<string,mixed> $contact
+   * @return array<string,string>
+   */
+  private function copropiedadTicketFields(array $community, ?array $contract, array $contact): array
+  {
+    $first = static function (array $values): string {
+      foreach ($values as $value) {
+        $value = trim((string) $value);
+        if ($value !== '') {
+          return $value;
+        }
+      }
+      return '';
+    };
+    $contract = $contract ?? [];
+    return array_filter([
+      'id_copropiedad' => $first([$community['_ID'] ?? '', $contract['id_copropiedad'] ?? '', $contact['actor_id'] ?? '']),
+      'copropiedad' => $first([$community['copropiedad'] ?? '', $contract['copropiedad'] ?? '']),
+      'correo_copropiedad' => $first([$community['correo'] ?? '', $contract['correo_copropiedad'] ?? '', $contact['email'] ?? '']),
+      'celular_copropiedad' => $first([$community['contacto'] ?? '', $contract['celular_copropiedad'] ?? '', $contact['phone'] ?? '']),
+      'indicativo_copropiedad' => $this->normalizeIndicativo($first([$community['indicativo'] ?? '', $contact['indicativo'] ?? '', '+57'])),
+    ], static fn(string $value): bool => $value !== '');
   }
 
   /**
@@ -386,10 +428,13 @@ trait TicketPersistenceConcern
         'departamento' => trim((string) ($row['departamento'] ?? '')),
         'fecha' => $timestamp > 0 ? date('Y-m-d H:i', $timestamp) : '',
         'contrato' => trim((string) ($row['contrato'] ?? '')),
-        'origen' => (trim((string) ($row['contrato'] ?? '')) !== '' || trim((string) ($row['id_contrato'] ?? '')) !== '') ? 'Contrato' : 'Comercial',
+        'origen' => (trim((string) ($row['contrato'] ?? '')) !== '' || trim((string) ($row['id_contrato'] ?? '')) !== '') ? 'Contrato' : ($actor === 'copropiedad' ? 'Copropiedad' : 'Comercial'),
         'inmueble' => trim((string) ($row['inmueble'] ?? '')),
         'direccion' => trim((string) ($row['direccion'] ?? '')),
-        'ticket_url' => $this->buildPublicTicketUrl($logicalId),
+        // Vista pública nueva y firmada del caso, según el perfil que consulta.
+        'ticket_url' => (int) ($row['_ID'] ?? 0) > 0
+          ? \SCM\Support\PublicCaseAccess::url((int) $row['_ID'], in_array($actor, ['propietario', 'arrendatario', 'copropiedad'], true) ? $actor : 'publico')
+          : $this->buildPublicTicketUrl($logicalId),
       ];
     }
 

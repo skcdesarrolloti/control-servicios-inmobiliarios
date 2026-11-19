@@ -40,6 +40,10 @@
     const opener = document.activeElement;
     let busy = false;
     let selected = null;
+    // Copropiedad elegida al buscar por copropiedad; el contrato (selected) es opcional en ese caso.
+    let community = null;
+    const hasSelection = () => !!(selected || community);
+    const selectionKey = () => `${selected?._ID || ''}|${community?._ID || ''}`;
     // Se asigna más abajo: completa título, descripción, departamento y adjuntos de un recibo.
     let applyReceiptDefaults = () => {};
     // fin_contrato llega como timestamp (segundos o milisegundos) o como fecha; el campo usa AAAA-MM-DD.
@@ -61,7 +65,7 @@
     dialog.setAttribute('aria-labelledby', 'scm-new-case-title');
     dialog.setAttribute('closedby', 'none');
     dialog.innerHTML = `<header class="scm-new-case-header">
-      <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-500">SKC SuCasa Inmobiliaria</p><h2 id="scm-new-case-title" class="text-xl font-bold text-slate-900 mt-1">Crear nuevo caso</h2><p class="text-sm text-slate-500 mt-1">Vincula un contrato y asigna la gestión a tu equipo.</p></div>
+      <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-500">SKC SuCasa Inmobiliaria</p><h2 id="scm-new-case-title" class="text-xl font-bold text-slate-900 mt-1">Crear nuevo caso</h2><p class="text-sm text-slate-500 mt-1">Vincula un contrato o una copropiedad y asigna la gestión a tu equipo.</p></div>
       <button type="button" data-close class="scm-new-case-icon" aria-label="Cerrar popup"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
     </header><div data-content class="p-6"><p role="status" class="text-sm text-slate-500">Cargando temas y funcionarios…</p></div>`;
     document.body.append(dialog);
@@ -92,9 +96,9 @@
       current.querySelector('[data-content]').innerHTML = `<form data-case-form class="flex flex-col gap-6">
         <div class="flex flex-wrap items-center justify-between gap-2"><p data-draft-status role="status" aria-live="polite" class="text-xs text-slate-500">El borrador se guardará en este navegador durante 24 horas.</p><button type="button" data-discard-draft class="text-xs font-semibold text-slate-500 underline">Descartar borrador</button></div>
         <div data-discard-confirm hidden class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700"><p>¿Descartar los datos y archivos de este borrador? Esta acción no se puede deshacer.</p><div class="mt-3 flex gap-2"><button type="button" data-confirm-discard class="scm-new-case-button">Sí, descartar</button><button type="button" data-keep-draft class="scm-new-case-button">Conservar borrador</button></div></div>
-        <section class="flex flex-col gap-3"><h3 class="scm-new-case-section"><span>1</span> Encuentra el contrato</h3>
+        <section class="flex flex-col gap-3"><h3 class="scm-new-case-section"><span>1</span> Encuentra el contrato o la copropiedad</h3>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <label class="scm-new-case-label">Buscar por<select data-search-by>${option('contrato', 'Contrato')}${option('inmueble', 'Inmueble SIMI')}${option('propietario', 'Propietario')}${option('arrendatario', 'Arrendatario')}</select></label>
+            <label class="scm-new-case-label">Buscar por<select data-search-by>${option('contrato', 'Contrato')}${option('inmueble', 'Inmueble SIMI')}${option('propietario', 'Propietario')}${option('arrendatario', 'Arrendatario')}${option('copropiedad', 'Copropiedad (nombre o NIT)')}</select></label>
             <label class="scm-new-case-label sm:col-span-2">Número, código o nombre<div class="flex gap-2"><input type="search" data-search maxlength="100" placeholder="Escribe al menos 2 caracteres" class="min-w-0 flex-1"><button type="button" data-search-button class="scm-new-case-button">Buscar</button></div></label>
           </div><p data-search-status role="status" aria-live="polite" class="text-xs text-slate-500">Busca y selecciona el contrato correspondiente.</p>
           <div data-results class="flex flex-col gap-2 max-h-56 overflow-y-auto"></div>
@@ -140,7 +144,7 @@
         <section data-notify-section class="flex flex-col gap-3"><h3 class="scm-new-case-section"><span>4</span> Notifica a los interesados</h3>
           <p class="text-sm text-slate-500">Opcional. Selecciona a quién avisar por correo y WhatsApp con el título, tema, contrato y responsable. El correo también incluye la descripción.</p>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">${[['propietario', 'Propietario'], ['arrendatario', 'Arrendatario'], ['copropiedad', 'Copropiedad']].map(([value, label]) => `<label class="flex items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700"><input type="checkbox" name="notify_roles[]" value="${value}" class="h-4 w-4">${label}</label>`).join('')}</div>
-          <p class="text-xs text-slate-500">Se usan los datos del contrato y su ficha. Deben tener correo y celular válidos.${config.whatsapp_enabled ? '' : ' WhatsApp está pendiente de activar; por ahora se encolará solo el correo.'}</p>
+          <p class="text-xs text-slate-500">Se usan los datos del contrato y su ficha (la copropiedad también desde su ficha). Deben tener correo y celular válidos. Sin contrato solo se puede avisar a la copropiedad.${config.whatsapp_enabled ? '' : ' WhatsApp está pendiente de activar; por ahora se encolará solo el correo.'}</p>
         </section>
         </div></fieldset></div></fieldset>
         <p data-error hidden role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"></p>
@@ -164,9 +168,38 @@
         current.querySelector('[data-create-action]').hidden = !visible || !assistantChoice;
         form.querySelector('[type=submit]').disabled = !visible || !assistantChoice;
       };
-      const invalidateSelection = () => { sequence++; resetAi(); assistantChoice = ''; selected = null; setAssistantChoice(''); summary.hidden = true; setContractStepsVisible(false); showError(''); results.replaceChildren(); status.textContent = 'Busca y selecciona el contrato correspondiente.'; };
+      const invalidateSelection = () => { sequence++; resetAi(); assistantChoice = ''; selected = null; community = null; setAssistantChoice(''); summary.hidden = true; setContractStepsVisible(false); showError(''); results.replaceChildren(); status.textContent = searchBy.value === 'copropiedad' ? 'Busca y selecciona la copropiedad.' : 'Busca y selecciona el contrato correspondiente.'; };
+      // Copropiedad: caso general (sin contrato) o uno de sus contratos vinculados.
+      const communityContract = () => community?.contracts?.find(item => String(item._ID) === String(summary.querySelector('[data-community-contract]')?.value || '')) || null;
+      const selectCommunity = (item, contractId = '') => {
+        community = item;
+        selected = null;
+        results.replaceChildren();
+        const contracts = Array.isArray(item.contracts) ? item.contracts : [];
+        const contact = [item.administrador && `Administrador: ${escape(item.administrador)}`, item.correo && escape(item.correo), item.contacto && `Cel. ${escape(item.contacto)}`].filter(Boolean).join(' · ');
+        summary.innerHTML = `<strong>Copropiedad ${escape(item.copropiedad)}${item.nit ? ` · NIT ${escape(item.nit)}` : ''}</strong>${item.direccion ? `<p class="mt-1">${escape(item.direccion)}</p>` : ''}${contact ? `<p class="text-xs mt-1">${contact}</p>` : '<p class="text-xs mt-1">La ficha de la copropiedad no tiene correo ni celular registrados.</p>'}
+          <label class="scm-new-case-label mt-3">¿El caso es de un contrato?<select data-community-contract>${option('', 'No, caso general (sin contrato)')}${contracts.map(contract => option(contract._ID, `Contrato ${contract.contrato} · SIMI ${contract.inmueble || '-'} · ${contract.direccion || ''}${contract.estado ? ` · ${contract.estado}` : ''}`)).join('')}</select></label>
+          <p class="text-xs mt-2">${contracts.length ? `${contracts.length} contrato(s) vinculado(s). Elige uno si el caso es de un inmueble; si es del edificio o zonas comunes, déjalo sin contrato.` : 'No tiene contratos vinculados: el caso se creará sin contrato.'}</p>`;
+        const picker = summary.querySelector('[data-community-contract]');
+        if (contractId && contracts.some(contract => String(contract._ID) === String(contractId))) picker.value = String(contractId);
+        const syncCommunityContract = () => {
+          selected = communityContract();
+          applyReceiptDefaults(); syncReceiptTopic();
+          invalidateAiDraft();
+          scheduleDraft();
+        };
+        picker.onchange = syncCommunityContract;
+        selected = communityContract();
+        if (!form.elements.departamento.value && config.departments.includes('Servicio a la copropiedad')) form.elements.departamento.value = 'Servicio a la copropiedad';
+        summary.hidden = false; status.textContent = 'Copropiedad seleccionada. Puedes cambiarla realizando otra búsqueda.';
+        syncReceiptTopic();
+        setContractStepsVisible(true);
+        current.querySelector('[data-assistant-choice="yes"]').focus();
+        scheduleDraft();
+      };
       const selectContract = contract => {
         selected = contract;
+        community = null;
         applyReceiptDefaults();
         const receiptDate = form.elements.fecha_entrega_recibo;
         if (receiptDate) {
@@ -178,6 +211,7 @@
         results.replaceChildren();
         summary.innerHTML = `<strong>Contrato ${escape(contract.contrato)} · SIMI ${escape(contract.inmueble)}</strong><p class="mt-1">${escape(contract.direccion)}</p><p class="text-xs mt-1">Propietario: ${escape(contract.propietario)} · Arrendatario: ${escape(contract.arrendatario)}</p>`;
         summary.hidden = false; status.textContent = 'Contrato seleccionado. Puedes cambiarlo realizando otra búsqueda.';
+        syncReceiptTopic();
         setContractStepsVisible(true);
         current.querySelector('[data-assistant-choice="yes"]').focus();
         scheduleDraft();
@@ -190,11 +224,24 @@
         if (query.length < 2) { status.textContent = 'Escribe al menos 2 caracteres para buscar.'; searchInput.focus(); return; }
         invalidateSelection();
         const run = ++sequence;
-        status.textContent = 'Buscando contratos…';
+        const byCommunity = searchBy.value === 'copropiedad';
+        status.textContent = byCommunity ? 'Buscando copropiedades…' : 'Buscando contratos…';
         const data = new FormData(); data.set('query', query); data.set('by', searchBy.value);
         try {
           const response = await api('scm_panel_case_search', data);
           if (!current.isConnected || run !== sequence) return;
+          if (byCommunity) {
+            const communities = Array.isArray(response.communities) ? response.communities : [];
+            status.textContent = communities.length ? `${communities.length} copropiedad(es). Selecciona una.` : 'No se encontraron copropiedades. Revisa el nombre o el NIT (sin dígito de verificación).';
+            communities.forEach(item => {
+              const button = document.createElement('button');
+              button.type = 'button'; button.className = 'scm-new-case-result';
+              button.innerHTML = `<strong>${escape(item.copropiedad)}${item.nit ? ` · NIT ${escape(item.nit)}` : ''}</strong><span>${escape(item.direccion || 'Sin dirección registrada')}</span><span>${item.administrador ? `Administrador: ${escape(item.administrador)} · ` : ''}${(item.contracts || []).length} contrato(s) vinculado(s)</span>`;
+              button.onclick = () => selectCommunity(item);
+              results.append(button);
+            });
+            return;
+          }
           status.textContent = response.contracts.length ? `${response.contracts.length} resultado(s). Selecciona un contrato.${response.contracts.length === 30 ? ' Si no lo encuentras, precisa la búsqueda.' : ''}` : 'No se encontraron contratos. Revisa el dato o cambia el tipo de búsqueda.';
           response.contracts.forEach(contract => {
             const button = document.createElement('button');
@@ -237,7 +284,7 @@
           const active = button.dataset.assistantChoice === assistantChoice;
           button.setAttribute('aria-pressed', String(active)); button.classList.toggle('is-active', active);
         });
-        setContractStepsVisible(!!selected);
+        setContractStepsVisible(hasSelection());
       };
       current.querySelectorAll('[data-assistant-choice]').forEach(button => button.onclick = () => {
         if (button.dataset.assistantChoice === 'no') invalidateAiDraft();
@@ -260,7 +307,7 @@
       current.addEventListener('close', clearAiSources);
       aiText.oninput = invalidateAiDraft;
       const addAiImages = blobs => {
-        if (busy || aiController || !selected || !config.ai?.enabled || !current.isConnected) return;
+        if (busy || aiController || !hasSelection() || !config.ai?.enabled || !current.isConnected) return;
         const types = {'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp'};
         const combined = [...aiSources.map(image => image.file), ...blobs];
         if (combined.length > 4 || blobs.some(blob => !types[blob.type] || !blob.size || blob.size > 5 * 1024 * 1024)
@@ -284,7 +331,7 @@
         renderAiSources();
       };
       aiSection.addEventListener('paste', event => {
-        if (!config.ai?.enabled || !selected || busy || aiController) return;
+        if (!config.ai?.enabled || !hasSelection() || busy || aiController) return;
         const images = [...(event.clipboardData?.items || [])].filter(item => item.type.startsWith('image/')).map(item => item.getAsFile()).filter(Boolean);
         if (!images.length) return;
         event.preventDefault(); event.stopPropagation(); addAiImages(images);
@@ -303,19 +350,19 @@
         } catch (_) { aiStatus.textContent = 'No se pudo leer el portapapeles. Usa Ctrl+V dentro del contenido del asistente.'; aiText.focus(); }
       };
       aiAnalyze.onclick = async () => {
-        if (busy || aiController || !selected || !config.ai?.enabled) return;
+        if (busy || aiController || !hasSelection() || !config.ai?.enabled) return;
         if (!aiText.value.trim() && !aiSources.length) { aiStatus.textContent = 'Pega el contenido del mensaje o agrega una captura.'; aiText.focus(); return; }
         invalidateAiDraft();
         const run = ++aiSequence;
-        const contractId = String(selected._ID);
-        const data = new FormData(); data.set('contract_id', contractId); data.set('source_text', aiText.value);
+        const key = selectionKey();
+        const data = new FormData(); data.set('contract_id', selected?._ID || ''); data.set('copropiedad_id', selected ? '' : (community?._ID || '')); data.set('source_text', aiText.value);
         aiSources.forEach(image => data.append('ai_images[]', image.file, image.file.name));
         aiController = new AbortController();
         aiInputs.disabled = true; aiAnalyze.textContent = 'Analizando…'; aiSection.setAttribute('aria-busy', 'true');
         aiStatus.textContent = 'Leyendo la solicitud y preparando una propuesta…';
         try {
           const response = await api('scm_panel_case_analyze', data, aiController.signal);
-          if (!current.isConnected || run !== aiSequence || String(selected?._ID) !== contractId || String(response.contract_id) !== contractId) return;
+          if (!current.isConnected || run !== aiSequence || selectionKey() !== key || String(response.contract_id) !== String(selected?._ID || '')) return;
           aiDraft = response.draft;
           const labels = {asunto: 'Título', descripcion: 'Descripción', tema_ayuda: 'Tema', departamento: 'Departamento', observaciones: 'Por revisar'};
           current.querySelector('[data-ai-draft]').innerHTML = Object.entries(labels).map(([key, label]) => `<div><p class="text-xs font-semibold text-slate-500">${label}</p><p class="mt-1 whitespace-pre-wrap break-words">${escape(aiDraft[key] || (key === 'observaciones' ? 'Revisa que el resumen corresponda a la solicitud.' : 'Seleccionar manualmente'))}</p></div>`).join('');
@@ -329,7 +376,7 @@
         }
       };
       aiApply.onclick = () => {
-        if (!aiDraft || busy || !selected) return;
+        if (!aiDraft || busy || !hasSelection()) return;
         aiUndoValues = Object.fromEntries(aiFields.map(key => [key, form.elements[key].value]));
         form.elements.asunto.value = aiDraft.asunto;
         form.elements.descripcion.value = aiDraft.descripcion;
@@ -376,7 +423,7 @@
         renderFiles();
       };
       const addPastedImages = async blobs => {
-        if (busy || !selected || !assistantChoice || !current.isConnected) return;
+        if (busy || !hasSelection() || !assistantChoice || !current.isConnected) return;
         const allowedTypes = {'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp'};
         if (blobs.some(blob => !allowedTypes[blob.type])) { showError('Pega imágenes en formato JPG, PNG o WebP.'); return; }
         const combined = [...files(), ...blobs];
@@ -403,7 +450,7 @@
         pasteStatus.textContent = 'Captura quitada. Puedes pegar otra con Ctrl+V.';
       };
       form.addEventListener('paste', event => {
-        if (busy || !selected || !assistantChoice) return;
+        if (busy || !hasSelection() || !assistantChoice) return;
         if (event.target.closest('[data-ai-section]')) return;
         const clipboard = event.clipboardData;
         if (!clipboard) return;
@@ -437,7 +484,7 @@
       let draftWrites = Promise.resolve();
       const snapshotDraft = () => ({
         version: 1, expires: Date.now() + 24 * 3600 * 1000, requestId,
-        selected, query: searchInput.value, by: searchBy.value, assistantChoice,
+        selected, community: community ? {_ID: community._ID, copropiedad: community.copropiedad, nit: community.nit} : null, query: searchInput.value, by: searchBy.value, assistantChoice,
         fields: Object.fromEntries(draftFields.map(key => [key, form.elements[key].value])),
         notifyRoles: [...form.querySelectorAll('[name="notify_roles[]"]:checked')].map(input => input.value),
         sourceText: aiText.value, sourceImages: aiSources.map(image => image.file),
@@ -447,7 +494,7 @@
         clearTimeout(draftTimer);
         if (!draftReady || draftFinished || !draftScope) return;
         const snapshot = snapshotDraft();
-        const hasContent = selected || snapshot.query || snapshot.sourceText || snapshot.images.length || snapshot.documents.length || snapshot.sourceImages.length || Object.values(snapshot.fields).some(Boolean);
+        const hasContent = hasSelection() || snapshot.query || snapshot.sourceText || snapshot.images.length || snapshot.documents.length || snapshot.sourceImages.length || Object.values(snapshot.fields).some(Boolean);
         draftStatus.textContent = 'Guardando borrador…';
         draftWrites = draftWrites.then(() => draftStore(draftScope, hasContent ? snapshot : null)).then(() => {
           if (current.isConnected && !draftFinished) draftStatus.textContent = hasContent ? 'Borrador guardado en este navegador. Se puede recuperar durante 24 horas, incluidos los archivos.' : 'El borrador se guardará en este navegador durante 24 horas.';
@@ -486,9 +533,10 @@
           const tenant = input.value === 'arrendatario';
           if (isReceipt && tenant && !input.checked) { input.checked = true; receiptTenantAutoChecked = true; }
           if (!isReceipt && tenant && receiptTenantAutoChecked) { input.checked = false; receiptTenantAutoChecked = false; }
-          if (isReceipt && !tenant) input.checked = false;
-          input.disabled = isReceipt && !tenant;
-          input.closest('label').classList.toggle('opacity-50', isReceipt && !tenant);
+          const needsContract = !selected && input.value !== 'copropiedad';
+          if ((isReceipt && !tenant) || needsContract) input.checked = false;
+          input.disabled = (isReceipt && !tenant) || needsContract;
+          input.closest('label').classList.toggle('opacity-50', input.disabled);
         });
       };
       form.elements.tema_ayuda.addEventListener('change', () => { syncReceiptTopic(); applyReceiptDefaults(); });
@@ -518,12 +566,13 @@
         if (busy || !form.reportValidity()) return;
         if (!assistantChoice) { showError('Elige si quieres usar el asistente o completar el caso manualmente.'); return; }
         showError('');
-        if (!selected) { showError('Busca y selecciona un contrato antes de crear el caso.'); searchInput.focus(); return; }
+        if (!hasSelection()) { showError('Busca y selecciona un contrato o una copropiedad antes de crear el caso.'); searchInput.focus(); return; }
+        if (!selected && isReceiptTopic()) { showError('El recibo de inmuebles necesita un contrato. Elige uno de los contratos de la copropiedad.'); return; }
         const attachments = files();
         if ((form.elements.has_attachments.value === 'Si' && !attachments.length) || attachments.length > 10 || attachments.some(f => f.size > config.max_file_bytes) || attachments.reduce((sum, f) => sum + f.size, 0) > 25 * 1024 * 1024) {
           showError('Revisa los adjuntos: agrega al menos uno si elegiste Sí, máximo 10 archivos y respeta los límites de tamaño.'); return;
         }
-        const data = new FormData(form); data.set('contract_id', selected._ID); data.set('request_id', requestId);
+        const data = new FormData(form); data.set('contract_id', selected?._ID || ''); data.set('copropiedad_id', community?._ID || ''); data.set('request_id', requestId);
         pastedImages.forEach(image => data.append('imagenes[]', image.file, image.file.name));
         busy = true;
         const submit = form.querySelector('[type=submit]');
@@ -566,7 +615,17 @@
           if (saved?.version === 1 && saved.expires > Date.now()) {
             if (/^[a-f0-9-]{36}$/.test(saved.requestId)) requestId = saved.requestId;
             searchInput.value = saved.query || ''; searchBy.value = saved.by || 'contrato';
-            if (saved.selected?._ID) {
+            if (saved.community?._ID) {
+              const data = new FormData();
+              const nit = String(saved.community.nit || '').replace(/\D+/g, '');
+              data.set('by', 'copropiedad'); data.set('query', nit.length >= 6 ? nit : String(saved.community.copropiedad || saved.query || ''));
+              try {
+                const response = await api('scm_panel_case_search', data);
+                if (!current.isConnected) return;
+                const item = (response.communities || []).find(candidate => String(candidate._ID) === String(saved.community._ID));
+                if (item) { searchBy.value = 'copropiedad'; selectCommunity(item, saved.selected?._ID || ''); }
+              } catch (_) { /* Recover fields and files even when the community lookup must be retried. */ }
+            } else if (saved.selected?._ID) {
               const data = new FormData();
               const useNumber = String(saved.selected.contrato || '').length >= 2;
               data.set('by', useNumber ? 'contrato' : saved.by); data.set('query', useNumber ? saved.selected.contrato : saved.query);
@@ -583,19 +642,19 @@
             (saved.sourceImages || []).filter(file => file instanceof File).forEach(file => aiSources.push({file, url: URL.createObjectURL(file)}));
             (saved.images || []).filter(file => file instanceof File).forEach(file => pastedImages.push({file, url: URL.createObjectURL(file)}));
             const documents = new DataTransfer(); (saved.documents || []).filter(file => file instanceof File).forEach(file => documents.items.add(file)); fileInputs[1].files = documents.files;
-            setAssistantChoice(selected ? saved.assistantChoice : '');
+            setAssistantChoice(hasSelection() ? saved.assistantChoice : '');
             current.querySelector('[data-attachments]').hidden = form.elements.has_attachments.value !== 'Si';
             fileInputs.forEach(input => { input.disabled = form.elements.has_attachments.value !== 'Si'; });
             renderAiSources(); renderFiles(); form.elements.id_empleado.onchange();
-            draftStatus.textContent = selected ? 'Borrador recuperado, incluidos los archivos. Revisa los datos antes de crear el caso.' : 'Borrador recuperado. Selecciona nuevamente el contrato para continuar.';
+            draftStatus.textContent = hasSelection() ? 'Borrador recuperado, incluidos los archivos. Revisa los datos antes de crear el caso.' : 'Borrador recuperado. Selecciona nuevamente el contrato o la copropiedad para continuar.';
           }
         } catch (_) { draftStatus.textContent = 'El autoguardado no está disponible en este navegador. Mantén abierto el formulario para conservarlo.'; }
         finally { searchInput.disabled = searchBy.disabled = current.querySelector('[data-search-button]').disabled = false; }
       } else draftStatus.textContent = 'El autoguardado no está disponible. Mantén abierto el formulario para conservar los datos.';
       if (presetContract && current.isConnected) {
-        if (selected && String(selected._ID) !== String(presetContract.id)) {
+        if (hasSelection() && String(selected?._ID || '') !== String(presetContract.id)) {
           status.textContent = 'Recuperamos un borrador con otro contrato. Descártalo o busca el contrato ' + presetContract.code + '.';
-        } else if (!selected && String(presetContract.code || '').trim().length >= 2) {
+        } else if (!hasSelection() && String(presetContract.code || '').trim().length >= 2) {
           searchBy.value = 'contrato'; searchInput.value = String(presetContract.code).trim();
           status.textContent = 'Buscando el contrato seleccionado…';
           const data = new FormData(); data.set('by', 'contrato'); data.set('query', searchInput.value);
@@ -608,7 +667,7 @@
         }
       }
       draftReady = true;
-      if (!selected) searchInput.focus();
+      if (!hasSelection()) searchInput.focus();
     } catch (e) {
       if (current.isConnected) current.querySelector('[data-content]').innerHTML = `<p role="alert" class="text-sm text-rose-700">${escape(e.message)}</p>`;
     }

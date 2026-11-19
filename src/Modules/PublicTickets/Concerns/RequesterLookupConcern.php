@@ -135,7 +135,12 @@ trait RequesterLookupConcern
     }
 
     $coproIds = $this->findCopropiedadIds($lookupValue, $lookupDigits);
+    // Fichas que coinciden: primero el caso general de cada copropiedad (sin contrato) y luego sus contratos.
+    $records = $this->findCopropiedadRecords($lookupValue);
     $rows = [];
+    foreach ($records as $record) {
+      $rows[] = $this->formatCopropiedadGeneralRow($record);
+    }
     foreach ($this->getContractsCatalog() as $contract) {
       $nit = $this->normalizeDigits((string) ($contract['nit_copropiedad'] ?? ''));
       $coproId = trim((string) ($contract['id_copropiedad'] ?? ''));
@@ -144,7 +149,9 @@ trait RequesterLookupConcern
       $matchId = $coproId !== '' && isset($coproIds[$coproId]);
       $matchName = $lookupText !== '' && $coproName !== '' && strpos($coproName, $lookupText) !== false;
       if ($matchNit || $matchId || $matchName) {
-        $rows[] = $this->formatContractLookupRow($contract, 'copropiedad');
+        $row = $this->formatContractLookupRow($contract, 'copropiedad');
+        $record = $records[$coproId] ?? null;
+        $rows[] = is_array($record) ? $this->withCopropiedadContact($row, $record) : $row;
       }
     }
     return $rows;
@@ -318,6 +325,161 @@ trait RequesterLookupConcern
       }
     }
     return $ids;
+  }
+
+  /**
+   * Fichas de jet_cct_copropiedades por nombre o NIT (sin dígito de verificación). Llave: _ID.
+   * @return array<string,array<string,mixed>>
+   */
+  private function findCopropiedadRecords(string $rawLookup, int $limit = 5): array
+  {
+    $table = $this->db->table('jet_cct_copropiedades');
+    $lookup = trim($rawLookup);
+    if (mb_strlen($lookup) < 2 || !$this->schema->tableExists($table)) {
+      return [];
+    }
+    $where = ["TRIM(COALESCE(`copropiedad`, '')) LIKE ?"];
+    $args = ['%' . $this->db->escapeLike($lookup) . '%'];
+    $digits = $this->normalizeDigits($lookup);
+    if (strlen($digits) >= 6) {
+      $where[] = "REPLACE(REPLACE(REPLACE(TRIM(COALESCE(`nit`, '')), '.', ''), '-', ''), ' ', '') LIKE ?";
+      $args[] = $this->db->escapeLike($digits) . '%';
+    }
+    $status = $this->schema->columnExists($table, 'cct_status') ? " AND (`cct_status` IS NULL OR `cct_status` <> 'trash')" : '';
+    $rows = $this->db->getResults(
+      "SELECT * FROM `{$table}` WHERE (" . implode(' OR ', $where) . "){$status} ORDER BY `copropiedad` LIMIT " . max(1, $limit),
+      $args
+    );
+    $records = [];
+    foreach ($rows as $row) {
+      $id = trim((string) ($row['_ID'] ?? ''));
+      if ($id !== '') {
+        $records[$id] = $row;
+      }
+    }
+    return $records;
+  }
+
+  /** @return array<string,mixed>|null */
+  private function findCopropiedadRecordById(string $id): ?array
+  {
+    $id = trim($id);
+    $table = $this->db->table('jet_cct_copropiedades');
+    if (!ctype_digit($id) || (int) $id <= 0 || !$this->schema->tableExists($table)) {
+      return null;
+    }
+    $row = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [(int) $id]);
+    if (!is_array($row) || ($this->schema->columnExists($table, 'cct_status') && (string) ($row['cct_status'] ?? '') === 'trash')) {
+      return null;
+    }
+    return $row;
+  }
+
+  private function copropiedadRecordMatchesLookup(array $record, string $lookupValue): bool
+  {
+    $lookupValue = trim($lookupValue);
+    if ($lookupValue === '') {
+      return true;
+    }
+    $digits = $this->normalizeDigits($lookupValue);
+    $nit = $this->normalizeDigits((string) ($record['nit'] ?? ''));
+    if (strlen($digits) >= 6 && $nit !== '' && str_starts_with($nit, $digits)) {
+      return true;
+    }
+    $name = mb_strtolower(trim((string) ($record['copropiedad'] ?? '')), 'UTF-8');
+    return $name !== '' && str_contains($name, mb_strtolower($lookupValue, 'UTF-8'));
+  }
+
+  /** Administrador de la copropiedad o, si no está registrado, el nombre de la copropiedad. */
+  private function copropiedadContactName(array $source): string
+  {
+    $administrator = trim((string) ($source['administrador'] ?? ''));
+    return $administrator !== '' ? $administrator : trim((string) ($source['copropiedad'] ?? ''));
+  }
+
+  private function isCopropiedadName(string $name, array $source): bool
+  {
+    $name = mb_strtolower(trim($name), 'UTF-8');
+    return $name === '' || $name === mb_strtolower(trim((string) ($source['copropiedad'] ?? '')), 'UTF-8');
+  }
+
+  /** Fila para radicar un caso general de la copropiedad, sin contrato (id `copropiedad:<_ID>`). */
+  private function formatCopropiedadGeneralRow(array $record): array
+  {
+    $id = trim((string) ($record['_ID'] ?? ''));
+    $name = trim((string) ($record['copropiedad'] ?? ''));
+    $name = $name !== '' ? $name : 'Copropiedad';
+    return [
+      'id' => 'copropiedad:' . $id,
+      'type' => 'copropiedad',
+      'actor_id' => $id,
+      'contrato' => 'Caso general de ' . $name . ' (sin contrato)',
+      'estado' => '',
+      'inmueble' => '',
+      'direccion' => trim((string) ($record['direccion'] ?? '')),
+      'barrio' => trim((string) ($record['barrio'] ?? '')),
+      'sucursal' => '',
+      'propietario' => '',
+      'arrendatario' => '',
+      'copropiedad' => $name,
+      'nit_copropiedad' => trim((string) ($record['nit'] ?? '')),
+      'contact_name' => $this->copropiedadContactName($record + ['copropiedad' => $name]),
+      'contact_email' => trim((string) ($record['correo'] ?? '')),
+      'contact_phone' => trim((string) ($record['contacto'] ?? '')),
+      'contact_indicativo' => $this->normalizeIndicativo((string) ($record['indicativo'] ?? '+57')),
+      'responsable_id' => '',
+      'responsable_nombre' => '',
+      'responsable_correo' => '',
+      'responsable_celular' => '',
+      'display' => $name . ' · caso general sin contrato',
+    ];
+  }
+
+  /** Completa el contacto de una fila de contrato con la ficha de su copropiedad cuando el contrato no lo tiene. */
+  private function withCopropiedadContact(array $row, array $record): array
+  {
+    // Sin administrador en el contrato, el nombre de contacto era el del edificio: prima el administrador de la ficha.
+    $administrator = trim((string) ($record['administrador'] ?? ''));
+    if ($administrator !== '' && $this->isCopropiedadName((string) ($row['contact_name'] ?? ''), $row + $record)) {
+      $row['contact_name'] = $administrator;
+    }
+    $fallback = [
+      'contact_name' => $this->copropiedadContactName($record),
+      'contact_email' => trim((string) ($record['correo'] ?? '')),
+      'contact_phone' => trim((string) ($record['contacto'] ?? '')),
+      'actor_id' => trim((string) ($record['_ID'] ?? '')),
+    ];
+    foreach ($fallback as $key => $value) {
+      if (trim((string) ($row[$key] ?? '')) === '' && $value !== '') {
+        $row[$key] = $value;
+      }
+    }
+    return $row;
+  }
+
+  /**
+   * Contacto del solicitante copropiedad: lo escrito y el contrato primero; la ficha completa lo que falte.
+   * @param array{name:string,email:string,phone:string,indicativo:string,actor_id:string} $contact
+   * @return array{name:string,email:string,phone:string,indicativo:string,actor_id:string}
+   */
+  private function applyCopropiedadContact(array $contact, array $record): array
+  {
+    $administrator = trim((string) ($record['administrador'] ?? ''));
+    if ($administrator !== '' && $this->isCopropiedadName((string) ($contact['name'] ?? ''), $record)) {
+      $contact['name'] = $administrator;
+    }
+    $fallback = [
+      'name' => $this->copropiedadContactName($record),
+      'email' => trim((string) ($record['correo'] ?? '')),
+      'phone' => trim((string) ($record['contacto'] ?? '')),
+      'actor_id' => trim((string) ($record['_ID'] ?? '')),
+    ];
+    foreach ($fallback as $key => $value) {
+      if (trim((string) ($contact[$key] ?? '')) === '' && $value !== '') {
+        $contact[$key] = $value;
+      }
+    }
+    return $contact;
   }
 
   /** @return array<string,bool> */
@@ -614,7 +776,7 @@ trait RequesterLookupConcern
       $contactIndicativo = $this->normalizeIndicativo((string) ($contract['indicativo_arrendatario'] ?? '+57'));
       $actorId = trim((string) ($contract['id_arrendatario'] ?? ''));
     } elseif ($actor === 'copropiedad') {
-      $contactName = trim((string) ($contract['administrador'] ?? $contract['copropiedad'] ?? ''));
+      $contactName = $this->copropiedadContactName($contract);
       $contactEmail = trim((string) ($contract['correo_copropiedad'] ?? ''));
       $contactPhone = trim((string) ($contract['celular_copropiedad'] ?? ''));
       $contactIndicativo = $this->normalizeIndicativo((string) ($contract['indicativo'] ?? '+57'));
@@ -728,7 +890,7 @@ trait RequesterLookupConcern
       $indicativo = $indicativo !== '' ? $indicativo : $this->normalizeIndicativo((string) ($contract['indicativo_arrendatario'] ?? '+57'));
       $actorId = $actorId !== '' ? $actorId : trim((string) ($contract['id_arrendatario'] ?? ''));
     } elseif ($actor === 'copropiedad' && is_array($contract)) {
-      $name = $name !== '' ? $name : trim((string) ($contract['administrador'] ?? $contract['copropiedad'] ?? ''));
+      $name = $name !== '' ? $name : $this->copropiedadContactName($contract);
       $email = $email !== '' ? $email : trim((string) ($contract['correo_copropiedad'] ?? ''));
       $phone = $phone !== '' ? $phone : trim((string) ($contract['celular_copropiedad'] ?? ''));
       $indicativo = $indicativo !== '' ? $indicativo : $this->normalizeIndicativo((string) ($contract['indicativo'] ?? '+57'));

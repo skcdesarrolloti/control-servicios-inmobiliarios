@@ -16,10 +16,11 @@ const assert = require('node:assert/strict');
       const action = field('action');
       let data;
       if (action === 'scm_panel_case_options') data = {themes: ['Reparaciones necesarias', 'Reparaciones locativas', 'Mejoras utiles', 'Reparaciones voluntarias', 'Contable y tributaria', 'Certificaciones tributarias', 'Procesos juridicos', 'Solicitud contractual', 'Solicitud de servicios publicos', 'Otros servicios', 'Reparaciones antes de la entrega', 'Reparaciones antes del recibo', 'Servicio publico critico'], departments: ['Servicio al propietario', 'Servicio al arrendatario', 'Servicio a la copropiedad'], theme_departments: {'Servicio publico critico': 'Servicio al arrendatario'}, employees: [{employee_id: '9002', name: 'Responsable Ejemplo', cargo: 'Coordinación', email: 'responsable@example.invalid'}], max_file_bytes: 10485760};
-      if (action === 'scm_panel_case_search') data = {contracts: [{_ID: '801', contrato: 'QA801', inmueble: 'SIMI8001', direccion: 'Calle de ejemplo 123', estado: 'Entregado', propietario: 'Propietario Ejemplo', arrendatario: 'Arrendatario Ejemplo'}]};
+      if (action === 'scm_panel_case_search' && field('by') === 'copropiedad') data = {communities: [{_ID: '61', copropiedad: 'Edificio Torres del Mar', nit: '900123456', administrador: 'Ana Administradora', correo: 'admin@torres.invalid', contacto: '3001112230', direccion: 'Calle 5 # 1-20', contracts: [{_ID: '811', contrato: 'QA811', inmueble: 'SIMI811', direccion: 'Apto 301', estado: 'Entregado'}]}]};
+      else if (action === 'scm_panel_case_search') data = {contracts: [{_ID: '801', contrato: 'QA801', inmueble: 'SIMI8001', direccion: 'Calle de ejemplo 123', estado: 'Entregado', propietario: 'Propietario Ejemplo', arrendatario: 'Arrendatario Ejemplo'}]};
       if (action === 'scm_panel_case_options') { data.whatsapp_enabled = true; data.employees[0].phone = '3001112202'; }
       if (action === 'scm_panel_case_create') {
-        await page.evaluate(payload => { window.submissions.push(payload); }, {id: field('request_id'), contract: field('contract_id'), employee: field('id_empleado'), roles: [...body.matchAll(/name="notify_roles\[\]"\r\n\r\n([^\r]+)/g)].map(match => match[1]), attachments: body.includes('evidencia.png'), pasted: body.includes('filename="captura-'), imageCount: [...body.matchAll(/name="imagenes\[\]"; filename="[^"]+"/g)].length});
+        await page.evaluate(payload => { window.submissions.push(payload); }, {id: field('request_id'), contract: field('contract_id'), community: field('copropiedad_id'), employee: field('id_empleado'), roles: [...body.matchAll(/name="notify_roles\[\]"\r\n\r\n([^\r]+)/g)].map(match => match[1]), attachments: body.includes('evidencia.png'), pasted: body.includes('filename="captura-'), imageCount: [...body.matchAll(/name="imagenes\[\]"; filename="[^"]+"/g)].length});
         const fail = await page.evaluate(() => window.failOnce);
         if (fail) {
           await page.evaluate(() => { window.failOnce = false; });
@@ -171,6 +172,41 @@ const assert = require('node:assert/strict');
     await page.locator('[data-close]').click();
     await page.locator('dialog').waitFor({state: 'detached'});
     assert.equal(await page.locator('dialog').count(), 0, 'explicit close button closes modal');
+    // Copropiedad: caso general sin contrato, o uno de sus contratos.
+    await page.locator('#open').click();
+    await page.locator('[data-case-form]').waitFor();
+    if (await page.locator('[data-selected]').isVisible()) {
+      await page.locator('[data-discard-draft]').click();
+      await page.locator('[data-confirm-discard]').click();
+    }
+    await page.locator('[data-search-by]').selectOption('copropiedad');
+    await page.locator('[data-search]').fill('Torres');
+    await page.locator('[data-search]').press('Enter');
+    await page.locator('[data-results] button').click();
+    assert((await page.locator('[data-selected]').innerText()).includes('Edificio Torres del Mar'), 'selected community is summarized');
+    assert.equal(await page.locator('[data-community-contract]').inputValue(), '', 'community case defaults to no contract');
+    assert(await page.locator('[data-contract-steps]').isVisible(), 'community without contract reveals later steps');
+    await page.locator('[data-assistant-choice=no]').click();
+    assert.equal(await page.locator('[name=departamento]').inputValue(), 'Servicio a la copropiedad', 'community suggests its department');
+    assert(await page.locator('[name="notify_roles[]"][value=propietario]').isDisabled() && await page.locator('[name="notify_roles[]"][value=copropiedad]').isEnabled(), 'without contract only the community can be notified');
+    await page.locator('[data-community-contract]').selectOption('811');
+    assert(await page.locator('[name="notify_roles[]"][value=propietario]').isEnabled(), 'choosing a community contract enables owner and tenant notices');
+    await page.locator('[data-community-contract]').selectOption('');
+    await page.locator('[name=asunto]').fill('Filtración en el lobby');
+    await page.locator('[name=descripcion]').fill('Humedad en zona común.');
+    await page.locator('[name=tema_ayuda]').selectOption('Reparaciones necesarias');
+    await page.locator('[name=id_empleado]').selectOption('9002');
+    await page.locator('[name=has_attachments]').selectOption('No');
+    await page.locator('[name="notify_roles[]"][value=copropiedad]').check();
+    await page.locator('[data-selected]').screenshot({path: path.join(__dirname, '../output/panel-case/community.png')});
+    await page.locator('[type=submit]').click();
+    await page.locator('[data-done]').waitFor();
+    const communityCase = (await page.evaluate(() => window.submissions)).at(-1);
+    assert.equal(communityCase.community, '61', 'community id is submitted');
+    assert.equal(communityCase.contract, undefined, 'general community case submits no contract');
+    assert.deepEqual(communityCase.roles, ['copropiedad'], 'community notice is submitted');
+    await page.locator('[data-done]').click();
+    await page.locator('dialog').waitFor({state: 'detached'});
     assert.deepEqual(errors, [], 'no browser runtime errors');
     const runtime = fs.readFileSync(path.join(__dirname, '../public/assets/js/admin-dashboard-runtime.js'), 'utf8');
     const start = runtime.indexOf('    function openPanelCaseById(');

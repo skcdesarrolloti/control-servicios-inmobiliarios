@@ -12,6 +12,25 @@ El panel también permite el tema `Servicio publico critico`, con el mismo valor
 
 El caso sigue la persistencia de `PublicTicketsService` utilizada por el bot, con origen `Panel administrativo` y creador `Funcionario`. El autor del CCT y el historial del inmueble usan el `id_empleado` real del creador. La creación queda auditada en el inmueble, sin insertar una respuesta automática en `historial_del_ticket`. Las filas antiguas sin contenido, adjuntos ni actividad relacionada se omiten en la presentación del historial, conservando sus datos. La asignación usa el `id_empleado` del responsable. Solo se inicializan los estados del caso nuevo según la regla existente; no se alteran otros casos.
 
+### Casos de copropiedad
+
+**Buscar por → Copropiedad (nombre o NIT)** consulta `jet_cct_copropiedades` por nombre o NIT sin dígito de verificación, con un máximo de 15 resultados (`searchPanelCopropiedades`). Cada resultado trae sus contratos vinculados por `id_copropiedad` o por `nit_copropiedad`. El NIT de la ficha se compara con y sin dígito de verificación. Al seleccionar la copropiedad:
+
+- **¿El caso es de un contrato?** Por defecto es **caso general (sin contrato)**, para temas del edificio o de zonas comunes. También se puede elegir uno de sus contratos.
+- Se sugiere el departamento `Servicio a la copropiedad`.
+- Sin contrato solo se puede avisar a la copropiedad. Propietario y arrendatario se habilitan al elegir un contrato. El recibo de inmuebles siempre exige contrato.
+- El caso guarda `id_copropiedad`, `copropiedad`, `correo_copropiedad`, `celular_copropiedad` e `indicativo_copropiedad`, tomados de la ficha y, como respaldo, del contrato. Sin contrato usa la dirección y el barrio de la ficha y no escribe historial del inmueble.
+- El servidor rechaza un contrato que no pertenezca a la copropiedad elegida.
+
+El mismo cambio aplica a **Guardian y al portal web** (`RequesterLookupConcern::lookupCopropiedad`, compartido con el bot):
+
+- Antes de los contratos aparece la opción **Caso general de &lt;copropiedad&gt; (sin contrato)**, con id `copropiedad:<_ID>`.
+- `createTicket` la acepta solo para el perfil copropiedad y valida que coincida con el nombre o NIT consultado. Nunca acepta la ficha desde el formulario.
+- El contacto del solicitante sale del contrato y, si falta, de la ficha: primero el administrador, luego el correo y el `contacto`.
+- En Guardian el caso general se conserva aunque la categoría pida contrato entregado.
+
+Prueba: `php tests/panel-case-copropiedad-check.php`.
+
 Después de seleccionar un contrato se pregunta **¿Quieres preparar la información del caso con el asistente?**. **Sí, usar el asistente** muestra sus herramientas y el formulario; **No, completar manualmente** muestra el formulario habitual. Antes de responder, los demás pasos permanecen ocultos y deshabilitados. Si cambia la búsqueda, se requiere seleccionar nuevamente el contrato y responder la pregunta.
 
 ## Asistente después de seleccionar contrato

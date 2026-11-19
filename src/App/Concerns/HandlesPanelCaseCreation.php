@@ -51,7 +51,11 @@ trait HandlesPanelCaseCreation
   {
     $service = $this->panelCaseService();
     try {
-      $this->jsonOk(['contracts' => $service->searchPanelContracts(trim((string) ($_POST['query'] ?? '')), (string) ($_POST['by'] ?? ''))]);
+      $query = trim((string) ($_POST['query'] ?? ''));
+      $by = (string) ($_POST['by'] ?? '');
+      $this->jsonOk($by === 'copropiedad'
+        ? ['communities' => $service->searchPanelCopropiedades($query)]
+        : ['contracts' => $service->searchPanelContracts($query, $by)]);
     } catch (\InvalidArgumentException $e) {
       $this->jsonFail($e->getMessage());
     }
@@ -65,10 +69,21 @@ trait HandlesPanelCaseCreation
         throw new \InvalidArgumentException(\SCM\Support\PanelCaseAi::availability()['message']);
       }
       $id = $_POST['contract_id'] ?? '';
+      $communityId = $_POST['copropiedad_id'] ?? '';
       $text = $_POST['source_text'] ?? '';
-      if (!is_scalar($id) || !ctype_digit((string) $id) || !is_string($text)) throw new \InvalidArgumentException('Selecciona el contrato y revisa el contenido para analizar.');
-      $contract = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_contratos_arrendamiento') . '` WHERE `_ID` = ? LIMIT 1', [(int) $id]);
-      if (!$contract) throw new \InvalidArgumentException('Selecciona un contrato existente antes de analizar.');
+      $valid = static fn($value): bool => is_scalar($value) && ((string) $value === '' || ctype_digit((string) $value));
+      if (!$valid($id) || !$valid($communityId) || ((string) $id === '' && (string) $communityId === '') || !is_string($text)) {
+        throw new \InvalidArgumentException('Selecciona el contrato o la copropiedad y revisa el contenido para analizar.');
+      }
+      if ((string) $id !== '') {
+        $contract = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_contratos_arrendamiento') . '` WHERE `_ID` = ? LIMIT 1', [(int) $id]);
+        if (!$contract) throw new \InvalidArgumentException('Selecciona un contrato existente antes de analizar.');
+      } else {
+        // Caso general de la copropiedad: el asistente recibe su nombre y dirección como contexto.
+        $community = $service->panelCopropiedad((int) $communityId);
+        if (!$community) throw new \InvalidArgumentException('Selecciona una copropiedad existente antes de analizar.');
+        $contract = ['_ID' => '', 'contrato' => 'Sin contrato · copropiedad ' . trim((string) ($community['copropiedad'] ?? '')), 'inmueble' => '', 'direccion' => trim((string) ($community['direccion'] ?? ''))];
+      }
       $ai = new \SCM\Support\PanelCaseAi();
       $images = $ai->images(is_array($_FILES['ai_images'] ?? null) ? $_FILES['ai_images'] : []);
       $options = $service->panelCaseOptions();
@@ -83,7 +98,7 @@ trait HandlesPanelCaseCreation
     } catch (\InvalidArgumentException | \RuntimeException $e) {
       $this->jsonFail($e->getMessage());
     }
-    $this->jsonOk(['draft' => $draft, 'contract_id' => (string) $contract['_ID']]);
+    $this->jsonOk(['draft' => $draft, 'contract_id' => (string) $contract['_ID'], 'copropiedad_id' => (string) ($_POST['copropiedad_id'] ?? '')]);
   }
 
   /**

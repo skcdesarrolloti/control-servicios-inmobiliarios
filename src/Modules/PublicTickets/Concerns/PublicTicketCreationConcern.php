@@ -42,9 +42,21 @@ trait PublicTicketCreationConcern
       && in_array($actor, ['propietario', 'arrendatario'], true)
       && in_array($tipoPqrs, ['Captacion', 'Avaluo'], true);
 
+    // Solo el flujo interno marca la ficha de copropiedad; nunca se acepta desde el formulario.
+    unset($input['copropiedad_record']);
     $contract = null;
     $client = null;
-    if (!empty($config['requires_contract']) && !$allowWithoutContract) {
+    $community = null;
+    if ($actor === 'copropiedad' && str_starts_with($selectedId, 'copropiedad:')) {
+      // Caso general de la copropiedad: sin contrato, ligado a su ficha.
+      $community = $this->findCopropiedadRecordById(substr($selectedId, strlen('copropiedad:')));
+      if (!is_array($community)) {
+        return ['ok' => false, 'message' => 'Copropiedad no encontrada.'];
+      }
+      if ($lookupValue !== '' && !$this->copropiedadRecordMatchesLookup($community, $lookupValue)) {
+        return ['ok' => false, 'message' => 'La copropiedad no coincide con la consulta realizada.'];
+      }
+    } elseif (!empty($config['requires_contract']) && !$allowWithoutContract) {
       $contract = $this->fetchContractById($selectedId);
       if (!is_array($contract)) {
         return ['ok' => false, 'message' => 'Contrato no encontrado.'];
@@ -64,7 +76,14 @@ trait PublicTicketCreationConcern
       }
     }
 
+    if ($actor === 'copropiedad' && $community === null && is_array($contract)) {
+      $community = $this->findCopropiedadRecordById(trim((string) ($contract['id_copropiedad'] ?? '')));
+    }
     $contact = $this->buildRequesterContact($actor, $contract, $client, $input);
+    if ($actor === 'copropiedad' && is_array($community)) {
+      $contact = $this->applyCopropiedadContact($contact, $community);
+      $input['copropiedad_record'] = $community;
+    }
     if ($contact['name'] === '' || $contact['phone'] === '' || ($actor !== 'cliente' && $contact['email'] === '')) {
       return ['ok' => false, 'message' => 'Debes completar solicitante, correo y celular.'];
     }
