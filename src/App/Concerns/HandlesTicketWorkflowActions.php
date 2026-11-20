@@ -6033,14 +6033,15 @@ trait HandlesTicketWorkflowActions
     $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
     $summary = 'Contrato ' . $contract . ', inmueble ' . $property . '. Gestionar retención o búsqueda comercial.';
     $requesterType = $this->contractRetentionRequesterType($ticket);
-    // El cliente abre la consulta pública firmada del caso; el funcionario, su enlace individual que inicia la sesión.
-    $requesterUrl = \SCM\Support\PublicCaseAccess::url($ticketId, $requesterType);
-    $employeeUrl = \SCM\Support\PublicCaseAccess::staffUrl($ticketId, trim((string) ($ticket['id_empleado'] ?? '')));
+    // La retención es una tarea comercial (estado_comercial = Nuevo) que se gestiona en el panel comercial: el cliente abre
+    // la vista pública de su tarea y el consultor/a su enlace individual, que inicia la sesión y abre la tarea.
+    $requesterUrl = \SCM\Support\CommercialTaskLink::publicUrl($ticketId);
+    $employeeUrl = \SCM\Support\CommercialTaskLink::staffUrl($ticketId, trim((string) ($input['id_empleado'] ?? $ticket['id_empleado'] ?? '')));
     $requesterName = $this->contractTerminationFirstText([$ticket], [$requesterType, 'solicitante']) ?: 'cliente';
     $requesterPhone = $this->contractTerminationFirstText([$ticket], ['celular_' . $requesterType]);
 
     if ($requesterPhone !== '') {
-      $ok = $queue->enqueue($requesterPhone, $requesterName, "Se creó el caso comercial #{$ticketId} para gestionar la retención del contrato.", [
+      $ok = $queue->enqueue($requesterPhone, $requesterName, "Se creó la tarea comercial #{$ticketId} para gestionar la retención del contrato.", [
         'source_module' => 'retencion_contrato',
         'campaign_tag' => 'retencion_contrato',
         'categoria_mensaje' => 'informacion',
@@ -6075,7 +6076,7 @@ trait HandlesTicketWorkflowActions
     $employeePhone = trim((string) ($employee['phone'] ?? ''));
     if ($employeePhone !== '') {
       $employeeName = trim((string) ($employee['name'] ?? 'Funcionario')) ?: 'Funcionario';
-      $ok = $queue->enqueue($employeePhone, $employeeName, "Se te asignó el caso comercial #{$ticketId} de retención de contrato.", [
+      $ok = $queue->enqueue($employeePhone, $employeeName, "Se te asignó la tarea comercial #{$ticketId} de retención de contrato.", [
         'source_module' => 'retencion_contrato',
         'campaign_tag' => 'retencion_contrato',
         'categoria_mensaje' => 'informacion',

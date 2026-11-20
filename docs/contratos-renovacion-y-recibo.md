@@ -149,3 +149,13 @@ anterior, nueva, caso, tipo de solicitud y funcionario real. Una fecha corregida
 abre un nuevo ciclo de renovación y retira recordatorios del ciclo anterior.
 Si otra persona cambió la fecha desde que se abrió el popup, se solicita actualizar
 el listado antes de responder. Cancelar el popup no cambia el contrato.
+
+## Enlaces de la retención (tarea comercial)
+
+La retención se crea aquí pero es una tarea del panel comercial (`estado_comercial = Nuevo`, tema `Retencion de contrato`) y se gestiona en `dashboard-comercial`. Sus avisos llevan los enlaces de ese panel (`SCM\Support\CommercialTaskLink`), nunca la página de tickets anterior:
+
+- WhatsApp `scm_retencion_contrato_funcionario`: enlace individual del consultor/a, que inicia su sesión en el panel comercial y abre la tarea.
+- WhatsApp `scm_retencion_contrato_solicitante`: vista pública de la tarea (`tarea.php`), donde el cliente ve el historial y responde.
+- Correo de creación: a funcionarios y copias, la tarea en el panel comercial (sin inicio de sesión); al cliente, su vista pública. Botón **Ver tarea**.
+
+Los botones de las dos plantillas tienen como URL fija `https://sucasainmobiliaria.com.co/{{1}}` y el panel completa la ruta. Los enlaces se firman con `COMMERCIAL_APP_SECRET` o, si no se configura, con `APP_SECRET`: los dos paneles deben tener el mismo. La dirección del panel comercial es `COMMERCIAL_URL` (por defecto `https://sucasainmobiliaria.com.co/dashboard-comercial/public`). Verificación: `php tests/shared-whatsapp-templates-check.php`.

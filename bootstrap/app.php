@@ -82,6 +82,8 @@ if ($actaAutologinSecret !== '' && strlen($actaAutologinSecret) < 32) {
 }
 
 define('SCM_APP_SECRET', (string) $scmConfig['app_secret']);
+define('SCM_COMMERCIAL_URL', (string) ($scmConfig['commercial_url'] ?? ''));
+define('SCM_COMMERCIAL_SECRET', (string) ($scmConfig['commercial_app_secret'] ?? ''));
 define('SCM_ACTA_AUTOLOGIN_SECRET', $actaAutologinSecret);
 define('SCM_UPLOAD_MAX_BYTES', max(1024, (int) ($scmConfig['upload_max_bytes'] ?? 10485760)));
 define('SCM_SESSION_IDLE_TIMEOUT', max(14400, (int) ($scmConfig['session_idle_timeout'] ?? 28800)));

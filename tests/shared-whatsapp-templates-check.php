@@ -59,3 +59,16 @@ foreach (glob($root . '/public/{*.php,assets/js/*.js}', GLOB_BRACE) ?: [] as $fi
 }
 $check($legacy === [], 'no link points to the old ticket page' . ($legacy !== [] ? ': ' . implode(', ', $legacy) : ''));
 $check(SCM\Support\CaseLink::panelUrl(10945) === rtrim((string) SCM_BASE_URL, '/') . '/?scm_case=10945' && SCM\Support\CaseLink::panelUrl('abc') === '', 'case links open ?scm_case=<_ID> in the panel');
+
+// La retención es una tarea del panel comercial: sus enlaces deben valer allá (misma firma que StaffTaskLink y PublicTaskAccess).
+$commercial = dirname($root) . '/control-servicios-comerciales/src/Support';
+if (is_file($commercial . '/StaffTaskLink.php') && is_file($commercial . '/PublicTaskAccess.php')) {
+  require_once $commercial . '/StaffTaskLink.php';
+  require_once $commercial . '/PublicTaskAccess.php';
+  parse_str((string) parse_url(SCM\Support\CommercialTaskLink::staffUrl(11459, '101'), PHP_URL_QUERY), $staffQuery);
+  parse_str((string) parse_url(SCM\Support\CommercialTaskLink::publicUrl(11459), PHP_URL_QUERY), $publicQuery);
+  $sameSecret = !defined('SCM_COMMERCIAL_SECRET') || SCM_COMMERCIAL_SECRET === '';
+  $check(!$sameSecret || SCM\Support\StaffTaskLink::verify((string) ($staffQuery['ticket_id'] ?? '')) === ['id' => 11459, 'employee' => '101'], 'retention staff link signs in the consultant in the commercial panel');
+  $check(!$sameSecret || SCM\Support\PublicTaskAccess::verify((string) ($publicQuery['t'] ?? '')) === 11459, 'retention client link opens the commercial public task view');
+}
+$check(str_contains(SCM\Support\CommercialTaskLink::openUrl(11459), '/index.php?tab=abiertos&ticket_id=11459&abrir_tarea=11459'), 'retention emails with copies open the task in the commercial panel');

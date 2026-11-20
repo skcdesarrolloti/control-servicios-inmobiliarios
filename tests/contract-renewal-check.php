@@ -276,7 +276,7 @@ try {
   check($result['ok']==='1' && $result['emails_queued']==='1','The specific retention event must route to configured recipients: '.json_encode($result));
   $retentionMail=json_decode($db->getVar('SELECT payload FROM test_jobs WHERE dedupe_key LIKE ?', ['ticket_admin_created_'.$result['ticket_id'].':%']),true);
   check(str_starts_with($retentionMail['subject'],'Tarea comercial: Retención de contrato') && str_contains($retentionMail['message_html'],'Gestión comercial solicitada') && !str_contains($retentionMail['message_html'],'Se ha creado un caso administrativo.'),'Retention queue uses commercial task subject and actionable content');
-  check($retentionMail['meta']['targets']===['admin'] && str_contains($retentionMail['message_html'],'Ver caso'),'Retention email keeps configured recipients and case access');
+  check($retentionMail['meta']['targets']===['admin'] && str_contains($retentionMail['message_html'],'Ver tarea') && str_contains($retentionMail['message_html'],'dashboard-comercial/public/index.php?tab=abiertos') && !str_contains($retentionMail['message_html'],'scm_case='),'Retention email keeps configured recipients and opens the task in the commercial panel');
   check($db->getVar('SELECT id_contrato FROM wp_jet_cct_tickets WHERE _ID=?',[$result['ticket_id']])==='193','Real ticket creation must select exact PK despite a number collision');
   check($db->getVar('SELECT cct_author_id FROM wp_jet_cct_historial_del_inmueble WHERE id_ticket=?',[$result['ticket_id']])==='EMP-900','Property audit must record creator, not assignee');
   check((int)$db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket WHERE id_ticket=?',[$result['ticket_id']])===0,'Retention creation must not insert an automatic response');

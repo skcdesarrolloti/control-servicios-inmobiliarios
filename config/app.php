@@ -23,6 +23,10 @@ return [
   'timezone' => $env('APP_TIMEZONE', 'America/Bogota'),
   'base_url' => $env('APP_URL', ''),
   'app_secret' => $env('APP_SECRET', ''),
+  // Panel comercial (dashboard-comercial): los casos de retención se gestionan allá. Su secreto firma los enlaces a sus
+  // tareas; si no se configura, se usa APP_SECRET (los dos paneles comparten el mismo).
+  'commercial_url' => rtrim((string) $env('COMMERCIAL_URL', 'https://sucasainmobiliaria.com.co/dashboard-comercial/public'), '/'),
+  'commercial_app_secret' => $env('COMMERCIAL_APP_SECRET', ''),
   'acta_autologin_secret' => $env('ACTA_AUTOLOGIN_SECRET', ''),
   // Secreto compartido solo con el bot de WhatsApp para la API de créditos (public/owner-credit-bot.php).
   'owner_credit_bot_secret' => $env('OWNER_CREDIT_BOT_SECRET', ''),

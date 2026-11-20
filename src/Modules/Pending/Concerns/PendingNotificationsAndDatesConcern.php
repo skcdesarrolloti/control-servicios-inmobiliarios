@@ -139,10 +139,16 @@ trait PendingNotificationsAndDatesConcern
         if (count($primaryEmails) > 1) $jobCopies = [];
       } else {
         // Enlace firmado del caso según quién recibe: funcionarios y copias, el de funcionario; el cliente, su consulta pública.
+        // La retención es una tarea del panel comercial: los funcionarios la abren allá y el cliente ve su vista pública.
         $jobTargets = (array) ($job['targets'] ?? []);
-        $jobRole = array_intersect(['empleado', 'admin'], $jobTargets) !== [] ? 'empleado' : (string) ($jobTargets[0] ?? 'empleado');
+        $jobInternal = array_intersect(['empleado', 'admin'], $jobTargets) !== [];
+        $jobRole = $jobInternal ? 'empleado' : (string) ($jobTargets[0] ?? 'empleado');
+        $jobUrl = $isRetention
+          ? ($jobInternal ? \SCM\Support\CommercialTaskLink::openUrl($ticketId) : \SCM\Support\CommercialTaskLink::publicUrl($ticketId))
+          : \SCM\Support\CaseReplyNotifications::emailCaseUrl($ticketId, $jobRole);
         $html = EmailTemplate::render($subject, $extraContent, [
-          'ticket_url' => \SCM\Support\CaseReplyNotifications::emailCaseUrl($ticketId, $jobRole),
+          'ticket_url' => $jobUrl,
+          'ticket_label' => $isRetention ? 'Ver tarea' : 'Ver caso',
           'buttons' => $pdfButtons,
         ]);
       }
