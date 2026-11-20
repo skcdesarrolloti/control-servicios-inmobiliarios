@@ -4356,6 +4356,10 @@ trait HandlesTicketWorkflowActions
       if ($logicalTicket === '') {
         $logicalTicket = $ticketLookup;
       }
+      // Plantillas compartidas con el panel comercial: la referencia va con su nombre en una variable y el botón
+      // (https://sucasainmobiliaria.com.co/{{1}}) lleva la ruta del caso en este panel (SharedButtonUrl).
+      $casePk = (int) ($ticket['_ID'] ?? (ctype_digit($ticketLookup) ? $ticketLookup : 0));
+      $caseReference = 'Caso #' . $logicalTicket;
       $category = trim(strip_tags((string) ($appointment['categoria'] ?? '')));
       if ($category === '') {
         $category = trim((string) ($ticket['tipo_pqrs'] ?? $ticket['tema_ayuda'] ?? $ticket['asunto'] ?? 'cita'));
@@ -4398,7 +4402,7 @@ trait HandlesTicketWorkflowActions
                 'parameters' => [
                   ['type' => 'text', 'text' => $employeeName],
                   ['type' => 'text', 'text' => $category],
-                  ['type' => 'text', 'text' => $logicalTicket],
+                  ['type' => 'text', 'text' => $caseReference],
                   ['type' => 'text', 'text' => $dateLabel],
                   ['type' => 'text', 'text' => $timeLabel],
                   ['type' => 'text', 'text' => $location !== '' ? $location : '-'],
@@ -4409,7 +4413,8 @@ trait HandlesTicketWorkflowActions
                 'sub_type' => 'url',
                 'index' => '0',
                 'parameters' => [
-                  ['type' => 'text', 'text' => $logicalTicket],
+                  // El funcionario entra con su enlace individual y abre el caso en el panel.
+                  ['type' => 'text', 'text' => \SCM\Support\SharedButtonUrl::caseSuffix($casePk, $employeeId)],
                 ],
               ],
             ],
@@ -4452,7 +4457,7 @@ trait HandlesTicketWorkflowActions
               'parameters' => [
                 ['type' => 'text', 'text' => $requesterName !== '' ? $requesterName : 'Cliente'],
                 ['type' => 'text', 'text' => $category],
-                ['type' => 'text', 'text' => $logicalTicket],
+                ['type' => 'text', 'text' => $caseReference],
                 ['type' => 'text', 'text' => $dateLabel],
                 ['type' => 'text', 'text' => $timeLabel],
                 ['type' => 'text', 'text' => $location !== '' ? $location : '-'],
@@ -4464,7 +4469,8 @@ trait HandlesTicketWorkflowActions
               'sub_type' => 'url',
               'index' => '0',
               'parameters' => [
-                ['type' => 'text', 'text' => $logicalTicket],
+                // El cliente abre la consulta pública del caso con la audiencia de su contacto.
+                ['type' => 'text', 'text' => \SCM\Support\SharedButtonUrl::caseSuffix($casePk, '', (string) ($requester['audience'] ?? 'publico'))],
               ],
             ],
           ],
@@ -6936,23 +6942,26 @@ trait HandlesTicketWorkflowActions
     ];
   }
 
-  /** @param array<string,mixed> $ticket @return array{name:string,phone:string} */
+  /** @param array<string,mixed> $ticket @return array{name:string,phone:string,audience:string} audience: la del enlace público del caso. */
   private function calendarCitaRequesterContact(array $ticket): array
   {
     $creator = strtolower(trim((string) ($ticket['creador_por'] ?? $ticket['creado_por'] ?? '')));
     $name = trim((string) ($ticket['solicitante'] ?? ''));
     $phone = trim((string) ($ticket['celular_solicitante'] ?? ''));
+    $audience = 'publico';
 
     if ($phone === '' && strpos($creator, 'propiet') !== false) {
       $phone = trim((string) ($ticket['celular_propietario'] ?? ''));
       $name = trim((string) ($ticket['propietario'] ?? $name));
+      $audience = 'propietario';
     }
     if ($phone === '' && strpos($creator, 'arrend') !== false) {
       $phone = trim((string) ($ticket['celular_arrendatario'] ?? ''));
       $name = trim((string) ($ticket['arrendatario'] ?? $name));
+      $audience = 'arrendatario';
     }
 
-    return ['name' => $name !== '' ? $name : 'Cliente', 'phone' => $phone];
+    return ['name' => $name !== '' ? $name : 'Cliente', 'phone' => $phone, 'audience' => $audience];
   }
 
   /** @param array{name:string,phone:string} $creator */

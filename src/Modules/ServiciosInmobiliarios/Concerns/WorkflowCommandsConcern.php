@@ -1445,7 +1445,7 @@ trait WorkflowCommandsConcern
         $destinationName = $newEmpNombre !== '' ? $newEmpNombre : 'Funcionario';
         $previousName = $oldEmpNombre !== '' ? $oldEmpNombre : 'Sin asignar';
         $message = "Hola {$destinationName}.\n\n";
-        $message .= "La solicitud #{$logicalTicket} fue trasladada a tu gestión.\n\n";
+        $message .= "Se trasladó a tu gestión: Caso #{$logicalTicket}.\n\n";
         $message .= "*Tipo:* {$tipo}\n";
         $message .= "*Responsable anterior:* {$previousName}\n\n";
         $message .= "Consulta los detalles en el botón.";
@@ -1467,17 +1467,19 @@ trait WorkflowCommandsConcern
               'type' => 'body',
               'parameters' => [
                 ['type' => 'text', 'text' => $destinationName],
-                ['type' => 'text', 'text' => $logicalTicket],
+                ['type' => 'text', 'text' => 'Caso #' . $logicalTicket],
                 ['type' => 'text', 'text' => $tipo],
                 ['type' => 'text', 'text' => $previousName],
               ],
             ],
             [
+              // Plantilla compartida con el panel comercial: botón https://sucasainmobiliaria.com.co/{{1}} con el enlace
+              // individual del nuevo responsable (inicia su sesión y abre el caso).
               'type' => 'button',
               'sub_type' => 'url',
               'index' => '0',
               'parameters' => [
-                ['type' => 'text', 'text' => $logicalTicket],
+                ['type' => 'text', 'text' => \SCM\Support\SharedButtonUrl::caseSuffix((int) ($ticket['_ID'] ?? 0), $newEmpId)],
               ],
             ],
           ],

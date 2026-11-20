@@ -276,17 +276,19 @@ trait HandlesPublicPqrActions
             'type' => 'body',
             'parameters' => [
               ['type' => 'text', 'text' => $displayName],
-              ['type' => 'text', 'text' => $logicalTicket],
+              ['type' => 'text', 'text' => 'Caso #' . $logicalTicket],
               ['type' => 'text', 'text' => $tipoPqrs],
               ['type' => 'text', 'text' => $oldEmployeeName !== '' ? $oldEmployeeName : 'Sin asignar'],
             ],
           ],
           [
+            // Plantilla compartida con el panel comercial: botón https://sucasainmobiliaria.com.co/{{1}} con el enlace
+            // individual del funcionario (inicia su sesión y abre el caso).
             'type' => 'button',
             'sub_type' => 'url',
             'index' => '0',
             'parameters' => [
-              ['type' => 'text', 'text' => $logicalTicket],
+              ['type' => 'text', 'text' => \SCM\Support\SharedButtonUrl::caseSuffix((int) ($ticket['_ID'] ?? 0), $employeeId)],
             ],
           ],
         ],
