@@ -155,14 +155,14 @@ el listado antes de responder. Cancelar el popup no cambia el contrato.
 La retención se crea aquí pero es una tarea del panel comercial (`estado_comercial = Nuevo`, tema `Retencion de contrato`) y se gestiona en `dashboard-comercial`. Sus avisos llevan los enlaces de ese panel (`SCM\Support\CommercialTaskLink`), nunca la página de tickets anterior:
 
 - WhatsApp `scm_retencion_contrato_funcionario`: enlace individual del consultor/a, que inicia su sesión en el panel comercial y abre la tarea.
-- WhatsApp `scm_retencion_contrato_solicitante`: vista pública de la tarea (`tarea.php`), donde el cliente ve el historial y responde.
+- WhatsApp al cliente con `scm_tarea_comercial_registrada_v1` (Utilidad, del panel comercial): vista pública de la tarea (`tarea.php`), donde el cliente ve el historial y responde.
 - Correo de creación: a funcionarios y copias, la tarea en el panel comercial (sin inicio de sesión); al cliente, su vista pública. Botón **Ver tarea**.
 
-Los botones de las dos plantillas tienen como URL fija `https://sucasainmobiliaria.com.co/{{1}}` y el panel completa la ruta. Los enlaces se firman con `COMMERCIAL_APP_SECRET` o, si no se configura, con `APP_SECRET`: los dos paneles deben tener el mismo. La dirección del panel comercial es `COMMERCIAL_URL` (por defecto `https://sucasainmobiliaria.com.co/dashboard-comercial/public`). Verificación: `php tests/shared-whatsapp-templates-check.php`.
+El botón de `scm_retencion_contrato_funcionario` tiene como URL fija `https://sucasainmobiliaria.com.co/{{1}}` y el panel completa la ruta. Los enlaces se firman con `COMMERCIAL_APP_SECRET` o, si no se configura, con `APP_SECRET`: los dos paneles deben tener el mismo. La dirección del panel comercial es `COMMERCIAL_URL` (por defecto `https://sucasainmobiliaria.com.co/dashboard-comercial/public`). Verificación: `php tests/shared-whatsapp-templates-check.php`.
 
-### Plantillas de retención (editar en Meta)
+### Plantilla de retención del consultor/a (editar en Meta)
 
-Se editan con el mismo nombre y las mismas 3 variables. Categoría Utilidad, Spanish (COL), pie `SKC SuCasa Inmobiliaria`, botón **Ir al sitio web** con URL **Dinámica** `https://sucasainmobiliaria.com.co/{{1}}` (ya está así) y sin marcar el seguimiento de enlaces de Meta.
+Se edita con el mismo nombre y las mismas 3 variables. Categoría Utilidad, Spanish (COL), pie `SKC SuCasa Inmobiliaria`, botón **Ir al sitio web** con URL **Dinámica** `https://sucasainmobiliaria.com.co/{{1}}` (ya está así) y sin marcar el seguimiento de enlaces de Meta.
 
 `scm_retencion_contrato_funcionario`:
 
@@ -180,18 +180,4 @@ Gestiona la tarea desde el botón.
 
 Ejemplos: `{{1}}` Royner Guardo · `{{2}}` 10523 · `{{3}}` Contrato 280, inmueble 10523. Gestionar retención o búsqueda comercial. Botón `Ver tarea`, URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=10523.1893456000.101.ejemplo`.
 
-`scm_retencion_contrato_solicitante`:
-
-```text
-Hola *{{1}}*,
-
-Creamos la tarea comercial *#{{2}}* para acompañarte en la gestión de tu contrato.
-
-*Resumen:* {{3}}
-
-Desde el botón puedes ver tu tarea y escribirnos.
-
-*Construimos confianza, protegemos su patrimonio.*
-```
-
-Ejemplos: `{{1}}` Laura Gómez · `{{2}}` 10523 · `{{3}}` Contrato 280, inmueble 10523. Botón `Ver tarea`, URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=10523.1893456000.ejemplo`.
+`scm_retencion_contrato_solicitante` ya no se usa: Meta la clasificó como Marketing. Al cliente se le envía `scm_tarea_comercial_registrada_v1`, la plantilla de Utilidad del panel comercial para el cliente de una tarea nueva (encabezado con la ficha del consultor/a o el banner; variables: nombre, número de la tarea, `tu contrato 280 (inmueble 10523)` y el contacto del consultor/a; botón con URL fija `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=` + la referencia firmada). Su especificación está en `control-servicios-comerciales/docs/plantillas-whatsapp-tareas-comerciales.md` (sección 2).

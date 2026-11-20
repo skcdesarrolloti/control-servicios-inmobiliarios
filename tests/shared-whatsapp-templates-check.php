@@ -78,3 +78,10 @@ $retentionCase = ['solicitante' => 'Laura Cliente', 'contrato' => '280', 'inmueb
 $clientMail = SCM\Modules\Contracts\ContractRetentionEmail::clientContent(10523, $retentionCase);
 $check(str_contains($clientMail, 'Su consultor/a asignado es <strong>Daniela Consultora</strong>') && str_contains($clientMail, '#10523'), 'retention client email names the assigned consultant');
 $check(!str_contains($clientMail, 'Canon') && !str_contains($clientMail, 'conservarlo') && !str_contains($clientMail, 'Gestión comercial'), 'retention client email leaves out internal instructions and context');
+
+// El cliente de la retención recibe la plantilla de Utilidad del panel comercial (la de retención quedó como Marketing).
+$workflow = (string) file_get_contents($root . '/src/App/Concerns/HandlesTicketWorkflowActions.php');
+$check(!str_contains($workflow, "'scm_retencion_contrato_solicitante'") && str_contains($workflow, "'template_name' => 'scm_tarea_comercial_registrada_v1'"), 'retention client WhatsApp uses the approved utility template scm_tarea_comercial_registrada_v1');
+if (class_exists(SCM\Support\PublicTaskAccess::class) && (!defined('SCM_COMMERCIAL_SECRET') || SCM_COMMERCIAL_SECRET === '')) {
+  $check(SCM\Support\PublicTaskAccess::verify(SCM\Support\CommercialTaskLink::publicReference(10523)) === 10523, 'retention client button reference opens the commercial public task view');
+}

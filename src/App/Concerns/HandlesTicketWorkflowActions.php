@@ -6032,8 +6032,8 @@ trait HandlesTicketWorkflowActions
     $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: (string) ($input['id_contrato'] ?? '-');
     $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
     $summary = 'Contrato ' . $contract . ', inmueble ' . $property . '. Gestionar retención o búsqueda comercial.';
-    // Al cliente no se le manda la instrucción interna, solo su contrato e inmueble.
-    $clientSummary = 'Contrato ' . $contract . ', inmueble ' . $property . '.';
+    // Al cliente no se le manda la instrucción interna: el motivo de su tarea es su contrato e inmueble.
+    $clientSummary = 'tu contrato ' . $contract . ' (inmueble ' . $property . ')';
     $requesterType = $this->contractRetentionRequesterType($ticket);
     // La retención es una tarea comercial (estado_comercial = Nuevo) que se gestiona en el panel comercial: el cliente abre
     // la vista pública de su tarea y el consultor/a su enlace individual, que inicia la sesión y abre la tarea.
@@ -6051,22 +6051,27 @@ trait HandlesTicketWorkflowActions
         'ticket_url' => $requesterUrl,
         'button_url_mode' => 'dynamic_suffix',
         'dedupe_key' => 'retencion_contrato_solicitante:' . $ticketId,
-        'template_name' => 'scm_retencion_contrato_solicitante',
+        // Plantilla de Utilidad del panel comercial para el cliente de una tarea nueva (scm_retencion_contrato_solicitante
+        // quedó como Marketing en Meta). Encabezado: ficha del consultor/a o, si no tiene, el banner; botón con URL fija
+        // .../dashboard-comercial/public/tarea.php?t= + la referencia firmada de la tarea.
+        'template_name' => 'scm_tarea_comercial_registrada_v1',
         'template_language' => 'es_CO',
         'template_components' => [
+          ['type' => 'header', 'parameters' => [['type' => 'image', 'image' => ['link' => $this->contractRetentionHeaderImage((string) ($input['id_empleado'] ?? ''))]]]],
           [
             'type' => 'body',
             'parameters' => [
               ['type' => 'text', 'text' => $requesterName],
               ['type' => 'text', 'text' => (string) $ticketId],
               ['type' => 'text', 'text' => $clientSummary],
+              ['type' => 'text', 'text' => $this->contractRetentionContactLine($employee)],
             ],
           ],
           [
             'type' => 'button',
             'sub_type' => 'url',
             'index' => '0',
-            'parameters' => [['type' => 'text', 'text' => $this->contractTicketWhatsappButtonSuffix($requesterUrl)]],
+            'parameters' => [['type' => 'text', 'text' => \SCM\Support\CommercialTaskLink::publicReference($ticketId)]],
           ],
         ],
       ]);
@@ -6862,6 +6867,27 @@ trait HandlesTicketWorkflowActions
     $query = isset($parts['query']) ? ('?' . (string) $parts['query']) : '';
     $suffix = ltrim($path . $query, '/');
     return $suffix !== '' ? $suffix : $url;
+  }
+
+  /** Contacto del consultor/a en una sola variable, como en el panel comercial (CommercialCallsNotifier::contactLine). */
+  private function contractRetentionContactLine(array $employee): string
+  {
+    $parts = [trim((string) ($employee['name'] ?? '')) ?: 'Equipo comercial'];
+    if (trim((string) ($employee['email'] ?? '')) !== '') $parts[] = 'Correo: ' . trim((string) $employee['email']);
+    if (trim((string) ($employee['phone'] ?? '')) !== '') $parts[] = 'Celular: ' . trim((string) $employee['phone']);
+    return implode(' · ', $parts);
+  }
+
+  /** Encabezado de la plantilla del cliente: la ficha del consultor/a (columna `ficha`, la misma del panel comercial) o el banner. */
+  private function contractRetentionHeaderImage(string $employeeId): string
+  {
+    $table = $this->db->table('jet_cct_funcionarios');
+    if (trim($employeeId) !== '' && $this->column_exists($table, 'ficha')) {
+      $card = trim((string) $this->db->getVar('SELECT `ficha` FROM `' . $table . '` WHERE `id_empleado` = ? LIMIT 1', [trim($employeeId)]));
+      if ($card !== '') return $card;
+    }
+    $logo = \system_image('portal_logo_url');
+    return \system_image('banner', $logo);
   }
 
   private function contractTicketWhatsappUrl(string $ticketId): string

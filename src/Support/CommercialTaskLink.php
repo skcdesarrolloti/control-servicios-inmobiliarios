@@ -48,9 +48,14 @@ final class CommercialTaskLink
   /** Vista pública de la tarea para el cliente: ve su historial y responde con fotos y PDF. */
   public static function publicUrl(int $id): string
   {
+    return self::base() . '/tarea.php?t=' . self::publicReference($id);
+  }
+
+  /** Solo la referencia firmada: el botón de scm_tarea_comercial_registrada_v1 ya tiene fijo `.../tarea.php?t=`. */
+  public static function publicReference(int $id): string
+  {
     $expires = time() + self::PUBLIC_TTL;
-    $signature = hash_hmac('sha256', 'public_task_v1|' . $id . '|' . $expires, self::secret());
-    return self::base() . '/tarea.php?t=' . $id . '.' . $expires . '.' . $signature;
+    return $id . '.' . $expires . '.' . hash_hmac('sha256', 'public_task_v1|' . $id . '|' . $expires, self::secret());
   }
 
   private static function secret(): string
