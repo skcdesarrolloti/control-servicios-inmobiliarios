@@ -159,3 +159,39 @@ La retención se crea aquí pero es una tarea del panel comercial (`estado_comer
 - Correo de creación: a funcionarios y copias, la tarea en el panel comercial (sin inicio de sesión); al cliente, su vista pública. Botón **Ver tarea**.
 
 Los botones de las dos plantillas tienen como URL fija `https://sucasainmobiliaria.com.co/{{1}}` y el panel completa la ruta. Los enlaces se firman con `COMMERCIAL_APP_SECRET` o, si no se configura, con `APP_SECRET`: los dos paneles deben tener el mismo. La dirección del panel comercial es `COMMERCIAL_URL` (por defecto `https://sucasainmobiliaria.com.co/dashboard-comercial/public`). Verificación: `php tests/shared-whatsapp-templates-check.php`.
+
+### Plantillas de retención (editar en Meta)
+
+Se editan con el mismo nombre y las mismas 3 variables. Categoría Utilidad, Spanish (COL), pie `SKC SuCasa Inmobiliaria`, botón **Ir al sitio web** con URL **Dinámica** `https://sucasainmobiliaria.com.co/{{1}}` (ya está así) y sin marcar el seguimiento de enlaces de Meta.
+
+`scm_retencion_contrato_funcionario`:
+
+```text
+Hola *{{1}}*,
+
+Se te asignó la tarea comercial *#{{2}}* de *Retención de contrato*.
+
+*Resumen:* {{3}}
+
+Gestiona la tarea desde el botón.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Royner Guardo · `{{2}}` 10523 · `{{3}}` Contrato 280, inmueble 10523. Gestionar retención o búsqueda comercial. Botón `Ver tarea`, URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/index.php?tab=abiertos&ticket_id=10523.1893456000.101.ejemplo`.
+
+`scm_retencion_contrato_solicitante`:
+
+```text
+Hola *{{1}}*,
+
+Creamos la tarea comercial *#{{2}}* para acompañarte en la gestión de tu contrato.
+
+*Resumen:* {{3}}
+
+Desde el botón puedes ver tu tarea y escribirnos.
+
+*Construimos confianza, protegemos su patrimonio.*
+```
+
+Ejemplos: `{{1}}` Laura Gómez · `{{2}}` 10523 · `{{3}}` Contrato 280, inmueble 10523. Botón `Ver tarea`, URL de muestra `https://sucasainmobiliaria.com.co/dashboard-comercial/public/tarea.php?t=10523.1893456000.ejemplo`.
