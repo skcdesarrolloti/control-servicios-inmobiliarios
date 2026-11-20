@@ -85,7 +85,7 @@ final class OwnerPreapprovalView
           </section>
 
           <section class="ctl-card">
-            <div class="ctl-card__head"><span class="ctl-step">2</span><div><h2>Ingreso neto por inmueble</h2><p>Simula cada inmueble con las tarifas de SuCasa (comisión sobre canon + administración con IVA, garantía con una aseguradora o con póliza Berkley o Seguros Mundial, y seguro de servicios públicos). Los contratos de un propietario registrado llegan con su canon, la comisión de su mandato y sus coberturas. El seguro se reparte en los 12 meses.</p></div></div>
+            <div class="ctl-card__head"><span class="ctl-step">2</span><div><h2>Ingreso neto por inmueble</h2><p>Simula cada inmueble con las tarifas de SuCasa (comisión sobre canon + administración con IVA, garantía con una aseguradora o con póliza Berkley o Seguros Mundial, y seguro de servicios públicos). Los contratos de un propietario registrado llegan con su canon, la comisión de su mandato y sus coberturas. La póliza se descuenta solo en los meses de sus cuotas (1 pago en el mes 1, 2 cuotas en los meses 1 y 2…) y el ingreso neto mensual es el promedio de 12 meses.</p></div></div>
             <div class="ctl-sources" data-pre-sources>
               <div class="ctl-empty" data-pre-empty><span class="material-symbols-outlined" aria-hidden="true">home_work</span><p>Busca al propietario para cargar sus contratos vigentes, o agrega un inmueble para simularlo.</p></div>
             </div>
@@ -176,6 +176,10 @@ final class OwnerPreapprovalView
             <dl class="ctl-breakdown" data-pre-breakdown></dl>
             <p class="ctl-note ctl-rates" data-pre-source-policy hidden></p>
             <p class="ctl-alert" data-pre-source-warning hidden></p>
+            <details class="ctl-months" data-pre-months hidden open>
+              <summary><span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>Lo que recibe mes a mes</summary>
+              <div data-pre-months-table></div>
+            </details>
           </div>
           <footer class="ctl-source__foot">
             <span>Ingreso neto mensual<small data-pre-source-detail></small></span>

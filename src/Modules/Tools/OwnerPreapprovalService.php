@@ -191,7 +191,8 @@ final class OwnerPreapprovalService
   /**
    * Simulación para el PDF, recalculada aquí con los valores que escribió o ajustó el consultor (no se confía en los
    * totales del navegador). Cada inmueble se simula con las tarifas de SuCasa (`calc` = "sim") o trae los descuentos del
-   * contrato. Ingreso neto = canon − comisión − garantía − (seguro + intereses) / 12 − otros; crédito preaprobado = suma ×
+   * contrato. Ingreso neto = canon − comisión − garantía − (seguro + intereses) / 12 − otros, el promedio de 12 meses: la
+   * póliza se descuenta solo en los meses de sus cuotas (`meses` y `months`, policyInstallments()); crédito preaprobado = suma ×
    * meses de política. Los contratos de un propietario registrado (`contrato`) descuentan como mínimo `no_mandate_deduction`
    * (15 %) del canon: si la simulación da menos (p. ej. sin mandato), la diferencia va como ajuste. Plazo: duración en meses
    * del contrato más largo − margen. Las necesidades del propietario solo
@@ -225,11 +226,13 @@ final class OwnerPreapprovalService
       $item['poliza'] = $services ? 'si' : (!empty($source['poliza_pagada']) ? 'pagada' : 'no');
       $item['duracion'] = is_numeric($source['duracion'] ?? null) ? max(0, min(240, (int) $source['duracion'])) : 0;
       $item['meta'] = $text($source['meta'] ?? '', 160);
-      $item['seguro_mes'] = ($item['seguro'] + $item['intereses']) / 12;
+      $item += self::policyInstallments($item, $item['sim'], $item['poliza'] === 'si' ? (int) ($source['cuotas_pagadas'] ?? 0) : 0);
+      $item['seguro_mes'] = $item['poliza_total'] / 12;
       $deductions = $item['comision'] + $item['garantia'] + $item['seguro_mes'] + $item['otros'];
       $minimum = !empty($source['contrato']) ? round($item['canon'] * $settings['no_mandate_deduction'], 2) : 0.0;
       $item['ajuste'] = max(0.0, round($minimum - $deductions, 2));
       $item['net'] = max(0.0, $item['canon'] - $deductions - $item['ajuste']);
+      $item['meses'] = self::months($item);
       $sources[] = $item;
     }
     if ($sources === []) throw new \InvalidArgumentException('Agrega al menos un inmueble con su canon.');
@@ -243,13 +246,62 @@ final class OwnerPreapprovalService
       $value = min(9999999999.0, round(self::money($requested[$key] ?? 0)));
       if ($value > 0) $uses[$key] = $value;
     }
+    // Lo que recibe el propietario mes a mes con todos sus inmuebles (la póliza solo pesa en los meses de sus cuotas).
+    $months = [];
+    for ($month = 0; $month < 12; $month++) {
+      $months[] = [
+        'canon' => array_sum(array_column($sources, 'canon')),
+        'descuentos' => array_sum(array_map(static fn(array $item): float => $item['meses'][$month]['descuentos'], $sources)),
+        'poliza' => array_sum(array_map(static fn(array $item): float => $item['meses'][$month]['poliza'], $sources)),
+        'neto' => array_sum(array_map(static fn(array $item): float => $item['meses'][$month]['neto'], $sources)),
+      ];
+    }
     return [
-      'owner' => $owner, 'registered' => !empty($input['registered']), 'sources' => $sources,
+      'owner' => $owner, 'registered' => !empty($input['registered']), 'sources' => $sources, 'months' => $months,
       'income_months' => $settings['income_months'], 'term_margin_months' => $settings['term_margin_months'],
       'gross' => array_sum(array_column($sources, 'canon')), 'net' => $net, 'amount' => $net * $settings['income_months'], 'longest_months' => $longest, 'min_deduction' => $settings['no_mandate_deduction'],
       'term' => $longest > 0 ? max(0, $longest - $settings['term_margin_months']) : null,
       'needs' => $needs, 'uses' => $uses, 'notes' => mb_substr(trim(str_replace("\r", '', (string) ($input['notes'] ?? ''))), 0, 600),
     ];
+  }
+
+  /**
+   * Cuotas de la póliza (o seguro) que se descuentan del canon: una por mes desde el mes 1, así que un pago se descuenta
+   * completo en el mes 1, dos cuotas en los meses 1 y 2, etc. De la póliza de un contrato que ya va pagando (`$paid`
+   * cuotas de su mandato) solo cuentan las que le faltan. Sin simulación, el seguro se reparte en 12 cuotas.
+   * @param array<string,mixed> $item
+   * @param array<string,mixed>|null $sim
+   * @return array{cuotas:int,pagadas:int,poliza_cuota:float,poliza_meses:int,poliza_total:float}
+   */
+  public static function policyInstallments(array $item, ?array $sim, int $paid): array
+  {
+    $total = round((float) $item['seguro'] + (float) $item['intereses'], 2);
+    if ($total <= 0) return ['cuotas' => 0, 'pagadas' => 0, 'poliza_cuota' => 0.0, 'poliza_meses' => 0, 'poliza_total' => 0.0];
+    $installments = $sim !== null && (int) $sim['cuotas'] > 0 ? min(12, (int) $sim['cuotas']) : 12;
+    $installment = $sim !== null && (float) $sim['cuota'] > 0 ? (float) $sim['cuota'] : round($total / $installments, 2);
+    $paid = max(0, min($installments - 1, $paid));
+    return [
+      'cuotas' => $installments, 'pagadas' => $paid, 'poliza_cuota' => $installment, 'poliza_meses' => $installments - $paid,
+      'poliza_total' => $paid > 0 ? round($installment * ($installments - $paid), 2) : $total,
+    ];
+  }
+
+  /**
+   * Lo que recibe el propietario en cada uno de los próximos 12 meses por un inmueble: canon − descuentos fijos − la cuota
+   * de la póliza en los meses en que se paga (la última cuota ajusta los centavos). Su promedio es el ingreso neto mensual.
+   * @param array<string,mixed> $item
+   * @return list<array{descuentos:float,poliza:float,neto:float}>
+   */
+  public static function months(array $item): array
+  {
+    $fixed = (float) $item['comision'] + (float) $item['garantia'] + (float) $item['otros'] + (float) ($item['ajuste'] ?? 0);
+    $count = (int) $item['poliza_meses'];
+    $months = [];
+    for ($month = 1; $month <= 12; $month++) {
+      $policy = $month > $count ? 0.0 : ($month === $count ? round((float) $item['poliza_total'] - (float) $item['poliza_cuota'] * ($count - 1), 2) : (float) $item['poliza_cuota']);
+      $months[] = ['descuentos' => $fixed, 'poliza' => $policy, 'neto' => max(0.0, (float) $item['canon'] - $fixed - $policy)];
+    }
+    return $months;
   }
 
   /**

@@ -171,14 +171,66 @@
     var sim = simulate(root, card, item.canon);
     item.sim = sim;
     ["comision", "garantia", "seguro", "intereses", "cuota", "cuotas", "warnings"].forEach(function (key) { item[key] = sim[key]; });
-    item.seguroMes = (item.seguro + item.intereses) / 12;
+    // Cada cuota de la póliza se descuenta en su mes (OwnerPreapprovalService::policyInstallments): 1 pago en el
+    // mes 1, 2 cuotas en los meses 1 y 2… De la póliza del mandato que va pagando solo cuentan las cuotas que le faltan.
+    var total = round2(item.seguro + item.intereses);
+    var paid = item.poliza === "si" && card.dataset.policy === "pendiente" && Number(card.dataset.policyCuotas) === item.cuotas ? Math.max(0, Math.min(item.cuotas - 1, Number(card.dataset.paid) || 0)) : 0;
+    item.pagadas = paid;
+    item.polizaCuota = total > 0 ? (item.cuota > 0 ? item.cuota : round2(total / 12)) : 0;
+    item.polizaMeses = total > 0 ? (item.cuotas > 0 ? Math.min(12, item.cuotas) : 12) - paid : 0;
+    item.polizaTotal = paid > 0 ? round2(item.polizaCuota * item.polizaMeses) : total;
+    item.seguroMes = item.polizaTotal / 12;
     // Los contratos traídos del propietario registrado descuentan como mínimo el 15 % del canon (no_mandate_deduction):
     // sin mandato no hay con qué calcular sus descuentos reales, así que la diferencia va como ajuste.
     var deductions = item.comision + item.garantia + item.seguroMes + item.otros;
     var minimum = item.fromContract ? round2(item.canon * (Number(root.dataset.minDeduction) || 0)) : 0;
     item.ajuste = Math.max(0, round2(minimum - deductions));
     item.net = Math.max(0, item.canon - deductions - item.ajuste);
+    item.months = sourceMonths(item);
     return item;
+  }
+
+  // Lo que recibe en cada uno de los próximos 12 meses (OwnerPreapprovalService::months): la última cuota
+  // ajusta los centavos y el promedio es el ingreso neto mensual.
+  function sourceMonths(item) {
+    var fixed = item.comision + item.garantia + item.otros + item.ajuste;
+    var months = [];
+    for (var month = 1; month <= 12; month++) {
+      var policy = month > item.polizaMeses ? 0 : month === item.polizaMeses ? round2(item.polizaTotal - item.polizaCuota * (item.polizaMeses - 1)) : item.polizaCuota;
+      months.push({ descuentos: fixed, poliza: policy, neto: Math.max(0, item.canon - fixed - policy) });
+    }
+    return months;
+  }
+
+  // "en el mes 1", "en los meses 1 y 2", "en los meses 1 a 6" o "todos los meses".
+  function monthsText(count) {
+    if (count >= 12) return "todos los meses";
+    return count === 1 ? "en el mes 1" : "en los meses 1 " + (count === 2 ? "y 2" : "a " + count);
+  }
+
+  function policyNote(item) {
+    if (item.pagadas > 0) return "Le faltan " + item.polizaMeses + " de " + item.cuotas + " cuotas de " + money(item.polizaCuota) + ": se descuentan " + monthsText(item.polizaMeses);
+    if (item.polizaMeses === 1) return "1 pago: se descuenta completo en el mes 1";
+    return item.polizaMeses + " cuotas de " + money(item.polizaCuota) + (item.intereses > 0 ? " con intereses (total " + money(item.polizaTotal) + ")" : "") + ": se descuentan " + monthsText(item.polizaMeses);
+  }
+
+  // Tabla de lo que recibe mes a mes; los meses con cuota de la póliza van resaltados.
+  function monthsTable(months, net) {
+    var rows = months.map(function (month, index) {
+      return "<tr" + (month.poliza > 0 ? ' class="is-policy"' : "") + "><th scope=\"row\">Mes " + (index + 1) + "</th><td>" + (month.poliza > 0 ? "− " + money(month.poliza) : "—") + "</td><td>" + money(month.neto) + "</td></tr>";
+    }).join("");
+    return "<table><thead><tr><th>Mes</th><th>Cuota de la póliza</th><th>Recibe</th></tr></thead><tbody>" + rows + "</tbody><tfoot><tr><th scope=\"row\">Promedio</th><td></td><td>" + money(net) + "</td></tr></tfoot></table>";
+  }
+
+  // Meses seguidos con el mismo valor: "meses 1 a 2: $X; meses 3 a 12: $Y".
+  function monthRanges(months) {
+    var ranges = [];
+    months.forEach(function (month, index) {
+      var last = ranges[ranges.length - 1];
+      var value = Math.round(month.neto);
+      if (last && last.value === value) last.to = index + 1; else ranges.push({ from: index + 1, to: index + 1, value: value });
+    });
+    return ranges.map(function (range) { return (range.from === range.to ? "mes " + range.from : "meses " + range.from + (range.to === range.from + 1 ? " y " : " a ") + range.to) + ": " + money(range.value); }).join("; ");
   }
 
   function breakdownRow(label, value, note) {
@@ -192,7 +244,7 @@
     if (item.comision > 0) rows += breakdownRow("(−) Comisión de administración", money(item.comision), percent(item.sim.tasa) + " + IVA sobre " + (digits(simField(card, "administracion").value) > 0 ? "canon + administración" : "el canon"));
     if (item.garantia > 0) rows += breakdownRow("(−) Garantía inmobiliaria", money(item.garantia), item.sim.aseguradora);
     if (item.seguro <= 0 || item.poliza !== "si") rows += breakdownRow("(−) Póliza de servicios públicos", money(0), item.poliza === "pagada" ? "Ya se pagó: no se descuenta" : item.poliza === "no" ? "No la tiene" : "");
-    if (item.seguro > 0) rows += breakdownRow((item.poliza === "si" && simField(card, "modalidad").value === "defecto" ? "(−) Póliza de servicios públicos" : "(−) Seguro") + (item.intereses > 0 ? " e intereses" : ""), money(item.seguroMes) + " / mes", "Promedio mensual: " + money(item.seguro + item.intereses) + (item.cuotas > 0 ? " en " + (item.cuotas === 1 ? "1 pago" : item.cuotas + " cuotas de " + money(item.cuota)) + "," : "") + " repartido en 12 meses");
+    if (item.seguro > 0) rows += breakdownRow((item.poliza === "si" && simField(card, "modalidad").value === "defecto" ? "(−) Póliza de servicios públicos" : "(−) Seguro") + (item.intereses > 0 ? " e intereses" : ""), item.polizaMeses === 1 ? money(item.polizaTotal) : money(item.polizaCuota) + " / mes", policyNote(item));
     if (item.otros > 0) rows += breakdownRow("(−) Otros descuentos", money(item.otros));
     if (item.ajuste > 0) rows += breakdownRow("(−) Ajuste al descuento mínimo", money(item.ajuste), "Los contratos descuentan como mínimo el " + percent((Number(root.dataset.minDeduction) || 0) * 100) + " del canon");
     card.querySelector("[data-pre-breakdown]").innerHTML = item.canon > 0 ? rows : "";
@@ -202,11 +254,15 @@
     warning.textContent = warnings.join(" ");
     warning.hidden = !warnings.length;
     card.querySelector("[data-pre-source-net]").textContent = money(item.net);
-    // Con la cuota del seguro en menos de 12 meses, el neto cambia entre los meses con y sin cuota.
-    var base = Math.max(0, item.canon - item.comision - item.garantia - item.otros - item.ajuste);
-    card.querySelector("[data-pre-source-detail]").textContent = item.cuota > 0 && item.cuotas < 12
-      ? "Promedio de 12 meses: " + money(Math.max(0, base - item.cuota)) + " en " + (item.cuotas === 1 ? "el mes" : "los " + item.cuotas + " meses") + " con cuota del seguro y " + money(base) + " en los demás"
-      : item.seguroMes > 0 ? "Seguro" + (item.intereses > 0 ? " e intereses" : "") + ": " + money(item.seguroMes) + " / mes" : "";
+    // Con la póliza en menos de 12 cuotas, el neto cambia entre los meses con y sin cuota: el pie dice que es el promedio
+    // y la tabla muestra lo que recibe cada mes.
+    var varies = item.canon > 0 && item.polizaMeses > 0 && item.polizaMeses < 12;
+    card.querySelector("[data-pre-source-detail]").textContent = varies
+      ? "Promedio de 12 meses: " + monthRanges(item.months)
+      : item.polizaMeses >= 12 ? "La cuota de " + money(item.polizaCuota) + " se descuenta todos los meses" : "";
+    var table = card.querySelector("[data-pre-months]");
+    table.hidden = !(item.canon > 0 && item.polizaMeses > 0);
+    table.querySelector("[data-pre-months-table]").innerHTML = table.hidden ? "" : monthsTable(item.months, item.net);
     return item;
   }
 
@@ -228,7 +284,10 @@
     var term = longest > 0 ? Math.max(0, longest - margin) : null;
     var owner = {};
     root.querySelectorAll("[data-pre-owner]").forEach(function (input) { owner[input.dataset.preOwner] = input.value.trim(); });
-    return { months: months, margin: margin, sources: sources, gross: gross, net: net, amount: net * months, longest: longest, term: term, owner: owner, registered: root.dataset.mode !== "manual", needs: root.dataset.needs === "si", uses: useValues(root), notes: root.querySelector("[data-pre-notes]").value.trim() };
+    // Lo que recibe mes a mes con todos sus inmuebles.
+    var monthly = [];
+    for (var index = 0; index < 12; index++) monthly.push({ neto: sources.reduce(function (sum, item) { return sum + item.months[index].neto; }, 0), poliza: sources.reduce(function (sum, item) { return sum + item.months[index].poliza; }, 0) });
+    return { monthly: monthly, months: months, margin: margin, sources: sources, gross: gross, net: net, amount: net * months, longest: longest, term: term, owner: owner, registered: root.dataset.mode !== "manual", needs: root.dataset.needs === "si", uses: useValues(root), notes: root.querySelector("[data-pre-notes]").value.trim() };
   }
 
   function recalc(root) {
@@ -292,6 +351,8 @@
     var policy = data.contrato && !pending ? data.servicios : null;
     simField(card, "servicios").checked = !!policy && policy.estado !== "pagada";
     card.dataset.policy = policy ? policy.estado : "";
+    card.dataset.paid = policy ? String(Number(policy.pagadas) || 0) : "";
+    card.dataset.policyCuotas = policy ? String(policy.cuotas) : "";
     if (policy) {
       if (Number(policy.valor) > 0) simField(card, "valor").value = money(policy.valor);
       simField(card, "cuotas").value = String(policy.cuotas);
@@ -412,6 +473,9 @@
       lines.push("- Inmueble " + (index + 1) + (item.fromContract && item.meta ? " (" + item.meta + ")" : "") + ": canon " + money(item.canon) + " → neto " + money(item.net) + " / mes (" + (item.sim.modalidad === MODALITIES.defecto ? item.sim.aseguradora : "póliza " + item.sim.modalidad) + ")");
     });
     lines.push("", "Ingreso neto mensual: " + money(state.net));
+    // Con la póliza en cuotas, el neto no es igual todos los meses: se dice cuánto recibe en cada tramo.
+    var policyMonths = state.monthly.filter(function (month) { return month.poliza > 0; }).length;
+    if (policyMonths > 0 && policyMonths < 12) lines.push("Es el promedio de 12 meses, porque la póliza de servicios públicos se descuenta solo en los meses de sus cuotas. Recibirías " + monthRanges(state.monthly) + ".");
     lines.push("Con este ingreso cuentas con un crédito preaprobado de hasta " + money(state.amount) + " para ponerte al día con servicios públicos, cuotas de administración, reparaciones o libre inversión" + (state.term > 0 ? ", hasta en " + state.term + " cuotas." : "."));
     var uses = Object.keys(state.uses);
     if (uses.length) {
@@ -486,7 +550,7 @@
           return {
             calc: "sim", contrato: item.fromContract, canon: item.canon, otros: item.otros, duracion: item.duracion, meta: item.fromContract ? item.meta : "",
             administracion: digits(simField(card, "administracion").value), tasa_comision: simField(card, "tasa").value, modalidad: simField(card, "modalidad").value, aseguradora: simField(card, "aseguradora").value,
-            iva_canon: simField(card, "iva").checked, garantia: simField(card, "garantia").checked, servicios: simField(card, "servicios").checked, poliza_pagada: item.poliza === "pagada", valor_asegurado: digits(simField(card, "valor").value), cuotas: Number(simField(card, "cuotas").value) || 1,
+            iva_canon: simField(card, "iva").checked, garantia: simField(card, "garantia").checked, servicios: simField(card, "servicios").checked, poliza_pagada: item.poliza === "pagada", valor_asegurado: digits(simField(card, "valor").value), cuotas: Number(simField(card, "cuotas").value) || 1, cuotas_pagadas: item.pagadas,
           };
         }),
       }));

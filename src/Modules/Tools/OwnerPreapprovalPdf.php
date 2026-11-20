@@ -61,6 +61,15 @@ final class OwnerPreapprovalPdf
     return '<tr' . ($class !== '' ? ' class="' . $class . '"' : '') . '><th scope="row">' . self::e($label) . ($note !== '' ? '<small>' . self::e($note) . '</small>' : '') . '</th><td class="is-unit">' . self::e($unit) . '</td><td class="is-money">' . self::e(self::money($value)) . '</td></tr>';
   }
 
+  /** Meses en que se descuenta la póliza: "en el mes 1", "en los meses 1 y 2", "en los meses 1 a 6", "todos los meses". */
+  private static function monthsText(int $count, bool $unit = false): string
+  {
+    if ($count <= 0) return $unit ? '12 meses' : '';
+    if ($count >= 12) return $unit ? 'Meses 1 a 12' : 'todos los meses';
+    if ($count === 1) return $unit ? 'Mes 1' : 'en el mes 1';
+    return ($unit ? 'Meses 1 ' : 'en los meses 1 ') . ($count === 2 ? 'y 2' : 'a ' . $count);
+  }
+
   /**
    * @param array<string,mixed> $estimate
    * @param array{name?:string,cargo?:string,phone?:string,email?:string} $signer quien firma: nombre, cargo, celular y correo
@@ -91,7 +100,8 @@ final class OwnerPreapprovalPdf
     $income = '';
     foreach ($estimate['sources'] as $index => $item) {
       $sim = is_array($item['sim'] ?? null) ? $item['sim'] : null;
-      $installmentsNote = $sim !== null && $sim['cuotas'] > 0 ? ($sim['cuotas'] === 1 ? 'Se paga en 1 pago' : 'Se paga en ' . $sim['cuotas'] . ' cuotas de ' . self::money((float) $sim['cuota'])) . '. ' : '';
+      $policyMonths = (int) ($item['poliza_meses'] ?? 0);
+      $monthsUnit = self::monthsText($policyMonths, true);
       // Solo los descuentos que tiene el inmueble: las filas en $0 alargan el documento sin informar nada.
       $rows = self::row('Canon mensual', 'Mensual (mes)', (float) $item['canon']);
       if ($sim !== null && $sim['administracion'] > 0) $rows .= self::row('Administración', 'Mensual (mes)', (float) $sim['administracion'], 'Informativa: la inmobiliaria la paga a la copropiedad; no se descuenta del canon, pero hace parte de la base de la comisión y de la garantía.', 'is-info');
@@ -99,20 +109,40 @@ final class OwnerPreapprovalPdf
       if ($item['garantia'] > 0) $rows .= self::row('(−) Garantía inmobiliaria', 'Mensual (mes)', (float) $item['garantia'], $sim !== null ? (string) ($sim['detail']['Garantía inmobiliaria'] ?? $sim['detail']['Póliza Berkley'] ?? $sim['detail']['Póliza Seguros Mundial'] ?? '') : '');
       // La póliza de servicios públicos siempre sale: en $0 si ya se pagó o si el inmueble no la tiene (con el aviso).
       $policy = (string) ($item['poliza'] ?? 'si');
-      if ($item['seguro'] > 0) $rows .= self::row($sim !== null && $sim['modalidad'] !== OwnerNetIncomeSimulator::MODALITIES['defecto'] ? '(−) Póliza ' . $sim['modalidad'] : '(−) Póliza de servicios públicos', '12 meses', (float) $item['seguro'], $installmentsNote . 'Permanece mientras la vigencia del contrato continúa. Se descuentan ' . self::money($item['seguro'] / 12) . ' por mes en promedio.');
+      // Cada cuota se descuenta en su mes: 1 pago en el mes 1, 2 cuotas en los meses 1 y 2… (tabla mes a mes).
+      $paid = (int) ($item['pagadas'] ?? 0);
+      $policyLabel = $sim !== null && $sim['modalidad'] !== OwnerNetIncomeSimulator::MODALITIES['defecto'] ? '(−) Póliza ' . $sim['modalidad'] : '(−) Póliza de servicios públicos';
+      if ($item['seguro'] > 0) {
+        $rows .= $paid > 0
+          ? self::row($policyLabel, $monthsUnit, (float) $item['poliza_total'], 'Le faltan ' . $policyMonths . ' de ' . (int) $item['cuotas'] . ' cuotas de ' . self::money((float) $item['poliza_cuota']) . ': se descuentan ' . self::monthsText($policyMonths) . '.')
+          : self::row($policyLabel, $monthsUnit, (float) $item['seguro'], ($policyMonths === 1 ? 'Se paga en 1 pago: se descuenta completo ' : 'Se paga en ' . $policyMonths . ' cuotas de ' . self::money((float) $item['poliza_cuota']) . ($item['intereses'] > 0 ? ' con intereses' : '') . ': se descuentan ') . self::monthsText($policyMonths) . '. Permanece mientras la vigencia del contrato continúa.');
+      }
       if ($item['seguro'] <= 0 || $policy !== 'si') {
         $rows .= $policy === 'no'
           ? self::row('(−) Póliza de servicios públicos', '12 meses', 0.0, OwnerPreapprovalService::NO_SERVICES_POLICY, 'is-warning')
           : self::row('(−) Póliza de servicios públicos', '12 meses', 0.0, $policy === 'pagada' ? 'Ya se pagó: no se descuenta.' : '');
       }
-      if ($item['intereses'] > 0) $rows .= self::row('(−) Intereses', '12 meses', (float) $item['intereses'], 'Aplica si el seguro se difiere en cuotas. Se descuentan ' . self::money($item['intereses'] / 12) . ' por mes.');
+      if ($item['intereses'] > 0 && $paid === 0) $rows .= self::row('(−) Intereses', $monthsUnit, (float) $item['intereses'], 'Aplica porque el seguro se difiere en cuotas: van dentro de cada cuota.');
       // El ajuste al descuento mínimo no se le muestra al propietario: va dentro de otros descuentos para que cuadre el neto.
       $others = (float) $item['otros'] + (float) ($item['ajuste'] ?? 0);
       if ($others > 0) $rows .= self::row('(−) Otros descuentos', 'Mensual (mes)', $others);
-      $rows .= self::row('Ingreso neto mensual', 'Mensual (mes)', (float) $item['net'], $item['duracion'] > 0 ? 'Duración del contrato: ' . $item['duracion'] . ' meses' : '', 'is-total');
+      $netNote = array_filter([$item['duracion'] > 0 ? 'Duración del contrato: ' . $item['duracion'] . ' meses' : '', $policyMonths > 0 && $policyMonths < 12 ? 'Promedio de 12 meses: ver lo que recibe mes a mes' : '']);
+      $rows .= self::row('Ingreso neto mensual', 'Mensual (mes)', (float) $item['net'], implode(' · ', $netNote), 'is-total');
       $title = $item['meta'] !== '' ? $item['meta'] : ($sim === null ? '' : ($sim['modalidad'] === OwnerNetIncomeSimulator::MODALITIES['defecto'] ? 'Simulación con ' . $sim['aseguradora'] : 'Simulación con póliza ' . $sim['modalidad']));
       $income .= '<div class="scm-preapproval-property"><h3>Inmueble ' . ($index + 1) . ($title !== '' ? ' <span>' . self::e($title) . '</span>' : '') . '</h3>'
         . '<table class="scm-preapproval-income"><thead><tr><th>Concepto</th><th>Frecuencia</th><th>Valor</th></tr></thead><tbody>' . $rows . '</tbody></table></div>';
+    }
+
+    // Lo que recibe mes a mes (todos los inmuebles): solo si alguna póliza se descuenta por cuotas.
+    $months = is_array($estimate['months'] ?? null) ? $estimate['months'] : [];
+    if (array_sum(array_column($months, 'poliza')) > 0) {
+      $monthRows = '';
+      foreach ($months as $index => $month) {
+        $monthRows .= '<tr' . ($month['poliza'] > 0 ? ' class="is-policy"' : '') . '><th scope="row">Mes ' . ($index + 1) . '</th><td class="is-money">' . self::e(self::money((float) $month['canon'])) . '</td><td class="is-money">' . self::e(self::money((float) $month['descuentos'])) . '</td><td class="is-money">' . self::e($month['poliza'] > 0 ? self::money((float) $month['poliza']) : '—') . '</td><td class="is-money">' . self::e(self::money((float) $month['neto'])) . '</td></tr>';
+      }
+      $monthRows .= '<tr class="is-total"><th scope="row">Promedio mensual</th><td></td><td></td><td></td><td class="is-money">' . self::e(self::money((float) $estimate['net'])) . '</td></tr>';
+      $income .= '<div class="scm-preapproval-property"><h3>Lo que recibe mes a mes' . (count($estimate['sources']) > 1 ? ' <span>Todos los inmuebles</span>' : '') . '</h3>'
+        . '<table class="scm-preapproval-income scm-preapproval-months"><thead><tr><th>Mes</th><th>Canon</th><th>Descuentos</th><th>Cuota de la póliza</th><th>Recibe</th></tr></thead><tbody>' . $monthRows . '</tbody></table></div>';
     }
 
     $calc = self::row('Ingreso neto mensual total (' . count($estimate['sources']) . (count($estimate['sources']) === 1 ? ' inmueble)' : ' inmuebles)'), 'Mensual (mes)', (float) $estimate['net'])
@@ -147,7 +177,7 @@ final class OwnerPreapprovalPdf
         'Nombre' => $owner['name'], 'Cédula o NIT' => $owner['document'], 'Celular' => $owner['phone'], 'Correo' => $owner['email'],
         'Vínculo con SuCasa' => $estimate['registered'] ? 'Propietario registrado (contratos vigentes)' : 'Propietario aún no registrado (simulación con las tarifas de SuCasa)',
       ], static fn(string $value): bool => $value !== '')) . '</section>'
-      . '<section class="scm-acta-receipt-section"><h2>2. Ingreso neto por inmueble</h2><p class="scm-preapproval-lead">Los valores son mensuales, salvo el seguro, que se registra por sus 12 meses y se descuenta mes a mes.</p>' . $income . '</section>'
+      . '<section class="scm-acta-receipt-section"><h2>2. Ingreso neto por inmueble</h2><p class="scm-preapproval-lead">Los valores son mensuales, salvo la póliza, que se descuenta solo en los meses de sus cuotas. El ingreso neto mensual es el promedio de los próximos 12 meses.</p>' . $income . '</section>'
       . '<section class="scm-acta-receipt-section scm-preapproval-keep"><h2>3. Crédito preaprobado</h2><table class="scm-preapproval-income"><tbody>' . $calc . '</tbody></table></section>'
       . $usesSection . $conditions . $notes
       . '<p class="scm-preapproval-disclaimer"><strong>Importante:</strong> ' . self::e(OwnerPreapprovalView::DISCLAIMER) . '</p>'

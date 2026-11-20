@@ -185,6 +185,20 @@
 .ctl-breakdown dt { color:#334155 }
 .ctl-breakdown dt small { display:block; margin-top:2px; font-size:11.5px; color:var(--ctl-muted) }
 .ctl-breakdown dd { margin:0; font-weight:700; color:var(--ctl-navy); white-space:nowrap }
+/* Lo que recibe mes a mes: los meses con cuota de la póliza van resaltados. */
+.ctl-months { border:1px solid var(--ctl-line); border-radius:14px; background:#fff; overflow:hidden }
+.ctl-months[hidden] { display:none }
+.ctl-months summary { display:flex; align-items:center; gap:8px; padding:10px 14px; cursor:pointer; font-size:13px; font-weight:700; color:var(--ctl-navy); background:var(--ctl-sky) }
+.ctl-months summary .material-symbols-outlined { font-size:18px; color:var(--ctl-blue) }
+.ctl-months table { width:100%; border-collapse:collapse; font-size:12.5px }
+.ctl-months th, .ctl-months td { padding:6px 14px; border-bottom:1px solid #eef2f6; text-align:right; white-space:nowrap }
+.ctl-months th:first-child { text-align:left }
+.ctl-months thead th { font-size:11px; font-weight:700; color:var(--ctl-muted); text-transform:uppercase; letter-spacing:.04em }
+.ctl-months tbody th { font-weight:600; color:#334155 }
+.ctl-months tbody td:last-child { font-weight:700; color:var(--ctl-navy) }
+.ctl-months tr.is-policy th, .ctl-months tr.is-policy td { background:#fff7e6 }
+.ctl-months tr.is-policy td:nth-child(2) { color:#b45309; font-weight:600 }
+.ctl-months tfoot th, .ctl-months tfoot td { border-bottom:0; font-weight:700; color:var(--ctl-navy); background:#fbfcfe }
 .ctl-source__foot {
   display:flex;
   align-items:center;

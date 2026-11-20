@@ -45,6 +45,12 @@ try {
 $expectedNet = 2000000 - 261800 - 55000 - 30000 / 12;
 $check(is_array($estimate) && abs($estimate['net'] - $expectedNet) < 0.01 && abs($estimate['amount'] - $expectedNet * $estimate['income_months']) < 0.01, 'net income = canon − commission − guarantee − insurance / 12, credit = net × policy months');
 $check($estimate['term'] === 12 - $estimate['term_margin_months'], 'the term is the contract duration minus the margin');
+// La póliza en 1 pago se descuenta completa en el mes 1; los demás meses reciben el neto sin póliza y el promedio es el neto.
+$months = array_column($estimate['months'], 'neto');
+$check(abs($months[0] - (2000000 - 261800 - 55000 - 30000)) < 0.01 && abs($months[1] - (2000000 - 261800 - 55000)) < 0.01 && abs(array_sum($months) / 12 - $expectedNet) < 0.01, 'the policy is discounted only in the month of its single payment');
+$pending = $service->estimate(['owner' => ['name' => 'Ana', 'document' => '111', 'phone' => '3000000000', 'email' => 'ana@example.invalid'],
+  'sources' => [['calc' => 'sim', 'canon' => 2000000, 'modalidad' => 'defecto', 'aseguradora' => 'El Libertador', 'servicios' => true, 'valor_asegurado' => 3000000, 'cuotas' => 3, 'cuotas_pagadas' => 1]]]);
+$check($pending['sources'][0]['poliza_meses'] === 2 && $pending['sources'][0]['poliza_total'] === 20000.0 && $pending['months'][1]['poliza'] === 10000.0 && $pending['months'][2]['poliza'] === 0.0, 'a mandate policy already being paid only discounts the installments left');
 
 $failed = '';
 try {
@@ -56,5 +62,6 @@ $check(str_contains($failed, 'correo'), 'an invalid owner email is rejected');
 
 $html = OwnerPreapprovalPdf::html($estimate, ['name' => 'Royner Guardo', 'cargo' => 'Asistente de Desarrollo TI']);
 $check(str_contains($html, 'Crédito preaprobado estimado') && str_contains($html, 'SKC SuCasa Inmobiliaria') && str_contains($html, 'Royner Guardo'), 'the PDF names the credit, the company and who signs');
+$check(str_contains($html, 'Se paga en 1 pago: se descuenta completo en el mes 1.') && str_contains($html, 'Lo que recibe mes a mes</h3>') && substr_count($html, '<tr class="is-policy">') === 1 && str_contains(OwnerPreapprovalPdf::html($pending, []), 'Le faltan 2 de 3 cuotas de $10.000: se descuentan en los meses 1 y 2.'), 'the PDF shows the policy months and what the owner receives month by month');
 
 echo "Owner preapproval checks passed.\n";
