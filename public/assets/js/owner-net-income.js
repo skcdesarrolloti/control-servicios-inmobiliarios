@@ -188,7 +188,7 @@
     var item = {
       canon: value("canon"), otros: value("otros"),
       duracion: Number(card.querySelector('[data-pre-field="duracion"]').value) || 0,
-      meta: card.querySelector("[data-pre-source-meta]").textContent, fromContract: card.dataset.contract === "1",
+      meta: card.querySelector("[data-pre-source-meta]").textContent, fromContract: card.dataset.contract === "1", registered: card.dataset.registered === "1",
     };
     // Póliza de servicios públicos: se descuenta, ya se pagó (la del mandato) o el inmueble no la tiene.
     item.poliza = simField(card, "servicios").checked ? "si" : card.dataset.policy === "pagada" ? "pagada" : "no";
@@ -402,7 +402,16 @@
       note.textContent = "Contrato por entregar: escribe el canon y la administración para simularlo como un inmueble nuevo, con las tarifas de SuCasa.";
       note.hidden = false;
     }
-    card.querySelector("[data-pre-source-meta]").textContent = data.contrato ? ["Contrato " + data.contrato, data.inmueble ? "SIMI " + data.inmueble : "", data.direccion, data.estado].filter(Boolean).join(" · ") : "Simulación con las tarifas de SuCasa";
+    // Inmueble registrado sin contrato (OwnerPreapprovalService::withRegisteredProperties): llega con su canon y
+    // su administración y se simula con las tarifas de SuCasa, como un inmueble nuevo.
+    card.dataset.registered = data.registrado ? "1" : "";
+    if (data.registrado) {
+      var registered = card.querySelector("[data-pre-source-policy]");
+      registered.textContent = "Inmueble registrado sin contrato ni mandato: se simula con su canon" + (data.administracion_incluida ? " (el precio menos la administración, que viene incluida)" : "") + ", su administración y las tarifas de SuCasa. Revisa los valores y quítalo si no está en arriendo.";
+      registered.hidden = false;
+    }
+    card.querySelector("[data-pre-source-meta]").textContent = data.contrato ? ["Contrato " + data.contrato, data.inmueble ? "SIMI " + data.inmueble : "", data.direccion, data.estado].filter(Boolean).join(" · ")
+      : data.registrado ? ["Inmueble registrado" + (data.inmueble ? " " + data.inmueble : ""), data.direccion, data.estado].filter(Boolean).join(" · ") : "Simulación con las tarifas de SuCasa";
     list.append(card);
     renumber(root);
     return card;
@@ -474,20 +483,31 @@
       credits.hidden = !(result.active_credits > 0);
       credits.textContent = result.active_credits > 0 ? "Tiene " + result.active_credits + (result.active_credits === 1 ? " crédito aprobado vigente" : " créditos aprobados vigentes") + " en el liquidador: el crédito disponible será menor, porque el analista descuenta su saldo." : "";
       var contracts = result.contracts || [];
-      if (!contracts.length || !result.owner) {
+      if (!result.owner) {
         root.querySelector('[data-pre-owner="document"]').value = query;
-        setStatus(root, "No encontramos contratos Entregado o Por entregar de este documento. Si aún no está registrado, usa \"Aún no registrado\" o agrega un inmueble para simularlo.", true);
+        setStatus(root, "No encontramos a este propietario: no tiene contratos Entregado o Por entregar ni está registrado. Usa \"Aún no registrado\" o agrega un inmueble para simularlo.", true);
         recalc(root);
         return;
       }
       ["name", "document", "phone", "email"].forEach(function (key) { root.querySelector('[data-pre-owner="' + key + '"]').value = result.owner[key] || ""; });
+      // Registrado pero sin contratos ni inmuebles en arriendo: se dejan sus datos y un inmueble vacío para simularlo.
+      if (!contracts.length) {
+        addSource(root);
+        setStatus(root, result.owner.name + " está registrado, pero no tiene contratos ni inmuebles con canon. Escribe el canon y la administración para simularlo.");
+        root.querySelector('[data-pre-source] [data-pre-field="canon"]').focus();
+        recalc(root);
+        return;
+      }
       contracts.forEach(function (contract) { addSource(root, contract); });
+      var registeredCount = contracts.filter(function (contract) { return contract.registrado; }).length;
       var pendingCount = contracts.filter(function (contract) { return contract.por_entregar; }).length;
-      var active = contracts.length - pendingCount;
+      var active = contracts.length - pendingCount - registeredCount;
       var parts = [];
       if (active) parts.push(active === 1 ? "1 contrato entregado" : active + " contratos entregados");
       if (pendingCount) parts.push(pendingCount === 1 ? "1 por entregar" : pendingCount + " por entregar");
-      setStatus(root, result.owner.name + " es propietario en " + parts.join(" y ") + (pendingCount ? ". Escribe el canon y la administración de los contratos por entregar." : "."));
+      if (registeredCount) parts.push(registeredCount === 1 ? "1 inmueble registrado sin contrato" : registeredCount + " inmuebles registrados sin contrato");
+      var list = parts.length > 1 ? parts.slice(0, -1).join(", ") + " y " + parts[parts.length - 1] : parts[0];
+      setStatus(root, result.owner.name + " es propietario en " + list + (pendingCount ? ". Escribe el canon y la administración de los contratos por entregar." : "."));
       var firstPending = root.querySelector('[data-pre-source]:not([data-contract="1"]) [data-pre-field="canon"]');
       if (pendingCount && firstPending && !active) firstPending.focus();
       recalc(root);
@@ -503,7 +523,7 @@
   function shareMessage(state) {
     var lines = [state.owner.name ? "Hola " + state.owner.name + "," : "Hola,", "", "Te comparto la simulación de tu ingreso neto con SKC SuCasa Inmobiliaria:"];
     state.sources.forEach(function (item, index) {
-      lines.push("- Inmueble " + (index + 1) + (item.fromContract && item.meta ? " (" + item.meta + ")" : "") + ": canon " + money(item.canon) + " → neto " + money(item.net) + " / mes (" + (item.sim.modalidad === MODALITIES.defecto ? item.sim.aseguradora : "póliza " + item.sim.modalidad) + ")");
+      lines.push("- Inmueble " + (index + 1) + ((item.fromContract || item.registered) && item.meta ? " (" + item.meta + ")" : "") + ": canon " + money(item.canon) + " → neto " + money(item.net) + " / mes (" + (item.sim.modalidad === MODALITIES.defecto ? item.sim.aseguradora : "póliza " + item.sim.modalidad) + ")");
     });
     lines.push("", "Ingreso neto mensual: " + money(state.net));
     // Con la póliza en cuotas, el neto no es igual todos los meses: se dice cuánto recibe en cada tramo.
@@ -581,7 +601,7 @@
         sources: state.sources.map(function (item, index) {
           var card = cards[index];
           return {
-            calc: "sim", contrato: item.fromContract, canon: item.canon, otros: item.otros, duracion: item.duracion, meta: item.fromContract ? item.meta : "",
+            calc: "sim", contrato: item.fromContract, canon: item.canon, otros: item.otros, duracion: item.duracion, meta: item.fromContract || item.registered ? item.meta : "",
             administracion: digits(simField(card, "administracion").value), tasa_comision: simField(card, "tasa").value, modalidad: simField(card, "modalidad").value, aseguradora: simField(card, "aseguradora").value,
             iva_canon: simField(card, "iva").checked, garantia: simField(card, "garantia").checked, servicios: simField(card, "servicios").checked, poliza_pagada: item.poliza === "pagada", valor_asegurado: digits(simField(card, "valor").value), cuotas: Number(simField(card, "cuotas").value) || 1, cuotas_pagadas: item.pagadas,
           };

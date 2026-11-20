@@ -136,8 +136,9 @@ final class OwnerPreapprovalService
     }
     $result = ['owner' => null, 'contracts' => [], 'active_credits' => 0];
     $ownerMatched = false;
-    if ($where === []) return $result;
+    if ($where === []) return $this->withRegisteredProperties($result, $document, []);
     $noMandate = $this->settings()['no_mandate_deduction'];
+    $linked = [];
     // Solo contratos vigentes (Entregado) o por iniciar. Los Por entregar aún no tienen ingreso real: llegan sin canon
     // ni datos del mandato (`por_entregar`) para que el consultor escriba canon y administración y los simule como un
     // inmueble nuevo.
@@ -158,6 +159,7 @@ final class OwnerPreapprovalService
         $owner = $previous;
       }
       foreach (['email', 'phone'] as $key) if ($result['owner'][$key] === '' && ($owner[$key] ?? '') !== '') $result['owner'][$key] = $owner[$key];
+      foreach (['inmueble', 'id_inmueble'] as $key) if (trim((string) ($contract[$key] ?? '')) !== '') $linked[trim((string) $contract[$key])] = true;
       $end = self::timestamp($contract['fin_contrato'] ?? '');
       $pending = mb_strtolower(trim((string) ($contract['estado'] ?? '')), 'UTF-8') === 'por entregar';
       $income = $pending
@@ -171,7 +173,65 @@ final class OwnerPreapprovalService
         'por_entregar' => $pending,
       ] + $income;
     }
+    $result = $this->withRegisteredProperties($result, $document, $linked);
     $result['active_credits'] = $this->activeCredits($document);
+    return $result;
+  }
+
+  /** Estados de inmueble que ya no le dan ingreso al propietario. */
+  private const CLOSED_PROPERTY_STATES = ['vendido', 'desistido', 'vetado'];
+
+  /**
+   * Inmuebles registrados del propietario (`jet_cct_inmuebles.id_propietario` = `jet_cct_propietarios._ID`) que no
+   * tienen un contrato de los encontrados: un propietario puede estar registrado solo con inmuebles en arriendo, sin
+   * mandato ni contrato. Llegan con su canon y su administración (`registrado`) para simularlos con las tarifas de
+   * SuCasa; si la administración está incluida en el precio, el canon es el precio menos la administración. Sin
+   * contratos, los datos del propietario salen de su ficha.
+   * @param array{owner:array<string,string>|null,contracts:list<array<string,mixed>>,active_credits:int} $result
+   * @param array<string,true> $linked código o _ID de los inmuebles de los contratos encontrados
+   * @return array{owner:array<string,string>|null,contracts:list<array<string,mixed>>,active_credits:int}
+   */
+  private function withRegisteredProperties(array $result, string $document, array $linked): array
+  {
+    $owners = $this->db->table('jet_cct_propietarios');
+    $properties = $this->db->table('jet_cct_inmuebles');
+    $documentColumns = array_values(array_filter(['documento', 'documento_juridico'], fn(string $column): bool => $this->hasColumn($owners, $column)));
+    if ($documentColumns === []) return $result;
+    $clean = static fn(string $column): string => "UPPER(REPLACE(REPLACE(`{$column}`, '.', ''), ' ', '')) = ?";
+    $rows = $this->db->getResults("SELECT * FROM `{$owners}` WHERE " . implode(' OR ', array_map($clean, $documentColumns)) . ' LIMIT 20', array_fill(0, count($documentColumns), $document));
+    if ($rows === []) return $result;
+    if ($result['owner'] === null) {
+      $row = $rows[0];
+      $company = trim((string) ($row['nombre_juridico'] ?? '')) !== '' && self::document((string) ($row['documento_juridico'] ?? '')) === $document;
+      $result['owner'] = [
+        'name' => trim((string) ($company ? $row['nombre_juridico'] : ($row['nombre'] ?? ''))),
+        'document' => trim((string) ($company ? $row['documento_juridico'] : ($row['documento'] ?? ''))) ?: $document,
+        'email' => trim((string) ($row['correo'] ?? '')),
+        'phone' => self::phone((string) ($row['celular'] ?? ''), (string) ($row['indicativo'] ?? '')),
+      ];
+    }
+    if (!$this->hasColumn($properties, 'id_propietario') || !$this->hasColumn($properties, 'precio_arriendo')) return $result;
+    $ids = array_values(array_unique(array_filter(array_map(static fn(array $row): string => trim((string) ($row['_ID'] ?? '')), $rows))));
+    if ($ids === []) return $result;
+    // Los inmuebles que ya llegaron con su contrato no se repiten (código o _ID del inmueble en el contrato).
+    $sql = "SELECT * FROM `{$properties}` WHERE TRIM(`id_propietario`) IN (" . implode(',', array_fill(0, count($ids), '?')) . ') ORDER BY `_ID` DESC LIMIT 30';
+    foreach ($this->db->getResults($sql, $ids) as $property) {
+      $code = trim((string) ($property['codigo'] ?? ''));
+      $id = trim((string) ($property['_ID'] ?? ''));
+      $state = trim((string) ($property['estado'] ?? ''));
+      if (($code !== '' && isset($linked[$code])) || ($id !== '' && isset($linked[$id]))) continue;
+      if (in_array(mb_strtolower($state, 'UTF-8'), self::CLOSED_PROPERTY_STATES, true)) continue;
+      $price = self::money($property['precio_arriendo'] ?? '');
+      if ($price <= 0) continue;
+      $admin = self::money($property['precio_administracion'] ?? '');
+      $included = self::isYes($property['administracion_incluida'] ?? '') && $admin > 0 && $admin < $price;
+      $result['contracts'][] = [
+        'id' => 0, 'contrato' => '', 'inmueble' => $code, 'direccion' => trim((string) ($property['direccion'] ?? '')), 'estado' => $state,
+        'fin' => '', 'max_months' => 0, 'por_entregar' => false, 'registrado' => true, 'administracion_incluida' => $included,
+        'canon' => $included ? $price - $admin : $price, 'administracion' => $admin,
+        'comision' => 0.0, 'garantia' => 0.0, 'seguro' => 0.0, 'intereses' => 0.0, 'otros' => 0.0, 'servicios' => null,
+      ];
+    }
     return $result;
   }
 
