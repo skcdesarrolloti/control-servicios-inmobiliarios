@@ -17840,15 +17840,227 @@
 
     function contractResponseFormHtml(row, kind) {
       var meta = [row.contrato ? 'Contrato #' + row.contrato : '', row.inmueble ? 'Inmueble ' + row.inmueble : '', row.direccion || ''].filter(Boolean).join(' · ');
-      return '<form class="scm-contract-response-form" data-scm-contract-' + kind + '-form>' +
+      return '<form class="scm-contract-response-form" data-scm-contract-' + kind + '-form data-step="0" data-max-step="0">' +
         '<div class="rounded-xl bg-[#f2f3ff] p-4 space-y-2"><div class="flex flex-wrap items-center gap-2"><span class="scm-contract-tag !bg-[#dae2ff] font-semibold">' + contractUiIcon('ticket') + escHtml(row.titulo || 'Caso') + '</span><strong>' + escHtml(row.asunto || 'Solicitud contractual') + '</strong></div><p class="!m-0 text-xs">' + escHtml(meta) + '</p></div>' +
-        contractRequestReviewHtml(row) +
+        '<ol class="scm-contract-steps" aria-label="Pasos de la respuesta">' + CONTRACT_RESPONSE_STEPS.map(function (label, index) {
+          return '<li><button type="button" data-contract-step-go="' + index + '"' + (index === 0 ? ' aria-current="step"' : ' disabled') + '><span>' + (index + 1) + '</span>' + escHtml(label) + '</button></li>';
+        }).join('') + '</ol>' +
+        '<div class="scm-contract-step" data-contract-step="0">' + contractRequestReviewHtml(row) + '</div>' +
+        '<div class="scm-contract-step" data-contract-step="1" hidden>' +
         '<div data-contract-response-term>' + contractTerminationTermBadge(row, false) + '</div>' +
         '<div class="grid grid-cols-1 md:grid-cols-2 gap-4"><label class="scm-contract-field"><span>Clasificación de la respuesta <b class="text-red-700">*</b></span><select name="termino" required><option value="">Selecciona clasificación</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label><label class="scm-contract-field"><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || '') + '" readonly aria-readonly="true"></label>' +
         '<label class="scm-contract-field"><span>Fecha fin del contrato <b class="text-red-700">*</b></span><input type="date" name="fin_contrato" required value="' + escHtml(row.fin_contrato || '') + '"><small>El cálculo se actualiza al editar. La fecha se guarda en el contrato al responder.</small></label>' +
         '<input type="hidden" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || '') + '"></div>' +
-        '<label class="scm-contract-field"><span>Observaciones de la respuesta</span><textarea name="observaciones" rows="4" maxlength="4000" placeholder="Responde aquí al contenido de la carta o la descripción de la solicitud (opcional)."></textarea><small>Se agregan al final del acta, al correo de respuesta y quedan en el historial del caso.</small></label>' +
-        contractRetentionTicketBlockHtml(row) + '<section><div class="flex items-center justify-between gap-3 mb-3"><strong class="text-[10px] uppercase tracking-wider">Notificar a</strong><span class="text-[10px]">Correo y WhatsApp por destinatario</span></div>' + contractTerminationRecipientChecks(row) + '</section></form>';
+        '<label class="scm-contract-field"><span>Observaciones de la respuesta</span><textarea name="observaciones" rows="4" maxlength="4000" placeholder="Responde aquí al contenido de la carta o la descripción de la solicitud (opcional)."></textarea><small>Se agregan al final del acta, al correo de respuesta y quedan en el historial del caso.</small></label></div>' +
+        '<div class="scm-contract-step" data-contract-step="2" hidden>' + contractRetentionTicketBlockHtml(row) + '</div>' +
+        '<div class="scm-contract-step" data-contract-step="3" hidden><div class="scm-contract-summary" data-contract-summary></div>' +
+        '<section><div class="flex items-center justify-between gap-3 mb-3"><strong class="text-[10px] uppercase tracking-wider">Notificar a</strong><span class="text-[10px]">Correo y WhatsApp por destinatario</span></div>' + contractTerminationRecipientChecks(row) + '</section></div></form>';
+    }
+
+    var CONTRACT_RESPONSE_STEPS = ['Solicitud', 'Clasificación', 'Retención', 'Notificar'];
+
+    // Validates one step; returns false after showing the reason so the wizard stays on it.
+    function contractResponseStepValid(form, index) {
+      var step = form.querySelector('[data-contract-step="' + index + '"]');
+      if (!step) return true;
+      if (index === 1) {
+        var term = form.querySelector("[name='termino']");
+        if (!term.value) { window.Swal.showValidationMessage('Selecciona la clasificación de la respuesta.'); term.reportValidity(); return false; }
+        var invalid = Array.prototype.slice.call(step.querySelectorAll('input,select,textarea')).find(function (input) { return !input.checkValidity(); });
+        if (invalid) { invalid.reportValidity(); window.Swal.showValidationMessage('Revisa la fecha fin del contrato.'); return false; }
+      }
+      if (index === 2) {
+        var createRetention = form.querySelector("[name='crear_ticket_retencion']");
+        var retentionEmployee = form.querySelector("[name='retencion_id_empleado']");
+        if (createRetention && createRetention.checked && (!retentionEmployee || !retentionEmployee.value)) {
+          window.Swal.showValidationMessage('Selecciona el responsable del caso comercial de retención.');
+          return false;
+        }
+      }
+      if (index === 3) {
+        var checked = form.querySelectorAll('input[name="notify_recipients[]"]:checked');
+        if (!checked.length) { window.Swal.showValidationMessage('Selecciona a quién notificar o marca No notificar.'); return false; }
+        if (contractNotificationChannelSelection(form, Array.prototype.slice.call(checked)) === false) return false;
+      }
+      return true;
+    }
+
+    function contractResponseSummaryHtml(form) {
+      var term = form.querySelector("[name='termino']");
+      var end = form.querySelector('[name=fin_contrato]').value;
+      var observation = form.querySelector('[name=observaciones]').value.trim();
+      var createRetention = form.querySelector("[name='crear_ticket_retencion']");
+      var employee = form.querySelector("[name='retencion_id_empleado']");
+      var retention = createRetention && createRetention.disabled && form.querySelector('[data-contract-retention-existing]') && !createRetention.checked
+        ? 'Se conserva la retención abierta'
+        : (createRetention && createRetention.checked ? 'Se crea el caso · ' + (employee && employee.selectedIndex > 0 ? employee.options[employee.selectedIndex].text : 'sin responsable') : 'No se crea caso de retención');
+      var items = [
+        ['Clasificación', term && term.value ? term.options[term.selectedIndex].text : '-'],
+        ['Fin del contrato', end ? end.split('-').reverse().join('/') : '-'],
+        ['Retención', retention],
+        ['Observaciones', observation ? (observation.length > 140 ? observation.slice(0, 140) + '…' : observation) : 'Sin observaciones'],
+      ];
+      return '<strong class="text-[10px] uppercase tracking-wider">Resumen de la respuesta</strong><dl>' + items.map(function (item) { return '<div><dt>' + escHtml(item[0]) + '</dt><dd>' + escHtml(item[1]) + '</dd></div>'; }).join('') + '</dl>';
+    }
+
+    function contractResponseShowStep(form, index) {
+      var last = CONTRACT_RESPONSE_STEPS.length - 1;
+      index = Math.max(0, Math.min(last, index));
+      form.setAttribute('data-step', String(index));
+      form.setAttribute('data-max-step', String(Math.max(index, Number(form.getAttribute('data-max-step') || 0))));
+      var max = Number(form.getAttribute('data-max-step'));
+      form.querySelectorAll('[data-contract-step]').forEach(function (step) { step.hidden = Number(step.getAttribute('data-contract-step')) !== index; });
+      form.querySelectorAll('[data-contract-step-go]').forEach(function (button) {
+        var target = Number(button.getAttribute('data-contract-step-go'));
+        button.disabled = target > max;
+        button.classList.toggle('is-done', target < index);
+        if (target === index) button.setAttribute('aria-current', 'step'); else button.removeAttribute('aria-current');
+      });
+      if (index === last) form.querySelector('[data-contract-summary]').innerHTML = contractResponseSummaryHtml(form);
+      window.Swal.resetValidationMessage();
+      var confirm = window.Swal.getConfirmButton(), back = window.Swal.getDenyButton();
+      if (confirm) confirm.textContent = index === last ? 'Responder y cerrar' : 'Siguiente';
+      if (back) back.style.display = index > 0 ? '' : 'none';
+      var scroller = form.closest('.swal2-html-container');
+      if (scroller) scroller.scrollTop = 0;
+    }
+
+    // Moving forward validates every step in between; going back is always allowed.
+    function contractResponseGoTo(form, target) {
+      var current = Number(form.getAttribute('data-step') || 0);
+      for (var index = current; index < target; index++) {
+        if (!contractResponseStepValid(form, index)) { if (index !== current) contractResponseShowStep(form, index); return false; }
+      }
+      contractResponseShowStep(form, target);
+      return true;
+    }
+
+    function initContractResponseSteps(form, draft) {
+      form.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-contract-step-go]');
+        if (!button || button.disabled) return;
+        event.preventDefault();
+        contractResponseGoTo(form, Number(button.getAttribute('data-contract-step-go')));
+      });
+      // A warning refers to the field being fixed; clear it as soon as the user changes something.
+      ['input', 'change'].forEach(function (type) { form.addEventListener(type, function () { window.Swal.resetValidationMessage(); }); });
+      var start = draft && draft.step ? Number(draft.step) : 0;
+      if (draft && draft.maxStep) form.setAttribute('data-max-step', String(draft.maxStep));
+      contractResponseShowStep(form, start);
+      if (draft && scrollerOf(form)) scrollerOf(form).scrollTop = draft.scrollTop;
+      function scrollerOf(el) { return el.closest('.swal2-html-container'); }
+    }
+
+    // Shared by termination and non-renewal: same steps, validations and payload.
+    function openContractRequestResponse(kind, solicitudId, draft) {
+      var termination = kind === 'termination';
+      var row = (termination ? contractTerminationRowsByPk : contractNonRenewalRowsByPk)[String(solicitudId || "")];
+      if (!row || !window.Swal || typeof window.Swal.fire !== "function") {
+        showToast("warning", "No se encontró la solicitud seleccionada.");
+        return;
+      }
+      var formSelector = "[data-scm-contract-" + kind + "-form]";
+      function currentForm() { var popup = window.Swal.getPopup(); return popup ? popup.querySelector(formSelector) : null; }
+      window.Swal.fire({
+        title: '<span class="block text-[10px] uppercase tracking-wider mb-1 font-medium">Gestión contractual · SKC SuCasa Inmobiliaria</span>' + (termination ? 'Responder terminación' : 'Responder no prórroga'),
+        html: contractResponseFormHtml(row, kind),
+        width: "min(800px, 94vw)",
+        showCloseButton: true,
+        closeButtonAriaLabel: "Cerrar respuesta",
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: "Siguiente",
+        denyButtonText: "Anterior",
+        cancelButtonText: "Cancelar",
+        buttonsStyling: false,
+        reverseButtons: false,
+        customClass: {
+          popup: "scm-contract-response-swal",
+          confirmButton: "scm-contract-button scm-contract-button-primary",
+          denyButton: "scm-contract-button",
+          cancelButton: "scm-contract-button",
+        },
+        didOpen: function () {
+          var form = currentForm();
+          if (!form) return;
+          initContractResponseReturn(form, row, kind, draft);
+          initContractResponseDates(form, row);
+          initContractRequestReview(form);
+          syncContractRetentionTicketState(form);
+          initContractResponseSteps(form, draft);
+          form.addEventListener("change", function (event) {
+            if (event.target && event.target.name === "notify_recipients[]") {
+              var none = form.querySelector('input[name="notify_recipients[]"][value="none"]');
+              if (event.target.value === "none" && event.target.checked) {
+                form.querySelectorAll('input[name="notify_recipients[]"]').forEach(function (input) {
+                  if (input !== none) input.checked = false;
+                });
+              } else if (none && event.target.checked) {
+                none.checked = false;
+              }
+            }
+            syncContractNotificationChannels(form);
+            if (event.target && event.target.name === "crear_ticket_retencion") {
+              syncContractRetentionTicketState(form);
+            }
+          });
+        },
+        preDeny: function () {
+          var form = currentForm();
+          if (form) contractResponseShowStep(form, Number(form.getAttribute('data-step') || 0) - 1);
+          return false;
+        },
+        preConfirm: function () {
+          var form = currentForm();
+          if (!form) return false;
+          var last = CONTRACT_RESPONSE_STEPS.length - 1;
+          var current = Number(form.getAttribute('data-step') || 0);
+          if (current < last) { contractResponseGoTo(form, current + 1); return false; }
+          // Final check of every step: jump back to the first one that is no longer valid.
+          for (var index = 0; index <= last; index++) {
+            if (!contractResponseStepValid(form, index)) { if (index !== current) { contractResponseShowStep(form, index); contractResponseStepValid(form, index); } return false; }
+          }
+          var checked = Array.prototype.slice.call(form.querySelectorAll('input[name="notify_recipients[]"]:checked'));
+          var createRetention = form.querySelector("[name='crear_ticket_retencion']");
+          var retentionEmployee = form.querySelector("[name='retencion_id_empleado']");
+          return {
+            termino: form.querySelector("[name='termino']").value,
+            fin_contrato: form.querySelector('[name=fin_contrato]').value,
+            fecha_terminacion: form.querySelector("[name='fecha_terminacion']").value,
+            observaciones: form.querySelector('[name=observaciones]').value.trim(),
+            crear_ticket_retencion: createRetention && createRetention.checked ? "1" : "0",
+            retencion_id_empleado: retentionEmployee ? retentionEmployee.value : "",
+            channels: contractNotificationChannelSelection(form, checked),
+            notify: checked.map(function (input) { return input.value; }),
+          };
+        },
+      }).then(function (result) {
+        if (!result.isConfirmed || !result.value) return;
+        var value = result.value;
+        return dashboardFormAction(termination ? actionContractTerminationRespond : actionContractNonRenewalRespond, function (fd) {
+          fd.append("ticket_pk", String(row.ticket_pk || ""));
+          fd.append("solicitud_id", String(row.solicitud_id || ""));
+          fd.append("termino", value.termino || "");
+          fd.append("fecha_terminacion", value.fecha_terminacion || "");
+          fd.append("fin_contrato", value.fin_contrato || "");
+          fd.append("fin_contrato_original", row.fin_contrato || "");
+          fd.append("observaciones", value.observaciones || "");
+          fd.append("crear_ticket_retencion", value.crear_ticket_retencion || "0");
+          fd.append("retencion_id_empleado", value.retencion_id_empleado || "");
+          fd.append("notify_recipients_present", "1");
+          fd.append("notify_channels", JSON.stringify(value.channels || {}));
+          (value.notify || []).forEach(function (target) {
+            fd.append("notify_recipients[]", target);
+          });
+        }).then(function (data) {
+          showToast(data && data.notification_warning ? "warning" : "success", (data && data.message) || "Solicitud respondida.");
+          if (data && (data.renewal_probability_updated || data.contract_end_date_updated)) loadContractsEnding(true);
+          if (data && data.contract_end_date_updated) root.querySelectorAll('[data-scm-contract-termination-panel],[data-scm-contract-non-renewal-panel]').forEach(function(panel) { panel.setAttribute('data-scm-loaded','0'); });
+          if (termination) loadContractTerminationRequests(true); else loadContractNonRenewalRequests(true);
+        }).catch(function (error) {
+          showToast("error", error && error.message ? error.message : "No se pudo responder la solicitud.");
+        });
+      });
     }
 
     function initContractResponseDates(form, row) {
@@ -18057,8 +18269,6 @@
           else input.value = saved.value;
         });
         syncContractNotificationChannels(form);
-        var scroller = form.closest('.swal2-html-container');
-        if (scroller) scroller.scrollTop = draft.scrollTop;
       }
       form.addEventListener('click', function (event) {
         var button = event.target.closest('[data-contract-retention-open]');
@@ -18081,7 +18291,7 @@
         var caseData = data && data.case;
         if (!caseData || !caseData.case_source_html) throw new Error('No se encontró el detalle del caso.');
         var scroller = form.closest('.swal2-html-container');
-        var draft = {scrollTop:scroller ? scroller.scrollTop : 0, fields:Array.prototype.slice.call(form.elements).filter(function (input) { return input.name; }).map(function (input) { return {name:input.name, type:input.type, value:input.value, checked:input.checked}; })};
+        var draft = {scrollTop:scroller ? scroller.scrollTop : 0, step:form.getAttribute('data-step'), maxStep:form.getAttribute('data-max-step'), fields:Array.prototype.slice.call(form.elements).filter(function (input) { return input.name; }).map(function (input) { return {name:input.name, type:input.type, value:input.value, checked:input.checked}; })};
         var returned = false;
         var reopen = function () {
           if (returned) return;
@@ -18109,113 +18319,7 @@
     }
 
     function openContractTerminationResponse(solicitudId, draft) {
-      var row = contractTerminationRowsByPk[String(solicitudId || "")];
-      if (!row || !window.Swal || typeof window.Swal.fire !== "function") {
-        showToast("warning", "No se encontró la solicitud seleccionada.");
-        return;
-      }
-      var html = contractResponseFormHtml(row, 'termination');
-      window.Swal.fire({
-        title: '<span class="block text-[10px] uppercase tracking-wider mb-1 font-medium">Gestión contractual · SKC SuCasa Inmobiliaria</span>Responder terminación',
-        html: html,
-        width: "min(800px, 94vw)",
-        showCloseButton: true,
-        closeButtonAriaLabel: "Cerrar respuesta",
-        showCancelButton: true,
-        confirmButtonText: "Responder y cerrar",
-        cancelButtonText: "Cancelar",
-        buttonsStyling: false,
-        customClass: {
-          popup: "scm-contract-response-swal",
-          confirmButton: "scm-contract-button scm-contract-button-primary",
-          cancelButton: "scm-contract-button",
-        },
-        didOpen: function () {
-          var popup = window.Swal.getPopup();
-          var form = popup ? popup.querySelector("[data-scm-contract-termination-form]") : null;
-          if (!form) return;
-          initContractResponseReturn(form, row, 'termination', draft);
-          initContractResponseDates(form, row);
-          initContractRequestReview(form);
-          syncContractRetentionTicketState(form);
-          form.addEventListener("change", function (event) {
-            if (event.target && event.target.name === "notify_recipients[]") {
-              var none = form.querySelector('input[name="notify_recipients[]"][value="none"]');
-              if (event.target.value === "none" && event.target.checked) {
-                form.querySelectorAll('input[name="notify_recipients[]"]').forEach(function (input) {
-                  if (input !== none) input.checked = false;
-                });
-              } else if (none && event.target.checked) {
-                none.checked = false;
-              }
-            }
-            syncContractNotificationChannels(form);
-            if (event.target && event.target.name === "crear_ticket_retencion") {
-              syncContractRetentionTicketState(form);
-            }
-          });
-        },
-        preConfirm: function () {
-          var popup = window.Swal.getPopup();
-          var form = popup ? popup.querySelector("[data-scm-contract-termination-form]") : null;
-          if (!form) return false;
-          if (!form.reportValidity()) return false;
-          var checked = Array.prototype.slice.call(form.querySelectorAll('input[name="notify_recipients[]"]:checked'));
-          if (!checked.length) {
-            window.Swal.showValidationMessage("Selecciona a quién notificar o marca No notificar.");
-            return false;
-          }
-          var channels = contractNotificationChannelSelection(form, checked);
-          if (channels === false) return false;
-          var term = form.querySelector("[name='termino']");
-          if (!term || !term.value) {
-            window.Swal.showValidationMessage("Selecciona la clasificación de la respuesta.");
-            return false;
-          }
-          var createRetention = form.querySelector("[name='crear_ticket_retencion']");
-          var retentionEmployee = form.querySelector("[name='retencion_id_empleado']");
-          if (createRetention && createRetention.checked && (!retentionEmployee || !retentionEmployee.value)) {
-            window.Swal.showValidationMessage("Selecciona el responsable del caso comercial de retención.");
-            return false;
-          }
-          return {
-            termino: term.value,
-            fin_contrato: form.querySelector('[name=fin_contrato]').value,
-            fecha_terminacion: form.querySelector("[name='fecha_terminacion']").value,
-            observaciones: form.querySelector('[name=observaciones]').value.trim(),
-            crear_ticket_retencion: createRetention && createRetention.checked ? "1" : "0",
-            retencion_id_empleado: retentionEmployee ? retentionEmployee.value : "",
-            channels: channels,
-            notify: checked.map(function (input) { return input.value; }),
-          };
-        },
-      }).then(function (result) {
-        if (!result.isConfirmed || !result.value) return;
-        var value = result.value;
-        return dashboardFormAction(actionContractTerminationRespond, function (fd) {
-          fd.append("ticket_pk", String(row.ticket_pk || ""));
-          fd.append("solicitud_id", String(row.solicitud_id || ""));
-          fd.append("termino", value.termino || "");
-          fd.append("fecha_terminacion", value.fecha_terminacion || "");
-          fd.append("fin_contrato", value.fin_contrato || "");
-          fd.append("fin_contrato_original", row.fin_contrato || "");
-          fd.append("observaciones", value.observaciones || "");
-          fd.append("crear_ticket_retencion", value.crear_ticket_retencion || "0");
-          fd.append("retencion_id_empleado", value.retencion_id_empleado || "");
-          fd.append("notify_recipients_present", "1");
-          fd.append("notify_channels", JSON.stringify(value.channels || {}));
-          (value.notify || []).forEach(function (target) {
-            fd.append("notify_recipients[]", target);
-          });
-        }).then(function (data) {
-          showToast(data && data.notification_warning ? "warning" : "success", (data && data.message) || "Solicitud respondida.");
-          if (data && (data.renewal_probability_updated || data.contract_end_date_updated)) loadContractsEnding(true);
-          if (data && data.contract_end_date_updated) root.querySelectorAll('[data-scm-contract-termination-panel],[data-scm-contract-non-renewal-panel]').forEach(function(panel) { panel.setAttribute('data-scm-loaded','0'); });
-          loadContractTerminationRequests(true);
-        }).catch(function (error) {
-          showToast("error", error && error.message ? error.message : "No se pudo responder la solicitud.");
-        });
-      });
+      openContractRequestResponse('termination', solicitudId, draft);
     }
 
     function renderContractNonRenewal(data) {
@@ -18227,113 +18331,7 @@
     function loadContractNonRenewalRequests(force) { return loadContractRequests('non-renewal', force); }
 
     function openContractNonRenewalResponse(solicitudId, draft) {
-      var row = contractNonRenewalRowsByPk[String(solicitudId || "")];
-      if (!row || !window.Swal || typeof window.Swal.fire !== "function") {
-        showToast("warning", "No se encontró la solicitud seleccionada.");
-        return;
-      }
-      var html = contractResponseFormHtml(row, 'non-renewal');
-      window.Swal.fire({
-        title: '<span class="block text-[10px] uppercase tracking-wider mb-1 font-medium">Gestión contractual · SKC SuCasa Inmobiliaria</span>Responder no prórroga',
-        html: html,
-        width: "min(800px, 94vw)",
-        showCloseButton: true,
-        closeButtonAriaLabel: "Cerrar respuesta",
-        showCancelButton: true,
-        confirmButtonText: "Responder y cerrar",
-        cancelButtonText: "Cancelar",
-        buttonsStyling: false,
-        customClass: {
-          popup: "scm-contract-response-swal",
-          confirmButton: "scm-contract-button scm-contract-button-primary",
-          cancelButton: "scm-contract-button",
-        },
-        didOpen: function () {
-          var popup = window.Swal.getPopup();
-          var form = popup ? popup.querySelector("[data-scm-contract-non-renewal-form]") : null;
-          if (!form) return;
-          initContractResponseReturn(form, row, 'non-renewal', draft);
-          initContractResponseDates(form, row);
-          initContractRequestReview(form);
-          syncContractRetentionTicketState(form);
-          form.addEventListener("change", function (event) {
-            if (event.target && event.target.name === "notify_recipients[]") {
-              var none = form.querySelector('input[name="notify_recipients[]"][value="none"]');
-              if (event.target.value === "none" && event.target.checked) {
-                form.querySelectorAll('input[name="notify_recipients[]"]').forEach(function (input) {
-                  if (input !== none) input.checked = false;
-                });
-              } else if (none && event.target.checked) {
-                none.checked = false;
-              }
-            }
-            syncContractNotificationChannels(form);
-            if (event.target && event.target.name === "crear_ticket_retencion") {
-              syncContractRetentionTicketState(form);
-            }
-          });
-        },
-        preConfirm: function () {
-          var popup = window.Swal.getPopup();
-          var form = popup ? popup.querySelector("[data-scm-contract-non-renewal-form]") : null;
-          if (!form) return false;
-          if (!form.reportValidity()) return false;
-          var checked = Array.prototype.slice.call(form.querySelectorAll('input[name="notify_recipients[]"]:checked'));
-          if (!checked.length) {
-            window.Swal.showValidationMessage("Selecciona a quién notificar o marca No notificar.");
-            return false;
-          }
-          var channels = contractNotificationChannelSelection(form, checked);
-          if (channels === false) return false;
-          var term = form.querySelector("[name='termino']");
-          if (!term || !term.value) {
-            window.Swal.showValidationMessage("Selecciona la clasificación de la respuesta.");
-            return false;
-          }
-          var createRetention = form.querySelector("[name='crear_ticket_retencion']");
-          var retentionEmployee = form.querySelector("[name='retencion_id_empleado']");
-          if (createRetention && createRetention.checked && (!retentionEmployee || !retentionEmployee.value)) {
-            window.Swal.showValidationMessage("Selecciona el responsable del caso comercial de retención.");
-            return false;
-          }
-          return {
-            termino: term.value,
-            fin_contrato: form.querySelector('[name=fin_contrato]').value,
-            fecha_terminacion: form.querySelector("[name='fecha_terminacion']").value,
-            observaciones: form.querySelector('[name=observaciones]').value.trim(),
-            crear_ticket_retencion: createRetention && createRetention.checked ? "1" : "0",
-            retencion_id_empleado: retentionEmployee ? retentionEmployee.value : "",
-            channels: channels,
-            notify: checked.map(function (input) { return input.value; }),
-          };
-        },
-      }).then(function (result) {
-        if (!result.isConfirmed || !result.value) return;
-        var value = result.value;
-        return dashboardFormAction(actionContractNonRenewalRespond, function (fd) {
-          fd.append("ticket_pk", String(row.ticket_pk || ""));
-          fd.append("solicitud_id", String(row.solicitud_id || ""));
-          fd.append("termino", value.termino || "");
-          fd.append("fecha_terminacion", value.fecha_terminacion || "");
-          fd.append("fin_contrato", value.fin_contrato || "");
-          fd.append("fin_contrato_original", row.fin_contrato || "");
-          fd.append("observaciones", value.observaciones || "");
-          fd.append("crear_ticket_retencion", value.crear_ticket_retencion || "0");
-          fd.append("retencion_id_empleado", value.retencion_id_empleado || "");
-          fd.append("notify_recipients_present", "1");
-          fd.append("notify_channels", JSON.stringify(value.channels || {}));
-          (value.notify || []).forEach(function (target) {
-            fd.append("notify_recipients[]", target);
-          });
-        }).then(function (data) {
-          showToast(data && data.notification_warning ? "warning" : "success", (data && data.message) || "Solicitud respondida.");
-          if (data && (data.renewal_probability_updated || data.contract_end_date_updated)) loadContractsEnding(true);
-          if (data && data.contract_end_date_updated) root.querySelectorAll('[data-scm-contract-termination-panel],[data-scm-contract-non-renewal-panel]').forEach(function(panel) { panel.setAttribute('data-scm-loaded','0'); });
-          loadContractNonRenewalRequests(true);
-        }).catch(function (error) {
-          showToast("error", error && error.message ? error.message : "No se pudo responder la solicitud.");
-        });
-      });
+      openContractRequestResponse('non-renewal', solicitudId, draft);
     }
 
     function contractsEndingEmployeeOptions(row) {

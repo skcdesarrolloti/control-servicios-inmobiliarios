@@ -46,6 +46,24 @@
 .scm-contract-response-form textarea { width:100%; min-width:0; min-height:96px; border:0; border-radius:8px; background:#f2f3ff; color:#001944; padding:10px 12px; font:inherit; resize:vertical; }
 .scm-contract-response-form textarea:focus-visible { outline:2px solid #4b5d8c; outline-offset:2px; }
 .scm-contract-response-form .scm-contract-field small { font-size:11px; color:#52617b; }
+.scm-contract-steps { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:0; padding:0; list-style:none; }
+.scm-contract-steps button { width:100%; display:flex; align-items:center; gap:8px; padding:8px 10px; border:0; border-radius:10px; background:#f2f3ff; color:#52617b; font:inherit; font-size:12px; font-weight:600; text-align:left; cursor:pointer; }
+.scm-contract-steps button > span { display:inline-grid; place-items:center; width:22px; height:22px; flex-shrink:0; border-radius:999px; background:#dae2ff; color:#061d49; font-size:11px; }
+.scm-contract-steps button[aria-current="step"] { background:#061d49; color:white; }
+.scm-contract-steps button[aria-current="step"] > span { background:#f8cf4a; }
+.scm-contract-steps button.is-done > span { background:#c9f0d8; color:#14532d; }
+.scm-contract-steps button:disabled { opacity:.55; cursor:default; }
+.scm-contract-steps button:focus-visible { outline:2px solid #4b5d8c; outline-offset:2px; }
+.scm-contract-step { display:grid; gap:22px; min-width:0; }
+.scm-contract-step[hidden] { display:none; }
+.scm-contract-summary { display:grid; gap:10px; padding:14px 16px; border-radius:12px; background:#fff8e1; }
+.scm-contract-summary dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 16px; margin:0; }
+.scm-contract-summary dt { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:#52617b; }
+.scm-contract-summary dd { margin:2px 0 0; font-size:12px; overflow-wrap:anywhere; }
+@media(max-width:640px) {
+  .scm-contract-steps { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .scm-contract-summary dl { grid-template-columns:1fr; }
+}
 .scm-contract-review { display:grid; gap:10px; }
 .scm-contract-review-text { max-height:180px; overflow-y:auto; padding:12px 14px; border-radius:8px; background:#f8f9ff; border:1px solid #e1e6f5; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.55; }
 .scm-contract-review-doc { border-radius:10px; background:#f2f3ff; padding:10px 12px; min-width:0; }
