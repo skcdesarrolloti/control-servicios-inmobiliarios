@@ -39,7 +39,6 @@ return [
   'sla_overdue_days' => (int) $env('SLA_OVERDUE_DAYS', '15'),
   'default_per_page' => (int) $env('DEFAULT_PER_PAGE', '10'),
 
-  'ticket_url' => $env('TICKET_URL', ''),
   'preventiva_url' => $env('PREVENTIVA_URL', ''),
   'correctiva_url' => $env('CORRECTIVA_URL', ''),
   'cotizacion_url' => $env('COTIZACION_URL', ''),

@@ -56,6 +56,7 @@ require dirname(__DIR__) . '/src/Modules/Pending/Concerns/AdministrativeTicketCr
 require dirname(__DIR__) . '/src/Modules/Pending/Concerns/PendingNotificationsAndDatesConcern.php';
 date_default_timezone_set('America/Bogota');
 define('SCM_APP_SECRET', 'synthetic-review-secret');
+if (!defined('SCM_BASE_URL')) define('SCM_BASE_URL', 'https://panel.example.test/public');
 $_SESSION = ['scm_employee_id' => 'EMP-900', 'scm_user_id' => 9, 'scm_user' => 'Test creator'];
 
 final class RenewalTestPdo extends PDO {

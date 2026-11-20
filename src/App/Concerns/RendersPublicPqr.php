@@ -672,7 +672,7 @@ trait RendersPublicPqr
       }
       if (!empty($ticketIds)) {
         $caseCardConfig = [
-          'ticket_url' => $ticketUrl !== '' ? $ticketUrl : self::DEFAULT_TICKET_URL,
+          'ticket_url' => $ticketUrl !== '' ? $ticketUrl : \SCM\Support\CaseLink::base(),
           'preventiva_url' => self::defaultPreventiveReviewUrl(),
           'correctiva_url' => self::defaultCorrectiveReviewUrl(),
           'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
@@ -919,7 +919,7 @@ trait RendersPublicPqr
   public function renderPublicPqrReadonlyPage(string $employeeIdFilter = '', array $overrideConfig = []): string
   {
     $config = array_merge([
-      'ticket_url' => self::DEFAULT_TICKET_URL,
+      'ticket_url' => \SCM\Support\CaseLink::base(),
     ], $overrideConfig);
 
     $employeeIdFilter = preg_replace('/[^A-Za-z0-9_-]/', '', trim($employeeIdFilter));
@@ -932,7 +932,7 @@ trait RendersPublicPqr
     $contentHtml = $this->render_public_pqr_tab(
       $result,
       [],
-      (string) ($config['ticket_url'] ?? self::DEFAULT_TICKET_URL),
+      \SCM\Support\CaseLink::base(),
       $employeeIdFilter,
       true,
       [],
@@ -986,7 +986,7 @@ trait RendersPublicPqr
   public function renderPublicPqrSignedAccessPage(string $employeeIdFilter = '', string $expiresAt = '', string $signature = '', array $overrideConfig = [], string $flashMessage = '', string $flashType = 'success', string $accessScope = 'assigned', string $accessToken = ''): string
   {
     $config = array_merge([
-      'ticket_url' => self::DEFAULT_TICKET_URL,
+      'ticket_url' => \SCM\Support\CaseLink::base(),
     ], $overrideConfig);
 
     $employeeIdFilter = preg_replace('/[^A-Za-z0-9_-]/', '', trim($employeeIdFilter));
@@ -1003,7 +1003,7 @@ trait RendersPublicPqr
     $contentHtml = $this->render_public_pqr_tab(
       $result,
       $this->get_public_pqr_corresponsable_candidates(),
-      (string) ($config['ticket_url'] ?? self::DEFAULT_TICKET_URL),
+      \SCM\Support\CaseLink::base(),
       $accessScope === 'all' ? '' : $employeeIdFilter,
       false,
       [

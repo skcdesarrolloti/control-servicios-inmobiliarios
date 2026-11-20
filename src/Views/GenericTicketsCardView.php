@@ -322,7 +322,7 @@ final class GenericTicketsCardView
     $preventivaBaseUrl = trim((string) ($config['preventiva_url'] ?? ''));
     $correctivaBaseUrl = trim((string) ($config['correctiva_url'] ?? ''));
     $cotizacionBaseUrl = trim((string) ($config['cotizacion_url'] ?? ''));
-    $ticketIdUrl = $idTicketRaw !== '' ? $idTicketRaw : (string) $ticketPk;
+    $ticketIdUrl = $ticketPk > 0 ? (string) $ticketPk : $idTicketRaw;
     $ticketUrl = ($ticketBaseUrl !== '' && $ticketIdUrl !== '') ? esc_url($ticketBaseUrl . rawurlencode($ticketIdUrl)) : '';
     $prevFirstId = (string) call_user_func($this->firstIdValue, $idPrev);
     $corrFirstId = (string) call_user_func($this->firstIdValue, $idCorr);

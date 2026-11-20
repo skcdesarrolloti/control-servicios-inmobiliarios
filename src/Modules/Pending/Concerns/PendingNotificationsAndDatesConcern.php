@@ -25,7 +25,6 @@ trait PendingNotificationsAndDatesConcern
       return 0;
     }
 
-    $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode((string) $ticketId);
     $isRetention = in_array(mb_strtolower(trim((string) ($ticketPayload['tema_ayuda'] ?? '')), 'UTF-8'), ['retencion de contrato', 'retención de contrato'], true);
     $subject = $mode === 'preventiva'
       ? 'Aviso de revision preventiva del contrato ' . (string) ($ticketPayload['contrato'] ?? '')
@@ -139,8 +138,11 @@ trait PendingNotificationsAndDatesConcern
         ]);
         if (count($primaryEmails) > 1) $jobCopies = [];
       } else {
+        // Enlace firmado del caso según quién recibe: funcionarios y copias, el de funcionario; el cliente, su consulta pública.
+        $jobTargets = (array) ($job['targets'] ?? []);
+        $jobRole = array_intersect(['empleado', 'admin'], $jobTargets) !== [] ? 'empleado' : (string) ($jobTargets[0] ?? 'empleado');
         $html = EmailTemplate::render($subject, $extraContent, [
-          'ticket_url' => $ticketUrl,
+          'ticket_url' => \SCM\Support\CaseReplyNotifications::emailCaseUrl($ticketId, $jobRole),
           'buttons' => $pdfButtons,
         ]);
       }

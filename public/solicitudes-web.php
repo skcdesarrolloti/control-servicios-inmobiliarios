@@ -117,5 +117,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 echo $app->renderPublicPqrSignedAccessPage($employeeId, $expiresAt, $signature, [
-  'ticket_url' => (string) ($scmConfig['ticket_url'] ?? \SCM\App\SuCasaControlServiciosInmobiliarios::DEFAULT_TICKET_URL),
+  'ticket_url' => \SCM\Support\CaseLink::base(),
 ], $flashMessage, $flashType, $accessScope, $accessToken);

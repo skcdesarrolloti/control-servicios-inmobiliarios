@@ -10347,8 +10347,9 @@
         var ticketUrl = (btn.dataset.ticketUrl || "").trim();
         if (!ticketUrl) {
           var baseTicketUrl = String(runtimeConfig.ticket_url || "").trim();
+          // El panel abre los casos por su _ID (?scm_case=).
           var ticketRef = String(
-            btn.dataset.ticket || btn.dataset.ticketPk || "",
+            btn.dataset.ticketPk || btn.dataset.ticket || "",
           ).trim();
           if (baseTicketUrl && ticketRef) {
             ticketUrl = baseTicketUrl + encodeURIComponent(ticketRef);

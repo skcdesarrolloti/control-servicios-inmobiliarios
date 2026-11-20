@@ -21,8 +21,8 @@ final class HistoryLinkMap
 
     return [
       // Tickets
-      'id_ticket_cliente' => ['label' => 'Ver caso cliente', 'base' => 'https://sucasainmobiliaria.com.co/ticket/?id_ticket='],
-      'id_ticket_danos_entrega' => ['label' => 'Ver caso de danos encontrados', 'base' => 'https://sucasainmobiliaria.com.co/ticket/?id_ticket='],
+      'id_ticket_cliente' => ['label' => 'Ver caso cliente', 'base' => $baseUrl . '?scm_case='],
+      'id_ticket_danos_entrega' => ['label' => 'Ver caso de danos encontrados', 'base' => $baseUrl . '?scm_case='],
       'id_ticket_danos_recibo' => ['label' => 'Ver acta de revision de desocupacion', 'base' => 'https://sucasainmobiliaria.com.co/acta-de-revision-de-desocupacion/?numero='],
 
       // Revisiones

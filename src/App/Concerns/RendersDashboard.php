@@ -14,7 +14,7 @@ trait RendersDashboard
   public function renderPanel(array $overrideConfig = []): string
   {
     $config = array_merge([
-      'ticket_url'     => self::DEFAULT_TICKET_URL,
+      'ticket_url'     => \SCM\Support\CaseLink::base(),
       'preventiva_url' => self::defaultPreventiveReviewUrl(),
       'correctiva_url' => self::defaultCorrectiveReviewUrl(),
       'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
@@ -5190,7 +5190,7 @@ trait RendersDashboard
     $propietario = trim((string) ($row['propietario'] ?? $row['nombre_propietario'] ?? ''));
     $arrendatario = trim((string) ($row['arrendatario'] ?? $row['nombre_arrendatario'] ?? ''));
     $barrio = trim((string) ($row['barrio'] ?? ''));
-    $ticketUrl = $ticket !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticket) : '';
+    $ticketUrl = \SCM\Support\CaseLink::panelUrl($ticket);
     $cotUrl = $id !== '' ? self::signedMaintenanceQuotePublicUrl((int) $id) : '';
     $actaInfo = $this->cotizacion_satisfaction_act_info($id, trim((string) ($row['id_acta_satisfaccion'] ?? '')), $ticket);
     $orders = is_array($row['_scm_ordenes'] ?? null) ? $row['_scm_ordenes'] : [];
@@ -5506,7 +5506,7 @@ trait RendersDashboard
       $cardsByPk = $this->get_servicios_inmobiliarios_module()->renderCardsByTicketIds(
         $primaryKeys,
         [
-          'ticket_url' => self::DEFAULT_TICKET_URL,
+          'ticket_url' => \SCM\Support\CaseLink::base(),
           'preventiva_url' => self::defaultPreventiveReviewUrl(),
           'correctiva_url' => self::defaultCorrectiveReviewUrl(),
           'cotizacion_url' => self::DEFAULT_COTIZACION_URL,

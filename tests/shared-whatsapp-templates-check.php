@@ -47,3 +47,15 @@ foreach ([
   $body = $functionBody($file, $function);
   $check($body !== '' && !str_contains($body, 'sucasainmobiliaria.com.co/ticket/') && !str_contains($body, 'DEFAULT_TICKET_URL'), $function . ' links the signed case, never the old ticket page');
 }
+
+// La página de tickets anterior ya no existe: ningún enlace del panel debe llevar a ella.
+$legacy = [];
+$files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root . '/src', FilesystemIterator::SKIP_DOTS));
+foreach ($files as $file) {
+  if ($file->getExtension() === 'php' && $file->getFilename() !== 'CaseLink.php' && str_contains((string) file_get_contents($file->getPathname()), 'sucasainmobiliaria.com.co/ticket/')) $legacy[] = $file->getFilename();
+}
+foreach (glob($root . '/public/{*.php,assets/js/*.js}', GLOB_BRACE) ?: [] as $file) {
+  if (!str_contains($file, '.min.') && str_contains((string) file_get_contents($file), 'sucasainmobiliaria.com.co/ticket/')) $legacy[] = basename($file);
+}
+$check($legacy === [], 'no link points to the old ticket page' . ($legacy !== [] ? ': ' . implode(', ', $legacy) : ''));
+$check(SCM\Support\CaseLink::panelUrl(10945) === rtrim((string) SCM_BASE_URL, '/') . '/?scm_case=10945' && SCM\Support\CaseLink::panelUrl('abc') === '', 'case links open ?scm_case=<_ID> in the panel');

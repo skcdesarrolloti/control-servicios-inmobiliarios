@@ -439,9 +439,10 @@
         });
     }
 
+    // El caso se abre en su ventana del panel (?scm_case=), no en la página de tickets anterior.
     function openTicket(ticket) {
-      var url = "https://sucasainmobiliaria.com.co/ticket/?id_ticket=" + encodeURIComponent(ticket);
-      if (typeof core.openIframeModal === "function") core.openIframeModal(url, "Caso #" + ticket);
+      var runtimeRoot = document.querySelector("[data-scm-runtime]");
+      if (runtimeRoot) runtimeRoot.dispatchEvent(new CustomEvent("scm:open-panel-case", { detail: { ticket_id: String(ticket || "") } }));
     }
 
     // Eventos ------------------------------------------------------------------

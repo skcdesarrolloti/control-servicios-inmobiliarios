@@ -36,7 +36,7 @@
   const magnitudeSelect = root.querySelector('#scmDamageMagnitude');
   const limitSelect = root.querySelector('#scmDamageLimit');
   const refreshBtn = root.querySelector('#scmDamageRefresh');
-  const ticketBaseUrl = (runtime.config && runtime.config.ticket_url) || 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=';
+  const ticketBaseUrl = (runtime.config && runtime.config.ticket_url) || '';
 
   if (!grid || !summary || !state) return;
 
@@ -148,7 +148,7 @@
 
   function renderTicketCard(ticket, index) {
     const m = ticket.magnitud || {};
-    const ticketId = ticket.id_ticket || ticket.ticket_row_id || '';
+    const ticketId = ticket.ticket_row_id || ticket.id_ticket || '';
     const ticketUrl = ticket.ticket_url || (ticketId ? ticketBaseUrl + encodeURIComponent(String(ticketId)) : '');
     const indicators = Array.isArray(m.indicators) && m.indicators.length
       ? m.indicators.map(function (i) { return '<span>' + escapeHtml(i) + '</span>'; }).join('')

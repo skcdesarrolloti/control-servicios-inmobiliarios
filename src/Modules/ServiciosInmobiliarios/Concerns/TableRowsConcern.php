@@ -92,7 +92,7 @@ trait TableRowsConcern
       $idCorr = trim((string) ($row['id_revision_correctiva'] ?? ''));
       $tieneCorr = $idCorr !== '';
 
-      $ticketIdUrl = $this->firstIdValue($idTicket);
+      $ticketIdUrl = $ticketPk > 0 ? (string) $ticketPk : $this->firstIdValue($idTicket);
       $ticketUrl = ($ticketBaseUrl !== '' && $ticketIdUrl !== '') ? esc_url($ticketBaseUrl . rawurlencode($ticketIdUrl)) : '';
       $idCotzUrl = $this->firstIdValue($idCotz);
       $cotzUrl = ($tieneCotz && $idCotzUrl !== '') ? esc_url(\SCM\App\SuCasaControlServiciosInmobiliarios::signedMaintenanceQuotePublicUrl((int) $idCotzUrl)) : '';

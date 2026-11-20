@@ -441,14 +441,19 @@ trait TicketPersistenceConcern
     return $out;
   }
 
-  private function buildPublicTicketUrl(string $logicalTicket): string
+  /** Consulta pública firmada del caso (por `_ID` o, en registros antiguos, por `id_ticket`); vacío si no se encuentra. */
+  private function buildPublicTicketUrl(string $logicalTicket, string $audience = 'publico'): string
   {
     $logicalTicket = trim($logicalTicket);
-    if ($logicalTicket === '') {
+    if (preg_match('/^[1-9][0-9]{0,17}$/D', $logicalTicket) !== 1) {
       return '';
     }
-
-    return 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
+    $table = $this->db->table('jet_cct_tickets');
+    $pk = (int) $this->db->getVar('SELECT `_ID` FROM `' . $table . '` WHERE `_ID` = ? LIMIT 1', [(int) $logicalTicket]);
+    if ($pk <= 0) {
+      $pk = (int) $this->db->getVar('SELECT `_ID` FROM `' . $table . '` WHERE `id_ticket` = ? ORDER BY `_ID` DESC LIMIT 1', [$logicalTicket]);
+    }
+    return $pk > 0 ? \SCM\Support\PublicCaseAccess::url($pk, in_array($audience, ['publico', 'propietario', 'arrendatario', 'copropiedad'], true) ? $audience : 'publico') : '';
   }
 
   private function buildClientQuoteUrl(string $quoteNumero): string

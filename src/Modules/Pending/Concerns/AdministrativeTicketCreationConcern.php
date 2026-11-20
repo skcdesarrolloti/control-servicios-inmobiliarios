@@ -289,7 +289,7 @@ trait AdministrativeTicketCreationConcern
       'ok' => '1',
       'message' => $message,
       'ticket_id' => (string) $ticketId,
-      'ticket_url' => 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode((string) $ticketId),
+      'ticket_url' => \SCM\Support\CaseLink::panelUrl($ticketId),
       'emails_queued' => (string) $queued,
       'whatsapp_queued' => (string) $whatsapp['whatsapp'],
       'whatsapp_details' => $whatsapp['details'],

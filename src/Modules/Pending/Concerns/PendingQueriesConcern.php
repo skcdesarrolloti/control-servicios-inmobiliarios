@@ -270,9 +270,7 @@ trait PendingQueriesConcern
     foreach ($this->repo->getReportesAdministrativosPorVerificar($filters) as $row) {
       $row = (array) $row;
       $ticketRef = trim((string) ($row['id_ticket'] ?? ''));
-      $ticketUrl = $ticketRef !== ''
-        ? 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($ticketRef)
-        : '';
+      $ticketUrl = \SCM\Support\CaseLink::panelUrl($ticketRef);
 
       $items[] = [
         'row' => $row,

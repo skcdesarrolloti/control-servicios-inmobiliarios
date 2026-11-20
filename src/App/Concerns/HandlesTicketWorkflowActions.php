@@ -221,7 +221,7 @@ trait HandlesTicketWorkflowActions
 
     if (!is_array($metrics)) {
       $config = [
-        'ticket_url' => self::DEFAULT_TICKET_URL,
+        'ticket_url' => \SCM\Support\CaseLink::base(),
         'preventiva_url' => self::defaultPreventiveReviewUrl(),
         'correctiva_url' => self::defaultCorrectiveReviewUrl(),
         'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
@@ -539,7 +539,7 @@ trait HandlesTicketWorkflowActions
       }
     }
     $config = [
-      'ticket_url'     => self::sanitizeUrl($rawConfig['ticket_url']     ?? self::DEFAULT_TICKET_URL),
+      'ticket_url'     => \SCM\Support\CaseLink::base(),
       'preventiva_url' => self::sanitizeUrl($rawConfig['preventiva_url'] ?? self::defaultPreventiveReviewUrl()),
       'correctiva_url' => self::sanitizeUrl($rawConfig['correctiva_url'] ?? self::defaultCorrectiveReviewUrl()),
       'cotizacion_url' => self::sanitizeUrl($rawConfig['cotizacion_url'] ?? self::DEFAULT_COTIZACION_URL),
@@ -733,7 +733,7 @@ trait HandlesTicketWorkflowActions
     $rawConfig = json_decode(stripslashes((string)($_POST['config'] ?? '{}')), true);
     $rawConfig = is_array($rawConfig) ? $rawConfig : [];
     $config = [
-      'ticket_url'     => self::sanitizeUrl($rawConfig['ticket_url']     ?? self::DEFAULT_TICKET_URL),
+      'ticket_url'     => \SCM\Support\CaseLink::base(),
       'preventiva_url' => self::sanitizeUrl($rawConfig['preventiva_url'] ?? self::defaultPreventiveReviewUrl()),
       'correctiva_url' => self::sanitizeUrl($rawConfig['correctiva_url'] ?? self::defaultCorrectiveReviewUrl()),
       'cotizacion_url' => self::sanitizeUrl($rawConfig['cotizacion_url'] ?? self::DEFAULT_COTIZACION_URL),
@@ -3239,7 +3239,7 @@ trait HandlesTicketWorkflowActions
       'empleado_id' => $this->adminDueFirstText([$ticket], ['id_empleado']),
       'propietario' => $this->adminDueFirstText([$ticket], ['propietario']),
       'arrendatario' => $this->adminDueFirstText([$ticket], ['arrendatario']),
-      'ticket_url' => $ticketPk !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticketPk) : '',
+      'ticket_url' => \SCM\Support\CaseLink::panelUrl($ticketPk),
       'id_revision_preventiva' => $revisionId,
       'tab_key' => 'preventiva',
       'status_bucket' => $this->adminDueStatusBucket($ticket),
@@ -3466,7 +3466,7 @@ trait HandlesTicketWorkflowActions
       'empleado_id' => $this->adminDueFirstText([$ticketRow, $row], ['id_empleado']),
       'propietario' => $this->adminDueFirstText([$ticketRow, $row, $contract], ['propietario', 'nombre_propietario', 'nombre']),
       'arrendatario' => $this->adminDueFirstText([$ticketRow, $row, $contract], ['arrendatario', 'nombre_arrendatario']),
-      'ticket_url' => $ticketPk !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticketPk) : '',
+      'ticket_url' => \SCM\Support\CaseLink::panelUrl($ticketPk),
       'cotizacion_id' => $id,
       'cotizacion_url' => $id !== '' ? self::signedMaintenanceQuotePublicUrl((int) $id) : '',
       'cot_estado' => $estado !== '' ? $estado : ($sent ? 'Enviada sin respuesta' : 'Sin enviar'),
@@ -3532,7 +3532,7 @@ trait HandlesTicketWorkflowActions
       'empleado_id' => $this->adminDueFirstText([$ticket, $row], ['id_empleado']),
       'propietario' => $this->adminDueFirstText([$ticket, $row, $contract], ['propietario', 'nombre_propietario', 'nombre']),
       'arrendatario' => $this->adminDueFirstText([$ticket, $row, $contract], ['arrendatario', 'nombre_arrendatario']),
-      'ticket_url' => $ticketPk !== '' ? self::DEFAULT_TICKET_URL . rawurlencode($ticketPk) : '',
+      'ticket_url' => \SCM\Support\CaseLink::panelUrl($ticketPk),
       'id_revision_preventiva' => $revisionId,
       'tab_key' => 'preventiva',
       'status_bucket' => $statusBucket,
@@ -3750,7 +3750,7 @@ trait HandlesTicketWorkflowActions
       $cards = $this->get_servicios_inmobiliarios_module()->renderCardsByTicketIds(
         [$ticketPk],
         [
-          'ticket_url' => self::DEFAULT_TICKET_URL,
+          'ticket_url' => \SCM\Support\CaseLink::base(),
           'preventiva_url' => self::defaultPreventiveReviewUrl(),
           'correctiva_url' => self::defaultCorrectiveReviewUrl(),
           'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
@@ -6032,8 +6032,10 @@ trait HandlesTicketWorkflowActions
     $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: (string) ($input['id_contrato'] ?? '-');
     $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
     $summary = 'Contrato ' . $contract . ', inmueble ' . $property . '. Gestionar retención o búsqueda comercial.';
-    $ticketButtonSuffix = $this->contractTicketWhatsappButtonSuffix((string) $ticketId);
     $requesterType = $this->contractRetentionRequesterType($ticket);
+    // El cliente abre la consulta pública firmada del caso; el funcionario, su enlace individual que inicia la sesión.
+    $requesterUrl = \SCM\Support\PublicCaseAccess::url($ticketId, $requesterType);
+    $employeeUrl = \SCM\Support\PublicCaseAccess::staffUrl($ticketId, trim((string) ($ticket['id_empleado'] ?? '')));
     $requesterName = $this->contractTerminationFirstText([$ticket], [$requesterType, 'solicitante']) ?: 'cliente';
     $requesterPhone = $this->contractTerminationFirstText([$ticket], ['celular_' . $requesterType]);
 
@@ -6043,7 +6045,7 @@ trait HandlesTicketWorkflowActions
         'campaign_tag' => 'retencion_contrato',
         'categoria_mensaje' => 'informacion',
         'id_ticket' => (string) $ticketId,
-        'ticket_url' => $this->contractTicketWhatsappUrl((string) $ticketId),
+        'ticket_url' => $requesterUrl,
         'button_url_mode' => 'dynamic_suffix',
         'dedupe_key' => 'retencion_contrato_solicitante:' . $ticketId,
         'template_name' => 'scm_retencion_contrato_solicitante',
@@ -6061,7 +6063,7 @@ trait HandlesTicketWorkflowActions
             'type' => 'button',
             'sub_type' => 'url',
             'index' => '0',
-            'parameters' => [['type' => 'text', 'text' => $ticketButtonSuffix]],
+            'parameters' => [['type' => 'text', 'text' => $this->contractTicketWhatsappButtonSuffix($requesterUrl)]],
           ],
         ],
       ]);
@@ -6078,7 +6080,7 @@ trait HandlesTicketWorkflowActions
         'campaign_tag' => 'retencion_contrato',
         'categoria_mensaje' => 'informacion',
         'id_ticket' => (string) $ticketId,
-        'ticket_url' => $this->contractTicketWhatsappUrl((string) $ticketId),
+        'ticket_url' => $employeeUrl,
         'button_url_mode' => 'dynamic_suffix',
         'dedupe_key' => 'retencion_contrato_funcionario:' . $ticketId,
         'template_name' => 'scm_retencion_contrato_funcionario',
@@ -6096,7 +6098,7 @@ trait HandlesTicketWorkflowActions
             'type' => 'button',
             'sub_type' => 'url',
             'index' => '0',
-            'parameters' => [['type' => 'text', 'text' => $ticketButtonSuffix]],
+            'parameters' => [['type' => 'text', 'text' => $this->contractTicketWhatsappButtonSuffix($employeeUrl)]],
           ],
         ],
       ]);
@@ -6861,13 +6863,13 @@ trait HandlesTicketWorkflowActions
 
   private function contractTicketWhatsappUrl(string $ticketId): string
   {
-    $ticketId = trim($ticketId);
-    return 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($ticketId);
+    return \SCM\Support\CaseLink::panelUrl($ticketId);
   }
 
-  private function contractTicketWhatsappButtonSuffix(string $ticketId): string
+  /** Botón de las plantillas de retención (URL fija `https://sucasainmobiliaria.com.co/{{1}}`): ruta del caso sin el dominio. */
+  private function contractTicketWhatsappButtonSuffix(string $url): string
   {
-    return $this->contractTerminationWhatsappButtonSuffix($this->contractTicketWhatsappUrl($ticketId));
+    return \SCM\Support\SharedButtonUrl::suffix($url);
   }
 
   /** @return array{name:string,phone:string,id_empleado:string,cargo:string,email:string} */

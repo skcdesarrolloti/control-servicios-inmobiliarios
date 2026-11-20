@@ -37,6 +37,10 @@ trait HandlesPanelCaseCreation
   {
     if (!Auth::isLoggedIn()) throw new \InvalidArgumentException('Inicia sesión para consultar el caso.');
     $ticket = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE `_ID` = ?', [$id]);
+    if (!$ticket && $id > 0) {
+      // Enlaces anteriores con el número lógico del caso (id_ticket) en vez del _ID.
+      $ticket = $this->db->getRow('SELECT * FROM `' . $this->db->table('jet_cct_tickets') . '` WHERE `id_ticket` = ? ORDER BY `_ID` DESC LIMIT 1', [(string) $id]);
+    }
     $copies = array_column(\SCM\Support\InternalNotificationRecipients::contactsForAction($this->db, 'nuevo_caso_panel'), 'employee_id');
     $isCopy = ($ticket['medio'] ?? '') === 'Panel administrativo' && in_array((string) Auth::employeeId(), $copies, true);
     if (!$ticket || (!$this->canAccessDashboardTab('metricas') && (string) ($ticket['id_empleado'] ?? '') !== (string) Auth::employeeId() && !$isCopy)) {

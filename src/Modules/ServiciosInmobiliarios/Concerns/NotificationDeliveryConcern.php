@@ -46,13 +46,13 @@ trait NotificationDeliveryConcern
     return ['email' => $sent, 'whatsapp' => $whatsapp];
   }
 
-  /** Enlace firmado de la vista pública del caso; solo si falta el _ID se conserva la vista antigua. */
+  /** Enlace firmado de la vista pública del caso; si falta el _ID, el del panel con el número del caso. */
   private function caseEmailUrl(array $ticket, string $logicalTicket, string $role): string
   {
     $ticketPk = (int) ($ticket['_ID'] ?? 0);
     return $ticketPk > 0
       ? \SCM\Support\CaseReplyNotifications::emailCaseUrl($ticketPk, $role)
-      : 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
+      : \SCM\Support\CaseLink::panelUrl($logicalTicket);
   }
 
   /** @return array{email:int,whatsapp:int} */

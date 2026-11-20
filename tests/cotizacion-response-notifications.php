@@ -43,6 +43,7 @@ namespace {
   require $root . '/src/Support/EmailQueue.php';
   require $root . '/src/Support/SmsQueue.php';
   require $root . '/src/Support/EmailTemplate.php';
+  require $root . '/src/Support/CaseLink.php';
   require $root . '/src/Modules/ServiciosInmobiliarios/Concerns/NotificationDeliveryConcern.php';
   function wp_kses_post(string $text): string { return strip_tags($text, '<p><strong>'); }
   function wp_strip_all_tags(string $text): string { return strip_tags($text); }
@@ -134,7 +135,7 @@ namespace {
     $row = $storage->rows[0];
     check(preg_match('/\bticket\b/i', $row['subject'] . ' ' . $row['message_text']) === 0, 'Case notification must not expose the old term');
     check(str_contains($row['subject'], 'caso #10841') || str_contains($row['subject'], 'Caso #10841'), 'Case number missing from subject');
-    check(str_contains($row['message_html'], '/ticket/?id_ticket=10841') && str_contains($row['message_html'], 'Ver caso'), 'Case link must preserve its compatible URL and new label');
+    check(str_contains($row['message_html'], '?scm_case=10841') && !str_contains($row['message_html'], '/ticket/?id_ticket=') && str_contains($row['message_html'], 'Ver caso'), 'Case link without _ID opens the case in the panel (never the old ticket page) with the new label');
     check($row['destination'] === 'cliente@example.test' && $row['status'] === 'pending', 'Case terminology must preserve recipients and queue delivery');
   }
   $storage->rows = [];

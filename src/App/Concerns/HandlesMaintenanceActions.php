@@ -111,7 +111,7 @@ trait HandlesMaintenanceActions
     $rawConfig = json_decode(stripslashes((string)($_POST['config'] ?? '{}')), true);
     $rawConfig = is_array($rawConfig) ? $rawConfig : [];
     $config = [
-      'ticket_url'     => self::sanitizeUrl($rawConfig['ticket_url']     ?? self::DEFAULT_TICKET_URL),
+      'ticket_url'     => \SCM\Support\CaseLink::base(),
       'preventiva_url' => self::sanitizeUrl($rawConfig['preventiva_url'] ?? self::defaultPreventiveReviewUrl()),
       'correctiva_url' => self::sanitizeUrl($rawConfig['correctiva_url'] ?? self::defaultCorrectiveReviewUrl()),
       'cotizacion_url' => self::sanitizeUrl($rawConfig['cotizacion_url'] ?? self::DEFAULT_COTIZACION_URL),
@@ -175,7 +175,7 @@ trait HandlesMaintenanceActions
     $rawConfig = json_decode(stripslashes((string)($_POST['config'] ?? '{}')), true);
     $rawConfig = is_array($rawConfig) ? $rawConfig : [];
     $config = [
-      'ticket_url'     => self::sanitizeUrl($rawConfig['ticket_url']     ?? self::DEFAULT_TICKET_URL),
+      'ticket_url'     => \SCM\Support\CaseLink::base(),
       'preventiva_url' => self::sanitizeUrl($rawConfig['preventiva_url'] ?? self::defaultPreventiveReviewUrl()),
       'correctiva_url' => self::sanitizeUrl($rawConfig['correctiva_url'] ?? self::defaultCorrectiveReviewUrl()),
       'cotizacion_url' => self::sanitizeUrl($rawConfig['cotizacion_url'] ?? self::DEFAULT_COTIZACION_URL),

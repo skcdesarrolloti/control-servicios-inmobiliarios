@@ -373,7 +373,7 @@ trait HandlesPublicPqrActions
     $html = $this->render_public_pqr_tab(
       $result,
       $funcionarios,
-      self::DEFAULT_TICKET_URL,
+      \SCM\Support\CaseLink::base(),
       $employeeIdFilter,
       false,
       [],
