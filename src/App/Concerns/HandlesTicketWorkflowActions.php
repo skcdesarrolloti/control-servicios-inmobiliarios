@@ -1062,6 +1062,7 @@ trait HandlesTicketWorkflowActions
     }
     try {
       $notifyChannels = $this->contractRequestSelectedChannels($notifyRecipients, $_POST['notify_channels'] ?? null);
+      $observation = $this->contractRequestObservation();
     } catch (\InvalidArgumentException $exception) {
       $this->jsonFail($exception->getMessage()); return;
     }
@@ -1108,7 +1109,7 @@ trait HandlesTicketWorkflowActions
       $finContratoTs = $this->contractTerminationTimestamp($ticket['fin_contrato'] ?? '');
       $endDate = $finContratoTs > 0 ? date('Y-m-d', $finContratoTs) : '';
     }
-    $responseText = $this->contractTerminationResponseText($ticket, $term, $requestDate, $endDate);
+    $responseText = $this->contractRequestWithObservation($this->contractTerminationResponseText($ticket, $term, $requestDate, $endDate), $observation);
 
     try {
       $acta = $this->generateContractTerminationActa($ticket, $term, $responseText, $requestDate, $endDate, $creatorName, $creatorDetails);
@@ -1207,6 +1208,7 @@ trait HandlesTicketWorkflowActions
     }
     try {
       $notifyChannels = $this->contractRequestSelectedChannels($notifyRecipients, $_POST['notify_channels'] ?? null);
+      $observation = $this->contractRequestObservation();
     } catch (\InvalidArgumentException $exception) {
       $this->jsonFail($exception->getMessage()); return;
     }
@@ -1246,7 +1248,7 @@ trait HandlesTicketWorkflowActions
       $finContratoTs = $this->contractTerminationTimestamp($ticket['fin_contrato'] ?? '');
       $endDate = $finContratoTs > 0 ? date('Y-m-d', $finContratoTs) : '';
     }
-    $responseText = $this->contractNonRenewalResponseText($ticket, $term, $requestDate, $endDate);
+    $responseText = $this->contractRequestWithObservation($this->contractNonRenewalResponseText($ticket, $term, $requestDate, $endDate), $observation);
     $retentionTicket = [];
     if ($createRetentionTicket) {
       if ($retentionEmployeeId === '') {
@@ -4727,7 +4729,7 @@ trait HandlesTicketWorkflowActions
   private function contractTerminationTicketSelect(string $table): array
   {
     $columns = [
-      '_ID', 'id_ticket', 'tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion', 'estado', 'estado_administrativo',
+      '_ID', 'id_ticket', 'tipo_pqrs', 'tema_ayuda', 'asunto', 'descripcion', 'archivos', 'estado', 'estado_administrativo',
       'id_contrato', 'contrato', 'id_inmueble', 'id_inmueble_data', 'codigo_inmueble_web', 'inmueble', 'direccion', 'barrio', 'ciudad',
       'fin_contrato', 'fecha_final_contrato', 'fecha_terminacion_contrato',
       'solicitante', 'solicitante_tipo', 'correo_solicitante', 'celular_solicitante',
@@ -4805,6 +4807,11 @@ trait HandlesTicketWorkflowActions
     $merged['solicitud_fecha'] = $solicitud['fecha'] ?? '';
     $merged['solicitud_created'] = $solicitud['cct_created'] ?? '';
     $merged['motivo'] = trim((string) ($solicitud['motivo'] ?? ''));
+    // Answering overwrites carta_* with the generated acta; only an untouched record still points to the requester's letter.
+    $carta = @unserialize((string) ($solicitud['carta_archivo'] ?? ''), ['allowed_classes' => false]);
+    $cartaIsActa = is_array($carta) && array_key_exists('tipo_respuesta', $carta);
+    $merged['solicitud_carta_url'] = $cartaIsActa ? '' : trim((string) ($solicitud['carta_url'] ?? ''));
+    $merged['solicitud_carta_archivo'] = $cartaIsActa ? '' : ($solicitud['carta_archivo'] ?? '');
     $merged['ticket_pk'] = $ticketPk;
     $merged['id_ticket'] = $logicalTicket;
     $merged['asunto'] = $this->contractTerminationFirstText([$ticket], ['asunto', 'tema_ayuda', 'tipo_pqrs']) ?: 'Solicitud de terminación de contrato';
@@ -5111,7 +5118,7 @@ trait HandlesTicketWorkflowActions
       'recipients' => $includeCase ? $this->contractTerminationRecipientOptions($row, 'no_prorroga_contrato') : [],
       'retention_ticket' => $includeCase ? $this->contractRetentionTicketUiData($row) : [],
       'case' => $case,
-    ];
+    ] + $this->contractRequestReviewData($row);
   }
 
   /** @return array<int,array<string,mixed>> */
@@ -6131,7 +6138,7 @@ trait HandlesTicketWorkflowActions
       'recipients' => $includeCase ? $this->contractTerminationRecipientOptions($row) : [],
       'retention_ticket' => $includeCase ? $this->contractRetentionTicketUiData($row) : [],
       'case' => $case,
-    ];
+    ] + $this->contractRequestReviewData($row);
   }
 
   /** @param array<string,mixed> $ticket @return array<int,array<string,mixed>> */
@@ -6709,6 +6716,70 @@ trait HandlesTicketWorkflowActions
     $digits = preg_replace('/\D+/', '', $raw) ?: '';
     if (strlen($digits) === 10 && !str_starts_with(trim($raw), '+')) $digits = '57' . $digits;
     return preg_match('/^[1-9][0-9]{7,14}$/D', $digits) ? '+' . $digits : '';
+  }
+
+  /** Optional reply to the content of the request letter; it travels inside the response text (acta, email and case history). */
+  private function contractRequestObservation(): string
+  {
+    $raw = strip_tags(str_replace(["\r\n", "\r"], "\n", wp_unslash((string) ($_POST['observaciones'] ?? ''))));
+    if (mb_strlen($raw, 'UTF-8') > 4000) {
+      throw new \InvalidArgumentException('Las observaciones no pueden superar 4000 caracteres.');
+    }
+    // Each line becomes its own paragraph: the acta wraps text and would otherwise merge single line breaks.
+    $lines = array_filter(array_map(static fn(string $line): string => trim((string) preg_replace('/[ \t]+/', ' ', $line)), explode("\n", $raw)), static fn(string $line): bool => $line !== '');
+    return implode("\n\n", $lines);
+  }
+
+  private function contractRequestWithObservation(string $responseText, string $observation): string
+  {
+    return $observation === '' ? $responseText : $responseText . "\n\nObservaciones sobre su solicitud:\n\n" . $observation;
+  }
+
+  /**
+   * Request description and attached letter so the response popup can be answered without opening the case.
+   * @param array<string,mixed> $row
+   * @return array{descripcion:string,documentos:array<int,array{nombre:string,url:string,tipo:string}>}
+   */
+  private function contractRequestReviewData(array $row): array
+  {
+    $description = (string) ($row['descripcion'] ?? '');
+    $description = (string) preg_replace('#<br\s*/?>|</(p|div|li|h[1-6])>#i', "\n", $description);
+    $description = html_entity_decode(strip_tags($description), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $description = trim((string) preg_replace("/\n{3,}/", "\n\n", str_replace(["\r\n", "\r"], "\n", $description)));
+    if ($description === '') {
+      $description = trim((string) ($row['motivo'] ?? ''));
+    }
+
+    $documents = [];
+    $add = static function ($url, $name) use (&$documents): void {
+      $url = trim((string) $url);
+      if ($url === '' || !preg_match('#^https?://#i', $url) || isset($documents[$url])) return;
+      $path = (string) parse_url($url, PHP_URL_PATH);
+      $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+      $documents[$url] = [
+        'nombre' => trim((string) $name) ?: (rawurldecode(basename($path)) ?: 'Documento adjunto'),
+        'url' => $url,
+        'tipo' => $ext === 'pdf' ? 'pdf' : (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true) ? 'imagen' : 'archivo'),
+      ];
+    };
+    foreach (['archivos', 'solicitud_carta_archivo'] as $column) {
+      $raw = $row[$column] ?? '';
+      $list = is_array($raw) ? $raw : [];
+      if (is_string($raw) && trim($raw) !== '') {
+        $decoded = @unserialize($raw, ['allowed_classes' => false]);
+        $list = is_array($decoded) ? $decoded : (json_decode($raw, true) ?: []);
+      }
+      foreach (is_array($list) ? $list : [] as $item) {
+        if (is_array($item)) {
+          $add($item['archivo'] ?? $item['media_archivo'] ?? $item['url'] ?? '', $item['nombre_archivo'] ?? $item['nombre'] ?? '');
+        } elseif (is_string($item)) {
+          $add($item, '');
+        }
+      }
+    }
+    $add($row['solicitud_carta_url'] ?? '', 'Carta de la solicitud');
+
+    return ['descripcion' => mb_substr($description, 0, 8000, 'UTF-8'), 'documentos' => array_values($documents)];
   }
 
   private function contractTerminationHumanDate(string $date): string

@@ -17798,14 +17798,56 @@
       }
     }
 
+    // Request text and attached letter, readable inside the response popup without opening the case.
+    function contractRequestReviewHtml(row) {
+      var description = String(row.descripcion || '').trim();
+      var documents = (Array.isArray(row.documentos) ? row.documentos : []).filter(function (doc) { return doc && /^https?:\/\//i.test(String(doc.url || '')); });
+      var docs = documents.map(function (doc, index) {
+        var previewable = doc.tipo === 'pdf' || doc.tipo === 'imagen';
+        return '<div class="scm-contract-review-doc"><div class="scm-contract-review-doc-head">' + contractUiIcon('document') + '<span class="min-w-0">' + escHtml(doc.nombre || 'Documento adjunto') + '</span>' +
+          (previewable
+            ? '<button type="button" class="scm-contract-button" data-contract-doc-toggle="' + index + '" aria-expanded="false">' + contractUiIcon('eye') + 'Ver</button>'
+            : '<a class="scm-contract-button" href="' + escHtml(doc.url) + '" download>' + contractUiIcon('download') + 'Descargar</a>') +
+          '</div>' + (previewable ? '<div class="scm-contract-review-preview" data-contract-doc-preview="' + index + '" data-type="' + escHtml(doc.tipo) + '" data-url="' + escHtml(doc.url) + '" data-name="' + escHtml(doc.nombre || 'Documento adjunto') + '" hidden></div>' : '') + '</div>';
+      }).join('');
+      return '<section class="scm-contract-review" data-contract-request-review><strong class="text-[10px] uppercase tracking-wider">Solicitud recibida</strong>' +
+        '<div class="scm-contract-review-text" tabindex="0" aria-label="Descripción de la solicitud">' + (description ? escHtml(description) : '<em>La solicitud no tiene descripción registrada.</em>') + '</div>' +
+        (docs ? '<div class="grid gap-2">' + docs + '</div>' : '<p class="!m-0 text-xs">Sin carta ni documentos adjuntos.</p>') + '</section>';
+    }
+
+    function initContractRequestReview(form) {
+      form.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-contract-doc-toggle]');
+        if (!button) return;
+        event.preventDefault();
+        var preview = form.querySelector('[data-contract-doc-preview="' + button.getAttribute('data-contract-doc-toggle') + '"]');
+        if (!preview) return;
+        var open = preview.hidden;
+        if (open && !preview.firstChild) {
+          var url = preview.getAttribute('data-url'), name = preview.getAttribute('data-name');
+          var media = document.createElement(preview.getAttribute('data-type') === 'pdf' ? 'iframe' : 'img');
+          if (media.tagName === 'IFRAME') media.title = name; else media.alt = name;
+          media.src = url;
+          var download = document.createElement('a');
+          download.className = 'scm-contract-review-download'; download.href = url; download.setAttribute('download', ''); download.textContent = 'Descargar archivo';
+          preview.appendChild(media); preview.appendChild(download);
+        }
+        preview.hidden = !open;
+        button.setAttribute('aria-expanded', String(open));
+        button.lastChild.textContent = open ? 'Ocultar' : 'Ver';
+      });
+    }
+
     function contractResponseFormHtml(row, kind) {
       var meta = [row.contrato ? 'Contrato #' + row.contrato : '', row.inmueble ? 'Inmueble ' + row.inmueble : '', row.direccion || ''].filter(Boolean).join(' · ');
       return '<form class="scm-contract-response-form" data-scm-contract-' + kind + '-form>' +
         '<div class="rounded-xl bg-[#f2f3ff] p-4 space-y-2"><div class="flex flex-wrap items-center gap-2"><span class="scm-contract-tag !bg-[#dae2ff] font-semibold">' + contractUiIcon('ticket') + escHtml(row.titulo || 'Caso') + '</span><strong>' + escHtml(row.asunto || 'Solicitud contractual') + '</strong></div><p class="!m-0 text-xs">' + escHtml(meta) + '</p></div>' +
+        contractRequestReviewHtml(row) +
         '<div data-contract-response-term>' + contractTerminationTermBadge(row, false) + '</div>' +
         '<div class="grid grid-cols-1 md:grid-cols-2 gap-4"><label class="scm-contract-field"><span>Clasificación de la respuesta <b class="text-red-700">*</b></span><select name="termino" required><option value="">Selecciona clasificación</option><option value="dentro">Dentro de término</option><option value="fuera">Fuera de término</option></select></label><label class="scm-contract-field"><span>Fecha solicitud</span><input type="date" name="fecha_solicitud" value="' + escHtml(row.fecha_solicitud || '') + '" readonly aria-readonly="true"></label>' +
         '<label class="scm-contract-field"><span>Fecha fin del contrato <b class="text-red-700">*</b></span><input type="date" name="fin_contrato" required value="' + escHtml(row.fin_contrato || '') + '"><small>El cálculo se actualiza al editar. La fecha se guarda en el contrato al responder.</small></label>' +
         '<input type="hidden" name="fecha_terminacion" value="' + escHtml(row.fin_contrato || '') + '"></div>' +
+        '<label class="scm-contract-field"><span>Observaciones de la respuesta</span><textarea name="observaciones" rows="4" maxlength="4000" placeholder="Responde aquí al contenido de la carta o la descripción de la solicitud (opcional)."></textarea><small>Se agregan al final del acta, al correo de respuesta y quedan en el historial del caso.</small></label>' +
         contractRetentionTicketBlockHtml(row) + '<section><div class="flex items-center justify-between gap-3 mb-3"><strong class="text-[10px] uppercase tracking-wider">Notificar a</strong><span class="text-[10px]">Correo y WhatsApp por destinatario</span></div>' + contractTerminationRecipientChecks(row) + '</section></form>';
     }
 
@@ -18094,6 +18136,7 @@
           if (!form) return;
           initContractResponseReturn(form, row, 'termination', draft);
           initContractResponseDates(form, row);
+          initContractRequestReview(form);
           syncContractRetentionTicketState(form);
           form.addEventListener("change", function (event) {
             if (event.target && event.target.name === "notify_recipients[]") {
@@ -18139,6 +18182,7 @@
             termino: term.value,
             fin_contrato: form.querySelector('[name=fin_contrato]').value,
             fecha_terminacion: form.querySelector("[name='fecha_terminacion']").value,
+            observaciones: form.querySelector('[name=observaciones]').value.trim(),
             crear_ticket_retencion: createRetention && createRetention.checked ? "1" : "0",
             retencion_id_empleado: retentionEmployee ? retentionEmployee.value : "",
             channels: channels,
@@ -18155,6 +18199,7 @@
           fd.append("fecha_terminacion", value.fecha_terminacion || "");
           fd.append("fin_contrato", value.fin_contrato || "");
           fd.append("fin_contrato_original", row.fin_contrato || "");
+          fd.append("observaciones", value.observaciones || "");
           fd.append("crear_ticket_retencion", value.crear_ticket_retencion || "0");
           fd.append("retencion_id_empleado", value.retencion_id_empleado || "");
           fd.append("notify_recipients_present", "1");
@@ -18209,6 +18254,7 @@
           if (!form) return;
           initContractResponseReturn(form, row, 'non-renewal', draft);
           initContractResponseDates(form, row);
+          initContractRequestReview(form);
           syncContractRetentionTicketState(form);
           form.addEventListener("change", function (event) {
             if (event.target && event.target.name === "notify_recipients[]") {
@@ -18254,6 +18300,7 @@
             termino: term.value,
             fin_contrato: form.querySelector('[name=fin_contrato]').value,
             fecha_terminacion: form.querySelector("[name='fecha_terminacion']").value,
+            observaciones: form.querySelector('[name=observaciones]').value.trim(),
             crear_ticket_retencion: createRetention && createRetention.checked ? "1" : "0",
             retencion_id_empleado: retentionEmployee ? retentionEmployee.value : "",
             channels: channels,
@@ -18270,6 +18317,7 @@
           fd.append("fecha_terminacion", value.fecha_terminacion || "");
           fd.append("fin_contrato", value.fin_contrato || "");
           fd.append("fin_contrato_original", row.fin_contrato || "");
+          fd.append("observaciones", value.observaciones || "");
           fd.append("crear_ticket_retencion", value.crear_ticket_retencion || "0");
           fd.append("retencion_id_empleado", value.retencion_id_empleado || "");
           fd.append("notify_recipients_present", "1");

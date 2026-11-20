@@ -67,7 +67,7 @@ eval('?>' . substr($source, $start, $end - $start));
         if (action === 'request-reopen') { answeredFixture.items = answeredFixture.items.filter(row => row.solicitud_id !== fd.get('solicitud_id')); answeredFixture.count = answeredFixture.items.length; }
         return Promise.resolve({message:'Guardado simulado',renewal_probability_updated:fd.get('termino') === 'dentro',contract_end_date_updated:fd.get('fin_contrato') !== fd.get('fin_contrato_original')});
       }
-      var base = {solicitud_id:'41',ticket_pk:'41',id_ticket:'10863',titulo:'Caso #10863',asunto:'Solicitud de terminación de contrato de arrendamiento',creado:'05/10/2026 08:54',contrato:'2000',inmueble:'204578',direccion:'Urbanización Simón Bolívar manzana 20 lote 7',solicitante:'ARRENDATARIO DE EJEMPLO',estado:'Nuevo',estado_administrativo:'Nuevo',estado_solicitud:'Pendiente',fecha_solicitud:'2026-10-05',fin_contrato:'2027-01-09',fin_contrato_label:'09/01/2027',fecha_limite_label:'09/10/2026',term_status:'dentro',term_label:'Dentro de término',term_hint:'Solicitud recibida antes o el 09/10/2026.',case:{case_source_html:'<p>Detalle del caso</p>'},retention_ticket:{enabled:true,default_employee_id:'13',funcionarios:[{id:'13',name:'Funcionario de Ejemplo',cargo:'Asistente de Desarrollo TI'}],assignment_help:[{label:'Contrato',value:'#2000'},{label:'Contrato de',value:'Arrendatario: CLIENTE / Propietario: PROPIETARIO'},{label:'Inmueble',value:'Inmueble 204578 · Urbanización Simón Bolívar'},{label:'Funcionario relacionado',value:'Funcionario de Ejemplo · Asistente de Desarrollo TI'},{label:'Sugerido para asignar',value:'Funcionario de Ejemplo · Asistente de Desarrollo TI'}]},recipients:[{value:'arrendatario',label:'Arrendatario',name:'CLIENTE',email:'cliente@example.invalid',phone:'3001112233',available:true},{value:'propietario',label:'Propietario',name:'PROPIETARIO',email:'propietario@example.invalid',available:true},{value:'admin',label:'Funcionario configurado',name:'Funcionario',available:false}]};
+      var base = {solicitud_id:'41',ticket_pk:'41',id_ticket:'10863',titulo:'Caso #10863',asunto:'Solicitud de terminación de contrato de arrendamiento',creado:'05/10/2026 08:54',contrato:'2000',inmueble:'204578',direccion:'Urbanización Simón Bolívar manzana 20 lote 7',solicitante:'ARRENDATARIO DE EJEMPLO',estado:'Nuevo',estado_administrativo:'Nuevo',estado_solicitud:'Pendiente',fecha_solicitud:'2026-10-05',fin_contrato:'2027-01-09',fin_contrato_label:'09/01/2027',fecha_limite_label:'09/10/2026',term_status:'dentro',term_label:'Dentro de término',term_hint:'Solicitud recibida antes o el 09/10/2026.',case:{case_source_html:'<p>Detalle del caso</p>'},descripcion:'Motivo: humedad en el baño.' + String.fromCharCode(10) + '<img src=x onerror=alert(1)>',documentos:[{nombre:'Carta de terminación.pdf',url:'https://example.invalid/carta.pdf',tipo:'pdf'},{nombre:'Soporte.docx',url:'https://example.invalid/soporte.docx',tipo:'archivo'},{nombre:'Malicioso',url:'javascript:alert(1)',tipo:'pdf'}],retention_ticket:{enabled:true,default_employee_id:'13',funcionarios:[{id:'13',name:'Funcionario de Ejemplo',cargo:'Asistente de Desarrollo TI'}],assignment_help:[{label:'Contrato',value:'#2000'},{label:'Contrato de',value:'Arrendatario: CLIENTE / Propietario: PROPIETARIO'},{label:'Inmueble',value:'Inmueble 204578 · Urbanización Simón Bolívar'},{label:'Funcionario relacionado',value:'Funcionario de Ejemplo · Asistente de Desarrollo TI'},{label:'Sugerido para asignar',value:'Funcionario de Ejemplo · Asistente de Desarrollo TI'}]},recipients:[{value:'arrendatario',label:'Arrendatario',name:'CLIENTE',email:'cliente@example.invalid',phone:'3001112233',available:true},{value:'propietario',label:'Propietario',name:'PROPIETARIO',email:'propietario@example.invalid',available:true},{value:'admin',label:'Funcionario configurado',name:'Funcionario',available:false}]};
       var fixture = {generated_at:'05/10/2026 11:03',count:3,items:[base,Object.assign({},base,{solicitud_id:'42',ticket_pk:'42',titulo:'Caso #10864',id_ticket:'10864',contrato:'2001',term_status:'fuera',term_label:'Fuera de término'}),Object.assign({},base,{solicitud_id:'43',ticket_pk:'43',titulo:'Caso #10865',id_ticket:'10865',term_status:'unknown',term_label:'Sin cálculo de término',asunto:'<img src=x onerror=alert(1)>',solicitante:'=1+1'})]};
     ` + caseBridge + functions });
     await page.evaluate(() => { fixture.can_delete = true; renderContractTermination(fixture); renderContractNonRenewal(fixture); document.querySelector('#scm-home-calendar-section-contract-non-renewal').style.display='none'; });
@@ -98,6 +98,20 @@ eval('?>' . substr($source, $start, $end - $start));
       const popup = page.locator('.scm-contract-response-swal');
       await popup.waitFor();
       assert.equal(await popup.locator('[name="fecha_terminacion"]').getAttribute('type'),'hidden');
+      const review = popup.locator('[data-contract-request-review]');
+      assert.match(await review.locator('.scm-contract-review-text').innerText(),/Motivo: humedad en el baño\.\n<img src=x/,'request description is shown as plain text');
+      assert.equal(await review.locator('img').count(),0,'untrusted description is escaped');
+      assert.equal(await review.locator('.scm-contract-review-doc').count(),2,'only http(s) attachments are listed');
+      assert.equal(await review.locator('a[href^="javascript"]').count(),0);
+      assert.equal(await review.locator('a[download][href="https://example.invalid/soporte.docx"]').count(),1,'non-previewable files offer download, not a new tab');
+      assert.equal(await review.locator('[target="_blank"]').count(),0);
+      await review.locator('[data-contract-doc-toggle="0"]').click();
+      assert.equal(await review.locator('[data-contract-doc-preview="0"] iframe').getAttribute('src'),'https://example.invalid/carta.pdf','letter previews inside the popup');
+      await page.screenshot({path:path.join(qaDir,kind+'-modal-letter.png')});
+      assert.equal(await review.locator('[data-contract-doc-toggle="0"]').getAttribute('aria-expanded'),'true');
+      await review.locator('[data-contract-doc-toggle="0"]').click();
+      assert(await review.locator('[data-contract-doc-preview="0"]').isHidden(),'letter preview can be collapsed');
+      await popup.locator('[name="observaciones"]').fill('  Revisaremos la humedad reportada.  ');
       await page.mouse.move(0,0);
       await page.waitForTimeout(350);
       await page.screenshot({path:path.join(qaDir,kind+'-modal-initial.png')});
@@ -148,7 +162,7 @@ eval('?>' . substr($source, $start, $end - $start));
     }
     const sent = await page.evaluate(() => requests);
     assert.deepEqual(sent.map(r=>r.action),['termination-save','non-renewal-save']);
-    sent.forEach(r => { const data = Object.fromEntries(r.data); assert.equal(data.ticket_pk,'41'); assert.equal(data.retencion_id_empleado,'13'); assert.equal(data['notify_recipients[]'],'none'); assert.equal(data.termino,'fuera'); assert.equal(data.fin_contrato_original,'2027-01-09'); assert.match(data.fin_contrato,/^2027-02-/); });
+    sent.forEach(r => { const data = Object.fromEntries(r.data); assert.equal(data.ticket_pk,'41'); assert.equal(data.retencion_id_empleado,'13'); assert.equal(data['notify_recipients[]'],'none'); assert.equal(data.termino,'fuera'); assert.equal(data.fin_contrato_original,'2027-01-09'); assert.equal(data.observaciones,'Revisaremos la humedad reportada.'); assert.match(data.fin_contrato,/^2027-02-/); });
     for (const kind of ['termination','non-renewal']) {
       await page.evaluate(kind => {
         const rows = kind === 'termination' ? contractTerminationRowsByPk : contractNonRenewalRowsByPk;

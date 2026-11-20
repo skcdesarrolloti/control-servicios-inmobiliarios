@@ -28,6 +28,11 @@ final class ContractLetterProbe
       ? $this->generateContractTerminationActa($ticket,$term,$text,$request,$end,'Funcionario de ejemplo',$details)
       : $this->generateContractNonRenewalActa($ticket,$term,$text,'Funcionario de ejemplo',$details);
   }
+  public function observedText(string $text, string $observation): string { return $this->contractRequestWithObservation($text, $observation); }
+  public function observed(array $ticket, string $observation): array {
+    $text = $this->contractRequestWithObservation($this->contractTerminationResponseText($ticket,'fuera','2026-10-08','2027-01-09'), $observation);
+    return [$text, $this->generateContractTerminationActa($ticket,'fuera',$text,'2026-10-08','2027-01-09','Funcionario de ejemplo','Gestión de arrendamientos')];
+  }
 }
 $probe = new ContractLetterProbe();
 $ticket = ['_ID'=>10916,'id_ticket'=>'EJEMPLO-10916','contrato'=>'2000','inmueble'=>'204578','id_inmueble'=>'84016','id_inmueble_data'=>'12466','solicitante'=>'ARRENDATARIO DE EJEMPLO','direccion'=>'Calle de Ejemplo No. 10-20, apartamento 301, Cartagena'];
@@ -65,7 +70,26 @@ $result = $probe->generate('terminacion','fuera',$missing);
 $bytes = file_get_contents($result['path']);
 check(str_contains($bytes,'Inmueble SIMI: -') && !str_contains($bytes,'84016') && !str_contains($bytes,'12466'),'No fallback to a different identifier');
 unlink($result['path']);
+// Optional observations answer the letter content: they close the acta body, one paragraph per line, and long ones still keep the signature.
+foreach (['corta' => "Lamentamos las molestias.
+
+El daño fue atendido según la orden #55.", 'larga' => implode("
+
+", array_fill(0, 12, 'Revisamos cada punto de su carta y dejamos constancia de las visitas técnicas realizadas, los radicados atendidos y los soportes disponibles en el caso.'))] as $label => $observation) {
+  [$text, $result] = $probe->observed($ticket, $observation);
+  check(str_ends_with($text, $observation) && str_contains($text, "
+
+Observaciones sobre su solicitud:
+
+"), 'Observation appended after the standard answer');
+  $bytes = file_get_contents($result['path']);
+  check(str_contains($bytes, literal('Observaciones sobre su solicitud:')), 'Observation heading rendered in the acta: ' . $label);
+  check($label !== 'corta' || str_contains($bytes, literal('Lamentamos las molestias.')), 'Observation text rendered in the acta');
+  check(str_contains($bytes, '(Atentamente)') && str_contains($bytes, '(Funcionario de ejemplo)'), 'Signature kept with observation: ' . $label);
+  rename($result['path'], $directory . '/acta-terminacion-observacion-' . $label . '.pdf');
+}
+check($probe->observedText('Texto', '') === 'Texto', 'Empty observation leaves the answer untouched');
 // Opt-in document settings must not remove other modules' default footer.
 $pdf = new \SCM\Support\SimplePdf(); $pdf->paragraph('Documento de otro módulo');
 check(str_contains($pdf->bytes(),literal('Página 1')),'Other documents retain page number');
-echo "PASS: all four letters, removed decorations/footer, legal name, bold openings, SIMI selection, centred body, separated closing, safe letterhead margins, single-page layout and shared defaults. PDFs: {$directory}\n";
+echo "PASS: all four letters, removed decorations/footer, legal name, bold openings, SIMI selection, centred body, separated closing, safe letterhead margins, single-page layout, observations and shared defaults. PDFs: {$directory}\n";
