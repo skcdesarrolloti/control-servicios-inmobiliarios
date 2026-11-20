@@ -223,7 +223,9 @@ trait HandlesPublicPqrActions
     $publicService = new \SCM\Modules\PublicTickets\PublicTicketsService($this->db, $appConfig);
     $publicRequestsUrl = $publicService->buildResponsiblePublicPqrUrl($employeeId, 2592000, 'assigned');
     $logicalTicket = trim((string) ($ticket['id_ticket'] ?? $ticket['_ID'] ?? ''));
-    $ticketUrl = self::DEFAULT_TICKET_URL . rawurlencode($logicalTicket);
+    // Correo y WhatsApp van solo a este funcionario: su enlace individual inicia la sesión y abre el caso.
+    $ticketPk = (int) ($ticket['_ID'] ?? 0);
+    $ticketUrl = $ticketPk > 0 ? \SCM\Support\PublicCaseAccess::staffUrl($ticketPk, $employeeId) : rtrim((string) SCM_BASE_URL, '/') . '/';
     $contractLabel = trim((string) ($ticket['contrato'] ?? $ticket['id_contrato'] ?? ''));
     $subject = 'Solicitud web trasladada #' . $logicalTicket;
     $displayName = $employeeName !== '' ? $employeeName : ('Funcionario #' . $employeeId);
@@ -242,6 +244,7 @@ trait HandlesPublicPqrActions
       }
       $html = \SCM\Support\EmailTemplate::render($subject, $content, [
         'ticket_url' => $ticketUrl,
+        'ticket_label' => 'Ver caso',
         'buttons' => $buttons,
       ]);
       (new \SCM\Support\EmailQueue($this->db))->enqueue($employeeEmail, $subject, $html, [
@@ -260,7 +263,7 @@ trait HandlesPublicPqrActions
       if ($oldEmployeeName !== '') {
         $message .= '*Funcionario anterior:* ' . $oldEmployeeName . "\n";
       }
-      $message .= "\n*Ver solicitud:*\n" . $ticketUrl;
+      $message .= "\n*Ver caso:*\n" . $ticketUrl;
       if ($publicRequestsUrl !== '') {
         $message .= "\n\n*Tus solicitudes web:*\n" . $publicRequestsUrl;
       }

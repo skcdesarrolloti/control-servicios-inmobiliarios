@@ -1380,13 +1380,19 @@ trait WorkflowCommandsConcern
     string $newEmpId = ''
   ): int {
     $logicalTicket = $this->firstNonEmpty([$ticket['id_ticket'] ?? '', $ticket['_ID'] ?? '']);
-    $ticketUrl = 'https://sucasainmobiliaria.com.co/ticket/?id_ticket=' . rawurlencode($logicalTicket);
     $subject   = 'Traslado del caso #' . $logicalTicket;
     $sent      = 0;
     $fecha     = date('Y-m-d H:i');
     $targets = $this->normalizeTargets($notifyTargets);
     $copies = in_array('admin', $targets, true) && !in_array('none', $targets, true) ? $this->adminNotificationEmails('trasladar_caso') : [];
-    $botones   = EmailTemplate::buttons([['url' => $ticketUrl, 'label' => 'Ver caso']]);
+    // Cada correo lleva el enlace firmado del caso para su destinatario (nunca la página de tickets anterior). El nuevo
+    // responsable recibe su enlace individual con inicio de sesión solo si el correo no lleva copias.
+    $caseButton = fn(string $role): string => EmailTemplate::buttons([['url' => $this->caseEmailUrl($ticket, $logicalTicket, $role), 'label' => 'Ver caso']]);
+    $ticketPk  = (int) ($ticket['_ID'] ?? 0);
+    $botones   = $caseButton('empleado');
+    $newEmpButton = $copies === [] && $ticketPk > 0 && trim($newEmpId) !== ''
+      ? EmailTemplate::buttons([['url' => \SCM\Support\PublicCaseAccess::staffUrl($ticketPk, $newEmpId), 'label' => 'Ver caso']])
+      : $botones;
 
     $baseVars = [
       'id_ticket'        => EmailTemplate::e($logicalTicket),
@@ -1411,6 +1417,7 @@ trait WorkflowCommandsConcern
       $html = EmailTemplate::renderNamed('traslado_caso', array_merge($baseVars, [
         'destinatario'      => EmailTemplate::e($newEmpNombre ?: 'funcionario'),
         'mensaje_principal' => 'Se te ha asignado un nuevo caso.',
+        'botones'           => $newEmpButton,
       ]));
       $sent += $this->sendMailToUnique($newEmpCorreo, $subject, $html, ['internal_action' => 'trasladar_caso', 'internal_cc' => $copies, 'source_module' => 'trasladar_caso', 'meta' => ['event' => 'trasladar_caso', 'id_ticket' => $logicalTicket]]);
     }
@@ -1429,6 +1436,7 @@ trait WorkflowCommandsConcern
         $html = EmailTemplate::renderNamed('traslado_caso', array_merge($baseVars, [
           'destinatario'      => EmailTemplate::e($recipient['name'] ?: 'cliente'),
           'mensaje_principal' => 'Te informamos que el caso ha sido trasladado a un nuevo funcionario.',
+          'botones'           => $caseButton((string) ($recipient['role'] ?? '')),
         ]));
         $sent += $this->sendMailToUnique($recipient['email'], $subject, $html, ['internal_action' => 'trasladar_caso', 'internal_cc' => $recipient['internal_cc'] ?? [], 'source_module' => 'trasladar_caso', 'meta' => ['event' => 'trasladar_caso', 'id_ticket' => $logicalTicket]]);
       }

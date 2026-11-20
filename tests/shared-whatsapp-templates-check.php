@@ -30,3 +30,20 @@ foreach ([
     $check(str_contains($block, 'SharedButtonUrl::caseSuffix(') && !preg_match("/'button'.{0,200}'text' => \\\$logicalTicket\\]/s", $block), $template . ' sends the case path, not only the number, in ' . $file);
   }
 }
+
+// Los correos de traslado tampoco llevan a la página de tickets anterior.
+$functionBody = static function (string $file, string $function) use ($root): string {
+  $source = (string) file_get_contents($root . '/' . $file);
+  $start = (int) strpos($source, 'function ' . $function . '(');
+  $next = strpos($source, "\n  public function ", $start + 10);
+  $nextPrivate = strpos($source, "\n  private function ", $start + 10);
+  $end = min(array_filter([$next, $nextPrivate, strlen($source)], static fn($value): bool => $value !== false));
+  return substr($source, $start, $end - $start);
+};
+foreach ([
+  ['src/Modules/ServiciosInmobiliarios/Concerns/WorkflowCommandsConcern.php', 'notifyTrasladoCaso'],
+  ['src/App/Concerns/HandlesPublicPqrActions.php', 'notifyPublicPqrTransferToEmployee'],
+] as [$file, $function]) {
+  $body = $functionBody($file, $function);
+  $check($body !== '' && !str_contains($body, 'sucasainmobiliaria.com.co/ticket/') && !str_contains($body, 'DEFAULT_TICKET_URL'), $function . ' links the signed case, never the old ticket page');
+}
