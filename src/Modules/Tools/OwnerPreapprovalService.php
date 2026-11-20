@@ -249,12 +249,11 @@ final class OwnerPreapprovalService
     // Lo que recibe el propietario mes a mes con todos sus inmuebles (la póliza solo pesa en los meses de sus cuotas).
     $months = [];
     for ($month = 0; $month < 12; $month++) {
-      $months[] = [
-        'canon' => array_sum(array_column($sources, 'canon')),
-        'descuentos' => array_sum(array_map(static fn(array $item): float => $item['meses'][$month]['descuentos'], $sources)),
-        'poliza' => array_sum(array_map(static fn(array $item): float => $item['meses'][$month]['poliza'], $sources)),
-        'neto' => array_sum(array_map(static fn(array $item): float => $item['meses'][$month]['neto'], $sources)),
-      ];
+      $row = ['canon' => array_sum(array_column($sources, 'canon'))];
+      foreach (['comision', 'garantia', 'otros', 'descuentos', 'poliza', 'neto'] as $key) {
+        $row[$key] = array_sum(array_map(static fn(array $item): float => $item['meses'][$month][$key], $sources));
+      }
+      $months[] = $row;
     }
     return [
       'owner' => $owner, 'registered' => !empty($input['registered']), 'sources' => $sources, 'months' => $months,
@@ -290,16 +289,18 @@ final class OwnerPreapprovalService
    * Lo que recibe el propietario en cada uno de los próximos 12 meses por un inmueble: canon − descuentos fijos − la cuota
    * de la póliza en los meses en que se paga (la última cuota ajusta los centavos). Su promedio es el ingreso neto mensual.
    * @param array<string,mixed> $item
-   * @return list<array{descuentos:float,poliza:float,neto:float}>
+   * `otros` incluye el ajuste al descuento mínimo (al propietario no se le muestra aparte).
+   * @return list<array{comision:float,garantia:float,otros:float,descuentos:float,poliza:float,neto:float}>
    */
   public static function months(array $item): array
   {
-    $fixed = (float) $item['comision'] + (float) $item['garantia'] + (float) $item['otros'] + (float) ($item['ajuste'] ?? 0);
+    $others = (float) $item['otros'] + (float) ($item['ajuste'] ?? 0);
+    $fixed = (float) $item['comision'] + (float) $item['garantia'] + $others;
     $count = (int) $item['poliza_meses'];
     $months = [];
     for ($month = 1; $month <= 12; $month++) {
       $policy = $month > $count ? 0.0 : ($month === $count ? round((float) $item['poliza_total'] - (float) $item['poliza_cuota'] * ($count - 1), 2) : (float) $item['poliza_cuota']);
-      $months[] = ['descuentos' => $fixed, 'poliza' => $policy, 'neto' => max(0.0, (float) $item['canon'] - $fixed - $policy)];
+      $months[] = ['comision' => (float) $item['comision'], 'garantia' => (float) $item['garantia'], 'otros' => $others, 'descuentos' => $fixed, 'poliza' => $policy, 'neto' => max(0.0, (float) $item['canon'] - $fixed - $policy)];
     }
     return $months;
   }

@@ -191,13 +191,15 @@
 .ctl-months summary { display:flex; align-items:center; gap:8px; padding:10px 14px; cursor:pointer; font-size:13px; font-weight:700; color:var(--ctl-navy); background:var(--ctl-sky) }
 .ctl-months summary .material-symbols-outlined { font-size:18px; color:var(--ctl-blue) }
 .ctl-months table { width:100%; border-collapse:collapse; font-size:12.5px }
-.ctl-months th, .ctl-months td { padding:6px 14px; border-bottom:1px solid #eef2f6; text-align:right; white-space:nowrap }
+.ctl-months th, .ctl-months td { padding:6px 10px; border-bottom:1px solid #eef2f6; text-align:right; white-space:nowrap }
 .ctl-months th:first-child { text-align:left }
 .ctl-months thead th { font-size:11px; font-weight:700; color:var(--ctl-muted); text-transform:uppercase; letter-spacing:.04em }
 .ctl-months tbody th { font-weight:600; color:#334155 }
 .ctl-months tbody td:last-child { font-weight:700; color:var(--ctl-navy) }
 .ctl-months tr.is-policy th, .ctl-months tr.is-policy td { background:#fff7e6 }
-.ctl-months tr.is-policy td:nth-child(2) { color:#b45309; font-weight:600 }
+.ctl-months__scroll { overflow-x:auto }
+.ctl-months td.is-deduction { color:#475569 }
+.ctl-months tr.is-policy td.is-poliza { color:#b45309; font-weight:600 }
 .ctl-months tfoot th, .ctl-months tfoot td { border-bottom:0; font-weight:700; color:var(--ctl-navy); background:#fbfcfe }
 .ctl-source__foot {
   display:flex;

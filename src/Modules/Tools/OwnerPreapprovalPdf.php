@@ -136,13 +136,19 @@ final class OwnerPreapprovalPdf
     // Lo que recibe mes a mes (todos los inmuebles): solo si alguna póliza se descuenta por cuotas.
     $months = is_array($estimate['months'] ?? null) ? $estimate['months'] : [];
     if (array_sum(array_column($months, 'poliza')) > 0) {
+      // Cada descuento en su columna (solo los que tiene): comisión, garantía, otros y la cuota de la póliza.
+      $columns = array_filter(['comision' => 'Comisión', 'garantia' => 'Garantía', 'otros' => 'Otros descuentos', 'poliza' => 'Cuota de la póliza'], static fn(string $key): bool => array_sum(array_column($months, $key)) > 0, ARRAY_FILTER_USE_KEY);
       $monthRows = '';
       foreach ($months as $index => $month) {
-        $monthRows .= '<tr' . ($month['poliza'] > 0 ? ' class="is-policy"' : '') . '><th scope="row">Mes ' . ($index + 1) . '</th><td class="is-money">' . self::e(self::money((float) $month['canon'])) . '</td><td class="is-money">' . self::e(self::money((float) $month['descuentos'])) . '</td><td class="is-money">' . self::e($month['poliza'] > 0 ? self::money((float) $month['poliza']) : '—') . '</td><td class="is-money">' . self::e(self::money((float) $month['neto'])) . '</td></tr>';
+        $monthRows .= '<tr' . ($month['poliza'] > 0 ? ' class="is-policy"' : '') . '><th scope="row">Mes ' . ($index + 1) . '</th><td class="is-money">' . self::e(self::money((float) $month['canon'])) . '</td>';
+        foreach (array_keys($columns) as $key) $monthRows .= '<td class="is-money is-deduction">' . self::e($month[$key] > 0 ? '− ' . self::money((float) $month[$key]) : '—') . '</td>';
+        $monthRows .= '<td class="is-money">' . self::e(self::money((float) $month['neto'])) . '</td></tr>';
       }
-      $monthRows .= '<tr class="is-total"><th scope="row">Promedio mensual</th><td></td><td></td><td></td><td class="is-money">' . self::e(self::money((float) $estimate['net'])) . '</td></tr>';
+      $monthRows .= '<tr class="is-total"><th scope="row">Promedio mensual</th><td colspan="' . (count($columns) + 1) . '"></td><td class="is-money">' . self::e(self::money((float) $estimate['net'])) . '</td></tr>';
+      $head = '<th>Mes</th><th>Canon</th>';
+      foreach ($columns as $label) $head .= '<th>' . self::e($label) . '</th>';
       $income .= '<div class="scm-preapproval-property"><h3>Lo que recibe mes a mes' . (count($estimate['sources']) > 1 ? ' <span>Todos los inmuebles</span>' : '') . '</h3>'
-        . '<table class="scm-preapproval-income scm-preapproval-months"><thead><tr><th>Mes</th><th>Canon</th><th>Descuentos</th><th>Cuota de la póliza</th><th>Recibe</th></tr></thead><tbody>' . $monthRows . '</tbody></table></div>';
+        . '<table class="scm-preapproval-income scm-preapproval-months"><thead><tr>' . $head . '<th>Recibe</th></tr></thead><tbody>' . $monthRows . '</tbody></table></div>';
     }
 
     $calc = self::row('Ingreso neto mensual total (' . count($estimate['sources']) . (count($estimate['sources']) === 1 ? ' inmueble)' : ' inmuebles)'), 'Mensual (mes)', (float) $estimate['net'])

@@ -64,4 +64,6 @@ $html = OwnerPreapprovalPdf::html($estimate, ['name' => 'Royner Guardo', 'cargo'
 $check(str_contains($html, 'Crédito preaprobado estimado') && str_contains($html, 'SKC SuCasa Inmobiliaria') && str_contains($html, 'Royner Guardo'), 'the PDF names the credit, the company and who signs');
 $check(str_contains($html, 'Se paga en 1 pago: se descuenta completo en el mes 1.') && str_contains($html, 'Lo que recibe mes a mes</h3>') && substr_count($html, '<tr class="is-policy">') === 1 && str_contains(OwnerPreapprovalPdf::html($pending, []), 'Le faltan 2 de 3 cuotas de $10.000: se descuentan en los meses 1 y 2.'), 'the PDF shows the policy months and what the owner receives month by month');
 
+$check(str_contains($html, '<th>Mes</th><th>Canon</th><th>Comisión</th><th>Garantía</th><th>Cuota de la póliza</th><th>Recibe</th>') && str_contains($html, '<td class="is-money is-deduction">− $261.800</td><td class="is-money is-deduction">− $55.000</td><td class="is-money is-deduction">− $30.000</td>'), 'the month by month table breaks down each deduction');
+
 echo "Owner preapproval checks passed.\n";

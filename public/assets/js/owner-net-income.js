@@ -46,6 +46,30 @@
     input.setSelectionRange(position, position);
   }
 
+  // Loader del panel ([data-scm-panel-loader], el de showPanelLoader en admin-dashboard-runtime.js) mientras algo carga o
+  // se genera; en el panel comercial es SCMLoader. Se cierra antes de seguir.
+  async function withLoader(options, work) {
+    var loader = app.querySelector("[data-scm-panel-loader]");
+    if (loader) {
+      var title = loader.querySelector("[data-scm-panel-loader-title]");
+      var detail = loader.querySelector("[data-scm-panel-loader-detail]");
+      if (title) title.textContent = options.title;
+      if (detail) detail.textContent = options.detail;
+      loader.hidden = false;
+      loader.setAttribute("aria-hidden", "false");
+      document.body.classList.add("scm-panel-loading");
+      window.requestAnimationFrame(function () { if (!loader.hidden) loader.classList.add("is-visible"); });
+    }
+    try { return await work(); } finally {
+      if (loader) {
+        loader.classList.remove("is-visible");
+        loader.hidden = true;
+        loader.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("scm-panel-loading");
+      }
+    }
+  }
+
   /* ------------------------------------------------------------ Simulador de ingreso neto del propietario */
 
   var MODALITIES = { defecto: "Aseguradora", berkley: "Berkley", mundial: "Seguros Mundial" };
@@ -192,12 +216,14 @@
 
   // Lo que recibe en cada uno de los próximos 12 meses (OwnerPreapprovalService::months): la última cuota
   // ajusta los centavos y el promedio es el ingreso neto mensual.
+  // `otros` incluye el ajuste al descuento mínimo.
   function sourceMonths(item) {
-    var fixed = item.comision + item.garantia + item.otros + item.ajuste;
+    var others = item.otros + item.ajuste;
+    var fixed = item.comision + item.garantia + others;
     var months = [];
     for (var month = 1; month <= 12; month++) {
       var policy = month > item.polizaMeses ? 0 : month === item.polizaMeses ? round2(item.polizaTotal - item.polizaCuota * (item.polizaMeses - 1)) : item.polizaCuota;
-      months.push({ descuentos: fixed, poliza: policy, neto: Math.max(0, item.canon - fixed - policy) });
+      months.push({ canon: item.canon, comision: item.comision, garantia: item.garantia, otros: others, descuentos: fixed, poliza: policy, neto: Math.max(0, item.canon - fixed - policy) });
     }
     return months;
   }
@@ -215,11 +241,18 @@
   }
 
   // Tabla de lo que recibe mes a mes; los meses con cuota de la póliza van resaltados.
-  function monthsTable(months, net) {
+  // Cada descuento en su columna (solo los que tiene), como la tabla del PDF (OwnerPreapprovalPdf).
+  function monthsTable(months, net, othersLabel) {
+    var columns = [["comision", "Comisión"], ["garantia", "Garantía"], ["otros", othersLabel || "Otros"], ["poliza", "Cuota de la póliza"]].filter(function (column) {
+      return months.some(function (month) { return month[column[0]] > 0; });
+    });
     var rows = months.map(function (month, index) {
-      return "<tr" + (month.poliza > 0 ? ' class="is-policy"' : "") + "><th scope=\"row\">Mes " + (index + 1) + "</th><td>" + (month.poliza > 0 ? "− " + money(month.poliza) : "—") + "</td><td>" + money(month.neto) + "</td></tr>";
+      return "<tr" + (month.poliza > 0 ? ' class="is-policy"' : "") + "><th scope=\"row\">Mes " + (index + 1) + "</th><td>" + money(month.canon) + "</td>"
+        + columns.map(function (column) { var value = month[column[0]]; return "<td class=\"is-deduction" + (column[0] === "poliza" ? " is-poliza" : "") + "\">" + (value > 0 ? "− " + money(value) : "—") + "</td>"; }).join("")
+        + "<td>" + money(month.neto) + "</td></tr>";
     }).join("");
-    return "<table><thead><tr><th>Mes</th><th>Cuota de la póliza</th><th>Recibe</th></tr></thead><tbody>" + rows + "</tbody><tfoot><tr><th scope=\"row\">Promedio</th><td></td><td>" + money(net) + "</td></tr></tfoot></table>";
+    var head = "<th>Mes</th><th>Canon</th>" + columns.map(function (column) { return "<th>" + escapeHtml(column[1]) + "</th>"; }).join("") + "<th>Recibe</th>";
+    return "<div class=\"ctl-months__scroll\"><table><thead><tr>" + head + "</tr></thead><tbody>" + rows + "</tbody><tfoot><tr><th scope=\"row\">Promedio</th><td colspan=\"" + (columns.length + 1) + "\"></td><td>" + money(net) + "</td></tr></tfoot></table></div>";
   }
 
   // Meses seguidos con el mismo valor: "meses 1 a 2: $X; meses 3 a 12: $Y".
@@ -262,7 +295,7 @@
       : item.polizaMeses >= 12 ? "La cuota de " + money(item.polizaCuota) + " se descuenta todos los meses" : "";
     var table = card.querySelector("[data-pre-months]");
     table.hidden = !(item.canon > 0 && item.polizaMeses > 0);
-    table.querySelector("[data-pre-months-table]").innerHTML = table.hidden ? "" : monthsTable(item.months, item.net);
+    table.querySelector("[data-pre-months-table]").innerHTML = table.hidden ? "" : monthsTable(item.months, item.net, item.ajuste > 0 ? "Otros y ajuste" : "Otros");
     return item;
   }
 
@@ -435,7 +468,7 @@
     try {
       var data = new FormData();
       data.set("document", query);
-      var result = await request("scm_tools_preapproval_lookup", data);
+      var result = await withLoader({ title: "Buscando contratos", detail: "Consultamos los contratos vigentes del propietario.", icon: "pdf" }, function () { return request("scm_tools_preapproval_lookup", data); });
       clearSources(root);
       var credits = root.querySelector("[data-pre-credits]");
       credits.hidden = !(result.active_credits > 0);
@@ -554,15 +587,18 @@
           };
         }),
       }));
-      var response = await fetch(runtime.ajaxUrl || "api.php", { method: "POST", body: data, credentials: "same-origin" });
-      if (!response.ok || (response.headers.get("Content-Type") || "").indexOf("application/pdf") !== 0) {
-        var payload = null;
-        try { payload = await response.json(); } catch (_error) {}
-        throw new Error((payload && payload.data && payload.data.message) || "No se pudo generar el PDF.");
-      }
-      var match = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") || "");
+      var pdf = await withLoader({ title: "Generando el PDF", detail: "Preparamos la simulación para el propietario. Puede tardar unos segundos.", icon: "pdf" }, async function () {
+        var response = await fetch(runtime.ajaxUrl || "api.php", { method: "POST", body: data, credentials: "same-origin" });
+        if (!response.ok || (response.headers.get("Content-Type") || "").indexOf("application/pdf") !== 0) {
+          var payload = null;
+          try { payload = await response.json(); } catch (_error) {}
+          throw new Error((payload && payload.data && payload.data.message) || "No se pudo generar el PDF.");
+        }
+        var match = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") || "");
+        return { blob: await response.blob(), name: match ? match[1] : "simulacion-ingreso-neto.pdf" };
+      });
       if (root._pdf) URL.revokeObjectURL(root._pdf.url);
-      root._pdf = { url: URL.createObjectURL(await response.blob()), name: match ? match[1] : "simulacion-ingreso-neto.pdf" };
+      root._pdf = { url: URL.createObjectURL(pdf.blob), name: pdf.name };
       root.querySelector("[data-pre-viewer-frame]").src = root._pdf.url;
       root.querySelector("[data-pre-viewer]").showModal();
     } catch (error) {

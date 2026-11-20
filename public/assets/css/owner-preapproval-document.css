@@ -44,8 +44,10 @@
 .scm-preapproval-conditions li{margin:0 0 4px;padding-left:4px}
 .scm-preapproval-notes{margin:0;white-space:normal;color:#202020}
 /* Lo que recibe mes a mes: los meses con cuota de la póliza resaltados. */
-.scm-preapproval-months th:first-child{width:20%;white-space:nowrap}
-.scm-preapproval-months .is-money{width:20%}
+.scm-preapproval-months th:first-child{width:auto;white-space:nowrap}
+.scm-preapproval-months .is-money{width:auto}
 .scm-preapproval-months thead th:not(:first-child){text-align:right}
 .scm-preapproval-months tbody td.is-money:not(:last-child){font-weight:400}
+.scm-preapproval-months td.is-deduction{color:#5b6b82}
+.scm-preapproval-months tr.is-policy td.is-deduction:nth-last-child(2){color:#b45309;font-weight:600}
 .scm-preapproval-months tr.is-policy th,.scm-preapproval-months tr.is-policy td{background:#fff7e6}
