@@ -72,3 +72,9 @@ if (is_file($commercial . '/StaffTaskLink.php') && is_file($commercial . '/Publi
   $check(!$sameSecret || SCM\Support\PublicTaskAccess::verify((string) ($publicQuery['t'] ?? '')) === 11459, 'retention client link opens the commercial public task view');
 }
 $check(str_contains(SCM\Support\CommercialTaskLink::openUrl(11459), '/index.php?tab=abiertos&ticket_id=11459&abrir_tarea=11459'), 'retention emails with copies open the task in the commercial panel');
+
+// El cliente de una retención recibe su propio correo, sin las instrucciones internas ni el contexto de la gestión.
+$retentionCase = ['solicitante' => 'Laura Cliente', 'contrato' => '280', 'inmueble' => '10523', 'nombre_empleado' => 'Daniela Consultora', 'correo_empleado' => 'daniela@example.test', 'celular_empleado' => '3001234567', 'descripcion' => '<p>Canon mensual 2.500.000</p>'];
+$clientMail = SCM\Modules\Contracts\ContractRetentionEmail::clientContent(10523, $retentionCase);
+$check(str_contains($clientMail, 'Su consultor/a asignado es <strong>Daniela Consultora</strong>') && str_contains($clientMail, '#10523'), 'retention client email names the assigned consultant');
+$check(!str_contains($clientMail, 'Canon') && !str_contains($clientMail, 'conservarlo') && !str_contains($clientMail, 'Gestión comercial'), 'retention client email leaves out internal instructions and context');

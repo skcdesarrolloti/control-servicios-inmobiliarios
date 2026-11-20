@@ -6032,6 +6032,8 @@ trait HandlesTicketWorkflowActions
     $contract = $this->contractTerminationFirstText([$ticket], ['contrato', 'id_contrato']) ?: (string) ($input['id_contrato'] ?? '-');
     $property = $this->contractTerminationFirstText([$ticket], ['inmueble', 'id_inmueble']) ?: '-';
     $summary = 'Contrato ' . $contract . ', inmueble ' . $property . '. Gestionar retención o búsqueda comercial.';
+    // Al cliente no se le manda la instrucción interna, solo su contrato e inmueble.
+    $clientSummary = 'Contrato ' . $contract . ', inmueble ' . $property . '.';
     $requesterType = $this->contractRetentionRequesterType($ticket);
     // La retención es una tarea comercial (estado_comercial = Nuevo) que se gestiona en el panel comercial: el cliente abre
     // la vista pública de su tarea y el consultor/a su enlace individual, que inicia la sesión y abre la tarea.
@@ -6057,7 +6059,7 @@ trait HandlesTicketWorkflowActions
             'parameters' => [
               ['type' => 'text', 'text' => $requesterName],
               ['type' => 'text', 'text' => (string) $ticketId],
-              ['type' => 'text', 'text' => $summary],
+              ['type' => 'text', 'text' => $clientSummary],
             ],
           ],
           [

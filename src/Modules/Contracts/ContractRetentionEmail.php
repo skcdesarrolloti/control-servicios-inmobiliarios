@@ -12,6 +12,32 @@ final class ContractRetentionEmail
     return 'Tarea comercial: Retención de contrato · Tarea #' . $caseId;
   }
 
+  /** Correo del cliente: sin las instrucciones internas, el canon ni el contexto de la gestión. */
+  public static function clientSubject(int $caseId): string
+  {
+    return 'Tu tarea comercial #' . $caseId . ' · SKC SuCasa Inmobiliaria';
+  }
+
+  public static function clientContent(int $caseId, array $case): string
+  {
+    $name = trim((string) ($case['solicitante'] ?? ''));
+    $contract = trim((string) ($case['contrato'] ?? ''));
+    $property = trim((string) ($case['inmueble'] ?? ''));
+    $consultant = trim((string) ($case['nombre_empleado'] ?? $case['empleado'] ?? ''));
+    $contact = array_filter([
+      trim((string) ($case['correo_empleado'] ?? '')) !== '' ? 'Correo: ' . trim((string) $case['correo_empleado']) : '',
+      trim((string) ($case['celular_empleado'] ?? '')) !== '' ? 'Celular: ' . trim((string) $case['celular_empleado']) : '',
+    ]);
+    $html = '<p style="margin:0 0 16px;font-size:16px;line-height:1.6;">Hola' . ($name !== '' ? ' <strong>' . EmailTemplate::e($name) . '</strong>' : '') . ', en SKC SuCasa Inmobiliaria creamos la tarea comercial <strong>#' . $caseId . '</strong> para acompañarte en la gestión de tu contrato'
+      . ($contract !== '' ? ' <strong>' . EmailTemplate::e($contract) . '</strong>' : '') . ($property !== '' ? ' (inmueble ' . EmailTemplate::e($property) . ')' : '') . '.</p>';
+    if ($consultant !== '') {
+      $html .= '<p style="margin:0 0 16px;line-height:1.6;">Su consultor/a asignado es <strong>' . EmailTemplate::e($consultant) . '</strong>' . ($contact !== [] ? ' · ' . EmailTemplate::e(implode(' · ', $contact)) : '') . ', y se comunicará contigo.</p>';
+    }
+    $html .= '<p style="margin:0;line-height:1.6;">Desde el botón puedes ver tu tarea y escribirnos.</p>';
+    $html .= '<p style="margin:20px 0 0;font-weight:700;color:#061d49;">Construimos confianza, protegemos su patrimonio.</p>';
+    return $html;
+  }
+
   public static function content(int $caseId, array $case): string
   {
     $html = '<p style="margin:0 0 18px;font-size:16px;line-height:1.6;">Se ha creado una <strong>tarea comercial de retención</strong> en SKC SuCasa Inmobiliaria para acompañar al arrendatario y buscar alternativas que permitan conservarlo como cliente.</p>';

@@ -146,9 +146,18 @@ trait PendingNotificationsAndDatesConcern
         $jobUrl = $isRetention
           ? ($jobInternal ? \SCM\Support\CommercialTaskLink::openUrl($ticketId) : \SCM\Support\CommercialTaskLink::publicUrl($ticketId))
           : \SCM\Support\CaseReplyNotifications::emailCaseUrl($ticketId, $jobRole);
-        $html = EmailTemplate::render($subject, $extraContent, [
+        $jobContent = $extraContent;
+        $jobLabel = $isRetention ? 'Ver tarea' : 'Ver caso';
+        if ($isRetention && !$jobInternal) {
+          // El cliente no recibe el correo interno de la retención (instrucciones, canon, contexto): solo el suyo.
+          $jobSubject = \SCM\Modules\Contracts\ContractRetentionEmail::clientSubject($ticketId);
+          $jobContent = \SCM\Modules\Contracts\ContractRetentionEmail::clientContent($ticketId, $ticketPayload);
+          $jobLabel = 'Ver y responder';
+          $jobCopies = [];
+        }
+        $html = EmailTemplate::render($jobSubject, $jobContent, [
           'ticket_url' => $jobUrl,
-          'ticket_label' => $isRetention ? 'Ver tarea' : 'Ver caso',
+          'ticket_label' => $jobLabel,
           'buttons' => $pdfButtons,
         ]);
       }
