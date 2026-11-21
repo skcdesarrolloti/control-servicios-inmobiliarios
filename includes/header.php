@@ -257,7 +257,7 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'due';
   } elseif ($tabParam === 'inicio' && $subtabParam === 'team') {
     $current_page = 'team';
-  } elseif (in_array($tabParam, ['historial', 'historial_inmueble'], true) || ($tabParam === 'inicio' && in_array($subtabParam, ['property_history', 'property-history'], true))) {
+  } elseif (in_array($tabParam, ['historial', 'historial_inmueble', 'property-history', 'scm-panel-historial-inmueble'], true) || ($tabParam === 'inicio' && in_array($subtabParam, ['property_history', 'property-history'], true))) {
     $current_page = 'property_history';
   } elseif (in_array($tabParam, ['terminacion_contrato', 'terminacion'], true) || ($tabParam === 'inicio' && in_array($subtabParam, ['contract_terminations', 'contract-termination'], true))) {
     $current_page = 'contract_termination';
@@ -356,7 +356,7 @@ $checkTabPerm = static function (array $perms) use ($allowedTabsList): bool {
 };
 
 // Orden solicitado:
-// 1. Inicio (Dropdown: Resumen, Mi Calendario, Calendario Equipo, Vencimientos, Historial Inmueble)
+// 1. Inicio (Dropdown: Resumen, Mi Calendario, Calendario Equipo, Vencimientos)
 // 2. Gestión de Casos & Tickets (Dropdown: Tickets Abiertos, Mis Tickets, Tickets Postergados, Tickets Cerrados)
 // 3. Actividades Administrativas (Dropdown: Gestiones de Cobro, Cotizaciones, Actas, Preventivas, Servicios Públicos, Liquidación, Reportes, Auditoría, Cartas Aumento, Créditos › Propietarios)
 // 4. Actividades contractuales (Dropdown: Contratos por terminar, Terminación, No prórroga, Funcionario de contratos)
@@ -378,7 +378,7 @@ $rawNavItems = [
         'subtab' => 'mine',
         'url' => $baseUrl . '/index.php?tab=ini',
         'icon' => 'dashboard',
-        'perms' => ['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble'],
+        'perms' => ['mi_calendario', 'calendario_equipo', 'vencimientos'],
       ],
       'mine' => [
         'key' => 'mine',
@@ -409,16 +409,6 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=due',
         'icon' => 'calendar_month',
         'perms' => ['vencimientos'],
-      ],
-      'property_history' => [
-        'key' => 'property_history',
-        'label' => 'Historial inmueble',
-        'description' => 'Trazabilidad de casos por inmueble',
-        'panel_id' => 'scm-panel-inicio',
-        'subtab' => 'property-history',
-        'url' => $baseUrl . '/index.php?tab=property_history',
-        'icon' => 'history',
-        'perms' => ['historial_inmueble'],
       ],
     ],
   ],
@@ -611,6 +601,17 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=hojas_cierre',
         'icon' => 'handshake',
         'perms' => ['hojas_cierre'],
+      ],
+      'property_history' => [
+        'key' => 'property_history',
+        'label' => 'Historial inmueble',
+        'description' => 'Trazabilidad de casos por inmueble',
+        'panel_id' => 'scm-panel-actividades-administrativas',
+        'admin_sub_target' => 'scm-panel-historial-inmueble',
+        'admin_activity_key' => 'historial_inmueble',
+        'url' => $baseUrl . '/index.php?tab=historial_inmueble',
+        'icon' => 'history',
+        'perms' => ['historial_inmueble'],
       ],
       // Grupo Créditos: hoy solo propietarios; otros actores (arrendatarios, proveedores…) serán opciones hermanas.
       'credito_propietario' => [

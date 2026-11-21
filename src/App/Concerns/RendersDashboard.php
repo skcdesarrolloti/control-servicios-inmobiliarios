@@ -144,10 +144,11 @@ trait RendersDashboard
       'tickets' => 'scm-panel-abiertos',
       'ticket' => 'scm-panel-abiertos',
       'casos' => 'scm-panel-abiertos',
-      'historial' => 'scm-panel-inicio',
-      'historial_inmueble' => 'scm-panel-inicio',
-      'property_history' => 'scm-panel-inicio',
-      'property-history' => 'scm-panel-inicio',
+      'historial' => 'scm-panel-historial-inmueble',
+      'historial_inmueble' => 'scm-panel-historial-inmueble',
+      'property_history' => 'scm-panel-historial-inmueble',
+      'property-history' => 'scm-panel-historial-inmueble',
+      'scm-panel-historial-inmueble' => 'scm-panel-historial-inmueble',
       'mi_calendario' => 'scm-panel-inicio',
       'mine' => 'scm-panel-inicio',
       'calendario_equipo' => 'scm-panel-inicio',
@@ -355,6 +356,10 @@ trait RendersDashboard
         'panel' => 'scm-panel-hojas-cierre',
         'label' => $dashboardPermissionTabs['hojas_cierre'] ?? 'Hojas de cierre',
       ],
+      'historial_inmueble' => [
+        'panel' => 'scm-panel-historial-inmueble',
+        'label' => $dashboardPermissionTabs['historial_inmueble'] ?? 'Historial inmueble',
+      ],
       'revisiones_ocupacion' => [
         'panel' => 'scm-panel-revisiones-ocupacion',
         'label' => $dashboardPermissionTabs['revisiones_ocupacion'] ?? 'Revisiones antes de la ocupación',
@@ -412,7 +417,6 @@ trait RendersDashboard
       'scm-home-calendar-section-mine' => 'mi_calendario',
       'scm-home-calendar-section-team' => 'calendario_equipo',
       'scm-home-calendar-section-due' => 'vencimientos',
-      'scm-home-calendar-section-property-history' => 'historial_inmueble',
       'scm-home-calendar-section-contracts-ending' => 'contratos_por_terminar',
       'scm-home-calendar-section-contract-termination' => 'solicitudes_terminacion',
       'scm-home-calendar-section-contract-non-renewal' => 'solicitudes_no_prorroga',
@@ -926,15 +930,13 @@ trait RendersDashboard
         $activeHomeSection = 'scm-home-calendar-section-mine';
         if ($subtabReq === 'due' || in_array($tabKey, ['due', 'vencimientos', 'vencimiento'], true)) {
           $activeHomeSection = 'scm-home-calendar-section-due';
-        } elseif ($subtabReq === 'property-history' || $subtabReq === 'property_history' || in_array($tabKey, ['property_history', 'property-history', 'historial', 'historial_inmueble'], true)) {
-          $activeHomeSection = 'scm-home-calendar-section-property-history';
         } elseif ($subtabReq === 'team' || in_array($tabKey, ['team', 'calendario_equipo'], true)) {
           $activeHomeSection = 'scm-home-calendar-section-team';
         } elseif ($subtabReq === 'mine' || $tabKey === 'mi_calendario') {
           $activeHomeSection = 'scm-home-calendar-section-mine';
         }
         if (!$sectionAllowed($activeHomeSection)) {
-          $activeHomeSection = $firstAllowedSection(['scm-home-calendar-section-mine', 'scm-home-calendar-section-team', 'scm-home-calendar-section-due', 'scm-home-calendar-section-property-history']);
+          $activeHomeSection = $firstAllowedSection(['scm-home-calendar-section-mine', 'scm-home-calendar-section-team', 'scm-home-calendar-section-due']);
         }
         ?>
         <?php if ($canAccessAdministrativeCalendar): ?>
@@ -943,7 +945,6 @@ trait RendersDashboard
               <?php if ($sectionAllowed('scm-home-calendar-section-mine')): ?><button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-mine' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-mine"><span class="material-symbols-outlined" aria-hidden="true">calendar_month</span><span>Mi calendario</span></button><?php endif; ?>
               <?php if ($sectionAllowed('scm-home-calendar-section-team')): ?><button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-team' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-team"><span class="material-symbols-outlined" aria-hidden="true">groups</span><span>Calendario equipo</span></button><?php endif; ?>
               <?php if ($sectionAllowed('scm-home-calendar-section-due')): ?><button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-due' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-due"><span class="material-symbols-outlined" aria-hidden="true">schedule</span><span>Vencimientos</span><em data-scm-calendar-due-nav-count hidden>0</em></button><?php endif; ?>
-              <?php if ($sectionAllowed('scm-home-calendar-section-property-history')): ?><button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-property-history' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-property-history"><span class="material-symbols-outlined" aria-hidden="true">home</span><span>Historial inmueble</span></button><?php endif; ?>
             </div>
             <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-mine' ? ' active' : ''; ?>" id="scm-home-calendar-section-mine"<?php echo $sectionAllowed('scm-home-calendar-section-mine') ? '' : ' hidden'; ?> data-calendar-section-panel>
               <?php echo $this->render_calendario_actividades_panel($config, [
@@ -977,24 +978,6 @@ trait RendersDashboard
                 'show_report_action' => false,
                 'show_pending_action' => false,
               ]); ?>
-            </div>
-            <div class="scm-calendar-section-panel<?php echo $activeHomeSection === 'scm-home-calendar-section-property-history' ? ' active' : ''; ?>" id="scm-home-calendar-section-property-history"<?php echo $sectionAllowed('scm-home-calendar-section-property-history') ? '' : ' hidden'; ?> data-calendar-section-panel>
-              <?php $phUi = \SCM\Modules\Pending\PublicServicesUi::class; ?>
-              <section class="scm-property-history-v2 !sp-font-sans !sp-text-service-navy !sp-space-y-4" data-scm-property-history-panel aria-live="polite">
-                <div class="<?php echo $phUi::CARD; ?> !sp-p-5 !sp-space-y-4">
-                  <div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-3">
-                    <div class="!sp-flex !sp-items-center !sp-gap-3"><span class="!sp-p-2.5 !sp-bg-amber-50 !sp-rounded-xl !sp-border !sp-border-solid !sp-border-amber-200"><?php echo $phUi::icon('clock', '!sp-w-6 !sp-h-6'); ?></span><div><h3 class="!sp-m-0 !sp-text-xl !sp-font-bold">Historial del inmueble</h3><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">Contratos, casos, revisiones, cotizaciones, gestiones y movimientos en una sola línea de tiempo. Busca por contrato o por código web / inmueble.</p></div></div>
-                  </div>
-                  <form class="!sp-grid !sp-grid-cols-1 md:!sp-grid-cols-[1fr_1fr_auto_auto] !sp-items-end !sp-gap-3" data-scm-property-history-form autocomplete="off">
-                    <label class="!sp-block" for="scm_property_history_contract"><span class="<?php echo $phUi::LABEL; ?>">Número de contrato</span><input id="scm_property_history_contract" name="contract_number" type="text" class="<?php echo $phUi::INPUT; ?>" placeholder="Ej: 660"></label>
-                    <label class="!sp-block" for="scm_property_history_code"><span class="<?php echo $phUi::LABEL; ?>">Código web / inmueble</span><input id="scm_property_history_code" name="property_code" type="text" class="<?php echo $phUi::INPUT; ?>" placeholder="Ej: 3825"></label>
-                    <button type="submit" class="<?php echo $phUi::PRIMARY; ?> !sp-h-10"><?php echo $phUi::icon('filter'); ?>Consultar historial</button>
-                    <button type="button" class="<?php echo $phUi::SECONDARY; ?> !sp-h-10" data-scm-property-history-pdf disabled><?php echo $phUi::icon('download'); ?>Descargar PDF</button>
-                  </form>
-                  <p class="!sp-m-0 !sp-text-[11px] !sp-text-service-muted" data-scm-property-history-status role="status">Ingresa un contrato o un código web / inmueble para consultar.</p>
-                </div>
-                <div data-scm-property-history-results></div>
-              </section>
             </div>
 
           </section>
@@ -1426,6 +1409,27 @@ trait RendersDashboard
           <?php if (in_array('hojas_cierre', $allowedAdministrativeActivityTabs, true)): ?>
             <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'hojas_cierre' ? ' active' : ''; ?>" id="scm-panel-hojas-cierre" data-permission-tab="hojas_cierre" data-admin-activity-panel="hojas_cierre" data-scm-loaded="0">
               <?php echo \SCM\Modules\ClosingSheets\ClosingSheetPanelView::shell(self::AJAX_CLOSING_SHEET_LIST); ?>
+            </div>
+          <?php endif; ?>
+
+          <?php if (in_array('historial_inmueble', $allowedAdministrativeActivityTabs, true)): ?>
+            <div class="scm-admin-activity-panel<?php echo $initialAdministrativeActivityKey === 'historial_inmueble' ? ' active' : ''; ?>" id="scm-panel-historial-inmueble" data-permission-tab="historial_inmueble" data-admin-activity-panel="historial_inmueble">
+              <?php $phUi = \SCM\Modules\Pending\PublicServicesUi::class; ?>
+              <section class="scm-property-history-v2 !sp-font-sans !sp-text-service-navy !sp-space-y-4" data-scm-property-history-panel aria-live="polite">
+                <div class="<?php echo $phUi::CARD; ?> !sp-p-5 !sp-space-y-4">
+                  <div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-3">
+                    <div class="!sp-flex !sp-items-center !sp-gap-3"><span class="!sp-p-2.5 !sp-bg-amber-50 !sp-rounded-xl !sp-border !sp-border-solid !sp-border-amber-200"><?php echo $phUi::icon('clock', '!sp-w-6 !sp-h-6'); ?></span><div><h3 class="!sp-m-0 !sp-text-xl !sp-font-bold">Historial del inmueble</h3><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">Contratos, casos, revisiones, cotizaciones, gestiones y movimientos en una sola línea de tiempo. Busca por contrato o por código web / inmueble.</p></div></div>
+                  </div>
+                  <form class="!sp-grid !sp-grid-cols-1 md:!sp-grid-cols-[1fr_1fr_auto_auto] !sp-items-end !sp-gap-3" data-scm-property-history-form autocomplete="off">
+                    <label class="!sp-block" for="scm_property_history_contract"><span class="<?php echo $phUi::LABEL; ?>">Número de contrato</span><input id="scm_property_history_contract" name="contract_number" type="text" class="<?php echo $phUi::INPUT; ?>" placeholder="Ej: 660"></label>
+                    <label class="!sp-block" for="scm_property_history_code"><span class="<?php echo $phUi::LABEL; ?>">Código web / inmueble</span><input id="scm_property_history_code" name="property_code" type="text" class="<?php echo $phUi::INPUT; ?>" placeholder="Ej: 3825"></label>
+                    <button type="submit" class="<?php echo $phUi::PRIMARY; ?> !sp-h-10"><?php echo $phUi::icon('filter'); ?>Consultar historial</button>
+                    <button type="button" class="<?php echo $phUi::SECONDARY; ?> !sp-h-10" data-scm-property-history-pdf disabled><?php echo $phUi::icon('download'); ?>Descargar PDF</button>
+                  </form>
+                  <p class="!sp-m-0 !sp-text-[11px] !sp-text-service-muted" data-scm-property-history-status role="status">Ingresa un contrato o un código web / inmueble para consultar.</p>
+                </div>
+                <div data-scm-property-history-results></div>
+              </section>
             </div>
           <?php endif; ?>
 

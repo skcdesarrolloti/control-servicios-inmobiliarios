@@ -423,7 +423,7 @@ final class SuCasaControlServiciosInmobiliarios
 
   /** Opciones que, si alguna está permitida, habilitan el panel o la verificación agrupada. */
   private const DERIVED_DASHBOARD_TABS = [
-    'calendario_actividades' => ['mi_calendario', 'calendario_equipo', 'vencimientos', 'historial_inmueble'],
+    'calendario_actividades' => ['mi_calendario', 'calendario_equipo', 'vencimientos'],
     'actividades_contractuales' => ['contratos_por_terminar', 'solicitudes_terminacion', 'solicitudes_no_prorroga'],
     'metricas' => ['metricas_casos', 'metricas_cotizaciones', 'metricas_preventivas', 'metricas_costo_entrega_recibo', 'metricas_costo_beneficio', 'metricas_servicios_publicos', 'metricas_ocupaciones', 'metricas_desocupaciones', 'metricas_ocupaciones_vs', 'metricas_crecimiento'],
     // Panel compartido de ocupaciones y desocupaciones (una consulta para todas sus vistas), también desde Actividades de cartera.
@@ -938,7 +938,8 @@ final class SuCasaControlServiciosInmobiliarios
     if (isset($selected['cotizaciones_mantenimiento'])) $selected['ordenes_mantenimiento'] = 'ordenes_mantenimiento';
     if (isset($selected['servicios_publicos_pendientes'])) $selected['liquidador_servicios_publicos'] = 'liquidador_servicios_publicos';
     // Antes todos los cargos tenían Inicio y las solicitudes contractuales (calendario_actividades se concedía siempre).
-    foreach (array_merge(self::DERIVED_DASHBOARD_TABS['calendario_actividades'], self::DERIVED_DASHBOARD_TABS['actividades_contractuales']) as $tabKey) {
+    // Historial inmueble vivía en Inicio; ahora está en Actividades administrativas pero se conserva el acceso.
+    foreach (array_merge(self::DERIVED_DASHBOARD_TABS['calendario_actividades'], self::DERIVED_DASHBOARD_TABS['actividades_contractuales'], ['historial_inmueble']) as $tabKey) {
       $selected[$tabKey] = $tabKey;
     }
     if (isset($selected['contratos_arrendamiento'])) $selected['funcionario_contratos'] = 'funcionario_contratos';

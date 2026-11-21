@@ -5959,7 +5959,9 @@
           '<label class="scm-seg-field"><span>' + escHtml(defaultKindConfig.categoryLabel) + ' <b>*</b></span><select class="select select-bordered select-sm scm-select" name="id_categoria" required><option value="">Selecciona categor&iacute;a</option>' + categoryOptions + '</select></label>' +
           '</div>' +
           locationFieldsHtml +
-          '<label class="scm-seg-field scm-calendar-field-full"><span>Funcionario responsable <b>*</b></span>' + employeesControl + '</label>' +
+          (mode === "multiple"
+            ? '<div class="scm-seg-field scm-calendar-field-full" role="group" aria-label="Funcionarios responsables"><span>Funcionarios responsables <b>*</b></span>' + employeesControl + '</div>'
+            : '<label class="scm-seg-field scm-calendar-field-full"><span>Funcionario responsable <b>*</b></span>' + employeesControl + '</label>') +
           '<div class="scm-calendar-create-row scm-calendar-date-row">' +
           '<label class="scm-seg-field"><span>Fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + defaultDate + '"></label>' +
           '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required value="' + defaultStart + '"></label>' +
@@ -6073,10 +6075,24 @@
                 return;
               }
               selectedEmployeesWrap.innerHTML = selected.map(function (employeeId) {
-                return '<button type="button" class="scm-calendar-selected-chip" data-calendar-remove-employee="' + escHtml(employeeId) + '">' +
+                return '<button type="button" class="scm-calendar-selected-chip" data-calendar-remove-employee="' + escHtml(employeeId) + '" aria-label="Quitar ' + escHtml(employeeDisplayName(employeeId)) + '">' +
                   '<span>' + escHtml(employeeDisplayName(employeeId)) + '</span><b aria-hidden="true">&times;</b>' +
                   '</button>';
               }).join("");
+            }
+            // Quien ya está elegido no se vuelve a ofrecer en el buscador.
+            function syncEmployeeAddOptions() {
+              if (!employeeAddSelect) return;
+              var chosen = {};
+              selectedEmployees().forEach(function (id) { chosen[id] = true; });
+              Array.prototype.forEach.call(employeeAddSelect.options, function (option) {
+                if (option.value) option.disabled = !!chosen[option.value];
+              });
+              if (canUseSelect2() && window.jQuery(employeeAddSelect).data("select2")) {
+                window.jQuery(employeeAddSelect).val(null).trigger("change.select2");
+              } else {
+                employeeAddSelect.value = "";
+              }
             }
             function selectedTicket() {
               var value = ticketSelect ? String(ticketSelect.value || "").trim() : "";
@@ -6495,30 +6511,44 @@
             }
             if (employeePicker) {
               employeePicker.querySelectorAll("[data-calendar-employee-check]").forEach(function (input) {
-                input.addEventListener("change", updateSelectedEmployeeChips);
+                input.addEventListener("change", function () {
+                  updateSelectedEmployeeChips();
+                  syncEmployeeAddOptions();
+                });
               });
               if (employeeAddSelect) {
-                if (canUseSelect2()) {
-                  window.jQuery(employeeAddSelect).select2({
-                    width: "100%",
-                    dropdownParent: window.jQuery(popup),
-                    placeholder: "Buscar funcionario...",
-                    allowClear: true,
-                  });
-                }
-                employeeAddSelect.addEventListener("change", function () {
-                  var id = String(employeeAddSelect.value || "");
+                var addEmployee = function (id) {
+                  id = String(id || "");
                   if (!id) return;
                   var input = Array.prototype.slice.call(employeePicker.querySelectorAll("[data-calendar-employee-check]")).find(function (candidate) {
                     return String(candidate.value || "") === id;
                   });
-                  if (input) input.checked = true;
-                  employeeAddSelect.value = "";
-                  if (canUseSelect2()) window.jQuery(employeeAddSelect).val("").trigger("change.select2");
+                  if (!input || input.checked) return;
+                  input.checked = true;
                   updateSelectedEmployeeChips();
                   refreshAgenda();
                   refreshTickets();
-                });
+                };
+                if (canUseSelect2()) {
+                  var $employeeAdd = window.jQuery(employeeAddSelect);
+                  $employeeAdd.select2({
+                    width: "100%",
+                    dropdownParent: window.jQuery(popup),
+                    placeholder: "Buscar funcionario...",
+                  });
+                  // Se agrega con el evento de select2 y se limpia el buscador cuando select2 terminó su propio cambio;
+                  // limpiarlo dentro del mismo "change" dejaba su estado desincronizado (dos opciones marcadas).
+                  $employeeAdd.on("select2:select", function (event) {
+                    var data = event && event.params && event.params.data;
+                    addEmployee(data && data.id);
+                    window.setTimeout(syncEmployeeAddOptions, 0);
+                  });
+                } else {
+                  employeeAddSelect.addEventListener("change", function () {
+                    addEmployee(employeeAddSelect.value);
+                    syncEmployeeAddOptions();
+                  });
+                }
               }
               if (selectedEmployeesWrap) {
                 selectedEmployeesWrap.addEventListener("click", function (event) {
@@ -6532,6 +6562,7 @@
                   if (input) {
                     input.checked = false;
                     updateSelectedEmployeeChips();
+                    syncEmployeeAddOptions();
                     refreshAgenda();
                     refreshTickets();
                   }
@@ -6622,6 +6653,7 @@
             applyRelatedTicketVisibility();
             applyLocationType(false);
             updateSelectedEmployeeChips();
+            syncEmployeeAddOptions();
             refreshRecurrenceUi();
             maybeAutofillTitleAndLocation(false);
             maybeAutofillPreventiveDescription();
@@ -17200,7 +17232,7 @@
             '<section class="scm-home-shortcuts"><div class="scm-home-card-heading"><div><span class="scm-home-card-kicker">Accesos</span><h2>Ir directo</h2></div></div><div class="scm-home-shortcut-grid">' +
               '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-mine"><span class="material-symbols-outlined">calendar_month</span><strong>Mi calendario</strong><i>Agenda</i></button>' +
               '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-team"><span class="material-symbols-outlined">groups</span><strong>Calendario equipo</strong><i>Equipo</i></button>' +
-              '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-property-history"><span class="material-symbols-outlined">home</span><strong>Historial inmueble</strong><i>Consulta</i></button>' +
+              '<button type="button" class="scm-home-shortcut" data-scm-home-target="admin:historial_inmueble"><span class="material-symbols-outlined">home</span><strong>Historial inmueble</strong><i>Consulta</i></button>' +
             '</div></section>' +
           '</div>';
       }
@@ -26933,12 +26965,6 @@
         });
         var activeSection = parentPanel.querySelector(".scm-calendar-section-panel.active");
         initCalendarPanel(activeSection || parentPanel);
-        if (target === "scm-home-calendar-section-property-history") {
-          var input = parentPanel.querySelector("#scm_property_history_contract");
-          if (input) {
-            window.setTimeout(function () { input.focus({ preventScroll: true }); }, 80);
-          }
-        }
         if (target === "scm-home-calendar-section-contract-termination") {
           loadContractTerminationRequests(false);
         }
@@ -27136,6 +27162,11 @@
       var shortcut = event.target.closest("[data-scm-home-target]");
       if (!shortcut) return;
       var targetPanel = shortcut.getAttribute("data-scm-home-target") || "";
+      if (targetPanel.indexOf("admin:") === 0) {
+        event.preventDefault();
+        openAdministrativeActivityTab(targetPanel.slice(6));
+        return;
+      }
       var sectionTab = targetPanel
         ? Array.prototype.find.call(root.querySelectorAll(".scm-calendar-section-tab[data-calendar-section-target]"), function (tab) {
           return tab.getAttribute("data-calendar-section-target") === targetPanel;
