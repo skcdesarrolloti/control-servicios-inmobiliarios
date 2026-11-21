@@ -3526,7 +3526,7 @@
 
       function quickCreateEmployeeId() {
         var filterEmployee = filterForm ? filterForm.querySelector('[name="id_empleado"]') : null;
-        var preferred = currentCalendarEmployeeId || (filterEmployee && filterEmployee.value) || "";
+        var preferred = (filterEmployee && filterEmployee.value) || currentCalendarEmployeeId || "";
         if (preferred) return preferred;
         return allowedEmployees.length ? getEmployeeId(allowedEmployees[0]) : "";
       }
@@ -4193,6 +4193,7 @@
           });
       }
 
+      var calendarLoadRequestId = 0;
       function loadEvents() {
         if (isDueCalendar) {
           return loadDueCalendar();
@@ -4201,7 +4202,9 @@
         enforceLockedEmployeeFilter();
         syncCalendarLayerScope();
         var range = activeCalendarRange();
-        var filters = { pagina: 1, limite: 500, fecha_inicio: range.from, fecha_fin: range.to };
+        var filters = { pagina: 1, limite: 5000, fecha_inicio: range.from, fecha_fin: range.to };
+        // Solo la última carga pinta: al cambiar rápido de mes o con el refresco automático, una respuesta vieja no pisa la nueva.
+        var loadRequestId = ++calendarLoadRequestId;
         var selectedEmployeeId = "";
         var scope = activeCalendarScope();
         if (filterForm) {
@@ -4244,9 +4247,11 @@
             return loadLegacyEvents();
           })
           .then(function (rows) {
+            if (loadRequestId !== calendarLoadRequestId) return;
             renderEvents(rows || []);
           })
           .catch(function (err) {
+            if (loadRequestId !== calendarLoadRequestId) return;
             if (monthGrid) monthGrid.innerHTML = '<div class="scm-calendar-loading">No se pudo cargar el calendario.</div>';
             if (eventsWrap) eventsWrap.innerHTML = '<div class="scm-empty scm-empty-cards">No se pudieron cargar eventos.</div>';
             showToast("error", err.message || "No se pudieron cargar eventos.", "No se pudo cargar el calendario");

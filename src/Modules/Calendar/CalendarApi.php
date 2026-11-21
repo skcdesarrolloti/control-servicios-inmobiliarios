@@ -315,7 +315,8 @@ final class CalendarApi
       try {
         $this->store->touchTicket($ticket);
         if (strtolower(trim((string) ($input['es_cita'] ?? 'no'))) === 'si') {
-          $this->store->addTicketHistory($ticket, (string) $event['id_empleado'], $id, $observation, $this->me());
+          // Como en calendario-actividades: el historial del caso guarda el mensaje para el caso/cliente, o el motivo si no hay.
+          $this->store->addTicketHistory($ticket, (string) $event['id_empleado'], $id, trim((string) ($input['descripcion'] ?? '')) ?: $observation, $this->me());
           $this->mailer->requesterAppointment($event, true);
         }
       } catch (\Throwable $exception) {

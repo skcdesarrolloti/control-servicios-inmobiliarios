@@ -86,10 +86,11 @@ $check(count(array_filter($mailer->emails, static fn($m) => $m['module'] === 'ev
 $list = $api->handle('filtrar_eventos_admin', ['id_empleado' => '100', 'fecha_inicio' => $future, 'fecha_fin' => $future, 'pagina' => 1, 'limite' => 2]);
 $check($list['success'] && count($list['data']['data']) === 2 && $list['data']['total'] === 4 && $list['data']['data'][0]['funcionario'] === 'Responsable QA', 'filtrar_eventos_admin pagina y devuelve {data,total}');
 
-$moved = $api->handle('trasladar_evento', ['id_evento' => 1, 'fecha_inicio' => $future . ' 17:00:00', 'fecha_fin' => $future . ' 18:00:00', 'observacion' => 'Cliente pidió otra hora', 'es_cita' => 'si']);
+$moved = $api->handle('trasladar_evento', ['id_evento' => 1, 'fecha_inicio' => $future . ' 17:00:00', 'fecha_fin' => $future . ' 18:00:00', 'observacion' => 'Cliente pidió otra hora', 'es_cita' => 'si', 'descripcion' => 'Le reprogramamos la visita para las 5 p. m.']);
 $event = $db->getRow('SELECT * FROM calendario_actividades WHERE id = 1');
 $check($moved['success'] && $event['fue_trasladado'] === 'Si' && $event['fecha_inicio'] === $future . ' 17:00:00', 'trasladar_evento mueve la fecha y marca el traslado');
 $check(in_array('cita-trasladada-solicitante-email', array_column($mailer->emails, 'module'), true) && (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_historial_del_ticket') === 2, 'el traslado de la cita avisa al solicitante y deja historial');
+$check($db->getVar('SELECT respuesta FROM wp_jet_cct_historial_del_ticket ORDER BY _ID DESC LIMIT 1') === 'Le reprogramamos la visita para las 5 p. m.', 'el historial del traslado guarda el mensaje para el caso, no solo el motivo');
 
 $done = $api->handle('cambiar_estado', ['id_evento' => 1, 'observacion' => 'Visita realizada']);
 $check($done['success'] && $db->getVar('SELECT estado FROM calendario_actividades WHERE id = 1') === 'Si', 'cambiar_estado marca realizado');
