@@ -10,20 +10,35 @@ use SCM\Core\Database;
  * API propia del calendario del panel (reemplaza calendario-actividades). Atiende las acciones que usa el panel con la
  * misma respuesta {success,message,data} para que el motor JS del calendario no cambie. La sesión y el nonce se exigen
  * en public/calendar-api.php; los procesos del servidor (p. ej. Revisión crítica) la llaman directamente sin sesión.
+ *
+ * Permisos con sesión ($team no nulo):
+ * - Con "Calendario equipo" o cargo administrador ($team = true): leer y modificar todo.
+ * - Sin él: lo propio (asignado a la persona o creado por ella). De otros funcionarios solo se entrega ocupado/libre,
+ *   y solo se agenda a otro funcionario desde su caso (cita de un caso abierto).
+ * Sin sesión ($team = null, procesos del servidor): acceso completo y sin reglas de horario.
  * No hay sincronización con Google Calendar.
  */
 final class CalendarApi
 {
   private const MAX_BULK_EVENTS = 400;
+  /** Margen para guardar algo que acaba de terminar (la pantalla valida contra la hora del navegador). */
+  private const PAST_GRACE_MINUTES = 10;
+  /** Franja de agenda del panel; la pantalla aplica la misma. */
+  private const DAY_START = '08:00';
+  private const DAY_END = '21:00';
+  private const CLOSED_TICKET_STATES = ['cerrado', 'cerrada', 'resuelto', 'resuelta', 'finalizado', 'finalizada', 'anulado', 'anulada'];
 
   private CalendarStore $store;
   private CalendarMailer $mailer;
+  private ?bool $team;
   private ?string $me = null;
 
-  public function __construct(Database $db, ?CalendarMailer $mailer = null)
+  /** @param bool|null $team null = proceso del servidor (sin sesión); true/false = sesión con o sin "Calendario equipo". */
+  public function __construct(Database $db, ?CalendarMailer $mailer = null, ?bool $team = null)
   {
     $this->store = new CalendarStore($db);
     $this->mailer = $mailer ?? new CalendarMailer($this->store);
+    $this->team = $team;
   }
 
   /**
@@ -43,6 +58,7 @@ final class CalendarApi
       'crear_eventos' => 'createEvents',
       'crear_item_calendario' => 'createItem',
       'crear_recordatorio' => 'createReminder',
+      'crear_recordatorios' => 'createReminders',
       'actualizar_evento' => 'updateEvent',
       'trasladar_evento' => 'moveEvent',
       'cambiar_estado' => 'completeEvent',
@@ -57,6 +73,8 @@ final class CalendarApi
     }
     try {
       return $this->{$handlers[$action]}($input);
+    } catch (\DomainException $exception) {
+      return self::fail($exception->getMessage(), [], 403);
     } catch (\InvalidArgumentException $exception) {
       return self::fail($exception->getMessage());
     }
@@ -86,26 +104,34 @@ final class CalendarApi
     } elseif (is_array($input['tipos_item'] ?? null) && $input['tipos_item'] !== []) {
       $types = array_values(array_unique(array_map(static fn($type): string => self::itemType((string) $type), $input['tipos_item'])));
     }
-    $filters = self::filters($input);
+    [$filters, $masked] = $this->readScope($input);
+    if ($filters === null) {
+      return self::ok('Items de calendario', []);
+    }
     $items = [];
     if (in_array('evento', $types, true)) {
       $items = $this->store->events($filters)['rows'];
     }
-    if (in_array('recordatorio', $types, true)) {
+    if (in_array('recordatorio', $types, true) && !$masked) {
       $items = array_merge($items, $this->store->reminders($filters));
     }
     usort($items, static fn(array $a, array $b): int => strcmp((string) ($a['fecha_inicio'] ?? ''), (string) ($b['fecha_inicio'] ?? '')));
     $limit = isset($input['limite']) ? max(1, min(CalendarStore::MAX_ROWS, (int) $input['limite'])) : CalendarStore::MAX_ROWS;
-    return self::ok('Items de calendario', array_slice($items, max(0, (int) ($input['offset'] ?? 0)), $limit));
+    $items = array_slice($items, max(0, (int) ($input['offset'] ?? 0)), $limit);
+    return self::ok('Items de calendario', $masked ? array_map([self::class, 'mask'], $items) : $items);
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
   private function filterEventsAdmin(array $input): array
   {
+    [$filters, $masked] = $this->readScope($input);
+    if ($filters === null) {
+      return self::ok('Eventos filtrados', ['data' => [], 'total' => 0]);
+    }
     $page = max(1, (int) ($input['pagina'] ?? 1));
     $limit = max(1, min(CalendarStore::MAX_ROWS, (int) ($input['limite'] ?? 50)));
-    $result = $this->store->events(self::filters($input), $limit, ($page - 1) * $limit);
-    return self::ok('Eventos filtrados', ['data' => $result['rows'], 'total' => $result['total']]);
+    $result = $this->store->events($filters, $limit, ($page - 1) * $limit);
+    return self::ok('Eventos filtrados', ['data' => $masked ? array_map([self::class, 'mask'], $result['rows']) : $result['rows'], 'total' => $result['total']]);
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
@@ -115,7 +141,7 @@ final class CalendarApi
     if ($employee === '') {
       return self::fail('ID de empleado requerido.');
     }
-    return self::ok('Eventos pendientes vencidos', $this->store->overdueEvents($employee));
+    return self::ok('Eventos pendientes vencidos', $this->canSeeEmployee($employee) ? $this->store->overdueEvents($employee) : []);
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */
@@ -125,7 +151,7 @@ final class CalendarApi
     if ($employee === '') {
       return self::fail('ID de funcionario requerido');
     }
-    return self::ok('Tickets encontrados', $this->store->openTicketsForEmployee($employee));
+    return self::ok('Tickets encontrados', $this->canSeeEmployee($employee) ? $this->store->openTicketsForEmployee($employee) : []);
   }
 
   // ── Crear ──────────────────────────────────────────
@@ -139,7 +165,13 @@ final class CalendarApi
       }
     }
     [$start, $end] = self::dateRange((string) $input['fecha_inicio'], (string) $input['fecha_fin']);
+    $this->assertSchedule($start, $end, true);
     $employee = $this->assertEmployee((string) $input['id_empleado']);
+    $ticket = (int) ($input['id_ticket'] ?? 0);
+    if ($ticket > 0) {
+      $this->assertOpenTicket($ticket);
+    }
+    $this->assertCanAssign([$employee], $ticket);
     $this->assertCategory((int) $input['id_categoria']);
     $blocked = $this->blockResponse($employee, $input);
     if ($blocked !== null) {
@@ -148,7 +180,6 @@ final class CalendarApi
     $data = $this->eventData($input, $employee, $start, $end);
     $id = $this->store->insertEvent($data);
     $this->mailer->newEvent($data + ['notificar_funcionarios' => $input['notificar_funcionarios'] ?? []], $id);
-    $ticket = (int) ($input['id_ticket'] ?? 0);
     if ($ticket > 0) {
       $this->linkTicket($ticket, $id, $employee, $input, $start, $end);
     }
@@ -169,6 +200,7 @@ final class CalendarApi
     foreach ($employees as $employee) {
       $this->assertEmployee($employee);
     }
+    $this->assertCanAssign($employees, 0);
     $rows = [];
     foreach ($events as $event) {
       if (!is_array($event)) {
@@ -180,6 +212,7 @@ final class CalendarApi
         }
       }
       [$start, $end] = self::dateRange((string) $event['fecha_inicio'], (string) $event['fecha_fin']);
+      $this->assertSchedule($start, $end, true);
       $this->assertCategory((int) $event['id_categoria']);
       foreach ($employees as $employee) {
         $rows[] = [$event + ['creado_por' => $input['creado_por'] ?? null, 'meta' => $input['meta'] ?? null], $employee, $start, $end];
@@ -192,10 +225,19 @@ final class CalendarApi
       }
     }
     $byEmployee = [];
-    foreach ($rows as [$event, $employee, $start, $end]) {
-      $data = $this->eventData($event, $employee, $start, $end);
-      $id = $this->store->insertEvent($data);
-      $byEmployee[$employee][] = ['id' => $id, 'notificar_funcionarios' => $event['notificar_funcionarios'] ?? ($input['notificar_funcionarios'] ?? [])] + $data;
+    $pdo = $this->store->database()->pdo();
+    $pdo->beginTransaction();
+    try {
+      foreach ($rows as [$event, $employee, $start, $end]) {
+        $data = $this->eventData($event, $employee, $start, $end);
+        $data['id_ticket'] = 0;
+        $id = $this->store->insertEvent($data);
+        $byEmployee[$employee][] = ['id' => $id, 'notificar_funcionarios' => $event['notificar_funcionarios'] ?? ($input['notificar_funcionarios'] ?? [])] + $data;
+      }
+      $pdo->commit();
+    } catch (\Throwable $exception) {
+      $pdo->rollBack();
+      throw $exception;
     }
     foreach ($byEmployee as $employee => $list) {
       $this->mailer->bulkEvents((string) $employee, $list);
@@ -222,13 +264,16 @@ final class CalendarApi
     if ($end === null || strtotime($end) <= strtotime($start)) {
       $end = self::plusMinutes($start, (int) ($input['duracion_minutos'] ?? 30));
     }
+    $this->assertSchedule($start, $end, true);
     $employee = $this->assertEmployee((string) $input['id_empleado']);
+    $this->assertCanAssign([$employee], 0);
     $this->assertCategory((int) $input['id_categoria']);
     $blocked = $this->blockResponse($employee, $input);
     if ($blocked !== null) {
       return $blocked;
     }
     $data = $this->eventData($input, $employee, $start, $end);
+    $data['id_ticket'] = 0;
     $id = $this->store->insertEvent($data);
     $this->mailer->newEvent($data + ['notificar_funcionarios' => $input['notificar_funcionarios'] ?? []], $id);
     return self::ok('Evento creado.', ['item' => $this->store->event($id), 'recordatorio' => null]);
@@ -237,45 +282,48 @@ final class CalendarApi
   /** @param array<string,mixed> $input @return array<string,mixed> */
   private function createReminder(array $input): array
   {
-    foreach (['titulo', 'id_empleado'] as $field) {
-      if (empty($input[$field])) {
-        return self::fail("El campo '{$field}' es obligatorio para recordatorios.");
+    $data = $this->reminderData($input);
+    $id = $this->store->insertReminder($data);
+    return self::ok('Recordatorio creado.', $this->scheduleReminder($id));
+  }
+
+  /**
+   * Varios recordatorios de una vez (varias fechas o funcionarios): se validan todos y se guardan juntos, así un error
+   * no deja la mitad creada ni se duplican al reintentar.
+   * @param array<string,mixed> $input
+   * @return array<string,mixed>
+   */
+  private function createReminders(array $input): array
+  {
+    $items = is_array($input['recordatorios'] ?? null) ? array_values($input['recordatorios']) : [];
+    if ($items === []) {
+      return self::fail('Indica los recordatorios a crear.');
+    }
+    if (count($items) > self::MAX_BULK_EVENTS) {
+      return self::fail('Son demasiadas fechas a la vez. El máximo es ' . self::MAX_BULK_EVENTS . ' recordatorios.');
+    }
+    $rows = [];
+    foreach ($items as $item) {
+      if (!is_array($item)) {
+        return self::fail('Formato incorrecto en los recordatorios.');
       }
+      $rows[] = $this->reminderData($item);
     }
-    $at = self::parseDate((string) (($input['recordatorio_at'] ?? '') ?: ($input['fecha_inicio'] ?? '')));
-    if ($at === null) {
-      return self::fail('La fecha del recordatorio es obligatoria.');
+    $ids = [];
+    $pdo = $this->store->database()->pdo();
+    $pdo->beginTransaction();
+    try {
+      foreach ($rows as $row) {
+        $ids[] = $this->store->insertReminder($row);
+      }
+      $pdo->commit();
+    } catch (\Throwable $exception) {
+      $pdo->rollBack();
+      throw $exception;
     }
-    $employee = $this->assertEmployee((string) $input['id_empleado']);
-    $categoryId = (int) ($input['id_categoria'] ?? 0);
-    if ($categoryId > 0) {
-      $this->assertCategory($categoryId);
-    }
-    $meta = is_array($input['meta'] ?? null) ? $input['meta'] : [];
-    unset($meta['google_calendar_requested']);
-    $meta['aviso_minutos_antes'] = self::noticeMinutes($input['aviso_minutos_antes'] ?? ($meta['aviso_minutos_antes'] ?? 30));
-    $id = $this->store->insertReminder([
-      'titulo' => (string) $input['titulo'],
-      'mensaje' => (string) (($input['mensaje'] ?? '') ?: ($input['descripcion'] ?? '')),
-      'recordatorio_at' => $at,
-      'recordatorio_canal' => (string) ($input['recordatorio_canal'] ?? 'email'),
-      'id_empleado' => $employee,
-      'creado_por' => $this->creator($input),
-      'id_evento' => (int) ($input['id_evento'] ?? 0),
-      'id_ticket' => (int) ($input['id_ticket'] ?? 0),
-      'id_categoria' => $categoryId,
-      'origen_app' => $input['origen_app'] ?? CalendarStore::ORIGIN,
-      'external_ref' => $input['external_ref'] ?? null,
-      'meta' => $meta,
-    ]);
-    $reminder = (array) $this->store->reminder($id);
-    $queueId = $this->mailer->scheduleReminder($reminder);
-    if ($queueId !== null) {
-      $this->store->setReminderQueue($id, $queueId, 'programado');
-    }
-    $reminder = (array) $this->store->reminder($id);
-    $reminder['aviso_programado'] = $queueId !== null;
-    return self::ok('Recordatorio creado.', $reminder);
+    $created = array_map([$this, 'scheduleReminder'], $ids);
+    $scheduled = count(array_filter($created, static fn(array $row): bool => !empty($row['aviso_programado'])));
+    return self::ok('Se crearon ' . count($ids) . ' recordatorios.', ['creados' => count($ids), 'aviso_programado' => $scheduled === count($ids), 'items' => $created]);
   }
 
   // ── Modificar ──────────────────────────────────────
@@ -284,7 +332,7 @@ final class CalendarApi
   private function updateEvent(array $input): array
   {
     $id = (int) ($input['id'] ?? 0);
-    $event = $this->existingEvent($id);
+    $event = $this->editableEvent($id);
     $title = trim((string) ($input['titulo'] ?? ''));
     $category = (int) ($input['id_categoria'] ?? 0);
     if ($title === '' || $category <= 0) {
@@ -306,7 +354,12 @@ final class CalendarApi
       return self::fail('Datos incompletos para trasladar el evento.');
     }
     [$start, $end] = self::dateRange((string) $input['fecha_inicio'], (string) $input['fecha_fin']);
-    $this->existingEvent($id);
+    $current = $this->editableEvent($id);
+    // Trasladar lo reabría (estado 'No') y luego podía bloquear al funcionario como vencido.
+    if (strcasecmp(trim((string) ($current['estado'] ?? '')), 'Si') === 0) {
+      return self::fail('Este evento ya fue realizado; no se puede trasladar. Crea uno nuevo si necesitas otra cita.');
+    }
+    $this->assertSchedule($start, $end, true);
     $this->store->rescheduleEvent($id, $start, $end, $observation);
     $event = (array) $this->store->event($id);
     $this->mailer->eventMoved($event, $id);
@@ -334,7 +387,7 @@ final class CalendarApi
     if ($id <= 0 || $observation === '') {
       return self::fail('El evento y la observación son obligatorios.');
     }
-    $this->existingEvent($id);
+    $this->editableEvent($id);
     if ($this->store->requiresCommercialReport($id)) {
       return self::fail('Debes completar el reporte comercial antes de finalizar el evento. Ciérralo desde el panel comercial.', ['requiere_reporte' => true]);
     }
@@ -348,7 +401,7 @@ final class CalendarApi
   {
     $this->store->finalizeExpiredReminders();
     $id = (int) ($input['id_recordatorio'] ?? ($input['id'] ?? 0));
-    $current = $this->existingReminder($id);
+    $current = $this->editableReminder($id);
     if (!in_array($current['estado'], ['pendiente', 'programado'], true)) {
       return self::fail('Solo se pueden editar recordatorios pendientes.');
     }
@@ -357,6 +410,7 @@ final class CalendarApi
     if ($title === '' || $at === null) {
       return self::fail('El título y la fecha del recordatorio son obligatorios.');
     }
+    $this->assertSchedule($at, $at, false);
     $meta = array_merge(is_array($current['meta'] ?? null) ? $current['meta'] : [], is_array($input['meta'] ?? null) ? $input['meta'] : []);
     unset($meta['google_calendar_requested']);
     $meta['aviso_minutos_antes'] = self::noticeMinutes($input['aviso_minutos_antes'] ?? ($meta['aviso_minutos_antes'] ?? 0));
@@ -380,14 +434,25 @@ final class CalendarApi
     if (!in_array($status, ['enviado', 'cancelado'], true)) {
       return self::fail('Estado de recordatorio no válido.');
     }
-    $this->existingReminder($id);
+    $this->editableReminder($id);
     $this->store->setReminderStatus($id, $status);
     $reminder = (array) $this->store->reminder($id);
     $this->mailer->cancelReminder($reminder, $status === 'enviado' ? 'Cancelado porque el recordatorio fue marcado como enviado manualmente.' : 'Cancelado manualmente desde calendario.');
     return self::ok($status === 'enviado' ? 'Recordatorio marcado como enviado.' : 'Recordatorio cancelado.', $reminder);
   }
 
-  // ── Apoyo ──────────────────────────────────────────
+  // ── Permisos ───────────────────────────────────────
+
+  /** Proceso del servidor (sin sesión): acceso completo. */
+  private function isSystem(): bool
+  {
+    return $this->team === null;
+  }
+
+  private function canTeam(): bool
+  {
+    return $this->team !== false;
+  }
 
   /** Quien tiene la sesión; vacío en procesos del servidor. */
   private function me(): string
@@ -395,15 +460,141 @@ final class CalendarApi
     return $this->me ??= $this->store->currentEmployeeId();
   }
 
-  /**
-   * `creado_por` es el `id_empleado` real de quien tiene la sesión; sin sesión (procesos del servidor) se usa el que
-   * envía el proceso.
-   * @param array<string,mixed> $input
-   */
-  private function creator(array $input): string
+  private function canSeeEmployee(string $employee): bool
   {
+    return $this->canTeam() || ($this->me() !== '' && $employee === $this->me());
+  }
+
+  /**
+   * Qué agenda puede leer la persona: con el equipo, cualquiera; sin él, la suya completa y la de otro solo como
+   * ocupado/libre. Sin funcionario en el filtro y sin equipo, la suya.
+   * @param array<string,mixed> $input
+   * @return array{0:array<string,string>|null,1:bool} [filtros o null si no puede ver nada, enmascarar]
+   */
+  private function readScope(array $input): array
+  {
+    $filters = self::filters($input);
+    if ($this->canTeam()) {
+      return [$filters, false];
+    }
     $me = $this->me();
-    return $me !== '' ? $me : trim((string) ($input['creado_por'] ?? ''));
+    $requested = $filters['id_empleado'] ?? '';
+    if ($requested === '' || $requested === $me) {
+      if ($me === '') {
+        return [null, false];
+      }
+      $filters['id_empleado'] = $me;
+      return [$filters, false];
+    }
+    // De otro funcionario solo fechas: nada de búsqueda, casos ni categorías que revelen el contenido.
+    return [array_intersect_key($filters, array_flip(['id_empleado', 'fecha_inicio', 'fecha_fin', 'estado'])), true];
+  }
+
+  /**
+   * A sí mismo siempre. A otros, con "Calendario equipo", o una sola persona desde su caso (cita del caso).
+   * @param array<int,string> $employees
+   */
+  private function assertCanAssign(array $employees, int $ticket): void
+  {
+    if ($this->canTeam()) {
+      return;
+    }
+    foreach ($employees as $employee) {
+      if ($employee === $this->me()) {
+        continue;
+      }
+      if (!($ticket > 0 && count($employees) === 1)) {
+        throw new \DomainException('No tienes permiso para agendar en el calendario de otro funcionario.');
+      }
+    }
+  }
+
+  /** @param array<string,mixed> $row */
+  private function canChange(array $row): bool
+  {
+    if ($this->canTeam()) {
+      return true;
+    }
+    $me = $this->me();
+    return $me !== '' && ((string) ($row['id_empleado'] ?? '') === $me || (string) ($row['creado_por'] ?? '') === $me);
+  }
+
+  /** @return array<string,mixed> */
+  private function editableEvent(int $id): array
+  {
+    $event = $this->store->event($id);
+    if ($event === null) {
+      throw new \InvalidArgumentException('Evento no encontrado.');
+    }
+    if (!$this->canChange($event)) {
+      throw new \DomainException('No tienes permiso para modificar este evento.');
+    }
+    return $event;
+  }
+
+  /** @return array<string,mixed> */
+  private function editableReminder(int $id): array
+  {
+    $reminder = $this->store->reminder($id);
+    if ($reminder === null) {
+      throw new \InvalidArgumentException('Recordatorio no encontrado.');
+    }
+    if (!$this->canChange($reminder)) {
+      throw new \DomainException('No tienes permiso para modificar este recordatorio.');
+    }
+    return $reminder;
+  }
+
+  /** @param array<string,mixed> $row @return array<string,mixed> */
+  private static function mask(array $row): array
+  {
+    return [
+      'id' => $row['id'] ?? '',
+      'tipo_item' => $row['tipo_item'] ?? 'evento',
+      'titulo' => 'Ocupado',
+      'categoria' => 'Ocupado',
+      'fecha_inicio' => $row['fecha_inicio'] ?? '',
+      'fecha_fin' => $row['fecha_fin'] ?? '',
+      'id_empleado' => $row['id_empleado'] ?? '',
+      'funcionario' => $row['funcionario'] ?? '',
+      'estado' => $row['estado'] ?? '',
+      'color' => '#94a3b8',
+      'privado' => true,
+    ];
+  }
+
+  // ── Reglas ─────────────────────────────────────────
+
+  /**
+   * Igual que la pantalla: con sesión no se agenda en el pasado y los eventos van de 8:00 a. m. a 9:00 p. m. Los
+   * procesos del servidor (vencimientos a cualquier hora) no tienen estas reglas.
+   */
+  private function assertSchedule(string $start, string $end, bool $isEvent): void
+  {
+    if ($this->isSystem()) {
+      return;
+    }
+    $limit = (new \DateTimeImmutable($this->store->now(), new \DateTimeZone(CalendarStore::TIMEZONE)))
+      ->modify('-' . self::PAST_GRACE_MINUTES . ' minutes')->format('Y-m-d H:i:s');
+    if ($end < $limit) {
+      throw new \InvalidArgumentException('No puedes agendar en una fecha u hora que ya pasó.');
+    }
+    if ($isEvent && (substr($start, 0, 10) !== substr($end, 0, 10) || substr($start, 11, 5) < self::DAY_START || substr($end, 11, 5) > self::DAY_END)) {
+      throw new \InvalidArgumentException('El evento debe ser el mismo día, entre las 8:00 a. m. y las 9:00 p. m.');
+    }
+  }
+
+  private function assertOpenTicket(int $ticket): void
+  {
+    $row = $this->store->ticket($ticket);
+    if ($row === null) {
+      throw new \InvalidArgumentException('El caso vinculado no existe.');
+    }
+    foreach (['estado', 'estado_administrativo'] as $field) {
+      if (in_array(mb_strtolower(trim((string) ($row[$field] ?? ''))), self::CLOSED_TICKET_STATES, true)) {
+        throw new \InvalidArgumentException('El caso #' . $ticket . ' está cerrado; no se le pueden agendar citas.');
+      }
+    }
   }
 
   private function assertEmployee(string $employeeId): string
@@ -422,24 +613,65 @@ final class CalendarApi
     }
   }
 
-  /** @return array<string,mixed> */
-  private function existingEvent(int $id): array
+  /** @param array<string,mixed> $input @return array<string,mixed> */
+  private function reminderData(array $input): array
   {
-    $event = $this->store->event($id);
-    if ($event === null) {
-      throw new \InvalidArgumentException('Evento no encontrado.');
+    foreach (['titulo', 'id_empleado'] as $field) {
+      if (empty($input[$field])) {
+        throw new \InvalidArgumentException("El campo '{$field}' es obligatorio para recordatorios.");
+      }
     }
-    return $event;
+    $at = self::parseDate((string) (($input['recordatorio_at'] ?? '') ?: ($input['fecha_inicio'] ?? '')));
+    if ($at === null) {
+      throw new \InvalidArgumentException('La fecha del recordatorio es obligatoria.');
+    }
+    $this->assertSchedule($at, $at, false);
+    $employee = $this->assertEmployee((string) $input['id_empleado']);
+    $this->assertCanAssign([$employee], 0);
+    $categoryId = (int) ($input['id_categoria'] ?? 0);
+    if ($categoryId > 0) {
+      $this->assertCategory($categoryId);
+    }
+    $meta = is_array($input['meta'] ?? null) ? $input['meta'] : [];
+    unset($meta['google_calendar_requested']);
+    $meta['aviso_minutos_antes'] = self::noticeMinutes($input['aviso_minutos_antes'] ?? ($meta['aviso_minutos_antes'] ?? 30));
+    return [
+      'titulo' => (string) $input['titulo'],
+      'mensaje' => (string) (($input['mensaje'] ?? '') ?: ($input['descripcion'] ?? '')),
+      'recordatorio_at' => $at,
+      'recordatorio_canal' => (string) ($input['recordatorio_canal'] ?? 'email'),
+      'id_empleado' => $employee,
+      'creado_por' => $this->creator($input),
+      'id_evento' => (int) ($input['id_evento'] ?? 0),
+      'id_ticket' => (int) ($input['id_ticket'] ?? 0),
+      'id_categoria' => $categoryId,
+      'origen_app' => $input['origen_app'] ?? CalendarStore::ORIGIN,
+      'external_ref' => $input['external_ref'] ?? null,
+      'meta' => $meta,
+    ];
   }
 
-  /** @return array<string,mixed> */
-  private function existingReminder(int $id): array
+  /** Programa el aviso del recordatorio ya guardado y lo devuelve. @return array<string,mixed> */
+  private function scheduleReminder(int $id): array
   {
-    $reminder = $this->store->reminder($id);
-    if ($reminder === null) {
-      throw new \InvalidArgumentException('Recordatorio no encontrado.');
+    $queueId = $this->mailer->scheduleReminder((array) $this->store->reminder($id));
+    if ($queueId !== null) {
+      $this->store->setReminderQueue($id, $queueId, 'programado');
     }
+    $reminder = (array) $this->store->reminder($id);
+    $reminder['aviso_programado'] = $queueId !== null;
     return $reminder;
+  }
+
+  /**
+   * `creado_por` es el `id_empleado` real de quien tiene la sesión; sin sesión (procesos del servidor) se usa el que
+   * envía el proceso.
+   * @param array<string,mixed> $input
+   */
+  private function creator(array $input): string
+  {
+    $me = $this->me();
+    return $me !== '' ? $me : trim((string) ($input['creado_por'] ?? ''));
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed>|null */
@@ -449,11 +681,13 @@ final class CalendarApi
     if (!$block['bloqueado']) {
       return null;
     }
-    $this->store->logBlock($employee, $block['cantidad']);
     $value = $input['permitir_vencidos'] ?? '';
-    if ($value === true || in_array(strtolower(trim((string) $value)), ['1', 'si', 'true', 'yes'], true)) {
+    $override = $value === true || in_array(strtolower(trim((string) $value)), ['1', 'si', 'true', 'yes'], true);
+    if ($override) {
       return null;
     }
+    // Se registra una sola vez, en el intento bloqueado; el "crear de todas formas" que sigue no lo duplica.
+    $this->store->logBlock($employee, $block['cantidad']);
     // El bloqueo es del funcionario asignado (no de quien crea) y solo por eventos que terminaron hace más de 2 días:
     // se nombran para que se sepa cuál cerrar o trasladar.
     $overdue = $this->store->overdueEvents($employee);
@@ -468,6 +702,7 @@ final class CalendarApi
     return self::fail($message, [
       'bloqueado_vencidos' => true,
       'cantidad' => $block['cantidad'],
+      'id_empleado' => $employee,
       'eventos' => array_map(static fn(array $row): array => ['id' => $row['id'] ?? null, 'titulo' => $row['titulo'] ?? '', 'fecha_inicio' => $row['fecha_inicio'] ?? '', 'fecha_fin' => $row['fecha_fin'] ?? ''], $overdue),
     ]);
   }
@@ -511,12 +746,12 @@ final class CalendarApi
     }
   }
 
-  /** @param array<string,mixed> $input @return array<string,mixed> */
+  /** @param array<string,mixed> $input @return array<string,string> */
   private static function filters(array $input): array
   {
     $filters = [];
     foreach (['id_empleado', 'id_categoria', 'id_ticket', 'estado', 'fue_trasladado', 'origen_app', 'external_ref', 'fecha_inicio', 'fecha_fin', 'buscar'] as $key) {
-      if (isset($input[$key]) && !is_array($input[$key])) {
+      if (isset($input[$key]) && !is_array($input[$key]) && trim((string) $input[$key]) !== '') {
         $filters[$key] = trim((string) $input[$key]);
       }
     }

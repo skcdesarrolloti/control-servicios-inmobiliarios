@@ -41,7 +41,9 @@ session_write_close();
 set_time_limit(60);
 
 try {
-  $respond((new CalendarApi($scmDb))->handle($action, is_array($input) ? $input : []));
+  // "Calendario equipo" o cargo administrador: ve y modifica todo; los demás, lo suyo (de otros solo ocupado/libre).
+  $team = (new SuCasaControlServiciosInmobiliarios($scmDb))->calendarTeamAccess();
+  $respond((new CalendarApi($scmDb, null, $team))->handle($action, is_array($input) ? $input : []));
 } catch (\Throwable $exception) {
   $reference = bin2hex(random_bytes(6));
   error_log(sprintf('[calendar-api:%s] action=%s %s in %s:%d', $reference, $action, $exception->getMessage(), $exception->getFile(), $exception->getLine()));

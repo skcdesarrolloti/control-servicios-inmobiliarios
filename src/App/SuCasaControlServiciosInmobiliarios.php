@@ -350,6 +350,13 @@ final class SuCasaControlServiciosInmobiliarios
   }
 
   /** @return array<int,string> */
+  /** El calendario completo del equipo: con la opción "Calendario equipo" o un cargo administrador. */
+  public function calendarTeamAccess(): bool
+  {
+    return in_array((string) Auth::userCargo(), $this->dashboardPermissionAdminCargos(), true)
+      || $this->canAccessDashboardTab('calendario_equipo');
+  }
+
   private function dashboardPermissionAdminCargos(): array
   {
     return ['11', '12', '13', '14'];

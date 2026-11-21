@@ -79,9 +79,10 @@ final class CalendarStore
       }
     }
     if (!empty($filters['fecha_inicio']) && !empty($filters['fecha_fin'])) {
-      $where[] = 'e.`fecha_inicio` BETWEEN ? AND ?';
-      $args[] = substr((string) $filters['fecha_inicio'], 0, 10) . ' 00:00:00';
+      // Por traslape: también entra un evento de varios días que empezó antes del rango.
+      $where[] = 'e.`fecha_inicio` <= ? AND e.`fecha_fin` >= ?';
       $args[] = substr((string) $filters['fecha_fin'], 0, 10) . ' 23:59:59';
+      $args[] = substr((string) $filters['fecha_inicio'], 0, 10) . ' 00:00:00';
     }
     $search = trim((string) ($filters['buscar'] ?? ''));
     if ($search !== '') {
@@ -95,8 +96,7 @@ final class CalendarStore
              WHERE ' . implode(' AND ', $where);
     $limit = max(1, min(self::MAX_ROWS, $limit));
     $rows = $this->db->getResults(
-      'SELECT e.*, c.`nombre` AS categoria, c.`color`, f.`nombre` AS funcionario,
-              f.`correo` AS funcionario_correo, f.`celular` AS funcionario_celular' . $from
+      'SELECT e.*, c.`nombre` AS categoria, c.`color`, f.`nombre` AS funcionario' . $from
         . ' ORDER BY e.`fecha_inicio` ASC, e.`id` ASC LIMIT ' . $limit . ' OFFSET ' . max(0, $offset),
       $args
     );
@@ -262,8 +262,7 @@ final class CalendarStore
       $args[] = substr((string) $filters['fecha_fin'], 0, 10) . ' 23:59:59';
     }
     $rows = $this->db->getResults(
-      'SELECT r.*, c.`nombre` AS categoria, c.`color`, f.`nombre` AS funcionario,
-              f.`correo` AS funcionario_correo, f.`celular` AS funcionario_celular
+      'SELECT r.*, c.`nombre` AS categoria, c.`color`, f.`nombre` AS funcionario
          FROM `' . self::REMINDERS . '` r
          LEFT JOIN `' . self::CATEGORIES . '` c ON r.`id_categoria` = c.`id`
          JOIN `' . $this->employees . '` f ON r.`id_empleado` = f.`id_empleado`
@@ -281,8 +280,7 @@ final class CalendarStore
       return null;
     }
     $row = $this->db->getRow(
-      'SELECT r.*, c.`nombre` AS categoria, c.`color`, f.`nombre` AS funcionario,
-              f.`correo` AS funcionario_correo, f.`celular` AS funcionario_celular
+      'SELECT r.*, c.`nombre` AS categoria, c.`color`, f.`nombre` AS funcionario
          FROM `' . self::REMINDERS . '` r
          LEFT JOIN `' . self::CATEGORIES . '` c ON r.`id_categoria` = c.`id`
          JOIN `' . $this->employees . '` f ON r.`id_empleado` = f.`id_empleado`
@@ -352,7 +350,7 @@ final class CalendarStore
   public function openTicketsForEmployee(string $employeeId): array
   {
     return $this->db->getResults(
-      'SELECT `_ID`, `indicativo`, `solicitante`, `correo_solicitante`, `celular_solicitante`, `id_empleado`, `estado`,
+      'SELECT `_ID`, `indicativo`, `solicitante`, `id_empleado`, `estado`,
               `estado_comercial`, `estado_administrativo`, `departamento`, `contrato`, `inmueble`, `direccion`
          FROM `' . $this->tickets . '`
         WHERE `id_empleado` = ? AND `estado` IN (' . implode(',', array_fill(0, count(self::OPEN_TICKET_STATES), '?')) . ')',
@@ -411,7 +409,7 @@ final class CalendarStore
   /** @return array<int,array<string,mixed>> */
   public function employees(): array
   {
-    return $this->db->getResults('SELECT `_ID`, `nombre`, `correo`, `celular`, `rol`, `id_cargo`, `id_empleado`, `activo` FROM `' . $this->employees . '` ORDER BY `nombre` ASC');
+    return $this->db->getResults('SELECT `_ID`, `nombre`, `rol`, `id_cargo`, `id_empleado`, `activo` FROM `' . $this->employees . '` ORDER BY `nombre` ASC');
   }
 
   /** @return array<string,mixed>|null Fila completa: es de uso interno y nunca se envía tal cual al navegador. */

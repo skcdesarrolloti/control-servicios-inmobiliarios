@@ -137,4 +137,45 @@ unset($_SESSION['scm_employee_id']);
 $server = (new CalendarApi($db, $mailer))->handle('crear_recordatorio', ['titulo' => 'Proceso', 'recordatorio_at' => $future . ' 10:00:00', 'id_empleado' => '100', 'creado_por' => '900']);
 $check($server['success'] && $server['data']['creado_por'] === '900', 'sin sesión (procesos del servidor) conserva el creador enviado');
 
+// ── Con sesión: permisos y reglas de horario ─────────────────────────
+$_SESSION['scm_employee_id'] = '100';
+$own = new CalendarApi($db, $mailer, false);
+$team = new CalendarApi($db, $mailer, true);
+$other = $own->handle('filtrar_eventos_admin', ['id_empleado' => '900', 'fecha_inicio' => $future, 'fecha_fin' => $future, 'limite' => 100]);
+$check($other['success'] && $other['data']['data'] !== [] && count(array_filter($other['data']['data'], static fn($r) => $r['titulo'] !== 'Ocupado' || empty($r['privado']) || isset($r['descripcion']))) === 0, 'sin Calendario equipo, la agenda de otro funcionario solo muestra Ocupado');
+$mine = $own->handle('listar_items_calendario', ['fecha_inicio' => $future, 'fecha_fin' => $future]);
+$check($mine['data'] !== [] && count(array_filter($mine['data'], static fn($r) => (string) $r['id_empleado'] !== '100')) === 0, 'sin funcionario en el filtro, solo se lee lo propio');
+$check($own->handle('listar_pendientes_vencidos', ['id_empleado' => '900'])['data'] === [] && $own->handle('obtener_tickets_funcionario', ['id_empleado' => '900'])['data'] === [], 'no se leen vencidos ni casos de otro funcionario');
+$otherEventId = (int) $db->getVar("SELECT MIN(id) FROM calendario_actividades WHERE id_empleado = '900' AND estado = 'No' AND (creado_por IS NULL OR creado_por <> '100')");
+$denied = $own->handle('cambiar_estado', ['id_evento' => $otherEventId, 'observacion' => 'x']);
+$check(!$denied['success'] && $denied['status'] === 403, 'no se modifican eventos de otros sin Calendario equipo');
+$check($team->handle('trasladar_evento', ['id_evento' => $otherEventId, 'fecha_inicio' => $future . ' 09:00', 'fecha_fin' => $future . ' 09:30', 'observacion' => 'Equipo'])['success'], 'con Calendario equipo sí se modifican');
+$forOther = $own->handle('crear_evento', ['titulo' => 'Para otro', 'fecha_inicio' => $future . ' 10:00', 'fecha_fin' => $future . ' 10:30', 'id_empleado' => '900', 'id_categoria' => 1, 'permitir_vencidos' => '1']);
+$check(!$forOther['success'] && $forOther['status'] === 403, 'no se agenda a otro funcionario sin Calendario equipo');
+$check($own->handle('crear_evento', ['titulo' => 'Cita del caso', 'fecha_inicio' => $future . ' 10:00', 'fecha_fin' => $future . ' 10:30', 'id_empleado' => '900', 'id_categoria' => 1, 'id_ticket' => 55, 'permitir_vencidos' => '1'])['success'], 'sí se agenda la cita de un caso abierto a su funcionario');
+$past = $own->handle('crear_evento', ['titulo' => 'Pasado', 'fecha_inicio' => '2020-02-02 09:00', 'fecha_fin' => '2020-02-02 10:00', 'id_empleado' => '100', 'id_categoria' => 1, 'permitir_vencidos' => '1']);
+$check(!$past['success'] && str_contains($past['message'], 'ya pasó'), 'con sesión no se agenda en el pasado');
+$early = $own->handle('crear_evento', ['titulo' => 'Madrugada', 'fecha_inicio' => $future . ' 06:00', 'fecha_fin' => $future . ' 07:00', 'id_empleado' => '100', 'id_categoria' => 1, 'permitir_vencidos' => '1']);
+$check(!$early['success'] && str_contains($early['message'], '8:00'), 'con sesión los eventos van de 8:00 a. m. a 9:00 p. m.');
+$db->update('wp_jet_cct_tickets', ['estado' => 'Cerrado'], ['_ID' => 55]);
+$closedTicket = $team->handle('crear_evento', ['titulo' => 'Caso cerrado', 'fecha_inicio' => $future . ' 11:00', 'fecha_fin' => $future . ' 11:30', 'id_empleado' => '100', 'id_categoria' => 1, 'id_ticket' => 55, 'permitir_vencidos' => '1']);
+$check(!$closedTicket['success'] && str_contains($closedTicket['message'], 'cerrado') && $db->getVar('SELECT estado FROM wp_jet_cct_tickets WHERE _ID = 55') === 'Cerrado', 'no se agenda en un caso cerrado ni se reabre');
+$doneMove = $team->handle('trasladar_evento', ['id_evento' => 1, 'fecha_inicio' => $future . ' 12:00', 'fecha_fin' => $future . ' 12:30', 'observacion' => 'x']);
+$check(!$doneMove['success'] && $db->getVar('SELECT estado FROM calendario_actividades WHERE id = 1') === 'Si', 'un evento realizado no se traslada ni se reabre');
+$before = (int) $db->getVar('SELECT COUNT(*) FROM calendario_recordatorios');
+$bulkFail = $team->handle('crear_recordatorios', ['recordatorios' => [
+  ['titulo' => 'R1', 'recordatorio_at' => $future . ' 09:00', 'id_empleado' => '100'],
+  ['titulo' => 'R2', 'recordatorio_at' => 'no-es-fecha', 'id_empleado' => '100'],
+]]);
+$check(!$bulkFail['success'] && (int) $db->getVar('SELECT COUNT(*) FROM calendario_recordatorios') === $before, 'recordatorios en lote: si uno es inválido no se crea ninguno');
+$bulkOk = $team->handle('crear_recordatorios', ['recordatorios' => [
+  ['titulo' => 'R1', 'recordatorio_at' => $future . ' 09:00', 'id_empleado' => '100'],
+  ['titulo' => 'R2', 'recordatorio_at' => $future . ' 09:00', 'id_empleado' => '900'],
+]]);
+$check($bulkOk['success'] && $bulkOk['data']['creados'] === 2 && (int) $db->getVar('SELECT COUNT(*) FROM calendario_recordatorios') === $before + 2, 'recordatorios en lote se crean juntos');
+$db->insert('calendario_actividades', ['titulo' => 'Varios días', 'fecha_inicio' => '2030-03-30 09:00:00', 'fecha_fin' => '2030-04-02 18:00:00', 'id_empleado' => '100', 'id_categoria' => 1, 'estado' => 'No']);
+$april = $team->handle('filtrar_eventos_admin', ['id_empleado' => '100', 'fecha_inicio' => '2030-04-01', 'fecha_fin' => '2030-04-30', 'limite' => 50]);
+$check(in_array('Varios días', array_column($april['data']['data'], 'titulo'), true), 'un evento de varios días aparece en el mes donde continúa');
+$check(!isset($team->handle('listar_funcionarios', [])['data'][0]['correo']), 'la lista de funcionarios no expone correos ni celulares');
+
 echo "Calendar API checks passed; no real database or notifications used.\n";
