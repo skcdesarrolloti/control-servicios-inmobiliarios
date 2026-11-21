@@ -5302,9 +5302,10 @@
   function calendarApiBase(root) {
     var runtime = root ? parseRuntime(root) || {} : {};
     var config = runtime.config || {};
+    // API propia del calendario (public/calendar-api.php): exige sesión y el nonce del panel.
     return String(
       config.calendar_api_url ||
-        "https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action=",
+        String(runtime.baseUrl || "").replace(/\/+$/, "") + "/calendar-api.php?action=",
     );
   }
 
@@ -5312,9 +5313,10 @@
     var options = {
       method: payload ? "POST" : "GET",
       credentials: "same-origin",
+      headers: { "X-SCM-Nonce": ((root ? parseRuntime(root) : null) || {}).nonce || "" },
     };
     if (payload) {
-      options.headers = { "Content-Type": "application/json" };
+      options.headers["Content-Type"] = "application/json";
       options.body = JSON.stringify(payload);
     }
     return fetch(
@@ -8048,7 +8050,6 @@
           fecha_fin: dateValue + " " + endValue + ":00",
           id_empleado: employeeId,
           creado_por: creatorId,
-          sincronizar_google: "0",
           id_categoria: fd.get("id_categoria") || "",
           id_ticket: ticketPk,
           es_cita: "si",

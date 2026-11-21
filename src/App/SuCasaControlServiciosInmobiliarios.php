@@ -250,8 +250,12 @@ final class SuCasaControlServiciosInmobiliarios
   const DEFAULT_CORRECTIVA_URL = 'revision-correctiva.php?numero=';
   const DEFAULT_COTIZACION_URL = 'cotizacion-mantenimiento.php?numero=';
   const DEFAULT_ACTA_URL = 'https://sucasainmobiliaria.com.co/acta-de-satisfaccion/?numero=';
-  const DEFAULT_CALENDAR_APP_URL = 'https://calendar-skc.netlify.app';
-  const DEFAULT_CALENDAR_API_URL = 'https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action=';
+
+  /** API propia del calendario (public/calendar-api.php); ya no se usa calendario-actividades. */
+  public static function calendarApiUrl(): string
+  {
+    return rtrim((string) (defined('SCM_BASE_URL') ? SCM_BASE_URL : ''), '/') . '/calendar-api.php?action=';
+  }
 
   private Database $db;
   private array $tableExistsCache = [];
@@ -533,7 +537,7 @@ final class SuCasaControlServiciosInmobiliarios
       'servicios_publicos' => [
         'label' => 'Servicios públicos',
         'items' => [
-          'servicios_publicos_critico' => ['label'=>'Revisión crítica · 72 horas','description'=>'Revisión, acta y caso Servicio publico critico con vencimiento a las 72 horas; se agenda en Google si el seleccionado tiene cuenta conectada. También se informa al creador y al arrendatario.','channel'=>'WhatsApp oficial, email en cola y calendario'],
+          'servicios_publicos_critico' => ['label'=>'Revisión crítica · 72 horas','description'=>'Revisión, acta y caso Servicio publico critico con vencimiento a las 72 horas; el seleccionado recibe el recordatorio en el calendario del panel. También se informa al creador y al arrendatario.','channel'=>'WhatsApp oficial, email en cola y calendario'],
           'acta_servicios_publicos' => [
             'label' => 'Acta de servicios públicos',
             'description' => 'Cuando se genera una revisión nativa de servicios públicos y sus actas.',

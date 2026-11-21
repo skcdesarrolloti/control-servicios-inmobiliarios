@@ -1,0 +1,38 @@
+# Calendario: API propia del panel
+
+El calendario del panel (Mi calendario, Calendario equipo, vencimientos, cita desde el caso, informes) ya no usa la app
+externa `calendario-actividades` ni su frontend en Netlify. Todo pasa por esta app, igual que en el panel comercial.
+
+## Piezas
+
+- `public/calendar-api.php`: entrada HTTP. Exige sesión del panel; los `POST` exigen el nonce del panel en la cabecera
+  `X-SCM-Nonce`. Solo `listar_categorias` y `listar_funcionarios` aceptan `GET`.
+- `src/Modules/Calendar/CalendarApi.php`: acciones con la misma respuesta `{success, message, data}` que usaba el panel.
+- `src/Modules/Calendar/CalendarStore.php`: consultas sobre las mismas tablas (`calendario_actividades`,
+  `calendario_recordatorios`, `categorias_calendario`, `registro_bloqueos`, casos e historial). Las comparte el panel comercial.
+- `src/Modules/Calendar/CalendarMailer.php`: correos y avisos de recordatorio, siempre encolados en `shared-notifications`.
+
+El JS (`admin-dashboard-runtime.js` y `scm-admin.js`) toma la URL de `config.calendar_api_url`, que el servidor fija en
+`SuCasaControlServiciosInmobiliarios::calendarApiUrl()`.
+
+## Acciones
+
+`listar_categorias`, `listar_funcionarios`, `listar_items_calendario`, `filtrar_eventos_admin`, `listar_pendientes_vencidos`,
+`obtener_tickets_funcionario`, `crear_evento`, `crear_eventos`, `crear_item_calendario`, `crear_recordatorio`,
+`actualizar_evento`, `trasladar_evento`, `cambiar_estado`, `actualizar_recordatorio`, `actualizar_recordatorio_estado`.
+
+## Reglas conservadas
+
+- Bloqueo por eventos vencidos (más de 2 días sin cerrar) con registro en `registro_bloqueos`; `permitir_vencidos` lo omite.
+- Cita de un caso (`es_cita = si`): el caso queda "En proceso", el estado administrativo solo cambia si el formulario lo
+  envía (la cita lo pasa a "Por inspeccionar") y nunca se vacía el estado comercial. Se deja historial del caso con
+  `cct_author_id` del funcionario de la sesión y se avisa al solicitante con el enlace firmado del caso.
+- `creado_por` es el `id_empleado` real de la sesión. Los procesos del servidor (Revisión crítica) llaman a
+  `CalendarApi` directamente y envían su propio `creado_por`.
+- Correos al responsable, a quien creó, a los "roles a notificar" de la categoría y a los funcionarios elegidos.
+- Un evento de cargo con reporte comercial obligatorio no se cierra aquí: se cierra desde el panel comercial.
+- No hay sincronización con Google Calendar.
+
+## Pruebas
+
+`php tests/calendar-api-check.php` ejecuta la API sobre SQLite en memoria, sin base real ni notificaciones.

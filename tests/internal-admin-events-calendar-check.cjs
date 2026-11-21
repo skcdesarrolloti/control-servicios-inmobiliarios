@@ -7,13 +7,13 @@ const end=source.indexOf('    function openCollectionQueueFromLog(',start);
 const inner=source.indexOf('      function calendarApi(action, payload, method)');
 const innerEnd=source.indexOf('      function dashboardAjax(',inner);
 const calls=[];
-let failure=false,invalid=false,syncFailure=false;
-const context=vm.createContext({actions:{},root:{isConnected:true},document:{hidden:false},window:{setInterval(){return 1;},clearInterval(){}},console:{warn(){}},calendarApiUrl:'https://example.invalid/?action=',dashboardAction:async(action)=>{calls.push('sync');if(syncFailure)throw new Error('Synthetic sync failure');return {queued:1};},fetch:async(url,options)=>{calls.push('calendar');return {status:200,json:async()=>({success:!failure}),text:async()=>invalid?'bad JSON':JSON.stringify({success:!failure})};}});
+let failure=false,invalid=false,syncFailure=false,lastHeaders=null;
+const context=vm.createContext({nonce:'qa-nonce',actions:{},root:{isConnected:true},document:{hidden:false},window:{setInterval(){return 1;},clearInterval(){}},console:{warn(){}},calendarApiUrl:'https://example.invalid/?action=',dashboardAction:async(action)=>{calls.push('sync');if(syncFailure)throw new Error('Synthetic sync failure');return {queued:1};},fetch:async(url,options)=>{calls.push('calendar');lastHeaders=options.headers;return {status:200,json:async()=>({success:!failure}),text:async()=>invalid?'bad JSON':JSON.stringify({success:!failure})};}});
 vm.runInContext(source.slice(start,end)+source.slice(inner,innerEnd),context);
 context.actions.internal_events_sync='internal-events';
 (async()=>{
   let result=await context.calendarApi('crear_evento',{id_ticket:9});
-  assert.deepEqual(calls,['sync','calendar','sync']);assert.equal(result.internal_notifications.queued,1);
+  assert.deepEqual(calls,['sync','calendar','sync']);assert.equal(lastHeaders['X-SCM-Nonce'],'qa-nonce','calendar requests carry the panel nonce');assert.equal(result.internal_notifications.queued,1);
   calls.length=0;await context.calendarApiRequest('filtrar_eventos_admin',{});assert.deepEqual(calls,['calendar'],'reads do not create internal events');
   calls.length=0;failure=true;result=await context.calendarApi('cambiar_estado',{id_evento:9});assert.equal(result.success,false);assert.deepEqual(calls,['sync','calendar'],'failed actions never trigger a post-save notice');failure=false;
   calls.length=0;invalid=true;await assert.rejects(context.calendarApi('cambiar_estado',{}),error=>error.calendarResponseInvalid===true);assert.deepEqual(calls,['sync','calendar'],'malformed responses retain existing error policy');invalid=false;

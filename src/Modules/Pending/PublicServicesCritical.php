@@ -117,9 +117,7 @@ final class PublicServicesCritical
   }
   public function configHtml(): string
   {
-    try { $googleEmployeeIds = array_column($this->connectedCalendarContacts(),'employee_id'); }
-    catch (\Throwable $e) { $googleEmployeeIds = []; }
-    return PublicServicesUi::render('critical-config',['config'=>$this->config(),'contacts'=>FuncionarioOptions::panelFuncionarios($this->db,new SchemaInspector($this->db),'primary',[]),'events'=>(array)(new Settings($this->db,true))->get('internal_admin_notifications',[]),'googleEmployeeIds'=>$googleEmployeeIds]);
+    return PublicServicesUi::render('critical-config',['config'=>$this->config(),'contacts'=>FuncionarioOptions::panelFuncionarios($this->db,new SchemaInspector($this->db),'primary',[]),'events'=>(array)(new Settings($this->db,true))->get('internal_admin_notifications',[])]);
   }
   public static function admin(array $employee): bool { return !empty($employee['id_empleado']) && in_array((string)($employee['id_cargo']??''),['11','12','13','14'],true); }
   public function detailHtml(int $id): string
@@ -138,15 +136,6 @@ final class PublicServicesCritical
     $settings = (array) (new Settings($this->db, true))->get('internal_admin_notifications', []);
     $ids = array_map('strval', (array) ($settings[$event] ?? []));
     return array_values(array_filter(FuncionarioOptions::panelFuncionarios($this->db, new SchemaInspector($this->db), 'primary', []), static fn($f)=>in_array((string) $f['id'], $ids, true)));
-  }
-  /** Query connection metadata only; OAuth credentials stay inside the calendar app. */
-  public function connectedCalendarContacts(): array
-  {
-    $schema = new SchemaInspector($this->db);
-    if (!$schema->tableExists('calendario_google_accounts')) throw new \RuntimeException('No está disponible la tabla de cuentas Google del calendario.');
-    $ids = $this->db->getCol('SELECT id_empleado FROM calendario_google_accounts WHERE COALESCE(google_email,\'\')<>\'\' AND (COALESCE(refresh_token_enc,\'\')<>\'\' OR (COALESCE(access_token_enc,\'\')<>\'\' AND expires_at>NOW()))');
-    $connected = array_fill_keys(array_map('strval', $ids), true);
-    return array_values(array_filter(FuncionarioOptions::panelFuncionarios($this->db, $schema, 'primary', []), static fn($f)=>isset($connected[(string)$f['employee_id']])));
   }
   /** Called inside the review transaction; all external effects happen after commit. */
   public function record(array $result): ?int
@@ -214,15 +203,11 @@ final class PublicServicesCritical
         $this->notifyJobs($case,$r,$body,$link,$p['documents'],false);
       }
       $selectedCalendarContacts = $this->contacts(self::EVENT);
-      // A missing Google accounts table must not block the case notices; reminders still go to the internal calendar.
-      try { $connected = $selectedCalendarContacts ? $this->connectedCalendarContacts() : []; }
-      catch (\Throwable $e) { $connected = []; error_log('[services-critical-calendar] ' . $e->getMessage()); }
-      $googleIds = array_fill_keys(array_column($connected,'employee_id'), true);
       $calendarRecipients = [];
       foreach ($selectedCalendarContacts as $r) $calendarRecipients[(string)$r['employee_id']] = $r;
       foreach ($calendarRecipients as $r) {
         $ref='services-critical:'.$id.':employee:'.$r['employee_id'];
-        $this->job($id,'calendar',$ref.':ticket',['tipo_item'=>'recordatorio','titulo'=>'Caso servicios públicos críticos · contrato #'.$contract['contrato'],'descripcion'=>$details.' · Plazo de atención del caso: 72 horas. '.PublicServicesDocument::url($id),'recordatorio_at'=>date('Y-m-d H:i:s',(int)$case['deadline_at']),'id_empleado'=>(string)$r['employee_id'],'creado_por'=>(string)$p['employee']['id_empleado'],'origen_app'=>'control-servicios-inmobiliarios','external_ref'=>$ref,'recordatorio_canal'=>'email','sincronizar_google'=>isset($googleIds[(string)$r['employee_id']]),'meta'=>['review_id'=>$id,'deadline_at'=>(int)$case['deadline_at'],'ticket_id'=>(int)($p['ticket_id']??0),'workflow'=>self::WORKFLOW]]);
+        $this->job($id,'calendar',$ref.':ticket',['tipo_item'=>'recordatorio','titulo'=>'Caso servicios públicos críticos · contrato #'.$contract['contrato'],'descripcion'=>$details.' · Plazo de atención del caso: 72 horas. '.PublicServicesDocument::url($id),'recordatorio_at'=>date('Y-m-d H:i:s',(int)$case['deadline_at']),'id_empleado'=>(string)$r['employee_id'],'creado_por'=>(string)$p['employee']['id_empleado'],'origen_app'=>'control-servicios-inmobiliarios','external_ref'=>$ref,'recordatorio_canal'=>'email','meta'=>['review_id'=>$id,'deadline_at'=>(int)$case['deadline_at'],'ticket_id'=>(int)($p['ticket_id']??0),'workflow'=>self::WORKFLOW]]);
       }
       $this->db->update($this->table(), ['planned'=>1], ['review_id'=>$id]);
       $pdo->commit();
@@ -437,7 +422,6 @@ final class PublicServicesCritical
       $result = (array)($result['item']??[]) + $result;
     }else $result=$this->calendarRequest('crear_recordatorio',$p);
     $result = (array)($result['item']??[]) + $result;
-    if(!empty($p['sincronizar_google']) && empty($result['google_event_id']))throw new \RuntimeException('Recordatorio guardado; Google Calendar pendiente. Revisa la conexión Google del funcionario.');
     return $result;
   }
   private function calendarRequest(string $action,array $p): array
@@ -447,13 +431,9 @@ final class PublicServicesCritical
       if(!is_array($result)||empty($result['success']))throw new \RuntimeException('No se confirmó la operación del calendario. Se reintentará.');
       return (array)($result['data']??[]);
     }
-    $base=(string)(getenv('SCM_CALENDAR_API_URL')?:'https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action=');
-    if(!str_starts_with($base,'https://'))throw new \RuntimeException('La API del calendario requiere HTTPS.');
-    $ch=curl_init($base.$action);$headers=['Content-Type: application/json'];$key=(string)(getenv('SCM_CALENDAR_API_KEY')?:'');if($key!=='')$headers[]='X-SKC-Calendar-Key: '.$key;
-    curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>self::json($p),CURLOPT_HTTPHEADER=>$headers,CURLOPT_RETURNTRANSFER=>true,CURLOPT_CONNECTTIMEOUT=>5,CURLOPT_TIMEOUT=>25]);
-    $raw=curl_exec($ch);$status=curl_getinfo($ch,CURLINFO_RESPONSE_CODE);curl_close($ch);
-    $result=is_string($raw)?json_decode($raw,true):null;
-    if($status<200||$status>=300||!is_array($result)||empty($result['success']))throw new \RuntimeException('No se confirmó la operación del calendario. Se reintentará.');
+    // Calendario propio del panel (mismas tablas); ya no se llama a calendario-actividades por HTTP.
+    $result=(new \SCM\Modules\Calendar\CalendarApi($this->db))->handle($action,$p);
+    if(empty($result['success']))throw new \RuntimeException('No se confirmó la operación del calendario: '.($result['message']??'').' Se reintentará.');
     return (array)($result['data']??[]);
   }
 }

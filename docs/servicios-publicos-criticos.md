@@ -9,7 +9,7 @@ Desde la versión **3.3.372**, la revisión crítica se atiende mediante un caso
 3. El plazo del caso es de **72 horas calendario desde el registro de la revisión**, con fecha y hora de Colombia. Es independiente de la próxima revisión trimestral.
 4. Se encolan avisos de revisión con actas para el arrendatario, el creador y la lista `internal_admin_notifications.servicios_publicos_critico`. WhatsApp utiliza un encabezado Documento y botón **Ver revisión** con URL firmada. Se prepara un WhatsApp por acta crítica y destinatario; se deduplican destinos y reintentos.
 5. El caso aparece en vencimientos y en el popup con el grupo **Servicios críticos · 72 horas**. El acceso abre el caso nativo dentro del panel. El estado vencido se calcula a la hora exacta, incluso dentro del mismo día.
-6. Los funcionarios seleccionados en el evento crítico reciben un recordatorio interno; se solicita Google Calendar solo para los que tienen cuenta conectada. El creador y el arrendatario no se agendan por el solo hecho de recibir el aviso.
+6. Los funcionarios seleccionados en el evento crítico reciben un recordatorio en el calendario del panel. El creador y el arrendatario no se agendan por el solo hecho de recibir el aviso.
 7. La atención, respuestas, evidencias y cierre se realizan con el flujo normal del caso. Se consulta su estado real; cerrar/finalizar/anular el caso retira su vencimiento y el procesador solicita cancelar sus recordatorios. Esta integración no modifica `estado_administrativo` de casos existentes.
 
 ## Cambio del flujo anterior
@@ -46,13 +46,13 @@ php bin/process-public-services-critical.php 10
 
 Este procesador convierte seguimientos abiertos anteriores, prepara avisos, sincroniza el cierre del caso y procesa la API del calendario. No envía mensajes directamente. Conservar el almacenamiento de comprobantes antiguos en `storage/public-services-payments/`.
 
-La integración del calendario utiliza `SCM_CALENDAR_API_URL` y, cuando corresponde, `SCM_CALENDAR_API_KEY` como cabecera `X-SKC-Calendar-Key`. Recupera recordatorios por `origen_app` y `external_ref` para evitar duplicados. Si Google queda pendiente, reintenta sobre el mismo registro.
+El recordatorio se guarda con la API propia del calendario del panel (`SCM\Modules\Calendar\CalendarApi`, sin HTTP ni Google Calendar). Recupera recordatorios por `origen_app` y `external_ref` para evitar duplicados; si falla, el trabajo se reintenta sobre el mismo registro.
 
 ## Verificación
 
 - `tests/public-services-review-check.php`: tablas temporales, revisión y caso, historial del inmueble, autor real, idempotencia, cola compartida, vencimiento, cierre, conversión del flujo anterior y rollback. Simula la migración InnoDB solo en sus tablas temporales.
-- `tests/public-services-critical-calendar-check.php`: destinatarios activos, recordatorios, conexión Google, reintento sin duplicados y cierre del caso, con API simulada.
+- `tests/public-services-critical-calendar-check.php`: destinatarios activos, recordatorios, reintento sin duplicados y cierre del caso, con API simulada.
 - `tests/public-services-workspace-check.cjs`: apertura del caso nativo, filtros, plantilla única y regresiones de interfaz en escritorio y móvil.
 - `tests/public-services-critical-upload-check.cjs`: comprueba que el endpoint público retirado rechaza nuevas cargas.
 
-No confundir un trabajo encolado con un mensaje entregado. Los intentos de transporte se consultan en shared-notifications. Estas pruebas no llaman proveedores reales ni crean eventos reales de Google.
+No confundir un trabajo encolado con un mensaje entregado. Los intentos de transporte se consultan en shared-notifications. Estas pruebas no llaman proveedores reales.

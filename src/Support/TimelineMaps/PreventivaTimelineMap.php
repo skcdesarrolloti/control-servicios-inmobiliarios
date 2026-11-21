@@ -31,7 +31,6 @@ final class PreventivaTimelineMap
         'done_field' => 'cita_fecha_inicio',
         'elapsed_from_fields' => ['ticket_cct_created'],
         'elapsed_from_label' => 'Tarea generada',
-        'link_url' => 'https://calendar-skc.netlify.app/evento/{id_cita_agendada}',
         'empty_text' => 'Cita sin agendar',
       ],
       [

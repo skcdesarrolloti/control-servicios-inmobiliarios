@@ -1835,31 +1835,11 @@
     root.addEventListener("scm:menu-tab-selected", function (event) {
       maybeShowDashboardTabPopups(String((event.detail && event.detail.tab) || ""));
     });
-    var calendarAppUrl = String(
-      (config && config.calendar_app_url) || "https://calendar-skc.netlify.app",
-    ).replace(/\/+$/, "");
+    // API propia del calendario (public/calendar-api.php): exige sesión y el nonce del panel.
     var calendarApiUrl = String(
       (config && config.calendar_api_url) ||
-        "https://sucasainmobiliaria.com.co/calendario-actividades/index.php?action=",
+        String(runtime.baseUrl || "").replace(/\/+$/, "") + "/calendar-api.php?action=",
     );
-
-    function buildCalendarUrl(path) {
-      var cleanPath = String(path || "").trim();
-      if (!cleanPath) {
-        cleanPath = "/";
-      }
-      if (/^https?:\/\//i.test(cleanPath)) {
-        return cleanPath;
-      }
-      if (cleanPath.charAt(0) !== "/") {
-        cleanPath = "/" + cleanPath;
-      }
-      return calendarAppUrl + cleanPath;
-    }
-
-    function openCalendarPath(path, title) {
-      openIframeModal(buildCalendarUrl(path), title || "Calendario", false);
-    }
 
     var internalEventsSyncPromise = null;
     function syncInternalAdminEvents() {
@@ -1891,9 +1871,10 @@
       var options = {
         method: method || (payload ? "POST" : "GET"),
         credentials: "same-origin",
+        headers: { "X-SCM-Nonce": nonce },
       };
       if (payload) {
-        options.headers = { "Content-Type": "application/json" };
+        options.headers["Content-Type"] = "application/json";
         options.body = JSON.stringify(payload);
       }
       return calendarMutationWithNotifications(action, function() {
@@ -2240,9 +2221,7 @@
         return;
       }
       panel.setAttribute("data-scm-calendar-init", "1");
-      var panelAppUrl = String(panel.getAttribute("data-calendar-app-url") || "").replace(/\/+$/, "");
       var panelApiUrl = String(panel.getAttribute("data-calendar-api-url") || "");
-      if (panelAppUrl) calendarAppUrl = panelAppUrl;
       if (panelApiUrl) calendarApiUrl = panelApiUrl;
       var calendarMode = String(panel.getAttribute("data-calendar-mode") || "team").trim();
       var calendarView = String(panel.getAttribute("data-calendar-view") || "month").trim();
@@ -2305,21 +2284,16 @@
       var WEEK_DAY_START_MINUTES = 8 * 60;
       var WEEK_DAY_END_MINUTES = 21 * 60;
 
-      panel.querySelectorAll("[data-scm-calendar-open-path]").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          openCalendarPath(btn.getAttribute("data-scm-calendar-open-path") || "/", btn.getAttribute("data-iframe-title") || "Calendario");
-        });
-      });
-
       rebuildAllowedEmployeeMap();
 
       function calendarApi(action, payload, method) {
         var options = {
           method: method || (payload ? "POST" : "GET"),
           credentials: "same-origin",
+          headers: { "X-SCM-Nonce": nonce },
         };
         if (payload) {
-          options.headers = { "Content-Type": "application/json" };
+          options.headers["Content-Type"] = "application/json";
           options.body = JSON.stringify(payload);
         }
         return calendarMutationWithNotifications(action, function() { return fetch(calendarApiUrl + encodeURIComponent(action), options).then(function (r) {
@@ -3576,7 +3550,6 @@
           fecha_fin: selection.date + " " + timeFromMinutes(selection.end) + ":00",
           id_empleado: employeeId,
           creado_por: currentCalendarEmployeeId || "",
-          sincronizar_google: "0",
         };
         if (tipoItem === "tarea") {
           payload.fecha_limite = payload.fecha_fin;
@@ -6682,7 +6655,6 @@
               ubicacion: rawLocation || (defaultKind === "reminder" ? "Recordatorio interno" : (defaultKind === "task" ? "Tarea interna" : "")),
               id_categoria: fd.get("id_categoria") || "",
               creado_por: currentCalendarEmployeeId || "",
-              sincronizar_google: "0",
             };
             if (tipoItem === "recordatorio") {
               basePayload.recordatorio_canal = "whatsapp";
@@ -6795,7 +6767,7 @@
               if (tipoItem === "evento") {
                 var sendEvents = function (extra) {
                   return selected.length > 1 || eventsToCreate.length > 1
-                    ? calendarApi("crear_eventos", Object.assign({ eventos: eventsToCreate, empleados: selected, sincronizar_google: "0" }, extra))
+                    ? calendarApi("crear_eventos", Object.assign({ eventos: eventsToCreate, empleados: selected }, extra))
                     : calendarApi("crear_evento", Object.assign({}, eventsToCreate[0], { id_empleado: selected[0] }, extra));
                 };
                 request = sendEvents({}).then(function (json) {

@@ -19,9 +19,10 @@ trait RendersDashboard
       'correctiva_url' => self::defaultCorrectiveReviewUrl(),
       'cotizacion_url' => self::DEFAULT_COTIZACION_URL,
       'acta_url'       => self::DEFAULT_ACTA_URL,
-      'calendar_app_url' => self::DEFAULT_CALENDAR_APP_URL,
-      'calendar_api_url' => self::DEFAULT_CALENDAR_API_URL,
     ], $overrideConfig);
+    // El calendario siempre usa la API propia del panel.
+    $config['calendar_api_url'] = self::calendarApiUrl();
+    unset($config['calendar_app_url']);
 
     $tabla = $this->db->table('jet_cct_tickets');
     if (!$this->table_exists($tabla)) {
@@ -2899,14 +2900,7 @@ trait RendersDashboard
   /** @param array<string,mixed> $config */
   private function render_calendario_actividades_panel(array $config, array $options = []): string
   {
-    $appUrl = rtrim(trim((string) ($config['calendar_app_url'] ?? self::DEFAULT_CALENDAR_APP_URL)), '/');
-    $apiUrl = trim((string) ($config['calendar_api_url'] ?? self::DEFAULT_CALENDAR_API_URL));
-    if ($appUrl === '') {
-      $appUrl = rtrim(self::DEFAULT_CALENDAR_APP_URL, '/');
-    }
-    if ($apiUrl === '') {
-      $apiUrl = self::DEFAULT_CALENDAR_API_URL;
-    }
+    $apiUrl = self::calendarApiUrl();
     $allowedFuncionarios = is_array($config['calendar_allowed_funcionarios'] ?? null) ? $config['calendar_allowed_funcionarios'] : [];
     $allowedCargos = is_array($config['calendar_allowed_cargos'] ?? null) ? $config['calendar_allowed_cargos'] : FuncionarioOptions::panelCargoIds();
     $currentCalendarEmployeeId = trim((string) ($config['calendar_current_employee_id'] ?? ''));
@@ -2964,7 +2958,6 @@ trait RendersDashboard
       data-calendar-mode="<?php echo esc_attr($mode); ?>"
       data-calendar-view="<?php echo esc_attr($view); ?>"
       data-calendar-lock-current="<?php echo $mode === 'personal' ? '1' : '0'; ?>"
-      data-calendar-app-url="<?php echo esc_attr($appUrl); ?>"
       data-calendar-api-url="<?php echo esc_attr($apiUrl); ?>"
       data-calendar-can-configure="<?php echo $canConfigureDueCalendar ? '1' : '0'; ?>"
       data-calendar-current-employee-id="<?php echo esc_attr($currentCalendarEmployeeId); ?>"

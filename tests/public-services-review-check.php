@@ -20,7 +20,6 @@ $tables = array_map([$db, 'table'], ['jet_cct_contratos_arrendamiento', 'jet_cct
 foreach (['cases','payments','audit','jobs'] as $suffix) $tables[] = $db->table('scm_services_critical_' . $suffix);
 $tables[] = $queueTable;
 $tables[] = $attemptsTable;
-$tables[] = 'calendario_google_accounts';
 foreach ($tables as $table) {
   if (!preg_match('/^[a-zA-Z0-9_]+$/D', $table)) { throw new RuntimeException('Invalid table name.'); }
   $definition = $db->getRow('SHOW CREATE TABLE `' . $table . '`');
@@ -44,7 +43,6 @@ $db->insert($employeeTable, ['_ID' => 70001, 'id_empleado' => '94001', 'nombre' 
 $db->insert($employeeTable, ['_ID' => 70002, 'id_empleado' => '70001', 'nombre' => 'Gloria QA - señuelo', 'correo' => 'decoy@example.invalid', 'activo' => 'Si']);
 $db->insert($employeeTable, ['_ID' => 70003, 'id_empleado' => '', 'nombre' => 'Funcionario incompleto QA', 'activo' => 'Si']);
 $db->insert($employeeTable, ['_ID' => 70004, 'id_empleado' => '94004', 'nombre' => 'Administracion configurada QA', 'correo' => 'admin-config@example.invalid', 'id_cargo' => '3', 'activo' => 'Si']);
-$db->insert('calendario_google_accounts', ['id_empleado'=>'94004','google_email'=>'google@example.invalid','refresh_token_enc'=>'synthetic-test-token']);
 \SCM\Core\App::settings()->set('internal_admin_notifications', ['acta_servicios_publicos' => ['70004']], 70001);
 \SCM\Core\App::settings()->refresh();
 $base = ['_ID' => 90001, 'contrato' => '2000', 'estado' => 'Entregado', 'id_inmueble' => '80001', 'inmueble' => '204578', 'direccion' => 'Dirección de prueba', 'arrendatario' => 'Arrendatario QA', 'propietario' => 'Propietario QA', 'correo_propietario' => 'owner@example.invalid', 'correo_arrendatario' => 'tenant@example.invalid', 'servicios_publicos' => '', 'mes_revision_servicios' => '11', 'revisiones_servicios' => '4', 'ultima_revision_servicios' => 1700000000];
@@ -283,13 +281,13 @@ try {
   $assert(!empty($replayed['replayed']) && (int)$replayed['critical_ticket_id']===$ticketId && (int)$db->getVar('SELECT COUNT(*) FROM `'.$db->table('jet_cct_tickets').'`')===1,'duplicate review submission returns same case and never creates duplicate');
   $assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE kind=? AND review_id=?',['whatsapp',$id])===3,'WhatsApp review jobs target tenant creator and configured employee');
   $calendarJob=json_decode($db->getVar('SELECT payload_json FROM `'.$critical->table('jobs').'` WHERE kind=?',['calendar']),true);
-  $assert($calendarJob['id_empleado']==='94004' && $calendarJob['sincronizar_google'] && $calendarJob['meta']['ticket_id']===$ticketId,'calendar targets configured employee and carries linked case');
+  $assert($calendarJob['id_empleado']==='94004' && !isset($calendarJob['sincronizar_google']) && $calendarJob['meta']['ticket_id']===$ticketId,'calendar targets configured employee and carries linked case');
   $count=(int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'`');$critical->plan($id);
   $assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'`')===$count,'planning does not duplicate notifications or reminder');
-  $critical->run(30,static fn()=>['id'=>100,'google_event_id'=>'qa-google-only']);
+  $critical->run(30,static fn()=>['id'=>100]);
   $assert((int)$db->getVar('SELECT COUNT(*) FROM `'.$critical->table('jobs').'` WHERE kind=? AND status=?',['whatsapp','pending'])===3,'WhatsApp awaits new approved template durably');
   $critical->saveConfig(['whatsapp_template'=>'qa_revision_critica','language'=>'es','whatsapp_enabled'=>'1','servicios_publicos_critico'=>['70004']],$actor);
-  $critical->run(30,static fn()=>['id'=>100,'google_event_id'=>'qa-google-only']);
+  $critical->run(30,static fn()=>['id'=>100]);
   $wa=$db->getResults('SELECT * FROM `'.$queueTable.'` WHERE source_module=? AND channel=?',['public-services-critical','whatsapp']);
   $assert(count($wa)===3 && count(array_unique(array_column($wa,'destination')))===3,'approved WhatsApp enqueues once per intended recipient');
   $wp=json_decode($wa[0]['payload_json'],true);
