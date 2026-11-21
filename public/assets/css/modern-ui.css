@@ -5292,6 +5292,29 @@ body,
   padding: 1rem 1.55rem !important;
 }
 
+#scm-app .scm-calendar-case-availability {
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.65rem !important;
+  color: #475569 !important;
+  font-size: 0.78rem !important;
+  font-weight: 650 !important;
+  line-height: 1.5 !important;
+  margin: 0 !important;
+  padding: 0.6rem 0.85rem !important;
+}
+
+#scm-app .scm-calendar-case-availability.is-free {
+  background: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+  color: #047857 !important;
+}
+
+#scm-app .scm-calendar-case-availability.is-busy {
+  background: #fff7ed !important;
+  border-color: #fdba74 !important;
+  color: #9a3412 !important;
+}
+
 #scm-app .scm-calendar-case-footnote {
   color: #94a3b8 !important;
   font-size: 0.72rem !important;

@@ -2645,7 +2645,21 @@
         if (calendarDisplayMode === "week") {
           return weekRange(dateFromKey(selectedDay) || currentMonth || new Date());
         }
-        return monthRange(currentMonth);
+        // La cuadrícula mensual pinta 6 semanas: se cargan también los días grises de los meses vecinos.
+        return isDueCalendar ? monthRange(currentMonth) : monthGridRange(currentMonth);
+      }
+
+      function monthGridRange(date) {
+        var start = startOfWeek(startOfMonth(date));
+        return { from: toDateKey(start), to: toDateKey(addDays(start, 41)) };
+      }
+
+      // Un evento de varios días cuenta en cada día que abarca (los vencimientos, solo en su fecha).
+      function rowCoversDay(row, key) {
+        var start = eventDateKey(row);
+        if (isDueCalendar || !start) return start === key;
+        var end = String(row && row.fecha_fin ? row.fecha_fin : "").slice(0, 10) || start;
+        return key >= start && key <= (end < start ? start : end);
       }
 
       function weekLabel(date) {
@@ -2959,6 +2973,10 @@
           }
           return;
         }
+        if (calendarDisplayMode === "month") {
+          var kpiMonth = monthRange(currentMonth);
+          rows = rows.filter(function (row) { var key = eventDateKey(row); return key >= kpiMonth.from && key <= kpiMonth.to; });
+        }
         var todayKey = toDateKey(new Date());
         var pending = rows.filter(function (row) { return !calendarItemIsDone(row); }).length;
         var done = rows.filter(function (row) { return calendarItemIsDone(row); }).length;
@@ -3143,7 +3161,8 @@
         if (isDueCalendar) {
           return dueEventCardHtml(row);
         }
-        var id = String(row.id || "").trim();
+        // "Ocupado" de otro funcionario (sin Calendario equipo): sin acciones.
+        var id = row.privado ? "" : String(row.id || "").trim();
         var ticket = String(row.id_ticket || "").trim();
         var kind = calendarItemKind(row);
         var isEventKind = kind === "evento";
@@ -3172,7 +3191,7 @@
           (isEventKind && ticket ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-view-ticket data-event-id="' + escHtml(id) + '" data-ticket-id="' + escHtml(ticket) + '">Ver caso</button>' : "") +
           (isEventKind && id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-edit-event data-event-id="' + escHtml(id) + '">Editar</button>' : "") +
           (isEventKind && id && !isDone ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-complete-event data-event-id="' + escHtml(id) + '">Marcar realizado</button>' : "") +
-          (isEventKind && id ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Trasladar evento</button>' : "") +
+          (isEventKind && id && !isDone ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-reschedule-event data-event-id="' + escHtml(id) + '">Trasladar evento</button>' : "") +
           (kind === "tarea" && id && !isDone ? '<button type="button" class="scm-case-work-btn scm-calendar-action-btn--success" data-scm-calendar-complete-task data-task-id="' + escHtml(id) + '">Marcar realizada</button>' : "") +
           (kind === "recordatorio" && id && !isDone ? '<button type="button" class="scm-case-work-btn" data-scm-calendar-edit-item data-item-id="' + escHtml(id) + '" data-item-kind="recordatorio">Editar</button>' : "") +
           (kind === "recordatorio" && id && !isDone ? '<button type="button" class="scm-case-work-btn scm-calendar-action-btn--danger" data-scm-calendar-cancel-reminder data-reminder-id="' + escHtml(id) + '">Cancelar</button>' : "") +
@@ -3220,7 +3239,7 @@
       }
 
       function renderSelectedDay() {
-        var dayRows = calendarEvents.filter(function (row) { return eventDateKey(row) === selectedDay; });
+        var dayRows = calendarEvents.filter(function (row) { return rowCoversDay(row, selectedDay); });
         var holiday = holidayForDateKey(selectedDay);
         if (dayTitleEl) dayTitleEl.textContent = calendarDayTitle(selectedDay);
         if (daySubtitleEl) daySubtitleEl.textContent = (holiday ? "Festivo Colombia: " + holiday + ". " : "") + (dayRows.length ? dayRows.length + (isDueCalendar ? " vencimiento(s) para este dia." : visibleCalendarItemWord(dayRows.length) + " para este dia.") : (isDueCalendar ? "Sin vencimientos para este dia." : "Sin items para este dia."));
@@ -3287,31 +3306,69 @@
         });
       }
 
+      // Tramos del día para la vista semana/día: un evento de varios días aparece en cada día que abarca; lo que cae
+      // por completo fuera de 8:00–21:00 se muestra pegado al borde (marcado "fuera de horario") en vez de esconderse;
+      // y los que se cruzan se reparten en columnas (lanes) para no taparse.
       function timeGridEvents(dateKey) {
-        return calendarEvents.filter(function (row) {
-          if (eventDateKey(row) !== dateKey) return false;
-          var start = eventMinutes(row, "fecha_inicio");
-          if (start === null) return false;
-          var end = eventMinutes(row, "fecha_fin");
-          if (end === null || end <= start) end = start + WEEK_DEFAULT_EVENT_MINUTES;
-          return start < WEEK_DAY_END_MINUTES && end > WEEK_DAY_START_MINUTES;
-        }).sort(function (a, b) {
-          return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
+        var DAY_MINUTES = 24 * 60;
+        var segments = [];
+        calendarEvents.forEach(function (row) {
+          if (!rowCoversDay(row, dateKey)) return;
+          var startKey = eventDateKey(row);
+          var endKey = String(row.fecha_fin || "").slice(0, 10) || startKey;
+          var start = startKey === dateKey ? eventMinutes(row, "fecha_inicio") : 0;
+          if (start === null) return;
+          var end = endKey === dateKey || endKey < dateKey ? eventMinutes(row, "fecha_fin") : DAY_MINUTES;
+          if (end === null || (endKey === startKey && end <= start)) end = start + WEEK_DEFAULT_EVENT_MINUTES;
+          var outside = "";
+          var visibleStart = Math.max(WEEK_DAY_START_MINUTES, start);
+          var visibleEnd = Math.min(WEEK_DAY_END_MINUTES, end);
+          if (end <= WEEK_DAY_START_MINUTES) {
+            outside = "before";
+            visibleStart = WEEK_DAY_START_MINUTES;
+            visibleEnd = WEEK_DAY_START_MINUTES + WEEK_SLOT_MINUTES * 2;
+          } else if (start >= WEEK_DAY_END_MINUTES) {
+            outside = "after";
+            visibleStart = WEEK_DAY_END_MINUTES - WEEK_SLOT_MINUTES * 2;
+            visibleEnd = WEEK_DAY_END_MINUTES;
+          }
+          segments.push({ row: row, start: start, end: end, visibleStart: visibleStart, visibleEnd: visibleEnd, outside: outside, continues: startKey !== endKey });
         });
+        segments.sort(function (a, b) { return a.visibleStart - b.visibleStart || b.visibleEnd - a.visibleEnd; });
+        // Columnas por grupo de eventos que se cruzan.
+        var group = [];
+        var groupEnd = -1;
+        function closeGroup() {
+          var lanesEnd = [];
+          group.forEach(function (segment) {
+            var lane = 0;
+            while (lane < lanesEnd.length && lanesEnd[lane] > segment.visibleStart) lane += 1;
+            lanesEnd[lane] = segment.visibleEnd;
+            segment.lane = lane;
+          });
+          group.forEach(function (segment) { segment.lanes = Math.max(1, lanesEnd.length); });
+          group = [];
+        }
+        segments.forEach(function (segment) {
+          if (group.length && segment.visibleStart >= groupEnd) closeGroup();
+          group.push(segment);
+          groupEnd = Math.max(groupEnd, segment.visibleEnd);
+        });
+        if (group.length) closeGroup();
+        return segments;
       }
 
-      function timeGridEventHtml(row, columnIndex, totalDays) {
-        var start = eventMinutes(row, "fecha_inicio");
-        if (start === null) return "";
-        var end = eventMinutes(row, "fecha_fin");
-        if (end === null || end <= start) end = start + WEEK_DEFAULT_EVENT_MINUTES;
-        var visibleStart = Math.max(WEEK_DAY_START_MINUTES, start);
-        var visibleEnd = Math.min(WEEK_DAY_END_MINUTES, end);
+      function timeGridEventHtml(segment, columnIndex, totalDays) {
+        var row = segment.row;
+        var start = segment.start;
+        var end = segment.end;
+        var visibleStart = segment.visibleStart;
+        var visibleEnd = segment.visibleEnd;
         if (visibleEnd <= visibleStart) return "";
         var startSlot = Math.floor((visibleStart - WEEK_DAY_START_MINUTES) / WEEK_SLOT_MINUTES);
         var span = Math.max(1, Math.ceil((visibleEnd - visibleStart) / WEEK_SLOT_MINUTES));
         var color = String(row.color || "#f97316").trim() || "#f97316";
-        var id = String(row.id || row._ID || row.event_id || "").trim();
+        var id = row.privado ? "" : String(row.id || row._ID || row.event_id || "").trim();
         var kind = calendarItemKind(row);
         var tag = id ? "button" : "div";
         var attrs = tag === "button"
@@ -3320,9 +3377,14 @@
             : ' type="button" data-scm-calendar-view-item data-item-id="' + escHtml(id) + '" data-item-kind="' + escHtml(kind) + '"')
           : ' role="group"';
         var timeLabel = (timePartFromDateTime(row.fecha_inicio) || timeFromMinutes(start)) + " - " + (timePartFromDateTime(row.fecha_fin) || timeFromMinutes(end));
+        if (segment.continues) timeLabel = formatDateTime(row.fecha_inicio) + " - " + formatDateTime(row.fecha_fin);
+        if (segment.outside) timeLabel += " · fuera de horario";
         var dayIndex = Math.max(0, columnIndex - 2);
         var daysCount = Math.max(1, totalDays || 7);
-        return '<' + tag + attrs + ' class="scm-calendar-time-event scm-calendar-time-event--' + escHtml(kind) + '" style="--event-day:' + String(dayIndex) + ';--event-days:' + String(daysCount) + ';--event-start-slot:' + String(startSlot) + ';--event-slot-span:' + String(span) + ';--event-color:' + escHtml(color) + '">' +
+        // Arrastrar para trasladar: solo eventos propios por hacer (no realizados ni "Ocupado" de otro funcionario).
+        var draggable = tag === "button" && kind === "evento" && !isDueCalendar && !row.privado && !calendarItemIsDone(row) && !segment.continues;
+        var dragAttrs = draggable ? ' data-scm-calendar-drag-event="' + escHtml(id) + '" data-duration="' + String(Math.max(WEEK_SLOT_MINUTES, end - start)) + '" title="Arrastra para trasladar"' : "";
+        return '<' + tag + attrs + dragAttrs + ' class="scm-calendar-time-event scm-calendar-time-event--' + escHtml(kind) + (segment.outside ? " is-outside-hours" : "") + (draggable ? " is-draggable" : "") + '" style="--event-day:' + String(dayIndex) + ';--event-days:' + String(daysCount) + ';--event-start-slot:' + String(startSlot) + ';--event-slot-span:' + String(span) + ';--event-lane:' + String(segment.lane || 0) + ';--event-lanes:' + String(segment.lanes || 1) + ';--event-color:' + escHtml(color) + '">' +
           '<strong>' + escHtml(row.titulo || calendarItemKindLabel(row)) + '</strong>' +
           '<em>' + escHtml(timeLabel) + '</em>' +
           '</' + tag + '>';
@@ -3539,6 +3601,36 @@
         }).join("");
       }
 
+      // Bloqueo por eventos vencidos fuera de un modal: los lista y pregunta si se crea de todas formas.
+      function confirmCalendarOverdueCreate(json) {
+        var rows = json && json.data && Array.isArray(json.data.eventos) ? json.data.eventos : [];
+        var message = String((json && json.message) || "El funcionario tiene eventos vencidos sin realizar.");
+        if (!window.Swal || typeof window.Swal.fire !== "function") {
+          return Promise.resolve(window.confirm(message + "\n\n¿Crear de todas formas? Quedará registrado el bloqueo."));
+        }
+        return window.Swal.fire({
+          icon: "warning",
+          title: "Eventos vencidos sin realizar",
+          html: '<div class="scm-calendar-overdue-block"><strong>' + escHtml(message.split(":")[0]) + '</strong>' +
+            (rows.length ? '<ul>' + rows.slice(0, 5).map(function (row) {
+              return '<li>#' + escHtml(row.id) + ' · ' + escHtml(row.titulo || "Evento") + ' · ' + escHtml(formatDateTime(row.fecha_inicio)) + '</li>';
+            }).join("") + (rows.length > 5 ? '<li>y ' + (rows.length - 5) + ' más</li>' : "") + '</ul>' : "") +
+            '<span>Lo ideal es marcarlos como realizados o trasladarlos. Si creas el evento igual, quedará registrado el bloqueo.</span></div>',
+          showCancelButton: true,
+          showDenyButton: true,
+          confirmButtonText: "Crear de todas formas",
+          denyButtonText: "Ver pendientes",
+          cancelButtonText: "Cancelar",
+          reverseButtons: true,
+        }).then(function (result) {
+          if (result && result.isDenied) {
+            window.setTimeout(openPendingEventsPopup, 120);
+            return false;
+          }
+          return !!(result && result.isConfirmed);
+        });
+      }
+
       function createQuickEvent(selection, form) {
         var fd = new FormData(form);
         var title = String(fd.get("titulo") || "").trim();
@@ -3559,6 +3651,14 @@
         }
         if (!employeeId) {
           showToast("error", "No se encontro el funcionario del calendario.");
+          return Promise.resolve(false);
+        }
+        // Mismas reglas que el formulario completo: nada en el pasado y eventos entre 8:00 a. m. y 9:00 p. m.
+        var quickTimeError = tipoItem === "recordatorio"
+          ? (new Date(selection.date + "T" + timeFromMinutes(selection.start)) < new Date() ? "No puedes crear un recordatorio en una hora que ya pasó." : "")
+          : validateCalendarEventTimes(selection.date, timeFromMinutes(selection.start), timeFromMinutes(selection.end));
+        if (quickTimeError) {
+          showToast("error", quickTimeError);
           return Promise.resolve(false);
         }
         var payload = {
@@ -3586,10 +3686,16 @@
           submit.textContent = "Guardando...";
         }
         return calendarApi("crear_item_calendario", payload).then(function (json) {
-          if ((!json || !json.success) && tipoItem === "evento") {
-            return calendarApi("crear_evento", payload);
-          }
-          return json;
+          var blocked = json && !json.success && json.data && json.data.bloqueado_vencidos;
+          if (!blocked) return json;
+          return confirmCalendarOverdueCreate(json).then(function (ok) {
+            if (!ok) {
+              var cancelled = new Error("Creación cancelada: el funcionario tiene eventos vencidos.");
+              cancelled.calendarSilent = true;
+              throw cancelled;
+            }
+            return calendarApi("crear_item_calendario", Object.assign({}, payload, { permitir_vencidos: "1" }));
+          });
         }).then(function (json) {
           if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el " + itemLabel + ".");
           showToast("success", json.message || (itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1) + " creado."));
@@ -3599,7 +3705,7 @@
           closeWeekQuickPopover();
           return loadEvents();
         }).catch(function (err) {
-          showToast(err.calendarResponseInvalid ? "warning" : "error", err.message || "No se pudo crear el " + itemLabel + ".", err.calendarResponseInvalid ? "Guardado sin confirmar" : undefined);
+          if (!err.calendarSilent) showToast(err.calendarResponseInvalid ? "warning" : "error", err.message || "No se pudo crear el " + itemLabel + ".", err.calendarResponseInvalid ? "Guardado sin confirmar" : undefined);
           if (err.calendarResponseInvalid) loadEvents().catch(function () {});
           if (submit) {
             submit.disabled = false;
@@ -3749,6 +3855,37 @@
 
       function bindTimeGridInteractions(grid) {
         if (!grid) return;
+        var eventDrag = null;
+        grid.addEventListener("pointerdown", function (event) {
+          var item = event.target && event.target.closest ? event.target.closest("[data-scm-calendar-drag-event]") : null;
+          if (!item || !grid.contains(item) || event.button !== 0) return;
+          eventDrag = { el: item, id: item.getAttribute("data-scm-calendar-drag-event") || "", duration: Number(item.getAttribute("data-duration") || 30), x: event.clientX, y: event.clientY, moved: false, target: null };
+        });
+        grid.addEventListener("pointermove", function (event) {
+          if (!eventDrag) return;
+          if (!eventDrag.moved && Math.abs(event.clientX - eventDrag.x) + Math.abs(event.clientY - eventDrag.y) < 8) return;
+          eventDrag.moved = true;
+          eventDrag.el.style.pointerEvents = "none";
+          eventDrag.el.classList.add("is-dragging");
+          var slot = slotFromPoint(grid, event);
+          if (!slot) return;
+          var start = Number(slot.getAttribute("data-start") || 0);
+          var end = Math.min(WEEK_DAY_END_MINUTES, start + eventDrag.duration);
+          eventDrag.target = { date: slot.getAttribute("data-date") || selectedDay, start: start, end: Math.max(start + WEEK_SLOT_MINUTES, end) };
+          updateWeekSelection(grid, eventDrag.target.date, eventDrag.target.start, eventDrag.target.end);
+        });
+        grid.addEventListener("pointerup", function () {
+          if (!eventDrag) return;
+          var drag = eventDrag;
+          eventDrag = null;
+          drag.el.style.pointerEvents = "";
+          drag.el.classList.remove("is-dragging");
+          if (!drag.moved) return;
+          ignoreNextTapClick();
+          clearWeekSelection(grid);
+          if (!drag.target) return;
+          openRescheduleEventPopup(drag.id, { date: drag.target.date, start: timeFromMinutes(drag.target.start), end: timeFromMinutes(drag.target.end) });
+        });
         grid.addEventListener("pointerdown", function (event) {
           var slot = slotFromEvent(event);
           if (!slot || !grid.contains(slot)) return;
@@ -3779,6 +3916,7 @@
         });
         grid.addEventListener("pointerup", function (event) {
           var selection = weekSlotSelection;
+          if (!selection) return;
           var boundary = selection && selection.dragged ? weekBoundaryFromPoint(grid, event, selection.date) : null;
           var finalSelection = boundary
             ? weekSelectionFromBoundary(boundary.date, boundary.minutes, boundary.slotEnd, selection)
@@ -3913,7 +4051,7 @@
           cellDate.setDate(start.getDate() + i);
           var key = toDateKey(cellDate);
           var holiday = holidayForDateKey(key);
-          var dayEvents = calendarEvents.filter(function (row) { return eventDateKey(row) === key; });
+          var dayEvents = calendarEvents.filter(function (row) { return rowCoversDay(row, key); });
           var classes = "scm-calendar-day";
           if (cellDate.getMonth() !== currentMonth.getMonth()) classes += " is-muted";
           if (key === todayKey) classes += " is-today";
@@ -4195,6 +4333,8 @@
 
       var calendarLoadRequestId = 0;
       function loadEvents() {
+        employeeAgendaCache = {};
+        ticketCacheByEmployee = {};
         if (isDueCalendar) {
           return loadDueCalendar();
         }
@@ -4316,28 +4456,33 @@
         });
       }
 
-      function fetchEmployeeMonthEvents(employeeId) {
+      // Agenda real del funcionario en el mes de la fecha elegida (no lo ya pintado, que depende de la vista y los
+      // filtros). Se guarda por funcionario y mes y se vacía en cada recarga del calendario (tras crear o mover).
+      var employeeAgendaCache = {};
+      function fetchEmployeeMonthEvents(employeeId, dateKey) {
         employeeId = String(employeeId || "").trim();
         if (!employeeId) return Promise.resolve([]);
-        var rows = currentMonthEventsForEmployee(employeeId);
-        if (rows.length) return Promise.resolve(rows);
-        var range = monthRange(currentMonth);
-        return calendarApi("filtrar_eventos_admin", {
+        var range = monthRange(dateFromKey(dateKey) || currentMonth);
+        var cacheKey = employeeId + "|" + range.from;
+        if (employeeAgendaCache[cacheKey]) return employeeAgendaCache[cacheKey];
+        employeeAgendaCache[cacheKey] = calendarApi("filtrar_eventos_admin", {
           pagina: 1,
-          limite: 120,
+          limite: 1000,
           fecha_inicio: range.from,
           fecha_fin: range.to,
           id_empleado: employeeId,
         }).then(function (json) {
-          if (!json || !json.success) return [];
-          return filterRowsByAllowedEmployees(extractRows(json.data || [])).filter(function (row) {
+          if (!json || !json.success) throw new Error("agenda");
+          return extractRows(json.data || []).filter(function (row) {
             return getEventEmployeeId(row) === employeeId;
           }).sort(function (a, b) {
             return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
           });
         }).catch(function () {
+          delete employeeAgendaCache[cacheKey];
           return [];
         });
+        return employeeAgendaCache[cacheKey];
       }
 
       function agendaRowsHtml(rows, emptyText) {
@@ -4361,7 +4506,7 @@
         }
         var requestId = ++popupAgendaRequestId;
         agenda.innerHTML = '<div class="scm-calendar-popup-agenda-empty">Cargando agenda...</div>';
-        Promise.all(employeeIds.map(fetchEmployeeMonthEvents)).then(function (allRows) {
+        Promise.all(employeeIds.map(function (employeeId) { return fetchEmployeeMonthEvents(employeeId, selectedDay); })).then(function (allRows) {
           if (requestId !== popupAgendaRequestId) return;
           if (isMultiple) {
             agenda.innerHTML = employeeIds.map(function (employeeId, index) {
@@ -4393,7 +4538,7 @@
 
       function popupRowsForDate(rows, dateKey) {
         dateKey = String(dateKey || "").slice(0, 10);
-        return (rows || []).filter(function (row) { return eventDateKey(row) === dateKey; }).sort(function (a, b) {
+        return (rows || []).filter(function (row) { return rowCoversDay(row, dateKey); }).sort(function (a, b) {
           return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || ""));
         });
       }
@@ -4530,6 +4675,31 @@
         return option ? String(option.textContent || "").trim() : "";
       }
 
+      // Fechas de la recurrencia diaria/semanal según el formulario (la misma lista para el aviso y para guardar).
+      function recurrenceDates(formData) {
+        var baseDate = String(formData.get("fecha") || "");
+        var endRecurrence = String(formData.get("fecha_fin_recurrencia") || "");
+        var type = String(formData.get("tipo_recurrencia") || "diario");
+        var current = dateFromKey(baseDate);
+        var endDate = dateFromKey(endRecurrence);
+        if (!current || !endDate || endDate < current) return null;
+        var days = formData.getAll("dias_semana").map(function (value) { return parseInt(value, 10); });
+        var skipSundayHolidays = formData.get("omitir_domingos_festivos") === "1";
+        var skipSaturday = formData.get("omitir_sabados") === "1";
+        var dates = [];
+        var guard = 0;
+        while (current <= endDate && guard < 800) {
+          guard += 1;
+          var key = toDateKey(current);
+          var weekday = current.getDay();
+          var wanted = type === "diario" || days.indexOf(weekday) !== -1;
+          if (wanted && skipSundayHolidays && (weekday === 0 || holidayForDateKey(key))) wanted = false;
+          if (wanted && skipSaturday && weekday === 6) wanted = false;
+          if (wanted) dates.push(key);
+          current = addDays(current, 1);
+        }
+        return dates;
+      }
       function validateCalendarEventTimes(dateValue, startValue, endValue) {
         if (!dateValue || !startValue || !endValue) return "Debes ingresar fecha, hora de inicio y hora de fin.";
         var start = new Date(dateValue + "T" + startValue);
@@ -5019,9 +5189,9 @@
           '</section>' +
           '<footer class="scm-calendar-event-detail-foot">' +
           '<div>' +
-          (eventId ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-edit-event data-event-id="' + escHtml(eventId) + '">Editar evento</button>' : "") +
-          (eventId && !isDone ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--success" data-scm-calendar-complete-event data-event-id="' + escHtml(eventId) + '"><span class="material-symbols-outlined" aria-hidden="true">check_circle</span>Marcar como realizado</button>' : '<span class="scm-calendar-modern-done-pill"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span>Realizado</span>') +
-          (eventId ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-reschedule-event data-event-id="' + escHtml(eventId) + '"><span class="material-symbols-outlined" aria-hidden="true">event_repeat</span>Trasladar evento</button>' : "") +
+          (eventId && !row.privado ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-edit-event data-event-id="' + escHtml(eventId) + '">Editar evento</button>' : "") +
+          (eventId && !isDone && !row.privado ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--success" data-scm-calendar-complete-event data-event-id="' + escHtml(eventId) + '"><span class="material-symbols-outlined" aria-hidden="true">check_circle</span>Marcar como realizado</button>' : '<span class="scm-calendar-modern-done-pill"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span>Realizado</span>') +
+          (eventId && !isDone && !row.privado ? '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--soft" data-scm-calendar-reschedule-event data-event-id="' + escHtml(eventId) + '"><span class="material-symbols-outlined" aria-hidden="true">event_repeat</span>Trasladar evento</button>' : "") +
           '</div>' +
           '<button type="button" class="scm-calendar-modern-btn scm-calendar-modern-btn--dark" data-scm-calendar-close>Cerrar</button>' +
           '</footer>' +
@@ -5476,9 +5646,9 @@
         }
         var title = String(row.titulo || row.title || "Evento #" + eventId).trim();
         var categoryName = categoryNameForRow(row);
-        var dateValue = datePartFromDateTime(row.fecha_inicio) || selectedDay || toDateKey(new Date());
-        var startValue = timePartFromDateTime(row.fecha_inicio);
-        var endValue = timePartFromDateTime(row.fecha_fin);
+        var dateValue = options.date || datePartFromDateTime(row.fecha_inicio) || selectedDay || toDateKey(new Date());
+        var startValue = options.start || timePartFromDateTime(row.fecha_inicio);
+        var endValue = options.end || timePartFromDateTime(row.fecha_fin);
         var ticket = String(row.id_ticket || "").trim();
         var location = String(row.ubicacion || row.lugar || row.direccion || "").trim();
         var html = '<form class="scm-calendar-reschedule-modern scm-calendar-reschedule-form" autocomplete="off">' +
@@ -5736,7 +5906,7 @@
           }).join("") + '</div>';
         }
         return '<div class="scm-calendar-pending-modern-list">' + rows.map(function (row) {
-          var id = String(row.id || row._ID || row.event_id || "").trim();
+          var id = row.privado ? "" : String(row.id || row._ID || row.event_id || "").trim();
           var ticket = String(row.id_ticket || "").trim();
           return '<article class="scm-calendar-pending-modern-event">' +
             '<div class="scm-calendar-pending-modern-event-head"><div><span>' + escHtml(row.fecha_fin ? "Vence: " + formatDateTime(row.fecha_fin) : "Pendiente") + '</span>' + (ticket ? '<em>#TSK-' + escHtml(ticket) + '</em>' : "") + '</div><strong>' + escHtml(row.fecha_fin ? "Limite: " + formatDateTime(row.fecha_fin) : formatDateTime(row.fecha_inicio)) + '</strong></div>' +
@@ -5969,8 +6139,11 @@
             : '<label class="scm-seg-field scm-calendar-field-full"><span>Funcionario responsable <b>*</b></span>' + employeesControl + '</label>') +
           '<div class="scm-calendar-create-row scm-calendar-date-row">' +
           '<label class="scm-seg-field"><span>Fecha</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha" required value="' + defaultDate + '"></label>' +
-          '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required value="' + defaultStart + '"></label>' +
-          '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required value="' + defaultEnd + '"></label>' +
+          // Un recordatorio es un momento: una sola hora (la "hora fin" se iguala al guardar).
+          (defaultKind === "reminder"
+            ? '<label class="scm-seg-field"><span>Hora del recordatorio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required value="' + defaultStart + '"></label><input type="hidden" name="hora_fin" value="">'
+            : '<label class="scm-seg-field"><span>Hora inicio</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_inicio" required value="' + defaultStart + '"></label>' +
+              '<label class="scm-seg-field"><span>Hora fin</span><input class="input input-bordered input-sm scm-input" type="time" name="hora_fin" required value="' + defaultEnd + '"></label>') +
           '</div>' +
           (defaultKind === "reminder" ? '<label class="scm-seg-field scm-calendar-field-full"><span>Aviso por WhatsApp</span><select class="select select-bordered select-sm scm-select" name="aviso_minutos_antes"><option value="0">A la hora del recordatorio</option><option value="5">5 minutos antes</option><option value="15">15 minutos antes</option><option value="30" selected>30 minutos antes</option><option value="60">1 hora antes</option></select></label>' : "") +
           '<label class="scm-seg-field scm-calendar-field-full"><span>' + escHtml(defaultKindConfig.descriptionLabel) + '</span><textarea class="textarea textarea-bordered textarea-sm scm-textarea" name="descripcion" rows="3" placeholder="' + escHtml(defaultKindConfig.descriptionPlaceholder) + '"></textarea></label>' +
@@ -5981,7 +6154,8 @@
           '<label class="scm-seg-field" data-calendar-recurrence-end><span>Fecha l&iacute;mite de recurrencia</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha_fin_recurrencia"></label>' +
           '<div class="scm-calendar-week-picker" data-calendar-week-picker hidden><span>D&iacute;as de la semana</span><label><input type="checkbox" value="1" name="dias_semana"> Lun</label><label><input type="checkbox" value="2" name="dias_semana"> Mar</label><label><input type="checkbox" value="3" name="dias_semana"> Mi&eacute;</label><label><input type="checkbox" value="4" name="dias_semana"> Jue</label><label><input type="checkbox" value="5" name="dias_semana"> Vie</label><label><input type="checkbox" value="6" name="dias_semana"> S&aacute;b</label><label><input type="checkbox" value="0" name="dias_semana"> Dom</label></div>' +
           '<div class="scm-calendar-custom-dates" data-calendar-custom-dates hidden><div data-calendar-custom-rows></div><button type="button" class="scm-case-work-btn" data-calendar-add-custom-date>Agregar fecha personalizada</button></div>' +
-          '<small>Se programar&aacute;n las fechas generadas respetando la configuraci&oacute;n del rango.</small>' +
+          '<div class="scm-calendar-recurrence-skip" data-calendar-recurrence-skip><label><input type="checkbox" name="omitir_domingos_festivos" value="1" checked> Omitir domingos y festivos</label><label><input type="checkbox" name="omitir_sabados" value="1"> Omitir s&aacute;bados</label></div>' +
+          '<small data-calendar-recurrence-preview>Se programar&aacute;n las fechas generadas respetando la configuraci&oacute;n del rango.</small>' +
           '</div></div>' +
           ticketFieldsHtml +
           '</div>' +
@@ -6321,7 +6495,7 @@
               }
               var requestId = ++popupAgendaRequestId;
               agenda.innerHTML = '<div class="scm-calendar-popup-agenda-empty">Cargando disponibilidad...</div>';
-              Promise.all(selected.map(fetchEmployeeMonthEvents)).then(function (allRows) {
+              Promise.all(selected.map(function (employeeId) { return fetchEmployeeMonthEvents(employeeId, dateValue); })).then(function (allRows) {
                 if (requestId !== popupAgendaRequestId) return;
                 var totalDayRows = 0;
                 var hasOverlap = false;
@@ -6386,6 +6560,25 @@
                 '<button type="button" class="scm-case-work-btn" data-calendar-remove-custom-date>Quitar</button>' +
                 '</div>';
             }
+            function refreshRecurrencePreview() {
+              var preview = popup.querySelector("[data-calendar-recurrence-preview]");
+              var skipWrap = popup.querySelector("[data-calendar-recurrence-skip]");
+              var active = !!(recurrenceToggle && recurrenceToggle.checked);
+              var type = recurrenceType ? recurrenceType.value : "diario";
+              if (skipWrap) skipWrap.hidden = !active || type === "personalizado";
+              if (!preview) return;
+              if (!active || type === "personalizado") {
+                preview.textContent = type === "personalizado" ? "Se crearán las fechas personalizadas que agregues." : "";
+                return;
+              }
+              var dates = recurrenceDates(new FormData(popup.querySelector(".scm-calendar-popup-form")));
+              var people = Math.max(1, selectedEmployees().length);
+              preview.textContent = dates === null
+                ? "Elige la fecha fin de la recurrencia para ver cuántos eventos se crearán."
+                : (dates.length
+                  ? "Se crearán " + (dates.length * people) + " evento(s): " + dates.length + " fecha(s)" + (people > 1 ? " × " + people + " funcionarios" : "") + ", del " + calendarDayTitle(dates[0]) + " al " + calendarDayTitle(dates[dates.length - 1]) + "."
+                  : "Con esta configuración no se crea ningún evento.");
+            }
             function refreshRecurrenceUi() {
               var active = !!(recurrenceToggle && recurrenceToggle.checked);
               if (recurrenceBody) recurrenceBody.hidden = !active;
@@ -6397,6 +6590,7 @@
               if (active && type === "personalizado" && customRows && !customRows.children.length) {
                 customRows.insertAdjacentHTML("beforeend", customDateRowHtml());
               }
+              refreshRecurrencePreview();
             }
             function employeeMonthRows(employeeId, monthDate) {
               var range = monthRange(monthDate);
@@ -6442,7 +6636,7 @@
                   cellDate.setDate(start.getDate() + i);
                   var key = toDateKey(cellDate);
                   var holiday = holidayForDateKey(key);
-                  var dayRows = rows.filter(function (row) { return eventDateKey(row) === key; });
+                  var dayRows = rows.filter(function (row) { return rowCoversDay(row, key); });
                   var classes = "scm-case-calendar-day" + (cellDate.getMonth() !== monthDate.getMonth() ? " is-muted" : "") + (key === todayKey ? " is-today" : "") + (holiday ? " is-holiday" : "");
                   htmlRows += '<div class="' + classes + '">' +
                     '<div class="scm-case-calendar-day-head"><span class="scm-case-calendar-day-number">' + String(cellDate.getDate()) + '</span>' +
@@ -6636,6 +6830,9 @@
             }
             if (recurrenceToggle) recurrenceToggle.addEventListener("change", refreshRecurrenceUi);
             if (recurrenceType) recurrenceType.addEventListener("change", refreshRecurrenceUi);
+            ["fecha", "fecha_fin_recurrencia", "dias_semana", "omitir_domingos_festivos", "omitir_sabados"].forEach(function (name) {
+              popup.querySelectorAll('[name="' + name + '"]').forEach(function (input) { input.addEventListener("change", refreshRecurrencePreview); });
+            });
             if (addCustomDateBtn && customRows) {
               addCustomDateBtn.addEventListener("click", function () {
                 customRows.insertAdjacentHTML("beforeend", customDateRowHtml());
@@ -6765,7 +6962,7 @@
             } else {
               var baseDate = String(fd.get("fecha") || "");
               var baseStart = String(fd.get("hora_inicio") || "");
-              var baseEnd = String(fd.get("hora_fin") || "");
+              var baseEnd = defaultKind === "reminder" ? baseStart : String(fd.get("hora_fin") || "");
               var baseError = validateCalendarEventTimes(baseDate, baseStart, baseEnd);
               if (baseError) {
                 window.Swal.showValidationMessage(baseError);
@@ -6779,24 +6976,19 @@
                   window.Swal.showValidationMessage("Debes seleccionar una fecha fin para la recurrencia.");
                   return false;
                 }
-                var current = new Date(baseDate + "T00:00:00");
-                var endDate = new Date(endRecurrence + "T00:00:00");
-                if (Number.isNaN(endDate.getTime()) || endDate < current) {
-                  window.Swal.showValidationMessage("La fecha fin de recurrencia no puede ser menor a la fecha de inicio.");
-                  return false;
-                }
-                var selectedDays = fd.getAll("dias_semana").map(function (value) { return parseInt(value, 10); });
+                var selectedDays = fd.getAll("dias_semana");
                 if (recurrenceTypeValue === "semanal" && !selectedDays.length) {
                   window.Swal.showValidationMessage("Selecciona al menos un dia de la semana.");
                   return false;
                 }
-                while (current <= endDate) {
-                  var shouldAdd = recurrenceTypeValue === "diario" || selectedDays.indexOf(current.getDay()) !== -1;
-                  if (shouldAdd) {
-                    eventsToCreate.push(makePayload(toDateKey(current), baseStart, baseEnd));
-                  }
-                  current = addDays(current, 1);
+                var recurrenceKeys = recurrenceDates(fd);
+                if (recurrenceKeys === null) {
+                  window.Swal.showValidationMessage("La fecha fin de recurrencia no puede ser menor a la fecha de inicio.");
+                  return false;
                 }
+                recurrenceKeys.forEach(function (key) {
+                  eventsToCreate.push(makePayload(key, baseStart, baseEnd));
+                });
                 if (!eventsToCreate.length) {
                   window.Swal.showValidationMessage("No se generaron eventos con la configuracion seleccionada.");
                   return false;
@@ -6828,11 +7020,25 @@
                     ? calendarApi("crear_eventos", Object.assign({ eventos: eventsToCreate, empleados: selected }, extra))
                     : calendarApi("crear_evento", Object.assign({}, eventsToCreate[0], { id_empleado: selected[0] }, extra));
                 };
-                request = sendEvents({}).then(function (json) {
+                // Bloqueo por vencidos: se listan dentro del mismo modal (otro popup cerraría el formulario) y el
+                // siguiente clic en el botón crea de todas formas, solo si no cambiaron los funcionarios.
+                var createPopup = window.Swal.getPopup();
+                var overrideKey = selected.slice().sort().join(",");
+                var overrideAccepted = !!(createPopup && createPopup.getAttribute("data-overdue-override") === overrideKey);
+                request = sendEvents(overrideAccepted ? { permitir_vencidos: "1" } : {}).then(function (json) {
                   var blocked = json && !json.success && ((json.data && json.data.bloqueado_vencidos) || /vencidos sin realizar/i.test(String(json.message || "")));
                   if (!blocked) return json;
-                  var ok = window.confirm(String(json.message || "El funcionario tiene eventos vencidos sin realizar.") + "\n\n¿Deseas crear el evento de todas formas? Quedará registrado el bloqueo.");
-                  return ok ? sendEvents({ permitir_vencidos: "1" }) : json;
+                  if (createPopup) createPopup.setAttribute("data-overdue-override", overrideKey);
+                  var confirmButton = window.Swal.getConfirmButton();
+                  if (confirmButton) confirmButton.textContent = "Crear de todas formas";
+                  var overdueRows = json.data && Array.isArray(json.data.eventos) ? json.data.eventos : [];
+                  var overdueError = new Error("");
+                  overdueError.calendarOverdueHtml = '<div class="scm-calendar-overdue-block"><strong>' + escHtml(String(json.message || "Hay eventos vencidos sin realizar.").split(":")[0]) + '</strong>' +
+                    (overdueRows.length ? '<ul>' + overdueRows.slice(0, 5).map(function (row) {
+                      return '<li>#' + escHtml(row.id) + ' · ' + escHtml(row.titulo || "Evento") + ' · ' + escHtml(formatDateTime(row.fecha_inicio)) + '</li>';
+                    }).join("") + (overdueRows.length > 5 ? '<li>y ' + (overdueRows.length - 5) + ' más</li>' : "") + '</ul>' : "") +
+                    '<span>Márcalos como realizados o trasládalos desde «Eventos pendientes». Si debes crearlo igual, pulsa «Crear de todas formas»: quedará registrado el bloqueo.</span></div>';
+                  throw overdueError;
                 });
               } else {
                 var itemPayloads = [];
@@ -6841,17 +7047,10 @@
                     itemPayloads.push(Object.assign({}, eventPayload, { id_empleado: employeeId }));
                   });
                 });
-                request = Promise.all(itemPayloads.map(function (payload) {
-                  return calendarApi("crear_item_calendario", payload);
-                })).then(function (responses) {
-                  var failed = responses.find(function (json) { return !json || !json.success; });
-                  if (failed) return failed;
-                  return {
-                    success: true,
-                    message: tipoItem === "tarea" ? "Tarea creada." : "Recordatorio creado.",
-                    data: responses.map(function (json) { return json && json.data ? json.data : json; }),
-                  };
-                });
+                // Un solo envío: el servidor guarda todos juntos o ninguno, así reintentar no duplica.
+                request = itemPayloads.length === 1
+                  ? calendarApi("crear_item_calendario", itemPayloads[0])
+                  : calendarApi("crear_recordatorios", { recordatorios: itemPayloads });
               }
               return request.then(function (json) {
                 if (!json || !json.success) throw new Error((json && json.message) || "No se pudo crear el item.");
@@ -6859,7 +7058,7 @@
                 return json;
               });
             }).catch(function (err) {
-              window.Swal.showValidationMessage(err.message || "No se pudo crear el item.");
+              window.Swal.showValidationMessage(err.calendarOverdueHtml || escHtml(err.message || "No se pudo crear el item."));
               return false;
             });
           },

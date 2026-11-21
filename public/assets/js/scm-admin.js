@@ -7709,64 +7709,54 @@
     if (closeBtn) closeBtn.focus();
   }
 
-  function renderCalendarCaseEmployeeAgenda(root, body, employeeId) {
-    var agenda = body
-      ? body.querySelector("[data-scm-calendar-case-agenda]")
-      : null;
-    if (!agenda) return;
+  // Cruces de la cita con la agenda del funcionario ese día (sin abrir el calendario).
+  var caseAvailabilityRequestId = 0;
+  function checkCalendarCaseAvailability(root, target, employeeId, dateValue, startValue, endValue) {
+    if (!target) return;
+    target.classList.remove("is-busy", "is-free");
     if (!employeeId) {
-      agenda.innerHTML =
-        '<div class="scm-calendar-popup-agenda-empty">Este caso no tiene funcionario asignado.</div>';
+      target.textContent = "Este caso no tiene funcionario asignado.";
       return;
     }
-    if (!isCalendarEmployeeAllowed(root, employeeId)) {
-      agenda.innerHTML =
-        '<div class="scm-calendar-popup-agenda-empty">El funcionario asignado no pertenece a los cargos visibles del calendario.</div>';
+    if (!dateValue || !startValue || !endValue) {
+      target.textContent = "Elige fecha y hora para revisar la agenda del funcionario.";
       return;
     }
-    agenda.innerHTML =
-      '<div class="scm-calendar-popup-agenda-empty">Cargando agenda del funcionario...</div>';
-    var range = calendarCurrentMonthRange();
+    var requestId = ++caseAvailabilityRequestId;
+    target.textContent = "Revisando la agenda del funcionario...";
     calendarApiRequest(root, "filtrar_eventos_admin", {
       id_empleado: employeeId,
-      fecha_inicio: range.from,
-      fecha_fin: range.to,
+      fecha_inicio: dateValue,
+      fecha_fin: dateValue,
       pagina: 1,
-      limite: 80,
+      limite: 100,
     })
       .then(function (json) {
-        if (!json || !json.success) {
-          throw new Error(
-            (json && json.message) || "No se pudo cargar la agenda.",
-          );
-        }
-        var rows = extractCalendarRows(json.data || []).sort(function (a, b) {
-          return String(a.fecha_inicio || "").localeCompare(
-            String(b.fecha_inicio || ""),
-          );
+        if (requestId !== caseAvailabilityRequestId) return;
+        if (!json || !json.success) throw new Error("agenda");
+        var from = dateValue + " " + startValue;
+        var to = dateValue + " " + endValue;
+        var rows = extractCalendarRows(json.data || []);
+        var conflicts = rows.filter(function (row) {
+          var rowStart = String(row.fecha_inicio || "").replace("T", " ").slice(0, 16);
+          var rowEnd = String(row.fecha_fin || row.fecha_inicio || "").replace("T", " ").slice(0, 16);
+          return rowStart < to && rowEnd > from;
         });
-        if (!rows.length) {
-          agenda.innerHTML =
-            '<div class="scm-calendar-popup-agenda-empty">El funcionario no tiene eventos en el mes visible.</div>';
+        if (!conflicts.length) {
+          target.classList.add("is-free");
+          target.textContent = rows.length
+            ? "Franja libre. El funcionario tiene " + rows.length + " evento(s) ese día en otros horarios."
+            : "Franja libre. El funcionario no tiene eventos ese día.";
           return;
         }
-        agenda.innerHTML = rows
-          .slice(0, 12)
-          .map(function (row) {
-            return (
-              '<div class="scm-calendar-popup-agenda-item"><strong>' +
-              escHtml(formatCalendarDateTime(row.fecha_inicio)) +
-              "</strong><span>" +
-              escHtml(row.titulo || "Evento") +
-              "</span></div>"
-            );
-          })
-          .join("");
+        target.classList.add("is-busy");
+        target.innerHTML = "<strong>Cruce de horario:</strong> " + conflicts.slice(0, 3).map(function (row) {
+          return escHtml((row.titulo || "Evento") + " (" + String(row.fecha_inicio || "").slice(11, 16) + " - " + String(row.fecha_fin || "").slice(11, 16) + ")");
+        }).join("; ") + (conflicts.length > 3 ? " y otros." : ".") + " Puedes agendar igual o elegir otra hora.";
       })
-      .catch(function (error) {
-        agenda.innerHTML =
-          '<div class="scm-calendar-popup-agenda-empty">No se pudo cargar la agenda.</div>';
-        scmNotify("error", error.message || "No se pudo cargar la agenda.");
+      .catch(function () {
+        if (requestId !== caseAvailabilityRequestId) return;
+        target.textContent = "No se pudo revisar la agenda. Usa «Ver agenda en paralelo».";
       });
   }
 
@@ -7866,6 +7856,7 @@
             .join(" · ") || "Revisa la agenda sin cerrar este formulario.",
         ) +
         '</span></div></div><button type="button" class="scm-case-work-btn scm-calendar-case-open-btn" data-scm-calendar-case-open-month>Ver agenda en paralelo</button></div>' +
+        '<p class="scm-calendar-case-availability" data-scm-case-availability aria-live="polite">Elige fecha y hora para revisar la agenda del funcionario.</p>' +
         '<div class="scm-seg-actions"><span class="scm-calendar-case-footnote">Notificaci&oacute;n por WhatsApp y correo activa</span><button type="button" class="scm-btn-secondary" data-scm-case-submodal-cancel>Cancelar</button><button type="submit" class="scm-btn-primary">Crear y Notificar Evento</button><span class="scm-seg-msg" aria-live="polite"></span></div>' +
         "</form>";
     }
@@ -7890,6 +7881,21 @@
     var cancelBtn = form
       ? form.querySelector("[data-scm-case-submodal-cancel]")
       : null;
+    var availabilityNote = form ? form.querySelector("[data-scm-case-availability]") : null;
+    function refreshCaseAvailability() {
+      checkCalendarCaseAvailability(
+        root,
+        availabilityNote,
+        employeeId,
+        dateInput ? dateInput.value : "",
+        startInput ? startInput.value : "",
+        endInput ? endInput.value : "",
+      );
+    }
+    [dateInput, startInput, endInput].forEach(function (input) {
+      if (input) input.addEventListener("change", refreshCaseAvailability);
+    });
+    refreshCaseAvailability();
     function maybeAutofillCaseCalendarFields(force) {
       var categoryName = selectedCalendarCategoryName(categorySelect);
       if (titleInput) {

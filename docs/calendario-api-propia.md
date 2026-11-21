@@ -19,7 +19,20 @@ El JS (`admin-dashboard-runtime.js` y `scm-admin.js`) toma la URL de `config.cal
 
 `listar_categorias`, `listar_funcionarios`, `listar_items_calendario`, `filtrar_eventos_admin`, `listar_pendientes_vencidos`,
 `obtener_tickets_funcionario`, `crear_evento`, `crear_eventos`, `crear_item_calendario`, `crear_recordatorio`,
+`crear_recordatorios` (varios en una transacción),
 `actualizar_evento`, `trasladar_evento`, `cambiar_estado`, `actualizar_recordatorio`, `actualizar_recordatorio_estado`.
+
+## Permisos
+
+- Con la opción **Calendario equipo** o un cargo administrador (11–14): leer y modificar todas las agendas.
+- Sin ella: lo propio (asignado a la persona o creado por ella). La agenda de otro funcionario llega como **Ocupado**
+  (solo fechas, `privado: true`) y solo se agenda a otro funcionario desde su caso abierto (cita del caso).
+- Los procesos del servidor llaman a `CalendarApi` sin sesión y tienen acceso completo.
+
+## Reglas de horario (solo con sesión)
+
+- Nada en el pasado (margen de 10 minutos) y los eventos van el mismo día entre 8:00 a. m. y 9:00 p. m.
+- Un evento realizado no se traslada; un caso cerrado no recibe citas.
 
 ## Reglas conservadas
 

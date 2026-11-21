@@ -2677,7 +2677,7 @@
   display: grid;
   gap: 2px;
   height: calc((var(--event-slot-span, 1) * 24px) - 6px);
-  left: calc(68px + (((100% - 68px) / var(--event-days, 7)) * var(--event-day, 0)) + 6px);
+  left: calc(68px + (((100% - 68px) / var(--event-days, 7)) * var(--event-day, 0)) + ((((100% - 68px) / var(--event-days, 7)) / var(--event-lanes, 1)) * var(--event-lane, 0)) + 6px);
   margin: 0 !important;
   min-height: 34px;
   min-width: 0;
@@ -2686,8 +2686,70 @@
   position: absolute;
   text-align: left;
   top: calc(68px + (var(--event-start-slot, 0) * 24px) + 3px);
-  width: calc(((100% - 68px) / var(--event-days, 7)) - 12px);
+  width: calc((((100% - 68px) / var(--event-days, 7)) / var(--event-lanes, 1)) - 12px);
   z-index: 5;
+}
+
+#scm-app .scm-calendar-time-event.is-outside-hours {
+  background: repeating-linear-gradient(135deg, var(--event-color, #1a73e8) 0 8px, rgba(255, 255, 255, 0.18) 8px 12px);
+  opacity: 0.9;
+}
+
+#scm-app .scm-calendar-time-event.is-draggable {
+  cursor: grab;
+  touch-action: none;
+}
+
+#scm-app .scm-calendar-time-event.is-dragging {
+  cursor: grabbing;
+  opacity: 0.45;
+}
+
+.swal2-popup .scm-calendar-recurrence-skip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  grid-column: 1 / -1;
+}
+
+.swal2-popup .scm-calendar-recurrence-skip label {
+  align-items: center;
+  color: #334155;
+  display: inline-flex !important;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 6px;
+  margin: 0 !important;
+}
+
+.swal2-popup .scm-calendar-recurrence-skip input {
+  min-height: auto !important;
+  width: auto !important;
+}
+
+.swal2-popup [data-calendar-recurrence-preview] {
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 700;
+  grid-column: 1 / -1;
+}
+
+.scm-calendar-overdue-block {
+  color: #7c2d12;
+  display: grid;
+  font-size: 12px;
+  gap: 8px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.scm-calendar-overdue-block ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.scm-calendar-overdue-block span {
+  color: #9a3412;
 }
 
 #scm-app button.scm-calendar-time-event {
