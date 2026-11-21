@@ -5,7 +5,7 @@ const source=fs.readFileSync(require('node:path').join(__dirname,'../public/asse
 const start=source.indexOf('    var internalEventsSyncPromise = null;');
 const end=source.indexOf('    function openCollectionQueueFromLog(',start);
 const inner=source.indexOf('      function calendarApi(action, payload, method)');
-const innerEnd=source.indexOf('      function googleCalendarAuthWindow(',inner);
+const innerEnd=source.indexOf('      function dashboardAjax(',inner);
 const calls=[];
 let failure=false,invalid=false,syncFailure=false;
 const context=vm.createContext({actions:{},root:{isConnected:true},document:{hidden:false},window:{setInterval(){return 1;},clearInterval(){}},console:{warn(){}},calendarApiUrl:'https://example.invalid/?action=',dashboardAction:async(action)=>{calls.push('sync');if(syncFailure)throw new Error('Synthetic sync failure');return {queued:1};},fetch:async(url,options)=>{calls.push('calendar');return {status:200,json:async()=>({success:!failure}),text:async()=>invalid?'bad JSON':JSON.stringify({success:!failure})};}});
