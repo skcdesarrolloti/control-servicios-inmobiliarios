@@ -453,7 +453,22 @@ final class CalendarApi
     if ($value === true || in_array(strtolower(trim((string) $value)), ['1', 'si', 'true', 'yes'], true)) {
       return null;
     }
-    return self::fail('Tienes ' . $block['cantidad'] . ' evento/s vencidos sin realizar. Finalízalos antes de crear otro.', ['bloqueado_vencidos' => true, 'cantidad' => $block['cantidad']]);
+    // El bloqueo es del funcionario asignado (no de quien crea) y solo por eventos que terminaron hace más de 2 días:
+    // se nombran para que se sepa cuál cerrar o trasladar.
+    $overdue = $this->store->overdueEvents($employee);
+    $list = array_map(static function (array $row): string {
+      $ts = strtotime((string) ($row['fecha_inicio'] ?? ''));
+      return '«' . trim((string) ($row['titulo'] ?? 'Evento')) . '» #' . (int) ($row['id'] ?? 0) . ' del ' . ($ts ? date('d/m/Y h:i A', $ts) : (string) ($row['fecha_inicio'] ?? ''));
+    }, array_slice($overdue, 0, 3));
+    $name = trim((string) ($this->store->employee($employee)['nombre'] ?? ''));
+    $who = $employee === $this->me() || $name === '' ? 'Tienes' : $name . ' tiene';
+    $message = $who . ' ' . $block['cantidad'] . ' evento/s vencidos sin realizar (terminaron hace más de 2 días): ' . implode('; ', $list)
+      . ($block['cantidad'] > count($list) ? ' y otros' : '') . '. Márcalos como realizados o trasládalos antes de crear otro.';
+    return self::fail($message, [
+      'bloqueado_vencidos' => true,
+      'cantidad' => $block['cantidad'],
+      'eventos' => array_map(static fn(array $row): array => ['id' => $row['id'] ?? null, 'titulo' => $row['titulo'] ?? '', 'fecha_inicio' => $row['fecha_inicio'] ?? '', 'fecha_fin' => $row['fecha_fin'] ?? ''], $overdue),
+    ]);
   }
 
   /** @param array<string,mixed> $input @return array<string,mixed> */

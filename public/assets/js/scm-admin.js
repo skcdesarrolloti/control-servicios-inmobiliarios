@@ -5335,10 +5335,13 @@
 
   function confirmCalendarOverdueOverride(json) {
     var count = Number((json && json.data && json.data.cantidad) || 0);
+    // El servidor nombra los eventos que bloquean (sin realizar y terminados hace más de 2 días).
+    var serverMessage = String((json && json.message) || "").trim();
     var text =
-      (count > 0
-        ? "El funcionario tiene " + count + " evento(s) vencido(s) sin realizar."
-        : "El funcionario tiene eventos vencidos sin realizar.") +
+      (serverMessage ||
+        (count > 0
+          ? "El funcionario tiene " + count + " evento(s) vencido(s) sin realizar."
+          : "El funcionario tiene eventos vencidos sin realizar.")) +
       " ¿Deseas crear la cita de todas formas? Quedará registrado el bloqueo.";
     if (!window.Swal || typeof window.Swal.fire !== "function") {
       return Promise.resolve(window.confirm(text));

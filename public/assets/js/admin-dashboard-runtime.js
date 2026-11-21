@@ -2967,7 +2967,28 @@
         if (pendingEl) pendingEl.textContent = String(pending || 0);
         if (doneEl) doneEl.textContent = String(done || 0);
         if (todayEl) todayEl.textContent = String(todayCount || 0);
-        if (pendingActionCountEl) pendingActionCountEl.textContent = String(pending || 0);
+        refreshPendingActionCount();
+      }
+
+      // "Eventos pendientes" cuenta lo mismo que su popup y que el bloqueo al crear: eventos sin realizar que terminaron
+      // hace más de 2 días. Los del mes que aún no ocurren no cuentan.
+      var pendingActionRequestId = 0;
+      function refreshPendingActionCount() {
+        if (!pendingActionCountEl) return;
+        var requestId = ++pendingActionRequestId;
+        var apply = function (total) {
+          if (requestId !== pendingActionRequestId) return;
+          pendingActionCountEl.textContent = String(total);
+          pendingActionCountEl.style.display = total > 0 ? "" : "none";
+        };
+        var employeeId = selectedEmployeeFromFilter();
+        if (!employeeId) {
+          apply(0);
+          return;
+        }
+        calendarApi("listar_pendientes_vencidos", { id_empleado: employeeId }).then(function (json) {
+          apply(json && json.success ? filterRowsByAllowedEmployees(extractRows(json.data || [])).length : 0);
+        }).catch(function () { apply(0); });
       }
 
       function dueCaseAttrsHtml(caseData) {
