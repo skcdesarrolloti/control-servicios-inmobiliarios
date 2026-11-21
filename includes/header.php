@@ -31,7 +31,7 @@ $authUserCargoName = class_exists('\SCM\Core\Auth') ? \SCM\Core\Auth::userCargoN
 
 $userName = !empty($user_name) ? (string)$user_name : (!empty($authUserName) ? $authUserName : 'Royner Guardo');
 $userRole = !empty($user_role) ? (string)$user_role : (!empty($authUserCargoName) ? $authUserCargoName : (!empty($authUserCargo) ? $authUserCargo : 'Administrador Operativo'));
-$pageTitle = !empty($page_title) ? (string)$page_title : 'SKC SuCasa Inmobiliaria — Control Operativo';
+$pageTitle = !empty($page_title) ? (string)$page_title : 'Dashboard administrativo · SKC SuCasa Inmobiliaria';
 
 // Logo corporativo y favicon/isologo desde wp_jet_cct_confi_sistema
 $logoUrl = function_exists('system_image')
@@ -373,12 +373,11 @@ $rawNavItems = [
       'inicio' => [
         'key' => 'inicio',
         'label' => 'Inicio (Resumen general)',
-        'description' => 'Resumen general de la operación',
+        'description' => 'Agenda de hoy y accesos rápidos',
         'panel_id' => 'scm-panel-inicio',
-        'subtab' => 'mine',
         'url' => $baseUrl . '/index.php?tab=ini',
         'icon' => 'dashboard',
-        'perms' => ['mi_calendario', 'calendario_equipo', 'vencimientos'],
+        'perms' => [],
       ],
       'mine' => [
         'key' => 'mine',

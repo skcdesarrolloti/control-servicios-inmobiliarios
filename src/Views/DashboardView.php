@@ -11,7 +11,7 @@ final class DashboardView
     $standalone_function = $standaloneFunction;
     $allowed_tabs = $allowedTabs;
     $body_class = $standaloneFunction ? 'scm-standalone-function' : '';
-    $page_title = $standaloneFunction ? 'Función protegida — SKC SuCasa Inmobiliaria' : 'Panel de Control — SKC SuCasa Inmobiliaria';
+    $page_title = $standaloneFunction ? 'Función protegida — SKC SuCasa Inmobiliaria' : 'Dashboard administrativo · SKC SuCasa Inmobiliaria';
 
     require dirname(__DIR__, 2) . '/includes/header.php';
     echo '<div class="scm-modern-panel-wrapper w-full">';

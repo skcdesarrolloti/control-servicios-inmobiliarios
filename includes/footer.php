@@ -399,6 +399,10 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
                 }
                 window.history.pushState({}, '', url.toString());
               }
+              // Inicio: sin subpestaña es la página de bienvenida; con subpestaña, el calendario pedido.
+              if (panelTarget === 'scm-panel-inicio') {
+                scmApp.dispatchEvent(new CustomEvent('scm:home-view', { bubbles: true, detail: { view: subtabTarget ? 'calendar' : 'summary' } }));
+              }
               nativeTabBtn.click();
               window.scrollTo({ top: 0, behavior: 'instant' });
               setTimeout(function () {

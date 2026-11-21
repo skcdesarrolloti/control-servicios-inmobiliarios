@@ -39,7 +39,8 @@ echo $html;
       assert(await page.locator('[data-scm-contract-'+kind+'-panel]').evaluate(el=>!!el.closest('#scm-app')));
       assert(await page.locator('[data-scm-contract-'+kind+'-panel]').evaluate(el=>!!el.closest('#scm-panel-actividades-contractuales')), 'contractual sections belong to their own main panel');
     }
-    assert.equal(await page.locator('#scm-panel-inicio .scm-calendar-section-tab').count(),4,'Inicio has only its four operational views');
+    assert.equal(await page.locator('#scm-panel-inicio .scm-calendar-section-tab').count(),3,'Inicio has its three calendar views');
+    assert.equal(await page.locator('#scm-panel-inicio [data-scm-home-start]').count(),1,'Inicio has its welcome page with quick access');
     assert.equal(await page.locator('#scm-panel-actividades-contractuales .scm-calendar-section-tab').count(),3,'Contract activities has its three views');
     const modalIds=['scm-ticket-topic-settings-modal','scm-pqr-settings-modal','scm-internal-notifications-modal','scm-permissions-modal'];
     for(const id of modalIds) {

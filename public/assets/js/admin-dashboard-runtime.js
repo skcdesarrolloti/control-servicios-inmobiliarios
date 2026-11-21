@@ -1157,6 +1157,7 @@
 
     function openDashboardDueCalendar() {
       var homeTab = root.querySelector('.scm-main-tabs .scm-tab[data-tab="scm-panel-inicio"]');
+      setHomeView("calendar");
       if (homeTab) homeTab.click();
       window.setTimeout(function () {
         var dueTab = root.querySelector('[data-calendar-section-target="scm-home-calendar-section-due"]');
@@ -1823,6 +1824,31 @@
         delete dashboardAlertsShown["case-return"];
         maybeShowDashboardEntryPopups("case-return");
       }, 160);
+    });
+
+    root.addEventListener("scm:home-view", function (event) {
+      setHomeView(String((event.detail && event.detail.view) || "summary"));
+    });
+
+    root.addEventListener("click", function (event) {
+      var start = event.target.closest("[data-scm-home-start]");
+      if (!start) return;
+      var calendarButton = event.target.closest("[data-scm-start-calendar]");
+      if (calendarButton) {
+        event.preventDefault();
+        openHomeCalendarSection(calendarButton.getAttribute("data-scm-start-calendar") || "");
+        return;
+      }
+      var shortcut = event.target.closest("[data-scm-start-shortcut]");
+      if (!shortcut || event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1) return;
+      var link = homeShortcutLinks[parseInt(shortcut.getAttribute("data-scm-start-shortcut") || "-1", 10)];
+      if (!link) return;
+      event.preventDefault();
+      link.click();
+    });
+
+    root.addEventListener("input", function (event) {
+      if (event.target && event.target.matches && event.target.matches("[data-scm-start-search]")) filterHomeShortcuts(event.target);
     });
 
     root.addEventListener("scm:home-summary-selected", function () {
@@ -17350,98 +17376,300 @@
       return root.querySelector("#scm-panel-inicio");
     }
 
-    function dashboardHomeSummaryHost(panel) {
-      panel = panel || dashboardHomePanel();
-      if (!panel) return null;
-      var host = panel.querySelector("[data-scm-home-summary]");
-      if (host) return host;
-      host = document.createElement("div");
-      host.className = "scm-home-summary";
-      host.setAttribute("data-scm-home-summary", "1");
-      var status = panel.querySelector("[data-scm-home-status]");
-      if (status && status.parentNode) {
-        status.parentNode.insertBefore(host, status.nextSibling);
-      } else {
-        panel.insertBefore(host, panel.firstChild);
-      }
-      return host;
+    // ── Inicio: bienvenida, agenda de hoy, estado de los casos y accesos rápidos ──
+    function homeStartElement() {
+      var panel = dashboardHomePanel();
+      return panel ? panel.querySelector("[data-scm-home-start]") : null;
     }
 
-    function showDashboardHomeMessage(message, isError) {
+    function homeView() {
+      var start = homeStartElement();
+      return start && !start.hidden ? "summary" : "calendar";
+    }
+
+    function setHomeView(view) {
       var panel = dashboardHomePanel();
       if (!panel) return;
-      var status = panel.querySelector("[data-scm-home-status]");
-      if (!status) return;
-      var text = status.querySelector("[data-scm-home-status-text]");
-      var retry = status.querySelector("[data-scm-home-retry]");
-      status.hidden = false;
-      status.classList.toggle("is-error", !!isError);
-      if (text) text.textContent = message || "";
-      if (retry) retry.hidden = !isError;
+      var start = panel.querySelector("[data-scm-home-start]");
+      var calendar = panel.querySelector(".scm-home-calendar");
+      if (!calendar) view = "summary";
+      if (start) start.hidden = view !== "summary";
+      if (calendar) calendar.hidden = view === "summary";
     }
 
-    function dashboardHomeMetric(label, value, tone) {
-      return '<article class="scm-kpi' + (tone ? " " + tone : "") + '">' +
-        '<div class="scm-kpi-label">' + escHtml(label) + "</div>" +
-        '<div class="scm-kpi-value">' + formatDashboardCount(value) + "</div>" +
-      "</article>";
+    // Abre una sección del calendario de Inicio (Mi calendario, equipo o vencimientos) desde la bienvenida.
+    function openHomeCalendarSection(sectionId) {
+      var panel = dashboardHomePanel();
+      if (!panel) return;
+      var tab = panel.querySelector('.scm-calendar-section-tab[data-calendar-section-target="' + cssAttrValue(sectionId) + '"]') ||
+        panel.querySelector(".scm-calendar-section-tab");
+      if (!tab) return;
+      tab.click();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    function dashboardHomeCategoryRows(categories) {
-      categories = categories && typeof categories === "object" ? categories : {};
-      var rows = Object.keys(categories).map(function (key) {
-        var item = categories[key] || {};
+    function homeDateKey(date) {
+      return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+    }
+
+    function homeTimeLabel(value) {
+      var match = String(value || "").match(/(\d{2}):(\d{2})/);
+      if (!match) return "";
+      var hour = parseInt(match[1], 10);
+      var hour12 = hour % 12 === 0 ? 12 : hour % 12;
+      return hour12 + ":" + match[2] + (hour >= 12 ? " p. m." : " a. m.");
+    }
+
+    function homeEmpty(message) {
+      return '<div class="scm-start-empty">' + escHtml(message) + "</div>";
+    }
+
+    // Los accesos se arman con el menú del encabezado: ya viene filtrado por los permisos del funcionario.
+    var homeShortcutLinks = [];
+    function homeShortcutGroups() {
+      var nav = document.querySelector("[data-scm-main-nav]");
+      homeShortcutLinks = [];
+      if (!nav) return [];
+      var itemFromLink = function (link) {
+        if (!link || link.getAttribute("data-tab-key") === "inicio") return null;
+        var spans = link.querySelectorAll("span");
+        var labelNode = link.querySelector(".scm-nav-item-label") || spans[spans.length - 1];
+        var descNode = link.querySelector(".scm-nav-item-desc");
+        var iconNode = link.querySelector(".material-symbols-outlined");
+        homeShortcutLinks.push(link);
         return {
-          key: key,
-          label: item.label || key,
-          total: Number(item.total || item.abiertos || 0),
-          abiertos: Number(item.abiertos || 0),
-          vencidos: Number(item.sla_vencido || item.vencidos || 0),
+          index: homeShortcutLinks.length - 1,
+          href: link.getAttribute("href") || "#",
+          label: labelNode ? labelNode.textContent.trim() : "",
+          description: descNode ? descNode.textContent.trim() : "",
+          icon: iconNode ? iconNode.textContent.trim() : "arrow_forward",
         };
-      }).sort(function (a, b) {
-        return b.abiertos - a.abiertos || b.total - a.total || a.label.localeCompare(b.label);
+      };
+      var groups = [];
+      var singles = [];
+      Array.prototype.forEach.call(nav.children, function (node) {
+        if (node.matches("a.nav-tab-pill[href]")) {
+          var single = itemFromLink(node);
+          if (single) singles.push(single);
+          return;
+        }
+        if (!node.matches("[data-scm-nav-dropdown]")) return;
+        var trigger = node.querySelector(".nav-tab-dropdown-btn");
+        var list = node.querySelector("[data-scm-dropdown-menu] > div");
+        if (!trigger || !list) return;
+        var sections = [];
+        var loose = [];
+        Array.prototype.forEach.call(list.children, function (child) {
+          if (child.matches("a.nav-tab-dropdown-item")) {
+            var item = itemFromLink(child);
+            if (item) loose.push(item);
+            return;
+          }
+          if (!child.matches("[data-scm-dropdown-sub]")) return;
+          var subLabel = child.querySelector(".scm-dropdown-sub-trigger .scm-nav-item-label");
+          var subItems = Array.prototype.map.call(child.querySelectorAll("a.nav-tab-dropdown-item"), itemFromLink).filter(Boolean);
+          if (subItems.length) sections.push({ title: subLabel ? subLabel.textContent.trim() : "", items: subItems });
+        });
+        if (loose.length) sections.unshift({ title: "", items: loose });
+        if (!sections.length) return;
+        var triggerSpans = trigger.querySelectorAll("span");
+        groups.push({
+          title: triggerSpans[1] ? triggerSpans[1].textContent.trim() : "",
+          icon: triggerSpans[0] ? triggerSpans[0].textContent.trim() : "apps",
+          sections: sections,
+        });
       });
-      if (!rows.length) {
-        return '<div class="scm-empty scm-empty-cards">Sin indicadores por categor&iacute;a.</div>';
-      }
-      return '<div class="scm-home-process-list">' + rows.slice(0, 6).map(function (row) {
-        return '<div class="scm-home-process"><span>' + escHtml(row.label) + '</span><strong>' + formatDashboardCount(row.abiertos || row.total) + '</strong></div>';
-      }).join("") + "</div>";
+      if (singles.length) groups.push({ title: "Más accesos", icon: "apps", sections: [{ title: "", items: singles }] });
+      return groups;
     }
 
-    function renderDashboardHome(summary, generatedAt) {
-      var panel = dashboardHomePanel();
-      if (!panel) return;
-      summary = summary || {};
-      var host = dashboardHomeSummaryHost(panel);
-      var status = panel.querySelector("[data-scm-home-status]");
-      var generatedLabel = generatedAt ? formatDashboardDateTime(generatedAt) : "";
-      if (host) {
-        host.innerHTML =
-          '<section class="scm-home-hero">' +
-            '<div><span class="scm-home-eyebrow">Resumen general</span><h1>Inicio operativo</h1><p>Indicadores principales del panel y accesos r&aacute;pidos a las vistas de trabajo.</p></div>' +
-            '<button type="button" class="scm-home-primary-action" data-scm-home-target="scm-home-calendar-section-due"><span class="material-symbols-outlined" aria-hidden="true">schedule</span><span>Ver vencimientos</span></button>' +
-          '</section>' +
-          '<div class="scm-kpis scm-kpis-daisy">' +
-            dashboardHomeMetric("Total", summary.total, "") +
-            dashboardHomeMetric("Abiertos", summary.abiertos, "") +
-            dashboardHomeMetric("Cerrados", summary.cerrados, "success") +
-            dashboardHomeMetric("Vencidos", summary.sla_vencido, "danger") +
-            dashboardHomeMetric("En riesgo", summary.sla_riesgo, "warning") +
-            dashboardHomeMetric("Sin cotiz.", summary.sin_cotizacion, "") +
-            dashboardHomeMetric("Sin revisi&oacute;n", summary.sin_revision, "") +
-          '</div>' +
-          '<div class="scm-home-content-grid">' +
-            '<section class="scm-home-card"><div class="scm-home-card-heading"><div><span class="scm-home-card-kicker">Categor&iacute;as</span><h2>Casos abiertos por frente</h2></div><span class="scm-home-updated">' + escHtml(generatedLabel ? "Actualizado " + generatedLabel : "Actualizado") + '</span></div>' + dashboardHomeCategoryRows(summary.por_categoria) + '</section>' +
-            '<section class="scm-home-shortcuts"><div class="scm-home-card-heading"><div><span class="scm-home-card-kicker">Accesos</span><h2>Ir directo</h2></div></div><div class="scm-home-shortcut-grid">' +
-              '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-mine"><span class="material-symbols-outlined">calendar_month</span><strong>Mi calendario</strong><i>Agenda</i></button>' +
-              '<button type="button" class="scm-home-shortcut" data-scm-home-target="scm-home-calendar-section-team"><span class="material-symbols-outlined">groups</span><strong>Calendario equipo</strong><i>Equipo</i></button>' +
-              '<button type="button" class="scm-home-shortcut" data-scm-home-target="admin:historial_inmueble"><span class="material-symbols-outlined">home</span><strong>Historial inmueble</strong><i>Consulta</i></button>' +
-            '</div></section>' +
-          '</div>';
+    function renderHomeShortcuts(start) {
+      var host = start.querySelector("[data-scm-start-shortcuts]");
+      if (!host || host.getAttribute("data-scm-ready") === "1") return;
+      var groups = homeShortcutGroups();
+      if (!groups.length) {
+        host.innerHTML = homeEmpty("Tu perfil no tiene módulos asignados. Pide acceso al administrador del panel.");
+        return;
       }
-      if (status) status.hidden = true;
-      panel.setAttribute("data-scm-loaded", "1");
+      host.innerHTML =
+        '<label class="scm-start-search"><span class="material-symbols-outlined" aria-hidden="true">search</span>' +
+          '<input type="search" placeholder="Buscar un módulo…" aria-label="Buscar un módulo" data-scm-start-search autocomplete="off"></label>' +
+        '<div class="scm-start-access-columns">' + groups.map(function (group) {
+          return '<section class="scm-start-access-group" data-scm-start-group>' +
+            '<h3><span class="material-symbols-outlined" aria-hidden="true">' + escHtml(group.icon) + "</span>" + escHtml(group.title) + "</h3>" +
+            group.sections.map(function (section) {
+              return '<div class="scm-start-access-section" data-scm-start-section>' +
+                (section.title ? "<h4>" + escHtml(section.title) + "</h4>" : "") +
+                section.items.map(function (item) {
+                  var searchText = (group.title + " " + section.title + " " + item.label + " " + item.description).toLowerCase();
+                  return '<a class="scm-start-shortcut" href="' + escHtml(item.href) + '" data-scm-start-shortcut="' + item.index + '"' +
+                    ' data-scm-start-search-text="' + escHtml(searchText) + '"' +
+                    (item.description ? ' title="' + escHtml(item.description) + '"' : "") + ">" +
+                    '<span class="material-symbols-outlined" aria-hidden="true">' + escHtml(item.icon) + "</span>" +
+                    "<strong>" + escHtml(item.label) + "</strong></a>";
+                }).join("") +
+              "</div>";
+            }).join("") +
+          "</section>";
+        }).join("") + "</div>" +
+        '<div class="scm-start-empty" data-scm-start-search-empty hidden>Ningún módulo coincide con la búsqueda.</div>';
+      host.setAttribute("data-scm-ready", "1");
+    }
+
+    function filterHomeShortcuts(input) {
+      var start = input.closest("[data-scm-home-start]");
+      if (!start) return;
+      var term = String(input.value || "").toLowerCase().trim();
+      var visibleTotal = 0;
+      start.querySelectorAll("[data-scm-start-group]").forEach(function (group) {
+        var groupVisible = 0;
+        group.querySelectorAll("[data-scm-start-section]").forEach(function (section) {
+          var sectionVisible = 0;
+          section.querySelectorAll("[data-scm-start-shortcut]").forEach(function (link) {
+            var match = !term || String(link.getAttribute("data-scm-start-search-text") || "").indexOf(term) !== -1;
+            link.hidden = !match;
+            if (match) sectionVisible += 1;
+          });
+          section.hidden = sectionVisible === 0;
+          groupVisible += sectionVisible;
+        });
+        group.hidden = groupVisible === 0;
+        visibleTotal += groupVisible;
+      });
+      var empty = start.querySelector("[data-scm-start-search-empty]");
+      if (empty) empty.hidden = visibleTotal > 0;
+    }
+
+    function homeStat(label, value, tone, sectionId) {
+      return '<button type="button" class="scm-start-stat' + (tone ? " is-" + tone : "") + '" data-scm-start-calendar="' + escHtml(sectionId) + '">' +
+        "<strong>" + formatDashboardCount(value) + "</strong><span>" + escHtml(label) + "</span></button>";
+    }
+
+    function homeAgendaRow(row, now) {
+      var done = String(row.estado || "").toLowerCase().trim() === "si";
+      var startAt = new Date(String(row.fecha_inicio || "").replace(" ", "T"));
+      var endAt = new Date(String(row.fecha_fin || row.fecha_inicio || "").replace(" ", "T"));
+      var state = done ? ["done", "Realizado"] : (endAt < now ? ["late", "Sin cerrar"] : (startAt <= now ? ["now", "En curso"] : ["next", "Pendiente"]));
+      var startLabel = homeTimeLabel(row.fecha_inicio);
+      var endLabel = homeTimeLabel(row.fecha_fin);
+      return '<button type="button" class="scm-start-agenda-row is-' + state[0] + '" data-scm-start-calendar="scm-home-calendar-section-mine" style="--event-color:' + escHtml(row.color || "#64748b") + '">' +
+        '<span class="scm-start-agenda-time">' + escHtml(startLabel) + (endLabel && endLabel !== startLabel ? "<small>" + escHtml(endLabel) + "</small>" : "") + "</span>" +
+        '<span class="scm-start-agenda-body"><strong>' + escHtml(row.titulo || "Evento") + "</strong><small>" + escHtml(row.categoria || "Actividad") + "</small></span>" +
+        '<span class="scm-start-agenda-state">' + escHtml(state[1]) + "</span>" +
+      "</button>";
+    }
+
+    function homeRowsFrom(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (payload && Array.isArray(payload.data)) return payload.data;
+      if (payload && Array.isArray(payload.rows)) return payload.rows;
+      return [];
+    }
+
+    function loadHomeAgenda(start) {
+      var host = start.querySelector("[data-scm-start-agenda]");
+      var stats = start.querySelector("[data-scm-start-stats]");
+      if (!host || start.getAttribute("data-scm-start-agenda-enabled") !== "1") return Promise.resolve();
+      var employeeId = String((config && config.calendar_current_employee_id) || "").trim();
+      if (!employeeId) {
+        host.innerHTML = homeEmpty("Tu usuario no tiene un funcionario asociado; no hay agenda para mostrar.");
+        return Promise.resolve();
+      }
+      var now = new Date();
+      var today = homeDateKey(now);
+      return Promise.all([
+        calendarApiRequest("filtrar_eventos_admin", { pagina: 1, limite: 100, fecha_inicio: today, fecha_fin: today, id_empleado: employeeId }),
+        calendarApiRequest("listar_pendientes_vencidos", { id_empleado: employeeId }).catch(function () { return null; }),
+      ]).then(function (results) {
+        var json = results[0];
+        if (!json || !json.success) throw new Error((json && json.message) || "agenda");
+        var rows = homeRowsFrom(json.data).filter(function (row) {
+          return String(row.id_empleado || "") === employeeId &&
+            String(row.fecha_inicio || "").slice(0, 10) <= today &&
+            String(row.fecha_fin || row.fecha_inicio || "").slice(0, 10) >= today;
+        }).sort(function (a, b) { return String(a.fecha_inicio || "").localeCompare(String(b.fecha_inicio || "")); });
+        host.innerHTML = rows.length
+          ? '<div class="scm-start-agenda-list">' + rows.map(function (row) { return homeAgendaRow(row, now); }).join("") + "</div>"
+          : homeEmpty("No tienes eventos agendados para hoy.");
+        var overdue = results[1] && results[1].success ? homeRowsFrom(results[1].data).length : 0;
+        var pending = rows.filter(function (row) { return String(row.estado || "").toLowerCase().trim() !== "si"; }).length;
+        if (stats) {
+          stats.innerHTML = homeStat("eventos hoy", rows.length, "", "scm-home-calendar-section-mine") +
+            homeStat("pendientes hoy", pending, pending ? "warning" : "", "scm-home-calendar-section-mine") +
+            homeStat("vencidos sin cerrar", overdue, overdue ? "danger" : "ok", "scm-home-calendar-section-mine");
+          stats.hidden = false;
+        }
+      }).catch(function () {
+        host.innerHTML = homeEmpty("No se pudo cargar tu agenda. Abre Mi calendario para verla.");
+      });
+    }
+
+    function loadHomeCases(start) {
+      var card = start.querySelector("[data-scm-start-cases-card]");
+      var host = start.querySelector("[data-scm-start-cases]");
+      var grid = start.querySelector(".scm-start-grid");
+      var syncGrid = function () {
+        if (!grid) return;
+        var visibleCards = grid.querySelectorAll(".scm-start-card:not([hidden])").length;
+        grid.hidden = visibleCards === 0;
+        grid.classList.toggle("is-single", visibleCards === 1);
+      };
+      if (!card || !host || !actionDashboardHome) {
+        syncGrid();
+        return Promise.resolve();
+      }
+      return dashboardAction(actionDashboardHome, {}).then(function (data) {
+        var summary = data && data.summary;
+        if (!summary) {
+          card.hidden = true;
+          return;
+        }
+        var metric = function (label, value, tone) {
+          return '<div class="scm-start-metric' + (tone ? " is-" + tone : "") + '"><strong>' + formatDashboardCount(value) + "</strong><span>" + escHtml(label) + "</span></div>";
+        };
+        var categories = summary.por_categoria && typeof summary.por_categoria === "object" ? summary.por_categoria : {};
+        var categoryRows = Object.keys(categories).map(function (key) {
+          var item = categories[key] || {};
+          return { label: item.label || key, open: Number(item.abiertos || 0) };
+        }).filter(function (row) { return row.open > 0; }).sort(function (x, y) { return y.open - x.open; }).slice(0, 5);
+        var maxOpen = categoryRows.reduce(function (max, row) { return Math.max(max, row.open); }, 1);
+        host.innerHTML =
+          '<div class="scm-start-metrics">' +
+            metric("Abiertos", summary.abiertos, "") +
+            metric("Vencidos", summary.sla_vencido, Number(summary.sla_vencido) ? "danger" : "") +
+            metric("En riesgo", summary.sla_riesgo, Number(summary.sla_riesgo) ? "warning" : "") +
+            metric("Sin cotización", summary.sin_cotizacion, "") +
+          "</div>" +
+          (categoryRows.length
+            ? '<div class="scm-start-bars">' + categoryRows.map(function (row) {
+                return '<div class="scm-start-bar"><span>' + escHtml(row.label) + '</span><i><b style="width:' + Math.max(4, Math.round((row.open / maxOpen) * 100)) + '%"></b></i><strong>' + formatDashboardCount(row.open) + "</strong></div>";
+              }).join("") + "</div>"
+            : "");
+        var updated = start.querySelector("[data-scm-start-updated]");
+        if (updated) updated.textContent = data.generated_at ? "Actualizado " + formatDashboardDateTime(data.generated_at) : "";
+        card.hidden = false;
+      }).catch(function () {
+        card.hidden = true;
+      }).then(syncGrid);
+    }
+
+    var homeStartPromise = null;
+    function renderHomeStart() {
+      var start = homeStartElement();
+      if (!start) return Promise.resolve();
+      var now = new Date();
+      var dateNode = start.querySelector("[data-scm-start-date]");
+      if (dateNode) dateNode.textContent = new Intl.DateTimeFormat("es-CO", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(now);
+      var greeting = start.querySelector("[data-scm-start-greeting]");
+      if (greeting) greeting.textContent = now.getHours() < 12 ? "Buenos días" : (now.getHours() < 19 ? "Buenas tardes" : "Buenas noches");
+      renderHomeShortcuts(start);
+      if (!homeStartPromise) {
+        homeStartPromise = Promise.all([loadHomeAgenda(start), loadHomeCases(start)]).finally(function () {
+          homeStartPromise = null;
+        });
+      }
+      // La página aparece de inmediato; agenda e indicadores llegan después sin bloquear el panel.
+      return Promise.resolve();
     }
 
     function propertyHistoryEmpty(message) {
@@ -19001,6 +19229,12 @@
       var panel = root.querySelector("#scm-panel-inicio");
       if (!panel) {
         return Promise.resolve();
+      }
+      if (homeView() === "summary") {
+        return renderHomeStart().then(function () {
+          panel.setAttribute("data-scm-loaded", "1");
+          panel.removeAttribute("aria-busy");
+        });
       }
       var initHomeCalendar = function () {
         var activeHomeCalendarSection = panel.querySelector("[data-calendar-sections] .scm-calendar-section-panel.active");
@@ -27153,7 +27387,9 @@
           return;
         }
         var contractParent = parentPanel.closest("#scm-panel-actividades-contractuales");
-        if (parentPanel.closest("#scm-panel-inicio") || contractParent) {
+        var homeParent = parentPanel.closest("#scm-panel-inicio");
+        if (homeParent) setHomeView("calendar");
+        if (homeParent || contractParent) {
           var homeSectionUrl = new URL(window.location.href);
           homeSectionUrl.searchParams.set("tab", target.replace(/^scm-home-calendar-section-/, "").replace(/-/g, "_"));
           homeSectionUrl.searchParams.delete("subtab");
@@ -27168,7 +27404,11 @@
           panel.classList.toggle("active", panel.id === target);
         });
         var activeSection = parentPanel.querySelector(".scm-calendar-section-panel.active");
-        initCalendarPanel(activeSection || parentPanel);
+        if (homeParent) {
+          loadDashboardFilterOptions().then(function () { initCalendarPanel(activeSection || parentPanel); });
+        } else {
+          initCalendarPanel(activeSection || parentPanel);
+        }
         if (target === "scm-home-calendar-section-contract-termination") {
           loadContractTerminationRequests(false);
         }

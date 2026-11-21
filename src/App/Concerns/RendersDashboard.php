@@ -481,17 +481,8 @@ trait RendersDashboard
       }
     }
     if ($initialTab === '') {
-      if (in_array('calendario_actividades', $dashboardAllowedTabs, true)) {
-        $initialTab = 'scm-panel-inicio';
-      } elseif (in_array('abiertos', $dashboardAllowedTabs, true)) {
-        $initialTab = 'scm-panel-abiertos';
-      } elseif (in_array('mis_tickets', $dashboardAllowedTabs, true)) {
-        $initialTab = 'scm-panel-mis-tickets';
-      } elseif (in_array('metricas', $dashboardAllowedTabs, true)) {
-        $initialTab = $firstMetricsPanel;
-      } else {
-        $initialTab = 'scm-panel-inicio';
-      }
+      // Todos entran por Inicio: bienvenida, agenda del día y accesos rápidos según sus permisos.
+      $initialTab = 'scm-panel-inicio';
     }
     if ($initialAdministrativeActivityKey === '' || !in_array($initialAdministrativeActivityKey, $allowedAdministrativeActivityTabs, true)) {
       $initialAdministrativeActivityKey = (string) ($allowedAdministrativeActivityTabs[0] ?? '');
@@ -512,25 +503,8 @@ trait RendersDashboard
       : $this->render_lazy_tickets_placeholder('Abre Mantenimiento para cargar los casos.');
     $paginationHtml = $hydrateMaintenanceRows ? (string)($result['pagination_html'] ?? '') : '';
 
-    $homeDisplayName = trim((string) Auth::user());
-    $homeNameParts = preg_split('/\s+/u', $homeDisplayName, -1, PREG_SPLIT_NO_EMPTY);
-    $homeFirstName = (string)($homeNameParts[0] ?? '');
-    $homeQuickLinks = [];
-    if (in_array('abiertos', $dashboardAllowedTabs, true)) {
-      $homeQuickLinks[] = ['panel' => 'scm-panel-abiertos', 'icon' => 'fa-inbox', 'label' => 'Casos abiertos'];
-    }
-    if (in_array('mis_tickets', $dashboardAllowedTabs, true)) {
-      $homeQuickLinks[] = ['panel' => 'scm-panel-mis-tickets', 'icon' => 'fa-user-check', 'label' => 'Mis casos'];
-    }
-    if ($canAccessAdministrativeActivities) {
-      $homeQuickLinks[] = ['panel' => 'scm-panel-actividades-administrativas', 'icon' => 'fa-calendar-check', 'label' => 'Actividades administrativas'];
-    }
-    if (in_array('contratos_arrendamiento', $dashboardAllowedTabs, true)) {
-      $homeQuickLinks[] = ['panel' => 'scm-panel-contratos-arrendamiento', 'icon' => 'fa-file-contract', 'label' => 'Contratos'];
-    }
-    if (in_array('metricas', $dashboardAllowedTabs, true)) {
-      $homeQuickLinks[] = ['panel' => $firstMetricsPanel, 'icon' => 'fa-chart-line', 'label' => 'Métricas'];
-    }
+    $homeNameParts = preg_split('/\s+/u', trim((string) Auth::user()), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    $homeFirstName = isset($homeNameParts[0]) ? mb_convert_case((string) $homeNameParts[0], MB_CASE_TITLE, 'UTF-8') : '';
 
     $nonce = \SCM\Core\App::csrf()->token(self::NONCE_KEY);
     $apiUrl = defined('SCM_BASE_URL') ? (SCM_BASE_URL . '/api.php') : '/api.php';
@@ -938,9 +912,50 @@ trait RendersDashboard
         if (!$sectionAllowed($activeHomeSection)) {
           $activeHomeSection = $firstAllowedSection(['scm-home-calendar-section-mine', 'scm-home-calendar-section-team', 'scm-home-calendar-section-due']);
         }
+        // Inicio muestra la página de bienvenida; los calendarios se abren solo cuando se piden por enlace o menú.
+        $calendarRouteKeys = ['mine', 'mi_calendario', 'team', 'calendario_equipo', 'due', 'vencimientos', 'vencimiento', 'calendario', 'calendario_actividades'];
+        $homeView = $canAccessAdministrativeCalendar && (in_array($tabKey, $calendarRouteKeys, true) || in_array($subtabReq, ['mine', 'team', 'due'], true))
+          ? 'calendar'
+          : 'summary';
+        $homeCanSeeAgenda = $canAccessAdministrativeCalendar && $sectionAllowed('scm-home-calendar-section-mine');
         ?>
+        <div class="scm-start" data-scm-home-start data-scm-start-agenda-enabled="<?php echo $homeCanSeeAgenda ? '1' : '0'; ?>"<?php echo $homeView === 'summary' ? '' : ' hidden'; ?>>
+          <section class="scm-start-hero">
+            <div class="scm-start-hero-text">
+              <span class="scm-start-date" data-scm-start-date></span>
+              <h1><span data-scm-start-greeting>Hola</span><?php echo $homeFirstName !== '' ? ', ' . esc_html($homeFirstName) : ''; ?></h1>
+              <p>Dashboard administrativo · SKC SuCasa Inmobiliaria</p>
+            </div>
+            <div class="scm-start-hero-stats" data-scm-start-stats hidden></div>
+          </section>
+          <div class="scm-start-grid<?php echo $homeCanSeeAgenda ? '' : ' is-single'; ?>">
+            <?php if ($homeCanSeeAgenda): ?>
+              <section class="scm-start-card" aria-labelledby="scm-start-agenda-title">
+                <header class="scm-start-card-head">
+                  <div><span class="scm-start-kicker">Hoy</span><h2 id="scm-start-agenda-title">Mi agenda</h2></div>
+                  <button type="button" class="scm-start-link" data-scm-start-calendar="scm-home-calendar-section-mine">Ver calendario <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></button>
+                </header>
+                <div class="scm-start-agenda" data-scm-start-agenda><div class="scm-start-empty">Cargando tu agenda…</div></div>
+              </section>
+            <?php endif; ?>
+            <section class="scm-start-card" data-scm-start-cases-card hidden aria-labelledby="scm-start-cases-title">
+              <header class="scm-start-card-head">
+                <div><span class="scm-start-kicker">Casos</span><h2 id="scm-start-cases-title">Estado general</h2></div>
+                <span class="scm-start-updated" data-scm-start-updated></span>
+              </header>
+              <div data-scm-start-cases></div>
+            </section>
+          </div>
+          <section class="scm-start-access" aria-labelledby="scm-start-access-title">
+            <header class="scm-start-section-head">
+              <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
+              <h2 id="scm-start-access-title">Accesos rápidos</h2>
+            </header>
+            <div class="scm-start-access-grid" data-scm-start-shortcuts></div>
+          </section>
+        </div>
         <?php if ($canAccessAdministrativeCalendar): ?>
-          <section class="scm-home-calendar" aria-labelledby="scm-home-calendar-title" data-calendar-sections>
+          <section class="scm-home-calendar" aria-labelledby="scm-home-calendar-title" data-calendar-sections<?php echo $homeView === 'summary' ? ' hidden' : ''; ?>>
             <div class="scm-calendar-section-tabs" role="tablist" aria-label="Calendarios administrativos">
               <?php if ($sectionAllowed('scm-home-calendar-section-mine')): ?><button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-mine' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-mine"><span class="material-symbols-outlined" aria-hidden="true">calendar_month</span><span>Mi calendario</span></button><?php endif; ?>
               <?php if ($sectionAllowed('scm-home-calendar-section-team')): ?><button class="scm-status-topic-tab scm-calendar-section-tab<?php echo $activeHomeSection === 'scm-home-calendar-section-team' ? ' active' : ''; ?>" type="button" data-calendar-section-target="scm-home-calendar-section-team"><span class="material-symbols-outlined" aria-hidden="true">groups</span><span>Calendario equipo</span></button><?php endif; ?>

@@ -138,26 +138,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Acceso — Control Servicios Inmobiliarios</title>
+  <title>Iniciar sesión · SKC SuCasa Inmobiliaria</title>
   <link rel="icon" href="<?php echo esc_url(system_image('portal_favicon_url', SCM_DEFAULT_PORTAL_FAVICON_URL)); ?>" sizes="32x32">
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
   <link rel="stylesheet" href="<?php echo esc_url(rtrim((string) SCM_BASE_URL, '/') . '/assets/css/login.css?v=' . SCM_VERSION); ?>">
 </head>
 
 <body>
-  <div class="login-card">
-    <div class="logo">
-      <div class="logo-plate">
-        <img src="<?php echo esc_url(system_image('portal_logo_url', SCM_DEFAULT_PORTAL_LOGO_URL)); ?>" alt="Su Casa Inmobiliaria">
+  <main class="login-card">
+    <div class="brand">
+      <div class="brand-icon"><span class="material-symbols-outlined" aria-hidden="true">domain</span></div>
+      <div>
+        <span class="brand-name">SKC SuCasa Inmobiliaria</span>
+        <span class="brand-area">Servicios Inmobiliarios</span>
       </div>
-      <span class="logo-text">Control Servicios<br><span>Inmobiliarios</span></span>
     </div>
-    <h1>Iniciar sesión</h1>
-    <p>Ingresa tus credenciales de acceso</p>
+
+    <div>
+      <h1>Iniciar sesión</h1>
+      <p class="intro">Ingresa con tus credenciales institucionales.</p>
+    </div>
 
     <?php if ($error !== ''): ?>
-      <div class="alert-error"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
+      <div class="alert-error" role="alert">
+        <span class="material-symbols-outlined" aria-hidden="true">warning</span>
+        <span><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></span>
+      </div>
     <?php endif; ?>
 
     <form method="post" action="">
@@ -165,15 +174,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?php if ($next !== ''): ?><input type="hidden" name="next" value="<?php echo htmlspecialchars($next, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
       <div class="form-group">
         <label for="username">Usuario</label>
-        <input type="text" id="username" name="username" autocomplete="username" required>
+        <div class="input-wrap">
+          <span class="material-symbols-outlined" aria-hidden="true">person</span>
+          <input type="text" id="username" name="username" autocomplete="username" required>
+        </div>
       </div>
       <div class="form-group">
         <label for="password">Contraseña</label>
-        <input type="password" id="password" name="password" autocomplete="current-password" required>
+        <div class="input-wrap">
+          <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+          <input type="password" id="password" name="password" autocomplete="current-password" required>
+        </div>
       </div>
-      <button type="submit" class="btn-primary">Entrar</button>
+      <button type="submit" class="btn-primary">Iniciar sesión</button>
     </form>
-  </div>
+  </main>
 </body>
 
 </html>

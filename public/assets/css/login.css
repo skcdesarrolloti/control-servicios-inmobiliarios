@@ -1,144 +1,214 @@
+/* Login — mismo diseño que el panel comercial (tokens de su tema Tailwind, en CSS plano). */
 *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-    :root {
-      --primary: #f19001;
-      --dark: #1e293b;
-      --light: #f8fafc;
-      --radius: 10px;
-    }
+:root {
+  --background: #faf8ff;
+  --surface: #ffffff;
+  --surface-low: #f2f3ff;
+  --surface-container: #e9edff;
+  --on-surface: #001944;
+  --on-surface-variant: #4d4635;
+  --secondary: #4b5d8c;
+  --primary-container: #f8cf4a;
+  --inverse-surface: #0b2e67;
+  --outline-variant: #d0c6ae;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+}
 
-    body {
-      font-family: 'Poppins', sans-serif;
-      background: var(--light);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-    }
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1rem;
+  background: var(--background);
+  color: var(--on-surface);
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  line-height: 22px;
+  -webkit-font-smoothing: antialiased;
+}
 
-    .login-card {
-      background: #fff;
-      border-radius: var(--radius);
-      box-shadow: 0 4px 24px rgba(0, 0, 0, .10);
-      padding: 2.5rem 2rem;
-      width: 100%;
-      max-width: 380px;
-    }
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
+}
 
-    .login-card h1 {
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: var(--dark);
-      margin-bottom: .25rem;
-    }
+.login-card {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  max-width: 28rem;
+  padding: 2.5rem;
+  border: 1px solid var(--surface-container);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
 
-    .login-card p {
-      font-size: .85rem;
-      color: #64748b;
-      margin-bottom: 1.5rem;
-    }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 
-    .form-group {
-      margin-bottom: 1rem;
-    }
+.brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  background: var(--primary-container);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
 
-    .form-group label {
-      display: block;
-      font-size: .8rem;
-      font-weight: 600;
-      color: var(--dark);
-      margin-bottom: .35rem;
-    }
+.brand-icon .material-symbols-outlined {
+  color: var(--on-surface);
+  font-size: 24px;
+}
 
-    .form-group input {
-      width: 100%;
-      padding: .65rem .85rem;
-      border: 1.5px solid #e2e8f0;
-      border-radius: 7px;
-      font-size: .9rem;
-      font-family: inherit;
-      transition: border-color .2s;
-      outline: none;
-    }
+.brand-name {
+  display: block;
+  color: var(--on-surface);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 26px;
+  letter-spacing: -0.01em;
+}
 
-    .form-group input:focus {
-      border-color: var(--primary);
-    }
+.brand-area {
+  display: block;
+  color: var(--secondary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 
-    .btn-primary {
-      width: 100%;
-      padding: .75rem;
-      background: var(--primary);
-      color: #fff;
-      border: none;
-      border-radius: 7px;
-      font-size: .95rem;
-      font-weight: 600;
-      font-family: inherit;
-      cursor: pointer;
-      margin-top: .5rem;
-      transition: background .2s;
-    }
+h1 {
+  color: var(--on-surface);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 36px;
+  letter-spacing: -0.01em;
+}
 
-    .btn-primary:hover {
-      background: #d97f00;
-    }
+.intro {
+  margin-top: 0.25rem;
+  color: var(--on-surface-variant);
+}
 
-    .alert-error {
-      background: #fef2f2;
-      color: #991b1b;
-      border: 1px solid #fca5a5;
-      border-radius: 7px;
-      padding: .65rem .9rem;
-      font-size: .85rem;
-      margin-bottom: 1rem;
-    }
+.alert-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 0.75rem;
+  background: var(--error-container);
+  color: var(--on-error-container);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
 
-    .logo {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: .65rem;
-      margin-bottom: 1.65rem;
-      text-align: center;
-    }
+.alert-error .material-symbols-outlined {
+  font-size: 20px;
+}
 
-    .logo-plate {
-      width: min(230px, 100%);
-      min-height: 72px;
-      background: linear-gradient(145deg, #344149, #1f292e);
-      border: 1px solid rgba(241, 144, 1, .5);
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: .7rem 1rem;
-      box-shadow: 0 8px 18px rgba(15, 23, 42, .18);
-      flex: 0 0 auto;
-    }
+form {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
+}
 
-    .logo-plate img {
-      display: block;
-      width: auto;
-      max-width: 100%;
-      max-height: 50px;
-      object-fit: contain;
-    }
+.form-group {
+  display: grid;
+  gap: 0.25rem;
+}
 
-    .logo-text {
-      font-weight: 700;
-      color: var(--dark);
-      font-size: 1rem;
-      line-height: 1.2;
-    }
+.form-group label {
+  color: var(--secondary);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+}
 
-    .logo-text span {
-      color: var(--primary);
-    }
+.input-wrap {
+  position: relative;
+}
+
+.input-wrap .material-symbols-outlined {
+  position: absolute;
+  top: 0.625rem;
+  left: 0.75rem;
+  color: var(--secondary);
+  font-size: 18px;
+  pointer-events: none;
+}
+
+.input-wrap input {
+  width: 100%;
+  padding: 0.625rem 0.75rem 0.625rem 2.25rem;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  background: var(--surface-low);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+  color: var(--on-surface);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.input-wrap input:focus {
+  border-color: var(--outline-variant);
+  background: var(--surface);
+}
+
+.btn-primary {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: var(--inverse-surface);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-primary:hover,
+.btn-primary:focus-visible {
+  background: var(--secondary);
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 1.75rem 1.25rem;
+  }
+}

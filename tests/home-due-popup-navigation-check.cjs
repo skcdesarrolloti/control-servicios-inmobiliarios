@@ -26,7 +26,7 @@ const sectionHtml = section => '<button class="scm-calendar-section-tab" data-ca
     const page = await browser.newPage();
     await page.route('http://scm.test/**', route => route.fulfill({contentType: 'text/html', body: '<main></main>'}));
     await page.goto('http://scm.test/index.php?tab=ini&keep=value#context');
-    await page.setContent('<nav><button class="nav-tab-pill" id="summary" data-panel-target="scm-panel-inicio" data-tab-key="inicio" data-subtab-target="mine">Inicio</button>' + sections.map(section => '<button class="nav-tab-pill" id="nav-' + section + '" data-panel-target="' + panelFor(section) + '" data-tab-key="' + section.replace(/-/g, '_') + '" data-subtab-target="' + section + '">' + section + '</button>').join('') + '</nav><div id="scm-app"><div class="scm-main-tabs"><button class="scm-tab" data-tab="scm-panel-inicio"></button><button class="scm-tab" data-tab="scm-panel-actividades-contractuales"></button></div>' + ['scm-panel-inicio', 'scm-panel-actividades-contractuales'].map(panel => '<section id="' + panel + '" class="scm-tab-panel ' + (panel === 'scm-panel-inicio' ? 'active' : '') + '"><div data-calendar-sections>' + sections.filter(section => panelFor(section) === panel).map(sectionHtml).join('') + '</div></section>').join('') + '</div>');
+    await page.setContent('<nav><button class="nav-tab-pill" id="summary" data-panel-target="scm-panel-inicio" data-tab-key="inicio">Inicio</button>' + sections.map(section => '<button class="nav-tab-pill" id="nav-' + section + '" data-panel-target="' + panelFor(section) + '" data-tab-key="' + section.replace(/-/g, '_') + '" data-subtab-target="' + section + '">' + section + '</button>').join('') + '</nav><div id="scm-app"><div class="scm-main-tabs"><button class="scm-tab" data-tab="scm-panel-inicio"></button><button class="scm-tab" data-tab="scm-panel-actividades-contractuales"></button></div>' + ['scm-panel-inicio', 'scm-panel-actividades-contractuales'].map(panel => '<section id="' + panel + '" class="scm-tab-panel ' + (panel === 'scm-panel-inicio' ? 'active' : '') + '"><div data-calendar-sections>' + sections.filter(section => panelFor(section) === panel).map(sectionHtml).join('') + '</div></section>').join('') + '</div>');
     await page.addScriptTag({content: `
       var root = document.getElementById('scm-app');
       var funcionarioBridgeMode = false, duePopupConfig = {enabled:true}, dashboardDuePopupShown = {};
@@ -34,6 +34,10 @@ const sectionHtml = section => '<button class="scm-calendar-section-tab" data-ca
       function loadDashboardDuePopupRows() { return window.pendingDue || Promise.resolve({rows:[{}]}); }
       function dashboardDueEntryPopupHtml() { return ''; }
       function initCalendarPanel() {}
+      var homeViewState = "summary";
+      function setHomeView(view) { homeViewState = view; }
+      function loadDashboardFilterOptions() { return Promise.resolve(); }
+      root.addEventListener("scm:home-view", function (event) { setHomeView(event.detail.view); });
       function loadContractTerminationRequests() {}
       function loadContractNonRenewalRequests() {}
       function loadContractsEnding() {}
@@ -59,7 +63,8 @@ const sectionHtml = section => '<button class="scm-calendar-section-tab" data-ca
       assert.deepEqual(state, {tab:section.replace(/-/g, '_'), keep:'value', hash:'#context', count:0, show:false});
     }
     await page.locator('#summary').click();
-    await page.waitForFunction(() => !new URL(location.href).searchParams.has('subtab') && document.getElementById('scm-home-calendar-section-mine').classList.contains('active'));
+    // Inicio (Resumen general) abre la bienvenida, no un calendario.
+    await page.waitForFunction(() => !new URL(location.href).searchParams.has('subtab') && new URL(location.href).searchParams.get('tab') === 'ini' && homeViewState === 'summary');
     assert.equal(await page.evaluate(() => shouldAutoShowDashboardDuePopup('login')), true);
     await page.waitForFunction(() => popupCount > 0);
     await page.locator('[data-calendar-section-target="scm-home-calendar-section-team"]').click();
