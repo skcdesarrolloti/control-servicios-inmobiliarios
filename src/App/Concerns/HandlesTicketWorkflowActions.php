@@ -640,7 +640,7 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail('La observacion es obligatoria.');
     }
 
-    $executorChange = $this->caseExecutorFromRequest();
+    $executorChange = $this->caseExecutorFromRequest($ticketPk);
 
     $service = $this->get_seguimiento_service();
     if (!($service instanceof \SCM\Modules\ServiciosInmobiliarios\SeguimientoService)) {
@@ -917,7 +917,7 @@ trait HandlesTicketWorkflowActions
       $this->jsonFail('No tienes permiso para responder cotizaciones.');
     }
 
-    $executorChange = $this->caseExecutorFromRequest();
+    $executorChange = $this->caseExecutorFromRequest($ticketPk);
 
     $service = $this->get_seguimiento_service();
     try { $additionalEmails = \SCM\Support\AdditionalEmailRecipients::parse($_POST['additional_emails'] ?? ''); }

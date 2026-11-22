@@ -5013,7 +5013,7 @@ trait HandlesMaintenanceActions
    * "Ejecutado por" enviado junto a una respuesta o seguimiento: null = sin cambio, '' = Sin definir.
    * Valida permiso y valor antes de guardar la respuesta para no dejarla a medias.
    */
-  private function caseExecutorFromRequest(): ?string
+  private function caseExecutorFromRequest(int $ticketPk): ?string
   {
     $raw = trim(sanitize_text_field(wp_unslash((string) ($_POST['ejecutado'] ?? '__keep__'))));
     if ($raw === '__keep__') {
@@ -5021,6 +5021,11 @@ trait HandlesMaintenanceActions
     }
     if (!$this->canUseDashboardAction('case_edit_executor')) {
       $this->jsonFail('No tienes permiso para cambiar quién ejecuta el caso.');
+    }
+    $table = $this->db->table('jet_cct_tickets');
+    $ticket = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]);
+    if (!is_array($ticket) || !$this->caseExecutorApplies($ticket)) {
+      $this->jsonFail('Ejecutado por solo aplica a casos de Mantenimiento y de Preventiva con cotización.');
     }
     if ($raw !== '' && !in_array($raw, $this->caseExecutorOptions(), true)) {
       $this->jsonFail('Ejecutado por no válido.');
@@ -5069,18 +5074,48 @@ trait HandlesMaintenanceActions
     return $change;
   }
 
-  /** Sugerencia para un caso vacío: si tiene cotización ejecuta la inmobiliaria (la cotización dice quién aprueba). */
-  private function caseQuoteExecutorSuggestion(int $ticketPk): string
+  private function caseHasMaintenanceQuote(int $ticketPk): bool
   {
     $table = $this->db->table('jet_cct_cotizacion_mantenimiento');
-    if (!$this->table_exists($table) || !$this->column_exists($table, 'id_ticket')) {
-      return '';
+    if ($ticketPk <= 0 || !$this->table_exists($table) || !$this->column_exists($table, 'id_ticket')) {
+      return false;
     }
-    $hasQuote = (int) ($this->db->getVar(
+    return (int) ($this->db->getVar(
       "SELECT COUNT(*) FROM `{$table}` WHERE TRIM(COALESCE(`id_ticket`, '')) = ?",
       [(string) $ticketPk]
     ) ?? 0) > 0;
-    return $hasQuote ? \SCM\Support\CaseExecutorSql::QUOTE_EXECUTOR : '';
+  }
+
+  /** Sugerencia para un caso vacío: si tiene cotización ejecuta la inmobiliaria (la cotización dice quién aprueba). */
+  private function caseQuoteExecutorSuggestion(int $ticketPk): string
+  {
+    return $this->caseHasMaintenanceQuote($ticketPk) ? \SCM\Support\CaseExecutorSql::QUOTE_EXECUTOR : '';
+  }
+
+  /**
+   * "Ejecutado por" aplica siempre en Mantenimiento y en Preventiva solo si el caso tiene cotización.
+   * Misma regla que la pestaña Mantenimiento (MaintenanceQueriesConcern) y que el popup (scm-admin.js). Ver docs/ejecutado-caso.md.
+   *
+   * @param array<string,mixed> $ticket
+   */
+  private function caseExecutorApplies(array $ticket): bool
+  {
+    $normalize = static fn(string $value): string => strtr(
+      mb_strtolower(trim($value), 'UTF-8'),
+      ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u']
+    );
+    $tema = $normalize((string) ($ticket['tema_ayuda'] ?? ''));
+    if (
+      $normalize((string) ($ticket['departamento'] ?? '')) === 'mantenimiento'
+      || in_array($tema, \SCM\Repositories\TicketsRepository::MAINTENANCE_TOPICS, true)
+      || str_contains($tema, 'reparacion')
+      || str_contains($tema, 'mantenimiento')
+    ) {
+      return true;
+    }
+    $isPreventiva = trim((string) ($ticket['id_revision_preventiva'] ?? '')) !== ''
+      || str_contains($normalize($tema . ' ' . (string) ($ticket['asunto'] ?? '') . ' ' . (string) ($ticket['descripcion'] ?? '')), 'preventiva');
+    return $isPreventiva && $this->caseHasMaintenanceQuote((int) ($ticket['_ID'] ?? 0));
   }
 
   public function ajax_handler_edit_case_data(): void
@@ -5100,6 +5135,9 @@ trait HandlesMaintenanceActions
     $ticket = $this->db->getRow("SELECT * FROM `{$table}` WHERE `_ID` = ? LIMIT 1", [$ticketPk]);
     if (!is_array($ticket)) {
       $this->jsonFail('Caso no encontrado.');
+    }
+    if ($executorScope && !$this->caseExecutorApplies($ticket)) {
+      $this->jsonFail('Ejecutado por solo aplica a casos de Mantenimiento y de Preventiva con cotización.');
     }
 
     $options = $executorScope ? [] : $this->caseDataEditOptions($table);

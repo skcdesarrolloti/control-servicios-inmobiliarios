@@ -15,6 +15,15 @@ La columna `ejecutado` existe en dos tablas con significados distintos:
 
 El trabajo cotizado siempre lo ejecuta la inmobiliaria (`CaseExecutorSql::QUOTE_EXECUTOR`). Otro ejecutor (propietario, arrendatario, copropiedad, externo) solo llega al caso por el acta de solución o por un cambio manual.
 
+## Dónde aplica
+
+"Ejecutado por" solo aplica a:
+
+- casos de **Mantenimiento**, siempre (departamento Mantenimiento o tema de reparaciones/mejoras, la misma regla de la pestaña);
+- casos de **Preventiva**, solo si tienen cotización.
+
+En los demás casos el popup no muestra la línea "Ejecuta:", ni el botón "Editar ejecutado", ni el selector de Responder/Seguimiento, y el servidor rechaza el cambio (`caseExecutorApplies()` en `HandlesMaintenanceActions`; `caseExecutorApplies()` en `scm-admin.js`).
+
 ## Cómo se llena el caso
 
 Solo estas acciones cambian `ejecutado` del caso:

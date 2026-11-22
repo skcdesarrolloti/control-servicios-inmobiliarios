@@ -80,10 +80,10 @@ $actions = new class($db, true) {
   public function __construct(private \SCM\Core\Database $db, private bool $allowed) {}
   private function canUseDashboardAction(string $action): bool { return $this->allowed && $action === 'case_edit_executor'; }
   private function jsonFail(string $message): never { throw new \RuntimeException($message); }
-  private function table_exists($t): bool { return in_array($t, ['wp_jet_cct_tickets', 'wp_jet_cct_notas_ticket'], true); }
-  private function column_exists($t, $c): bool { return $t === 'wp_jet_cct_notas_ticket' ? $c !== 'cct_status' && $c !== 'cct_created' && $c !== 'cct_modified' : in_array($c, ['_ID', 'ejecutado'], true); }
+  private function table_exists($t): bool { return in_array($t, ['wp_jet_cct_tickets', 'wp_jet_cct_notas_ticket', 'wp_jet_cct_cotizacion_mantenimiento'], true); }
+  private function column_exists($t, $c): bool { return $t === 'wp_jet_cct_notas_ticket' ? $c !== 'cct_status' && $c !== 'cct_created' && $c !== 'cct_modified' : ($t === 'wp_jet_cct_cotizacion_mantenimiento' ? $c === 'id_ticket' : in_array($c, ['_ID', 'ejecutado'], true)); }
   private function ticketCompletionActor(): array { return ['employee_id' => '77', 'name' => 'Ana Funcionaria']; }
-  public function fromRequest(): ?string { return $this->caseExecutorFromRequest(); }
+  public function fromRequest(int $id = 5): ?string { return $this->caseExecutorFromRequest($id); }
   public function apply(int $id, ?string $value, string $origin): string { return $this->applyCaseExecutorChange($id, $value, $origin); }
 };
 $_POST = [];
@@ -98,12 +98,22 @@ $note = $db->getRow('SELECT * FROM wp_jet_cct_notas_ticket ORDER BY _ID DESC LIM
 $assert($db->getVar('SELECT ejecutado FROM wp_jet_cct_tickets WHERE _ID = 5') === 'Copropiedad' && str_contains($change, '"Sin definir" → "Copropiedad"'), 'followup executor change updates the case');
 $assert($note['cct_author_id'] === '77' && str_contains($note['observacion'], 'desde un seguimiento'), 'executor change leaves an internal note by the real employee');
 $assert($actions->apply(5, 'Copropiedad', 'una respuesta') === '' && (int) $db->getVar('SELECT COUNT(*) FROM wp_jet_cct_notas_ticket') === 1, 'unchanged executor adds no duplicate note');
+// Solo Mantenimiento (siempre) y Preventiva con cotización admiten "Ejecutado por".
+$pdo->exec("INSERT INTO wp_jet_cct_tickets (_ID,id_ticket,departamento,tema_ayuda,ejecutado) VALUES (20,'120','Administracion','Revision preventiva',''),(21,'121','Administracion','Revisiones preventivas',''),(22,'122','Contabilidad','Contable y tributaria',''),(23,'123','','Mejoras útiles','')");
+$pdo->exec("INSERT INTO wp_jet_cct_cotizacion_mantenimiento (_ID,id_ticket,ejecutado,estado) VALUES (30,'21','Propietario','')");
+$_POST = ['ejecutado' => 'Inmobiliaria'];
+foreach ([20 => 'preventive cases without a quote', 22 => 'cases outside maintenance and preventive'] as $id => $label) {
+  try { $actions->fromRequest($id); throw new \LogicException('executor accepted for ' . $label); }
+  catch (\RuntimeException $error) { $assert(str_contains($error->getMessage(), 'solo aplica'), 'executor is rejected for ' . $label); }
+}
+$assert($actions->fromRequest(21) === 'Inmobiliaria', 'preventive cases with a quote accept the executor');
+$assert($actions->fromRequest(23) === 'Inmobiliaria', 'maintenance topics with accents accept the executor');
 $denied = new class($db, false) {
   use \SCM\App\Concerns\HandlesMaintenanceActions;
   public function __construct(private \SCM\Core\Database $db, private bool $allowed) {}
   private function canUseDashboardAction(string $action): bool { return false; }
   private function jsonFail(string $message): never { throw new \RuntimeException($message); }
-  public function fromRequest(): ?string { return $this->caseExecutorFromRequest(); }
+  public function fromRequest(): ?string { return $this->caseExecutorFromRequest(5); }
 };
 try { $denied->fromRequest(); throw new \LogicException('executor change without permission accepted'); }
 catch (\RuntimeException $error) { $assert(str_contains($error->getMessage(), 'permiso'), 'executor change requires case_edit_executor'); }

@@ -2920,6 +2920,14 @@
     return tabKey === "mantenimiento";
   }
 
+  // "Ejecutado por" aplica siempre en Mantenimiento y en Preventiva solo con cotización (docs/ejecutado-caso.md).
+  function caseExecutorApplies(caseBtn) {
+    return (
+      isMaintenanceCase(caseBtn) ||
+      (isPreventivaCase(caseBtn) && caseHasCotizacion(caseBtn))
+    );
+  }
+
   function scmIsYesLike(value) {
     var text = String(value || "")
       .trim()
@@ -3016,7 +3024,7 @@
 
   // "Ejecutado por" junto a respuesta/seguimiento: el cambio queda como nota interna (docs/ejecutado-caso.md).
   function renderComposerExecutorField(caseBtn, isPublicPqr) {
-    if (isPublicPqr || !caseBtn) return "";
+    if (isPublicPqr || !caseBtn || !caseExecutorApplies(caseBtn)) return "";
     var root = findRootFromNode(caseBtn);
     var runtime = root ? parseRuntime(root) || {} : {};
     var allowed = runtime.actionPermissions && runtime.actionPermissions.actions;
@@ -10981,10 +10989,12 @@
             '<div class="flex items-center justify-between pt-1 border-t border-slate-100"><span class="scm-spec-label text-xs">Magnitud:</span><span data-scm-case-magnitude-badge>' +
             renderMagnitudeBadge(sideMagnitude) +
             "</span></div>";
-          sidebarHtml +=
-            '<div class="flex items-center justify-between pt-1"><span class="scm-spec-label text-xs">Ejecuta:</span><strong class="text-xs" data-scm-case-executor-value>' +
-            escHtml(caseExecutorLabel(btn.dataset.ejecutado)) +
-            "</strong></div>";
+          if (caseExecutorApplies(btn)) {
+            sidebarHtml +=
+              '<div class="flex items-center justify-between pt-1"><span class="scm-spec-label text-xs">Ejecuta:</span><strong class="text-xs" data-scm-case-executor-value>' +
+              escHtml(caseExecutorLabel(btn.dataset.ejecutado)) +
+              "</strong></div>";
+          }
           if (isPreventivaCase(btn)) {
             var noAccessSideCount = Math.max(
               0,
@@ -11012,7 +11022,11 @@
               "</button>",
           );
         }
-        if (!isPublicPqr && canUseDashboardAction("case_edit_executor")) {
+        if (
+          !isPublicPqr &&
+          caseExecutorApplies(btn) &&
+          canUseDashboardAction("case_edit_executor")
+        ) {
           sidebarStateButtons.push(
             '<button type="button" class="scm-case-work-btn w-full" data-scm-edit-case-executor>' +
               '<span class="material-symbols-outlined scm-btn-icon">engineering</span>' +
