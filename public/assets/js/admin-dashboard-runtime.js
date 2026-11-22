@@ -4702,6 +4702,7 @@
       }
 
       // Fechas de la recurrencia diaria/semanal según el formulario (la misma lista para el aviso y para guardar).
+      // Siempre se omiten domingos y festivos de Colombia; los sábados cuentan como día hábil.
       function recurrenceDates(formData) {
         var baseDate = String(formData.get("fecha") || "");
         var endRecurrence = String(formData.get("fecha_fin_recurrencia") || "");
@@ -4710,8 +4711,6 @@
         var endDate = dateFromKey(endRecurrence);
         if (!current || !endDate || endDate < current) return null;
         var days = formData.getAll("dias_semana").map(function (value) { return parseInt(value, 10); });
-        var skipSundayHolidays = formData.get("omitir_domingos_festivos") === "1";
-        var skipSaturday = formData.get("omitir_sabados") === "1";
         var dates = [];
         var guard = 0;
         while (current <= endDate && guard < 800) {
@@ -4719,8 +4718,7 @@
           var key = toDateKey(current);
           var weekday = current.getDay();
           var wanted = type === "diario" || days.indexOf(weekday) !== -1;
-          if (wanted && skipSundayHolidays && (weekday === 0 || holidayForDateKey(key))) wanted = false;
-          if (wanted && skipSaturday && weekday === 6) wanted = false;
+          if (wanted && (weekday === 0 || holidayForDateKey(key))) wanted = false;
           if (wanted) dates.push(key);
           current = addDays(current, 1);
         }
@@ -6180,7 +6178,6 @@
           '<label class="scm-seg-field" data-calendar-recurrence-end><span>Fecha l&iacute;mite de recurrencia</span><input class="input input-bordered input-sm scm-input" type="date" name="fecha_fin_recurrencia"></label>' +
           '<div class="scm-calendar-week-picker" data-calendar-week-picker hidden><span>D&iacute;as de la semana</span><label><input type="checkbox" value="1" name="dias_semana"> Lun</label><label><input type="checkbox" value="2" name="dias_semana"> Mar</label><label><input type="checkbox" value="3" name="dias_semana"> Mi&eacute;</label><label><input type="checkbox" value="4" name="dias_semana"> Jue</label><label><input type="checkbox" value="5" name="dias_semana"> Vie</label><label><input type="checkbox" value="6" name="dias_semana"> S&aacute;b</label><label><input type="checkbox" value="0" name="dias_semana"> Dom</label></div>' +
           '<div class="scm-calendar-custom-dates" data-calendar-custom-dates hidden><div data-calendar-custom-rows></div><button type="button" class="scm-case-work-btn" data-calendar-add-custom-date>Agregar fecha personalizada</button></div>' +
-          '<div class="scm-calendar-recurrence-skip" data-calendar-recurrence-skip><label><input type="checkbox" name="omitir_domingos_festivos" value="1" checked> Omitir domingos y festivos</label><label><input type="checkbox" name="omitir_sabados" value="1"> Omitir s&aacute;bados</label></div>' +
           '<small data-calendar-recurrence-preview>Se programar&aacute;n las fechas generadas respetando la configuraci&oacute;n del rango.</small>' +
           '</div></div>' +
           ticketFieldsHtml +
@@ -6588,10 +6585,8 @@
             }
             function refreshRecurrencePreview() {
               var preview = popup.querySelector("[data-calendar-recurrence-preview]");
-              var skipWrap = popup.querySelector("[data-calendar-recurrence-skip]");
               var active = !!(recurrenceToggle && recurrenceToggle.checked);
               var type = recurrenceType ? recurrenceType.value : "diario";
-              if (skipWrap) skipWrap.hidden = !active || type === "personalizado";
               if (!preview) return;
               if (!active || type === "personalizado") {
                 preview.textContent = type === "personalizado" ? "Se crearán las fechas personalizadas que agregues." : "";
@@ -6602,7 +6597,7 @@
               preview.textContent = dates === null
                 ? "Elige la fecha fin de la recurrencia para ver cuántos eventos se crearán."
                 : (dates.length
-                  ? "Se crearán " + (dates.length * people) + " evento(s): " + dates.length + " fecha(s)" + (people > 1 ? " × " + people + " funcionarios" : "") + ", del " + calendarDayTitle(dates[0]) + " al " + calendarDayTitle(dates[dates.length - 1]) + "."
+                  ? "Se crearán " + (dates.length * people) + " evento(s): " + dates.length + " fecha(s)" + (people > 1 ? " × " + people + " funcionarios" : "") + ", del " + calendarDayTitle(dates[0]) + " al " + calendarDayTitle(dates[dates.length - 1]) + " (sin domingos ni festivos)."
                   : "Con esta configuración no se crea ningún evento.");
             }
             function refreshRecurrenceUi() {
@@ -6856,7 +6851,7 @@
             }
             if (recurrenceToggle) recurrenceToggle.addEventListener("change", refreshRecurrenceUi);
             if (recurrenceType) recurrenceType.addEventListener("change", refreshRecurrenceUi);
-            ["fecha", "fecha_fin_recurrencia", "dias_semana", "omitir_domingos_festivos", "omitir_sabados"].forEach(function (name) {
+            ["fecha", "fecha_fin_recurrencia", "dias_semana"].forEach(function (name) {
               popup.querySelectorAll('[name="' + name + '"]').forEach(function (input) { input.addEventListener("change", refreshRecurrencePreview); });
             });
             if (addCustomDateBtn && customRows) {

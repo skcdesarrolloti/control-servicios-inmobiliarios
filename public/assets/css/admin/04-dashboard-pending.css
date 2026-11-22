@@ -2705,28 +2705,6 @@
   opacity: 0.45;
 }
 
-.swal2-popup .scm-calendar-recurrence-skip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  grid-column: 1 / -1;
-}
-
-.swal2-popup .scm-calendar-recurrence-skip label {
-  align-items: center;
-  color: #334155;
-  display: inline-flex !important;
-  font-size: 12px;
-  font-weight: 700;
-  gap: 6px;
-  margin: 0 !important;
-}
-
-.swal2-popup .scm-calendar-recurrence-skip input {
-  min-height: auto !important;
-  width: auto !important;
-}
-
 .swal2-popup [data-calendar-recurrence-preview] {
   color: #9a3412;
   font-size: 12px;
