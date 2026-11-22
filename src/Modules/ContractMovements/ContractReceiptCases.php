@@ -76,7 +76,8 @@ final class ContractReceiptCases
    */
   public static function alertGroups(array $cases, DateTimeImmutable $today, bool $canOpenView = false): array
   {
-    if ($cases === []) {
+    // Sin nada por recibir no hay nada que recordar: lo ya cerrado solo acompaña a lo pendiente.
+    if (array_filter($cases, static fn(array $case): bool => !empty($case['abierto'])) === []) {
       return [];
     }
     $year = (int) $today->format('Y');

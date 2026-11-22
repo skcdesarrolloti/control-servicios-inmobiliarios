@@ -16950,3 +16950,29 @@ html.scm-lease-modal-open {
     width: auto !important;
   }
 }
+
+/* Popups de vencimientos y alertas: «No mostrar más hoy» (Configuración › Popups y avisos). */
+.swal2-popup.scm-due-entry-swal .scm-popup-snooze-bar {
+  display: flex;
+  justify-content: flex-start;
+  padding: 10px 20px 14px;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+.swal2-popup.scm-due-entry-swal [data-scm-popup-snooze] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.swal2-popup.scm-due-entry-swal [data-scm-popup-snooze]:hover,
+.swal2-popup.scm-due-entry-swal [data-scm-popup-snooze]:focus-visible { background: #eef2ff; border-color: #4b5d8c; }
+.swal2-popup.scm-due-entry-swal [data-scm-popup-snooze] .material-symbols-outlined { font-size: 17px; }

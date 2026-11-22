@@ -881,3 +881,54 @@
   font-weight: 400 !important;
   letter-spacing: 0 !important;
 }
+
+/* Configuración › Popups y avisos (pestaña de Permisos por cargo). */
+#scm-app #scm-permissions-modal.is-alerts-only .scm-perm-pane-btn,
+#scm-app #scm-permissions-modal.is-alerts-only .scm-perm-switches { display: none !important; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-general,
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-behavior {
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8faff;
+}
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-general-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-general-head > .material-symbols-outlined {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex: 0 0 auto;
+  border-radius: 10px; background: #f8cf4a; color: #0f1e36; font-size: 19px;
+}
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-general-head h4,
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-behavior h5 { margin: 0; color: #0f1e36; font-size: 14px; font-weight: 700; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-general-head p { margin: 2px 0 0; color: #64748b; font-size: 12px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-general-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-general fieldset { min-width: 0; margin: 0; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-general legend { padding: 0 4px; color: #4b5d8c; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-time-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-time-row label { display: grid; gap: 3px; color: #334155; font-size: 12px; font-weight: 600; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-time-row input,
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-time-row select,
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-behavior select {
+  width: 100%; min-height: 36px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 10px;
+  background: #fff; color: #0f1e36; font-family: inherit; font-size: 12px;
+}
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-days { display: flex; flex-wrap: wrap; gap: 6px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-days label { position: relative; cursor: pointer; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-days input { position: absolute; opacity: 0; pointer-events: none; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-days span {
+  display: inline-flex; min-width: 42px; justify-content: center; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 999px;
+  background: #fff; color: #475569; font-size: 11px; font-weight: 700;
+}
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-days input:checked + span { border-color: #0f1e36; background: #0f1e36; color: #fff; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-days input:focus-visible + span { outline: 2px solid #f8cf4a; outline-offset: 2px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-behavior h5 { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-behavior h5 .material-symbols-outlined { color: #4b5d8c; font-size: 18px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-behavior-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-behavior-grid > label { display: grid; gap: 3px; min-width: 0; color: #334155; font-size: 12px; font-weight: 600; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-behavior-check { display: flex !important; align-items: flex-start; gap: 8px; grid-column: 1 / -1; cursor: pointer; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-behavior-check input { width: auto; margin-top: 3px; }
+#scm-app #scm-permissions-form.scm-perm-form .scm-popup-behavior-check small { display: block; color: #64748b; font-size: 11px; font-weight: 400; }
+@media (max-width: 760px) {
+  #scm-app #scm-permissions-form.scm-perm-form .scm-popup-general-grid,
+  #scm-app #scm-permissions-form.scm-perm-form .scm-popup-behavior-grid { grid-template-columns: minmax(0, 1fr); }
+}

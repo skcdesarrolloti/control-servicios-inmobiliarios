@@ -324,6 +324,10 @@
     var dashboardDuePopupPromise = null;
     var dashboardDuePopupRestoreAfterCase = false;
     var alertPopupConfig = runtime.alertPopup || {};
+    // Configuración › Popups y avisos del cargo: alcance de la lista, frecuencia, cierre y horario laboral.
+    var popupBehavior = runtime.popupBehavior || {};
+    var POPUP_DAILY_STORAGE_KEY = "scm-popups-daily-shown";
+    var POPUP_SNOOZE_STORAGE_KEY = "scm-popups-snoozed";
     var dashboardAlertsShown = {};
     var dashboardDueActionTaken = false;
     var DASHBOARD_REMINDER_EVERY_MS = 3600000;
@@ -1102,8 +1106,9 @@
         var monthIndex = Math.max(0, Math.min(11, Number(match[2]) - 1));
         return match[3] + " " + months[monthIndex] + " " + match[1];
       }
-      // Los conteos son los del cargo; la lista de casos, solo los asignados a quien entra.
-      var assignedRows = rows.filter(function (row) { return row.asignado; });
+      // Los conteos son los del cargo; la lista sigue Popups y avisos: lo asignado (más lo sin responsable) o todo.
+      var listScope = String(popupBehavior.scope || "assigned");
+      var assignedRows = rows.filter(function (row) { return listScope === "cargo" || row.asignado || row.sin_responsable; });
       var detailRows = assignedRows.slice(0, 18).map(function (row) {
         var caseData = row && row.case ? row.case : {};
         var sourceHtml = String(caseData.case_source_html || "").trim();
@@ -1143,7 +1148,7 @@
         '<section><h4 class="!sp-m-0 !sp-mb-3 !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">En control por tipo de tarea pendiente</h4>' +
         '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-3 !sp-gap-3">' + groupHtml + "</div></section>" +
         '<section class="' + ui.card + ' !sp-overflow-hidden">' +
-        '<div class="!sp-flex !sp-flex-wrap !sp-items-end !sp-justify-between !sp-gap-2 !sp-px-4 !sp-py-3 !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><div><h4 class="!sp-m-0 !sp-text-sm !sp-font-bold">Casos con mayor tiempo de atraso</h4><p class="!sp-m-0 !sp-mt-0.5 !sp-text-[10px] !sp-text-service-muted">Asignados a ti · ordenados por antigüedad de vencimiento</p></div>' +
+        '<div class="!sp-flex !sp-flex-wrap !sp-items-end !sp-justify-between !sp-gap-2 !sp-px-4 !sp-py-3 !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><div><h4 class="!sp-m-0 !sp-text-sm !sp-font-bold">Casos con mayor tiempo de atraso</h4><p class="!sp-m-0 !sp-mt-0.5 !sp-text-[10px] !sp-text-service-muted">' + (listScope === "cargo" ? "Todos los del cargo" : "Asignados a ti y sin responsable") + ' · ordenados por antigüedad de vencimiento</p></div>' +
         '<span class="!sp-rounded-full !sp-bg-slate-50 !sp-border !sp-border-solid !sp-border-slate-200 !sp-px-3 !sp-py-1 !sp-text-[10px] !sp-font-semibold !sp-text-service-muted">Mostrando ' + escHtml(String(Math.min(assignedRows.length, 18))) + " de " + escHtml(String(assignedRows.length)) + "</span></div>" +
         '<div class="!sp-max-h-[292px] !sp-overflow-y-auto">' + detailRows + "</div></section>" +
         more +
@@ -1375,6 +1380,85 @@
       } catch (_storageError) {}
     }
 
+    function popupTodayKey() {
+      var date = new Date();
+      return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+    }
+
+    function popupStorageGet(key) {
+      try {
+        return String(window.localStorage.getItem(key) || "");
+      } catch (_storageError) {
+        return "";
+      }
+    }
+
+    function popupStorageSet(key, value) {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch (_storageError) {}
+    }
+
+    function popupFrequency() {
+      return String(popupBehavior.frequency || "60");
+    }
+
+    // Minutos entre avisos repetidos; 0 cuando el cargo los quiere solo al entrar o una vez al día.
+    function popupRepeatMs() {
+      var frequency = popupFrequency();
+      return /^\d+$/.test(frequency) ? Number(frequency) * 60000 : 0;
+    }
+
+    function popupInWorkHours(date) {
+      if (!popupBehavior.work_hours_only) return true;
+      var work = popupBehavior.work || {};
+      var weekday = date.getDay() === 0 ? 7 : date.getDay();
+      var days = Array.isArray(work.work_days) ? work.work_days.map(Number) : [1, 2, 3, 4, 5, 6];
+      if (days.indexOf(weekday) === -1) return false;
+      var time = String(date.getHours()).padStart(2, "0") + ":" + String(date.getMinutes()).padStart(2, "0");
+      return time >= String(work.work_start || "08:00") && time < String(work.work_end || "18:00");
+    }
+
+    // Reglas del cargo para cualquier popup automático. Volver de un caso retoma el popup que la persona atendía.
+    function popupsAllowedNow(source) {
+      source = String(source || "");
+      if (source === "case-return") return true;
+      if (popupStorageGet(POPUP_SNOOZE_STORAGE_KEY) === popupTodayKey()) return false;
+      if (!popupInWorkHours(new Date())) return false;
+      if (source.indexOf("tab-") !== 0 && popupFrequency() === "daily" && popupStorageGet(POPUP_DAILY_STORAGE_KEY) === popupTodayKey()) return false;
+      return true;
+    }
+
+    function markPopupDisplayed() {
+      popupStorageSet(POPUP_DAILY_STORAGE_KEY, popupTodayKey());
+    }
+
+    function popupCloseMode() {
+      return String(popupBehavior.close || "confirm");
+    }
+
+    function dashboardClosePopup(popup) {
+      if (popupCloseMode() === "confirm") {
+        dashboardConfirmPopupClose(popup);
+        return;
+      }
+      window.Swal.close();
+    }
+
+    // «No mostrar más hoy»: apaga los popups automáticos de este navegador hasta mañana. Es un botón del popup, así que
+    // también corta la cadena de popups pendientes (dashboardDueActionTaken).
+    function addPopupSnoozeButton(popup) {
+      if (popupCloseMode() !== "snooze" || !popup || popup.querySelector("[data-scm-popup-snooze]")) return;
+      var bar = document.createElement("div");
+      bar.className = "scm-popup-snooze-bar";
+      bar.innerHTML = '<button type="button" data-scm-popup-snooze><span class="material-symbols-outlined" aria-hidden="true">notifications_paused</span>No mostrar más hoy</button>';
+      popup.appendChild(bar);
+      bar.querySelector("[data-scm-popup-snooze]").addEventListener("click", function () {
+        popupStorageSet(POPUP_SNOOZE_STORAGE_KEY, popupTodayKey());
+        window.Swal.close();
+      });
+    }
+
     // No interrumpe: si está escribiendo, tiene un caso o un popup abierto, o no está en esta pestaña, espera.
     function dashboardReminderBusy() {
       if (document.hidden || (window.Swal && window.Swal.isVisible())) return true;
@@ -1385,7 +1469,8 @@
 
     function dashboardReminderTick() {
       if (funcionarioBridgeMode || (!duePopupConfig.enabled && !alertPopupConfig.enabled)) return;
-      if (Date.now() - dashboardReminderLastAt() < DASHBOARD_REMINDER_EVERY_MS || dashboardReminderBusy()) return;
+      var repeatMs = popupRepeatMs();
+      if (!repeatMs || Date.now() - dashboardReminderLastAt() < repeatMs || dashboardReminderBusy() || !popupsAllowedNow("hourly")) return;
       delete dashboardDuePopupShown.hourly;
       delete dashboardAlertsShown.hourly;
       maybeShowDashboardEntryPopups("hourly");
@@ -1422,6 +1507,7 @@
     // Swal muestra uno a la vez: el siguiente sale al cerrar. Si el funcionario fue a atender algo, los demás esperan.
     function showDashboardAlertPopups(popups) {
       if (!popups.length || window.Swal.isVisible()) return;
+      markPopupDisplayed();
       return window.Swal.fire({
         title: "",
         html: dashboardAlertsPopupHtml(popups[0]),
@@ -1433,15 +1519,16 @@
         showCancelButton: false,
         buttonsStyling: false,
         allowOutsideClick: false,
-        allowEscapeKey: false,
+        allowEscapeKey: popupCloseMode() !== "confirm",
         customClass: { popup: "scm-due-entry-swal" },
         didOpen: function () {
           var popup = window.Swal.getPopup();
           if (!popup) return;
+          addPopupSnoozeButton(popup);
           popup.addEventListener("click", function (event) {
             var target = event.target && event.target.closest ? event.target : null;
             if (!target) return;
-            if (target.closest("[data-scm-dashboard-alert-close]")) { dashboardConfirmPopupClose(popup); return; }
+            if (target.closest("[data-scm-dashboard-alert-close]")) { dashboardClosePopup(popup); return; }
             var goButton = target.closest("[data-scm-dashboard-alert-go]");
             if (goButton) { openDashboardAlertTab(goButton.getAttribute("data-scm-dashboard-alert-go")); return; }
             // Los botones del crédito los atiende admin-owner-credits.js al llegar el clic al documento.
@@ -1474,6 +1561,7 @@
     function maybeShowDashboardEntryPopups(source) {
       // Clic en Inicio llega dos veces (la pestaña y el menú): el segundo no reemplaza el popup que ya está abierto.
       if (window.Swal && window.Swal.isVisible()) return Promise.resolve();
+      if (!popupsAllowedNow(source)) return Promise.resolve();
       // Cargar una página fuera de Inicio no muestra popups, así que tampoco reinicia la cuenta de la hora.
       if (shouldAutoShowDashboardDuePopup(source)) markDashboardReminderShown();
       dashboardDueActionTaken = false;
@@ -1502,7 +1590,8 @@
     function maybeShowDashboardTabPopups(tab) {
       var keys = (alertPopupConfig.tabs || {})[tab];
       if (funcionarioBridgeMode || !Array.isArray(keys) || !keys.length) return Promise.resolve();
-      if (Date.now() - dashboardTabAlertLastAt(tab) < DASHBOARD_REMINDER_EVERY_MS || dashboardReminderBusy()) return Promise.resolve();
+      var tabRepeatMs = popupFrequency() === "daily" ? 86400000 : (popupRepeatMs() || DASHBOARD_REMINDER_EVERY_MS);
+      if (!popupsAllowedNow("tab-" + tab) || Date.now() - dashboardTabAlertLastAt(tab) < tabRepeatMs || dashboardReminderBusy()) return Promise.resolve();
       var source = "tab-" + tab;
       markDashboardTabAlertShown(tab);
       delete dashboardDuePopupShown[source];
@@ -1642,15 +1731,20 @@
           if (!shouldAutoShowDashboardDuePopup(source) || dashboardDuePopupShown[source]) return;
           dashboardDuePopupShown[source] = true;
           payload = payload || {};
-          // Los créditos van en el popup de alertas, que se activa por cargo.
+          // Los créditos salen aquí, salvo que el cargo tenga su popup propio de créditos (no se repiten).
+          var alertKeys = Array.isArray(alertPopupConfig.keys) ? alertPopupConfig.keys : [];
           var rows = (Array.isArray(payload.rows) ? payload.rows : []).filter(function (row) {
-            return String(row.tipo_vencimiento || "").indexOf("credito_") !== 0;
+            var type = String(row.tipo_vencimiento || "");
+            if (type === "credito_solicitud_pendiente") return alertKeys.indexOf("credito_solicitudes") === -1;
+            if (type === "credito_contabilidad_pendiente") return alertKeys.indexOf("credito_contabilidad") === -1;
+            return true;
           });
           var summaryGroups = Array.isArray(payload.summaryGroups) ? payload.summaryGroups : [];
           var summaryTotal = summaryGroups.reduce(function (total, group) {
             return total + Math.max(0, Number(group && group.count ? group.count : 0));
           }, 0);
           if (!rows.length && !summaryTotal) return;
+          markPopupDisplayed();
           return window.Swal.fire({
             title: "",
             html: dashboardDueEntryPopupHtml(rows, summaryGroups, payload.allowedTypes),
@@ -1662,12 +1756,14 @@
             showCancelButton: false,
             buttonsStyling: false,
             allowOutsideClick: false,
-            allowEscapeKey: false,
+            allowEscapeKey: popupCloseMode() !== "confirm",
             customClass: {
               popup: "scm-due-entry-swal",
             },
             didOpen: function () {
-              bindDashboardDuePopupActions(window.Swal.getPopup(), function (popup) { dashboardConfirmPopupClose(popup); });
+              var popup = window.Swal.getPopup();
+              addPopupSnoozeButton(popup);
+              bindDashboardDuePopupActions(popup, function (target) { dashboardClosePopup(target); });
             },
           });
         })
@@ -12171,6 +12267,10 @@
 
     function bindDashboardPermissions() {
       var permConfig = runtime.dashboardPermissions || {};
+      // Popups y avisos vive en Permisos: sin ese permiso la opción del menú Configuración no se muestra.
+      document.querySelectorAll("[data-scm-config-requires-permissions]").forEach(function (item) {
+        item.style.display = permConfig.canManage ? "" : "none"; // la clase flex ganaría al atributo hidden
+      });
       if (!permConfig.canManage) {
         return;
       }
@@ -12184,12 +12284,22 @@
         return;
       }
 
-      function openModal() {
+      var permissionsTitle = modal.querySelector("#scm-permissions-title");
+      var permissionsTitleText = permissionsTitle ? permissionsTitle.textContent : "";
+      function openModal(mode) {
+        var alertsOnly = mode === "alerts";
+        modal.classList.toggle("is-alerts-only", alertsOnly);
+        if (permissionsTitle) permissionsTitle.textContent = alertsOnly ? "Popups y avisos" : permissionsTitleText;
+        var paneButton = modal.querySelector('[data-scm-perm-pane="' + (alertsOnly ? "alerts" : "tabs") + '"]');
+        if (paneButton) paneButton.click();
         modal.classList.add("open");
         modal.setAttribute("aria-hidden", "false");
         filterPermissionCargo();
         refreshCardState(form);
       }
+      window.addEventListener("scm:open-popup-settings", function () {
+        openModal("alerts");
+      });
       function filterPermissionCargo() {
         if (!cargoPicker) return;
         form.querySelectorAll("[data-permission-cargo]").forEach(function (item) {
@@ -12347,6 +12457,23 @@
           alertTabs[cargoId][input.getAttribute("data-alert")] = input.value.split(",");
         });
         fd.append("alert_tabs", JSON.stringify(alertTabs));
+        var popupBehaviorByCargo = {};
+        form.querySelectorAll("[data-scm-popup-behavior]").forEach(function (block) {
+          var options = {};
+          block.querySelectorAll("[data-scm-popup-field]").forEach(function (field) {
+            options[field.getAttribute("data-scm-popup-field")] = field.type === "checkbox" ? field.checked : field.value;
+          });
+          popupBehaviorByCargo[block.getAttribute("data-cargo")] = options;
+        });
+        fd.append("popup_behavior", JSON.stringify(popupBehaviorByCargo));
+        var popupGeneral = {};
+        form.querySelectorAll("[data-scm-popup-general]").forEach(function (field) {
+          popupGeneral[field.getAttribute("data-scm-popup-general")] = field.value;
+        });
+        ["work_days", "reminder_days"].forEach(function (name) {
+          popupGeneral[name] = Array.prototype.slice.call(form.querySelectorAll('[data-scm-popup-general-day="' + name + '"]:checked')).map(function (input) { return Number(input.value); });
+        });
+        fd.append("popup_general", JSON.stringify(popupGeneral));
         fetch(ajaxUrl, { method: "POST", body: fd, credentials: "same-origin" })
           .then(function (r) {
             return r.json();
@@ -12370,7 +12497,12 @@
               if (Array.isArray(json.data.admin_due_popup_cargo_ids)) {
                 permConfig.adminDuePopupCargoIds = json.data.admin_due_popup_cargo_ids;
                 duePopupConfig.cargoIds = json.data.admin_due_popup_cargo_ids;
-                duePopupConfig.enabled = json.data.admin_due_popup_cargo_ids.indexOf(String(permConfig.cargo || "")) !== -1;
+                duePopupConfig.enabled = typeof json.data.due_popup_enabled === "boolean"
+                  ? json.data.due_popup_enabled
+                  : json.data.admin_due_popup_cargo_ids.indexOf(String(permConfig.cargo || "")) !== -1;
+              }
+              if (json.data.popup_behavior) {
+                popupBehavior = json.data.popup_behavior;
               }
               if (json.data.action_permissions) {
                 permConfig.actionPermissions = json.data.action_permissions;

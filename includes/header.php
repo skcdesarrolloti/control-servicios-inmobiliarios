@@ -1271,6 +1271,19 @@ foreach ($rawNavItems as $k => $item) {
                 </button>
                 <button
                   type="button"
+                  data-scm-config-action="popup-settings"
+                  data-scm-config-requires-permissions
+                  class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
+                  role="menuitem"
+                >
+                  <span class="material-symbols-outlined text-[18px] text-slate-500">notifications_active</span>
+                  <span class="scm-nav-item-text">
+                    <span class="scm-nav-item-label">Popups y avisos</span>
+                    <span class="scm-nav-item-desc">Qué popups ve cada cargo, cuándo y el recordatorio diario</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
                   data-scm-config-action="due-settings"
                   class="flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium"
                   role="menuitem"

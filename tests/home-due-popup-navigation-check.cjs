@@ -34,6 +34,11 @@ const sectionHtml = section => '<button class="scm-calendar-section-tab" data-ca
       function loadDashboardDuePopupRows() { return window.pendingDue || Promise.resolve({rows:[{}]}); }
       function dashboardDueEntryPopupHtml() { return ''; }
       function initCalendarPanel() {}
+      var alertPopupConfig = {}, popupBehavior = {};
+      function markPopupDisplayed() {}
+      function popupCloseMode() { return "confirm"; }
+      function addPopupSnoozeButton() {}
+      function dashboardClosePopup() {}
       var homeViewState = "summary";
       function setHomeView(view) { homeViewState = view; }
       function loadDashboardFilterOptions() { return Promise.resolve(); }

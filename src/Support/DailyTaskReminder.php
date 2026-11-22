@@ -54,7 +54,7 @@ final class DailyTaskReminder
   }
 
   /** @param array<string,list<array<string,mixed>>> $groups */
-  public static function emailBody(string $name, array $groups): string
+  public static function emailBody(string $name, array $groups, string $scope = 'assigned'): string
   {
     $e = static fn($value): string => EmailTemplate::e((string) $value);
     $total = array_sum(array_map('count', $groups));
@@ -69,6 +69,9 @@ final class DailyTaskReminder
       if (count($items) > 10) $html .= '<li>y ' . (count($items) - 10) . ' más en el calendario.</li>';
       $html .= '</ul>';
     }
-    return $html . '<p style="margin:0;line-height:1.65;">Son las mismas tareas de tu calendario de vencimientos en el panel.</p>';
+    $closing = $scope === 'cargo'
+      ? 'Son las tareas de tu cargo en el calendario de vencimientos del panel.'
+      : 'Son las tareas asignadas a ti y las de tu cargo que no tienen responsable.';
+    return $html . '<p style="margin:0;line-height:1.65;">' . $closing . '</p>';
   }
 }

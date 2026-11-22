@@ -424,6 +424,21 @@ trait HandlesTicketWorkflowActions
         return;
       }
     }
+    // Configuración › Popups y avisos: comportamiento por cargo y horario general.
+    $popupBehavior = $this->dashboardPopupBehaviorMap();
+    $popupGeneral = $this->dashboardPopupGeneral();
+    try {
+      if (array_key_exists('popup_behavior', $_POST)) {
+        $cargoIds = array_map(static fn(array $cargo): string => trim((string) ($cargo['id'] ?? '')), $this->getDashboardCargoOptions());
+        $popupBehavior = \SCM\Support\DashboardPopupSettings::sanitizeCargos(json_decode(stripslashes((string) $_POST['popup_behavior']), true, 512, JSON_THROW_ON_ERROR), $cargoIds);
+      }
+      if (array_key_exists('popup_general', $_POST)) {
+        $popupGeneral = \SCM\Support\DashboardPopupSettings::sanitizeGeneral(json_decode(stripslashes((string) $_POST['popup_general']), true, 512, JSON_THROW_ON_ERROR));
+      }
+    } catch (\JsonException $exception) {
+      $this->jsonFail('La configuración de popups y avisos no es válida.');
+      return;
+    }
     $dueTypeMaps = [];
     foreach (['due_type_permissions' => self::ADMIN_DUE_TYPE_SETTING, 'due_reminder_types' => self::ADMIN_DUE_REMINDER_SETTING] as $field => $setting) {
       if (!array_key_exists($field, $_POST)) continue;
@@ -454,6 +469,8 @@ trait HandlesTicketWorkflowActions
     \SCM\Core\App::settings()->set('dashboard_alert_permissions', $alertPermissions, Auth::userId());
     \SCM\Core\App::settings()->set(\SCM\Support\DashboardAlertTabs::SETTING, $alertTabs, Auth::userId());
     foreach ($dueTypeMaps as $setting => $map) \SCM\Core\App::settings()->set($setting, $map, Auth::userId());
+    \SCM\Core\App::settings()->set(\SCM\Support\DashboardPopupSettings::CARGO_SETTING, $popupBehavior, Auth::userId());
+    \SCM\Core\App::settings()->set(\SCM\Support\DashboardPopupSettings::GENERAL_SETTING, $popupGeneral, Auth::userId());
     \SCM\Core\App::settings()->refresh();
     $this->clearDashboardPerformanceCache('dashboard-filter-options-v4');
     $this->clearDashboardPerformanceCache('dashboard-filter-options-v5');
@@ -468,6 +485,9 @@ trait HandlesTicketWorkflowActions
       'allowed_actions' => $this->currentDashboardAllowedActions(),
       'employee_cargo_ids' => $employeeCargoIds,
       'admin_due_popup_cargo_ids' => $adminDuePopupCargoIds,
+      // Lo que ya aplica a quien guardó, con las mismas reglas del servidor (no solo si su cargo está marcado).
+      'due_popup_enabled' => $this->shouldShowAdminDuePopup(),
+      'popup_behavior' => \SCM\Support\DashboardPopupSettings::forCargo($popupBehavior, (string) Auth::userCargo()) + ['work' => $popupGeneral],
       'calendar_allowed_employee_ids' => array_values(array_filter(array_map(
         static fn(array $row): string => trim((string) ($row['id_empleado'] ?? '')),
         $calendarFuncionarios
@@ -1948,7 +1968,10 @@ trait HandlesTicketWorkflowActions
       // Al entrar a una pestaña salen solo las alertas configuradas para ella.
       $tab = trim((string) ($_POST['tab'] ?? ''));
       if ($tab !== '') $keys = array_values(array_intersect($keys, $this->dashboardAlertsByMenuTabForCurrentCargo()[$tab] ?? []));
-      $groups = $this->adminDueThemeAlertGroups($keys);
+      // Los popups por tema se omiten solo cuando el general sale en ese mismo momento (Inicio o la misma pestaña).
+      $generalShows = $this->shouldShowAdminDuePopup()
+        && ($tab === '' || in_array(self::ALERT_ADMIN_DUE, $this->dashboardAlertsByMenuTabForCurrentCargo()[$tab] ?? [], true));
+      $groups = $this->adminDueThemeAlertGroups($keys, $generalShows);
       if (array_intersect(['credito_solicitudes', 'credito_contabilidad'], $keys) !== [] && $this->canAccessDashboardTab('credito_propietario')) {
         $groups = array_merge($groups, array_map(static fn(array $group): array => $group + ['popup' => 'Créditos a propietarios'], $this->ownerCreditAlertGroups($keys)));
       }
@@ -1970,7 +1993,8 @@ trait HandlesTicketWorkflowActions
       !$this->canAccessDashboardTab('cotizaciones_mantenimiento')
       && !$this->canAccessDashboardTab('preventivas_pendientes')
       && !$this->canAccessDashboardTab('servicios_publicos_pendientes')
-      && !$this->canAccessDashboardTab('contractual')
+      && !$this->canAccessDashboardTab('solicitudes_terminacion')
+      && !$this->canAccessDashboardTab('solicitudes_no_prorroga')
       && !$this->canAccessDashboardTab('vencimientos')
       && !$this->canAccessDashboardTab('ordenes_mantenimiento')
       && !$this->canAccessDashboardTab('contratos_arrendamiento')
@@ -2029,6 +2053,7 @@ trait HandlesTicketWorkflowActions
         $owner = trim((string) (($item['responsable_id'] ?? '') ?: ($item['case']['empleado_id'] ?? '')));
       }
       $item['asignado'] = $employeeId !== '' && $owner === $employeeId;
+      $item['responsable_actual'] = $owner;
       // Mis actividades lista aparte lo del cargo que no tiene responsable (créditos, por ejemplo).
       $item['sin_responsable'] = $owner === '';
     }
@@ -2066,7 +2091,8 @@ trait HandlesTicketWorkflowActions
       !$this->canAccessDashboardTab('cotizaciones_mantenimiento')
       && !$this->canAccessDashboardTab('preventivas_pendientes')
       && !$this->canAccessDashboardTab('servicios_publicos_pendientes')
-      && !$this->canAccessDashboardTab('contractual')
+      && !$this->canAccessDashboardTab('solicitudes_terminacion')
+      && !$this->canAccessDashboardTab('solicitudes_no_prorroga')
       && !$this->canAccessDashboardTab('vencimientos')
       && !$this->canAccessDashboardTab('ordenes_mantenimiento')
       && !$this->canAccessDashboardTab('contratos_arrendamiento')
@@ -2256,7 +2282,9 @@ trait HandlesTicketWorkflowActions
     'servicios_publicos_pendientes' => ['servicios_publicos_critico'],
     'cotizaciones_mantenimiento' => ['cotizacion_sin_enviar', 'cotizacion_enviada_sin_respuesta'],
     'preventivas_pendientes' => ['preventiva_sin_enviar', 'ticket_preventiva_sin_cita', 'preventiva_cita_sin_realizar'],
-    'contractual' => ['terminacion_contrato_pendiente', 'no_prorroga_contrato_pendiente'],
+    // Cada solicitud contractual llega con su propia pestaña del menú (la clave 'contractual' no es un permiso).
+    'solicitudes_terminacion' => ['terminacion_contrato_pendiente'],
+    'solicitudes_no_prorroga' => ['no_prorroga_contrato_pendiente'],
     'ordenes_mantenimiento' => ['orden_mantenimiento_sin_respuesta'],
     'contratos_arrendamiento' => ['contrato_anexos_sin_enviar'],
     'credito_propietario' => ['credito_solicitud_pendiente', 'credito_contabilidad_pendiente'],
@@ -2266,6 +2294,8 @@ trait HandlesTicketWorkflowActions
   /** Permisos por cargo › Alertas: cargo => tipos. Un cargo que no se ha guardado conserva todos los de sus pestañas. */
   private const ADMIN_DUE_TYPE_SETTING = 'dashboard_due_type_permissions';
   private const ADMIN_DUE_REMINDER_SETTING = 'dashboard_due_reminder_types';
+
+  private const ADMIN_DUE_CONTRACTUAL_TYPES = ['terminacion_contrato_pendiente', 'no_prorroga_contrato_pendiente'];
 
   /** Popups por tema: cada cargo activa los suyos y ve solo los tipos que atiende. */
   private const ADMIN_DUE_THEME_POPUPS = [
@@ -2319,15 +2349,15 @@ trait HandlesTicketWorkflowActions
   {
     return array_map(static fn(array $theme): array => [
       'label' => $theme['label'],
-      'hint' => 'Popup propio con lo vencido o para hoy de este tema, si el cargo lo atiende. No sale si el cargo tiene el popup general.',
+      'hint' => 'Popup propio con lo vencido o para hoy de este tema, si el cargo lo atiende. Si el popup general sale en ese mismo momento, no se repite.',
     ], self::ADMIN_DUE_THEME_POPUPS);
   }
 
-  /** El popup general ya contiene todo: quien lo tiene no recibe además los popups por tema. @param list<string> $keys @return list<array<string,mixed>> */
-  private function adminDueThemeAlertGroups(array $keys): array
+  /** El popup general ya contiene todo: si sale en el mismo momento, los popups por tema no se repiten. @param list<string> $keys @return list<array<string,mixed>> */
+  private function adminDueThemeAlertGroups(array $keys, bool $generalShows): array
   {
     $themes = array_intersect_key(self::ADMIN_DUE_THEME_POPUPS, array_flip($keys));
-    if ($themes === [] || $this->shouldShowAdminDuePopup()) {
+    if ($themes === [] || $generalShows) {
       return [];
     }
     $types = array_values(array_intersect($this->adminDueTypesForCurrentCargo(), array_merge(...array_column($themes, 'types'))));
@@ -2336,7 +2366,8 @@ trait HandlesTicketWorkflowActions
       $this->adminDueCalendarItems($this->adminDueCalendarSettings(), $fromTs, $toTs, $types),
       $this->adminDueCalendarSummaryItems($fromTs, $toTs, $this->adminDueSummaryTypes($types))
     );
-    return $this->adminDueThemeGroups($themes, $items, $this->current_employee_id(), $this->canAccessDashboardTab('vencimientos'));
+    $scope = \SCM\Support\DashboardPopupSettings::forCargo($this->dashboardPopupBehaviorMap(), (string) Auth::userCargo())['scope'];
+    return $this->adminDueThemeGroups($themes, $items, $this->current_employee_id(), $this->canAccessDashboardTab('vencimientos'), $scope);
   }
 
   /**
@@ -2345,7 +2376,7 @@ trait HandlesTicketWorkflowActions
    * @param list<array<string,mixed>> $items
    * @return list<array<string,mixed>>
    */
-  private function adminDueThemeGroups(array $themes, array $items, string $employeeId, bool $canOpenTab): array
+  private function adminDueThemeGroups(array $themes, array $items, string $employeeId, bool $canOpenTab, string $scope = 'assigned'): array
   {
     $today = date('Y-m-d');
     $open = array_values(array_filter($items, static fn(array $item): bool => !empty($item['cuenta_pendiente']) || (string) ($item['fecha_vencimiento'] ?? '') <= $today));
@@ -2366,7 +2397,7 @@ trait HandlesTicketWorkflowActions
     $groups = [];
     foreach ($themes as $theme) {
       $themeItems = array_values(array_filter($open, static fn(array $item): bool => in_array((string) ($item['tipo_vencimiento'] ?? ''), $theme['types'], true)));
-      $note = count($themeItems) . ' tarea(s) del cargo. La lista muestra las asignadas a ti.';
+      $note = count($themeItems) . ' tarea(s) del cargo. ' . ($scope === 'cargo' ? 'La lista muestra todas.' : 'La lista muestra las asignadas a ti y las que no tienen responsable.');
       foreach ($theme['types'] as $type) {
         $typeItems = array_values(array_filter($themeItems, static fn(array $item): bool => (string) ($item['tipo_vencimiento'] ?? '') === $type));
         if ($typeItems === []) {
@@ -2375,8 +2406,8 @@ trait HandlesTicketWorkflowActions
         $groups[] = [
           'key' => $type, 'label' => $labels[$type], 'hint' => 'En control del cargo', 'icon' => $theme['icon'], 'count' => count($typeItems),
           'popup' => $theme['label'], 'popup_note' => $note,
-          'popup_action' => $canOpenTab ? ['label' => 'Ver vencimientos', 'tab' => 'vencimientos'] : null,
-          'rows' => array_map($row, array_values(array_filter($typeItems, static fn(array $item): bool => !empty($item['asignado'])))),
+          'popup_action' => $canOpenTab ? ['label' => 'Ver vencimientos', 'tab' => 'due'] : null,
+          'rows' => array_map($row, \SCM\Support\DashboardPopupSettings::itemsForScope($typeItems, $scope, $employeeId)),
         ];
       }
     }
@@ -2437,8 +2468,8 @@ trait HandlesTicketWorkflowActions
       if ($canTab($tab)) array_push($types, ...$tabTypes);
     }
     // Quien responde casos también atiende las solicitudes contractuales, aunque no tenga la pestaña.
-    if (!in_array('terminacion_contrato_pendiente', $types, true) && ($caseRespond ?? $this->canUseDashboardAction('case_respond'))) {
-      array_push($types, ...self::ADMIN_DUE_TYPES_BY_TAB['contractual']);
+    if (array_diff(self::ADMIN_DUE_CONTRACTUAL_TYPES, $types) !== [] && ($caseRespond ?? $this->canUseDashboardAction('case_respond'))) {
+      array_push($types, ...array_values(array_diff(self::ADMIN_DUE_CONTRACTUAL_TYPES, $types)));
     }
     return $types;
   }
@@ -2692,12 +2723,13 @@ trait HandlesTicketWorkflowActions
         ? (int) $settings['cotizaciones_enviadas_sin_respuesta_dias']
         : (int) $settings['cotizaciones_sin_enviar_dias'];
       $baseTs = $sent
-        ? $this->adminDueFirstTimestamp($row, ['fecha_envio_cotizacion_mantenimiento', 'fecha_envio', 'fecha_enviada', 'fecha_envio_correo', 'cct_modified', 'fecha', 'cct_created'])
+        ? $this->adminDueFirstTimestamp($row, ['fecha_envio_cotizacion_mantenimiento', 'fecha_envio', 'fecha_enviada', 'fecha_envio_correo', 'fecha', 'cct_created'])
         : $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
       if ($baseTs <= 0) {
         continue;
       }
-      $dueTs = strtotime('+' . $days . ' days', strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs);
+      $baseDayTs = strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs;
+      $dueTs = $sent ? strtotime('+' . $days . ' days', $baseDayTs) : $this->adminDueAddBusinessDays($baseDayTs, $days);
       $calendarTs = $dueTs !== false ? $this->adminDueCalendarPlacementTimestamp((int) $dueTs, $fromTs, $toTs) : 0;
       if ($dueTs === false || $calendarTs <= 0) {
         continue;
@@ -3009,7 +3041,8 @@ trait HandlesTicketWorkflowActions
     $controller = $this->get_pending_controller();
     $payload = $controller->buildServiciosPublicosPayload([]);
     $items = [];
-    $yearStartTs = strtotime(date('Y-01-01 00:00:00', $fromTs)) ?: $fromTs;
+    // Lo vencido de los últimos 12 meses sigue en control (antes se cortaba el 1 de enero y desaparecía lo de diciembre).
+    $yearStartTs = strtotime('-12 months', $fromTs) ?: $fromTs;
     $todayTs = strtotime(date('Y-m-d 00:00:00')) ?: time();
     foreach ((array) ($payload['items'] ?? []) as $item) {
       $item = (array) $item;
@@ -3324,9 +3357,29 @@ trait HandlesTicketWorkflowActions
       ? (int) $settings['cotizaciones_enviadas_sin_respuesta_dias']
       : (int) $settings['cotizaciones_sin_enviar_dias'];
     $baseTs = $sent
-      ? $this->adminDueFirstTimestamp($row, ['fecha_envio_cotizacion_mantenimiento', 'fecha_envio', 'fecha_enviada', 'fecha_envio_correo', 'cct_modified', 'fecha', 'cct_created'])
+      ? $this->adminDueFirstTimestamp($row, ['fecha_envio_cotizacion_mantenimiento', 'fecha_envio', 'fecha_enviada', 'fecha_envio_correo', 'fecha', 'cct_created'])
       : $this->adminDueFirstTimestamp($row, ['fecha', 'cct_created']);
-    return $this->adminDueTimingFromBase($baseTs, $days);
+    $timing = $this->adminDueTimingFromBase($baseTs, $days);
+    if (!$sent && $baseTs > 0) {
+      // Sin enviar cuenta días hábiles: el vencimiento se corre igual que en el calendario.
+      $timing['due_ts'] = $this->adminDueAddBusinessDays(strtotime(date('Y-m-d 00:00:00', $baseTs)) ?: $baseTs, $days);
+      $todayTs = strtotime(date('Y-m-d 00:00:00')) ?: time();
+      $timing['overdue_days'] = $timing['due_ts'] < $todayTs ? max(0, (int) floor(($todayTs - $timing['due_ts']) / 86400)) : 0;
+    }
+    return $timing;
+  }
+
+  /** Suma días hábiles de Colombia (sin domingos ni festivos) a la medianoche de $dayTs. */
+  private function adminDueAddBusinessDays(int $dayTs, int $days): int
+  {
+    if (!class_exists('SkcColombiaBusinessCalendar', false)) require_once dirname(__DIR__, 2) . '/Support/ColombiaBusinessCalendar.php';
+    $date = (new \DateTimeImmutable('@' . $dayTs))->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+    $left = max(0, $days);
+    while ($left > 0) {
+      $date = $date->modify('+1 day');
+      if (\SkcColombiaBusinessCalendar::isBusinessDay($date->format('Y-m-d'))) $left--;
+    }
+    return $date->getTimestamp();
   }
 
   /** @return array{base_ts:int,due_ts:int,days_limit:int,elapsed_days:int,overdue_days:int} */

@@ -98,6 +98,8 @@ $scmVersion = defined('SCM_VERSION') ? SCM_VERSION : '2.0.0';
             const el = document.getElementById('scm-open-permissions');
             if (el) el.click();
             else window.dispatchEvent(new CustomEvent('scm:open-configuracion'));
+          } else if (action === 'popup-settings') {
+            window.dispatchEvent(new CustomEvent('scm:open-popup-settings'));
           } else if (action === 'due-settings') {
             window.dispatchEvent(new CustomEvent('scm:open-due-settings-global'));
           } else if (action === 'ticket-topic-settings') {

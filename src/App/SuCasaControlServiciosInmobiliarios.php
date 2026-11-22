@@ -1240,7 +1240,7 @@ final class SuCasaControlServiciosInmobiliarios
   {
     return [
       ['label' => 'Popup general', 'items' => [
-        self::ALERT_ADMIN_DUE => ['label' => 'Vencimientos administrativos', 'hint' => 'Popup al entrar al panel con todos los vencimientos que atiende el cargo. Requiere ver cotizaciones o preventivas.'],
+        self::ALERT_ADMIN_DUE => ['label' => 'Vencimientos administrativos', 'hint' => 'Popup al entrar al panel con todos los vencimientos que atiende el cargo. Sale si el cargo atiende algún tipo de vencimiento.'],
       ]],
       ['label' => 'Popups por tema', 'items' => $this->adminDueThemeAlertCatalog()],
       ['label' => 'Créditos a propietarios', 'items' => [
@@ -1318,6 +1318,19 @@ final class SuCasaControlServiciosInmobiliarios
     return DashboardAlertTabs::byMenuTab($this->dashboardAlertTabs()[trim((string) Auth::userCargo())] ?? [], $active);
   }
 
+  /** Configuración › Popups y avisos, por cargo. @return array<string,array<string,mixed>> */
+  private function dashboardPopupBehaviorMap(): array
+  {
+    $cargos = array_map(static fn(array $cargo): string => trim((string) ($cargo['id'] ?? '')), $this->getDashboardCargoOptions());
+    return \SCM\Support\DashboardPopupSettings::sanitizeCargos(\SCM\Core\App::settings()->get(\SCM\Support\DashboardPopupSettings::CARGO_SETTING, []), $cargos);
+  }
+
+  /** @return array{work_start:string,work_end:string,work_days:list<int>,reminder_hour:int,reminder_days:list<int>} */
+  private function dashboardPopupGeneral(): array
+  {
+    return \SCM\Support\DashboardPopupSettings::sanitizeGeneral(\SCM\Core\App::settings()->get(\SCM\Support\DashboardPopupSettings::GENERAL_SETTING, []));
+  }
+
   /** @return array<int,string> */
   private function adminDuePopupCargoIdsConfig(): array
   {
@@ -1355,7 +1368,8 @@ final class SuCasaControlServiciosInmobiliarios
     if ($cargo === '' || !in_array($cargo, $this->adminDuePopupCargoIdsConfig(), true)) {
       return false;
     }
-    return $this->canAccessDashboardTab('cotizaciones_mantenimiento') || $this->canAccessDashboardTab('preventivas_pendientes');
+    // Basta con que el cargo atienda algún tipo de vencimiento (antes exigía ver cotizaciones o preventivas).
+    return $this->adminDueTypesForCurrentCargo() !== [];
   }
 
   /** @param mixed $raw @return array<int,string> */

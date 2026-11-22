@@ -729,7 +729,14 @@ trait RendersDashboard
         'enabled' => $this->shouldShowAdminDuePopup(),
         'cargoIds' => $adminDuePopupCargoIds,
       ],
-      'alertPopup' => ['enabled' => $this->dashboardAlertKeysForCurrentCargo() !== [], 'tabs' => $this->dashboardAlertsByMenuTabForCurrentCargo()],
+      'alertPopup' => [
+        'enabled' => $this->dashboardAlertKeysForCurrentCargo() !== [],
+        'keys' => $this->dashboardAlertKeysForCurrentCargo(),
+        'tabs' => $this->dashboardAlertsByMenuTabForCurrentCargo(),
+      ],
+      // Configuración › Popups y avisos: cómo salen los popups de este cargo.
+      'popupBehavior' => \SCM\Support\DashboardPopupSettings::forCargo($this->dashboardPopupBehaviorMap(), (string) Auth::userCargo())
+        + ['work' => $this->dashboardPopupGeneral()],
       'session' => [
         'loginUrl' => rtrim((string) SCM_BASE_URL, '/') . '/login.php',
         'idleTimeoutSeconds' => defined('SCM_SESSION_IDLE_TIMEOUT') ? (int) SCM_SESSION_IDLE_TIMEOUT : 7200,
@@ -2198,7 +2205,7 @@ trait RendersDashboard
                     </button>
                   <?php endif; ?>
                   <button type="button" role="tab" class="scm-perm-pane-btn" aria-selected="false" data-scm-perm-pane="alerts">
-                    <span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>Alertas <em data-scm-perm-pane-count="alerts"></em>
+                    <span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>Popups y avisos <em data-scm-perm-pane-count="alerts"></em>
                   </button>
                 </div>
                 <label class="scm-perm-search scm-perm-filter">
@@ -2261,12 +2268,76 @@ trait RendersDashboard
                 </div>
               <?php endif; ?>
               <div class="scm-perm-pane" data-scm-perm-pane-body="alerts" hidden>
-                <?php $popupAlertKeys = $this->dashboardPopupAlertKeys(); $alertTabsConfig = $this->dashboardAlertTabs(); ?>
+                <?php $popupAlertKeys = $this->dashboardPopupAlertKeys(); $alertTabsConfig = $this->dashboardAlertTabs(); $popupBehaviorMap = $this->dashboardPopupBehaviorMap(); $popupGeneral = $this->dashboardPopupGeneral(); ?>
+                <section class="scm-popup-general" data-scm-popup-general-box aria-labelledby="scm-popup-general-title">
+                  <div class="scm-popup-general-head">
+                    <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
+                    <div><h4 id="scm-popup-general-title">Horarios para todos los cargos</h4><p>El horario laboral aplica a los cargos con &laquo;Solo en horario laboral&raquo;. El recordatorio diario nunca sale en festivo.</p></div>
+                  </div>
+                  <div class="scm-popup-general-grid">
+                    <fieldset>
+                      <legend>Horario laboral</legend>
+                      <div class="scm-popup-time-row">
+                        <label>Desde <input type="time" step="900" data-scm-popup-general="work_start" value="<?php echo esc_attr($popupGeneral['work_start']); ?>"></label>
+                        <label>Hasta <input type="time" step="900" data-scm-popup-general="work_end" value="<?php echo esc_attr($popupGeneral['work_end']); ?>"></label>
+                      </div>
+                      <div class="scm-popup-days" role="group" aria-label="Días laborales">
+                        <?php foreach (\SCM\Support\DashboardPopupSettings::WEEKDAYS as $dayNumber => $dayLabel): ?>
+                          <label><input type="checkbox" data-scm-popup-general-day="work_days" value="<?php echo (int) $dayNumber; ?>" <?php checked(in_array($dayNumber, $popupGeneral['work_days'], true)); ?>><span><?php echo esc_html($dayLabel); ?></span></label>
+                        <?php endforeach; ?>
+                      </div>
+                    </fieldset>
+                    <fieldset>
+                      <legend>Recordatorio diario por correo o WhatsApp</legend>
+                      <div class="scm-popup-time-row">
+                        <label>Hora de env&iacute;o
+                          <select data-scm-popup-general="reminder_hour">
+                            <?php for ($reminderHour = 5; $reminderHour <= 20; $reminderHour++): ?>
+                              <option value="<?php echo $reminderHour; ?>" <?php selected((int) $popupGeneral['reminder_hour'], $reminderHour); ?>><?php echo esc_html(($reminderHour % 12 === 0 ? 12 : $reminderHour % 12) . ':00 ' . ($reminderHour < 12 ? 'a. m.' : 'p. m.')); ?></option>
+                            <?php endfor; ?>
+                          </select>
+                        </label>
+                      </div>
+                      <div class="scm-popup-days" role="group" aria-label="Días del recordatorio">
+                        <?php foreach (\SCM\Support\DashboardPopupSettings::WEEKDAYS as $dayNumber => $dayLabel): ?>
+                          <label><input type="checkbox" data-scm-popup-general-day="reminder_days" value="<?php echo (int) $dayNumber; ?>" <?php checked(in_array($dayNumber, $popupGeneral['reminder_days'], true)); ?>><span><?php echo esc_html($dayLabel); ?></span></label>
+                        <?php endforeach; ?>
+                      </div>
+                    </fieldset>
+                  </div>
+                </section>
                 <?php foreach ($cargos as $cargo): $cargoId = trim((string) ($cargo['id'] ?? '')); if ($cargoId === '') continue; $allowedAlerts = $this->dashboardAlertPermissions()[$cargoId] ?? []; ?>
                   <section class="scm-permission-card scm-permission-action-card" data-scm-perm-kind="alerts" data-permission-cargo="<?php echo esc_attr($cargoId); ?>" <?php if ($cargoId !== $selectedPermissionCargo) echo 'hidden'; ?>>
                     <div class="scm-permission-card-head">
                       <p>Popups, vencimientos y recordatorio diario de este cargo, para que no se le olvide hacer algo. <span data-scm-perm-card-count></span></p>
                       <button type="button" class="scm-permission-select-all" data-scm-perm-all="<?php echo esc_attr($cargoId); ?>">Marcar todo</button>
+                    </div>
+                    <?php $cargoBehavior = \SCM\Support\DashboardPopupSettings::forCargo($popupBehaviorMap, $cargoId); ?>
+                    <div class="scm-popup-behavior" data-scm-popup-behavior data-cargo="<?php echo esc_attr($cargoId); ?>">
+                      <h5><span class="material-symbols-outlined" aria-hidden="true">tune</span>C&oacute;mo salen los popups de este cargo</h5>
+                      <div class="scm-popup-behavior-grid">
+                        <label><span>Qu&eacute; muestran</span>
+                          <select data-scm-popup-field="scope">
+                            <?php foreach (\SCM\Support\DashboardPopupSettings::SCOPES as $optionKey => $optionLabel): ?><option value="<?php echo esc_attr($optionKey); ?>" <?php selected($cargoBehavior['scope'], $optionKey); ?>><?php echo esc_html($optionLabel); ?></option><?php endforeach; ?>
+                          </select>
+                        </label>
+                        <label><span>Cada cu&aacute;nto salen</span>
+                          <select data-scm-popup-field="frequency">
+                            <?php foreach (\SCM\Support\DashboardPopupSettings::FREQUENCIES as $optionKey => $optionLabel): ?><option value="<?php echo esc_attr((string) $optionKey); ?>" <?php selected($cargoBehavior['frequency'], (string) $optionKey); ?>><?php echo esc_html($optionLabel); ?></option><?php endforeach; ?>
+                          </select>
+                        </label>
+                        <label><span>Al cerrar</span>
+                          <select data-scm-popup-field="close">
+                            <?php foreach (\SCM\Support\DashboardPopupSettings::CLOSE_MODES as $optionKey => $optionLabel): ?><option value="<?php echo esc_attr($optionKey); ?>" <?php selected($cargoBehavior['close'], $optionKey); ?>><?php echo esc_html($optionLabel); ?></option><?php endforeach; ?>
+                          </select>
+                        </label>
+                        <label><span>Recordatorio diario incluye</span>
+                          <select data-scm-popup-field="reminder_scope">
+                            <?php foreach (\SCM\Support\DashboardPopupSettings::SCOPES as $optionKey => $optionLabel): ?><option value="<?php echo esc_attr($optionKey); ?>" <?php selected($cargoBehavior['reminder_scope'], $optionKey); ?>><?php echo esc_html($optionLabel); ?></option><?php endforeach; ?>
+                          </select>
+                        </label>
+                        <label class="scm-popup-behavior-check"><input type="checkbox" data-scm-popup-field="work_hours_only" value="1" <?php checked($cargoBehavior['work_hours_only']); ?>><span>Solo en horario laboral<small>Fuera del horario no sale ning&uacute;n popup autom&aacute;tico.</small></span></label>
+                      </div>
                     </div>
                     <div class="scm-permission-options">
                       <?php foreach ($this->dashboardAlertCatalog() as $alertGroup): ?>
@@ -2314,7 +2385,7 @@ trait RendersDashboard
             <div class="scm-alert-tabs-box">
               <h4 id="scm-alert-tabs-title">Mostrar tambi&eacute;n en estas pesta&ntilde;as</h4>
               <p class="scm-alert-tabs-name" data-scm-alert-tabs-name></p>
-              <p class="scm-alert-tabs-help">Sale al entrar a la pesta&ntilde;a, m&aacute;ximo una vez por hora en cada una, adem&aacute;s de Inicio y del aviso de cada hora. Solo aplica si la alerta est&aacute; activa y el cargo tiene esa pesta&ntilde;a.</p>
+              <p class="scm-alert-tabs-help">Sale al entrar a la pesta&ntilde;a, con la misma frecuencia del cargo en cada una, adem&aacute;s de Inicio. Solo aplica si la alerta est&aacute; activa y el cargo tiene esa pesta&ntilde;a.</p>
               <div class="scm-alert-tabs-list">
                 <?php foreach ($tabGroups as $tabGroup): ?>
                   <div class="scm-alert-tabs-group">

@@ -74,6 +74,7 @@ const harness = (groupsJson) => `
   var alertPopupConfig = { enabled: true }, duePopupConfig = { enabled: false }, dashboardAlertsShown = {}, dashboardDuePopupShown = {}, dashboardDueActionTaken = false, dashboardDuePopupRestoreAfterCase = false;
   var DASHBOARD_REMINDER_EVERY_MS = 3600000, DASHBOARD_REMINDER_STORAGE_KEY = 'scm-dashboard-reminder-at', dashboardReminderAt = 0;
   var DASHBOARD_TAB_ALERT_STORAGE_PREFIX = 'scm-dashboard-tab-alert-at:', dashboardTabAlertAt = {};
+  var popupBehavior = {}, POPUP_DAILY_STORAGE_KEY = 'scm-popups-daily-shown', POPUP_SNOOZE_STORAGE_KEY = 'scm-popups-snoozed';
   window.setTabAlertAt = (tab, v) => { dashboardTabAlertAt[tab] = v; };
   window.getReminderAt = () => dashboardReminderAt;
   window.payloads = [];
@@ -296,7 +297,7 @@ const harness = (groupsJson) => `
 
   // Popup de Vencimientos: las tarjetas siguen a lo que atiende el cargo y la lista, a los casos de la persona.
   const dueHtml = (dueRows, summary, allowed) => page.evaluate(({ uiSource, source, dueRows, summary, allowed }) => {
-    const helpers = 'var escHtml = v => String(v); var dashboardDueStats = r => ({ total: r.length, vencidos: r.length, hoy: 0 }); var dashboardDueGroupControlled = g => g.vencidos || 0; var dashboardDueTypeLabel = t => "tipo:" + t + ";"; var dashboardDueCaseAttrsHtml = () => "";';
+    const helpers = 'var escHtml = v => String(v); var dashboardDueStats = r => ({ total: r.length, vencidos: r.length, hoy: 0 }); var dashboardDueGroupControlled = g => g.vencidos || 0; var dashboardDueTypeLabel = t => "tipo:" + t + ";"; var dashboardDueCaseAttrsHtml = () => ""; var popupBehavior = {};';
     return new Function('r', 's', 'a', helpers + uiSource + source + '; return dashboardDueEntryPopupHtml(r, s, a);')(dueRows, summary, allowed);
   }, { uiSource: ui, source: slice(runtime, '    function dashboardDueEntryPopupHtml(', '    function openDashboardDueCalendar('), dueRows, summary, allowed });
   const dueRow = (titulo, tipo_vencimiento, asignado) => ({ titulo, tipo_vencimiento, asignado, estado: 'Vencido', dias_vencido: 3, fecha_vencimiento: '2026-11-01', case: {} });
