@@ -4263,7 +4263,7 @@
   display: grid;
   gap: 10px;
   grid-column: 1 / -1;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 #scm-app .scm-calendar-layer-group {
@@ -4272,11 +4272,6 @@
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
-}
-
-#scm-app .scm-calendar-layer-group--scope {
-  border-right: 1px solid #e2e8f0;
-  padding-right: 10px;
 }
 
 #scm-app .scm-calendar-layer-chip {
@@ -4559,13 +4554,6 @@
 @media (max-width: 1100px) {
   #scm-app .scm-calendar-layer-filters {
     grid-template-columns: 1fr;
-  }
-
-  #scm-app .scm-calendar-layer-group--scope {
-    border-right: 0;
-    border-bottom: 1px solid #e2e8f0;
-    padding-bottom: 10px;
-    padding-right: 0;
   }
 
   #scm-app .scm-calendar-due-settings-form {

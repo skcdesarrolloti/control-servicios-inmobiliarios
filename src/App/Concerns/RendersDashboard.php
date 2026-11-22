@@ -3027,20 +3027,6 @@ trait RendersDashboard
             <div class="scm-field"><label>Categor&iacute;a del evento</label><select class="select select-bordered select-sm scm-select" name="id_categoria" data-scm-calendar-filter-categories><option value="">Todas las categor&iacute;as</option></select></div>
           </div>
           <div class="scm-calendar-layer-filters" data-scm-calendar-layer-filters aria-label="Filtros de calendario">
-            <div class="scm-calendar-layer-group scm-calendar-layer-group--scope" role="radiogroup" aria-label="Alcance">
-              <label class="scm-calendar-layer-chip">
-                <input type="radio" name="calendar_scope" value="mine" <?php echo $mode === 'personal' ? 'checked' : ''; ?>>
-                <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
-                <strong>Mi calendario</strong>
-              </label>
-              <?php if ($mode !== 'personal'): ?>
-              <label class="scm-calendar-layer-chip">
-                <input type="radio" name="calendar_scope" value="team" checked>
-                <span class="material-symbols-outlined" aria-hidden="true">groups</span>
-                <strong>Equipo</strong>
-              </label>
-              <?php endif; ?>
-            </div>
             <div class="scm-calendar-layer-group" aria-label="Capas visibles">
               <label class="scm-calendar-layer-chip scm-calendar-layer-chip--event">
                 <input type="checkbox" name="item_type" value="evento" <?php echo $typeChecked('evento'); ?>>
@@ -3052,12 +3038,12 @@ trait RendersDashboard
                 <span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>
                 <strong>Recordatorios</strong>
               </label>
-              <label class="scm-calendar-layer-chip scm-calendar-layer-chip--pending">
+              <label class="scm-calendar-layer-chip scm-calendar-layer-chip--pending" title="Muestra lo que a&uacute;n no se ha marcado como realizado">
                 <input type="checkbox" name="item_status" value="pending" <?php echo $statusChecked('pending'); ?>>
                 <span class="material-symbols-outlined" aria-hidden="true">pending_actions</span>
                 <strong>Pendientes</strong>
               </label>
-              <label class="scm-calendar-layer-chip scm-calendar-layer-chip--done">
+              <label class="scm-calendar-layer-chip scm-calendar-layer-chip--done" title="Muestra lo que ya se marc&oacute; como realizado">
                 <input type="checkbox" name="item_status" value="completed" <?php echo $statusChecked('completed'); ?>>
                 <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
                 <strong>Realizados</strong>
