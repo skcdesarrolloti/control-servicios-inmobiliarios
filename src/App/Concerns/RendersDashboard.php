@@ -5386,7 +5386,7 @@ trait RendersDashboard
     $totalAdmonMasIva = $this->format_cop_currency($totalAdmonMasIvaValue);
     $totalCotizacion = $this->format_cop_currency($this->cotizacion_money_value($row, ['total']));
     $ordenesTotal = (string) ($row['ordenes_total'] ?? count($orders));
-    $nativeCotizacionHtml = $this->render_native_cotizacion_mantenimiento_view($row, $orders);
+    $nativeCotizacionHtml = $this->render_native_cotizacion_mantenimiento_view($row, $orders, true);
     $cotizacionSinResponder = in_array(strtolower($estado), ['', 'esperando respuesta'], true);
     $cotizacionPuedeResponder = $cotizacionSinResponder && $enviada;
     $cotizacionEditable = !in_array(strtolower(trim($estado)), ['desaprobada', 'desaprobado'], true);
@@ -5839,8 +5839,12 @@ trait RendersDashboard
       . '</div>';
   }
 
-  /** @param array<string,mixed> $row @param array<int,array<string,mixed>> $orders */
-  private function render_native_cotizacion_mantenimiento_view(array $row, array $orders): string
+  /**
+   * Documento de la cotización. Los saldos son control interno: solo salen con $internal (vista del panel); la página
+   * pública y el PDF que recibe el destinatario no los muestran.
+   * @param array<string,mixed> $row @param array<int,array<string,mixed>> $orders
+   */
+  private function render_native_cotizacion_mantenimiento_view(array $row, array $orders, bool $internal = false): string
   {
     $id = trim((string) ($row['_ID'] ?? ''));
     $tipo = trim((string) ($row['tipo_mantenimiento'] ?? 'Mantenimiento'));
@@ -5943,9 +5947,11 @@ trait RendersDashboard
     $html .= '<div class="is-grand-total"><span>Total cotización</span><strong>' . esc_html($totalCotizacion) . '</strong></div>';
     $html .= '</div></section>';
 
-    $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-balances"><div class="scm-cotizacion-native-section-title"><div><span>Control financiero</span><h3>Saldos de la cotizaci&oacute;n</h3></div></div>';
-    $html .= $this->render_cotizacion_balance_table($row);
-    $html .= '</section>';
+    if ($internal) {
+      $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-balances"><div class="scm-cotizacion-native-section-title"><div><span>Control financiero</span><h3>Saldos de la cotizaci&oacute;n</h3></div></div>';
+      $html .= $this->render_cotizacion_balance_table($row);
+      $html .= '</section>';
+    }
 
     $html .= '<section class="scm-cotizacion-native-section"><h3>Observaciones y perturbación</h3>';
     if (trim((string) ($row['observaciones'] ?? '')) !== '') {
