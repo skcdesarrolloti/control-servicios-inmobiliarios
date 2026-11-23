@@ -21405,7 +21405,9 @@
       }
 
       function openModal(kickerText, titleText, html, trigger) {
-        opener = trigger || opener;
+        // Si la acción viene de un menú (oculto al cerrar), el foco vuelve al botón "Ver"/"Más".
+        var menuWrap = trigger && trigger.closest ? trigger.closest("[data-lease-menu-wrap]") : null;
+        opener = (menuWrap && menuWrap.querySelector("[data-lease-menu-toggle]")) || trigger || opener;
         if (kicker) kicker.textContent = kickerText || "Contrato";
         if (title) title.textContent = titleText || "Contrato";
         body.innerHTML = html;
@@ -21535,13 +21537,58 @@
           });
       }
 
-      function loadPropertyHistory(trigger) {
+      // Historial unificado: pestañas "Del contrato" y "Del inmueble" dentro del mismo popup.
+      var historyTrigger = null;
+      var HISTORY_TAB = "!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-3 !sp-py-2 !sp-rounded-md !sp-bg-transparent !sp-border-0 !sp-text-service-muted !sp-font-sans !sp-text-[10px] !sp-font-medium !sp-cursor-pointer aria-pressed:!sp-bg-service-navy aria-pressed:!sp-text-white aria-pressed:!sp-font-semibold focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow";
+
+      function loadHistory(trigger) {
+        var code = trigger.getAttribute("data-contract-code") || "";
+        var property = trigger.getAttribute("data-property-code") || "";
+        historyTrigger = trigger;
+        var tab = function (key, label, active) {
+          return '<button type="button" class="' + HISTORY_TAB + '" data-lease-history-tab="' + key + '" aria-pressed="' + (active ? "true" : "false") + '">' + escHtml(label) + "</button>";
+        };
+        openModal(
+          "Historial",
+          "Contrato #" + code + (property ? " · Inmueble " + property : ""),
+          '<div class="!sp-space-y-4"><nav class="!sp-flex !sp-flex-wrap !sp-gap-1 !sp-p-1 !sp-bg-slate-100 !sp-rounded-lg !sp-w-fit" aria-label="Tipo de historial">' +
+            tab("contrato", "Del contrato", true) + tab("inmueble", "Del inmueble", false) +
+            '</nav><div data-lease-history-body></div></div>',
+          trigger,
+        );
+        showHistoryTab("contrato");
+      }
+
+      function showHistoryTab(key) {
+        var target = body.querySelector("[data-lease-history-body]");
+        if (!target || !historyTrigger) return;
+        body.querySelectorAll("[data-lease-history-tab]").forEach(function (button) {
+          button.setAttribute("aria-pressed", button.getAttribute("data-lease-history-tab") === key ? "true" : "false");
+        });
+        if (key === "inmueble") {
+          loadPropertyHistory(historyTrigger, target);
+          return;
+        }
+        var seq = ++requestSeq;
+        target.innerHTML = loadingHtml("Cargando el historial del contrato...");
+        dashboardAction(actionLeaseContractView, { view: "historial-contrato", contract_id: historyTrigger.getAttribute("data-contract-id") || "" })
+          .then(function (data) {
+            if (seq !== requestSeq) return;
+            target.innerHTML = data.html || "";
+          })
+          .catch(function (error) {
+            if (seq !== requestSeq) return;
+            target.innerHTML = '<p class="!sp-m-0 !sp-p-6 !sp-text-center !sp-text-xs !sp-text-rose-700" role="alert">' + escHtml(error.message || "No se pudo cargar el historial.") + "</p>";
+          });
+      }
+
+      function loadPropertyHistory(trigger, target) {
         var code = trigger.getAttribute("data-contract-code") || "";
         var property = trigger.getAttribute("data-property-code") || "";
         var seq = ++requestSeq;
-        openModal("Historial del inmueble", "Contrato #" + code + (property ? " · Inmueble " + property : ""), loadingHtml("Consultando el historial del inmueble..."), trigger);
+        target.innerHTML = loadingHtml("Consultando el historial del inmueble...");
         if (!actionPropertyHistoryReport) {
-          body.innerHTML = propertyHistoryEmpty("La consulta de historial no está disponible.");
+          target.innerHTML = propertyHistoryEmpty("La consulta de historial no está disponible.");
           return;
         }
         // "No asignado" u otros textos no son números de contrato: se consulta solo por el inmueble.
@@ -21553,7 +21600,7 @@
           });
         };
         if (!contractNumber && !property) {
-          body.innerHTML = propertyHistoryEmpty("El contrato no tiene número ni código de inmueble para consultar su historial.");
+          target.innerHTML = propertyHistoryEmpty("El contrato no tiene número ni código de inmueble para consultar su historial.");
           return;
         }
         request(!!contractNumber)
@@ -21564,12 +21611,12 @@
           })
           .then(function (data) {
             if (seq !== requestSeq) return;
-            body.innerHTML = data && data.html ? data.html : '<div class="scm-property-history-results">' + propertyHistoryResultsHtml(data || {}) + "</div>";
-            if (typeof window.scmPropertyHistoryBind === "function") window.scmPropertyHistoryBind(body);
+            target.innerHTML = data && data.html ? data.html : '<div class="scm-property-history-results">' + propertyHistoryResultsHtml(data || {}) + "</div>";
+            if (typeof window.scmPropertyHistoryBind === "function") window.scmPropertyHistoryBind(target);
           })
           .catch(function (error) {
             if (seq !== requestSeq) return;
-            body.innerHTML = propertyHistoryEmpty(error.message || "No se pudo consultar el historial.");
+            target.innerHTML = propertyHistoryEmpty(error.message || "No se pudo consultar el historial.");
           });
       }
 
@@ -21597,11 +21644,90 @@
           }));
           return;
         }
-        if (key === "historial-inmueble") {
-          loadPropertyHistory(action);
+        if (key === "historial") {
+          loadHistory(action);
           return;
         }
         loadView(key, action);
+      });
+
+      // Menús "Ver" y "Más" de cada fila: se posicionan fijos en pantalla para que el scroll horizontal de la tabla no los recorte.
+      var openMenu = null;
+
+      function closeLeaseMenu(focusToggle) {
+        if (!openMenu) return;
+        var menu = openMenu.querySelector("[data-lease-menu]");
+        var toggle = openMenu.querySelector("[data-lease-menu-toggle]");
+        if (menu) menu.classList.add("!sp-hidden");
+        if (toggle) {
+          toggle.setAttribute("aria-expanded", "false");
+          if (focusToggle) toggle.focus();
+        }
+        openMenu = null;
+      }
+
+      function openLeaseMenu(menuWrap) {
+        var menu = menuWrap.querySelector("[data-lease-menu]");
+        var toggle = menuWrap.querySelector("[data-lease-menu-toggle]");
+        if (!menu || !toggle) return;
+        closeLeaseMenu(false);
+        menu.classList.remove("!sp-hidden");
+        var rect = toggle.getBoundingClientRect();
+        var width = menu.offsetWidth;
+        var height = menu.offsetHeight;
+        var left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+        var top = rect.bottom + 4;
+        if (top + height > window.innerHeight - 8 && rect.top - height - 4 > 8) top = rect.top - height - 4;
+        menu.style.left = left + "px";
+        menu.style.top = top + "px";
+        toggle.setAttribute("aria-expanded", "true");
+        openMenu = menuWrap;
+        var first = menu.querySelector('[role="menuitem"]');
+        if (first) first.focus();
+      }
+
+      wrap.addEventListener("click", function (event) {
+        var target = event.target && event.target.closest ? event.target : null;
+        if (!target) return;
+        var toggle = target.closest("[data-lease-menu-toggle]");
+        if (toggle) {
+          event.preventDefault();
+          var menuWrap = toggle.closest("[data-lease-menu-wrap]");
+          if (openMenu === menuWrap) closeLeaseMenu(false);
+          else openLeaseMenu(menuWrap);
+          return;
+        }
+        // Al elegir una opción se cierra el menú; la acción la atienden los demás manejadores.
+        if (target.closest('[data-lease-menu] [role="menuitem"]')) closeLeaseMenu(false);
+        var historyTab = target.closest("[data-lease-history-tab]");
+        if (historyTab) {
+          event.preventDefault();
+          showHistoryTab(historyTab.getAttribute("data-lease-history-tab") || "contrato");
+        }
+      });
+
+      document.addEventListener("click", function (event) {
+        if (openMenu && !(event.target && event.target.closest && event.target.closest("[data-lease-menu-wrap]") === openMenu)) closeLeaseMenu(false);
+      });
+      window.addEventListener("scroll", function (event) {
+        if (openMenu && !(event.target && event.target.closest && event.target.closest("[data-lease-menu]"))) closeLeaseMenu(false);
+      }, true);
+      window.addEventListener("resize", function () { closeLeaseMenu(false); });
+
+      wrap.addEventListener("keydown", function (event) {
+        if (!openMenu) return;
+        var items = Array.prototype.slice.call(openMenu.querySelectorAll('[data-lease-menu] [role="menuitem"]'));
+        var index = items.indexOf(document.activeElement);
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeLeaseMenu(true);
+        } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          var next = event.key === "ArrowDown" ? index + 1 : index - 1;
+          if (items.length) items[(next + items.length) % items.length].focus();
+        } else if (event.key === "Tab") {
+          closeLeaseMenu(false);
+        }
       });
 
       modal.addEventListener("keydown", function (event) {

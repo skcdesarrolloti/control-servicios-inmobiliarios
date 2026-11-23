@@ -160,6 +160,10 @@ try {
   $historyCount=(int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`");
   $assert(!empty($service->markContratoRecibido(90001,'2026-10-03')['ok']) && (int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`")===$historyCount && $repo->getPublicServicesContract(90001)['fecha_recibo']===$receivedRow['fecha_recibo'], 'received retry preserves original date and avoids duplicate history');
   $assert(empty($service->markContratoRecibido(90002,'2026-02-30')['ok']) && empty($service->markContratoRecibido(99999,'2026-10-02')['ok']), 'invalid receipt dates and missing exact contract PK fail closed');
+  $db->insert($contractTable, array_replace($base, ['_ID' => 90003, 'contrato' => 'No asignado', 'estado' => 'Por entregar']));
+  $db->insert($contractTable, array_replace($base, ['_ID' => 90004, 'contrato' => '2004', 'estado' => 'Desistido']));
+  $historyCount=(int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`");
+  $assert(empty($service->markContratoRecibido(90003,'2026-10-02')['ok']) && empty($service->markContratoRecibido(90004,'2026-10-02')['ok']) && $repo->getPublicServicesContract(90003)['estado']==='Por entregar' && $repo->getPublicServicesContract(90004)['estado']==='Desistido' && (int)$db->getVar("SELECT COUNT(*) FROM `{$historyTable}`")===$historyCount, 'contracts not yet delivered or desisted cannot be marked received');
   $schedule = \SCM\Modules\Pending\PublicServicesSchedule::class;
   $assert(date('Y-m-d', $schedule::initial(strtotime('2026-10-02'), 1)) === '2027-01-02', 'missing-date January schedule cannot precede October delivery');
   $assert(date('Y-m-d', $schedule::initial(strtotime('2024-10-31'), 2)) === '2025-02-28', 'legacy overdue schedule retains original year and clamps day');

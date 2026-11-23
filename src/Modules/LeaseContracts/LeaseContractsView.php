@@ -11,6 +11,7 @@ use SCM\Modules\Pending\PublicServicesUi as UI;
 final class LeaseContractsView
 {
   private const MODAL_BUTTON = '!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-2.5 !sp-py-1.5 !sp-rounded-lg !sp-bg-white !sp-text-service-navy !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-[10px] !sp-font-semibold !sp-font-sans !sp-cursor-pointer hover:!sp-bg-slate-50 hover:!sp-border-slate-300 focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow !sp-whitespace-nowrap !sp-no-underline';
+  private const SUCCESS_BUTTON = '!sp-inline-flex !sp-items-center !sp-justify-center !sp-gap-1.5 !sp-px-3 !sp-py-2 !sp-rounded-lg !sp-bg-emerald-600 !sp-text-white !sp-border !sp-border-solid !sp-border-emerald-600 !sp-text-xs !sp-font-semibold !sp-font-sans !sp-cursor-pointer hover:!sp-bg-emerald-700 focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow';
 
   /** @param array<string,array<string,string>> $bucketDefs */
   public function renderPanel(array $bucketDefs, bool $canSend): string
@@ -109,60 +110,114 @@ final class LeaseContractsView
       $id = $v('_ID', '');
       $code = $v('contrato', $id);
       $sent = strtolower($v('se_envio', '')) === 'si';
+      $estado = strtolower($v('estado', ''));
+      $unassigned = strtolower($code) === 'no asignado';
       $codebtors = ctype_digit($v('num_codeudores', '')) ? (int) $row['num_codeudores'] : 0;
+      $phone = static fn(string $key): string => in_array(trim((string) ($row[$key] ?? '')), ['', '0', '-'], true) ? '' : trim((string) $row[$key]);
+      $start = $this->date($row['inicio_contrato'] ?? null);
+      $end = $this->date($row['fin_contrato'] ?? null);
       $attrs = ' data-contract-id="' . esc_attr($id) . '" data-contract-code="' . esc_attr($code) . '" data-property-code="' . esc_attr($v('id_inmueble', $v('inmueble', ''))) . '"';
       $html .= '<tr class="!sp-bg-white hover:!sp-bg-slate-50 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100">';
       $html .= '<td class="' . $td . ' !sp-whitespace-nowrap"><span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200 !sp-text-amber-900 !sp-font-bold">#' . esc_html($code) . '</span>' . $this->stateBadge($v('estado', 'Sin estado')) . '</td>';
       $html .= '<td class="' . $td . ' !sp-max-w-[240px]"><span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-bg-emerald-50 !sp-border !sp-border-solid !sp-border-emerald-200 !sp-text-emerald-700 !sp-font-semibold">SIMI ' . esc_html($v('inmueble')) . '</span><small class="' . $muted . '">Código web ' . esc_html($v('id_inmueble')) . '</small><p class="!sp-m-0 !sp-mt-1.5 !sp-leading-relaxed !sp-font-medium">' . esc_html($v('direccion')) . '</p></td>';
       $coOwners = self::coOwnersLabel($row);
-      $html .= '<td class="' . $td . ' !sp-max-w-[200px]"><strong class="!sp-block !sp-leading-relaxed">' . esc_html($v('propietario')) . '</strong><small class="' . $muted . '">' . esc_html($v('celular_propietario', '')) . '</small>' . ($coOwners !== '' ? '<small class="' . $muted . ' !sp-font-semibold">' . esc_html($coOwners) . '</small>' : '') . '</td>';
-      $html .= '<td class="' . $td . ' !sp-max-w-[200px]"><strong class="!sp-block !sp-leading-relaxed">' . esc_html($v('arrendatario')) . '</strong><small class="' . $muted . '">' . esc_html($v('celular_arrendatario', '')) . '</small>' . ($codebtors > 0 ? '<small class="' . $muted . '">' . $codebtors . ' codeudor(es)</small>' : '') . '</td>';
-      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap"><span class="!sp-block">' . esc_html($this->date($row['inicio_contrato'] ?? null)) . '</span><small class="' . $muted . '">hasta ' . esc_html($this->date($row['fin_contrato'] ?? null)) . '</small></td>';
-      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap">' . ($sent
-        ? '<span class="!sp-inline-flex !sp-items-center !sp-gap-1 !sp-px-2 !sp-py-1 !sp-rounded-full !sp-border !sp-border-solid !sp-border-emerald-200 !sp-bg-emerald-50 !sp-text-emerald-700 !sp-text-[9px] !sp-font-bold">' . $ui::icon('check', '!sp-w-3 !sp-h-3') . 'Enviados</span>'
-        : '<span class="!sp-inline-flex !sp-items-center !sp-gap-1 !sp-px-2 !sp-py-1 !sp-rounded-full !sp-border !sp-border-solid !sp-border-amber-200 !sp-bg-amber-50 !sp-text-amber-800 !sp-text-[9px] !sp-font-bold">' . $ui::icon('clock', '!sp-w-3 !sp-h-3') . 'Pendientes</span>') . '</td>';
-      $html .= '<td class="' . $td . '"><div class="!sp-grid !sp-grid-cols-2 !sp-gap-1.5 !sp-min-w-[300px]">';
-      $html .= $this->action('documentos', 'Documentación', 'document', $attrs);
-      if ($id !== '') {
-        $html .= $this->folderButton((int) $id, $code);
-      }
-      $html .= $this->action('ficha', 'Ficha del inmueble', 'building', $attrs);
-      $html .= $this->action('historial-inmueble', 'Historial inmueble', 'clock', $attrs);
-      $html .= $this->action('historial-contrato', 'Historial contrato', 'copy', $attrs);
-      $html .= '<button type="button" class="' . $ui::SECONDARY . ' !sp-text-[10px] !sp-justify-start" data-lease-action="caso"' . $attrs . '>' . $ui::icon('edit', '!sp-w-3 !sp-h-3') . 'Crear caso</button>';
-      $unassigned = strtolower($code) === 'no asignado';
-      if ($canSend && !$sent && strtolower($v('estado', '')) === 'recibido') {
-        $html .= '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start !sp-text-emerald-700 !sp-border-emerald-200 hover:!sp-bg-emerald-50" data-lease-annexes-ok' . $attrs . '>' . $ui::icon('check', '!sp-w-3 !sp-h-3') . 'Marcar anexos al día</button>';
-      }
-      if ($unassigned && $canCreate && strtolower($v('estado', '')) !== 'desistido') {
-        $html .= '<button type="button" class="' . $ui::PRIMARY . ' !sp-text-[10px] !sp-py-2 !sp-justify-start" data-lease-action="crear"' . $attrs . '>' . $ui::icon('document', '!sp-w-3 !sp-h-3') . 'Crear contrato</button>';
-      } elseif ($canSend && !$unassigned && strtolower($v('estado', '')) !== 'desistido') {
-        $html .= '<button type="button" class="' . $ui::NAVY . ' !sp-justify-start" data-lease-action="envio"' . $attrs . '>' . $ui::icon('bolt', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . ($sent ? 'Reenviar anexos' : 'Enviar anexos') . '</button>';
-      }
-      if ($canSend && !$unassigned && strtolower($v('propiedad_horizontal', '')) === 'si') {
-        $hasActs = $v('acta_notificacion_arrendatario', '') !== '' || $v('acta_administracion', '') !== '';
-        $html .= '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start" data-lease-action="actas-copropiedad"' . $attrs . '>' . $ui::icon('building', '!sp-w-3 !sp-h-3') . ($hasActs ? 'Reenviar actas copropiedad' : 'Enviar actas copropiedad') . '</button>';
-      }
-      if ($id !== '' && !in_array(strtolower($v('estado', '')), ['recibido', 'desistido'], true)) {
-        $html .= '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start" data-scm-mark-contract-received data-contract-context="contratos" data-contract-id="' . esc_attr($id) . '" data-contract-code="' . esc_attr($code) . '">' . $ui::icon('check', '!sp-w-3 !sp-h-3') . 'Marcar recibido</button>';
-        if ($canDesist) {
-          $html .= '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start !sp-text-rose-700 !sp-border-rose-200 hover:!sp-bg-rose-50 hover:!sp-border-rose-300" data-lease-action="desistir"' . $attrs . '>' . $ui::icon('close', '!sp-w-3 !sp-h-3') . 'Marcar desistido</button>';
-        }
-      }
-      $html .= '</div></td></tr>';
+      $html .= '<td class="' . $td . ' !sp-max-w-[200px]"><strong class="!sp-block !sp-leading-relaxed">' . esc_html($v('propietario')) . '</strong><small class="' . $muted . '">' . esc_html($phone('celular_propietario')) . '</small>' . ($coOwners !== '' ? '<small class="' . $muted . ' !sp-font-semibold">' . esc_html($coOwners) . '</small>' : '') . '</td>';
+      $html .= '<td class="' . $td . ' !sp-max-w-[200px]"><strong class="!sp-block !sp-leading-relaxed">' . esc_html($v('arrendatario')) . '</strong><small class="' . $muted . '">' . esc_html($phone('celular_arrendatario')) . '</small>' . ($codebtors > 0 ? '<small class="' . $muted . '">' . $codebtors . ' codeudor(es)</small>' : '') . '</td>';
+      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap">' . ($start === '-' && $end === '-'
+        ? '<span class="!sp-text-service-muted">Sin fechas</span>'
+        : '<span class="!sp-block">' . esc_html($start) . '</span><small class="' . $muted . '">hasta ' . esc_html($end) . '</small>') . '</td>';
+      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap">' . $this->annexesBadge($sent, $unassigned || $estado === 'desistido') . '</td>';
+      $html .= '<td class="' . $td . '">' . $this->renderActions($row, $id, $code, $estado, $sent, $unassigned, $attrs, $canSend, $canDesist, $canCreate) . '</td></tr>';
     }
     return $html . '</tbody></table></div>';
   }
 
-  /** Carpeta de documentos del negocio (hoja de cierre y contrato) en la ventana del panel. */
-  private function folderButton(int $id, string $code): string
+  /**
+   * Acciones de la fila: un solo botón con el siguiente paso según el estado, y el resto agrupado en
+   * "Ver" (solo consulta) y "Más" (acciones que cambian algo, con "Marcar desistido" separado al final).
+   *
+   * @param array<string,mixed> $row
+   */
+  private function renderActions(array $row, string $id, string $code, string $estado, bool $sent, bool $unassigned, string $attrs, bool $canSend, bool $canDesist, bool $canCreate): string
   {
-    return '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start" data-scm-open-iframe data-iframe-url="' . esc_attr(ClosingSheetDocuments::folderUrl($id) . '&embed=1') . '" data-iframe-title="Carpeta de documentos · #' . esc_attr($code) . '">' . UI::icon('copy', '!sp-w-3 !sp-h-3') . 'Carpeta de documentos</button>';
+    $ui = UI::class;
+    $desisted = $estado === 'desistido';
+    $lease = static fn(string $key): string => ' data-lease-action="' . $key . '"' . $attrs;
+    $received = ' data-scm-mark-contract-received data-contract-context="contratos" data-contract-id="' . esc_attr($id) . '" data-contract-code="' . esc_attr($code) . '"';
+    // "Recibido" es la devolución del inmueble al terminar el contrato: no aplica si aún no se ha entregado.
+    $canReceive = $id !== '' && !$unassigned && !in_array($estado, ['recibido', 'desistido', 'por entregar'], true);
+    $canAnnexes = $canSend && !$unassigned && !$desisted;
+    $canAnnexesOk = $canSend && !$sent && $estado === 'recibido';
+
+    $primary = '';
+    $next = '';
+    if ($unassigned && $canCreate && !$desisted) {
+      [$primary, $next] = [$this->primaryButton($ui::PRIMARY, 'document', 'Crear contrato', $lease('crear')), 'crear'];
+    } elseif ($canAnnexesOk) {
+      [$primary, $next] = [$this->primaryButton(self::SUCCESS_BUTTON, 'check', 'Marcar anexos al día', ' data-lease-annexes-ok' . $attrs), 'anexos-ok'];
+    } elseif ($canAnnexes && !$sent && $estado === 'entregado') {
+      [$primary, $next] = [$this->primaryButton($ui::NAVY, 'bolt', 'Enviar anexos', $lease('envio')), 'envio'];
+    } elseif ($canReceive && $estado === 'por recibir') {
+      [$primary, $next] = [$this->primaryButton($ui::PRIMARY, 'check', 'Marcar recibido', $received), 'recibido'];
+    }
+
+    $view = $this->menuItem('Documentación', 'Partes, condiciones y anexos', 'document', $lease('documentos'))
+      . ($id !== '' ? $this->menuItem('Carpeta de documentos', 'Archivos del negocio: ver y subir', 'copy', ' data-scm-open-iframe data-iframe-url="' . esc_attr(ClosingSheetDocuments::folderUrl((int) $id) . '&embed=1') . '" data-iframe-title="Carpeta de documentos · #' . esc_attr($code) . '"') : '')
+      . $this->menuItem('Ficha del inmueble', 'Datos del inmueble', 'building', $lease('ficha'))
+      . $this->menuItem('Historial', 'Del contrato y del inmueble', 'clock', $lease('historial'));
+
+    $more = '';
+    if ($canAnnexes && $next !== 'envio') {
+      $more .= $this->menuItem($sent ? 'Reenviar anexos' : 'Enviar anexos', 'Actas de bienvenida a propietario, arrendatario y codeudores', 'bolt', $lease('envio'));
+    }
+    if ($canSend && !$unassigned && strtolower(trim((string) ($row['propiedad_horizontal'] ?? ''))) === 'si') {
+      $hasActs = trim((string) ($row['acta_notificacion_arrendatario'] ?? '')) !== '' || trim((string) ($row['acta_administracion'] ?? '')) !== '';
+      $more .= $this->menuItem(($hasActs ? 'Reenviar' : 'Enviar') . ' actas copropiedad', 'Acta de ingreso y carta a la administración', 'building', $lease('actas-copropiedad'));
+    }
+    $more .= $this->menuItem('Crear caso', 'Nuevo caso con este contrato', 'edit', $lease('caso'));
+    if ($canReceive && $next !== 'recibido') {
+      $more .= $this->menuItem('Marcar recibido', 'El inmueble se devolvió al terminar el contrato', 'check', $received);
+    }
+    if ($canDesist && $id !== '' && !in_array($estado, ['recibido', 'desistido'], true)) {
+      $more .= '<div class="!sp-my-1 !sp-border-x-0 !sp-border-b-0 !sp-border-t !sp-border-solid !sp-border-slate-100" role="separator"></div>'
+        . $this->menuItem('Marcar desistido', 'El negocio no sigue: pide motivo y confirmación', 'close', $lease('desistir'), true);
+    }
+
+    return '<div class="!sp-flex !sp-flex-col !sp-gap-1.5 !sp-w-[230px]">'
+      . ($primary !== '' ? '<span class="!sp-text-[8px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Siguiente paso</span>' . $primary : '')
+      . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-1.5">' . $this->menu('Ver', 'eye', $view) . $this->menu('Más', 'dots', $more) . '</div></div>';
   }
 
-  private function action(string $key, string $label, string $icon, string $attrs): string
+  private function primaryButton(string $classes, string $icon, string $label, string $attrs): string
   {
-    return '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start" data-lease-action="' . $key . '"' . $attrs . '>' . UI::icon($icon, '!sp-w-3 !sp-h-3') . esc_html($label) . '</button>';
+    return '<button type="button" class="' . $classes . ' !sp-w-full"' . $attrs . '>' . UI::icon($icon, '!sp-w-3.5 !sp-h-3.5') . esc_html($label) . '</button>';
+  }
+
+  /** Menú desplegable; el runtime lo posiciona en pantalla para que la tabla con scroll no lo recorte. */
+  private function menu(string $label, string $icon, string $items): string
+  {
+    return '<div data-lease-menu-wrap>'
+      . '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-w-full !sp-justify-between aria-expanded:!sp-bg-slate-100 aria-expanded:!sp-border-slate-300" data-lease-menu-toggle aria-haspopup="menu" aria-expanded="false"><span class="!sp-inline-flex !sp-items-center !sp-gap-1.5">' . UI::icon($icon, '!sp-w-3 !sp-h-3') . esc_html($label) . '</span>' . UI::icon('chevron-down', '!sp-w-3 !sp-h-3') . '</button>'
+      . '<div class="!sp-hidden !sp-fixed !sp-z-[10040] !sp-w-[260px] !sp-py-1 !sp-bg-white !sp-rounded-xl !sp-border !sp-border-solid !sp-border-slate-200 !sp-shadow-2xl" role="menu" aria-label="' . esc_attr($label) . '" data-lease-menu>' . $items . '</div>'
+      . '</div>';
+  }
+
+  private function menuItem(string $label, string $hint, string $icon, string $attrs, bool $danger = false): string
+  {
+    $tone = $danger ? '!sp-text-rose-700 hover:!sp-bg-rose-50 focus-visible:!sp-bg-rose-50' : '!sp-text-service-navy hover:!sp-bg-slate-50 focus-visible:!sp-bg-slate-50';
+    return '<button type="button" role="menuitem" class="!sp-flex !sp-w-full !sp-items-start !sp-gap-2 !sp-px-3 !sp-py-2 !sp-bg-white !sp-border-0 !sp-text-left !sp-font-sans !sp-cursor-pointer focus-visible:!sp-outline-none ' . $tone . '"' . $attrs . '>'
+      . UI::icon($icon, '!sp-w-3.5 !sp-h-3.5 !sp-mt-0.5') . '<span class="!sp-flex !sp-flex-col"><span class="!sp-text-[11px] !sp-font-semibold">' . esc_html($label) . '</span><span class="!sp-text-[9px] ' . ($danger ? '!sp-text-rose-500' : '!sp-text-service-muted') . '">' . esc_html($hint) . '</span></span></button>';
+  }
+
+  private function annexesBadge(bool $sent, bool $notApplicable): string
+  {
+    $ui = UI::class;
+    $badge = '!sp-inline-flex !sp-items-center !sp-gap-1 !sp-px-2 !sp-py-1 !sp-rounded-full !sp-border !sp-border-solid !sp-text-[9px] !sp-font-bold ';
+    return match (true) {
+      $sent => '<span class="' . $badge . '!sp-border-emerald-200 !sp-bg-emerald-50 !sp-text-emerald-700">' . $ui::icon('check', '!sp-w-3 !sp-h-3') . 'Enviados</span>',
+      $notApplicable => '<span class="' . $badge . '!sp-border-slate-200 !sp-bg-slate-50 !sp-text-slate-500">No aplica</span>',
+      default => '<span class="' . $badge . '!sp-border-amber-200 !sp-bg-amber-50 !sp-text-amber-800">' . $ui::icon('clock', '!sp-w-3 !sp-h-3') . 'Pendientes</span>',
+    };
   }
 
   private function stateBadge(string $state): string

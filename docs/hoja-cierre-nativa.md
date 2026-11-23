@@ -341,7 +341,7 @@ Los documentos de la lista de chequeo se suben en el panel, en su almacenamiento
   caben se nombran en el correo y se ven en la hoja.
 - **Carpeta del contrato:** `documentos-contrato.php?contrato=<id>` (o `?cierre=<hoja>`). Junta los archivos del
   contrato y los de sus hojas de cierre (`id_cierre` del contrato o `id_contrato_arrendamiento` de la hoja).
-  - Se abre en Contratos de arrendamiento con **Carpeta de documentos** (en la fila y en *Documentación*).
+  - Se abre en Contratos de arrendamiento con **Carpeta de documentos** (en el menú *Ver* de la fila y en *Documentación*).
   - En contratos viejos sin hoja nativa también se suben ahí.
   - El enlace queda en la columna `link_documentos` de `contratos_arrendamiento`. Se llena al crear el contrato desde
     «No asignado», al subir desde el contrato y al abrir la carpeta. La columna se crea con

@@ -50,6 +50,12 @@ final class PendingService
         $pdo->commit();
         return ['ok' => true, 'message' => 'El contrato ya estaba recibido; no se modificó nuevamente.', 'estado' => 'Recibido', 'tipo' => $row['tipo'] ?? 'Ex', 'fecha_recibo' => $row['fecha_recibo'] ?? 0];
       }
+      // "Recibido" es la devolución del inmueble al terminar el contrato: no aplica a contratos sin crear, sin entregar o desistidos.
+      $estadoActual = strtolower(trim((string) ($row['estado'] ?? '')));
+      if ($estadoActual === 'desistido') throw new \DomainException('El contrato está desistido; no se puede marcar como recibido.');
+      if ($estadoActual === 'por entregar' || strtolower(trim((string) ($row['contrato'] ?? ''))) === 'no asignado') {
+        throw new \DomainException('El inmueble aún no se ha entregado al arrendatario; no se puede marcar como recibido. Si el negocio no sigue, márcalo como desistido.');
+      }
       $now = date('Y-m-d H:i:s');
       if ($this->repo->updateContratoArrendamiento($contractId, [
         'estado' => 'Recibido', 'tipo' => 'Ex', 'fecha_recibo' => $fechaTs, 'cct_modified' => $now,

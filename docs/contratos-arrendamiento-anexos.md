@@ -6,13 +6,25 @@ Menú: **Actividades contractuales › Contratos de arrendamiento** (permiso de 
 
 Pestañas por estado (Todos, Anexos pendientes, Por entregar, Entregado, Por recibir, Desistido, No asignado). "Anexos pendientes" muestra contratos `Entregado` con `se_envio` distinto de `Si`.
 
-Acciones por contrato, todas dentro del panel:
+Anexos muestra "No aplica" en contratos sin número o desistidos, y Vigencia "Sin fechas" si el contrato no tiene inicio ni fin.
+
+La columna **Acciones** tiene tres partes, todas dentro del panel:
+
+1. **Siguiente paso**: un solo botón destacado según el estado (si no aplica ninguno, no se muestra):
+   - Sin número ("No asignado") → **Crear contrato**.
+   - `Recibido` con anexos sin enviar → **Marcar anexos al día**.
+   - `Entregado` con anexos sin enviar → **Enviar anexos**.
+   - `Por recibir` → **Marcar recibido**.
+2. Menú **Ver** (solo consulta): Documentación, Carpeta de documentos, Ficha del inmueble e Historial.
+3. Menú **Más** (acciones que cambian algo): Enviar/Reenviar anexos, Enviar/Reenviar actas copropiedad, Crear caso, Marcar recibido y, separado al final y en rojo, Marcar desistido. Una acción que ya está como siguiente paso no se repite en el menú.
+
+Los menús se posicionan fijos en pantalla (`data-lease-menu-toggle` / `data-lease-menu`) para que el scroll horizontal de la tabla no los recorte; se cierran con Escape, clic afuera o scroll, y se recorren con las flechas.
 
 - **Documentación**: partes, condiciones económicas, documentos y expedientes, y la vista de anexos de cada actor.
 - **Ficha del inmueble**: datos de `jet_cct_inmuebles` (por `codigo` = `id_inmueble` del contrato) y del contrato.
-- **Historial inmueble**: el mismo informe de *Historial inmueble* (`scm_property_history_report`).
-- **Historial contrato**: registros de `jet_cct_historial_contrato_arrendamiento`.
+- **Historial**: un popup con dos pestañas: *Del contrato* (registros de `jet_cct_historial_contrato_arrendamiento`) y *Del inmueble* (el mismo informe de *Historial inmueble*, `scm_property_history_report`).
 - **Crear caso**: abre *Crear nuevo caso* con el contrato ya seleccionado.
+- **Marcar recibido**: el inmueble se devolvió al terminar el contrato (`Recibido` / tipo `Ex`, con fecha de recibo). Solo se ofrece en contratos con número que no estén `Por entregar`, `Recibido` ni `Desistido`; el servidor (`PendingService::markContratoRecibido`) también rechaza contratos sin número, `Por entregar` o `Desistido`, venga de donde venga la solicitud.
 - **Marcar anexos al día** (contratos `Recibido` con `se_envio` distinto de `Si`, acción `contract_annexes_send`): pide confirmación y una observación opcional, deja `se_envio = Si` sin enviar nada y lo registra en el historial del contrato y del inmueble.
 - **Marcar desistido**: pide motivo del glosario JetEngine "Razón de desistir" (id 1463), observación opcional y confirmación. Cambia `estado` a `Desistido` y guarda `razon_desistido`; registra el cambio en el historial del contrato y del inmueble y avisa a quienes se configuren en Notificaciones internas › Contratos › Contrato de arrendamiento desistido (`contrato_desistido`). Si el contrato tiene hoja de cierre, la hoja queda "Desistida" (ver `docs/hoja-cierre-nativa.md` › Negocio desistido). Requiere la acción `contract_desist`. `contract_desist` y `contract_create` se conservan en todos los cargos hasta que se guarden los permisos con estas opciones (`contract_lifecycle_permissions_configured`).
 - **Enviar / Reenviar anexos**: reemplaza el formulario JetForm "Enviar contrato de arrendamiento". Requiere la acción `contract_annexes_send`; hasta que se guarden los permisos, todos los cargos la conservan.
