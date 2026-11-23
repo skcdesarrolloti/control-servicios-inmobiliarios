@@ -162,7 +162,7 @@ final class LeaseContractsView
     }
 
     $view = $this->menuItem('Documentación', 'Partes, condiciones y anexos', 'document', $lease('documentos'))
-      . ($id !== '' ? $this->menuItem('Carpeta de documentos', 'Archivos del negocio: ver y subir', 'copy', ' data-scm-open-iframe data-iframe-url="' . esc_attr(ClosingSheetDocuments::folderUrl((int) $id) . '&embed=1') . '" data-iframe-title="Carpeta de documentos · #' . esc_attr($code) . '"') : '')
+      . ($id !== '' ? $this->menuItem('Carpeta de documentos', 'Archivos del negocio: ver y subir', 'copy', ' ' . $this->folderAttrs((int) $id, $code)) : '')
       . $this->menuItem('Ficha del inmueble', 'Datos del inmueble', 'building', $lease('ficha'))
       . $this->menuItem('Historial', 'Del contrato y del inmueble', 'clock', $lease('historial'));
 
@@ -186,6 +186,17 @@ final class LeaseContractsView
     return '<div class="!sp-flex !sp-flex-col !sp-gap-1.5 !sp-w-[230px]">'
       . ($primary !== '' ? '<span class="!sp-text-[8px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Siguiente paso</span>' . $primary : '')
       . '<div class="!sp-grid !sp-grid-cols-2 !sp-gap-1.5">' . $this->menu('Ver', 'eye', $view) . $this->menu('Más', 'dots', $more) . '</div></div>';
+  }
+
+  /** Botón de la carpeta de documentos del negocio dentro de Documentación (se abre en la ventana del panel). */
+  private function folderButton(int $id, string $code): string
+  {
+    return '<button type="button" class="' . self::MODAL_BUTTON . ' !sp-justify-start" ' . $this->folderAttrs($id, $code) . '>' . UI::icon('copy', '!sp-w-3 !sp-h-3') . 'Carpeta de documentos</button>';
+  }
+
+  private function folderAttrs(int $id, string $code): string
+  {
+    return 'data-scm-open-iframe data-iframe-url="' . esc_attr(ClosingSheetDocuments::folderUrl($id) . '&embed=1') . '" data-iframe-title="Carpeta de documentos · #' . esc_attr($code) . '"';
   }
 
   private function primaryButton(string $classes, string $icon, string $label, string $attrs): string
