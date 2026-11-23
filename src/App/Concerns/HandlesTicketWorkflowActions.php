@@ -1916,7 +1916,7 @@ trait HandlesTicketWorkflowActions
     }
 
     $controller = $this->get_pending_controller();
-    $payload = $controller->buildPreventivasPayload($_POST);
+    $payload = $this->scopePreventivasToOwnRecords($controller->buildPreventivasPayload($_POST));
     $view = new \SCM\Modules\Pending\PendingView();
     $kpis = $view->renderPreventivasKpis((int)($payload['count'] ?? 0), (string)($payload['corte'] ?? ''), (array)($payload['items'] ?? []));
     $table = $view->renderPreventivasTable((array)($payload['items'] ?? []));
@@ -1925,6 +1925,36 @@ trait HandlesTicketWorkflowActions
       'table_html' => $table,
       'count' => (string)($payload['count'] ?? 0),
     ]);
+  }
+
+  /**
+   * Sin permiso de ver todo el mantenimiento, solo quedan los contratos cuyo caso preventivo tiene asignado al funcionario.
+   * @param array<string,mixed> $payload @return array<string,mixed>
+   */
+  private function scopePreventivasToOwnRecords(array $payload): array
+  {
+    $employeeId = $this->maintenanceOwnRecordsEmployeeId();
+    if ($employeeId === null) {
+      return $payload;
+    }
+    $items = array_values(array_filter((array) ($payload['items'] ?? []), static function ($item) use ($employeeId): bool {
+      if ($employeeId === '' || !is_array($item)) {
+        return false;
+      }
+      $tickets = (array) ($item['tickets'] ?? []);
+      if (is_array($item['ticket'] ?? null)) {
+        $tickets[] = $item['ticket'];
+      }
+      foreach ($tickets as $ticket) {
+        if (is_array($ticket) && trim((string) ($ticket['id_empleado'] ?? '')) === $employeeId) {
+          return true;
+        }
+      }
+      return false;
+    }));
+    $payload['items'] = $items;
+    $payload['count'] = count($items);
+    return $payload;
   }
 
   public function ajax_handler_servicios_publicos_pendientes()

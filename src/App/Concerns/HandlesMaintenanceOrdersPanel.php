@@ -44,6 +44,12 @@ trait HandlesMaintenanceOrdersPanel
 
     $where = ["LOWER(TRIM(COALESCE(o.`cct_status`, ''))) NOT IN ('trash', 'deleted')"];
     $args = [];
+    // Sin permiso de ver todo, el funcionario solo ve las órdenes que realizó o coordina.
+    $ownScope = $this->maintenanceOwnRecordsCondition(['o.`id_empleado`', 'o.`cct_author_id`', 'o.`id_coordinador`']);
+    if ($ownScope !== null) {
+      $where[] = $ownScope[0];
+      $args = array_merge($args, $ownScope[1]);
+    }
     $search = $text('q');
     if ($search !== '') {
       $like = '%' . $search . '%';

@@ -185,7 +185,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTRACT_OWNERS = 'scm_funcionario_contratos';
   const AJAX_CONTRACT_OWNERS_SAVE = 'scm_funcionario_contratos_guardar';
   /** Acciones que no se conceden por defecto a cargos sin permisos configurados. */
-  const SENSITIVE_DEFAULT_ACTIONS = ['contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'owner_credit_accounting', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure', 'quote_reset_dev', 'closing_sheet_respond', 'closing_sheet_policy_configure', 'legal_case_manage', 'legal_case_send', 'legal_case_config', 'legal_case_export', 'org_manager_view', 'org_manager_manage', 'org_manager_delete', 'org_manager_transfer', 'org_manager_export'];
+  const SENSITIVE_DEFAULT_ACTIONS = ['maintenance_view_all', 'contract_history_manage', 'contract_owner_change', 'quote_order_delete', 'case_export_excel', 'owner_credit_decide', 'owner_credit_manage', 'owner_credit_configure', 'owner_credit_accounting', 'admin_report_manage', 'admin_report_payments', 'admin_report_accounts', 'market_stats_admin', 'cleaning_internal_view', 'cleaning_configure', 'quote_fee_configure', 'quote_reset_dev', 'closing_sheet_respond', 'closing_sheet_policy_configure', 'legal_case_manage', 'legal_case_send', 'legal_case_config', 'legal_case_export', 'org_manager_view', 'org_manager_manage', 'org_manager_delete', 'org_manager_transfer', 'org_manager_export'];
   /** Herramientas de pruebas: hasta guardar permisos solo las tiene el cargo de desarrollo (Asistente de Desarrollo TI). */
   const DEVELOPER_DEFAULT_ACTIONS = ['quote_reset_dev'];
   const DEVELOPER_CARGOS = ['13'];
@@ -1050,6 +1050,7 @@ final class SuCasaControlServiciosInmobiliarios
           'quote_order_delete' => 'Eliminar orden de mantenimiento',
           'quote_acta_create' => 'Crear acta de cotización',
           'quote_reset_dev' => 'Reiniciar cotización a enviada sin respuesta (pruebas de desarrollo)',
+          'maintenance_view_all' => 'Mantenimiento: ver cotizaciones, órdenes, actas y preventivas de todos los funcionarios (sin este permiso solo ve las suyas)',
         ],
       ],
       'administrativas' => [
@@ -1561,6 +1562,32 @@ final class SuCasaControlServiciosInmobiliarios
   {
     $action = preg_replace('/[^a-z0-9_]/', '', strtolower($action)) ?: '';
     return $action !== '' && in_array($action, $this->currentDashboardAllowedActions(), true);
+  }
+
+  /**
+   * Mantenimiento (cotizaciones, órdenes, actas y preventivas): sin 'maintenance_view_all' el funcionario solo ve los
+   * registros que realizó o coordina. Devuelve null cuando ve todos; '' si no se pudo resolver su id_empleado.
+   */
+  private function maintenanceOwnRecordsEmployeeId(): ?string
+  {
+    if ($this->canManageDashboardPermissions() || $this->canUseDashboardAction('maintenance_view_all')) {
+      return null;
+    }
+    return trim(Auth::employeeId());
+  }
+
+  /** @param array<int,string> $columns Columnas SQL ya calificadas (ej. "c.`id_empleado`"). @return array{0:string,1:array<int,string>}|null */
+  private function maintenanceOwnRecordsCondition(array $columns): ?array
+  {
+    $employeeId = $this->maintenanceOwnRecordsEmployeeId();
+    if ($employeeId === null) {
+      return null;
+    }
+    if ($employeeId === '' || $columns === []) {
+      return ['1=0', []];
+    }
+    $parts = array_map(static fn(string $column): string => "TRIM(CAST(COALESCE({$column}, '') AS CHAR)) = ?", $columns);
+    return ['(' . implode(' OR ', $parts) . ')', array_fill(0, count($columns), $employeeId)];
   }
 
   /** Corta la petición si el cargo no tiene la acción del catálogo de permisos. */

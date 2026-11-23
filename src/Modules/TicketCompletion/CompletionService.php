@@ -1642,8 +1642,11 @@ final class CompletionService
     return (new CompletionPdf())->render($act, $payload, $staff);
   }
 
-  /** @return array{filters:array<string,string|int>,items:array<int,array<string,mixed>>,stats:array<string,int>,count:int,pagination:array<string,int>} */
-  public function dashboardList(array $input): array
+  /**
+   * @param string|null $ownerEmployeeId Si no es null, solo actas que realizó el funcionario o de casos a su cargo.
+   * @return array{filters:array<string,string|int>,items:array<int,array<string,mixed>>,stats:array<string,int>,count:int,pagination:array<string,int>}
+   */
+  public function dashboardList(array $input, ?string $ownerEmployeeId = null): array
   {
     $this->repo->requireSchema();
     $clean = static fn(mixed $value): string => trim(strip_tags((string) (is_scalar($value) ? $value : '')));
@@ -1664,6 +1667,17 @@ final class CompletionService
 
     $where = [];
     $args = [];
+    $ownerWhere = '';
+    $ownerArgs = [];
+    if ($ownerEmployeeId !== null) {
+      $ownerEmployeeId = trim($ownerEmployeeId);
+      $ownerWhere = $ownerEmployeeId === ''
+        ? '1=0'
+        : "(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.payload_json, '$.actor.employee_id')), '')) = ? OR TRIM(COALESCE(t.id_empleado, '')) = ?)";
+      $ownerArgs = $ownerEmployeeId === '' ? [] : [$ownerEmployeeId, $ownerEmployeeId];
+      $where[] = $ownerWhere;
+      $args = array_merge($args, $ownerArgs);
+    }
     if ($status !== 'all') {
       $where[] = 'a.status = ?';
       $args[] = $status;
@@ -1711,7 +1725,9 @@ final class CompletionService
         $items[] = $row;
       }
     }
-    $statsRows = $this->repo->db->getResults("SELECT status, COUNT(*) AS total FROM `{$table}` GROUP BY status");
+    $statsRows = $ownerWhere === ''
+      ? $this->repo->db->getResults("SELECT status, COUNT(*) AS total FROM `{$table}` GROUP BY status")
+      : $this->repo->db->getResults("SELECT a.status, COUNT(*) AS total FROM `{$table}` a LEFT JOIN `{$tickets}` t ON t._ID = a.ticket_pk WHERE {$ownerWhere} GROUP BY a.status", $ownerArgs);
     $stats = ['pending' => 0, 'signed' => 0, 'archived' => 0, 'cancelled' => 0, 'all' => 0];
     foreach ($statsRows as $row) {
       $key = (string) ($row['status'] ?? '');

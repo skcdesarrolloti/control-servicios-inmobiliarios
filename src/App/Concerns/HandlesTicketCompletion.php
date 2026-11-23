@@ -318,7 +318,7 @@ trait HandlesTicketCompletion
       } elseif ($operation !== '') {
         throw new \DomainException('Operación de acta no válida.');
       }
-      $data = $service->dashboardList($_POST);
+      $data = $service->dashboardList($_POST, $this->maintenanceOwnRecordsEmployeeId());
       $view = new CompletionView();
       $message = $operation === 'archive'
         ? 'Acta archivada. Salió de pendientes, el caso sigue abierto y no se generó cobro.'

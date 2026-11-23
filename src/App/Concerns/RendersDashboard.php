@@ -2492,6 +2492,12 @@ trait RendersDashboard
 
     $where = ['1=1'];
     $args = [];
+    // Sin permiso de ver todo, el funcionario solo ve las cotizaciones que realizó o coordina.
+    $ownScope = $this->maintenanceOwnRecordsCondition(['c.`id_empleado`', 'c.`cct_author_id`', 'c.`id_coordinador`']);
+    if ($ownScope !== null) {
+      $where[] = $ownScope[0];
+      $args = array_merge($args, $ownScope[1]);
+    }
     $like = function (string $column, string $value) use (&$where, &$args): void {
       if ($value === '') {
         return;
