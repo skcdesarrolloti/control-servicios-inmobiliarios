@@ -397,9 +397,16 @@ $quoteLimit = $service->quoteTermLimit(590);
 $check($quoteLimit > 0, 'a quote has a maximum financing term');
 // Antes de pedir el crédito, el propietario ve la cuota de cada plazo posible sobre el total de la cotización.
 $preview = $service->quoteFinancingPreview(590);
-$check($preview['max_term'] === $quoteLimit && array_keys($preview['plans']) === range(1, $quoteLimit) && $preview['amount'] === 400000.0, 'the quote preview offers a plan for every term up to the maximum, on the quote total');
-$check($preview['plans'][$quoteLimit]['payment'] === \SCM\Modules\OwnerCredits\OwnerCreditCoverage::payment(400000, $preview['rate'], $quoteLimit) && $preview['rate'] > 0, 'the quote preview uses the same payment as the liquidator');
-foreach ([0 => 'Indica a cuántos meses', $quoteLimit + 1 => 'El plazo máximo para financiar la cotización #590 es de ' . $quoteLimit . ' meses'] as $badTerm => $expected) {
+// El propietario siempre puede pedir hasta 12 meses: si cumple con el plazo de su contrato lo verifica el funcionario.
+$check($preview['max_term'] === 12 && array_keys($preview['plans']) === range(1, 12) && $preview['amount'] === 400000.0, 'the quote preview offers every term from 1 to 12 months, on the quote total');
+$check($preview['plans'][12]['payment'] === \SCM\Modules\OwnerCredits\OwnerCreditCoverage::payment(400000, $preview['rate'], 12) && $preview['rate'] > 0, 'the quote preview uses the same payment as the liquidator');
+$service->assertQuoteTerm(590, 12);
+$check(true, 'a term over the contract maximum but within 12 months can be requested');
+$evaluation = $service->quoteFinancingEvaluation(590);
+$check($evaluation !== null && $evaluation['owner'] === 'Sin Mandato' && $evaluation['document'] === '55.555.555' && $evaluation['contract'] === '980' && $evaluation['max_term'] === $quoteLimit, 'the staff evaluation names the owner, the contract and its maximum term');
+$check($evaluation['net_income'] > 0 && $evaluation['cupo'] === round($evaluation['net_income'] * $evaluation['income_months']) && $evaluation['available'] > 0 && $evaluation['credit']['id'] === (int) $service->byQuote(590)['id'], 'the staff evaluation carries net income, preapproved amount, what can go to the payment and the existing request');
+$check($service->quoteFinancingEvaluation(999999) === null, 'a quote that does not exist has no evaluation');
+foreach ([0 => 'Indica a cuántos meses', 13 => 'El plazo máximo para financiar la cotización #590 es de 12 meses'] as $badTerm => $expected) {
   try {
     $service->assertQuoteTerm(590, $badTerm);
     $check(false, 'a financing term of ' . $badTerm . ' months is rejected');

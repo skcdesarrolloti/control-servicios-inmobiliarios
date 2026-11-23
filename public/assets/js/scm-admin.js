@@ -2827,7 +2827,7 @@
     }).then(function (limit) {
       var max = limit.max;
       if (max > 0) input.max = String(max);
-      hint.textContent = max > 0 ? "Máximo " + max + " meses según el contrato del propietario. El crédito queda sujeto a estudio, verificación y aprobación." : "";
+      hint.textContent = max > 0 ? "Puede pedir hasta " + max + " meses. Si cumple con el plazo de su contrato se verifica al estudiar el crédito, que queda sujeto a estudio, verificación y aprobación." : "";
       wrap._scmPreview = attachCotizacionFinancingPreview(wrap, input, limit.preview);
       if (wrap._scmPreview) wrap._scmPreview.setVisible(wrap.style.display !== "none");
     });
@@ -9614,7 +9614,7 @@
         var max = limit.max;
         cotPlazo.dataset.scmTermMax = String(max);
         if (max > 0) plazoInput.max = String(max);
-        hint.textContent = max > 0 ? "Máximo " + max + " meses según el contrato del propietario." : "";
+        hint.textContent = max > 0 ? "Puede pedir hasta " + max + " meses; el plazo de su contrato se verifica al estudiar el crédito." : "";
         cotPlazo._scmPreview = attachCotizacionFinancingPreview(cotPlazo, plazoInput, limit.preview);
         if (cotPlazo._scmPreview) cotPlazo._scmPreview.setVisible(cotPlazo.style.display !== "none");
       });

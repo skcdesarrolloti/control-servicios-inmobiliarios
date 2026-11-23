@@ -33,7 +33,21 @@
     ".scm-qfp-table tfoot td{font-weight:800;background:#f8fafc}" +
     ".scm-qfp-hint{margin:0;color:#475569;font-size:12.5px;font-weight:600}" +
     ".scm-qfp-note{margin:0;color:#64748b;font-size:11px;font-weight:500;line-height:1.5}" +
-    "@media (max-width:720px){.scm-qfp-summary{grid-template-columns:1fr}}";
+    ".scm-qfp-eval{padding:11px 12px;border:1px solid #c7d2fe;border-radius:11px;background:#fff}" +
+    ".scm-qfp-eval h4{margin:0 0 8px;color:#3730a3;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}" +
+    ".scm-qfp-eval dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px;margin:0}" +
+    ".scm-qfp-eval dt{color:#64748b;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}" +
+    ".scm-qfp-eval dd{margin:1px 0 0;color:#0b254f;font-size:12.5px;font-weight:700}" +
+    ".scm-qfp-eval dd small{display:block;color:#64748b;font-size:11px;font-weight:500}" +
+    ".scm-qfp-eval .scm-qfp-eval-credit{margin:8px 0 0;color:#92400e;font-size:12px;font-weight:700}" +
+    ".scm-qfp .scm-qfp-option em{display:block;margin-top:3px;padding:1px 6px;border-radius:999px;background:#fef3c7;color:#92400e;font-size:10px;font-style:normal;font-weight:800}" +
+    ".scm-qfp .scm-qfp-option[aria-pressed=\"true\"] em{background:#fde68a;color:#78350f}" +
+    ".scm-qfp-checks{display:grid;gap:4px;margin:10px 0 0;padding:0;list-style:none}" +
+    ".scm-qfp-checks li{display:flex;gap:6px;align-items:flex-start;color:#0f172a;font-size:12px;font-weight:600}" +
+    ".scm-qfp-checks li b{flex:0 0 auto;font-size:12px}" +
+    ".scm-qfp-checks li.is-ok b{color:#047857}" +
+    ".scm-qfp-checks li.is-bad b{color:#b91c1c}" +
+    "@media (max-width:720px){.scm-qfp-summary,.scm-qfp-eval dl{grid-template-columns:1fr}}";
 
   var money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 
@@ -59,6 +73,43 @@
     return term + (Number(term) === 1 ? " mes" : " meses");
   }
 
+  // Evaluación del funcionario (solo en el panel): si el plazo, la cuota y el valor caben en lo del propietario.
+  function checks(data, term) {
+    var ev = data.evaluation;
+    var plan = data.plans[term];
+    if (!ev || !plan) return [];
+    var list = [];
+    if (ev.max_term > 0) {
+      list.push(Number(term) <= ev.max_term
+        ? { ok: true, text: months(term) + " está dentro del plazo máximo según el contrato (" + months(ev.max_term) + ")." }
+        : { ok: false, text: months(term) + " supera el plazo máximo según el contrato (" + months(ev.max_term) + ")." });
+    }
+    list.push(plan.payment <= ev.available
+      ? { ok: true, text: "La cuota de " + money.format(plan.payment) + " cabe en lo que puede ir a la cuota (" + money.format(ev.available) + " al mes)." }
+      : { ok: false, text: "La cuota de " + money.format(plan.payment) + " supera lo que puede ir a la cuota (" + money.format(ev.available) + " al mes)." });
+    list.push(data.amount <= ev.cupo
+      ? { ok: true, text: "El valor cabe en el cupo preaprobado (" + money.format(ev.cupo) + ")." }
+      : { ok: false, text: "El valor supera el cupo preaprobado (" + money.format(ev.cupo) + ") en " + money.format(data.amount - ev.cupo) + "." });
+    return list;
+  }
+
+  function evaluationHtml(ev) {
+    if (!ev) return "";
+    var item = function (label, value, note) {
+      return "<div><dt>" + label + "</dt><dd>" + value + (note ? "<small>" + escapeHtml(note) + "</small>" : "") + "</dd></div>";
+    };
+    return '<div class="scm-qfp-eval" data-scm-qfp-eval><h4>Evaluación para el funcionario</h4><dl>' +
+      item("Propietario", escapeHtml(ev.owner || "Sin dato"), ev.document ? "Documento " + ev.document : "") +
+      item("Contrato", escapeHtml(ev.contract || "Sin dato"), ev.property ? "Inmueble " + ev.property : "") +
+      item("Plazo máximo según contrato", ev.max_term > 0 ? months(ev.max_term) : "Sin plazo por vigencia", ev.term_basis || "") +
+      item("Ingreso neto mensual", money.format(ev.net_income), ev.contracts > 1 ? ev.contracts + " contratos del propietario" : "Contrato del inmueble") +
+      item("Cupo preaprobado", money.format(ev.cupo), "Ingreso neto × " + ev.income_months + " meses") +
+      item("Puede ir a la cuota", money.format(ev.available) + " al mes", "Según el % utilizable y la cobertura mínima") +
+      "</dl>" +
+      (ev.credit ? '<p class="scm-qfp-eval-credit">Esta cotización ya tiene la solicitud de crédito #' + ev.credit.id + " (" + escapeHtml(ev.credit.status) + ").</p>" : "") +
+      "</div>";
+  }
+
   function usable(data) {
     return !!(data && data.plans && Object.keys(data.plans).length);
   }
@@ -76,11 +127,16 @@
       "<p>Cuota mensual estimada según el plazo, con la tasa de referencia de " + percent(data.rate) + " mensual (" + percent(data.effective_annual) + " efectivo anual). Elige los meses para ver el plan de pagos.</p></div>" +
       '<div class="scm-qfp-options" role="group" aria-label="Cuota según el plazo">' +
       terms.map(function (term) {
-        return '<button type="button" class="scm-qfp-option" data-scm-qfp-term="' + term + '" aria-pressed="false"><strong>' + months(term) + "</strong><span>" + money.format(data.plans[term].payment) + " al mes</span></button>";
+        var ev = data.evaluation;
+        var flags = [];
+        if (ev && ev.max_term > 0 && term > ev.max_term) flags.push("Supera plazo");
+        if (ev && data.plans[term].payment > ev.available) flags.push("No alcanza");
+        return '<button type="button" class="scm-qfp-option" data-scm-qfp-term="' + term + '" aria-pressed="false"><strong>' + months(term) + "</strong><span>" + money.format(data.plans[term].payment) + " al mes</span>" + (flags.length ? "<em>" + flags.join(" · ") + "</em>" : "") + "</button>";
       }).join("") +
       "</div>" +
       '<div class="scm-qfp-plan" data-scm-qfp-plan aria-live="polite"></div>' +
       (data.note ? '<p class="scm-qfp-note">' + escapeHtml(data.note) + "</p>" : "");
+    if (data.evaluation) host.querySelector(".scm-qfp-head").insertAdjacentHTML("afterend", evaluationHtml(data.evaluation));
     var planBox = host.querySelector("[data-scm-qfp-plan]");
 
     function update(value) {
@@ -96,11 +152,15 @@
       var rows = plan.rows.map(function (row, index) {
         return "<tr><td>" + (index + 1) + "</td><td>" + money.format(row[0]) + "</td><td>" + money.format(row[1]) + "</td><td>" + money.format(row[2]) + "</td><td>" + money.format(row[3]) + "</td></tr>";
       }).join("");
+      var checkList = data.evaluation ? '<ul class="scm-qfp-checks" data-scm-qfp-checks>' + checks(data, term).map(function (check) {
+        return '<li class="' + (check.ok ? "is-ok" : "is-bad") + '"><b aria-hidden="true">' + (check.ok ? "✓" : "✗") + "</b><span>" + escapeHtml(check.text) + "</span></li>";
+      }).join("") + "</ul>" : "";
       planBox.innerHTML =
         '<div class="scm-qfp-summary">' +
         '<div class="is-main"><span>Cuota mensual estimada</span><strong>' + money.format(plan.payment) + "</strong></div>" +
         "<div><span>Total intereses</span><strong>" + money.format(plan.interest) + "</strong></div>" +
         "<div><span>Total a pagar en " + months(term) + "</span><strong>" + money.format(plan.total) + "</strong></div></div>" +
+        checkList +
         '<div class="scm-qfp-table"><table><thead><tr><th>Cuota</th><th>Valor cuota</th><th>Intereses</th><th>Abono a capital</th><th>Saldo</th></tr></thead><tbody>' + rows + "</tbody>" +
         "<tfoot><tr><td>Total</td><td>" + money.format(plan.total) + "</td><td>" + money.format(plan.interest) + "</td><td>" + money.format(data.amount) + "</td><td></td></tr></tfoot></table></div>";
     }

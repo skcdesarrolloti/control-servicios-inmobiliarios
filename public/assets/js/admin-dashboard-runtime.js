@@ -25193,7 +25193,7 @@
         var max = limit.max;
         wrap._scmTermMax = max;
         if (max > 0) input.max = String(max);
-        hint.textContent = max > 0 ? 'Máximo ' + max + ' meses según el contrato del propietario. El crédito queda sujeto a estudio, verificación y aprobación.' : '';
+        hint.textContent = max > 0 ? 'Puede pedir hasta ' + max + ' meses. Si cumple con el plazo de su contrato se verifica al estudiar el crédito, que queda sujeto a estudio, verificación y aprobación.' : '';
         if (window.SCMQuoteFinancingPreview && limit.preview) {
           wrap._scmPreview = window.SCMQuoteFinancingPreview.attach(wrap, input, limit.preview);
           if (wrap._scmPreview) wrap._scmPreview.setVisible(!wrap.hidden);

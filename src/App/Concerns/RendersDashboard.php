@@ -5804,8 +5804,9 @@ trait RendersDashboard
       $preview = (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db))->quoteFinancingPreview((int) $id);
     } catch (\Throwable $error) {
       error_log('[public_quote_term] ' . $error->getMessage());
-      $preview = ['amount' => 0.0, 'rate' => 0.0, 'effective_annual' => 0.0, 'max_term' => 0, 'plans' => []];
+      $preview = ['amount' => 0.0, 'rate' => 0.0, 'effective_annual' => 0.0, 'max_term' => \SCM\Modules\OwnerCredits\OwnerCreditService::QUOTE_REQUEST_MAX_TERM, 'plans' => []];
     }
+    // El propietario puede pedir hasta 12 meses; si cumple con el plazo de su contrato lo verifica el funcionario.
     $maxTerm = (int) $preview['max_term'];
     return '<section id="responder-cotizacion" tabindex="-1" class="scm-cotizacion-native-section scm-public-quote-response"><h3>Responder cotización</h3>'
       . '<p>Selecciona tu respuesta para que el equipo de SKC SuCasa Inmobiliaria pueda continuar el proceso.</p>'

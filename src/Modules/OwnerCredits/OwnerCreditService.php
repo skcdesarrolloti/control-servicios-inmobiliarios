@@ -33,6 +33,12 @@ use SCM\Support\SmsQueue;
 final class OwnerCreditService
 {
   /** Aviso en todo valor que no es una aprobación (cupo, simulación): no genera promesas ni expectativas. */
+  /**
+   * Meses que puede pedir el propietario al financiar una cotización: siempre hasta 12. Si cumple con el plazo de su
+   * contrato lo verifica el funcionario en el liquidador, que decide y le informa la respuesta.
+   */
+  public const QUOTE_REQUEST_MAX_TERM = 12;
+
   public const DISCLAIMER = 'Valores de referencia sujetos a las políticas de crédito y a los términos y condiciones de SKC SuCasa Inmobiliaria. No constituyen una aprobación ni un compromiso de desembolso: el crédito queda sujeto a estudio, verificación y aprobación.';
 
   public const STATUSES = [
@@ -428,15 +434,15 @@ final class OwnerCreditService
 
   /**
    * Cuotas estimadas para financiar una cotización, para que el propietario decida antes de pedir el crédito: el plan de
-   * cada plazo posible (1 hasta el máximo) sobre el total de la cotización, a la tasa de referencia (sin pasar la usura).
-   * No registra nada: el analista define las condiciones finales.
+   * cada plazo que puede pedir (1 a 12 meses) sobre el total de la cotización, a la tasa de referencia (sin pasar la
+   * usura). No registra nada: el analista define las condiciones finales.
    * @return array{amount:float,rate:float,effective_annual:float,max_term:int,plans:array<int,array<string,mixed>>}
    */
   public function quoteFinancingPreview(int $quoteId): array
   {
     $quote = $this->db->getRow("SELECT * FROM `{$this->db->table('jet_cct_cotizacion_mantenimiento')}` WHERE `_ID` = ? LIMIT 1", [$quoteId]);
     $amount = is_array($quote) ? self::money($quote['total'] ?? '') : 0.0;
-    $maxTerm = $this->quoteTermLimit($quoteId);
+    $maxTerm = self::QUOTE_REQUEST_MAX_TERM;
     $rate = OwnerCreditSimulator::rate($this->config());
     $plans = [];
     if ($amount > 0 && $rate > 0) {
@@ -472,12 +478,56 @@ final class OwnerCreditService
     return array_merge([['net_income' => (float) $property['net_total']] + $property], $rows);
   }
 
-  /** Los meses elegidos al responder la cotización con financiación Sí. @throws \DomainException */
+  /**
+   * Los meses elegidos al responder la cotización con financiación Sí: de 1 a 12. El plazo del contrato no limita la
+   * solicitud; el funcionario lo verifica en el liquidador. @throws \DomainException
+   */
   public function assertQuoteTerm(int $quoteId, int $term): void
   {
     if ($term <= 0) throw new \DomainException('Indica a cuántos meses se financia la cotización.');
-    $limit = $this->quoteTermLimit($quoteId);
-    if ($limit > 0 && $term > $limit) throw new \DomainException('El plazo máximo para financiar la cotización #' . $quoteId . ' es de ' . $limit . ' meses.');
+    if ($term > self::QUOTE_REQUEST_MAX_TERM) throw new \DomainException('El plazo máximo para financiar la cotización #' . $quoteId . ' es de ' . self::QUOTE_REQUEST_MAX_TERM . ' meses.');
+  }
+
+  /**
+   * Lo que el funcionario revisa en el panel antes de registrar la financiación de una cotización: propietario, plazo
+   * máximo según su contrato, ingreso neto, cupo preaprobado y cuánto del ingreso se puede usar para la cuota. Es solo
+   * informativo (no va a la vista pública). Null si la cotización no tiene contrato.
+   * @return array<string,mixed>|null
+   */
+  public function quoteFinancingEvaluation(int $quoteId): ?array
+  {
+    $quote = $this->db->getRow("SELECT * FROM `{$this->db->table('jet_cct_cotizacion_mantenimiento')}` WHERE `_ID` = ? LIMIT 1", [$quoteId]);
+    if (!is_array($quote)) return null;
+    $contract = $this->contractById((int) ($quote['id_contrato'] ?? 0)) ?? $this->contractByRef((string) ($quote['contrato'] ?? ''));
+    if ($contract === null) return null;
+    $owner = $this->contractOwners((int) $contract['_ID'])[0] ?? null;
+    $document = $this->ownerDocument($owner, $contract);
+    $preapproval = $this->repairTerm($contract, $document);
+    $settings = $this->config();
+    $net = max(0.0, (float) $preapproval['net_income']);
+    $credit = null;
+    try {
+      $this->ensureSchema();
+      $row = $this->byQuote($quoteId);
+      if ($row !== null) $credit = ['id' => (int) $row['id'], 'status' => self::STATUSES[$row['status']] ?? (string) $row['status']];
+    } catch (\Throwable $error) {
+      error_log('[quote-financing-evaluation] ' . $error->getMessage());
+    }
+    return [
+      'owner' => $owner !== null ? (string) $owner['name'] : (string) ($contract['propietario'] ?? ''),
+      'document' => $document,
+      'contract' => (string) ($contract['contrato'] ?? ''),
+      'property' => (string) ($contract['inmueble'] ?? $contract['id_inmueble'] ?? ''),
+      'contracts' => (int) $preapproval['contracts'],
+      'max_term' => $this->requestTermLimit($preapproval),
+      'term_basis' => (string) $preapproval['term_basis'],
+      'net_income' => round($net),
+      'income_months' => (int) $preapproval['income_months'],
+      'cupo' => round((float) $preapproval['amount']),
+      // Lo que puede ir a la cuota cada mes: el % utilizable del ingreso neto, dividido por la cobertura mínima.
+      'available' => round($net * (float) $settings['usable_income_factor'] / max(1.0, (float) $settings['min_coverage'])),
+      'credit' => $credit,
+    ];
   }
 
   /**

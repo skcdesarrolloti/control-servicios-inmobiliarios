@@ -31,7 +31,8 @@ $simulate = static function (array $raw) use ($service): array {
 echo json_encode([
   'publicHtml' => $panel,
   'toolHtml' => (new ToolsView())->creditSimulator($service->defaults(), $service->rateStatus()),
-  'panelPreview' => OwnerCreditSimulator::browserPreview(['amount' => 893723.0, 'rate' => 0.0242, 'effective_annual' => OwnerCreditSimulator::effectiveAnnual(0.0242), 'max_term' => 3, 'plans' => $plans]),
+  'panelPreview' => ['evaluation' => ['owner' => 'Ana Pérez', 'document' => '1.047.000', 'contract' => '650', 'property' => '10500', 'contracts' => 1, 'max_term' => 2, 'term_basis' => '4 meses de vigencia del contrato (fin 30/03/2027) − 2 de margen', 'net_income' => 1200000, 'income_months' => 3, 'cupo' => 3600000, 'available' => 500000, 'credit' => ['id' => 41, 'status' => 'Pendiente']]]
+    + OwnerCreditSimulator::browserPreview(['amount' => 893723.0, 'rate' => 0.0242, 'effective_annual' => OwnerCreditSimulator::effectiveAnnual(0.0242), 'max_term' => 3, 'plans' => $plans]),
   'rateResponse' => ['html' => (new ToolsView())->creditRateCard((new CreditSimulationService(['usury_synced_at' => (int) strtotime('2026-11-23 08:15:00'), 'reference_rate' => 0.021] + $settings))->rateStatus()), 'rate' => '2,1', 'ok' => true],
   'responses' => [
     '12' => $simulate(['valor' => '2.500.000', 'plazo' => '12', 'tasa' => '2,42', 'desembolso' => '2026-11-20']),

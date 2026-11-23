@@ -41,13 +41,21 @@ trait HandlesMaintenanceActions
       $quoteId = $ids === [] ? 0 : max($ids);
     }
     try {
-      // Con el plazo va la simulación (cuota de cada plazo y plan de pagos) para mostrarla debajo del campo de meses.
+      // El propietario puede pedir hasta 12 meses. Con el plazo va la simulación (cuota de cada plazo y plan de pagos) y,
+      // como esto es del panel, la evaluación para el funcionario: plazo máximo según el contrato, cupo e ingreso.
       $credits = new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db);
-      $preview = $quoteId > 0 ? $credits->quoteFinancingPreview($quoteId) : null;
-      $this->jsonOk(['max' => $preview !== null ? (int) $preview['max_term'] : $credits->quoteTermLimit($quoteId), 'preview' => $preview !== null ? \SCM\Modules\OwnerCredits\OwnerCreditSimulator::browserPreview($preview) : null]);
+      $preview = $quoteId > 0 ? \SCM\Modules\OwnerCredits\OwnerCreditSimulator::browserPreview($credits->quoteFinancingPreview($quoteId)) : null;
+      if ($preview !== null) {
+        try {
+          $preview['evaluation'] = $credits->quoteFinancingEvaluation($quoteId);
+        } catch (\Throwable $error) {
+          error_log('[cotizacion_financing_evaluation] ' . $error->getMessage());
+        }
+      }
+      $this->jsonOk(['max' => \SCM\Modules\OwnerCredits\OwnerCreditService::QUOTE_REQUEST_MAX_TERM, 'preview' => $preview]);
     } catch (\Throwable $error) {
       error_log('[cotizacion_financing_term] ' . $error->getMessage());
-      $this->jsonOk(['max' => 0, 'preview' => null]);
+      $this->jsonOk(['max' => \SCM\Modules\OwnerCredits\OwnerCreditService::QUOTE_REQUEST_MAX_TERM, 'preview' => null]);
     }
   }
 

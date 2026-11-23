@@ -107,7 +107,8 @@ $check(str_contains($publicPage, 'assets/js/quote-financing-preview.js') && str_
 $dashboard = (string) file_get_contents(dirname(__DIR__) . '/src/App/Concerns/RendersDashboard.php');
 $check(strpos($dashboard, 'assets/js/quote-financing-preview.js') < strpos($dashboard, '<script src="<?php echo $jsUrl; ?>"'), 'the panel loads the shared simulation component before its forms');
 $termEndpoint = (string) file_get_contents(dirname(__DIR__) . '/src/App/Concerns/HandlesMaintenanceActions.php');
-$check(str_contains($termEndpoint, "'preview' => \$preview !== null ? \SCM\Modules\OwnerCredits\OwnerCreditSimulator::browserPreview(\$preview)"), 'the months endpoint of the panel sends the simulation with the maximum term');
+$check(str_contains($termEndpoint, "OwnerCreditSimulator::browserPreview(\$credits->quoteFinancingPreview(\$quoteId))") && str_contains($termEndpoint, "\$preview['evaluation'] = \$credits->quoteFinancingEvaluation(\$quoteId)") && str_contains($termEndpoint, "'max' => \SCM\Modules\OwnerCredits\OwnerCreditService::QUOTE_REQUEST_MAX_TERM"), 'the months endpoint of the panel sends 12 months, the simulation and the staff evaluation');
+$check(!str_contains((string) json_encode($data), 'evaluation') && !str_contains($block, 'Ingreso neto'), 'the public page never gets the staff evaluation');
 
 // Tasa del simulador: vigente o no, de dónde sale y cuándo se actualizó.
 $current = ['usury_auto' => true, 'usury_synced_at' => (int) strtotime('2026-11-23 08:15:00'), 'usury_resolution' => '1472', 'reference_rate_updated_at' => (int) strtotime('2026-11-02 10:30:00'), 'usury_sync_error' => ''] + $settings;
