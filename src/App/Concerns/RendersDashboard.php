@@ -6038,9 +6038,22 @@ trait RendersDashboard
     return '';
   }
 
-  /** @return array{nombre:string,cargo:string,email:string,celular:string} */
+  /**
+   * Responsable de la cotización: el coordinador (quien la envía) con sus propios datos de contacto; sin coordinador,
+   * quien la elaboró. "Elaboró la cotización" se muestra aparte con los datos del creador.
+   * @return array{nombre:string,cargo:string,email:string,celular:string}
+   */
   private function cotizacion_responsable_contact(array $row): array
   {
+    $coordinator = $this->cotizacion_first_non_empty($row, ['responsable_cotizacion', 'responsable', 'coordinador']);
+    if ($coordinator !== '') {
+      return [
+        'nombre' => $coordinator,
+        'cargo' => $this->cotizacion_first_non_empty($row, ['cargo_responsable_cotizacion', 'cargo_responsable', 'cargo_coordinador']),
+        'email' => $this->cotizacion_first_non_empty($row, ['email_responsable_cotizacion', 'correo_responsable_cotizacion', 'email_responsable', 'correo_responsable', 'email_coordinador', 'correo_coordinador']),
+        'celular' => $this->cotizacion_first_non_empty($row, ['celular_responsable_cotizacion', 'telefono_responsable_cotizacion', 'celular_responsable', 'telefono_responsable', 'celular_coordinador', 'telefono_coordinador']),
+      ];
+    }
     return [
       'nombre' => $this->cotizacion_first_non_empty($row, [
         'responsable_cotizacion',

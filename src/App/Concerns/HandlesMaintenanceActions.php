@@ -608,6 +608,7 @@ trait HandlesMaintenanceActions
         'coordinador' => trim((string) ($actor['name'] ?? Auth::user())),
         'email_coordinador' => trim((string) ($actor['email'] ?? '')),
         'celular_coordinador' => trim((string) ($actor['phone'] ?? '')),
+        'cargo_coordinador' => trim((string) ($actor['cargo'] ?? '')),
         'destinatario' => $destinatario,
         'id_ticket' => $ticketId,
         'id_inmueble' => $this->maintenance_quote_first([$revision['id_inmueble'] ?? '', $ticket['id_inmueble'] ?? '', $sourceQuote['id_inmueble'] ?? '']),
@@ -3187,7 +3188,15 @@ trait HandlesMaintenanceActions
       );
       $quote = array_merge($quote, $sendTotals);
       [$now, $nowSql] = $this->maintenance_quote_now_pair();
-      $documentRow = array_merge($quote, [
+      // Quien envía queda como coordinador (responsable de la cotización); el PDF ya debe salir con sus datos.
+      $sender = $this->ticketCompletionActor();
+      $senderFields = [
+        'coordinador' => trim((string) ($sender['name'] ?? Auth::user())),
+        'email_coordinador' => trim((string) ($sender['email'] ?? '')),
+        'celular_coordinador' => trim((string) ($sender['phone'] ?? '')),
+        'cargo_coordinador' => trim((string) ($sender['cargo'] ?? '')),
+      ];
+      $documentRow = array_merge($quote, $senderFields, [
         'destinatario' => $destinatario,
         'email_destinatario' => $email,
         'celular_destinatario' => $celular,
@@ -3351,6 +3360,7 @@ trait HandlesMaintenanceActions
         'coordinador' => $actorName,
         'email_coordinador' => $actorEmail,
         'celular_coordinador' => trim((string) ($actor['phone'] ?? '')),
+        'cargo_coordinador' => trim((string) ($actor['cargo'] ?? '')),
       ];
       $quoteUpdate = $schema->filterTableData($quoteTable, $quoteUpdate);
       if (!empty($quoteUpdate)) {
