@@ -67,6 +67,8 @@ trait GenericQueryConcern
       'fTuvoSeguimiento' => $clean($input[$prefix . 'tuvo_seguimiento'] ?? ''),
       'fSort' => $this->normalize_generic_sort($clean($input[$prefix . 'sort'] ?? '')),
       'fTema' => $clean($input[$prefix . 'tema'] ?? ''),
+      // Pestaña Servicios públicos: separa las solicitudes normales de los casos críticos de 72 h.
+      'fTipoServicioPublico' => in_array($tipoSp = $clean($input[$prefix . 'tipo_servicio_publico'] ?? ''), ['normal', 'critico'], true) ? $tipoSp : '',
       'fPage' => max(1, (int) $clean($input[$prefix . 'page'] ?? '1')),
       'fPerPage' => max(10, min(100, (int) $clean($input[$prefix . 'per_page'] ?? '10'))),
     ];
@@ -90,6 +92,15 @@ trait GenericQueryConcern
     if (!empty($p['fTema'])) {
       $where[] = 'CONVERT(`tema_ayuda` USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci';
       $args[] = $p['fTema'];
+    }
+
+    $tipoServicioPublico = (string) ($p['fTipoServicioPublico'] ?? '');
+    if ($tipoServicioPublico !== '') {
+      $criticalTopics = [\SCM\Modules\Pending\PublicServicesCriticalTicket::TOPIC, 'Servicio público crítico'];
+      $where[] = "LOWER(TRIM(COALESCE(`tema_ayuda`, ''))) " . ($tipoServicioPublico === 'critico' ? 'IN' : 'NOT IN') . ' (?, ?)';
+      foreach ($criticalTopics as $topic) {
+        $args[] = mb_strtolower($topic, 'UTF-8');
+      }
     }
 
     $myCategory = trim((string) ($p['_scmMyCategory'] ?? ''));

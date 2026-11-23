@@ -64,6 +64,18 @@ $check(str_contains($dashboard, "'servicios_publicos' => self::AJAX_SERVICIOS_PU
 $workflow = (string) file_get_contents($root . '/src/App/Concerns/HandlesTicketWorkflowActions.php');
 $check(str_contains($workflow, "\$case['tab_key'] = 'servicios_publicos'"), 'el crítico abierto desde Alertas usa las reglas de Servicios públicos');
 
+// Filtro "Tipo de caso": solicitudes normales vs. críticos de 72 h.
+$parser = new class {
+  use SCM\Modules\GenericTickets\Concerns\GenericQueryConcern;
+};
+$parse = static fn(string $value): string => (string) ($parser->parse_params_generic(['scmsp_tipo_servicio_publico' => $value], 'scmsp_')['fTipoServicioPublico'] ?? '');
+$check($parse('critico') === 'critico' && $parse('normal') === 'normal', 'el filtro acepta normales y críticos');
+$check($parse('cualquier cosa') === '', 'el filtro ignora valores desconocidos');
+$query = (string) file_get_contents($root . '/src/Modules/GenericTickets/Concerns/GenericQueryConcern.php');
+$check(str_contains($query, "(\$tipoServicioPublico === 'critico' ? 'IN' : 'NOT IN')"), 'normales excluye los críticos y críticos solo trae esos');
+$ui = (string) file_get_contents($root . '/src/Views/GenericTicketsUiView.php');
+$check(str_contains($ui, "=== 'servicios_publicos'): \$tipoSp") && str_contains($ui, 'Críticos (72 h)'), 'el filtro solo se pinta en Servicios públicos');
+
 if ($failures > 0) {
   fwrite(STDERR, $failures . " check(s) failed\n");
   exit(1);

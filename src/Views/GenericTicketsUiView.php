@@ -856,6 +856,13 @@ final class GenericTicketsUiView
                 <option value="">Todas</option><?php foreach ($temaOpts as $t): ?><option value="<?php echo esc_attr($t); ?>" <?php selected(strtolower((string) ($p['fTema'] ?? '')), strtolower($t)); ?>><?php echo esc_html($t); ?></option><?php endforeach; ?>
               </select></div>
           <?php endif; ?>
+          <?php if (($baseTabKey !== '' ? $baseTabKey : $tabKey) === 'servicios_publicos'): $tipoSp = (string) ($p['fTipoServicioPublico'] ?? ''); ?>
+            <div class="scm-field"><label for="<?php echo esc_attr($prefix); ?>tipo_servicio_publico">Tipo de caso</label><select class="select select-bordered select-sm scm-select" id="<?php echo esc_attr($prefix); ?>tipo_servicio_publico" name="<?php echo esc_attr($prefix); ?>tipo_servicio_publico">
+                <option value="">Todos</option>
+                <option value="normal" <?php selected($tipoSp, 'normal'); ?>>Solicitudes normales</option>
+                <option value="critico" <?php selected($tipoSp, 'critico'); ?>>Críticos (72 h)</option>
+              </select></div>
+          <?php endif; ?>
           <?php /* "Mis casos" usa un formulario reducido: sin Vista, Funcionario, Asunto, Ordenar por, Atraso, Sin actualizar ni Tuvo seguimiento. */ $myCasesForm = $tabKey === 'mis_tickets'; ?>
           <?php if ($myCasesForm): ?>
           <?php elseif ($lockedStatusLabel !== ''): ?>
