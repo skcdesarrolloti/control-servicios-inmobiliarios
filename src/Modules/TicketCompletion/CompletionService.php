@@ -1728,7 +1728,7 @@ final class CompletionService
     $statsRows = $ownerWhere === ''
       ? $this->repo->db->getResults("SELECT status, COUNT(*) AS total FROM `{$table}` GROUP BY status")
       : $this->repo->db->getResults("SELECT a.status, COUNT(*) AS total FROM `{$table}` a LEFT JOIN `{$tickets}` t ON t._ID = a.ticket_pk WHERE {$ownerWhere} GROUP BY a.status", $ownerArgs);
-    $stats = ['pending' => 0, 'signed' => 0, 'archived' => 0, 'cancelled' => 0, 'all' => 0];
+    $stats = ['pending' => 0, 'signed' => 0, 'archived' => 0, 'cancelled' => 0, 'superseded' => 0, 'all' => 0];
     foreach ($statsRows as $row) {
       $key = (string) ($row['status'] ?? '');
       if (isset($stats[$key])) {

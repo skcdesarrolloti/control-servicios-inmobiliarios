@@ -201,105 +201,165 @@ final class CompletionView
     return '<fieldset class="scm-acta-item" data-acta-item><legend>Daño y solución</legend>' . $syncField . $correctiveBlock . '<div class="scm-acta-grid"><label>Daño encontrado *<textarea name="items[' . $index . '][damage]" required maxlength="3000" rows="3">' . self::e($values['damage'] ?? '') . '</textarea></label><label>Solución realizada *<textarea name="items[' . $index . '][solution]" required maxlength="3000" rows="3">' . self::e($values['solution'] ?? '') . '</textarea></label></div>' . $damagePhotosBlock . '<div class="scm-acta-photo-field"><label>Fotos de la solución realizada (opcional)<input type="file" name="acta_item_photos_' . $index . '[]" accept="image/jpeg,image/png,image/webp" multiple data-acta-photos aria-describedby="' . $helpId . '"></label><button type="button" class="scm-acta-photo-paste" data-acta-photo-paste><strong>Pegar foto de solución</strong><span>Haz clic aquí y presiona Ctrl+V</span></button><small id="' . $helpId . '" data-acta-photo-help>Sin límite de cantidad de fotos. Máximo 8 MB en toda el acta después de comprimir. JPG, PNG o WebP; hasta 25 MB por archivo. Se comprimen automáticamente.</small></div><div class="scm-acta-photo-preview" data-acta-photo-preview aria-live="polite" aria-label="Fotos de solución seleccionadas">' . $photosHtml . '</div><button type="button" class="scm-acta-remove" data-acta-remove-item>Quitar este detalle</button></fieldset>';
   }
 
+  /** @var array<string,array{0:string,1:string,2:string,3:string}> estado => [pestaña, icono, título, descripción] */
+  private const DASHBOARD_TABS = [
+    'pending' => ['Sin firmar', 'clock', 'Actas sin firmar', 'Actas enviadas que esperan la firma del destinatario. Quedan aquí hasta que firme.'],
+    'signed' => ['Firmadas', 'check', 'Actas firmadas', 'Actas firmadas por el destinatario. Puedes verlas o descargar el PDF firmado.'],
+    'archived' => ['Archivadas', 'document', 'Actas archivadas', 'Actas retiradas de pendientes sin cerrar el caso ni generar cobro.'],
+    'cancelled' => ['Anuladas', 'close', 'Actas anuladas', 'Actas anuladas. No cerraron el caso ni generaron cobro.'],
+    'superseded' => ['Versiones anteriores', 'refresh', 'Versiones firmadas anteriores', 'Firmas anteriores conservadas cuando un acta firmada se reabrió para corregirla.'],
+    'all' => ['Todas', 'filter', 'Todas las actas', 'Todas las actas, sin importar su estado.'],
+  ];
+
   /** @param array<string,string|int> $filters @param array<int,array<string,mixed>> $items @param array<string,int> $stats @param array<string,int> $pagination */
   public function dashboardPanel(array $filters, array $items, array $stats, int $count, array $pagination, CompletionService $service, bool $canDeleteAny = false): string
   {
+    $ui = \SCM\Modules\Pending\PublicServicesUi::class;
     $status = (string) ($filters['estado'] ?? 'pending');
+    $status = isset(self::DASHBOARD_TABS[$status]) ? $status : 'pending';
+    $field = static fn(string $id, string $label, string $control): string => '<label class="!sp-block" for="' . $id . '"><span class="' . $ui::LABEL . '">' . self::e($label) . '</span>' . $control . '</label>';
+    $input = static fn(string $id, string $value, string $placeholder): string => '<input class="' . $ui::INPUT . '" id="' . $id . '" name="' . $id . '" type="text" value="' . self::e($value) . '" placeholder="' . self::e($placeholder) . '">';
+    $perPage = '';
+    foreach ([30, 50, 100] as $size) {
+      $perPage .= '<option value="' . $size . '"' . ((int) ($filters['per_page'] ?? 30) === $size ? ' selected' : '') . '>' . $size . '</option>';
+    }
+    $tabsJson = array_map(static fn(array $tab): array => ['title' => $tab[2], 'description' => $tab[3]], self::DASHBOARD_TABS);
     ob_start(); ?>
-    <div class="scm-pending-wrap scm-actas-dashboard" id="sacta_panel">
-      <div class="scm-pending-header scm-pending-header--brand">
-        <div>
-          <h2>Actas de satisfacción</h2>
-          <p>Consulta actas sin firmar, firmadas, archivadas y anuladas. Las pendientes quedan aquí hasta que el destinatario firme.</p>
-        </div>
-        <div>
-          <div class="scm-pending-count" id="sacta-kpi-count"><?= self::e((string) $count) ?></div>
-          <div class="scm-pending-count-label"><?= $status === 'pending' ? 'actas sin firmar' : 'actas filtradas' ?></div>
-        </div>
-      </div>
-      <div id="sacta_kpis"><?= $this->dashboardKpis($stats) ?></div>
-      <div class="scm-filter-card">
-        <h3>Filtros</h3>
+    <div class="scm-actas-dashboard !sp-font-sans !sp-text-service-navy !sp-bg-service-background !sp-p-3 sm:!sp-p-5 !sp-space-y-5" id="sacta_panel">
+      <header class="<?= $ui::CARD ?> !sp-p-5 !sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-4">
+        <div class="!sp-flex !sp-items-center !sp-gap-3"><span class="!sp-p-2.5 !sp-bg-amber-50 !sp-rounded-xl !sp-border !sp-border-solid !sp-border-amber-200"><?= $ui::icon('check', '!sp-w-6 !sp-h-6') ?></span><div><h2 class="!sp-m-0 !sp-text-xl !sp-font-bold !sp-text-service-navy">Actas de satisfacción</h2><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">Recibido a satisfacción de los trabajos: firma del destinatario, cierre del caso y cobro</p></div></div>
+        <div class="!sp-text-right !sp-border-y-0 !sp-border-r-0 !sp-border-l !sp-border-solid !sp-border-slate-200 !sp-pl-4"><strong class="!sp-text-xl" id="sacta-kpi-count"><?= self::e((string) $count) ?></strong><p class="!sp-m-0 !sp-text-[9px] !sp-uppercase !sp-text-service-muted">Actas en la vista</p></div>
+      </header>
+      <div id="sacta_kpis"><?= $this->dashboardKpis($stats, $status) ?></div>
+      <div class="<?= $ui::CARD ?> !sp-p-5">
+        <div class="!sp-flex !sp-flex-wrap !sp-justify-between !sp-items-center !sp-gap-2 !sp-pb-3 !sp-mb-4 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100"><h3 class="!sp-m-0 !sp-flex !sp-gap-2 !sp-items-center !sp-text-[10px] !sp-font-semibold !sp-uppercase !sp-tracking-wide"><?= $ui::icon('filter') ?>Filtros</h3><span class="!sp-text-[10px] !sp-text-service-muted">Los filtros aplican a todas las pestañas</span></div>
         <form method="post" autocomplete="off" id="sacta_form">
-          <div class="scm-grid scm-actas-filter-grid">
-            <div class="scm-field"><label for="sacta_estado">Estado</label><select id="sacta_estado" name="sacta_estado"><option value="pending" <?= $status === 'pending' ? 'selected' : '' ?>>Actas sin firmar</option><option value="signed" <?= $status === 'signed' ? 'selected' : '' ?>>Firmadas</option><option value="archived" <?= $status === 'archived' ? 'selected' : '' ?>>Archivadas</option><option value="cancelled" <?= $status === 'cancelled' ? 'selected' : '' ?>>Anuladas</option><option value="superseded" <?= $status === 'superseded' ? 'selected' : '' ?>>Versiones firmadas anteriores</option><option value="all" <?= $status === 'all' ? 'selected' : '' ?>>Todas</option></select></div>
-            <div class="scm-field"><label for="sacta_caso"># caso</label><input id="sacta_caso" name="sacta_caso" type="text" value="<?= self::e($filters['caso'] ?? '') ?>" placeholder="Caso"></div>
-            <div class="scm-field"><label for="sacta_inmueble">Inmueble</label><input id="sacta_inmueble" name="sacta_inmueble" type="text" value="<?= self::e($filters['inmueble'] ?? '') ?>" placeholder="# inmueble"></div>
-            <div class="scm-field"><label for="sacta_contrato">Contrato</label><input id="sacta_contrato" name="sacta_contrato" type="text" value="<?= self::e($filters['contrato'] ?? '') ?>" placeholder="# contrato"></div>
-            <div class="scm-field"><label for="sacta_firmante">Firmante</label><input id="sacta_firmante" name="sacta_firmante" type="text" value="<?= self::e($filters['firmante'] ?? '') ?>" placeholder="Nombre, correo o celular"></div>
-            <div class="scm-field"><label for="sacta_per_page">Por página</label><select id="sacta_per_page" name="sacta_per_page"><?php foreach ([30, 50, 100] as $size): ?><option value="<?= $size ?>" <?= (int) ($filters['per_page'] ?? 30) === $size ? 'selected' : '' ?>><?= $size ?></option><?php endforeach; ?></select></div>
-          </div>
+          <input type="hidden" name="sacta_estado" value="<?= self::e($status) ?>" data-acta-status-input>
           <input type="hidden" name="sacta_page" value="<?= (int) ($pagination['page'] ?? 1) ?>">
-          <div class="scm-actions">
-            <button class="scm-btn-primary-cyan" type="submit">Filtrar</button>
-            <button class="scm-btn-secondary" type="button" data-pending-clear="sacta_">Limpiar</button>
+          <div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-5 !sp-gap-4">
+            <?= $field('sacta_caso', '# Caso', $input('sacta_caso', (string) ($filters['caso'] ?? ''), 'Número del caso')) ?>
+            <?= $field('sacta_inmueble', 'Inmueble', $input('sacta_inmueble', (string) ($filters['inmueble'] ?? ''), '# inmueble')) ?>
+            <?= $field('sacta_contrato', 'Contrato', $input('sacta_contrato', (string) ($filters['contrato'] ?? ''), '# contrato')) ?>
+            <?= $field('sacta_firmante', 'Firmante', $input('sacta_firmante', (string) ($filters['firmante'] ?? ''), 'Nombre, correo o celular')) ?>
+            <?= $field('sacta_per_page', 'Registros por página', '<select class="' . $ui::INPUT . '" id="sacta_per_page" name="sacta_per_page">' . $perPage . '</select>') ?>
+          </div>
+          <div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-3 !sp-mt-5">
+            <button class="<?= $ui::PRIMARY ?>" type="submit"><?= $ui::icon('filter') ?>Filtrar</button>
+            <button class="!sp-bg-transparent !sp-border-0 !sp-text-service-muted !sp-text-xs !sp-cursor-pointer" type="button" data-pending-clear="sacta_">Limpiar filtros</button>
             <span class="scm-spinner" id="sacta_spinner"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span>
           </div>
         </form>
       </div>
-      <div id="sacta_table"><?= $this->dashboardTable($items, $service, $pagination, $canDeleteAny) ?></div>
+      <div class="<?= $ui::CARD ?>">
+        <div class="!sp-p-4"><h3 class="!sp-m-0 !sp-font-bold !sp-text-sm" data-acta-tab-title><?= self::e(self::DASHBOARD_TABS[$status][2]) ?></h3><p class="!sp-m-0 !sp-mt-1 !sp-text-[10px] !sp-text-service-muted" data-acta-tab-description><?= self::e(self::DASHBOARD_TABS[$status][3]) ?></p></div>
+        <div id="sacta_table"><?= $this->dashboardTable($items, $service, $pagination, $canDeleteAny) ?></div>
+      </div>
+      <script type="application/json" data-acta-tabs><?= (string) json_encode($tabsJson, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
     </div>
     <?php return (string) ob_get_clean();
   }
 
-  /** @param array<string,int> $stats */
-  public function dashboardKpis(array $stats): string
+  /** Pestañas por estado con su contador (se recargan junto con el listado). @param array<string,int> $stats */
+  public function dashboardKpis(array $stats, string $status = 'pending'): string
   {
-    return '<div class="scm-actas-kpis"><div><span>Sin firmar</span><strong>' . self::e((string) ($stats['pending'] ?? 0)) . '</strong></div><div><span>Firmadas</span><strong>' . self::e((string) ($stats['signed'] ?? 0)) . '</strong></div><div><span>Archivadas</span><strong>' . self::e((string) ($stats['archived'] ?? 0)) . '</strong></div><div><span>Anuladas</span><strong>' . self::e((string) ($stats['cancelled'] ?? 0)) . '</strong></div><div><span>Total</span><strong>' . self::e((string) ($stats['all'] ?? 0)) . '</strong></div></div>';
+    $ui = \SCM\Modules\Pending\PublicServicesUi::class;
+    $status = isset(self::DASHBOARD_TABS[$status]) ? $status : 'pending';
+    $html = '<nav class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-1 !sp-p-1 !sp-bg-slate-100 !sp-rounded-lg !sp-w-fit !sp-max-w-full !sp-font-sans" role="tablist" aria-label="Estados de las actas">';
+    foreach (self::DASHBOARD_TABS as $key => $tab) {
+      $html .= '<button type="button" class="sp-group !sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-3 !sp-py-2 !sp-rounded-md !sp-bg-transparent !sp-border-0 !sp-text-service-muted !sp-font-sans !sp-text-[10px] !sp-font-medium !sp-cursor-pointer aria-pressed:!sp-bg-service-navy aria-pressed:!sp-text-white aria-pressed:!sp-font-semibold focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow" data-acta-tab="' . self::e($key) . '" aria-pressed="' . ($key === $status ? 'true' : 'false') . '">'
+        . $ui::icon($tab[1], '!sp-w-3 !sp-h-3 group-aria-pressed:!sp-text-service-yellow') . '<span>' . self::e($tab[0]) . '</span>'
+        . '<span class="!sp-min-w-[18px] !sp-px-1.5 !sp-py-0.5 !sp-rounded-full !sp-bg-white !sp-text-service-navy !sp-text-[9px] !sp-font-bold !sp-text-center group-aria-pressed:!sp-bg-service-yellow">' . self::e((string) (int) ($stats[$key] ?? 0)) . '</span></button>';
+    }
+    return $html . '</nav>';
   }
 
   /** @param array<int,array<string,mixed>> $items @param array<string,int> $pagination */
   public function dashboardTable(array $items, CompletionService $service, array $pagination = [], bool $canDeleteAny = false): string
   {
+    $ui = \SCM\Modules\Pending\PublicServicesUi::class;
     if (!$items) {
-      return '<div class="scm-table-wrap"><p class="scm-actas-empty">No hay actas para los filtros actuales.</p></div>';
+      return '<div class="!sp-p-10 !sp-text-center !sp-font-sans !sp-text-service-navy"><span class="!sp-inline-flex !sp-p-3 !sp-rounded-full !sp-bg-slate-100 !sp-text-service-muted">' . $ui::icon('document', '!sp-w-5 !sp-h-5') . '</span><p class="!sp-m-0 !sp-mt-3 !sp-text-xs !sp-font-semibold">No hay actas en esta pestaña</p><p class="!sp-m-0 !sp-mt-1 !sp-text-[10px] !sp-text-service-muted">Ajusta los filtros o revisa otra pestaña.</p></div>';
     }
-    $labels = ['pending' => 'Acta sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada', 'superseded' => 'Versión firmada anterior'];
-    $html = '<div class="scm-table-wrap"><table class="scm-table scm-table-prev scm-actas-table"><thead><tr><th>Acta</th><th>Estado</th><th>Caso</th><th>Inmueble</th><th>Firmante</th><th>Reporte</th><th>Fechas</th><th>Acciones</th></tr></thead><tbody>';
+    $labels = ['pending' => 'Sin firmar', 'signed' => 'Firmada', 'archived' => 'Archivada', 'cancelled' => 'Anulada', 'superseded' => 'Versión anterior'];
+    $badges = [
+      'pending' => '!sp-bg-amber-50 !sp-border-amber-200 !sp-text-amber-800',
+      'signed' => '!sp-bg-emerald-50 !sp-border-emerald-200 !sp-text-emerald-700',
+      'archived' => '!sp-bg-slate-100 !sp-border-slate-200 !sp-text-slate-600',
+      'cancelled' => '!sp-bg-rose-50 !sp-border-rose-200 !sp-text-rose-700',
+      'superseded' => '!sp-bg-sky-50 !sp-border-sky-200 !sp-text-sky-700',
+    ];
+    $th = '!sp-text-left !sp-text-[9px] !sp-uppercase !sp-tracking-wide !sp-font-bold !sp-text-service-muted !sp-bg-slate-50 !sp-px-3 !sp-py-4 !sp-border-x-0 !sp-border-y !sp-border-solid !sp-border-slate-200';
+    $td = '!sp-border-x-0 !sp-border-y-0 !sp-px-3 !sp-py-4 !sp-align-top';
+    $muted = '!sp-block !sp-mt-1 !sp-text-[9px] !sp-text-service-muted';
+    $danger = '!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-3 !sp-py-2 !sp-rounded-lg !sp-bg-white !sp-text-rose-700 !sp-border !sp-border-solid !sp-border-rose-200 !sp-text-[10px] !sp-font-semibold !sp-font-sans !sp-cursor-pointer hover:!sp-bg-rose-50 focus-visible:!sp-ring-2 focus-visible:!sp-ring-rose-300 !sp-whitespace-nowrap';
+    $html = '<div class="!sp-overflow-x-auto !sp-font-sans"><table class="!sp-w-full !sp-border-collapse !sp-text-[10px] !sp-text-service-navy !sp-min-w-[1050px]"><thead class="!sp-bg-slate-50"><tr>';
+    foreach (['Acta', 'Caso', 'Inmueble', 'Firmante', 'Cobro', 'Estado', 'Acciones'] as $label) {
+      $html .= '<th class="' . $th . '">' . $label . '</th>';
+    }
+    $html .= '</tr></thead><tbody>';
     foreach ($items as $act) {
       $payload = (array) ($act['_payload'] ?? []);
       $ticket = (string) ($payload['ticket_number'] ?? $act['ticket_display'] ?? $act['ticket_pk'] ?? '-');
-      $property = (string) ($payload['property'] ?? $act['ticket_inmueble'] ?? '-');
-      $contract = (string) ($payload['contract'] ?? $act['ticket_contrato'] ?? '-');
+      $property = trim((string) ($payload['property'] ?? $act['ticket_inmueble'] ?? ''));
+      $contract = trim((string) ($payload['contract'] ?? $act['ticket_contrato'] ?? ''));
+      $address = trim((string) ($act['ticket_address'] ?? ''));
       $signer = (array) ($payload['signer'] ?? []);
-      $report = (array) ($payload['report'] ?? []);
       $source = (array) ($payload['source'] ?? []);
-      $sourceLabel = ((string) ($source['flow'] ?? '') === 'approved_quote' && trim((string) ($source['quote_id'] ?? '')) !== '')
-        ? 'Cotización aprobada #' . trim((string) $source['quote_id'])
-        : 'Solución sin aprobación de cotización';
+      $actorName = trim((string) (((array) ($payload['actor'] ?? []))['name'] ?? ''));
+      $quoteId = trim((string) ($source['quote_id'] ?? ''));
+      $sourceLabel = ((string) ($source['flow'] ?? '') === 'approved_quote' && $quoteId !== '') ? 'Cotización aprobada #' . $quoteId : 'Solución sin cotización aprobada';
       $status = (string) ($act['status'] ?? '');
       $url = $service->viewUrl((int) $act['id']);
-      $html .= '<tr>';
-      $html .= '<td><span class="scm-ticket-badge">#' . self::e($act['id']) . '</span></td>';
-      $html .= '<td><span class="scm-acta-dashboard-status scm-acta-dashboard-status--' . self::e($status) . '">' . self::e($labels[$status] ?? $status) . '</span></td>';
-      $html .= '<td><strong>#' . self::e($ticket) . '</strong><br><small>' . self::e((string) ($act['ticket_estado_admin'] ?? '')) . '</small><br><small>' . self::e($sourceLabel) . '</small></td>';
-      $html .= '<td><span class="scm-inmueble-badge">' . self::e($property ?: '-') . '</span><br><small>Contrato ' . self::e($contract ?: '-') . '</small></td>';
-      $html .= '<td><strong>' . self::e($signer['name'] ?? '-') . '</strong><br><small>' . self::e($signer['email'] ?? '') . ($signer['phone'] ?? '' ? ' · ' . self::e($signer['phone']) : '') . '</small></td>';
-      $reportApplies = false;
-      $reportNote = trim((string) ($source['quote_id'] ?? '')) !== '' ? 'Cobro en cotización' : 'Sin reporte nuevo';
-      $html .= '<td>' . ($reportApplies ? self::money((int) ($report['total'] ?? 0)) : 'No aplica') . '<br><small>' . ($reportApplies ? (!empty($act['report_id']) ? 'Cobro #' . self::e($act['report_id']) : 'Se genera al firmar') : self::e($reportNote)) . '</small>' . (!empty($act['legacy_act_id']) ? '<br><small>CCT acta #' . self::e($act['legacy_act_id']) . '</small>' : '') . '</td>';
-      $html .= '<td class="scm-date-cell">Creada ' . self::e(date('d/m/Y H:i', (int) ($act['created_at'] ?? 0))) . (!empty($act['signed_at']) ? '<br>Firmada ' . self::e(date('d/m/Y H:i', (int) $act['signed_at'])) : '') . '</td>';
-      $canDelete = in_array($status, ['archived', 'cancelled'], true) || $canDeleteAny;
-      $pdfButtons = in_array($status, ['signed', 'superseded'], true)
-        ? '<a class="scm-pending-action-btn" href="' . self::e($url . '&format=pdf' . ($status === 'superseded' ? '&audience=staff' : '')) . '" download>Descargar PDF firmado</a>'
-        : '';
-      $html .= '<td class="scm-pending-action-cell"><button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" data-scm-open-iframe data-iframe-url="' . self::e($url) . '" data-iframe-title="Acta de satisfacción #' . self::e($act['id']) . '" data-scm-compact-iframe>Ver acta</button>' . (in_array($status, ['pending', 'signed'], true) && (int) ($act['active_slot'] ?? 1) === 1 ? '<a class="scm-pending-action-btn scm-pending-action-btn--blue" href="' . self::e($service->editUrl($act)) . '">Editar</a>' : '') . $pdfButtons . ($status === 'pending' ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-archive="' . self::e($act['id']) . '" data-ticket-pk="' . self::e($act['ticket_pk']) . '">Archivar</button>' : '') . ($canDelete ? '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--danger" data-acta-delete="' . self::e($act['id']) . '">Eliminar</button>' : '') . '</td>';
-      $html .= '</tr>';
+      $createdAt = (int) ($act['created_at'] ?? 0);
+      $adminState = trim((string) ($act['ticket_estado_admin'] ?? ''));
+      $email = trim((string) ($signer['email'] ?? ''));
+      $phone = trim((string) ($signer['phone'] ?? ''));
+      $html .= '<tr class="!sp-bg-white hover:!sp-bg-slate-50 !sp-border-t-0 !sp-border-x-0 !sp-border-b !sp-border-solid !sp-border-slate-100">';
+      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap"><span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200 !sp-text-amber-900 !sp-font-bold">#' . self::e($act['id']) . '</span>'
+        . '<small class="' . $muted . '">' . ($createdAt > 0 ? self::e(date('d/m/Y g:i a', $createdAt)) : '-') . '</small>'
+        . ($actorName !== '' ? '<small class="' . $muted . '">Por ' . self::e($actorName) . '</small>' : '') . '</td>';
+      $html .= '<td class="' . $td . ' !sp-max-w-[200px]"><strong class="!sp-block">Caso #' . self::e($ticket) . '</strong><small class="' . $muted . '">' . self::e($sourceLabel) . '</small>'
+        . ($adminState !== '' ? '<small class="' . $muted . '">' . self::e($adminState) . '</small>' : '') . '</td>';
+      $html .= '<td class="' . $td . ' !sp-max-w-[220px]"><span class="!sp-inline-flex !sp-px-2 !sp-py-1 !sp-rounded !sp-bg-emerald-50 !sp-border !sp-border-solid !sp-border-emerald-200 !sp-text-emerald-700 !sp-font-semibold">' . self::e($property !== '' ? $property : '-') . '</span>'
+        . ($address !== '' ? '<small class="' . $muted . ' !sp-leading-relaxed">' . self::e($address) . '</small>' : '')
+        . '<small class="' . $muted . '">Contrato #' . self::e($contract !== '' ? $contract : '-') . '</small></td>';
+      $html .= '<td class="' . $td . ' !sp-max-w-[220px]"><strong class="!sp-block !sp-leading-relaxed">' . self::e($signer['name'] ?? '-') . '</strong>'
+        . ($email !== '' ? '<small class="' . $muted . ' !sp-break-all">' . self::e($email) . '</small>' : '')
+        . ($phone !== '' ? '<small class="' . $muted . '">' . self::e($phone) . '</small>' : '') . '</td>';
+      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap"><strong class="!sp-block">' . ($quoteId !== '' ? 'En la cotización' : 'Sin reporte nuevo') . '</strong>'
+        . (!empty($act['legacy_act_id']) ? '<small class="' . $muted . '">CCT acta #' . self::e($act['legacy_act_id']) . '</small>' : '') . '</td>';
+      $html .= '<td class="' . $td . ' !sp-whitespace-nowrap"><span class="!sp-inline-flex !sp-items-center !sp-gap-1 !sp-px-2 !sp-py-1 !sp-rounded-full !sp-border !sp-border-solid !sp-text-[9px] !sp-font-bold ' . ($badges[$status] ?? $badges['archived']) . '"><span class="!sp-w-1.5 !sp-h-1.5 !sp-rounded-full !sp-bg-current"></span>' . self::e($labels[$status] ?? $status) . '</span>'
+        . (!empty($act['signed_at']) ? '<small class="' . $muted . '">Firmada ' . self::e(date('d/m/Y g:i a', (int) $act['signed_at'])) . '</small>' : '') . '</td>';
+      $actions = '<button type="button" class="' . $ui::NAVY . ' !sp-whitespace-nowrap" data-scm-open-iframe data-iframe-url="' . self::e($url) . '" data-iframe-title="Acta de satisfacción #' . self::e($act['id']) . '" data-scm-compact-iframe>' . $ui::icon('eye', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . 'Ver</button>';
+      if (in_array($status, ['pending', 'signed'], true) && (int) ($act['active_slot'] ?? 1) === 1) {
+        $actions .= '<a class="' . $ui::SECONDARY . ' !sp-text-[10px] !sp-whitespace-nowrap !sp-no-underline" href="' . self::e($service->editUrl($act)) . '">' . $ui::icon('edit', '!sp-w-3 !sp-h-3') . 'Editar</a>';
+      }
+      if (in_array($status, ['signed', 'superseded'], true)) {
+        $actions .= '<a class="' . $ui::SECONDARY . ' !sp-text-[10px] !sp-whitespace-nowrap !sp-no-underline" href="' . self::e($url . '&format=pdf' . ($status === 'superseded' ? '&audience=staff' : '')) . '" download title="Descargar PDF firmado">' . $ui::icon('download', '!sp-w-3 !sp-h-3') . 'PDF</a>';
+      }
+      if ($status === 'pending') {
+        $actions .= '<button type="button" class="' . $danger . '" data-acta-archive="' . self::e($act['id']) . '" data-ticket-pk="' . self::e($act['ticket_pk']) . '">' . $ui::icon('document', '!sp-w-3 !sp-h-3') . 'Archivar</button>';
+      }
+      if (in_array($status, ['archived', 'cancelled'], true) || $canDeleteAny) {
+        $actions .= '<button type="button" class="' . $danger . '" data-acta-delete="' . self::e($act['id']) . '">' . $ui::icon('close', '!sp-w-3 !sp-h-3') . 'Eliminar</button>';
+      }
+      $html .= '<td class="' . $td . '"><div class="!sp-flex !sp-flex-wrap !sp-gap-1.5 !sp-min-w-[170px]">' . $actions . '</div></td></tr>';
     }
     $html .= '</tbody></table></div>';
-    if (($pagination['total_pages'] ?? 1) > 1) {
-      $page = (int) ($pagination['page'] ?? 1);
-      $totalPages = (int) ($pagination['total_pages'] ?? 1);
-      $html .= '<div class="scm-actas-pagination"><span>Página ' . self::e((string) $page) . ' de ' . self::e((string) $totalPages) . ' · ' . self::e((string) $pagination['total']) . ' registros</span><div>';
-      if ($page > 1) {
-        $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" data-pending-page="sacta_" data-page="' . ($page - 1) . '">Anterior</button>';
-      }
-      if ($page < $totalPages) {
-        $html .= '<button type="button" class="scm-pending-action-btn scm-pending-action-btn--blue" data-pending-page="sacta_" data-page="' . ($page + 1) . '">Siguiente</button>';
-      }
-      $html .= '</div></div>';
+    $page = max(1, (int) ($pagination['page'] ?? 1));
+    $totalPages = max(1, (int) ($pagination['total_pages'] ?? 1));
+    $total = (int) ($pagination['total'] ?? count($items));
+    $html .= '<div class="!sp-p-4 !sp-bg-slate-50/50 !sp-font-sans">';
+    if ($totalPages <= 1) {
+      $html .= '<span class="!sp-text-[10px] !sp-text-service-muted">Mostrando ' . self::e((string) $total) . ' acta(s)</span>';
+    } else {
+      $button = static fn(int $target, bool $disabled, string $label): string => '<button type="button" class="' . $ui::SECONDARY . '" data-pending-page="sacta_" data-page="' . $target . '"' . ($disabled ? ' disabled' : '') . '>' . $label . '</button>';
+      $html .= '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-3"><span class="!sp-text-[10px] !sp-text-service-muted">Página ' . self::e((string) $page) . ' de ' . self::e((string) $totalPages) . ' · ' . self::e((string) $total) . ' actas</span>'
+        . '<div class="!sp-flex !sp-items-center !sp-gap-2">' . $button(max(1, $page - 1), $page <= 1, 'Anterior')
+        . '<span class="!sp-bg-service-navy !sp-text-white !sp-text-[10px] !sp-px-3 !sp-py-2 !sp-rounded">' . self::e((string) $page) . '</span>'
+        . $button(min($totalPages, $page + 1), $page >= $totalPages, 'Siguiente') . '</div></div>';
     }
-    return $html;
+    return $html . '</div>';
   }
 
   public function document(array $act, array $payload, bool $staff, string $form = ''): string

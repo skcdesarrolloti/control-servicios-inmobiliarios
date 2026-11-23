@@ -116,6 +116,31 @@
               submitForm();
             });
             if (prefix === 'sacta_') {
+              // Pestañas por estado (Sin firmar, Firmadas...): mismo patrón que Órdenes de mantenimiento.
+              document.addEventListener('click', function(e) {
+                var tabBtn = e.target && e.target.closest ? e.target.closest('[data-acta-tab]') : null;
+                if (!tabBtn) return;
+                var panel = tabBtn.closest('#sacta_panel');
+                if (!panel) return;
+                e.preventDefault();
+                var status = tabBtn.getAttribute('data-acta-tab') || 'pending';
+                var statusInput = form.querySelector('[data-acta-status-input]');
+                if (statusInput) statusInput.value = status;
+                panel.querySelectorAll('[data-acta-tab]').forEach(function(button) {
+                  button.setAttribute('aria-pressed', button === tabBtn ? 'true' : 'false');
+                });
+                var tabs = {};
+                try {
+                  tabs = JSON.parse((panel.querySelector('[data-acta-tabs]') || {}).textContent || '{}');
+                } catch (err) {}
+                var title = panel.querySelector('[data-acta-tab-title]');
+                var description = panel.querySelector('[data-acta-tab-description]');
+                if (tabs[status] && title) title.textContent = tabs[status].title || '';
+                if (tabs[status] && description) description.textContent = tabs[status].description || '';
+                var pageInput = form.querySelector('input[name="' + prefix + 'page"]');
+                if (pageInput) pageInput.value = '1';
+                submitForm();
+              });
               document.addEventListener('click', function(e) {
                 var archiveBtn = e.target && e.target.closest ? e.target.closest('[data-acta-archive]') : null;
                 if (!archiveBtn) return;

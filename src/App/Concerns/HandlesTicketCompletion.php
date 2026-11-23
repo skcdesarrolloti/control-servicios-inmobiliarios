@@ -325,7 +325,7 @@ trait HandlesTicketCompletion
         : ($operation === 'delete' ? 'Acta eliminada permanentemente. No se cerró el caso ni se generó cobro.' : '');
       $this->jsonOk([
         'table_html' => $view->dashboardTable($data['items'], $service, $data['pagination'], $canDeleteAny),
-        'kpis_html' => $view->dashboardKpis($data['stats']),
+        'kpis_html' => $view->dashboardKpis($data['stats'], (string) ($data['filters']['estado'] ?? 'pending')),
         'count' => (string) $data['count'],
         'message' => $message,
       ]);
