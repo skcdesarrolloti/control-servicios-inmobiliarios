@@ -251,8 +251,31 @@ trait HandlesTools
     foreach (['destinatario', 'nombre', 'documento', 'destinacion', 'valor', 'plazo', 'tasa', 'desembolso', 'observaciones'] as $key) {
       $raw[$key] = $key === 'observaciones' ? sanitize_textarea_field(wp_unslash((string) ($_POST[$key] ?? ''))) : sanitize_text_field(wp_unslash((string) ($_POST[$key] ?? '')));
     }
-    $service = new CreditSimulationService(\SCM\Modules\OwnerCredits\OwnerCreditSettings::read(App::settings()));
-    return $service->simulate($service->input($raw));
+    $service = $this->creditSimulationService();
+    return ['rate_status' => $service->rateStatus()] + $service->simulate($service->input($raw));
+  }
+
+  /**
+   * Simulador con la tasa verificada: la usura automática se vuelve a consultar en datos.gov.co si tiene más de un día
+   * o ya no rige (si no responde, queda la última guardada y el error se muestra en el recuadro de la tasa).
+   */
+  private function creditSimulationService(): CreditSimulationService
+  {
+    return new CreditSimulationService(\SCM\Modules\OwnerCredits\OwnerCreditUsuryRate::sync(App::settings()));
+  }
+
+  /** Recuadro "Tasa vigente" del simulador, verificado al abrir la herramienta. */
+  public function ajax_handler_tools_credit_rate(): void
+  {
+    $this->verifyCsrf();
+    if (!$this->canAccessDashboardTab('herramienta_simulador_credito')) $this->jsonFail('No tienes permiso para usar el simulador de crédito.');
+    try {
+      $status = $this->creditSimulationService()->rateStatus();
+    } catch (\Throwable $error) {
+      error_log('[tools-credit-rate] ' . $error->getMessage());
+      $this->jsonFail('No se pudo verificar la tasa.');
+    }
+    $this->jsonOk(['html' => (new ToolsView())->creditRateCard($status), 'rate' => rtrim(rtrim(number_format($status['rate'] * 100, 4, ',', ''), '0'), ','), 'ok' => $status['ok']]);
   }
 
   public function ajax_handler_tools_credit_simulate(): void
@@ -275,6 +298,7 @@ trait HandlesTools
       'compare' => $result['compare'],
       'warnings' => $result['warnings'],
       'summary' => CreditSimulationService::summary($result, (new OwnerPreapprovalService($this->db))->signer()),
+      'rate_html' => (new ToolsView())->creditRateCard($result['rate_status']),
     ]);
   }
 

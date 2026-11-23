@@ -120,33 +120,6 @@ session_write_close();
     .scm-public-quote-response-form input[readonly]{background:#f1f5f9;color:#475569}
     .scm-public-quote-response-form .scm-public-quote-response-error{color:#b91c1c;font-weight:700}
     .scm-public-quote-response-form button{grid-column:1/-1;justify-self:start;border:0;border-radius:13px;background:#ff8a00;color:#fff;font:800 14px Poppins,Arial,sans-serif;padding:12px 18px;cursor:pointer}
-    .scm-public-quote-financing{grid-column:1/-1;min-width:0;display:flex;flex-direction:column;gap:14px;padding:16px;border:1px solid #bfdbfe;border-radius:16px;background:#f8fbff}
-    .scm-public-quote-financing-head span{display:block;color:#ff8a00;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
-    .scm-public-quote-financing-head strong{display:block;margin-top:2px;color:#0b254f;font-size:18px;font-weight:800}
-    .scm-public-quote-financing-head p{margin:4px 0 0;color:#475569;font-size:13px;line-height:1.55}
-    .scm-public-quote-financing-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px}
-    .scm-public-quote-response-form .scm-public-quote-financing-options button{grid-column:auto;justify-self:stretch;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;color:#0b254f;font:600 12px Poppins,Arial,sans-serif;text-align:left;box-shadow:none}
-    .scm-public-quote-financing-options button strong{font-size:14px;font-weight:800}
-    .scm-public-quote-financing-options button span{color:#475569}
-    .scm-public-quote-response-form .scm-public-quote-financing-options button[aria-pressed="true"]{border-color:#0b254f;background:#0b254f;color:#fff}
-    .scm-public-quote-financing-options button[aria-pressed="true"] span{color:#fde68a}
-    .scm-public-quote-financing-options button:focus-visible{outline:3px solid #ff8a00;outline-offset:2px}
-    .scm-public-quote-financing-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-    .scm-public-quote-financing-summary div{padding:10px 12px;border-radius:12px;background:#fff;border:1px solid #e2e8f0}
-    .scm-public-quote-financing-summary div.is-main{background:#0b254f;border-color:#0b254f}
-    .scm-public-quote-financing-summary span{display:block;color:#64748b;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
-    .scm-public-quote-financing-summary strong{display:block;margin-top:2px;color:#0b254f;font-size:17px;font-weight:800}
-    .scm-public-quote-financing-summary .is-main span{color:#fde68a}
-    .scm-public-quote-financing-summary .is-main strong{color:#fff}
-    .scm-public-quote-financing-table{overflow-x:auto;margin-top:10px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
-    .scm-public-quote-financing-table table{width:100%;border-collapse:collapse;font-size:12px;color:#0f172a}
-    .scm-public-quote-financing-table th,.scm-public-quote-financing-table td{padding:7px 10px;border-bottom:1px solid #eef2f7;text-align:right;white-space:nowrap}
-    .scm-public-quote-financing-table th:first-child,.scm-public-quote-financing-table td:first-child{text-align:left}
-    .scm-public-quote-financing-table thead th{background:#f1f5f9;color:#475569;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
-    .scm-public-quote-financing-table tfoot td{font-weight:800;background:#f8fafc}
-    .scm-public-quote-financing-hint{margin:0;color:#475569;font-size:13px;font-weight:600}
-    .scm-public-quote-financing-note{margin:0;color:#64748b;font-size:11px;font-weight:500;line-height:1.55}
-    @media (max-width:720px){.scm-public-quote-financing-summary{grid-template-columns:1fr}}
     @media (max-width:720px){.scm-public-quote-response-form{grid-template-columns:1fr}.scm-public-quote-head{align-items:flex-start;flex-direction:column}.scm-public-quote-logo{max-width:100%;width:170px}.scm-public-quote-confirmation{align-items:flex-start;flex-direction:column}.scm-public-quote-confirmation a{width:100%;box-sizing:border-box}}
     @media print{body{background:#fff}#scm-app{max-width:none;padding:0}.scm-public-quote-head,.scm-public-quote-alert,.scm-public-quote-confirmation,.scm-public-quote-response{display:none!important}#scm-app>.scm-cotizacion-native-doc{width:800px;max-width:none;box-sizing:border-box;margin:0 auto;zoom:.9}}
   </style>
@@ -163,6 +136,7 @@ session_write_close();
     <?= $responseNotice ?>
     <?= (string) ($result['content'] ?? '') ?>
   </main>
+  <script src="assets/js/quote-financing-preview.js?v=<?= $escape(SCM_VERSION) ?>"></script>
   <script>
     (function () {
       var forms = document.querySelectorAll("[data-public-quote-response-form]");
@@ -208,49 +182,23 @@ session_write_close();
             if (!financed) termInput.value = "";
           }
           if (financing) financing.hidden = !financed;
-          renderPlan();
+          if (preview) preview.update(termInput ? termInput.value : "");
         }
-        // Simulación: la cuota de cada plazo y el plan de pagos de los meses elegidos (planes calculados en el servidor).
+        // Simulación: la cuota de cada plazo y el plan de pagos de los meses elegidos (quote-financing-preview.js).
         var financing = form.querySelector("[data-public-quote-financing]");
-        var planBox = financing ? financing.querySelector("[data-public-quote-financing-plan]") : null;
-        var financingData = null;
+        var preview = null;
         try {
           var dataNode = financing ? financing.querySelector("[data-public-quote-financing-data]") : null;
-          financingData = dataNode ? JSON.parse(dataNode.textContent || "{}") : null;
-        } catch (error) {
-          financingData = null;
-        }
-        var money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
-        function renderPlan() {
-          if (!financing || !planBox || !financingData) return;
-          var term = termInput ? String(Number(termInput.value) || "") : "";
-          var plan = financingData.plans ? financingData.plans[term] : null;
-          financing.querySelectorAll("[data-public-quote-financing-term]").forEach(function (button) {
-            button.setAttribute("aria-pressed", button.getAttribute("data-public-quote-financing-term") === term ? "true" : "false");
-          });
-          if (!plan) {
-            planBox.innerHTML = '<p class="scm-public-quote-financing-hint">' + (term !== "" ? "No hay simulación para " + term + " meses: elige uno de los plazos de arriba." : "Elige un plazo o escribe los meses para ver tu plan de pagos.") + "</p>";
-            return;
+          var financingData = dataNode ? JSON.parse(dataNode.textContent || "{}") : null;
+          if (financingData && window.SCMQuoteFinancingPreview && window.SCMQuoteFinancingPreview.usable(financingData)) {
+            preview = window.SCMQuoteFinancingPreview.mount(financing, financingData, function (term) {
+              if (!termInput || termInput.disabled) return;
+              termInput.value = term;
+              checkTerm();
+            });
           }
-          var rows = plan.rows.map(function (row, index) {
-            return "<tr><td>" + (index + 1) + "</td><td>" + money.format(row[0]) + "</td><td>" + money.format(row[1]) + "</td><td>" + money.format(row[2]) + "</td><td>" + money.format(row[3]) + "</td></tr>";
-          }).join("");
-          planBox.innerHTML =
-            '<div class="scm-public-quote-financing-summary">' +
-            '<div class="is-main"><span>Cuota mensual estimada</span><strong>' + money.format(plan.payment) + "</strong></div>" +
-            "<div><span>Total intereses</span><strong>" + money.format(plan.interest) + "</strong></div>" +
-            "<div><span>Total a pagar en " + term + (term === "1" ? " mes" : " meses") + "</span><strong>" + money.format(plan.total) + "</strong></div></div>" +
-            '<div class="scm-public-quote-financing-table"><table><thead><tr><th>Cuota</th><th>Valor cuota</th><th>Intereses</th><th>Abono a capital</th><th>Saldo</th></tr></thead><tbody>' + rows + "</tbody>" +
-            '<tfoot><tr><td>Total</td><td>' + money.format(plan.total) + "</td><td>" + money.format(plan.interest) + "</td><td>" + money.format(financingData.amount) + "</td><td></td></tr></tfoot></table></div>";
-        }
-        if (financing) {
-          financing.addEventListener("click", function (event) {
-            var button = event.target.closest("[data-public-quote-financing-term]");
-            if (!button || !termInput || termInput.disabled) return;
-            termInput.value = button.getAttribute("data-public-quote-financing-term");
-            checkTerm();
-            renderPlan();
-          });
+        } catch (error) {
+          preview = null;
         }
         // Si escriben más meses que el máximo se avisa al lado del campo y no se deja enviar.
         var termError = termWrap ? termWrap.querySelector("[data-public-quote-response-term-error]") : null;
@@ -266,7 +214,7 @@ session_write_close();
           }
           return message === "";
         }
-        if (termInput) termInput.addEventListener("input", function () { checkTerm(); renderPlan(); });
+        if (termInput) termInput.addEventListener("input", function () { checkTerm(); if (preview) preview.update(termInput.value); });
         if (state) state.addEventListener("change", sync);
         if (approveSelect) approveSelect.addEventListener("change", sync);
         form.addEventListener("submit", function (event) {

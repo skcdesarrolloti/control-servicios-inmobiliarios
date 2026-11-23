@@ -115,7 +115,7 @@
     initQuoteFeeSettings(root, post);
     initClosingPolicySettings(root, post);
     // Si la página abrió directo en una herramienta, el runtime pudo pedir la carga antes de este script.
-    [pse, mora, market].forEach(function (module) {
+    [pse, mora, market, creditSimulator].forEach(function (module) {
       var panel = module && module.closest(".scm-tab-panel");
       if (panel && panel.classList.contains("active")) module.dispatchEvent(new CustomEvent("scm:load-tool"));
     });
@@ -1851,6 +1851,25 @@
     var money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
     var summary = "";
     var simulated = false;
+    var rateBox = module.querySelector("[data-credit-sim-rate]");
+    var rateInput = form.querySelector("[name=tasa]");
+    var rateEdited = false;
+    var rateChecked = false;
+    rateInput.addEventListener("input", function () { rateEdited = true; });
+
+    // Al abrir la herramienta se verifica la tasa: la usura se vuelve a consultar si tiene más de un día o ya no rige.
+    // Si el funcionario no cambió la tasa, se reemplaza por la vigente.
+    function checkRate() {
+      if (rateChecked) return;
+      rateChecked = true;
+      post("scm_tools_credit_rate", {})
+        .then(function (data) {
+          if (data.html) rateBox.innerHTML = data.html;
+          if (data.rate && !rateEdited) rateInput.value = data.rate;
+        })
+        .catch(function () { rateChecked = false; });
+    }
+    module.addEventListener("scm:load-tool", checkRate);
 
     function percent(value) {
       return (Math.round(Number(value) * 10000) / 100).toLocaleString("es-CO", { maximumFractionDigits: 2 }) + " %";
@@ -1919,6 +1938,7 @@
       return post("scm_tools_credit_simulate", new FormData(form))
         .then(function (data) {
           render(data);
+          if (data.rate_html) rateBox.innerHTML = data.rate_html;
           summary = String(data.summary || "");
           setReady(true);
           status.textContent = "";

@@ -325,7 +325,7 @@ final class ToolsView
    * Simulador de crédito (admin-tools.js, initCreditSimulator): el servidor calcula con la configuración de créditos.
    * @param array{rate:float,usury:float,policy_rate:float,max_term:int,default_term:int,purposes:list<string>} $defaults CreditSimulationService::defaults()
    */
-  public function creditSimulator(array $defaults): string
+  public function creditSimulator(array $defaults, array $rateStatus = []): string
   {
     $pct = static fn(float $value): string => rtrim(rtrim(number_format($value * 100, 4, ',', ''), '0'), ',');
     $recipients = '';
@@ -340,6 +340,7 @@ final class ToolsView
       . '<div class="!sp-grid !sp-grid-cols-1 xl:!sp-grid-cols-12 !sp-gap-5 !sp-items-start">'
       . '<form class="' . UI::CARD . ' !sp-p-5 xl:!sp-col-span-4 !sp-space-y-4" data-credit-sim-form autocomplete="off" novalidate>'
       . '<div class="' . self::SECTION_HEAD . ' !sp-mb-0"><h3 class="' . self::SECTION_TITLE . '"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">tune</span>Datos del crédito</h3></div>'
+      . '<div data-credit-sim-rate>' . ($rateStatus !== [] ? $this->creditRateCard($rateStatus) : '') . '</div>'
       . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">'
       . $this->field('Valor del crédito', '<input class="' . UI::INPUT . '" type="text" inputmode="numeric" name="valor" placeholder="Ej: 2.500.000" required data-credit-sim-money>')
       . $this->field('Plazo (meses)', '<input class="' . UI::INPUT . '" type="number" min="1" max="' . OwnerCreditSimulator::MAX_TERM . '" step="1" name="plazo" value="' . (int) $defaults['default_term'] . '" required>' . $hint('Tope de la política: ' . (int) $defaults['max_term'] . ' meses.'))
@@ -364,6 +365,28 @@ final class ToolsView
       . '<div class="!sp-flex !sp-flex-wrap !sp-gap-2">' . $button(UI::SECONDARY, 'data-credit-sim-copy', 'content_copy', 'Copiar resumen') . $button(UI::NAVY . ' !sp-text-xs', 'data-credit-sim-pdf', 'picture_as_pdf', 'PDF para el cliente') . '</div></div>'
       . '<div data-credit-sim-result><p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">Escribe el valor, el plazo y la tasa y pulsa Simular para ver la cuota y el plan de pagos.</p></div>'
       . '</section></div></section>';
+  }
+
+  /**
+   * Recuadro "Tasa vigente" del simulador: si la usura rige hoy, la tasa con que se simula y cuándo se actualizó.
+   * @param array<string,mixed> $status CreditSimulationService::rateStatus()
+   */
+  public function creditRateCard(array $status): string
+  {
+    $pct = static fn(float $value, int $decimals = 2): string => rtrim(rtrim(number_format($value * 100, $decimals, ',', '.'), '0'), ',') . ' %';
+    $ok = (bool) $status['ok'];
+    $row = static fn(string $label, string $value): string => '<div class="!sp-flex !sp-justify-between !sp-gap-3"><dt class="!sp-text-service-muted">' . $label . '</dt><dd class="!sp-m-0 !sp-font-semibold !sp-text-right">' . $value . '</dd></div>';
+    $rows = $row('Tasa de la simulación', self::e($pct((float) $status['rate'], 4)) . ' mensual')
+      . $row('Tasa de referencia', self::e($pct((float) $status['reference'], 4)) . ' N.M.V.' . ((string) $status['reference_updated'] !== '' ? '<span class="!sp-block !sp-font-normal !sp-text-service-muted">Cambiada el ' . self::e((string) $status['reference_updated']) . '</span>' : ''))
+      . $row('Usura', self::e($pct((float) $status['usury_annual'])) . ' E.A. (' . self::e($pct((float) $status['usury_monthly'], 4)) . ' mensual)' . ((string) $status['period'] !== '' ? '<span class="!sp-block !sp-font-normal !sp-text-service-muted">' . self::e(ucfirst((string) $status['period'])) . '</span>' : ''))
+      . $row('Última actualización', self::e((string) $status['updated'] !== '' ? (string) $status['updated'] : 'Sin registro') . '<span class="!sp-block !sp-font-normal !sp-text-service-muted">' . self::e((string) $status['source']) . '</span>');
+    $notes = '';
+    if (!$ok) $notes .= '<p class="!sp-m-0 !sp-mt-2 !sp-text-[11px] !sp-font-semibold">La usura guardada no rige hoy: confirma la tasa antes de darle cifras al cliente. Quien tenga permiso puede pulsar "Actualizar usura" en el liquidador de créditos.</p>';
+    if ((string) $status['error'] !== '') $notes .= '<p class="!sp-m-0 !sp-mt-2 !sp-text-[11px]">No se pudo consultar datos.gov.co: ' . self::e((string) $status['error']) . ' Se usa la última tasa guardada.</p>';
+    if (!empty($status['capped'])) $notes .= '<p class="!sp-m-0 !sp-mt-2 !sp-text-[11px]">La tasa de referencia supera la usura: se simula con la usura.</p>';
+    return '<div class="!sp-p-3 !sp-rounded-lg !sp-border !sp-border-solid ' . ($ok ? '!sp-bg-emerald-50 !sp-border-emerald-200' : '!sp-bg-amber-50 !sp-border-amber-200') . ' !sp-text-service-navy" data-credit-sim-rate-state="' . ($ok ? 'ok' : 'stale') . '">'
+      . '<p class="!sp-m-0 !sp-mb-2 !sp-flex !sp-items-center !sp-gap-1.5 !sp-text-xs !sp-font-bold ' . ($ok ? '!sp-text-emerald-800' : '!sp-text-amber-800') . '"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">' . ($ok ? 'verified' : 'warning') . '</span>' . self::e((string) $status['label']) . '</p>'
+      . '<dl class="!sp-m-0 !sp-space-y-1.5 !sp-text-[11px]">' . $rows . '</dl>' . $notes . '</div>';
   }
 
   public function duplicateInventory(): string

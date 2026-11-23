@@ -2776,8 +2776,17 @@
     });
     return fetch(runtime.ajaxUrl || "api.php", { method: "POST", credentials: "same-origin", body: fd })
       .then(function (response) { return response.json(); })
-      .then(function (json) { return json && json.success ? Number((json.data || {}).max) || 0 : 0; })
-      .catch(function () { return 0; });
+      .then(function (json) {
+        var data = json && json.success ? json.data || {} : {};
+        return { max: Number(data.max) || 0, preview: data.preview || null };
+      })
+      .catch(function () { return { max: 0, preview: null }; });
+  }
+
+  // Simulación de la financiación (cuota de cada plazo y plan de pagos) debajo del campo de meses.
+  function attachCotizacionFinancingPreview(anchor, input, preview) {
+    if (!window.SCMQuoteFinancingPreview || !preview) return null;
+    return window.SCMQuoteFinancingPreview.attach(anchor, input, preview);
   }
 
   function syncCotizacionFinancingTerm(box) {
@@ -2796,6 +2805,7 @@
     var input = wrap.querySelector('input[name="plazo_financiacion"]');
     var financed = estado.value === "Aprobada" && financiacion.value === "Si";
     wrap.style.display = financed ? "" : "none";
+    if (wrap._scmPreview) wrap._scmPreview.setVisible(financed);
     input.required = financed;
     input.disabled = !financed;
     if (!financed) {
@@ -2814,9 +2824,12 @@
     loadCotizacionFinancingTermLimit(box, {
       id_cotizacion: (quoteInput && quoteInput.value) || (quoteNode && quoteNode.getAttribute("data-cotizacion-id")) || "",
       ticket_pk: (ticketInput && ticketInput.value) || (ticketNode && ticketNode.getAttribute("data-ticket-pk")) || "",
-    }).then(function (max) {
+    }).then(function (limit) {
+      var max = limit.max;
       if (max > 0) input.max = String(max);
       hint.textContent = max > 0 ? "Máximo " + max + " meses según el contrato del propietario. El crédito queda sujeto a estudio, verificación y aprobación." : "";
+      wrap._scmPreview = attachCotizacionFinancingPreview(wrap, input, limit.preview);
+      if (wrap._scmPreview) wrap._scmPreview.setVisible(wrap.style.display !== "none");
     });
   }
 
@@ -9585,6 +9598,7 @@
       var financed = !!cotStateSelect && cotStateSelect.value === "Aprobada" && !!cotFinInput && cotFinInput.value === "Si";
       var plazoInput = cotPlazo.querySelector("[data-scm-composer-cot-plazo-input]");
       cotPlazo.style.display = financed ? "block" : "none";
+      if (cotPlazo._scmPreview) cotPlazo._scmPreview.setVisible(financed);
       if (!financed) {
         plazoInput.value = "";
         return;
@@ -9596,10 +9610,13 @@
       loadCotizacionFinancingTermLimit(composer, {
         id_cotizacion: (caseBtn && caseBtn.dataset.cotizacionId) || "",
         ticket_pk: (caseBtn && (caseBtn.dataset.ticketPk || caseBtn.getAttribute("data-ticket-pk"))) || "",
-      }).then(function (max) {
+      }).then(function (limit) {
+        var max = limit.max;
         cotPlazo.dataset.scmTermMax = String(max);
         if (max > 0) plazoInput.max = String(max);
         hint.textContent = max > 0 ? "Máximo " + max + " meses según el contrato del propietario." : "";
+        cotPlazo._scmPreview = attachCotizacionFinancingPreview(cotPlazo, plazoInput, limit.preview);
+        if (cotPlazo._scmPreview) cotPlazo._scmPreview.setVisible(cotPlazo.style.display !== "none");
       });
     };
     if (cotFinInput) cotFinInput.addEventListener("change", syncComposerPlazo);

@@ -48,6 +48,29 @@ final class OwnerCreditSimulator
   }
 
   /**
+   * Simulación de la financiación de una cotización en el formato que pinta quote-financing-preview.js: pesos
+   * redondeados y cada cuota como [valor, intereses, abono, saldo]. Sin planes devuelve null.
+   * @param array{amount:float,rate:float,effective_annual:float,max_term:int,plans:array<int,array<string,mixed>>} $preview OwnerCreditService::quoteFinancingPreview()
+   * @return array<string,mixed>|null
+   */
+  public static function browserPreview(array $preview): ?array
+  {
+    if ($preview['plans'] === []) return null;
+    $plans = [];
+    foreach ($preview['plans'] as $term => $plan) {
+      $plans[(string) $term] = [
+        'payment' => round((float) $plan['payment']), 'interest' => round((float) $plan['total_interest']), 'total' => round((float) $plan['total']),
+        'rows' => array_map(static fn(array $row): array => [round((float) $row['cuota']), round((float) $row['interes']), round((float) $row['abono']), round((float) $row['saldo'])], $plan['rows']),
+      ];
+    }
+    return [
+      'amount' => round((float) $preview['amount']), 'rate' => (float) $preview['rate'], 'effective_annual' => (float) $preview['effective_annual'],
+      'max_term' => (int) $preview['max_term'], 'plans' => $plans,
+      'note' => 'Si se aprueba, las cuotas se descuentan de los giros de arrendamiento del inmueble. ' . OwnerCreditService::DISCLAIMER,
+    ];
+  }
+
+  /**
    * Cuota de cada plazo para comparar. @param list<int> $terms
    * @return list<array{term:int,payment:float,total_interest:float,total:float}>
    */

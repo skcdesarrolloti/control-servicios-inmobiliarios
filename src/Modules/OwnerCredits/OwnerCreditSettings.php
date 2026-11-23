@@ -39,6 +39,8 @@ final class OwnerCreditSettings
       'usury_sync_error' => '',
       'no_mandate_deduction' => 0.15,
       'reference_rate' => 0.0242,
+      // Cuándo se cambió la tasa de referencia por última vez (lo muestra el simulador de crédito); 0 = sin registro.
+      'reference_rate_updated_at' => 0,
       'policy_discount' => 0.05,
       'income_months' => 3,
       'min_remaining_months' => 3,
@@ -113,6 +115,7 @@ final class OwnerCreditSettings
       'usury_sync_error' => mb_substr(trim((string) ($input['usury_sync_error'] ?? '')), 0, 200),
       'no_mandate_deduction' => $rate($input['no_mandate_deduction'] ?? null, $defaults['no_mandate_deduction'], 1.0),
       'reference_rate' => $rate($input['reference_rate'] ?? null, $defaults['reference_rate'], 0.2),
+      'reference_rate_updated_at' => max(0, (int) ($input['reference_rate_updated_at'] ?? 0)),
       'policy_discount' => $rate($input['policy_discount'] ?? null, $defaults['policy_discount'], 1.0),
       'income_months' => $int($input['income_months'] ?? null, $defaults['income_months'], 1, 24),
       'min_remaining_months' => $int($input['min_remaining_months'] ?? null, $defaults['min_remaining_months'], 0, 60),
@@ -135,6 +138,11 @@ final class OwnerCreditSettings
   public static function save(Settings $settings, array $input, int $updatedBy): array
   {
     $normalized = self::normalize($input);
+    $stored = $settings->get(self::KEY, []);
+    $before = is_array($stored) && $stored !== [] ? self::normalize($stored) : null;
+    // Se registra cuándo cambió la tasa de referencia, venga de Configuración, del liquidador o del tope de usura.
+    if ($before !== null && abs((float) $before['reference_rate'] - (float) $normalized['reference_rate']) > 1e-12) $normalized['reference_rate_updated_at'] = time();
+    elseif ($before !== null) $normalized['reference_rate_updated_at'] = max((int) $before['reference_rate_updated_at'], (int) $normalized['reference_rate_updated_at']);
     $settings->set(self::KEY, $normalized, $updatedBy);
     return $normalized;
   }

@@ -25169,25 +25169,35 @@
       Object.keys(params || {}).forEach(function (key) { fd.set(key, params[key] || ''); });
       return fetch(ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
         .then(function (response) { return response.json(); })
-        .then(function (json) { return json && json.success ? Number((json.data || {}).max) || 0 : 0; })
-        .catch(function () { return 0; });
+        .then(function (json) {
+          var data = json && json.success ? json.data || {} : {};
+          return { max: Number(data.max) || 0, preview: data.preview || null };
+        })
+        .catch(function () { return { max: 0, preview: null }; });
     }
 
-    // Muestra u oculta el campo de meses del popup según la financiación elegida y pide el máximo una sola vez.
+    // Muestra u oculta el campo de meses del popup según la financiación elegida y pide el máximo una sola vez. Con él
+    // llega la simulación (cuota de cada plazo y plan de pagos), que se muestra debajo del campo.
     function syncQuoteFinancingTerm(scope, financed, params) {
       var wrap = scope.querySelector('[data-scm-quote-financing-term]');
       if (!wrap) return;
       var input = wrap.querySelector('[data-scm-quote-financing-term-input]');
       var hint = wrap.querySelector('[data-scm-quote-financing-term-hint]');
       wrap.hidden = !financed;
+      if (wrap._scmPreview) wrap._scmPreview.setVisible(financed);
       if (!financed) { input.value = ''; return; }
       if (wrap._scmTermLoaded) return;
       wrap._scmTermLoaded = true;
       hint.textContent = 'Calculando el plazo máximo…';
-      loadQuoteFinancingTermLimit(params).then(function (max) {
+      loadQuoteFinancingTermLimit(params).then(function (limit) {
+        var max = limit.max;
         wrap._scmTermMax = max;
         if (max > 0) input.max = String(max);
         hint.textContent = max > 0 ? 'Máximo ' + max + ' meses según el contrato del propietario. El crédito queda sujeto a estudio, verificación y aprobación.' : '';
+        if (window.SCMQuoteFinancingPreview && limit.preview) {
+          wrap._scmPreview = window.SCMQuoteFinancingPreview.attach(wrap, input, limit.preview);
+          if (wrap._scmPreview) wrap._scmPreview.setVisible(!wrap.hidden);
+        }
       });
     }
 
@@ -27434,7 +27444,7 @@
         return loadMaintenanceMetrics(activePanel.querySelector("[data-maint-metrics]"), false);
       }
       // Herramientas: admin-tools.js carga el archivador PSE y la tasa SFC al abrir cada panel.
-      if (activePanel.id === "scm-panel-herramienta-pse" || activePanel.id === "scm-panel-herramienta-mora" || activePanel.id === "scm-panel-herramienta-mercado") {
+      if (activePanel.id === "scm-panel-herramienta-pse" || activePanel.id === "scm-panel-herramienta-mora" || activePanel.id === "scm-panel-herramienta-mercado" || activePanel.id === "scm-panel-herramienta-simulador-credito") {
         var toolModule = activePanel.querySelector("[data-scm-tool]");
         if (toolModule) {
           toolModule.dispatchEvent(new CustomEvent("scm:load-tool"));

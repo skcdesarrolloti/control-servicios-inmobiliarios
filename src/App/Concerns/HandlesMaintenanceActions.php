@@ -41,10 +41,13 @@ trait HandlesMaintenanceActions
       $quoteId = $ids === [] ? 0 : max($ids);
     }
     try {
-      $this->jsonOk(['max' => (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db))->quoteTermLimit($quoteId)]);
+      // Con el plazo va la simulación (cuota de cada plazo y plan de pagos) para mostrarla debajo del campo de meses.
+      $credits = new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db);
+      $preview = $quoteId > 0 ? $credits->quoteFinancingPreview($quoteId) : null;
+      $this->jsonOk(['max' => $preview !== null ? (int) $preview['max_term'] : $credits->quoteTermLimit($quoteId), 'preview' => $preview !== null ? \SCM\Modules\OwnerCredits\OwnerCreditSimulator::browserPreview($preview) : null]);
     } catch (\Throwable $error) {
       error_log('[cotizacion_financing_term] ' . $error->getMessage());
-      $this->jsonOk(['max' => 0]);
+      $this->jsonOk(['max' => 0, 'preview' => null]);
     }
   }
 

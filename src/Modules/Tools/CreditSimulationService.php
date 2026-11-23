@@ -35,6 +35,37 @@ final class CreditSimulationService
   }
 
   /**
+   * Estado de la tasa con que se simula: si la usura guardada rige hoy, de dónde salió y cuándo se actualizó.
+   * @return array{ok:bool,label:string,rate:float,reference:float,reference_updated:string,usury_annual:float,usury_monthly:float,period:string,source:string,updated:string,capped:bool,error:string}
+   */
+  public function rateStatus(): array
+  {
+    $s = $this->settings;
+    $auto = !empty($s['usury_auto']);
+    $stale = OwnerCreditUsuryRate::staleMessage($s) !== '';
+    $reference = (float) $s['reference_rate'];
+    $usury = OwnerCreditUsuryRate::monthly($s);
+    $day = static fn(string $value): string => preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? date('d/m/Y', (int) strtotime($value)) : '';
+    $synced = (int) ($s['usury_synced_at'] ?? 0);
+    $changed = (int) ($s['reference_rate_updated_at'] ?? 0);
+    return [
+      'ok' => !$stale,
+      'label' => $stale ? 'Tasa no vigente' : 'Tasa actualizada',
+      'rate' => OwnerCreditSimulator::rate($s),
+      'reference' => $reference,
+      'reference_updated' => $changed > 0 ? date('d/m/Y H:i', $changed) : '',
+      'usury_annual' => (float) $s['usury_annual'],
+      'usury_monthly' => $usury,
+      'period' => ltrim(OwnerCreditService::usuryPeriod($s), ' ·'),
+      'source' => $auto ? 'Superfinanciera (datos.gov.co)' : 'Manual en Configuración › Créditos a propietarios',
+      // Automática: la última consulta a datos.gov.co; manual: desde cuándo rige la que se escribió.
+      'updated' => $auto ? ($synced > 0 ? date('d/m/Y H:i', $synced) : '') : $day((string) $s['usury_updated_at']),
+      'capped' => $reference > $usury + 1e-9,
+      'error' => $auto ? trim((string) ($s['usury_sync_error'] ?? '')) : '',
+    ];
+  }
+
+  /**
    * Lee y valida lo que escribió el funcionario. @param array<string,mixed> $raw
    * @return array{recipient:string,name:string,document:string,purpose:string,amount:float,term:int,rate:float,disbursed_ts:int,notes:string}
    * @throws \InvalidArgumentException
@@ -92,7 +123,7 @@ final class CreditSimulationService
       $warnings[] = 'Por ahora el liquidador solo registra créditos a propietarios: para ' . mb_strtolower(self::RECIPIENTS[$input['recipient']]) . ' esta simulación es solo informativa.';
     }
     if (OwnerCreditUsuryRate::staleMessage($this->settings) !== '') {
-      $warnings[] = 'La tasa de usura guardada no está vigente hoy: confirma la tasa antes de darle las cifras al cliente.';
+      $warnings[] = 'La tasa de usura guardada no está vigente hoy (' . ltrim(OwnerCreditService::usuryPeriod($this->settings), ' ·') . '): confirma la tasa antes de darle las cifras al cliente.';
     }
     return $warnings;
   }

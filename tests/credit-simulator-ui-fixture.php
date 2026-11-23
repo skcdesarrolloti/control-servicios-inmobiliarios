@@ -30,7 +30,9 @@ $simulate = static function (array $raw) use ($service): array {
 
 echo json_encode([
   'publicHtml' => $panel,
-  'toolHtml' => (new ToolsView())->creditSimulator($service->defaults()),
+  'toolHtml' => (new ToolsView())->creditSimulator($service->defaults(), $service->rateStatus()),
+  'panelPreview' => OwnerCreditSimulator::browserPreview(['amount' => 893723.0, 'rate' => 0.0242, 'effective_annual' => OwnerCreditSimulator::effectiveAnnual(0.0242), 'max_term' => 3, 'plans' => $plans]),
+  'rateResponse' => ['html' => (new ToolsView())->creditRateCard((new CreditSimulationService(['usury_synced_at' => (int) strtotime('2026-11-23 08:15:00'), 'reference_rate' => 0.021] + $settings))->rateStatus()), 'rate' => '2,1', 'ok' => true],
   'responses' => [
     '12' => $simulate(['valor' => '2.500.000', 'plazo' => '12', 'tasa' => '2,42', 'desembolso' => '2026-11-20']),
     '6' => $simulate(['valor' => '2.500.000', 'plazo' => '6', 'tasa' => '2,42', 'desembolso' => '2026-11-20']),

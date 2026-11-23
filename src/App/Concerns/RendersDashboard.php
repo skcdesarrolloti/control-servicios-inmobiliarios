@@ -1598,7 +1598,8 @@ trait RendersDashboard
         <?php endif; ?>
         <?php if (in_array('herramienta_simulador_credito', $dashboardAllowedTabs, true)): ?>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-herramienta-simulador-credito' ? ' active' : ''; ?>" id="scm-panel-herramienta-simulador-credito" data-permission-tab="herramienta_simulador_credito">
-          <?php echo (new \SCM\Modules\Tools\ToolsView())->creditSimulator((new \SCM\Modules\Tools\CreditSimulationService(\SCM\Modules\OwnerCredits\OwnerCreditSettings::read(\SCM\Core\App::settings())))->defaults()); ?>
+          <?php $creditSimulation = new \SCM\Modules\Tools\CreditSimulationService(\SCM\Modules\OwnerCredits\OwnerCreditSettings::read(\SCM\Core\App::settings())); ?>
+          <?php echo (new \SCM\Modules\Tools\ToolsView())->creditSimulator($creditSimulation->defaults(), $creditSimulation->rateStatus()); ?>
         </div>
         <?php endif; ?>
       <?php endif; ?>
@@ -1652,6 +1653,7 @@ trait RendersDashboard
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/scm-photo-compress.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/scm-photo-compress.js'))); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/ticket-completion-form-state.js?v=' . SCM_VERSION); ?>" data-scm-draft-user="<?php echo self::h((string) \SCM\Core\Auth::userId()); ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-inventory-form.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-inventory-form.js'))); ?>" defer></script>
+    <script src="<?php echo self::h($assetBaseUrl . 'assets/js/quote-financing-preview.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/quote-financing-preview.js'))); ?>" defer></script>
     <script src="<?php echo $jsUrl; ?>" defer></script>
     <script src="<?php echo $dashboardRuntimeJsUrl; ?>" defer></script>
     <script src="<?php echo self::h($assetBaseUrl . 'assets/js/admin-config-modals.js?v=' . rawurlencode($assetVersion($assetBasePath . 'assets/js/admin-config-modals.js'))); ?>" defer></script>
@@ -5824,30 +5826,14 @@ trait RendersDashboard
 
   /**
    * Simulación de la financiación en la respuesta pública: la cuota de cada plazo posible y, al elegir los meses, el
-   * plan de pagos (cotizacion-mantenimiento.php lo pinta con los planes del JSON). Solo se ve con financiación "Sí".
+   * plan de pagos. quote-financing-preview.js la pinta con el JSON; solo se ve con financiación "Sí".
    * @param array{amount:float,rate:float,effective_annual:float,max_term:int,plans:array<int,array<string,mixed>>} $preview OwnerCreditService::quoteFinancingPreview()
    */
   private function render_public_quote_financing_preview(array $preview): string
   {
-    if ($preview['plans'] === []) return '';
-    $money = static fn(float $value): string => '$' . number_format(round($value), 0, ',', '.');
-    $percent = static fn(float $value): string => rtrim(rtrim(number_format($value * 100, 2, ',', '.'), '0'), ',') . ' %';
-    $options = '';
-    $plans = [];
-    foreach ($preview['plans'] as $term => $plan) {
-      $options .= '<button type="button" data-public-quote-financing-term="' . (int) $term . '" aria-pressed="false"><strong>' . (int) $term . ($term === 1 ? ' mes' : ' meses') . '</strong><span>' . esc_html($money((float) $plan['payment'])) . ' al mes</span></button>';
-      $plans[(string) $term] = [
-        'payment' => round((float) $plan['payment']), 'interest' => round((float) $plan['total_interest']), 'total' => round((float) $plan['total']),
-        'rows' => array_map(static fn(array $row): array => [round((float) $row['cuota']), round((float) $row['interes']), round((float) $row['abono']), round((float) $row['saldo'])], $plan['rows']),
-      ];
-    }
-    $data = ['amount' => round((float) $preview['amount']), 'plans' => $plans];
-    return '<div class="is-wide scm-public-quote-financing" data-public-quote-financing hidden>'
-      . '<div class="scm-public-quote-financing-head"><span>Simulación de tu financiación</span><strong>Valor a financiar: ' . esc_html($money((float) $preview['amount'])) . '</strong>'
-      . '<p>Cuota mensual estimada según el plazo, con la tasa de referencia de ' . esc_html($percent((float) $preview['rate'])) . ' mensual (' . esc_html($percent((float) $preview['effective_annual'])) . ' efectivo anual). Elige los meses para ver tu plan de pagos.</p></div>'
-      . '<div class="scm-public-quote-financing-options" role="group" aria-label="Cuota según el plazo">' . $options . '</div>'
-      . '<div class="scm-public-quote-financing-plan" data-public-quote-financing-plan aria-live="polite"></div>'
-      . '<p class="scm-public-quote-financing-note">Si se aprueba, las cuotas se descuentan de los giros de arrendamiento del inmueble. ' . esc_html(\SCM\Modules\OwnerCredits\OwnerCreditService::DISCLAIMER) . '</p>'
+    $data = \SCM\Modules\OwnerCredits\OwnerCreditSimulator::browserPreview($preview);
+    if ($data === null) return '';
+    return '<div class="is-wide" data-public-quote-financing hidden>'
       . '<script type="application/json" data-public-quote-financing-data>' . json_encode($data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) . '</script>'
       . '</div>';
   }
