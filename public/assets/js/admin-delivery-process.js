@@ -10,6 +10,7 @@
     module.dataset.dpInit = "1";
     var content = module.querySelector("[data-delivery-process-content]");
     var search = module.querySelector("[data-delivery-process-search]");
+    var total = module.querySelector("[data-delivery-process-total]");
     var page = 1;
     var loaded = false;
 
@@ -27,6 +28,7 @@
         .then(function (json) {
           if (!json || !json.success) throw new Error((json && json.data && json.data.message) || "No se pudo cargar el listado.");
           content.innerHTML = (json.data && json.data.html) || "";
+          if (total) total.textContent = String((json.data && json.data.total) || 0);
           loaded = true;
         })
         .catch(function (error) {
@@ -43,6 +45,14 @@
       page = 1;
       load();
     });
+    var clear = search.querySelector("[data-delivery-process-clear]");
+    if (clear) {
+      clear.addEventListener("click", function () {
+        search.reset();
+        page = 1;
+        load();
+      });
+    }
     content.addEventListener("click", function (event) {
       var target = event.target.closest("button");
       if (!target) return;
@@ -50,7 +60,7 @@
         page = Number(target.dataset.deliveryProcessPage) || 1;
         load();
       } else if (target.dataset.deliveryProcessEdit && typeof window.scmOpenInventoryEditor === "function") {
-        window.scmOpenInventoryEditor(root, target.dataset.ticketPk, target.dataset.deliveryProcessEdit);
+        window.scmOpenInventoryEditor(root, target.dataset.ticketPk, target.dataset.deliveryProcessEdit, target.dataset.editKind || "inventario");
       }
     });
     root.addEventListener("scm:case-action-saved", function () {

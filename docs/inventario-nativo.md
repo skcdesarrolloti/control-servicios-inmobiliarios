@@ -7,7 +7,9 @@ el mismo CCT `inventario` con las mismas claves de fila, así que los inventario
 
 - **Caso de entrega**: *Acciones del caso → Complementarias → Crear o gestionar inventario*.
 - **Actividades administrativas → Proceso de entrega**: listados de *Revisiones antes de la ocupación* e *Inventarios*
-  (ver y editar en popup).
+  (ver y editar en popup, los dos). Filtros por contrato, inmueble SIMI y caso (número exacto), propietario, arrendatario,
+  funcionario y fechas; contrato, propietario y arrendatario que falten en el registro se toman del contrato (`id_contrato`).
+  Editar aparece con `inventory_manage` o `delivery_review_manage`.
 - **Caso de recibo**: *Complementarias → Crear inventario anterior*, solo si el contrato no tiene inventario (o para seguir
   gestionando el creado desde ese caso). Queda tipo **Anterior**, sin reporte administrativo, con `incluir_anexos = No`,
   y se vincula al contrato y al caso sin cambiar `estado_administrativo`. El inventario de la entrega no se edita desde el recibo.

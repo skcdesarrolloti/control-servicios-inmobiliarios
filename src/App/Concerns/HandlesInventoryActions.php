@@ -894,23 +894,49 @@ trait HandlesInventoryActions
       $this->jsonFail('No tienes permiso para ver este listado.');
     }
     $table = $this->db->table($inventories ? 'jet_cct_inventario' : 'jet_cct_revision_entrega');
+    $contracts = $this->db->table('jet_cct_contratos_arrendamiento');
     $columns = $inventories
-      ? ['_ID', 'fecha', 'cct_created', 'tipo_inventario', 'categoria_inventario', 'contrato', 'inmueble', 'direccion', 'arrendatario', 'id_ticket', 'creador']
-      : ['_ID', 'fecha', 'cct_created', 'contrato', 'inmueble', 'direccion', 'tip_inm', 'habitaciones', 'banos', 'id_ticket', 'creador'];
+      ? ['_ID', 'fecha', 'cct_created', 'tipo_inventario', 'categoria_inventario', 'contrato', 'inmueble', 'direccion', 'arrendatario', 'propietario', 'tipo_de_inmueble', 'cantidad_habitaciones', 'cantidad_banos', 'id_ticket', 'creador']
+      : ['_ID', 'fecha', 'cct_created', 'contrato', 'inmueble', 'direccion', 'tip_inm', 'habitaciones', 'banos', 'destinatario', 'id_ticket', 'creador'];
+    // Propietario y arrendatario: los del registro y, si faltan (las revisiones no guardan arrendatario), los del contrato.
+    $owner = $inventories ? 't.`propietario`' : 't.`destinatario`';
+    $tenant = $inventories ? "COALESCE(NULLIF(t.`arrendatario`, ''), c.`arrendatario`)" : 'c.`arrendatario`';
     $text = static fn(string $key): string => mb_substr(trim(strip_tags(wp_unslash((string) ($_POST[$key] ?? '')))), 0, 120, 'UTF-8');
-    $where = ["COALESCE(`cct_status`, 'publish') = 'publish'"];
+    $where = ["COALESCE(t.`cct_status`, 'publish') = 'publish'"];
     $args = [];
     $search = $text('q');
     if ($search !== '') {
-      $searchable = array_values(array_intersect($columns, ['_ID', 'id_ticket', 'contrato', 'inmueble', 'direccion', 'arrendatario', 'creador']));
-      $where[] = '(' . implode(' OR ', array_map(static fn(string $column): string => "CAST(`{$column}` AS CHAR) LIKE ?", $searchable)) . ')';
-      $args = array_fill(0, count($searchable), '%' . $search . '%');
+      $searchable = ['t.`_ID`', 't.`id_ticket`', 't.`contrato`', 'c.`contrato`', 't.`inmueble`', 't.`direccion`', $owner, $tenant, 't.`creador`'];
+      $where[] = '(' . implode(' OR ', array_map(static fn(string $column): string => "CAST({$column} AS CHAR) LIKE ?", $searchable)) . ')';
+      array_push($args, ...array_fill(0, count($searchable), '%' . $search . '%'));
+    }
+    $contract = ltrim($text('contrato'), '#');
+    if ($contract !== '') {
+      $where[] = '(t.`contrato` IN (?, ?) OR c.`contrato` = ?)';
+      array_push($args, $contract, '#' . $contract, $contract);
+    }
+    $property = $text('inmueble');
+    if ($property !== '') {
+      $where[] = '(t.`inmueble` = ? OR c.`inmueble` = ?)';
+      array_push($args, $property, $property);
+    }
+    $case = ltrim($text('caso'), '#');
+    if ($case !== '') {
+      $where[] = 't.`id_ticket` = ?';
+      $args[] = $case;
+    }
+    foreach (['propietario' => "COALESCE(NULLIF({$owner}, ''), c.`propietario`)", 'arrendatario' => $tenant, 'funcionario' => 't.`creador`'] as $field => $column) {
+      $value = $text($field);
+      if ($value !== '') {
+        $where[] = "{$column} LIKE ?";
+        $args[] = '%' . $value . '%';
+      }
     }
     if ($inventories) {
       foreach (['tipo' => 'tipo_inventario', 'categoria' => 'categoria_inventario'] as $field => $column) {
         $value = $text($field);
         if ($value !== '') {
-          $where[] = "`{$column}` = ?";
+          $where[] = "t.`{$column}` = ?";
           $args[] = $value;
         }
       }
@@ -918,26 +944,28 @@ trait HandlesInventoryActions
     foreach (['desde' => '>=', 'hasta' => '<='] as $field => $operator) {
       $date = $text($field);
       if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1) {
-        $where[] = "DATE(`cct_created`) {$operator} ?";
+        $where[] = "DATE(t.`cct_created`) {$operator} ?";
         $args[] = $date;
       }
     }
     $condition = implode(' AND ', $where);
-    $perPage = 25;
+    $from = "`{$table}` t LEFT JOIN `{$contracts}` c ON c.`_ID` = t.`id_contrato`";
+    $perPage = in_array((int) ($_POST['per_page'] ?? 0), DeliveryProcessView::PER_PAGE, true) ? (int) $_POST['per_page'] : DeliveryProcessView::PER_PAGE[0];
     try {
-      $total = (int) $this->db->getVar("SELECT COUNT(*) FROM `{$table}` WHERE {$condition}", $args);
+      $total = (int) $this->db->getVar("SELECT COUNT(*) FROM {$from} WHERE {$condition}", $args);
       $pages = max(1, (int) ceil($total / $perPage));
       $page = min(max(1, (int) ($_POST['page'] ?? 1)), $pages);
       $offset = ($page - 1) * $perPage;
-      $select = implode(', ', array_map(static fn(string $column): string => "`{$column}`", $columns));
-      $rows = $this->db->getResults("SELECT {$select} FROM `{$table}` WHERE {$condition} ORDER BY `_ID` DESC LIMIT {$perPage} OFFSET {$offset}", $args);
+      $select = implode(', ', array_map(static fn(string $column): string => "t.`{$column}`", $columns))
+        . ', c.`contrato` AS c_contrato, c.`inmueble` AS c_inmueble, c.`propietario` AS c_propietario, c.`arrendatario` AS c_arrendatario';
+      $rows = $this->db->getResults("SELECT {$select} FROM {$from} WHERE {$condition} ORDER BY t.`_ID` DESC LIMIT {$perPage} OFFSET {$offset}", $args);
     } catch (\Throwable $error) {
       error_log('[proceso-entrega] ' . $error->getMessage());
       $this->jsonFail('No se pudo cargar el listado.');
     }
     $html = $inventories
       ? DeliveryProcessView::inventories($rows, ['manage' => $this->canUseDashboardAction('inventory_manage')], $page, $pages, $total, static fn(int $id): string => self::inventoryPublicUrl($id))
-      : DeliveryProcessView::reviews($rows, $page, $pages, $total, static fn(int $id): string => self::deliveryReviewPublicUrl($id));
+      : DeliveryProcessView::reviews($rows, ['manage' => $this->canUseDashboardAction('delivery_review_manage')], $page, $pages, $total, static fn(int $id): string => self::deliveryReviewPublicUrl($id));
     $this->jsonOk(['html' => $html, 'total' => $total]);
   }
 

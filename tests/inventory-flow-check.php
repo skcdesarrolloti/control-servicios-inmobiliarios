@@ -36,7 +36,7 @@ foreach (InventorySchema::sections() as $key => $section) {
 $inventoryColumns = array_values(array_unique(array_merge($inventoryColumns, array_values(InventorySchema::agreements()))));
 $tables = [
   'wp_jet_cct_inventario' => $inventoryColumns,
-  'wp_jet_cct_contratos_arrendamiento' => ['id_inventario','direccion','arrendatario','documento_arrendatario','correo_arrendatario','celular_arrendatario','tiene_delegado','delegado','documento_delegado','correo_delegado','celular_delegado','luz','agua','gas','medidor_luz','medidor_agua','medidor_gas','registro_fotografico','servicios_publicos','tiene_parqueadero','tipo_parqueadero','parqueaderos','numero_parqueadero','tiene_deposito','depositos','fecha_linderos','conjunto_lin','torre_lin','inmueble_lin','parqueadero_lin','deposito_lin','acuerdos_precontractuales','contrato','inmueble','id_inmueble','id_propietario'],
+  'wp_jet_cct_contratos_arrendamiento' => ['id_inventario','direccion','arrendatario','documento_arrendatario','correo_arrendatario','celular_arrendatario','tiene_delegado','delegado','documento_delegado','correo_delegado','celular_delegado','luz','agua','gas','medidor_luz','medidor_agua','medidor_gas','registro_fotografico','servicios_publicos','tiene_parqueadero','tipo_parqueadero','parqueaderos','numero_parqueadero','tiene_deposito','depositos','fecha_linderos','conjunto_lin','torre_lin','inmueble_lin','parqueadero_lin','deposito_lin','acuerdos_precontractuales','contrato','inmueble','id_inmueble','id_propietario','propietario'],
   'wp_jet_cct_tickets' => ['tema_ayuda','id_inventario','estado_inventario','estado_administrativo','fecha_actualizacion','nombre_empleado','correo_empleado','celular_empleado','reportes','tuvo_reporte','id_contrato','id_inmueble','id_revision_entrega','fecha'],
   'wp_jet_cct_reportes_administrativos' => ['cct_status','cct_author_id','cct_created','cct_modified','id_ticket','id_empleado','creador','fecha','fecha_revision','fecha_ticket','fue_pagado','exportado','categoria','descripcion','valor','transporte','valor_mantenimiento','valor_revision','sucursal','contrato','inmueble','arrendatario','id_contrato','id_inmueble','id_rev_entrega','id_estudio_aseguradora','numero_solicitud'],
   'wp_jet_cct_historial_del_ticket' => ['cct_status','cct_author_id','cct_created','cct_modified','id_ticket','fecha','id_empleado','nombre','correo','celular','respuesta','id_inventario'],
@@ -325,9 +325,21 @@ $list = new class($db) {
 $_POST = ['kind' => 'inventarios', 'tipo' => 'Nuevo', 'q' => 'Calle', 'page' => '1'];
 $list->ajax_handler_delivery_process_list();
 $assert($list->out['total'] === 1 && str_contains($list->out['html'], 'inventario.php?numero=') && str_contains($list->out['html'], 'data-delivery-process-edit'), 'Listado de inventarios: ' . json_encode($list->out['total']));
+$_POST = ['kind' => 'inventarios', 'contrato' => '#nada', 'page' => '1'];
+$list->ajax_handler_delivery_process_list();
+$assert($list->out['total'] === 0 && str_contains($list->out['html'], 'No hay registros'), 'Filtro por contrato sin resultados.');
+$withContract = (int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_inventario WHERE contrato = '900' AND COALESCE(cct_status, 'publish') = 'publish'");
+$_POST = ['kind' => 'inventarios', 'contrato' => '#900', 'inmueble' => '77', 'per_page' => '50', 'page' => '1'];
+$list->ajax_handler_delivery_process_list();
+$assert($withContract > 0 && $list->out['total'] === $withContract && str_contains($list->out['html'], 'data-edit-kind="inventario"') && str_contains($list->out['html'], '>SIMI '), 'Filtro por contrato e inmueble SIMI: ' . json_encode([$withContract, $list->out['total']]));
 $_POST = ['kind' => 'revisiones'];
 try { $list->ajax_handler_delivery_process_list(); $assert(false, 'Debe validar el permiso de la pestaña.'); } catch (DomainException) {}
 $assert(str_contains(\SCM\Modules\Inventory\DeliveryProcessView::shell('inventarios', 'x'), 'data-delivery-process="inventarios"'), 'Contenedor del listado.');
+$shell = \SCM\Modules\Inventory\DeliveryProcessView::shell('revisiones', 'x');
+$assert(str_contains($shell, 'name="contrato"') && str_contains($shell, 'name="inmueble"') && str_contains($shell, 'name="propietario"') && str_contains($shell, 'name="arrendatario"') && !str_contains($shell, 'name="tipo"'), 'Filtros del listado de revisiones.');
+$reviewHtml = \SCM\Modules\Inventory\DeliveryProcessView::reviews([['_ID' => 9, 'id_ticket' => '5', 'contrato' => 'No asignado', 'c_contrato' => '853', 'inmueble' => '10', 'destinatario' => 'Dueño', 'c_arrendatario' => 'Inquilino', 'tip_inm' => 'Casa']], ['manage' => true], 1, 1, 1, static fn(int $id): string => 'r.php?numero=' . $id);
+$assert(str_contains($reviewHtml, 'data-edit-kind="entrega"') && str_contains($reviewHtml, 'Contrato #853') && str_contains($reviewHtml, 'Inquilino') && !str_contains($reviewHtml, 'No asignado'), 'Revisiones: editar, contrato e inquilino del contrato.');
+$assert(!str_contains(\SCM\Modules\Inventory\DeliveryProcessView::reviews([['_ID' => 9, 'id_ticket' => '5']], ['manage' => false], 1, 1, 1, static fn(int $id): string => ''), 'data-delivery-process-edit'), 'Sin permiso no se muestra Editar.');
 
 // Anexos: el inventario adicional va con enlace firmado, después del principal.
 $annexes = \SCM\Modules\LeaseContracts\LeaseAnnexesDocument::annexes(['id_inventario' => '4', '_inventarios_adicionales' => [7]], 'propietario', 0);

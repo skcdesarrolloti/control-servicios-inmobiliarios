@@ -10041,8 +10041,10 @@
     closeCaseModal(modal);
   };
 
-  // Editar un inventario desde el listado de Proceso de entrega, sin abrir el caso completo.
-  window.scmOpenInventoryEditor = function (root, ticketPk, inventoryId) {
+  // Editar un inventario o una revisión antes de la ocupación desde los listados de Proceso de entrega,
+  // sin abrir el caso completo.
+  window.scmOpenInventoryEditor = function (root, ticketPk, inventoryId, kind) {
+    kind = kind === "entrega" ? "entrega" : "inventario";
     var host = root.querySelector("[data-scm-inventory-host]");
     if (!host) {
       host = document.createElement("div");
@@ -10054,7 +10056,7 @@
     var proxy = host.querySelector("button[hidden]");
     proxy.dataset.ticketPk = String(ticketPk);
     proxy.dataset.ticket = String(ticketPk);
-    openDamageReviewEditor(host, proxy, "inventario", { operation: "edit", reviewId: inventoryId });
+    openDamageReviewEditor(host, proxy, kind, { operation: "edit", reviewId: inventoryId });
   };
 
   window.scmOpenCase = function (btn) {
