@@ -6,6 +6,7 @@ namespace SCM\Modules\LeaseContracts;
 
 use SCM\Modules\ClosingSheets\ClosingSheetDocuments;
 use SCM\Modules\Pending\PublicServicesUi as UI;
+use SCM\Support\CommercialTaskLink;
 
 /** Actividades contractuales › Contratos de arrendamiento, con el diseño Tailwind de los workspaces. */
 final class LeaseContractsView
@@ -347,7 +348,9 @@ final class LeaseContractsView
       ['Acta de recibo', 'id_acta_recibo', $wp . 'acta-de-recibo/?numero=', false],
       ['Revisión de recibo', 'id_revision_recibo', $wp . 'revision-de-recibo/?numero=', false],
       ['Acta de revisión de desocupación', 'id_acta_revision_desocupacion', $wp . 'acta-de-revision-de-desocupacion/?numero=', false],
-      ['Caso cliente', 'id_ticket_cliente', $wp . 'ticket/?id_ticket=', false],
+      // Tarea comercial del cliente: su vista pública del panel comercial (tarea.php, enlace firmado), nunca la página
+      // de tickets anterior. Esa vista no permite mostrarse dentro de otra página (frame-ancestors 'none'): pestaña aparte.
+      ['Caso cliente', 'id_ticket_cliente', 'commercial-task', true],
       ['Hoja de cierre', 'id_cierre', $base . 'hoja-cierre-ver.php?numero=', false],
       ['Estudio aseguradora', 'id_estudio_aseguradora', $wp . 'estudio-aseguradora/?id_estudio=', false],
       ['Revisión preventiva', 'id_revision_preventiva', $base . 'revision-preventiva.php?numero=', false],
@@ -361,6 +364,13 @@ final class LeaseContractsView
     foreach ($links as [$label, $field, $prefix, $external]) {
       $value = trim(html_entity_decode((string) ($c[$field] ?? ''), ENT_QUOTES, 'UTF-8'));
       if ($value === '' || $value === '0') {
+        continue;
+      }
+      if ($prefix === 'commercial-task') {
+        if (!ctype_digit($value)) {
+          continue;
+        }
+        $out[] = ['label' => $label, 'url' => CommercialTaskLink::publicUrl((int) $value), 'external' => $external];
         continue;
       }
       $url = $prefix !== '' ? $prefix . rawurlencode($value) : $value;

@@ -20,7 +20,7 @@ La columna **Acciones** tiene tres partes, todas dentro del panel:
 
 Los menús se posicionan fijos en pantalla (`data-lease-menu-toggle` / `data-lease-menu`) para que el scroll horizontal de la tabla no los recorte; se cierran con Escape, clic afuera o scroll, y se recorren con las flechas.
 
-- **Documentación**: partes, condiciones económicas, documentos y expedientes, y la vista de anexos de cada actor.
+- **Documentación**: partes, condiciones económicas, documentos y expedientes, y la vista de anexos de cada actor. En *Documentos y expedientes*, **Caso cliente** (`id_ticket_cliente`, la tarea comercial del cliente) abre la vista pública del panel comercial (`tarea.php`, enlace firmado con `CommercialTaskLink::publicUrl`), no la página de tickets anterior de WordPress. Se abre en pestaña aparte porque esa vista no permite mostrarse dentro de otra página (`frame-ancestors 'none'`).
 - **Ficha del inmueble**: datos de `jet_cct_inmuebles` (por `codigo` = `id_inmueble` del contrato) y del contrato.
 - **Historial**: un popup con dos pestañas: *Del contrato* (registros de `jet_cct_historial_contrato_arrendamiento`) y *Del inmueble* (el mismo informe de *Historial inmueble*, `scm_property_history_report`).
 - **Crear caso**: abre *Crear nuevo caso* con el contrato ya seleccionado.
