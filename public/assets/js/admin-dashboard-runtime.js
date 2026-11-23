@@ -21192,6 +21192,17 @@
         return wrap.querySelector(".scm-contract-panel.active");
       }
 
+      // El total del encabezado sigue a la pestaña activa, también al volver a una ya cargada (que no se consulta de nuevo).
+      function syncHeaderCount() {
+        var headerCount = wrap.querySelector("[data-contract-header-count]") || wrap.querySelector("#sca-kpi-count");
+        var panel = activePanel();
+        if (!headerCount || !panel) return;
+        headerCount.textContent = panel.getAttribute("data-scm-loaded") === "1" ? panel.getAttribute("data-contract-total") || "0" : "…";
+        var label = wrap.querySelector("[data-contract-header-label]");
+        var tab = wrap.querySelector('.scm-contract-tab[data-contract-bucket="' + (panel.getAttribute("data-contract-panel") || "") + '"]');
+        if (label) label.textContent = "Contratos · " + (tab ? tab.textContent.trim() : "en la vista");
+      }
+
       function fetchContracts(panel) {
         if (!panel) {
           return Promise.resolve();
@@ -21268,11 +21279,9 @@
             if (countEl) {
               countEl.textContent = data.count || "0";
             }
-            var headerCount = root.querySelector("#sca-kpi-count");
-            if (headerCount) {
-              headerCount.textContent = data.count || "0";
-            }
+            panel.setAttribute("data-contract-total", String(data.count || "0"));
             panel.setAttribute("data-scm-loaded", "1");
+            if (panel.classList.contains("active")) syncHeaderCount();
           })
           .catch(function (err) {
             showToast(
@@ -21313,6 +21322,7 @@
               panel.getAttribute("data-contract-panel") === bucket,
             );
           });
+          syncHeaderCount();
           loadActiveContracts(false);
         });
       });

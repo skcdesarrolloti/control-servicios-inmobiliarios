@@ -23,10 +23,7 @@ final class LeaseContractsView
     <div class="scm-lease-contracts !sp-font-sans !sp-text-service-navy !sp-bg-service-background !sp-p-3 sm:!sp-p-5 !sp-space-y-5" data-scm-contracts data-lease-contracts data-can-send="<?php echo $canSend ? '1' : '0'; ?>">
       <header class="<?php echo $ui::CARD; ?> !sp-p-5 !sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-4">
         <div class="!sp-flex !sp-items-center !sp-gap-3"><span class="!sp-p-2.5 !sp-bg-amber-50 !sp-rounded-xl !sp-border !sp-border-solid !sp-border-amber-200"><?php echo $ui::icon('document', '!sp-w-6 !sp-h-6'); ?></span><div><h2 class="!sp-m-0 !sp-text-xl !sp-font-bold !sp-text-service-navy">Contratos de arrendamiento</h2><p class="!sp-m-0 !sp-mt-1 !sp-text-xs !sp-text-service-muted">Partes del contrato · Documentación · Historiales · Envío de anexos a propietario, arrendatario y codeudores</p></div></div>
-        <div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-4">
-          <div class="!sp-text-right !sp-border-y-0 !sp-border-r-0 !sp-border-l !sp-border-solid !sp-border-slate-200 !sp-pl-4"><strong class="!sp-text-xl" id="sca-kpi-count">0</strong><p class="!sp-m-0 !sp-text-[9px] !sp-uppercase !sp-text-service-muted">Contratos en la vista</p></div>
-          <button type="button" class="<?php echo $ui::SECONDARY; ?>" data-scm-open-due-settings><?php echo $ui::icon('calendar'); ?>Configurar vencimientos</button>
-        </div>
+        <div class="!sp-text-right !sp-border-y-0 !sp-border-r-0 !sp-border-l !sp-border-solid !sp-border-slate-200 !sp-pl-4"><strong class="!sp-text-xl" id="sca-kpi-count" data-contract-header-count>0</strong><p class="!sp-m-0 !sp-text-[9px] !sp-uppercase !sp-text-service-muted" data-contract-header-label>Contratos en la vista</p></div>
       </header>
       <nav class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-1 !sp-p-1 !sp-bg-slate-100 !sp-rounded-lg !sp-w-fit !sp-max-w-full" role="tablist" aria-label="Estados del contrato">
         <?php foreach ($bucketDefs as $key => $def): $active = $key === $firstKey; ?>
