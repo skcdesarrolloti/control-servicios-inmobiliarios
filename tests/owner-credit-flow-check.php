@@ -395,6 +395,10 @@ $check($service->byQuote(590)['owner_document'] === '55.555.555', 'a quote credi
 // Financiación Sí desde la cotización: se elige a cuántos meses, hasta el máximo del propietario.
 $quoteLimit = $service->quoteTermLimit(590);
 $check($quoteLimit > 0, 'a quote has a maximum financing term');
+// Antes de pedir el crédito, el propietario ve la cuota de cada plazo posible sobre el total de la cotización.
+$preview = $service->quoteFinancingPreview(590);
+$check($preview['max_term'] === $quoteLimit && array_keys($preview['plans']) === range(1, $quoteLimit) && $preview['amount'] === 400000.0, 'the quote preview offers a plan for every term up to the maximum, on the quote total');
+$check($preview['plans'][$quoteLimit]['payment'] === \SCM\Modules\OwnerCredits\OwnerCreditCoverage::payment(400000, $preview['rate'], $quoteLimit) && $preview['rate'] > 0, 'the quote preview uses the same payment as the liquidator');
 foreach ([0 => 'Indica a cuántos meses', $quoteLimit + 1 => 'El plazo máximo para financiar la cotización #590 es de ' . $quoteLimit . ' meses'] as $badTerm => $expected) {
   try {
     $service->assertQuoteTerm(590, $badTerm);
@@ -667,7 +671,7 @@ $check($signer['name'] === 'Quien Envía' && $signer['email'] === 'envia@example
 $signer = (new ReflectionMethod(OwnerCreditService::class, 'requestSigner'))->invoke($service, $service->find($longTerm), $actor);
 $check($signer['name'] === 'Analista QA', 'a manual request is signed by whoever registered it');
 $check(str_contains($quoteBody, 'Al responder la cotización #574 usted realizó una solicitud de crédito para financiarla') && str_contains($quoteBody, 'Cotización: <b>#574</b>'), 'the quote request email names the quote it finances');
-$check(str_contains($source, "$action, 'Crédito solicitado al responder la cotización #'") && str_contains((string) file_get_contents(dirname(__DIR__) . '/src/App/SuCasaControlServiciosInmobiliarios.php'), "'" . OwnerCreditService::EVENT_REPAIR_REQUESTED . "' => [") && str_contains((string) file_get_contents(dirname(__DIR__) . '/src/App/SuCasaControlServiciosInmobiliarios.php'), "'" . OwnerCreditService::EVENT_FREE_REQUESTED . "' => ["), 'quote requests notify their own configurable internal event');
+$check(str_contains($source, '$action, \'Crédito solicitado al responder la cotización #\'') && str_contains((string) file_get_contents(dirname(__DIR__) . '/src/App/SuCasaControlServiciosInmobiliarios.php'), "'" . OwnerCreditService::EVENT_REPAIR_REQUESTED . "' => [") && str_contains((string) file_get_contents(dirname(__DIR__) . '/src/App/SuCasaControlServiciosInmobiliarios.php'), "'" . OwnerCreditService::EVENT_FREE_REQUESTED . "' => ["), 'quote requests notify their own configurable internal event');
 $check(in_array('Reparaciones y mantenimiento', \SCM\Modules\OwnerCredits\OwnerCreditSettings::PURPOSES, true) && $service->byQuote(574)['purpose'] === 'Reparaciones y mantenimiento', 'quote requests use a purpose from the list');
 $check(\SCM\Modules\OwnerCredits\OwnerCreditSettings::normalize([])['notify_owner_request_email'] === true && \SCM\Modules\OwnerCredits\OwnerCreditSettings::normalize([])['notify_owner_request_whatsapp'] === false, 'the owner request email is on and the WhatsApp is off by default');
 

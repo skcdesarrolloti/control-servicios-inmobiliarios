@@ -10,6 +10,8 @@ use SCM\Modules\CanonInsuranceAudit\SpreadsheetReader;
 use SCM\Modules\Tools\CleaningCalculator;
 use SCM\Modules\Tools\CleaningQuotePdf;
 use SCM\Modules\Tools\CleaningSettings;
+use SCM\Modules\Tools\CreditSimulationPdf;
+use SCM\Modules\Tools\CreditSimulationService;
 use SCM\Modules\Tools\LateFeeCalculator;
 use SCM\Modules\Tools\MarketStatsService;
 use SCM\Modules\Tools\OwnerPreapprovalPdf;
@@ -234,6 +236,66 @@ trait HandlesTools
     header_remove('Content-Type');
     header('Content-Type: application/pdf');
     header('Content-Disposition: attachment; filename="' . OwnerPreapprovalPdf::filename($estimate) . '"');
+    header('Content-Length: ' . (string) strlen($bytes));
+    header('Cache-Control: private, no-store');
+    header('X-Content-Type-Options: nosniff');
+    echo $bytes;
+    exit;
+  }
+
+  /** Simulador de crédito: el cálculo se hace en el servidor con la configuración de créditos (tasa, usura y tope). */
+  private function creditSimulation(): array
+  {
+    if (!$this->canAccessDashboardTab('herramienta_simulador_credito')) $this->jsonFail('No tienes permiso para usar el simulador de crédito.');
+    $raw = [];
+    foreach (['destinatario', 'nombre', 'documento', 'destinacion', 'valor', 'plazo', 'tasa', 'desembolso', 'observaciones'] as $key) {
+      $raw[$key] = $key === 'observaciones' ? sanitize_textarea_field(wp_unslash((string) ($_POST[$key] ?? ''))) : sanitize_text_field(wp_unslash((string) ($_POST[$key] ?? '')));
+    }
+    $service = new CreditSimulationService(\SCM\Modules\OwnerCredits\OwnerCreditSettings::read(App::settings()));
+    return $service->simulate($service->input($raw));
+  }
+
+  public function ajax_handler_tools_credit_simulate(): void
+  {
+    $this->verifyCsrf();
+    $result = [];
+    try {
+      $result = $this->creditSimulation();
+    } catch (\InvalidArgumentException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      error_log('[tools-credit-simulate] ' . $error->getMessage());
+      $this->jsonFail('No se pudo simular el crédito.');
+    }
+    $date = static fn(int $ts): string => $ts > 0 ? date('d/m/Y', $ts) : '';
+    $sim = $result['simulation'];
+    $sim['rows'] = array_map(static fn(array $row): array => ['fecha_texto' => $date((int) $row['fecha'])] + $row, $sim['rows']);
+    $this->jsonOk([
+      'simulation' => ['first_due' => $date((int) $sim['first_due_ts']), 'last_due' => $date((int) $sim['last_due_ts'])] + $sim,
+      'compare' => $result['compare'],
+      'warnings' => $result['warnings'],
+      'summary' => CreditSimulationService::summary($result, (new OwnerPreapprovalService($this->db))->signer()),
+    ]);
+  }
+
+  public function ajax_handler_tools_credit_pdf(): void
+  {
+    $this->verifyCsrf();
+    $bytes = '';
+    $result = [];
+    try {
+      $result = $this->creditSimulation();
+      $bytes = CreditSimulationPdf::bytes($result, (new OwnerPreapprovalService($this->db))->signer());
+    } catch (\InvalidArgumentException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      error_log('[tools-credit-pdf] ' . $error->getMessage());
+      $this->jsonFail($error instanceof \RuntimeException ? $error->getMessage() : 'No se pudo generar el PDF.');
+    }
+    if (ob_get_level() > 0) ob_end_clean();
+    header_remove('Content-Type');
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="' . CreditSimulationPdf::filename($result) . '"');
     header('Content-Length: ' . (string) strlen($bytes));
     header('Cache-Control: private, no-store');
     header('X-Content-Type-Options: nosniff');

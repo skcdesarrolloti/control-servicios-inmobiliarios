@@ -426,6 +426,25 @@ final class OwnerCreditService
     return OwnerCreditCalculator::fallbackTerm($this->config());
   }
 
+  /**
+   * Cuotas estimadas para financiar una cotización, para que el propietario decida antes de pedir el crédito: el plan de
+   * cada plazo posible (1 hasta el máximo) sobre el total de la cotización, a la tasa de referencia (sin pasar la usura).
+   * No registra nada: el analista define las condiciones finales.
+   * @return array{amount:float,rate:float,effective_annual:float,max_term:int,plans:array<int,array<string,mixed>>}
+   */
+  public function quoteFinancingPreview(int $quoteId): array
+  {
+    $quote = $this->db->getRow("SELECT * FROM `{$this->db->table('jet_cct_cotizacion_mantenimiento')}` WHERE `_ID` = ? LIMIT 1", [$quoteId]);
+    $amount = is_array($quote) ? self::money($quote['total'] ?? '') : 0.0;
+    $maxTerm = $this->quoteTermLimit($quoteId);
+    $rate = OwnerCreditSimulator::rate($this->config());
+    $plans = [];
+    if ($amount > 0 && $rate > 0) {
+      for ($term = 1; $term <= min($maxTerm, OwnerCreditSimulator::MAX_TERM); $term++) $plans[$term] = OwnerCreditSimulator::simulate($amount, $term, $rate);
+    }
+    return ['amount' => $amount, 'rate' => $rate, 'effective_annual' => OwnerCreditSimulator::effectiveAnnual($rate), 'max_term' => $maxTerm, 'plans' => $plans];
+  }
+
   /** Preaprobado de un crédito del inmueble: su contrato al 100 % más los demás contratos del propietario. @return array<string,mixed> */
   private function repairTerm(array $contract, string $document): array
   {

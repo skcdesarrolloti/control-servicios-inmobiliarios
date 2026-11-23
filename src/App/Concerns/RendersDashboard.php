@@ -216,6 +216,9 @@ trait RendersDashboard
       'simulador_ingreso_neto' => 'scm-panel-herramienta-ingreso-neto',
       'ingreso_neto' => 'scm-panel-herramienta-ingreso-neto',
       'scm-panel-herramienta-ingreso-neto' => 'scm-panel-herramienta-ingreso-neto',
+      'herramienta_simulador_credito' => 'scm-panel-herramienta-simulador-credito',
+      'simulador_credito' => 'scm-panel-herramienta-simulador-credito',
+      'scm-panel-herramienta-simulador-credito' => 'scm-panel-herramienta-simulador-credito',
       'ocupaciones' => 'scm-panel-movimientos-contratos',
       'desocupaciones' => 'scm-panel-movimientos-contratos',
       'ocupaciones_vs_desocupaciones' => 'scm-panel-movimientos-contratos',
@@ -470,6 +473,7 @@ trait RendersDashboard
       'scm-panel-herramienta-aseo' => 'herramienta_aseo',
       'scm-panel-herramienta-duplicar-inventario' => 'herramienta_duplicar_inventario',
       'scm-panel-herramienta-ingreso-neto' => 'herramienta_ingreso_neto',
+      'scm-panel-herramienta-simulador-credito' => 'herramienta_simulador_credito',
     ];
     if ($initialTab !== '') {
       $initialTabPermissionKey = $dashboardPanelToTab[$initialTab] ?? '';
@@ -1592,6 +1596,11 @@ trait RendersDashboard
           <?php echo \SCM\Modules\Tools\OwnerPreapprovalView::render(new \SCM\Modules\Tools\OwnerPreapprovalService($this->db)); ?>
         </div>
         <?php endif; ?>
+        <?php if (in_array('herramienta_simulador_credito', $dashboardAllowedTabs, true)): ?>
+        <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-herramienta-simulador-credito' ? ' active' : ''; ?>" id="scm-panel-herramienta-simulador-credito" data-permission-tab="herramienta_simulador_credito">
+          <?php echo (new \SCM\Modules\Tools\ToolsView())->creditSimulator((new \SCM\Modules\Tools\CreditSimulationService(\SCM\Modules\OwnerCredits\OwnerCreditSettings::read(\SCM\Core\App::settings())))->defaults()); ?>
+        </div>
+        <?php endif; ?>
       <?php endif; ?>
 
       <?php // Créditos (Actividades Administrativas): panel propio, no depende de Métricas. ?>
@@ -2096,6 +2105,8 @@ trait RendersDashboard
         'herramienta_mercado' => '',
         'herramienta_aseo' => '',
         'herramienta_duplicar_inventario' => '',
+        'herramienta_ingreso_neto' => '',
+        'herramienta_simulador_credito' => '',
       ]],
       ['label' => 'Métricas', 'tabs' => [
         'metricas_casos' => '',
@@ -5788,11 +5799,12 @@ trait RendersDashboard
     }
     $destinatario = $this->cotizacion_clean_text($row['destinatario'] ?? '');
     try {
-      $maxTerm = (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db))->quoteTermLimit((int) $id);
+      $preview = (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db))->quoteFinancingPreview((int) $id);
     } catch (\Throwable $error) {
       error_log('[public_quote_term] ' . $error->getMessage());
-      $maxTerm = 0;
+      $preview = ['amount' => 0.0, 'rate' => 0.0, 'effective_annual' => 0.0, 'max_term' => 0, 'plans' => []];
     }
+    $maxTerm = (int) $preview['max_term'];
     return '<section id="responder-cotizacion" tabindex="-1" class="scm-cotizacion-native-section scm-public-quote-response"><h3>Responder cotización</h3>'
       . '<p>Selecciona tu respuesta para que el equipo de SKC SuCasa Inmobiliaria pueda continuar el proceso.</p>'
       . '<form method="post" class="scm-public-quote-response-form" data-public-quote-response-form>'
@@ -5804,9 +5816,40 @@ trait RendersDashboard
       . '<label data-public-quote-response-term hidden><span>¿A cuántos meses? <em>*</em></span><input type="number" name="plazo_financiacion" min="1"' . ($maxTerm > 0 ? ' max="' . $maxTerm . '"' : '') . ' step="1" inputmode="numeric" placeholder="Escribe los meses" disabled>'
       . ($maxTerm > 0 ? '<small>Máximo ' . $maxTerm . ' meses. El crédito queda sujeto a estudio, verificación y aprobación.</small>' : '')
       . '<small class="scm-public-quote-response-error" data-public-quote-response-term-error role="alert" hidden></small></label>'
+      . $this->render_public_quote_financing_preview($preview)
       . '<label class="is-wide"><span>Observaciones</span><textarea name="observacion" rows="4" placeholder="Agrega observaciones si deseas complementar la respuesta."></textarea></label>'
       . '<button type="submit">Guardar respuesta</button>'
       . '</form></section>';
+  }
+
+  /**
+   * Simulación de la financiación en la respuesta pública: la cuota de cada plazo posible y, al elegir los meses, el
+   * plan de pagos (cotizacion-mantenimiento.php lo pinta con los planes del JSON). Solo se ve con financiación "Sí".
+   * @param array{amount:float,rate:float,effective_annual:float,max_term:int,plans:array<int,array<string,mixed>>} $preview OwnerCreditService::quoteFinancingPreview()
+   */
+  private function render_public_quote_financing_preview(array $preview): string
+  {
+    if ($preview['plans'] === []) return '';
+    $money = static fn(float $value): string => '$' . number_format(round($value), 0, ',', '.');
+    $percent = static fn(float $value): string => rtrim(rtrim(number_format($value * 100, 2, ',', '.'), '0'), ',') . ' %';
+    $options = '';
+    $plans = [];
+    foreach ($preview['plans'] as $term => $plan) {
+      $options .= '<button type="button" data-public-quote-financing-term="' . (int) $term . '" aria-pressed="false"><strong>' . (int) $term . ($term === 1 ? ' mes' : ' meses') . '</strong><span>' . esc_html($money((float) $plan['payment'])) . ' al mes</span></button>';
+      $plans[(string) $term] = [
+        'payment' => round((float) $plan['payment']), 'interest' => round((float) $plan['total_interest']), 'total' => round((float) $plan['total']),
+        'rows' => array_map(static fn(array $row): array => [round((float) $row['cuota']), round((float) $row['interes']), round((float) $row['abono']), round((float) $row['saldo'])], $plan['rows']),
+      ];
+    }
+    $data = ['amount' => round((float) $preview['amount']), 'plans' => $plans];
+    return '<div class="is-wide scm-public-quote-financing" data-public-quote-financing hidden>'
+      . '<div class="scm-public-quote-financing-head"><span>Simulación de tu financiación</span><strong>Valor a financiar: ' . esc_html($money((float) $preview['amount'])) . '</strong>'
+      . '<p>Cuota mensual estimada según el plazo, con la tasa de referencia de ' . esc_html($percent((float) $preview['rate'])) . ' mensual (' . esc_html($percent((float) $preview['effective_annual'])) . ' efectivo anual). Elige los meses para ver tu plan de pagos.</p></div>'
+      . '<div class="scm-public-quote-financing-options" role="group" aria-label="Cuota según el plazo">' . $options . '</div>'
+      . '<div class="scm-public-quote-financing-plan" data-public-quote-financing-plan aria-live="polite"></div>'
+      . '<p class="scm-public-quote-financing-note">Si se aprueba, las cuotas se descuentan de los giros de arrendamiento del inmueble. ' . esc_html(\SCM\Modules\OwnerCredits\OwnerCreditService::DISCLAIMER) . '</p>'
+      . '<script type="application/json" data-public-quote-financing-data>' . json_encode($data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) . '</script>'
+      . '</div>';
   }
 
   /** @param array<string,mixed> $row @param array<int,array<string,mixed>> $orders */

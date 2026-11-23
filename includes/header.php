@@ -340,6 +340,8 @@ if (empty($current_page) || $current_page === 'tickets') {
     $current_page = 'herramienta_duplicar_inventario';
   } elseif (in_array($tabParam, ['herramienta_ingreso_neto', 'simulador_ingreso_neto', 'ingreso_neto', 'scm-panel-herramienta-ingreso-neto'], true)) {
     $current_page = 'herramienta_ingreso_neto';
+  } elseif (in_array($tabParam, ['herramienta_simulador_credito', 'simulador_credito', 'scm-panel-herramienta-simulador-credito'], true)) {
+    $current_page = 'herramienta_simulador_credito';
   } else {
     $current_page = empty($tabParam) ? 'inicio' : 'abiertos';
   }
@@ -846,6 +848,15 @@ $rawNavItems = [
         'url' => $baseUrl . '/index.php?tab=simulador_ingreso_neto',
         'icon' => 'savings',
         'perms' => ['herramienta_ingreso_neto'],
+      ],
+      'herramienta_simulador_credito' => [
+        'key' => 'herramienta_simulador_credito',
+        'label' => 'Simulador de crédito',
+        'description' => 'Cuota y plan de pagos según valor, plazo y tasa',
+        'panel_id' => 'scm-panel-herramienta-simulador-credito',
+        'url' => $baseUrl . '/index.php?tab=simulador_credito',
+        'icon' => 'calculate',
+        'perms' => ['herramienta_simulador_credito'],
       ],
     ],
   ],

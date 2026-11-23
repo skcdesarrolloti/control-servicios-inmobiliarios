@@ -142,6 +142,8 @@ final class AuthenticatedActionRouter
       'scm_tools_cleaning_settings' => 'ajax_handler_tools_cleaning_settings',
       'scm_tools_preapproval_lookup' => 'ajax_handler_tools_preapproval_lookup',
       'scm_tools_preapproval_pdf' => 'ajax_handler_tools_preapproval_pdf',
+      'scm_tools_credit_simulate' => 'ajax_handler_tools_credit_simulate',
+      'scm_tools_credit_pdf' => 'ajax_handler_tools_credit_pdf',
       'scm_quote_fee_settings' => 'ajax_handler_quote_fee_settings',
       'scm_closing_policy_settings' => 'ajax_handler_closing_policy_settings',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_ORDER_CONTEXT => 'ajax_handler_cotizacion_order_context',

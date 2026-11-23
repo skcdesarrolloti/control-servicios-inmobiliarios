@@ -109,6 +109,8 @@
     if (cleaning) initCleaning(cleaning, request, post);
     var duplicate = root.querySelector('[data-scm-tool="duplicate-inventory"]');
     if (duplicate) initDuplicateInventory(duplicate, post);
+    var creditSimulator = root.querySelector('[data-scm-tool="credit-simulator"]');
+    if (creditSimulator) initCreditSimulator(creditSimulator, core, request, post);
     initCleaningSettings(root, post);
     initQuoteFeeSettings(root, post);
     initClosingPolicySettings(root, post);
@@ -1836,6 +1838,175 @@
 
   // ── Calculadora de aseo (antes plugin "Calculadora de Aseo Universal") ─────────────────────────
   // Duplicar inventario: primero muestra qué se copia y hacia dónde; solo copia al confirmar.
+  // ── Simulador de crédito ────────────────────────────────────────────────
+  // El servidor calcula (misma tasa, usura y plan del liquidador); aquí se pinta y se piden el PDF y el resumen.
+  function initCreditSimulator(module, core, request, post) {
+    var form = module.querySelector("[data-credit-sim-form]");
+    var result = module.querySelector("[data-credit-sim-result]");
+    var status = module.querySelector("[data-credit-sim-status]");
+    var submit = module.querySelector("[data-credit-sim-submit]");
+    var copyButton = module.querySelector("[data-credit-sim-copy]");
+    var pdfButton = module.querySelector("[data-credit-sim-pdf]");
+    var notify = typeof core.scmNotify === "function" ? core.scmNotify : function () {};
+    var money = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+    var summary = "";
+    var simulated = false;
+
+    function percent(value) {
+      return (Math.round(Number(value) * 10000) / 100).toLocaleString("es-CO", { maximumFractionDigits: 2 }) + " %";
+    }
+
+    function setReady(ready) {
+      simulated = ready;
+      copyButton.disabled = !ready;
+      pdfButton.disabled = !ready;
+    }
+
+    function kpi(label, value, note, accent) {
+      return '<div class="' + (accent ? "!sp-bg-service-navy !sp-border-service-navy" : "!sp-bg-white !sp-border-slate-200") + ' !sp-rounded-xl !sp-border !sp-border-solid !sp-p-4">' +
+        '<p class="!sp-m-0 !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide ' + (accent ? "!sp-text-service-yellow" : "!sp-text-service-muted") + '">' + label + "</p>" +
+        '<p class="!sp-m-0 !sp-mt-1 !sp-text-lg !sp-font-extrabold ' + (accent ? "!sp-text-white" : "!sp-text-service-navy") + '">' + value + "</p>" +
+        (note ? '<p class="!sp-m-0 !sp-mt-1 !sp-text-[10px] ' + (accent ? "!sp-text-white" : "!sp-text-service-muted") + '">' + note + "</p>" : "") + "</div>";
+    }
+
+    var TH = '!sp-px-2 !sp-py-2 !sp-text-[9px] !sp-uppercase !sp-tracking-wide !sp-font-bold !sp-text-service-muted !sp-whitespace-nowrap';
+    var TD = '!sp-px-2 !sp-py-1.5 !sp-text-[11px] !sp-whitespace-nowrap !sp-border-0 !sp-border-b !sp-border-solid !sp-border-slate-100';
+
+    function render(data) {
+      var sim = data.simulation;
+      var months = function (n) { return n + (Number(n) === 1 ? " mes" : " meses"); };
+      var warnings = (data.warnings || []).map(function (text) {
+        return '<li class="!sp-m-0">' + escapeHtml(text) + "</li>";
+      }).join("");
+      var compare = (data.compare || []).map(function (option) {
+        var chosen = Number(option.term) === Number(sim.term);
+        return '<tr class="' + (chosen ? "!sp-bg-amber-50 !sp-font-bold" : "") + '">' +
+          '<td class="' + TD + ' !sp-text-left"><button type="button" class="!sp-bg-transparent !sp-border-0 !sp-p-0 !sp-text-[11px] !sp-font-semibold !sp-text-service-navy !sp-underline !sp-cursor-pointer" data-credit-sim-term="' + Number(option.term) + '">' + months(option.term) + "</button></td>" +
+          '<td class="' + TD + ' !sp-text-right">' + money.format(option.payment) + "</td>" +
+          '<td class="' + TD + ' !sp-text-right">' + money.format(option.total_interest) + "</td>" +
+          '<td class="' + TD + ' !sp-text-right">' + money.format(option.total) + "</td></tr>";
+      }).join("");
+      var rows = (sim.rows || []).map(function (row) {
+        return "<tr>" +
+          '<td class="' + TD + ' !sp-text-left !sp-font-semibold">' + row.mes + "</td>" +
+          '<td class="' + TD + ' !sp-text-left">' + escapeHtml(row.fecha_texto || "") + "</td>" +
+          '<td class="' + TD + ' !sp-text-right">' + money.format(row.cuota) + "</td>" +
+          '<td class="' + TD + ' !sp-text-right">' + money.format(row.interes) + "</td>" +
+          '<td class="' + TD + ' !sp-text-right">' + money.format(row.abono) + "</td>" +
+          '<td class="' + TD + ' !sp-text-right">' + money.format(row.saldo) + "</td></tr>";
+      }).join("");
+      result.innerHTML = '<div class="!sp-space-y-4">' +
+        '<div class="!sp-grid !sp-grid-cols-2 lg:!sp-grid-cols-4 !sp-gap-3">' +
+        kpi("Cuota mensual", money.format(sim.payment), "A " + months(sim.term), true) +
+        kpi("Total intereses", money.format(sim.total_interest), "") +
+        kpi("Total a pagar", money.format(sim.total), "Valor " + money.format(sim.amount)) +
+        kpi("Tasa", percent(sim.rate) + " mensual", percent(sim.effective_annual) + " E.A.") + "</div>" +
+        (sim.first_due ? '<p class="!sp-m-0 !sp-text-[11px] !sp-text-service-muted">Primera cuota: <strong class="!sp-text-service-navy">' + escapeHtml(sim.first_due) + '</strong> · Última: <strong class="!sp-text-service-navy">' + escapeHtml(sim.last_due) + "</strong></p>" : "") +
+        (warnings ? '<ul class="!sp-m-0 !sp-p-3 !sp-pl-6 !sp-space-y-1 !sp-rounded-lg !sp-bg-amber-50 !sp-border !sp-border-solid !sp-border-amber-200 !sp-text-[11px] !sp-text-service-navy">' + warnings + "</ul>" : "") +
+        '<div><h4 class="!sp-m-0 !sp-mb-2 !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide">Cuota según el plazo</h4>' +
+        '<div class="!sp-overflow-x-auto !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200"><table class="!sp-w-full !sp-border-collapse"><thead class="!sp-bg-slate-50"><tr>' +
+        '<th class="' + TH + ' !sp-text-left">Plazo</th><th class="' + TH + ' !sp-text-right">Cuota mensual</th><th class="' + TH + ' !sp-text-right">Total intereses</th><th class="' + TH + ' !sp-text-right">Total a pagar</th></tr></thead><tbody>' + compare + "</tbody></table></div>" +
+        '<p class="!sp-m-0 !sp-mt-1 !sp-text-[10px] !sp-text-service-muted">Pulsa un plazo para simularlo.</p></div>' +
+        '<div><h4 class="!sp-m-0 !sp-mb-2 !sp-text-[10px] !sp-font-bold !sp-uppercase !sp-tracking-wide">Plan de pagos</h4>' +
+        '<div class="!sp-overflow-x-auto !sp-max-h-[480px] !sp-overflow-y-auto !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200"><table class="!sp-w-full !sp-border-collapse"><thead class="!sp-bg-slate-50"><tr>' +
+        '<th class="' + TH + ' !sp-text-left">Cuota</th><th class="' + TH + ' !sp-text-left">Vence</th><th class="' + TH + ' !sp-text-right">Valor cuota</th><th class="' + TH + ' !sp-text-right">Intereses</th><th class="' + TH + ' !sp-text-right">Abono a capital</th><th class="' + TH + ' !sp-text-right">Saldo</th></tr></thead><tbody>' + rows + "</tbody></table></div></div>" +
+        "</div>";
+    }
+
+    function simulate() {
+      submit.disabled = true;
+      status.textContent = "Simulando…";
+      return post("scm_tools_credit_simulate", new FormData(form))
+        .then(function (data) {
+          render(data);
+          summary = String(data.summary || "");
+          setReady(true);
+          status.textContent = "";
+        })
+        .catch(function (error) {
+          status.textContent = error.message;
+          setReady(false);
+        })
+        .finally(function () { submit.disabled = false; });
+    }
+
+    function copySummary() {
+      if (!summary) return;
+      var done = function () { notify("success", "Resumen copiado: pégalo en WhatsApp o en el correo.", "Simulador de crédito"); };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(summary).then(done).catch(fallback);
+      } else {
+        fallback();
+      }
+      function fallback() {
+        var area = document.createElement("textarea");
+        area.value = summary;
+        area.setAttribute("readonly", "");
+        area.style.position = "fixed";
+        area.style.opacity = "0";
+        document.body.appendChild(area);
+        area.select();
+        try { document.execCommand("copy"); done(); } catch (error) { status.textContent = "No se pudo copiar el resumen."; }
+        area.remove();
+      }
+    }
+
+    function requestPdf() {
+      pdfButton.disabled = true;
+      status.textContent = "Generando PDF…";
+      request("scm_tools_credit_pdf", new FormData(form))
+        .then(function (response) {
+          var type = response.headers.get("Content-Type") || "";
+          if (type.indexOf("application/json") !== -1) {
+            return response.json().then(function (json) { throw new Error((json && json.data && json.data.message) || "No se pudo generar el PDF."); });
+          }
+          if (!response.ok) throw new Error("No se pudo generar el PDF.");
+          var disposition = response.headers.get("Content-Disposition") || "";
+          var match = /filename="([^"]+)"/.exec(disposition);
+          return response.blob().then(function (blob) { return { blob: blob, name: match ? match[1] : "simulacion-credito.pdf" }; });
+        })
+        .then(function (file) {
+          var link = document.createElement("a");
+          link.href = URL.createObjectURL(file.blob);
+          link.download = file.name;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.setTimeout(function () { URL.revokeObjectURL(link.href); }, 1000);
+          status.textContent = "";
+        })
+        .catch(function (error) { status.textContent = error.message; })
+        .finally(function () { pdfButton.disabled = !simulated; });
+    }
+
+    // Valor con separador de miles mientras se escribe.
+    var amount = form.querySelector("[data-credit-sim-money]");
+    amount.addEventListener("input", function () {
+      var digits = amount.value.replace(/\D+/g, "");
+      amount.value = digits ? Number(digits).toLocaleString("es-CO") : "";
+    });
+    // Si cambian los datos después de simular, el resumen y el PDF quedarían desactualizados.
+    form.addEventListener("input", function () {
+      if (!simulated) return;
+      setReady(false);
+      status.textContent = "Cambiaste los datos: simula de nuevo para copiar el resumen o generar el PDF.";
+    });
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      simulate();
+    });
+    module.addEventListener("click", function (event) {
+      var term = event.target.closest("[data-credit-sim-term]");
+      if (term) {
+        form.elements.plazo.value = term.getAttribute("data-credit-sim-term");
+        simulate();
+        return;
+      }
+      if (event.target.closest("[data-credit-sim-copy]") && simulated) copySummary();
+      if (event.target.closest("[data-credit-sim-pdf]") && simulated) requestPdf();
+    });
+  }
+
   function initDuplicateInventory(module, post) {
     var form = module.querySelector("[data-duplicate-form]");
     var status = module.querySelector("[data-duplicate-status]");

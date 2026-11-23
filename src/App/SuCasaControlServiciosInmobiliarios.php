@@ -459,6 +459,7 @@ final class SuCasaControlServiciosInmobiliarios
       'herramienta_aseo' => 'Calculadora de aseo',
       'herramienta_duplicar_inventario' => 'Duplicar inventario',
       'herramienta_ingreso_neto' => 'Simulador de ingreso neto del propietario',
+      'herramienta_simulador_credito' => 'Simulador de crédito',
     ];
   }
 
@@ -953,6 +954,10 @@ final class SuCasaControlServiciosInmobiliarios
       // El simulador de ingreso neto es nuevo: mientras no se guarden permisos que lo conozcan, lo ve quien ve Créditos.
       if (!in_array('herramienta_ingreso_neto', $knownTabs, true) && in_array('credito_propietario', (array) $raw[$cargo], true)) {
         $raw[$cargo] = array_merge((array) $raw[$cargo], ['herramienta_ingreso_neto']);
+      }
+      // El simulador de crédito es nuevo: mientras no se guarden permisos que lo conozcan, lo ve quien ve Créditos o el simulador de ingreso neto.
+      if (!in_array('herramienta_simulador_credito', $knownTabs, true) && array_intersect(['credito_propietario', 'herramienta_ingreso_neto'], (array) $raw[$cargo]) !== []) {
+        $raw[$cargo] = array_merge((array) $raw[$cargo], ['herramienta_simulador_credito']);
       }
       // Las vistas de costo y el presupuesto de otros funcionarios son sensibles: mientras no se guarden permisos que las conozcan, solo las ven quienes administran permisos.
       if (in_array((string) $cargo, $this->dashboardPermissionAdminCargos(), true)) {

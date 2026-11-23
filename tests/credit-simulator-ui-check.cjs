@@ -1,0 +1,92 @@
+// Respuesta pública de la cotización con la simulación de la financiación y Herramientas › Simulador de crédito.
+const { chromium } = require('playwright');
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
+
+const fixture = JSON.parse(execFileSync('php', ['tests/credit-simulator-ui-fixture.php'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
+const publicPage = fs.readFileSync('public/cotizacion-mantenimiento.php', 'utf8');
+const publicStyle = publicPage.slice(publicPage.indexOf('<style>') + 7, publicPage.indexOf('</style>'));
+const publicScript = publicPage.slice(publicPage.lastIndexOf('<script>') + 8, publicPage.lastIndexOf('</script>'));
+const tools = fs.readFileSync('public/assets/js/admin-tools.js', 'utf8');
+const extract = (start, end) => tools.slice(tools.indexOf(start), tools.indexOf(end, tools.indexOf(start)));
+const toolFunctions = extract('  function initCreditSimulator(', '  function initDuplicateInventory(') + extract('  function escapeHtml(', '\n  }\n') + '\n  }\n';
+
+(async () => {
+  const browser = await chromium.launch({ headless: true, executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' });
+  try {
+    // ── Respuesta pública ──
+    const page = await browser.newPage();
+    await page.setContent('<style>' + publicStyle + '</style><main id="scm-app">' + fixture.publicHtml + '</main>');
+    await page.addScriptTag({ content: publicScript });
+    const financing = page.locator('[data-public-quote-financing]');
+    assert.equal(await financing.isVisible(), false, 'the simulation stays hidden until the owner approves with financing');
+    await page.locator('[name=estado]').selectOption('Aprobada');
+    assert.equal(await financing.isVisible(), false, 'approving alone does not show the simulation');
+    await page.locator('[name=financiacion]').selectOption('Si');
+    assert.equal(await financing.isVisible(), true, 'financing Sí shows the simulation');
+    assert.equal(await page.locator('[data-public-quote-financing-term]').count(), 3);
+    assert.match(await page.locator('[data-public-quote-financing-plan]').innerText(), /Elige un plazo/);
+    const option = page.locator('[data-public-quote-financing-term="3"]');
+    const optionStyle = await option.evaluate((node) => getComputedStyle(node).backgroundColor);
+    assert.notEqual(optionStyle, 'rgb(255, 138, 0)', 'term options do not inherit the orange submit button style');
+    await option.click();
+    assert.equal(await page.locator('[name=plazo_financiacion]').inputValue(), '3', 'choosing an option fills the months');
+    assert.equal(await option.getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('[data-public-quote-financing-plan] tbody tr').count(), 3, 'the plan lists one row per installment');
+    const planText = await page.locator('[data-public-quote-financing-plan]').innerText();
+    assert.match(planText, /Cuota mensual estimada/i);
+    assert.match(planText, /893\.723/, 'the plan total row shows the financed amount as principal');
+    await page.locator('[name=plazo_financiacion]').fill('2');
+    assert.equal(await page.locator('[data-public-quote-financing-plan] tbody tr').count(), 2, 'typing the months updates the plan');
+    assert.equal(await page.locator('[data-public-quote-financing-term="2"]').getAttribute('aria-pressed'), 'true');
+    await page.locator('[name=plazo_financiacion]').fill('9');
+    assert.match(await page.locator('[data-public-quote-financing-plan]').innerText(), /No hay simulación para 9 meses/);
+    assert.equal(await page.locator('[data-public-quote-response-term-error]').isVisible(), true, 'more months than the maximum is still flagged');
+    await page.locator('[name=financiacion]').selectOption('No');
+    assert.equal(await financing.isVisible(), false, 'financing No hides the simulation');
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.locator('[name=financiacion]').selectOption('Si');
+    await page.locator('[data-public-quote-financing-term="1"]').click();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    assert.ok(overflow <= 1, 'the simulation fits a phone screen without horizontal scroll');
+
+    // ── Herramienta ──
+    const tool = await browser.newPage();
+    await tool.setContent('<div id="root">' + fixture.toolHtml + '</div>');
+    await tool.addScriptTag({ content: `
+      window.calls = []; window.toasts = [];
+      window.fixture = ${JSON.stringify(fixture.responses)};
+      ${toolFunctions}
+      var post = function (action, data) { calls.push({ action: action, plazo: data.get('plazo'), valor: data.get('valor') }); return Promise.resolve(fixture[data.get('plazo')]); };
+      var request = function () { return Promise.reject(new Error('sin PDF en la prueba')); };
+      initCreditSimulator(document.querySelector('[data-scm-tool="credit-simulator"]'), { scmNotify: function (type, message) { toasts.push(type + ':' + message); } }, request, post);
+    ` });
+    assert.equal(await tool.locator('[data-credit-sim-pdf]').isDisabled(), true, 'the PDF waits for a simulation');
+    assert.equal(await tool.locator('[name=tasa]').inputValue(), '2,42', 'the rate starts at the reference rate');
+    await tool.locator('[name=valor]').pressSequentially('2500000');
+    assert.equal(await tool.locator('[name=valor]').inputValue(), '2.500.000', 'the amount gets thousands separators');
+    await tool.locator('[name=plazo]').fill('12');
+    await tool.locator('[data-credit-sim-submit]').click();
+    await tool.waitForFunction(() => document.querySelectorAll('[data-credit-sim-result] tbody tr').length > 0);
+    const result = await tool.locator('[data-credit-sim-result]').innerText();
+    assert.match(result, /Cuota mensual/i);
+    assert.match(result, /30\/12\/2026/, 'a disbursement on the 20th starts paying the next month');
+    assert.match(result, /tope de la política/, 'the policy warning is shown');
+    assert.equal(await tool.locator('[data-credit-sim-copy]').isDisabled(), false);
+    assert.equal(await tool.locator('[data-credit-sim-pdf]').isDisabled(), false);
+    await tool.locator('[data-credit-sim-term="6"]').click();
+    await tool.waitForFunction(() => window.calls.length === 2);
+    assert.equal(await tool.locator('[name=plazo]').inputValue(), '6', 'a term from the comparison is simulated');
+    await tool.waitForFunction(() => /A 6 meses/.test(document.querySelector('[data-credit-sim-result]').innerText));
+    await tool.locator('[name=nombre]').fill('Ana');
+    assert.equal(await tool.locator('[data-credit-sim-pdf]').isDisabled(), true, 'changing the data asks to simulate again');
+    assert.match(await tool.locator('[data-credit-sim-status]').innerText(), /simula de nuevo/);
+  } finally {
+    await browser.close();
+  }
+  console.log('Credit simulator UI checks passed.');
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

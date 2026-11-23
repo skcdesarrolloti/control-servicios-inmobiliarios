@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SCM\Modules\Tools;
 
+use SCM\Modules\OwnerCredits\OwnerCreditSimulator;
 use SCM\Modules\Pending\PublicServicesUi as UI;
 
 /** Herramientas del encabezado: Generar PSE y Calculadora de mora (public/assets/js/admin-tools.js). */
@@ -318,6 +319,51 @@ final class ToolsView
       . '<span class="!sp-text-[11px] !sp-text-service-muted" role="status" data-cleaning-settings-status>Se guarda en la misma configuración que usa el plugin de WordPress.</span>'
       . '<button type="submit" class="' . UI::PRIMARY . '"><span class="material-symbols-outlined !sp-text-[18px]" aria-hidden="true">save</span>Guardar configuración</button></footer>'
       . '</form>';
+  }
+
+  /**
+   * Simulador de crédito (admin-tools.js, initCreditSimulator): el servidor calcula con la configuración de créditos.
+   * @param array{rate:float,usury:float,policy_rate:float,max_term:int,default_term:int,purposes:list<string>} $defaults CreditSimulationService::defaults()
+   */
+  public function creditSimulator(array $defaults): string
+  {
+    $pct = static fn(float $value): string => rtrim(rtrim(number_format($value * 100, 4, ',', ''), '0'), ',');
+    $recipients = '';
+    foreach (CreditSimulationService::RECIPIENTS as $key => $label) $recipients .= '<option value="' . self::e($key) . '">' . self::e($label) . '</option>';
+    $purposes = '<option value="">Sin especificar</option>';
+    foreach ($defaults['purposes'] as $purpose) $purposes .= '<option value="' . self::e($purpose) . '">' . self::e($purpose) . '</option>';
+    $hint = static fn(string $text): string => '<span class="!sp-block !sp-mt-1 !sp-text-[10px] !sp-text-service-muted">' . $text . '</span>';
+    $button = static fn(string $class, string $data, string $icon, string $label): string => '<button type="button" class="' . $class . ' disabled:!sp-opacity-50" ' . $data . ' disabled><span class="material-symbols-outlined !sp-text-[17px]" aria-hidden="true">' . $icon . '</span>' . $label . '</button>';
+
+    return '<section class="!sp-font-sans !sp-text-service-navy !sp-bg-service-background !sp-p-3 sm:!sp-p-5 !sp-space-y-5" data-scm-tool="credit-simulator">'
+      . $this->header('calculate', 'Simulador de crédito', 'Cuota, plan de pagos y comparativo de plazos para darle detalles a un propietario, arrendatario u otra persona · No registra solicitudes')
+      . '<div class="!sp-grid !sp-grid-cols-1 xl:!sp-grid-cols-12 !sp-gap-5 !sp-items-start">'
+      . '<form class="' . UI::CARD . ' !sp-p-5 xl:!sp-col-span-4 !sp-space-y-4" data-credit-sim-form autocomplete="off" novalidate>'
+      . '<div class="' . self::SECTION_HEAD . ' !sp-mb-0"><h3 class="' . self::SECTION_TITLE . '"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">tune</span>Datos del crédito</h3></div>'
+      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-4">'
+      . $this->field('Valor del crédito', '<input class="' . UI::INPUT . '" type="text" inputmode="numeric" name="valor" placeholder="Ej: 2.500.000" required data-credit-sim-money>')
+      . $this->field('Plazo (meses)', '<input class="' . UI::INPUT . '" type="number" min="1" max="' . OwnerCreditSimulator::MAX_TERM . '" step="1" name="plazo" value="' . (int) $defaults['default_term'] . '" required>' . $hint('Tope de la política: ' . (int) $defaults['max_term'] . ' meses.'))
+      . $this->field('Tasa mensual N.M.V. (%)', '<input class="' . UI::INPUT . '" type="text" inputmode="decimal" name="tasa" value="' . self::e($pct((float) $defaults['rate'])) . '" required>' . $hint('Referencia de Créditos. Usura: ' . self::e($pct((float) $defaults['usury'])) . ' % mensual.'))
+      . $this->field('Fecha de desembolso', '<input class="' . UI::INPUT . '" type="date" name="desembolso" value="' . self::e(date('Y-m-d')) . '">' . $hint('Del 1 al 15, la primera cuota vence ese mes; desde el 16, el siguiente.'))
+      . '<div class="sm:!sp-col-span-2">' . $this->field('Destinación', '<select class="' . UI::INPUT . '" name="destinacion">' . $purposes . '</select>') . '</div>'
+      . '</div>'
+      . '<fieldset class="!sp-m-0 !sp-min-w-0 !sp-p-4 !sp-rounded-xl !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-slate-50/60 !sp-space-y-3">'
+      . '<legend class="!sp-px-1 !sp-text-xs !sp-font-bold !sp-text-service-navy">Cliente (opcional, sale en el PDF)</legend>'
+      . $this->field('Tipo de cliente', '<select class="' . UI::INPUT . '" name="destinatario">' . $recipients . '</select>')
+      . '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 !sp-gap-3">'
+      . $this->field('Nombre', '<input class="' . UI::INPUT . '" type="text" name="nombre" maxlength="120" placeholder="Nombre completo">')
+      . $this->field('Cédula o NIT', '<input class="' . UI::INPUT . '" type="text" name="documento" maxlength="40">')
+      . '</div>'
+      . $this->field('Observaciones', '<textarea class="' . UI::INPUT . ' !sp-h-auto !sp-py-2" name="observaciones" rows="2" maxlength="600" placeholder="Detalle para el cliente (opcional)"></textarea>')
+      . '</fieldset>'
+      . '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-3"><button class="' . UI::PRIMARY . '" type="submit" data-credit-sim-submit><span class="material-symbols-outlined !sp-text-[18px]" aria-hidden="true">calculate</span>Simular</button>'
+      . '<span class="!sp-text-[11px] !sp-text-service-muted" role="status" data-credit-sim-status></span></div>'
+      . '</form>'
+      . '<section class="' . UI::CARD . ' !sp-p-5 xl:!sp-col-span-8 !sp-space-y-4 !sp-min-w-0">'
+      . '<div class="' . self::SECTION_HEAD . ' !sp-mb-0"><h3 class="' . self::SECTION_TITLE . '"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">receipt_long</span>Resultado</h3>'
+      . '<div class="!sp-flex !sp-flex-wrap !sp-gap-2">' . $button(UI::SECONDARY, 'data-credit-sim-copy', 'content_copy', 'Copiar resumen') . $button(UI::NAVY . ' !sp-text-xs', 'data-credit-sim-pdf', 'picture_as_pdf', 'PDF para el cliente') . '</div></div>'
+      . '<div data-credit-sim-result><p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">Escribe el valor, el plazo y la tasa y pulsa Simular para ver la cuota y el plan de pagos.</p></div>'
+      . '</section></div></section>';
   }
 
   public function duplicateInventory(): string
