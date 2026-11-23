@@ -98,6 +98,7 @@ trait HandlesMaintenanceActions
       self::AJAX_CONTABLE        => ['tab' => 'contable',        'temas' => $defs['contable']['temas'],        'prefix' => 'scmco_'],
       self::AJAX_CERTIFICACIONES => ['tab' => 'certificaciones', 'temas' => $defs['certificaciones']['temas'], 'prefix' => 'scmcr_'],
       self::AJAX_CONTRACTUAL     => ['tab' => 'contractual',     'temas' => $defs['contractual']['temas'],     'prefix' => 'scmct_'],
+      self::AJAX_SERVICIOS_PUBLICOS_CASOS => ['tab' => 'servicios_publicos', 'temas' => $defs['servicios_publicos']['temas'], 'prefix' => 'scmsp_'],
     ];
     if (!isset($tabMap[$action])) {
       $this->jsonFail('Tab no reconocido.');

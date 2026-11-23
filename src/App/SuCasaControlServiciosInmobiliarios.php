@@ -82,6 +82,7 @@ final class SuCasaControlServiciosInmobiliarios
   const AJAX_CONTABLE        = 'scm_contable';
   const AJAX_CERTIFICACIONES = 'scm_certificaciones';
   const AJAX_CONTRACTUAL     = 'scm_contractual';
+  const AJAX_SERVICIOS_PUBLICOS_CASOS = 'scm_servicios_publicos_casos';
   const AJAX_PREVENTIVAS_PENDIENTES = 'scm_preventivas_pendientes';
   const AJAX_SERVICIOS_PUBLICOS_PENDIENTES = 'scm_servicios_publicos_pendientes';
   const AJAX_REVISION_SERVICIOS_PUBLICOS = 'scm_revision_servicios_publicos';
@@ -285,8 +286,32 @@ final class SuCasaControlServiciosInmobiliarios
       'recibo' => ['label' => 'Recibo de Inmuebles', 'temas' => ['Recibo de inmuebles', 'Recibo de inmueble', 'Recibos de inmuebles'], 'prefix' => 'scmrc_'],
       'contable' => ['label' => 'Contable y Tributaria', 'temas' => ['Contable y tributaria', 'Contable y tributario', 'Contabilidad tributaria'], 'prefix' => 'scmco_'],
       'certificaciones' => ['label' => 'Certificaciones Tributarias', 'temas' => ['Certificaciones tributarias', 'Certificacion tributaria', 'Certificado tributario', 'Certificados tributarios'], 'prefix' => 'scmcr_'],
-      'contractual' => ['label' => 'Contractual', 'temas' => ['Procesos juridicos', 'Proceso juridico', 'Solicitud contractual', 'Solicitudes contractuales', 'Solicitud de servicios publicos', 'Solicitudes de servicios publicos', 'No prorroga de contrato', 'Terminacion de contrato', 'Retencion de contrato', 'Otros servicios'], 'prefix' => 'scmct_'],
+      'contractual' => ['label' => 'Contractual', 'temas' => ['Procesos juridicos', 'Proceso juridico', 'Solicitud contractual', 'Solicitudes contractuales', 'No prorroga de contrato', 'Terminacion de contrato', 'Retencion de contrato', 'Otros servicios'], 'prefix' => 'scmct_'],
+      'servicios_publicos' => ['label' => 'Servicios Públicos', 'temas' => self::PUBLIC_SERVICES_TICKET_TOPICS, 'prefix' => 'scmsp_'],
     ];
+  }
+
+  /** Temas de la pestaña Servicios públicos; ya no se mezclan con Contractual ni con Mantenimiento. */
+  public const PUBLIC_SERVICES_TICKET_TOPICS = ['Solicitud de servicios publicos', 'Solicitudes de servicios publicos', \SCM\Modules\Pending\PublicServicesCriticalTicket::TOPIC];
+
+  /**
+   * Temas (en minúscula, con y sin tilde) de la pestaña Servicios públicos, para sacarlos del
+   * universo de Mantenimiento: esas solicitudes llegan con departamento "Mantenimiento".
+   * @return array<int,string>
+   */
+  public static function publicServicesTicketTopicsLower(): array
+  {
+    $topics = (array) (self::configuredGenericTicketTabDefinitions()['servicios_publicos']['temas'] ?? self::PUBLIC_SERVICES_TICKET_TOPICS);
+    $out = [];
+    foreach ($topics as $topic) {
+      $lower = mb_strtolower(trim((string) $topic), 'UTF-8');
+      if ($lower === '') {
+        continue;
+      }
+      $out[$lower] = true;
+      $out[strtr($lower, ['publicos' => 'públicos', 'publico' => 'público', 'critico' => 'crítico'])] = true;
+    }
+    return array_keys($out);
   }
 
   /** @param array<string,array<string,mixed>> $defaults @return array<string,array<string,mixed>> */
@@ -312,6 +337,21 @@ final class SuCasaControlServiciosInmobiliarios
         $out[$key]['temas'] = $configured;
       } else {
         $out[$key]['temas'] = self::sanitizeTicketTopicList($definition['temas'] ?? []);
+      }
+    }
+
+    // Configuraciones guardadas antes de existir la pestaña Servicios públicos tenían sus temas en
+    // Contractual: se mueven para que un caso no salga en las dos pestañas.
+    if (isset($out['servicios_publicos']) && self::sanitizeTicketTopicList($raw['servicios_publicos'] ?? null) === []) {
+      $moved = array_map(static fn(string $topic): string => mb_strtolower($topic, 'UTF-8'), $out['servicios_publicos']['temas']);
+      foreach ($out as $key => $definition) {
+        if ($key === 'servicios_publicos') {
+          continue;
+        }
+        $kept = array_values(array_filter((array) $definition['temas'], static fn(string $topic): bool => !in_array(mb_strtolower($topic, 'UTF-8'), $moved, true)));
+        if ($kept !== []) {
+          $out[$key]['temas'] = $kept;
+        }
       }
     }
 
@@ -2170,6 +2210,7 @@ final class SuCasaControlServiciosInmobiliarios
       'entrega' => ['label' => 'Entrega', 'base' => 'entrega', 'kind' => 'generic', 'temas' => $generic['entrega']['temas']],
       'recibo' => ['label' => 'Recibo', 'base' => 'recibo', 'kind' => 'generic', 'temas' => $generic['recibo']['temas']],
       'contractual' => ['label' => 'Contractual', 'base' => 'contractual', 'kind' => 'generic', 'temas' => $generic['contractual']['temas']],
+      'servicios_publicos' => ['label' => 'Servicios públicos', 'base' => 'servicios_publicos', 'kind' => 'generic', 'temas' => $generic['servicios_publicos']['temas']],
       'contable' => ['label' => 'Contable', 'base' => 'contable', 'kind' => 'generic', 'temas' => $generic['contable']['temas']],
       'certificaciones' => ['label' => 'Certificaciones', 'base' => 'certificaciones', 'kind' => 'generic', 'temas' => $generic['certificaciones']['temas']],
     ];

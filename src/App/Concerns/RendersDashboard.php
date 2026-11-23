@@ -70,6 +70,9 @@ trait RendersDashboard
       'scm-panel-recibo' => 'recibo',
       'contractual' => 'contractual',
       'scm-panel-contractual' => 'contractual',
+      'servicios_publicos' => 'servicios_publicos',
+      'servicios-publicos' => 'servicios_publicos',
+      'scm-panel-servicios_publicos' => 'servicios_publicos',
       'contable' => 'contable',
       'scm-panel-contable' => 'contable',
       'certificaciones' => 'certificaciones',
@@ -119,6 +122,7 @@ trait RendersDashboard
       'entrega' => ['label' => 'Entrega'],
       'recibo' => ['label' => 'Recibo'],
       'contractual' => ['label' => 'Contractual'],
+      'servicios_publicos' => ['label' => 'Servicios públicos'],
       'contable' => ['label' => 'Contable'],
       'certificaciones' => ['label' => 'Certificaciones'],
     ];
@@ -567,6 +571,7 @@ trait RendersDashboard
         'contable'        => self::AJAX_CONTABLE,
         'certificaciones' => self::AJAX_CERTIFICACIONES,
         'contractual'     => self::AJAX_CONTRACTUAL,
+        'servicios_publicos' => self::AJAX_SERVICIOS_PUBLICOS_CASOS,
         'preventivas_pendientes' => self::AJAX_PREVENTIVAS_PENDIENTES,
         'servicios_publicos_pendientes' => self::AJAX_SERVICIOS_PUBLICOS_PENDIENTES,
         'revision_servicios_publicos' => self::AJAX_REVISION_SERVICIOS_PUBLICOS,
@@ -1308,7 +1313,7 @@ trait RendersDashboard
         <div class="scm-pagination" id="scm-pagination"><?php echo $paginationHtml; ?></div>
       </div>
 
-      <?php foreach (['preventiva', 'entrega', 'recibo', 'contractual', 'contable', 'certificaciones'] as $gTabKey): $gTabData = $genericResults[$gTabKey];
+      <?php foreach (['preventiva', 'entrega', 'recibo', 'contractual', 'servicios_publicos', 'contable', 'certificaciones'] as $gTabKey): $gTabData = $genericResults[$gTabKey];
         $gParams = $gTabData['params'];
         $gRows = $gTabData['result']['rows'];
         $gStats = $gTabData['result']['stats'];
@@ -2889,7 +2894,7 @@ trait RendersDashboard
   {
     // Mismo orden que las pestañas de casos abiertos.
     $categories = ['mantenimiento' => 'Mantenimiento'];
-    $labels = ['preventiva' => 'Preventiva', 'entrega' => 'Entrega', 'recibo' => 'Recibo', 'contractual' => 'Contractual', 'contable' => 'Contable', 'certificaciones' => 'Certificaciones'];
+    $labels = ['preventiva' => 'Preventiva', 'entrega' => 'Entrega', 'recibo' => 'Recibo', 'contractual' => 'Contractual', 'servicios_publicos' => 'Servicios públicos', 'contable' => 'Contable', 'certificaciones' => 'Certificaciones'];
     $definitions = $this->get_generic_tab_definitions();
     foreach ($labels as $key => $label) {
       if (isset($definitions[$key])) $categories[$key] = $label;
@@ -6729,7 +6734,7 @@ trait RendersDashboard
       $cards[] = ['sin-rev-entrega', 'Sin revisión de entrega', 'visibility_off', 'slate', 'sin_revision_entrega'];
       $cards[] = ['con-inventario', 'Con inventario', 'inventory_2', 'green', 'con_inventario'];
       $cards[] = ['sin-inventario', 'Sin inventario', 'inventory', 'orange', 'sin_inventario'];
-    } elseif (in_array($tabKey, ['contractual', 'contable', 'certificaciones', 'otros'], true)) {
+    } elseif (in_array($tabKey, ['contractual', 'servicios_publicos', 'contable', 'certificaciones', 'otros'], true)) {
       $cards[] = ['nuevo', 'Nuevo', 'fiber_new', 'blue', 'estado_nuevo'];
       $cards[] = ['en-proceso', 'En proceso', 'pending', 'orange', 'estado_en_proceso'];
     } elseif ($tabKey === 'recibo') {

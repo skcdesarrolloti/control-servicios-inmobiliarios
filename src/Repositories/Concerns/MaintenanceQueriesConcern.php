@@ -6,6 +6,23 @@ namespace SCM\Repositories\Concerns;
 
 trait MaintenanceQueriesConcern
 {
+  /**
+   * Las solicitudes de servicios públicos llegan con departamento "Mantenimiento", pero tienen su
+   * propia pestaña y reglas de popup: no se cuentan ni se listan en Mantenimiento.
+   * @param array<int,string> $where @param array<int,mixed> $args
+   */
+  private function excludePublicServicesTopics(array &$where, array &$args): void
+  {
+    $topics = \SCM\App\SuCasaControlServiciosInmobiliarios::publicServicesTicketTopicsLower();
+    if ($topics === []) {
+      return;
+    }
+    $where[] = "LOWER(TRIM(COALESCE(t.tema_ayuda, ''))) NOT IN (" . implode(',', array_fill(0, count($topics), '%s')) . ')';
+    foreach ($topics as $topic) {
+      $args[] = $topic;
+    }
+  }
+
   public function ticketsTable(): string
   {
     return $this->db->table('jet_cct_tickets');
@@ -80,6 +97,7 @@ trait MaintenanceQueriesConcern
     }
     $args[] = '%reparacion%';
     $args[] = '%mantenimiento%';
+    $this->excludePublicServicesTopics($where, $args);
 
     if ($filters['fTema'] !== '') {
       $where[] = "LOWER(TRIM(COALESCE(t.tema_ayuda, ''))) = %s";

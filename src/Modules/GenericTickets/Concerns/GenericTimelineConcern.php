@@ -35,6 +35,7 @@ trait GenericTimelineConcern
       'recibo' => ReciboTimelineMap::steps(),
       'contable' => ContableTimelineMap::steps(),
       'certificaciones' => CertificacionesTimelineMap::steps(),
+      'servicios_publicos' => ContractualTimelineMap::steps(),
     ];
     return array_merge($maps, ContractualTimelineMap::maps());
   }

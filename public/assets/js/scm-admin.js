@@ -10417,7 +10417,7 @@
           ) !== -1;
         // Estos temas no tienen una solución en sitio que firmar.
         var tabWithoutCompletionAct =
-          ["entrega", "recibo", "contractual", "contable", "certificaciones"].indexOf(
+          ["entrega", "recibo", "contractual", "servicios_publicos", "contable", "certificaciones"].indexOf(
             normalizeCaseActionState(btn.dataset.tabKey || ""),
           ) !== -1;
 

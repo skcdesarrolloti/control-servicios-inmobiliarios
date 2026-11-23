@@ -35,6 +35,7 @@ trait RendersPublicPqr
       'entrega' => ['label' => 'Entrega', 'themes' => (array) ($generic['entrega']['temas'] ?? [])],
       'recibo' => ['label' => 'Recibo', 'themes' => (array) ($generic['recibo']['temas'] ?? [])],
       'contractual' => ['label' => 'Contractual', 'themes' => (array) ($generic['contractual']['temas'] ?? [])],
+      'servicios_publicos' => ['label' => 'Servicios públicos', 'themes' => (array) ($generic['servicios_publicos']['temas'] ?? [])],
       'contable' => ['label' => 'Contable', 'themes' => (array) ($generic['contable']['temas'] ?? [])],
       'certificaciones' => ['label' => 'Certificaciones', 'themes' => (array) ($generic['certificaciones']['temas'] ?? [])],
     ];

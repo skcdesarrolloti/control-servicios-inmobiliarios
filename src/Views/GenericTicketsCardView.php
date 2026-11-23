@@ -762,7 +762,10 @@ final class GenericTicketsCardView
     if ($temaKey === 'certificaciones tributarias') {
       return 'certificaciones';
     }
-    if (in_array($tema, ['Procesos juridicos', 'Solicitud contractual', 'Solicitud de servicios publicos', 'No prorroga de contrato', 'Terminacion de contrato', 'Retencion de contrato', 'Otros servicios'], true)) {
+    if (in_array($temaKey, \SCM\App\SuCasaControlServiciosInmobiliarios::publicServicesTicketTopicsLower(), true)) {
+      return 'servicios_publicos';
+    }
+    if (in_array($tema, ['Procesos juridicos', 'Solicitud contractual', 'No prorroga de contrato', 'Terminacion de contrato', 'Retencion de contrato', 'Otros servicios'], true)) {
       return 'contractual';
     }
 

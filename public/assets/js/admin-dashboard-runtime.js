@@ -15974,7 +15974,8 @@
       } else if (
         catKey === "contable" ||
         catKey === "certificaciones" ||
-        catKey === "contractual"
+        catKey === "contractual" ||
+        catKey === "servicios_publicos"
       ) {
         flujoRows = [
           { label: "Nuevo", value: metrics.estado_nuevo, cls: "accent" },
@@ -16778,6 +16779,7 @@
         contable: "contable",
         certificaciones: "certificaciones",
         contractual: "contractual",
+        servicios_publicos: "servicios públicos",
       };
       return labels[key] || labels.mantenimiento;
     }
@@ -19551,6 +19553,7 @@
       "scm-contable-",
       "scm-certificaciones-",
       "scm-contractual-",
+      "scm-servicios_publicos-",
     ];
     revisionPrefixes.forEach(function (prefix) {
       var conEl = root.querySelector("#" + prefix + "kpi-con-prev");
@@ -20730,7 +20733,7 @@
               );
             }
             if (
-              ["contractual", "contable", "certificaciones"].includes(tabKey)
+              ["contractual", "servicios_publicos", "contable", "certificaciones"].includes(tabKey)
             ) {
               updateGenericKPI(tabKey, "nuevo", d.kpi_nuevo || "0");
               updateGenericKPI(tabKey, "en-proceso", d.kpi_en_proceso || "0");
@@ -26956,6 +26959,7 @@
       { key: "contable", action: actions.contable || "" },
       { key: "certificaciones", action: actions.certificaciones || "" },
       { key: "contractual", action: actions.contractual || "" },
+      { key: "servicios_publicos", action: actions.servicios_publicos || "" },
       { key: "mis_tickets", action: actionMyTickets || "" },
       {
         key: "cotizaciones_mantenimiento",

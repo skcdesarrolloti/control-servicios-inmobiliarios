@@ -313,6 +313,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_CONTABLE,
       SuCasaControlServiciosInmobiliarios::AJAX_CERTIFICACIONES,
       SuCasaControlServiciosInmobiliarios::AJAX_CONTRACTUAL,
+      SuCasaControlServiciosInmobiliarios::AJAX_SERVICIOS_PUBLICOS_CASOS,
     ] as $genericAction) {
       $this->routes[$genericAction] = 'ajax_handler_generic';
     }

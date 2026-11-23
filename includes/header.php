@@ -158,7 +158,12 @@ if (class_exists('\SCM\Core\App')) {
         $icon = 'build';
         $areaLabel = 'Mantenimiento';
 
-        if (str_contains($topicKey, 'reparacion') || str_contains($topicKey, 'mejora') || str_contains($topicKey, 'mantenimiento') || $deptoKey === 'mantenimiento') {
+        if (str_contains($topicKey, 'servicios public') || str_contains($topicKey, 'servicio publico') || str_contains($topicKey, 'servicios públic') || str_contains($topicKey, 'servicio públic')) {
+          // Antes que Mantenimiento: estas solicitudes llegan con departamento "Mantenimiento".
+          $subtab = 'servicios_publicos';
+          $icon = 'water_drop';
+          $areaLabel = 'Servicios públicos';
+        } elseif (str_contains($topicKey, 'reparacion') || str_contains($topicKey, 'mejora') || str_contains($topicKey, 'mantenimiento') || $deptoKey === 'mantenimiento') {
           $subtab = 'mant';
           $icon = 'build';
           $areaLabel = 'Mantenimiento';
@@ -182,7 +187,7 @@ if (class_exists('\SCM\Core\App')) {
           $subtab = 'contable';
           $icon = 'receipt_long';
           $areaLabel = 'Contable';
-        } elseif (str_contains($topicKey, 'juridic') || str_contains($topicKey, 'contractual') || str_contains($topicKey, 'servicios public') || str_contains($topicKey, 'retencion')) {
+        } elseif (str_contains($topicKey, 'juridic') || str_contains($topicKey, 'contractual') || str_contains($topicKey, 'retencion')) {
           $subtab = 'contractual';
           $icon = 'gavel';
           $areaLabel = 'Contractual';

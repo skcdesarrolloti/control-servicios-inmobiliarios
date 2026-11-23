@@ -714,7 +714,16 @@ trait GenericQueryConcern
       $args[] = '%reparacion%';
       $parts[] = "LOWER(COALESCE(`tema_ayuda`, '')) LIKE ?";
       $args[] = '%mantenimiento%';
-      return '(' . implode(' OR ', $parts) . ')';
+      // Igual que la pestaña Mantenimiento: servicios públicos tiene su propia pestaña.
+      $publicServicesTopics = \SCM\App\SuCasaControlServiciosInmobiliarios::publicServicesTicketTopicsLower();
+      $exclude = '';
+      if ($publicServicesTopics !== []) {
+        $exclude = " AND LOWER(TRIM(COALESCE(`tema_ayuda`, ''))) NOT IN (" . implode(',', array_fill(0, count($publicServicesTopics), '?')) . ')';
+        foreach ($publicServicesTopics as $topic) {
+          $args[] = $topic;
+        }
+      }
+      return '((' . implode(' OR ', $parts) . ')' . $exclude . ')';
     };
     $defs = \SCM\App\SuCasaControlServiciosInmobiliarios::configuredGenericTicketTabDefinitions();
 

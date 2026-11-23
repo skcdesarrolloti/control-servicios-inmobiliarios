@@ -6,6 +6,7 @@ namespace SCM\Repositories\Concerns;
 
 trait MaintenanceStatisticsConcern
 {
+
   private function buildMaintenanceWhereParts(array $filters): array
   {
     $table = $this->ticketsTable();
@@ -25,6 +26,7 @@ trait MaintenanceStatisticsConcern
     }
     $args[] = '%reparacion%';
     $args[] = '%mantenimiento%';
+    $this->excludePublicServicesTopics($where, $args);
 
     $tema = (string) ($filters['fTema'] ?? '');
     if ($tema !== '') {

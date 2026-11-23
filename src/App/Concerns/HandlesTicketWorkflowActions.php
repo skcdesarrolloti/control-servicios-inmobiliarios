@@ -246,6 +246,7 @@ trait HandlesTicketWorkflowActions
         'Contable' => (int) ($genericStats['contable']['total'] ?? 0),
         'Certificaciones' => (int) ($genericStats['certificaciones']['total'] ?? 0),
         'Contractual' => (int) ($genericStats['contractual']['total'] ?? 0),
+        'Servicios públicos' => (int) ($genericStats['servicios_publicos']['total'] ?? 0),
       ];
 
       $metrics = [
@@ -275,6 +276,7 @@ trait HandlesTicketWorkflowActions
           'contable' => ['label' => 'Contable'] + ($genericStats['contable'] ?? []),
           'certificaciones' => ['label' => 'Certificaciones'] + ($genericStats['certificaciones'] ?? []),
           'contractual' => ['label' => 'Contractual'] + ($genericStats['contractual'] ?? []),
+          'servicios_publicos' => ['label' => 'Servicios públicos'] + ($genericStats['servicios_publicos'] ?? []),
         ],
       ];
 
@@ -2115,6 +2117,8 @@ trait HandlesTicketWorkflowActions
       if (!$this->canAccessDashboardTab('servicios_publicos_pendientes')) $this->jsonFail('No tienes permiso para ver servicios públicos críticos.');
       $ticket = $this->db->getRow('SELECT * FROM `'.$this->db->table('jet_cct_tickets').'` WHERE _ID=?', [(int)($_POST['ticket_pk']??0)]);
       if ($ticket && ($ticket['tema_ayuda']??'') === \SCM\Modules\Pending\PublicServicesCriticalTicket::TOPIC) $case=$this->adminDueNativeTicketCasePayload((int)$ticket['_ID'],$this->adminDueStatusBucket($ticket));
+      // Se abre con las reglas de la pestaña Servicios públicos (responder, seguimiento y notas), no las de Mantenimiento.
+      if ($case !== []) $case['tab_key'] = 'servicios_publicos';
     }
     if ($case === [] && in_array($type, ['calendar_ticket', 'terminacion_contrato_pendiente', 'no_prorroga_contrato_pendiente'], true) && $ticketRefs !== []) {
       $ticket = [];
