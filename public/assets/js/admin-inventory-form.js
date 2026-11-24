@@ -177,9 +177,8 @@
     function panes() {
       var list = [{ id: "datos", label: "Datos" }, { id: "linderos", label: "Linderos" }];
       visibleSections().forEach(function (section) {
-        list.push({ id: "s:" + section.key, label: sectionLabel(section), section: section, count: state.sections[section.key].rows.length + (section.key === "elementos_electricos" ? electricalFromSections().length : 0) });
+        list.push({ id: "s:" + section.key, label: sectionLabel(section), section: section, count: state.sections[section.key].rows.length + (isFurnished() ? state.furniture[section.key].length : 0) + (section.key === "elementos_electricos" ? electricalFromSections().length : 0) });
       });
-      if (isFurnished()) list.push({ id: "muebles", label: "Muebles y enseres" });
       list.push({ id: "cierre", label: "Cierre" });
       return list;
     }
@@ -504,7 +503,9 @@
       var withFloor = material && section && section.group === "general" && floorsCount() > 1;
       return '<div class="scm-inv-row' + (withFloor ? " has-floor" : "") + '" data-row="' + index + '">' +
         (withFloor ? '<select class="scm-inv-p" data-f="p" aria-label="Piso">' + range(1, floorsCount()).map(function (n) { return '<option value="' + n + '"' + (String(row.p || "1") === n ? " selected" : "") + ">Piso " + n + "</option>"; }).join("") + "</select>" : "") +
-        '<input class="scm-inv-d" data-f="d" value="' + esc(row.d) + '" placeholder="Elemento" data-suggest="scm-inv-desc-' + esc(key) + '" autocomplete="off" aria-label="Descripción">' +
+        (kind === "furniture"
+          ? '<textarea class="scm-inv-d" data-f="d" rows="' + Math.min(8, String(row.d || "").split("\n").length) + '" placeholder="Mueble o enser: marca, color, material" aria-label="Mueble o enser">' + esc(row.d) + "</textarea>"
+          : '<input class="scm-inv-d" data-f="d" value="' + esc(row.d) + '" placeholder="Elemento" data-suggest="scm-inv-desc-' + esc(key) + '" autocomplete="off" aria-label="Descripción">') +
         '<input class="scm-inv-c" data-f="c" value="' + esc(row.c) + '" placeholder="Cant." data-suggest="scm-inv-qty" autocomplete="off" aria-label="Cantidad">' +
         (material ? '<input class="scm-inv-m" data-f="m" value="' + esc(row.m) + '" placeholder="Material" data-suggest="' + listId + '" autocomplete="off" aria-label="Tipo de material"><datalist id="' + listId + '">' + materials.map(function (m) { return '<option value="' + esc(m) + '">'; }).join("") + "</datalist>" : "") +
         '<div class="scm-inv-state" role="group" aria-label="Estado">' + STATES.map(function (s) { return '<button type="button" data-state="' + s + '" class="' + ((row.e || "Bueno") === s ? "is-on is-" + s.toLowerCase() : "") + '">' + s + "</button>"; }).join("") + "</div>" +
@@ -573,18 +574,20 @@
         html += '<p class="scm-inv-hint">Aún no hay elementos. Toca los sugeridos de arriba, usa «+ Fila» o copia los de otro espacio.</p>';
       }
       html += rowsBlock("sections", section.key, entry.rows, true, section) + "</div>";
+      if (isFurnished()) html += furnitureBlock(section);
       return html;
     }
 
-    function paneFurniture() {
-      var html = '<p class="scm-inv-hint">Registra los muebles y enseres en el lugar donde están. Solo se guardan las secciones con filas.</p>';
-      visibleSections().forEach(function (section) {
-        var rows = state.furniture[section.key];
-        html += '<details class="scm-inv-card scm-inv-furniture"' + (rows.length || voice.target === "furniture:" + section.key ? " open" : "") + '><summary>' + esc(sectionLabel(section)) + ' <small>' + rows.length + "</small></summary>" +
-          rowsBlock("furniture", section.key, rows, false, null) +
-          '<button type="button" class="scm-inv-tool" data-furniture-add="' + esc(section.key) + '">+ Mueble o enser</button>' + voiceButton("furniture:" + section.key) + voicePanel("furniture:" + section.key) + "</details>";
-      });
-      return html;
+    // Amoblado: muebles y enseres del mismo espacio, debajo de sus elementos.
+    function furnitureBlock(section) {
+      var rows = state.furniture[section.key];
+      return '<div class="scm-inv-card scm-inv-furniture">' +
+        '<div class="scm-inv-card-head"><h4>Muebles y enseres <small>' + rows.length + "</small></h4></div>" +
+        '<p class="scm-inv-hint">Un mueble o enser por fila. En la descripción incluye lo que lo identifica: marca, color, material o tamaño (ej.: «Nevera Mabe 2 puertas gris», «Cucharas metálicas»).</p>' +
+        '<div class="scm-inv-tools"><button type="button" class="scm-inv-tool" data-furniture-add="' + esc(section.key) + '">+ Mueble o enser</button>' + voiceButton("furniture:" + section.key) + "</div>" +
+        voicePanel("furniture:" + section.key) +
+        (rows.length ? '<div class="scm-inv-head"><span>Mueble o enser</span><span>Cant.</span><span>Estado</span><span>Observaciones</span><span></span></div>' : "") +
+        rowsBlock("furniture", section.key, rows, false, null) + "</div>";
     }
 
     function paneClosing() {
@@ -628,7 +631,7 @@
       if (!list.some(function (p) { return p.id === paneId; })) paneId = "datos";
       var index = list.findIndex(function (p) { return p.id === paneId; });
       var pane = list[index];
-      var body = pane.id === "datos" ? paneData() : pane.id === "linderos" ? paneBoundaries() : pane.id === "muebles" ? paneFurniture() : pane.id === "cierre" ? paneClosing() : paneSection(pane.section);
+      var body = pane.id === "datos" ? paneData() : pane.id === "linderos" ? paneBoundaries() : pane.id === "cierre" ? paneClosing() : paneSection(pane.section);
       var hidden = hiddenGeneralSections();
       if (!hidden.length) spacePicker = false;
       var keepScroll = root.querySelector("[data-pane-nav]");
@@ -876,6 +879,7 @@
       } else if (target.dataset.entry) {
         state.sections[currentSection().key][target.dataset.entry] = target.value;
       } else if (target.dataset.f) {
+        if (target.tagName === "TEXTAREA") { target.style.height = "auto"; target.style.height = target.scrollHeight + 2 + "px"; }
         var rows = rowsTarget(target);
         rows[Number(target.closest("[data-row]").dataset.row)][target.dataset.f] = target.value;
         if (target.dataset.f === "d") {

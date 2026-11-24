@@ -206,12 +206,21 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     // Amoblado: muebles y cobro doble.
     await go('Datos');
     await pick('categoria_inventario', 'Amoblado');
-    assert.ok((await chips()).includes('Muebles y enseres'));
-    await go('Muebles y enseres');
-    await page.locator('.scm-inv-furniture summary', { hasText: 'Sala, comedor' }).click();
+    assert.ok(!(await chips()).includes('Muebles y enseres'), 'No separate furniture tab');
+    await go('Sala, comedor');
+    assert.equal(await page.textContent('.scm-inv-furniture h4'), 'Muebles y enseres 0', 'Furniture block inside the space tab');
     await page.locator('[data-furniture-add="sala"]').click();
     await page.locator('[data-rows="furniture:sala"] [data-f="d"]').fill('Sofá');
+    assert.equal(await page.evaluate(() => document.querySelector('[data-rows="furniture:sala"] [data-f="d"]').tagName), 'TEXTAREA', 'Furniture description allows several lines');
     assert.equal(await page.locator('[data-rows="furniture:sala"] [data-f="m"]').count(), 0, 'Furniture has no material');
+    assert.ok((await chips()).some(c => c.startsWith('Sala')), 'Space tab counts its furniture');
+    if (shots) await page.screenshot({ path: path.join(shots, 'inv-muebles.png'), fullPage: true });
+    await go('Datos');
+    await pick('categoria_inventario', 'No amoblado');
+    await go('Sala, comedor');
+    assert.equal(await page.locator('.scm-inv-furniture').count(), 0, 'No furniture block when not furnished');
+    await go('Datos');
+    await pick('categoria_inventario', 'Amoblado');
     await go('Cierre');
     let billing = await page.textContent('.scm-inv-billing');
     assert.ok(billing.includes('152.912') && billing.includes('160.912') && billing.includes('doble'), 'Double service: ' + billing);

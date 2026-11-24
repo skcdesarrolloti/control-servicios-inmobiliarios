@@ -101,6 +101,19 @@ php bin/cct-add-fields.php inventario informacion_adicional_del_inmueble_tab tip
 
 Pruebas: `php tests/inventory-public-check.php`, `php tests/inventory-flow-check.php` y `node tests/inventory-form-check.cjs`.
 
+## Muebles y enseres (Amoblado)
+
+- No hay pestaña aparte: cada espacio muestra, debajo de sus elementos, el bloque "Muebles y enseres" con su propio
+  "+ Mueble o enser" y dictado. El contador de la pestaña suma elementos y muebles. Si es "No amoblado" el bloque no sale
+  y los muebles no se guardan.
+- Campos por fila: descripción, cantidad, estado y observaciones. Es la estructura del repeater `<espacio>_muebles`
+  (`descripcion_*`, `cantidad_*`, `estado_*`, `observaciones_*`); no tiene material ni marca. En los inventarios
+  amoblados reales (1.055 filas revisadas) la marca, el color y el material se escriben dentro de la descripción
+  ("Nevera M/Mabe 2 puertas", "Cucharas metálicas") y muchos enseres no tienen marca, así que no se agregan columnas.
+- La descripción es un área de texto que crece: los inventarios anteriores traen listas de varias líneas y un input
+  las juntaba en una sola al editar. El informe respeta esos saltos de línea (`white-space: pre-line`).
+- Las claves antiguas de JetForm `texto_cantidad_*`, `ninguna_*` y `estado_*_final_muebles` no se usan en ningún módulo.
+
 ## Diseño adaptable
 
 - El popup del inventario y de la revisión antes de la ocupación usa hasta 1280 px de ancho.

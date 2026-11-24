@@ -8,7 +8,7 @@
 .scm-inv-table-wrap { overflow-x: auto; border: 1px solid var(--scm-line); border-radius: 10px; }
 .scm-inv-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 13px; }
 .scm-inv-table th { padding: 8px 10px; background: #f3f7fc; color: var(--scm-navy); font-size: 12px; text-align: left; }
-.scm-inv-table td { padding: 7px 10px; border-top: 1px solid var(--scm-line); vertical-align: top; overflow-wrap: anywhere; }
+.scm-inv-table td { padding: 7px 10px; border-top: 1px solid var(--scm-line); vertical-align: top; overflow-wrap: anywhere; white-space: pre-line; }
 .scm-inv-state-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border: 1px solid; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .scm-inv-state-badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .scm-inv-state-badge.is-good { border-color: #86efac; background: #f0fdf4; color: #15803d; }

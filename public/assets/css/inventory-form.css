@@ -49,9 +49,13 @@
 .scm-inv-state .is-malo { background: #dc2626; }
 .scm-inv-row-actions { display: flex; gap: 3px; }
 .scm-inv-icon { width: 26px; height: 30px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; color: #475569; font-size: 15px; line-height: 1; cursor: pointer; }
-.scm-inv-furniture summary { font-size: 14px; font-weight: 600; color: #071f49; cursor: pointer; }
-.scm-inv-furniture summary small { color: #64748b; font-weight: 500; }
-.scm-inv-furniture .scm-inv-rows { margin: 10px 0; }
+.scm-inv-furniture { border-color: #c7d2fe; background: #fafbff; }
+.scm-inv-furniture h4 small { color: #64748b; font-weight: 500; }
+.scm-inv-furniture .scm-inv-hint { margin: 0 0 8px; }
+.scm-inv-furniture .scm-inv-head { grid-template-columns: minmax(160px, 2fr) minmax(124px, .75fr) 168px minmax(130px, 1.3fr) 62px; margin-top: 8px; }
+.scm-inv-furniture .scm-inv-rows { margin-top: 6px; }
+.scm-inv-furniture .scm-inv-row { align-items: start; }
+.scm-inv-row textarea.scm-inv-d { width: 100%; min-width: 0; min-height: 34px; padding: 7px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; font-size: 13px; line-height: 1.35; box-sizing: border-box; resize: vertical; background: #fff; }
 .scm-inv-checks { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 10px; font-size: 13px; }
 .scm-inv-billing ul { margin: 10px 0 6px; padding: 0; list-style: none; font-size: 13px; }
 .scm-inv-billing li { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f1f5f9; }
@@ -181,7 +185,7 @@
 }
 /* En pantallas táctiles pequeñas, 16 px evita que el teléfono haga zoom al escribir. */
 @media (max-width: 760px) {
-  .scm-inv-row input { font-size: 16px; }
+  .scm-inv-row input, .scm-inv-row textarea { font-size: 16px; }
   .scm-inv-field input, .scm-inv-field select, .scm-inv-field textarea { font-size: 16px; }
 }
 .scm-inv-voice > .scm-inv-voice-mic, .scm-inv-voice > .scm-inv-voice-wave, .scm-inv-voice > .scm-inv-voice-spin { flex: 0 0 auto; }
