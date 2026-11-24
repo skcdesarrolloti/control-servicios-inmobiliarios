@@ -824,6 +824,7 @@ trait HandlesInventoryActions
               </div>
               <div class="scm-corrective-existing-actions">
                 <button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-url="<?= $h(self::inventoryPublicUrl($id)) ?>" data-iframe-title="Inventario #<?= $h((string) $id) ?>">Ver</button>
+                <button type="button" class="scm-acta-button scm-acta-secondary" data-scm-copy-link="<?= $h(self::signedInventoryPublicUrl($id)) ?>" title="Enlace para compartir; abre sin iniciar sesión">Copiar vínculo</button>
                 <?php if ($manage): ?><button type="button" class="scm-acta-button scm-acta-secondary" data-inventory-edit="<?= $h((string) $id) ?>">Editar</button><?php endif; ?>
                 <?php if ($manage && $canDelete): ?><button type="button" class="scm-acta-button scm-acta-danger" data-inventory-delete="<?= $h((string) $id) ?>">Eliminar</button><?php endif; ?>
               </div>
@@ -964,8 +965,8 @@ trait HandlesInventoryActions
       $this->jsonFail('No se pudo cargar el listado.');
     }
     $html = $inventories
-      ? DeliveryProcessView::inventories($rows, ['manage' => $this->canUseDashboardAction('inventory_manage')], $page, $pages, $total, static fn(int $id): string => self::inventoryPublicUrl($id))
-      : DeliveryProcessView::reviews($rows, ['manage' => $this->canUseDashboardAction('delivery_review_manage')], $page, $pages, $total, static fn(int $id): string => self::deliveryReviewPublicUrl($id));
+      ? DeliveryProcessView::inventories($rows, ['manage' => $this->canUseDashboardAction('inventory_manage')], $page, $pages, $total, static fn(int $id): string => self::inventoryPublicUrl($id), static fn(int $id): string => self::signedInventoryPublicUrl($id))
+      : DeliveryProcessView::reviews($rows, ['manage' => $this->canUseDashboardAction('delivery_review_manage')], $page, $pages, $total, static fn(int $id): string => self::deliveryReviewPublicUrl($id), static fn(int $id): string => self::signedDeliveryReviewPublicUrl($id));
     $this->jsonOk(['html' => $html, 'total' => $total]);
   }
 

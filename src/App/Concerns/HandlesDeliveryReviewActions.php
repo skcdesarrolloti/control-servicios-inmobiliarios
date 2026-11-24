@@ -861,6 +861,7 @@ trait HandlesDeliveryReviewActions
               </div>
               <div class="scm-corrective-existing-actions">
                 <button type="button" class="scm-acta-button scm-acta-secondary" data-scm-open-iframe data-iframe-url="<?= $h(self::deliveryReviewPublicUrl($id)) ?>" data-iframe-title="Revisión antes de la ocupación #<?= $h((string) $id) ?>">Ver informe</button>
+                <button type="button" class="scm-acta-button scm-acta-secondary" data-scm-copy-link="<?= $h(self::signedDeliveryReviewPublicUrl($id)) ?>" title="Enlace para compartir; abre sin iniciar sesión">Copiar vínculo</button>
                 <button type="button" class="scm-acta-button scm-acta-secondary" data-delivery-edit-review="<?= $h((string) $id) ?>">Editar</button>
                 <button type="button" class="scm-acta-button scm-acta-danger" data-delivery-delete-review="<?= $h((string) $id) ?>">Eliminar</button>
               </div>

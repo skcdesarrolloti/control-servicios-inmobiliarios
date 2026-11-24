@@ -320,6 +320,8 @@ $list = new class($db) {
   private function jsonOk(array $data): void { $this->out = $data; }
   private function jsonFail(string $message): never { throw new DomainException($message); }
   public static function inventoryPublicUrl(int $id): string { return 'inventario.php?numero=' . $id; }
+  public static function signedInventoryPublicUrl(int $id): string { return 'inventario.php?numero=' . $id . '&expires=1&sig=firma'; }
+  public static function signedDeliveryReviewPublicUrl(int $id): string { return 'revision-entrega.php?numero=' . $id . '&expires=1&sig=firma'; }
   public static function deliveryReviewPublicUrl(int $id): string { return 'revision-entrega.php?numero=' . $id; }
 };
 $_POST = ['kind' => 'inventarios', 'tipo' => 'Nuevo', 'q' => 'Calle', 'page' => '1'];
@@ -331,7 +333,7 @@ $assert($list->out['total'] === 0 && str_contains($list->out['html'], 'No hay re
 $withContract = (int) $db->getVar("SELECT COUNT(*) FROM wp_jet_cct_inventario WHERE contrato = '900' AND COALESCE(cct_status, 'publish') = 'publish'");
 $_POST = ['kind' => 'inventarios', 'contrato' => '#900', 'inmueble' => '77', 'per_page' => '50', 'page' => '1'];
 $list->ajax_handler_delivery_process_list();
-$assert($withContract > 0 && $list->out['total'] === $withContract && str_contains($list->out['html'], 'data-edit-kind="inventario"') && str_contains($list->out['html'], '>SIMI '), 'Filtro por contrato e inmueble SIMI: ' . json_encode([$withContract, $list->out['total']]));
+$assert($withContract > 0 && $list->out['total'] === $withContract && str_contains($list->out['html'], 'data-edit-kind="inventario"') && str_contains($list->out['html'], '>SIMI ') && str_contains($list->out['html'], 'data-scm-copy-link="inventario.php?numero=') && str_contains($list->out['html'], 'sig=firma'), 'Filtro por contrato e inmueble SIMI: ' . json_encode([$withContract, $list->out['total']]));
 $_POST = ['kind' => 'revisiones'];
 try { $list->ajax_handler_delivery_process_list(); $assert(false, 'Debe validar el permiso de la pestaña.'); } catch (DomainException) {}
 $assert(str_contains(\SCM\Modules\Inventory\DeliveryProcessView::shell('inventarios', 'x'), 'data-delivery-process="inventarios"'), 'Contenedor del listado.');

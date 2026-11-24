@@ -10041,6 +10041,40 @@
     closeCaseModal(modal);
   };
 
+  // "Copiar vínculo": copia un enlace firmado para compartirlo (inventario, revisión antes de la ocupación…).
+  function scmCopyText(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    return new Promise(function (resolve, reject) {
+      var area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      area.remove();
+      if (ok) resolve(); else reject(new Error("copy"));
+    });
+  }
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest ? event.target.closest("[data-scm-copy-link]") : null;
+    if (!button) return;
+    event.preventDefault();
+    var url = button.getAttribute("data-scm-copy-link") || "";
+    if (!url) return;
+    scmCopyText(url).then(function () {
+      if (!button.dataset.copyLabel) button.dataset.copyLabel = button.innerHTML;
+      button.textContent = "¡Vínculo copiado!";
+      window.clearTimeout(button._scmCopyTimer);
+      button._scmCopyTimer = window.setTimeout(function () { button.innerHTML = button.dataset.copyLabel; }, 2200);
+      scmNotify("success", "Pégalo donde lo necesites. Abre sin iniciar sesión.", "Vínculo copiado");
+    }).catch(function () {
+      window.prompt("Copia el vínculo:", url);
+    });
+  });
+
   // Editar un inventario o una revisión antes de la ocupación desde los listados de Proceso de entrega,
   // sin abrir el caso completo.
   window.scmOpenInventoryEditor = function (root, ticketPk, inventoryId, kind) {

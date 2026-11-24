@@ -65,7 +65,7 @@ final class DeliveryProcessView
   }
 
   /** @param list<array<string,mixed>> $rows @param array{manage:bool} $can */
-  public static function inventories(array $rows, array $can, int $page, int $pages, int $total, callable $viewUrl): string
+  public static function inventories(array $rows, array $can, int $page, int $pages, int $total, callable $viewUrl, ?callable $shareUrl = null): string
   {
     $body = '';
     foreach ($rows as $row) {
@@ -77,7 +77,7 @@ final class DeliveryProcessView
       $categoryBadge = $category === '' ? '' : '<span class="!sp-inline-flex !sp-px-2 !sp-py-0.5 !sp-rounded-full !sp-border !sp-border-solid !sp-text-[9px] !sp-font-semibold ' . ($category === 'Amoblado' ? '!sp-bg-violet-50 !sp-border-violet-200 !sp-text-violet-800' : '!sp-bg-white !sp-border-slate-200 !sp-text-service-muted') . '">' . self::e($category) . '</span>';
       $detail = '<div class="!sp-flex !sp-flex-wrap !sp-gap-1">' . $typeBadge . $categoryBadge . '</div>'
         . self::propertyFacts(self::clean($row['tipo_de_inmueble'] ?? ''), $row['cantidad_habitaciones'] ?? '', $row['cantidad_banos'] ?? '');
-      $actions = self::viewButton((string) $viewUrl($id), 'Inventario #' . $id)
+      $actions = self::viewButton((string) $viewUrl($id), 'Inventario #' . $id) . self::copyButton($shareUrl, $id)
         . ($can['manage'] && $ticket > 0 ? self::editButton($id, $ticket, 'inventario') : '');
       $body .= self::row($id, $row, $ticket, self::first([$row['propietario'] ?? '', $row['c_propietario'] ?? '']), self::first([$row['arrendatario'] ?? '', $row['c_arrendatario'] ?? '']), $detail, $actions);
     }
@@ -85,14 +85,14 @@ final class DeliveryProcessView
   }
 
   /** @param list<array<string,mixed>> $rows @param array{manage:bool} $can */
-  public static function reviews(array $rows, array $can, int $page, int $pages, int $total, callable $viewUrl): string
+  public static function reviews(array $rows, array $can, int $page, int $pages, int $total, callable $viewUrl, ?callable $shareUrl = null): string
   {
     $body = '';
     foreach ($rows as $row) {
       $id = (int) $row['_ID'];
       $ticket = (int) ($row['id_ticket'] ?? 0);
       $detail = self::propertyFacts(self::clean($row['tip_inm'] ?? ''), $row['habitaciones'] ?? '', $row['banos'] ?? '', false);
-      $actions = self::viewButton((string) $viewUrl($id), 'Revisión antes de la ocupación #' . $id)
+      $actions = self::viewButton((string) $viewUrl($id), 'Revisión antes de la ocupación #' . $id) . self::copyButton($shareUrl, $id)
         . ($can['manage'] && $ticket > 0 ? self::editButton($id, $ticket, 'entrega') : '');
       $body .= self::row($id, $row, $ticket, self::first([$row['destinatario'] ?? '', $row['c_propietario'] ?? '']), self::clean($row['c_arrendatario'] ?? ''), $detail, $actions);
     }
@@ -119,7 +119,7 @@ final class DeliveryProcessView
       . '<small class="' . self::MUTED . '">Contrato ' . ($contract !== '' ? '#' . self::e($contract) : 'sin asignar') . '</small></td>'
       . '<td class="' . self::TD . ' !sp-max-w-[240px] !sp-space-y-2">' . $party('Propietario', $owner) . $party('Arrendatario', $tenant) . '</td>'
       . '<td class="' . self::TD . ' !sp-max-w-[200px]">' . $detail . '</td>'
-      . '<td class="' . self::TD . '"><div class="!sp-flex !sp-flex-wrap !sp-gap-1.5 !sp-min-w-[150px]">' . $actions . '</div></td>'
+      . '<td class="' . self::TD . '"><div class="!sp-flex !sp-flex-wrap !sp-gap-1.5 !sp-min-w-[170px]">' . $actions . '</div></td>'
       . '</tr>';
   }
 
@@ -136,6 +136,15 @@ final class DeliveryProcessView
   private static function viewButton(string $url, string $title): string
   {
     return '<button type="button" class="' . UI::NAVY . ' !sp-whitespace-nowrap" data-scm-open-iframe data-iframe-url="' . self::e($url) . '" data-iframe-title="' . self::e($title) . '">' . UI::icon('eye', '!sp-w-3 !sp-h-3 !sp-text-service-yellow') . 'Ver</button>';
+  }
+
+  /** Enlace firmado para compartir con quien no tiene sesión del panel. */
+  private static function copyButton(?callable $shareUrl, int $id): string
+  {
+    if ($shareUrl === null) {
+      return '';
+    }
+    return '<button type="button" class="' . UI::SECONDARY . ' !sp-text-[10px] !sp-whitespace-nowrap" data-scm-copy-link="' . self::e((string) $shareUrl($id)) . '" title="Enlace para compartir; abre sin iniciar sesión">' . UI::icon('copy', '!sp-w-3 !sp-h-3') . 'Copiar vínculo</button>';
   }
 
   private static function editButton(int $id, int $ticket, string $kind): string
