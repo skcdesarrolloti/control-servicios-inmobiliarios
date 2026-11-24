@@ -251,7 +251,11 @@ final class InventoryPublicView
   {
     $date = $this->date($row['fecha'] ?? '', $row['fecha_entrega'] ?? '');
     $delegated = strcasecmp($this->text($row['tiene_delegado'] ?? ''), 'Si') === 0 && $this->text($row['delegado'] ?? '') !== '';
-    $verifier = $this->party('Verificador de inmuebles', $this->first([$row['coordinador'] ?? '', $row['creador'] ?? '']), $this->first([$row['email_coordinador'] ?? '', $row['email_creador'] ?? '']), $this->first([$row['celular_coordinador'] ?? '', $row['celular_creador'] ?? '']));
+    // Firma quien hizo el inventario (creador). El coordinador contractual de la sucursal solo cubre registros sin creador.
+    $byCreator = $this->text($row['creador'] ?? '') !== '';
+    $verifier = $byCreator
+      ? $this->party('Verificador de inmuebles', $this->text($row['creador']), $this->text($row['email_creador'] ?? ''), $this->text($row['celular_creador'] ?? ''))
+      : $this->party('Verificador de inmuebles', $this->text($row['coordinador'] ?? ''), $this->text($row['email_coordinador'] ?? ''), $this->text($row['celular_coordinador'] ?? ''));
     $receiver = $delegated
       ? $this->party('Quien recibe en representación del arrendatario', $this->text($row['delegado']), $this->text($row['correo_delegado'] ?? ''), $this->text($row['celular_delegado'] ?? ''))
       : $this->party('Quien recibe', $this->text($row['arrendatario'] ?? ''), $this->text($row['correo_arrendatario'] ?? ''), $this->text($row['celular_arrendatario'] ?? ''));

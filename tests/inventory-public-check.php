@@ -36,7 +36,7 @@ $furnished = $insert([
   'patio' => InventorySchema::rowsToStored([['d' => 'Lavadero', 'c' => '1', 'm' => 'Granito', 'e' => 'Regular', 'o' => 'Rayón']], 'patio'),
   'sala_muebles' => InventorySchema::rowsToStored([['d' => 'Sofá', 'c' => '1', 'e' => 'Bueno', 'o' => '']], 'sala_muebles', false),
   'servicios_publicos' => serialize(['Agua', 'Energia']), 'agua' => '111', 'luz' => '222', 'medidor_luz' => 'M-9',
-  'acuerdos_precontractuales_pro' => 'Paz y salvo pendiente', 'coordinador' => 'Coordinadora Prueba', 'email_coordinador' => 'c@example.invalid',
+  'acuerdos_precontractuales_pro' => 'Paz y salvo pendiente', 'coordinador' => 'Coordinadora Prueba', 'email_coordinador' => 'c@example.invalid', 'creador' => 'Funcionaria Que Lo Hizo', 'email_creador' => 'f@example.invalid',
   'tiene_delegado' => 'Si', 'delegado' => 'Delegado Prueba',
   'registro_fotografico' => 'https://drive.google.com/drive/folders/abcdefghijkl',
 ]);
@@ -45,10 +45,12 @@ $voided = $insert(['cct_status' => 'trash']);
 
 $view = new InventoryPublicView($db);
 $html = (string) $view->render($furnished)['content'];
-foreach (['Inventario #' . $furnished, 'Sala, comedor y hall', 'Puertas', 'Madera', 'Lavadero', 'Muebles y enseres', 'Sofá', 'Paz y salvo pendiente', 'mérito ejecutivo suficiente', 'Delegado Prueba', 'Quien recibe en representación del arrendatario', 'Coordinadora Prueba', 'Inventario realizado por SKC SuCasa Inmobiliaria', 'embeddedfolderview?id=abcdefghijkl', 'data-scm-print', 'Medidor', 'Pisos'] as $needle) {
+foreach (['Inventario #' . $furnished, 'Sala, comedor y hall', 'Puertas', 'Madera', 'Lavadero', 'Muebles y enseres', 'Sofá', 'Paz y salvo pendiente', 'mérito ejecutivo suficiente', 'Delegado Prueba', 'Quien recibe en representación del arrendatario', 'Funcionaria Que Lo Hizo', 'f@example.invalid', 'Inventario realizado por SKC SuCasa Inmobiliaria', 'embeddedfolderview?id=abcdefghijkl', 'data-scm-print', 'Medidor', 'Pisos'] as $needle) {
   $assert(str_contains($html, $needle), 'Falta en el documento: ' . $needle);
 }
 $assert(!str_contains($html, 'SUCURSAL-OCULTA'), 'El documento no debe mostrar la sucursal.');
+$assert(!str_contains($html, 'Coordinadora Prueba'), 'Firma quien hizo el inventario, no el coordinador de la sucursal.');
+$assert(str_contains((string) $view->render($legacy)['content'], 'Verificador de inmuebles'), 'Sin creador conserva la firma del verificador.');
 $assert(!str_contains($html, '<script>x'), 'El documento debe escapar los datos.');
 $assert(!str_contains($html, 'Tipo de material</th><th>Estado</th><th>Observaciones</th></tr></thead><tbody><tr><td>Sofá'), 'Muebles no lleva columna de material.');
 $assert(!str_contains($html, 'Habitación 1'), 'Las secciones vacías no se muestran.');
