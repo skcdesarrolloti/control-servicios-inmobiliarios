@@ -74,6 +74,9 @@ El estado viaja como un solo JSON: un inventario amoblado supera `max_input_vars
   todas las opciones (la actual con ✓), al escribir se filtran y se eligen con un toque o con flechas + Enter. Los materiales
   también se agrupan sin variantes de tilde u ortografía. Una fila nueva trae cantidad solo si hay una aprendida y la observación
   vacía (se guarda como "Ninguna").
+- La lista tiene dos grupos: "Más usados para este elemento" (lo aprendido) y "Ya usados en este inventario" (materiales u
+  observaciones escritos en otras filas de cualquier espacio, sin repetir). Va en el `body` con posición fija: se abre hacia
+  abajo o hacia arriba según el espacio, mide como máximo 320 px, se desplaza por dentro y sigue al campo al desplazar la página.
 - Dictado: el micrófono lo permite `Permissions-Policy: microphone=(self)` en `public/.htaccess` (antes estaba en `()` y el
   navegador lo bloqueaba siempre). Requiere `MINIMAX_API_KEY` en el `.env` del servidor (la misma del asistente de crear caso). Con el plan de suscripción
   se usa `MiniMax-M3.1-Flash`; se cambia con `MINIMAX_INVENTORY_MODEL`. El navegador envía WAV porque MiniMax no acepta webm.

@@ -621,6 +621,7 @@
     }
 
     function render() {
+      suggestClose();
       syncRooms();
       refreshErrors();
       var list = panes();
@@ -909,37 +910,95 @@
       if (suggest) suggest.input.setAttribute("aria-expanded", "false");
       suggest = null;
     }
+    // Lo que ya se escribió en ese mismo campo en otras filas del inventario (material u observación).
+    function usedInInventory(input) {
+      var field = input.dataset.f;
+      if (field !== "m" && field !== "o") return [];
+      var own = null;
+      var ownRows = rowsTarget(input);
+      if (ownRows && input.closest("[data-row]")) own = ownRows[Number(input.closest("[data-row]").dataset.row)];
+      var seen = {};
+      var out = [];
+      var groups = Object.keys(state.sections).map(function (k) { return state.sections[k].rows || []; })
+        .concat(Object.keys(state.furniture || {}).map(function (k) { return state.furniture[k] || []; }));
+      groups.forEach(function (rows) {
+        rows.forEach(function (row) {
+          if (row === own) return;
+          var value = String(row[field] || "").trim();
+          var key = plain(value);
+          if (!key || key === "ninguna" || seen[key]) return;
+          seen[key] = true;
+          out.push(value);
+        });
+      });
+      return out;
+    }
     function suggestOpen(input) {
       suggestClose();
+      if (!input.isConnected || !input.offsetParent) return;
       var list = document.getElementById(input.getAttribute("data-suggest") || "");
-      var all = list ? [].map.call(list.options, function (o) { return o.value; }).filter(Boolean) : [];
+      var learned = list ? [].map.call(list.options, function (o) { return o.value; }).filter(Boolean) : [];
+      var learnedKeys = learned.map(plain);
+      var used = usedInInventory(input).filter(function (v) { return learnedKeys.indexOf(plain(v)) === -1; });
       var query = plain(input.value);
-      var exact = all.some(function (v) { return plain(v) === query; });
-      var shown = !query || exact ? all : all.filter(function (v) { return plain(v).indexOf(query) !== -1; });
-      if (!shown.length || !input.offsetParent) return;
+      var exact = learned.concat(used).some(function (v) { return plain(v) === query; });
+      var match = function (v) { return !query || exact || plain(v).indexOf(query) !== -1; };
+      var field = input.dataset.f;
+      var groups = [
+        { title: field === "c" ? "Cantidades" : field === "d" ? "Elementos frecuentes" : "Más usados para este elemento", values: learned.filter(match) },
+        { title: "Ya usados en este inventario", values: used.filter(match) }
+      ].filter(function (g) { return g.values.length; });
+      if (!groups.length) return;
       var box = document.createElement("div");
       box.className = "scm-inv-suggest";
       box.setAttribute("role", "listbox");
-      box.innerHTML = shown.slice(0, 12).map(function (v) {
-        return '<button type="button" role="option" tabindex="-1" data-suggest-pick class="' + (plain(v) === query ? "is-current" : "") + '">' + esc(v) + "</button>";
+      box.innerHTML = groups.map(function (g) {
+        return '<div class="scm-inv-suggest-group" role="presentation">' + esc(g.title) + "</div>" + g.values.map(function (v) {
+          return '<button type="button" role="option" tabindex="-1" data-suggest-pick data-value="' + esc(v) + '" class="' + (plain(v) === query ? "is-current" : "") + '">' + esc(v) + "</button>";
+        }).join("");
       }).join("");
-      box.style.top = input.offsetTop + input.offsetHeight + 2 + "px";
-      box.style.left = input.offsetLeft + "px";
-      box.style.minWidth = Math.max(input.offsetWidth, 180) + "px";
-      box.style.maxWidth = Math.min(360, input.parentNode.clientWidth) + "px";
-      input.parentNode.appendChild(box);
-      // Que no se salga por la derecha (columna de cantidad en el celular).
-      var overflow = box.offsetLeft + box.offsetWidth - input.parentNode.clientWidth;
-      if (overflow > 0) box.style.left = Math.max(0, box.offsetLeft - overflow) + "px";
+      var font = window.getComputedStyle(input).fontFamily;
+      if (font) box.style.fontFamily = font;
+      // En el body con posición fija: no lo recorta el popup y se ubica arriba o abajo según el espacio.
+      document.body.appendChild(box);
+      // mousedown para que el campo no pierda el foco antes de elegir; desplazar la lista no elige nada.
+      box.addEventListener("mousedown", function (event) {
+        event.preventDefault();
+        var pick = event.target.closest("[data-suggest-pick]");
+        if (pick) suggestPick(pick);
+      });
       input.setAttribute("aria-expanded", "true");
       suggest = { box: box, input: input, index: -1 };
+      suggestPlace();
     }
-    // Al girar la tablet o cambiar el tamaño, la posición ya no sirve.
+    function suggestPlace() {
+      if (!suggest) return;
+      var input = suggest.input;
+      var box = suggest.box;
+      if (!input.isConnected) { suggestClose(); return; }
+      var r = input.getBoundingClientRect();
+      var view = window.visualViewport;
+      var height = view ? view.height : window.innerHeight;
+      var width = view ? view.width : window.innerWidth;
+      if (r.bottom < 0 || r.top > height) { suggestClose(); return; }
+      var below = height - r.bottom - 10;
+      var above = r.top - 10;
+      var up = below < 200 && above > below;
+      box.style.maxHeight = Math.max(120, Math.min(320, up ? above : below)) + "px";
+      var w = Math.min(Math.max(r.width, 240), 420, width - 16);
+      box.style.width = w + "px";
+      box.style.left = Math.max(8, Math.min(r.left, width - w - 8)) + "px";
+      box.style.top = (up ? r.top - 4 - box.offsetHeight : r.bottom + 4) + "px";
+    }
+    // Al desplazar se mueve con el campo; al girar la tablet o cambiar el tamaño se cierra.
+    window.addEventListener("scroll", function (event) {
+      if (suggest && !suggest.box.contains(event.target)) suggestPlace();
+    }, true);
     window.addEventListener("resize", function () { if (suggest) suggestClose(); });
     function suggestPick(button) {
       if (!suggest) return;
       var input = suggest.input;
-      input.value = button.textContent;
+      input.value = button.getAttribute("data-value");
       suggestClose();
       picking = true;
       input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -964,13 +1023,6 @@
     });
     form.addEventListener("click", function (event) {
       if (event.target.hasAttribute && event.target.hasAttribute("data-suggest") && !suggest) suggestOpen(event.target);
-    });
-    // mousedown para que el campo no pierda el foco antes de elegir.
-    form.addEventListener("mousedown", function (event) {
-      var pick = event.target.closest && event.target.closest("[data-suggest-pick]");
-      if (!pick) return;
-      event.preventDefault();
-      suggestPick(pick);
     });
 
     form.addEventListener("change", function (event) {

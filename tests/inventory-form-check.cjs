@@ -161,6 +161,18 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-row]:last-child [data-f="c"]'), '', 'A new row has no default quantity');
     await page.locator('[data-rows="sections:sala"] [data-row]:last-child [data-f="d"]').fill('Puerta');
     assert.deepEqual(await obsOptions(), ['Con tope'], 'Typing the element refreshes its observation list');
+    // También recomienda lo ya escrito en otras filas del inventario.
+    await page.locator('[data-rows="sections:sala"] [data-row]:last-child [data-f="m"]').click();
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.scm-inv-suggest-group')].map(g => g.textContent)), ['Ya usados en este inventario'], 'Groups materials used in other rows');
+    assert.deepEqual(await picks(), ['Aluminio'], 'Offers the material typed in another row');
+    // Lista larga: cabe en la pantalla y se desplaza por dentro.
+    await page.evaluate(() => { const l = document.getElementById(document.querySelector('[data-rows="sections:sala"] [data-row]:last-child [data-f="m"]').getAttribute('data-suggest')); l.innerHTML = Array.from({ length: 40 }, (_, i) => '<option value="Material ' + i + '">').join(''); });
+    await page.locator('[data-rows="sections:sala"] [data-row]:last-child [data-f="d"]').click();
+    await page.locator('[data-rows="sections:sala"] [data-row]:last-child [data-f="m"]').click();
+    const box = await page.evaluate(() => { const b = document.querySelector('.scm-inv-suggest'); const r = b.getBoundingClientRect(); b.scrollTop = 9999; return { top: r.top, bottom: r.bottom, scrolls: b.scrollHeight > b.clientHeight, scrolled: b.scrollTop > 0, h: innerHeight }; });
+    assert.ok(box.top >= 0 && box.bottom <= box.h && box.scrolls && box.scrolled, 'Long list stays on screen and scrolls: ' + JSON.stringify(box));
+    if (shots) await page.screenshot({ path: path.join(shots, 'inv-sugerencias-larga.png') });
+    await page.locator('[data-rows="sections:sala"] [data-row]:last-child [data-f="d"]').click();
     await page.locator('[data-rows="sections:sala"] [data-row]:last-child [data-row-remove]').click();
     await page.selectOption('[data-rows="sections:sala"] [data-f="p"]', '2');
     await page.locator('[data-rows="sections:sala"] [data-state="Regular"]').click();
