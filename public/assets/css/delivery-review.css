@@ -288,8 +288,8 @@
 
 .scm-delivery-public-photos {
   display: grid;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 8px;
+  margin: 20px 0 16px;
 }
 
 .scm-delivery-public-photos > button,
@@ -311,7 +311,7 @@
 .scm-delivery-public-photos > a:hover { background: #fff7ed; }
 
 .scm-delivery-public-photo-hint {
-  margin-top: -4px;
+  margin-left: 4px;
   color: #64748b;
   font-size: 12px;
 }
