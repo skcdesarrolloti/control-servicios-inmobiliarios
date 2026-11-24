@@ -184,6 +184,16 @@ $learned = InventorySuggestions::aggregate([
 ], InventorySchema::sections());
 $assert($learned['habitacion']['items'] === ['Puerta'] && $learned['habitacion']['materials']['Puerta'] === ['Madera'], 'Habitaciones comparten sugerencias.');
 $assert($learned['sala']['quantities']['Pisos'] === 'Todo el inmueble', 'Cantidad más usada.');
+$learnedNotes = InventorySuggestions::aggregate([
+  ['sala' => serialize([['descripcion_sala' => 'Puerta', 'observaciones_sala' => 'con tope'], ['descripcion_sala' => 'Pisos', 'observaciones_sala' => 'Ninguna']])],
+  ['sala' => serialize([['descripcion_sala' => 'Puerta', 'observaciones_sala' => 'Con tope'], ['descripcion_sala' => 'Pisos', 'observaciones_sala' => 'N/A']])],
+  ['sala' => serialize([['descripcion_sala' => 'Puerta', 'observaciones_sala' => 'Rayones leves']])],
+], InventorySchema::sections());
+$assert($learnedNotes['sala']['observations']['Puerta'] === ['Con tope'], 'Observaciones repetidas por elemento; las de un solo uso no se sugieren.');
+$assert(!isset($learnedNotes['sala']['observations']['Pisos']), 'No sugiere "Ninguna" ni "N/A".');
+$learnedSimilar = InventorySuggestions::aggregate(array_map(static fn(string $note): array => ['sala' => serialize([['descripcion_sala' => 'Sanitario', 'observaciones_sala' => $note]])],
+  ['Funcionando y probado', 'Funcionando y probado', 'Funcionando y probado', 'Funcionando y porbado', 'Funcionando y porbado', 'Con 1 rejilla', 'Con 1 rejilla', 'Con 2 rejillas', 'Con 2 rejillas']), InventorySchema::sections());
+$assert($learnedSimilar['sala']['observations']['Sanitario'] === ['Funcionando y probado', 'Con 1 rejilla', 'Con 2 rejillas'], 'Une variantes con errores pero no cantidades distintas.');
 
 // Borrador: una fila, conflicto entre dispositivos y sin escritura si no cambió.
 $pdo->exec('CREATE TABLE wp_scm_inventory_drafts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_key TEXT, ticket_id INTEGER, inventory_id INTEGER, revision INTEGER DEFAULT 1, payload_hash TEXT, payload BLOB, backup_payload BLOB, backup_at INTEGER DEFAULT 0, updated_at INTEGER)');

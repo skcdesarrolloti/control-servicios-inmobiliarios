@@ -187,12 +187,12 @@
       return section.group === "general" ? section.key : section.group;
     }
     function suggestionsFor(section) {
-      var learned = catalog.suggestions[bucketOf(section)] || { items: [], materials: {}, quantities: {} };
+      var learned = catalog.suggestions[bucketOf(section)] || { items: [], materials: {}, quantities: {}, observations: {} };
       var names = [];
       learned.items.concat(section.glossary).forEach(function (name) {
         if (names.indexOf(name) === -1) names.push(name);
       });
-      return { names: names, materials: learned.materials || {}, quantities: learned.quantities || {} };
+      return { names: names, materials: learned.materials || {}, quantities: learned.quantities || {}, observations: learned.observations || {} };
     }
 
     // Campos ---------------------------------------------------------------
@@ -508,9 +508,17 @@
         '<input class="scm-inv-c" data-f="c" value="' + esc(row.c) + '" placeholder="Cant." list="scm-inv-qty" aria-label="Cantidad">' +
         (material ? '<input class="scm-inv-m" data-f="m" value="' + esc(row.m) + '" placeholder="Material" list="' + listId + '" aria-label="Tipo de material"><datalist id="' + listId + '">' + materials.map(function (m) { return '<option value="' + esc(m) + '">'; }).join("") + "</datalist>" : "") +
         '<div class="scm-inv-state" role="group" aria-label="Estado">' + STATES.map(function (s) { return '<button type="button" data-state="' + s + '" class="' + ((row.e || "Bueno") === s ? "is-on is-" + s.toLowerCase() : "") + '">' + s + "</button>"; }).join("") + "</div>" +
-        '<input class="scm-inv-o" data-f="o" value="' + esc(row.o) + '" placeholder="Ninguna" aria-label="Observaciones">' +
+        '<input class="scm-inv-o" data-f="o" value="' + esc(row.o) + '" placeholder="Ninguna" list="' + listId + '-o" aria-label="Observaciones"><datalist id="' + listId + '-o">' + optionsHtml(observationsFor(suggestion, row.d)) + "</datalist>" +
         '<div class="scm-inv-row-actions"><button type="button" class="scm-inv-icon" data-row-copy aria-label="Duplicar fila" title="Duplicar">⧉</button><button type="button" class="scm-inv-icon" data-row-remove aria-label="Quitar fila" title="Quitar">×</button></div>' +
         "</div>";
+    }
+
+    function optionsHtml(values) {
+      return values.map(function (v) { return '<option value="' + esc(v) + '">'; }).join("");
+    }
+    // Observaciones que más se han usado para ese elemento en inventarios anteriores.
+    function observationsFor(suggestion, name) {
+      return suggestion && suggestion.observations[name] ? suggestion.observations[name] : [];
     }
 
     function rowsBlock(kind, key, rows, material, section) {
@@ -869,12 +877,22 @@
       } else if (target.dataset.f) {
         var rows = rowsTarget(target);
         rows[Number(target.closest("[data-row]").dataset.row)][target.dataset.f] = target.value;
+        if (target.dataset.f === "d") {
+          var obsList = target.closest("[data-row]").querySelector(".scm-inv-o + datalist");
+          var obsSection = target.closest("[data-rows]") && target.closest("[data-rows]").dataset.rows.indexOf("sections:") === 0 ? currentSection() : null;
+          if (obsList && obsSection) obsList.innerHTML = optionsHtml(observationsFor(suggestionsFor(obsSection), target.value.trim()));
+        }
       } else {
         return;
       }
       var marked = target.closest(".is-missing");
       if (marked && String(target.value).trim()) marked.classList.remove("is-missing");
       changed();
+    });
+
+    form.addEventListener("focusin", function (event) {
+      var target = event.target;
+      if (target.classList && target.classList.contains("scm-inv-o") && target.value === "Ninguna") target.select();
     });
 
     form.addEventListener("change", function (event) {

@@ -24,7 +24,7 @@ const config = {
     boundaries: [{ key: 'inmueble_lin', label: 'Inmueble', suffix: 'inmueble', sides: ['norte', 'sur'], multiple: false, when: '', required: true }, { key: 'parqueadero_lin', label: 'Parqueadero', suffix: 'parqueadero', sides: ['norte'], multiple: true, when: 'tiene_parqueadero', required: false }],
     profiles: { '': residential, Apartamento: residential, Local: { ...residential, key: 'local', labels: { sala: 'Sala' }, order: ['elementos_principales', 'sala', 'banos', 'garaje', 'elementos_electricos', 'bodega', 'otros'], max_rooms: 0 } },
     types: ['Nuevo', 'Anterior'], categories: ['No amoblado', 'Amoblado'], states: ['Bueno', 'Regular', 'Malo'], parking: ['Asignado', 'Privado'], services: ['Agua', 'Gas', 'Energia'], agreements: { Propietario: 'acuerdos_precontractuales_pro' },
-    suggestions: { sala: { items: ['Ventanas'], materials: { Ventanas: ['Aluminio', 'PVC'] }, quantities: { Ventanas: '3' } } },
+    suggestions: { sala: { items: ['Ventanas'], materials: { Ventanas: ['Aluminio', 'PVC'] }, quantities: { Ventanas: '3' }, observations: { Ventanas: ['Vidrio rayado', 'Sin seguro'], Puerta: ['Con tope'] } } },
   },
   previous: [], billing: { base: 76456, transporte: 8000 }, voice: false,
 };
@@ -137,6 +137,13 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="m"]'), 'Aluminio');
     assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="c"]'), '3');
     assert.equal(await page.locator('[data-add-item="Ventanas"]').count(), 0, 'A used suggestion leaves the chips');
+    const obsOptions = () => page.evaluate(() => [...document.querySelectorAll('[data-rows="sections:sala"] [data-row]:last-child .scm-inv-o + datalist option')].map(o => o.value));
+    assert.deepEqual(await obsOptions(), ['Vidrio rayado', 'Sin seguro'], 'Learned observations are offered for the element');
+    assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="o"]'), 'Ninguna', 'Observation is not filled automatically');
+    await page.locator('[data-row-add]').click();
+    await page.locator('[data-rows="sections:sala"] [data-row]:last-child [data-f="d"]').fill('Puerta');
+    assert.deepEqual(await obsOptions(), ['Con tope'], 'Typing the element refreshes its observation list');
+    await page.locator('[data-rows="sections:sala"] [data-row]:last-child [data-row-remove]').click();
     await page.selectOption('[data-rows="sections:sala"] [data-f="p"]', '2');
     await page.locator('[data-rows="sections:sala"] [data-state="Regular"]').click();
     await page.locator('[data-rows="sections:sala"] [data-f="o"]').fill('Vidrio "rayado"');

@@ -65,6 +65,10 @@ El estado viaja como un solo JSON: un inventario amoblado supera `max_input_vars
   copias llevan `origen_electricos` en la fila y se recalculan en cada edición; a mano solo se agrega lo que no está en ninguna
   sección (contador, caja de fusibles).
 - Sugerencias: glosarios más lo aprendido de los últimos 150 inventarios Nuevo (`storage/data/inventory-suggestions.json`, semanal).
+- Observaciones aprendidas: por cada elemento se guardan hasta 8 observaciones usadas al menos dos veces (sin "Ninguna", "N/A"…,
+  y uniendo variantes con errores de digitación, pero no cantidades distintas). Se ofrecen como lista del campo Observaciones:
+  no se llenan solas. Al entrar al campo con "Ninguna" queda seleccionado para escribir encima; escribir el elemento actualiza la lista.
+  Un archivo de sugerencias anterior (sin `observations`) se recalcula solo.
 - Dictado: el micrófono lo permite `Permissions-Policy: microphone=(self)` en `public/.htaccess` (antes estaba en `()` y el
   navegador lo bloqueaba siempre). Requiere `MINIMAX_API_KEY` en el `.env` del servidor (la misma del asistente de crear caso). Con el plan de suscripción
   se usa `MiniMax-M3.1-Flash`; se cambia con `MINIMAX_INVENTORY_MODEL`. El navegador envía WAV porque MiniMax no acepta webm.
