@@ -31,6 +31,7 @@
   .scm-corrective-public-actions,
   .scm-delivery-public-photos > button,
   .scm-delivery-public-photos > a,
+  .scm-delivery-public-photo-hint,
   .scm-delivery-public-frame { display: none !important; }
   .scm-delivery-public-print-link { display: block; font-size: 9px; word-break: break-all; }
   .scm-corrective-public-card { margin-bottom: 6px; padding: 8px 10px; box-shadow: none; }

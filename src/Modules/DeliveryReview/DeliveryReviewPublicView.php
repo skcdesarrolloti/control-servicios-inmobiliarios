@@ -137,13 +137,11 @@ final class DeliveryReviewPublicView
     $photo = trim((string) ($review['registro_fotografico'] ?? ''));
     $photoHtml = '';
     if (preg_match('#^https?://#i', $photo)) {
-      $folder = $this->driveFolderId($photo);
       $photoHtml = '<div class="scm-delivery-public-photos">'
-        . ($folder !== ''
-          ? '<button type="button" data-delivery-photos="' . $this->h('https://drive.google.com/embeddedfolderview?id=' . rawurlencode($folder) . '#grid') . '">Ver registro fotográfico</button>'
-          : '<a href="' . $this->h($photo) . '" rel="noopener">Ver registro fotográfico</a>')
+        . '<a class="scm-delivery-public-photo-link" href="' . $this->h($photo) . '" target="_blank" rel="noopener noreferrer">Ver registro fotográfico<span aria-hidden="true"> ↗</span></a>'
+        . '<small class="scm-delivery-public-photo-hint">Se abre en Google Drive, en otra pestaña.</small>'
         . '<span class="scm-delivery-public-print-link">Registro fotográfico: ' . $this->h($photo) . '</span>'
-        . '<div class="scm-delivery-public-frame" data-delivery-photos-frame hidden></div></div>';
+        . '</div>';
     }
     if ($cards === '' && $photoHtml === '') {
       return '';
@@ -206,16 +204,6 @@ final class DeliveryReviewPublicView
       . $html . '</section>';
   }
 
-  private function driveFolderId(string $url): string
-  {
-    if (!preg_match('#^https://drive\.google\.com/#i', $url)) {
-      return '';
-    }
-    if (preg_match('#/folders/([A-Za-z0-9_-]{10,})#', $url, $match) === 1 || preg_match('#[?&]id=([A-Za-z0-9_-]{10,})#', $url, $match) === 1) {
-      return $match[1];
-    }
-    return '';
-  }
 
   /** @param array<string,string> $items */
   private function grid(array $items): string

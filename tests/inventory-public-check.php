@@ -45,7 +45,7 @@ $voided = $insert(['cct_status' => 'trash']);
 
 $view = new InventoryPublicView($db);
 $html = (string) $view->render($furnished)['content'];
-foreach (['Inventario #' . $furnished, 'Sala, comedor y hall', 'Puertas', 'Madera', 'Lavadero', 'Muebles y enseres', 'Sofá', 'Paz y salvo pendiente', 'mérito ejecutivo suficiente', 'Delegado Prueba', 'Quien recibe en representación del arrendatario', 'Funcionaria Que Lo Hizo', 'f@example.invalid', 'Inventario realizado por SKC SuCasa Inmobiliaria', 'embeddedfolderview?id=abcdefghijkl', 'data-scm-print', 'Medidor', 'Pisos'] as $needle) {
+foreach (['Inventario #' . $furnished, 'Sala, comedor y hall', 'Puertas', 'Madera', 'Lavadero', 'Muebles y enseres', 'Sofá', 'Paz y salvo pendiente', 'mérito ejecutivo suficiente', 'Delegado Prueba', 'Quien recibe en representación del arrendatario', 'Funcionaria Que Lo Hizo', 'f@example.invalid', 'Inventario realizado por SKC SuCasa Inmobiliaria', 'href="https://drive.google.com/drive/folders/abcdefghijkl" target="_blank"', 'data-scm-print', 'Medidor', 'Pisos'] as $needle) {
   $assert(str_contains($html, $needle), 'Falta en el documento: ' . $needle);
 }
 $assert(!str_contains($html, 'SUCURSAL-OCULTA'), 'El documento no debe mostrar la sucursal.');

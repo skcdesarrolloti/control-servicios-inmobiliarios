@@ -93,13 +93,11 @@ final class InventoryPublicView
     if (!preg_match('#^https?://#i', $photo)) {
       return '';
     }
-    $folder = preg_match('~/folders/([A-Za-z0-9_-]{10,})~', $photo, $match) === 1 ? $match[1] : '';
     return '<div class="scm-delivery-public-photos">'
-      . ($folder !== ''
-        ? '<button type="button" data-delivery-photos="' . $this->h('https://drive.google.com/embeddedfolderview?id=' . rawurlencode($folder) . '#grid') . '">Ver registro fotográfico</button>'
-        : '<a href="' . $this->h($photo) . '" rel="noopener">Ver registro fotográfico</a>')
+      . '<a class="scm-delivery-public-photo-link" href="' . $this->h($photo) . '" target="_blank" rel="noopener noreferrer">Ver registro fotográfico<span aria-hidden="true"> ↗</span></a>'
+        . '<small class="scm-delivery-public-photo-hint">Se abre en Google Drive, en otra pestaña.</small>'
       . '<span class="scm-delivery-public-print-link">Registro fotográfico: ' . $this->h($photo) . '</span>'
-      . '<div class="scm-delivery-public-frame" data-delivery-photos-frame hidden></div></div>';
+      . '</div>';
   }
 
   /** @param array<string,mixed> $row */

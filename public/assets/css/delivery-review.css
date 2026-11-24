@@ -308,6 +308,14 @@
   cursor: pointer;
 }
 
+.scm-delivery-public-photos > a:hover { background: #fff7ed; }
+
+.scm-delivery-public-photo-hint {
+  margin-top: -4px;
+  color: #64748b;
+  font-size: 12px;
+}
+
 .scm-delivery-public-print-link {
   display: none;
 }
@@ -398,6 +406,7 @@ h3.scm-delivery-public-subtitle {
   .scm-delivery-public-service { break-inside: avoid; page-break-inside: avoid; }
   .scm-delivery-public-photos > button,
   .scm-delivery-public-photos > a,
+  .scm-delivery-public-photo-hint,
   .scm-delivery-public-frame { display: none !important; }
   .scm-delivery-public-print-link { display: block; font-size: 9px; word-break: break-all; }
   .scm-delivery-public-section { break-inside: auto; page-break-inside: auto; }
