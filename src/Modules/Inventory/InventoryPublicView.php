@@ -251,17 +251,25 @@ final class InventoryPublicView
   {
     $date = $this->date($row['fecha'] ?? '', $row['fecha_entrega'] ?? '');
     $delegated = strcasecmp($this->text($row['tiene_delegado'] ?? ''), 'Si') === 0 && $this->text($row['delegado'] ?? '') !== '';
-    // Firma quien hizo el inventario (creador). El coordinador contractual de la sucursal solo cubre registros sin creador.
-    $byCreator = $this->text($row['creador'] ?? '') !== '';
-    $verifier = $byCreator
-      ? $this->party('Verificador de inmuebles', $this->text($row['creador']), $this->text($row['email_creador'] ?? ''), $this->text($row['celular_creador'] ?? ''))
-      : $this->party('Verificador de inmuebles', $this->text($row['coordinador'] ?? ''), $this->text($row['email_coordinador'] ?? ''), $this->text($row['celular_coordinador'] ?? ''));
+    // Firman quien hizo el inventario y el coordinador contractual de la sucursal; si son la misma persona, una sola vez.
+    $creator = $this->text($row['creador'] ?? '');
+    $coordinator = $this->text($row['coordinador'] ?? '');
+    $signers = '';
+    if ($creator !== '') {
+      $signers .= $this->party('Verificador de inmuebles', $creator, $this->text($row['email_creador'] ?? ''), $this->text($row['celular_creador'] ?? ''));
+    }
+    if ($coordinator !== '' && mb_strtolower($coordinator, 'UTF-8') !== mb_strtolower($creator, 'UTF-8')) {
+      $signers .= $this->party($creator !== '' ? 'Coordinador contractual' : 'Verificador de inmuebles', $coordinator, $this->text($row['email_coordinador'] ?? ''), $this->text($row['celular_coordinador'] ?? ''));
+    }
+    if ($signers === '') {
+      $signers = $this->party('Verificador de inmuebles', '', '', '');
+    }
     $receiver = $delegated
       ? $this->party('Quien recibe en representación del arrendatario', $this->text($row['delegado']), $this->text($row['correo_delegado'] ?? ''), $this->text($row['celular_delegado'] ?? ''))
       : $this->party('Quien recibe', $this->text($row['arrendatario'] ?? ''), $this->text($row['correo_arrendatario'] ?? ''), $this->text($row['celular_arrendatario'] ?? ''));
     return '<section class="scm-corrective-public-card scm-inv-closing">'
       . '<p class="scm-inv-text">Para constancia de nuestra conformidad firmamos el presente documento' . ($date !== '' ? ', el día ' . $this->h($date) : '') . '.</p>'
-      . '<div class="scm-inv-signatures">' . $verifier . $receiver . '</div>'
+      . '<div class="scm-inv-signatures">' . $signers . $receiver . '</div>'
       . '<p class="scm-inv-performed">Inventario realizado por SKC SuCasa Inmobiliaria.</p></section>';
   }
 

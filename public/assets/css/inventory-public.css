@@ -15,7 +15,7 @@
 .scm-inv-state-badge.is-fair { border-color: #fcd34d; background: #fffbeb; color: #a16207; }
 .scm-inv-state-badge.is-bad { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
 .scm-inv-note-card h3 { margin: 10px 0 6px; color: var(--scm-navy); font-size: 14px; }
-.scm-inv-signatures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; margin-top: 44px; }
+.scm-inv-signatures { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 28px; margin-top: 44px; }
 .scm-inv-signature { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .scm-inv-signature-line { display: block; height: 1px; margin-bottom: 8px; background: var(--scm-navy); }
 .scm-inv-signature strong { font-size: 14px; }
@@ -52,7 +52,7 @@
   .scm-inv-closing,
   .scm-inv-signature { break-inside: avoid; page-break-inside: avoid; }
   .scm-inv-note-card h3 { margin: 3px 0 2px; font-size: 10px; }
-  .scm-inv-signatures { gap: 18px; margin-top: 30px; }
+  .scm-inv-signatures { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 30px; }
   .scm-inv-signature strong { font-size: 10px; }
   .scm-inv-signature small { font-size: 9px; }
   .scm-inv-performed { margin-top: 8px; font-size: 9px; }

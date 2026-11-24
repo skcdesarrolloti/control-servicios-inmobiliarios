@@ -49,7 +49,7 @@ foreach (['Inventario #' . $furnished, 'Sala, comedor y hall', 'Puertas', 'Mader
   $assert(str_contains($html, $needle), 'Falta en el documento: ' . $needle);
 }
 $assert(!str_contains($html, 'SUCURSAL-OCULTA'), 'El documento no debe mostrar la sucursal.');
-$assert(!str_contains($html, 'Coordinadora Prueba'), 'Firma quien hizo el inventario, no el coordinador de la sucursal.');
+$assert(str_contains($html, 'Coordinadora Prueba') && str_contains($html, 'Coordinador contractual') && strpos($html, 'Funcionaria Que Lo Hizo') < strpos($html, 'Coordinadora Prueba'), 'Firman quien hizo el inventario y el coordinador contractual.');
 $assert(str_contains((string) $view->render($legacy)['content'], 'Verificador de inmuebles'), 'Sin creador conserva la firma del verificador.');
 $assert(!str_contains($html, '<script>x'), 'El documento debe escapar los datos.');
 $assert(!str_contains($html, 'Tipo de material</th><th>Estado</th><th>Observaciones</th></tr></thead><tbody><tr><td>Sofá'), 'Muebles no lleva columna de material.');
