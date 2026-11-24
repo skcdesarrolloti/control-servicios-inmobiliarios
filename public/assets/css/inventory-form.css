@@ -65,9 +65,22 @@
 .scm-inv-voice > span, .scm-inv-voice > p { flex: 1 1 240px; margin: 0; }
 .scm-inv-voice.is-recording { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
 .scm-inv-voice.is-error { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
-.scm-inv-voice-rows { flex: 1 1 100%; margin: 0; padding: 0; list-style: none; }
-.scm-inv-voice-rows li { padding: 3px 0; }
-.scm-inv-voice-actions { display: flex; gap: 8px; }
+.scm-inv-voice-text { flex: 1 1 240px; min-width: 0; }
+.scm-inv-voice-live { display: block; margin-top: 4px; color: #0f172a; font-style: italic; overflow-wrap: anywhere; }
+.scm-inv-voice.is-done { border-color: #86efac; background: #f0fdf4; color: #166534; }
+/* Animación mientras escucha: micrófono que late y barras de onda. */
+.scm-inv-voice-mic { position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 50%; background: #dc2626; font-size: 16px; animation: scm-inv-pulse 1.4s ease-out infinite; }
+.scm-inv-voice-wave { display: inline-flex; align-items: center; gap: 3px; height: 24px; flex: none; }
+.scm-inv-voice-wave i { display: block; width: 4px; height: 6px; border-radius: 2px; background: #dc2626; animation: scm-inv-wave 0.9s ease-in-out infinite; }
+.scm-inv-voice-wave i:nth-child(2) { animation-delay: 0.15s; }
+.scm-inv-voice-wave i:nth-child(3) { animation-delay: 0.3s; }
+.scm-inv-voice-wave i:nth-child(4) { animation-delay: 0.45s; }
+.scm-inv-voice-wave i:nth-child(5) { animation-delay: 0.6s; }
+.scm-inv-voice-spin { width: 20px; height: 20px; flex: none; border: 3px solid #bfdbfe; border-top-color: #1d4ed8; border-radius: 50%; animation: scm-inv-spin 0.8s linear infinite; }
+@keyframes scm-inv-pulse { 0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55); } 100% { box-shadow: 0 0 0 14px rgba(220, 38, 38, 0); } }
+@keyframes scm-inv-wave { 0%, 100% { height: 6px; } 50% { height: 22px; } }
+@keyframes scm-inv-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .scm-inv-voice-mic, .scm-inv-voice-wave i, .scm-inv-voice-spin { animation-duration: 2.4s; } }
 .scm-inv-dup { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 10px; font-size: 13px; }
 .scm-inv-dup h4 { margin: 0 0 6px; }
 .scm-inv-dup ul { margin: 0; padding: 0; list-style: none; }
@@ -143,3 +156,5 @@
   .scm-inv-footer { justify-content: stretch; }
   .scm-inv-status { flex: 1 1 100%; }
 }
+.scm-inv-voice > .scm-inv-voice-mic, .scm-inv-voice > .scm-inv-voice-wave, .scm-inv-voice > .scm-inv-voice-spin { flex: 0 0 auto; }
+.scm-inv-voice > .scm-inv-voice-wave { width: 31px; }

@@ -221,7 +221,7 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     await page.waitForFunction(() => /Guardado/.test(document.querySelector('[data-draft-status]').textContent), null, { timeout: 8000 });
     assert.equal(saves().at(-1).revision, '7', 'Save continues from the draft revision');
 
-    // Dictado: graba, envía WAV (MiniMax no acepta webm), muestra lo entendido y agrega solo lo aceptado.
+    // Dictado: anima mientras escucha, envía WAV (MiniMax no acepta webm) y llena la tabla sola; se puede deshacer.
     config.voice = true;
     serverDraft = null;
     voiceReply = { text: 'dos tomas y una puerta', rows: [{ d: 'Tomas', c: '2', m: 'Plástico', e: 'Bueno', o: 'Ninguna' }, { d: 'Puerta', c: '1', m: 'Madera', e: 'Malo', o: 'Rota' }] };
@@ -229,16 +229,34 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     await go('Sala, comedor');
     await page.locator('[data-voice-start="sections:sala"]').click();
     await page.locator('[data-voice-stop]').waitFor();
+    assert.equal(await page.locator('.scm-inv-voice.is-recording .scm-inv-voice-wave i').count(), 5, 'Shows the listening animation');
+    assert.ok((await page.textContent('.scm-inv-voice')).includes('Escuchando'), 'Says it is listening');
     await page.waitForTimeout(700);
     await page.locator('[data-voice-stop]').click();
-    await page.locator('[data-voice-accept]').waitFor({ timeout: 15000 });
+    await page.locator('.scm-inv-voice.is-done').waitFor({ timeout: 15000 });
     assert.equal(audioHeader, 'RIFFWAVE', 'Sends a WAV file');
-    assert.ok((await page.textContent('.scm-inv-voice')).includes('dos tomas y una puerta'), 'Shows what was understood');
-    assert.equal(await page.locator('[data-rows="sections:sala"] [data-row]').count(), 0, 'Nothing is added before accepting');
-    await page.locator('[data-voice-row="0"]').uncheck();
-    await page.locator('[data-voice-accept]').click();
-    assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="d"]'), 'Puerta', 'Adds only the accepted row');
-    assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="o"]'), 'Rota');
+    assert.ok((await page.textContent('.scm-inv-voice')).includes('Se agregaron 2 elementos'), 'Confirms what was added');
+    assert.equal(await page.locator('[data-rows="sections:sala"] [data-row]').count(), 2, 'Fills the table without an extra step');
+    assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-row="1"] [data-f="d"]'), 'Puerta');
+    assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-row="1"] [data-f="o"]'), 'Rota');
+    await page.locator('[data-voice-undo]').click();
+    assert.equal(await page.locator('[data-rows="sections:sala"] [data-row]').count(), 0, 'Undo removes the dictated rows');
+    voiceReply = { text: 'eh no sé', rows: [] };
+    await page.locator('[data-voice-start="sections:sala"]').click();
+    await page.locator('[data-voice-stop]').waitFor();
+    await page.waitForTimeout(500);
+    await page.locator('[data-voice-stop]').click();
+    await page.locator('.scm-inv-voice.is-error').waitFor({ timeout: 15000 });
+    assert.ok((await page.textContent('.scm-inv-voice')).includes('No se entendieron elementos'), 'Explains when nothing was understood');
+    await page.locator('[data-voice-cancel]').click();
+    voiceReply = { text: 'una puerta rota', rows: [{ d: 'Puerta', c: '1', m: 'Madera', e: 'Malo', o: 'Rota' }] };
+    await page.locator('[data-voice-start="sections:sala"]').click();
+    await page.locator('[data-voice-stop]').waitFor();
+    await page.waitForTimeout(500);
+    await page.locator('[data-voice-stop]').click();
+    await page.locator('.scm-inv-voice.is-done').waitFor({ timeout: 15000 });
+    await page.locator('.scm-inv-voice [data-voice-cancel]').click();
+    assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="d"]'), 'Puerta', 'Closing the notice keeps the rows');
     voiceReply = { transcription_failed: true, message: 'MiniMax no pudo transcribir el audio.' };
     await page.locator('[data-voice-start="sections:sala"]').click();
     await page.locator('[data-voice-stop]').waitFor();

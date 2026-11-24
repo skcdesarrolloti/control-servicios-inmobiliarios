@@ -68,7 +68,9 @@ El estado viaja como un solo JSON: un inventario amoblado supera `max_input_vars
 - Dictado: el micrófono lo permite `Permissions-Policy: microphone=(self)` en `public/.htaccess` (antes estaba en `()` y el
   navegador lo bloqueaba siempre). Requiere `MINIMAX_API_KEY` en el `.env` del servidor (la misma del asistente de crear caso). Con el plan de suscripción
   se usa `MiniMax-M3.1-Flash`; se cambia con `MINIMAX_INVENTORY_MODEL`. El navegador envía WAV porque MiniMax no acepta webm.
-  El audio no se guarda y cada fila propuesta se acepta a mano. Si falla la transcripción, ofrece el dictado del navegador.
+  El audio no se guarda. Mientras graba se ve una animación de "Escuchando…" (con el dictado del navegador también el texto en vivo);
+  al terminar, las filas se agregan solas a la tabla, se editan ahí mismo y el aviso trae "Deshacer". Si no se entiende ningún
+  elemento lo dice. Si falla la transcripción, ofrece el dictado del navegador.
 
 ## Permisos
 
