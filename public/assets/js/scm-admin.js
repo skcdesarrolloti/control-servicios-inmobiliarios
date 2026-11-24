@@ -11345,10 +11345,17 @@
           var ubicLlavesHead = (btn.dataset.ubicacionLlaves || "").trim();
           var personaLlavesHead = (btn.dataset.personaLlaves || "").trim();
           var contactoLlavesHead = (btn.dataset.contactoLlaves || "").trim();
-          if (tabKeyHead === "entrega" && idEstudioHead) {
+          // Los estudios del panel comercial guardan en anexos_entrega su página de documentos (estudio.php?d=):
+          // «Ver asegurable» la abre en el PDF del asegurable. Los anteriores siguen en la página de WordPress.
+          var documentosEstudioHead = /\/estudio\.php\?d=/.test(anexosHead);
+          if (tabKeyHead === "entrega" && (idEstudioHead || documentosEstudioHead)) {
+            var asegurableUrlHead = documentosEstudioHead
+              ? anexosHead + "&ver=asegurable"
+              : "https://sucasainmobiliaria.com.co/estudio-aseguradora/?id_estudio=" +
+                encodeURIComponent(idEstudioHead);
             headActions.innerHTML +=
-              '<button type="button" class="scm-case-side-link" data-scm-open-iframe data-iframe-title="Estudio asegurable" data-iframe-url="https://sucasainmobiliaria.com.co/estudio-aseguradora/?id_estudio=' +
-              encodeURIComponent(idEstudioHead) +
+              '<button type="button" class="scm-case-side-link" data-scm-open-iframe data-iframe-title="Estudio asegurable" data-iframe-url="' +
+              escHtml(asegurableUrlHead) +
               '"><span class="material-symbols-outlined text-[16px]">verified</span> Ver asegurable</button>';
           }
           if (tabKeyHead === "entrega" && anexosHead) {
