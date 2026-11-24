@@ -6,9 +6,9 @@ final class PendingView
 {
   // Preventivas ----------------------------------------------------------------
 
-  public function renderPreventivasPanel(array $filters, array $funcionarios, array $items, int $count, string $corte): string
+  public function renderPreventivasPanel(array $filters, array $funcionarios, array $items, int $count, string $corte, string $portfolioSelect = ''): string
   {
-    return PreventiveWorkspace::render('panel', ['view' => $this, 'filters' => $filters, 'items' => $items, 'count' => $count, 'corte' => $corte]);
+    return PreventiveWorkspace::render('panel', ['view' => $this, 'filters' => $filters, 'items' => $items, 'count' => $count, 'corte' => $corte, 'portfolioSelect' => $portfolioSelect]);
   }
 
   // Servicios Publicos ---------------------------------------------------------

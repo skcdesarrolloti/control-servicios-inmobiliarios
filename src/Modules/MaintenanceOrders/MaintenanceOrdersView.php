@@ -15,7 +15,7 @@ final class MaintenanceOrdersView
     'desaprobadas' => ['Órdenes desaprobadas', 'close', 'Órdenes que no fueron autorizadas. Puedes revisarlas o eliminarlas para liberar el saldo.'],
   ];
 
-  public function renderPanel(bool $canCreate): string
+  public function renderPanel(bool $canCreate, string $portfolioSelect = ''): string
   {
     $ui = UI::class;
     ob_start();
@@ -35,7 +35,7 @@ final class MaintenanceOrdersView
           <button type="button" class="sp-group !sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-3 !sp-py-2 !sp-rounded-md !sp-bg-transparent !sp-border-0 !sp-text-service-muted !sp-font-sans !sp-text-[10px] !sp-font-medium !sp-cursor-pointer aria-pressed:!sp-bg-service-navy aria-pressed:!sp-text-white aria-pressed:!sp-font-semibold focus-visible:!sp-ring-2 focus-visible:!sp-ring-service-yellow" data-maintenance-orders-tab="<?php echo esc_attr($key); ?>" aria-pressed="<?php echo $active ? 'true' : 'false'; ?>"><?php echo $ui::icon($tab[1], '!sp-w-3 !sp-h-3 group-aria-pressed:!sp-text-service-yellow'); ?><span><?php echo esc_html($tab[0]); ?></span><span class="!sp-min-w-[18px] !sp-px-1.5 !sp-py-0.5 !sp-rounded-full !sp-bg-white !sp-text-service-navy !sp-text-[9px] !sp-font-bold !sp-text-center group-aria-pressed:!sp-bg-service-yellow" data-maintenance-orders-count="<?php echo esc_attr($key); ?>">·</span></button>
         <?php endforeach; ?>
       </nav>
-      <?php echo $this->renderFilters(); ?>
+      <?php echo $this->renderFilters($portfolioSelect); ?>
       <div class="<?php echo $ui::CARD; ?>">
         <div class="!sp-p-4"><h3 class="!sp-m-0 !sp-font-bold !sp-text-sm" data-maintenance-orders-title><?php echo esc_html(self::TABS['pendientes'][0]); ?></h3><p class="!sp-m-0 !sp-mt-1 !sp-text-[10px] !sp-text-service-muted" data-maintenance-orders-description><?php echo esc_html(self::TABS['pendientes'][2]); ?></p></div>
         <div data-maintenance-orders-table><p class="!sp-m-0 !sp-p-8 !sp-text-center !sp-text-xs !sp-text-service-muted">Cargando órdenes...</p></div>
@@ -47,7 +47,7 @@ final class MaintenanceOrdersView
     return (string) ob_get_clean();
   }
 
-  private function renderFilters(): string
+  private function renderFilters(string $portfolioSelect = ''): string
   {
     $ui = UI::class;
     $field = static fn(string $label, string $control): string => '<label class="!sp-block"><span class="' . $ui::LABEL . '">' . esc_html($label) . '</span>' . $control . '</label>';
@@ -70,6 +70,9 @@ final class MaintenanceOrdersView
           echo $field('Creada por', $input('creador', 'text', 'Nombre del funcionario...'));
           echo $field('Creada desde', $input('desde', 'date'));
           echo $field('Creada hasta', $input('hasta', 'date'));
+          if ($portfolioSelect !== '') {
+            echo $field('Ver', $portfolioSelect);
+          }
           echo $field('Registros por página', '<select class="' . $ui::INPUT . '" name="per_page"><option value="20">20</option><option value="30">30</option><option value="60">60</option><option value="100">100</option></select>');
           ?>
         </div>

@@ -20,6 +20,7 @@ $months = [1 => 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 
           <?php foreach (['inmueble' => ['Inmueble', 'Ej: 10156'], 'propietario' => ['Propietario', 'Buscar por nombre...'], 'arrendatario' => ['Arrendatario', 'Buscar por nombre...'], 'contrato' => ['Contrato', 'Código contrato...'], 'caso' => ['Caso', 'Ej: 10368']] as $key => $field): ?>
           <label><span class="<?= UI::LABEL ?>"><?= $field[0] ?></span><input type="text" class="<?= UI::INPUT ?>" id="spp_<?= $key ?>" name="spp_<?= $key ?>" value="<?= $e($filters[$key === 'caso' ? 'id_ticket' : $key] ?? '') ?>" placeholder="<?= $field[1] ?>"></label>
           <?php endforeach ?>
+          <?php if (($portfolioSelect ?? '') !== ''): ?><label><span class="<?= UI::LABEL ?>">Ver</span><?= $portfolioSelect ?></label><?php endif ?>
         </div>
         <div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-3 !sp-mt-5"><button class="<?= UI::PRIMARY ?>" type="submit"><?= UI::icon('filter') ?>Filtrar contratos</button><button class="!sp-bg-transparent !sp-border-0 !sp-text-service-muted !sp-text-xs !sp-cursor-pointer" type="button" data-pending-clear="spp_">Limpiar filtros</button><span class="scm-spinner" id="spp_spinner"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span></div>
       </form>

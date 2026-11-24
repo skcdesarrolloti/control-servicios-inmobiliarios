@@ -13,7 +13,8 @@ trait HandlesMaintenanceOrdersPanel
   private function renderMaintenanceOrdersPanel(): string
   {
     return (new MaintenanceOrdersView())->renderPanel(
-      $this->canUseDashboardAction('quote_order_create')
+      $this->canUseDashboardAction('quote_order_create'),
+      $this->maintenancePortfolioSelect(\SCM\Modules\Pending\PublicServicesUi::INPUT)
     );
   }
 

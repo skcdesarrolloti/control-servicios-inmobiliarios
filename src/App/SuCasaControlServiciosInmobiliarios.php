@@ -1055,7 +1055,12 @@ final class SuCasaControlServiciosInmobiliarios
           'quote_order_delete' => 'Eliminar orden de mantenimiento',
           'quote_acta_create' => 'Crear acta de cotización',
           'quote_reset_dev' => 'Reiniciar cotización a enviada sin respuesta (pruebas de desarrollo)',
-          'maintenance_view_all' => 'Mantenimiento: ver cotizaciones, órdenes, actas y preventivas de todos los funcionarios (sin este permiso solo ve las suyas)',
+        ],
+      ],
+      'mantenimiento_alcance' => [
+        'label' => 'Cotizaciones, órdenes, actas y preventivas: qué registros ve',
+        'items' => [
+          'maintenance_view_all' => 'Ver los de todos los funcionarios y elegir Todos / Mi portafolio en los filtros (sin este permiso solo ve Mi portafolio: lo que realizó, coordina o de casos a su cargo)',
         ],
       ],
       'administrativas' => [
@@ -1575,10 +1580,29 @@ final class SuCasaControlServiciosInmobiliarios
    */
   private function maintenanceOwnRecordsEmployeeId(): ?string
   {
-    if ($this->canManageDashboardPermissions() || $this->canUseDashboardAction('maintenance_view_all')) {
-      return null;
+    if ($this->canViewAllMaintenanceRecords()) {
+      // Quien ve todo puede elegir en los filtros "Mi portafolio" para quedarse solo con lo suyo.
+      $choice = strtolower(trim((string) ($_POST['scm_portafolio'] ?? $_GET['scm_portafolio'] ?? '')));
+      return $choice === 'mio' ? trim(Auth::employeeId()) : null;
     }
     return trim(Auth::employeeId());
+  }
+
+  private function canViewAllMaintenanceRecords(): bool
+  {
+    return $this->canManageDashboardPermissions() || $this->canUseDashboardAction('maintenance_view_all');
+  }
+
+  /**
+   * Selector "Ver" de los filtros de cotizaciones, órdenes, actas y preventivas: Todos o Mi portafolio.
+   * Sin permiso de ver todo queda fijo en Mi portafolio (el servidor lo impone de todas formas).
+   */
+  public function maintenancePortfolioSelect(string $class): string
+  {
+    if (!$this->canViewAllMaintenanceRecords()) {
+      return '<select class="' . esc_attr($class) . '" disabled title="Tu cargo solo ve los registros que realizaste, coordinas o de casos a tu cargo."><option>Mi portafolio</option></select>';
+    }
+    return '<select class="' . esc_attr($class) . '" name="scm_portafolio" title="Mi portafolio: lo que realizaste, coordinas o de casos a tu cargo."><option value="todos">Todos los funcionarios</option><option value="mio">Mi portafolio</option></select>';
   }
 
   /** @param array<int,string> $columns Columnas SQL ya calificadas (ej. "c.`id_empleado`"). @return array{0:string,1:array<int,string>}|null */

@@ -27,6 +27,15 @@ La pestaña Vencimientos también lista, con su filtro, las **Preventivas pendie
 
 En el popup de Vencimientos, las tarjetas por tipo son las que el cargo atiende (un tipo desmarcado no aparece, uno marcado sin pendientes sale en 0). La lista **Casos con mayor tiempo de atraso** muestra solo los asignados a quien entra: el `id_empleado` del caso, igual que Mis casos, o el responsable directo cuando no hay caso (anexos de contrato, casos jurídicos). Los totales siguen siendo los del cargo.
 
+## Cotizaciones, órdenes, actas y preventivas: Mi portafolio
+
+En **Acciones › Cotizaciones, órdenes, actas y preventivas: qué registros ve** está `maintenance_view_all`:
+
+- **Sin el permiso** el funcionario solo ve **Mi portafolio**: cotizaciones y órdenes que realizó, creó o coordina (`id_empleado`, `cct_author_id`, `id_coordinador`), actas que hizo o de casos a su cargo, y preventivas de casos asignados a él. El filtro **Ver** sale fijo en *Mi portafolio*.
+- **Con el permiso** (y los administradores de permisos) ve todo y el filtro **Ver** permite elegir *Todos los funcionarios* o *Mi portafolio* (`scm_portafolio=mio`, resuelto en `maintenanceOwnRecordsEmployeeId()`).
+
+El servidor impone la regla aunque se manipule el formulario. Es un permiso sensible: los cargos nuevos nacen sin él.
+
 ## Contratos por desocupar
 
 El popup **Contratos por desocupar** (alerta `contratos_por_desocupar`) lista los casos de **Recibo de inmuebles** cuya `fecha_terminacion_contrato` cae en el mes en curso (`ContractReceiptCases`), separados en **Por recibir** (caso abierto) y **Ya cerrados**. La casilla del cargo basta para verlo, porque cartera lo necesita sin acceso a contratos ni métricas.

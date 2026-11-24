@@ -212,7 +212,7 @@ final class CompletionView
   ];
 
   /** @param array<string,string|int> $filters @param array<int,array<string,mixed>> $items @param array<string,int> $stats @param array<string,int> $pagination */
-  public function dashboardPanel(array $filters, array $items, array $stats, int $count, array $pagination, CompletionService $service, bool $canDeleteAny = false): string
+  public function dashboardPanel(array $filters, array $items, array $stats, int $count, array $pagination, CompletionService $service, bool $canDeleteAny = false, string $portfolioSelect = ''): string
   {
     $ui = \SCM\Modules\Pending\PublicServicesUi::class;
     $status = (string) ($filters['estado'] ?? 'pending');
@@ -236,11 +236,12 @@ final class CompletionView
         <form method="post" autocomplete="off" id="sacta_form">
           <input type="hidden" name="sacta_estado" value="<?= self::e($status) ?>" data-acta-status-input>
           <input type="hidden" name="sacta_page" value="<?= (int) ($pagination['page'] ?? 1) ?>">
-          <div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-5 !sp-gap-4">
+          <div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-6 !sp-gap-4">
             <?= $field('sacta_caso', '# Caso', $input('sacta_caso', (string) ($filters['caso'] ?? ''), 'Número del caso')) ?>
             <?= $field('sacta_inmueble', 'Inmueble', $input('sacta_inmueble', (string) ($filters['inmueble'] ?? ''), '# inmueble')) ?>
             <?= $field('sacta_contrato', 'Contrato', $input('sacta_contrato', (string) ($filters['contrato'] ?? ''), '# contrato')) ?>
             <?= $field('sacta_firmante', 'Firmante', $input('sacta_firmante', (string) ($filters['firmante'] ?? ''), 'Nombre, correo o celular')) ?>
+            <?php if ($portfolioSelect !== ''): ?><label class="!sp-block"><span class="<?= $ui::LABEL ?>">Ver</span><?= $portfolioSelect ?></label><?php endif ?>
             <?= $field('sacta_per_page', 'Registros por página', '<select class="' . $ui::INPUT . '" id="sacta_per_page" name="sacta_per_page">' . $perPage . '</select>') ?>
           </div>
           <div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-3 !sp-mt-5">

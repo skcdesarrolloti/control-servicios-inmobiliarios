@@ -5116,6 +5116,7 @@ trait RendersDashboard
           <div class="scm-field"><label for="scmqt_contrato">Contrato</label><input id="scmqt_contrato" name="scmqt_contrato" class="input input-bordered input-sm scm-input" type="text" value="<?php echo esc_attr((string) ($p['fContrato'] ?? '')); ?>"></div>
           <div class="scm-field"><label for="scmqt_tipo_mantenimiento">Tipo mantenimiento</label><select id="scmqt_tipo_mantenimiento" name="scmqt_tipo_mantenimiento" class="select select-bordered select-sm scm-select"><option value="">Todos</option></select></div>
           <div class="scm-field"><label for="scmqt_categoria">Categoria</label><select id="scmqt_categoria" name="scmqt_categoria" class="select select-bordered select-sm scm-select"><option value="">Todas</option></select></div>
+          <div class="scm-field"><label>Ver</label><?php echo $this->maintenancePortfolioSelect('select select-bordered select-sm scm-select'); ?></div>
         </div>
         <div class="scm-actions"><button class="scm-btn-primary btn btn-primary" type="submit">Filtrar</button><button class="scm-btn-secondary btn btn-outline" type="button" id="scm-clear-cotizaciones_mantenimiento">Limpiar</button><span class="scm-spinner" id="scm-spinner-cotizaciones_mantenimiento"><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span><span class="scm-spinner-dot"></span></span></div>
       </form>
@@ -6573,7 +6574,8 @@ trait RendersDashboard
       [],
       [],
       0,
-      (string) date('Y')
+      (string) date('Y'),
+      $this->maintenancePortfolioSelect(\SCM\Modules\Pending\PublicServicesUi::INPUT)
     );
 
     return str_replace(
@@ -6623,7 +6625,8 @@ trait RendersDashboard
       0,
       ['page' => 1, 'per_page' => 30, 'total' => 0, 'total_pages' => 1],
       new \SCM\Modules\TicketCompletion\CompletionService(new \SCM\Modules\TicketCompletion\CompletionRepository($this->db), SCM_APP_SECRET, SCM_BASE_URL),
-      $this->canDeleteAnyTicketCompletionActs()
+      $this->canDeleteAnyTicketCompletionActs(),
+      $this->maintenancePortfolioSelect(\SCM\Modules\Pending\PublicServicesUi::INPUT)
     );
   }
 
