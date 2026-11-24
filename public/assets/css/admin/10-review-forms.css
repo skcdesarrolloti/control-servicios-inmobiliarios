@@ -3,6 +3,7 @@
 
 /* Popup más ancho para formularios largos */
 #scm-app .scm-case-submodal--review .scm-case-submodal-dialog { width: min(1040px, calc(100% - 8px)); }
+#scm-app .scm-case-submodal--review .scm-case-submodal-dialog:has(.scm-inventory-review, .scm-delivery-wizard) { width: min(1280px, calc(100% - 16px)); }
 
 .scm-acta.scm-corrective-review {
   --rv-navy: #0f1e36;

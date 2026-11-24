@@ -267,10 +267,24 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     await page.locator('[data-voice-cancel]').click();
     config.voice = false;
 
-    // Vista de celular sin desborde horizontal.
-    await page.setViewportSize({ width: 390, height: 800 });
+    // Computador, tablet horizontal/vertical y celular: sin desborde y con campos de ancho usable.
     await go('Sala, comedor');
     await page.locator('[data-row-add]').click();
+    await page.locator('[data-rows="sections:sala"] [data-row]').last().locator('[data-f="c"]').fill('Todo el espacio');
+    for (const width of [1366, 1024, 768, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      const sizes = await page.evaluate(() => {
+        const row = [...document.querySelectorAll('[data-rows="sections:sala"] [data-row]')].pop();
+        const w = sel => Math.round(row.querySelector(sel).getBoundingClientRect().width);
+        return { d: w('.scm-inv-d'), c: w('.scm-inv-c'), m: w('.scm-inv-m'), o: w('.scm-inv-o'), state: w('.scm-inv-state'), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+      });
+      assert.ok(sizes.overflow <= 1, width + 'px: no horizontal scroll (' + sizes.overflow + ')');
+      assert.ok(sizes.d >= 140 && sizes.c >= 124 && sizes.m >= 110 && sizes.o >= 120 && sizes.state >= 150, width + 'px: usable field widths ' + JSON.stringify(sizes));
+      if (shots) await page.screenshot({ path: path.join(shots, 'inv-ancho-' + width + '.png'), fullPage: true });
+    }
+
+    // Vista de celular sin desborde horizontal.
+    await page.setViewportSize({ width: 390, height: 800 });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     assert.ok(overflow <= 1, 'No horizontal scroll on a phone: ' + overflow);
     if (shots) await page.screenshot({ path: path.join(shots, 'inv-4-celular.png'), fullPage: true });

@@ -181,15 +181,17 @@ const shots = process.env.DELIVERY_SHOTS || '';
     assert.match(sent.body, /name="hab_piso\[2\]"\r\n\r\n1/);
     assert.doesNotMatch(sent.body, /servicios_publicos\[\]"\r\n\r\nGas/);
 
-    // Móvil: sin desbordamiento horizontal.
-    await page.setViewportSize({ width: 380, height: 800 });
-    await page.evaluate(() => { document.querySelector('#sub .scm-case-submodal-body').innerHTML = ''; window.openDelivery(); });
-    await page.locator('[data-delivery-review-form]').waitFor();
-    for (const step of ['inmueble', 'linderos', 'espacios', 'servicios']) {
-      await page.click(`[data-prev-goto="${step}"]`).catch(() => {});
-      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, 'Wizard overflows on mobile at ' + step);
+    // Computador, tablet horizontal/vertical y celular: sin desbordamiento horizontal en ningún paso.
+    for (const width of [1366, 1024, 768, 600, 380]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.evaluate(() => { document.querySelector('#sub .scm-case-submodal-body').innerHTML = ''; window.openDelivery(); });
+      await page.locator('[data-delivery-review-form]').waitFor();
+      for (const step of ['inmueble', 'linderos', 'espacios', 'servicios']) {
+        await page.click(`[data-prev-goto="${step}"]`).catch(() => {});
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, 'Wizard overflows at ' + width + 'px on ' + step);
+        if (shots && (step === 'inmueble' || step === 'espacios')) await page.screenshot({ path: path.join(shots, 'entrega-' + width + '-' + step + '.png'), fullPage: true });
+      }
     }
-    if (shots) await page.screenshot({ path: path.join(shots, 'entrega-5-movil.png'), fullPage: true });
 
     assert.deepEqual(errors, []);
     console.log('PASS: delivery review wizard steps, conditionals, room cards, repeaters, services, summary, autosave restore, submit payload and mobile layout.');

@@ -88,3 +88,11 @@ php bin/cct-add-fields.php inventario informacion_adicional_del_inmueble_tab tip
 ```
 
 Pruebas: `php tests/inventory-public-check.php`, `php tests/inventory-flow-check.php` y `node tests/inventory-form-check.cjs`.
+
+## Diseño adaptable
+
+- El popup del inventario y de la revisión antes de la ocupación usa hasta 1280 px de ancho.
+- Las filas de elementos se acomodan al ancho real del popup (container query `scm-inv`), no al de la pantalla:
+  tabla completa desde 880 px, dos líneas por fila en tablet (elemento, cantidad y material / estado y observaciones)
+  y tarjeta en celular (menos de 560 px). La cantidad siempre deja leer valores como "Todo el espacio".
+- `tests/inventory-form-check.cjs` y `tests/delivery-review-wizard-check.cjs` comprueban 1366, 1024, 768 y 390/380 px.

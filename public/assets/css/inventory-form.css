@@ -29,10 +29,12 @@
 .scm-inv-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 6px 0 10px; font-size: 12px; color: #64748b; }
 .scm-inv-chips button { padding: 4px 9px; border: 1px dashed #94a3b8; border-radius: 999px; background: #f8fafc; color: #1e293b; font-size: 12px; cursor: pointer; }
 .scm-inv-chips button.is-all { border-style: solid; border-color: #071f49; color: #071f49; font-weight: 600; }
-.scm-inv-head, .scm-inv-row { display: grid; grid-template-columns: minmax(130px, 1.5fr) 72px minmax(110px, 1.2fr) 156px minmax(110px, 1.2fr) 58px; gap: 6px; align-items: center; }
+/* Las filas se adaptan al ancho real del popup (no al de la pantalla): tabla, dos líneas o tarjeta. */
+.scm-inventory-review [data-inventory-form] { container: scm-inv / inline-size; }
+.scm-inv-head, .scm-inv-row { display: grid; grid-template-columns: minmax(150px, 1.6fr) minmax(124px, .75fr) minmax(120px, 1.2fr) 168px minmax(130px, 1.3fr) 62px; gap: 6px; align-items: center; }
 .scm-inv-head { padding: 0 2px 4px; color: #64748b; font-size: 11px; font-weight: 600; }
-.scm-inv-furniture .scm-inv-row { grid-template-columns: minmax(150px, 2fr) 72px 156px minmax(120px, 1.2fr) 58px; }
-.scm-inv-head.has-floor, .scm-inv-row.has-floor { grid-template-columns: 78px minmax(120px, 1.5fr) 64px minmax(100px, 1.2fr) 150px minmax(100px, 1.2fr) 58px; }
+.scm-inv-furniture .scm-inv-row { grid-template-columns: minmax(160px, 2fr) minmax(124px, .75fr) 168px minmax(130px, 1.3fr) 62px; }
+.scm-inv-head.has-floor, .scm-inv-row.has-floor { grid-template-columns: 84px minmax(140px, 1.5fr) minmax(120px, .7fr) minmax(110px, 1.1fr) 160px minmax(120px, 1.2fr) 62px; }
 .scm-inv-row select.scm-inv-p { width: 100%; padding: 7px 4px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
 .scm-inv-auto { margin: 6px 0 10px; padding: 10px; border: 1px dashed #94a3b8; border-radius: 8px; background: #f8fafc; font-size: 13px; }
 .scm-inv-auto ul { margin: 6px 0; padding-left: 18px; }
@@ -98,7 +100,7 @@
 .scm-inv-sub { display: flex; flex-direction: column; gap: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
 .scm-inv-card > .scm-inv-sub { margin-top: 12px; }
 .scm-inv-sub.is-open { border-color: #bfdbfe; background: #f8fbff; }
-.scm-inv-sub .scm-inv-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); align-items: end; }
+.scm-inv-sub .scm-inv-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); align-items: end; }
 .scm-inv-sub > .scm-inv-field > span { color: #071f49; font-size: 13px; font-weight: 700; }
 /* Misma altura en todos los campos y etiquetas en una línea, para que queden alineados. */
 .scm-inv-field > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -143,18 +145,44 @@
 }
 .scm-inv-copy select { min-width: 190px; padding: 7px 8px; }
 
-@media (max-width: 760px) {
+/* Tablet o popup angosto: cada fila en dos líneas (elemento, cantidad y material / estado y observaciones). */
+@container scm-inv (max-width: 879px) {
   .scm-inv-head { display: none; }
-  .scm-inv-row, .scm-inv-row.has-floor, .scm-inv-furniture .scm-inv-row { grid-template-columns: 1fr 72px; padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; }
-  .scm-inv-m, .scm-inv-o, .scm-inv-state, .scm-inv-p { grid-column: 1 / -1; }
-  .scm-inv-row-actions { grid-column: 1 / -1; justify-content: flex-end; }
+  .scm-inv-row, .scm-inv-row.has-floor, .scm-inv-furniture .scm-inv-row { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; }
+  .scm-inv-row > .scm-inv-d { grid-column: span 3; }
+  .scm-inv-row > .scm-inv-c { grid-column: span 2; }
+  .scm-inv-row > .scm-inv-m { grid-column: span 3; }
+  .scm-inv-row.has-floor > .scm-inv-p { grid-column: span 2; }
+  .scm-inv-row.has-floor > .scm-inv-d { grid-column: span 3; }
+  .scm-inv-row.has-floor > .scm-inv-c { grid-column: span 3; }
+  .scm-inv-row.has-floor > .scm-inv-m { grid-column: span 4; }
+  .scm-inv-row.has-floor > .scm-inv-state { grid-column: span 4; }
+  .scm-inv-row.has-floor > .scm-inv-o { grid-column: span 6; }
+  .scm-inv-furniture .scm-inv-row > .scm-inv-d { grid-column: span 6; }
+  .scm-inv-row > .scm-inv-state { grid-column: span 3; }
+  .scm-inv-row > .scm-inv-o { grid-column: span 4; }
+  .scm-inv-row > .scm-inv-row-actions { grid-column: span 1; justify-content: flex-end; }
+  .scm-inv-row.has-floor > .scm-inv-row-actions { grid-column: span 2; }
+}
+/* Celular: tarjeta con el elemento y la cantidad arriba y lo demás a lo ancho. */
+@container scm-inv (max-width: 560px) {
+  .scm-inv-row, .scm-inv-row.has-floor, .scm-inv-furniture .scm-inv-row { grid-template-columns: minmax(0, 1fr) minmax(130px, 40%); }
+  .scm-inv-row > .scm-inv-d, .scm-inv-row.has-floor > .scm-inv-d, .scm-inv-furniture .scm-inv-row > .scm-inv-d { grid-column: 1; }
+  .scm-inv-row > .scm-inv-c, .scm-inv-row.has-floor > .scm-inv-c { grid-column: 2; }
+  .scm-inv-row > .scm-inv-m, .scm-inv-row > .scm-inv-o, .scm-inv-row > .scm-inv-state, .scm-inv-row > .scm-inv-p,
+  .scm-inv-row.has-floor > .scm-inv-m, .scm-inv-row.has-floor > .scm-inv-o, .scm-inv-row.has-floor > .scm-inv-state, .scm-inv-row.has-floor > .scm-inv-p,
+  .scm-inv-row > .scm-inv-row-actions, .scm-inv-row.has-floor > .scm-inv-row-actions { grid-column: 1 / -1; }
   .scm-inv-state button { padding: 9px 2px; font-size: 12px; }
-  .scm-inv-row input { font-size: 16px; }
-  .scm-inv-field input, .scm-inv-field select, .scm-inv-field textarea { font-size: 16px; }
   .scm-inv-choice { width: 100%; }
   .scm-inv-choice button { flex: 1; padding: 10px; }
   .scm-inv-footer { justify-content: stretch; }
   .scm-inv-status { flex: 1 1 100%; }
+  .scm-inv-copy select { min-width: 0; width: 100%; }
+}
+/* En pantallas táctiles pequeñas, 16 px evita que el teléfono haga zoom al escribir. */
+@media (max-width: 760px) {
+  .scm-inv-row input { font-size: 16px; }
+  .scm-inv-field input, .scm-inv-field select, .scm-inv-field textarea { font-size: 16px; }
 }
 .scm-inv-voice > .scm-inv-voice-mic, .scm-inv-voice > .scm-inv-voice-wave, .scm-inv-voice > .scm-inv-voice-spin { flex: 0 0 auto; }
 .scm-inv-voice > .scm-inv-voice-wave { width: 31px; }
