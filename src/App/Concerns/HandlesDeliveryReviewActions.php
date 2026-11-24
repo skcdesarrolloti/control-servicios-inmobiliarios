@@ -983,7 +983,7 @@ trait HandlesDeliveryReviewActions
         <template data-delivery-floor-count-template><?= $this->renderDeliveryFloorCount('__FLOOR__', 0, 0) ?></template>
         <p class="scm-prev-muted"><?= $editing ? '' : 'Según el inmueble registrado: ' . $h($v('habitaciones') !== '' ? $v('habitaciones') : 'sin dato') . ' habitación(es) y ' . $h($v('banos') !== '' ? $v('banos') : 'sin dato') . ' baño(s). ' ?>Si tiene varios pisos, reparte las habitaciones y los baños en cada piso; en el paso Espacios sale una ficha por cada uno.</p>
         <div class="scm-delivery-grid">
-          <fieldset class="scm-prev-block">
+          <fieldset class="scm-prev-block scm-delivery-toggle">
             <legend>¿Tiene parqueadero? *</legend>
             <?= $yesNo('tiene_parqueadero', $v('tiene_parqueadero'), '¿Tiene parqueadero?') ?>
             <div class="scm-delivery-grid scm-delivery-grid--3" data-delivery-when="tiene_parqueadero=Si"<?= $v('tiene_parqueadero') === 'Si' ? '' : ' hidden' ?>>
@@ -992,7 +992,7 @@ trait HandlesDeliveryReviewActions
               <label class="scm-delivery-field"><span>Número(s) *</span><input type="text" name="numero_parqueadero" maxlength="120" required value="<?= $h($v('numero_parqueadero')) ?>" placeholder="Ej: 12, 13"></label>
             </div>
           </fieldset>
-          <fieldset class="scm-prev-block">
+          <fieldset class="scm-prev-block scm-delivery-toggle">
             <legend>¿Tiene depósito? *</legend>
             <?= $yesNo('tiene_deposito', $v('tiene_deposito'), '¿Tiene depósito?') ?>
             <div data-delivery-when="tiene_deposito=Si"<?= $v('tiene_deposito') === 'Si' ? '' : ' hidden' ?>>

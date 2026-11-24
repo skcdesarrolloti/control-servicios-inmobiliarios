@@ -275,15 +275,15 @@
         "</div></div>";
       html += '<div class="scm-inv-card"><h4>Parqueadero y depósito</h4><div class="scm-inv-split">' +
         toggleBlock("¿Tiene parqueadero?", "tiene_parqueadero",
-          select("Tipo de parqueadero", "tipo_parqueadero", catalog.parking, { required: true }) + input("Cantidad", "parqueaderos", { required: true, type: "number" }) +
+          select("Tipo", "tipo_parqueadero", catalog.parking, { required: true }) + input("Cantidad", "parqueaderos", { required: true, type: "number" }) +
           input("Número(s)", "numero_parqueadero", { required: true, placeholder: "Ej: 12, 13" })) +
-        toggleBlock("¿Tiene depósito?", "tiene_deposito", input("Cantidad de depósitos", "depositos", { required: true, type: "number" })) +
+        toggleBlock("¿Tiene depósito?", "tiene_deposito", input("Cantidad", "depositos", { required: true, type: "number" })) +
         "</div></div>";
       html += '<div class="scm-inv-card"><h4>Quien recibe</h4><div class="scm-inv-grid">' +
         input("Arrendatario", "arrendatario", { required: true }) + input("Documento", "cedula_arrendatario") + input("Correo", "correo_arrendatario", { required: true, type: "email" }) + input("Celular", "celular_arrendatario", { required: true, type: "tel" }) +
         "</div>" +
         toggleBlock("¿Recibe un delegado?", "tiene_delegado",
-          input("Delegado", "delegado", { required: true }) + input("Documento del delegado", "cedula_delegado") + input("Correo del delegado", "correo_delegado", { required: true, type: "email" }) + input("Celular del delegado", "celular_delegado", { required: true, type: "tel" })) +
+          input("Nombre", "delegado", { required: true }) + input("Documento", "cedula_delegado") + input("Correo", "correo_delegado", { required: true, type: "email" }) + input("Celular", "celular_delegado", { required: true, type: "tel" })) +
         "</div>";
       return html;
     }

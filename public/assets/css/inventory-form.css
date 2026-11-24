@@ -85,7 +85,11 @@
 .scm-inv-sub { display: flex; flex-direction: column; gap: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
 .scm-inv-card > .scm-inv-sub { margin-top: 12px; }
 .scm-inv-sub.is-open { border-color: #bfdbfe; background: #f8fbff; }
-.scm-inv-sub .scm-inv-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.scm-inv-sub .scm-inv-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); align-items: end; }
+.scm-inv-sub > .scm-inv-field > span { color: #071f49; font-size: 13px; font-weight: 700; }
+/* Misma altura en todos los campos y etiquetas en una línea, para que queden alineados. */
+.scm-inv-field > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scm-inv-field input, .scm-inv-field select { height: 40px; min-height: 40px; margin: 0; background-color: #fff; }
 .scm-inv-card .scm-inv-hint + .scm-inv-grid { margin-top: 8px; }
 .scm-inv-field.is-missing > span { color: #b91c1c; font-weight: 600; }
 .scm-inv-field.is-missing input, .scm-inv-field.is-missing select, .scm-inv-field.is-missing .scm-inv-choice { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220, 38, 38, .12); }

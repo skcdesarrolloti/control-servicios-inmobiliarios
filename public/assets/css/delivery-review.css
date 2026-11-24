@@ -498,3 +498,63 @@ h3.scm-delivery-public-subtitle {
 .scm-delivery-floor > header h3 {
   color: #1d4ed8;
 }
+
+/* Parqueadero y depósito: tarjeta con Sí/No y, al responder Sí, sus campos dentro (mismo estilo del inventario). */
+.scm-delivery-wizard .scm-delivery-toggle {
+  display: block;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+.scm-delivery-wizard .scm-delivery-toggle:has(input[value="Si"]:checked) {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+}
+.scm-delivery-wizard .scm-delivery-toggle > legend {
+  float: left;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 0;
+  color: #071f49;
+  font-size: 13px;
+  font-weight: 700;
+}
+.scm-delivery-wizard .scm-delivery-toggle > legend + * { clear: both; }
+.scm-delivery-wizard .scm-delivery-toggle .scm-prev-choice {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+}
+.scm-delivery-wizard .scm-delivery-toggle .scm-prev-choice label + label span { border-left: 1px solid #e2e8f0; }
+.scm-delivery-wizard .scm-delivery-toggle .scm-prev-choice span {
+  min-width: 64px;
+  padding: 8px 14px;
+  border-radius: 0;
+  color: #334155;
+}
+.scm-delivery-wizard .scm-delivery-toggle .scm-prev-choice input:checked + span {
+  background: #071f49;
+  color: #fff;
+  box-shadow: none;
+}
+.scm-delivery-wizard .scm-delivery-toggle .scm-delivery-grid {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  align-items: end;
+  margin-top: 12px;
+}
+.scm-delivery-wizard .scm-delivery-toggle .scm-delivery-field > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scm-delivery-wizard .scm-delivery-toggle > div[data-delivery-when]:not(.scm-delivery-grid) { margin-top: 12px; max-width: 220px; }
+.scm-delivery-wizard .scm-delivery-field select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  cursor: pointer;
+}
