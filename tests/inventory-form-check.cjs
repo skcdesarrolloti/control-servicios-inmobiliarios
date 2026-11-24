@@ -139,8 +139,26 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     assert.equal(await page.locator('[data-add-item="Ventanas"]').count(), 0, 'A used suggestion leaves the chips');
     const obsOptions = () => page.evaluate(() => [...document.querySelectorAll('[data-rows="sections:sala"] [data-row]:last-child .scm-inv-o + datalist option')].map(o => o.value));
     assert.deepEqual(await obsOptions(), ['Vidrio rayado', 'Sin seguro'], 'Learned observations are offered for the element');
-    assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="o"]'), 'Ninguna', 'Observation is not filled automatically');
+    assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="o"]'), '', 'Observation starts empty (saved as Ninguna)');
+    // Lista propia: aunque el material ya tenga valor, al tocarlo salen todas las opciones y se elige con un toque.
+    const picks = () => page.evaluate(() => [...document.querySelectorAll('.scm-inv-suggest [data-suggest-pick]')].map(b => b.textContent));
+    await page.locator('[data-rows="sections:sala"] [data-f="m"]').click();
+    assert.deepEqual(await picks(), ['Aluminio', 'PVC'], 'Material field with a value still lists every learned material');
+    if (shots) await page.screenshot({ path: path.join(shots, 'inv-sugerencias.png') });
+    await page.locator('.scm-inv-suggest [data-suggest-pick]', { hasText: 'PVC' }).click();
+    assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="m"]'), 'PVC', 'Picking a suggestion fills the field');
+    assert.equal(await page.locator('.scm-inv-suggest').count(), 0, 'The list closes after picking');
+    await page.locator('[data-rows="sections:sala"] [data-f="o"]').click();
+    assert.deepEqual(await picks(), ['Vidrio rayado', 'Sin seguro'], 'Observation field lists learned observations');
+    await page.keyboard.type('seg');
+    assert.deepEqual(await picks(), ['Sin seguro'], 'Typing filters the list');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-f="o"]'), 'Sin seguro', 'Keyboard picks a suggestion');
+    await page.locator('[data-rows="sections:sala"] [data-f="o"]').fill('');
+    await page.locator('[data-rows="sections:sala"] [data-f="m"]').fill('Aluminio');
     await page.locator('[data-row-add]').click();
+    assert.equal(await page.inputValue('[data-rows="sections:sala"] [data-row]:last-child [data-f="c"]'), '', 'A new row has no default quantity');
     await page.locator('[data-rows="sections:sala"] [data-row]:last-child [data-f="d"]').fill('Puerta');
     assert.deepEqual(await obsOptions(), ['Con tope'], 'Typing the element refreshes its observation list');
     await page.locator('[data-rows="sections:sala"] [data-row]:last-child [data-row-remove]').click();

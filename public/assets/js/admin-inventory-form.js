@@ -504,11 +504,11 @@
       var withFloor = material && section && section.group === "general" && floorsCount() > 1;
       return '<div class="scm-inv-row' + (withFloor ? " has-floor" : "") + '" data-row="' + index + '">' +
         (withFloor ? '<select class="scm-inv-p" data-f="p" aria-label="Piso">' + range(1, floorsCount()).map(function (n) { return '<option value="' + n + '"' + (String(row.p || "1") === n ? " selected" : "") + ">Piso " + n + "</option>"; }).join("") + "</select>" : "") +
-        '<input class="scm-inv-d" data-f="d" value="' + esc(row.d) + '" placeholder="Elemento" list="scm-inv-desc-' + esc(key) + '" aria-label="Descripción">' +
-        '<input class="scm-inv-c" data-f="c" value="' + esc(row.c) + '" placeholder="Cant." list="scm-inv-qty" aria-label="Cantidad">' +
-        (material ? '<input class="scm-inv-m" data-f="m" value="' + esc(row.m) + '" placeholder="Material" list="' + listId + '" aria-label="Tipo de material"><datalist id="' + listId + '">' + materials.map(function (m) { return '<option value="' + esc(m) + '">'; }).join("") + "</datalist>" : "") +
+        '<input class="scm-inv-d" data-f="d" value="' + esc(row.d) + '" placeholder="Elemento" data-suggest="scm-inv-desc-' + esc(key) + '" autocomplete="off" aria-label="Descripción">' +
+        '<input class="scm-inv-c" data-f="c" value="' + esc(row.c) + '" placeholder="Cant." data-suggest="scm-inv-qty" autocomplete="off" aria-label="Cantidad">' +
+        (material ? '<input class="scm-inv-m" data-f="m" value="' + esc(row.m) + '" placeholder="Material" data-suggest="' + listId + '" autocomplete="off" aria-label="Tipo de material"><datalist id="' + listId + '">' + materials.map(function (m) { return '<option value="' + esc(m) + '">'; }).join("") + "</datalist>" : "") +
         '<div class="scm-inv-state" role="group" aria-label="Estado">' + STATES.map(function (s) { return '<button type="button" data-state="' + s + '" class="' + ((row.e || "Bueno") === s ? "is-on is-" + s.toLowerCase() : "") + '">' + s + "</button>"; }).join("") + "</div>" +
-        '<input class="scm-inv-o" data-f="o" value="' + esc(row.o) + '" placeholder="Ninguna" list="' + listId + '-o" aria-label="Observaciones"><datalist id="' + listId + '-o">' + optionsHtml(observationsFor(suggestion, row.d)) + "</datalist>" +
+        '<input class="scm-inv-o" data-f="o" value="' + esc(row.o) + '" placeholder="Ninguna" data-suggest="' + listId + '-o" autocomplete="off" aria-label="Observaciones"><datalist id="' + listId + '-o">' + optionsHtml(observationsFor(suggestion, row.d)) + "</datalist>" +
         '<div class="scm-inv-row-actions"><button type="button" class="scm-inv-icon" data-row-copy aria-label="Duplicar fila" title="Duplicar">⧉</button><button type="button" class="scm-inv-icon" data-row-remove aria-label="Quitar fila" title="Quitar">×</button></div>' +
         "</div>";
     }
@@ -641,7 +641,7 @@
         }).join("") +
         (hidden.length ? '<button type="button" class="scm-inv-add-space" data-space-open aria-expanded="' + spacePicker + '">+ Agregar espacio</button>' : "") + "</nav>" +
         (spacePicker ? spacePickerHtml(hidden) : "") +
-        '<datalist id="scm-inv-qty"><option value="Todo el inmueble"><option value="Nada"></datalist>' +
+        '<datalist id="scm-inv-qty">' + ["1", "2", "3", "4", "5", "6", "Todo el inmueble", "Todo el espacio", "Nada"].map(function (q) { return '<option value="' + q + '">'; }).join("") + "</datalist>" +
         (paneErrors.length ? '<div class="scm-inv-banner is-warn" role="alert"><span>Para guardar falta en este paso: ' + esc(paneErrors.map(function (e) { return e.text; }).join(", ")) + ".</span></div>" : "") +
         '<div class="scm-inv-pane">' + body + "</div>" +
         '<footer class="scm-inv-footer"><div class="scm-inv-status"><span class="scm-inv-progress">Paso ' + (index + 1) + " de " + list.length + '</span><span class="scm-inv-saved" data-draft-status></span>' +
@@ -862,7 +862,7 @@
     }
     function newRow(name, section) {
       var suggestion = section ? suggestionsFor(section) : null;
-      return { p: "1", d: name || "", c: suggestion && suggestion.quantities[name] ? suggestion.quantities[name] : "1", m: suggestion && suggestion.materials[name] && suggestion.materials[name][0] ? suggestion.materials[name][0] : "", e: "Bueno", o: "Ninguna" };
+      return { p: "1", d: name || "", c: suggestion && suggestion.quantities[name] ? suggestion.quantities[name] : "", m: suggestion && suggestion.materials[name] && suggestion.materials[name][0] ? suggestion.materials[name][0] : "", e: "Bueno", o: "" };
     }
 
     form.addEventListener("input", function (event) {
@@ -878,9 +878,16 @@
         var rows = rowsTarget(target);
         rows[Number(target.closest("[data-row]").dataset.row)][target.dataset.f] = target.value;
         if (target.dataset.f === "d") {
-          var obsList = target.closest("[data-row]").querySelector(".scm-inv-o + datalist");
+          var rowEl = target.closest("[data-row]");
           var obsSection = target.closest("[data-rows]") && target.closest("[data-rows]").dataset.rows.indexOf("sections:") === 0 ? currentSection() : null;
-          if (obsList && obsSection) obsList.innerHTML = optionsHtml(observationsFor(suggestionsFor(obsSection), target.value.trim()));
+          if (obsSection) {
+            var learnedRow = suggestionsFor(obsSection);
+            var name = target.value.trim();
+            var obsList = rowEl.querySelector(".scm-inv-o + datalist");
+            var matList = rowEl.querySelector(".scm-inv-m + datalist");
+            if (obsList) obsList.innerHTML = optionsHtml(observationsFor(learnedRow, name));
+            if (matList) matList.innerHTML = optionsHtml(learnedRow.materials[name] || []);
+          }
         }
       } else {
         return;
@@ -890,9 +897,80 @@
       changed();
     });
 
+    // Sugerencias de los campos de fila --------------------------------------
+    // Lista propia: al tocar el campo muestra todas las opciones (aunque ya tenga un valor) y filtra al escribir.
+    var suggest = null;
+    var picking = false;
+    function plain(value) {
+      return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    }
+    function suggestClose() {
+      if (suggest && suggest.box.parentNode) suggest.box.parentNode.removeChild(suggest.box);
+      if (suggest) suggest.input.setAttribute("aria-expanded", "false");
+      suggest = null;
+    }
+    function suggestOpen(input) {
+      suggestClose();
+      var list = document.getElementById(input.getAttribute("data-suggest") || "");
+      var all = list ? [].map.call(list.options, function (o) { return o.value; }).filter(Boolean) : [];
+      var query = plain(input.value);
+      var exact = all.some(function (v) { return plain(v) === query; });
+      var shown = !query || exact ? all : all.filter(function (v) { return plain(v).indexOf(query) !== -1; });
+      if (!shown.length || !input.offsetParent) return;
+      var box = document.createElement("div");
+      box.className = "scm-inv-suggest";
+      box.setAttribute("role", "listbox");
+      box.innerHTML = shown.slice(0, 12).map(function (v) {
+        return '<button type="button" role="option" tabindex="-1" data-suggest-pick class="' + (plain(v) === query ? "is-current" : "") + '">' + esc(v) + "</button>";
+      }).join("");
+      box.style.top = input.offsetTop + input.offsetHeight + 2 + "px";
+      box.style.left = input.offsetLeft + "px";
+      box.style.minWidth = Math.max(input.offsetWidth, 180) + "px";
+      box.style.maxWidth = Math.min(360, input.parentNode.clientWidth) + "px";
+      input.parentNode.appendChild(box);
+      // Que no se salga por la derecha (columna de cantidad en el celular).
+      var overflow = box.offsetLeft + box.offsetWidth - input.parentNode.clientWidth;
+      if (overflow > 0) box.style.left = Math.max(0, box.offsetLeft - overflow) + "px";
+      input.setAttribute("aria-expanded", "true");
+      suggest = { box: box, input: input, index: -1 };
+    }
+    // Al girar la tablet o cambiar el tamaño, la posición ya no sirve.
+    window.addEventListener("resize", function () { if (suggest) suggestClose(); });
+    function suggestPick(button) {
+      if (!suggest) return;
+      var input = suggest.input;
+      input.value = button.textContent;
+      suggestClose();
+      picking = true;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      picking = false;
+    }
+    function suggestMove(step) {
+      var items = suggest.box.querySelectorAll("[data-suggest-pick]");
+      suggest.index = (suggest.index + step + items.length) % items.length;
+      [].forEach.call(items, function (item, i) { item.classList.toggle("is-active", i === suggest.index); });
+      items[suggest.index].scrollIntoView({ block: "nearest" });
+    }
     form.addEventListener("focusin", function (event) {
       var target = event.target;
       if (target.classList && target.classList.contains("scm-inv-o") && target.value === "Ninguna") target.select();
+      if (target.hasAttribute && target.hasAttribute("data-suggest")) suggestOpen(target);
+    });
+    form.addEventListener("focusout", function (event) {
+      if (suggest && event.target === suggest.input) suggestClose();
+    });
+    form.addEventListener("input", function (event) {
+      if (event.target.hasAttribute && event.target.hasAttribute("data-suggest") && !picking && document.activeElement === event.target) suggestOpen(event.target);
+    });
+    form.addEventListener("click", function (event) {
+      if (event.target.hasAttribute && event.target.hasAttribute("data-suggest") && !suggest) suggestOpen(event.target);
+    });
+    // mousedown para que el campo no pierda el foco antes de elegir.
+    form.addEventListener("mousedown", function (event) {
+      var pick = event.target.closest && event.target.closest("[data-suggest-pick]");
+      if (!pick) return;
+      event.preventDefault();
+      suggestPick(pick);
     });
 
     form.addEventListener("change", function (event) {
@@ -1095,7 +1173,7 @@
       }
       if (button.hasAttribute("data-all-good")) { state.sections[section.key].rows.forEach(function (r) { r.e = "Bueno"; }); render(); changed(); return; }
       if (button.dataset.furnitureAdd) {
-        state.furniture[button.dataset.furnitureAdd].push({ d: "", c: "1", m: "", e: "Bueno", o: "Ninguna" });
+        state.furniture[button.dataset.furnitureAdd].push({ d: "", c: "", m: "", e: "Bueno", o: "" });
         render();
         changed();
         return;
@@ -1118,6 +1196,11 @@
 
     form.addEventListener("submit", function (event) { event.preventDefault(); });
     form.addEventListener("keydown", function (event) {
+      if (suggest && event.target === suggest.input) {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); suggestMove(event.key === "ArrowDown" ? 1 : -1); return; }
+        if (event.key === "Escape") { event.preventDefault(); suggestClose(); return; }
+        if (event.key === "Enter" && suggest.index >= 0) { event.preventDefault(); suggestPick(suggest.box.querySelectorAll("[data-suggest-pick]")[suggest.index]); return; }
+      }
       if (event.key === "Enter" && event.target.tagName === "INPUT") event.preventDefault();
     });
 

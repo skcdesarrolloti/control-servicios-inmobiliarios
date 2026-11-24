@@ -69,6 +69,11 @@ El estado viaja como un solo JSON: un inventario amoblado supera `max_input_vars
   y uniendo variantes con errores de digitación, pero no cantidades distintas). Se ofrecen como lista del campo Observaciones:
   no se llenan solas. Al entrar al campo con "Ninguna" queda seleccionado para escribir encima; escribir el elemento actualiza la lista.
   Un archivo de sugerencias anterior (sin `observations`) se recalcula solo.
+- Los campos de fila (elemento, cantidad, material, observaciones) usan una lista propia (`data-suggest` → `.scm-inv-suggest`),
+  no la del navegador: esa se filtraba por el valor ya escrito y, con "Madera" puesto, no mostraba nada. Al tocar el campo salen
+  todas las opciones (la actual con ✓), al escribir se filtran y se eligen con un toque o con flechas + Enter. Los materiales
+  también se agrupan sin variantes de tilde u ortografía. Una fila nueva trae cantidad solo si hay una aprendida y la observación
+  vacía (se guarda como "Ninguna").
 - Dictado: el micrófono lo permite `Permissions-Policy: microphone=(self)` en `public/.htaccess` (antes estaba en `()` y el
   navegador lo bloqueaba siempre). Requiere `MINIMAX_API_KEY` en el `.env` del servidor (la misma del asistente de crear caso). Con el plan de suscripción
   se usa `MiniMax-M3.1-Flash`; se cambia con `MINIMAX_INVENTORY_MODEL`. El navegador envía WAV porque MiniMax no acepta webm.

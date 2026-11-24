@@ -98,7 +98,7 @@ final class InventorySuggestions
         }
         $found = $data['m'] ?? [];
         arsort($found);
-        $materials[$name] = array_map('strval', array_slice(array_keys($found), 0, self::TOP_MATERIALS));
+        $materials[$name] = self::distinct(array_map('strval', array_keys($found)), self::TOP_MATERIALS);
         $quantity = $data['q'] ?? [];
         arsort($quantity);
         $quantities[$name] = (string) (array_key_first($quantity) ?? '');
