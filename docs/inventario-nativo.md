@@ -113,6 +113,11 @@ Pruebas: `php tests/inventory-public-check.php`, `php tests/inventory-flow-check
 - La descripción es un área de texto que crece: los inventarios anteriores traen listas de varias líneas y un input
   las juntaba en una sola al editar. El informe respeta esos saltos de línea (`white-space: pre-line`).
 - Las claves antiguas de JetForm `texto_cantidad_*`, `ninguna_*` y `estado_*_final_muebles` no se usan en ningún módulo.
+- "Agregar rápido" de muebles: `InventorySuggestions` aprende hasta 24 muebles por espacio de los últimos 150 inventarios
+  amoblados (de cualquier tipo). De cada línea de las listas antiguas toma el nombre corto: sin la cantidad inicial, sin
+  encabezados terminados en ":", hasta la primera cifra o "C/", "M/", "con", "marca"…, máximo tres palabras y sin colores ni
+  tamaños al final. Une plurales y tildes ("Ollas"/"Olla", "Sofa"/"Sofá") y solo sugiere lo que aparece al menos dos veces.
+  El botón agrega la fila con cantidad vacía. El bloque también tiene "Todo en Bueno".
 
 ## Diseño adaptable
 

@@ -24,7 +24,7 @@ const config = {
     boundaries: [{ key: 'inmueble_lin', label: 'Inmueble', suffix: 'inmueble', sides: ['norte', 'sur'], multiple: false, when: '', required: true }, { key: 'parqueadero_lin', label: 'Parqueadero', suffix: 'parqueadero', sides: ['norte'], multiple: true, when: 'tiene_parqueadero', required: false }],
     profiles: { '': residential, Apartamento: residential, Local: { ...residential, key: 'local', labels: { sala: 'Sala' }, order: ['elementos_principales', 'sala', 'banos', 'garaje', 'elementos_electricos', 'bodega', 'otros'], max_rooms: 0 } },
     types: ['Nuevo', 'Anterior'], categories: ['No amoblado', 'Amoblado'], states: ['Bueno', 'Regular', 'Malo'], parking: ['Asignado', 'Privado'], services: ['Agua', 'Gas', 'Energia'], agreements: { Propietario: 'acuerdos_precontractuales_pro' },
-    suggestions: { sala: { items: ['Ventanas'], materials: { Ventanas: ['Aluminio', 'PVC'] }, quantities: { Ventanas: '3' }, observations: { Ventanas: ['Vidrio rayado', 'Sin seguro'], Puerta: ['Con tope'] } } },
+    suggestions: { sala: { items: ['Ventanas'], materials: { Ventanas: ['Aluminio', 'PVC'] }, quantities: { Ventanas: '3' }, observations: { Ventanas: ['Vidrio rayado', 'Sin seguro'], Puerta: ['Con tope'] }, furniture: ['Sofá', 'Mesa de centro'] } },
   },
   previous: [], billing: { base: 76456, transporte: 8000 }, voice: false,
 };
@@ -209,6 +209,14 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     assert.ok(!(await chips()).includes('Muebles y enseres'), 'No separate furniture tab');
     await go('Sala, comedor');
     assert.equal(await page.textContent('.scm-inv-furniture h4'), 'Muebles y enseres 0', 'Furniture block inside the space tab');
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('[data-furniture-item]')].map(b => b.textContent)), ['Sofá', 'Mesa de centro'], 'Learned furniture chips for the space');
+    await page.locator('[data-furniture-item="Mesa de centro"]').click();
+    assert.equal(await page.inputValue('[data-rows="furniture:sala"] [data-f="d"]'), 'Mesa de centro', 'Chip adds the furniture row');
+    assert.equal(await page.locator('[data-furniture-item="Mesa de centro"]').count(), 0, 'A used furniture chip leaves the list');
+    await page.locator('[data-rows="furniture:sala"] [data-state="Malo"]').click();
+    await page.locator('[data-furniture-all-good="sala"]').click();
+    assert.equal(await page.getAttribute('[data-rows="furniture:sala"] [data-state="Bueno"]', 'class'), 'is-on is-bueno', 'Todo en Bueno for furniture');
+    await page.locator('[data-rows="furniture:sala"] [data-row-remove]').click();
     await page.locator('[data-furniture-add="sala"]').click();
     await page.locator('[data-rows="furniture:sala"] [data-f="d"]').fill('Sofá');
     assert.equal(await page.evaluate(() => document.querySelector('[data-rows="furniture:sala"] [data-f="d"]').tagName), 'TEXTAREA', 'Furniture description allows several lines');

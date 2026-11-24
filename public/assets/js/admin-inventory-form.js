@@ -186,12 +186,12 @@
       return section.group === "general" ? section.key : section.group;
     }
     function suggestionsFor(section) {
-      var learned = catalog.suggestions[bucketOf(section)] || { items: [], materials: {}, quantities: {}, observations: {} };
+      var learned = catalog.suggestions[bucketOf(section)] || { items: [], materials: {}, quantities: {}, observations: {}, furniture: [] };
       var names = [];
       learned.items.concat(section.glossary).forEach(function (name) {
         if (names.indexOf(name) === -1) names.push(name);
       });
-      return { names: names, materials: learned.materials || {}, quantities: learned.quantities || {}, observations: learned.observations || {} };
+      return { names: names, materials: learned.materials || {}, quantities: learned.quantities || {}, observations: learned.observations || {}, furniture: learned.furniture || [] };
     }
 
     // Campos ---------------------------------------------------------------
@@ -581,10 +581,18 @@
     // Amoblado: muebles y enseres del mismo espacio, debajo de sus elementos.
     function furnitureBlock(section) {
       var rows = state.furniture[section.key];
+      // Muebles que más se registran en este espacio y que aún no están en la lista.
+      var used = rows.map(function (r) { return plain(String(r.d || "").split("\n")[0]); });
+      var pending = suggestionsFor(section).furniture.filter(function (n) {
+        var key = plain(n);
+        return !used.some(function (u) { return u === key || u.indexOf(key + " ") === 0; });
+      });
       return '<div class="scm-inv-card scm-inv-furniture">' +
         '<div class="scm-inv-card-head"><h4>Muebles y enseres <small>' + rows.length + "</small></h4></div>" +
         '<p class="scm-inv-hint">Un mueble o enser por fila. En la descripción incluye lo que lo identifica: marca, color, material o tamaño (ej.: «Nevera Mabe 2 puertas gris», «Cucharas metálicas»).</p>' +
-        '<div class="scm-inv-tools"><button type="button" class="scm-inv-tool" data-furniture-add="' + esc(section.key) + '">+ Mueble o enser</button>' + voiceButton("furniture:" + section.key) + "</div>" +
+        '<div class="scm-inv-tools"><button type="button" class="scm-inv-tool" data-furniture-add="' + esc(section.key) + '">+ Mueble o enser</button>' + voiceButton("furniture:" + section.key) +
+        (rows.length ? '<button type="button" class="scm-inv-tool" data-furniture-all-good="' + esc(section.key) + '">Todo en Bueno</button>' : "") + "</div>" +
+        (pending.length ? '<div class="scm-inv-chips"><span>Agregar rápido:</span>' + pending.map(function (n) { return '<button type="button" data-furniture-item="' + esc(n) + '" data-furniture-key="' + esc(section.key) + '">' + esc(n) + "</button>"; }).join("") + "</div>" : "") +
         voicePanel("furniture:" + section.key) +
         (rows.length ? '<div class="scm-inv-head"><span>Mueble o enser</span><span>Cant.</span><span>Estado</span><span>Observaciones</span><span></span></div>' : "") +
         rowsBlock("furniture", section.key, rows, false, null) + "</div>";
@@ -1228,6 +1236,18 @@
         return;
       }
       if (button.hasAttribute("data-all-good")) { state.sections[section.key].rows.forEach(function (r) { r.e = "Bueno"; }); render(); changed(); return; }
+      if (button.dataset.furnitureItem) {
+        state.furniture[button.dataset.furnitureKey].push({ d: button.dataset.furnitureItem, c: "", m: "", e: "Bueno", o: "" });
+        render();
+        changed();
+        return;
+      }
+      if (button.dataset.furnitureAllGood) {
+        state.furniture[button.dataset.furnitureAllGood].forEach(function (r) { r.e = "Bueno"; });
+        render();
+        changed();
+        return;
+      }
       if (button.dataset.furnitureAdd) {
         state.furniture[button.dataset.furnitureAdd].push({ d: "", c: "", m: "", e: "Bueno", o: "" });
         render();

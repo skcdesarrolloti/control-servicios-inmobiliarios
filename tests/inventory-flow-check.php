@@ -193,6 +193,17 @@ $assert($learnedNotes['sala']['observations']['Puerta'] === ['Con tope'], 'Obser
 $assert(!isset($learnedNotes['sala']['observations']['Pisos']), 'No sugiere "Ninguna" ni "N/A".');
 $learnedSimilar = InventorySuggestions::aggregate(array_map(static fn(string $note): array => ['sala' => serialize([['descripcion_sala' => 'Sanitario', 'observaciones_sala' => $note]])],
   ['Funcionando y probado', 'Funcionando y probado', 'Funcionando y probado', 'Funcionando y porbado', 'Funcionando y porbado', 'Con 1 rejilla', 'Con 1 rejilla', 'Con 2 rejillas', 'Con 2 rejillas']), InventorySchema::sections());
+$learnedFurniture = InventorySuggestions::aggregate([], InventorySchema::sections(), [
+  ['cocina_o_cafeteria_muebles' => serialize([['descripcion_cocina_o_cafeteria_muebles' => "En el mueble de arriba hay:
+1 - Nevera M/Mabe de 2 puertas C/dispensador
+2 - Ollas grandes con tapa
+1 - Licuadora marca Samurai"]])],
+  ['cocina_o_cafeteria_muebles' => serialize([['descripcion_cocina_o_cafeteria_muebles' => "1 - Nevera de 2 puertas gris
+1 - Olla azul
+4 - Juego de 3 vasos"]])],
+]);
+$assert($learnedFurniture['cocina_o_cafeteria']['furniture'] === ['Nevera', 'Olla'], 'Muebles aprendidos de las listas, sin marca, color ni encabezados: ' . json_encode($learnedFurniture['cocina_o_cafeteria']['furniture']));
+$assert($learned['sala']['furniture'] === [], 'Sin inventarios amoblados no hay muebles sugeridos.');
 $assert($learnedSimilar['sala']['observations']['Sanitario'] === ['Funcionando y probado', 'Con 1 rejilla', 'Con 2 rejillas'], 'Une variantes con errores pero no cantidades distintas.');
 
 // Borrador: una fila, conflicto entre dispositivos y sin escritura si no cambió.
