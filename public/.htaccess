@@ -9,7 +9,8 @@ DirectoryIndex index.php
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "SAMEORIGIN"
   Header always set Referrer-Policy "no-referrer"
-  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+  # Micrófono solo para este sitio: lo usa el dictado del inventario (admin-inventory-form.js).
+  Header always set Permissions-Policy "camera=(), microphone=(self), geolocation=(self)"
 </IfModule>
 
 <IfModule mod_rewrite.c>

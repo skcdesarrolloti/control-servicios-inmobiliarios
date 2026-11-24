@@ -89,7 +89,9 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
 
     // Condicionales y secciones según la cantidad y el tipo de inmueble.
     assert.equal(await page.isVisible('select[data-b="tipo_parqueadero"]'), false);
-    await page.selectOption('select[data-b="tiene_parqueadero"]', 'Si');
+    const pick = (key, value) => page.locator('[data-choice="' + key + '"][data-value="' + value + '"]').click();
+    await pick('tiene_parqueadero', 'Si');
+    assert.equal(await page.getAttribute('[data-choice="tiene_parqueadero"][data-value="Si"]', 'aria-checked'), 'true', 'Yes/No is a toggle');
     assert.equal(await page.isVisible('select[data-b="tipo_parqueadero"]'), true, 'Parking fields appear');
     await page.selectOption('select[data-b="tipo_parqueadero"]', 'Privado');
     await page.fill('input[data-b="parqueaderos"]', '1');
@@ -101,7 +103,22 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     let names = await chips();
     assert.deepEqual(names, ['Datos', 'Linderos', 'Elementos principales', 'Sala', 'Baño 1 · Principal', 'Garaje', 'Elementos eléctricos', 'Bodega', 'Otros', 'Cierre'], 'Local sections');
     assert.equal(await page.locator('select[data-b="cantidad_habitaciones"]').count(), 0, 'A local has no rooms');
-    assert.equal(await page.locator('[data-extra-section] option', { hasText: 'Baño de emergencia' }).count(), 1, 'Hidden section can be added back');
+    // Agregar espacios desde cualquier paso, varios a la vez, y quitarlos si sobran.
+    await go('Sala');
+    await page.locator('[data-space-open]').click();
+    assert.equal(await page.locator('[data-space-pick][value="bano_emergencia"]').count(), 1, 'Hidden section can be added back');
+    assert.equal(await page.isDisabled('[data-space-add]'), true, 'Nothing picked, nothing to add');
+    await page.locator('[data-space-pick][value="bano_emergencia"]').check();
+    await page.locator('[data-space-pick][value="balcon"]').check();
+    assert.equal(await page.textContent('[data-space-add]'), 'Agregar 2 espacios');
+    await page.locator('[data-space-add]').click();
+    names = await chips();
+    assert.ok(names.includes('Baño de emergencia') && names.includes('Balcón'), 'Several spaces added at once: ' + names.join(' | '));
+    assert.equal(await page.locator('[data-pane].is-active').textContent(), 'Balcón', 'Opens the first added space in tab order');
+    await go('Baño de emergencia');
+    await page.locator('[data-space-remove="bano_emergencia"]').click();
+    assert.ok(!(await chips()).includes('Baño de emergencia'), 'An empty added space can be removed');
+    await go('Datos');
     await page.selectOption('select[data-b="tipo_de_inmueble"]', 'Apartamento');
 
     // Dos pisos: habitaciones por piso y piso por fila en las áreas comunes.
@@ -139,6 +156,9 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     assert.ok((await chips()).some(c => c.startsWith('Elementos eléctricos') && c.endsWith('1')), 'Counted in the electrical chip');
     await go('Sala, comedor');
     await page.locator('[data-rows="sections:sala"] [data-row="1"] [data-row-remove]').click();
+    await page.locator('[data-undo]').click();
+    assert.equal(await page.locator('[data-rows="sections:sala"] [data-row]').count(), 2, 'Undo brings the row back');
+    await page.locator('[data-rows="sections:sala"] [data-row="1"] [data-row-remove]').click();
 
     // Copiar filas entre secciones.
     await go('Habitación 1');
@@ -148,7 +168,7 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
 
     // Amoblado: muebles y cobro doble.
     await go('Datos');
-    await page.selectOption('select[data-b="categoria_inventario"]', 'Amoblado');
+    await pick('categoria_inventario', 'Amoblado');
     assert.ok((await chips()).includes('Muebles y enseres'));
     await go('Muebles y enseres');
     await page.locator('.scm-inv-furniture summary', { hasText: 'Sala, comedor' }).click();
@@ -158,16 +178,19 @@ const formHtml = cfg => '<div class="scm-acta scm-inventory-review"><form data-i
     await go('Cierre');
     let billing = await page.textContent('.scm-inv-billing');
     assert.ok(billing.includes('152.912') && billing.includes('160.912') && billing.includes('doble'), 'Double service: ' + billing);
-    await page.selectOption('select[data-b="con_transporte"]', 'No');
+    await pick('con_transporte', 'No');
     billing = await page.textContent('.scm-inv-billing');
     assert.ok(/Total del reporte\s*\$\s*152\.912/.test(billing), 'Without transport: ' + billing);
     if (shots) await page.screenshot({ path: path.join(shots, 'inv-3-cierre.png'), fullPage: true });
 
     // Validación antes de enviar y envío como un solo JSON.
     await page.locator('[data-save]').click();
-    assert.ok((await page.textContent('[data-corrective-review-message]')).includes('tiene delegado'), 'Reports the missing answer');
+    assert.ok((await page.textContent('[data-corrective-review-message]')).includes('si recibe un delegado'), 'Reports the missing answer');
     assert.equal(await page.locator('[data-pane].is-active').textContent(), 'Datos', 'Goes to the pane with the error');
-    await page.selectOption('select[data-b="tiene_delegado"]', 'No');
+    assert.equal(await page.locator('.scm-inv-field.is-missing [data-choice="tiene_delegado"]').count(), 2, 'Marks the missing field');
+    assert.ok((await page.getAttribute('[data-pane="datos"]', 'class')).includes('has-error'), 'Marks the step with errors');
+    await pick('tiene_delegado', 'No');
+    assert.equal(await page.locator('.is-missing').count(), 0, 'The mark clears once answered');
     await go('Cierre');
     await page.locator('[data-save]').click();
     await page.locator('text=Guardado').waitFor();

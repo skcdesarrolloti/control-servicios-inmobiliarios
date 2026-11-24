@@ -51,8 +51,13 @@ El estado viaja como un solo JSON: un inventario amoblado supera `max_input_vars
   - Local: elementos principales, sala, cocina, baños, garaje, eléctricos y bodega.
   - Oficina: elementos principales, sala, cocina, baños, garaje y eléctricos.
   - Bodega: lo mismo de la oficina, más la sección Oficina.
-  Garaje y depósito aparecen cuando el paso Datos dice que tiene parqueadero o depósito. Cualquier otra sección se puede
-  agregar a mano y se muestra siempre si ya tiene filas.
+  Garaje y depósito aparecen cuando el paso Datos dice que tiene parqueadero o depósito. Cualquier otra sección se agrega con
+  **+ Agregar espacio** (al final de las pestañas, en cualquier paso, varias a la vez) y se puede quitar si sobra; se muestra
+  siempre si ya tiene filas.
+- Usabilidad: preguntas cortas (Sí/No, tipo, categoría, transporte) como botones; cada Sí/No agrupa los campos que dependen de
+  él; indicador "Paso X de N"; al intentar guardar se marcan en rojo los campos y pestañas que faltan y se desmarcan al
+  completarlos; quitar una fila se puede deshacer. En el documento el estado sale con color (Bueno verde, Regular amarillo,
+  Malo rojo).
 - Pisos: con varios pisos se indica cuántas habitaciones y baños hay en cada piso. Cada uno guarda su piso (`piso_habitacion_*`,
   `piso_bano_*`) y su tipo (`tipos_espacios`, JSON). En las áreas comunes cada fila guarda su piso (`piso_<sufijo>` dentro de la fila).
 - Eléctricos: lo que se registra como eléctrico en cualquier sección (tomas, interruptores, lámparas, apliques…, comparado
@@ -60,7 +65,8 @@ El estado viaja como un solo JSON: un inventario amoblado supera `max_input_vars
   copias llevan `origen_electricos` en la fila y se recalculan en cada edición; a mano solo se agrega lo que no está en ninguna
   sección (contador, caja de fusibles).
 - Sugerencias: glosarios más lo aprendido de los últimos 150 inventarios Nuevo (`storage/data/inventory-suggestions.json`, semanal).
-- Dictado: requiere `MINIMAX_API_KEY` en el `.env` del servidor (la misma del asistente de crear caso). Con el plan de suscripción
+- Dictado: el micrófono lo permite `Permissions-Policy: microphone=(self)` en `public/.htaccess` (antes estaba en `()` y el
+  navegador lo bloqueaba siempre). Requiere `MINIMAX_API_KEY` en el `.env` del servidor (la misma del asistente de crear caso). Con el plan de suscripción
   se usa `MiniMax-M3.1-Flash`; se cambia con `MINIMAX_INVENTORY_MODEL`. El navegador envía WAV porque MiniMax no acepta webm.
   El audio no se guarda y cada fila propuesta se acepta a mano. Si falla la transcripción, ofrece el dictado del navegador.
 

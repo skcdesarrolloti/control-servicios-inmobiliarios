@@ -38,6 +38,13 @@
     var localKey = ["scm", "inventario", (document.querySelector("[data-scm-draft-user]") || { dataset: {} }).dataset.scmDraftUser || "", ticket, config.inventoryId || "nuevo"].join(":");
     var draft = { ready: false, blocked: false, revision: 0, last: "", timer: 0, saving: false, stopped: false };
     var voice = { target: "", mode: "", text: "", rows: [], message: "", dictation: false, recorder: null, stream: null, recognition: null, timer: 0, heard: "" };
+    // Usabilidad: selector de espacios, fila quitada que se puede recuperar y errores que se marcan en vivo
+    // después del primer intento de guardar.
+    var spacePicker = false;
+    var undo = null;
+    var showErrors = false;
+    var missing = {};
+    var errorPanes = {};
 
     function normalize() {
       state.data = state.data || {};
@@ -189,9 +196,12 @@
     }
 
     // Campos ---------------------------------------------------------------
+    function miss(key) {
+      return missing[key] ? " is-missing" : "";
+    }
     function input(label, key, options) {
       options = options || {};
-      return '<label class="scm-inv-field' + (options.wide ? " is-wide" : "") + '"><span>' + esc(label) + (options.required ? " *" : "") + "</span>" +
+      return '<label class="scm-inv-field' + (options.wide ? " is-wide" : "") + miss(key) + '"><span>' + esc(label) + (options.required ? " *" : "") + "</span>" +
         '<input type="' + (options.type || "text") + '" data-b="' + esc(key) + '" value="' + esc(d(key)) + '"' + (options.placeholder ? ' placeholder="' + esc(options.placeholder) + '"' : "") + "></label>";
     }
     function select(label, key, values, options) {
@@ -199,13 +209,31 @@
       var current = d(key);
       var list = values.slice();
       if (current !== "" && list.indexOf(current) === -1) list.unshift(current);
-      return '<label class="scm-inv-field"><span>' + esc(label) + (options.required ? " *" : "") + "</span>" +
+      return '<label class="scm-inv-field' + miss(key) + '"><span>' + esc(label) + (options.required ? " *" : "") + "</span>" +
         '<select data-b="' + esc(key) + '"' + (options.rerender ? " data-rerender" : "") + "><option value=\"\">Elige una opción</option>" +
         list.map(function (value) {
           var text = typeof value === "object" ? value.label : value;
           var val = typeof value === "object" ? value.value : value;
           return '<option value="' + esc(val) + '"' + (String(val) === String(current) ? " selected" : "") + ">" + esc(text) + "</option>";
         }).join("") + "</select></label>";
+    }
+    // Opciones cortas (Sí/No, Nuevo/Anterior…) como botones: un toque en lugar de abrir una lista.
+    function choice(label, key, values, options) {
+      options = options || {};
+      var current = d(key);
+      return '<div class="scm-inv-field' + miss(key) + '"><span>' + esc(label) + (options.required ? " *" : "") + "</span>" +
+        '<div class="scm-inv-choice" role="radiogroup" aria-label="' + esc(label) + '">' + values.map(function (value) {
+          var val = Array.isArray(value) ? value[0] : value;
+          var text = Array.isArray(value) ? value[1] : value;
+          var on = String(current) === String(val);
+          return '<button type="button" role="radio" aria-checked="' + on + '" class="' + (on ? "is-on" : "") + '" data-choice="' + esc(key) + '" data-value="' + esc(val) + '">' + esc(text) + "</button>";
+        }).join("") + "</div></div>";
+    }
+    var YES_NO = [["Si", "Sí"], ["No", "No"]];
+    // Bloque que agrupa una pregunta Sí/No con los campos que dependen de ella.
+    function toggleBlock(label, key, fields) {
+      return '<div class="scm-inv-sub' + (isYes(key) ? " is-open" : "") + '">' + choice(label, key, YES_NO, { required: true }) +
+        (isYes(key) && fields ? '<div class="scm-inv-grid">' + fields + "</div>" : "") + "</div>";
     }
     function range(from, to) {
       var out = [];
@@ -228,28 +256,35 @@
           config.previous.map(function (item) { return '<option value="' + esc(item.id) + '">' + esc(item.label) + "</option>"; }).join("") +
           '</select></label><button type="button" class="scm-acta-button scm-acta-secondary" data-load-previous>Cargar elementos</button></div>';
       }
-      html += '<div class="scm-inv-card"><h4>Inventario</h4><div class="scm-inv-grid">' +
-        select("Tipo de inventario", "tipo_inventario", config.receipt ? ["Anterior"] : catalog.types, { required: true, rerender: true }) +
-        select("Categoría", "categoria_inventario", catalog.categories, { required: true, rerender: true }) +
-        input("Registro fotográfico (enlace)", "registro_fotografico", { required: !config.editing, wide: true, placeholder: "https://drive.google.com/..." }) +
+      html += '<div class="scm-inv-card"><h4>Inventario</h4><div class="scm-inv-inline">' +
+        choice("Tipo de inventario", "tipo_inventario", config.receipt ? ["Anterior"] : catalog.types, { required: true }) +
+        choice("Categoría", "categoria_inventario", catalog.categories, { required: true }) +
+        '</div><div class="scm-inv-grid">' +
+        input("Registro fotográfico (enlace de Drive)", "registro_fotografico", { required: !config.editing, wide: true, placeholder: "https://drive.google.com/..." }) +
         "</div></div>";
       html += '<div class="scm-inv-card"><h4>Inmueble</h4><div class="scm-inv-grid">' +
-        input("Contrato", "contrato", { required: true }) + input("Inmueble", "inmueble", { required: true }) + input("Dirección física", "direccion", { required: true, wide: true }) +
+        input("Contrato", "contrato", { required: true }) + input("Inmueble (código SIMI)", "inmueble", { required: true }) +
         select("Tipo de inmueble", "tipo_de_inmueble", Object.keys(catalog.profiles).filter(Boolean), { rerender: true }) +
+        input("Dirección física", "direccion", { required: true, wide: true }) +
         input("Tipo de negocio", "tipo_negocio") + input("Destinación", "destinacion") +
+        "</div></div>";
+      html += '<div class="scm-inv-card"><h4>Distribución</h4><p class="scm-inv-hint">Cada habitación y cada baño tiene su propia pestaña.</p><div class="scm-inv-grid">' +
         select("Cantidad de pisos", "cantidad_pisos", range(1, 10), { rerender: true }) +
         roomCountFields("habitacion", p.rooms_label, p.max_rooms) +
         roomCountFields("bano", p.baths_label, p.max_baths) +
-        select("¿Tiene parqueadero?", "tiene_parqueadero", ["Si", "No"], { required: true, rerender: true }) +
-        (isYes("tiene_parqueadero") ? select("Tipo de parqueadero", "tipo_parqueadero", catalog.parking, { required: true }) + input("Cantidad", "parqueaderos", { required: true }) + input("# Parqueadero", "numero_parqueadero", { required: true, placeholder: "Separa con coma si son varios" }) : "") +
-        select("¿Tiene depósito?", "tiene_deposito", ["Si", "No"], { required: true, rerender: true }) +
-        (isYes("tiene_deposito") ? input("Depósitos", "depositos", { required: true }) : "") +
+        "</div></div>";
+      html += '<div class="scm-inv-card"><h4>Parqueadero y depósito</h4><div class="scm-inv-split">' +
+        toggleBlock("¿Tiene parqueadero?", "tiene_parqueadero",
+          select("Tipo de parqueadero", "tipo_parqueadero", catalog.parking, { required: true }) + input("Cantidad", "parqueaderos", { required: true, type: "number" }) +
+          input("Número(s)", "numero_parqueadero", { required: true, placeholder: "Ej: 12, 13" })) +
+        toggleBlock("¿Tiene depósito?", "tiene_deposito", input("Cantidad de depósitos", "depositos", { required: true, type: "number" })) +
         "</div></div>";
       html += '<div class="scm-inv-card"><h4>Quien recibe</h4><div class="scm-inv-grid">' +
         input("Arrendatario", "arrendatario", { required: true }) + input("Documento", "cedula_arrendatario") + input("Correo", "correo_arrendatario", { required: true, type: "email" }) + input("Celular", "celular_arrendatario", { required: true, type: "tel" }) +
-        select("¿Tiene delegado?", "tiene_delegado", ["Si", "No"], { required: true, rerender: true }) +
-        (isYes("tiene_delegado") ? input("Delegado", "delegado", { required: true }) + input("Documento del delegado", "cedula_delegado") + input("Correo del delegado", "correo_delegado", { required: true, type: "email" }) + input("Celular del delegado", "celular_delegado", { required: true, type: "tel" }) : "") +
-        "</div></div>";
+        "</div>" +
+        toggleBlock("¿Recibe un delegado?", "tiene_delegado",
+          input("Delegado", "delegado", { required: true }) + input("Documento del delegado", "cedula_delegado") + input("Correo del delegado", "correo_delegado", { required: true, type: "email" }) + input("Celular del delegado", "celular_delegado", { required: true, type: "tel" })) +
+        "</div>";
       return html;
     }
 
@@ -358,7 +393,10 @@
       recognition.onresult = function (event) {
         for (var i = event.resultIndex; i < event.results.length; i++) voice.heard += " " + event.results[i][0].transcript;
       };
-      recognition.onerror = function () { voiceSet("error", "No se pudo usar el dictado. Revisa el permiso del micrófono."); };
+      recognition.onerror = function (event) {
+        var code = event && event.error;
+        voiceSet("error", microphoneError({ name: code === "not-allowed" || code === "service-not-allowed" ? "NotAllowedError" : code === "audio-capture" ? "NotFoundError" : "" }));
+      };
       recognition.onend = function () {
         if (voice.mode !== "recording") return;
         voice.recognition = null;
@@ -392,7 +430,16 @@
         recorder.start();
         voice.timer = window.setTimeout(function () { if (recorder.state === "recording") recorder.stop(); }, 120000);
         voiceSet("recording");
-      }).catch(function () { voiceSet("error", "No se pudo usar el micrófono. Revisa el permiso del navegador."); });
+      }).catch(function (error) { voiceSet("error", microphoneError(error)); });
+    }
+    // Mensaje según la causa real para que el funcionario sepa qué hacer.
+    function microphoneError(error) {
+      var name = error && error.name;
+      if (!window.isSecureContext) return "El dictado necesita abrir el panel con https.";
+      if (name === "NotAllowedError" || name === "SecurityError") return "El navegador bloqueó el micrófono. Toca el candado junto a la dirección de la página, permite el micrófono y vuelve a tocar Dictar.";
+      if (name === "NotFoundError" || name === "OverconstrainedError") return "No se encontró un micrófono en este equipo. Conecta uno o registra las filas a mano.";
+      if (name === "NotReadableError" || name === "AbortError") return "Otra aplicación está usando el micrófono. Ciérrala y vuelve a tocar Dictar.";
+      return "No se pudo usar el micrófono. Revisa el permiso del navegador.";
     }
     // MiniMax no acepta el webm que graban los navegadores: se envía WAV mono de 16 kHz.
     function toWav(blob) {
@@ -443,6 +490,9 @@
         rows.map(function (row, index) { return rowHtml(kind, key, row, index, material, section); }).join("") + "</div>";
     }
 
+    function isOptionalSpace(section) {
+      return section.group === "general" && extraSections.indexOf(section.key) !== -1 && profile().order.indexOf(section.key) === -1;
+    }
     function paneSection(section) {
       var entry = state.sections[section.key];
       var suggestion = suggestionsFor(section);
@@ -450,7 +500,8 @@
       var pending = suggestion.names.filter(function (n) { return used.indexOf(n) === -1; });
       var multiFloor = Number(d("cantidad_pisos")) > 1;
       var others = visibleSections().filter(function (s) { return s.key !== section.key && state.sections[s.key].rows.length; });
-      var html = '<div class="scm-inv-card"><h4>' + esc(sectionLabel(section)) + '</h4>';
+      var html = '<div class="scm-inv-card"><div class="scm-inv-card-head"><h4>' + esc(sectionLabel(section)) + "</h4>" +
+        (isOptionalSpace(section) ? '<button type="button" class="scm-inv-link is-danger" data-space-remove="' + esc(section.key) + '">Quitar este espacio</button>' : "") + "</div>";
       if (section.group !== "general") {
         var types = section.group === "habitacion" ? catalog.roomTypes : catalog.bathTypes;
         html += '<div class="scm-inv-grid"><label class="scm-inv-field"><span>Tipo</span><select data-room-type="' + esc(section.key) + '">' +
@@ -464,10 +515,10 @@
         '<button type="button" class="scm-inv-tool" data-row-add>+ Fila</button>' +
         voiceButton("sections:" + section.key) +
         (entry.rows.length ? '<button type="button" class="scm-inv-tool" data-all-good>Todo en Bueno</button>' : "") +
-        (others.length ? '<label class="scm-inv-copy"><span>Copiar de</span><select data-copy-from><option value=""></option>' + others.map(function (s) { return '<option value="' + esc(s.key) + '">' + esc(sectionLabel(s)) + "</option>"; }).join("") + "</select></label>" : "") +
+        (others.length ? '<label class="scm-inv-copy"><span>Copiar elementos de</span><select data-copy-from><option value="">Elige un espacio</option>' + others.map(function (s) { return '<option value="' + esc(s.key) + '">' + esc(sectionLabel(s)) + "</option>"; }).join("") + "</select></label>" : "") +
         "</div>";
       if (pending.length) {
-        html += '<div class="scm-inv-chips"><span>Agregar:</span>' + pending.slice(0, 40).map(function (n) { return '<button type="button" data-add-item="' + esc(n) + '">' + esc(n) + "</button>"; }).join("") +
+        html += '<div class="scm-inv-chips"><span>Agregar rápido:</span>' + pending.slice(0, 40).map(function (n) { return '<button type="button" data-add-item="' + esc(n) + '">' + esc(n) + "</button>"; }).join("") +
           '<button type="button" class="is-all" data-add-all>Agregar todos</button></div>';
       }
       html += voicePanel("sections:" + section.key);
@@ -483,7 +534,7 @@
       if (entry.rows.length) {
         html += '<div class="scm-inv-head' + (section.group === "general" && multiFloor ? " has-floor" : "") + '">' + (section.group === "general" && multiFloor ? "<span>Piso</span>" : "") + '<span>Elemento</span><span>Cant.</span><span>Material</span><span>Estado</span><span>Observaciones</span><span></span></div>';
       } else {
-        html += '<p class="scm-inv-hint">Toca los elementos de arriba para registrarlos o carga «Copiar de» otra sección.</p>';
+        html += '<p class="scm-inv-hint">Aún no hay elementos. Toca los sugeridos de arriba, usa «+ Fila» o copia los de otro espacio.</p>';
       }
       html += rowsBlock("sections", section.key, entry.rows, true, section) + "</div>";
       return html;
@@ -526,7 +577,7 @@
       var service = config.billing.base * (double ? 2 : 1);
       var transport = isYes("con_transporte") ? config.billing.transporte : 0;
       return '<div class="scm-inv-card scm-inv-billing"><h4>Reporte administrativo</h4><div class="scm-inv-grid">' +
-        select("¿Cobrar transporte?", "con_transporte", ["Si", "No"], { rerender: true }) + "</div>" +
+        choice("¿Cobrar transporte?", "con_transporte", YES_NO) + "</div>" +
         '<ul><li><span>Servicio' + (double ? " (doble: " + (isFurnished() ? "amoblado" : "2 pisos o más") + ")" : "") + "</span><strong>" + money(service) + "</strong></li>" +
         "<li><span>Transporte</span><strong>" + money(transport) + "</strong></li>" +
         '<li class="is-total"><span>Total del reporte</span><strong>' + money(service + transport) + "</strong></li></ul>" +
@@ -535,25 +586,32 @@
 
     function render() {
       syncRooms();
+      refreshErrors();
       var list = panes();
       if (!list.some(function (p) { return p.id === paneId; })) paneId = "datos";
       var index = list.findIndex(function (p) { return p.id === paneId; });
       var pane = list[index];
       var body = pane.id === "datos" ? paneData() : pane.id === "linderos" ? paneBoundaries() : pane.id === "muebles" ? paneFurniture() : pane.id === "cierre" ? paneClosing() : paneSection(pane.section);
-      var hidden = pane.section ? [] : hiddenGeneralSections();
+      var hidden = hiddenGeneralSections();
+      if (!hidden.length) spacePicker = false;
       var keepScroll = root.querySelector("[data-pane-nav]");
       var scrollLeft = keepScroll ? keepScroll.scrollLeft : 0;
+      var paneErrors = showErrors ? validate().filter(function (e) { return e.pane === pane.id; }) : [];
       root.innerHTML =
         '<div data-draft-banner></div>' +
-        '<nav class="scm-inv-nav" data-pane-nav>' + list.map(function (p) {
-          return '<button type="button" data-pane="' + esc(p.id) + '" class="' + (p.id === paneId ? "is-active " : "") + (p.count ? "is-done" : "") + '">' + esc(p.label) + (p.count ? " <small>" + p.count + "</small>" : "") + "</button>";
-        }).join("") + "</nav>" +
+        '<nav class="scm-inv-nav" data-pane-nav aria-label="Pasos del inventario">' + list.map(function (p, position) {
+          var cls = (p.id === paneId ? "is-active " : "") + (p.count ? "is-done " : "") + (errorPanes[p.id] ? "has-error" : "");
+          return '<button type="button" data-pane="' + esc(p.id) + '" class="' + cls.trim() + '"' + (p.id === paneId ? ' aria-current="step"' : "") + ' title="Paso ' + (position + 1) + " de " + list.length + '">' + esc(p.label) + (p.count ? " <small>" + p.count + "</small>" : "") + "</button>";
+        }).join("") +
+        (hidden.length ? '<button type="button" class="scm-inv-add-space" data-space-open aria-expanded="' + spacePicker + '">+ Agregar espacio</button>' : "") + "</nav>" +
+        (spacePicker ? spacePickerHtml(hidden) : "") +
         '<datalist id="scm-inv-qty"><option value="Todo el inmueble"><option value="Nada"></datalist>' +
+        (paneErrors.length ? '<div class="scm-inv-banner is-warn" role="alert"><span>Para guardar falta en este paso: ' + esc(paneErrors.map(function (e) { return e.text; }).join(", ")) + ".</span></div>" : "") +
         '<div class="scm-inv-pane">' + body + "</div>" +
-        (pane.id === "datos" && hidden.length ? '<div class="scm-inv-card"><label class="scm-inv-copy"><span>Agregar sección oculta para este tipo de inmueble</span><select data-extra-section><option value=""></option>' + hidden.map(function (s) { return '<option value="' + esc(s.key) + '">' + esc(sectionLabel(s)) + "</option>"; }).join("") + "</select></label></div>" : "") +
-        '<footer class="scm-inv-footer"><span class="scm-inv-saved" data-draft-status></span>' +
+        '<footer class="scm-inv-footer"><div class="scm-inv-status"><span class="scm-inv-progress">Paso ' + (index + 1) + " de " + list.length + '</span><span class="scm-inv-saved" data-draft-status></span>' +
+        (undo ? '<span class="scm-inv-undo" role="status">Se quitó «' + esc(undo.row.d || "fila sin nombre") + '». <button type="button" class="scm-inv-link" data-undo>Deshacer</button></span>' : "") + "</div>" +
         (index > 0 ? '<button type="button" class="scm-acta-button scm-acta-secondary" data-step="-1">Volver</button>' : "") +
-        (index < list.length - 1 ? '<button type="button" class="scm-acta-button scm-acta-secondary" data-goto-end>Ir al final</button><button type="button" class="scm-acta-button" data-step="1">Siguiente</button>' : '<button type="button" class="scm-acta-button" data-save>' + (config.editing ? "Guardar cambios" : "Guardar inventario") + "</button>") +
+        (index < list.length - 1 ? '<button type="button" class="scm-acta-button scm-acta-secondary" data-goto-end>Ir al cierre</button><button type="button" class="scm-acta-button" data-step="1">Siguiente</button>' : '<button type="button" class="scm-acta-button" data-save>' + (config.editing ? "Guardar cambios" : "Guardar inventario") + "</button>") +
         (config.editing ? '<button type="button" class="scm-acta-button scm-acta-secondary" data-inventory-cancel>Cancelar</button>' : "") +
         "</footer>";
       var nav = root.querySelector("[data-pane-nav]");
@@ -566,6 +624,25 @@
       setStatus(draft.statusText || "");
     }
 
+    function spacePickerHtml(hidden) {
+      return '<div class="scm-inv-card scm-inv-picker" role="group" aria-label="Agregar espacios">' +
+        '<div class="scm-inv-card-head"><h4>¿Qué otros espacios tiene el inmueble?</h4><button type="button" class="scm-inv-icon" data-space-close aria-label="Cerrar">×</button></div>' +
+        '<p class="scm-inv-hint">Marca todos los que necesites; cada uno queda como una pestaña más. Las habitaciones y los baños se agregan con su cantidad en Datos.</p>' +
+        '<div class="scm-inv-picks">' + hidden.map(function (s) {
+          return '<label><input type="checkbox" data-space-pick value="' + esc(s.key) + '"><span>' + esc(sectionLabel(s)) + "</span></label>";
+        }).join("") + "</div>" +
+        '<div class="scm-inv-picker-actions"><button type="button" class="scm-acta-button scm-acta-secondary" data-space-close>Cancelar</button><button type="button" class="scm-acta-button" data-space-add disabled>Agregar</button></div></div>';
+    }
+    function refreshErrors() {
+      missing = {};
+      errorPanes = {};
+      if (!showErrors) return;
+      validate().forEach(function (e) {
+        if (e.key) missing[e.key] = true;
+        errorPanes[e.pane] = true;
+      });
+    }
+
     function go(id) {
       if (voice.mode !== "recording") voiceClose();
       paneId = id;
@@ -575,37 +652,43 @@
     }
 
     // Validación -----------------------------------------------------------
+    var LABELS = { tipo_inventario: "el tipo de inventario", categoria_inventario: "la categoría", contrato: "el contrato", inmueble: "el código del inmueble", direccion: "la dirección",
+      arrendatario: "el arrendatario", correo_arrendatario: "el correo del arrendatario", celular_arrendatario: "el celular del arrendatario", registro_fotografico: "el enlace del registro fotográfico",
+      tiene_parqueadero: "si tiene parqueadero", tiene_deposito: "si tiene depósito", tiene_delegado: "si recibe un delegado", tipo_parqueadero: "el tipo de parqueadero",
+      parqueaderos: "la cantidad de parqueaderos", numero_parqueadero: "el número de parqueadero", depositos: "la cantidad de depósitos", delegado: "el nombre del delegado",
+      correo_delegado: "el correo del delegado", celular_delegado: "el celular del delegado", fecha_linderos: "la fecha de linderos" };
     function validate() {
       var errors = [];
-      function need(pane, ok, text) {
-        if (!ok) errors.push({ pane: pane, text: text });
+      function need(pane, ok, key, text) {
+        if (!ok) errors.push({ pane: pane, key: key, text: text || LABELS[key] || key.replace(/_/g, " ") });
       }
-      need("datos", d("tipo_inventario"), "el tipo de inventario");
-      need("datos", d("categoria_inventario"), "la categoría");
-      ["contrato", "inmueble", "direccion", "arrendatario", "correo_arrendatario", "celular_arrendatario"].forEach(function (key) {
-        need("datos", String(d(key)).trim(), key.replace(/_/g, " "));
-      });
-      if (!config.editing) need("datos", /^https?:\/\//i.test(String(d("registro_fotografico"))), "el enlace del registro fotográfico");
-      ["tiene_parqueadero", "tiene_deposito", "tiene_delegado"].forEach(function (key) {
-        need("datos", d(key), "responder " + key.replace(/_/g, " "));
-      });
-      if (isYes("tiene_parqueadero")) ["tipo_parqueadero", "parqueaderos", "numero_parqueadero"].forEach(function (key) { need("datos", String(d(key)).trim(), key.replace(/_/g, " ")); });
-      if (isYes("tiene_deposito")) need("datos", String(d("depositos")).trim(), "los depósitos");
-      if (isYes("tiene_delegado")) ["delegado", "correo_delegado", "celular_delegado"].forEach(function (key) { need("datos", String(d(key)).trim(), key.replace(/_/g, " ")); });
-      need("linderos", d("fecha_linderos"), "la fecha de linderos");
+      function filled(key) {
+        return String(d(key)).trim() !== "";
+      }
+      ["tipo_inventario", "categoria_inventario", "contrato", "inmueble", "direccion"].forEach(function (key) { need("datos", filled(key), key); });
+      if (!config.editing) need("datos", /^https?:\/\//i.test(String(d("registro_fotografico"))), "registro_fotografico");
+      ["tiene_parqueadero", "tiene_deposito"].forEach(function (key) { need("datos", filled(key), key); });
+      if (isYes("tiene_parqueadero")) ["tipo_parqueadero", "parqueaderos", "numero_parqueadero"].forEach(function (key) { need("datos", filled(key), key); });
+      if (isYes("tiene_deposito")) need("datos", filled("depositos"), "depositos");
+      ["arrendatario", "correo_arrendatario", "celular_arrendatario", "tiene_delegado"].forEach(function (key) { need("datos", filled(key), key); });
+      if (isYes("tiene_delegado")) ["delegado", "correo_delegado", "celular_delegado"].forEach(function (key) { need("datos", filled(key), key); });
+      need("linderos", d("fecha_linderos"), "fecha_linderos");
       var main = state.boundaries.inmueble_lin[0] || {};
-      need("linderos", Object.keys(main).some(function (k) { return String(main[k] || "").trim(); }), "los linderos del inmueble");
+      need("linderos", Object.keys(main).some(function (k) { return String(main[k] || "").trim(); }), "inmueble_lin", "los linderos del inmueble");
       var total = visibleSections().reduce(function (sum, s) { return sum + state.sections[s.key].rows.filter(function (r) { return String(r.d || "").trim(); }).length; }, 0);
-      need("datos", total > 0, "al menos un elemento en el inventario");
+      need("datos", total > 0, "", "al menos un elemento en el inventario");
       var names = { Energia: "luz", Agua: "agua", Gas: "gas" };
-      d("servicios").forEach(function (service) { if (names[service]) need("cierre", String(d(names[service])).trim(), "la póliza de " + names[service]); });
+      d("servicios").forEach(function (service) { if (names[service]) need("cierre", filled(names[service]), names[service], "la póliza de " + names[service]); });
       return errors;
     }
 
     function submit() {
       var errors = validate();
       if (errors.length) {
+        showErrors = true;
         go(errors[0].pane);
+        var first = root.querySelector(".is-missing input, .is-missing select, .is-missing button");
+        if (first) first.focus();
         helpers.message("Falta completar: " + errors.slice(0, 4).map(function (e) { return e.text; }).join(", ") + (errors.length > 4 ? " y " + (errors.length - 4) + " más" : "") + ".", true);
         return;
       }
@@ -761,6 +844,8 @@
       } else {
         return;
       }
+      var marked = target.closest(".is-missing");
+      if (marked && String(target.value).trim()) marked.classList.remove("is-missing");
       changed();
     });
 
@@ -794,17 +879,59 @@
         state.sections[target.value].rows.forEach(function (row) { state.sections[section.key].rows.push(Object.assign({}, row)); });
         render();
         changed();
-      } else if (target.matches("[data-extra-section]") && target.value) {
-        extraSections.push(target.value);
-        go("s:" + target.value);
-        changed();
+      } else if (target.matches("[data-space-pick]")) {
+        var picked = root.querySelectorAll("[data-space-pick]:checked").length;
+        var addBtn = root.querySelector("[data-space-add]");
+        if (addBtn) {
+          addBtn.disabled = !picked;
+          addBtn.textContent = picked ? "Agregar " + picked + (picked === 1 ? " espacio" : " espacios") : "Agregar";
+        }
       }
     });
 
     form.addEventListener("click", function (event) {
       var button = event.target.closest("button");
       if (!button || !form.contains(button)) return;
+      if (undo && !button.hasAttribute("data-undo") && !button.hasAttribute("data-row-remove")) undo = null;
       if (button.dataset.pane) { go(button.dataset.pane); return; }
+      if (button.dataset.choice) {
+        state.data[button.dataset.choice] = button.dataset.value;
+        render();
+        changed();
+        return;
+      }
+      if (button.hasAttribute("data-space-open")) { spacePicker = !spacePicker; render(); return; }
+      if (button.hasAttribute("data-space-close")) { spacePicker = false; render(); return; }
+      if (button.hasAttribute("data-space-add")) {
+        var keys = Array.prototype.map.call(root.querySelectorAll("[data-space-pick]:checked"), function (box) { return box.value; });
+        if (!keys.length) return;
+        keys.forEach(function (key) { if (extraSections.indexOf(key) === -1) extraSections.push(key); });
+        spacePicker = false;
+        go("s:" + keys[0]);
+        changed();
+        helpers.message(keys.length === 1 ? "Espacio agregado." : keys.length + " espacios agregados como pestañas.", false);
+        return;
+      }
+      if (button.dataset.spaceRemove) {
+        var spaceKey = button.dataset.spaceRemove;
+        var count = state.sections[spaceKey].rows.length + state.furniture[spaceKey].length;
+        (count ? confirmAction("¿Quitar este espacio?", "Se borran sus " + count + " elemento(s) registrados.", "Quitar") : Promise.resolve(true)).then(function (ok) {
+          if (!ok) return;
+          state.sections[spaceKey].rows = [];
+          state.furniture[spaceKey] = [];
+          extraSections = extraSections.filter(function (key) { return key !== spaceKey; });
+          go("datos");
+          changed();
+        });
+        return;
+      }
+      if (button.hasAttribute("data-undo")) {
+        if (undo) undo.rows.splice(Math.min(undo.index, undo.rows.length), 0, undo.row);
+        undo = null;
+        render();
+        changed();
+        return;
+      }
       if (button.dataset.step) {
         var list = panes();
         var next = list[list.findIndex(function (p) { return p.id === paneId; }) + Number(button.dataset.step)];
@@ -937,7 +1064,7 @@
         var rows = rowsTarget(button);
         var index = Number(button.closest("[data-row]").dataset.row);
         if (button.hasAttribute("data-row-copy")) rows.splice(index + 1, 0, Object.assign({}, rows[index]));
-        else rows.splice(index, 1);
+        else undo = { rows: rows, index: index, row: rows.splice(index, 1)[0] };
         render();
         changed();
       }

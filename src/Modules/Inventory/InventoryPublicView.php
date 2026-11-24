@@ -192,9 +192,17 @@ final class InventoryPublicView
     foreach ($rows as $item) {
       $body .= '<tr>' . ($byFloor ? '<td>' . $this->h($item['p'] ?? '') . '</td>' : '') . '<td>' . $this->h($item['d']) . '</td><td>' . $this->h($item['c']) . '</td>'
         . ($material ? '<td>' . $this->h($item['m']) . '</td>' : '')
-        . '<td>' . $this->h($item['e']) . '</td><td>' . $this->h($item['o']) . '</td></tr>';
+        . '<td>' . $this->state((string) ($item['e'] ?? '')) . '</td><td>' . $this->h($item['o']) . '</td></tr>';
     }
     return '<div class="scm-inv-table-wrap"><table class="scm-inv-table"><thead>' . $head . '</thead><tbody>' . $body . '</tbody></table></div>';
+  }
+
+  /** Estado con color: Bueno verde, Regular amarillo, Malo rojo; otros valores sin color. */
+  private function state(string $state): string
+  {
+    $key = strtr(mb_strtolower(trim($state), 'UTF-8'), ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u']);
+    $tone = ['bueno' => 'good', 'buena' => 'good', 'regular' => 'fair', 'malo' => 'bad', 'mala' => 'bad'][$key] ?? '';
+    return $tone === '' ? $this->h($state) : '<span class="scm-inv-state-badge is-' . $tone . '">' . $this->h($state) . '</span>';
   }
 
   /** @param array<string,mixed> $row */

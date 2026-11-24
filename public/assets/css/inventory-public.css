@@ -9,6 +9,11 @@
 .scm-inv-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 13px; }
 .scm-inv-table th { padding: 8px 10px; background: #f3f7fc; color: var(--scm-navy); font-size: 12px; text-align: left; }
 .scm-inv-table td { padding: 7px 10px; border-top: 1px solid var(--scm-line); vertical-align: top; overflow-wrap: anywhere; }
+.scm-inv-state-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border: 1px solid; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.scm-inv-state-badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.scm-inv-state-badge.is-good { border-color: #86efac; background: #f0fdf4; color: #15803d; }
+.scm-inv-state-badge.is-fair { border-color: #fcd34d; background: #fffbeb; color: #a16207; }
+.scm-inv-state-badge.is-bad { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
 .scm-inv-note-card h3 { margin: 10px 0 6px; color: var(--scm-navy); font-size: 14px; }
 .scm-inv-signatures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; margin-top: 44px; }
 .scm-inv-signature { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
@@ -40,6 +45,8 @@
   .scm-inv-table th { padding: 2px 4px; font-size: 8.5px; }
   .scm-inv-table td { padding: 2px 4px; }
   .scm-inv-table tr { break-inside: avoid; page-break-inside: avoid; }
+  .scm-inv-state-badge { gap: 3px; padding: 0 5px; font-size: 8.5px; }
+  .scm-inv-state-badge::before { width: 5px; height: 5px; }
   .scm-inv-table thead { display: table-header-group; }
   .scm-inv-note-card,
   .scm-inv-closing,
