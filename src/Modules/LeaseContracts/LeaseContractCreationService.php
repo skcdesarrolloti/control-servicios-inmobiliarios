@@ -319,7 +319,7 @@ final class LeaseContractCreationService
     $staff = $this->annexes->staff();
     $context = array_merge($contract, $data, $ids, [
       'fecha' => $now, 'ciudad' => 'Cartagena de Indias',
-      'realizado_por' => $sender['name'], 'realizado_por_cargo' => $sender['cargo'], 'realizado_por_telefono' => $sender['phone'],
+      'realizado_por' => $sender['name'], 'realizado_por_cargo' => $sender['cargo'], 'realizado_por_telefono' => $sender['phone'], 'correo_realizado_por' => $sender['email'] ?? '',
       'nombre_contractual' => $staff['contractual']['nombre'] ?? '', 'celular_contractual' => $staff['contractual']['celular'] ?? '', 'correo_contractual' => $staff['contractual']['correo'] ?? '',
       'nombre_propietarios' => $staff['propietarios']['nombre'] ?? '', 'celular_propietarios' => $staff['propietarios']['celular'] ?? '', 'correo_propietarios' => $staff['propietarios']['correo'] ?? '',
       'nombre_arrendatarios' => $staff['arrendatarios']['nombre'] ?? '', 'celular_arrendatarios' => $staff['arrendatarios']['celular'] ?? '', 'correo_arrendatarios' => $staff['arrendatarios']['correo'] ?? '',
@@ -804,6 +804,7 @@ final class LeaseContractCreationService
     $staff = $this->annexes->staff();
     return array_merge($contract, [
       'realizado_por' => $sender['name'],
+      'correo_realizado_por' => $sender['email'] ?? '',
       'correo_contractual' => $staff['contractual']['correo'] ?? '',
       'representante_legal' => $staff['legal']['nombre'] ?? '',
       'celular_legal' => $staff['legal']['celular'] ?? '',
@@ -815,6 +816,13 @@ final class LeaseContractCreationService
       'correo_copropiedad' => strtolower(trim((string) ($contract['correo_copropiedad'] ?? ''))),
       'celular_copropiedad' => trim((string) ($contract['celular_copropiedad'] ?? '')),
     ]);
+  }
+
+  /** Copia al funcionario que crea o reenvía el contrato, para que tenga el correo y pueda reenviarlo. @return string[] */
+  private function senderCopy(array $context): array
+  {
+    $email = strtolower(trim((string) ($context['correo_realizado_por'] ?? '')));
+    return filter_var($email, FILTER_VALIDATE_EMAIL) ? [$email] : [];
   }
 
   private function company(array $context): string
@@ -844,7 +852,7 @@ final class LeaseContractCreationService
       ['url' => $document['url'], 'label' => 'Ver acta'], ['url' => 'https://sucasainmobiliaria.com.co/arrendatario', 'label' => 'Entrar a mi cuenta'], ['url' => 'https://sucasainmobiliaria.com.co/revista/', 'label' => 'Ver revista'],
     ]]), [
       'source_module' => 'contratos_arrendamiento', 'internal_cc' => [], 'destination_name' => $context['arrendatario'], 'dedupe_key' => $dedupe . '_arrendatario',
-      'payload' => ['attachments' => $document['path'] !== '' ? [['path' => $document['path'], 'name' => $document['name']]] : [], 'reply_to' => (string) ($context['correo_contractual'] ?? '')],
+      'payload' => ['attachments' => $document['path'] !== '' ? [['path' => $document['path'], 'name' => $document['name']]] : [], 'reply_to' => (string) ($context['correo_contractual'] ?? ''), 'cc' => $this->senderCopy($context)],
       'meta' => ['contract_id' => $contractId, 'recipient_role' => 'arrendatario'],
     ]);
     $messages = $this->whatsapp(new SmsQueue($this->db), (string) $context['celular_arrendatario'], (string) $context['arrendatario'], self::TEMPLATE_TENANT, $document, $dedupe . '_wa_arrendatario', $contractId,
@@ -868,7 +876,7 @@ final class LeaseContractCreationService
       ['url' => $document['url'], 'label' => 'Ver acta'], ['url' => 'https://sucasainmobiliaria.com.co/revista/', 'label' => 'Ver revista'],
     ]]), [
       'source_module' => 'contratos_arrendamiento', 'internal_cc' => [], 'destination_name' => $context['administrador'], 'dedupe_key' => $dedupe . '_copropiedad',
-      'payload' => ['attachments' => $document['path'] !== '' ? [['path' => $document['path'], 'name' => $document['name']]] : [], 'reply_to' => (string) ($context['correo_contractual'] ?? '')],
+      'payload' => ['attachments' => $document['path'] !== '' ? [['path' => $document['path'], 'name' => $document['name']]] : [], 'reply_to' => (string) ($context['correo_contractual'] ?? ''), 'cc' => $this->senderCopy($context)],
       'meta' => ['contract_id' => $contractId, 'recipient_role' => 'copropiedad', 'acta_administracion_id' => $actaId],
     ]);
     $building = $this->row('jet_cct_copropiedades', $context['id_copropiedad'] ?? '');

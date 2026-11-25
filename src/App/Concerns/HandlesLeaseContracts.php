@@ -224,11 +224,11 @@ trait HandlesLeaseContracts
     return ['url' => $url, 'path' => $path];
   }
 
-  /** @return array{employee_id:string,name:string,cargo:string,phone:string} */
+  /** @return array{employee_id:string,name:string,cargo:string,phone:string,email:string} */
   private function lease_contract_sender(): array
   {
     $employeeId = trim((string) $this->current_employee_id());
-    $sender = ['employee_id' => $employeeId !== '' ? $employeeId : (string) Auth::userId(), 'name' => trim(Auth::user()) ?: 'SKC SuCasa Inmobiliaria', 'cargo' => '', 'phone' => ''];
+    $sender = ['employee_id' => $employeeId !== '' ? $employeeId : (string) Auth::userId(), 'name' => trim(Auth::user()) ?: 'SKC SuCasa Inmobiliaria', 'cargo' => '', 'phone' => '', 'email' => ''];
     $table = $this->db->table('jet_cct_funcionarios');
     $cargoTable = $this->db->table('jet_cct_cargos');
     if (Auth::userId() > 0 && $this->table_exists($table)) {
@@ -236,6 +236,7 @@ trait HandlesLeaseContracts
       if (is_array($row)) {
         $sender['name'] = trim((string) ($row['nombre'] ?? '')) ?: $sender['name'];
         $sender['phone'] = trim((string) ($row['celular'] ?? ''));
+        $sender['email'] = strtolower(trim((string) ($row['correo'] ?? '')));
         $cargoId = trim((string) ($row['id_cargo'] ?? ''));
         if ($cargoId !== '' && $this->table_exists($cargoTable)) {
           $sender['cargo'] = trim((string) $this->db->getVar("SELECT `nombre_cargo` FROM `{$cargoTable}` WHERE `_ID` = ? LIMIT 1", [$cargoId]));
