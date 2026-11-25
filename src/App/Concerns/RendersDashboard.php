@@ -1566,6 +1566,9 @@ trait RendersDashboard
           <?php echo $maintenanceMetricsView->shell('crecimiento'); ?>
         </div>
         <?php endif; ?>
+      <?php endif; ?>
+
+      <?php // Herramientas: cada panel depende solo de su propio permiso, no de tener Métricas. ?>
         <?php if (in_array('herramienta_pse', $dashboardAllowedTabs, true)): ?>
         <div class="scm-tab-panel<?php echo $initialTab === 'scm-panel-herramienta-pse' ? ' active' : ''; ?>" id="scm-panel-herramienta-pse" data-permission-tab="herramienta_pse" data-scm-loaded="0">
           <?php echo (new \SCM\Modules\Tools\ToolsView())->pse($this->toolsPseFormValues()); ?>
@@ -1602,7 +1605,6 @@ trait RendersDashboard
           <?php echo (new \SCM\Modules\Tools\ToolsView())->creditSimulator($creditSimulation->defaults(), $creditSimulation->rateStatus()); ?>
         </div>
         <?php endif; ?>
-      <?php endif; ?>
 
       <?php // Créditos (Actividades Administrativas): panel propio, no depende de Métricas. ?>
       <?php if (in_array('credito_propietario', $dashboardAllowedTabs, true)): ?>
