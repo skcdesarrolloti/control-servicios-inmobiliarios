@@ -15588,7 +15588,7 @@
       submitPreventivaPostpone(button, fecha);
     }
 
-    function closePreventivaTicketsModal(modal) {
+    function closePreventivaTicketsModal(modal, keepBody) {
       modal =
         modal ||
         root.querySelector("#scm-preventiva-tickets-modal.open");
@@ -15597,6 +15597,11 @@
       }
       modal.classList.remove("open");
       modal.setAttribute("aria-hidden", "true");
+      // Al abrir un caso desde el listado se conservan los botones en el DOM:
+      // las acciones del caso (activar, ubicación...) los buscan por data-ticket-pk.
+      if (keepBody) {
+        return;
+      }
       var body = modal.querySelector("[data-preventiva-tickets-body]");
       if (body) {
         body.innerHTML = "";
@@ -20184,8 +20189,19 @@
         var activateCaseBtn = activateCard
           ? activateCard.querySelector(".scm-btn-case")
           : null;
+        var activeModal = activateCaseBtn
+          ? null
+          : activateTicketBtn.closest(".scm-case-modal");
+        if (
+          activeModal &&
+          activeModal._scmCurrentCaseButton &&
+          (activeModal._scmCurrentCaseButton.dataset.ticketPk || "") ===
+            (activeModal.dataset.ticketPk || "")
+        ) {
+          // Botón con el que se abrió el caso (puede venir de un listado emergente o una plantilla).
+          activateCaseBtn = activeModal._scmCurrentCaseButton;
+        }
         if (!activateCaseBtn) {
-          var activeModal = activateTicketBtn.closest(".scm-case-modal");
           var activeTicketPk = activeModal ? activeModal.dataset.ticketPk || "" : "";
           activateCaseBtn = activeTicketPk
             ? root.querySelector(
@@ -20216,13 +20232,15 @@
         var parentCaseModal = locationEditorBtn.closest(".scm-case-modal");
         if (parentCaseModal) {
           var activeTicketPk = parentCaseModal.dataset.ticketPk || "";
-          var activeCaseBtn = activeTicketPk
-            ? root.querySelector(
-                '.scm-btn-case[data-ticket-pk="' +
-                  cssAttrValue(activeTicketPk) +
-                  '"]',
-              )
-            : null;
+          var activeCaseBtn =
+            parentCaseModal._scmCurrentCaseButton ||
+            (activeTicketPk
+              ? root.querySelector(
+                  '.scm-btn-case[data-ticket-pk="' +
+                    cssAttrValue(activeTicketPk) +
+                    '"]',
+                )
+              : null);
           if (activeCaseBtn) {
             openPropertyLocationEditor(parentCaseModal, activeCaseBtn);
           }
@@ -20292,6 +20310,11 @@
         e.target && e.target.closest ? e.target.closest(".scm-btn-case") : null;
       if (caseBtn) {
         e.preventDefault();
+        var preventivaListModal = caseBtn.closest("#scm-preventiva-tickets-modal");
+        if (preventivaListModal) {
+          // El listado de casos preventivos quedaba encima del caso y tapaba sus acciones.
+          closePreventivaTicketsModal(preventivaListModal, true);
+        }
         window.scmOpenCase(caseBtn);
         return;
       }
