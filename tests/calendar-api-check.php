@@ -178,4 +178,29 @@ $april = $team->handle('filtrar_eventos_admin', ['id_empleado' => '100', 'fecha_
 $check(in_array('Varios días', array_column($april['data']['data'], 'titulo'), true), 'un evento de varios días aparece en el mes donde continúa');
 $check(!isset($team->handle('listar_funcionarios', [])['data'][0]['correo']), 'la lista de funcionarios no expone correos ni celulares');
 
+// Configuración › Categorías del calendario.
+$categories = new \SCM\Modules\Calendar\CalendarCategorySettings($db);
+$db->insert('wp_jet_cct_funcionarios', ['_ID' => 4, 'nombre' => 'Retirado QA', 'correo' => 'ret@example.invalid', 'id_cargo' => '3', 'id_empleado' => '400', 'activo' => 'No']);
+$loaded = $categories->load();
+$first = array_values(array_filter($loaded['categories'], static fn(array $c): bool => $c['id'] === '1'))[0];
+$check($first['notificar'] === ['900'] && $first['eventos'] > 0, 'carga la categoría con sus funcionarios a notificar y sus eventos');
+$check(!in_array('400', array_column($loaded['employees'], 'id'), true) && in_array('900', array_column($loaded['employees'], 'id'), true), 'para notificar se ofrecen los funcionarios activos');
+$created = $categories->save([
+  ['id' => '1', 'nombre' => ' Inspección   técnica ', 'color' => '#AA0000', 'descripcion' => 'Visitas', 'notificar' => ['900', '100', 'desconocido']],
+  ['id' => '', 'nombre' => 'Nueva QA', 'color' => '#00aa00', 'notificar' => []],
+], []);
+$row = $db->getRow('SELECT * FROM categorias_calendario WHERE id = 1');
+$check($row['nombre'] === 'Inspección técnica' && $row['color'] === '#aa0000' && $row['roles_notificar'] === '900,100', 'guarda nombre, color y a quién notificar (descarta IDs que no son funcionarios)');
+$check(count($created) === 1 && $db->getVar('SELECT nombre FROM categorias_calendario WHERE id = ?', [(int) $created[0]]) === 'Nueva QA', 'crea categorías nuevas y devuelve su id');
+$fails = static function (callable $fn): bool { try { $fn(); return false; } catch (\InvalidArgumentException $e) { return true; } };
+$check($fails(static fn() => $categories->save([['id' => '', 'nombre' => 'nueva qa', 'color' => '#000000']], [])), 'no permite dos categorías con el mismo nombre');
+$check($fails(static fn() => $categories->save([['id' => '', 'nombre' => 'Color malo', 'color' => 'rojo']], [])), 'valida el color');
+$check($fails(static fn() => $categories->save([], ['1'])) && (int) $db->getVar('SELECT COUNT(*) FROM categorias_calendario WHERE id = 1') === 1, 'una categoría con eventos no se elimina');
+$categories->save([], [$created[0]]);
+$check((int) $db->getVar('SELECT COUNT(*) FROM categorias_calendario WHERE id = ?', [(int) $created[0]]) === 0, 'una categoría sin eventos se elimina');
+$mailer->emails = [];
+$team->handle('crear_evento', ['titulo' => 'Aviso categoría', 'fecha_inicio' => $future . ' 15:00:00', 'fecha_fin' => $future . ' 16:00:00', 'id_empleado' => '100', 'id_categoria' => 1, 'permitir_vencidos' => true]);
+$to = $mailer->emails[0]['destinations'] ?? [];
+$check(in_array('rol@example.invalid', $to, true), 'al crear un evento se avisa a quienes la categoría tiene en Notificar a');
+
 echo "Calendar API checks passed; no real database or notifications used.\n";

@@ -159,6 +159,7 @@
         org_manager_export: "[data-om-export]",
         cleaning_configure: "[data-cleaning-settings]",
         quote_fee_configure: "[data-quote-fee-settings]",
+        calendar_categories_configure: "[data-calendar-category-settings]",
         closing_sheet_policy_configure: "[data-closing-policy-settings]",
         collection_import: "[data-scm-portfolio-import]",
         collection_action: "[data-scm-portfolio-management], [data-scm-portfolio-letter], [data-scm-portfolio-bulkbar], [data-scm-portfolio-bulk-check], [data-scm-portfolio-reset]",
@@ -7217,7 +7218,7 @@
             var id = String(row.id || row._ID || row.id_categoria || "").trim();
             if (id) categoriesById[id] = row;
           });
-          // Como opciones solo salen las categorías habilitadas en Configuración → Temas de ayuda y categorías
+          // Como opciones solo salen las categorías visibles en Configuración → Categorías del calendario
           // (vacío = todas); los eventos existentes conservan el nombre de su categoría.
           var allowedCategoryIds = Array.isArray(runtime.calendarCategoryIds) ? runtime.calendarCategoryIds.map(String) : [];
           if (allowedCategoryIds.length) {
@@ -12797,9 +12798,8 @@
               throw new Error((json && json.data && json.data.message) || "No se pudo guardar la configuración.");
             }
             runtime.caseHelpTopics = (json.data && json.data.help_topics) || runtime.caseHelpTopics;
-            runtime.calendarCategoryIds = (json.data && json.data.calendar_categories) || [];
             setMessage((json.data && json.data.message) || "Configuración guardada.", false);
-            showToast("success", "Temas de ayuda y categorías guardados. Recarga para ver las categorías en el calendario.");
+            showToast("success", "Temas de ayuda guardados.");
           })
           .catch(function (error) {
             setMessage(error.message || "No se pudo guardar la configuración.", true);
@@ -14310,7 +14310,7 @@
         "Servicio al arrendatario",
         "Servicio a la copropiedad",
       ];
-      // Mismos temas de ayuda que "Crear nuevo caso" (Configuración → Temas de ayuda y categorías).
+      // Mismos temas de ayuda que "Crear nuevo caso" (Configuración → Temas de ayuda).
       var topicOptions = (Array.isArray(runtime.caseHelpTopics) ? runtime.caseHelpTopics : []).slice();
       if (defaultTema && topicOptions.indexOf(defaultTema) < 0) topicOptions.unshift(defaultTema);
       // Desde Contratos siempre se puede crear el recibo (genera el aviso previo de revisión antes de la desocupación para el arrendatario).

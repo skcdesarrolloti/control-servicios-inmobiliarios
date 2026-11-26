@@ -143,26 +143,81 @@ trait HandlesTicketWorkflowActions
     if ($topics === []) {
       $this->jsonFail('Agrega al menos un tema de ayuda.');
     }
-    $categories = \SCM\Support\PanelCaseCatalog::sanitizeList(is_array($_POST['calendar_categories'] ?? null) ? $_POST['calendar_categories'] : []);
-    if ($categories === []) {
-      $this->jsonFail('Marca al menos una categoría del calendario.');
-    }
-    $allCategories = array_column($this->panelCalendarCategoryRows(), 'id');
-    $categories = array_values(array_intersect($categories, $allCategories));
-    // Si quedan todas marcadas se guarda vacío: las categorías nuevas aparecen sin reconfigurar.
-    if (count($categories) === count($allCategories)) {
-      $categories = [];
-    }
-
     \SCM\Core\App::settings()->set(\SCM\Support\PanelCaseCatalog::HELP_TOPICS_SETTING, $topics, Auth::userId());
-    \SCM\Core\App::settings()->set(\SCM\Support\PanelCaseCatalog::CALENDAR_CATEGORIES_SETTING, $categories, Auth::userId());
     \SCM\Core\App::settings()->refresh();
 
     $this->jsonOk([
-      'message' => 'Temas de ayuda y categorías guardados.',
+      'message' => 'Temas de ayuda guardados.',
       'help_topics' => $topics,
-      'calendar_categories' => $categories,
     ]);
+  }
+
+  /**
+   * Configuración › Categorías del calendario: nombre, color, descripción, a quién se avisa y si sale en el panel.
+   * La tabla es compartida con el panel comercial; la visibilidad (`panel_calendar_categories`) es solo de este panel.
+   */
+  public function ajax_handler_calendar_category_settings(): void
+  {
+    $this->verifyCsrf();
+    $this->requireDashboardAction('calendar_categories_configure', 'Tu cargo no tiene permiso para configurar las categorías del calendario.');
+    $service = new \SCM\Modules\Calendar\CalendarCategorySettings($this->db);
+    $visibility = static function (array $data): array {
+      $visible = \SCM\Support\PanelCaseCatalog::calendarCategoryIds();
+      foreach ($data['categories'] as $index => $category) {
+        $data['categories'][$index]['visible'] = $visible === [] || in_array((string) $category['id'], $visible, true);
+      }
+      return $data;
+    };
+    try {
+      if ((string) ($_POST['mode'] ?? '') !== 'save') {
+        $this->jsonOk($visibility($service->load()));
+      }
+      $input = json_decode(wp_unslash((string) ($_POST['settings'] ?? '')), true);
+      if (!is_array($input) || !is_array($input['categories'] ?? null)) {
+        throw new \InvalidArgumentException('No se recibió la configuración.');
+      }
+      $deleted = is_array($input['deleted'] ?? null) ? array_map('strval', $input['deleted']) : [];
+      $anyVisible = false;
+      foreach ($input['categories'] as $row) {
+        $anyVisible = $anyVisible || (is_array($row) && !empty($row['visible']) && !in_array((string) (int) ($row['id'] ?? 0), $deleted, true));
+      }
+      if (!$anyVisible) {
+        throw new \InvalidArgumentException('Deja al menos una categoría visible en el panel.');
+      }
+      $created = $service->save($input['categories'], $deleted);
+
+      // Visibles: las marcadas de las existentes más las nuevas marcadas (llegan en orden, sin id).
+      $visible = [];
+      $newIndex = 0;
+      foreach ($input['categories'] as $row) {
+        if (!is_array($row)) {
+          continue;
+        }
+        $id = (string) (int) ($row['id'] ?? 0);
+        if ($id === '0') {
+          $id = $created[$newIndex++] ?? '';
+        }
+        if ($id !== '' && !empty($row['visible'])) {
+          $visible[] = $id;
+        }
+      }
+      $all = $service->ids();
+      $visible = array_values(array_intersect($all, $visible));
+      // Todas visibles se guarda vacío: las categorías nuevas que cree el panel comercial también salen aquí.
+      \SCM\Core\App::settings()->set(\SCM\Support\PanelCaseCatalog::CALENDAR_CATEGORIES_SETTING, count($visible) === count($all) ? [] : $visible, Auth::userId());
+      \SCM\Core\App::settings()->refresh();
+
+      $data = $visibility($service->load());
+      $this->jsonOk($data + [
+        'message' => 'Categorías del calendario guardadas.',
+        'calendar_categories' => \SCM\Support\PanelCaseCatalog::calendarCategoryIds(),
+      ]);
+    } catch (\InvalidArgumentException $error) {
+      $this->jsonFail($error->getMessage());
+    } catch (\Throwable $error) {
+      error_log('[calendar-category-settings] ' . $error->getMessage());
+      $this->jsonFail('No se pudieron guardar las categorías del calendario.');
+    }
   }
 
   public function ajax_handler_dashboard_filter_options(): void

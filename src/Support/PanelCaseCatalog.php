@@ -8,7 +8,7 @@ use SCM\Modules\Pending\PublicServicesCriticalTicket;
 
 /**
  * Temas de ayuda y categorías del calendario que el panel ofrece como opciones.
- * Se configuran en Configuración → Temas de ayuda y categorías.
+ * Se configuran en Configuración → Temas de ayuda y Configuración → Categorías del calendario.
  */
 final class PanelCaseCatalog
 {

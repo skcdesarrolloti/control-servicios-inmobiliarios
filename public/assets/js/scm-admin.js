@@ -5464,7 +5464,7 @@
 
   function administrativeCalendarCategories(rows, root) {
     rows = Array.isArray(rows) ? rows : [];
-    // Categorías elegidas en Configuración → Temas de ayuda y categorías; sin configurar se usa el filtro por nombre.
+    // Categorías visibles en Configuración → Categorías del calendario; sin configurar se usa el filtro por nombre.
     var runtime = root ? parseRuntime(root) || {} : {};
     var allowed = Array.isArray(runtime.calendarCategoryIds) ? runtime.calendarCategoryIds.map(String) : [];
     if (allowed.length) {

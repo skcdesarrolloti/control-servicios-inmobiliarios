@@ -147,6 +147,7 @@ final class AuthenticatedActionRouter
       'scm_tools_credit_pdf' => 'ajax_handler_tools_credit_pdf',
       'scm_tools_credit_rate' => 'ajax_handler_tools_credit_rate',
       'scm_quote_fee_settings' => 'ajax_handler_quote_fee_settings',
+      'scm_calendar_category_settings' => 'ajax_handler_calendar_category_settings',
       'scm_closing_policy_settings' => 'ajax_handler_closing_policy_settings',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_ORDER_CONTEXT => 'ajax_handler_cotizacion_order_context',
       SuCasaControlServiciosInmobiliarios::AJAX_COTIZACION_ORDER_SAVE => 'ajax_handler_cotizacion_order_save',

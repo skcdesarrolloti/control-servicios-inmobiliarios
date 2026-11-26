@@ -4985,7 +4985,7 @@ trait HandlesMaintenanceActions
   private function caseDataEditOptions(string $table): array
   {
     $base = [
-      // Mismos temas que "Crear nuevo caso", configurables en Temas de ayuda y categorías.
+      // Mismos temas que "Crear nuevo caso", configurables en Configuración → Temas de ayuda.
       'tema_ayuda' => \SCM\Support\PanelCaseCatalog::helpTopics(),
       'prioridad' => ['Prioridad urgente', 'Prioridad alta', 'Prioridad media', 'Prioridad baja'],
       'departamento' => ['Servicio al cliente', 'Servicio al propietario', 'Servicio al arrendatario', 'Servicio a la copropiedad'],

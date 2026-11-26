@@ -43,6 +43,16 @@ El JS (`admin-dashboard-runtime.js` y `scm-admin.js`) toma la URL de `config.cal
 - `creado_por` es el `id_empleado` real de la sesión. Los procesos del servidor (Revisión crítica) llaman a
   `CalendarApi` directamente y envían su propio `creado_por`.
 - Correos al responsable, a quien creó, a los "roles a notificar" de la categoría y a los funcionarios elegidos.
+
+## Categorías (Configuración › Categorías del calendario)
+
+- Se abre desde el menú **Configuración** del encabezado y se oculta sin la acción `calendar_categories_configure`
+  (grupo Calendario; por defecto solo cargos administradores).
+- `src/Modules/Calendar/CalendarCategorySettings.php` edita `categorias_calendario`: nombre, color, descripción y
+  **Notificar a** (`roles_notificar`, IDs de funcionarios separados por coma; solo se guardan IDs que existen). La tabla
+  es compartida con el panel comercial, que aplica las mismas reglas en `CommercialSettingsService::saveCategories`.
+- **Visible en el panel** se guarda en `panel_calendar_categories` (vacío = todas) y solo afecta a este panel.
+- Una categoría con eventos no se elimina (la app anterior borraba también sus eventos).
 - Un evento de cargo con reporte comercial obligatorio no se cierra aquí: se cierra desde el panel comercial.
 - No hay sincronización con Google Calendar.
 

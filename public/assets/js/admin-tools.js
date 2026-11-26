@@ -113,6 +113,7 @@
     if (creditSimulator) initCreditSimulator(creditSimulator, core, request, post);
     initCleaningSettings(root, post);
     initQuoteFeeSettings(root, post);
+    initCalendarCategorySettings(root, post);
     initClosingPolicySettings(root, post);
     // Si la página abrió directo en una herramienta, el runtime pudo pedir la carga antes de este script.
     [pse, mora, market, creditSimulator].forEach(function (module) {
@@ -2843,6 +2844,198 @@
       event.preventDefault();
       post("scm_quote_fee_settings", {})
         .then(function (data) { show(data.html || ""); })
+        .catch(function (error) { window.alert(error.message); });
+    });
+  }
+
+  // Configuración › Categorías del calendario (src/Modules/Calendar/CalendarCategorySettings.php; se oculta sin
+  // calendar_categories_configure). La tabla es compartida con el panel comercial; "Visible en el panel" es solo de este.
+  function initCalendarCategorySettings(root, post) {
+    var modal = null;
+    var employees = [];
+    var deleted = [];
+    var INPUT = "!sp-w-full !sp-px-2.5 !sp-py-1.5 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-300 !sp-bg-white !sp-text-xs !sp-text-service-navy";
+
+    function ensureModal() {
+      if (modal) return modal;
+      modal = document.createElement("div");
+      modal.className = "scm-cia-modal";
+      modal.hidden = true;
+      modal.innerHTML =
+        '<div class="scm-cia-modal-backdrop" data-calcat-close></div>' +
+        '<section tabindex="-1" class="!sp-relative !sp-outline-none !sp-flex !sp-flex-col !sp-w-[min(980px,calc(100vw-24px))] !sp-max-h-[92vh] !sp-overflow-hidden !sp-rounded-2xl !sp-bg-service-background !sp-border !sp-border-solid !sp-border-slate-200 !sp-shadow-2xl !sp-font-sans" role="dialog" aria-modal="true" aria-labelledby="scm-calcat-title">' +
+        '<header class="!sp-flex !sp-items-center !sp-justify-between !sp-gap-4 !sp-px-4 sm:!sp-px-6 !sp-py-4 !sp-bg-white !sp-border-x-0 !sp-border-t-0 !sp-border-b !sp-border-solid !sp-border-slate-200">' +
+        '<div><p class="!sp-m-0 !sp-text-[9px] !sp-font-bold !sp-uppercase !sp-tracking-wide !sp-text-service-muted">Configuración</p><h3 id="scm-calcat-title" class="!sp-m-0 !sp-text-lg !sp-font-bold !sp-text-service-navy">Categorías del calendario</h3></div>' +
+        '<button type="button" class="!sp-flex !sp-items-center !sp-justify-center !sp-w-9 !sp-h-9 !sp-rounded-full !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-text-service-navy !sp-text-lg !sp-cursor-pointer hover:!sp-bg-slate-50" data-calcat-close aria-label="Cerrar">&times;</button></header>' +
+        '<form class="!sp-flex !sp-flex-col !sp-flex-1 !sp-min-h-0 !sp-text-service-navy" data-calcat-form autocomplete="off" novalidate>' +
+        '<div class="!sp-flex-1 !sp-overflow-y-auto !sp-p-4 sm:!sp-p-6 !sp-space-y-4">' +
+        '<p class="!sp-m-0 !sp-text-[11px] !sp-text-service-muted !sp-leading-relaxed">Nombre, color y descripción son compartidos con el panel comercial. Al crear, trasladar o cerrar un evento se avisa por correo al responsable, a quien lo creó y a los funcionarios de <strong>Notificar a</strong> de su categoría. <strong>Visible en el panel</strong> solo define qué categorías se ofrecen aquí. Una categoría con eventos no se puede eliminar.</p>' +
+        '<div class="!sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2"><input type="search" class="' + INPUT + ' !sp-max-w-xs" placeholder="Buscar categoría" aria-label="Buscar categoría" data-calcat-search>' +
+        '<button type="button" class="!sp-inline-flex !sp-items-center !sp-gap-1 !sp-px-3 !sp-py-1.5 !sp-rounded-lg !sp-border-0 !sp-bg-service-blue !sp-text-white !sp-text-xs !sp-font-semibold !sp-cursor-pointer" data-calcat-add><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">add</span>Agregar categoría</button></div>' +
+        '<div class="!sp-space-y-2" data-calcat-rows></div>' +
+        '</div>' +
+        '<footer class="!sp-flex !sp-flex-wrap !sp-items-center !sp-justify-between !sp-gap-3 !sp-px-4 sm:!sp-px-6 !sp-py-3 !sp-bg-white !sp-border-0 !sp-border-t !sp-border-solid !sp-border-slate-200">' +
+        '<span class="!sp-text-[11px] !sp-text-service-muted" role="status" data-calcat-status></span>' +
+        '<button type="submit" class="!sp-inline-flex !sp-items-center !sp-gap-1.5 !sp-px-4 !sp-py-2 !sp-rounded-lg !sp-border-0 !sp-bg-service-navy !sp-text-white !sp-text-xs !sp-font-bold !sp-cursor-pointer disabled:!sp-opacity-60"><span class="material-symbols-outlined !sp-text-[18px]" aria-hidden="true">save</span>Guardar categorías</button></footer>' +
+        '</form></section>';
+      root.appendChild(modal);
+
+      modal.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") close();
+      });
+      modal.addEventListener("click", function (event) {
+        if (event.target.closest("[data-calcat-close]")) return close();
+        if (event.target.closest("[data-calcat-add]")) {
+          var list = modal.querySelector("[data-calcat-rows]");
+          list.insertAdjacentHTML("afterbegin", rowHtml({ id: "", nombre: "", color: "#1e3c76", descripcion: "", notificar: [], eventos: 0, visible: true }));
+          list.firstElementChild.querySelector('[data-field="nombre"]').focus();
+          return;
+        }
+        var toggle = event.target.closest("[data-calcat-toggle]");
+        if (toggle) {
+          var picker = toggle.closest("[data-calcat-row]").querySelector("[data-calcat-picker]");
+          picker.hidden = !picker.hidden;
+          toggle.setAttribute("aria-expanded", picker.hidden ? "false" : "true");
+          if (!picker.hidden) picker.querySelector("[data-calcat-employee-search]").focus();
+          return;
+        }
+        var remove = event.target.closest("[data-calcat-remove]");
+        if (remove) {
+          var row = remove.closest("[data-calcat-row]");
+          var name = row.querySelector('[data-field="nombre"]').value.trim() || "esta categoría";
+          if (!window.confirm("¿Eliminar la categoría \"" + name + "\"? Se elimina al guardar y también deja de salir en el panel comercial.")) return;
+          if (row.getAttribute("data-id")) deleted.push(row.getAttribute("data-id"));
+          row.remove();
+        }
+      });
+      modal.addEventListener("input", function (event) {
+        if (event.target.matches("[data-calcat-search]")) {
+          var term = normalize(event.target.value);
+          modal.querySelectorAll("[data-calcat-row]").forEach(function (row) {
+            row.hidden = term !== "" && normalize(row.querySelector('[data-field="nombre"]').value).indexOf(term) === -1;
+          });
+        } else if (event.target.matches("[data-calcat-employee-search]")) {
+          var needle = normalize(event.target.value);
+          event.target.closest("[data-calcat-picker]").querySelectorAll("[data-calcat-employee]").forEach(function (label) {
+            // Con !sp-flex el atributo hidden no oculta: se usa la clase.
+            label.classList.toggle("!sp-hidden", needle !== "" && normalize(label.textContent).indexOf(needle) === -1);
+          });
+        } else if (event.target.matches('[data-field="color"]')) {
+          event.target.closest("[data-calcat-row]").querySelector("[data-calcat-swatch]").style.background = event.target.value;
+        }
+      });
+      modal.addEventListener("change", function (event) {
+        if (event.target.matches("[data-calcat-notify]")) refreshSummary(event.target.closest("[data-calcat-row]"));
+      });
+      modal.addEventListener("submit", function (event) {
+        var form = event.target.closest("[data-calcat-form]");
+        if (!form) return;
+        event.preventDefault();
+        var statusNode = form.querySelector("[data-calcat-status]");
+        var rows = Array.prototype.slice.call(form.querySelectorAll("[data-calcat-row]")).map(function (row) {
+          return {
+            id: row.getAttribute("data-id") || "",
+            nombre: row.querySelector('[data-field="nombre"]').value,
+            color: row.querySelector('[data-field="color"]').value,
+            descripcion: row.querySelector('[data-field="descripcion"]').value,
+            visible: row.querySelector('[data-field="visible"]').checked,
+            notificar: Array.prototype.slice.call(row.querySelectorAll("[data-calcat-notify]:checked")).map(function (input) { return input.value; }),
+          };
+        });
+        var empty = rows.filter(function (row) { return !row.nombre.trim(); }).length;
+        if (empty) return setStatus(statusNode, "Escribe el nombre de cada categoría.", true);
+        if (!rows.some(function (row) { return row.visible; })) return setStatus(statusNode, "Deja al menos una categoría visible en el panel.", true);
+        var button = form.querySelector('button[type="submit"]');
+        button.disabled = true;
+        setStatus(statusNode, "Guardando…", false);
+        post("scm_calendar_category_settings", { mode: "save", settings: JSON.stringify({ categories: rows, deleted: deleted }) })
+          .then(function (data) {
+            render(data);
+            setStatus(modal.querySelector("[data-calcat-status]"), (data.message || "Guardado.") + " Recarga el calendario para ver los cambios.", false, true);
+          })
+          .catch(function (error) { setStatus(statusNode, error.message, true); })
+          .finally(function () { button.disabled = false; });
+      });
+      return modal;
+    }
+
+    function normalize(value) {
+      return String(value || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+    }
+
+    function setStatus(node, text, isError, ok) {
+      node.textContent = text;
+      node.classList.remove("!sp-text-red-700", "!sp-text-emerald-700", "!sp-font-semibold");
+      if (isError) node.classList.add("!sp-text-red-700", "!sp-font-semibold");
+      if (ok) node.classList.add("!sp-text-emerald-700", "!sp-font-semibold");
+    }
+
+    function rowHtml(category) {
+      var selected = (category.notificar || []).map(String);
+      var color = /^#[0-9a-fA-F]{6}$/.test(String(category.color || "")) ? category.color : "#1e3c76";
+      var events = Number(category.eventos || 0);
+      var checks = employees.map(function (employee) {
+        return '<label class="!sp-flex !sp-items-center !sp-gap-2 !sp-px-2 !sp-py-1 !sp-rounded-md hover:!sp-bg-slate-50 !sp-text-xs !sp-cursor-pointer" data-calcat-employee>' +
+          '<input type="checkbox" value="' + escapeHtml(employee.id) + '" data-calcat-notify' + (selected.indexOf(String(employee.id)) !== -1 ? " checked" : "") + ">" +
+          '<span data-calcat-employee-name>' + escapeHtml(employee.label) + "</span>" + (employee.activo ? "" : ' <em class="!sp-not-italic !sp-text-amber-700">(inactivo)</em>') + "</label>";
+      }).join("");
+      return '<article class="!sp-rounded-xl !sp-bg-white !sp-border !sp-border-solid !sp-border-slate-200 !sp-p-3" data-calcat-row data-id="' + escapeHtml(category.id || "") + '">' +
+        '<div class="!sp-grid !sp-grid-cols-1 md:!sp-grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_auto] !sp-gap-3 !sp-items-center">' +
+        '<label class="!sp-relative !sp-w-9 !sp-h-9 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-300 !sp-cursor-pointer !sp-overflow-hidden" data-calcat-swatch style="background:' + escapeHtml(color) + '" title="Color">' +
+        '<input type="color" data-field="color" value="' + escapeHtml(color) + '" class="!sp-absolute !sp-inset-0 !sp-opacity-0 !sp-cursor-pointer" aria-label="Color de la categoría"></label>' +
+        '<input data-field="nombre" value="' + escapeHtml(category.nombre || "") + '" maxlength="100" placeholder="Nombre de la categoría" class="' + INPUT + ' !sp-font-semibold" aria-label="Nombre">' +
+        '<input data-field="descripcion" value="' + escapeHtml(category.descripcion || "") + '" maxlength="500" placeholder="Descripción (opcional)" class="' + INPUT + '" aria-label="Descripción">' +
+        '<div class="!sp-flex !sp-items-center !sp-gap-3 !sp-justify-end">' +
+        '<label class="!sp-flex !sp-items-center !sp-gap-1.5 !sp-text-[11px] !sp-whitespace-nowrap !sp-cursor-pointer"><input type="checkbox" data-field="visible"' + (category.visible ? " checked" : "") + ">Visible en el panel</label>" +
+        '<span class="!sp-text-[10px] !sp-text-service-muted !sp-whitespace-nowrap">' + events + (events === 1 ? " evento" : " eventos") + "</span>" +
+        (events > 0 ? "" : '<button type="button" class="!sp-flex !sp-items-center !sp-justify-center !sp-w-7 !sp-h-7 !sp-rounded-full !sp-border-0 !sp-bg-transparent !sp-text-red-700 hover:!sp-bg-red-50 !sp-cursor-pointer" data-calcat-remove aria-label="Eliminar categoría" title="Eliminar categoría"><span class="material-symbols-outlined !sp-text-[18px]" aria-hidden="true">delete</span></button>') +
+        "</div></div>" +
+        '<div class="!sp-mt-2 !sp-flex !sp-flex-wrap !sp-items-center !sp-gap-2">' +
+        '<button type="button" class="!sp-inline-flex !sp-items-center !sp-gap-1 !sp-px-2.5 !sp-py-1 !sp-rounded-full !sp-border !sp-border-solid !sp-border-slate-300 !sp-bg-slate-50 !sp-text-[11px] !sp-font-semibold !sp-text-service-navy !sp-cursor-pointer" data-calcat-toggle aria-expanded="false"><span class="material-symbols-outlined !sp-text-[16px]" aria-hidden="true">notifications</span>Notificar a</button>' +
+        '<span class="!sp-text-[11px] !sp-text-service-muted" data-calcat-summary></span></div>' +
+        '<div class="!sp-mt-2 !sp-rounded-lg !sp-border !sp-border-solid !sp-border-slate-200 !sp-bg-slate-50 !sp-p-2" data-calcat-picker hidden>' +
+        '<input type="search" class="' + INPUT + ' !sp-mb-2" placeholder="Buscar funcionario" aria-label="Buscar funcionario" data-calcat-employee-search>' +
+        (checks ? '<div class="!sp-grid !sp-grid-cols-1 sm:!sp-grid-cols-2 lg:!sp-grid-cols-3 !sp-gap-0.5 !sp-max-h-56 !sp-overflow-y-auto">' + checks + "</div>" : '<p class="!sp-m-0 !sp-text-xs !sp-text-service-muted">No hay funcionarios activos.</p>') +
+        "</div></article>";
+    }
+
+    function refreshSummary(row) {
+      var names = Array.prototype.slice.call(row.querySelectorAll("[data-calcat-notify]:checked")).map(function (input) {
+        return input.parentNode.querySelector("[data-calcat-employee-name]").textContent;
+      });
+      row.querySelector("[data-calcat-summary]").textContent = names.length ? names.join(", ") : "Solo el responsable y quien crea el evento";
+    }
+
+    function render(data) {
+      var box = ensureModal();
+      employees = Array.isArray(data.employees) ? data.employees : [];
+      deleted = [];
+      var list = box.querySelector("[data-calcat-rows]");
+      var categories = Array.isArray(data.categories) ? data.categories : [];
+      list.innerHTML = categories.length ? categories.map(rowHtml).join("") : '<p class="!sp-m-0 !sp-text-xs !sp-text-service-muted">No hay categorías. Agrega la primera.</p>';
+      list.querySelectorAll("[data-calcat-row]").forEach(refreshSummary);
+      box.querySelector("[data-calcat-search]").value = "";
+      setStatus(box.querySelector("[data-calcat-status]"), "", false);
+    }
+
+    function open(data) {
+      render(data);
+      modal.hidden = false;
+      document.body.classList.add("scm-cia-modal-open");
+      modal.querySelector("section").focus();
+    }
+
+    function close() {
+      if (!modal) return;
+      modal.hidden = true;
+      document.body.classList.remove("scm-cia-modal-open");
+    }
+
+    document.addEventListener("click", function (event) {
+      if (!event.target.closest || !event.target.closest("[data-calendar-category-settings]")) return;
+      event.preventDefault();
+      post("scm_calendar_category_settings", {})
+        .then(open)
         .catch(function (error) { window.alert(error.message); });
     });
   }
