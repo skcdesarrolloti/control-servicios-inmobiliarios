@@ -3714,6 +3714,89 @@ body,
   font-weight: 400;
 }
 
+#scm-app .scm-composer-saved-emails {
+  margin-top: 0.5rem;
+}
+
+#scm-app .scm-composer-saved-emails[hidden] {
+  display: none;
+}
+
+#scm-app .scm-composer-saved-emails.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+#scm-app .scm-composer-saved-emails-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+#scm-app .scm-composer-saved-emails-all {
+  border: 0;
+  background: none;
+  color: #1d4ed8;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+#scm-app .scm-composer-saved-emails-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+#scm-app .scm-composer-saved-email {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  overflow: hidden;
+}
+
+#scm-app .scm-composer-saved-email.is-active {
+  border-color: #1d4ed8;
+  background: #eff6ff;
+}
+
+#scm-app .scm-composer-saved-email button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: #334155;
+}
+
+#scm-app .scm-composer-saved-email-pick {
+  padding: 0.2rem 0.3rem 0.2rem 0.55rem;
+}
+
+#scm-app .scm-composer-saved-email.is-active .scm-composer-saved-email-pick {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+#scm-app .scm-composer-saved-email-forget {
+  padding: 0.2rem 0.45rem 0.2rem 0.2rem;
+  color: #94a3b8 !important;
+}
+
+#scm-app .scm-composer-saved-email-forget:hover {
+  color: #b42318 !important;
+}
+
 #scm-app .scm-composer-notify-options {
   display: flex !important;
   align-items: center !important;

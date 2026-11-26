@@ -663,6 +663,7 @@ trait HandlesTicketWorkflowActions
     $this->jsonOk([
       'message' => (string) ($result['message'] ?? 'Seguimiento guardado.') . ($executorChanged !== '' ? ' ' . $executorChanged . '.' : ''),
       'ejecutado' => $executorChange,
+      'correos_adicionales' => $this->rememberCaseAdditionalEmails($ticketPk, $additionalEmails),
       'seg_saved' => (string) ($result['seg_saved'] ?? '0'),
       'hist_saved' => (string) ($result['hist_saved'] ?? '0'),
       'cot_rows' => (string) ($result['cot_rows'] ?? '0'),
@@ -942,7 +943,39 @@ trait HandlesTicketWorkflowActions
     if ($executorChange !== null) {
       $result['ejecutado'] = $executorChange;
     }
+    $result['correos_adicionales'] = $this->rememberCaseAdditionalEmails($ticketPk, $additionalEmails);
     $this->jsonOk($result);
+  }
+
+  /**
+   * Deja anexados al caso los correos adicionales (CC) usados, para elegirlos de nuevo en próximos envíos.
+   * @param string[] $emails
+   * @return string[]
+   */
+  private function rememberCaseAdditionalEmails(int $ticketPk, array $emails): array
+  {
+    try {
+      return (new \SCM\Support\CaseAdditionalEmails($this->db, new \SCM\Support\SchemaInspector($this->db)))->remember($ticketPk, $emails);
+    } catch (\Throwable $error) {
+      error_log('[correos_adicionales] Caso #' . $ticketPk . ': ' . $error->getMessage());
+      return [];
+    }
+  }
+
+  /** Quita un correo adicional guardado del caso (no afecta envíos ya realizados). */
+  public function ajax_handler_case_additional_email_forget()
+  {
+    $this->verifyCsrf();
+    if (!$this->canUseDashboardAction('case_respond') && !$this->canUseDashboardAction('case_followup')) {
+      $this->jsonFail('No tienes permiso para gestionar los correos del caso.');
+    }
+    $ticketPk = isset($_POST['ticket_pk']) ? (int) $_POST['ticket_pk'] : 0;
+    $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+    if ($ticketPk <= 0 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      $this->jsonFail('Correo o caso inválido.');
+    }
+    $service = new \SCM\Support\CaseAdditionalEmails($this->db, new \SCM\Support\SchemaInspector($this->db));
+    $this->jsonOk(['message' => 'Correo quitado del caso.', 'correos_adicionales' => $service->forget($ticketPk, $email)]);
   }
 
   public function ajax_handler_cotizacion_response()

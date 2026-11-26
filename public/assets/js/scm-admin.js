@@ -9066,7 +9066,96 @@
       var none = composer.querySelector('input[name="composer_notify[]"][value="none"]');
       if (additionalEmailBox) additionalEmailBox.hidden = mode === "note";
       if (additionalEmailInput) additionalEmailInput.disabled = mode === "note" || !!(none && none.checked);
+      renderSavedEmails();
     }
+
+    // Correos adicionales ya usados en el caso: se eligen con un clic en vez de escribirlos otra vez.
+    var savedEmailsWrap = composer.querySelector("[data-scm-composer-saved-emails]");
+    function savedCaseEmails() {
+      return String(caseBtn.dataset.correosAdicionales || "")
+        .split(/[\s,;]+/)
+        .map(function (email) { return email.trim().toLowerCase(); })
+        .filter(Boolean);
+    }
+    function typedAdditionalEmails() {
+      return additionalEmailInput
+        ? additionalEmailInput.value.split(/[\s,;]+/).map(function (email) { return email.trim().toLowerCase(); }).filter(Boolean)
+        : [];
+    }
+    function setTypedAdditionalEmails(list) {
+      if (!additionalEmailInput) return;
+      additionalEmailInput.value = list.join("; ");
+      additionalEmailInput.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    function renderSavedEmails() {
+      if (!savedEmailsWrap) return;
+      var saved = savedCaseEmails();
+      var typed = typedAdditionalEmails();
+      savedEmailsWrap.hidden = !saved.length;
+      savedEmailsWrap.classList.toggle("is-disabled", !!(additionalEmailInput && additionalEmailInput.disabled));
+      if (!saved.length) { savedEmailsWrap.innerHTML = ""; return; }
+      var pending = saved.filter(function (email) { return typed.indexOf(email) === -1; });
+      savedEmailsWrap.innerHTML =
+        '<div class="scm-composer-saved-emails-head"><span>Correos guardados en el caso</span>' +
+        (saved.length > 1 && pending.length ? '<button type="button" class="scm-composer-saved-emails-all" data-scm-saved-email-all>Usar todos</button>' : "") +
+        "</div>" +
+        '<div class="scm-composer-saved-emails-list">' +
+        saved.map(function (email) {
+          var active = typed.indexOf(email) !== -1;
+          return '<span class="scm-composer-saved-email' + (active ? " is-active" : "") + '">' +
+            '<button type="button" class="scm-composer-saved-email-pick" data-scm-saved-email-pick="' + escHtml(email) + '" aria-pressed="' + (active ? "true" : "false") + '" title="' + (active ? "Quitar de este envío" : "Agregar a este envío") + '">' +
+            '<span class="material-symbols-outlined text-[14px]">' + (active ? "check" : "add") + "</span>" + escHtml(email) + "</button>" +
+            '<button type="button" class="scm-composer-saved-email-forget" data-scm-saved-email-forget="' + escHtml(email) + '" title="Quitar del caso" aria-label="Quitar ' + escHtml(email) + ' del caso">' +
+            '<span class="material-symbols-outlined text-[14px]">close</span></button></span>';
+        }).join("") +
+        "</div>";
+    }
+    if (savedEmailsWrap) {
+      savedEmailsWrap.addEventListener("click", function (ev) {
+        if (additionalEmailInput && additionalEmailInput.disabled) return;
+        var allBtn = ev.target.closest("[data-scm-saved-email-all]");
+        var pickBtn = ev.target.closest("[data-scm-saved-email-pick]");
+        var forgetBtn = ev.target.closest("[data-scm-saved-email-forget]");
+        if (allBtn) {
+          var merged = typedAdditionalEmails();
+          savedCaseEmails().forEach(function (email) { if (merged.indexOf(email) === -1) merged.push(email); });
+          setTypedAdditionalEmails(merged.slice(0, 20));
+        } else if (pickBtn) {
+          var email = pickBtn.getAttribute("data-scm-saved-email-pick");
+          var typed = typedAdditionalEmails();
+          var at = typed.indexOf(email);
+          if (at === -1) typed.push(email); else typed.splice(at, 1);
+          setTypedAdditionalEmails(typed);
+        } else if (forgetBtn) {
+          var target = forgetBtn.getAttribute("data-scm-saved-email-forget");
+          var ask = "Se quitará " + target + " de los correos guardados de este caso. Los envíos anteriores no cambian.";
+          var confirmed = window.Swal && typeof window.Swal.fire === "function"
+            ? window.Swal.fire({ icon: "warning", title: "¿Quitar correo del caso?", text: ask, showCancelButton: true, confirmButtonText: "Sí, quitar", cancelButtonText: "Cancelar", confirmButtonColor: "#b42318", focusCancel: true })
+                .then(function (result) { return !!(result && result.isConfirmed); })
+            : Promise.resolve(window.confirm("¿Quitar correo del caso?\n\n" + ask));
+          confirmed.then(function (ok) {
+            if (!ok) return;
+            var body = new FormData();
+            body.append("nonce", nonce);
+            body.append("action", "scm_case_additional_email_forget");
+            body.append("ticket_pk", ticketPk);
+            body.append("email", target);
+            return fetch(ajaxUrl, { method: "POST", body: body, credentials: "same-origin" })
+              .then(function (r) { return r.json(); })
+              .then(function (json) {
+                if (!json || !json.success) throw new Error((json && json.data && (json.data.message || json.data)) || "No se pudo quitar el correo.");
+                caseBtn.dataset.correosAdicionales = (json.data.correos_adicionales || []).join("; ");
+                setTypedAdditionalEmails(typedAdditionalEmails().filter(function (email) { return email !== target; }));
+                if (typeof scmNotify === "function") scmNotify("success", json.data.message || "Correo quitado del caso.");
+              });
+          }).catch(function (error) {
+            if (typeof scmNotify === "function") scmNotify("error", error.message || "No se pudo quitar el correo.");
+          });
+        }
+      });
+    }
+    if (additionalEmailInput) additionalEmailInput.addEventListener("input", renderSavedEmails);
+    renderSavedEmails();
     var notifyOptions = composer.querySelector(
       "[data-scm-composer-notify-options]",
     );
@@ -9928,9 +10017,13 @@
               var executorCurrent = composer.querySelector("[data-scm-composer-executor-wrap] em");
               if (executorCurrent) executorCurrent.textContent = "Actual: " + caseExecutorLabel(json.data.ejecutado);
             }
+            if (json.data && Array.isArray(json.data.correos_adicionales)) {
+              caseBtn.dataset.correosAdicionales = json.data.correos_adicionales.join("; ");
+            }
             if (executorSelect) executorSelect.value = "__keep__";
             if (input) input.value = "";
             if (additionalEmailInput) additionalEmailInput.value = "";
+            renderSavedEmails();
             composerFiles = [];
             renderFilePreviews();
             clearDocs();
@@ -10788,8 +10881,10 @@
           '<div class="scm-composer-extra-box scm-composer-additional-email-box" data-scm-composer-additional-email-box>' +
           '<label><span>Correos adicionales (CC)</span>' +
           '<textarea class="scm-composer-textarea" name="additional_emails" rows="2" maxlength="6000" spellcheck="false" autocomplete="off" placeholder="correo@ejemplo.com; otro@ejemplo.com" data-scm-composer-additional-emails></textarea>' +
-          '<small>Solo para este envío. Separa con coma, punto y coma o salto de línea. Máximo 20 correos.</small>' +
-          '</label></div>' +
+          '<small>Separa con coma, punto y coma o salto de línea. Máximo 20 correos. Quedan guardados en el caso para próximos envíos.</small>' +
+          '</label>' +
+          '<div class="scm-composer-saved-emails" data-scm-composer-saved-emails hidden></div>' +
+          '</div>' +
           '<div class="scm-case-composer-footer">' +
           '<div class="scm-composer-tools">' +
           '<label class="scm-composer-tool-btn scm-composer-attach-btn" title="Adjuntar imagen">' +

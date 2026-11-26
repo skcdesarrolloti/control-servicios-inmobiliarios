@@ -407,6 +407,7 @@ final class GenericTicketsCardView
     $dataAttrs .= ' data-prioridad="' . esc_attr($prioridadRaw !== '' ? $prioridadRaw : '-') . '"';
     $dataAttrs .= ' data-magnitud-caso="' . esc_attr($magnitudCasoRaw !== '' ? ucfirst($magnitudCasoRaw) : '-') . '"';
     $dataAttrs .= ' data-ejecutado="' . esc_attr(trim((string) ($row['ejecutado'] ?? ''))) . '"';
+    $dataAttrs .= ' data-correos-adicionales="' . esc_attr(implode('; ', \SCM\Support\CaseAdditionalEmails::decode($row['correos_adicionales'] ?? ''))) . '"';
     $dataAttrs .= ' data-perturbacion="' . esc_attr($perturbacionRaw) . '"';
     $dataAttrs .= ' data-justificacion-perturbacion="' . esc_attr($justificacionPerturbacionRaw) . '"';
     $dataAttrs .= ' data-valor-bonificacion="' . esc_attr($valorBonificacionRaw) . '"';

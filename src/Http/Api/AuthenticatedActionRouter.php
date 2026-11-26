@@ -37,6 +37,7 @@ final class AuthenticatedActionRouter
       SuCasaControlServiciosInmobiliarios::AJAX_SEGUIMIENTO => 'ajax_handler_seguimiento',
       SuCasaControlServiciosInmobiliarios::AJAX_NOTA => 'ajax_handler_nota',
       SuCasaControlServiciosInmobiliarios::AJAX_TICKET_RESPONSE => 'ajax_handler_ticket_response',
+      'scm_case_additional_email_forget' => 'ajax_handler_case_additional_email_forget',
       SuCasaControlServiciosInmobiliarios::AJAX_POSTPONE_TICKET => 'ajax_handler_postpone_ticket',
       SuCasaControlServiciosInmobiliarios::AJAX_STATUS_TICKETS => 'ajax_handler_status_tickets',
       SuCasaControlServiciosInmobiliarios::AJAX_MY_TICKETS => 'ajax_handler_my_tickets',

@@ -22,7 +22,7 @@ assert(start > 0 && end > start && markupEnd > markupStart);
       var btn=document.querySelector('#case'),isPublicPqr=false,statusBucket='';
       function isPreventivaCase(){return false;} function caseHasCotizacion(){return false;}
       function renderComposerResponseOptions(){return '<div data-scm-composer-response-options><select data-scm-composer-admin-state><option value="__keep__">Sin cambio</option></select><input type="checkbox" data-scm-composer-close-ticket></div>';}
-      function findRootFromNode(){return document.querySelector('#scm-app');}
+      function escHtml(v){return String(v).replace(/[&<>"']/g,function(c){return '&#'+c.charCodeAt(0)+';';});} function renderComposerExecutorField(){return '';} function findRootFromNode(){return document.querySelector('#scm-app');}
       function parseRuntime(){return {ajaxUrl:'/api.php',nonce:'qa',actions:{ticket_response:'reply',seg:'followup',nota:'note'}};}
       window.submissions=[];window.notices=[];window.failSave=false;
       function scmNotify(type,message){notices.push({type,message});}
