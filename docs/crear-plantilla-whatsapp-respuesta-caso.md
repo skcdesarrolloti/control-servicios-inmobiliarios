@@ -53,3 +53,9 @@ Consulta el caso completo y responde desde el botón.
 ## Activación
 
 El envío queda apagado hasta que Meta apruebe la plantilla; mientras tanto las respuestas salen solo por correo. Cuando quede **Activa**, el administrador técnico establece `reply_enabled = true` en la configuración interna `panel_case_notifications`. El nombre se puede cambiar con `reply_template`. La definición completa está en `docs/whatsapp-respuesta-caso-template.json`.
+
+Estado: activada en producción el 2026-11-26 (`reply_enabled = true`). Los avisos de la vista pública al funcionario asignado salen por correo y WhatsApp; las copias se configuran en el evento **Respuesta de un actor en la vista pública** de Notificaciones internas.
+
+## Correos adicionales (CC) del caso
+
+Los correos escritos en **Correos adicionales (CC)** al responder o hacer seguimiento quedan guardados en `correos_adicionales` del caso (CCT `tickets`, pestaña Complementarios, máximo 50). En los siguientes envíos aparecen como chips para agregarlos con un clic o con **Usar todos**; la ✕ los quita del caso con confirmación, sin afectar envíos anteriores.
