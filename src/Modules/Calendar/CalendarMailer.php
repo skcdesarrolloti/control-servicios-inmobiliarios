@@ -178,25 +178,39 @@ class CalendarMailer
    */
   protected function sendEmail(array $destinations, string $subject, string $title, string $body, string $module, string $dedupe, array $meta, array $buttons = []): void
   {
-    $unique = [];
-    foreach ($destinations as $mail) {
-      $mail = trim((string) $mail);
-      if (filter_var($mail, FILTER_VALIDATE_EMAIL)) {
-        $unique[strtolower($mail)] = $mail;
-      }
-    }
+    ['to' => $to, 'cc' => $cc] = self::addressing($destinations);
     $queue = $this->queue();
-    if ($unique === [] || $queue === null) {
+    if ($to === null || $queue === null) {
       return;
     }
     try {
       $queue->cancelByDedupeKey($dedupe, 'Cancelado por una notificacion mas reciente del calendario.');
-      $queue->enqueueEmail(array_values($unique), $subject, EmailTemplate::render($title, $body, $buttons !== [] ? ['buttons' => $buttons] : []), [
-        'project_code' => self::PROJECT, 'source_module' => $module, 'created_by' => CalendarStore::ORIGIN, 'provider' => 'email_smtp', 'dedupe_key' => $dedupe, 'meta' => $meta,
+      $queue->enqueueEmail([$to], $subject, EmailTemplate::render($title, $body, $buttons !== [] ? ['buttons' => $buttons] : []), [
+        'project_code' => self::PROJECT, 'source_module' => $module, 'created_by' => CalendarStore::ORIGIN, 'provider' => 'email_smtp', 'dedupe_key' => $dedupe, 'meta' => $meta + ['cc' => $cc],
+        'payload' => ['cc' => $cc],
       ]);
     } catch (\Throwable $exception) {
       error_log('[calendar] correo ' . $module . ': ' . $exception->getMessage());
     }
+  }
+
+  /**
+   * Un solo correo por aviso: el primero (el responsable del evento) como destinatario y los demás en copia (CC),
+   * sin repetir ni correos inválidos.
+   * @param array<int,string> $destinations
+   * @return array{to:?string,cc:array<int,string>}
+   */
+  public static function addressing(array $destinations): array
+  {
+    $unique = [];
+    foreach ($destinations as $mail) {
+      $mail = trim((string) $mail);
+      if (filter_var($mail, FILTER_VALIDATE_EMAIL) && !isset($unique[strtolower($mail)])) {
+        $unique[strtolower($mail)] = $mail;
+      }
+    }
+    $list = array_values($unique);
+    return ['to' => $list[0] ?? null, 'cc' => array_slice($list, 1)];
   }
 
   private function queue(): ?\SharedNotifications\NotificationQueue

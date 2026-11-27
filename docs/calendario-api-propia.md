@@ -42,7 +42,8 @@ El JS (`admin-dashboard-runtime.js` y `scm-admin.js`) toma la URL de `config.cal
   `cct_author_id` del funcionario de la sesión y se avisa al solicitante con el enlace firmado del caso.
 - `creado_por` es el `id_empleado` real de la sesión. Los procesos del servidor (Revisión crítica) llaman a
   `CalendarApi` directamente y envían su propio `creado_por`.
-- Correos al responsable, a quien creó, a los "roles a notificar" de la categoría y a los funcionarios elegidos.
+- Un solo correo por aviso: el responsable como destinatario y en copia (CC) quien creó, los "roles a notificar" de la
+  categoría y los funcionarios elegidos (`CalendarMailer::addressing`, igual en el panel comercial).
 
 ## Categorías (Configuración › Categorías del calendario)
 

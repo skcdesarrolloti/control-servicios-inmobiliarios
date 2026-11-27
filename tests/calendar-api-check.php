@@ -202,5 +202,8 @@ $mailer->emails = [];
 $team->handle('crear_evento', ['titulo' => 'Aviso categoría', 'fecha_inicio' => $future . ' 15:00:00', 'fecha_fin' => $future . ' 16:00:00', 'id_empleado' => '100', 'id_categoria' => 1, 'permitir_vencidos' => true]);
 $to = $mailer->emails[0]['destinations'] ?? [];
 $check(in_array('rol@example.invalid', $to, true), 'al crear un evento se avisa a quienes la categoría tiene en Notificar a');
+$addr = CalendarMailer::addressing(['resp@example.invalid', 'ROL@example.invalid', 'no-es-correo', 'rol@example.invalid', 'crea@example.invalid']);
+$check($addr === ['to' => 'resp@example.invalid', 'cc' => ['ROL@example.invalid', 'crea@example.invalid']], 'un solo correo al responsable con los demás en copia, sin repetidos');
+$check(CalendarMailer::addressing(['', 'x'])['to'] === null, 'sin correos válidos no se encola nada');
 
 echo "Calendar API checks passed; no real database or notifications used.\n";
