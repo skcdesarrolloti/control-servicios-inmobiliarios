@@ -5870,6 +5870,7 @@ trait RendersDashboard
       $html .= '</tr>';
     }
     $html .= '</tbody></table></div></section>';
+    $html .= $this->render_cotizacion_response_summary($row);
 
     $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-damage-report"><div class="scm-cotizacion-native-section-title"><div><span>Informe t&eacute;cnico</span><h3>Da&ntilde;os encontrados</h3></div><strong>' . esc_html((string) count($danos)) . ' ' . (count($danos) === 1 ? 'hallazgo' : 'hallazgos') . '</strong></div>';
     if (empty($danos)) {
@@ -5956,6 +5957,60 @@ trait RendersDashboard
     $html .= '<section class="scm-cotizacion-native-section scm-cotizacion-native-legal"><h3>Favor tener en cuenta</h3><p>Cuando las reparaciones sean responsabilidad de los propietarios, el administrador informará la novedad. Si no se atiende dentro del plazo contractual, la administración podrá realizar la gestión y descontar el valor correspondiente del canon de arrendamiento, de acuerdo con el contrato de mandato vigente.</p></section>';
     $html .= '<footer class="scm-cotizacion-native-footer"><div><span>Responsable de cotización</span><strong>' . esc_html($responsableCotizacion['nombre'] !== '' ? $responsableCotizacion['nombre'] : '-') . '</strong><p>' . esc_html($responsableCotizacion['cargo'] !== '' ? $responsableCotizacion['cargo'] : 'Responsable de cotización') . '</p><p>Email: ' . esc_html($responsableCotizacion['email'] !== '' ? $responsableCotizacion['email'] : '-') . '</p><p>Celular: ' . esc_html($responsableCotizacion['celular'] !== '' ? $responsableCotizacion['celular'] : '-') . '</p></div><div><span>Elaboró la cotización</span><strong>' . esc_html($creadorNombre !== '' ? $creadorNombre : '-') . '</strong><p>Email: ' . esc_html($creadorEmail !== '' ? $creadorEmail : '-') . '</p><p>Celular: ' . esc_html($creadorCelular !== '' ? $creadorCelular : '-') . '</p></div><div><span>Empresa</span><strong>SKC SuCasa Inmobiliaria</strong><p>NIT 900623242-4</p><p>Cartagena de Indias - Colombia</p></div></footer>';
     return $html . '</article>';
+  }
+
+  /**
+   * Lo que respondió el destinatario (estado, fecha, motivo, financiación con su plazo y observación). Solo sale cuando
+   * la cotización ya tiene respuesta; el plazo vive en el crédito del propietario ligado a la cotización.
+   * @param array<string,mixed> $row
+   */
+  private function render_cotizacion_response_summary(array $row): string
+  {
+    $estado = $this->cotizacion_clean_text($row['estado'] ?? $row['estado_respuesta_cotizacion_mantenimiento'] ?? '');
+    if (in_array(strtolower($estado), ['', 'esperando respuesta'], true)) {
+      return '';
+    }
+    $isRejected = in_array(strtolower($estado), ['desaprobada', 'desaprobado'], true);
+    $fields = ['Respuesta' => $estado];
+    $fecha = $this->cotizacion_date_label($row['fecha_respuesta'] ?? '');
+    if ($fecha !== '-') {
+      $fields['Fecha de respuesta'] = $fecha;
+    }
+    $motivo = $this->cotizacion_clean_text($row['motivo'] ?? '');
+    if ($isRejected || $motivo !== '') {
+      $fields['Motivo'] = $motivo !== '' ? $motivo : 'Sin motivo registrado';
+    }
+    if (!$isRejected) {
+      $financiacion = $this->cotizacion_clean_text($row['financiacion'] ?? '');
+      $isFinanced = in_array(strtolower($financiacion), ['si', 'sí'], true);
+      $fields['¿Requiere financiación?'] = $isFinanced ? 'Sí' : ($financiacion !== '' ? $financiacion : 'Sin respuesta');
+      if ($isFinanced) {
+        $term = 0;
+        try {
+          $credit = (new \SCM\Modules\OwnerCredits\OwnerCreditService($this->db))->byQuote((int) ($row['_ID'] ?? 0));
+          $term = (int) ($credit['requested_term'] ?? 0);
+        } catch (\Throwable $error) {
+          error_log('[quote_response_term] ' . $error->getMessage());
+        }
+        if ($term > 0) {
+          $fields['Plazo solicitado'] = $term . ($term === 1 ? ' mes' : ' meses');
+        }
+      }
+    }
+
+    $html = '<section class="scm-cotizacion-native-section scm-cotizacion-native-response"><div class="scm-cotizacion-native-section-title"><div><span>Respuesta del destinatario</span><h3>Respuesta a la cotizaci&oacute;n</h3></div></div>';
+    $html .= '<div class="scm-cotizacion-native-grid">';
+    foreach ($fields as $label => $value) {
+      $html .= '<div><span>' . esc_html($label) . '</span><strong>' . esc_html($value) . '</strong></div>';
+    }
+    $html .= '</div>';
+    $observacion = trim((string) ($row['observacion_respuesta'] ?? ''));
+    if ($observacion !== '') {
+      // Se guarda como texto plano con saltos de línea ("Respondido por: ..." va en su propio renglón).
+      $note = $observacion === strip_tags($observacion) ? '<p>' . nl2br(esc_html($observacion)) . '</p>' : $this->cotizacion_rich_text($observacion);
+      $html .= '<h4>Observaci&oacute;n</h4><div class="scm-cotizacion-native-note">' . $note . '</div>';
+    }
+    return $html . '</section>';
   }
 
   private function cotizacion_date_label($raw): string
